@@ -103,6 +103,7 @@ download_core() {
         "plan.sh"
         "progress.sh"
         "git-workflow.sh"
+        "file-lock.sh"
     )
 
     for file in "${bin_files[@]}"; do
