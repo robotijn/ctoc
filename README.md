@@ -574,12 +574,76 @@ Ready for business review at /review
 
 But if you want shortcuts:
 
-| Type | What it does |
-|------|--------------|
+### Basic Commands
+
+| Command | What it does |
+|---------|--------------|
 | `ctoc` | Show status and menu |
 | `ctoc f` | Start functional planning |
 | `ctoc t` | Start technical planning |
 | `ctoc i` | Implement a ready feature |
+
+### Plan Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc plan new <title>` | Create a new functional plan |
+| `ctoc plan propose <id>` | Submit plan for review |
+| `ctoc plan approve <id>` | Approve a plan |
+| `ctoc plan start <id>` | Begin work on plan |
+| `ctoc plan implement <id>` | Create implementation plan |
+| `ctoc plan complete <id>` | Mark plan as implemented |
+| `ctoc plan list [status]` | List plans by status |
+| `ctoc plan status` | Show plan dashboard |
+
+### Progress Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc progress` | Quick Iron Loop progress view |
+| `ctoc dashboard` | Full progress dashboard |
+| `ctoc progress step <n>` | Move to Iron Loop step n |
+| `ctoc progress complete <n>` | Complete step and advance |
+
+### Git Workflow Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc sync` | Pull-rebase-push workflow |
+| `ctoc commit "message"` | Validated commit with Co-Author |
+| `ctoc qc "message"` | Quick commit and push |
+| `ctoc status` | Enhanced git status |
+
+### File Lock Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc lock check [files]` | Check file freshness |
+| `ctoc lock resolve [file]` | Smart conflict resolution |
+| `ctoc lock setup-rerere` | Enable git rerere globally |
+| `ctoc lock worktree new <branch>` | Create parallel workspace |
+| `ctoc lock worktree list` | List all worktrees |
+| `ctoc lock worktree remove <branch>` | Remove a worktree |
+
+### Skills Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc skills list` | List all available skills |
+| `ctoc skills active` | Show skills for this project |
+| `ctoc skills add <name>` | Download and add a skill |
+| `ctoc skills search <query>` | Search skills by keyword |
+| `ctoc skills sync` | Auto-detect and download skills |
+| `ctoc skills info <name>` | Show skill details |
+| `ctoc skills feedback <name>` | Suggest skill improvement |
+
+### Detection Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc detect` | Detect technologies in project |
+| `ctoc detect languages` | Detect only languages |
+| `ctoc detect frameworks` | Detect only frameworks |
 
 ---
 
@@ -632,6 +696,131 @@ The "enforcement" comes from `CLAUDE.md` which tells Claude Code:
 - "Always write tests before implementation..."
 
 Claude Code reads `CLAUDE.md` at the start of every session and follows these instructions.
+
+---
+
+## Git Workflow
+
+CTOC uses a **monobranch workflow** (trunk-based development) optimized for AI-assisted development.
+
+### The Pattern
+
+```bash
+# Before any work
+ctoc sync              # Pull-rebase from main
+
+# Work happens...
+
+# Before commit
+ctoc lock check        # Verify files are fresh
+
+# Commit
+ctoc commit "feat: add login"  # Validated commit + push
+```
+
+### Why Monobranch?
+
+1. **Simpler mental model** — No branch juggling
+2. **Faster feedback** — Changes hit main immediately
+3. **Fewer conflicts** — Small, frequent merges
+4. **AI-friendly** — Claude Code works better with linear history
+
+### Handling Conflicts
+
+CTOC uses three layers of protection:
+
+| Layer | Purpose |
+|-------|---------|
+| **Optimistic Locking** | Check file freshness before editing |
+| **Git Rerere** | Remember how you resolved conflicts |
+| **Smart Recovery** | AI-assisted conflict resolution |
+
+If conflicts occur:
+```bash
+ctoc lock resolve      # Interactive resolution
+```
+
+---
+
+## Parallel Execution
+
+CTOC supports parallel subagent execution for research and analysis tasks.
+
+### Parallelism Formula
+
+```
+max(2, CPU_CORES - 4)
+```
+
+- 8-core machine → 4 parallel agents
+- 16-core machine → 12 parallel agents
+- 4-core machine → 2 parallel agents
+
+### Safe vs Unsafe Operations
+
+| Operation | Parallel Safe? | Notes |
+|-----------|---------------|-------|
+| WebSearch | Yes | No state modification |
+| Read/Glob/Grep | Yes | Read-only |
+| WebFetch | Yes | External fetch |
+| Analysis | Yes | Results can merge |
+| Edit/Write | **NO** | Serialize by file |
+| Git operations | **NO** | Serialize |
+
+### Research Pattern
+
+When starting a new feature, CTOC launches parallel research:
+
+```
+Launch in parallel:
+├── Agent 1: WebSearch "official docs {topic}"
+├── Agent 2: WebSearch "GitHub implementations {topic}"
+├── Agent 3: WebSearch "security considerations {topic}"
+├── Agent 4: Grep codebase for existing patterns
+└── Agent 5: Read related files
+
+Wait for all → Synthesize → Proceed sequentially
+```
+
+---
+
+## File Locking
+
+CTOC uses a **hybrid file locking system** that combines optimistic locking with git-native conflict resolution.
+
+### Check Before Editing
+
+```bash
+ctoc lock check src/auth.py    # Check single file
+ctoc lock check                # Check all modified files
+```
+
+Output:
+```
+src/auth.py: Fresh (no changes)
+src/login.py: Local changes (safe to commit)
+WARNING: src/user.py has been modified on remote!
+```
+
+### Git Rerere
+
+CTOC auto-enables **git rerere** (Reuse Recorded Resolution):
+
+```bash
+ctoc lock setup-rerere
+```
+
+Once enabled, git remembers how you resolve conflicts and replays those resolutions automatically.
+
+### Parallel Workspaces
+
+For truly parallel work, use git worktrees:
+
+```bash
+ctoc lock worktree new feature-auth   # Create workspace
+cd .ctoc/worktrees/feature-auth       # Work in isolation
+ctoc lock worktree remove feature-auth # Clean up
+```
 
 ---
 
