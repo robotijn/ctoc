@@ -8,9 +8,9 @@ set -euo pipefail
 #  Smart skill loading: Downloads only the skills your project needs.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-CTOC_VERSION="2.0.0"
-CTOC_REPO="https://github.com/theaiguys/ctoc"
-CTOC_RAW="https://raw.githubusercontent.com/theaiguys/ctoc/main"
+CTOC_VERSION="3.0.0"
+CTOC_REPO="https://github.com/robotijn/ctoc"
+CTOC_RAW="https://raw.githubusercontent.com/robotijn/ctoc/main"
 
 # Colors
 RED='\033[0;31m'
@@ -52,13 +52,15 @@ print_error() {
 }
 
 # Check if we're in a git repository or project directory
+# Smart merge handled by init-claude-md.sh during setup_project
 check_directory() {
-    if [[ -f "CLAUDE.md" ]]; then
-        print_warning "CLAUDE.md already exists in this directory."
-        read -p "Overwrite? (y/N): " -n 1 -r
+    # Directory check - allow existing CLAUDE.md (will be smart-merged)
+    if [[ ! -d ".git" ]]; then
+        print_warning "Not a git repository. CTOC works best with git."
+        read -p "Continue anyway? (Y/n): " -n 1 -r
         echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo "Aborted."
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            echo "Initialize git first: git init"
             exit 1
         fi
     fi
@@ -96,6 +98,8 @@ download_core() {
         "ctoc.sh"
         "detect.sh"
         "download.sh"
+        "init-claude-md.sh"
+        "process-issues.sh"
     )
 
     for file in "${bin_files[@]}"; do
@@ -320,122 +324,15 @@ setup_project() {
     echo
     read -p "One-line project description: " DESCRIPTION
 
-    # Generate files
-    generate_claude_md
+    # Use smart CLAUDE.md integration (handles existing files)
+    .ctoc/bin/init-claude-md.sh integrate "$PROJECT_NAME" "$LANGUAGE" "$FRAMEWORK"
+
     generate_iron_loop_md
     generate_planning_md
 }
 
-generate_claude_md() {
-    print_step "Generating CLAUDE.md..."
-
-    # Get lowercase language for skill file reference
-    local lang_lower
-    lang_lower=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-
-    # Get framework skill path if detected
-    local framework_skill_path=""
-    if [[ -n "$FRAMEWORK" && "$NO_JQ" != "true" ]]; then
-        local fw_lower
-        fw_lower=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-        framework_skill_path=$(jq -r --arg f "$fw_lower" '
-            .skills.frameworks | to_entries[] | .value[$f].file // empty
-        ' .ctoc/skills.json 2>/dev/null | head -1 || true)
-    fi
-
-    cat > CLAUDE.md << CLAUDE_EOF
-# $PROJECT_NAME
-
-> $DESCRIPTION
-
-## CTO Persona
-
-You are a **Senior CTO** with 20+ years of experience in $LANGUAGE${FRAMEWORK:+ and $FRAMEWORK}.
-You have built and scaled systems at companies like Google, Stripe, and Airbnb.
-Your role is to ensure this project meets the highest standards of engineering excellence.
-
-## Technical Stack
-
-- **Primary Language:** $LANGUAGE
-${FRAMEWORK:+- **Framework:** $FRAMEWORK}
-
-## Skills Library
-
-Reference skills from \`.ctoc/skills/\` for language and framework-specific guidance.
-
-**Active Skills:**
-- \`.ctoc/skills/languages/$lang_lower.md\` - $LANGUAGE CTO standards
-${framework_skill_path:+- \`.ctoc/skills/$framework_skill_path\` - $FRAMEWORK CTO standards}
-
-**Skill Management:**
-\`\`\`bash
-# See all available skills (261 total)
-.ctoc/bin/ctoc.sh skills list
-
-# Add a new skill
-.ctoc/bin/ctoc.sh skills add <skill-name>
-
-# Auto-detect and sync skills
-.ctoc/bin/ctoc.sh skills sync
-\`\`\`
-
-## Your Standards
-
-### Non-Negotiables (Will Block PR)
-1. Type safety / static analysis enabled
-2. Tests for business logic
-3. No secrets in code
-4. Proper error handling
-5. Documentation for public APIs
-
-### Red Lines (Never Approve)
-- Security vulnerabilities
-- Untested critical paths
-- Hardcoded configuration
-- Missing input validation
-- N+1 queries
-
-## Commands
-
-| Command | Action |
-|---------|--------|
-| \`ctoc plan\` | Enter planning mode - analyze requirements, create technical design |
-| \`ctoc implement\` | Enter implementation mode - write code following Iron Loop |
-| \`ctoc review\` | Enter review mode - CTO code review |
-| \`ctoc improve\` | Suggest improvements to current code |
-
-## Iron Loop Methodology
-
-Follow the 12-step Iron Loop for all implementation:
-
-1. **ASSESS** - Understand the problem
-2. **PLAN** - Design the solution
-3. **RISKS** - Identify what could go wrong
-4. **PREPARE** - Set up environment
-5. **ITERATE** - Build incrementally
-6. **VALIDATE** - Test thoroughly
-7. **DOCUMENT** - Explain decisions
-8. **REVIEW** - Self-review as CTO
-9. **SHIP** - Deploy confidently
-10. **MONITOR** - Watch for issues
-11. **LEARN** - Retrospective
-12. **IMPROVE** - Apply lessons
-
-See \`IRON_LOOP.md\` for current project status.
-See \`PLANNING.md\` for feature backlog.
-
-## Skill Auto-Sync
-
-When you notice the project using a new technology (new dependencies, new file types),
-automatically run skill sync to download relevant guidance:
-
-\`\`\`bash
-.ctoc/bin/ctoc.sh skills sync
-\`\`\`
-CLAUDE_EOF
-
-    print_success "CLAUDE.md created"
-}
+# Note: CLAUDE.md generation is now handled by init-claude-md.sh
+# which supports smart merge with existing CLAUDE.md files
 
 generate_iron_loop_md() {
     print_step "Generating IRON_LOOP.md..."
@@ -443,30 +340,43 @@ generate_iron_loop_md() {
     cat > IRON_LOOP.md << IRON_EOF
 # Iron Loop - $PROJECT_NAME
 
-> Track progress through the 12-step methodology
+> Track progress through the 15-step methodology
 
 ## Current Status
 
-| Step | Status | Notes |
-|------|--------|-------|
-| 1. ASSESS | 🟡 In Progress | Initial project setup |
-| 2. PLAN | ⚪ Pending | |
-| 3. RISKS | ⚪ Pending | |
-| 4. PREPARE | ⚪ Pending | |
-| 5. ITERATE | ⚪ Pending | |
-| 6. VALIDATE | ⚪ Pending | |
-| 7. DOCUMENT | ⚪ Pending | |
-| 8. REVIEW | ⚪ Pending | |
-| 9. SHIP | ⚪ Pending | |
-| 10. MONITOR | ⚪ Pending | |
-| 11. LEARN | ⚪ Pending | |
-| 12. IMPROVE | ⚪ Pending | |
+| Step | Phase | Status | Notes |
+|------|-------|--------|-------|
+| 1. ASSESS | Planning | 🟡 In Progress | Understand the problem |
+| 2. ALIGN | Planning | ⚪ Pending | Business alignment |
+| 3. CAPTURE | Planning | ⚪ Pending | Gather requirements |
+| 4. PLAN | Planning | ⚪ Pending | Design solution |
+| 5. DESIGN | Planning | ⚪ Pending | Architecture decisions |
+| 6. SPEC | Planning | ⚪ Pending | Technical specification |
+| 7. TEST | Development | ⚪ Pending | Write tests first |
+| 8. QUALITY | Development | ⚪ Pending | Quality gates |
+| 9. IMPLEMENT | Development | ⚪ Pending | Write code |
+| 10. REVIEW | Development | ⚪ Pending | Self-review as CTO |
+| 11. OPTIMIZE | Delivery | ⚪ Pending | Performance tuning |
+| 12. SECURE | Delivery | ⚪ Pending | Security validation |
+| 13. DOCUMENT | Delivery | ⚪ Pending | Update docs |
+| 14. VERIFY | Delivery | ⚪ Pending | Final validation |
+| 15. COMMIT | Delivery | ⚪ Pending | Ship with confidence |
 
 ## Legend
 - ⚪ Pending
 - 🟡 In Progress
 - 🟢 Complete
 - 🔴 Blocked
+
+## Research Protocol
+
+Before implementing, use parallel web search agents for:
+1. **Validate assumptions** - Search for current best practices (2026)
+2. **Check dependencies** - Search for security advisories
+3. **Find patterns** - Search for similar implementations
+4. **Verify APIs** - Search for current documentation
+
+**Subagent count:** max(2, CPU_CORES - 4)
 
 ## Session Log
 
@@ -572,24 +482,31 @@ main() {
 
     echo
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  CTOC installed successfully!${NC}"
+    echo -e "${GREEN}  CTOC v$CTOC_VERSION installed successfully!${NC}"
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     echo
-    echo "  Files created:"
-    echo "    • CLAUDE.md     - CTO instructions for Claude"
-    echo "    • IRON_LOOP.md  - Progress tracking"
+    echo "  Files created/updated:"
+    echo "    • CLAUDE.md     - CTO instructions (smart-merged)"
+    echo "    • IRON_LOOP.md  - 15-step progress tracking"
     echo "    • PLANNING.md   - Feature backlog"
     echo "    • .ctoc/        - Skills library ($skill_count skills downloaded)"
     echo
     echo "  Skill commands:"
-    echo "    • .ctoc/bin/ctoc.sh skills list     - See all 261 available skills"
-    echo "    • .ctoc/bin/ctoc.sh skills add NAME - Add a specific skill"
-    echo "    • .ctoc/bin/ctoc.sh skills sync     - Auto-detect & download skills"
+    echo "    • .ctoc/bin/ctoc.sh skills list       - See all 261 available skills"
+    echo "    • .ctoc/bin/ctoc.sh skills add NAME   - Add a specific skill"
+    echo "    • .ctoc/bin/ctoc.sh skills sync       - Auto-detect & download skills"
+    echo "    • .ctoc/bin/ctoc.sh skills feedback   - Suggest skill improvements"
+    echo
+    echo "  GitHub integration (requires gh CLI):"
+    echo "    • .ctoc/bin/ctoc.sh process-issues   - Process community suggestions"
     echo
     echo "  Next steps:"
     echo "    1. Review and customize CLAUDE.md"
     echo "    2. Run 'claude' in this directory"
     echo "    3. Claude is now your CTO!"
+    echo
+    echo "  Iron Loop: Use many parallel subagents for research phases!"
+    echo "    Subagent count: max(2, CPU_CORES - 4)"
     echo
 }
 

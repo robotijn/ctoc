@@ -6,14 +6,14 @@
     Installs CTOC (CTO Chief) - Your Army of Virtual CTOs
     Smart skill loading: Downloads only the skills your project needs.
 .EXAMPLE
-    irm https://raw.githubusercontent.com/theaiguys/ctoc/main/install.ps1 | iex
+    irm https://raw.githubusercontent.com/robotijn/ctoc/main/install.ps1 | iex
 #>
 
 $ErrorActionPreference = "Stop"
 
-$CTOC_VERSION = "2.0.0"
-$CTOC_REPO = "https://github.com/theaiguys/ctoc"
-$CTOC_RAW = "https://raw.githubusercontent.com/theaiguys/ctoc/main"
+$CTOC_VERSION = "3.0.0"
+$CTOC_REPO = "https://github.com/robotijn/ctoc"
+$CTOC_RAW = "https://raw.githubusercontent.com/robotijn/ctoc/main"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Helper Functions
@@ -59,11 +59,12 @@ function Write-Error {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 function Test-Directory {
-    if (Test-Path "CLAUDE.md") {
-        Write-Warning "CLAUDE.md already exists in this directory."
-        $response = Read-Host "Overwrite? (y/N)"
-        if ($response -notmatch "^[Yy]$") {
-            Write-Host "Aborted."
+    # Directory check - allow existing CLAUDE.md (will be smart-merged)
+    if (-not (Test-Path ".git")) {
+        Write-Warning "Not a git repository. CTOC works best with git."
+        $response = Read-Host "Continue anyway? (Y/n)"
+        if ($response -match "^[Nn]$") {
+            Write-Host "Initialize git first: git init"
             exit 1
         }
     }
@@ -83,7 +84,7 @@ function Get-CoreFiles {
     New-Item -ItemType Directory -Path ".ctoc\templates" -Force | Out-Null
 
     # Download bin scripts
-    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1")
+    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1")
     foreach ($file in $binFiles) {
         try {
             Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/bin/$file" -OutFile ".ctoc\bin\$file" -UseBasicParsing -ErrorAction Stop
@@ -456,26 +457,45 @@ $frameworkSkillLine
 | ``ctoc implement`` | Enter implementation mode - write code following Iron Loop |
 | ``ctoc review`` | Enter review mode - CTO code review |
 | ``ctoc improve`` | Suggest improvements to current code |
+| ``ctoc skills feedback`` | Suggest skill improvements |
 
-## Iron Loop Methodology
+## Iron Loop - 15-Step Methodology
 
-Follow the 12-step Iron Loop for all implementation:
-
-1. **ASSESS** - Understand the problem
-2. **PLAN** - Design the solution
-3. **RISKS** - Identify what could go wrong
-4. **PREPARE** - Set up environment
-5. **ITERATE** - Build incrementally
-6. **VALIDATE** - Test thoroughly
-7. **DOCUMENT** - Explain decisions
-8. **REVIEW** - Self-review as CTO
-9. **SHIP** - Deploy confidently
-10. **MONITOR** - Watch for issues
-11. **LEARN** - Retrospective
-12. **IMPROVE** - Apply lessons
+| Step | Phase | Description |
+|------|-------|-------------|
+| 1. ASSESS | Planning | Understand the problem |
+| 2. ALIGN | Planning | Business alignment |
+| 3. CAPTURE | Planning | Gather requirements |
+| 4. PLAN | Planning | Design solution |
+| 5. DESIGN | Planning | Architecture decisions |
+| 6. SPEC | Planning | Technical specification |
+| 7. TEST | Development | Write tests first |
+| 8. QUALITY | Development | Quality gates |
+| 9. IMPLEMENT | Development | Write code |
+| 10. REVIEW | Development | Self-review as CTO |
+| 11. OPTIMIZE | Delivery | Performance tuning |
+| 12. SECURE | Delivery | Security validation |
+| 13. DOCUMENT | Delivery | Update docs |
+| 14. VERIFY | Delivery | Final validation |
+| 15. COMMIT | Delivery | Ship with confidence |
 
 See ``IRON_LOOP.md`` for current project status.
 See ``PLANNING.md`` for feature backlog.
+
+## Parallel Execution Guidelines
+
+### Subagent Parallelism Formula
+Use: ``max(2, CPU_CORES - 4)`` concurrent subagents
+
+### Safe Parallelization Matrix
+
+| Operation Type | Parallel Safe? | Notes |
+|----------------|----------------|-------|
+| WebSearch | Yes | No state modification |
+| Read/Glob/Grep | Yes | Read-only |
+| WebFetch | Yes | External fetch |
+| Edit/Write | NO | Serialize by file |
+| Git operations | NO | Use worktrees for parallelism |
 
 ## Skill Auto-Sync
 
@@ -502,30 +522,43 @@ function New-IronLoopMd {
     $content = @"
 # Iron Loop - $($Project.Name)
 
-> Track progress through the 12-step methodology
+> Track progress through the 15-step methodology
 
 ## Current Status
 
-| Step | Status | Notes |
-|------|--------|-------|
-| 1. ASSESS | In Progress | Initial project setup |
-| 2. PLAN | Pending | |
-| 3. RISKS | Pending | |
-| 4. PREPARE | Pending | |
-| 5. ITERATE | Pending | |
-| 6. VALIDATE | Pending | |
-| 7. DOCUMENT | Pending | |
-| 8. REVIEW | Pending | |
-| 9. SHIP | Pending | |
-| 10. MONITOR | Pending | |
-| 11. LEARN | Pending | |
-| 12. IMPROVE | Pending | |
+| Step | Phase | Status | Notes |
+|------|-------|--------|-------|
+| 1. ASSESS | Planning | In Progress | Understand the problem |
+| 2. ALIGN | Planning | Pending | Business alignment |
+| 3. CAPTURE | Planning | Pending | Gather requirements |
+| 4. PLAN | Planning | Pending | Design solution |
+| 5. DESIGN | Planning | Pending | Architecture decisions |
+| 6. SPEC | Planning | Pending | Technical specification |
+| 7. TEST | Development | Pending | Write tests first |
+| 8. QUALITY | Development | Pending | Quality gates |
+| 9. IMPLEMENT | Development | Pending | Write code |
+| 10. REVIEW | Development | Pending | Self-review as CTO |
+| 11. OPTIMIZE | Delivery | Pending | Performance tuning |
+| 12. SECURE | Delivery | Pending | Security validation |
+| 13. DOCUMENT | Delivery | Pending | Update docs |
+| 14. VERIFY | Delivery | Pending | Final validation |
+| 15. COMMIT | Delivery | Pending | Ship with confidence |
 
 ## Legend
 - Pending
 - In Progress
 - Complete
 - Blocked
+
+## Research Protocol
+
+Before implementing, use parallel web search agents for:
+1. **Validate assumptions** - Search for current best practices (2026)
+2. **Check dependencies** - Search for security advisories
+3. **Find patterns** - Search for similar implementations
+4. **Verify APIs** - Search for current documentation
+
+**Subagent count:** max(2, CPU_CORES - 4)
 
 ## Session Log
 
@@ -641,22 +674,29 @@ if (Test-Path ".ctoc\skills") {
 
 Write-Host ""
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
-Write-Host "  CTOC installed successfully!" -ForegroundColor Green
+Write-Host "  CTOC v$CTOC_VERSION installed successfully!" -ForegroundColor Green
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Files created:"
-Write-Host "    • CLAUDE.md     - CTO instructions for Claude"
-Write-Host "    • IRON_LOOP.md  - Progress tracking"
+Write-Host "  Files created/updated:"
+Write-Host "    • CLAUDE.md     - CTO instructions (smart-merged)"
+Write-Host "    • IRON_LOOP.md  - 15-step progress tracking"
 Write-Host "    • PLANNING.md   - Feature backlog"
 Write-Host "    • .ctoc\        - Skills library ($skillCount skills downloaded)"
 Write-Host ""
 Write-Host "  Skill commands:"
-Write-Host "    • .ctoc\bin\ctoc.ps1 skills list     - See all 261 available skills"
-Write-Host "    • .ctoc\bin\ctoc.ps1 skills add NAME - Add a specific skill"
-Write-Host "    • .ctoc\bin\ctoc.ps1 skills sync     - Auto-detect & download skills"
+Write-Host "    • .ctoc\bin\ctoc.ps1 skills list       - See all 261 available skills"
+Write-Host "    • .ctoc\bin\ctoc.ps1 skills add NAME   - Add a specific skill"
+Write-Host "    • .ctoc\bin\ctoc.ps1 skills sync       - Auto-detect & download skills"
+Write-Host "    • .ctoc\bin\ctoc.ps1 skills feedback   - Suggest skill improvements"
+Write-Host ""
+Write-Host "  GitHub integration (requires gh CLI):"
+Write-Host "    • .ctoc\bin\ctoc.ps1 process-issues   - Process community suggestions"
 Write-Host ""
 Write-Host "  Next steps:"
 Write-Host "    1. Review and customize CLAUDE.md"
 Write-Host "    2. Run 'claude' in this directory"
 Write-Host "    3. Claude is now your CTO!"
+Write-Host ""
+Write-Host "  Iron Loop: Use many parallel subagents for research phases!"
+Write-Host "    Subagent count: max(2, CPU_CORES - 4)"
 Write-Host ""
