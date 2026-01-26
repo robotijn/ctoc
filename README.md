@@ -40,10 +40,45 @@ When you install CTOC, you become the **CTO Chief** — commanding an army of vi
 
 ### How It Works
 
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   BUSINESS GOALS → PLANNING → IMPLEMENTATION → REVIEW       │
+│                                                             │
+│   ┌─────────────────────────────────────────────┐           │
+│   │  Steps 1-3: PLAN (Iterative)                │           │
+│   │  ─────────────────────────────────────────  │           │
+│   │                                             │           │
+│   │  1. ASSESS  →  2. PLAN  →  3. CRITIQUE      │           │
+│   │       ↑                          │          │           │
+│   │       └──────────────────────────┘          │           │
+│   │              (repeat until ready)           │           │
+│   │                                             │           │
+│   │  Product Owners, Project Managers,          │           │
+│   │  or Developers can do this phase.           │           │
+│   │                                             │           │
+│   │  Plans can be small (1 feature) or          │           │
+│   │  large (entire product roadmap).            │           │
+│   │                                             │           │
+│   └─────────────────────────────────────────────┘           │
+│                        │                                    │
+│                        ▼                                    │
+│   ┌─────────────────────────────────────────────┐           │
+│   │  Steps 4-12: IMPLEMENT (Autonomous)         │           │
+│   │  ─────────────────────────────────────────  │           │
+│   │                                             │           │
+│   │  Hand the plan to a developer.              │           │
+│   │  Claude Code executes autonomously.         │           │
+│   │                                             │           │
+│   └─────────────────────────────────────────────┘           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
 1. **You define the business problem** (what needs to be built)
-2. **CTOC's Super CTO** aligns business goals with technical approach
-3. **Specialized CTOs** implement using their domain expertise
-4. **You review and approve** — the CTO Chief has final say
+2. **Iterate on the plan** — Assess, Plan, Critique, repeat until solid
+3. **Hand off to implementation** — Plans go to developers or run autonomously
+4. **Review and approve** — the CTO Chief has final say
 
 Each technology CTO:
 - Is **adamant** about engineering excellence
@@ -80,11 +115,23 @@ With CTOC, the same request produces:
 
 ## Who Is This For?
 
-| Role | How CTOC Helps |
-|------|----------------|
-| **Developers** | Plan and implement features with best practices enforced automatically |
-| **Product Managers** | Describe what you want in plain English — Claude Code handles the technical translation |
-| **Business Users** | Test completed features and provide feedback through a simple web interface |
+CTOC bridges the gap between **business goals** and **working software**. Different roles use different parts:
+
+| Role | Primary Use | What They Do |
+|------|-------------|--------------|
+| **Product Owners** | Steps 1-3 (Planning) | Define business requirements, iterate on plans, approve direction |
+| **Project Managers** | Steps 1-3 (Planning) | Break down large initiatives, create feature roadmaps, hand off to developers |
+| **Developers** | Steps 1-12 (Full Loop) | Refine plans technically, implement features, respond to feedback |
+| **Business Users** | Review Interface | Test completed features, provide feedback |
+
+### The Handoff Model
+
+A **Product Owner** or **Project Manager** can:
+1. Plan an entire product or large initiative (Steps 1-3)
+2. Iterate until the plan is solid
+3. Hand the plan to a **Developer** for implementation (Steps 4-12)
+
+The developer doesn't start from scratch — they have a well-defined plan to execute.
 
 ---
 
@@ -101,22 +148,22 @@ The Iron Loop is a 12-step process that every feature follows:
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  PLANNING (Steps 1-3)                                       │
-│  You participate in these steps.                            │
+│  PLANNING (Steps 1-3) — ITERATIVE                           │
+│  For: Product Owners, Project Managers, Developers          │
 │  ─────────────────────────────────────────────────────────  │
 │                                                             │
-│  Step 1: ASSESS                                             │
+│  Step 1: ASSESS ←──┐                                        │
 │          Understand scope and complexity                    │
-│                                                             │
-│  Step 2: PLAN                                               │
-│          Create detailed implementation approach            │
-│                                                             │
-│  Step 3: CRITIQUE                                           │
+│                    │                                        │
+│  Step 2: PLAN      │  Repeat steps 1-3 until                │
+│          Create detailed approach                           │
+│                    │  the plan is solid.                    │
+│  Step 3: CRITIQUE ─┘                                        │
 │          Review and improve the plan                        │
 │                                                             │
 │  ════════════════════════════════════════════════════════   │
-│  After Step 3, you can leave.                               │
-│  Claude Code works autonomously from here.                  │
+│  HANDOFF POINT: Pass plan to a developer, or continue.      │
+│  Plans can be small (1 feature) or large (full roadmap).    │
 │  ════════════════════════════════════════════════════════   │
 │                                                             │
 │  IMPLEMENTATION (Steps 4-7)                                 │
