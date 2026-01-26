@@ -1,74 +1,76 @@
 # Chef CTO
-> Infrastructure automation leader demanding cookbook versioning, Test Kitchen validation, and Policyfile workflows.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Chef Workstation (includes knife, chef, cookstyle)
+curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- -P chef-workstation
+# Verify
+chef --version
+# Create cookbook
 chef generate cookbook mycookbook
-kitchen test -c 3
-cookstyle -a && chef exec rspec
 ```
 
-## Non-Negotiables
-1. Cookbook versioning with Policyfiles over legacy environments
-2. Test Kitchen for integration testing on real VMs/containers
-3. Encrypted data bags or external secrets for sensitive data
-4. InSpec for compliance-as-code verification
-5. ChefSpec for unit testing recipes
+## Claude's Common Mistakes
+1. **Uses legacy environments** - Policyfiles are standard now
+2. **Missing guards on execute** - not_if/only_if required
+3. **Plaintext secrets in attributes** - Use encrypted data bags or Vault
+4. **Skips Test Kitchen** - Integration testing required
+5. **Monolithic cookbooks** - Should decompose into focused units
 
-## Red Lines
-- Unversioned cookbook dependencies in metadata.rb
-- Plaintext secrets in attributes or recipes
-- execute without guards (not_if/only_if)
-- Missing ChefSpec tests for custom resources
-- Monolithic cookbooks - decompose into focused units
-
-## Pattern: Custom Resource with Guards
+## Correct Patterns (2026)
 ```ruby
+# Policyfile.rb (replaces environments + Berksfile)
+name 'myapp'
+default_source :supermarket
+run_list 'myapp::default'
+cookbook 'myapp', path: '.'
+
+# recipes/default.rb
+package 'myapp' do
+  version node['myapp']['version']
+end
+
+# Custom resource with proper guards
+app_config '/etc/myapp/config.json' do
+  content node['myapp']['config']
+  owner 'myapp'
+  mode '0644'
+  notifies :restart, 'service[myapp]', :delayed
+  action :create
+end
+
+service 'myapp' do
+  action [:enable, :start]
+end
+
 # resources/app_config.rb
 provides :app_config
+unified_mode true  # Chef 18+ default
 
 property :path, String, name_property: true
 property :content, Hash, required: true
-property :owner, String, default: 'app'
+property :owner, String, default: 'root'
+property :mode, String, default: '0644'
 
 action :create do
   file new_resource.path do
     content JSON.pretty_generate(new_resource.content)
     owner new_resource.owner
-    mode '0644'
-    notifies :restart, 'service[myapp]', :delayed
+    mode new_resource.mode
   end
-end
-
-# recipes/default.rb
-package 'myapp'
-
-app_config '/etc/myapp/config.json' do
-  content node['myapp']['config']
-  owner 'myapp'
-end
-
-service 'myapp' do
-  action [:enable, :start]
-  subscribes :restart, 'app_config[/etc/myapp/config.json]'
 end
 ```
 
-## Integrates With
-- **DB**: database cookbook with encrypted data bag credentials
-- **Auth**: chef-vault or external secrets operator
-- **Cache**: redis cookbook with attribute-driven configuration
+## Version Gotchas
+- **Chef 18+**: unified_mode default for custom resources
+- **Policyfiles**: Replace Berkshelf + environments
+- **chef-vault**: Being replaced by external secrets
+- **With InSpec**: Use for compliance testing alongside Chef
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Cookbook not found` | Run `chef update` to refresh Policyfile.lock.json |
-| `Resource does not exist` | Check cookbook dependency, verify provides declaration |
-| `Kitchen: SSH connection refused` | Check VM is running, verify SSH key in .kitchen.yml |
-
-## Prod Ready
-- [ ] Policyfile.lock.json committed for reproducible deploys
-- [ ] Kitchen tests passing on all target platforms
-- [ ] InSpec profiles validating security baseline
-- [ ] Automate/Infra Server managing node convergence
+## What NOT to Do
+- Do NOT use legacy environments - migrate to Policyfiles
+- Do NOT skip guards on execute resources
+- Do NOT store secrets in attributes - use encrypted data bags
+- Do NOT release without Test Kitchen validation
+- Do NOT create monolithic cookbooks - decompose

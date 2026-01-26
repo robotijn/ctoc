@@ -1,80 +1,82 @@
 # Compose Multiplatform CTO
-> Kotlin declarative UI leader demanding shared UI code with proper expect/actual platform abstractions.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Setup | Dev | Test
-./gradlew :composeApp:build
-./gradlew :composeApp:runDebugExecutable
-./gradlew :shared:allTests && ./gradlew :composeApp:iosSimulatorArm64Test
+## Installation (CURRENT - January 2026)
+```kotlin
+// settings.gradle.kts
+plugins {
+    id("org.jetbrains.kotlin.multiplatform") version "2.2.0"  // Required for CMP 1.10+
+    id("org.jetbrains.compose") version "1.10.0"
+}
+
+// build.gradle.kts (shared module)
+kotlin {
+    androidTarget()
+    iosArm64()
+    iosSimulatorArm64()
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.ui)
+            implementation(compose.material3)
+        }
+    }
+}
 ```
 
-## Non-Negotiables
-1. Shared UI in commonMain, platform code in platform-specific source sets
-2. expect/actual pattern for platform-specific implementations
-3. Proper state hoisting for reusable composables
-4. kotlinx.coroutines for async operations across platforms
-5. Small, focused composables - extract early
+## Claude's Common Mistakes
+1. **Uses Kotlin 2.1 with CMP 1.10** - Requires Kotlin 2.2 for native/web
+2. **Ignores expect/actual pattern** - Platform code must use this pattern
+3. **Assumes iOS parity with Android** - Some APIs differ or unavailable
+4. **Missing Google Maven repository** - Required for Compose artifacts
+5. **Uses remember for complex state** - Use ViewModel or rememberSaveable
 
-## Red Lines
-- I/O directly in composable functions - use LaunchedEffect
-- Side effects in composition - causes recomposition bugs
-- remember{} for complex objects - use ViewModel or rememberSaveable
-- Hardcoded dimensions - use platform-aware Dp sizing
-- Skipping iOS testing - behavior differs from Android
-
-## Pattern: Expect/Actual with Shared Composable
+## Correct Patterns (2026)
 ```kotlin
-// commonMain
-expect fun getPlatformName(): String
-expect class PlatformContext
-
+// commonMain - shared composables
 @Composable
 expect fun PlatformTheme(content: @Composable () -> Unit)
+
+expect fun getPlatformName(): String
 
 @Composable
 fun App() {
     PlatformTheme {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Hello from ${getPlatformName()}")
-            PlatformSpecificButton()
         }
     }
 }
 
 // androidMain
-actual fun getPlatformName(): String = "Android"
-
 @Composable
 actual fun PlatformTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = dynamicColorScheme()) {
-        content()
-    }
+    MaterialTheme(
+        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
+    ) { content() }
 }
 
-// iosMain
-actual fun getPlatformName(): String = "iOS"
+actual fun getPlatformName(): String = "Android"
 
+// iosMain
 @Composable
 actual fun PlatformTheme(content: @Composable () -> Unit) {
     MaterialTheme { content() }
 }
+
+actual fun getPlatformName(): String = "iOS"
 ```
 
-## Integrates With
-- **DB**: SQLDelight for shared database, Room for Android-only
-- **Auth**: Ktor client with platform auth, KeyStore/Keychain wrappers
-- **Cache**: DataStore Preferences multiplatform, Ktor caching
+## Version Gotchas
+- **CMP 1.10+**: Kotlin 2.2 required for native and web targets
+- **CMP 1.10**: Unified @Preview support, Navigation 3 stable
+- **CMP 1.7+**: Google Maven required for some artifacts
+- **With iOS**: Xcode 15+ required for framework export
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Unresolved reference: expect` | Check source set configuration in build.gradle.kts |
-| `Kotlin/Native: linkDebugFrameworkIos failed` | Clean and rebuild, check iOS toolchain |
-| `@Composable invocations can only happen` | Move to composable scope or LaunchedEffect |
-
-## Prod Ready
-- [ ] iOS framework exported and integrated in Xcode project
-- [ ] Android ProGuard rules configured for Compose
-- [ ] Shared module published to Maven for multi-app usage
-- [ ] Platform-specific theming matches native design guidelines
+## What NOT to Do
+- Do NOT use Kotlin 2.1 with CMP 1.10 - native builds fail
+- Do NOT perform I/O in composables - use LaunchedEffect
+- Do NOT skip iOS testing - behavior differs from Android
+- Do NOT hardcode dimensions - use platform-aware sizing
+- Do NOT forget `google()` in repositories block

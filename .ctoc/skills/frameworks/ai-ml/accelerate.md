@@ -1,42 +1,28 @@
 # Accelerate CTO
-> Distributed training made simple with automatic device management.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install accelerate
-accelerate config  # Interactive setup
-accelerate launch --multi_gpu train.py
-accelerate test  # Verify configuration
+accelerate config  # Interactive setup - run this first!
+# Verify: accelerate test
 ```
 
-## Non-Negotiables
-1. Run `accelerate config` for initial setup
-2. Proper device placement with prepare()
-3. Gradient accumulation for large batches
-4. Mixed precision (fp16/bf16) for efficiency
-5. DeepSpeed/FSDP integration for large models
-6. Checkpointing with save_state/load_state
+## Claude's Common Mistakes
+1. Manual `.to(device)` instead of using `accelerator.prepare()`
+2. Missing `accelerator.accumulate()` context manager
+3. Not using `accelerate config` for initial setup
+4. Forgetting to unwrap model before saving
+5. Using `loss.backward()` instead of `accelerator.backward()`
 
-## Red Lines
-- Manual device management with .to(device)
-- Missing gradient accumulation steps
-- No mixed precision when GPU available
-- Ignoring accelerate config file
-- Hardcoded world size or rank
-- Not using prepare() for all objects
-
-## Pattern: Production Distributed Training
+## Correct Patterns (2026)
 ```python
 from accelerate import Accelerator, DeepSpeedPlugin
 from accelerate.utils import set_seed
 import torch
 
-# Configure with DeepSpeed
-deepspeed_plugin = DeepSpeedPlugin(
-    zero_stage=2,
-    gradient_accumulation_steps=4,
-)
+# Configure with DeepSpeed (optional)
+deepspeed_plugin = DeepSpeedPlugin(zero_stage=2, gradient_accumulation_steps=4)
 
 accelerator = Accelerator(
     mixed_precision="bf16",
@@ -47,53 +33,43 @@ accelerator = Accelerator(
 
 set_seed(42)
 
-# Prepare all training objects
-model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-    model, optimizer, train_dataloader, lr_scheduler
+# Prepare ALL training objects (no manual .to(device)!)
+model, optimizer, train_loader, scheduler = accelerator.prepare(
+    model, optimizer, train_loader, scheduler
 )
 
-# Training loop
+# Training loop with gradient accumulation
 for epoch in range(num_epochs):
     model.train()
-    for batch in train_dataloader:
-        with accelerator.accumulate(model):
+    for batch in train_loader:
+        with accelerator.accumulate(model):  # Handles accumulation
             outputs = model(**batch)
             loss = outputs.loss
-            accelerator.backward(loss)
+            accelerator.backward(loss)  # Not loss.backward()!
 
             optimizer.step()
-            lr_scheduler.step()
+            scheduler.step()
             optimizer.zero_grad()
 
-        # Log metrics
         accelerator.log({"train_loss": loss.item()}, step=step)
 
-    # Save checkpoint
+    # Checkpoint
     accelerator.save_state(f"checkpoint-{epoch}")
 
-# Unwrap for saving
-unwrapped_model = accelerator.unwrap_model(model)
-accelerator.save_model(unwrapped_model, "final_model")
+# Save model - MUST unwrap first
+unwrapped = accelerator.unwrap_model(model)
+accelerator.save_model(unwrapped, "final_model")
 ```
 
-## Integrates With
-- **Distributed**: DeepSpeed, FSDP, DDP
-- **Training**: Transformers Trainer, PyTorch
-- **Tracking**: W&B, TensorBoard, MLflow
-- **Hardware**: Multi-GPU, TPU, Apple Silicon
+## Version Gotchas
+- **prepare()**: Must include ALL objects (model, optimizer, dataloader, scheduler)
+- **accumulate()**: Required for gradient accumulation to work correctly
+- **unwrap_model()**: Required before saving to get original model
+- **DeepSpeed**: Use DeepSpeedPlugin for ZeRO integration
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `NCCL error` | Check network, increase timeout |
-| `OOM with gradient accumulation` | Reduce per-device batch size |
-| `Device mismatch` | Use accelerator.prepare() for all objects |
-| `Checkpoint loading fails` | Use accelerator.load_state() |
-
-## Prod Ready
-- [ ] accelerate config completed
-- [ ] All objects passed through prepare()
-- [ ] Gradient accumulation configured
-- [ ] Mixed precision enabled
-- [ ] Checkpointing with save_state
-- [ ] Logging integrated
+## What NOT to Do
+- Do NOT use manual `.to(device)` - use `accelerator.prepare()`
+- Do NOT use `loss.backward()` - use `accelerator.backward(loss)`
+- Do NOT skip `accelerate config` initial setup
+- Do NOT forget `accelerator.accumulate()` context
+- Do NOT save without `accelerator.unwrap_model()`

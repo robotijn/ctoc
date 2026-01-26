@@ -1,52 +1,40 @@
 # PlanetScale CTO
-> Serverless MySQL platform with branching and non-blocking schema changes.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Install CLI
+brew install planetscale/tap/pscale
 pscale auth login
-pscale branch create mydb feature-branch
-pscale connect mydb feature-branch --port 3306
+pscale connect mydb main --port 3306
 ```
 
-## Non-Negotiables
-1. Branch-based development workflow
-2. Deploy requests for schema changes
-3. Per-branch connection strings
-4. Query Insights for optimization
-5. PlanetScale Boost for edge caching
-6. No foreign key constraints (Vitess limitation)
+## Claude's Common Mistakes
+1. **Using foreign key constraints** - Not supported (Vitess limitation)
+2. **Direct production schema changes** - Use deploy requests (safe migrations)
+3. **Single connection string** - Use branch-specific connections
+4. **Ignoring Query Insights** - Built-in query analyzer
+5. **Not using branch workflow** - Branches are like git for databases
 
-## Red Lines
-- Direct schema changes in production
-- Using foreign key constraints (not supported)
-- Missing deploy requests for migrations
-- Ignoring Query Insights alerts
-- No safe migrations workflow
-
-## Pattern: Branch-Based Workflow
+## Correct Patterns (2026)
 ```bash
-# Create feature branch from main
-pscale branch create mydb add-user-preferences
+# Branch-based workflow (like git)
+pscale branch create mydb feature-add-users
+pscale connect mydb feature-add-users --port 3306
 
-# Connect to feature branch
-pscale connect mydb add-user-preferences --port 3306
-
-# Apply schema changes on branch
+# Apply schema on branch
 mysql -h 127.0.0.1 -P 3306 -u root < migration.sql
 
 # Create deploy request (PR for schema)
-pscale deploy-request create mydb add-user-preferences
+pscale deploy-request create mydb feature-add-users
 
-# Review schema diff
+# Review and deploy (non-blocking)
 pscale deploy-request diff mydb 1
-
-# Deploy to production (non-blocking)
 pscale deploy-request deploy mydb 1
 ```
 
 ```sql
--- Schema without foreign keys (use application-level integrity)
+-- Schema WITHOUT foreign keys (enforce in application)
 CREATE TABLE users (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -54,37 +42,23 @@ CREATE TABLE users (
     INDEX idx_created (created_at)
 );
 
-CREATE TABLE preferences (
+CREATE TABLE orders (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT UNSIGNED NOT NULL,
-    theme VARCHAR(50) DEFAULT 'light',
+    total DECIMAL(10,2),
     INDEX idx_user (user_id)
-    -- No FOREIGN KEY, enforce in application
+    -- NO FOREIGN KEY - enforce in application
 );
-
--- Safe migration: add column with default
-ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active';
-
--- Safe migration: add index (non-blocking in PlanetScale)
-CREATE INDEX idx_status ON users(status);
 ```
 
-## Integrates With
-- **ORM**: Prisma, Drizzle, Sequelize (disable FK)
-- **Frameworks**: Next.js, Rails, Laravel
-- **Edge**: PlanetScale Boost for global caching
+## Version Gotchas
+- **No foreign keys**: Vitess limitation; use application-level integrity
+- **Deploy requests**: Non-blocking schema migrations
+- **Boost**: Edge caching for read-heavy workloads
+- **Branches**: Each branch has isolated schema and data
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `foreign key constraint` | Remove FK, use application joins |
-| `deploy request conflict` | Resolve schema differences |
-| `branch not found` | Check branch name with `pscale branch list` |
-| `connection timeout` | Use regional connection strings |
-
-## Prod Ready
-- [ ] Branch workflow established
-- [ ] Deploy requests for all changes
-- [ ] Query Insights monitored
-- [ ] Application-level referential integrity
-- [ ] Boost configured for read-heavy workloads
+## What NOT to Do
+- Do NOT use FOREIGN KEY constraints (not supported)
+- Do NOT change production schema directly (use deploy requests)
+- Do NOT ignore Query Insights alerts
+- Do NOT forget branch workflow for schema changes

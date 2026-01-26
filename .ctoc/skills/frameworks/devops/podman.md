@@ -1,30 +1,26 @@
 # Podman CTO
-> Daemonless container engineering leader demanding rootless-first architecture and systemd integration.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-podman build -t myapp:dev .
-podman-compose up -d && podman logs -f myapp
-podman generate systemd --new --name myapp > ~/.config/systemd/user/myapp.service
+# Fedora/RHEL
+sudo dnf install podman
+# Ubuntu/Debian
+sudo apt-get install podman
+# Rootless setup (run as user)
+podman system migrate
 ```
 
-## Non-Negotiables
-1. Rootless containers by default - root only when absolutely required
-2. Pod-based deployments for multi-container applications
-3. Systemd integration via Quadlet for production services
-4. OCI compliance for image portability
-5. SELinux/AppArmor context awareness with :Z volume mounts
+## Claude's Common Mistakes
+1. **Assumes Docker socket exists** - Podman is daemonless
+2. **Ignores SELinux volume contexts** - Missing :Z causes permission denied
+3. **Uses docker-compose directly** - Use podman-compose or Quadlet
+4. **Runs as root unnecessarily** - Rootless is default and preferred
+5. **Forgets subuid/subgid setup** - Required for rootless containers
 
-## Red Lines
-- Running containers as root without security justification
-- Ignoring SELinux contexts causing permission denied errors
-- Docker socket mounting - use Podman socket if needed
-- Missing health checks in pod definitions
-- Privileged mode without explicit security review
-
-## Pattern: Quadlet Service Definition
+## Correct Patterns (2026)
 ```ini
+# Quadlet service definition (replaces systemd generation)
 # ~/.config/containers/systemd/myapp.container
 [Unit]
 Description=My Application Container
@@ -48,20 +44,21 @@ TimeoutStartSec=300
 WantedBy=default.target
 ```
 
-## Integrates With
-- **DB**: Podman pods with PostgreSQL sidecar, shared networking
-- **Auth**: Podman secrets with external secret store sync
-- **Cache**: Volume mounts with :Z for SELinux, tmpfs for ephemeral
+```bash
+# Enable and start the service
+systemctl --user daemon-reload
+systemctl --user enable --now myapp.service
+```
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `ERRO[0000] cannot find UID/GID` | Run `podman system migrate` after user changes |
-| `Permission denied on volume` | Add :Z suffix for SELinux relabeling |
-| `slirp4netns: failed to setup network` | Install slirp4netns, check user namespaces enabled |
+## Version Gotchas
+- **Podman 5.x**: Quadlet replaces `podman generate systemd`
+- **Podman 4.x+**: Improved Docker Compose compatibility
+- **SELinux**: Always use :Z for bind mounts on Fedora/RHEL
+- **With Kubernetes**: `podman generate kube` for migration
 
-## Prod Ready
-- [ ] Rootless mode configured with proper subuid/subgid
-- [ ] Quadlet files deployed via config management
-- [ ] Pod YAML exported for Kubernetes migration path
-- [ ] Auto-update configured with `podman auto-update`
+## What NOT to Do
+- Do NOT assume Docker socket - Podman is daemonless
+- Do NOT skip :Z volume suffix on SELinux systems
+- Do NOT run as root - rootless is default
+- Do NOT use `podman generate systemd` - use Quadlet
+- Do NOT forget `podman system migrate` after user changes

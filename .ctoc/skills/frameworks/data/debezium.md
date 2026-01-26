@@ -1,33 +1,25 @@
 # Debezium CTO
-> Distributed change data capture platform for streaming database changes.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name debezium -p 8083:8083 debezium/connect
-curl http://localhost:8083/connectors
-curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @connector.json
+docker run -d --name debezium -p 8083:8083 \
+  -e BOOTSTRAP_SERVERS=kafka:9092 \
+  debezium/connect:2.5
+# Register connector via REST API
 ```
 
-## Non-Negotiables
-1. Connector configuration with proper serialization
-2. Schema Registry integration for schema evolution
-3. Offset management and backup strategy
-4. Single Message Transforms (SMTs) for routing/filtering
-5. Monitoring with JMX or Prometheus metrics
-6. Heartbeat enabled to prevent slot growth
+## Claude's Common Mistakes
+1. **Missing heartbeat** - Causes WAL/binlog growth on idle tables
+2. **No Schema Registry** - Schema changes break consumers silently
+3. **Ignoring tombstones** - Needed for proper delete handling in sinks
+4. **Large transactions without tuning** - Causes lag and memory issues
+5. **No offset backup** - Losing offsets means full resync
 
-## Red Lines
-- Missing heartbeat causing WAL/binlog growth
-- No tombstone handling for deletes
-- Ignoring schema evolution breaking consumers
-- Large transactions without chunking
-- No offset backup strategy
-
-## Pattern: Production CDC Setup
+## Correct Patterns (2026)
 ```json
 {
-  "name": "postgres-cdc-connector",
+  "name": "postgres-cdc",
   "config": {
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
     "database.hostname": "postgres",
@@ -40,7 +32,7 @@ curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json
 
     "plugin.name": "pgoutput",
     "slot.name": "debezium_slot",
-    "publication.name": "debezium_publication",
+    "publication.name": "debezium_pub",
 
     "key.converter": "io.confluent.connect.avro.AvroConverter",
     "key.converter.schema.registry.url": "http://schema-registry:8081",
@@ -48,36 +40,22 @@ curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json
     "value.converter.schema.registry.url": "http://schema-registry:8081",
 
     "heartbeat.interval.ms": "10000",
-    "heartbeat.action.query": "UPDATE debezium_heartbeat SET ts = NOW()",
+    "heartbeat.action.query": "UPDATE heartbeat SET ts = NOW()",
 
-    "transforms": "route",
-    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
-    "transforms.route.regex": "prod\\.public\\.(.*)",
-    "transforms.route.replacement": "cdc.$1",
-
-    "snapshot.mode": "initial",
-    "decimal.handling.mode": "string",
-    "tombstones.on.delete": "true"
+    "tombstones.on.delete": "true",
+    "snapshot.mode": "initial"
   }
 }
 ```
 
-## Integrates With
-- **Databases**: PostgreSQL, MySQL, MongoDB, SQL Server, Oracle
-- **Messaging**: Kafka, Pulsar, Kinesis
-- **Processing**: Flink, Spark Streaming, ksqlDB
+## Version Gotchas
+- **v2.5+**: Improved incremental snapshots, better MongoDB support
+- **Heartbeat**: Required to prevent slot/binlog growth on idle tables
+- **Schema Registry**: Essential for schema evolution without breaking consumers
+- **Snapshot modes**: initial, schema_only, never - choose based on needs
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Replication slot inactive` | Enable heartbeat queries |
-| `Schema change broke consumer` | Use Schema Registry compatibility |
-| `WAL/binlog growing` | Check heartbeat, reduce retention |
-| `Connector lag high` | Increase tasks, optimize queries |
-
-## Prod Ready
-- [ ] Heartbeat configured
-- [ ] Schema Registry integrated
-- [ ] Offset backup automated
-- [ ] Monitoring dashboards deployed
-- [ ] Tombstone handling configured
+## What NOT to Do
+- Do NOT skip heartbeat configuration (causes WAL growth)
+- Do NOT ignore Schema Registry (schema changes break consumers)
+- Do NOT forget tombstones for delete handling
+- Do NOT run without offset backup strategy

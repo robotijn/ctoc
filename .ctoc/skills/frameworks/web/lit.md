@@ -1,52 +1,40 @@
 # Lit CTO
-> Fast web components - small, efficient, standards-based.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm init @open-wc && cd myapp
-npm run dev
-npm test
+npm init @open-wc
+# Or manually:
+npm install lit
+# Lit 3.x - fast web components
 ```
 
-## Non-Negotiables
-1. Reactive properties with decorators
-2. Shadow DOM for style encapsulation
-3. Template literals with `html` tag
-4. Proper lifecycle callbacks
-5. Declarative event handling
+## Claude's Common Mistakes
+1. **Missing `@property()` decorator** — Properties won't be reactive without it
+2. **Forgetting `reflect: true`** — Attributes won't sync to element
+3. **CSS outside Shadow DOM** — Use `:host` and `::slotted()` selectors
+4. **Events not bubbling** — Add `bubbles: true, composed: true` to CustomEvent
+5. **Direct DOM manipulation** — Use reactive properties and templates
 
-## Red Lines
-- Direct DOM manipulation - use reactive properties
-- Missing property decorators
-- Ignoring Shadow DOM styling constraints
-- No attribute reflection when needed
-- Blocking render with sync operations
-
-## Pattern: Custom Element
+## Correct Patterns (2026)
 ```typescript
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-}
-
 @customElement('user-card')
 export class UserCard extends LitElement {
+  // Scoped styles (Shadow DOM)
   static styles = css`
-    :host {
-      display: block;
-      padding: 1rem;
-      border: 1px solid #ccc;
-    }
+    :host { display: block; padding: 1rem; }
+    :host([selected]) { border: 2px solid blue; }
     .name { font-weight: bold; }
   `;
 
+  // Public property (reactive, reflected to attribute)
   @property({ type: Object }) user?: User;
   @property({ type: Boolean, reflect: true }) selected = false;
+
+  // Private state (reactive, not reflected)
   @state() private _editing = false;
 
   render() {
@@ -55,9 +43,7 @@ export class UserCard extends LitElement {
     return html`
       <div class="name">${this.user.name}</div>
       <div>${this.user.email}</div>
-      <button @click=${this._handleEdit}>
-        ${this._editing ? 'Cancel' : 'Edit'}
-      </button>
+      <button @click=${this._handleEdit}>Edit</button>
       ${this._editing ? html`
         <input .value=${this.user.name} @input=${this._handleInput} />
       ` : ''}
@@ -70,33 +56,41 @@ export class UserCard extends LitElement {
 
   private _handleInput(e: InputEvent) {
     const input = e.target as HTMLInputElement;
+    // Dispatch with bubbles + composed for Shadow DOM
     this.dispatchEvent(new CustomEvent('user-updated', {
       detail: { ...this.user, name: input.value },
       bubbles: true,
-      composed: true,
+      composed: true,  // Required to cross Shadow DOM
     }));
   }
 }
 ```
 
-## Integrates With
-- **Routing**: Vaadin Router, or custom
-- **State**: Lit Context, or external stores
-- **Styling**: CSS-in-JS via `css` tag, or external CSS
-- **Build**: Vite, Rollup, or Webpack
+## Version Gotchas
+- **Lit 3.x**: Current stable; smaller bundle
+- **Shadow DOM**: Styles are encapsulated; use `:host` for element styling
+- **Decorators**: Require TypeScript or Babel plugin
+- **SSR**: Use `@lit-labs/ssr` for server rendering
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Property not reactive` | Add `@property()` decorator |
-| `Styles not applying` | Check Shadow DOM, use `:host` |
-| `Event not bubbling` | Add `composed: true` to CustomEvent |
-| `Attribute not syncing` | Add `reflect: true` to property |
+## What NOT to Do
+- ❌ Missing `@property()` — Property changes won't trigger render
+- ❌ `reflect: false` on state attributes — Won't sync to HTML
+- ❌ `document.querySelector()` in component — Use `this.shadowRoot`
+- ❌ `composed: false` on events — Won't bubble through Shadow DOM
+- ❌ Global CSS expecting to style component — Shadow DOM blocks it
 
-## Prod Ready
-- [ ] Bundle size optimized
-- [ ] SSR with `@lit-labs/ssr`
-- [ ] Accessible: proper ARIA roles
-- [ ] Properties documented
-- [ ] Custom elements manifest generated
-- [ ] Works in all modern browsers
+## Property Decorators
+| Decorator | Use For |
+|-----------|---------|
+| `@property()` | Public reactive props |
+| `@state()` | Private reactive state |
+| `@query()` | Shadow DOM element refs |
+| `@queryAll()` | Multiple element refs |
+
+## Shadow DOM Styling
+```css
+:host { }                    /* The element itself */
+:host([attr]) { }            /* With attribute */
+:host-context(.dark) { }     /* Parent has class */
+::slotted(p) { }             /* Slotted content */
+```

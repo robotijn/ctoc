@@ -1,71 +1,70 @@
 # Terraform CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-terraform fmt -check -recursive        # Check format
-terraform fmt -recursive               # Format
-terraform validate                     # Validate
-terraform plan -out=tfplan             # Plan (ALWAYS before apply)
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses local state — use remote state with locking
+- Claude hardcodes values — use variables with validation
+- Claude forgets `moved` blocks — prevents destroy on rename
+- Claude uses `terraform apply -auto-approve` in prod — never
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `opentofu` / `terraform` | IaC engine | Manual infra |
+| `terragrunt` or `terramate` | Orchestration, DRY | Monolithic configs |
+| `tflint` | Linting | Just validate |
+| `checkov` / `tfsec` | Security scanning | No security checks |
+| `infracost` | Cost estimation | Surprise bills |
+
+## Patterns Claude Should Use
+```hcl
+# Remote state with locking
+terraform {
+  backend "s3" {
+    bucket         = "my-terraform-state"
+    key            = "prod/network/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+
+# Variable validation
+variable "environment" {
+  type = string
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be dev, staging, or prod."
+  }
+}
+
+# Moved blocks prevent destroy on rename
+moved {
+  from = aws_instance.old_name
+  to   = aws_instance.new_name
+}
+
+# Pin provider versions
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
 ```
 
-## Tools (2024-2025)
-- **OpenTofu/Terraform** - IaC engine
-- **Terragrunt** - DRY wrapper, remote state
-- **tflint** - Linting
-- **Checkov/tfsec** - Security scanning
-- **Infracost** - Cost estimation
+## Anti-Patterns Claude Generates
+- Local state in production — use remote with locking
+- Hardcoded values — use variables with validation
+- `-auto-approve` in prod — always review plans
+- No `moved` blocks — causes accidental destroys
+- Large monolithic state — split by component/env
 
-## Project Structure
-```
-project/
-├── modules/           # Reusable modules
-├── environments/      # Per-env configs
-│   ├── dev/
-│   ├── staging/
-│   └── prod/
-├── variables.tf       # Input variables
-├── outputs.tf         # Output values
-└── backend.tf         # State config
-```
-
-## Non-Negotiables
-1. Remote state with locking (S3+DynamoDB, GCS, etc.)
-2. Environment separation (workspaces or directories)
-3. Module composition for reusability
-4. Variable validation blocks
-
-## Red Lines (Reject PR)
-- Secrets in state or code (use vault/secrets manager)
-- Local state in production
-- Hardcoded values (use variables)
-- Missing explicit resource dependencies
-- No plan before apply
-- terraform apply -auto-approve in production
-
-## Testing Strategy
-- **Unit**: terraform validate, tflint
-- **Integration**: Terratest for real resources
-- **Security**: Checkov/tfsec in CI
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| State drift | Regular plan, import existing resources |
-| Destroy on rename | Use moved blocks |
-| Provider version drift | Pin versions in required_providers |
-| Circular dependencies | Restructure or use depends_on |
-
-## Performance Red Lines
-- No O(n^2) resource lookups
-- No massive blast radius (split state)
-- No blocking applies on unrelated changes
-
-## Security Checklist
-- [ ] State encrypted at rest
-- [ ] Secrets from vault/secrets manager
-- [ ] Least privilege IAM for providers
-- [ ] Checkov/tfsec passing in CI
+## Version Gotchas
+- **OpenTofu 1.8+**: State encryption, early variable evaluation
+- **OpenTofu**: Drop-in replacement, MPL 2.0 license
+- **State isolation**: Separate state per env and component
+- **Modules**: Use for reusability and abstraction
+- **With teams**: Peer review all plans before apply

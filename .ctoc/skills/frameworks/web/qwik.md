@@ -1,39 +1,32 @@
 # Qwik CTO
-> Resumable applications - zero hydration, instant interactivity, O(1) startup.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm create qwik@latest
-npm run dev
-npm run test.unit
+# Select template and options
+cd my-app && npm install && npm run dev
 ```
 
-## Non-Negotiables
-1. `$` suffix for lazy-loaded code boundaries
-2. `useSignal` for reactive state - fine-grained updates
-3. `routeLoader$` for server-side data loading
-4. Serialization boundaries respected - no closures in `$`
-5. `useTask$` for side effects
+## Claude's Common Mistakes
+1. **Closures in `$` functions** — Variables captured in `$` must be serializable
+2. **Missing `$` suffix** — Lazy-loaded boundaries need `$` (e.g., `onClick$`)
+3. **Heavy client-side JS** — Defeats Qwik's resumability purpose
+4. **Non-serializable state** — Use `noSerialize()` or restructure
+5. **Accessing `.value` incorrectly** — `routeLoader$` returns signal, access `.value`
 
-## Red Lines
-- Heavy client-side JavaScript - defeats Qwik's purpose
-- Breaking resumability with non-serializable state
-- Closures capturing variables in `$` functions
-- Eager loading when lazy works
-- Ignoring serialization warnings
-
-## Pattern: Resumable Data Loading
+## Correct Patterns (2026)
 ```typescript
-// src/routes/users/index.tsx
+// Resumable data loading
 import { component$, useSignal } from '@builder.io/qwik';
-import { routeLoader$, Form, routeAction$, zod$, z } from '@builder.io/qwik-city';
+import { routeLoader$, routeAction$, Form, zod$, z } from '@builder.io/qwik-city';
 
+// Server-side data loader
 export const useUsers = routeLoader$(async ({ platform }) => {
-  const users = await platform.db.user.findMany();
-  return users;
+  return await platform.db.user.findMany();
 });
 
+// Server action with validation
 export const useCreateUser = routeAction$(
   async (data, { platform }) => {
     await platform.db.user.create({ data });
@@ -47,46 +40,56 @@ export default component$(() => {
   const createAction = useCreateUser();
   const search = useSignal('');
 
-  const filteredUsers = users.value.filter(
+  // CORRECT: Access .value for loader data
+  const filtered = users.value.filter(
     u => u.name.toLowerCase().includes(search.value.toLowerCase())
   );
 
   return (
     <div>
       <input bind:value={search} placeholder="Search..." />
-
       <Form action={createAction}>
         <input name="email" type="email" required />
-        <input name="name" required />
-        <button>Add User</button>
+        <button type="submit">Add User</button>
       </Form>
-
-      {filteredUsers.map(user => (
-        <div key={user.id}>{user.name}</div>
-      ))}
+      {filtered.map(user => <div key={user.id}>{user.name}</div>)}
     </div>
   );
 });
 ```
 
-## Integrates With
-- **DB**: Any ORM via platform bindings
-- **Auth**: Cookie-based sessions with `routeLoader$`
-- **Validation**: Zod with `zod$` helper
-- **Deploy**: Adapters for Cloudflare, Vercel, Node
+## Version Gotchas
+- **Serialization**: All state in `$` functions must be serializable
+- **Resumability**: Zero hydration is the goal; avoid client-side bloat
+- **Closure capture**: Variables from outer scope cause serialization errors
+- **Prefetch**: Configure strategy for optimal lazy loading
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Captured closure variable` | Move variable inside `$` function |
-| `Not serializable` | Use `noSerialize()` or restructure |
-| `useSignal outside component` | Call inside `component$` body |
-| `routeLoader$ not awaited` | Access `.value` property |
+## What NOT to Do
+- ❌ Capturing closures in `$` functions — Move variable inside function
+- ❌ `onClick={() => ...}` — Use `onClick$={() => ...}` for lazy loading
+- ❌ Heavy client JS bundles — Defeats Qwik's O(1) startup
+- ❌ `users.value.value` — Only one `.value` needed
+- ❌ Non-serializable objects in state — Use `noSerialize()`
 
-## Prod Ready
-- [ ] Adapter configured for deployment target
-- [ ] Prefetch strategy configured
-- [ ] Error boundaries in place
-- [ ] Service worker for offline support
-- [ ] Bundle size minimal (should be tiny)
-- [ ] Lighthouse performance > 95
+## Serialization Rules
+```typescript
+// WRONG: Closure captures external variable
+const external = someValue;
+const handler$ = $(() => {
+  console.log(external);  // Error: captured closure
+});
+
+// CORRECT: Pass as parameter or compute inside
+const handler$ = $((event) => {
+  const value = computeValue();  // Inside the function
+  console.log(value);
+});
+```
+
+## When to Use Qwik
+| Good Fit | Bad Fit |
+|----------|---------|
+| Content sites | Real-time apps |
+| E-commerce | Heavy animations |
+| Marketing pages | Complex client state |
+| SEO-critical apps | Offline-first apps |

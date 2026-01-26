@@ -1,30 +1,25 @@
 # Nuxt CTO
-> Vue meta-framework - universal rendering, auto-imports, file-based routing.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npx nuxi init myapp -t v3
-npm run dev
-npm run test
+npx nuxi init my-app
+# For Nuxt 4-ready project:
+npx nuxi init my-app -t v4-compat
+# Requires Node.js 18+
+cd my-app && npm install && npm run dev
 ```
 
-## Non-Negotiables
-1. Auto-imports used wisely - be explicit for complex utilities
-2. Server routes (`/server/api/`) for backend logic
-3. Composables in `composables/` for shared reactive logic
-4. `useFetch` or `useAsyncData` for data fetching - never raw fetch in setup
-5. SEO with `useHead` and `useSeoMeta` on every page
+## Claude's Common Mistakes
+1. **Confusing create-nuxt versions** — Package version != Nuxt version; v3.27 creates Nuxt 4
+2. **Corrupted lockfiles** — Use `npm ci` not `npm install` for clean installs
+3. **NODE_ENV=production locally** — Excludes devDependencies; breaks builds
+4. **Tailwind/Vite plugin errors** — Ensure proper @tailwindcss/vite configuration
+5. **Calling useFetch in event handlers** — Must be in `<script setup>` or composables
 
-## Red Lines
-- Client-only data fetching when server rendering works
-- Missing error handling on async operations
-- Blocking renders with synchronous data
-- Huge auto-imported namespaces without explicit imports
-- Ignoring TypeScript errors
-
-## Pattern: Data Fetching with Composable
+## Correct Patterns (2026)
 ```typescript
+// Composable pattern (useFetch in setup only)
 // composables/useUsers.ts
 export function useUsers() {
   const users = useState<User[]>('users', () => []);
@@ -35,6 +30,7 @@ export function useUsers() {
     },
   });
 
+  // For mutations, use $fetch (not useFetch)
   async function createUser(data: CreateUserDTO) {
     await $fetch('/api/users', {
       method: 'POST',
@@ -43,42 +39,46 @@ export function useUsers() {
     await refresh();
   }
 
-  return { users, pending, error, createUser, refresh };
+  return { users, pending, error, createUser };
 }
 
+// Server API route with validation
 // server/api/users.post.ts
 import { z } from 'zod';
 
-const CreateUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(2),
-});
-
 export default defineEventHandler(async (event) => {
-  const body = await readValidatedBody(event, CreateUserSchema.parse);
-  const user = await prisma.user.create({ data: body });
-  return user;
+  const body = await readValidatedBody(event,
+    z.object({ email: z.string().email() }).parse
+  );
+  return await db.user.create({ data: body });
 });
 ```
 
-## Integrates With
-- **DB**: Prisma or Drizzle in server routes
-- **Auth**: `@sidebase/nuxt-auth` or custom session handling
-- **State**: Pinia with `@pinia/nuxt` module
-- **UI**: Nuxt UI or custom component library
+## Version Gotchas
+- **Nuxt 3→4**: Run codemod, review changes carefully
+- **Auto-imports**: Can mask issues; be explicit for complex utilities
+- **useFetch**: Only works during setup, not in event handlers
+- **useState**: Must be called in setup, not callbacks
+
+## What NOT to Do
+- ❌ `npm install` with corrupted lockfile — Use `npm ci`
+- ❌ `useFetch` in click handlers — Use `$fetch` for imperative calls
+- ❌ `useState` outside setup — Only in `<script setup>` or composables
+- ❌ Skip codemod review — It may alter custom code incorrectly
+- ❌ Raw `fetch()` in setup — Use `useFetch` or `useAsyncData`
+
+## useFetch vs $fetch
+| Context | Use |
+|---------|-----|
+| `<script setup>` | `useFetch()` |
+| Event handlers | `$fetch()` |
+| Composables (setup) | `useFetch()` |
+| Server routes | `$fetch()` |
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Hydration mismatch` | Use `<ClientOnly>` for browser-only content |
-| `useFetch only works during setup` | Call in `<script setup>` or composable, not event handlers |
-| `500 Internal Server Error` | Check server route, add error handling |
-| `useState must be called in setup` | Move to `<script setup>` block |
-
-## Prod Ready
-- [ ] `nuxt build` with `nitro.preset` for target platform
-- [ ] ISR or SWR caching configured
-- [ ] Error pages (`error.vue`) customized
-- [ ] Runtime config separated from build-time
-- [ ] Image optimization with `@nuxt/image`
-- [ ] Bundle analyzed with `nuxt analyze`
+| `useFetch only works during setup` | Move to setup or use `$fetch` |
+| `Hydration mismatch` | Use `<ClientOnly>` wrapper |
+| `Pre-transform error: tailwindcss` | Check Tailwind Vite plugin config |
+| `useState must be called in setup` | Move to `<script setup>` |

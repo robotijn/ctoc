@@ -1,78 +1,50 @@
 # TensorFlow CTO
-> Enterprise-grade ML at scale with seamless production deployment.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install tensorflow[and-cuda]
-python -m tensorflow.keras.backend.clear_session && python train.py
-pytest tests/ -v && python -m tf_keras.testing
+# TensorFlow 2.20+ requires Python 3.11+. Do NOT use conda.
+pip install tensorflow[and-cuda]  # GPU support included
+# Verify: python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
 
-## Non-Negotiables
-1. Keras API exclusively for model building
-2. `tf.data` pipelines with prefetch and caching
-3. Mixed precision via `tf.keras.mixed_precision`
-4. TensorBoard for training visualization
-5. SavedModel format for deployment
-6. `@tf.function` for graph execution
+## Claude's Common Mistakes
+1. Suggesting `from tensorflow.keras import` - Keras 3 is standalone now
+2. Using deprecated `tf.lite` - migrated to LiteRT (separate package)
+3. Recommending `tf_keras` when project uses Keras 3
+4. Missing memory growth config causing OOM on first run
+5. Using `model.fit()` without `tf.data` pipeline optimization
 
-## Red Lines
-- TensorFlow 1.x style session-based code
-- Manual training loops when `model.fit()` suffices
-- Not using `tf.function` for performance-critical paths
-- Eager execution in production inference
-- Ignoring XLA compilation for TPU/GPU
-- Raw NumPy arrays instead of `tf.data.Dataset`
-
-## Pattern: Production Training Pipeline
+## Correct Patterns (2026)
 ```python
 import tensorflow as tf
+import keras  # Keras 3 is standalone
 
-# Enable mixed precision
-tf.keras.mixed_precision.set_global_policy("mixed_float16")
+# Enable memory growth BEFORE any TF operations
+gpus = tf.config.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
 
-# Build model with Functional API
-inputs = tf.keras.Input(shape=(224, 224, 3))
-x = tf.keras.applications.EfficientNetV2B0(include_top=False)(inputs)
-x = tf.keras.layers.GlobalAveragePooling2D()(x)
-outputs = tf.keras.layers.Dense(10, dtype="float32")(x)
-model = tf.keras.Model(inputs, outputs)
+# Mixed precision for efficiency
+keras.mixed_precision.set_global_policy("mixed_float16")
 
 # Optimized data pipeline
-dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+dataset = tf.data.Dataset.from_tensor_slices((x, y))
 dataset = dataset.shuffle(10000).batch(32).prefetch(tf.data.AUTOTUNE)
 
-# Train with callbacks
-model.compile(optimizer="adamw", loss="sparse_categorical_crossentropy")
-model.fit(dataset, epochs=10, callbacks=[
-    tf.keras.callbacks.TensorBoard(log_dir="./logs"),
-    tf.keras.callbacks.ModelCheckpoint("model.keras", save_best_only=True),
-    tf.keras.callbacks.EarlyStopping(patience=3),
-])
-
-# Export for serving
+# Export for serving (new API)
 model.export("saved_model/")
 ```
 
-## Integrates With
-- **Serving**: TF Serving, TFLite, TensorFlow.js
-- **Data**: tf.data, TFRecord, BigQuery
-- **Tracking**: TensorBoard, Vertex AI
-- **Hardware**: TPU, GPU via XLA
+## Version Gotchas
+- **v2.20**: `tf.lite` deprecated - use LiteRT package instead
+- **v2.16+**: `pip install tensorflow` installs Keras 3 by default
+- **Keras 3.13+**: Requires Python 3.11+
+- **Legacy**: Use `pip install tf_keras` for Keras 2 compatibility
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `OOM when allocating tensor` | Enable memory growth: `tf.config.experimental.set_memory_growth(gpu, True)` |
-| `Graph execution error` | Debug with `tf.config.run_functions_eagerly(True)` |
-| `InvalidArgumentError: incompatible shapes` | Check input shapes with `model.summary()` |
-| `Could not load dynamic library` | Verify CUDA/cuDNN versions match TF requirements |
-
-## Prod Ready
-- [ ] Model saved as SavedModel with signatures
-- [ ] tf.data pipeline uses prefetch and cache
-- [ ] Mixed precision enabled for GPU training
-- [ ] XLA compilation enabled for TPU deployment
-- [ ] Model versioned with SavedModel metadata
-- [ ] TFLite conversion tested for mobile deployment
+## What NOT to Do
+- Do NOT use `from tensorflow.keras` - import `keras` directly
+- Do NOT install TensorFlow with conda (outdated versions)
+- Do NOT skip memory growth config on GPU systems
+- Do NOT use eager execution in production inference
+- Do NOT ignore XLA compilation for TPU/GPU performance

@@ -1,51 +1,37 @@
-# GGML CTO
-> Lightweight tensor library for efficient ML inference on CPUs and GPUs.
+# GGML/GGUF CTO
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install ggml  # Python bindings
-# Or build from source
-git clone https://github.com/ggerganov/ggml && cd ggml && mkdir build && cd build && cmake .. && make
-./bin/test-ggml
+# GGML is typically used via llama-cpp-python
+pip install llama-cpp-python
+# For CUDA: CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python
+# Models use GGUF format (successor to GGML)
 ```
 
-## Non-Negotiables
-1. Select appropriate quantization format (Q4_K_M, Q5_K_M)
-2. Enable memory mapping for large models
-3. Plan context size based on available memory
-4. Configure thread count for CPU inference
-5. Validate model conversion before deployment
-6. Use GGUF format (successor to GGML)
+## Claude's Common Mistakes
+1. Using old GGML format instead of GGUF
+2. Wrong quantization for hardware (Q4_K_M is usually best)
+3. Not enabling memory mapping for large models
+4. Missing `n_gpu_layers` when GPU available
+5. Default context size too small
 
-## Red Lines
-- Wrong quantization for target hardware
-- Missing memory mapping for large models
-- Ignoring context size limits
-- No thread optimization for multi-core
-- Using unconverted model formats
-- Skipping conversion validation
-
-## Pattern: Model Conversion and Inference
+## Correct Patterns (2026)
 ```python
-# Convert HuggingFace model to GGUF (using llama.cpp tools)
-# python convert_hf_to_gguf.py meta-llama/Llama-3.1-8B --outtype q4_k_m
-
-# Using GGML through llama-cpp-python
 from llama_cpp import Llama
 
-# Configure for optimal performance
+# Load GGUF model with optimizations
 llm = Llama(
-    model_path="llama-3.1-8b.Q4_K_M.gguf",
-    n_ctx=4096,  # Context size
-    n_threads=8,  # CPU threads
-    n_gpu_layers=35,  # GPU offload layers
-    use_mmap=True,  # Memory mapping
-    use_mlock=False,  # Lock in RAM (requires privileges)
+    model_path="llama-3.1-8b.Q4_K_M.gguf",  # GGUF format, not GGML
+    n_ctx=4096,           # Context window
+    n_threads=8,          # CPU threads
+    n_gpu_layers=-1,      # -1 = offload all layers to GPU
+    use_mmap=True,        # Memory map for efficiency
+    use_mlock=False,      # Set True if you have permissions
     verbose=False,
 )
 
-# Inference
+# Basic inference
 output = llm(
     "Explain quantum computing:",
     max_tokens=256,
@@ -53,36 +39,31 @@ output = llm(
     top_p=0.9,
     stop=["User:", "\n\n"],
 )
-
 print(output["choices"][0]["text"])
 
 # Streaming
-for chunk in llm(
-    "Write a poem about AI:",
-    max_tokens=256,
-    stream=True,
-):
+for chunk in llm("Write a poem:", max_tokens=256, stream=True):
     print(chunk["choices"][0]["text"], end="", flush=True)
+
+# Chat completion (OpenAI-compatible)
+response = llm.create_chat_completion(
+    messages=[
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello!"}
+    ],
+    max_tokens=256,
+)
 ```
 
-## Integrates With
-- **Inference**: llama.cpp, llama-cpp-python
-- **Formats**: GGUF, safetensors (via conversion)
-- **Hardware**: CPU (AVX2/AVX512), CUDA, Metal
-- **Deployment**: Local, edge devices, servers
+## Version Gotchas
+- **GGUF**: Current format, GGML is deprecated
+- **Quantization**: Q4_K_M best balance, Q5_K_M for quality, Q4_0 for size
+- **n_gpu_layers**: Use -1 for full GPU, reduce if OOM
+- **Context**: Default 512, most models support 4096+
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Model format not supported` | Convert to GGUF format |
-| `Out of memory` | Use smaller quantization, enable mmap |
-| `Slow inference` | Increase n_gpu_layers, optimize n_threads |
-| `Context too long` | Reduce n_ctx, use sliding window |
-
-## Prod Ready
-- [ ] Model converted to GGUF format
-- [ ] Quantization appropriate for hardware
-- [ ] Memory mapping enabled
-- [ ] Thread count optimized for CPU
-- [ ] GPU layers configured if available
-- [ ] Context size validated
+## What NOT to Do
+- Do NOT use GGML format - convert to GGUF
+- Do NOT skip `n_gpu_layers` when GPU available
+- Do NOT use default context size (512) - set explicitly
+- Do NOT forget `use_mmap=True` for large models
+- Do NOT use Q8_0 unless quality critical (slow)

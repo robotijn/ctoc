@@ -1,30 +1,21 @@
 # Apache Hudi CTO
-> Streaming data lakehouse with incremental processing and ACID transactions.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install pyspark hudi-spark-bundle
-spark-submit --packages org.apache.hudi:hudi-spark3.4-bundle_2.12:0.14.0 job.py
-hudi-cli --table-path s3://bucket/hudi_table
+pip install pyspark
+# With Spark
+spark-submit --packages org.apache.hudi:hudi-spark3.5-bundle_2.12:0.15.0 job.py
 ```
 
-## Non-Negotiables
-1. Table type selection: Copy-on-Write (CoW) vs Merge-on-Read (MoR)
-2. Record key design for efficient upserts
-3. Compaction scheduling for MoR tables
-4. Clustering for query performance
-5. Incremental queries for efficient downstream
-6. Cleaning policies to manage storage
+## Claude's Common Mistakes
+1. **Wrong table type** - CoW for read-heavy, MoR for write-heavy
+2. **Missing compaction for MoR** - Causes read amplification
+3. **Bad record key design** - Affects upsert performance
+4. **No cleaning policy** - Storage bloat over time
+5. **Ignoring clustering** - Important for read performance
 
-## Red Lines
-- Wrong table type for access pattern
-- Missing compaction causing read amplification
-- Large file groups degrading performance
-- No cleaning policy causing storage bloat
-- Ignoring timeline for debugging
-
-## Pattern: Production Hudi Table
+## Correct Patterns (2026)
 ```python
 from pyspark.sql import SparkSession
 
@@ -33,16 +24,15 @@ spark = SparkSession.builder \
     .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.hudi.catalog.HoodieCatalog") \
     .getOrCreate()
 
-# Write with Hudi (MoR for streaming, CoW for batch)
 hudi_options = {
     "hoodie.table.name": "events",
-    "hoodie.datasource.write.table.type": "MERGE_ON_READ",
+    "hoodie.datasource.write.table.type": "MERGE_ON_READ",  # Or COPY_ON_WRITE
     "hoodie.datasource.write.recordkey.field": "event_id",
     "hoodie.datasource.write.precombine.field": "event_time",
     "hoodie.datasource.write.partitionpath.field": "date",
     "hoodie.datasource.write.operation": "upsert",
 
-    # Compaction settings
+    # Compaction (CRITICAL for MoR)
     "hoodie.compact.inline": "true",
     "hoodie.compact.inline.max.delta.commits": "5",
 
@@ -55,39 +45,23 @@ hudi_options = {
     "hoodie.cleaner.commits.retained": "10",
 }
 
-df.write.format("hudi") \
-    .options(**hudi_options) \
-    .mode("append") \
-    .save("s3://bucket/events")
+df.write.format("hudi").options(**hudi_options).mode("append").save("s3://bucket/events")
 
 # Incremental query (efficient for pipelines)
 incremental_df = spark.read.format("hudi") \
     .option("hoodie.datasource.query.type", "incremental") \
     .option("hoodie.datasource.read.begin.instanttime", last_commit) \
     .load("s3://bucket/events")
-
-# Time travel
-historical_df = spark.read.format("hudi") \
-    .option("as.of.instant", "20240115100000") \
-    .load("s3://bucket/events")
 ```
 
-## Integrates With
-- **Compute**: Spark, Flink, Presto, Trino
-- **Storage**: S3, ADLS, GCS, HDFS
-- **Streaming**: Kafka via DeltaStreamer
+## Version Gotchas
+- **v0.15+**: Improved performance, record-level indexing
+- **CoW vs MoR**: CoW = simple reads, slow writes; MoR = fast writes, need compaction
+- **Incremental queries**: Key feature for efficient ETL pipelines
+- **Timeline**: Debug issues via .hoodie folder metadata
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Compaction not running` | Check inline or async compaction settings |
-| `Duplicate records` | Verify recordkey uniqueness |
-| `Slow reads on MoR` | Run compaction more frequently |
-| `Storage growing` | Enable cleaning policy |
-
-## Prod Ready
-- [ ] Table type matched to access pattern
-- [ ] Compaction schedule configured
-- [ ] Clustering enabled for read performance
-- [ ] Cleaning policy active
-- [ ] Incremental queries for pipelines
+## What NOT to Do
+- Do NOT use wrong table type for access pattern
+- Do NOT skip compaction for MoR tables (slow reads)
+- Do NOT ignore cleaning policy (storage bloat)
+- Do NOT forget clustering for read performance

@@ -1,31 +1,26 @@
 # Crossplane CTO
-> Kubernetes-native cloud infrastructure leader demanding composition-based platform APIs.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Install Crossplane
+kubectl create namespace crossplane-system
+helm repo add crossplane-stable https://charts.crossplane.io/stable
+helm install crossplane crossplane-stable/crossplane -n crossplane-system
+# Install provider
 kubectl crossplane install provider upbound/provider-aws
-kubectl apply -f composition.yaml
-kubectl get managed -A && kubectl describe composite mydb
 ```
 
-## Non-Negotiables
-1. Compositions for abstracting cloud resources into platform APIs
-2. Provider credentials via Kubernetes secrets with IRSA/Workload Identity
-3. XRDs (Composite Resource Definitions) for self-service platform APIs
-4. Patch and transform pipelines for dynamic configuration
-5. GitOps workflow with ArgoCD or Flux for composition management
+## Claude's Common Mistakes
+1. **Direct managed resource access** - Use XRDs for platform APIs
+2. **Hardcodes credentials** - Must use ProviderConfig with IRSA/Workload Identity
+3. **Missing deletion policies** - Causes orphaned cloud resources
+4. **Unversioned XRDs** - Breaks consumer compatibility
+5. **Skips composition validation** - Errors surface in production
 
-## Red Lines
-- Direct managed resource access for application teams - use XRDs
-- Credentials hardcoded in compositions - use ProviderConfig
-- Missing deletion policies causing orphaned cloud resources
-- No composition validation before deployment
-- Unversioned XRDs breaking consumer compatibility
-
-## Pattern: Composition with XRD
+## Correct Patterns (2026)
 ```yaml
-# xrd.yaml
+# Composite Resource Definition (XRD)
 apiVersion: apiextensions.crossplane.io/v1
 kind: CompositeResourceDefinition
 metadata:
@@ -35,6 +30,9 @@ spec:
   names:
     kind: XPostgreSQL
     plural: xpostgresqls
+  claimNames:
+    kind: PostgreSQL
+    plural: postgresqls
   versions:
     - name: v1alpha1
       served: true
@@ -51,11 +49,14 @@ spec:
                   enum: [small, medium, large]
               required: [size]
 
-# composition.yaml
+---
+# Composition
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
   name: xpostgresql-aws
+  labels:
+    provider: aws
 spec:
   compositeTypeRef:
     apiVersion: database.example.com/v1alpha1
@@ -69,6 +70,7 @@ spec:
           forProvider:
             engine: postgres
             engineVersion: "15"
+          deletionPolicy: Delete  # or Orphan
       patches:
         - fromFieldPath: spec.size
           toFieldPath: spec.forProvider.instanceClass
@@ -80,20 +82,15 @@ spec:
                 large: db.t3.medium
 ```
 
-## Integrates With
-- **DB**: AWS RDS, GCP CloudSQL, Azure Database via providers
-- **Auth**: IRSA/Workload Identity for cloud provider authentication
-- **Cache**: ElastiCache compositions with VPC networking
+## Version Gotchas
+- **Crossplane 1.15+**: Composition Functions GA
+- **Upbound providers**: Replacing crossplane-contrib
+- **IRSA/Workload Identity**: Required for cloud auth
+- **With ArgoCD**: Use App-of-Apps for composition management
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `cannot compose resources: referenced field not found` | Verify patch fromFieldPath exists in XRD schema |
-| `provider not healthy` | Check provider pod logs, verify credentials |
-| `resource stuck in creating` | Check cloud provider console, examine managed resource events |
-
-## Prod Ready
-- [ ] XRDs versioned with backward compatibility strategy
-- [ ] Compositions tested in dev cluster before promotion
-- [ ] Provider credentials using cloud-native identity (IRSA/Workload Identity)
-- [ ] Usage policies enforced via Crossplane RBAC
+## What NOT to Do
+- Do NOT expose managed resources directly - use XRDs
+- Do NOT hardcode credentials - use ProviderConfig
+- Do NOT skip deletionPolicy - causes orphaned resources
+- Do NOT deploy unversioned XRDs - breaks consumers
+- Do NOT skip composition validation in dev cluster first

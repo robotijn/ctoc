@@ -1,32 +1,23 @@
 # dbt CTO
-> The analytics engineering standard for data transformation and modeling.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install dbt-core dbt-postgres  # or dbt-snowflake, dbt-bigquery
-dbt run --select staging+ --target dev
-dbt test --select tag:critical
+pip install dbt-core dbt-postgres  # or dbt-snowflake, dbt-bigquery, dbt-duckdb
+dbt init my_project && cd my_project
+dbt debug  # Verify connection
 ```
 
-## Non-Negotiables
-1. Layered architecture: staging -> intermediate -> marts
-2. Tests on all critical models (unique, not_null, relationships)
-3. Documentation for every model and column
-4. Incremental models for tables > 1M rows
-5. `ref()` and `source()` exclusively, never hardcoded tables
-6. Version control all models with CI/CD
+## Claude's Common Mistakes
+1. **Hardcoding table names** - Always use ref() and source(), never raw table names
+2. **Business logic in staging** - Staging is for renaming/casting only
+3. **Full refresh on large tables** - Use incremental for tables >1M rows
+4. **Missing tests on marts** - Every mart column needs at least unique/not_null
+5. **Monolithic models** - Split into staging -> intermediate -> marts layers
 
-## Red Lines
-- Hardcoded table names bypassing lineage
-- Models without tests
-- Undocumented columns in marts
-- Full refresh on incremental-capable data
-- Business logic in staging models
-
-## Pattern: Layered Model Architecture
+## Correct Patterns (2026)
 ```sql
--- models/staging/stg_orders.sql
+-- models/staging/stg_orders.sql (light transformation only)
 {{ config(materialized='view') }}
 
 SELECT
@@ -36,9 +27,9 @@ SELECT
     status,
     amount_cents / 100.0 AS amount
 FROM {{ source('raw', 'orders') }}
-WHERE _fivetran_deleted = FALSE
+WHERE NOT _fivetran_deleted
 
--- models/marts/fct_daily_revenue.sql
+-- models/marts/fct_daily_revenue.sql (incremental for large data)
 {{ config(
     materialized='incremental',
     unique_key='date_day',
@@ -57,22 +48,14 @@ WHERE status = 'completed'
 GROUP BY 1
 ```
 
-## Integrates With
-- **Warehouse**: Snowflake, BigQuery, Redshift, Postgres
-- **Orchestration**: Airflow, Dagster, Prefect
-- **Docs**: dbt docs generate and host
+## Version Gotchas
+- **dbt Core vs Cloud**: Cloud has scheduler, CI, docs hosting; Core is CLI only
+- **Incremental models**: Must handle late-arriving data with lookback window
+- **Macros**: Use for DRY code; test macros separately
+- **dbt Mesh**: Multi-project refs with dbt 1.6+ cross-project dependencies
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Compilation Error: ref not found` | Check model path and run `dbt deps` |
-| `Database Error: permission denied` | Verify service account roles |
-| `Incremental model full refresh` | Check `is_incremental()` logic |
-| `Test failed: unique` | Add deduplication in staging |
-
-## Prod Ready
-- [ ] CI/CD with `dbt build` on PR
-- [ ] Critical tests tagged and enforced
-- [ ] Documentation hosted and current
-- [ ] Incremental models for large tables
-- [ ] Source freshness monitoring enabled
+## What NOT to Do
+- Do NOT hardcode table/schema names (use ref/source)
+- Do NOT put business logic in staging models
+- Do NOT skip tests on mart/fact tables
+- Do NOT use full refresh for large incremental-capable tables

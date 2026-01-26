@@ -1,38 +1,28 @@
 # Vert.x CTO
-> Reactive JVM toolkit - event-driven, non-blocking, polyglot.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 # Maven: io.vertx:vertx-core, io.vertx:vertx-web
 mvn compile exec:java
-mvn test
+# Vert.x 4.x - reactive JVM toolkit
 ```
 
-## Non-Negotiables
-1. Event loop awareness - never block
-2. Verticle architecture for modularity
-3. Event bus for inter-component messaging
-4. Non-blocking patterns throughout
-5. Proper Future/Promise composition
+## Claude's Common Mistakes
+1. **Blocking the event loop** — Never block; use `executeBlocking`
+2. **Ignoring Future composition** — Chain with `.compose()` or `.flatMap()`
+3. **Missing error handlers** — Add `.onFailure()` to all operations
+4. **Sync JDBC calls** — Use Vert.x async SQL clients
+5. **Global mutable state** — Use Verticle-scoped state
 
-## Red Lines
-- Blocking the event loop
-- Ignoring Future composition
-- Missing error handlers on handlers
-- Sync JDBC calls - use async clients
-- Global mutable state
-
-## Pattern: Web Verticle
+## Correct Patterns (2026)
 ```java
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.Future;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 
 public class MainVerticle extends AbstractVerticle {
-
     private UserService userService;
 
     @Override
@@ -60,7 +50,7 @@ public class MainVerticle extends AbstractVerticle {
             .requestHandler(router)
             .listen(8080)
             .onSuccess(server ->
-                System.out.println("Server started on port " + server.actualPort())
+                System.out.println("Started on port " + server.actualPort())
             );
     }
 
@@ -97,24 +87,23 @@ public class MainVerticle extends AbstractVerticle {
 }
 ```
 
-## Integrates With
-- **DB**: Vert.x SQL clients (async Postgres, MySQL)
-- **Auth**: Vert.x Auth with JWT
-- **Messaging**: Event bus, Kafka, RabbitMQ
-- **Clustering**: Hazelcast for distributed
+## Version Gotchas
+- **Vert.x 4.x**: Future-based API; Java 11+ required
+- **Event loop**: Never block; use `vertx.executeBlocking()`
+- **Futures**: Chain with `.compose()`, handle errors with `.onFailure()`
+- **Async clients**: Use Vert.x SQL clients, not JDBC
+
+## What NOT to Do
+- ❌ Blocking operations on event loop — Use `executeBlocking()`
+- ❌ Sync JDBC — Use Vert.x async SQL clients
+- ❌ Missing `.onFailure()` — Errors silently dropped
+- ❌ Unhandled Futures — Chain or subscribe
+- ❌ Global mutable state — Use Verticle scope
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Blocked event loop` | Move to worker verticle or executeBlocking |
-| `Future not composed` | Chain with `.compose()` or `.flatMap()` |
+| `Blocked event loop` | Use worker verticle or `executeBlocking` |
+| `Future not composed` | Chain with `.compose()` |
 | `NullPointerException` | Check body and path params |
-| `Verticle not deployed` | Check deployment succeeded |
-
-## Prod Ready
-- [ ] Clustering configured
-- [ ] Health check endpoint
-- [ ] Metrics exported
-- [ ] Circuit breakers for resilience
-- [ ] Graceful shutdown
-- [ ] Worker pool sized
+| `Verticle not deployed` | Check deployment result |

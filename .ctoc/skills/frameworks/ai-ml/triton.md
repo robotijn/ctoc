@@ -1,31 +1,24 @@
 # NVIDIA Triton CTO
-> High-performance ML model serving at enterprise scale.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker pull nvcr.io/nvidia/tritonserver:24.01-py3
-docker run --gpus all -p 8000:8000 -p 8001:8001 -p 8002:8002 -v /models:/models nvcr.io/nvidia/tritonserver:24.01-py3 tritonserver --model-repository=/models
-curl localhost:8000/v2/health/ready
+# Pull Triton server
+docker pull nvcr.io/nvidia/tritonserver:25.01-py3
+# Run: docker run --gpus all -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+#      -v /models:/models nvcr.io/nvidia/tritonserver:25.01-py3 \
+#      tritonserver --model-repository=/models
+# Python client: pip install tritonclient[all]
 ```
 
-## Non-Negotiables
-1. Proper model repository structure
-2. Correct backend selection for model format
-3. Dynamic batching for throughput
-4. Model ensembles for pipelines
-5. Metrics and health check configuration
-6. Instance groups for GPU allocation
+## Claude's Common Mistakes
+1. Missing config.pbtxt in model directory
+2. No dynamic batching for production
+3. Wrong platform string for model format
+4. Not specifying instance groups for GPU allocation
+5. Missing input/output shape specifications
 
-## Red Lines
-- Missing config.pbtxt in model directory
-- No dynamic batching for production
-- Wrong backend for model format
-- No health check endpoints
-- Ignoring instance groups configuration
-- Missing input/output specifications
-
-## Pattern: Production Model Serving
+## Correct Patterns (2026)
 ```
 # Model repository structure
 model_repository/
@@ -33,17 +26,10 @@ model_repository/
     config.pbtxt
     1/
       model.onnx
-  classifier/
-    config.pbtxt
-    1/
-      model.pt
-  ensemble/
-    config.pbtxt
-    1/
 ```
 
 ```protobuf
-# config.pbtxt for ONNX model
+# config.pbtxt
 name: "text_encoder"
 platform: "onnxruntime_onnx"
 max_batch_size: 64
@@ -78,9 +64,7 @@ instance_group [
 ]
 
 optimization {
-  cuda {
-    graphs: true
-  }
+  cuda { graphs: true }
 }
 ```
 
@@ -103,24 +87,15 @@ result = client.infer("text_encoder", inputs)
 embeddings = result.as_numpy("embeddings")
 ```
 
-## Integrates With
-- **Backends**: ONNX, TensorRT, PyTorch, TensorFlow
-- **Formats**: SavedModel, TorchScript, ONNX, Plan
-- **Monitoring**: Prometheus, Grafana
-- **Deployment**: Kubernetes, Docker, cloud
+## Version Gotchas
+- **Platform strings**: onnxruntime_onnx, tensorrt_plan, pytorch_libtorch
+- **Dynamic batching**: Required for production throughput
+- **Instance groups**: Allocate GPUs explicitly
+- **Metrics**: Prometheus on port 8002
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Model not ready` | Check config.pbtxt, verify model path |
-| `Backend not found` | Use correct platform string |
-| `Shape mismatch` | Verify input dims match model |
-| `OOM error` | Reduce batch size, configure instance groups |
-
-## Prod Ready
-- [ ] Model repository structured correctly
-- [ ] Dynamic batching configured
-- [ ] Instance groups allocate GPUs
-- [ ] Health endpoints monitored
-- [ ] Metrics exported to Prometheus
-- [ ] Input/output shapes validated
+## What NOT to Do
+- Do NOT forget config.pbtxt in each model directory
+- Do NOT skip dynamic_batching for production
+- Do NOT use wrong platform string for model format
+- Do NOT ignore instance_group GPU allocation
+- Do NOT skip health check endpoints monitoring

@@ -1,69 +1,72 @@
 # GraphQL CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-npx graphql-eslint .                   # Lint
-npx prettier --write **/*.graphql      # Format
-npm test                               # Test
-npm run codegen                        # Generate types
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude creates N+1 queries — use DataLoader everywhere
+- Claude allows unbounded lists — require pagination
+- Claude exposes internal errors — use error formatting
+- Claude forgets authorization — check at field level
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `apollo server/client` | Full ecosystem | Basic GraphQL |
+| `dataloader` | N+1 prevention | Manual batching |
+| `pothos`/`nexus` | Code-first schemas | String schemas |
+| `graphql-eslint` | Linting | No validation |
+| `graphql-codegen` | Type generation | Manual types |
+
+## Patterns Claude Should Use
+```typescript
+// DataLoader for N+1 prevention
+const userLoader = new DataLoader<string, User>(async (ids) => {
+  const users = await db.users.findMany({ where: { id: { in: [...ids] } } });
+  const userMap = new Map(users.map(u => [u.id, u]));
+  return ids.map(id => userMap.get(id) ?? null);
+});
+
+// Resolver with DataLoader
+const resolvers = {
+  Post: {
+    author: (post, _, { loaders }) => loaders.user.load(post.authorId),
+  },
+  Query: {
+    // Cursor-based pagination required
+    posts: async (_, { first, after }) => {
+      const posts = await db.posts.findMany({
+        take: first + 1,  // Fetch one extra for hasNextPage
+        cursor: after ? { id: after } : undefined,
+      });
+      return {
+        edges: posts.slice(0, first).map(p => ({ node: p, cursor: p.id })),
+        pageInfo: {
+          hasNextPage: posts.length > first,
+          endCursor: posts[first - 1]?.id,
+        },
+      };
+    },
+  },
+};
+
+// Field-level authorization
+author: {
+  resolve: (post, _, { user, loaders }) => {
+    if (!user) throw new AuthenticationError('Must be logged in');
+    return loaders.user.load(post.authorId);
+  },
+},
 ```
 
-## Tools (2024-2025)
-- **Apollo Server/Client** - Full ecosystem
-- **GraphQL Code Generator** - Type generation
-- **Pothos/Nexus** - Code-first schema builders
-- **graphql-eslint** - Schema and operation linting
-- **DataLoader** - N+1 query prevention
+## Anti-Patterns Claude Generates
+- Database query per item — use DataLoader
+- `users(limit: 1000)` — require cursor pagination
+- Exposing raw errors — format for clients
+- Schema-level auth only — check at field level
+- Enabled introspection in prod — disable it
 
-## Project Structure
-```
-project/
-├── src/
-│   ├── schema/        # Type definitions
-│   ├── resolvers/     # Resolver implementations
-│   └── dataloaders/   # DataLoader instances
-├── tests/             # Resolver tests
-└── codegen.yml        # Code generator config
-```
-
-## Non-Negotiables
-1. Schema-first or code-first (pick one, be consistent)
-2. DataLoader for all database associations
-3. Cursor-based pagination for lists
-4. Query complexity/depth limits
-
-## Red Lines (Reject PR)
-- N+1 queries without DataLoader
-- Unbounded list queries (require pagination)
-- Exposing internal errors to clients
-- Missing authentication/authorization
-- Over-fetching sensitive fields
-- Secrets in schema or resolvers
-
-## Testing Strategy
-- **Unit**: Resolver unit tests
-- **Integration**: Full query tests
-- **Schema**: Breaking change detection
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| N+1 queries | Use DataLoader everywhere |
-| Circular references | Lazy loading, depth limits |
-| Schema breaking changes | Use schema registry |
-| Over-fetching | Field-level authorization |
-
-## Performance Red Lines
-- No N+1 database queries
-- No unbounded result sets
-- No expensive computations without caching
-
-## Security Checklist
-- [ ] Authentication on all mutations
-- [ ] Field-level authorization
-- [ ] Query complexity limits enforced
-- [ ] Introspection disabled in production
+## Version Gotchas
+- **DataLoader**: Critical for performance
+- **Pagination**: Always cursor-based for lists
+- **Depth limiting**: Prevent deep nested queries
+- **Complexity analysis**: Limit query cost
+- **With Federation**: Use Apollo Federation for microservices

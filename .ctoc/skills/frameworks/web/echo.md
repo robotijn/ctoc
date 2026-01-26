@@ -1,39 +1,40 @@
 # Echo CTO
-> High-performance Go web framework - minimalist, extensible, HTTP/2 ready.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-go mod init myapp && go get github.com/labstack/echo/v4
+go mod init myapp
+go get github.com/labstack/echo/v4
+# Echo 4.x - requires Go 1.21+
 go run main.go
-go test -v -cover ./...
 ```
 
-## Non-Negotiables
-1. Middleware for logging, recovery, CORS, auth
-2. Request binding with validation tags
-3. Custom error handler for consistent responses
-4. Context propagation with timeouts
-5. Graceful shutdown on signals
+## Claude's Common Mistakes
+1. **Missing custom validator** — Echo requires explicit validator setup
+2. **Unvalidated request input** — Always bind AND validate
+3. **Context not propagated** — Pass `c.Request().Context()` to services
+4. **No error handler** — Errors return generic responses without custom handler
+5. **Blocking without timeouts** — Use context with deadlines
 
-## Red Lines
-- Unvalidated request input
-- Missing error handling
-- Context not propagated to downstream calls
-- Panics leaking to clients
-- Blocking without timeouts
-
-## Pattern: Clean Handler Structure
+## Correct Patterns (2026)
 ```go
-package handler
+package main
 
 import (
     "net/http"
+
+    "github.com/go-playground/validator/v10"
     "github.com/labstack/echo/v4"
+    "github.com/labstack/echo/v4/middleware"
 )
 
-type UserHandler struct {
-    service *service.UserService
+// Custom validator (REQUIRED - Echo doesn't have one)
+type CustomValidator struct {
+    validator *validator.Validate
+}
+
+func (cv *CustomValidator) Validate(i interface{}) error {
+    return cv.validator.Struct(i)
 }
 
 type CreateUserRequest struct {
@@ -43,54 +44,64 @@ type CreateUserRequest struct {
 
 func (h *UserHandler) Create(c echo.Context) error {
     var req CreateUserRequest
+
+    // Bind request body
     if err := c.Bind(&req); err != nil {
         return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
     }
 
+    // Validate (REQUIRED - Bind doesn't validate)
     if err := c.Validate(&req); err != nil {
         return echo.NewHTTPError(http.StatusBadRequest, err.Error())
     }
 
+    // Pass context to service
     ctx := c.Request().Context()
     user, err := h.service.Create(ctx, req.Email, req.Password)
     if err != nil {
-        if errors.Is(err, service.ErrEmailExists) {
-            return echo.NewHTTPError(http.StatusConflict, "email exists")
-        }
         return echo.NewHTTPError(http.StatusInternalServerError, "server error")
     }
 
     return c.JSON(http.StatusCreated, user)
 }
 
-// Custom validator setup
-type CustomValidator struct {
-    validator *validator.Validate
-}
+func main() {
+    e := echo.New()
 
-func (cv *CustomValidator) Validate(i interface{}) error {
-    return cv.validator.Struct(i)
+    // Set custom validator (REQUIRED)
+    e.Validator = &CustomValidator{validator: validator.New()}
+
+    // Middleware
+    e.Use(middleware.Logger())
+    e.Use(middleware.Recover())
+    e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+        Timeout: 30 * time.Second,
+    }))
+
+    // Routes
+    e.POST("/users", userHandler.Create)
+
+    e.Start(":3000")
 }
 ```
 
-## Integrates With
-- **DB**: `sqlx` or `gorm` with context propagation
-- **Auth**: JWT middleware with `echo-jwt`
-- **Validation**: `go-playground/validator` as custom validator
-- **Docs**: Swagger with `swaggo/echo-swagger`
+## Version Gotchas
+- **Echo 4.x**: No built-in validator; must set `e.Validator`
+- **Bind vs Validate**: `Bind()` only parses; `Validate()` checks constraints
+- **Context**: Use `c.Request().Context()` for cancellation/timeout
+- **HTTPError**: Use `echo.NewHTTPError()` for proper responses
+
+## What NOT to Do
+- ❌ `c.Bind(&req)` without `c.Validate(&req)` — No validation
+- ❌ Missing `e.Validator = ...` — Validate() panics
+- ❌ Ignoring `c.Request().Context()` — No timeout propagation
+- ❌ Plain `error` returns — Use `echo.NewHTTPError()`
+- ❌ Missing `middleware.Recover()` — Panics crash server
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
 | `validator not registered` | Set `e.Validator = &CustomValidator{...}` |
-| `context deadline exceeded` | Increase timeout or optimize query |
+| `context deadline exceeded` | Increase timeout or optimize |
 | `bind: unexpected EOF` | Check Content-Type header |
-| `panic recovered` | Check nil pointers, add nil checks |
-
-## Prod Ready
-- [ ] Recovery middleware enabled
-- [ ] Request logging with request ID
-- [ ] Health check endpoints
-- [ ] Prometheus metrics
-- [ ] Graceful shutdown configured
-- [ ] Rate limiting middleware
+| `panic: nil pointer` | Add nil checks, use Recover middleware |

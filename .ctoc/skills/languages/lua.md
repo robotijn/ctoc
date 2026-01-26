@@ -1,68 +1,64 @@
 # Lua CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-luacheck .                             # Lint
-lua-format -i **/*.lua                 # Format
-busted --verbose                       # Test
-luarocks make                          # Build/install
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses global variables — always use `local`
+- Claude concatenates strings in loops — use `table.concat`
+- Claude uses `load`/`loadstring` with user input — code injection
+- Claude forgets `nil` can break table iteration — handle explicitly
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `lua 5.4` / `luajit` | Runtime choice | Lua 5.1 |
+| `luacheck` | Static analysis | No linting |
+| `lua-format` | Formatting | Manual style |
+| `busted` | BDD testing | Ad-hoc tests |
+| `luarocks` | Package management | Manual deps |
+
+## Patterns Claude Should Use
+```lua
+-- Always use local
+local function process(data)
+    local result = {}
+    for i, v in ipairs(data) do
+        result[i] = transform(v)
+    end
+    return result
+end
+
+-- String building with table.concat (not ..)
+local function build_message(items)
+    local parts = {}
+    for i, item in ipairs(items) do
+        parts[i] = tostring(item)
+    end
+    return table.concat(parts, ", ")
+end
+
+-- Proper error handling
+local ok, result = pcall(risky_function, arg)
+if not ok then
+    log_error(result)
+    return nil, result
+end
+
+-- Module pattern
+local M = {}
+function M.public_function() end
+return M
 ```
 
-## Tools (2024-2025)
-- **Lua 5.4 / LuaJIT** - Runtime options
-- **luacheck** - Static analysis
-- **lua-format** - Code formatting
-- **busted** - BDD testing framework
-- **luarocks** - Package management
+## Anti-Patterns Claude Generates
+- Global variables — use `local` always
+- String concat `..` in loops — use `table.concat`
+- `load(user_input)` — code injection vulnerability
+- `nil` in arrays — breaks iteration with `#`
+- Metatable abuse — keep inheritance shallow
 
-## Project Structure
-```
-project/
-├── src/               # Source files
-├── spec/              # Busted test specs
-├── rockspec           # Package definition
-├── .luacheckrc        # Luacheck config
-└── init.lua           # Module entry
-```
-
-## Non-Negotiables
-1. Local variables by default - no globals
-2. Proper error handling with pcall/xpcall
-3. Metatables with documentation
-4. Clean module pattern (return table)
-
-## Red Lines (Reject PR)
-- Global variables without justification
-- Missing error handling on I/O
-- Complex metatable inheritance chains
-- loadstring/load with user input
-- Secrets hardcoded in code
-- require without pcall for optional deps
-
-## Testing Strategy
-- **Unit**: Busted specs, <100ms
-- **Integration**: Real file/network tests
-- **Mocking**: busted mock/stub features
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Global pollution | Use local, strict mode |
-| Table reference sharing | Deep copy when needed |
-| Nil in tables | Use sentinel or check explicitly |
-| Metatable recursion | Document and limit depth |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No table rehashing in loops (preallocate)
-- No string concatenation in loops (use table.concat)
-
-## Security Checklist
-- [ ] Input validated and sanitized
-- [ ] No load/loadstring with user input
-- [ ] Secrets from environment (os.getenv)
-- [ ] Sandbox for untrusted code
+## Version Gotchas
+- **Lua 5.4**: `<const>` and `<close>` attributes
+- **LuaJIT**: Faster but stuck at 5.1 compatibility
+- **nil in tables**: Use sentinel values or explicit checks
+- **Metatables**: Document behavior, limit nesting
+- **With C**: Use registry for references, not globals

@@ -1,36 +1,24 @@
 # fastai CTO
-> Practical deep learning that makes state-of-the-art accessible.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install fastai
-python -c "from fastai.vision.all import *; print('OK')"
-pytest tests/ -v
+# Verify: python -c "from fastai.vision.all import *; print('OK')"
 ```
 
-## Non-Negotiables
-1. DataBlock API for flexible data loading
-2. Use `lr_find()` before training
-3. Use `fine_tune()` for transfer learning
-4. Mixed precision enabled by default
-5. Use callbacks for training control
-6. Export with `learn.export()` for deployment
+## Claude's Common Mistakes
+1. Skipping `lr_find()` before training
+2. Not using `fine_tune()` for transfer learning
+3. Manual training loops when `Learner.fit()` works
+4. Missing DataBlock validation with `show_batch()`
+5. Using `learn.save()` instead of `learn.export()` for deployment
 
-## Red Lines
-- Manual training loops when Learner works
-- Skipping learning rate finder
-- Not using transfer learning when applicable
-- Training from scratch for standard tasks
-- Ignoring data augmentation
-- Not using fastai's built-in transforms
-
-## Pattern: Production Training Pipeline
+## Correct Patterns (2026)
 ```python
 from fastai.vision.all import *
-from fastai.callback.wandb import WandbCallback
 
-# DataBlock for flexible data loading
+# DataBlock with proper transforms
 dblock = DataBlock(
     blocks=(ImageBlock, CategoryBlock),
     get_items=get_image_files,
@@ -44,53 +32,39 @@ dblock = DataBlock(
 )
 
 dls = dblock.dataloaders(path, bs=64)
-dls.show_batch(max_n=9)
+dls.show_batch(max_n=9)  # Always validate DataBlock
 
 # Create learner with pretrained model
-learn = vision_learner(
-    dls,
-    resnet50,
-    metrics=[accuracy, F1Score()],
-    cbs=[WandbCallback(), SaveModelCallback()]
-)
+learn = vision_learner(dls, resnet50, metrics=[accuracy, F1Score()])
 
-# Find optimal learning rate
+# ALWAYS find learning rate first
 learn.lr_find()
 
 # Fine-tune with discriminative learning rates
 learn.fine_tune(10, base_lr=1e-3, freeze_epochs=3)
 
-# Evaluate
+# Interpret results
 interp = ClassificationInterpretation.from_learner(learn)
 interp.plot_confusion_matrix()
 interp.plot_top_losses(9)
 
-# Export for production
+# Export for production (not save!)
 learn.export("model.pkl")
 
 # Load and predict
 learn_inf = load_learner("model.pkl")
-pred, pred_idx, probs = learn_inf.predict(img)
+pred, idx, probs = learn_inf.predict(img)
 ```
 
-## Integrates With
-- **Data**: PIL, OpenCV, pandas
-- **Training**: PyTorch, timm models
-- **Tracking**: W&B, TensorBoard
-- **Deployment**: ONNX, TorchScript, Gradio
+## Version Gotchas
+- **export vs save**: `export()` for deployment, `save()` for training checkpoints
+- **lr_find()**: New `valley` suggestion - use `learn.lr_find().valley`
+- **fine_tune()**: Automatically freezes then unfreezes layers
+- **timm models**: Use `timm.create_model()` for more architectures
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `DataBlock error` | Verify get_items returns valid paths |
-| `CUDA out of memory` | Reduce batch size, use mixed precision |
-| `Label mismatch` | Check get_y returns correct labels |
-| `Transform error` | Ensure transforms match data type |
-
-## Prod Ready
-- [ ] DataBlock tested with show_batch()
-- [ ] Learning rate found with lr_find()
-- [ ] Fine-tuning used for transfer learning
-- [ ] Interpretation plots reviewed
-- [ ] Model exported with learn.export()
-- [ ] Inference tested with load_learner()
+## What NOT to Do
+- Do NOT skip `lr_find()` before training
+- Do NOT use `learn.save()` for deployment - use `learn.export()`
+- Do NOT skip `show_batch()` to validate DataBlock
+- Do NOT write manual training loops
+- Do NOT forget to use transfer learning when applicable

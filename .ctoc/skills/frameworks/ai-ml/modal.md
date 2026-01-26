@@ -1,52 +1,37 @@
 # Modal CTO
-> Serverless cloud infrastructure for ML workloads.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install modal
-modal token new
-modal run app.py
-modal deploy app.py
+modal token new  # Authenticate
+# Run: modal run app.py
+# Deploy: modal deploy app.py
 ```
 
-## Non-Negotiables
-1. Use function decorators for compute units
-2. Select appropriate GPU type for workload
-3. Define container images with dependencies
-4. Use volumes for model persistence
-5. Manage secrets securely
-6. Handle cold starts appropriately
+## Claude's Common Mistakes
+1. Hardcoded secrets in code (use Modal secrets)
+2. Wrong GPU type for model size
+3. Missing image dependencies causing import failures
+4. No volume for large model weights
+5. Loading model in `@method` instead of `@enter`
 
-## Red Lines
-- Hardcoded secrets in code
-- Wrong GPU type for model size
-- Missing image dependencies causing failures
-- No volume for large model weights
-- Ignoring cold start latency
-- Not using stub for organization
-
-## Pattern: Production ML Inference
+## Correct Patterns (2026)
 ```python
 import modal
 
-# Define app and image
 app = modal.App("ml-inference")
 
+# Define image with all dependencies
 image = modal.Image.debian_slim(python_version="3.11").pip_install(
-    "torch",
-    "transformers",
-    "accelerate",
-).run_commands(
-    "pip install flash-attn --no-build-isolation"
-)
+    "torch", "transformers", "accelerate"
+).run_commands("pip install flash-attn --no-build-isolation")
 
-# Volume for model weights
+# Volume for model weights (persists across runs)
 volume = modal.Volume.from_name("model-weights", create_if_missing=True)
 
-# GPU function with model caching
 @app.cls(
-    gpu=modal.gpu.A100(count=1, memory=40),
+    gpu=modal.gpu.A100(count=1, memory=40),  # Match GPU to model
     image=image,
     volumes={"/models": volume},
     secrets=[modal.Secret.from_name("huggingface-secret")],
@@ -54,10 +39,10 @@ volume = modal.Volume.from_name("model-weights", create_if_missing=True)
     allow_concurrent_inputs=10,
 )
 class Inference:
-    @modal.enter()
+    @modal.enter()  # Load model ONCE at container start
     def load_model(self):
-        import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
+        import torch
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-3.1-8B-Instruct",
@@ -76,39 +61,21 @@ class Inference:
         outputs = self.model.generate(**inputs, max_new_tokens=max_tokens)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-# Web endpoint
-@app.function(image=image)
-@modal.web_endpoint(method="POST")
-def inference_endpoint(request: dict):
-    inference = Inference()
-    return {"response": inference.generate.remote(request["prompt"])}
-
-# Local entrypoint for testing
 @app.local_entrypoint()
 def main():
     inference = Inference()
-    result = inference.generate.remote("Explain quantum computing:")
-    print(result)
+    print(inference.generate.remote("Hello, world!"))
 ```
 
-## Integrates With
-- **GPUs**: A100, A10G, T4, H100
-- **Storage**: Volumes, CloudBucketMount
-- **APIs**: Web endpoints, webhooks
-- **Frameworks**: PyTorch, TensorFlow, JAX
+## Version Gotchas
+- **GPU selection**: A100-40GB for 8B models, A100-80GB/H100 for 70B
+- **@modal.enter()**: Runs once when container starts (for model loading)
+- **Volumes**: Required for large model weights to avoid re-download
+- **Secrets**: Use `modal secret create` for API keys
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `GPU not available` | Check GPU quota, use different type |
-| `Import error` | Add dependency to Image definition |
-| `Volume not found` | Create volume with create_if_missing=True |
-| `Cold start timeout` | Use @modal.enter() for model loading |
-
-## Prod Ready
-- [ ] GPU type matches workload requirements
-- [ ] Image includes all dependencies
-- [ ] Volumes persist model weights
-- [ ] Secrets stored securely
-- [ ] Cold start handled with @modal.enter()
-- [ ] Concurrent inputs configured
+## What NOT to Do
+- Do NOT hardcode secrets - use Modal secrets
+- Do NOT load model in `@method` - use `@modal.enter()`
+- Do NOT skip volumes for large models (slow cold starts)
+- Do NOT use wrong GPU for model size
+- Do NOT forget `container_idle_timeout` (wastes money)

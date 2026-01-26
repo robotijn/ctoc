@@ -1,47 +1,52 @@
 # Kubernetes CTO
-> Container orchestration engineering leader demanding GitOps workflows, resource governance, and zero-trust networking.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-kubectl apply -k overlays/dev/
-kubectl rollout status deployment/myapp -n production --timeout=300s
-kubectl run test-pod --rm -it --image=busybox -- wget -qO- http://myapp:8080/health
+# kubectl (latest stable)
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+# kubeadm (for cluster setup)
+sudo apt-get install -y kubeadm kubelet kubectl
+# Note: K8s 1.32 EOL Feb 2026, 1.33 EOL June 2026
 ```
 
-## Non-Negotiables
-1. Declarative GitOps with ArgoCD or Flux - no kubectl apply from laptops
-2. Resource limits and requests on every container
-3. Liveness, readiness, and startup probes for all workloads
-4. Network policies enforcing least-privilege pod communication
-5. RBAC with namespace-scoped service accounts
+## Claude's Common Mistakes
+1. **Uses deprecated APIs** - `flowcontrol.apiserver.k8s.io/v1beta3` removed in 1.32
+2. **Ignores kubeadm cri-tools change** - 1.32+ doesn't auto-install crictl
+3. **Suggests old etcd endpoints** - 1.31+ requires etcd 3.5.11+ for `/livez`/`/readyz`
+4. **Missing PodDisruptionBudgets** - Required for safe rollouts
+5. **Uses `latest` image tag** - Must use digests for production
 
-## Red Lines
-- kubectl apply from local machine in production
-- Running containers as root without explicit security context
-- latest tag in production - use immutable image digests
-- Secrets in plain ConfigMaps - use Sealed Secrets or External Secrets
-- Missing PodDisruptionBudgets for critical workloads
-
-## Pattern: Production-Ready Deployment
+## Correct Patterns (2026)
 ```yaml
+# Production-ready Deployment (K8s 1.32+)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: myapp
 spec:
   replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: myapp
   template:
+    metadata:
+      labels:
+        app: myapp
     spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: myapp
-        image: myapp@sha256:abc123...
+        image: myapp@sha256:abc123...  # DIGEST, not tag
         resources:
           limits:
             memory: "512Mi"
@@ -58,22 +63,21 @@ spec:
           httpGet:
             path: /ready
             port: 8080
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
 ```
 
-## Integrates With
-- **DB**: External operators (CloudNativePG, Vitess) or managed services
-- **Auth**: OIDC via Dex, service mesh mTLS for inter-pod auth
-- **Cache**: Redis Operator or managed ElastiCache with NetworkPolicy
+## Version Gotchas
+- **1.32**: `flowcontrol.apiserver.k8s.io/v1beta3` removed, use v1
+- **1.32**: AuthorizeNodeWithSelectors beta, breaks some RBAC
+- **1.32**: Anonymous auth restricted to health endpoints only
+- **AWS EKS 1.32**: Last version with AL2 AMIs, use AL2023 going forward
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `CrashLoopBackOff` | Check logs, verify probes aren't failing, check resource limits |
-| `ImagePullBackOff` | Verify image exists, check imagePullSecrets for private registries |
-| `OOMKilled` | Increase memory limits or fix application memory leak |
-
-## Prod Ready
-- [ ] Horizontal Pod Autoscaler configured with custom metrics
-- [ ] Pod Security Standards enforced (restricted profile)
-- [ ] Observability stack deployed (Prometheus, Grafana, tracing)
-- [ ] Disaster recovery tested with etcd snapshots and cluster restore
+## What NOT to Do
+- Do NOT use `kubectl apply` from laptops in production - use GitOps
+- Do NOT run as root without explicit security justification
+- Do NOT use `latest` tag - pin to digests
+- Do NOT skip PodDisruptionBudgets for critical workloads
+- Do NOT ignore deprecated API warnings - they become errors

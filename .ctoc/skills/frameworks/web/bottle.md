@@ -1,36 +1,28 @@
 # Bottle CTO
-> Single-file Python micro-framework - simple, lightweight, WSGI compliant.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install bottle
 python app.py
-pytest tests/ -v
+# Bottle 0.13.x - single-file Python micro-framework
 ```
 
-## Non-Negotiables
-1. WSGI compliance for deployment
-2. Plugin architecture for extensions
-3. Route decorators for clean APIs
-4. Template simplicity (built-in or Jinja2)
-5. Proper error handling with error decorator
+## Claude's Common Mistakes
+1. **Complex apps in single file** — Modularize with multiple Bottle instances
+2. **Missing error handlers** — Register handlers for 404, 500
+3. **No plugin architecture** — Use plugins for cross-cutting concerns
+4. **Ignoring WSGI compliance** — Required for production deployment
+5. **Blocking operations** — Bottle is sync; use threads or async server
 
-## Red Lines
-- Complex applications in single file - modularize
-- Missing plugins for features (auth, DB)
-- No error handlers registered
-- Ignoring request/response objects
-- Blocking without async support
-
-## Pattern: Modular Application
+## Correct Patterns (2026)
 ```python
-from bottle import Bottle, request, response, abort, HTTPError
+from bottle import Bottle, request, response, abort
 import json
 
 app = Bottle()
 
-# Error handling
+# Error handlers (REQUIRED)
 @app.error(404)
 def error404(error):
     response.content_type = 'application/json'
@@ -39,9 +31,9 @@ def error404(error):
 @app.error(500)
 def error500(error):
     response.content_type = 'application/json'
-    return json.dumps({'error': 'Internal server error'})
+    return json.dumps({'error': 'Internal error'})
 
-# Plugins for services
+# Plugin for dependency injection
 class ServicePlugin:
     name = 'services'
     api = 2
@@ -63,7 +55,6 @@ def create_user(user_service):
     data = request.json
     if not data or not data.get('email'):
         abort(400, 'Email required')
-
     user = user_service.create(data)
     response.status = 201
     response.content_type = 'application/json'
@@ -76,33 +67,25 @@ def get_user(user_id, user_service):
         abort(404, 'User not found')
     response.content_type = 'application/json'
     return json.dumps(user.to_dict())
-
-@app.get('/health')
-def health():
-    return {'status': 'ok'}
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
 ```
 
-## Integrates With
-- **DB**: SQLAlchemy via plugin, or raw SQL
-- **Templates**: Built-in SimpleTemplate or Jinja2
-- **Auth**: `bottle-cork` or custom plugin
-- **Server**: Gunicorn, Waitress for production
+## Version Gotchas
+- **Bottle 0.13.x**: Stable; minimal updates
+- **WSGI**: Use Gunicorn/uWSGI for production
+- **Plugins**: API version 2 for current plugin interface
+- **JSON**: Set `Content-Type` manually
+
+## What NOT to Do
+- ❌ Large apps in single file — Split into modules
+- ❌ `app.run()` in production — Use WSGI server
+- ❌ Missing error handlers — Silent failures
+- ❌ Forgetting `response.content_type` for JSON
+- ❌ Blocking I/O without thread pool
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Route not found` | Check route decorator syntax |
-| `Request.json is None` | Check Content-Type header |
+| `request.json is None` | Check Content-Type header |
+| `Route not found` | Check decorator syntax |
 | `Plugin not found` | Install with `app.install()` |
-| `Template not found` | Check `views/` directory |
-
-## Prod Ready
-- [ ] WSGI server (Gunicorn, uWSGI)
-- [ ] Error handlers for all codes
-- [ ] Plugins for cross-cutting concerns
-- [ ] Logging configured
-- [ ] Health check endpoint
-- [ ] Request validation
+| `Thread pool exhausted` | Use async WSGI server |

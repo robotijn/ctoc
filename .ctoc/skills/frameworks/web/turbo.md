@@ -1,36 +1,28 @@
 # Turbo CTO
-> HTML-over-the-wire framework - Drive, Frames, Streams for SPA-like speed.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm install @hotwired/turbo
 # Or Rails: rails turbo:install
-# Backend serves HTML responses
+# Server returns HTML, not JSON
 ```
 
-## Non-Negotiables
-1. Turbo Drive for automatic navigation
-2. Turbo Frames for partial page updates
-3. Turbo Streams for real-time mutations
-4. Proper morphing strategy
-5. Cache-Control headers for performance
+## Claude's Common Mistakes
+1. **Building JSON APIs** — Turbo expects HTML responses
+2. **Missing frame IDs** — Turbo can't target frames without matching IDs
+3. **Full page reloads** — Use Turbo Frames for partial updates
+4. **JavaScript for simple updates** — Use Turbo Streams instead
+5. **No loading states** — Users need feedback during navigation
 
-## Red Lines
-- Full page reloads when frames work
-- Missing frame IDs for targeting
-- No stream actions for live updates
-- JavaScript for simple HTML updates
-- Ignoring Turbo's loading states
-
-## Pattern: Frames and Streams
+## Correct Patterns (2026)
 ```html
-<!-- List page with lazy-loaded frame -->
+<!-- Turbo Frame for partial page updates -->
 <turbo-frame id="users_list" src="/users" loading="lazy">
   <p>Loading users...</p>
 </turbo-frame>
 
-<!-- User row with frame for edit -->
+<!-- Row with in-place edit (frame targets itself) -->
 <turbo-frame id="user_1">
   <tr>
     <td>john@example.com</td>
@@ -40,26 +32,25 @@ npm install @hotwired/turbo
   </tr>
 </turbo-frame>
 
-<!-- Edit form replaces frame content -->
+<!-- Server returns replacement frame -->
 <turbo-frame id="user_1">
   <form action="/users/1" method="post">
     <input name="email" value="john@example.com" />
     <button type="submit">Save</button>
-    <a href="/users/1" data-turbo-frame="user_1">Cancel</a>
   </form>
 </turbo-frame>
 
-<!-- Server response with Turbo Stream -->
+<!-- Turbo Stream for real-time updates -->
+<!-- Server response (Content-Type: text/vnd.turbo-stream.html) -->
 <turbo-stream action="replace" target="user_1">
   <template>
     <tr id="user_1">
       <td>updated@example.com</td>
-      <td><a href="/users/1/edit">Edit</a></td>
     </tr>
   </template>
 </turbo-stream>
 
-<!-- Append new item -->
+<!-- Append new item to list -->
 <turbo-stream action="append" target="users_list">
   <template>
     <tr id="user_2">...</tr>
@@ -67,35 +58,34 @@ npm install @hotwired/turbo
 </turbo-stream>
 ```
 
+## Version Gotchas
+- **Turbo 8**: Latest with page refresh morphing
+- **Content-Type**: Streams need `text/vnd.turbo-stream.html`
+- **WebSocket**: Use Action Cable or Mercure for live streams
+- **Rails 8**: Turbo built-in with new defaults
+
+## What NOT to Do
+- ❌ `fetch().then(r => r.json())` — Return HTML, not JSON
+- ❌ `<turbo-frame>` without `id` — Can't be targeted
+- ❌ JavaScript DOM manipulation — Use Turbo Streams
+- ❌ Missing Accept header on forms — Streams won't work
+- ❌ Full page refreshes for updates — Use frames
+
 ## Stream Actions
-| Action | Description |
-|--------|-------------|
-| `append` | Add to end of target |
-| `prepend` | Add to start of target |
-| `replace` | Replace target element |
-| `update` | Replace target's content |
-| `remove` | Remove target element |
-| `before` | Insert before target |
-| `after` | Insert after target |
+| Action | Effect |
+|--------|--------|
+| `append` | Add to end |
+| `prepend` | Add to start |
+| `replace` | Replace entire element |
+| `update` | Replace content only |
+| `remove` | Delete element |
+| `before` | Insert before |
+| `after` | Insert after |
 
-## Integrates With
-- **Backend**: Rails, Laravel, Django (server renders HTML)
-- **Stimulus**: For JavaScript sprinkles
-- **WebSocket**: Action Cable, Mercure for live streams
-- **Morphing**: `data-turbo-method` for animations
-
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Frame not found` | Check ID matches, frame exists |
-| `No Turbo Stream` | Set `Accept: text/vnd.turbo-stream.html` |
-| `Form not submitting` | Check `data-turbo="true"` |
-| `Scroll jumping` | Use `data-turbo-action="advance"` |
-
-## Prod Ready
-- [ ] Cache-Control headers configured
-- [ ] Progress bar styled
-- [ ] Frame loading states handled
-- [ ] Stream actions for real-time
-- [ ] Fallback for non-JS browsers
-- [ ] WebSocket for live updates
+## Pairs With
+| Tool | Purpose |
+|------|---------|
+| Stimulus | JavaScript sprinkles |
+| Rails | Server framework |
+| Action Cable | WebSocket streams |
+| HTMX | Alternative approach |

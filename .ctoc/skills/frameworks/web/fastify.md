@@ -1,52 +1,47 @@
 # Fastify CTO
-> Fast and low overhead Node.js framework - schema-based, plugin-driven, TypeScript-first.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm init -y && npm install fastify @fastify/type-provider-typebox
-npm run dev
-npm test
+npm init -y
+npm install fastify @fastify/type-provider-typebox @sinclair/typebox
+# Requires Node.js 18+ (recommend LTS 24 for 2026)
 ```
 
-## Non-Negotiables
-1. JSON Schema validation on all routes
-2. Plugin encapsulation with proper scope
-3. Decorators extend request/reply safely
-4. Hooks for lifecycle management
-5. TypeScript with type providers
+## Claude's Common Mistakes
+1. **Skipping schema validation** — Loses Fastify's performance advantage and security
+2. **Awaiting plugin registration** — Use `register()` correctly, don't `await` incorrectly
+3. **Global variables for state** — Use decorators or request context
+4. **Underestimating Fastify** — It's a full framework, not just Express alternative
+5. **Missing response schemas** — Precompiled serialization needs response schema
 
-## Red Lines
-- Skipping schema validation - performance and security loss
-- `await` on plugin registration - use `register()` correctly
-- Circular plugin dependencies
-- Synchronous route handlers without schema
-- Ignoring plugin encapsulation
-
-## Pattern: Type-Safe Plugin
+## Correct Patterns (2026)
 ```typescript
 import Fastify from 'fastify';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { Type, Static } from '@sinclair/typebox';
 
+// Define schemas
 const CreateUserSchema = Type.Object({
   email: Type.String({ format: 'email' }),
   password: Type.String({ minLength: 8 }),
 });
-type CreateUserBody = Static<typeof CreateUserSchema>;
 
 const UserResponseSchema = Type.Object({
   id: Type.Number(),
   email: Type.String(),
 });
 
-const usersPlugin = async (fastify: FastifyInstance) => {
+type CreateUserBody = Static<typeof CreateUserSchema>;
+
+// Plugin with proper encapsulation
+const usersPlugin = async (fastify) => {
   fastify.post<{ Body: CreateUserBody }>(
     '/users',
     {
       schema: {
         body: CreateUserSchema,
-        response: { 201: UserResponseSchema },
+        response: { 201: UserResponseSchema },  // Required for fast serialization
       },
     },
     async (request, reply) => {
@@ -57,31 +52,39 @@ const usersPlugin = async (fastify: FastifyInstance) => {
   );
 };
 
-export default usersPlugin;
+// App setup
+const app = Fastify({
+  logger: true,  // Pino logger built-in
+}).withTypeProvider<TypeBoxTypeProvider>();
 
-// Register plugin
-const app = Fastify().withTypeProvider<TypeBoxTypeProvider>();
 app.register(usersPlugin, { prefix: '/api' });
 ```
 
-## Integrates With
-- **DB**: `@fastify/postgres` or Prisma
-- **Auth**: `@fastify/jwt` with decorators
-- **Validation**: JSON Schema or TypeBox
-- **Docs**: `@fastify/swagger` with `@fastify/swagger-ui`
+## Version Gotchas
+- **Node.js 24 LTS**: Recommended for 2026 production
+- **TypeBox**: Preferred over Zod for Fastify (faster schema compilation)
+- **Pino logger**: Built-in, extremely low overhead
+- **Plugin timeout**: `FST_ERR_PLUGIN_TIMEOUT` if registration takes too long
+
+## What NOT to Do
+- ❌ Routes without schema validation — Loses performance + security
+- ❌ `await app.register(plugin)` incorrectly — Check plugin registration docs
+- ❌ Global state variables — Use decorators or request context
+- ❌ Missing response schema — Slows serialization
+- ❌ `console.log` for logging — Use built-in Pino logger
+
+## Schema Benefits
+| Feature | Benefit |
+|---------|---------|
+| Request validation | Runs before handler; invalid requests never hit DB |
+| Response serialization | Precompiled; 2-3x faster than JSON.stringify |
+| OpenAPI docs | Auto-generated with @fastify/swagger |
+| TypeScript types | Full type safety from schema |
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `FST_ERR_PLUGIN_TIMEOUT` | Plugin async registration taking too long |
-| `Schema validation failed` | Check request matches schema exactly |
-| `Decorator already exists` | Use unique decorator names, check scope |
-| `Reply already sent` | Don't call reply methods multiple times |
-
-## Prod Ready
-- [ ] Schemas for all routes
-- [ ] Response serialization schemas
-- [ ] Health check endpoint
-- [ ] Structured logging with `pino`
-- [ ] Graceful shutdown
-- [ ] Rate limiting with `@fastify/rate-limit`
+| `FST_ERR_PLUGIN_TIMEOUT` | Plugin async registration too slow |
+| `Schema validation failed` | Request doesn't match schema |
+| `Decorator already exists` | Use unique names, check scope |
+| `Reply already sent` | Don't call reply methods twice |

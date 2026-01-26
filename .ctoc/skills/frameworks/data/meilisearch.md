@@ -1,59 +1,45 @@
 # Meilisearch CTO
-> Lightning-fast, typo-tolerant search engine for instant search experiences.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name meilisearch -p 7700:7700 getmeili/meilisearch:v1.6
-curl http://localhost:7700/health
-curl -X POST http://localhost:7700/indexes/products/documents -H 'Content-Type: application/json' -d @data.json
+docker run -d --name meilisearch -p 7700:7700 \
+  -e MEILI_MASTER_KEY=masterkey \
+  getmeili/meilisearch:v1.6
+# Dashboard at http://localhost:7700
 ```
 
-## Non-Negotiables
-1. Configure searchableAttributes for relevance
-2. Set filterableAttributes before filtering
-3. Customize ranking rules for use case
-4. Master key required in production
-5. Pagination with offset/limit or cursor
-6. Sortable attributes configured explicitly
+## Claude's Common Mistakes
+1. **All attributes searchable** - Configure searchableAttributes for relevance
+2. **Filtering without filterableAttributes** - Must set before querying
+3. **No API key in production** - Master key required; generate search keys
+4. **Sorting without sortableAttributes** - Must configure explicitly
+5. **Large documents** - Split or reduce document size
 
-## Red Lines
-- All attributes searchable (poor relevance)
-- Missing filterableAttributes for facets
-- No API key authentication in production
-- Large documents exceeding limits
-- Ignoring indexing settings for performance
-
-## Pattern: Search Index Configuration
-```bash
-# Create index with primary key
-curl -X POST 'http://localhost:7700/indexes' \
-  -H 'Authorization: Bearer MASTER_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '{"uid": "products", "primaryKey": "id"}'
-
-# Configure searchable attributes (order matters for relevance)
-curl -X PUT 'http://localhost:7700/indexes/products/settings/searchable-attributes' \
-  -H 'Authorization: Bearer MASTER_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '["name", "description", "category", "brand"]'
-
-# Configure filterable attributes
-curl -X PUT 'http://localhost:7700/indexes/products/settings/filterable-attributes' \
-  -H 'Authorization: Bearer MASTER_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '["category", "brand", "price", "in_stock"]'
-
-# Configure sortable attributes
-curl -X PUT 'http://localhost:7700/indexes/products/settings/sortable-attributes' \
-  -H 'Authorization: Bearer MASTER_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '["price", "created_at", "popularity"]'
-```
-
+## Correct Patterns (2026)
 ```javascript
+import { MeiliSearch } from 'meilisearch';
+
+const client = new MeiliSearch({
+  host: 'http://localhost:7700',
+  apiKey: 'masterkey',
+});
+
+// Configure index settings (order matters for relevance!)
+await client.index('products').updateSettings({
+  searchableAttributes: ['name', 'description', 'category', 'brand'],
+  filterableAttributes: ['category', 'brand', 'price', 'in_stock'],
+  sortableAttributes: ['price', 'created_at', 'popularity'],
+  rankingRules: [
+    'words', 'typo', 'proximity', 'attribute', 'sort', 'exactness'
+  ],
+});
+
+// Add documents
+await client.index('products').addDocuments(products);
+
 // Search with filters and facets
-const results = await index.search('wireless headphones', {
+const results = await client.index('products').search('wireless headphones', {
   filter: ['category = electronics', 'price < 500', 'in_stock = true'],
   facets: ['brand', 'category'],
   sort: ['price:asc'],
@@ -62,22 +48,14 @@ const results = await index.search('wireless headphones', {
 });
 ```
 
-## Integrates With
-- **SDKs**: JavaScript, Python, Ruby, PHP, Go, Rust
-- **Frameworks**: Instant Search UI components
-- **Sync**: Meilisync for database replication
+## Version Gotchas
+- **v1.6+**: Hybrid search (keyword + vector) support
+- **v1.6+**: Multi-index search in single query
+- **Typo tolerance**: Built-in; configurable per attribute
+- **Instant Search**: InstantSearch.js components work out of box
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `invalid_api_key` | Check Authorization header |
-| `attribute not filterable` | Add to filterableAttributes first |
-| `document too large` | Split or reduce document size |
-| `indexing slow` | Batch documents, tune settings |
-
-## Prod Ready
-- [ ] Master key and API keys configured
-- [ ] Searchable/filterable attributes set
-- [ ] Ranking rules customized
-- [ ] Pagination for all queries
-- [ ] Backups via snapshots or dumps
+## What NOT to Do
+- Do NOT leave all attributes searchable (poor relevance)
+- Do NOT filter without setting filterableAttributes first
+- Do NOT expose master key to clients (generate search-only keys)
+- Do NOT skip pagination (use limit/offset)

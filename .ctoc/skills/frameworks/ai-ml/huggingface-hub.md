@@ -1,45 +1,31 @@
 # Hugging Face Hub CTO
-> The central repository for ML models, datasets, and Spaces.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install huggingface_hub
-huggingface-cli login
-huggingface-cli repo create model-name --type model
-huggingface-cli upload model-name ./local-path --repo-type model
+huggingface-cli login  # Required for uploads and gated models
+# Verify: huggingface-cli whoami
 ```
 
-## Non-Negotiables
-1. Model cards with documentation and usage
-2. Proper licensing for all uploads
-3. Version control with meaningful commits
-4. Gated models for sensitive content
-5. Spaces for interactive demos
-6. Dataset cards with data documentation
+## Claude's Common Mistakes
+1. Missing model cards (README.md) for uploaded models
+2. Not specifying license in uploads
+3. Large files without Git LFS tracking
+4. Exposing HF tokens in code
+5. Missing repo_type causing wrong repository type
 
-## Red Lines
-- Missing model cards
-- No license specification
-- Large files without Git LFS
-- Exposing API tokens in code
-- No dataset documentation
-- Private models without access control
-
-## Pattern: Production Model Upload
+## Correct Patterns (2026)
 ```python
-from huggingface_hub import (
-    HfApi, create_repo, upload_folder,
-    ModelCard, ModelCardData
-)
+from huggingface_hub import HfApi, create_repo, upload_folder, ModelCard, ModelCardData
 
 api = HfApi()
 
 # Create repository
-repo_id = "org/model-name"
+repo_id = "username/my-model"
 create_repo(repo_id, repo_type="model", private=False)
 
-# Create model card
+# Create model card (required for discoverability)
 card_data = ModelCardData(
     license="apache-2.0",
     language="en",
@@ -53,8 +39,6 @@ card = ModelCard.from_template(
     card_data,
     model_id=repo_id,
     model_description="BERT fine-tuned for sentiment analysis",
-    training_procedure="Fine-tuned on IMDB dataset for 3 epochs",
-    evaluation_results="Accuracy: 92% on test set",
 )
 card.push_to_hub(repo_id)
 
@@ -63,34 +47,25 @@ upload_folder(
     folder_path="./model",
     repo_id=repo_id,
     repo_type="model",
-    commit_message="Upload fine-tuned model v1.0",
+    commit_message="Upload model v1.0",
 )
 
 # Download with caching
 from huggingface_hub import hf_hub_download, snapshot_download
 
-model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 full_model = snapshot_download(repo_id=repo_id, cache_dir="./cache")
 ```
 
-## Integrates With
-- **Libraries**: Transformers, Diffusers, PEFT
-- **Hosting**: Spaces, Inference Endpoints
-- **CI/CD**: GitHub Actions, webhooks
-- **Storage**: Git LFS, S3 backends
+## Version Gotchas
+- **Cache**: Default `~/.cache/huggingface/hub`, set `HF_HUB_CACHE` to change
+- **Gated models**: Require `huggingface-cli login` and model approval
+- **LFS**: Files >10MB automatically use Git LFS
+- **repo_type**: Must specify "model", "dataset", or "space"
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Repository not found` | Check repo_id format: "username/repo-name" |
-| `Authentication required` | Run `huggingface-cli login` |
-| `File too large` | Use Git LFS for files >10MB |
-| `Rate limit exceeded` | Use token with higher limits |
-
-## Prod Ready
-- [ ] Model card with full documentation
-- [ ] License specified in model card
-- [ ] Large files tracked with Git LFS
-- [ ] API token stored securely
-- [ ] Version tags for releases
-- [ ] Space demo linked to model
+## What NOT to Do
+- Do NOT upload without a model card
+- Do NOT skip license specification
+- Do NOT expose HF tokens in code - use `huggingface-cli login`
+- Do NOT forget `repo_type` parameter
+- Do NOT upload large files without LFS consideration

@@ -1,98 +1,76 @@
 # Anthropic SDK CTO
-> Production Claude API integration with enterprise-grade reliability.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# v0.76+ requires Python 3.8+
 pip install anthropic
-export ANTHROPIC_API_KEY="sk-ant-..."
-pytest tests/ -v && python -c "from anthropic import Anthropic; print(Anthropic().messages.create(model='claude-sonnet-4-20250514', max_tokens=10, messages=[{'role':'user','content':'Hi'}]))"
+# For AWS Bedrock: pip install "anthropic[bedrock]"
+# For Google Vertex: pip install "anthropic[vertex]"
+# Set API key: export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-## Non-Negotiables
-1. XML tags for structured prompts
-2. Tool use for structured outputs
-3. Streaming for real-time responses
-4. Prompt caching for repeated prefixes
-5. Appropriate max_tokens settings
-6. Async client for throughput
+## Claude's Common Mistakes
+1. Not using tool_use for structured outputs (Claude's native approach)
+2. Missing `cache_control` for prompt caching on repeated prefixes
+3. Using sync client in async applications
+4. Setting `max_tokens` too high (wastes budget)
+5. Not using XML tags for structured prompts
 
-## Red Lines
-- No error handling for API failures
-- Ignoring prompt caching for repeated calls
-- max_tokens too high wasting budget
-- Synchronous calls in async applications
-- Not using tool_use for structured data
-- Hardcoded API keys in code
-
-## Pattern: Production API Integration
+## Correct Patterns (2026)
 ```python
-import anthropic
-from anthropic import AsyncAnthropic
+from anthropic import Anthropic, AsyncAnthropic
 
-client = AsyncAnthropic()
+client = Anthropic()
+async_client = AsyncAnthropic()
 
-# Tool-based structured output
+# Tool-based structured output (Claude's native approach)
 tools = [{
     "name": "extract_data",
-    "description": "Extract structured data from text",
+    "description": "Extract structured information",
     "input_schema": {
         "type": "object",
         "properties": {
             "entities": {"type": "array", "items": {"type": "string"}},
             "sentiment": {"type": "string", "enum": ["positive", "negative", "neutral"]},
-            "confidence": {"type": "number"}
         },
-        "required": ["entities", "sentiment", "confidence"]
+        "required": ["entities", "sentiment"]
     }
 }]
 
-async def analyze(text: str):
-    response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1024,
-        tools=tools,
-        messages=[{
-            "role": "user",
-            "content": f"<document>{text}</document>\n\nExtract entities and sentiment."
-        }]
-    )
+response = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    tools=tools,
+    messages=[{"role": "user", "content": "<document>Text here</document>\nExtract data."}]
+)
 
-    for block in response.content:
-        if block.type == "tool_use":
-            return block.input
-    return None
+# Get tool result
+for block in response.content:
+    if block.type == "tool_use":
+        result = block.input  # Structured data
 
 # Streaming with prompt caching
-async def stream_with_cache(system: str, user: str):
-    async with client.messages.stream(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4096,
-        system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user}]
-    ) as stream:
-        async for text in stream.text_stream:
-            yield text
+async with async_client.messages.stream(
+    model="claude-sonnet-4-20250514",
+    max_tokens=4096,
+    system=[{"type": "text", "text": long_system_prompt,
+             "cache_control": {"type": "ephemeral"}}],  # Cache this
+    messages=[{"role": "user", "content": user_input}]
+) as stream:
+    async for text in stream.text_stream:
+        yield text
 ```
 
-## Integrates With
-- **Frameworks**: LangChain, LlamaIndex
-- **Monitoring**: LangSmith, Helicone
-- **Caching**: Redis for response caching
-- **Vector DBs**: Any via embeddings API
+## Version Gotchas
+- **Claude 4**: Use `claude-sonnet-4-20250514` or `claude-opus-4-20250514`
+- **Caching**: Use `cache_control: {"type": "ephemeral"}` on system prompts
+- **Bedrock/Vertex**: Different auth - use extras packages
+- **Tool use**: Claude prefers tools over JSON mode for structured output
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `RateLimitError` | Implement backoff, use async batching |
-| `InvalidRequestError: max_tokens` | Reduce max_tokens, check model limits |
-| `OverloadedError` | Retry with exponential backoff |
-| `PromptTooLongError` | Reduce context, use summarization |
-
-## Prod Ready
-- [ ] Async client used for all API calls
-- [ ] Tool use for structured outputs
-- [ ] Prompt caching enabled for repeated prefixes
-- [ ] Streaming implemented for UX
-- [ ] API key stored in environment variables
-- [ ] Usage tracked and logged per request
+## What NOT to Do
+- Do NOT use JSON mode when tool_use is cleaner
+- Do NOT skip prompt caching for repeated system prompts
+- Do NOT set max_tokens higher than needed
+- Do NOT forget XML tags for document/context sections
+- Do NOT use sync client in async applications

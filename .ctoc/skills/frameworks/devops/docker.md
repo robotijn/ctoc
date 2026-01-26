@@ -1,62 +1,53 @@
 # Docker CTO
-> Container engineering leader demanding minimal images, secure defaults, and reproducible builds.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker build -t myapp:dev --target development .
-docker compose up -d && docker compose logs -f
-docker scan myapp:latest && docker compose run --rm test pytest
+# Docker Engine 27.x (APT method - recommended)
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt-get update && sudo apt-get install docker-ce docker-ce-cli containerd.io
 ```
 
-## Non-Negotiables
-1. Multi-stage builds separating build and runtime dependencies
-2. Non-root USER in final stage with explicit UID
-3. Minimal base images - distroless, alpine, or scratch
-4. .dockerignore excluding node_modules, .git, secrets
-5. Layer caching optimization - dependencies before source code
+## Claude's Common Mistakes
+1. **Uses ADD instead of COPY** - ADD has implicit tar extraction and URL fetching
+2. **Runs as root by default** - Must specify non-root USER
+3. **Combines unrelated RUN commands** - Busts cache unnecessarily
+4. **Uses `latest` base image** - Pin specific versions
+5. **Installs unnecessary packages** - Increases attack surface
 
-## Red Lines
-- Running as root without explicit security justification
-- ADD when COPY suffices - ADD has tar extraction and URL fetching
-- latest tag in FROM - pin specific versions
-- Secrets in build args or committed layers
-- Installing unnecessary packages in production image
-
-## Pattern: Secure Multi-Stage Build
+## Correct Patterns (2026)
 ```dockerfile
-# Build stage
-FROM node:20-alpine AS builder
+# Multi-stage build with security best practices
+FROM node:22-alpine AS builder
 WORKDIR /app
+# Copy package files first (layer caching)
 COPY package*.json ./
 RUN npm ci --only=production
 COPY . .
 RUN npm run build
 
-# Production stage
-FROM gcr.io/distroless/nodejs20-debian12
+# Production stage with distroless
+FROM gcr.io/distroless/nodejs22-debian12
 WORKDIR /app
+# Use non-root user
+USER nonroot:nonroot
 COPY --from=builder --chown=nonroot:nonroot /app/dist ./dist
 COPY --from=builder --chown=nonroot:nonroot /app/node_modules ./node_modules
-USER nonroot:nonroot
+
 EXPOSE 8080
 CMD ["dist/index.js"]
 ```
 
-## Integrates With
-- **DB**: Docker Compose services with healthchecks and depends_on
-- **Auth**: BuildKit secrets for registry auth, never in image
-- **Cache**: BuildKit cache mounts for package managers
+## Version Gotchas
+- **Docker 27.x**: BuildKit default, classic builder deprecated
+- **Docker 27.3+**: OCI image spec 1.1 support
+- **Rocky Linux**: Use overlay2 storage driver (default)
+- **With SELinux**: Use :Z suffix for volume mounts
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `COPY failed: file not found` | Check .dockerignore, verify path relative to context |
-| `standard_init_linux.go: exec format error` | Platform mismatch - use `--platform linux/amd64` |
-| `OCI runtime: permission denied` | Check file permissions, ensure non-root user has access |
-
-## Prod Ready
-- [ ] Image scanned with Trivy/Snyk, zero critical vulnerabilities
-- [ ] Health check defined in Dockerfile or Compose
-- [ ] Image signed with cosign or Docker Content Trust
-- [ ] CI builds use BuildKit with remote cache
+## What NOT to Do
+- Do NOT use ADD when COPY suffices - security risk
+- Do NOT run as root without justification
+- Do NOT put secrets in build args or layers
+- Do NOT use `latest` tag in FROM
+- Do NOT skip multi-stage builds - bloated images

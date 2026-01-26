@@ -1,81 +1,80 @@
 # Unreal Engine CTO
-> AAA mobile game leader demanding LOD optimization and thermal-aware performance budgets.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-/UnrealEngine/Engine/Build/BatchFiles/RunUAT.sh BuildCookRun -project=MyGame.uproject -platform=iOS -clientconfig=Development
-UnrealEditor MyGame.uproject -run=AutomationTool -testfilter=Project
-./RunUAT.sh -project=MyGame.uproject -platform=Android -cook -stage -pak
+# Install via Epic Games Launcher
+# UE 5.5+ for latest mobile features
+
+# CLI cook/package
+./Engine/Build/BatchFiles/RunUAT.sh BuildCookRun \
+  -project=MyGame.uproject \
+  -platform=Android \
+  -clientconfig=Shipping \
+  -cook -stage -pak -archive
 ```
 
-## Non-Negotiables
-1. Scalability settings to target different mobile device tiers
-2. LOD (Level of Detail) for all visible meshes
-3. Texture streaming and compressed formats (ASTC, ETC2) for mobile memory
-4. Unreal Insights and platform GPU profilers for performance
-5. Minimal draw calls with instanced static meshes and merged actors
+## Claude's Common Mistakes
+1. **Uses dynamic shadows on mobile** - Baked lighting required for performance
+2. **Ignores LOD setup** - Every visible mesh needs LOD for mobile
+3. **Uses Tick() for event-driven logic** - Disable tick, use events
+4. **Suggests OpenGL ES for Android** - Vulkan preferred since Android 14
+5. **Ignores 16KB page size** - Android 15+ requirement for UE 5.6+
 
-## Red Lines
-- Editor-only code or assets in mobile builds
-- Ignoring thermal throttling - test sustained 30-minute sessions
-- Dynamic shadows on mobile - use baked lighting
-- Tick() for logic that can be event-driven
-- Skipping cook/package testing - content errors surface late
-
-## Pattern: Event-Driven Tick Management
+## Correct Patterns (2026)
 ```cpp
-// MyActor.h
+// Event-driven tick management
 UCLASS()
 class MYGAME_API AMyActor : public AActor
 {
     GENERATED_BODY()
 
 public:
-    virtual void BeginPlay() override;
-    void EnableTicking();
-    void DisableTicking();
+    virtual void BeginPlay() override
+    {
+        Super::BeginPlay();
+        // Disable tick by default for mobile
+        SetActorTickEnabled(false);
+
+        if (USphereComponent* Trigger = FindComponentByClass<USphereComponent>())
+        {
+            Trigger->OnComponentBeginOverlap.AddDynamic(
+                this, &AMyActor::OnPlayerEnter);
+            Trigger->OnComponentEndOverlap.AddDynamic(
+                this, &AMyActor::OnPlayerExit);
+        }
+    }
 
 private:
     UFUNCTION()
-    void OnPlayerNearby(AActor* Player);
+    void OnPlayerEnter(UPrimitiveComponent* Comp, AActor* Other,
+                       UPrimitiveComponent* OtherComp, int32 Idx,
+                       bool bSweep, const FHitResult& Hit)
+    {
+        if (Other->IsA<APlayerCharacter>())
+        {
+            SetActorTickEnabled(true);  // Enable only when needed
+        }
+    }
+
+    UFUNCTION()
+    void OnPlayerExit(UPrimitiveComponent* Comp, AActor* Other,
+                      UPrimitiveComponent* OtherComp, int32 Idx)
+    {
+        SetActorTickEnabled(false);
+    }
 };
-
-// MyActor.cpp
-void AMyActor::BeginPlay()
-{
-    Super::BeginPlay();
-    SetActorTickEnabled(false);  // Disabled by default
-
-    if (USphereComponent* Trigger = FindComponentByClass<USphereComponent>())
-    {
-        Trigger->OnComponentBeginOverlap.AddDynamic(this, &AMyActor::OnPlayerNearby);
-    }
-}
-
-void AMyActor::OnPlayerNearby(AActor* Player)
-{
-    if (Player->IsA<APlayerCharacter>())
-    {
-        SetActorTickEnabled(true);
-    }
-}
 ```
 
-## Integrates With
-- **DB**: SQLite via plugin, JSON files for simple data
-- **Auth**: Online Subsystem with platform providers
-- **Cache**: Pak file streaming, DDC for editor builds
+## Version Gotchas
+- **UE 5.5+**: Mobile Forward Renderer improvements, D-buffer decals
+- **UE 5.6+**: Android 16KB page size support required
+- **Android 14+**: Vulkan default, OpenGL ES fallback
+- **iOS**: Metal required, minimum iOS 15 for UE 5.5
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Shader compilation timeout` | Reduce shader complexity, use mobile shaders |
-| `Out of memory during cook` | Split into chunks, increase swap, use pak chunking |
-| `Texture not streaming` | Check texture group settings and streaming pool size |
-
-## Prod Ready
-- [ ] Target hardware profiled for frame budget (16.6ms/30fps)
-- [ ] Thermal testing passed with 30-minute sustained load
-- [ ] Shader permutations minimized for mobile
-- [ ] Platform-specific packaging scripts in CI/CD
+## What NOT to Do
+- Do NOT use dynamic shadows on mobile - bake lighting
+- Do NOT skip LODs for visible meshes - causes frame drops
+- Do NOT use Tick() when events suffice - wastes battery
+- Do NOT test only in editor - profile on target device
+- Do NOT ignore thermal throttling - test 30-minute sessions

@@ -1,68 +1,62 @@
 # Verilog CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-verilator --lint-only -Wall src/*.v    # Lint
-# (Format with IDE or verible)
-verilator --cc src/top.v && make -C obj_dir  # Simulate
-yosys -p "synth_ice40" src/top.v       # Synthesize
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses blocking assigns in sequential blocks — use `<=`
+- Claude creates incomplete sensitivity lists — causes sim/synth mismatch
+- Claude generates latches — complete all if/case branches
+- Claude forgets clock domain crossing — use synchronizers
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `verilator` | Fast simulation/lint | Slow simulators |
+| `verible` | Linting and formatting | No linting |
+| `icarus verilog` | Open source simulation | Vendor-only |
+| `yosys` | Synthesis suite | Vendor-only flow |
+| `cocotb` | Python testbenches | Manual testbenches |
+
+## Patterns Claude Should Use
+```verilog
+// Proper sequential logic with non-blocking assigns
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        counter <= 8'b0;
+        data_out <= 32'b0;
+    end else begin
+        counter <= counter + 1'b1;  // Non-blocking!
+        data_out <= data_in;
+    end
+end
+
+// Complete case statement to avoid latches
+always @(*) begin
+    case (state)
+        IDLE:    next_state = start ? RUNNING : IDLE;
+        RUNNING: next_state = done ? DONE : RUNNING;
+        DONE:    next_state = IDLE;
+        default: next_state = IDLE;  // Required!
+    endcase
+end
+
+// Clock domain crossing
+reg [1:0] sync_ff;
+always @(posedge clk_dst) begin
+    sync_ff <= {sync_ff[0], async_input};
+end
+assign sync_output = sync_ff[1];
 ```
 
-## Tools (2024-2025)
-- **Verilator** - Fast simulation/lint
-- **Icarus Verilog** - Open source simulator
-- **Yosys** - Synthesis suite
-- **Vivado/Quartus** - FPGA vendor tools
-- **cocotb** - Python testbench framework
+## Anti-Patterns Claude Generates
+- `=` in sequential blocks — use `<=` (non-blocking)
+- Incomplete sensitivity lists — use `always @(*)`
+- Missing `default` in case — causes latches
+- Single-flop CDC — use double-flop synchronizer
+- Magic delays `#10` in RTL — only in testbenches
 
-## Project Structure
-```
-project/
-├── rtl/               # RTL source (.v/.sv)
-├── tb/                # Testbenches
-├── sim/               # Simulation outputs
-├── syn/               # Synthesis outputs
-└── constraints/       # Timing/pinout
-```
-
-## Non-Negotiables
-1. Synchronous design principles
-2. Proper reset handling (sync preferred)
-3. Avoid latches (complete if/case)
-4. Clock domain crossing protocols
-
-## Red Lines (Reject PR)
-- Incomplete sensitivity lists
-- Blocking assigns in sequential blocks
-- Multiple drivers on signals
-- Unregistered outputs
-- Magic timing delays in RTL
-- Combinational loops
-
-## Testing Strategy
-- **Unit**: Verilator/Icarus simulation
-- **Integration**: cocotb testbenches
-- **Formal**: SymbiYosys for verification
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Latch inference | Complete all branches |
-| Clock domain crossing | Use sync FIFOs |
-| Metastability | Multi-flop synchronizers |
-| Timing violations | Proper constraints |
-
-## Performance Red Lines
-- No combinational loops
-- No excessive logic depth
-- No unregistered long paths
-
-## Security Checklist
-- [ ] Reset values defined
-- [ ] No debug logic in production
-- [ ] Secure boot if applicable
-- [ ] Side-channel considerations
+## Version Gotchas
+- **SystemVerilog**: Preferred for new designs
+- **Latches**: Avoided by complete if/case branches
+- **CDC**: Always use multi-flop synchronizers
+- **Reset**: Prefer synchronous reset for FPGA
+- **With cocotb**: Python-based verification is powerful

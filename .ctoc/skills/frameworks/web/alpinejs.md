@@ -1,31 +1,25 @@
 # Alpine.js CTO
-> Minimal JavaScript for HTML sprinkles - reactive without the build step.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Setup | Dev | Test
-# Add to HTML: <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
-# Or: npm install alpinejs
-# No build required for basic usage
+## Installation (CURRENT - January 2026)
+```html
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+<!-- Or via npm: npm install alpinejs -->
 ```
 
-## Non-Negotiables
-1. Declarative behavior in HTML attributes
-2. `x-data` for component state scope
-3. Proper magics usage (`$store`, `$refs`, `$el`)
-4. Alpine stores for shared state
-5. Plugins for extended functionality
+## Claude's Common Mistakes
+1. **Missing `x-cloak`** — Causes flash of unstyled content on load
+2. **Complex logic in attributes** — Extract to functions or `Alpine.data()`
+3. **Forgetting `alpine:init`** — Stores must be registered in this event
+4. **No `x-data` scope** — All Alpine directives need a parent `x-data`
+5. **Treating Alpine like React** — It's for HTML sprinkles, not SPAs
 
-## Red Lines
-- Complex logic in `x-data` - extract to functions
-- Missing `x-cloak` causing flash of unstyled content
-- Inline JavaScript abuse in attributes
-- No component extraction for reusable patterns
-- Ignoring `x-transition` for smooth UX
-
-## Pattern: Component with Store
+## Correct Patterns (2026)
 ```html
-<!-- Define global store -->
+<!-- Add x-cloak CSS (required) -->
+<style>[x-cloak] { display: none !important; }</style>
+
+<!-- Define store BEFORE Alpine loads -->
 <script>
   document.addEventListener('alpine:init', () => {
     Alpine.store('users', {
@@ -44,39 +38,57 @@
 <div x-data="{ search: '' }" x-init="$store.users.fetch()">
   <input x-model="search" placeholder="Search users..." />
 
-  <template x-if="$store.users.loading">
-    <p>Loading...</p>
-  </template>
+  <!-- Use x-cloak to hide until Alpine initializes -->
+  <div x-show="$store.users.loading" x-cloak>Loading...</div>
 
   <ul x-show="!$store.users.loading" x-cloak>
-    <template x-for="user in $store.users.items.filter(u => u.name.includes(search))" :key="user.id">
+    <template x-for="user in $store.users.items.filter(u => u.name.toLowerCase().includes(search.toLowerCase()))" :key="user.id">
       <li x-text="user.name"></li>
     </template>
   </ul>
 </div>
 
-<!-- Add x-cloak CSS -->
-<style>[x-cloak] { display: none !important; }</style>
+<!-- Reusable component pattern -->
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('userCard', (userId) => ({
+      user: null,
+      async init() {
+        this.user = await fetch(`/api/users/${userId}`).then(r => r.json());
+      }
+    }));
+  });
+</script>
+<div x-data="userCard(123)">...</div>
 ```
 
-## Integrates With
-- **Backend**: Any server-rendered HTML (Rails, Laravel, Django)
-- **Turbo**: Hotwire stack for full HTML-over-wire
-- **HTMX**: Complementary for server interactions
-- **Tailwind**: Natural pairing for utility CSS
+## Version Gotchas
+- **Alpine 3.x**: Current stable; uses `alpine:init` event
+- **No build required**: Works directly in HTML
+- **`x-cloak`**: Must have CSS rule defined
+- **Stores**: Must be initialized in `alpine:init`
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Alpine is not defined` | Ensure script loads before usage |
-| `x-data not reactive` | Use `Alpine.reactive()` for objects |
-| `Flash of content` | Add `x-cloak` to hidden elements |
-| `Store not found` | Initialize in `alpine:init` event |
+## What NOT to Do
+- ❌ Missing `x-cloak` CSS rule — Flash of unstyled content
+- ❌ Complex expressions in HTML — Extract to `Alpine.data()`
+- ❌ `x-for` without parent `x-data` — Won't work
+- ❌ Store access before `alpine:init` — Store undefined
+- ❌ Building SPAs with Alpine — Use for sprinkles only
 
-## Prod Ready
-- [ ] Bundle via npm if needed
-- [ ] `x-cloak` CSS rule defined
-- [ ] Stores extracted to separate file
-- [ ] No inline complex logic
-- [ ] Accessible: focus management, ARIA
-- [ ] Works without JS (progressive enhancement)
+## Alpine Magics
+| Magic | Purpose |
+|-------|---------|
+| `$store` | Access global stores |
+| `$refs` | DOM element references |
+| `$el` | Current element |
+| `$watch` | React to data changes |
+| `$dispatch` | Custom events |
+| `$nextTick` | After DOM update |
+
+## Pairs Well With
+| Tool | Purpose |
+|------|---------|
+| HTMX | Server interactions |
+| Tailwind | Utility CSS |
+| Turbo | SPA-like navigation |
+| Any backend | Server-rendered HTML |

@@ -1,34 +1,31 @@
 # Puppet CTO
-> Declarative infrastructure leader demanding idempotent resources, Hiera separation, and PDK-compliant modules.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Puppet Development Kit (for module development)
+# Download from puppet.com/download-puppet-development-kit
 pdk new module mymodule
-puppet apply --noop manifests/site.pp
-pdk test unit && puppet-lint manifests/
+# Puppet Agent
+wget https://apt.puppet.com/puppet8-release-jammy.deb
+sudo dpkg -i puppet8-release-jammy.deb
+sudo apt-get update && sudo apt-get install puppet-agent
 ```
 
-## Non-Negotiables
-1. Declarative resource model - describe desired state, not steps
-2. Hiera for data separation from code
-3. PDK for module development and testing
-4. r10k or Code Manager for environment management
-5. Forge-compatible module structure
+## Claude's Common Mistakes
+1. **Uses exec without guards** - Missing onlyif/unless breaks idempotence
+2. **Hardcodes data in manifests** - Use Hiera lookups
+3. **Missing module dependencies** - Breaks catalog compilation
+4. **Ignores resource ordering** - Causes race conditions
+5. **Skips PDK for development** - Non-standard module structure
 
-## Red Lines
-- Exec resources without onlyif/unless guards
-- Hardcoded data in manifests - use Hiera lookups
-- Missing module dependencies in metadata.json
-- No spec tests for custom types and providers
-- Resource ordering without explicit relationships
-
-## Pattern: Module with Hiera Data
+## Correct Patterns (2026)
 ```puppet
 # manifests/init.pp
 class myapp (
   String $version = lookup('myapp::version'),
   String $config_source = lookup('myapp::config_source'),
+  Boolean $manage_service = lookup('myapp::manage_service', default_value => true),
 ) {
   package { 'myapp':
     ensure => $version,
@@ -37,36 +34,35 @@ class myapp (
   file { '/etc/myapp/config.yml':
     ensure  => file,
     source  => $config_source,
+    mode    => '0644',
     require => Package['myapp'],
     notify  => Service['myapp'],
   }
 
-  service { 'myapp':
-    ensure    => running,
-    enable    => true,
-    subscribe => File['/etc/myapp/config.yml'],
+  if $manage_service {
+    service { 'myapp':
+      ensure    => running,
+      enable    => true,
+      subscribe => File['/etc/myapp/config.yml'],
+    }
   }
 }
 
 # data/common.yaml
 myapp::version: '2.1.0'
 myapp::config_source: 'puppet:///modules/myapp/config.yml'
+myapp::manage_service: true
 ```
 
-## Integrates With
-- **DB**: puppetlabs-postgresql with Hiera-driven configuration
-- **Auth**: puppetlabs-vault for dynamic secrets
-- **Cache**: puppet-redis module with class parameters
+## Version Gotchas
+- **Puppet 8**: Default for new installs, Ruby 3.x required
+- **Puppet 7**: Still supported, but migrate to 8 recommended
+- **PDK 3.x**: Required for Puppet 8 modules
+- **With r10k**: Lock module versions in Puppetfile
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Could not find dependency` | Verify module is in Puppetfile and deployed via r10k |
-| `Duplicate declaration` | Use ensure_resource or virtual resources for shared deps |
-| `Hiera lookup failed` | Check hierarchy paths in hiera.yaml, verify data exists |
-
-## Prod Ready
-- [ ] All modules tested with pdk test unit
-- [ ] Hiera data encrypted with hiera-eyaml
-- [ ] r10k Puppetfile locked to specific versions
-- [ ] Puppet Server tuned for node count with JRuby settings
+## What NOT to Do
+- Do NOT use exec without onlyif/unless guards
+- Do NOT hardcode data in manifests - use Hiera
+- Do NOT skip PDK for module development
+- Do NOT ignore resource relationships - explicit ordering required
+- Do NOT forget to encrypt Hiera data with hiera-eyaml

@@ -1,51 +1,31 @@
 # Hugging Face Datasets CTO
-> Efficient dataset loading, processing, and sharing for ML.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install datasets
-python -c "from datasets import load_dataset; print(load_dataset('squad', split='train[:10]'))"
-huggingface-cli datasets upload my-dataset ./data
+# Verify: python -c "from datasets import load_dataset; print('OK')"
 ```
 
-## Non-Negotiables
-1. Streaming for large datasets
-2. Memory mapping for efficiency
-3. Proper train/validation/test splits
-4. Arrow format for performance
-5. Dataset versioning and caching
-6. Batched processing with map()
+## Claude's Common Mistakes
+1. Loading entire large dataset into memory (use streaming)
+2. Processing without batching (slow)
+3. Missing `num_proc` for parallel processing
+4. Not using `remove_columns` to clean up after map
+5. Forgetting `trust_remote_code=True` for custom datasets
 
-## Red Lines
-- Loading entire large dataset in memory
-- Missing train/test splits
-- No caching strategy
-- Ignoring memory-mapped files
-- Hardcoded local paths
-- Processing without batching
-
-## Pattern: Production Data Pipeline
+## Correct Patterns (2026)
 ```python
 from datasets import load_dataset, Dataset, DatasetDict
 from transformers import AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
-# Load with streaming for large datasets
-dataset = load_dataset(
-    "squad",
-    split="train",
-    streaming=True,
-    trust_remote_code=True,
-)
+# Stream large datasets (memory efficient)
+dataset = load_dataset("wikipedia", "20220301.en", split="train", streaming=True)
 
-# Or load specific split with caching
-dataset = load_dataset(
-    "imdb",
-    split="train",
-    cache_dir="./cache",
-)
+# Or load with caching
+dataset = load_dataset("imdb", split="train", cache_dir="./cache")
 
 # Efficient batched processing
 def tokenize_batch(examples):
@@ -58,46 +38,39 @@ def tokenize_batch(examples):
 
 tokenized = dataset.map(
     tokenize_batch,
-    batched=True,
-    batch_size=1000,
-    num_proc=4,
-    remove_columns=["text"],
+    batched=True,           # Process in batches
+    batch_size=1000,        # Batch size
+    num_proc=4,             # Parallel workers
+    remove_columns=["text"], # Clean up original columns
 )
 
 # Create dataset from local data
 data = {"text": texts, "label": labels}
 dataset = Dataset.from_dict(data)
 
-# Split into train/val/test
-dataset = dataset.train_test_split(test_size=0.2, seed=42)
-dataset = DatasetDict({
-    "train": dataset["train"],
-    "validation": dataset["test"].train_test_split(test_size=0.5, seed=42)["train"],
-    "test": dataset["test"].train_test_split(test_size=0.5, seed=42)["test"],
+# Proper train/val/test split
+splits = dataset.train_test_split(test_size=0.2, seed=42)
+val_test = splits["test"].train_test_split(test_size=0.5, seed=42)
+
+dataset_dict = DatasetDict({
+    "train": splits["train"],
+    "validation": val_test["train"],
+    "test": val_test["test"],
 })
 
 # Push to Hub
-dataset.push_to_hub("username/my-dataset", private=True)
+dataset_dict.push_to_hub("username/my-dataset", private=True)
 ```
 
-## Integrates With
-- **Training**: Transformers Trainer, PyTorch
-- **Storage**: HuggingFace Hub, S3, local
-- **Processing**: pandas, NumPy, Arrow
-- **Streaming**: WebDataset, IterableDataset
+## Version Gotchas
+- **streaming=True**: Required for datasets larger than RAM
+- **trust_remote_code**: Required for some custom dataset scripts
+- **Arrow format**: Datasets use Apache Arrow for efficiency
+- **num_proc**: Use for CPU-bound preprocessing, not GPU
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `MemoryError` | Use streaming=True or reduce batch_size |
-| `FileNotFoundError` | Check dataset name, verify cache_dir |
-| `KeyError: column` | Check column names with dataset.column_names |
-| `Slow processing` | Enable batched=True, increase num_proc |
-
-## Prod Ready
-- [ ] Streaming enabled for large datasets
-- [ ] Caching configured for repeated access
-- [ ] Train/val/test splits created
-- [ ] Batched processing with num_proc
-- [ ] Dataset pushed to Hub with card
-- [ ] Version tags for reproducibility
+## What NOT to Do
+- Do NOT load large datasets without `streaming=True`
+- Do NOT skip `batched=True` in map operations
+- Do NOT forget `num_proc` for parallel processing
+- Do NOT leave unused columns after map
+- Do NOT skip proper train/val/test splits

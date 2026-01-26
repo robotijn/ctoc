@@ -1,36 +1,26 @@
 # Apache Cassandra CTO
-> Distributed wide-column store for massive scale with no single point of failure.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name cassandra -p 9042:9042 cassandra:4
-cqlsh -e "DESCRIBE KEYSPACES"
-cqlsh -f tests/queries.cql
+docker run -d --name cassandra -p 9042:9042 cassandra:5
+# Python driver
+pip install cassandra-driver
 ```
 
-## Non-Negotiables
-1. Partition key design for even data distribution
-2. Clustering columns for sorted data within partition
-3. Data model driven by query patterns (denormalize)
-4. Replication strategy: NetworkTopologyStrategy for production
-5. Compaction strategy matched to workload (STCS, LCS, TWCS)
-6. TTL on time-series and ephemeral data
+## Claude's Common Mistakes
+1. **Relational data modeling** - Model for queries, not entities (denormalize)
+2. **Large partitions (>100MB)** - Causes read timeouts and memory issues
+3. **Secondary indexes on high-cardinality** - Extremely slow; redesign schema
+4. **SELECT * without partition key** - Full cluster scan
+5. **Missing TTL on time-series** - Tombstones accumulate, kill performance
 
-## Red Lines
-- Secondary indexes on high-cardinality columns
-- Large partitions exceeding 100MB
-- `SELECT *` without partition key filter
-- Overuse of lightweight transactions (LWT)
-- Missing TTL on time-series data
-
-## Pattern: Query-Driven Data Modeling
+## Correct Patterns (2026)
 ```sql
 -- Keyspace with proper replication
 CREATE KEYSPACE app WITH replication = {
   'class': 'NetworkTopologyStrategy',
-  'dc1': 3,
-  'dc2': 3
+  'dc1': 3
 };
 
 -- Table designed for query: "Get user's recent orders"
@@ -42,43 +32,36 @@ CREATE TABLE orders_by_user (
     status TEXT,
     PRIMARY KEY ((user_id), order_date, order_id)
 ) WITH CLUSTERING ORDER BY (order_date DESC)
-  AND compaction = {'class': 'TimeWindowCompactionStrategy',
-                    'compaction_window_unit': 'DAYS',
-                    'compaction_window_size': 1}
-  AND default_time_to_live = 7776000;  -- 90 days
+  AND compaction = {
+    'class': 'TimeWindowCompactionStrategy',
+    'compaction_window_unit': 'DAYS',
+    'compaction_window_size': 1
+  }
+  AND default_time_to_live = 7776000;  -- 90 days TTL
 
--- Table designed for query: "Get order by ID"
+-- Denormalized table for different query pattern
 CREATE TABLE orders_by_id (
     order_id UUID PRIMARY KEY,
     user_id UUID,
     order_date TIMESTAMP,
     total DECIMAL,
-    status TEXT,
-    items LIST<FROZEN<item>>
+    status TEXT
 );
 
--- Query with partition key (efficient)
+-- Query WITH partition key (efficient)
 SELECT * FROM orders_by_user
 WHERE user_id = ? AND order_date > ?
 LIMIT 20;
 ```
 
-## Integrates With
-- **Drivers**: DataStax drivers for Java, Python, Node.js
-- **Streaming**: Kafka Connect, CDC
-- **Management**: DataStax OpsCenter, Medusa for backups
+## Version Gotchas
+- **v5**: Vector search support, unified nodes (no separate roles)
+- **TWCS**: TimeWindowCompactionStrategy for time-series
+- **Tombstones**: Delete operations create tombstones; use TTL instead
+- **Astra**: DataStax managed Cassandra (serverless)
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `ReadTimeout` | Check partition size, add caching |
-| `WriteTimeout` | Reduce batch size, check cluster health |
-| `TombstoneOverwhelmingException` | Reduce deletes, increase gc_grace_seconds |
-| `Large partition warning` | Redesign partition key |
-
-## Prod Ready
-- [ ] Partition sizes under 100MB
-- [ ] Replication factor >= 3
-- [ ] Compaction strategy configured
-- [ ] TTL on time-series tables
-- [ ] Monitoring via JMX or metrics
+## What NOT to Do
+- Do NOT model data like relational DB (model for queries)
+- Do NOT create partitions >100MB (redesign partition key)
+- Do NOT use secondary indexes on high-cardinality columns
+- Do NOT SELECT without partition key filter (cluster scan)

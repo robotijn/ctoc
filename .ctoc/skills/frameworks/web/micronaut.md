@@ -1,45 +1,27 @@
 # Micronaut CTO
-> Compile-time JVM framework - fast startup, low memory, GraalVM native ready.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+sdk install micronaut
 mn create-app myapp --features=data-jdbc,postgres && cd myapp
-./gradlew run  # or ./mvnw mn:run
-./gradlew test
+./gradlew run
+# Micronaut 4.x - compile-time JVM framework
 ```
 
-## Non-Negotiables
-1. Compile-time DI - no runtime reflection
-2. Declarative HTTP clients with `@Client`
-3. Micronaut Data for repositories
-4. GraalVM native image support
-5. Reactive patterns where appropriate
+## Claude's Common Mistakes
+1. **Runtime reflection** — Breaks GraalVM native compilation
+2. **Missing `@Serdeable`** — Required for JSON serialization
+3. **Forgetting `@Validated`** — Validation won't work without it
+4. **Blocking in reactive chains** — Use reactive patterns consistently
+5. **Spring patterns** — Micronaut has different conventions
 
-## Red Lines
-- Runtime reflection - breaks native compilation
-- Blocking in reactive chains
-- Missing health/metrics endpoints
-- Ignoring compile-time processing benefits
-- Heavy classpath scanning
-
-## Pattern: Controller with Validation
+## Correct Patterns (2026)
 ```java
 // src/main/java/com/example/controller/UserController.java
-package com.example.controller;
-
-import com.example.dto.CreateUserDto;
-import com.example.model.User;
-import com.example.service.UserService;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.*;
-import io.micronaut.validation.Validated;
-import jakarta.validation.Valid;
-
 @Controller("/users")
 @Validated
 public class UserController {
-
     private final UserService userService;
 
     public UserController(UserService userService) {
@@ -61,36 +43,37 @@ public class UserController {
 }
 
 // src/main/java/com/example/dto/CreateUserDto.java
-package com.example.dto;
-
-import io.micronaut.serde.annotation.Serdeable;
-import jakarta.validation.constraints.*;
-
-@Serdeable
+@Serdeable  // REQUIRED for JSON serialization
 public record CreateUserDto(
     @NotBlank @Email String email,
     @NotBlank @Size(min = 8) String password
 ) {}
+
+// src/main/java/com/example/client/ExternalApiClient.java
+@Client("https://api.example.com")
+public interface ExternalApiClient {
+    @Get("/users/{id}")
+    User getUser(Long id);
+}
 ```
 
-## Integrates With
-- **DB**: Micronaut Data JDBC or JPA
-- **Auth**: Micronaut Security with JWT
-- **HTTP Client**: Declarative `@Client` interfaces
-- **Messaging**: Micronaut Kafka or RabbitMQ
+## Version Gotchas
+- **Micronaut 4.x**: Java 17+ required; compile-time DI
+- **@Serdeable**: Required on all DTOs for JSON serialization
+- **@Validated**: Add to controller class, `@Valid` on parameters
+- **GraalVM**: Avoid runtime reflection for native image support
+
+## What NOT to Do
+- ❌ Runtime reflection — Breaks native compilation
+- ❌ Missing `@Serdeable` — Serialization fails
+- ❌ Missing `@Validated` on controller — Validation ignored
+- ❌ Spring `@Autowired` — Use constructor injection
+- ❌ Blocking calls in reactive chains — Stay reactive
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Bean not found` | Check `@Singleton` or `@Prototype` annotation |
-| `Validation not working` | Add `@Validated` on class, `@Valid` on param |
-| `Native build fails` | Check reflection config, avoid runtime proxies |
-| `Serialization error` | Add `@Serdeable` to DTOs |
-
-## Prod Ready
-- [ ] Health endpoint enabled: `/health`
-- [ ] Metrics exported: `/metrics`
-- [ ] Native image tested
-- [ ] Database connection pool configured
-- [ ] Logback configured for JSON output
-- [ ] Graceful shutdown enabled
+| `Bean not found` | Add `@Singleton` or `@Prototype` |
+| `Validation not working` | Add `@Validated` on class |
+| `Serialization error` | Add `@Serdeable` to DTO |
+| `Native build fails` | Check reflection-config.json |

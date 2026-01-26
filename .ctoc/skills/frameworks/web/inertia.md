@@ -1,31 +1,23 @@
 # Inertia.js CTO
-> Modern monolith SPA bridge - server routing, client rendering.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup (Laravel + Vue)
+# Laravel + Vue
 composer require inertiajs/inertia-laravel
 npm install @inertiajs/vue3
-# Setup (Rails + React)
-bundle add inertia_rails
+# Laravel + React
 npm install @inertiajs/react
 ```
 
-## Non-Negotiables
-1. Server-side routing - no client router
-2. Shared data via middleware for global props
-3. Proper page props validation
-4. Partial reloads for efficiency
-5. Form helpers for submissions
+## Claude's Common Mistakes
+1. **Building separate API endpoints** — Inertia replaces API; return page components
+2. **Client-side routing** — Server handles routing; no Vue Router/React Router
+3. **Missing shared data** — Auth, flash messages via middleware
+4. **No progress indicator** — Users need navigation feedback
+5. **Ignoring form helpers** — `useForm()` handles errors and state
 
-## Red Lines
-- Client-side routing duplicating server routes
-- API endpoints for page data
-- Missing shared data for auth/flash
-- No progress indicators on navigation
-- Ignoring Inertia's form helpers
-
-## Pattern: Full Stack Flow
+## Correct Patterns (2026)
 ```php
 // Laravel Controller
 class UserController extends Controller
@@ -34,7 +26,9 @@ class UserController extends Controller
     {
         return Inertia::render('Users/Index', [
             'users' => User::query()
-                ->when($request->search, fn($q, $s) => $q->where('name', 'like', "%{$s}%"))
+                ->when($request->search, fn($q, $s) =>
+                    $q->where('name', 'like', "%{$s}%")
+                )
                 ->paginate()
                 ->withQueryString(),
             'filters' => $request->only(['search']),
@@ -55,7 +49,7 @@ class UserController extends Controller
     }
 }
 
-// HandleInertiaRequests Middleware
+// HandleInertiaRequests Middleware (shared data)
 public function share(Request $request): array
 {
     return [
@@ -66,12 +60,13 @@ public function share(Request $request): array
 ```
 
 ```vue
-<!-- resources/js/Pages/Users/Index.vue -->
+<!-- Pages/Users/Index.vue -->
 <script setup>
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { router, useForm } from '@inertiajs/vue3';
 
 const props = defineProps(['users', 'filters']);
 
+// Form helper handles state, errors, processing
 const form = useForm({ email: '', password: '' });
 
 function submit() {
@@ -80,7 +75,7 @@ function submit() {
   });
 }
 
-// Partial reload for search
+// Partial reload (preserves scroll, state)
 function search(value) {
   router.get('/users', { search: value }, {
     preserveState: true,
@@ -90,37 +85,37 @@ function search(value) {
 </script>
 
 <template>
-  <Head title="Users" />
   <input :value="filters.search" @input="search($event.target.value)" />
+
   <form @submit.prevent="submit">
     <input v-model="form.email" />
+    <span v-if="form.errors.email">{{ form.errors.email }}</span>
     <input v-model="form.password" type="password" />
     <button :disabled="form.processing">Create</button>
   </form>
+
   <ul>
     <li v-for="user in users.data" :key="user.id">{{ user.email }}</li>
   </ul>
 </template>
 ```
 
-## Integrates With
-- **Backend**: Laravel, Rails, or any server framework
-- **Frontend**: Vue, React, or Svelte
-- **Auth**: Server sessions, shares via middleware
-- **Validation**: Server-side, errors passed to client
+## Version Gotchas
+- **Inertia 2.x**: Current; improved TypeScript, async rendering
+- **Server routing**: All routes defined server-side
+- **Shared data**: Passed via middleware to every page
+- **Validation**: Server-side; errors returned to `form.errors`
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Page not found` | Check Inertia middleware, page component path |
-| `Props undefined` | Check controller returns, middleware shares |
-| `Form errors not showing` | Access `form.errors.field` |
-| `No progress bar` | Configure NProgress in app setup |
+## What NOT to Do
+- ❌ `/api/users` endpoint for page data — Use `Inertia::render()`
+- ❌ Vue Router / React Router — Server handles routing
+- ❌ `axios.post()` for forms — Use `form.post()` helper
+- ❌ Missing progress bar — Configure in app bootstrap
+- ❌ Accessing `$page` without shared middleware — Data undefined
 
-## Prod Ready
-- [ ] SSR configured for SEO
-- [ ] Shared data minimized
-- [ ] Code splitting per page
-- [ ] Progress bar visible
-- [ ] Form validation displays errors
-- [ ] Flash messages handled
+## SSR Setup
+```bash
+# Enable server-side rendering
+npm install @inertiajs/vue3 @vue/server-renderer
+php artisan inertia:start-ssr
+```

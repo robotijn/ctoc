@@ -1,67 +1,73 @@
 # D CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-dscanner --styleCheck src/             # Lint
-dfmt -i src/*.d                        # Format
-dub test                               # Test
-dub build --build=release              # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses @trusted carelessly — requires careful security review
+- Claude ignores @safe — use @safe by default
+- Claude forgets scope guards — use `scope(exit)` for cleanup
+- Claude allocates in hot paths — profile GC impact first
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `ldc` | LLVM-based (optimized) | DMD for production |
+| `dmd` | Reference compiler | Only for dev |
+| `dub` | Package manager/build | Manual compilation |
+| `d-scanner` | Static analysis | No linting |
+| `dfmt` | Code formatting | Manual style |
+
+## Patterns Claude Should Use
+```d
+import std.algorithm : map, filter;
+import std.range : iota;
+
+// @safe by default
+@safe:
+
+struct User {
+    string name;
+    int age;
+}
+
+// RAII with scope guards
+void processFile(string path) {
+    auto file = File(path, "r");
+    scope(exit) file.close();  // Guaranteed cleanup
+
+    foreach (line; file.byLine) {
+        process(line);
+    }
+}
+
+// Ranges over raw pointers
+auto processUsers(User[] users) {
+    return users
+        .filter!(u => u.age >= 18)
+        .map!(u => u.name);
+}
+
+// @nogc for hot paths (after profiling)
+@nogc pure nothrow
+int fastCompute(int x) {
+    return x * x + 1;
+}
+
+// Template constraints
+T add(T)(T a, T b) if (is(typeof(a + b) : T)) {
+    return a + b;
+}
 ```
 
-## Tools (2024-2025)
-- **DMD** - Reference compiler
-- **LDC** - LLVM-based (optimized builds)
-- **DUB** - Package manager and build tool
-- **D-Scanner** - Static analysis
-- **dfmt** - Code formatter
+## Anti-Patterns Claude Generates
+- @trusted without review — use @safe, mark @trusted carefully
+- Raw pointers in @safe — use slices and ranges
+- GC in hot paths (unverified) — profile first
+- Missing scope guards — use `scope(exit)` for cleanup
+- Unconstrained templates — add template constraints
 
-## Project Structure
-```
-project/
-├── source/            # Source files (.d)
-├── tests/             # Test files
-├── dub.json           # Package definition
-└── dub.selections.json  # Locked versions
-```
-
-## Non-Negotiables
-1. @safe by default for new code
-2. RAII over manual memory management
-3. Ranges over raw pointers/indices
-4. Template constraints for generics
-
-## Red Lines (Reject PR)
-- @trusted without careful review
-- Raw pointers in @safe code
-- GC allocation in hot paths without profiling
-- Missing scope guards for cleanup
-- Unconstrained templates
-- Secrets hardcoded in source
-
-## Testing Strategy
-- **Unit**: Built-in unittest blocks
-- **Integration**: DUB test configuration
-- **Benchmark**: std.benchmark for perf tests
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| GC pauses | Use @nogc or manual memory |
-| Template bloat | Use constraints, limit instances |
-| Slice dangling | Careful with .dup and scope |
-| Betterc limitations | Know what's available |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No GC in inner loops (profile first)
-- No unnecessary array copies
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] @safe used appropriately
-- [ ] Secrets from environment
-- [ ] Dependencies audited (dub audit)
+## Version Gotchas
+- **LDC**: Use for production builds (optimized)
+- **@safe**: Default for new code, audit @trusted
+- **GC**: Avoid in hot paths, use @nogc if needed
+- **Ranges**: Idiomatic D, prefer over manual loops
+- **With C**: Easy interop via extern(C)

@@ -1,79 +1,62 @@
 # Dask CTO
-> Parallel computing for analytics: pandas and NumPy at scale.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install dask[complete] distributed
-dask scheduler & dask worker tcp://localhost:8786
-pytest tests/ -v
+pip install "dask[complete]" distributed
+# For cluster: dask scheduler & dask worker tcp://localhost:8786
 ```
 
-## Non-Negotiables
-1. Appropriate partition sizes (100MB-1GB per partition)
-2. Persist intermediate results for reuse
-3. Monitor via distributed dashboard (localhost:8787)
-4. Prefer Dask DataFrame for pandas-like workflows
-5. Use `compute()` only when results needed
-6. Set memory limits per worker
+## Claude's Common Mistakes
+1. **Using Dask for small data** - If it fits in memory, use pandas/Polars
+2. **compute() in loops** - Builds new task graph each time; use persist()
+3. **Wrong partition size** - Too small = overhead; too large = OOM
+4. **Ignoring dashboard** - localhost:8787 shows task progress and memory
+5. **Shuffles without repartition** - Causes memory explosion
 
-## Red Lines
-- Partitions too small (task overhead) or too large (memory issues)
-- Calling `compute()` in loops
-- Ignoring the dashboard during debugging
-- Operations requiring full shuffle without repartitioning
-- Using Dask when data fits in memory
-
-## Pattern: Scalable ETL Pipeline
+## Correct Patterns (2026)
 ```python
 import dask.dataframe as dd
 from dask.distributed import Client
 
-# Initialize distributed client
+# Distributed client with memory limits
 client = Client(n_workers=4, threads_per_worker=2, memory_limit='4GB')
+print(client.dashboard_link)  # Monitor at localhost:8787
 
-# Lazy load with optimized partitions
+# Lazy load with partition optimization
 df = dd.read_parquet(
     's3://bucket/data/*.parquet',
-    columns=['id', 'date', 'value', 'category'],
+    columns=['id', 'date', 'value', 'category'],  # Column pruning
     engine='pyarrow',
 )
 
-# Chain transformations (builds task graph)
+# Build task graph (no computation yet)
 result = (
     df[df['value'] > 0]
     .assign(year=df['date'].dt.year)
     .groupby(['year', 'category'])
-    .agg({'value': ['sum', 'mean', 'count']})
-    .reset_index()
-    .repartition(npartitions=10)  # Optimize for output
+    .agg({'value': ['sum', 'mean']})
+    .repartition(npartitions=10)  # Optimize before shuffle
 )
 
-# Persist for reuse, then compute
+# Persist for reuse (keeps in cluster memory)
 result = result.persist()
-print(f"Partitions: {result.npartitions}")
+
+# Compute only at the end
 final = result.compute()
 
-# Write distributed output
+# Write distributed (no compute() needed)
 result.to_parquet('s3://bucket/output/', engine='pyarrow')
 ```
 
-## Integrates With
-- **Compute**: Local threads, distributed cluster, Kubernetes
-- **Storage**: S3, GCS, HDFS via fsspec
-- **ML**: Dask-ML for scalable preprocessing
+## Version Gotchas
+- **Dask-expr**: New query optimizer in 2024+; faster planning
+- **Partition size**: Target 100MB-1GB per partition
+- **vs Polars**: Polars faster for single-machine; Dask for cluster
+- **With Coiled**: Managed Dask clusters on AWS/GCP
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `KilledWorker` | Reduce partition size or increase worker memory |
-| `MemoryError` on compute | Persist intermediate results first |
-| `Scheduler timeout` | Check network connectivity, increase timeout |
-| `Task graph too large` | Repartition or persist before further ops |
-
-## Prod Ready
-- [ ] Distributed cluster for production workloads
-- [ ] Memory limits configured per worker
-- [ ] Dashboard monitoring enabled
-- [ ] Partition sizes optimized (100MB-1GB)
-- [ ] Retry logic for transient failures
+## What NOT to Do
+- Do NOT use Dask for data that fits in memory
+- Do NOT call compute() in loops (persist + single compute)
+- Do NOT ignore partition sizing (KilledWorker = too large)
+- Do NOT skip the dashboard for debugging

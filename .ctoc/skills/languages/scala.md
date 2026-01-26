@@ -1,68 +1,56 @@
 # Scala CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-sbt scalafmtCheckAll scalafix --check  # Lint
-sbt scalafmtAll                        # Format
-sbt test coverage coverageReport       # Test with coverage
-sbt assembly                           # Build fat jar
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses `null` — use `Option[T]` always
+- Claude uses `var` loops — use `foldLeft`, `map`, higher-order functions
+- Claude catches `Throwable` — catches fatal JVM errors
+- Claude uses old implicits — use `given`/`using` (Scala 3)
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `scala 3.x` | given/using, enums, open classes | Scala 2.x |
+| `sbt` or `scala-cli` | Build tools | Manual javac |
+| `scalafmt` | Formatting | Manual style |
+| `scalafix` | Linting + refactoring | Just compiler |
+| `munit` or `scalatest` | Testing | Ad-hoc tests |
+
+## Patterns Claude Should Use
+```scala
+// Scala 3 patterns
+// Use given/using instead of implicits
+given Ordering[User] = Ordering.by(_.name)
+
+def sorted[T](list: List[T])(using ord: Ordering[T]): List[T] =
+  list.sorted
+
+// Enums instead of sealed trait + case objects
+enum Status:
+  case Active, Inactive, Pending
+
+// Open classes require explicit marking
+open class Base:
+  def method(): Unit = ()
+
+// Option instead of null
+def findUser(id: Int): Option[User] =
+  users.find(_.id == id)
+
+// Higher-order instead of var loops
+val sum = numbers.foldLeft(0)(_ + _)
 ```
 
-## Tools (2024-2025)
-- **Scala 3.x** - New syntax, enums, given/using
-- **sbt** - Build tool
-- **Scalafmt** - Code formatting
-- **Scalafix** - Linting and refactoring
-- **MUnit/ScalaTest** - Testing frameworks
+## Anti-Patterns Claude Generates
+- Using `null` — use `Option[T]`
+- `var` with loops — use `foldLeft`, `map`, `filter`
+- `catch { case _: Throwable => }` — catches OOM errors
+- Old `implicit` keyword — use `given`/`using`
+- Blocking `Await.result` — use for-comprehensions
 
-## Project Structure
-```
-project/
-├── src/main/scala/    # Production code
-├── src/test/scala/    # Test code
-├── build.sbt          # Build definition
-├── project/           # sbt plugins
-└── .scalafmt.conf     # Scalafmt config
-```
-
-## Non-Negotiables
-1. Immutability by default - val over var
-2. Case classes for all data structures
-3. Pattern matching for type handling
-4. Explicit type annotations on public APIs
-
-## Red Lines (Reject PR)
-- Mutable state without justification
-- null usage (use Option)
-- Side effects in pure functions
-- Blocking in async code (Futures, ZIO, Cats Effect)
-- Secrets hardcoded in source
-- Any/AnyRef type abuse
-
-## Testing Strategy
-- **Unit**: MUnit/ScalaTest, <100ms, mock traits
-- **Integration**: Testcontainers for services
-- **Property**: ScalaCheck for invariants
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Implicit resolution confusion | Use given/using (Scala 3) |
-| Future blocking with Await | Use for-comprehensions |
-| Memory leaks in streams | Proper resource management |
-| Type inference failures | Add explicit type annotations |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No blocking in effect systems
-- No unbounded collections (use fs2 streams)
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] SQL uses parameterized queries
-- [ ] Secrets from environment/config
-- [ ] Dependencies audited (`sbt dependencyCheck`)
+## Version Gotchas
+- **Scala 3**: `given`/`using` replace `implicit`
+- **Scala 3**: Traits can take parameters
+- **Scala 3**: `open` keyword required for extensible classes
+- **With Cats/ZIO**: Never block in effect systems
+- **With macros**: Follow Scala 3 macro best practices docs

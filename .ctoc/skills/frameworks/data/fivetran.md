@@ -1,40 +1,27 @@
 # Fivetran CTO
-> Automated data integration with pre-built connectors and schema management.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test (via API)
-curl -X GET "https://api.fivetran.com/v1/connectors" -H "Authorization: Basic $FIVETRAN_API_KEY"
-curl -X POST "https://api.fivetran.com/v1/connectors/{id}/sync" -H "Authorization: Basic $FIVETRAN_API_KEY"
+# No local install - managed service
+# Configure via UI or API
+curl -X GET "https://api.fivetran.com/v1/connectors" \
+  -H "Authorization: Basic $FIVETRAN_API_KEY"
 ```
 
-## Non-Negotiables
-1. Connector selection matched to source capabilities
-2. Sync frequency aligned with data freshness needs
-3. Schema handling strategy (allow columns vs. block)
-4. Transformation layers (dbt models) downstream
-5. Cost monitoring via Monthly Active Rows (MAR)
-6. Alerting on sync failures
+## Claude's Common Mistakes
+1. **Syncing all tables/columns** - Only sync what you need (cost control)
+2. **No dbt transformation layer** - Raw data needs transformation
+3. **Ignoring MAR costs** - Monthly Active Rows drive billing
+4. **No sync failure alerts** - Silent failures cause stale data
+5. **Full refresh when incremental works** - Wastes time and resources
 
-## Red Lines
-- Syncing unnecessary tables/columns
-- No transformation strategy post-landing
-- Ignoring sync failures without alerting
-- Missing monitoring dashboards
-- Unmonitored MAR causing cost spikes
-
-## Pattern: Production Integration Setup
+## Correct Patterns (2026)
 ```yaml
-# Connector configuration (conceptual)
+# Connector configuration (via API/UI)
 connector:
   service: postgres
-  schema_prefix: source_
-
-  config:
-    host: production-db.example.com
-    port: 5432
-    database: production
-    user: fivetran_user
+  schema_prefix: raw_
 
   sync_mode: incremental
   cursor_column: updated_at
@@ -44,7 +31,6 @@ connector:
       tables:
         - name: orders
           sync_mode: INCREMENTAL
-          enabled: true
           columns:
             - name: id
               hashed: false
@@ -62,43 +48,25 @@ connector:
 ```
 
 ```python
-# Fivetran API for automation
-import requests
 from base64 import b64encode
+import requests
 
-def trigger_connector_sync(connector_id: str):
+def trigger_sync(connector_id: str):
     auth = b64encode(f"{API_KEY}:{API_SECRET}".encode()).decode()
-    response = requests.post(
+    return requests.post(
         f"https://api.fivetran.com/v1/connectors/{connector_id}/sync",
         headers={"Authorization": f"Basic {auth}"}
-    )
-    return response.json()
-
-def get_sync_status(connector_id: str) -> dict:
-    auth = b64encode(f"{API_KEY}:{API_SECRET}".encode()).decode()
-    response = requests.get(
-        f"https://api.fivetran.com/v1/connectors/{connector_id}",
-        headers={"Authorization": f"Basic {auth}"}
-    )
-    return response.json()["data"]["status"]
+    ).json()
 ```
 
-## Integrates With
-- **Destinations**: Snowflake, BigQuery, Redshift, Databricks
-- **Transformation**: dbt for post-landing transforms
-- **Orchestration**: Airflow sensors, Prefect triggers
+## Version Gotchas
+- **MAR billing**: Monthly Active Rows determine cost; optimize selection
+- **Schema handling**: Allow columns or block - configure strategy
+- **Transformations**: Use dbt downstream; Fivetran Transformations available
+- **HVR acquisition**: Enterprise features for high-volume replication
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Connection failed` | Check firewall rules, credentials |
-| `Schema drift detected` | Review and allow/block columns |
-| `Sync timeout` | Reduce initial sync scope |
-| `MAR limit exceeded` | Review table selection, archive old data |
-
-## Prod Ready
-- [ ] Tables/columns selectively synced
-- [ ] Schema handling strategy defined
-- [ ] Alerting on sync failures
-- [ ] MAR budget monitored
-- [ ] dbt models for transformation
+## What NOT to Do
+- Do NOT sync unnecessary tables/columns (MAR costs)
+- Do NOT skip transformation layer (raw data is hard to use)
+- Do NOT ignore sync failures (stale data)
+- Do NOT use full refresh when incremental is available

@@ -1,82 +1,59 @@
 # Snowflake CTO
-> Cloud-native data warehouse with separation of storage and compute.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install snowflake-connector-python snowflake-sqlalchemy
-snowsql -c my_connection -q "SELECT CURRENT_VERSION()"
-pytest tests/ -v
+# Or for pandas integration:
+pip install "snowflake-connector-python[pandas]"
 ```
 
-## Non-Negotiables
-1. Right-size warehouses (start XS, scale up as needed)
-2. Clustering keys on large tables (>1TB) by query patterns
-3. Zero-copy cloning for dev/test environments
-4. Resource monitors with spend alerts
-5. Time travel configured appropriately (default 1 day)
-6. Separate warehouses for ETL vs. analytics
+## Claude's Common Mistakes
+1. **Oversized warehouses** - Start XS, scale up only if needed
+2. **ETL on BI warehouse** - Separate warehouses for ETL vs analytics
+3. **48-hour query timeout** - Set STATEMENT_TIMEOUT_IN_SECONDS
+4. **Missing auto-suspend** - Idle warehouses burn credits
+5. **No resource monitors** - Unexpected costs without spend alerts
 
-## Red Lines
-- Running ETL on same warehouse as user queries
-- Oversized warehouses running idle
-- Missing clustering on frequently filtered columns
-- No cost monitoring or alerts
-- Hardcoded credentials in connection strings
-
-## Pattern: Optimized Data Loading
+## Correct Patterns (2026)
 ```sql
--- Staging with proper file format
-CREATE OR REPLACE FILE FORMAT json_format
-  TYPE = 'JSON'
-  STRIP_OUTER_ARRAY = TRUE
-  COMPRESSION = 'AUTO';
+-- Right-size warehouse with auto-suspend
+CREATE WAREHOUSE etl_wh
+  WAREHOUSE_SIZE = 'X-SMALL'
+  AUTO_SUSPEND = 60
+  AUTO_RESUME = TRUE
+  STATEMENT_TIMEOUT_IN_SECONDS = 3600;
 
-CREATE OR REPLACE STAGE raw_stage
-  URL = 's3://bucket/raw/'
-  CREDENTIALS = (AWS_KEY_ID = '...' AWS_SECRET_KEY = '...')
-  FILE_FORMAT = json_format;
+-- Resource monitor with alerts
+CREATE RESOURCE MONITOR monthly_budget
+  WITH CREDIT_QUOTA = 1000
+  TRIGGERS
+    ON 75 PERCENT DO NOTIFY
+    ON 90 PERCENT DO NOTIFY
+    ON 100 PERCENT DO SUSPEND;
 
--- Efficient COPY with error handling
+-- Efficient data loading (100-250MB files optimal)
 COPY INTO raw.events
 FROM @raw_stage/events/
-  FILE_FORMAT = json_format
-  ON_ERROR = 'CONTINUE'
-  PATTERN = '.*[.]json[.]gz'
-  FORCE = FALSE;  -- Skip already loaded files
+  FILE_FORMAT = (TYPE = 'PARQUET')
+  PATTERN = '.*[.]parquet'
+  ON_ERROR = 'CONTINUE';
 
--- Materialized aggregation with clustering
-CREATE OR REPLACE TABLE analytics.daily_metrics
-  CLUSTER BY (date, region)
-AS
-SELECT
-  DATE_TRUNC('day', event_time) AS date,
-  region,
-  COUNT(*) AS event_count,
-  SUM(revenue) AS total_revenue
-FROM raw.events
-GROUP BY 1, 2;
+-- Clustering for large tables (>1TB)
+ALTER TABLE analytics.facts CLUSTER BY (date, region);
 
--- Auto-suspend warehouse
-ALTER WAREHOUSE etl_wh SET AUTO_SUSPEND = 60;
+-- Zero-copy clone for dev/test (instant, no storage cost)
+CREATE DATABASE dev_db CLONE prod_db;
 ```
 
-## Integrates With
-- **ETL**: Fivetran, Airbyte, dbt for transformations
-- **BI**: Tableau, Looker, Metabase direct connect
-- **Orchestration**: Airflow, Prefect with Snowflake operator
+## Version Gotchas
+- **Gen2 warehouses**: 67% faster DML, 56% cost reduction
+- **Dynamic tables**: Auto-refreshing materialized views
+- **Iceberg tables**: Native support for open table format
+- **Cortex AI**: Built-in LLM functions (COMPLETE, EXTRACT, etc.)
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Warehouse suspended` | Check AUTO_RESUME setting |
-| `Query timeout` | Increase warehouse size or optimize query |
-| `Credit usage spike` | Set resource monitors with alerts |
-| `File format mismatch` | Verify format matches actual file structure |
-
-## Prod Ready
-- [ ] Resource monitors with spend alerts
-- [ ] Separate warehouses for ETL and BI
-- [ ] Clustering keys on large tables
-- [ ] Zero-copy clones for dev/staging
-- [ ] Network policies for IP allowlisting
+## What NOT to Do
+- Do NOT use oversized warehouses by default (start XS)
+- Do NOT run ETL and BI on same warehouse
+- Do NOT skip resource monitors (surprise bills)
+- Do NOT forget AUTO_SUSPEND (idle credits burn)

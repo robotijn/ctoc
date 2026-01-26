@@ -1,57 +1,24 @@
 # Symfony CTO
-> Enterprise PHP framework - components, bundles, and full-stack for serious applications.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-composer create-project symfony/skeleton myapp && cd myapp
+composer create-project symfony/skeleton myapp
+cd myapp
 symfony server:start
-php bin/phpunit
+# Requires PHP 8.2+
 ```
 
-## Non-Negotiables
-1. Dependency injection via autowiring
-2. Doctrine ORM with repository pattern
-3. Form component for validation
-4. Security component for auth
-5. Event system for decoupling
+## Claude's Common Mistakes
+1. **Service locator pattern** — Use constructor injection, not `$container->get()`
+2. **Fat controllers** — Delegate to services; controllers orchestrate only
+3. **Raw SQL without query builder** — Use Doctrine ORM or DBAL
+4. **Missing input validation** — Use DTO classes with constraints
+5. **Ignoring autowiring** — Let Symfony inject dependencies automatically
 
-## Red Lines
-- Service locator anti-pattern - use constructor injection
-- Missing form/input validation
-- Raw SQL without query builder
-- Controllers as fat services
-- Ignoring Symfony conventions
-
-## Pattern: Controller with Validation
+## Correct Patterns (2026)
 ```php
-// src/Controller/UserController.php
-namespace App\Controller;
-
-use App\Dto\CreateUserDto;
-use App\Service\UserService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Routing\Attribute\Route;
-
-#[Route('/api/users')]
-class UserController extends AbstractController
-{
-    public function __construct(
-        private readonly UserService $userService,
-    ) {}
-
-    #[Route('', methods: ['POST'])]
-    public function create(
-        #[MapRequestPayload] CreateUserDto $dto,
-    ): JsonResponse {
-        $user = $this->userService->create($dto);
-        return $this->json($user, Response::HTTP_CREATED);
-    }
-}
-
+// DTO with validation constraints
 // src/Dto/CreateUserDto.php
 namespace App\Dto;
 
@@ -69,26 +36,82 @@ class CreateUserDto
         public readonly string $password,
     ) {}
 }
+
+// Controller with automatic DTO mapping
+// src/Controller/UserController.php
+namespace App\Controller;
+
+use App\Dto\CreateUserDto;
+use App\Service\UserService;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Routing\Attribute\Route;
+
+#[Route('/api/users')]
+class UserController extends AbstractController
+{
+    // Constructor injection (autowired)
+    public function __construct(
+        private readonly UserService $userService,
+    ) {}
+
+    #[Route('', methods: ['POST'])]
+    public function create(
+        #[MapRequestPayload] CreateUserDto $dto,  // Auto-validated
+    ): JsonResponse {
+        $user = $this->userService->create($dto);
+        return $this->json($user, Response::HTTP_CREATED);
+    }
+}
+
+// Service with Doctrine
+// src/Service/UserService.php
+class UserService
+{
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly UserPasswordHasherInterface $hasher,
+    ) {}
+
+    public function create(CreateUserDto $dto): User
+    {
+        $user = new User();
+        $user->setEmail($dto->email);
+        $user->setPassword($this->hasher->hashPassword($user, $dto->password));
+        $this->em->persist($user);
+        $this->em->flush();
+        return $user;
+    }
+}
 ```
 
-## Integrates With
-- **DB**: Doctrine ORM with migrations
-- **Auth**: Security bundle with voters
-- **Queue**: Messenger component
-- **Cache**: Cache component with pools
+## Version Gotchas
+- **Symfony 7.x**: Requires PHP 8.2+; uses attributes heavily
+- **Doctrine ORM 3.x**: Stricter typing, no more proxy class issues
+- **MapRequestPayload**: Auto-validates and deserializes request body
+- **Autowiring**: Default; no need for manual service registration
+
+## What NOT to Do
+- ❌ `$container->get('service')` — Use constructor injection
+- ❌ `$em->getRepository()->findBy()` in controller — Use service layer
+- ❌ Raw `$_POST` or `$_GET` — Use Request object or DTOs
+- ❌ Missing `#[Assert\*]` on DTOs — Validation won't run
+- ❌ Manual service wiring — Let autowiring handle it
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
 | `Service not found` | Check autowiring, add service tag |
-| `Validation failed` | Check DTO constraints |
+| `Validation failed` | Check DTO constraint attributes |
 | `Entity not persisted` | Call `$em->flush()` |
-| `Route not found` | Clear cache: `php bin/console cache:clear` |
+| `Route not found` | Clear cache: `bin/console cache:clear` |
 
-## Prod Ready
-- [ ] `APP_ENV=prod` in production
-- [ ] Cache warmed: `cache:warmup`
-- [ ] Doctrine migrations applied
-- [ ] Secrets managed with Vault
-- [ ] Monolog configured for logs
-- [ ] Health check endpoint
+## Production Checklist
+```bash
+APP_ENV=prod
+bin/console cache:clear
+bin/console cache:warmup
+bin/console doctrine:migrations:migrate
+```

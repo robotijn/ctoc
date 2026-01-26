@@ -1,81 +1,70 @@
 # Next.js CTO
-> React meta-framework - Server Components by default, client only when needed.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npx create-next-app@latest --typescript --tailwind --app
-npm run dev
-npm test && npm run build
+# Or upgrade existing:
+npx @next/codemod@canary upgrade latest
+# Turbopack now stable for dev:
+npm run dev --turbopack
 ```
 
-## Non-Negotiables
-1. Server Components by default - add `'use client'` only for interactivity
-2. Data fetching happens on server via `async` components or Server Actions
-3. Every route has `loading.tsx` and `error.tsx`
-4. Metadata API for SEO on every page
-5. Image optimization with `next/image` always
+## Claude's Common Mistakes
+1. **Caching fetch by default** — Next.js 15 changed to `no-store` by default; explicitly set cache strategy
+2. **Synchronous request APIs** — `cookies()`, `headers()`, `params`, `searchParams` are now async
+3. **Catching `redirect()`** — Don't wrap redirect() in try/catch; it throws intentionally
+4. **Using API routes for server data** — Use Server Components or Server Actions instead
+5. **Overusing `'use client'`** — Keep components server-side unless they need interactivity
 
-## Red Lines
-- `'use client'` at the top of files that don't need it
-- `useEffect` for fetching initial data - fetch on server
-- Missing loading/error states for async routes
-- Ignoring Web Vitals (LCP, FID, CLS)
-- API routes for data that Server Components can fetch directly
-
-## Pattern: Server Action with Validation
+## Correct Patterns (2026)
 ```typescript
-// app/actions/user.ts
-'use server'
-
-import { z } from 'zod';
-import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
-
-const CreateUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(2).max(100),
-});
-
-export async function createUser(formData: FormData) {
-  const validated = CreateUserSchema.safeParse({
-    email: formData.get('email'),
-    name: formData.get('name'),
-  });
-
-  if (!validated.success) {
-    return { error: validated.error.flatten().fieldErrors };
-  }
-
-  await db.user.create({ data: validated.data });
-  revalidatePath('/users');
-  redirect('/users');
+// Next.js 15: Async request APIs
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ query: string }>;
+}) {
+  const { id } = await params;
+  const { query } = await searchParams;
+  const cookieStore = await cookies();
 }
+
+// Server Action with validation
+'use server'
+import { revalidatePath } from 'next/cache';
+
+export async function createItem(formData: FormData) {
+  const validated = schema.safeParse(Object.fromEntries(formData));
+  if (!validated.success) return { error: validated.error.flatten() };
+  await db.item.create({ data: validated.data });
+  revalidatePath('/items');
+}
+
+// Explicit caching (no longer default)
+fetch(url, { cache: 'force-cache' })  // Opt into caching
+export const revalidate = 3600;        // ISR
 ```
 
-## Rendering Strategy Decision
-- **Static (SSG)**: Marketing pages, docs, blogs -> default
-- **Dynamic (SSR)**: User-specific, real-time data -> `export const dynamic = 'force-dynamic'`
-- **ISR**: Content that updates periodically -> `export const revalidate = 3600`
-- **Client**: Heavy interactivity, browser APIs -> `'use client'`
+## Version Gotchas
+- **v14→v15**: `cookies()`, `headers()`, `params`, `searchParams` are async (breaking)
+- **v14→v15**: fetch/GET handlers uncached by default
+- **v14→v15**: `sharp` auto-installed for image optimization
+- **Security**: Update to 15.1.4+ (CVE-2025-55184, CVE-2025-55183)
 
-## Integrates With
-- **DB**: Prisma with connection pooling (PgBouncer) for serverless
-- **Auth**: NextAuth.js v5 (Auth.js) with server-side sessions
-- **Cache**: `unstable_cache` for expensive computations
+## What NOT to Do
+- ❌ `const cookieStore = cookies()` — Use `await cookies()`
+- ❌ `try { redirect('/') } catch {}` — Let redirect throw
+- ❌ `'use client'` on data-fetching components — Fetch on server
+- ❌ API routes for simple data — Use Server Actions
+- ❌ Relying on cached behavior from v14 — Explicitly set cache
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Error: Hydration failed` | Ensure server/client render same content |
-| `Dynamic server usage` | Add `'use server'` or change to client component |
-| `NEXT_REDIRECT` in try/catch | Don't catch redirect(), let it throw |
-| `Prisma: prepared statement already exists` | Use connection pooling, limit pool size |
-
-## Prod Ready
-- [ ] `next.config.js` has security headers configured
-- [ ] Environment variables validated at build time
-- [ ] Parallel routes for complex layouts
-- [ ] Intercepting routes for modals
-- [ ] Vercel Analytics or custom Web Vitals tracking
-- [ ] Edge runtime for latency-sensitive routes
+## Rendering Strategy
+| Use Case | Strategy |
+|----------|----------|
+| Marketing/docs | Static (default) |
+| User-specific | `dynamic = 'force-dynamic'` |
+| Periodic updates | `revalidate = 3600` |
+| Heavy interactivity | `'use client'` |

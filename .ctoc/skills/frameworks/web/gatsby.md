@@ -1,35 +1,28 @@
 # Gatsby CTO
-> React-based static site generator - GraphQL data layer, plugin ecosystem.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npx gatsby new mysite && cd mysite
-gatsby develop
-npm test
+npm create gatsby@latest my-site
+cd my-site && npm run develop
+# Gatsby 5 - requires Node.js 18+
 ```
 
-## Non-Negotiables
-1. GraphQL data layer for all content
-2. Image optimization with `gatsby-plugin-image`
-3. Plugin ecosystem leveraged properly
-4. Page queries for static data
-5. Build optimization with caching
+## Claude's Common Mistakes
+1. **Client-side fetching for static data** — Use GraphQL page queries at build time
+2. **Using `<img>` tags** — Use `gatsby-plugin-image` for optimization
+3. **Large page bundles** — Split and lazy load components
+4. **Missing caching strategy** — Gatsby Cloud or incremental builds
+5. **Ignoring Core Web Vitals** — Optimize LCP, CLS, FID
 
-## Red Lines
-- Client-side data fetching for static data
-- Large page bundles - split and lazy load
-- Missing image optimization
-- No caching strategy for builds
-- Ignoring Core Web Vitals
-
-## Pattern: Dynamic Page with Query
+## Correct Patterns (2026)
 ```jsx
 // src/templates/post.jsx
 import React from 'react';
 import { graphql } from 'gatsby';
 import { GatsbyImage, getImage } from 'gatsby-plugin-image';
 
+// Page query (runs at build time, not client)
 export const query = graphql`
   query PostQuery($id: String!) {
     markdownRemark(id: { eq: $id }) {
@@ -54,51 +47,40 @@ export default function PostTemplate({ data }) {
   return (
     <article>
       <h1>{post.frontmatter.title}</h1>
-      <time>{post.frontmatter.date}</time>
+      {/* Use GatsbyImage, NOT <img> */}
       {image && <GatsbyImage image={image} alt={post.frontmatter.title} />}
       <div dangerouslySetInnerHTML={{ __html: post.html }} />
     </article>
   );
 }
-
-// gatsby-node.js
-exports.createPages = async ({ graphql, actions }) => {
-  const { data } = await graphql(`
-    query {
-      allMarkdownRemark {
-        nodes { id, frontmatter { slug } }
-      }
-    }
-  `);
-
-  data.allMarkdownRemark.nodes.forEach(node => {
-    actions.createPage({
-      path: `/blog/${node.frontmatter.slug}`,
-      component: require.resolve('./src/templates/post.jsx'),
-      context: { id: node.id },
-    });
-  });
-};
 ```
 
-## Integrates With
-- **CMS**: Contentful, Sanity, Strapi via source plugins
-- **Styling**: CSS Modules, styled-components, Tailwind
-- **SEO**: `gatsby-plugin-react-helmet`
-- **Deploy**: Gatsby Cloud, Netlify, Vercel
+## Version Gotchas
+- **Gatsby 5**: Slice API, Script component, partial hydration
+- **React 18**: Required; concurrent features
+- **gatsby-plugin-image**: Replaces gatsby-image
+- **GraphQL**: Build-time queries, not runtime
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `GraphQL error` | Check query syntax, run `gatsby clean` |
-| `Build OOM` | Increase Node memory, optimize images |
-| `Page not found` | Check `createPage` in gatsby-node.js |
-| `Image not rendering` | Use `GatsbyImage` not `img` tag |
+## What NOT to Do
+- ❌ `fetch()` in components for CMS data — Use GraphQL page queries
+- ❌ `<img src={...}>` — Use `<GatsbyImage>` for optimization
+- ❌ All JS in main bundle — Use `loadable-components` for code splitting
+- ❌ `gatsby build` without cache — Use incremental builds
+- ❌ Ignoring Lighthouse scores — Optimize Core Web Vitals
 
-## Prod Ready
-- [ ] Image optimization configured
-- [ ] Sitemap plugin enabled
-- [ ] SEO meta tags on all pages
-- [ ] Bundle analyzed and optimized
-- [ ] Incremental builds configured
-- [ ] Lighthouse score > 90
+## Data Sources
+| Source | Plugin |
+|--------|--------|
+| Markdown | `gatsby-transformer-remark` |
+| Contentful | `gatsby-source-contentful` |
+| Sanity | `gatsby-source-sanity` |
+| WordPress | `gatsby-source-wordpress` |
+
+## Image Optimization
+```jsx
+// Always use GatsbyImage
+import { GatsbyImage, getImage } from 'gatsby-plugin-image';
+
+const image = getImage(data.file);
+<GatsbyImage image={image} alt="Description" />
+```

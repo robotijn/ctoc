@@ -1,37 +1,26 @@
 # TensorRT CTO
-> NVIDIA's high-performance deep learning inference optimizer.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install tensorrt
-# Or use NVIDIA container
-docker pull nvcr.io/nvidia/tensorrt:24.01-py3
-trtexec --onnx=model.onnx --saveEngine=model.plan --fp16
+# Or use NVIDIA container:
+docker pull nvcr.io/nvidia/tensorrt:25.01-py3
+# Build engine: trtexec --onnx=model.onnx --saveEngine=model.plan --fp16
 ```
 
-## Non-Negotiables
-1. Precision selection (FP16/INT8) based on accuracy needs
-2. Calibration dataset for INT8 quantization
-3. Dynamic shapes with optimization profiles
-4. Engine serialization for deployment
-5. Layer fusion awareness for custom ops
-6. Workspace size configuration
+## Claude's Common Mistakes
+1. INT8 quantization without calibration data
+2. Missing optimization profiles for dynamic shapes
+3. Rebuilding engine on every run (slow startup)
+4. Not validating accuracy after conversion
+5. Wrong workspace size causing build failures
 
-## Red Lines
-- INT8 without proper calibration
-- Ignoring dynamic shape requirements
-- No engine caching (rebuilding every time)
-- Missing optimization profiles for variable inputs
-- Wrong workspace size causing failures
-- Not validating accuracy after conversion
-
-## Pattern: Production Model Optimization
+## Correct Patterns (2026)
 ```python
 import tensorrt as trt
 import numpy as np
 
-# Logger
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 def build_engine(onnx_path: str, fp16: bool = True, int8: bool = False):
@@ -44,9 +33,9 @@ def build_engine(onnx_path: str, fp16: bool = True, int8: bool = False):
     # Parse ONNX
     with open(onnx_path, "rb") as f:
         if not parser.parse(f.read()):
-            for error in range(parser.num_errors):
-                print(parser.get_error(error))
-            raise RuntimeError("Failed to parse ONNX")
+            for i in range(parser.num_errors):
+                print(parser.get_error(i))
+            raise RuntimeError("ONNX parse failed")
 
     # Build config
     config = builder.create_builder_config()
@@ -59,7 +48,7 @@ def build_engine(onnx_path: str, fp16: bool = True, int8: bool = False):
         config.set_flag(trt.BuilderFlag.INT8)
         config.int8_calibrator = MyCalibrator(calibration_data)
 
-    # Dynamic shapes
+    # Dynamic shapes with optimization profile
     profile = builder.create_optimization_profile()
     profile.set_shape(
         "input",
@@ -69,49 +58,28 @@ def build_engine(onnx_path: str, fp16: bool = True, int8: bool = False):
     )
     config.add_optimization_profile(profile)
 
-    # Build engine
-    serialized_engine = builder.build_serialized_network(network, config)
-
-    # Save engine
+    # Build and serialize engine
+    serialized = builder.build_serialized_network(network, config)
     with open("model.plan", "wb") as f:
-        f.write(serialized_engine)
+        f.write(serialized)
+    return serialized
 
-    return serialized_engine
-
-# Inference
-def inference(engine_path: str, input_data: np.ndarray):
-    runtime = trt.Runtime(TRT_LOGGER)
-
-    with open(engine_path, "rb") as f:
-        engine = runtime.deserialize_cuda_engine(f.read())
-
-    context = engine.create_execution_context()
-    context.set_input_shape("input", input_data.shape)
-
-    # Allocate buffers and run
-    # ... (buffer allocation code)
-
-    return output
+# Load and run engine
+runtime = trt.Runtime(TRT_LOGGER)
+with open("model.plan", "rb") as f:
+    engine = runtime.deserialize_cuda_engine(f.read())
+context = engine.create_execution_context()
 ```
 
-## Integrates With
-- **Frameworks**: PyTorch, TensorFlow, ONNX
-- **Serving**: Triton, TensorRT-LLM
-- **Hardware**: NVIDIA GPUs (Volta+)
-- **Deployment**: CUDA, cuDNN
+## Version Gotchas
+- **Engine caching**: ALWAYS serialize to .plan file
+- **GPU architecture**: Engine tied to GPU - rebuild for different card
+- **INT8 calibration**: Requires representative data samples
+- **Dynamic shapes**: Use optimization profiles for variable inputs
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Unsupported layer` | Use custom plugin or modify network |
-| `Calibration failed` | Ensure calibration data is representative |
-| `Engine rebuild required` | Different GPU architecture, rebuild engine |
-| `OOM during build` | Reduce workspace size, simplify network |
-
-## Prod Ready
-- [ ] Precision validated for accuracy
-- [ ] INT8 calibrated with representative data
-- [ ] Dynamic shapes profiled
-- [ ] Engine serialized for deployment
-- [ ] Latency benchmarked with trtexec
-- [ ] GPU architecture matched to engine
+## What NOT to Do
+- Do NOT use INT8 without calibration data
+- Do NOT skip optimization profiles for dynamic inputs
+- Do NOT rebuild engine on every run - cache .plan file
+- Do NOT skip accuracy validation after conversion
+- Do NOT ignore workspace size errors (increase memory)

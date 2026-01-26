@@ -1,109 +1,78 @@
 # Streamlit CTO
-> Build production ML dashboards and data apps in pure Python.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install streamlit
-streamlit run app.py --server.port 8501
-streamlit run app.py --server.headless true --server.address 0.0.0.0
+# Run: streamlit run app.py
+# Production: streamlit run app.py --server.headless true --server.address 0.0.0.0
 ```
 
-## Non-Negotiables
-1. Use `st.cache_data` for expensive computations
-2. Manage state with `st.session_state`
-3. Use columns and tabs for layout
-4. Deploy to Streamlit Cloud for sharing
-5. Handle errors gracefully with try/except
-6. Use `st.spinner` for long operations
+## Claude's Common Mistakes
+1. Missing `@st.cache_data` for expensive computations
+2. Using global variables instead of `st.session_state`
+3. No loading indicators for slow operations
+4. Duplicate widget keys causing errors
+5. Not using `st.secrets` for API keys
 
-## Red Lines
-- Expensive computations without caching
-- Global variables instead of session_state
-- No loading indicators for slow operations
-- Ignoring layout for user experience
-- Hardcoded secrets in code
-- No error handling in production
-
-## Pattern: Production ML Dashboard
+## Correct Patterns (2026)
 ```python
 import streamlit as st
 import pandas as pd
-from typing import Optional
 
 st.set_page_config(page_title="ML Dashboard", layout="wide")
 
-# Initialize session state
-if "model" not in st.session_state:
-    st.session_state.model = None
-if "history" not in st.session_state:
-    st.session_state.history = []
+# Initialize session state FIRST
+if "predictions" not in st.session_state:
+    st.session_state.predictions = []
 
-# Cached data loading
+# Cache data loading (TTL in seconds)
 @st.cache_data(ttl=3600)
 def load_data(path: str) -> pd.DataFrame:
     return pd.read_parquet(path)
 
-# Cached model loading
+# Cache model loading (use cache_resource for objects)
 @st.cache_resource
-def load_model(model_path: str):
+def load_model(path: str):
     import joblib
-    return joblib.load(model_path)
+    return joblib.load(path)
 
 # Sidebar configuration
 with st.sidebar:
-    st.title("Configuration")
-    model_choice = st.selectbox("Model", ["Random Forest", "XGBoost"])
-    threshold = st.slider("Confidence Threshold", 0.0, 1.0, 0.5)
+    model_choice = st.selectbox("Model", ["RF", "XGBoost"], key="model_select")
+    threshold = st.slider("Threshold", 0.0, 1.0, 0.5, key="threshold_slider")
 
 # Main content with tabs
-tab1, tab2, tab3 = st.tabs(["Predict", "History", "Metrics"])
+tab1, tab2 = st.tabs(["Predict", "History"])
 
 with tab1:
-    col1, col2 = st.columns(2)
-    with col1:
-        uploaded_file = st.file_uploader("Upload data", type=["csv", "parquet"])
+    uploaded = st.file_uploader("Upload CSV", type=["csv"], key="uploader")
+    if uploaded:
+        with st.spinner("Processing..."):  # Always show loading state
+            data = pd.read_csv(uploaded)
+            st.dataframe(data.head())
 
-    with col2:
-        if uploaded_file:
-            with st.spinner("Processing..."):
-                data = pd.read_csv(uploaded_file)
-                st.dataframe(data.head())
+        if st.button("Predict", type="primary", key="predict_btn"):
+            try:
+                model = load_model(f"models/{model_choice}.joblib")
+                preds = model.predict(data)
+                st.success(f"Predicted {len(preds)} rows")
+                st.session_state.predictions.append({"model": model_choice, "n": len(preds)})
+            except Exception as e:
+                st.error(f"Failed: {e}")
 
-                if st.button("Predict", type="primary"):
-                    try:
-                        model = load_model(f"models/{model_choice.lower()}.joblib")
-                        predictions = model.predict(data)
-                        st.success(f"Predictions complete: {len(predictions)} rows")
-                        st.session_state.history.append({"model": model_choice, "rows": len(predictions)})
-                    except Exception as e:
-                        st.error(f"Prediction failed: {e}")
-
-with tab2:
-    st.dataframe(pd.DataFrame(st.session_state.history))
-
-with tab3:
-    st.metric("Total Predictions", sum(h["rows"] for h in st.session_state.history))
+# Access secrets: st.secrets["OPENAI_API_KEY"]
 ```
 
-## Integrates With
-- **Data**: pandas, Polars, DuckDB
-- **ML**: scikit-learn, PyTorch, TensorFlow
-- **Viz**: Plotly, Altair, Matplotlib
-- **Deploy**: Streamlit Cloud, Docker, AWS
+## Version Gotchas
+- **cache_data**: For data (serializable), replaces `@st.cache`
+- **cache_resource**: For models/connections (non-serializable)
+- **session_state**: Persists across reruns, not across sessions
+- **Secrets**: Use `.streamlit/secrets.toml` or Streamlit Cloud
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `DuplicateWidgetID` | Add unique `key` parameter to widgets |
-| `SessionInfo not found` | Ensure code runs in Streamlit context |
-| `CachedObjectMutationWarning` | Return new objects from cached functions |
-| `MemoryError` | Use `st.cache_data` with `max_entries` limit |
-
-## Prod Ready
-- [ ] Expensive operations cached
-- [ ] Session state manages all state
-- [ ] Layout optimized with columns/tabs
-- [ ] Error handling for all user actions
-- [ ] Secrets stored in st.secrets
-- [ ] Loading indicators for slow operations
+## What NOT to Do
+- Do NOT skip `@st.cache_data` for expensive operations
+- Do NOT use global variables - use `st.session_state`
+- Do NOT forget unique `key` parameter for widgets
+- Do NOT skip `st.spinner()` for slow operations
+- Do NOT hardcode secrets - use `st.secrets`

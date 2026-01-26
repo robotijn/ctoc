@@ -1,68 +1,64 @@
 # Elixir CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-mix credo --strict                     # Lint
-mix format                             # Format
-mix test --cover                       # Test with coverage
-mix release                            # Build release
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude spawns processes without supervision — always supervise
+- Claude raises exceptions for expected errors — return `{:error, reason}`
+- Claude uses mutable state patterns — use GenServer/Agent
+- Claude forgets Dialyzer typespecs on public functions
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `elixir 1.19+` | OTP 28 support | Elixir 1.16 or older |
+| `mix format` | Built-in formatting | Manual style |
+| `credo --strict` | Static analysis | No linting |
+| `dialyxir` | Type checking | No types |
+| `mox` | Behavior-based mocking | Ad-hoc mocks |
+
+## Patterns Claude Should Use
+```elixir
+# Always supervise processes
+defmodule MyApp.Application do
+  use Application
+
+  def start(_type, _args) do
+    children = [
+      {MyApp.Worker, []},
+      {MyApp.Cache, []}
+    ]
+    Supervisor.start_link(children, strategy: :one_for_one)
+  end
+end
+
+# Return tuples for expected errors (don't raise)
+def fetch_user(id) do
+  case Repo.get(User, id) do
+    nil -> {:error, :not_found}
+    user -> {:ok, user}
+  end
+end
+
+# Set-theoretic types in patterns (1.17+)
+@spec process(list(integer())) :: integer()
+def process(numbers) when is_list(numbers) do
+  Enum.sum(numbers)
+end
+
+# Process labels for debugging (1.17+)
+Process.set_label(:my_worker)
 ```
 
-## Tools (2024-2025)
-- **Elixir 1.16+** - Set-theoretic types coming
-- **mix format** - Built-in formatting
-- **Credo** - Static analysis
-- **Dialyzer** - Type checking via dialyxir
-- **ExUnit** - Testing framework
+## Anti-Patterns Claude Generates
+- Spawning without supervision — use Supervisor
+- `raise` for expected errors — return `{:error, reason}`
+- Blocking GenServer callbacks — use `handle_continue`
+- Missing `@spec` on public functions — Dialyzer needs them
+- Unbounded message queues — use GenStage/backpressure
 
-## Project Structure
-```
-project/
-├── lib/project/       # Production code
-├── test/              # Test files
-├── config/            # Configuration
-├── mix.exs            # Project definition
-└── .formatter.exs     # Formatter config
-```
-
-## Non-Negotiables
-1. Supervision trees for fault tolerance
-2. Pattern matching for all data handling
-3. Immutable data structures everywhere
-4. OTP patterns (GenServer, Supervisor)
-
-## Red Lines (Reject PR)
-- Mutable state outside GenServer/Agent
-- Missing supervision for processes
-- Synchronous calls that should be async (cast vs call)
-- Missing Dialyzer typespecs on public functions
-- Secrets hardcoded in code
-- Process spawning without supervision
-
-## Testing Strategy
-- **Unit**: ExUnit, <100ms, mock with Mox
-- **Integration**: Ecto sandbox for database
-- **Property**: StreamData for property-based tests
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Process mailbox overflow | Use GenStage, backpressure |
-| ETS table leaks | Proper cleanup on terminate |
-| Large binary copies | Use iodata, binary references |
-| Blocking GenServer | Use handle_continue, Task |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No blocking in GenServer callbacks
-- No unbounded message queues (use backpressure)
-
-## Security Checklist
-- [ ] Input validated with Ecto changesets
-- [ ] SQL uses Ecto parameterized queries
-- [ ] Secrets from environment/runtime config
-- [ ] Dependencies audited (`mix deps.audit`)
+## Version Gotchas
+- **1.17+**: Set-theoretic types, `Duration` type, `Process.set_label/1`
+- **1.18+**: WERL removed on Windows, use OTP 26+
+- **1.19+**: Requires Erlang/OTP 28.1+
+- **OTP 27**: Built-in `json` module
+- **With Phoenix**: Use LiveView for real-time, not polling

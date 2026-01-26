@@ -1,32 +1,26 @@
 # Poem CTO
-> Full-featured async Rust web framework - OpenAPI-first, batteries included.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-cargo new myapp && cd myapp && cargo add poem poem-openapi tokio
+cargo new myapp && cd myapp
+cargo add poem poem-openapi tokio --features tokio/full
 cargo run
-cargo test
+# Poem 3.x - async Rust web framework with OpenAPI
 ```
 
-## Non-Negotiables
-1. OpenAPI integration with `poem-openapi` crate
-2. Extractor pattern for typed request data
-3. Middleware composition with `EndpointExt`
-4. Result-based error handling
-5. WebSocket support when needed
+## Claude's Common Mistakes
+1. **Using `unwrap()` in handlers** — Always use `Result`
+2. **Missing `Data<T>` for shared state** — Add with `.data()`
+3. **Forgetting OpenAPI annotations** — Use `poem-openapi` decorators
+4. **Blocking in async** — Use `spawn_blocking` for sync code
+5. **No error handling middleware** — Errors return 500 without context
 
-## Red Lines
-- `panic!` or `unwrap()` in handlers - always use `Result`
-- Missing OpenAPI documentation on endpoints
-- Blocking operations in async contexts
-- Ignoring extractor validation errors
-- Not using `Data<T>` for shared state
-
-## Pattern: OpenAPI Endpoint
+## Correct Patterns (2026)
 ```rust
-use poem::{listener::TcpListener, Server, web::Data};
+use poem::{listener::TcpListener, Route, Server, web::Data};
 use poem_openapi::{payload::Json, Object, OpenApi, OpenApiService};
+use sqlx::PgPool;
 
 #[derive(Object)]
 struct CreateUserRequest {
@@ -59,7 +53,22 @@ impl Api {
         )
         .fetch_one(pool.0)
         .await
-        .map_err(|e| poem::Error::from_status(StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(|_| poem::Error::from_status(StatusCode::INTERNAL_SERVER_ERROR))?;
+
+        Ok(Json(user))
+    }
+
+    #[oai(path = "/users/{id}", method = "get")]
+    async fn get_user(
+        &self,
+        pool: Data<&PgPool>,
+        id: Path<i32>,
+    ) -> Result<Json<User>, poem::Error> {
+        let user = sqlx::query_as!(User, "SELECT id, email FROM users WHERE id = $1", *id)
+            .fetch_optional(pool.0)
+            .await
+            .map_err(|_| poem::Error::from_status(StatusCode::INTERNAL_SERVER_ERROR))?
+            .ok_or_else(|| poem::Error::from_status(StatusCode::NOT_FOUND))?;
 
         Ok(Json(user))
     }
@@ -77,28 +86,28 @@ async fn main() {
             .nest("/api", api_service)
             .nest("/docs", ui)
             .data(pool))
-        .await;
+        .await
+        .unwrap();
 }
 ```
 
-## Integrates With
-- **DB**: SQLx with async queries
-- **Auth**: Custom middleware or extractors
-- **Docs**: Built-in Swagger UI
-- **WebSocket**: `poem::web::websocket`
+## Version Gotchas
+- **Poem 3.x**: Current stable; full async/await
+- **poem-openapi**: Derive OpenAPI docs from code
+- **Data<T>**: Extract shared state with `.data()` on routes
+- **Object derive**: Required for request/response serialization
+
+## What NOT to Do
+- ❌ `unwrap()` in handlers — Use `Result` with `?`
+- ❌ Missing `.data(pool)` — Data extractor fails
+- ❌ No `#[oai(...)]` attributes — OpenAPI not generated
+- ❌ Blocking I/O in async — Use `spawn_blocking`
+- ❌ Panic on errors — Use proper error types
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Data<T> not found` | Add `.data(value)` to route |
-| `OpenAPI schema error` | Check `Object` derive attributes |
-| `Extractor failed` | Validate request matches schema |
-| `Connection refused` | Check listener binding |
-
-## Prod Ready
-- [ ] OpenAPI documentation complete
-- [ ] Error handling middleware
-- [ ] Health check endpoint
-- [ ] Tracing integration
-- [ ] Graceful shutdown
-- [ ] TLS configured
+| `Data<T> not found` | Add `.data(value)` to Route |
+| `OpenAPI schema error` | Check Object derive attributes |
+| `Extractor failed` | Request doesn't match schema |
+| `Connection refused` | Check TcpListener binding |

@@ -1,89 +1,85 @@
 # Express CTO
-> Minimalist Node.js HTTP - add structure yourself, stay disciplined.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm init -y && npm install express helmet cors zod
-npm run dev  # nodemon or tsx watch
-npm test -- --coverage
+# Express 5 (stable) - requires Node.js 18+
+npm install express@^5.0.0
+# With TypeScript:
+npm install -D typescript @types/node @types/express tsx
+# Add to package.json: "type": "module"
 ```
 
-## Non-Negotiables
-1. Error handling middleware catches all async errors
-2. Input validation on every route with Zod or Joi
-3. Helmet for security headers on every app
-4. Structured logging with pino or winston
-5. Graceful shutdown handles SIGTERM properly
+## Claude's Common Mistakes
+1. **Using Express 4 patterns** — Express 5 has breaking changes in res.json(), routing, params
+2. **Not handling async errors** — Express 5 auto-forwards rejected promises to error middleware
+3. **Using `app.del()`** — Removed; use `app.delete()`
+4. **Using `req.param(name)`** — Removed; use `req.params`, `req.body`, or `req.query`
+5. **Using `res.json(obj, status)`** — Use `res.status(status).json(obj)`
 
-## Red Lines
-- Unhandled promise rejections crashing the server
-- Missing input validation on any endpoint
-- SQL injection via string concatenation
-- Secrets or credentials in code
-- Callback hell - use async/await everywhere
-
-## Pattern: Layered Architecture
+## Correct Patterns (2026)
 ```typescript
-// routes/users.ts
-import { Router } from 'express';
-import { z } from 'zod';
-import { validateBody } from '../middleware/validate';
-import { UserService } from '../services/UserService';
-import { asyncHandler } from '../middleware/asyncHandler';
+// Express 5: Async error handling (automatic)
+import express from 'express';
+const app = express();
 
-const router = Router();
-const userService = new UserService();
-
-const CreateUserSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
+// Rejected promises auto-forward to error middleware
+app.get('/users/:id', async (req, res) => {
+  const user = await db.users.findById(req.params.id);
+  if (!user) throw new NotFoundError('User not found');
+  res.json(user);
 });
 
-router.post('/',
-  validateBody(CreateUserSchema),
-  asyncHandler(async (req, res) => {
-    const user = await userService.create(req.body);
-    res.status(201).json(user);
-  })
-);
+// Centralized error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.status ?? 500).json({
+    error: err.message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
 
-export default router;
+// Express 5: Correct response pattern
+app.post('/items', async (req, res) => {
+  const item = await db.items.create(req.body);
+  res.status(201).json(item);  // Not res.json(item, 201)
+});
 
-// middleware/asyncHandler.ts
-export const asyncHandler = (fn: Function) => (req, res, next) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
+// Express 5: Body parsers (no combined bodyParser)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true, depth: 10 }));
 ```
 
-## Integrates With
-- **DB**: Prisma for type safety, Knex for raw SQL control
-- **Auth**: Passport.js with JWT strategy, or custom middleware
-- **Cache**: `ioredis` with in-memory fallback for dev
+## Version Gotchas
+- **v4→v5**: `res.json(obj, status)` → `res.status(status).json(obj)`
+- **v4→v5**: `app.del()` → `app.delete()`
+- **v4→v5**: `req.param()` removed, use specific sources
+- **v4→v5**: `request.query` is now read-only
+- **v4→v5**: Regex routes removed (ReDoS prevention)
+- **v4→v5**: path-to-regexp upgraded to v8 (stricter patterns)
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Cannot set headers after sent` | Ensure single response per request, add `return` |
-| `CORS error in browser` | Configure cors() middleware with allowed origins |
-| `PayloadTooLargeError` | Set `express.json({ limit: '10mb' })` |
-| `UnhandledPromiseRejection` | Wrap async handlers or use express-async-errors |
+## What NOT to Do
+- ❌ `res.json({ data }, 201)` — Use `res.status(201).json({ data })`
+- ❌ `app.del('/resource', ...)` — Use `app.delete('/resource', ...)`
+- ❌ `req.param('id')` — Use `req.params.id`
+- ❌ `app.get(/regex/, ...)` — Use string patterns
+- ❌ Manual try/catch in every route — Express 5 handles async errors
 
-## Middleware Order
+## Migration Codemods
+```bash
+# Auto-fix common patterns
+npx @expressjs/codemod <migration-name> <path>
+```
+
+## Production Setup
 ```typescript
-app.use(helmet());                    // 1. Security headers
-app.use(cors({ origin: ALLOWED }));   // 2. CORS
-app.use(express.json());              // 3. Body parsing
-app.use(requestLogger);               // 4. Logging
-app.use('/api', rateLimiter);         // 5. Rate limiting
-app.use('/api', routes);              // 6. Routes
-app.use(notFoundHandler);             // 7. 404 handler
-app.use(errorHandler);                // 8. Error handler (LAST)
-```
+import express from 'express';
+import helmet from 'helmet';
+import compression from 'compression';
 
-## Prod Ready
-- [ ] Health check endpoint at `/health` and `/ready`
-- [ ] Request ID middleware for tracing
-- [ ] Rate limiting per IP and per user
-- [ ] Compression middleware for responses
-- [ ] Process manager (PM2) or container orchestration
-- [ ] APM integration (DataDog, New Relic, or OpenTelemetry)
+const app = express();
+app.use(helmet());
+app.use(compression());
+app.use(express.json({ limit: '10kb' }));
+app.disable('x-powered-by');
+```

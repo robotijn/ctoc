@@ -1,48 +1,39 @@
 # Rocket CTO
-> Type-safe Rust web framework - macros for ergonomics, compile-time guarantees.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-cargo new myapp && cd myapp && cargo add rocket -F json
+cargo new myapp && cd myapp
+cargo add rocket -F json
+# Requires Rust nightly or stable 1.74+
 cargo run
-cargo test
 ```
 
-## Non-Negotiables
-1. Request guards for typed parameter extraction
-2. Fairings for middleware (logging, CORS, timing)
-3. Managed state via `State<T>` - no global mutables
-4. Responder implementations for custom responses
-5. Error catchers for all error codes
+## Claude's Common Mistakes
+1. **Using `unwrap()` in handlers** — Return `Result` with proper status codes
+2. **Missing managed state registration** — Add `.manage(state)` to builder
+3. **Forgetting error catchers** — Register catchers for all error codes
+4. **Blocking in async handlers** — Use `rocket::tokio::task::spawn_blocking`
+5. **Hardcoding configuration** — Use `Rocket.toml` and environment variables
 
-## Red Lines
-- `unwrap()` or `panic!` in handlers - return `Result`
-- Missing request guards for validation
-- Global mutable state - use managed state
-- Blocking operations in async handlers
-- Ignoring Rocket.toml for configuration
-
-## Pattern: Guarded Handler
+## Correct Patterns (2026)
 ```rust
-use rocket::{get, post, routes, State, serde::json::Json};
+use rocket::{get, post, routes, catch, catchers, State, serde::json::Json};
 use rocket::http::Status;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct CreateUser {
     email: String,
     password: String,
 }
 
-#[derive(Debug, Serialize)]
-struct User {
-    id: i32,
-    email: String,
-}
+#[derive(Serialize)]
+struct User { id: i32, email: String }
 
 struct DbPool(sqlx::PgPool);
 
+// Handler with Result (not unwrap!)
 #[post("/users", data = "<user>")]
 async fn create_user(
     db: &State<DbPool>,
@@ -61,38 +52,54 @@ async fn create_user(
     Ok((Status::Created, Json(user)))
 }
 
+// Error catchers (required)
 #[catch(404)]
 fn not_found() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "error": "Not found" }))
 }
 
+#[catch(500)]
+fn internal_error() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "error": "Internal server error" }))
+}
+
 #[launch]
-fn rocket() -> _ {
+async fn rocket() -> _ {
+    let pool = create_pool().await;
     rocket::build()
-        .manage(DbPool(create_pool().await))
+        .manage(DbPool(pool))           // Register state
         .mount("/api", routes![create_user])
-        .register("/", catchers![not_found])
+        .register("/", catchers![not_found, internal_error])
 }
 ```
 
-## Integrates With
-- **DB**: SQLx with compile-time verified queries
-- **Auth**: Custom request guards for JWT/sessions
-- **Validation**: `validator` crate with guard
-- **Config**: `Rocket.toml` and environment variables
+## Version Gotchas
+- **Rocket 0.5**: Async support, requires Rust 1.74+ stable
+- **State<T>**: Must call `.manage(state)` before routes
+- **Fairings**: Execute in registration order
+- **Rocket.toml**: Use for environment-specific config
+
+## What NOT to Do
+- ❌ `.unwrap()` in handlers — Return `Result<T, Status>`
+- ❌ Missing `.manage(state)` — State extraction fails at runtime
+- ❌ No error catchers — Unhandled errors return generic HTML
+- ❌ Blocking sync code — Use `spawn_blocking` for CPU work
+- ❌ Secrets in code — Use `Rocket.toml` or env vars
+
+## Rocket.toml Configuration
+```toml
+[default]
+address = "0.0.0.0"
+port = 8000
+
+[release]
+secret_key = "<generate-with-openssl>"
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Rocket failed to launch` | Check Rocket.toml, port availability |
-| `State not managed` | Add `.manage(state)` to rocket builder |
-| `Fairings not executing` | Check fairing attachment order |
-| `422 Unprocessable Entity` | JSON doesn't match struct |
-
-## Prod Ready
-- [ ] Release profile optimized
-- [ ] Error catchers for all codes
-- [ ] Structured logging fairing
-- [ ] Health check endpoint
-- [ ] TLS configured
-- [ ] Secrets via environment
+| `Rocket failed to launch` | Check port availability, Rocket.toml |
+| `State not managed` | Add `.manage(state)` to builder |
+| `422 Unprocessable Entity` | JSON doesn't match expected struct |
+| `Fairings not executing` | Check attachment order |

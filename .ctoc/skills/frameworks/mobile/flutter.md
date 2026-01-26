@@ -1,31 +1,25 @@
 # Flutter CTO
-> Cross-platform UI engineering leader demanding widget composition excellence and Dart-first architecture.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Install via official installer (not package managers for latest)
+flutter doctor
 flutter create --org com.example --platforms=ios,android myapp
-flutter run --flavor dev --dart-define=ENV=dev
-flutter test --coverage && flutter drive --driver=test_driver/integration_test.dart
+# Upgrade existing project
+flutter upgrade && dart fix --apply
 ```
 
-## Non-Negotiables
-1. Riverpod 2.x for state management with code generation
-2. go_router for declarative, type-safe navigation
-3. Widget composition over inheritance - max 100 lines per widget
-4. Null safety enforced, no dynamic types in business logic
-5. Platform-specific code isolated via MethodChannel abstractions
-6. Golden tests for critical UI components
+## Claude's Common Mistakes
+1. **Uses deprecated Provider patterns** - Riverpod 3.x is standard, Provider maintenance-only
+2. **Ignores Impeller renderer** - Enabled by default, Skia fallback removed on iOS
+3. **Suggests old Gradle configuration** - Flutter 3.27+ requires Plugin DSL migration
+4. **Uses `setState` for server state** - AsyncNotifier pattern required for proper loading states
+5. **Misses `context.mounted` checks** - Async gaps cause disposed widget errors
 
-## Red Lines
-- setState() outside local ephemeral state
-- Deep widget nesting beyond 3 levels - extract composables
-- Blocking UI thread with synchronous I/O
-- BuildContext used after async gaps without mounted check
-- Direct platform channel calls scattered through codebase
-
-## Pattern: Riverpod AsyncNotifier
+## Correct Patterns (2026)
 ```dart
+// Riverpod 3.x AsyncNotifier with code generation
 @riverpod
 class UserController extends _$UserController {
   @override
@@ -36,40 +30,28 @@ class UserController extends _$UserController {
   Future<void> updateProfile(String name) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final user = await ref.read(userRepositoryProvider).update(name);
-      return user;
+      return await ref.read(userRepositoryProvider).update(name);
     });
   }
 }
 
-// Usage in widget
-class ProfilePage extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(userControllerProvider);
-    return userAsync.when(
-      data: (user) => Text(user?.name ?? 'Guest'),
-      loading: () => const CircularProgressIndicator(),
-      error: (e, st) => Text('Error: $e'),
-    );
-  }
+// Proper async gap handling
+Future<void> _loadData() async {
+  final data = await repository.fetch();
+  if (!mounted) return;  // CRITICAL check
+  setState(() => _data = data);
 }
 ```
 
-## Integrates With
-- **DB**: Drift (SQLite) for structured data, Hive for fast KV storage
-- **Auth**: Firebase Auth or Supabase with flutter_secure_storage
-- **Cache**: Riverpod's built-in caching with keepAlive and refresh
+## Version Gotchas
+- **3.27+**: Deep links auto-handled, manual handling may conflict
+- **3.27+**: SafeArea issues with Native Views on Android - needs explicit handling
+- **Gradle 8.3+**: Required migration from old `build.gradle` syntax
+- **With PowerVR GPUs**: Impeller issues persist on some Oppo devices
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `setState() called after dispose()` | Check `mounted` before setState or use Riverpod |
-| `RenderFlex overflowed` | Wrap with SingleChildScrollView or use Expanded/Flexible |
-| `MissingPluginException` | Run `flutter clean && flutter pub get` then rebuild |
-
-## Prod Ready
-- [ ] Obfuscation enabled: `--obfuscate --split-debug-info`
-- [ ] Crashlytics/Sentry configured with dSYM upload
-- [ ] App icons and splash screens for all densities
-- [ ] Flavor configs for dev/staging/prod with separate bundle IDs
+## What NOT to Do
+- Do NOT use `setState()` after async without `mounted` check
+- Do NOT nest Widgets beyond 3 levels - extract to separate widgets
+- Do NOT ignore `dart fix` suggestions after Flutter upgrades
+- Do NOT use `BuildContext` after `await` without guard
+- Do NOT skip `flutter clean` when switching major versions

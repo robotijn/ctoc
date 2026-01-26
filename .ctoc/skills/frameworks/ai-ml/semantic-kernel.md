@@ -1,112 +1,76 @@
 # Semantic Kernel CTO
-> Microsoft's enterprise-grade AI orchestration SDK for .NET, Python, and Java.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Semantic Kernel merging with AutoGen into Microsoft Agent Framework
 pip install semantic-kernel
-python -c "import semantic_kernel as sk; print('OK')"
-pytest tests/ -v
+# For new projects, consider:
+pip install agent-framework  # Microsoft Agent Framework (preview)
 ```
 
-## Non-Negotiables
-1. Plugin architecture for modular functionality
-2. Appropriate planner selection for task complexity
-3. Memory connectors for context persistence
-4. Function calling with proper error handling
-5. Prompt templates with variables
-6. Token management and limits
+## Claude's Common Mistakes
+1. Using deprecated plugin decorators (use `kernel_function`)
+2. Missing context injection for plugin functions
+3. Not using Handlebars prompt templates (new default)
+4. Ignoring streaming for chat interfaces
+5. Using old planner APIs (use Function Calling)
 
-## Red Lines
-- Hardcoded prompts without templates
-- Missing error handling for AI calls
-- No memory strategy for conversations
-- Ignoring token limits causing truncation
-- Unsafe function execution without validation
-- Not using plugins for reusable functionality
-
-## Pattern: Production AI Application
+## Correct Patterns (2026)
 ```python
 import semantic_kernel as sk
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
-from semantic_kernel.core_plugins import TextPlugin
+from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
 from semantic_kernel.functions import kernel_function
-from semantic_kernel.prompt_template import PromptTemplateConfig
+from semantic_kernel.prompt_template import HandlebarsPromptTemplate
 
 # Initialize kernel
 kernel = sk.Kernel()
 
-# Add AI service
-kernel.add_service(
-    AzureChatCompletion(
-        deployment_name="gpt-4o",
-        endpoint="https://your-endpoint.openai.azure.com",
-        api_key="your-key",
-    )
-)
+# Add OpenAI service
+kernel.add_service(OpenAIChatCompletion(
+    ai_model_id="gpt-4o",
+    api_key=os.environ["OPENAI_API_KEY"],
+))
 
-# Create a custom plugin
-class ResearchPlugin:
-    @kernel_function(description="Search for information on a topic")
-    async def search(self, query: str) -> str:
-        # Implementation
-        return f"Results for: {query}"
+# Plugin with proper decorators
+class WeatherPlugin:
+    @kernel_function(description="Get weather for a city")
+    def get_weather(self, city: str) -> str:
+        return f"Weather in {city}: 72F, Sunny"
 
-    @kernel_function(description="Summarize text")
-    async def summarize(self, text: str) -> str:
-        return f"Summary: {text[:100]}..."
+kernel.add_plugin(WeatherPlugin(), plugin_name="weather")
 
-# Register plugins
-kernel.add_plugin(ResearchPlugin(), "research")
-kernel.add_plugin(TextPlugin(), "text")
+# Handlebars prompt template (new default)
+prompt = """{{#if instructions}}{{instructions}}{{/if}}
+User: {{input}}
+Assistant:"""
 
-# Create prompt function
-prompt = """
-{{$history}}
-User: {{$input}}
-Assistant: Let me help you with that.
-"""
-
-prompt_config = PromptTemplateConfig(
+template = HandlebarsPromptTemplate(
     template=prompt,
-    execution_settings={
-        "default": {"max_tokens": 1000, "temperature": 0.7}
-    }
+    template_format="handlebars",
 )
 
-chat_function = kernel.add_function(
-    plugin_name="chat",
-    function_name="respond",
-    prompt_template_config=prompt_config,
+# Invoke with function calling
+result = await kernel.invoke_prompt(
+    prompt,
+    input="What's the weather in Seattle?",
+    instructions="Use the weather plugin to answer.",
 )
 
-# Execute with context
-result = await kernel.invoke(
-    chat_function,
-    input="What is machine learning?",
-    history="Previous conversation context"
-)
-print(result)
+# Streaming
+async for chunk in kernel.invoke_stream("chat", prompt="Hello"):
+    print(chunk, end="")
 ```
 
-## Integrates With
-- **LLMs**: Azure OpenAI, OpenAI, HuggingFace
-- **Memory**: Azure AI Search, Chroma, Pinecone
-- **Tools**: Native functions, OpenAPI plugins
-- **Languages**: Python, .NET, Java
+## Version Gotchas
+- **2025-2026**: Merging with AutoGen into Microsoft Agent Framework
+- **Templates**: Handlebars is new default, Jinja2 still supported
+- **Planners**: Deprecated - use function calling instead
+- **Plugins**: Use `@kernel_function` not old decorators
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Service not found` | Verify service added with add_service() |
-| `Token limit exceeded` | Reduce prompt size, increase max_tokens |
-| `Plugin not registered` | Check add_plugin() call |
-| `Function not found` | Verify function_name matches decorator |
-
-## Prod Ready
-- [ ] Plugins modularize functionality
-- [ ] Prompt templates use variables
-- [ ] Error handling for all AI calls
-- [ ] Memory connector configured
-- [ ] Token limits respected
-- [ ] Functions validated before execution
+## What NOT to Do
+- Do NOT use deprecated planners - use function calling
+- Do NOT use old `@sk_function` decorator - use `@kernel_function`
+- Do NOT ignore streaming for interactive applications
+- Do NOT skip plugin descriptions (needed for function calling)
+- Do NOT ignore Microsoft Agent Framework for new projects

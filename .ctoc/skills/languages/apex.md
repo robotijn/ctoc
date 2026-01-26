@@ -1,68 +1,70 @@
 # Apex CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-sf scanner run -p force-app/           # Lint (PMD/Graph Engine)
-sf apex run test -l RunLocalTests      # Test
-sf project deploy start                # Deploy
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude puts SOQL/DML in loops — bulkify for 200+ records
+- Claude hardcodes Record IDs — use Custom Metadata or describe
+- Claude forgets governor limits — always design for bulk
+- Claude creates trigger logic without handler — one trigger per object
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `salesforce cli (sf)` | Development workflow | Manual deployment |
+| `vs code + sf extensions` | Modern IDE | Developer Console |
+| `pmd for apex` | Static analysis | No linting |
+| `salesforce code analyzer` | Security scanning | Manual review |
+| `devops center` | CI/CD | Manual releases |
+
+## Patterns Claude Should Use
+```apex
+// Bulkified trigger handler pattern
+public class OrderTriggerHandler {
+    public static void handleBeforeInsert(List<Order__c> newOrders) {
+        // Collect all account IDs first
+        Set<Id> accountIds = new Set<Id>();
+        for (Order__c ord : newOrders) {
+            if (ord.Account__c != null) {
+                accountIds.add(ord.Account__c);
+            }
+        }
+
+        // Single query outside loop
+        Map<Id, Account> accounts = new Map<Id, Account>(
+            [SELECT Id, Name, Discount__c
+             FROM Account
+             WHERE Id IN :accountIds
+             WITH SECURITY_ENFORCED]
+        );
+
+        // Process in bulk
+        for (Order__c ord : newOrders) {
+            Account acc = accounts.get(ord.Account__c);
+            if (acc != null) {
+                ord.Discount__c = acc.Discount__c;
+            }
+        }
+    }
+}
+
+// Trigger delegates to handler
+trigger OrderTrigger on Order__c (before insert) {
+    if (Trigger.isBefore && Trigger.isInsert) {
+        OrderTriggerHandler.handleBeforeInsert(Trigger.new);
+    }
+}
 ```
 
-## Tools (2024-2025)
-- **Salesforce CLI (sf)** - Development workflow
-- **VS Code + Salesforce Extensions** - Modern IDE
-- **PMD for Apex** - Static analysis
-- **Salesforce Code Analyzer** - Security scanning
-- **Salesforce DevOps Center** - CI/CD
+## Anti-Patterns Claude Generates
+- SOQL/DML in loops — collect IDs, query once
+- Hardcoded IDs `001xx...` — use Custom Metadata
+- Missing `WITH SECURITY_ENFORCED` — CRUD/FLS violation
+- Trigger logic directly in trigger — use handler class
+- Single-record design — always bulkify
 
-## Project Structure
-```
-project/
-├── force-app/main/default/
-│   ├── classes/       # Apex classes
-│   ├── triggers/      # Triggers
-│   └── lwc/           # Lightning components
-├── scripts/           # Automation
-└── sfdx-project.json  # Project config
-```
-
-## Non-Negotiables
-1. Bulkify all code (handle 200+ records)
-2. Governor limit awareness (SOQL, DML limits)
-3. Test coverage 75%+ (aim for 90%+)
-4. Trigger handler patterns (one trigger per object)
-
-## Red Lines (Reject PR)
-- SOQL/DML in loops
-- Hardcoded record IDs
-- Missing test assertions
-- Trigger logic without handler
-- No null checking on query results
-- Secrets in code (use Custom Settings/Metadata)
-
-## Testing Strategy
-- **Unit**: @isTest classes, mock data
-- **Integration**: Full process tests
-- **Security**: CRUD/FLS checks verified
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| SOQL in loops | Collect IDs, query once |
-| Governor limits | Bulkify, use async |
-| Mixed DML | Use @future or Queueable |
-| Test data dependency | Create test data in tests |
-
-## Performance Red Lines
-- No O(n^2) SOQL/DML patterns
-- No synchronous callouts in bulk operations
-- No queries without selective filters
-
-## Security Checklist
-- [ ] CRUD/FLS checks enforced
-- [ ] WITH SECURITY_ENFORCED in SOQL
-- [ ] Secrets in Protected Custom Settings
-- [ ] Sharing rules respected (with/without sharing)
+## Version Gotchas
+- **Governor limits**: 100 SOQL, 150 DML per transaction
+- **Bulkification**: Design for 200+ records always
+- **Test coverage**: 75% minimum, aim for 90%+
+- **Security**: WITH SECURITY_ENFORCED in all SOQL
+- **With LWC**: Modern UI, use Apex for backend only

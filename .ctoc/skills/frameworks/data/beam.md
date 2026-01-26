@@ -1,40 +1,32 @@
 # Apache Beam CTO
-> Unified programming model for batch and streaming data processing.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install apache-beam[gcp]
+pip install "apache-beam[gcp]"
+# Run locally
 python pipeline.py --runner=DirectRunner
-python pipeline.py --runner=DataflowRunner --project=myproject --region=us-central1
+# Run on Dataflow
+python pipeline.py --runner=DataflowRunner --project=myproject
 ```
 
-## Non-Negotiables
-1. Pipeline design with PTransforms and PCollections
-2. Windowing strategy matched to use case
-3. Triggers for early/late firing configuration
-4. Side inputs for enrichment patterns
-5. Runner selection based on deployment target
-6. Error handling with dead letter queues
+## Claude's Common Mistakes
+1. **Global windows without triggers** - Unbounded accumulation in streaming
+2. **Missing watermarks** - Late data handling breaks
+3. **Unbounded side inputs** - Causes memory issues
+4. **No dead letter queue** - Poison messages kill pipeline
+5. **Runner-agnostic assumptions** - Each runner has different capabilities
 
-## Red Lines
-- Global windows without triggers (unbounded accumulation)
-- Missing watermarks causing late data issues
-- Unbounded side inputs causing memory issues
-- No error handling for poison messages
-- Ignoring runner-specific capabilities and limitations
-
-## Pattern: Production Streaming Pipeline
+## Correct Patterns (2026)
 ```python
 import apache_beam as beam
 from apache_beam import window
 from apache_beam.transforms.trigger import AfterWatermark, AfterProcessingTime, AccumulationMode
 
-def run_pipeline():
+def run():
     options = beam.options.pipeline_options.PipelineOptions([
         '--runner=DataflowRunner',
         '--project=myproject',
-        '--region=us-central1',
         '--streaming',
         '--autoscaling_algorithm=THROUGHPUT_BASED',
     ])
@@ -43,59 +35,44 @@ def run_pipeline():
         # Read from Kafka
         events = (
             p
-            | 'ReadKafka' >> beam.io.ReadFromKafka(
+            | 'Read' >> beam.io.ReadFromKafka(
                 consumer_config={'bootstrap.servers': 'kafka:9092'},
-                topics=['events'],
-                with_metadata=True,
+                topics=['events']
             )
-            | 'ParseJSON' >> beam.Map(parse_event)
-            | 'AddTimestamp' >> beam.Map(
-                lambda x: beam.window.TimestampedValue(x, x['event_time'])
+            | 'Parse' >> beam.Map(parse_json)
+            | 'Timestamp' >> beam.Map(
+                lambda x: beam.window.TimestampedValue(x, x['ts'])
             )
         )
 
-        # Window and aggregate
+        # Window with triggers (CRITICAL for streaming)
         windowed = (
             events
             | 'Window' >> beam.WindowInto(
-                window.FixedWindows(60),  # 1-minute windows
+                window.FixedWindows(60),
                 trigger=AfterWatermark(
-                    early=AfterProcessingTime(30),  # Early firing every 30s
-                    late=AfterProcessingTime(60),   # Late firing
+                    early=AfterProcessingTime(30),
+                    late=AfterProcessingTime(60),
                 ),
                 accumulation_mode=AccumulationMode.ACCUMULATING,
                 allowed_lateness=beam.Duration(seconds=3600),
             )
-            | 'CountByType' >> beam.CombinePerKey(beam.combiners.CountCombineFn())
+            | 'Count' >> beam.CombinePerKey(sum)
         )
 
-        # Output to BigQuery
-        windowed | 'WriteBQ' >> beam.io.WriteToBigQuery(
-            'project:dataset.event_counts',
-            schema='event_type:STRING,count:INTEGER,window_start:TIMESTAMP',
-            write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
-        )
-
-        # Dead letter queue for errors
-        errors | 'WriteDLQ' >> beam.io.WriteToText('gs://bucket/dlq/')
+        # Output with error handling
+        windowed | 'Write' >> beam.io.WriteToBigQuery('project:dataset.table')
+        errors | 'DLQ' >> beam.io.WriteToText('gs://bucket/dlq/')
 ```
 
-## Integrates With
-- **Runners**: Dataflow, Flink, Spark, Direct
-- **Sources**: Kafka, Pub/Sub, Kinesis, files
-- **Sinks**: BigQuery, Bigtable, Elasticsearch, files
+## Version Gotchas
+- **Runners**: Dataflow, Flink, Spark - each has different features
+- **Windowing**: Fixed, Sliding, Session - choose based on use case
+- **Triggers**: Control when results emit; critical for streaming
+- **Watermarks**: Track event time progress; configure per source
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Watermark stuck` | Check source for idle partitions |
-| `OutOfMemory` | Reduce window size or use incremental combine |
-| `Late data dropped` | Increase allowed_lateness |
-| `Pipeline stuck` | Check for blocking operations |
-
-## Prod Ready
-- [ ] Windowing and triggers configured
-- [ ] Dead letter queue for errors
-- [ ] Autoscaling enabled for runner
-- [ ] Watermark strategy defined
-- [ ] Monitoring via runner dashboards
+## What NOT to Do
+- Do NOT use global windows in streaming (infinite accumulation)
+- Do NOT skip triggers configuration (unbounded buffering)
+- Do NOT forget dead letter queue (poison messages)
+- Do NOT assume all runners behave identically

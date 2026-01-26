@@ -1,131 +1,69 @@
 # CrewAI CTO
-> AI agent orchestration for building collaborative multi-agent systems.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# CrewAI uses uv by default. Requires Python 3.10-3.13.
 pip install crewai crewai-tools
-crewai create crew my_crew
-crewai run
+# Or with uv (recommended by CrewAI):
+uv pip install crewai crewai-tools
+# Create project: crewai create crew my_crew
 ```
 
-## Non-Negotiables
-1. Clear agent roles with specific expertise
-2. Well-defined task dependencies
-3. Tool integration with guardrails
-4. Appropriate process selection (sequential/hierarchical)
-5. Memory configuration for context retention
-6. Iteration limits to prevent runaway agents
+## Claude's Common Mistakes
+1. Using deprecated `from langchain_openai import ChatOpenAI` for LLM config
+2. Missing `max_iter` limits causing infinite agent loops
+3. Not setting `allow_delegation=False` when delegation not needed
+4. Forgetting `output_file` for task results persistence
+5. Using wrong process type (sequential vs hierarchical)
 
-## Red Lines
-- Vague or overlapping agent goals
-- Missing task context and expected outputs
-- No tool usage guardrails
-- Ignoring process type for workflow
-- Unlimited iterations without stops
-- No error handling for agent failures
-
-## Pattern: Production Agent Crew
+## Correct Patterns (2026)
 ```python
-from crewai import Agent, Task, Crew, Process
-from crewai_tools import SerperDevTool, WebsiteSearchTool
-from langchain_openai import ChatOpenAI
+from crewai import Agent, Task, Crew, Process, LLM
 
-# Configure LLM
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+# Use CrewAI's native LLM wrapper (not LangChain)
+llm = LLM(model="gpt-4o", temperature=0)
 
-# Define tools with guardrails
-search_tool = SerperDevTool()
-web_tool = WebsiteSearchTool()
-
-# Create specialized agents
+# Agent with proper guardrails
 researcher = Agent(
     role="Senior Research Analyst",
-    goal="Conduct thorough research and provide accurate, sourced information",
-    backstory="Expert researcher with 10 years of experience in data analysis",
-    tools=[search_tool, web_tool],
+    goal="Find accurate, sourced information",
+    backstory="Expert researcher with analytical skills",
     llm=llm,
-    verbose=True,
+    max_iter=5,  # CRITICAL: Prevent runaway loops
     allow_delegation=False,
-    max_iter=5,  # Limit iterations
+    verbose=True,
 )
 
-writer = Agent(
-    role="Technical Writer",
-    goal="Create clear, engaging content based on research",
-    backstory="Technical writer specializing in making complex topics accessible",
-    llm=llm,
-    verbose=True,
-    allow_delegation=False,
-    max_iter=3,
-)
-
-editor = Agent(
-    role="Content Editor",
-    goal="Review and polish content for accuracy and clarity",
-    backstory="Senior editor with expertise in technical documentation",
-    llm=llm,
-    verbose=True,
-    allow_delegation=False,
-    max_iter=3,
-)
-
-# Define tasks with clear outputs
+# Task with explicit output
 research_task = Task(
-    description="Research the latest developments in {topic}",
-    expected_output="Comprehensive report with sources and key findings",
+    description="Research {topic} and provide key findings",
+    expected_output="Bullet-point summary with sources",
     agent=researcher,
-    output_file="research.md",
+    output_file="research.md",  # Persist results
 )
 
-writing_task = Task(
-    description="Write an article based on the research findings",
-    expected_output="Well-structured article of 1000-1500 words",
-    agent=writer,
-    context=[research_task],  # Depends on research
-    output_file="article.md",
-)
-
-editing_task = Task(
-    description="Review and edit the article for publication",
-    expected_output="Polished, publication-ready article",
-    agent=editor,
-    context=[writing_task],
-    output_file="final_article.md",
-)
-
-# Create crew with process
+# Crew with memory
 crew = Crew(
-    agents=[researcher, writer, editor],
-    tasks=[research_task, writing_task, editing_task],
-    process=Process.sequential,  # Or Process.hierarchical
-    memory=True,  # Enable memory
+    agents=[researcher],
+    tasks=[research_task],
+    process=Process.sequential,
+    memory=True,
     verbose=True,
 )
 
-# Execute
-result = crew.kickoff(inputs={"topic": "AI agents in production"})
-print(result)
+result = crew.kickoff(inputs={"topic": "AI agents"})
 ```
 
-## Integrates With
-- **LLMs**: OpenAI, Anthropic, Ollama, local models
-- **Tools**: LangChain tools, custom tools
-- **Memory**: Short-term, long-term, entity memory
-- **Deployment**: FastAPI, Docker, Kubernetes
+## Version Gotchas
+- **2026**: CrewAI is independent of LangChain - use native LLM wrapper
+- **Tools**: Import from `crewai_tools`, not `langchain`
+- **Memory**: Enable with `memory=True` on Crew, not individual agents
+- **Process**: Use `Process.hierarchical` only for manager-worker patterns
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Agent stuck in loop` | Reduce max_iter, clarify task description |
-| `Tool execution failed` | Check tool configuration, add error handling |
-| `Context too long` | Summarize previous task outputs |
-| `Delegation confusion` | Set allow_delegation=False for clarity |
-
-## Prod Ready
-- [ ] Agent roles clearly defined
-- [ ] Task dependencies explicit
-- [ ] Iteration limits set (max_iter)
-- [ ] Tools have error handling
-- [ ] Memory configured for workflow
-- [ ] Output files specified for tasks
+## What NOT to Do
+- Do NOT use LangChain's ChatOpenAI - use CrewAI's native LLM class
+- Do NOT skip `max_iter` - agents can loop infinitely
+- Do NOT enable delegation without clear agent hierarchy
+- Do NOT forget `expected_output` in tasks
+- Do NOT use hierarchical process for simple linear workflows

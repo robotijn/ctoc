@@ -1,29 +1,22 @@
 # Grails CTO
-> Groovy-based rapid development - convention over configuration, Spring underneath.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+sdk install grails
 grails create-app myapp && cd myapp
 grails run-app
-grails test-app
+# Grails 6.x - Groovy framework on Spring Boot
 ```
 
-## Non-Negotiables
-1. Convention over configuration - follow Grails way
-2. GORM for persistence and relationships
-3. Service layer for business logic
-4. Plugin ecosystem for extensions
-5. Proper domain modeling with constraints
+## Claude's Common Mistakes
+1. **Business logic in controllers** — Use service layer
+2. **Missing `@Transactional`** — Services need transaction annotation
+3. **N+1 queries** — Use `fetch` or `join` in GORM queries
+4. **Skipping domain constraints** — Always define validation rules
+5. **LazyInitializationException** — Fetch associations in service layer
 
-## Red Lines
-- Business logic in controllers - use services
-- Missing `@Transactional` on services
-- N+1 query issues - use `fetch` or `join`
-- Skipping GORM best practices
-- Ignoring validation constraints
-
-## Pattern: Domain, Service, Controller
+## Correct Patterns (2026)
 ```groovy
 // grails-app/domain/com/example/User.groovy
 class User {
@@ -54,15 +47,12 @@ class UserService {
         }
         user.password = hashPassword(params.password)
         user.save(failOnError: true)
-        return user
     }
 
+    @Transactional(readOnly = true)
     User getUser(Long id) {
-        User.get(id)
-    }
-
-    List<User> searchUsers(String query) {
-        User.findAllByEmailIlike("%${query}%", [max: 20])
+        // Eager fetch to avoid LazyInitializationException
+        User.findById(id, [fetch: [posts: 'eager']])
     }
 }
 
@@ -70,7 +60,6 @@ class UserService {
 import grails.converters.JSON
 
 class UserController {
-
     UserService userService
 
     def create() {
@@ -96,24 +85,23 @@ class UserController {
 }
 ```
 
-## Integrates With
-- **DB**: GORM with Hibernate (Postgres, MySQL)
-- **Auth**: Spring Security Core plugin
-- **Cache**: Grails Cache plugin
-- **API**: Grails REST plugin for JSON views
+## Version Gotchas
+- **Grails 6.x**: Spring Boot 3.x underneath; Java 17+
+- **GORM**: Always use `@Transactional` on services
+- **Fetch**: Use `fetch: [relation: 'eager']` to avoid N+1
+- **Constraints**: Define in domain class, not controller
+
+## What NOT to Do
+- ❌ Logic in controllers — Move to services
+- ❌ Missing `@Transactional` — No transaction management
+- ❌ Lazy fetching in controllers — LazyInitializationException
+- ❌ Skipping constraints — Data integrity issues
+- ❌ `save()` without `failOnError` — Silent failures
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
+| `LazyInitializationException` | Use `fetch: 'eager'` or fetch in service |
 | `Validation failed` | Check domain constraints |
-| `LazyInitializationException` | Fetch in service or use `join` |
 | `StaleObjectStateException` | Handle optimistic locking |
-| `No such property` | Check domain field names |
-
-## Prod Ready
-- [ ] Production datasource configured
-- [ ] Asset pipeline for static files
-- [ ] Health actuator endpoint
-- [ ] Logging configured
-- [ ] Security plugin configured
-- [ ] Database migrations with Liquibase
+| `No session` | Add `@Transactional` to service |

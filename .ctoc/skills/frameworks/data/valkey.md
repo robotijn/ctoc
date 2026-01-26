@@ -1,59 +1,33 @@
 # Valkey CTO
-> Open-source Redis fork with full compatibility and community governance.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name valkey -p 6379:6379 valkey/valkey:7-alpine
-valkey-cli PING
-valkey-cli INFO server
+docker run -d --name valkey -p 6379:6379 valkey/valkey:8-alpine
+# Python client
+pip install valkey  # or use redis-py (compatible)
 ```
 
-## Non-Negotiables
-1. Same Redis patterns and best practices apply
-2. Cluster mode for horizontal scaling
-3. Persistence configured (RDB snapshots + AOF)
-4. Memory limits with maxmemory-policy
-5. Client library compatibility verified
-6. Slow log monitoring enabled
+## Claude's Common Mistakes
+1. **Treating differently from Redis** - Valkey is Redis-compatible; same patterns
+2. **KEYS * in production** - Use SCAN (same as Redis)
+3. **Single instance for critical data** - Use cluster mode
+4. **No persistence configured** - Enable AOF for durability
+5. **Missing memory limits** - Configure maxmemory and eviction policy
 
-## Red Lines
-- `KEYS *` in production (use SCAN)
-- No memory limits causing OOM
-- Missing persistence for durable data
-- Single instance for critical workloads
-- Ignoring slow log warnings
-
-## Pattern: Cluster-Ready Configuration
-```bash
-# valkey.conf for production
-maxmemory 4gb
-maxmemory-policy allkeys-lru
-appendonly yes
-appendfsync everysec
-save 900 1
-save 300 10
-slowlog-log-slower-than 10000
-slowlog-max-len 128
-
-# Enable cluster mode
-cluster-enabled yes
-cluster-config-file nodes.conf
-cluster-node-timeout 5000
-```
-
+## Correct Patterns (2026)
 ```python
 from valkey import Valkey
 from valkey.cluster import ValkeyCluster
 
-# Cluster client
+# Cluster client (production)
 cluster = ValkeyCluster(
     host='valkey-cluster',
     port=6379,
     decode_responses=True,
 )
 
-# Use hash tags for multi-key operations
+# Use hash tags for multi-key operations (same slot)
 user_id = 123
 cluster.hset(f"{{user:{user_id}}}:profile", mapping={"name": "Alice"})
 cluster.sadd(f"{{user:{user_id}}}:roles", "admin", "editor")
@@ -64,24 +38,20 @@ with cluster.pipeline() as pipe:
     pipe.hgetall(f"{{user:{user_id}}}:profile")
     pipe.smembers(f"{{user:{user_id}}}:roles")
     profile, roles = pipe.execute()
+
+# SCAN instead of KEYS (non-blocking)
+for key in cluster.scan_iter(match="user:*", count=100):
+    process(key)
 ```
 
-## Integrates With
-- **Compatibility**: Drop-in Redis replacement
-- **Clients**: Redis clients work unchanged
-- **Ecosystem**: Sentinel, Cluster, Streams
+## Version Gotchas
+- **v8**: Based on Redis 7.2; fully compatible
+- **Redis clients work**: redis-py, ioredis work unchanged
+- **Fork reason**: Open-source governance after Redis license change
+- **GLIDE client**: Valkey's new auto-multiplexing client
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `MOVED` in cluster | Use cluster-aware client |
-| `OOM command not allowed` | Configure maxmemory |
-| `CLUSTERDOWN` | Check cluster health, node status |
-| `CROSSSLOT` | Use hash tags for related keys |
-
-## Prod Ready
-- [ ] Cluster mode with replicas
-- [ ] Memory limits and eviction policy
-- [ ] AOF persistence enabled
-- [ ] Slow log monitoring
-- [ ] Backup strategy configured
+## What NOT to Do
+- Do NOT use KEYS * (use SCAN)
+- Do NOT skip cluster mode for production (no HA)
+- Do NOT forget maxmemory and eviction policy
+- Do NOT use without persistence for durable data

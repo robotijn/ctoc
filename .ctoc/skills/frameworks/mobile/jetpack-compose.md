@@ -1,30 +1,36 @@
 # Jetpack Compose CTO
-> Modern Android UI engineering leader demanding unidirectional data flow and recomposition-optimized composables.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Setup | Dev | Test
-./gradlew assembleDebug
-./gradlew connectedAndroidTest
-./gradlew testDebugUnitTest --tests "*ViewModelTest"
+## Installation (CURRENT - January 2026)
+```kotlin
+// build.gradle.kts (app level)
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0"  // Required for Kotlin 2.0
+}
+
+android {
+    buildFeatures { compose = true }
+}
+
+dependencies {
+    implementation(platform("androidx.compose:compose-bom:2024.12.00"))
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.0")
+}
 ```
 
-## Non-Negotiables
-1. Unidirectional data flow with ViewModel and StateFlow/SharedFlow
-2. State hoisting - composables receive state, emit events
-3. remember and derivedStateOf for expensive computations
-4. Compose Navigation with type-safe arguments
-5. LazyColumn/LazyRow for lists with proper keys
+## Claude's Common Mistakes
+1. **Ignores Strong Skipping mode** - Enabled by default, changes recomposition behavior
+2. **Uses deprecated Compose Compiler settings** - Kotlin 2.0 uses plugin, not extension
+3. **Missing collectAsStateWithLifecycle** - Regular collectAsState leaks on background
+4. **Suggests WindowSizeClass without setup** - Material3 adaptive layouts need explicit config
+5. **Hardcodes dp values** - Should use Material spacing tokens or WindowSizeClass
 
-## Red Lines
-- Side effects directly in composition - use LaunchedEffect/SideEffect
-- Missing remember for mutable state causing recomposition loops
-- Blocking composition with suspend calls outside coroutine scope
-- Composables with more than one responsibility
-- Hardcoded dimensions - use Material spacing tokens
-
-## Pattern: State Hoisting with ViewModel
+## Correct Patterns (2026)
 ```kotlin
+// Proper state hoisting with lifecycle-aware collection
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
@@ -33,7 +39,6 @@ fun ProfileScreen(
 
     ProfileContent(
         state = uiState,
-        onNameChange = viewModel::updateName,
         onSave = viewModel::save
     )
 }
@@ -41,35 +46,29 @@ fun ProfileScreen(
 @Composable
 private fun ProfileContent(
     state: ProfileUiState,
-    onNameChange: (String) -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier  // ALWAYS accept Modifier
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        OutlinedTextField(
-            value = state.name,
-            onValueChange = onNameChange
-        )
-        Button(onClick = onSave, enabled = !state.isLoading) {
+    // Defer state reads for performance
+    val isEnabled by remember { derivedStateOf { state.name.isNotBlank() } }
+
+    Column(modifier = modifier.padding(MaterialTheme.spacing.medium)) {
+        Button(onClick = onSave, enabled = isEnabled) {
             Text("Save")
         }
     }
 }
 ```
 
-## Integrates With
-- **DB**: Room with Flow for reactive queries
-- **Auth**: Firebase Auth with Credential Manager
-- **Cache**: DataStore for preferences, Room for structured cache
+## Version Gotchas
+- **Kotlin 2.0+**: Compose Compiler is now a Kotlin plugin, remove old config
+- **BOM 2024.12+**: Material3 is default, Material2 needs explicit dependency
+- **Strong Skipping**: Default on, unstable classes skip differently now
+- **With Hilt**: `hiltViewModel()` requires `@HiltViewModel` annotation
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Composable invocations can only happen from composable context` | Move call inside @Composable function or use LaunchedEffect |
-| `Type mismatch: inferred type is Unit` | Ensure lambda returns correct type, check remember usage |
-| `Skipping recomposition` | Verify state changes trigger recomposition, check Stability |
-
-## Prod Ready
-- [ ] R8/ProGuard configured with Compose keep rules
-- [ ] Baseline profiles generated for startup optimization
-- [ ] Compose UI tests covering critical flows
-- [ ] Material 3 theming with dynamic color support
+## What NOT to Do
+- Do NOT use `collectAsState()` - use `collectAsStateWithLifecycle()` always
+- Do NOT perform side effects in composition - use LaunchedEffect
+- Do NOT omit Modifier parameter - breaks parent layout control
+- Do NOT use mutableStateOf without remember - causes recomposition loops
+- Do NOT hardcode dimensions - use Material spacing or adaptive layouts

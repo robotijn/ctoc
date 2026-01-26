@@ -1,68 +1,66 @@
 # Tcl CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-nagelfar -H src/*.tcl                  # Lint
-# (No standard formatter)
-tclsh test/all.tcl                     # Test
-# Package with teapot/fossil
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude forgets proper quoting — use braces and `list`
+- Claude uses `eval` with user input — command injection
+- Claude pollutes global namespace — use namespaces
+- Claude forgets `expr` bracing — performance and security
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `tcl 8.6`/`9.0` | Latest versions | Old Tcl |
+| `tk` | GUI toolkit | External GUIs |
+| `nagelfar` | Static analysis | No linting |
+| `tcltest` | Testing framework | Ad-hoc tests |
+| `expect` | Process automation | Shell scripts |
+
+## Patterns Claude Should Use
+```tcl
+# Proper namespace isolation
+namespace eval myapp {
+    variable config [dict create]
+
+    proc initialize {args} {
+        variable config
+        # Proper quoting with braces
+        dict set config options $args
+    }
+
+    # Always brace expr arguments
+    proc calculate {a b} {
+        return [expr {$a + $b}]  # Braces required!
+    }
+}
+
+# Safe command building with list
+proc run_command {cmd args} {
+    # list prevents injection
+    set full_cmd [list {*}$cmd {*}$args]
+    exec {*}$full_cmd
+}
+
+# Error handling
+try {
+    risky_operation
+} on error {msg opts} {
+    puts stderr "Error: $msg"
+} finally {
+    cleanup
+}
 ```
 
-## Tools (2024-2025)
-- **Tcl 8.6/9.0** - Latest versions
-- **Tk** - GUI toolkit
-- **Expect** - Process automation
-- **Nagelfar** - Static analysis
-- **tcltest** - Testing framework
+## Anti-Patterns Claude Generates
+- Missing braces in `expr` — security and performance
+- `eval $user_input` — command injection
+- Global variables — use namespaces
+- Unquoted substitutions — word splitting bugs
+- `uplevel`/`upvar` abuse — hard to debug
 
-## Project Structure
-```
-project/
-├── src/               # Tcl source
-├── test/              # Test files
-├── lib/               # Packages
-├── pkgIndex.tcl       # Package index
-└── README.md          # Documentation
-```
-
-## Non-Negotiables
-1. Namespace isolation for packages
-2. Proper quoting discipline
-3. TclOO for object-oriented code
-4. Error handling with try/catch
-
-## Red Lines (Reject PR)
-- uplevel/upvar abuse
-- eval with user input
-- Global variable pollution
-- Missing error handling
-- Unquoted substitutions
-- Secrets hardcoded in scripts
-
-## Testing Strategy
-- **Unit**: tcltest framework
-- **Integration**: Expect for automation
-- **GUI**: Tk test utilities
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Quoting errors | Use list and braces |
-| Namespace leaks | Use namespace ensemble |
-| Trace overhead | Remove in production |
-| Event loop blocking | Use after, fileevent |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No expr without braces
-- No string operations in tight loops
-
-## Security Checklist
-- [ ] Input validated and escaped
-- [ ] No eval/exec with user input
-- [ ] Secrets from environment (env array)
-- [ ] Safe interp for untrusted code
+## Version Gotchas
+- **Tcl 9.0**: Modern features, improved performance
+- **expr bracing**: `{$a + $b}` not `"$a + $b"` (10x faster)
+- **list command**: Use for safe command building
+- **Namespaces**: Use `namespace ensemble` for OO-like
+- **With Tk**: Event-driven, use `after` for async

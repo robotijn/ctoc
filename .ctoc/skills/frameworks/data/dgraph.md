@@ -1,92 +1,68 @@
 # Dgraph CTO
-> Distributed native GraphQL database for connected data at scale.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name dgraph -p 8080:8080 -p 9080:9080 dgraph/standalone
-curl localhost:8080/alter -d '{"drop_all": true}'
-curl localhost:8080/query -d 'query { q(func: has(name)) { name } }'
+docker run -d --name dgraph -p 8080:8080 -p 9080:9080 dgraph/standalone:v23
+# GraphQL at http://localhost:8080/graphql
+# Admin at http://localhost:8080/admin
 ```
 
-## Non-Negotiables
-1. Schema-first with type definitions
-2. Indexes on all query predicates (term, exact, hash)
-3. DQL or GraphQL+/- for queries
-4. ACLs for production security
-5. Sharding strategy for horizontal scale
-6. Backup and restore procedures tested
+## Claude's Common Mistakes
+1. **Missing @index directives** - Queries fail without proper indexes
+2. **No type schema** - Dgraph needs explicit type definitions
+3. **Unbounded recursive queries** - Always use first/offset pagination
+4. **Ignoring @reverse for bidirectional** - Needed for reverse edge traversal
+5. **DQL vs GraphQL confusion** - Different query languages for different APIs
 
-## Red Lines
-- Missing type schema definitions
-- No indexes on filtered predicates
-- Unbounded recursive queries
-- Ignoring sharding for large graphs
-- No backup strategy
-- ACLs disabled in production
-
-## Pattern: Schema and Query Design
+## Correct Patterns (2026)
 ```graphql
-# Schema with proper indexes
+# Schema with proper indexes (REQUIRED)
 type User {
-  name: string @index(term, fulltext) .
-  email: string @index(exact) @upsert .
-  age: int @index(int) .
-  friends: [User] @reverse .
-  posts: [Post] @reverse .
-  createdAt: datetime @index(hour) .
+  name: String @search(by: [term, fulltext])
+  email: String @search(by: [hash]) @id
+  age: Int @search
+  friends: [User] @hasInverse(field: friends)
+  posts: [Post]
+  createdAt: DateTime @search(by: [hour])
 }
 
 type Post {
-  title: string @index(term, fulltext) .
-  content: string .
-  author: User .
-  tags: [string] @index(exact) .
+  title: String @search(by: [term, fulltext])
+  content: String
+  author: User @hasInverse(field: posts)
+  tags: [String] @search(by: [exact])
 }
+```
 
-# DQL query with filters and pagination
-{
-  users(func: type(User), orderdesc: createdAt, first: 20, offset: 0)
-    @filter(ge(age, 18) AND has(email)) {
-    uid
+```graphql
+# GraphQL query with pagination (REQUIRED)
+query GetUsers {
+  queryUser(
+    filter: { age: { ge: 18 }, has: email }
+    order: { desc: createdAt }
+    first: 20
+    offset: 0
+  ) {
+    id
     name
     email
-    friendCount: count(friends)
-    recentPosts: posts(orderdesc: createdAt, first: 5) {
+    posts(order: { desc: createdAt }, first: 5) {
       title
       tags
     }
   }
 }
-
-# GraphQL mutation
-mutation {
-  addUser(input: [{
-    name: "Alice"
-    email: "alice@example.com"
-    age: 25
-  }]) {
-    user { id name }
-  }
-}
 ```
 
-## Integrates With
-- **Clients**: Official Go, Python, Java, JS clients
-- **GraphQL**: Native GraphQL endpoint
-- **Auth**: JWT authentication, ACL rules
+## Version Gotchas
+- **v23+**: Improved GraphQL support, better performance
+- **@hasInverse**: Required for bidirectional relationships
+- **@search**: Must specify index type (term, hash, exact, etc.)
+- **Cloud vs Self-hosted**: Different deployment considerations
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `predicate not indexed` | Add @index directive to schema |
-| `schema not found` | Apply schema with /alter endpoint |
-| `connection refused` | Check Zero and Alpha are running |
-| `query timeout` | Add pagination, optimize predicates |
-
-## Prod Ready
-- [ ] Schema with all required indexes
-- [ ] ACLs configured for security
-- [ ] Sharding strategy documented
-- [ ] Backup automation configured
-- [ ] Monitoring via Prometheus metrics
+## What NOT to Do
+- Do NOT query predicates without @search indexes
+- Do NOT skip pagination (first/offset required)
+- Do NOT forget @hasInverse for bidirectional edges
+- Do NOT mix DQL and GraphQL patterns incorrectly

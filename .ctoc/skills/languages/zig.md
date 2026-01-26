@@ -1,68 +1,57 @@
 # Zig CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-zig fmt --check src/                   # Check format
-zig fmt src/                           # Format
-zig build test                         # Test
-zig build -Doptimize=ReleaseSafe      # Build optimized
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude ignores error returns — handle all errors with `try`/`catch`
+- Claude uses hidden allocations — allocators must be explicit
+- Claude uses `unreachable` in reachable paths — causes undefined behavior
+- Claude forgets `defer` for cleanup — memory leaks
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `zig 0.13+` | Latest stable | Older versions |
+| `zig fmt` | Built-in formatting | Manual style |
+| `zig build test` | Built-in testing | External runners |
+| `build.zig` | Build configuration | Makefiles |
+| `-fsanitize` | Runtime checks | No sanitizers |
+
+## Patterns Claude Should Use
+```zig
+const std = @import("std");
+
+// Explicit allocator - no hidden allocations
+pub fn createList(allocator: std.mem.Allocator) !std.ArrayList(u8) {
+    var list = std.ArrayList(u8).init(allocator);
+    errdefer list.deinit(); // cleanup on error
+    try list.append(42);
+    return list;
+}
+
+// Always use defer for cleanup
+pub fn readFile(path: []const u8) ![]u8 {
+    var file = try std.fs.cwd().openFile(path, .{});
+    defer file.close();
+    return try file.readToEndAlloc(allocator, max_size);
+}
+
+// Handle all errors explicitly
+const result = operation() catch |err| switch (err) {
+    error.NotFound => return default,
+    else => return err,
+};
 ```
 
-## Tools (2024-2025)
-- **Zig 0.13+** - Latest stable
-- **zig fmt** - Built-in formatter
-- **zig test** - Built-in testing
-- **zig build** - Build system
-- **C/C++ interop** - Drop-in replacement
+## Anti-Patterns Claude Generates
+- Ignoring `try` return — always handle errors
+- Hidden allocations — pass allocators explicitly
+- `unreachable` in reachable code — causes UB
+- Missing `defer`/`errdefer` — resource leaks
+- `@ptrCast` without validation — memory corruption
 
-## Project Structure
-```
-project/
-├── src/               # Source files
-│   └── main.zig       # Entry point
-├── build.zig          # Build configuration
-├── build.zig.zon      # Package dependencies
-└── test/              # Additional tests
-```
-
-## Non-Negotiables
-1. Explicit error handling - no ignored errors
-2. No hidden allocations - allocators explicit
-3. Comptime evaluation where possible
-4. C interop with proper safety wrappers
-
-## Red Lines (Reject PR)
-- Ignoring error return values
-- Hidden allocations in functions
-- Undefined behavior (use -fsanitize)
-- Unreachable in production paths
-- Secrets hardcoded in source
-- @ptrCast without validation
-
-## Testing Strategy
-- **Unit**: Built-in test blocks
-- **Integration**: zig build test with fixtures
-- **Fuzz**: AFL or libFuzzer integration
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Memory leaks | Use defer for cleanup |
-| Pointer aliasing | Follow strict aliasing rules |
-| Overflow behavior | Use checked arithmetic |
-| Comptime limits | Split complex comptime logic |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No unnecessary allocations
-- No cache-unfriendly access patterns
-
-## Security Checklist
-- [ ] Input bounds validated
-- [ ] Memory safety with allocators
-- [ ] Secrets from environment
-- [ ] C interop properly sandboxed
+## Version Gotchas
+- **0.13+**: Improved error messages, better comptime
+- **No hidden control flow**: Errors are explicit values
+- **Comptime**: Powerful but has limits on complexity
+- **C interop**: Drop-in C compiler replacement
+- **With C code**: Proper safety wrappers required

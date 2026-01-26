@@ -1,32 +1,23 @@
 # JAX CTO
-> High-performance numerical computing with automatic differentiation and XLA compilation.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# v0.9+ requires Python 3.11+ (minimum until July 2026)
 pip install jax jaxlib flax optax
-# For GPU support
-pip install jax[cuda12_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-python -c "import jax; print(jax.devices())"
+# GPU (CUDA): pip install jax[cuda12]
+# TPU: pip install jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+# Verify: python -c "import jax; print(jax.devices())"
 ```
 
-## Non-Negotiables
-1. Pure functions with no side effects for jit
-2. Use jit for performance-critical code
-3. Use vmap for automatic vectorization
-4. Flax or Haiku for neural network layers
-5. Proper PRNG key handling
-6. Pytree awareness for nested structures
+## Claude's Common Mistakes
+1. Side effects inside jitted functions
+2. Not using vmap for batching (manual loops slow)
+3. Mutating arrays in place (JAX arrays immutable)
+4. Reusing PRNG keys (causes repeated randomness)
+5. Ignoring XLA compilation overhead for small functions
 
-## Red Lines
-- Side effects inside jitted functions
-- Not using vmap for batching operations
-- Mutating arrays in place
-- Reusing PRNG keys
-- Ignoring XLA compilation overhead
-- Not using donate_argnums for memory
-
-## Pattern: Production Training Pipeline
+## Correct Patterns (2026)
 ```python
 import jax
 import jax.numpy as jnp
@@ -45,79 +36,47 @@ class MLP(nn.Module):
         x = nn.Dense(self.hidden_dim)(x)
         x = nn.relu(x)
         x = nn.Dropout(0.1, deterministic=not training)(x)
-        x = nn.Dense(self.output_dim)(x)
-        return x
+        return nn.Dense(self.output_dim)(x)
 
-# Initialize model
+# Initialize with PRNG key management
 key = random.PRNGKey(42)
-key, init_key, dropout_key = random.split(key, 3)
+key, init_key, dropout_key = random.split(key, 3)  # ALWAYS split before use
 
 model = MLP(hidden_dim=256, output_dim=10)
-dummy_input = jnp.ones((1, 784))
-params = model.init({"params": init_key, "dropout": dropout_key}, dummy_input)
+params = model.init({"params": init_key, "dropout": dropout_key}, jnp.ones((1, 784)))
 
 # Create training state
-tx = optax.adamw(learning_rate=1e-3)
 state = train_state.TrainState.create(
     apply_fn=model.apply,
     params=params["params"],
-    tx=tx,
+    tx=optax.adamw(learning_rate=1e-3),
 )
 
-# JIT-compiled training step
+# JIT-compiled training step (PURE function, no side effects)
 @jit
 def train_step(state, batch, dropout_key):
     def loss_fn(params):
-        logits = state.apply_fn(
-            {"params": params},
-            batch["image"],
-            training=True,
-            rngs={"dropout": dropout_key}
-        )
-        loss = optax.softmax_cross_entropy_with_integer_labels(
-            logits, batch["label"]
-        ).mean()
-        return loss, logits
+        logits = state.apply_fn({"params": params}, batch["x"], training=True, rngs={"dropout": dropout_key})
+        return optax.softmax_cross_entropy_with_integer_labels(logits, batch["y"]).mean()
 
-    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-    (loss, logits), grads = grad_fn(state.params)
-    state = state.apply_gradients(grads=grads)
-    return state, loss
+    loss, grads = jax.value_and_grad(loss_fn)(state.params)
+    return state.apply_gradients(grads=grads), loss
 
-# Vectorized inference
+# Vectorized inference with vmap
 @jit
 def batch_predict(params, images):
     return vmap(lambda x: model.apply({"params": params}, x, training=False))(images)
-
-# Training loop
-for epoch in range(num_epochs):
-    for batch in dataloader:
-        key, dropout_key = random.split(key)
-        state, loss = train_step(state, batch, dropout_key)
-
-# Save checkpoint
-from flax.training import checkpoints
-checkpoints.save_checkpoint("./checkpoints", state, step=epoch)
 ```
 
-## Integrates With
-- **NNs**: Flax, Haiku, Equinox
-- **Optimizers**: Optax
-- **Data**: TensorFlow Datasets, NumPy
-- **Hardware**: TPU, GPU, CPU via XLA
+## Version Gotchas
+- **v0.9+**: Python 3.11 minimum required
+- **PRNG keys**: MUST split before each use, never reuse
+- **Pure functions**: No side effects in jitted functions
+- **XLA cache**: Use `JAX_COMPILATION_CACHE_DIR` for persistence
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `ConcretizationTypeError` | Avoid data-dependent shapes in jit |
-| `TracerArrayConversionError` | Don't convert traced values to numpy |
-| `KeyReuseError` | Split PRNG keys before each use |
-| `XLA compilation slow` | Cache jitted functions, use persistent compilation cache |
-
-## Prod Ready
-- [ ] All training functions jit-compiled
-- [ ] vmap used for batching
-- [ ] PRNG keys properly split
-- [ ] Checkpoints saved with Flax
-- [ ] Memory optimized with donate_argnums
-- [ ] XLA compilation cache enabled
+## What NOT to Do
+- Do NOT use side effects in jitted functions
+- Do NOT reuse PRNG keys - always split
+- Do NOT mutate arrays - JAX arrays are immutable
+- Do NOT skip vmap for batching (manual loops slow)
+- Do NOT ignore XLA compilation cache for production

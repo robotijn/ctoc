@@ -1,29 +1,22 @@
 # Gorilla Mux CTO
-> Powerful Go HTTP router - regex matching, middleware, subrouters.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-go mod init myapp && go get github.com/gorilla/mux
+go mod init myapp
+go get github.com/gorilla/mux
 go run main.go
-go test -v ./...
+# Gorilla Mux 1.8.x - powerful Go HTTP router
 ```
 
-## Non-Negotiables
-1. Route variables with type constraints
-2. Middleware chains via `Use()`
-3. Subrouters for API versioning
-4. Proper CORS handling
-5. Request matching with headers/queries
+## Claude's Common Mistakes
+1. **Missing route variable regex** — Use `{id:[0-9]+}` for validation
+2. **No panic recovery middleware** — Server crashes on panic
+3. **Ignoring StrictSlash** — Causes 301 redirects
+4. **Missing request timeouts** — Use `http.Server` timeout config
+5. **Not using context** — Pass `r.Context()` to services
 
-## Red Lines
-- Missing route variable validation
-- No panic recovery middleware
-- Ignoring `StrictSlash` behavior
-- Missing request timeouts
-- Unvalidated path parameters
-
-## Pattern: Structured Router
+## Correct Patterns (2026)
 ```go
 package main
 
@@ -31,6 +24,7 @@ import (
     "encoding/json"
     "net/http"
     "strconv"
+    "time"
     "github.com/gorilla/mux"
 )
 
@@ -45,6 +39,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    // Pass context for cancellation
     user, err := h.service.Create(r.Context(), req)
     if err != nil {
         http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
@@ -58,7 +53,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    id, _ := strconv.Atoi(vars["id"]) // Already validated by regex
+    id, _ := strconv.Atoi(vars["id"])  // Already validated by regex
 
     user, err := h.service.GetByID(r.Context(), id)
     if err != nil {
@@ -70,30 +65,19 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(user)
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        log.Printf("%s %s", r.Method, r.URL.Path)
-        next.ServeHTTP(w, r)
-    })
-}
-
 func main() {
     r := mux.NewRouter()
     r.Use(loggingMiddleware)
-    r.Use(recoveryMiddleware)
+    r.Use(recoveryMiddleware)  // REQUIRED
 
-    // API v1
+    // API subrouter
     api := r.PathPrefix("/api/v1").Subrouter()
 
     userHandler := &UserHandler{service: NewUserService()}
     api.HandleFunc("/users", userHandler.Create).Methods("POST")
-    api.HandleFunc("/users/{id:[0-9]+}", userHandler.Get).Methods("GET")
+    api.HandleFunc("/users/{id:[0-9]+}", userHandler.Get).Methods("GET")  // Regex validation
 
-    // Health check
-    r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte("ok"))
-    }).Methods("GET")
-
+    // Server with timeouts (REQUIRED)
     srv := &http.Server{
         Handler:      r,
         Addr:         ":3000",
@@ -104,11 +88,18 @@ func main() {
 }
 ```
 
-## Integrates With
-- **DB**: `sqlx` or `pgx` with context
-- **Auth**: `gorilla/sessions` or JWT middleware
-- **Validation**: `go-playground/validator`
-- **CORS**: `gorilla/handlers` CORS helper
+## Version Gotchas
+- **Gorilla Mux 1.8.x**: Maintenance mode; consider chi for new projects
+- **Route variables**: Use regex like `{id:[0-9]+}` for validation
+- **StrictSlash**: `r.StrictSlash(true)` for consistent trailing slash
+- **Subrouters**: Use `PathPrefix().Subrouter()` for versioned APIs
+
+## What NOT to Do
+- ❌ Missing recovery middleware — Server crashes on panic
+- ❌ `{id}` without regex — No validation on path params
+- ❌ Missing server timeouts — DoS vulnerability
+- ❌ Ignoring `r.Context()` — No cancellation propagation
+- ❌ Hardcoded paths — Use subrouters for versioning
 
 ## Common Errors
 | Error | Fix |
@@ -116,12 +107,4 @@ func main() {
 | `405 Method Not Allowed` | Check `.Methods()` matches request |
 | `mux: variable not found` | Check route pattern matches path |
 | `Trailing slash mismatch` | Use `r.StrictSlash(true)` |
-| `nil pointer` | Check route handlers registered |
-
-## Prod Ready
-- [ ] Recovery middleware added
-- [ ] Request timeouts configured
-- [ ] Health check endpoint
-- [ ] CORS configured
-- [ ] Graceful shutdown
-- [ ] Prometheus metrics
+| `Server panic` | Add recovery middleware |

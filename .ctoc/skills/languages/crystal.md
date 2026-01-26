@@ -1,68 +1,67 @@
 # Crystal CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-crystal tool format --check            # Check format
-crystal tool format                    # Format
-crystal spec                           # Test
-crystal build --release src/main.cr    # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude abuses `.not_nil!` — use proper nil checks
+- Claude blocks fibers — use non-blocking I/O
+- Claude creates complex macros — keep macros simple
+- Claude ignores ameba warnings — fix all warnings
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `crystal 1.x+` | Latest stable | Older versions |
+| `crystal tool format` | Built-in formatting | Manual style |
+| `ameba` | Static analysis | No linting |
+| `spec` | Built-in testing | External frameworks |
+| `shards` | Dependency management | Manual deps |
+
+## Patterns Claude Should Use
+```crystal
+# Proper nil handling with type narrowing
+def process(user : User?)
+  return unless user  # user is now User, not User?
+  puts user.name
+end
+
+# Use case for exhaustive checks
+def handle(status : Status)
+  case status
+  when .pending?
+    process_pending
+  when .active?
+    process_active
+  when .completed?
+    process_completed
+  end
+end
+
+# Fibers with channels for concurrency
+channel = Channel(String).new
+spawn do
+  channel.send(fetch_data)
+end
+result = channel.receive
+
+# Timeout with select
+select
+when result = channel.receive
+  process(result)
+when timeout(5.seconds)
+  raise "Timeout waiting for data"
+end
 ```
 
-## Tools (2024-2025)
-- **Crystal 1.x** - Latest stable
-- **crystal tool format** - Built-in formatter
-- **ameba** - Static analysis
-- **spec** - Built-in testing
-- **shards** - Dependency management
+## Anti-Patterns Claude Generates
+- `.not_nil!` abuse — use type narrowing or guards
+- Blocking main fiber — use spawn for I/O
+- Complex macros — keep simple, use macro puts to debug
+- Ignoring ameba — fix all static analysis warnings
+- Missing specs — write tests for public APIs
 
-## Project Structure
-```
-project/
-├── src/               # Source files
-├── spec/              # Test specs
-├── lib/               # Dependencies (managed)
-├── shard.yml          # Dependencies
-└── shard.lock         # Locked versions
-```
-
-## Non-Negotiables
-1. Type inference with explicit types where needed
-2. Nil checking at compile time
-3. Fiber-based concurrency with channels
-4. Proper error handling with exceptions
-
-## Red Lines (Reject PR)
-- Runtime nil errors (.not_nil! abuse)
-- Blocking fibers on main thread
-- Unsafe pointer operations
-- Missing spec coverage
-- Secrets hardcoded in source
-- Ignoring ameba warnings
-
-## Testing Strategy
-- **Unit**: Spec framework, <100ms
-- **Integration**: HTTP mocks, DB fixtures
-- **E2E**: Full application tests
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Nil union complexity | Use case/if type narrowing |
-| Fiber deadlocks | Use select for timeouts |
-| Macro debugging | Use macro puts, keep simple |
-| C binding memory | Use GC.add_finalizer |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No blocking in fiber-heavy code
-- No unnecessary allocations in loops
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] SQL uses parameterized queries
-- [ ] Secrets from environment (ENV[])
-- [ ] Dependencies audited (shards check)
+## Version Gotchas
+- **Nil safety**: Compiler enforces nil checks
+- **Fibers**: Cooperative, not preemptive
+- **Macros**: Compile-time metaprogramming
+- **C bindings**: Use `GC.add_finalizer` for cleanup
+- **With shards**: Lock versions with `shards.lock`

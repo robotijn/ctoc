@@ -1,61 +1,47 @@
 # OpenAI SDK CTO
-> Production-grade GPT API integration with cost optimization.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install openai tiktoken
-export OPENAI_API_KEY="sk-..."
-pytest tests/ -v && python -c "from openai import OpenAI; print(OpenAI().models.list())"
+# v2.15+ requires Python 3.9+
+pip install openai
+# Optional extras: pip install "openai[realtime,voice-helpers]"
+# Set API key: export OPENAI_API_KEY="sk-..."
 ```
 
-## Non-Negotiables
-1. Async client (`AsyncOpenAI`) for throughput
-2. Exponential backoff with tenacity or built-in retries
-3. Structured outputs with `response_format`
-4. Streaming for real-time user experience
-5. tiktoken for accurate token counting
-6. Cost tracking per request
+## Claude's Common Mistakes
+1. Using deprecated `openai.ChatCompletion.create()` - use client instance
+2. Missing `AsyncOpenAI` for async applications
+3. Using `response_format={"type": "json_object"}` instead of Pydantic
+4. Not using `client.beta.chat.completions.parse()` for structured output
+5. Forgetting `max_retries` parameter for production reliability
 
-## Red Lines
-- No rate limit handling in production
-- Exceeding context window without chunking
-- No cost monitoring or budget alerts
-- Synchronous calls in async applications
-- Hardcoded API keys in code
-- Missing error handling for API failures
-
-## Pattern: Production API Integration
+## Correct Patterns (2026)
 ```python
-import asyncio
-from openai import AsyncOpenAI
+from openai import OpenAI, AsyncOpenAI
 from pydantic import BaseModel
-import tiktoken
 
-class Response(BaseModel):
-    answer: str
+# Sync client with retries
+client = OpenAI(max_retries=3, timeout=30.0)
+
+# Structured output with Pydantic (preferred method)
+class Answer(BaseModel):
+    response: str
     confidence: float
     sources: list[str]
 
-client = AsyncOpenAI(max_retries=3, timeout=30.0)
-encoder = tiktoken.encoding_for_model("gpt-4o")
+response = client.beta.chat.completions.parse(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Explain RAG"}],
+    response_format=Answer,
+)
+result = response.choices[0].message.parsed  # Typed Pydantic object
 
-async def query(prompt: str) -> Response:
-    # Token counting for cost tracking
-    input_tokens = len(encoder.encode(prompt))
+# Async for web applications
+async_client = AsyncOpenAI(max_retries=3)
 
-    response = await client.beta.chat.completions.parse(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}],
-        response_format=Response,
-        temperature=0,
-    )
-
-    return response.choices[0].message.parsed
-
-# Streaming example
 async def stream_response(prompt: str):
-    async with client.beta.chat.completions.stream(
+    async with async_client.chat.completions.stream(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
@@ -64,24 +50,15 @@ async def stream_response(prompt: str):
                 yield chunk.choices[0].delta.content
 ```
 
-## Integrates With
-- **Frameworks**: LangChain, LlamaIndex
-- **Monitoring**: LangSmith, Helicone, Portkey
-- **Caching**: Redis, GPTCache
-- **Vector DBs**: Pinecone, Chroma
+## Version Gotchas
+- **v2.0+**: Must use `OpenAI()` client instance, not module-level calls
+- **v2.15+**: New Responses API (`client.responses.create`) for simple use
+- **Agents SDK**: Separate package `openai-agents` for multi-agent workflows
+- **Structured output**: Use `client.beta.chat.completions.parse()` with Pydantic
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `RateLimitError` | Implement exponential backoff, use `max_retries` |
-| `InvalidRequestError: max tokens` | Use tiktoken to count tokens, chunk inputs |
-| `AuthenticationError` | Verify API key, check environment variable |
-| `Timeout` | Increase timeout, use streaming for long responses |
-
-## Prod Ready
-- [ ] Async client used for all API calls
-- [ ] Structured outputs with Pydantic models
-- [ ] Token usage tracked and logged
-- [ ] Rate limiting with exponential backoff
-- [ ] API key stored in environment variables
-- [ ] Cost alerts configured per project
+## What NOT to Do
+- Do NOT use `openai.ChatCompletion.create()` - deprecated v1 API
+- Do NOT use sync client in async applications - use `AsyncOpenAI`
+- Do NOT hardcode API keys - use environment variables
+- Do NOT skip `max_retries` in production
+- Do NOT use JSON mode when Pydantic structured output is available

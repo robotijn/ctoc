@@ -1,29 +1,24 @@
 # Helm CTO
-> Kubernetes package management leader demanding versioned charts, schema validation, and reproducible deployments.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-helm create mychart
-helm lint mychart/ && helm template mychart/ | kubectl apply --dry-run=client -f -
-helm upgrade --install myrelease mychart/ -n production --atomic --timeout 10m
+# Official script method
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+# Or package managers
+brew install helm        # macOS
+choco install kubernetes-helm  # Windows
+# Note: Helm 4.x under development, 3.21 next minor (May 2026)
 ```
 
-## Non-Negotiables
-1. SemVer chart versioning with documented breaking changes
-2. values.schema.json for input validation
-3. Named templates in _helpers.tpl for DRY configuration
-4. Chart testing with helm-unittest before release
-5. NOTES.txt with post-install instructions
+## Claude's Common Mistakes
+1. **Missing values.schema.json** - Required for input validation
+2. **Hardcodes values in templates** - Use values.yaml with defaults
+3. **Ignores NOTES.txt** - Users need post-install guidance
+4. **Uses Helm 2 patterns** - Tiller removed, v3 patterns required
+5. **Skips chart testing** - helm-unittest required before release
 
-## Red Lines
-- Hardcoded values in templates - use values.yaml or Chart defaults
-- Missing NOTES.txt leaving users without guidance
-- No default values for required fields
-- Untested chart releases to production
-- Helm 2 - migrate to v3 (Tiller is a security risk)
-
-## Pattern: Reusable Template Helper
+## Correct Patterns (2026)
 ```yaml
 # templates/_helpers.tpl
 {{- define "mychart.labels" -}}
@@ -33,7 +28,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-# values.schema.json
+# values.schema.json (REQUIRED)
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -46,25 +41,25 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
         "repository": { "type": "string" },
         "tag": { "type": "string", "minLength": 1 }
       }
+    },
+    "replicas": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
     }
   }
 }
 ```
 
-## Integrates With
-- **DB**: Bitnami charts for PostgreSQL/MySQL with proper values
-- **Auth**: cert-manager charts for TLS, external-secrets for credentials
-- **Cache**: Redis/Memcached Helm charts with persistence configuration
+## Version Gotchas
+- **Helm 3.19+**: Security patches, upgrade recommended
+- **Helm 4.x**: Under development on main branch, APIs changing
+- **OCI registries**: Preferred over ChartMuseum for new setups
+- **With ArgoCD**: Use `helm template` output, not Helm releases
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Error: UPGRADE FAILED: another operation in progress` | Run `helm rollback` or wait for lock release |
-| `template: no function "toYaml"` | Check Helm version, use `{{ toYaml .Values.x \| nindent 4 }}` |
-| `values don't meet schema` | Validate values against values.schema.json |
-
-## Prod Ready
-- [ ] Chart published to OCI registry or ChartMuseum
-- [ ] Automated testing in CI with helm-unittest
-- [ ] Rollback strategy documented and tested
-- [ ] Resource quotas and limits templated with sensible defaults
+## What NOT to Do
+- Do NOT hardcode values in templates - use values.yaml
+- Do NOT skip values.schema.json - catches config errors early
+- Do NOT omit NOTES.txt - users need guidance
+- Do NOT use Helm 2 - Tiller is security risk
+- Do NOT release charts without helm-unittest

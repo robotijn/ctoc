@@ -1,87 +1,88 @@
 # SolidJS CTO
-> Fine-grained reactivity - no virtual DOM, signals for surgical updates.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npx degit solidjs/templates/ts myapp && cd myapp
-npm run dev
-npm run test
+npx degit solidjs/templates/ts my-app
+cd my-app && npm install && npm run dev
+# For SolidStart (meta-framework):
+npm create solid@latest
 ```
 
-## Non-Negotiables
-1. Signals for primitive state - `createSignal`
-2. Stores for nested state - `createStore`
-3. Control flow components: `<Show>`, `<For>`, `<Switch>`
-4. Resources for async data - `createResource`
-5. Never destructure props - breaks reactivity
+## Claude's Common Mistakes
+1. **Destructuring props** — Breaks reactivity; always access as `props.name`
+2. **Using `createEffect` for derived values** — Use `createMemo` instead
+3. **Array mutations without reconciliation** — Use `reconcile` for store arrays
+4. **Missing `<Suspense>` for resources** — Wrap components using `createResource`
+5. **Accessing signals without calling** — Must call: `count()` not `count`
 
-## Red Lines
-- Destructuring props in component parameters
-- `<For>` without using callback's first argument
-- Missing `<Suspense>` wrapping `<Resource>` consumers
-- Using `createEffect` for derived state - use `createMemo`
-- Array mutations instead of reconciliation
-
-## Pattern: Reactive Data with Resource
+## Correct Patterns (2026)
 ```tsx
-import { createSignal, createResource, For, Show, Suspense } from 'solid-js';
-import { createStore, reconcile } from 'solid-js/store';
+import { createSignal, createResource, createMemo, For, Show, Suspense } from 'solid-js';
 
-interface User { id: number; name: string; email: string }
+// WRONG: Destructuring props
+function Bad({ name }) {  // Breaks reactivity!
+  return <div>{name}</div>;
+}
 
-const fetchUsers = async (query: string): Promise<User[]> => {
-  const res = await fetch(`/api/users?q=${query}`);
-  return res.json();
-};
+// CORRECT: Access props directly
+function Good(props) {
+  return <div>{props.name}</div>;
+}
 
-export default function UserList() {
-  const [search, setSearch] = createSignal('');
-  const [users, { refetch }] = createResource(search, fetchUsers);
+// WRONG: createEffect for derived state
+const [count, setCount] = createSignal(0);
+createEffect(() => {
+  doubled = count() * 2;  // Wrong!
+});
 
-  const handleSearch = (e: InputEvent) => {
-    setSearch((e.target as HTMLInputElement).value);
-  };
+// CORRECT: createMemo for derived state
+const doubled = createMemo(() => count() * 2);
 
+// Resource with Suspense
+const [users] = createResource(fetchUsers);
+
+function UserList() {
   return (
-    <div>
-      <input value={search()} onInput={handleSearch} placeholder="Search..." />
-
-      <Suspense fallback={<div>Loading...</div>}>
-        <Show when={!users.error} fallback={<div>Error loading users</div>}>
-          <For each={users()} fallback={<div>No users found</div>}>
-            {(user) => (
-              <div>
-                <span>{user.name}</span>
-                <span>{user.email}</span>
-              </div>
-            )}
-          </For>
-        </Show>
-      </Suspense>
-    </div>
+    <Suspense fallback={<div>Loading...</div>}>
+      <For each={users()} fallback={<div>No users</div>}>
+        {(user) => <div>{user.name}</div>}
+      </For>
+    </Suspense>
   );
 }
 ```
 
-## Integrates With
-- **Routing**: `@solidjs/router` with data functions
-- **Meta-framework**: SolidStart for SSR/SSG
-- **State**: Stores for complex state, context for DI
-- **Styling**: CSS Modules or `solid-styled-components`
+## Version Gotchas
+- **SolidStart 2.0**: Alpha in heavy development; 1.x is stable
+- **Vite 6**: Environment API removes need for vinxi abstraction
+- **Monorepo**: Add `@solidjs/start` to `nohoist` in workspaces
+- **Security**: Implement CSRF with Double-Submit Cookie pattern
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Property undefined` after destructure | Don't destructure props, access as `props.x` |
-| `Resource undefined` | Wrap consumer in `<Suspense>` |
-| `For callback not reactive` | Use signal accessor inside, not outside |
-| `Effect running too often` | Check dependencies, use `createMemo` |
+## What NOT to Do
+- ❌ `const { name } = props` — Access `props.name` directly
+- ❌ `createEffect(() => derived = ...)` — Use `createMemo`
+- ❌ `users.push(newUser)` on store — Use `reconcile` or spread
+- ❌ `<For each={users()}>` without `<Suspense>` — Will fail on resource
+- ❌ `count` instead of `count()` — Signals must be called
 
-## Prod Ready
-- [ ] Error boundaries for fault isolation
-- [ ] Lazy components with `lazy()`
-- [ ] Proper Suspense boundaries
-- [ ] Bundle size analyzed
-- [ ] SSR with SolidStart if needed
-- [ ] HMR configured for development
+## Control Flow Components
+| Component | Use For |
+|-----------|---------|
+| `<Show>` | Conditional rendering |
+| `<For>` | Lists (with callback) |
+| `<Switch>`/`<Match>` | Multiple conditions |
+| `<Suspense>` | Async boundaries |
+| `<ErrorBoundary>` | Error handling |
+
+## SolidStart Structure
+```
+src/
+├── routes/
+│   ├── index.tsx      # /
+│   ├── users.tsx      # /users
+│   └── api/
+│       └── users.ts   # /api/users
+├── components/
+└── lib/
+```

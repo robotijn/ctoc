@@ -1,51 +1,44 @@
 # Weights & Biases CTO
-> ML experiment tracking, visualization, and collaboration platform.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install wandb
-wandb login
-wandb sweep sweep.yaml && wandb agent SWEEP_ID
+wandb login  # Authenticate with API key
+# Verify: python -c "import wandb; print(wandb.__version__)"
 ```
 
-## Non-Negotiables
-1. Track all experiments with wandb.init()
-2. Log hyperparameters with wandb.config
-3. Use Sweeps for hyperparameter search
-4. Artifacts for dataset and model versioning
-5. Tables for data visualization
-6. Alerts for run failures
+## Claude's Common Mistakes
+1. Not passing config to `wandb.init()` - hyperparameters lost
+2. Missing `wandb.finish()` causing zombie runs
+3. Using manual logging when integration callbacks exist
+4. Not using Artifacts for dataset/model versioning
+5. Forgetting Tables for data visualization
 
-## Red Lines
-- Training without experiment tracking
-- Manual hyperparameter search
-- No artifact versioning for datasets
-- Ignoring run comparisons
-- Missing config logging
-- Not using Tables for data debugging
-
-## Pattern: Production Experiment Tracking
+## Correct Patterns (2026)
 ```python
 import wandb
 from wandb import AlertLevel
 
-# Initialize run with config
-wandb.init(
+# Initialize with full config
+run = wandb.init(
     project="production-model",
-    name="transformer-v2",
+    name="experiment-v1",
     config={
         "learning_rate": 1e-4,
         "batch_size": 32,
         "epochs": 10,
         "architecture": "transformer",
     },
-    tags=["production", "transformer"],
+    tags=["production", "v1"],
 )
 
-# Track training
+# Access config (supports hyperparameter sweeps)
+lr = wandb.config.learning_rate
+
+# Training loop with logging
 for epoch in range(wandb.config.epochs):
-    train_loss = train_epoch(model, train_loader)
+    train_loss = train_epoch(model, loader)
     val_loss, val_acc = validate(model, val_loader)
 
     wandb.log({
@@ -55,46 +48,26 @@ for epoch in range(wandb.config.epochs):
         "epoch": epoch,
     })
 
-    # Log sample predictions as Table
-    if epoch % 5 == 0:
-        table = wandb.Table(columns=["input", "prediction", "label"])
-        for inp, pred, label in samples:
-            table.add_data(inp, pred, label)
-        wandb.log({"predictions": table})
-
-# Save model as artifact
+# Save model as versioned artifact
 artifact = wandb.Artifact("model", type="model", metadata={"accuracy": val_acc})
 artifact.add_file("model.pt")
 wandb.log_artifact(artifact)
 
 # Alert on completion
-wandb.alert(
-    title="Training Complete",
-    text=f"Final accuracy: {val_acc:.4f}",
-    level=AlertLevel.INFO,
-)
+wandb.alert(title="Training Complete", text=f"Accuracy: {val_acc:.4f}", level=AlertLevel.INFO)
 
-wandb.finish()
+wandb.finish()  # Always call finish
 ```
 
-## Integrates With
-- **Training**: PyTorch, TensorFlow, Keras, JAX
-- **HPO**: Sweeps, Optuna, Ray Tune
-- **Deployment**: Model Registry, CI/CD
-- **Collaboration**: Reports, Teams
+## Version Gotchas
+- **Sweeps**: Use `wandb.config` for hyperparameter access
+- **Artifacts**: Version datasets and models separately
+- **Tables**: Use for data debugging and visualization
+- **Integrations**: Use callbacks for PyTorch Lightning, Keras, etc.
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `wandb.errors.CommError` | Check internet connection, verify API key |
-| `Run already finished` | Call wandb.init() for new run |
-| `Artifact not found` | Check artifact name and version, verify project |
-| `Config not logged` | Pass config to wandb.init() or use wandb.config |
-
-## Prod Ready
-- [ ] All runs tracked with wandb.init()
-- [ ] Hyperparameters logged via config
-- [ ] Sweeps configured for HPO
-- [ ] Models saved as versioned artifacts
-- [ ] Tables used for data debugging
-- [ ] Alerts configured for failures
+## What NOT to Do
+- Do NOT skip `wandb.init(config=...)` - loses hyperparameters
+- Do NOT forget `wandb.finish()` at end of training
+- Do NOT manually log when framework callbacks exist
+- Do NOT skip Artifacts for reproducibility
+- Do NOT ignore Tables for data debugging

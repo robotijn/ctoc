@@ -1,71 +1,63 @@
 # CoffeeScript CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-coffeelint src/                        # Lint
-coffee -c -o lib/ src/                 # Compile
-npm test                               # Test
-npm run build                          # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses CoffeeScript 1 syntax — use CoffeeScript 2 (ES6+)
+- Claude mixes tabs and spaces — use consistent 2-space indentation
+- Claude forgets implicit return issues — be explicit for side effects
+- Claude uses backticks for JS — rarely justified
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `coffeescript 2` | ES6+ output | CoffeeScript 1 |
+| `coffeelint` | Style checking | No linting |
+| `source maps` | Debugging | Debugging compiled JS |
+| `mocha`/`jest` | Testing (on JS output) | Ad-hoc tests |
+| `esbuild` | Bundling | Webpack (slower) |
+
+## Patterns Claude Should Use
+```coffee
+# Fat arrow for bound context
+class UserService
+  constructor: (@api) ->
+
+  # Fat arrow preserves this
+  fetchUser: (id) =>
+    @api.get("/users/#{id}")
+      .then (response) =>
+        @processUser(response.data)
+
+  processUser: (data) ->
+    name: data.name.trim()
+    email: data.email.toLowerCase()
+
+# Comprehensions over manual loops
+squares = (x * x for x in [1..10])
+
+# Destructuring
+{name, email} = user
+
+# Explicit return for side effects
+logAndReturn = (value) ->
+  console.log value
+  return value  # Explicit, not implicit
+
+# Default parameters
+greet = (name = 'World') ->
+  "Hello, #{name}!"
 ```
 
-## Tools (2024-2025)
-- **CoffeeScript 2** - ES6+ output
-- **CoffeeLint** - Style checking
-- **Source maps** - Debugging support
-- **Mocha/Jest** - Testing (JS output)
-- **Webpack/esbuild** - Bundling
+## Anti-Patterns Claude Generates
+- CoffeeScript 1 syntax — upgrade to CoffeeScript 2
+- Mixed tabs/spaces — use 2 spaces consistently
+- Implicit return confusion — be explicit for side effects
+- Backticks for inline JS — use proper CoffeeScript
+- Thin arrow when fat needed — use `=>` for callbacks
 
-## Project Structure
-```
-project/
-├── src/               # CoffeeScript source
-├── lib/               # Compiled JavaScript
-├── test/              # Test files
-├── coffeelint.json    # Lint config
-└── package.json       # Dependencies
-```
-
-## Non-Negotiables
-1. Use CoffeeScript 2 for ES6+ output
-2. Consistent indentation (2 spaces)
-3. Fat arrow for bound methods
-4. Comprehensions over manual loops
-
-## Red Lines (Reject PR)
-- Mixing tabs and spaces
-- Implicit returns in side-effect functions
-- Backticks for inline JS (rarely justified)
-- Ignoring compilation warnings
-- Secrets hardcoded in code
-- CoffeeScript 1 syntax in new code
-
-## Testing Strategy
-- **Unit**: Mocha/Jest on compiled JS
-- **Integration**: Full workflow tests
-- **Source maps**: Debug original CoffeeScript
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Indentation errors | Use consistent 2 spaces |
-| Implicit return confusion | Be explicit when needed |
-| Context binding | Use fat arrow => |
-| Debugging compiled code | Enable source maps |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No excessive comprehension nesting
-- No blocking event loop
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] No eval with user input
-- [ ] Secrets from environment
-- [ ] Dependencies audited (npm audit)
-
-## Note
-Consider migrating to TypeScript for new projects. CoffeeScript is in maintenance mode.
+## Version Gotchas
+- **CoffeeScript 2**: Outputs ES6+, modern syntax
+- **Source maps**: Enable for debugging
+- **Fat arrow**: Use `=>` when `this` binding needed
+- **Implicit returns**: Last expression returns automatically
+- **Consider TypeScript**: CoffeeScript is in maintenance mode

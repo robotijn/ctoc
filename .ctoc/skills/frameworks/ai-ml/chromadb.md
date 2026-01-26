@@ -1,103 +1,80 @@
 # ChromaDB CTO
-> Open-source embedding database for AI applications.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# v1.4.1+ requires Python 3.9+
 pip install chromadb
-python -c "import chromadb; print(chromadb.__version__)"
-chroma run --path ./chroma_data --port 8000
+# Server mode: chroma run --path /db_path
+# Verify: python -c "import chromadb; print(chromadb.__version__)"
 ```
 
-## Non-Negotiables
-1. Proper collection organization strategy
-2. Custom embedding function for production
-3. Metadata filtering for efficient queries
-4. Persistence configuration for durability
-5. Appropriate distance function selection
-6. Batch operations for performance
+## Claude's Common Mistakes
+1. Using deprecated `client.get_collection()` without persistence
+2. Missing embedding function configuration
+3. Using in-memory mode for production
+4. Not specifying distance metric (defaults to L2, usually want cosine)
+5. Forgetting to handle collection already exists error
 
-## Red Lines
-- Using default embeddings in production
-- Missing persistence leading to data loss
-- No metadata strategy for filtering
-- Ignoring distance metrics for use case
-- Large batch inserts without chunking
-- Not using async client for web apps
-
-## Pattern: Production RAG Backend
+## Correct Patterns (2026)
 ```python
 import chromadb
 from chromadb.config import Settings
-from chromadb.utils import embedding_functions
 
-# Production client with persistence
+# Persistent client (production)
 client = chromadb.PersistentClient(
-    path="./chroma_data",
-    settings=Settings(
-        anonymized_telemetry=False,
-        allow_reset=False,
-    )
+    path="./chroma_db",
+    settings=Settings(anonymized_telemetry=False)
+)
+
+# Client-server mode (recommended for production)
+# client = chromadb.HttpClient(host="localhost", port=8000)
+
+# Get or create collection with proper config
+collection = client.get_or_create_collection(
+    name="documents",
+    metadata={"hnsw:space": "cosine"},  # Cosine similarity
+    embedding_function=None,  # Use default or custom
 )
 
 # Custom embedding function
-openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key="your-key",
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+embedding_fn = OpenAIEmbeddingFunction(
+    api_key=os.environ["OPENAI_API_KEY"],
     model_name="text-embedding-3-small"
 )
 
-# Create collection with configuration
 collection = client.get_or_create_collection(
-    name="documents",
-    embedding_function=openai_ef,
-    metadata={
-        "hnsw:space": "cosine",  # Distance function
-        "hnsw:construction_ef": 100,
-        "hnsw:search_ef": 50,
-    }
+    name="openai_docs",
+    embedding_function=embedding_fn,
+    metadata={"hnsw:space": "cosine"},
 )
 
-# Batch upsert with metadata
-def upsert_documents(docs: list[dict], batch_size: int = 100):
-    for i in range(0, len(docs), batch_size):
-        batch = docs[i:i + batch_size]
-        collection.upsert(
-            ids=[d["id"] for d in batch],
-            documents=[d["text"] for d in batch],
-            metadatas=[{"source": d["source"], "date": d["date"]} for d in batch],
-        )
+# Add documents
+collection.add(
+    ids=["doc1", "doc2"],
+    documents=["First document", "Second document"],
+    metadatas=[{"source": "web"}, {"source": "api"}],
+)
 
-# Query with metadata filtering
+# Query with filters
 results = collection.query(
-    query_texts=["What is machine learning?"],
-    n_results=5,
-    where={"source": {"$in": ["docs", "articles"]}},
-    where_document={"$contains": "neural"},
+    query_texts=["search query"],
+    n_results=10,
+    where={"source": "web"},
     include=["documents", "metadatas", "distances"],
 )
-
-# Delete by filter
-collection.delete(where={"source": "outdated"})
 ```
 
-## Integrates With
-- **Embeddings**: OpenAI, Sentence Transformers, Cohere
-- **Frameworks**: LangChain, LlamaIndex
-- **Deployment**: Docker, Kubernetes
-- **Storage**: Local filesystem, cloud volumes
+## Version Gotchas
+- **v1.4+**: Database migrations are irreversible - backup first
+- **Distance**: Default L2, use `hnsw:space: cosine` for similarity
+- **Persistence**: Use `PersistentClient` or `HttpClient` for production
+- **Embeddings**: Must match between add() and query()
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Collection not found` | Use get_or_create_collection() |
-| `Embedding dimension mismatch` | Ensure consistent embedding model |
-| `OOM on large insert` | Use batch_size for chunked inserts |
-| `Slow queries` | Tune HNSW parameters, add indexes |
-
-## Prod Ready
-- [ ] Persistence configured for durability
-- [ ] Custom embedding function set
-- [ ] Metadata schema defined
-- [ ] HNSW parameters tuned
-- [ ] Batch operations for bulk inserts
-- [ ] Backup strategy in place
+## What NOT to Do
+- Do NOT use `Client()` (ephemeral) for production - use PersistentClient
+- Do NOT forget distance metric configuration
+- Do NOT mix embedding functions on same collection
+- Do NOT upgrade without backing up database first
+- Do NOT forget `include` parameter to get documents back

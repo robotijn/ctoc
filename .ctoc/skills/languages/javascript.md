@@ -1,69 +1,49 @@
 # JavaScript CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-npx eslint . --fix                     # Lint (auto-fix)
-npx prettier --write .                 # Format
-npx vitest run --coverage              # Test with coverage
-npm run build                          # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude suggests callback patterns — use async/await consistently
+- Claude uses `var` in examples — always `const`/`let`
+- Claude forgets `Object.groupBy()` exists (ES2025)
+- Claude suggests lodash for things now native (groupBy, structuredClone)
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `node 24+` LTS | Runtime with native test runner | Older Node |
+| `eslint 9` flat config | Linting | Legacy .eslintrc |
+| `vitest` or `node --test` | Testing | Jest (heavier) |
+| `vite` | Dev server, bundling | Webpack (slower) |
+| `biome` | Format + lint combo | Multiple tools |
+
+## Patterns Claude Should Use
+```javascript
+// ES2025+ patterns
+const grouped = Object.groupBy(users, (u) => u.role);
+
+// Promise.withResolvers (ES2025)
+const { promise, resolve, reject } = Promise.withResolvers();
+
+// Temporal API (when available)
+const now = Temporal.Now.plainDateTimeISO();
+
+// Structured clone for deep copy
+const copy = structuredClone(original);
 ```
 
-## Tools (2024-2025)
-- **ESLint 9** - Flat config, recommended rules
-- **Prettier** - Consistent formatting
-- **Vitest** - Fast, modern testing
-- **esbuild/Vite** - Fast bundling
-- **Node 22+** - LTS with native test runner option
+## Anti-Patterns Claude Generates
+- `==` loose equality — always `===`
+- `for...in` on arrays — use `for...of` or `.forEach()`
+- `new Array(n)` — use `Array.from({ length: n })`
+- Floating promises without handling — always await or catch
+- `innerHTML = userInput` — XSS vulnerability
 
-## Project Structure
-```
-project/
-├── src/               # Production code
-├── tests/             # Test files
-├── dist/              # Built output
-├── eslint.config.js   # ESLint flat config
-└── package.json       # Dependencies and scripts
-```
-
-## Non-Negotiables
-1. const/let only - never var
-2. Strict equality `===` always
-3. Handle all promises (async/await or .catch)
-4. Modern ES2024+ syntax (arrow, destructuring, spread)
-
-## Red Lines (Reject PR)
-- `var` keyword anywhere
-- `==` loose equality comparison
-- Callback hell (use async/await)
-- Global variable pollution
-- `eval()` ever
-- Unhandled promise rejections
-
-## Testing Strategy
-- **Unit**: Pure functions, <100ms, mock I/O
-- **Integration**: Real deps with containers
-- **E2E**: Playwright for critical flows
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| `this` context loss | Arrow functions or .bind() |
-| Floating promises | Always await or return |
-| Type coercion bugs | Use === and explicit conversion |
-| Memory leaks in closures | WeakMap/WeakRef, cleanup handlers |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No synchronous file I/O (use fs/promises)
-- No blocking event loop (use worker threads)
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] Outputs encoded (textContent not innerHTML)
-- [ ] Secrets from environment variables
-- [ ] Dependencies audited (`npm audit`)
-- [ ] CSP headers configured
+## Version Gotchas
+- **ES2026**: `Error.isError()` for cross-realm checks
+- **ES2025**: `Object.groupBy`, `Promise.withResolvers`, Set methods
+- **Node 24 LTS "Krypton"**: Active LTS (Jan 2026), native test runner, `--experimental-strip-types`
+- **Node 22 LTS**: Maintenance until April 2027
+- **Node 20 LTS**: Maintenance until April 2026
+- **Node 20.x**: Maintenance LTS until April 2026
+- **With modules**: Use `.js` extension in imports for ESM
+- **With fetch**: Native in Node 18+, no need for `node-fetch`

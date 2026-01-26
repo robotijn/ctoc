@@ -1,30 +1,26 @@
 # BeeWare CTO
-> Native Python mobile leader demanding Toga for native widgets and Briefcase for cross-platform packaging.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Create virtual environment
+python -m venv venv && source venv/bin/activate
+# Install Briefcase (packaging tool)
 pip install briefcase
-briefcase new && cd myapp
-briefcase dev && briefcase run android
-pytest tests/ && briefcase package android
+# Create new project
+briefcase new
+# Run in dev mode
+briefcase dev
 ```
 
-## Non-Negotiables
-1. Toga for cross-platform native UI - no web-based widgets
-2. Briefcase for packaging to each target platform
-3. Platform-specific code isolated in separate modules
-4. asyncio for non-blocking operations
-5. Test on actual devices - simulators miss platform quirks
+## Claude's Common Mistakes
+1. **Assumes all widgets available on all platforms** - Toga widgets vary by platform
+2. **Uses CPython-only libraries** - Must check mobile compatibility
+3. **Blocks event loop** - Heavy computation blocks UI
+4. **Ignores Briefcase packaging** - Testing without packaging misses issues
+5. **Uses asyncio incorrectly** - Must use `add_background_task` pattern
 
-## Red Lines
-- Assuming widget availability across all platforms - check Toga docs
-- CPython-only libraries without mobile compatibility check
-- Heavy computation in event handlers - use background tasks
-- Shipping without testing Briefcase-packaged binary
-- Ignoring Briefcase warnings about unsupported dependencies
-
-## Pattern: Async Data Loading with Toga
+## Correct Patterns (2026)
 ```python
 import toga
 from toga.style import Pack
@@ -40,32 +36,36 @@ class DataApp(toga.App):
             style=Pack(direction=COLUMN)
         )
         self.main_window.show()
+        # Use add_background_task for async operations
         self.add_background_task(self.load_data)
 
     async def load_data(self, widget):
-        await asyncio.sleep(0)  # Yield to event loop
-        data = await self.fetch_from_api()
-        self.label.text = f'Loaded: {data}'
+        # Yield to event loop first
+        await asyncio.sleep(0)
+        try:
+            data = await self.fetch_from_api()
+            # Safe to update UI - we're on main thread
+            self.label.text = f'Loaded: {data}'
+        except Exception as e:
+            self.label.text = f'Error: {e}'
 
     async def fetch_from_api(self):
-        # Async HTTP call here
-        return 'Sample Data'
+        # Use httpx for async HTTP
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get('https://api.example.com/data')
+            return response.json()
 ```
 
-## Integrates With
-- **DB**: SQLite via sqlite3, aiosqlite for async
-- **Auth**: httpx for async HTTP auth flows
-- **Cache**: aiofiles for async file storage
+## Version Gotchas
+- **Toga 0.4+**: Widget API changes, check migration guide
+- **Briefcase 0.3.18+**: pyproject.toml format changes
+- **iOS**: Requires macOS with Xcode command line tools
+- **Android**: Requires Java 17+ for Gradle builds
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `ModuleNotFoundError on device` | Add to briefcase.toml requires list |
-| `Toga widget not available` | Check platform support in Toga documentation |
-| `BriefcaseCommandError` | Run `briefcase update` then retry build |
-
-## Prod Ready
-- [ ] App icons configured in pyproject.toml for all platforms
-- [ ] Dependencies audited for mobile compatibility
-- [ ] Briefcase CI/CD configured for automated builds
-- [ ] Signing configured for Android APK and iOS distribution
+## What NOT to Do
+- Do NOT assume widget availability - check Toga platform support
+- Do NOT use requests library - use httpx for async HTTP
+- Do NOT block main thread - use `add_background_task`
+- Do NOT test only with `briefcase dev` - test packaged builds
+- Do NOT use libraries with C extensions without checking mobile support

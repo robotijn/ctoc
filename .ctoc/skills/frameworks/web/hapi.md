@@ -1,29 +1,21 @@
 # Hapi CTO
-> Configuration-driven Node.js framework - enterprise-ready, plugin architecture.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm init -y && npm install @hapi/hapi @hapi/joi @hapi/boom
-npm run start
-npm test
+npm init -y
+npm install @hapi/hapi @hapi/joi @hapi/boom
+# Hapi 21+ - requires Node.js 18+
 ```
 
-## Non-Negotiables
-1. Plugin architecture for modularity
-2. Joi validation on all route inputs
-3. Server methods for caching and reusable logic
-4. Authentication strategies configured properly
-5. Lifecycle hooks for cross-cutting concerns
+## Claude's Common Mistakes
+1. **Missing Joi validation** — Validate all route inputs
+2. **No authentication strategy** — Register auth before routes
+3. **Monolithic plugins** — One concern per plugin
+4. **Ignoring `server.ext` hooks** — Use for logging, auth
+5. **Synchronous handlers** — Always use async handlers
 
-## Red Lines
-- Direct request handling without validation
-- Ignoring `server.ext` hooks for auth/logging
-- Missing authentication on protected routes
-- Monolithic plugins - one concern per plugin
-- Synchronous handlers blocking event loop
-
-## Pattern: Plugin with Validation
+## Correct Patterns (2026)
 ```javascript
 // plugins/users.js
 const Joi = require('@hapi/joi');
@@ -39,7 +31,7 @@ const usersPlugin = {
       method: 'POST',
       path: '/users',
       options: {
-        auth: 'jwt',
+        auth: 'jwt',  // Auth strategy must be registered first
         validate: {
           payload: Joi.object({
             email: Joi.string().email().required(),
@@ -63,26 +55,51 @@ const usersPlugin = {
 };
 
 module.exports = usersPlugin;
+
+// server.js
+const Hapi = require('@hapi/hapi');
+
+const init = async () => {
+  const server = Hapi.server({ port: 3000 });
+
+  // Register auth BEFORE routes
+  await server.register(require('hapi-auth-jwt2'));
+  server.auth.strategy('jwt', 'jwt', { /* config */ });
+
+  // Register plugins
+  await server.register(usersPlugin);
+
+  await server.start();
+};
 ```
 
-## Integrates With
-- **DB**: Any ORM, inject via `server.app`
-- **Auth**: `@hapi/cookie`, `hapi-auth-jwt2`
-- **Caching**: `@hapi/catbox` with Redis adapter
-- **Docs**: `hapi-swagger` for OpenAPI
+## Version Gotchas
+- **Hapi 21+**: Node.js 18+ required
+- **@hapi/joi**: Validation; install separately
+- **@hapi/boom**: HTTP-friendly error objects
+- **Auth strategies**: Must register before routes use them
+
+## What NOT to Do
+- ❌ Routes without `validate` option — Always validate input
+- ❌ Using auth before registering strategy — Register auth first
+- ❌ Multiple concerns in one plugin — Split by domain
+- ❌ Sync handlers blocking event loop — Use async
+- ❌ Throwing plain errors — Use Boom for HTTP errors
+
+## Plugin Architecture
+```javascript
+// One plugin per domain
+plugins/
+├── users.js      // User routes and handlers
+├── auth.js       // Authentication strategy
+├── health.js     // Health check endpoint
+└── logging.js    // Request logging
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Unknown authentication strategy` | Register auth strategy before routes |
-| `Validation error` | Check Joi schema matches request shape |
-| `Plugin already registered` | Check for duplicate plugin registration |
+| `Unknown authentication strategy` | Register strategy before routes |
+| `Validation error` | Check Joi schema matches request |
+| `Plugin already registered` | Check for duplicate registration |
 | `Handler method did not return` | Return value or `h.response()` |
-
-## Prod Ready
-- [ ] All routes have validation
-- [ ] Authentication on protected endpoints
-- [ ] Server methods for expensive operations
-- [ ] Health check plugin registered
-- [ ] Error handling with Boom
-- [ ] Request logging plugin

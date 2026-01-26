@@ -1,31 +1,23 @@
 # Sinatra CTO
-> Minimal Ruby DSL for web apps - simple, lightweight, no magic.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 gem install sinatra puma
+# Sinatra 4.x - requires Ruby 3.0+
 ruby app.rb
-bundle exec rspec
 ```
 
-## Non-Negotiables
-1. Modular application style for production
-2. Helpers for reusable view logic
-3. Before/after filters for cross-cutting
-4. Error handling blocks for all codes
-5. Rack middleware for concerns
+## Claude's Common Mistakes
+1. **Classic style in production** — Use modular (`Sinatra::Base`)
+2. **Business logic in routes** — Extract to service objects
+3. **Missing error handlers** — Define handlers for all error codes
+4. **No input validation** — Validate before processing
+5. **Reading request body twice** — Body can only be read once
 
-## Red Lines
-- Classic style in production - use modular
-- Business logic in route blocks
-- Missing error handlers
-- No input validation
-- Global state without protection
-
-## Pattern: Modular Application
+## Correct Patterns (2026)
 ```ruby
-# app.rb
+# app.rb - Modular style (NOT classic)
 require 'sinatra/base'
 require 'json'
 
@@ -36,7 +28,7 @@ class UsersApp < Sinatra::Base
 
   helpers do
     def json_body
-      JSON.parse(request.body.read)
+      @json_body ||= JSON.parse(request.body.read)
     rescue JSON::ParserError
       halt 400, { error: 'Invalid JSON' }.to_json
     end
@@ -52,6 +44,7 @@ class UsersApp < Sinatra::Base
     content_type :json
   end
 
+  # Error handlers (required)
   error Sinatra::NotFound do
     json_response({ error: 'Not found' }, status: 404)
   end
@@ -64,7 +57,7 @@ class UsersApp < Sinatra::Base
     data = json_body
     halt 400, { error: 'Email required' }.to_json unless data['email']
 
-    user = UserService.create(data)
+    user = UserService.create(data)  # Service, not inline logic
     json_response(user, status: 201)
   end
 
@@ -80,24 +73,34 @@ require './app'
 run UsersApp
 ```
 
-## Integrates With
-- **DB**: Sequel or ActiveRecord
-- **Auth**: `sinatra-authentication` or Warden
-- **Validation**: dry-validation
-- **Templates**: ERB, Haml, or Slim
+## Version Gotchas
+- **Sinatra 4.x**: Ruby 3.0+ required
+- **Modular style**: `Sinatra::Base` for production
+- **Puma**: Recommended production server
+- **Request body**: Can only be read once; cache if needed
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `NoMethodError in route` | Check helper is defined |
-| `Empty request body` | Body already read; use `request.body.rewind` |
-| `Route not matching` | Check HTTP method and path |
-| `Template not found` | Check `views/` directory |
+## What NOT to Do
+- ❌ `require 'sinatra'` in production — Use `Sinatra::Base`
+- ❌ Business logic in route blocks — Extract to services
+- ❌ Missing `error` handlers — Errors return generic HTML
+- ❌ `request.body.read` multiple times — Cache in helper
+- ❌ `ruby app.rb` in production — Use `rackup` with Puma
 
-## Prod Ready
-- [ ] Modular style (`Sinatra::Base`)
-- [ ] Puma or Unicorn as server
-- [ ] Error handling for all codes
-- [ ] Request logging middleware
-- [ ] Environment-based config
-- [ ] Health check endpoint
+## Classic vs Modular
+| Classic (DEV only) | Modular (PRODUCTION) |
+|--------------------|----------------------|
+| `require 'sinatra'` | `class App < Sinatra::Base` |
+| Top-level routes | Class methods |
+| Auto-run | Explicit `run App` |
+
+## Production Setup
+```ruby
+# config.ru
+require './app'
+
+# Middleware
+use Rack::Logger
+use Rack::CommonLogger
+
+run UsersApp
+```

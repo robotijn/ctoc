@@ -1,113 +1,85 @@
 # Weaviate CTO
-> AI-native vector database with built-in ML model integration.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install weaviate-client
-docker run -d -p 8080:8080 semitechnologies/weaviate:latest
-python -c "import weaviate; print(weaviate.connect_to_local().is_ready())"
+# Docker: docker run -d -p 8080:8080 semitechnologies/weaviate:latest
+# Verify: python -c "import weaviate; print(weaviate.__version__)"
 ```
 
-## Non-Negotiables
-1. Explicit schema definition with properties
-2. Appropriate vectorizer module selection
-3. Multi-tenancy for SaaS applications
-4. Hybrid search configuration (vector + keyword)
-5. Backup and restore strategy
-6. RBAC setup for production
+## Claude's Common Mistakes
+1. Using v3 API instead of v4 (`weaviate.connect_to_*`)
+2. Missing vectorizer module configuration
+3. Not enabling multi-tenancy for SaaS applications
+4. Forgetting to close client connection
+5. Using near_text without vectorizer configured
 
-## Red Lines
-- Missing schema causing auto-generation issues
-- Wrong vectorizer for content type
-- No multi-tenancy for multi-customer apps
-- Ignoring hybrid search capabilities
-- No access control in production
-- Missing backup configuration
-
-## Pattern: Production Vector Store
+## Correct Patterns (2026)
 ```python
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType
 from weaviate.classes.query import MetadataQuery, Filter
 
-# Connect to Weaviate
+# Connect (v4 API)
 client = weaviate.connect_to_local(
-    headers={"X-OpenAI-Api-Key": "your-key"}
+    headers={"X-OpenAI-Api-Key": os.environ["OPENAI_API_KEY"]}
 )
+# Or: client = weaviate.connect_to_weaviate_cloud(cluster_url, auth_credentials)
 
-# Create collection with schema
-collection = client.collections.create(
-    name="Document",
-    vectorizer_config=Configure.Vectorizer.text2vec_openai(
-        model="text-embedding-3-small"
-    ),
-    generative_config=Configure.Generative.openai(model="gpt-4o"),
-    properties=[
-        Property(name="title", data_type=DataType.TEXT),
-        Property(name="content", data_type=DataType.TEXT),
-        Property(name="source", data_type=DataType.TEXT, skip_vectorization=True),
-        Property(name="date", data_type=DataType.DATE),
-    ],
-    # Enable multi-tenancy
-    multi_tenancy_config=Configure.multi_tenancy(enabled=True),
-)
+try:
+    # Create collection with schema
+    collection = client.collections.create(
+        name="Document",
+        vectorizer_config=Configure.Vectorizer.text2vec_openai(
+            model="text-embedding-3-small"
+        ),
+        generative_config=Configure.Generative.openai(model="gpt-4o"),
+        properties=[
+            Property(name="title", data_type=DataType.TEXT),
+            Property(name="content", data_type=DataType.TEXT),
+            Property(name="source", data_type=DataType.TEXT, skip_vectorization=True),
+        ],
+        multi_tenancy_config=Configure.multi_tenancy(enabled=True),
+    )
 
-# Create tenant
-collection.tenants.create("tenant_a")
+    # Create tenant and insert
+    collection.tenants.create("tenant_a")
+    tenant_col = collection.with_tenant("tenant_a")
 
-# Insert with tenant
-tenant_collection = collection.with_tenant("tenant_a")
-tenant_collection.data.insert_many([
-    {"title": "Doc 1", "content": "Content here", "source": "web"},
-    {"title": "Doc 2", "content": "More content", "source": "api"},
-])
+    tenant_col.data.insert_many([
+        {"title": "Doc 1", "content": "Content here", "source": "web"},
+    ])
 
-# Hybrid search (vector + keyword)
-results = tenant_collection.query.hybrid(
-    query="machine learning basics",
-    alpha=0.5,  # Balance vector/keyword
-    limit=10,
-    filters=Filter.by_property("source").equal("web"),
-    return_metadata=MetadataQuery(score=True, distance=True),
-)
+    # Hybrid search (vector + keyword)
+    results = tenant_col.query.hybrid(
+        query="machine learning",
+        alpha=0.5,  # 0=keyword, 1=vector
+        limit=10,
+        return_metadata=MetadataQuery(score=True),
+    )
 
-# Generative search (RAG)
-response = tenant_collection.generate.near_text(
-    query="Explain machine learning",
-    limit=3,
-    grouped_task="Summarize these documents into a cohesive answer",
-)
-print(response.generated)
+    # RAG with generative search
+    response = tenant_col.generate.near_text(
+        query="Explain ML",
+        limit=3,
+        grouped_task="Summarize these documents",
+    )
+    print(response.generated)
 
-# Backup
-client.backup.create(
-    backup_id="backup-2024",
-    backend="filesystem",
-    include_collections=["Document"],
-)
-
-client.close()
+finally:
+    client.close()  # ALWAYS close connection
 ```
 
-## Integrates With
-- **Vectorizers**: OpenAI, Cohere, HuggingFace, custom
-- **Frameworks**: LangChain, LlamaIndex
-- **Deployment**: Docker, Kubernetes, Weaviate Cloud
-- **Auth**: OIDC, API keys, RBAC
+## Version Gotchas
+- **v4**: New API - use `weaviate.connect_to_*` not `Client()`
+- **Vectorizers**: Must configure for near_text queries
+- **Multi-tenancy**: Enable at collection creation time
+- **Generative**: Requires generative module configured
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Schema validation error` | Check property types and names |
-| `Vectorizer module not enabled` | Enable in Docker config |
-| `Tenant not found` | Create tenant before inserting |
-| `Rate limit on vectorizer` | Use batch imports, add delays |
-
-## Prod Ready
-- [ ] Schema explicitly defined
-- [ ] Vectorizer configured for content type
-- [ ] Multi-tenancy enabled for SaaS
-- [ ] Hybrid search configured
-- [ ] RBAC configured
-- [ ] Backup strategy implemented
+## What NOT to Do
+- Do NOT use v3 `Client()` API - use v4 `connect_to_*`
+- Do NOT forget to close client connection
+- Do NOT use near_text without vectorizer configured
+- Do NOT skip multi-tenancy for SaaS applications
+- Do NOT forget to create tenant before inserting

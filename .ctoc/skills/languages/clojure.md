@@ -1,68 +1,56 @@
 # Clojure CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-clj-kondo --lint src test              # Lint
-cljfmt fix                             # Format
-clj -M:test                            # Test
-clj -T:build uber                      # Build uberjar
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude catches generic `Exception` — catch specific exceptions
+- Claude shadows `clojure.core` functions — use different names
+- Claude creates large anonymous functions — use `defn`
+- Claude forgets lazy sequence realization — use `doall` when needed
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `clojure 1.12+` | Latest features | Older versions |
+| `deps.edn` | Official dep management | Leiningen (legacy) |
+| `clj-kondo` | Static analysis | No linting |
+| `cljfmt` | Formatting | Manual style |
+| `kaocha` | Test runner | Basic test runner |
+
+## Patterns Claude Should Use
+```clojure
+;; Custom exceptions with context
+(throw (ex-info "User not found" {:user-id id :type :not-found}))
+
+;; Catch specific exceptions
+(try
+  (process-data data)
+  (catch java.io.IOException e
+    (log/error e "IO error"))
+  (catch Exception e
+    (throw (ex-info "Processing failed" {:data data} e))))
+
+;; Don't shadow core functions
+(let [user-name (:name user)]  ; NOT: (let [name (:name user)]
+  (str "Hello, " user-name))
+
+;; Force lazy seq when side effects needed
+(doall (map process! items))
+
+;; Type hints for reflection-free hot paths
+(defn fast-add ^long [^long a ^long b]
+  (+ a b))
 ```
 
-## Tools (2024-2025)
-- **Clojure 1.12+** - Latest stable
-- **deps.edn** - Official dependency management
-- **clj-kondo** - Static analysis
-- **cljfmt** - Formatting
-- **Kaocha** - Test runner
+## Anti-Patterns Claude Generates
+- Shadowing `clojure.core` (`name`, `type`, `count`) — use prefixed names
+- Generic `(catch Exception e ...)` — catch specific types
+- Large anonymous `(fn [...] ...)` — use `defn` for clarity
+- Missing `doall` on lazy seqs with side effects — force evaluation
+- Reflection in hot paths — add type hints
 
-## Project Structure
-```
-project/
-├── src/               # Production code
-├── test/              # Test files
-├── resources/         # Config, assets
-├── deps.edn           # Dependencies
-└── build.clj          # Build configuration
-```
-
-## Non-Negotiables
-1. Immutable data structures everywhere
-2. Pure functions with side effects at edges
-3. Data as plain maps and vectors
-4. REPL-driven development workflow
-
-## Red Lines (Reject PR)
-- Mutable state without atoms/refs/agents
-- Side effects in transaction functions
-- Missing specs for public API validation
-- Reflection warnings in hot paths
-- Secrets hardcoded in code
-- Large anonymous functions (use defn)
-
-## Testing Strategy
-- **Unit**: clojure.test, <100ms, pure functions
-- **Property**: test.check for generative tests
-- **Integration**: Real deps with test fixtures
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Laziness surprises | doall or into when needed |
-| Stack overflow recursion | Use recur for tail calls |
-| Reflection performance | Type hints in hot paths |
-| Keyword namespace confusion | Use qualified keywords |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No reflection in inner loops
-- No unnecessary sequence realization
-
-## Security Checklist
-- [ ] Input validated with specs
-- [ ] SQL uses parameterized queries
-- [ ] Secrets from environment (System/getenv)
-- [ ] Dependencies audited (nvd-clojure)
+## Version Gotchas
+- **1.12+**: Improved Java interop, method values
+- **Threading**: Use `->` and `->>` correctly (first vs last position)
+- **Lazy seqs**: Can cause resource leaks if not realized
+- **Pre/post conditions**: Use `:pre`/`:post` for function contracts
+- **With async**: Use `core.async` channels, not callbacks

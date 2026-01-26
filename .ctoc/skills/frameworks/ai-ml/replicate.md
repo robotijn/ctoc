@@ -1,41 +1,31 @@
 # Replicate CTO
-> Deploy and run ML models with a simple API.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install replicate cog
-cog init
-cog predict -i prompt="Hello"
-cog push r8.im/username/model
+# v2 SDK in beta - use --pre flag for latest
+pip install replicate --pre
+pip install cog  # For model packaging
+# Set API key: export REPLICATE_API_TOKEN="r8_..."
 ```
 
-## Non-Negotiables
-1. Proper Cog packaging with predict.py
-2. Clear input/output schema definitions
-3. Appropriate GPU hardware selection
-4. Model versioning for deployments
-5. Prediction webhooks for async workloads
-6. Setup method for model loading
+## Claude's Common Mistakes
+1. Loading model in `predict()` instead of `setup()`
+2. Missing input validation with `Input()` constraints
+3. Using sync client for long-running predictions
+4. Not pinning model versions in production
+5. Ignoring FileOutput for file responses (v2 change)
 
-## Red Lines
-- Missing cog.yaml configuration
-- No input validation on predictions
-- Wrong hardware tier for model
-- No version pinning in production
-- Ignoring async predictions for long tasks
-- Loading model in predict() instead of setup()
-
-## Pattern: Production Model Deployment
+## Correct Patterns (2026)
 ```python
-# predict.py
+# predict.py for Cog
 from cog import BasePredictor, Input, Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 class Predictor(BasePredictor):
     def setup(self):
-        """Load model into memory once during container start."""
+        """Load model ONCE during container start."""
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-3.1-8B-Instruct",
             cache_dir="./model_cache"
@@ -49,53 +39,29 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        prompt: str = Input(description="Input prompt for generation"),
-        max_tokens: int = Input(description="Maximum tokens to generate", default=256, ge=1, le=4096),
-        temperature: float = Input(description="Sampling temperature", default=0.7, ge=0, le=2),
-        top_p: float = Input(description="Top-p sampling", default=0.9, ge=0, le=1),
+        prompt: str = Input(description="Input prompt"),
+        max_tokens: int = Input(default=256, ge=1, le=4096),
+        temperature: float = Input(default=0.7, ge=0, le=2),
     ) -> str:
-        """Run inference on the model."""
+        """Run inference."""
         inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
-
         with torch.inference_mode():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                do_sample=True,
-            )
-
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return response[len(prompt):]  # Return only generated text
-```
-
-```yaml
-# cog.yaml
-build:
-  python_version: "3.11"
-  python_packages:
-    - torch==2.1.0
-    - transformers==4.36.0
-    - accelerate==0.25.0
-  gpu: true
-  cuda: "12.1"
-
-predict: "predict.py:Predictor"
+            outputs = self.model.generate(**inputs, max_new_tokens=max_tokens, temperature=temperature)
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 ```
 
 ```python
 # Client usage
 import replicate
 
-# Sync prediction
+# Sync prediction (v2 returns FileOutput for files)
 output = replicate.run(
-    "username/model:version",
-    input={"prompt": "Explain quantum computing:", "max_tokens": 256}
+    "username/model:version",  # ALWAYS pin version in production
+    input={"prompt": "Hello", "max_tokens": 256}
 )
 print(output)
 
-# Async prediction with webhook
+# Async prediction with webhook (for long tasks)
 prediction = replicate.predictions.create(
     model="username/model",
     version="abc123",
@@ -105,24 +71,15 @@ prediction = replicate.predictions.create(
 )
 ```
 
-## Integrates With
-- **Packaging**: Cog, Docker
-- **Hardware**: CPU, T4, A40, A100
-- **APIs**: REST, Python SDK, webhooks
-- **Storage**: Model weights caching
+## Version Gotchas
+- **v2 SDK**: Returns `FileOutput` for files, not URL strings
+- **v2 migration**: Check migration guide for breaking changes
+- **Version pinning**: Always use `model:version` in production
+- **Webhooks**: Required for predictions > 60 seconds
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Model failed to load` | Check setup() method, verify paths |
-| `Input validation error` | Add proper Input() constraints |
-| `Prediction timeout` | Use webhooks for long predictions |
-| `Version not found` | Pin specific version in production |
-
-## Prod Ready
-- [ ] cog.yaml configured with dependencies
-- [ ] Model loads in setup() not predict()
-- [ ] Input validation with constraints
-- [ ] Hardware tier appropriate for model
-- [ ] Webhooks for async predictions
-- [ ] Version pinned in production calls
+## What NOT to Do
+- Do NOT load model in `predict()` - use `setup()`
+- Do NOT skip `Input()` validation constraints
+- Do NOT use sync client for long predictions - use webhooks
+- Do NOT skip version pinning in production
+- Do NOT ignore v2 FileOutput changes

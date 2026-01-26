@@ -1,83 +1,64 @@
 # Great Expectations CTO
-> Data quality validation framework for reliable pipelines.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install great_expectations
 great_expectations init
-great_expectations checkpoint run my_checkpoint
+# Creates gx/ directory with data context
 ```
 
-## Non-Negotiables
-1. Expectations defined in code, version controlled
-2. Checkpoints integrated into pipeline orchestration
-3. Data docs generated for stakeholder visibility
-4. Custom expectations for domain-specific rules
-5. Validation at data boundaries (ingest, transform, export)
-6. Fail-fast on critical expectation failures
+## Claude's Common Mistakes
+1. **Expectations only in notebooks** - Must be in version control for production
+2. **Ignoring validation failures** - Pipeline should fail-fast on critical failures
+3. **No data docs** - Stakeholders need visibility into data quality
+4. **Custom expectations for standard checks** - Built-in expectations cover most cases
+5. **Validating after transformations only** - Validate at ingestion too
 
-## Red Lines
-- Data entering pipelines without validation
-- Expectations only in notebooks, not production
-- Ignoring validation failures in ETL
-- Missing data docs for compliance
-- No alerting on expectation failures
-
-## Pattern: Production Data Validation
+## Correct Patterns (2026)
 ```python
 import great_expectations as gx
-from great_expectations.checkpoint import Checkpoint
 
-# Initialize context
+# Initialize context (v1.0+ API)
 context = gx.get_context()
 
 # Create expectation suite programmatically
-suite = context.add_expectation_suite("orders_suite")
+suite = context.suites.add(gx.ExpectationSuite(name="orders_suite"))
 
 # Add expectations
-context.add_expectations(
-    suite,
-    expectations=[
-        gx.expectations.ExpectColumnValuesToNotBeNull(column="order_id"),
-        gx.expectations.ExpectColumnValuesToBeUnique(column="order_id"),
-        gx.expectations.ExpectColumnValuesToBeBetween(
-            column="amount", min_value=0, max_value=1_000_000
-        ),
-        gx.expectations.ExpectColumnValuesToMatchRegex(
-            column="email", regex=r"^[\w\.-]+@[\w\.-]+\.\w+$"
-        ),
-    ]
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToNotBeNull(column="order_id")
+)
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToBeUnique(column="order_id")
+)
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToBeBetween(
+        column="amount", min_value=0, max_value=1_000_000
+    )
 )
 
-# Run checkpoint and handle results
-checkpoint = Checkpoint(
-    name="orders_checkpoint",
-    data_context=context,
-    validations=[{"batch_request": batch_request, "expectation_suite_name": "orders_suite"}]
-)
-result = checkpoint.run()
+# Define data source and batch
+datasource = context.data_sources.add_pandas("my_datasource")
+data_asset = datasource.add_dataframe_asset("orders")
+batch_definition = data_asset.add_batch_definition_whole_dataframe("full_batch")
 
-if not result.success:
-    raise ValueError(f"Validation failed: {result.statistics}")
+# Run validation
+batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
+results = batch.validate(suite)
+
+if not results.success:
+    raise ValueError(f"Data validation failed: {results.statistics}")
 ```
 
-## Integrates With
-- **Orchestration**: Airflow, Prefect, Dagster operators
-- **Storage**: S3, GCS, databases via data connectors
-- **Alerting**: Slack, PagerDuty, email notifications
+## Version Gotchas
+- **v1.0**: Major API rewrite; context.suites, context.data_sources
+- **Checkpoints**: Renamed and restructured in v1.0
+- **Data docs**: Now auto-generated; configure hosting separately
+- **Cloud**: GX Cloud for managed expectations and collaboration
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `DataContextError: cannot find` | Run `great_expectations init` first |
-| `BatchRequestError` | Verify datasource configuration |
-| `Expectation evaluation error` | Check column exists and dtype matches |
-| `Checkpoint run timeout` | Profile large datasets, sample if needed |
-
-## Prod Ready
-- [ ] Expectations in version control
-- [ ] Checkpoints in CI/CD pipelines
-- [ ] Data docs hosted and accessible
-- [ ] Alerting on validation failures
-- [ ] Custom expectations for business rules
+## What NOT to Do
+- Do NOT leave expectations only in notebooks (version control them)
+- Do NOT ignore validation failures in production pipelines
+- Do NOT write custom expectations for standard validations
+- Do NOT skip validation at data ingestion boundaries

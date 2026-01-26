@@ -1,36 +1,27 @@
 # CherryPy CTO
-> Object-oriented Python web framework - mature, production-ready, self-contained.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install cherrypy
 python app.py
-pytest tests/ -v
+# CherryPy 18.x - object-oriented Python web framework
 ```
 
-## Non-Negotiables
-1. Object dispatching with @cherrypy.expose
-2. Tool architecture for cross-cutting concerns
-3. Configuration system (app.conf, server.conf)
-4. Engine plugins for background tasks
-5. Proper mounting for multiple apps
+## Claude's Common Mistakes
+1. **Missing `@cherrypy.expose`** — Methods not exposed as endpoints
+2. **Forgetting JSON tools** — Use `@cherrypy.tools.json_in/out()`
+3. **Ignoring configuration hierarchy** — Global vs app vs path config
+4. **Blocking without threading** — Configure thread pool
+5. **No error handling** — Use `cherrypy.HTTPError`
 
-## Red Lines
-- Ignoring configuration hierarchy
-- Missing tools for auth, JSON, sessions
-- No session handling for stateful apps
-- Blocking main thread without threading
-- Direct database access in handlers
-
-## Pattern: Application with Tools
+## Correct Patterns (2026)
 ```python
 import cherrypy
-from services import UserService
 
 class UserAPI:
-    def __init__(self):
-        self.service = UserService()
+    def __init__(self, user_service):
+        self.service = user_service
 
     @cherrypy.expose
     @cherrypy.tools.json_in()
@@ -56,7 +47,7 @@ class UserAPI:
     def health(self):
         return {'status': 'ok'}
 
-# Configuration
+# Configuration (global + path)
 config = {
     'global': {
         'server.socket_host': '0.0.0.0',
@@ -73,27 +64,26 @@ config = {
 }
 
 if __name__ == '__main__':
-    cherrypy.quickstart(UserAPI(), '/', config)
+    cherrypy.quickstart(UserAPI(UserService()), '/', config)
 ```
 
-## Integrates With
-- **DB**: SQLAlchemy, raw DB-API
-- **Auth**: cherrypy.tools.auth, custom tools
-- **Sessions**: Built-in sessions, Redis backend
-- **Deploy**: WSGI servers, reverse proxy
+## Version Gotchas
+- **CherryPy 18.x**: Stable; Python 3.6+ required
+- **Tools**: Decorators for JSON, sessions, auth
+- **Config**: Three levels (global, app, path)
+- **Threading**: Configure `thread_pool` for concurrency
+
+## What NOT to Do
+- ❌ Methods without `@cherrypy.expose` — Not accessible
+- ❌ Manual JSON parsing — Use `@cherrypy.tools.json_in()`
+- ❌ `raise Exception` — Use `cherrypy.HTTPError`
+- ❌ Default thread pool in production — Configure appropriately
+- ❌ Missing config hierarchy — Global < app < path
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Method not allowed` | Add @cherrypy.expose decorator |
-| `JSON parse error` | Add @cherrypy.tools.json_in() |
-| `Session error` | Enable sessions in config |
-| `Thread pool exhausted` | Increase thread_pool setting |
-
-## Prod Ready
-- [ ] Production config (disable autoreload)
-- [ ] Thread pool sized appropriately
-- [ ] Sessions configured with backend
-- [ ] Logging configured
-- [ ] Behind reverse proxy (nginx)
-- [ ] Health endpoint exposed
+| `Method not allowed` | Add `@cherrypy.expose` |
+| `JSON parse error` | Add `@cherrypy.tools.json_in()` |
+| `Session error` | Enable in config: `tools.sessions.on` |
+| `Thread pool exhausted` | Increase `thread_pool` setting |
