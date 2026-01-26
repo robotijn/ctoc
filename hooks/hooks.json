@@ -1,0 +1,114 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(py)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" python \"${tool_input.file_path}\""
+          }
+        ],
+        "description": "Validate Python code against CTO profile red lines"
+      },
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|tsx)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" typescript \"${tool_input.file_path}\""
+          }
+        ],
+        "description": "Validate TypeScript code against CTO profile red lines"
+      },
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(js|jsx)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" javascript \"${tool_input.file_path}\""
+          }
+        ],
+        "description": "Validate JavaScript code against CTO profile red lines"
+      },
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(go)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" go \"${tool_input.file_path}\""
+          }
+        ],
+        "description": "Validate Go code against CTO profile red lines"
+      },
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(rs)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" rust \"${tool_input.file_path}\""
+          }
+        ],
+        "description": "Validate Rust code against CTO profile red lines"
+      },
+      {
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"git commit\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/iron-loop-gate.js\""
+          }
+        ],
+        "description": "Block commit if Iron Loop steps incomplete"
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/session-start.js\""
+          }
+        ],
+        "description": "Detect stack, load CTO profiles, restore Iron Loop state"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/session-end.js\""
+          }
+        ],
+        "description": "Save Iron Loop progress, extract learnings"
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/pre-compact.js\""
+          }
+        ],
+        "description": "Save state before context compaction"
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CTOC_ROOT}/scripts/hooks/on-stop.js\""
+          }
+        ],
+        "description": "Update session state after each response"
+      }
+    ]
+  }
+}

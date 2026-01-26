@@ -1,0 +1,423 @@
+# CTOC Agent Activation Map
+# Defines which agents activate at each Iron Loop step
+#
+# This enables lean loading - only load agents relevant to current step
+# to minimize context window usage.
+
+version: "1.0.0"
+updated: "2026-01-26"
+
+# Token budget per step (approximate)
+token_budget:
+  default: 50000
+  reserved_for_coordinator: 5000
+  reserved_for_user: 10000
+  available_for_agents: 35000
+
+# Agent limits per step
+agent_limits:
+  max_per_step: 8
+  max_parallel: 4
+
+# ============================================================================
+# PLANNING PHASE (Steps 1-6)
+# ============================================================================
+
+steps:
+  1:
+    name: ASSESS
+    description: Assess the problem and context
+    phase: planning
+    required:
+      - cto-coordinator
+    optional:
+      - planning-assistant
+    max_agents: 2
+    estimated_tokens: 4000
+
+  2:
+    name: ALIGN
+    description: Align with user goals and business objectives
+    phase: planning
+    required:
+      - cto-coordinator
+    optional:
+      - planning-assistant
+    max_agents: 2
+    estimated_tokens: 4000
+
+  3:
+    name: CAPTURE
+    description: Capture requirements and success criteria
+    phase: planning
+    required:
+      - cto-coordinator
+    optional:
+      - planning-assistant
+    max_agents: 2
+    estimated_tokens: 4000
+
+  4:
+    name: PLAN
+    description: Plan the technical approach
+    phase: planning
+    required:
+      - cto-coordinator
+    optional:
+      - planning-assistant
+    max_agents: 2
+    estimated_tokens: 4000
+
+  5:
+    name: DESIGN
+    description: Design the architecture
+    phase: planning
+    required:
+      - cto-coordinator
+    optional:
+      - planning-assistant
+    max_agents: 2
+    estimated_tokens: 4000
+
+  6:
+    name: SPEC
+    description: Write detailed specifications
+    phase: planning
+    required:
+      - cto-coordinator
+    optional:
+      - planning-assistant
+    max_agents: 2
+    estimated_tokens: 4000
+
+  # ============================================================================
+  # IMPLEMENTATION PHASE (Steps 7-9)
+  # ============================================================================
+
+  7:
+    name: TEST
+    description: Write failing tests (TDD Red phase)
+    phase: implementation
+    required:
+      - unit-test-writer
+    optional:
+      - integration-test-writer
+      - e2e-test-writer
+      - property-test-writer
+      - component-tester
+    conditions:
+      e2e-test-writer:
+        project_has: [frontend, api]
+      property-test-writer:
+        language_supports: [python, haskell, scala, typescript]
+      component-tester:
+        project_has: [frontend]
+    parallel_groups:
+      - [unit-test-writer, integration-test-writer]
+      - [e2e-test-writer, property-test-writer]
+    max_agents: 5
+    estimated_tokens: 12000
+
+  8:
+    name: QUALITY
+    description: Run quality checks (lint, format, type-check)
+    phase: implementation
+    required:
+      - type-checker
+      - smoke-test-runner
+    optional:
+      - complexity-analyzer
+      - ios-checker
+      - android-checker
+      - terraform-validator
+      - kubernetes-checker
+      - ci-pipeline-checker
+      - data-quality-checker
+    conditions:
+      ios-checker:
+        project_has: [ios]
+      android-checker:
+        project_has: [android]
+      terraform-validator:
+        project_has: [terraform]
+      kubernetes-checker:
+        project_has: [kubernetes]
+      data-quality-checker:
+        project_has: [data_pipeline]
+    parallel_groups:
+      - [type-checker, smoke-test-runner, complexity-analyzer]
+      - [ios-checker, android-checker]
+      - [terraform-validator, kubernetes-checker]
+    max_agents: 6
+    estimated_tokens: 10000
+
+  9:
+    name: IMPLEMENT
+    description: Implement to make tests pass (TDD Green)
+    phase: implementation
+    required: []
+    optional: []
+    notes: Main Claude handles implementation directly
+    max_agents: 0
+    estimated_tokens: 0
+
+  # ============================================================================
+  # REVIEW PHASE (Steps 10-14)
+  # ============================================================================
+
+  10:
+    name: REVIEW
+    description: Code review against CTO profile
+    phase: review
+    required:
+      - code-reviewer
+      - architecture-checker
+    optional:
+      - consistency-checker
+      - code-smell-detector
+      - duplicate-code-detector
+      - dead-code-detector
+      - accessibility-checker
+      - database-reviewer
+      - api-contract-validator
+      - translation-checker
+      - observability-checker
+      - error-handler-checker
+      - visual-regression-checker
+      - react-native-bridge-checker
+      - hallucination-detector
+      - ai-code-quality-reviewer
+      - api-deprecation-checker
+      - backwards-compatibility-checker
+      - feature-flag-auditor
+      - technical-debt-tracker
+    conditions:
+      accessibility-checker:
+        project_has: [frontend]
+      database-reviewer:
+        project_has: [database]
+      api-contract-validator:
+        project_has: [api]
+      translation-checker:
+        project_has: [i18n]
+      visual-regression-checker:
+        project_has: [frontend]
+      react-native-bridge-checker:
+        framework: react-native
+      feature-flag-auditor:
+        project_has: [feature_flags]
+    parallel_groups:
+      - [code-reviewer, architecture-checker]
+      - [consistency-checker, code-smell-detector, duplicate-code-detector, dead-code-detector]
+      - [accessibility-checker, database-reviewer, api-contract-validator]
+      - [hallucination-detector, ai-code-quality-reviewer]
+    max_agents: 8
+    estimated_tokens: 16000
+
+  11:
+    name: OPTIMIZE
+    description: Optimize for performance
+    phase: review
+    required: []
+    optional:
+      - performance-profiler
+      - memory-safety-checker
+      - bundle-analyzer
+      - cloud-cost-analyzer
+    conditions:
+      performance-profiler:
+        feature_type: performance
+      bundle-analyzer:
+        project_has: [frontend]
+      cloud-cost-analyzer:
+        project_has: [cloud]
+    parallel_groups:
+      - [performance-profiler, memory-safety-checker]
+      - [bundle-analyzer, cloud-cost-analyzer]
+    max_agents: 4
+    estimated_tokens: 8000
+
+  12:
+    name: SECURE
+    description: Security audit
+    phase: review
+    required:
+      - security-scanner
+      - secrets-detector
+    optional:
+      - dependency-checker
+      - input-validation-checker
+      - concurrency-checker
+      - resilience-checker
+      - health-check-validator
+      - memory-safety-checker
+      - configuration-validator
+      - docker-security-checker
+      - terraform-validator
+      - kubernetes-checker
+      - ci-pipeline-checker
+      - gdpr-compliance-checker
+      - audit-log-checker
+      - license-scanner
+      - data-quality-checker
+      - ml-model-validator
+      - feature-store-validator
+      - observability-checker
+      - error-handler-checker
+      - accessibility-checker
+      - database-reviewer
+    conditions:
+      concurrency-checker:
+        language_supports: [go, rust, java, python]
+      docker-security-checker:
+        project_has: [docker]
+      terraform-validator:
+        project_has: [terraform]
+      kubernetes-checker:
+        project_has: [kubernetes]
+      gdpr-compliance-checker:
+        config: gdpr_required
+      ml-model-validator:
+        project_has: [ml]
+      feature-store-validator:
+        project_has: [feature_store]
+      accessibility-checker:
+        project_has: [frontend]
+      database-reviewer:
+        project_has: [database]
+    parallel_groups:
+      - [security-scanner, secrets-detector]
+      - [dependency-checker, input-validation-checker, concurrency-checker]
+      - [resilience-checker, health-check-validator, configuration-validator]
+      - [docker-security-checker, terraform-validator, kubernetes-checker]
+      - [gdpr-compliance-checker, audit-log-checker, license-scanner]
+    max_agents: 8
+    estimated_tokens: 16000
+
+  13:
+    name: DOCUMENT
+    description: Update documentation
+    phase: review
+    required:
+      - documentation-updater
+    optional:
+      - changelog-generator
+      - onboarding-validator
+    parallel_groups:
+      - [documentation-updater, changelog-generator, onboarding-validator]
+    max_agents: 3
+    estimated_tokens: 6000
+
+  14:
+    name: VERIFY
+    description: Run full test suite
+    phase: review
+    required:
+      - unit-test-runner
+    optional:
+      - integration-test-runner
+      - e2e-test-runner
+      - smoke-test-runner
+      - mutation-test-runner
+      - visual-regression-checker
+      - component-tester
+      - ios-checker
+      - android-checker
+      - react-native-bridge-checker
+      - api-contract-validator
+      - ml-model-validator
+    conditions:
+      e2e-test-runner:
+        project_has: [frontend, api]
+      mutation-test-runner:
+        config: mutation_testing.enabled
+      visual-regression-checker:
+        project_has: [frontend]
+      component-tester:
+        project_has: [frontend]
+      ios-checker:
+        project_has: [ios]
+      android-checker:
+        project_has: [android]
+      react-native-bridge-checker:
+        framework: react-native
+      api-contract-validator:
+        project_has: [api]
+      ml-model-validator:
+        project_has: [ml]
+    parallel_groups:
+      - [unit-test-runner, integration-test-runner]
+      - [e2e-test-runner, smoke-test-runner]
+      - [component-tester, visual-regression-checker]
+      - [ios-checker, android-checker]
+      - [mutation-test-runner]  # Background, can run longer
+    max_agents: 6
+    estimated_tokens: 12000
+
+  # ============================================================================
+  # COMMIT PHASE (Step 15)
+  # ============================================================================
+
+  15:
+    name: COMMIT
+    description: Commit with verification
+    phase: commit
+    required:
+      - backwards-compatibility-checker
+    optional:
+      - changelog-generator
+    parallel_groups:
+      - [backwards-compatibility-checker, changelog-generator]
+    max_agents: 2
+    estimated_tokens: 4000
+
+# ============================================================================
+# PARALLEL EXECUTION PHASES
+# ============================================================================
+
+parallel_phases:
+  description: |
+    Defines how agents should be grouped for parallel execution
+    to maximize efficiency while respecting dependencies.
+
+  phase_a:
+    name: Test Writers
+    agents: [unit-test-writer, integration-test-writer, e2e-test-writer, property-test-writer]
+    dependencies: []
+    notes: All can write tests simultaneously
+
+  phase_b:
+    name: Quick Validation
+    agents: [smoke-test-runner, type-checker, code-reviewer]
+    dependencies: [phase_a]
+    notes: Fast feedback before deep analysis
+
+  phase_c:
+    name: Implementation
+    agents: []
+    dependencies: [phase_b]
+    notes: Main Claude implements
+
+  phase_d:
+    name: Test Runners
+    agents: [unit-test-runner, integration-test-runner, e2e-test-runner, component-tester]
+    dependencies: [phase_c]
+    notes: Run all tests in parallel
+
+  phase_e:
+    name: Security Suite
+    agents: [security-scanner, secrets-detector, dependency-checker, accessibility-checker, docker-security-checker]
+    dependencies: [phase_d]
+    notes: All security checks in parallel
+
+  phase_f:
+    name: Specialized
+    agents: [performance-profiler, database-reviewer, api-contract-validator, translation-checker]
+    dependencies: [phase_d]
+    notes: Run based on project type
+
+  phase_g:
+    name: Final
+    agents: [architecture-checker, documentation-updater, mutation-test-runner]
+    dependencies: [phase_e, phase_f]
+    notes: Sequential final checks
