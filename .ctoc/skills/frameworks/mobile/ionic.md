@@ -1,30 +1,24 @@
 # Ionic CTO
-> Web-to-native mobile leader demanding Capacitor-first architecture with Angular/React/Vue flexibility.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm create ionic@latest myapp -- --type=angular --capacitor
-ionic serve --external
-ionic cap run ios --livereload --external && npm test
+# Or for React/Vue
+npm create ionic@latest myapp -- --type=react --capacitor
+npx cap add ios && npx cap add android
 ```
 
-## Non-Negotiables
-1. Capacitor 6+ for native runtime - Cordova only for legacy migration
-2. Lazy loading for all page modules with route-based code splitting
-3. Platform-specific styling via ion-* components and CSS variables
-4. Hardware back button handling on Android with proper navigation
-5. Standalone components pattern for Angular projects
+## Claude's Common Mistakes
+1. **Suggests Cordova plugins** - Capacitor 6+ is standard, Cordova deprecated
+2. **Uses Capacitor 5 patterns** - Capacitor 6 has `androidScheme: 'https'` default change
+3. **Ignores Angular standalone components** - Required pattern for Ionic 8+ Angular
+4. **Missing platform checks** - `Capacitor.isNativePlatform()` required before native APIs
+5. **Uses CocoaPods for iOS** - Capacitor 8 defaults to Swift Package Manager
 
-## Red Lines
-- Cordova plugins when Capacitor alternatives exist
-- Inline styles - use CSS custom properties for theming
-- Synchronous operations blocking the main thread
-- localStorage for sensitive data - use Capacitor Preferences with encryption
-- Browser-only testing - test on actual devices
-
-## Pattern: Platform-Aware Service
+## Correct Patterns (2026)
 ```typescript
+// Platform-aware service with Capacitor 6+
 import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType } from '@capacitor/camera';
@@ -35,34 +29,31 @@ export class PhotoService {
     if (!Capacitor.isNativePlatform()) {
       return this.webFallback();
     }
+
+    // Check permissions first (required pattern)
+    const perms = await Camera.checkPermissions();
+    if (perms.camera !== 'granted') {
+      await Camera.requestPermissions();
+    }
+
     const photo = await Camera.getPhoto({
       quality: 90,
       resultType: CameraResultType.Uri,
-      allowEditing: false
     });
     return photo.webPath ?? null;
-  }
-
-  private webFallback(): Promise<string | null> {
-    // File input fallback for web
   }
 }
 ```
 
-## Integrates With
-- **DB**: @capacitor/preferences for KV, @ionic/storage for SQLite
-- **Auth**: @capacitor/browser for OAuth, @capacitor/preferences for tokens
-- **Cache**: Service Worker for PWA, @ionic/storage for offline data
+## Version Gotchas
+- **Capacitor 6**: `androidScheme` defaults to `https`, set to `http` for migration
+- **Capacitor 8**: Swift Package Manager default for new iOS projects
+- **Ionic 8**: Angular 17+ required, standalone components preferred
+- **With Angular**: `provideIonicAngular()` replaces `IonicModule.forRoot()`
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Capacitor plugin not implemented` | Run `npx cap sync` after adding plugins |
-| `CORS error on device` | Use Capacitor HTTP plugin or configure native proxy |
-| `ion-back-button not working` | Set defaultHref and ensure proper IonicModule import |
-
-## Prod Ready
-- [ ] Capacitor native projects synced and version-locked
-- [ ] App icons and splash screens generated via capacitor-assets
-- [ ] Deep linking configured for iOS Universal Links and Android App Links
-- [ ] PWA manifest and service worker configured for web deployment
+## What NOT to Do
+- Do NOT use Cordova plugins when Capacitor equivalents exist
+- Do NOT skip `npx cap sync` after adding plugins
+- Do NOT assume native API availability - always check platform
+- Do NOT use localStorage for sensitive data - use `@capacitor/preferences`
+- Do NOT test only in browser - native builds behave differently

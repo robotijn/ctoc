@@ -1,69 +1,57 @@
 # R CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-Rscript -e "lintr::lint_package()"     # Lint
-Rscript -e "styler::style_pkg()"       # Format
-Rscript -e "devtools::test()"          # Test
-R CMD build .                          # Build package
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude writes for loops — use vectorized operations
+- Claude uses `attach()` — pollutes namespace, avoid entirely
+- Claude forgets `renv` for reproducibility — always lock dependencies
+- Claude uses base R when tidyverse is clearer — prefer tidyverse idioms
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `R 4.4+` | Latest features | Old R versions |
+| `tidyverse` | Data manipulation | Base R for data work |
+| `renv` | Dependency management | No lockfile |
+| `styler` + `lintr` | Code style | Manual formatting |
+| `testthat 3` | Testing | Ad-hoc scripts |
+
+## Patterns Claude Should Use
+```r
+# Tidyverse piping (not for loops)
+result <- data |>
+  filter(age > 18) |>
+  group_by(region) |>
+  summarise(mean_income = mean(income, na.rm = TRUE))
+
+# Explicit type coercion
+value <- as.integer(input)  # Not implicit
+
+# Namespaced function calls to avoid conflicts
+dplyr::select(data, column)
+
+# Use tidyterra for spatial + ggplot2 (2025 update)
+library(tidyterra)
+ggplot() + geom_spatraster(data = raster)
+
+# Document with roxygen2
+#' Calculate mean by group
+#' @param data A data frame
+#' @param group_col Column to group by
+#' @export
+calculate_mean <- function(data, group_col) { ... }
 ```
 
-## Tools (2024-2025)
-- **R 4.4+** - Latest features
-- **tidyverse** - Data manipulation ecosystem
-- **styler** - Code formatting
-- **lintr** - Static analysis
-- **testthat 3** - Testing framework
+## Anti-Patterns Claude Generates
+- `for` loops for data ops — use `map()`, `apply()`, vectorized
+- `attach(data)` — use `data$col` or tidyverse
+- `setwd()` in packages — use relative paths
+- `eval(parse(text=...))` with user input — injection risk
+- Row-wise operations — use vectorized alternatives
 
-## Project Structure
-```
-project/
-├── R/                 # R source files
-├── tests/testthat/    # Test files
-├── man/               # Documentation
-├── data/              # Package data
-├── DESCRIPTION        # Package metadata
-└── NAMESPACE          # Exports
-```
-
-## Non-Negotiables
-1. Tidyverse for data manipulation
-2. Vectorized operations over loops
-3. Reproducible analysis with renv
-4. Proper package structure for reusable code
-
-## Red Lines (Reject PR)
-- For loops when vectorized alternatives exist
-- attach() in scripts (namespace pollution)
-- Missing roxygen documentation
-- Hardcoded file paths
-- Secrets in scripts
-- setwd() in package code
-
-## Testing Strategy
-- **Unit**: testthat, <100ms per test
-- **Integration**: Test with sample datasets
-- **Snapshot**: testthat snapshot tests for outputs
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Memory overflow on large data | Use data.table or duckdb |
-| Non-reproducible results | Set seeds, use renv |
-| Silent type coercion | Be explicit with as.* |
-| Package conflicts | Use conflicted or explicit namespacing |
-
-## Performance Red Lines
-- No O(n^2) in data operations
-- No row-wise operations (use vectorized)
-- No loading full dataset when not needed
-
-## Security Checklist
-- [ ] Input validated before processing
-- [ ] No eval(parse(text=)) with user input
-- [ ] Secrets from environment (Sys.getenv)
-- [ ] Dependencies pinned with renv.lock
+## Version Gotchas
+- **R 4.4+**: Native pipe `|>` preferred over magrittr `%>%`
+- **tidyterra (2025)**: ggplot2 + terra spatial integration
+- **With large data**: Use `data.table` or `duckdb`, not tibbles
+- **Reproducibility**: Always use `renv::snapshot()` and `renv.lock`
+- **Package conflicts**: Use `conflicted` package or explicit namespacing

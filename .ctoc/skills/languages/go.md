@@ -1,68 +1,53 @@
 # Go CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-golangci-lint run --fix                # Lint (auto-fix)
-go fmt ./...                           # Format
-go test -race -cover ./...             # Test with race detection
-go build -o bin/ ./...                 # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude ignores loop variable capture fix — Go 1.22+ fixed this
+- Claude uses old timer patterns — Go 1.23 changed timer/ticker behavior
+- Claude forgets `go mod tidy -diff` for CI validation
+- Claude suggests manual iterator patterns — use range-over-func (1.23+)
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `go 1.23+` | Iterators, fixed timers | Older versions |
+| `golangci-lint` | Comprehensive linting | Just `go vet` |
+| `go test -race` | Race detection | Tests without -race |
+| `govulncheck` | Vulnerability scanning | Manual checks |
+| `staticcheck` | Additional analysis | Limited checks |
+
+## Patterns Claude Should Use
+```go
+// Range-over-func iterators (Go 1.23+)
+func All[V any](s []V) iter.Seq[V] {
+    return func(yield func(V) bool) {
+        for _, v := range s {
+            if !yield(v) { return }
+        }
+    }
+}
+
+// Correct timer usage (Go 1.23+)
+// Timers now have unbuffered channels (cap 0)
+// Stop/Reset guaranteed no stale values
+timer := time.NewTimer(duration)
+defer timer.Stop()
+
+// Always use context
+ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
 ```
 
-## Tools (2024-2025)
-- **Go 1.22+** - Latest stable with generics
-- **golangci-lint** - Comprehensive linting (100+ linters)
-- **go test -race** - Race condition detection
-- **go vet** - Static analysis
-- **dlv** - Delve debugger
+## Anti-Patterns Claude Generates
+- `_ = err` — handle all errors explicitly
+- Goroutines without lifecycle — use errgroup or context
+- `panic()` in library code — return errors
+- Missing `defer rows.Close()` — resource leaks
+- `interface{}` — use `any` (Go 1.18+)
 
-## Project Structure
-```
-project/
-├── cmd/app/           # Application entrypoints
-├── internal/          # Private application code
-├── pkg/               # Public library code
-├── go.mod             # Module definition
-└── go.sum             # Dependency checksums
-```
-
-## Non-Negotiables
-1. Handle ALL errors - never discard with `_`
-2. Use context for cancellation and timeouts
-3. No naked goroutines - always handle panics
-4. Document all exported functions and types
-
-## Red Lines (Reject PR)
-- Ignoring errors with `_`
-- Missing context.Context in public APIs
-- Goroutines without lifecycle management
-- Data races (use -race flag)
-- panic() in library code
-- Secrets hardcoded in source
-
-## Testing Strategy
-- **Unit**: Table-driven tests, <100ms, mock interfaces
-- **Integration**: testcontainers-go for real deps
-- **E2E**: Critical paths with real infrastructure
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Nil pointer dereference | Check nil before use |
-| Goroutine leaks | Use errgroup, context cancellation |
-| Range variable capture | Use loop var copy or Go 1.22+ |
-| Slice append mutation | Copy slice if sharing |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No unbounded goroutines (use worker pools)
-- No blocking without context timeout
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] SQL uses parameterized queries
-- [ ] Secrets from environment (os.Getenv)
-- [ ] Dependencies audited (`govulncheck`)
+## Version Gotchas
+- **1.23**: Timer channels now unbuffered; `len(timer.C)` returns 0
+- **1.23**: Range-over-func for custom iterators
+- **1.22**: Loop variable capture fixed — no more `v := v` needed
+- **1.27 (upcoming)**: `asynctimerchan` GODEBUG removed
+- **With generics**: Prefer `any` over `interface{}`, use constraints

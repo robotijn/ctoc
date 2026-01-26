@@ -1,37 +1,27 @@
 # Vaex CTO
-> Out-of-core DataFrame library for billion-row datasets on a laptop.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install vaex
-python -c "import vaex; print(vaex.__version__)"
-pytest tests/ -v
+# Note: Vaex development has slowed; consider Polars for new projects
 ```
 
-## Non-Negotiables
-1. Memory-mapped file formats (HDF5, Arrow) for lazy loading
-2. Virtual columns for derived data without memory allocation
-3. Lazy evaluation until explicit export or aggregation
-4. Expression system for vectorized operations
-5. Convert CSV/Parquet to HDF5 for repeated analysis
-6. Use `export_hdf5()` for optimized storage
+## Claude's Common Mistakes
+1. **Recommending Vaex for new projects** - Polars is now faster and better maintained
+2. **Loading CSV directly** - Convert to HDF5/Arrow first for repeated analysis
+3. **Materializing virtual columns** - Virtual columns are computed on-the-fly; don't materialize unnecessarily
+4. **Using pandas patterns** - Vaex has different API; expressions not method chains
+5. **Ignoring memory mapping** - HDF5 enables instant open regardless of file size
 
-## Red Lines
-- Loading entire dataset into memory
-- Using pandas for billion-row exploration
-- Ignoring expression-based filtering
-- Skipping HDF5 conversion for repeated workloads
-- Materializing virtual columns unnecessarily
-
-## Pattern: Interactive Large Data Analysis
+## Correct Patterns (2026)
 ```python
 import vaex
 
-# Memory-mapped loading (instant, regardless of size)
-df = vaex.open('large_data.hdf5')  # Or Arrow, Parquet
+# Memory-mapped loading (instant open, any size)
+df = vaex.open('data.hdf5')  # Or .arrow, .parquet
 
-# Virtual columns (no memory, computed on-the-fly)
+# Virtual columns (zero memory, computed on-the-fly)
 df['log_value'] = vaex.vlog(df['value'] + 1)
 df['category_upper'] = df['category'].str.upper()
 
@@ -39,32 +29,23 @@ df['category_upper'] = df['category'].str.upper()
 filtered = df[df['value'] > 100]
 stats = filtered.groupby('category').agg({
     'value': ['mean', 'std', 'count'],
-    'log_value': 'sum'
 })
 
-# Export subset to pandas for final analysis
+# Export subset to pandas only when needed
 result = stats.to_pandas_df()
 
-# Convert from CSV for repeated use
+# Convert CSV to HDF5 for repeated use
 vaex.from_csv('huge.csv', convert=True)  # Creates .hdf5
 ```
 
-## Integrates With
-- **Storage**: HDF5, Arrow, Parquet native support
-- **Viz**: Built-in plotting with matplotlib backend
-- **ML**: Vaex-ML for scalable preprocessing
+## Version Gotchas
+- **Maintenance status**: Limited updates since 2023; Polars recommended
+- **vs Polars**: Polars is faster, better maintained, more features
+- **HDF5 lock**: Use vaex.open(), not h5py directly (lock conflicts)
+- **Arrow format**: Better interop than HDF5 for modern pipelines
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `MemoryError` on open | Use HDF5/Arrow format, not CSV |
-| `Virtual column slow` | Materialize frequently used columns |
-| `Expression evaluation error` | Check column dtypes match operation |
-| `HDF5 lock error` | Use `vaex.open()` not `h5py` directly |
-
-## Prod Ready
-- [ ] Data converted to HDF5/Arrow format
-- [ ] Virtual columns for derived fields
-- [ ] Memory profiling validated
-- [ ] Chunked exports for large outputs
-- [ ] Expression-based filtering for all queries
+## What NOT to Do
+- Do NOT start new projects with Vaex (use Polars instead)
+- Do NOT load CSV repeatedly (convert to HDF5/Arrow once)
+- Do NOT materialize virtual columns unnecessarily
+- Do NOT expect pandas API compatibility

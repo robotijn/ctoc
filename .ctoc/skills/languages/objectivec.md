@@ -1,68 +1,58 @@
 # Objective-C CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-oclint-json-compilation-database       # Lint
-clang-format -i *.m *.h                # Format
-xcodebuild test -scheme MyApp          # Test
-xcodebuild -configuration Release      # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses manual retain/release — use ARC always
+- Claude forgets nullability annotations — add to all public APIs
+- Claude creates massive view controllers — use MVVM/coordination
+- Claude blocks main thread — use GCD/async patterns
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `xcode 16+` | Latest IDE | Older Xcode |
+| `clang-format` | Formatting | Manual style |
+| `oclint` | Static analysis | Just compiler |
+| `xctest` | Testing | Ad-hoc tests |
+| `instruments` | Profiling | Guessing perf |
+
+## Patterns Claude Should Use
+```objc
+// Always use nullability annotations
+- (nullable User *)findUserWithId:(nonnull NSString *)userId;
+
+// Modern Objective-C syntax
+NSDictionary *dict = @{@"key": @"value"};
+NSArray *array = @[@"one", @"two"];
+NSNumber *num = @42;
+
+// Weak references in blocks to avoid retain cycles
+__weak typeof(self) weakSelf = self;
+[self fetchDataWithCompletion:^(NSData *data) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    [strongSelf processData:data];
+}];
+
+// Use GCD for async work
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    NSData *data = [self expensiveOperation];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self updateUIWithData:data];
+    });
+});
 ```
 
-## Tools (2024-2025)
-- **Xcode 15+** - Latest IDE with modern ObjC
-- **clang-format** - Code formatting
-- **OCLint** - Static analysis
-- **XCTest** - Testing framework
-- **Instruments** - Performance profiling
+## Anti-Patterns Claude Generates
+- Manual retain/release — use ARC
+- Missing `nullable`/`nonnull` — annotate all public APIs
+- Massive view controllers — split logic out
+- Strong self in blocks — use weak/strong dance
+- Blocking main thread — use GCD queues
 
-## Project Structure
-```
-project/
-├── Sources/           # Implementation (.m)
-├── Headers/           # Public headers (.h)
-├── Tests/             # Unit tests
-├── MyApp.xcodeproj    # Project file
-└── .clang-format      # Format config
-```
-
-## Non-Negotiables
-1. ARC for memory management (no manual retain/release)
-2. Nullability annotations on all public APIs
-3. Modern Objective-C syntax (literals, subscripting)
-4. Proper delegation and protocol patterns
-
-## Red Lines (Reject PR)
-- Manual retain/release (use ARC)
-- Missing nullability annotations (nonnull, nullable)
-- Massive view controllers (use MVVM/coordination)
-- Blocking main thread
-- Secrets hardcoded in source
-- Category pollution on system classes
-
-## Testing Strategy
-- **Unit**: XCTest, <100ms, mock with OCMock
-- **Integration**: XCTest with real dependencies
-- **UI**: XCUITest for critical user flows
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Retain cycles | Use weak references in blocks |
-| Message to nil | Check for nil or use ?. when bridging |
-| KVO crashes | Remove observers in dealloc |
-| Thread safety | Use @synchronized or GCD queues |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No main thread blocking
-- No excessive autorelease pool pressure
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] Keychain for sensitive storage
-- [ ] Secrets from environment/secure storage
-- [ ] No sensitive data in logs
+## Version Gotchas
+- **Consider Swift**: New iOS code should prefer Swift 6
+- **Bridging**: Use `NS_SWIFT_NAME` for better Swift interop
+- **Nullability**: Required for Swift bridging
+- **KVO**: Remove observers in `dealloc` to avoid crashes
+- **With Swift**: Obj-C headers need nullability for proper optionals

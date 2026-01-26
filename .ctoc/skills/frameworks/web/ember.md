@@ -1,31 +1,23 @@
 # Ember.js CTO
-> Convention-driven ambitious applications - Octane, Glimmer, batteries included.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npx ember-cli new myapp --embroider && cd myapp
-ember serve
-ember test
+npx ember-cli new my-app --embroider
+cd my-app && ember serve
+# Ember 5.x - Octane is the only pattern
 ```
 
-## Non-Negotiables
-1. Follow Ember conventions strictly
-2. Octane patterns with Glimmer components
-3. Ember Data for model layer
-4. Route-based architecture
-5. Testing with QUnit built-in
+## Claude's Common Mistakes
+1. **Classic components** — Always use Glimmer components
+2. **Computed properties** — Use native getters with `@tracked`
+3. **Mixins** — Use composition and decorators instead
+4. **Observer patterns** — Use `@tracked` properties
+5. **Ignoring conventions** — Ember is opinionated; follow conventions
 
-## Red Lines
-- Classic components - use Glimmer only
-- Computed properties - use native getters
-- Mixins - use decorators and composition
-- Ignoring conventions - Ember is opinionated
-- Observer patterns - use tracked properties
-
-## Pattern: Octane Component
+## Correct Patterns (2026)
 ```javascript
-// app/components/user-list.js
+// app/components/user-list.js (Glimmer, NOT classic)
 import Component from '@glimmer/component';
 import { tracked } from '@glimmer/tracking';
 import { action } from '@ember/object';
@@ -35,6 +27,7 @@ export default class UserListComponent extends Component {
   @service store;
   @tracked searchTerm = '';
 
+  // Native getter (NOT computed property)
   get filteredUsers() {
     const { users } = this.args;
     if (!this.searchTerm) return users;
@@ -67,7 +60,32 @@ export default class UserListComponent extends Component {
     <button {{on "click" (fn this.deleteUser user)}}>Delete</button>
   </div>
 {{/each}}
+```
 
+## Version Gotchas
+- **Ember 5.x**: Octane is mandatory; classic deprecated
+- **Embroider**: Required for tree-shaking, code splitting
+- **Glimmer**: Components are default; no classic components
+- **@tracked**: Replaces computed properties
+
+## What NOT to Do
+- ❌ `extend(Component, { ... })` — Use `class extends Component`
+- ❌ `computed('dep', function() {})` — Use native getters
+- ❌ `Ember.Mixin.create()` — Use composition
+- ❌ `observes('prop')` — Use `@tracked` reactivity
+- ❌ Custom folder structure — Follow Ember conventions
+
+## Octane Patterns
+| Classic (WRONG) | Octane (CORRECT) |
+|-----------------|------------------|
+| `computed()` | Native getter |
+| `observer()` | `@tracked` |
+| `Mixin` | Composition |
+| `this.set()` | Direct assignment |
+| `@ember/component` | `@glimmer/component` |
+
+## Route Data Loading
+```javascript
 // app/routes/users.js
 import Route from '@ember/routing/route';
 import { service } from '@ember/service';
@@ -80,25 +98,3 @@ export default class UsersRoute extends Route {
   }
 }
 ```
-
-## Integrates With
-- **API**: Ember Data with JSON:API or REST
-- **Auth**: ember-simple-auth
-- **Testing**: QUnit with ember-qunit
-- **Styling**: ember-css-modules or Tailwind
-
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Adapter error` | Check API endpoint matches adapter |
-| `Template not found` | Check co-location or pods structure |
-| `Property not reactive` | Add `@tracked` decorator |
-| `Deprecation warning` | Update to Octane patterns |
-
-## Prod Ready
-- [ ] Embroider build for tree-shaking
-- [ ] Code splitting enabled
-- [ ] Fastboot for SSR (optional)
-- [ ] Error tracking integrated
-- [ ] Bundle size analyzed
-- [ ] All deprecations resolved

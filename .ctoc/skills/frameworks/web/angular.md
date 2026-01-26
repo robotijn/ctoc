@@ -1,39 +1,30 @@
 # Angular CTO
-> Enterprise frontend platform - signals and standalone components for modern Angular.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-ng new myapp --standalone --style=scss --routing
+npm install -g @angular/cli
+ng new myapp --standalone --style=scss
+# Angular 19+ components are standalone by default
 ng serve
-ng test --code-coverage --watch=false
 ```
 
-## Non-Negotiables
-1. Standalone components (Angular 17+) - no NgModules for new code
-2. Signals for reactive state - replace RxJS for simple cases
-3. Proper dependency injection with `inject()` function
-4. Lazy loading routes with `loadComponent`
-5. OnPush change detection by default
+## Claude's Common Mistakes
+1. **Using NgModules for new code** — Angular 19+ defaults to standalone components
+2. **RxJS for simple state** — Use Signals for synchronous reactive state
+3. **Default change detection** — Always use `OnPush` for performance
+4. **Manual subscription cleanup** — Use `takeUntilDestroyed()` or async pipe
+5. **Using deprecated TSLint** — Use ESLint with `@angular-eslint`
 
-## Red Lines
-- Default change detection everywhere - use `ChangeDetectionStrategy.OnPush`
-- Massive modules with dozens of declarations
-- Missing subscription cleanup - use `takeUntilDestroyed()`
-- Direct DOM manipulation - use renderer or directives
-- `any` type in TypeScript - strict mode always
-
-## Pattern: Signal-Based Component
+## Correct Patterns (2026)
 ```typescript
-// user-list.component.ts
+// Angular 19: Standalone + Signals
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { UserService } from './user.service';
 
 @Component({
-  selector: 'app-user-list',
+  selector: 'app-users',
   standalone: true,
-  imports: [AsyncPipe, UserCardComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (loading()) {
@@ -47,39 +38,61 @@ import { UserService } from './user.service';
     }
   `,
 })
-export class UserListComponent {
+export class UsersComponent {
   private userService = inject(UserService);
 
+  // Convert Observable to Signal
   users = toSignal(this.userService.getUsers(), { initialValue: [] });
   searchTerm = signal('');
-  loading = signal(true);
 
+  // Computed signal (auto-tracks dependencies)
   filteredUsers = computed(() =>
     this.users().filter(u =>
       u.name.toLowerCase().includes(this.searchTerm().toLowerCase())
     )
   );
 }
+
+// Auto-cleanup with takeUntilDestroyed
+private destroyRef = inject(DestroyRef);
+
+ngOnInit() {
+  this.data$.pipe(
+    takeUntilDestroyed(this.destroyRef)
+  ).subscribe(data => this.handleData(data));
+}
 ```
 
-## Integrates With
-- **HTTP**: `HttpClient` with interceptors for auth and error handling
-- **State**: NgRx SignalStore or Akita for complex state
-- **Forms**: Reactive Forms with typed `FormGroup`
-- **UI**: Angular Material or PrimeNG component libraries
+## Version Gotchas
+- **v18→v19**: Standalone is default; set `standalone: false` for NgModules
+- **v18→v19**: Incremental hydration for SSR
+- **v18→v19**: TypeScript 5.6 required
+- **v18 EOL**: Full end of life reached in 2025
+- **v19 EOL**: Security support ends May 2026
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `NullInjectorError: No provider` | Add to `providers` array or use `providedIn: 'root'` |
-| `ExpressionChangedAfterChecked` | Move logic to `ngOnInit` or use `ChangeDetectorRef` |
-| `Cannot find module` | Check import path and tsconfig paths |
-| `Observable not completing` | Use `take(1)`, `first()`, or `takeUntilDestroyed()` |
+## What NOT to Do
+- ❌ `@NgModule({ declarations: [...] })` for new code — Use standalone
+- ❌ `ChangeDetectionStrategy.Default` — Use `OnPush`
+- ❌ `ngOnDestroy() { this.sub.unsubscribe() }` — Use `takeUntilDestroyed`
+- ❌ `*ngIf` and `*ngFor` — Use `@if` and `@for` control flow
+- ❌ Zone.js for state in new apps — Use Signals
 
-## Prod Ready
-- [ ] AOT compilation enabled (default in production)
-- [ ] Bundle budget configured in `angular.json`
-- [ ] Lazy loading for all feature routes
-- [ ] Service worker for offline support
-- [ ] Internationalization with `@angular/localize`
-- [ ] Security: sanitization, CSP headers, HTTPS only
+## Signals vs RxJS
+| Use Case | Solution |
+|----------|----------|
+| Synchronous state | Signals |
+| HTTP requests | RxJS (HttpClient) |
+| Complex async flows | RxJS |
+| Template binding | Signals preferred |
+| Cross-component events | RxJS Subjects |
+
+## Control Flow Syntax (v17+)
+```html
+<!-- Old syntax -->
+<div *ngIf="condition">...</div>
+<li *ngFor="let item of items">...</li>
+
+<!-- New syntax (preferred) -->
+@if (condition) { <div>...</div> }
+@for (item of items; track item.id) { <li>...</li> }
+```

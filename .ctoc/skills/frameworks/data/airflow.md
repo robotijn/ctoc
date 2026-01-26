@@ -1,84 +1,67 @@
 # Apache Airflow CTO
-> Production-grade workflow orchestration for data pipelines.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install apache-airflow[celery,postgres,redis]
-airflow db init && airflow webserver -p 8080 &
-pytest tests/dags/ -v --ignore=tests/dags/test_dag_integrity.py
+pip install "apache-airflow[celery,postgres,redis]==2.9.0"
+airflow db migrate
+airflow standalone  # Dev mode with webserver + scheduler
 ```
 
-## Non-Negotiables
-1. TaskFlow API (`@task` decorator) for Python operators
-2. Idempotent tasks—safe to retry without side effects
-3. XComs for metadata only (<48KB), never large data
-4. Connections/Variables for all secrets (never in code)
-5. DAG testing locally before deployment
-6. Explicit task dependencies with `>>` or `set_downstream()`
+## Claude's Common Mistakes
+1. **Large data in XComs** - XComs are for metadata (<48KB), not data payloads
+2. **schedule_interval parameter** - Deprecated; use schedule="0 6 * * *"
+3. **Non-idempotent tasks** - Tasks must be safe to retry without side effects
+4. **Heavy logic in DAG file** - DAG parsing happens frequently; keep it light
+5. **Hardcoded credentials** - Use Connections and Variables, never code
 
-## Red Lines
-- Large data payloads in XComs
-- Non-idempotent tasks causing duplicate processing
-- Hardcoded credentials in DAG files
-- `schedule_interval` instead of `schedule` (deprecated)
-- Tasks with unbounded execution time
-
-## Pattern: Production DAG
+## Correct Patterns (2026)
 ```python
 from datetime import datetime, timedelta
 from airflow.decorators import dag, task
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
 @dag(
-    dag_id="etl_daily_sales",
-    schedule="0 6 * * *",
-    start_date=datetime(2024, 1, 1),
+    dag_id="etl_daily",
+    schedule="0 6 * * *",  # NOT schedule_interval (deprecated)
+    start_date=datetime(2025, 1, 1),
     catchup=False,
     default_args={
         "retries": 3,
         "retry_delay": timedelta(minutes=5),
         "execution_timeout": timedelta(hours=1),
     },
-    tags=["etl", "sales"],
+    tags=["etl"],
 )
-def etl_daily_sales():
+def etl_daily():
     @task
     def extract(ds: str) -> dict:
-        # Extract returns metadata, not data
+        # Return metadata only, not data
         return {"records": 1000, "source": "api", "date": ds}
 
     @task
     def transform(metadata: dict) -> dict:
-        # Transform logic here
-        return {"processed": metadata["records"], "status": "success"}
+        # Idempotent: same input = same output
+        return {"processed": metadata["records"]}
 
     @task
     def load(metadata: dict):
-        # Load to destination
+        # Use UPSERT, not INSERT (idempotent)
         print(f"Loaded {metadata['processed']} records")
 
+    # TaskFlow handles XCom automatically
     load(transform(extract()))
 
-etl_daily_sales()
+etl_daily()
 ```
 
-## Integrates With
-- **Compute**: Kubernetes, ECS, or Celery executors
-- **Storage**: S3, GCS, ADLS via providers
-- **Monitoring**: Prometheus metrics, Datadog, or native UI
+## Version Gotchas
+- **v2.9+**: MsSQL backend removed; use PostgreSQL
+- **v2.9+**: SQLAlchemy 1.4.36 minimum required
+- **v2.9+**: Rendered template fields limited to 4096 chars
+- **TaskFlow**: @task.docker and @task.kubernetes for isolation
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `DAG import error` | Check syntax with `python dags/my_dag.py` |
-| `Task stuck in queued` | Increase worker count or check executor |
-| `XCom size exceeded` | Use external storage (S3/GCS) for data |
-| `Zombie task detected` | Increase `scheduler_zombie_task_threshold` |
-
-## Prod Ready
-- [ ] Kubernetes or Celery executor for scaling
-- [ ] Secrets in Connections, not code
-- [ ] DAG versioning with CI/CD
-- [ ] SLA monitoring and alerting
-- [ ] Task-level timeout configuration
+## What NOT to Do
+- Do NOT pass large data through XComs (use S3/GCS)
+- Do NOT use schedule_interval (use schedule)
+- Do NOT hardcode credentials in DAG files
+- Do NOT make non-idempotent tasks (INSERT -> UPSERT)

@@ -1,34 +1,23 @@
 # pgvector CTO
-> Vector similarity search directly in PostgreSQL.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-# Install extension
+# PostgreSQL extension
 CREATE EXTENSION vector;
-# Verify
-SELECT * FROM pg_extension WHERE extname = 'vector';
 # Python client
 pip install pgvector psycopg[binary]
+# Verify: SELECT * FROM pg_extension WHERE extname = 'vector';
 ```
 
-## Non-Negotiables
-1. Choose appropriate index type (HNSW vs IVFFlat)
-2. Respect dimension limits (2000 for index)
-3. Use correct distance operator for use case
-4. Maintain indexes after bulk operations
-5. Create partial indexes for filtered queries
-6. Configure HNSW build parameters
+## Claude's Common Mistakes
+1. Using IVFFlat without enough rows (need 1000+ per list)
+2. Missing VACUUM ANALYZE after bulk inserts
+3. Wrong distance operator for use case
+4. Index not being used (check with EXPLAIN)
+5. Exceeding 2000 dimension limit for indexes
 
-## Red Lines
-- IVFFlat without sufficient training data
-- Missing vector index on large tables
-- Wrong distance operator for similarity type
-- No VACUUM after bulk inserts
-- Exceeding dimension limits
-- Not tuning ef_search for recall
-
-## Pattern: Production Vector Store
+## Correct Patterns (2026)
 ```sql
 -- Enable extension
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -38,29 +27,27 @@ CREATE TABLE documents (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,
     metadata JSONB,
-    embedding vector(1536),
+    embedding vector(1536),  -- Max 2000 for index
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create HNSW index (recommended for most cases)
+-- HNSW index (recommended for most cases)
 CREATE INDEX ON documents
 USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
 
--- Or IVFFlat for very large datasets with more RAM constraints
+-- IVFFlat for very large datasets (slower recall, faster build)
 -- CREATE INDEX ON documents
 -- USING ivfflat (embedding vector_cosine_ops)
--- WITH (lists = 100);
+-- WITH (lists = 100);  -- sqrt(rows) is good starting point
 
--- Partial index for filtered queries
-CREATE INDEX ON documents
-USING hnsw (embedding vector_cosine_ops)
-WHERE (metadata->>'type' = 'article');
+-- VACUUM after bulk insert (CRITICAL)
+VACUUM ANALYZE documents;
 
--- Similarity search
+-- Similarity search (cosine)
 SELECT id, content, 1 - (embedding <=> $1) AS similarity
 FROM documents
-ORDER BY embedding <=> $1  -- Cosine distance
+ORDER BY embedding <=> $1  -- <=> = cosine distance
 LIMIT 10;
 
 -- With metadata filter
@@ -69,9 +56,6 @@ FROM documents
 WHERE metadata->>'category' = 'tech'
 ORDER BY embedding <=> $1
 LIMIT 10;
-
--- After bulk insert
-VACUUM ANALYZE documents;
 ```
 
 ```python
@@ -95,24 +79,15 @@ results = conn.execute(
 ).fetchall()
 ```
 
-## Integrates With
-- **ORMs**: SQLAlchemy, Django, Prisma
-- **Databases**: PostgreSQL, Supabase, Neon
-- **Embeddings**: OpenAI, Sentence Transformers
-- **Frameworks**: LangChain, LlamaIndex
+## Version Gotchas
+- **Operators**: `<=>` cosine, `<->` L2, `<#>` inner product
+- **HNSW vs IVFFlat**: HNSW for quality, IVFFlat for build speed
+- **Dimension limit**: 2000 for indexed columns
+- **Index usage**: Check with `EXPLAIN ANALYZE`
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `index row size exceeds maximum` | Reduce vector dimensions below 2000 |
-| `operator does not exist` | Use correct operator: <=> (cosine), <-> (L2) |
-| `index not used` | Check planner, increase effective_cache_size |
-| `slow queries after bulk insert` | Run VACUUM ANALYZE |
-
-## Prod Ready
-- [ ] HNSW or IVFFlat index created
-- [ ] Dimension within limits
-- [ ] Correct distance operator used
-- [ ] VACUUM scheduled after bulk ops
-- [ ] ef_search tuned for recall needs
-- [ ] Partial indexes for common filters
+## What NOT to Do
+- Do NOT skip VACUUM ANALYZE after bulk inserts
+- Do NOT use IVFFlat with few rows (need 1000+ per list)
+- Do NOT forget to check index usage with EXPLAIN
+- Do NOT exceed 2000 dimensions for indexed columns
+- Do NOT use wrong distance operator for your use case

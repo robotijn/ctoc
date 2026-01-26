@@ -1,71 +1,60 @@
 # pandas CTO
-> The foundation of Python data analysis and manipulation.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install pandas[performance,excel,parquet]
-python -c "import pandas as pd; pd.show_versions()"
-pytest tests/ -v --tb=short
+pip install "pandas[performance,parquet]>=2.2"
+# PyArrow required for modern string handling and performance
+pip install pyarrow
 ```
 
-## Non-Negotiables
-1. Use `.loc[]` / `.iloc[]` for selection, never chained indexing
-2. Vectorized operations over iteration (100x faster)
-3. Explicit dtypes: `category` for strings, `Int64` for nullable ints
-4. Method chaining with `.pipe()` for readability
-5. Copy-on-Write mode enabled (`pd.options.mode.copy_on_write = True`)
-6. Use PyArrow backend for 2-10x memory reduction
+## Claude's Common Mistakes
+1. **Chained indexing** - `df[col][row]` causes SettingWithCopyWarning; use `.loc[]`
+2. **Iterating with for loops** - 100x slower than vectorized operations
+3. **Not using Copy-on-Write** - Default in pandas 3.0; enable now for safety
+4. **Ignoring PyArrow backend** - 5-10x faster strings, 50% less memory
+5. **apply() when vectorized exists** - apply() is slow; use native methods
 
-## Red Lines
-- `for` loops iterating over DataFrame rows
-- Ignoring `SettingWithCopyWarning`
-- Loading files without specifying dtypes
-- Using `apply()` when vectorized alternatives exist
-- Mixing inplace operations with chaining
-
-## Pattern: Production Data Pipeline
+## Correct Patterns (2026)
 ```python
 import pandas as pd
 
+# Enable future defaults (pandas 3.0 behavior)
 pd.options.mode.copy_on_write = True
+pd.options.future.infer_string = True  # PyArrow-backed strings
 
-def load_and_clean(path: str) -> pd.DataFrame:
-    return (
-        pd.read_parquet(path, dtype_backend="pyarrow")
-        .pipe(validate_schema)
-        .assign(
-            date=lambda df: pd.to_datetime(df["date"]),
-            category=lambda df: df["category"].astype("category"),
-        )
-        .loc[lambda df: df["value"].notna()]
-        .pipe(add_derived_columns)
+# Load with PyArrow backend (faster, less memory)
+df = pd.read_parquet("data.parquet", dtype_backend="pyarrow")
+
+# Method chaining with pipe (readable, maintainable)
+result = (
+    df
+    .pipe(validate_schema)
+    .assign(
+        date=lambda d: pd.to_datetime(d["date"]),
+        category=lambda d: d["category"].astype("category"),
     )
+    .loc[lambda d: d["value"].notna()]
+    .groupby("category", observed=True)
+    .agg({"value": ["sum", "mean"]})
+)
 
-def validate_schema(df: pd.DataFrame) -> pd.DataFrame:
-    required = {"id", "date", "value", "category"}
-    missing = required - set(df.columns)
-    if missing:
-        raise ValueError(f"Missing columns: {missing}")
-    return df
+# Vectorized operations (not apply)
+df["discount"] = df["price"] * 0.1  # Good
+# df["discount"] = df["price"].apply(lambda x: x * 0.1)  # Bad
+
+# Explicit .loc for assignment
+df.loc[df["status"] == "active", "flag"] = True
 ```
 
-## Integrates With
-- **Larger Data**: Polars, DuckDB, or Dask for >5GB datasets
-- **Viz**: Matplotlib, Seaborn, Plotly for analysis
-- **ML**: scikit-learn, XGBoost with `.values` arrays
+## Version Gotchas
+- **v2.2->v3.0**: Copy-on-Write becomes default and only mode
+- **v3.0**: PyArrow-backed strings default; `pd.options.future.infer_string`
+- **v3.0**: `pd.col` expressions for cleaner column selection
+- **PyArrow strings**: Immutable; zero-copy to NumPy not always possible
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `SettingWithCopyWarning` | Use `.loc[]` or enable Copy-on-Write |
-| `MemoryError` on read | Use `chunksize` param or switch to Polars |
-| `TypeError: unhashable` | Convert list columns to tuples before groupby |
-| `DtypeWarning: mixed types` | Specify `dtype` dict in read function |
-
-## Prod Ready
-- [ ] Copy-on-Write enabled for memory safety
-- [ ] PyArrow backend for production workloads
-- [ ] Schema validation on data ingestion
-- [ ] Explicit dtype declarations
-- [ ] Memory profiling for large operations
+## What NOT to Do
+- Do NOT use chained indexing `df["a"]["b"]` (unpredictable)
+- Do NOT iterate rows with `for i, row in df.iterrows()` (use vectorized)
+- Do NOT use apply() when vectorized alternative exists
+- Do NOT ignore SettingWithCopyWarning (real bugs)

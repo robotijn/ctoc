@@ -1,68 +1,54 @@
 # Dart CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-dart analyze --fatal-infos             # Lint
-dart format .                          # Format
-dart test --coverage=coverage          # Test with coverage
-dart compile exe bin/main.dart         # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses `dynamic` as escape hatch — use proper types
+- Claude forgets Flutter 3.38 null safety is mandatory
+- Claude uses `dart:html` for web — use `package:web` (Wasm compatible)
+- Claude creates heavy widgets — split into smaller composable widgets
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `dart 3.10+` | Records, patterns, MCP | Older Dart |
+| `flutter 3.38+` | Hot reload on web stable | Older Flutter |
+| `dart analyze --fatal-infos` | Strict analysis | Loose analysis |
+| `very_good_cli` | Project scaffolding | Manual setup |
+| `dcm` | Code quality metrics | No metrics |
+
+## Patterns Claude Should Use
+```dart
+// Dart 3.x records and patterns
+final (name, age) = getUserData();
+
+// Pattern matching in switch
+String describe(Object obj) => switch (obj) {
+  int n when n < 0 => 'negative',
+  int n => 'positive: $n',
+  String s => 'string: $s',
+  _ => 'unknown',
+};
+
+// Wasm-compatible web code
+import 'package:web/web.dart'; // NOT dart:html
+
+// Reduce widget rebuilds
+const MyWidget(); // Use const constructors
+
+// Heavy work on isolates
+final result = await compute(expensiveFunction, data);
 ```
 
-## Tools (2024-2025)
-- **Dart 3.x** - Records, patterns, class modifiers
-- **dart format** - Built-in formatting
-- **dart analyze** - Static analysis (strict mode)
-- **test** - Testing package
-- **very_good_cli** - Project scaffolding
+## Anti-Patterns Claude Generates
+- `dynamic` everywhere — use proper types
+- `dart:html` for web — breaks Wasm, use `package:web`
+- Heavy `build()` methods — extract smaller widgets
+- Missing `const` constructors — causes unnecessary rebuilds
+- `late` abuse — prefer nullable with null checks
 
-## Project Structure
-```
-project/
-├── lib/               # Production code
-├── test/              # Test files
-├── bin/               # Entry points
-├── pubspec.yaml       # Dependencies
-└── analysis_options.yaml  # Linter rules
-```
-
-## Non-Negotiables
-1. Sound null safety everywhere
-2. Strong typing - no dynamic unless necessary
-3. Async/await with proper error handling
-4. Follow Effective Dart guidelines
-
-## Red Lines (Reject PR)
-- Disabling null safety annotations
-- Untyped code (dynamic abuse)
-- Blocking main isolate
-- Missing error handling in Futures
-- Secrets hardcoded in code
-- print() statements in production
-
-## Testing Strategy
-- **Unit**: package:test, <100ms, mock with mockito
-- **Widget**: flutter_test for UI components
-- **Integration**: integration_test for full flows
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Late initialization errors | Use late wisely, prefer nullable |
-| Future not awaited | lint: unawaited_futures |
-| Isolate memory limits | Use compute() for heavy work |
-| Widget rebuild overhead | Use const constructors |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No blocking main isolate (use compute/isolates)
-- No widget rebuilds in tight loops
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] Secure storage for sensitive data
-- [ ] Secrets from environment/secure storage
-- [ ] Dependencies audited (`dart pub outdated`)
+## Version Gotchas
+- **Dart 3.10/Flutter 3.38**: MCP server for AI assistants
+- **Dart 3.9**: Build hooks stable for native code
+- **Wasm**: 2-3x faster but needs `package:web` instead of `dart:html`
+- **Hot reload**: Now stable on web (no experimental flag)
+- **With Flutter**: Use `lower_case_with_underscores` for directories

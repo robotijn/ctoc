@@ -1,30 +1,21 @@
 # Alembic CTO
-> Database migration management for SQLAlchemy applications.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install alembic sqlalchemy
-alembic init alembic && alembic revision --autogenerate -m "Initial"
-alembic upgrade head && alembic downgrade -1
+alembic init alembic
+# Configure alembic.ini and env.py with your database URL
 ```
 
-## Non-Negotiables
-1. Autogenerate as starting point, always review manually
-2. Every migration must have working downgrade
-3. Test migrations against production-like data
-4. Batch operations for large table alterations
-5. Transaction-safe migrations (no partial applies)
-6. Version control all migration files
+## Claude's Common Mistakes
+1. **Trusting autogenerate blindly** - Always review generated migrations
+2. **Missing downgrade** - Every migration needs working rollback
+3. **ALTER TABLE locks** - Use CONCURRENTLY for indexes on large tables
+4. **One big migration** - Split into atomic, focused changes
+5. **Skipping production-like testing** - Test with real data volumes
 
-## Red Lines
-- Untested migrations going to production
-- Migrations causing data loss without explicit handling
-- Missing indexes on foreign keys
-- Long-running locks on production tables
-- Skipping migration review before commit
-
-## Pattern: Safe Production Migration
+## Correct Patterns (2026)
 ```python
 # alembic/versions/001_add_user_email_index.py
 """Add index on user email for login performance."""
@@ -35,43 +26,36 @@ revision = '001'
 down_revision = None
 
 def upgrade():
-    # Create index concurrently to avoid table locks
+    # CONCURRENTLY avoids table lock (PostgreSQL)
     op.execute(
         "CREATE INDEX CONCURRENTLY IF NOT EXISTS "
         "ix_users_email ON users (email)"
     )
 
-    # Add nullable column first, backfill, then make NOT NULL
-    op.add_column('users', sa.Column('verified_at', sa.DateTime))
-
-    # Batch large updates to avoid long transactions
-    op.execute("""
-        UPDATE users SET verified_at = created_at
-        WHERE verified_at IS NULL
-        LIMIT 10000
-    """)
+    # Add nullable first, backfill, then add constraint
+    op.add_column('users', sa.Column('verified_at', sa.DateTime, nullable=True))
 
 def downgrade():
     op.drop_index('ix_users_email', 'users')
     op.drop_column('users', 'verified_at')
+
+# For async SQLAlchemy 2.0 in env.py:
+from sqlalchemy.ext.asyncio import async_engine_from_config
+
+async def run_async_migrations():
+    connectable = async_engine_from_config(config.get_section("alembic"))
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
 ```
 
-## Integrates With
-- **ORM**: SQLAlchemy 2.0 with async support
-- **Databases**: PostgreSQL, MySQL, SQLite
-- **CI/CD**: Migration verification in pipelines
+## Version Gotchas
+- **SQLAlchemy 2.0**: Use async_engine_from_config for async support
+- **Autogenerate**: Misses index name changes, CHECK constraints, triggers
+- **PostgreSQL**: Use CONCURRENTLY for production index creation
+- **Batch mode**: Required for SQLite ALTER TABLE operations
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Target database is not up to date` | Run `alembic upgrade head` first |
-| `Can't locate revision` | Check `down_revision` chain integrity |
-| `Table already exists` | Use `IF NOT EXISTS` in operations |
-| `Lock timeout during ALTER` | Use concurrent index creation or batch ops |
-
-## Prod Ready
-- [ ] All migrations tested with rollback
-- [ ] Concurrent operations for large tables
-- [ ] Data backup before destructive changes
-- [ ] CI/CD migration verification
-- [ ] Monitoring for long-running migrations
+## What NOT to Do
+- Do NOT trust autogenerate without review
+- Do NOT skip downgrade implementation
+- Do NOT create indexes without CONCURRENTLY on large tables
+- Do NOT run untested migrations in production

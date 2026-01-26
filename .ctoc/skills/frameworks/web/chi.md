@@ -1,35 +1,31 @@
 # Chi CTO
-> Lightweight Go HTTP router - composable, idiomatic, stdlib-compatible.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-go mod init myapp && go get github.com/go-chi/chi/v5
+go mod init myapp
+go get github.com/go-chi/chi/v5
+# Chi 5.x - requires Go 1.21+
 go run main.go
-go test -v ./...
 ```
 
-## Non-Negotiables
-1. Middleware composition with `r.Use()`
-2. Context for request-scoped data
-3. Sub-routers for modular organization
-4. Panic recovery middleware
-5. Graceful shutdown on SIGTERM
+## Claude's Common Mistakes
+1. **Global mutable state** — Use request context for request-scoped data
+2. **Missing middleware** — Always add Logger, Recoverer, Timeout
+3. **Ignoring context cancellation** — Check `ctx.Done()` in long operations
+4. **No request timeouts** — Use `middleware.Timeout()`
+5. **Blocking without context** — Pass context to all downstream calls
 
-## Red Lines
-- Global mutable state - use context
-- Missing middleware (logging, recovery)
-- Ignoring context cancellation
-- No request timeouts
-- Blocking without context
-
-## Pattern: Structured Router
+## Correct Patterns (2026)
 ```go
 package main
 
 import (
+    "context"
     "encoding/json"
     "net/http"
+    "time"
+
     "github.com/go-chi/chi/v5"
     "github.com/go-chi/chi/v5/middleware"
 )
@@ -52,6 +48,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    // Always use context from request
     ctx := r.Context()
     user, err := h.service.Create(ctx, req)
     if err != nil {
@@ -67,7 +64,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 func main() {
     r := chi.NewRouter()
 
-    // Middleware
+    // Middleware (REQUIRED)
     r.Use(middleware.RequestID)
     r.Use(middleware.RealIP)
     r.Use(middleware.Logger)
@@ -78,33 +75,36 @@ func main() {
     userHandler := &UserHandler{service: NewUserService()}
     r.Mount("/users", userHandler.Routes())
 
-    // Health check
-    r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte("ok"))
-    })
-
     http.ListenAndServe(":3000", r)
 }
 ```
 
-## Integrates With
-- **DB**: `sqlx` or `pgx` with context propagation
-- **Auth**: `chi/jwtauth` or custom middleware
-- **Validation**: `go-playground/validator`
-- **Tracing**: OpenTelemetry middleware
+## Version Gotchas
+- **Chi 5.x**: Requires Go 1.21+; stdlib `http.ServeMux` compatible
+- **Context**: Always propagate from `r.Context()`
+- **Middleware order**: Logger before Recoverer
+- **Sub-routers**: Use `r.Mount()` for modularity
+
+## What NOT to Do
+- ❌ Global variables for state — Use context
+- ❌ Missing `middleware.Recoverer` — Panics crash server
+- ❌ `http.ListenAndServe` without timeout middleware — No timeout
+- ❌ Ignoring `ctx.Done()` — Operations continue after timeout
+- ❌ Middleware after routes — Won't apply
+
+## Middleware Stack
+```go
+r.Use(middleware.RequestID)    // 1. Add request ID
+r.Use(middleware.RealIP)       // 2. Get real client IP
+r.Use(middleware.Logger)       // 3. Log requests
+r.Use(middleware.Recoverer)    // 4. Recover from panics
+r.Use(middleware.Timeout(30*time.Second))  // 5. Timeout
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `context canceled` | Check timeout, client disconnection |
+| `context canceled` | Client disconnected or timeout |
 | `panic: runtime error` | Add `middleware.Recoverer` |
-| `404 on route` | Check route registration, trailing slashes |
-| `chi: no middlewares` | Register middleware before routes |
-
-## Prod Ready
-- [ ] Request ID middleware
-- [ ] Timeout middleware configured
-- [ ] Prometheus metrics
-- [ ] Health and readiness endpoints
-- [ ] Graceful shutdown
-- [ ] Structured logging
+| `404 on route` | Check registration and trailing slashes |
+| `No middleware running` | Register middleware before routes |

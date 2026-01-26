@@ -1,37 +1,29 @@
 # SwiftUI CTO
-> Apple platform UI engineering leader demanding declarative excellence and Swift 6 concurrency-safe architecture.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-xcodebuild -scheme MyApp -destination 'platform=iOS Simulator,name=iPhone 15 Pro' build
-xcodebuild test -scheme MyApp -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
-swift build && swift test --parallel
+# Requires Xcode 16+ for iOS 18 SDK
+xcodebuild -version  # Verify 16.x
+# Create new project via Xcode or Swift Package Manager
+swift package init --type executable --name MyApp
 ```
 
-## Non-Negotiables
-1. MVVM with @Observable (iOS 17+) or ObservableObject with proper property wrappers
-2. Environment for dependency injection - no singletons in views
-3. async/await for all asynchronous operations, structured concurrency with TaskGroups
-4. Accessibility modifiers on all interactive elements
-5. Preview providers for every view with multiple states
+## Claude's Common Mistakes
+1. **Uses ObservableObject when @Observable available** - iOS 17+ uses Observation framework
+2. **Ignores Swift 6 strict concurrency** - MainActor isolation required for UI updates
+3. **Suggests @StateObject for all view models** - @State with @Observable is simpler pattern
+4. **Missing custom container view APIs** - iOS 18 subviewOf ForEach pattern ignored
+5. **Uses deprecated NavigationView** - NavigationStack required since iOS 16
 
-## Red Lines
-- @ObservedObject when @StateObject is required (ownership semantics)
-- Massive views beyond 100 lines - extract to subviews
-- Blocking main thread with synchronous network/disk I/O
-- Missing accessibility labels on buttons and interactive elements
-- Force unwrapping optionals in view body
-
-## Pattern: Observable ViewModel with Async
+## Correct Patterns (2026)
 ```swift
-import SwiftUI
-
+// iOS 17+ @Observable pattern with Swift 6 concurrency
 @Observable
+@MainActor
 final class ProfileViewModel {
     var user: User?
     var isLoading = false
-    var error: Error?
 
     private let repository: UserRepository
 
@@ -42,12 +34,7 @@ final class ProfileViewModel {
     func loadUser(id: String) async {
         isLoading = true
         defer { isLoading = false }
-
-        do {
-            user = try await repository.fetchUser(id: id)
-        } catch {
-            self.error = error
-        }
+        user = try? await repository.fetchUser(id: id)
     }
 }
 
@@ -68,20 +55,15 @@ struct ProfileView: View {
 }
 ```
 
-## Integrates With
-- **DB**: SwiftData for persistence, Core Data for legacy migrations
-- **Auth**: AuthenticationServices for Sign in with Apple, Keychain for tokens
-- **Cache**: URLCache for network, NSCache for in-memory objects
+## Version Gotchas
+- **iOS 17+**: @Observable replaces ObservableObject, simpler but different semantics
+- **iOS 18**: Custom container views with subviewOf API, enhanced accessibility
+- **Swift 6**: Strict concurrency checking, @MainActor required for UI mutations
+- **With SwiftData**: Replaces Core Data for new projects, different migration path
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Publishing changes from background threads` | Wrap updates in `await MainActor.run {}` |
-| `Type does not conform to Observable` | Add @Observable macro or implement ObservableObject |
-| `Modifying state during view update` | Move mutation to .task or .onAppear, not in body |
-
-## Prod Ready
-- [ ] VoiceOver tested on all screens with proper labels
-- [ ] Dark mode and Dynamic Type supported throughout
-- [ ] Xcode Cloud or Fastlane configured for CI/CD
-- [ ] Privacy manifest and App Store compliance verified
+## What NOT to Do
+- Do NOT use @ObservedObject when @State + @Observable works
+- Do NOT mutate state in view body - use `.task` or `.onAppear`
+- Do NOT skip `@MainActor` on ViewModels - causes background thread UI updates
+- Do NOT use NavigationView - deprecated, use NavigationStack
+- Do NOT force unwrap in view body - causes full view crash

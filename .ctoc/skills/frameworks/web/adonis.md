@@ -1,29 +1,21 @@
 # AdonisJS CTO
-> Full-featured TypeScript MVC framework - batteries included, Laravel-inspired for Node.js.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm init adonisjs@latest myapp && cd myapp
 node ace serve --watch
-node ace test
+# AdonisJS 6.x - TypeScript MVC framework
 ```
 
-## Non-Negotiables
-1. Lucid ORM with proper relationships and eager loading
-2. Validators for all request input - `@adonisjs/validator`
-3. Authentication with guards and providers
-4. Edge templating for server-rendered views
-5. Service injection via IoC container
+## Claude's Common Mistakes
+1. **Using deprecated `@adonisjs/validator`** — Use VineJS in v6
+2. **Missing IoC container injection** — Use `@inject()` decorator
+3. **Business logic in controllers** — Extract to services
+4. **Missing preload for relationships** — N+1 query issues
+5. **Using old path aliases** — Use `#` aliases (`#models`, `#services`)
 
-## Red Lines
-- Raw SQL without Lucid query builder
-- Missing request validation on any endpoint
-- Business logic in controllers - use services
-- Skipping migrations for schema changes
-- Ignoring TypeScript strict mode
-
-## Pattern: Controller with Validation
+## Correct Patterns (2026)
 ```typescript
 // app/controllers/users_controller.ts
 import type { HttpContext } from '@adonisjs/core/http';
@@ -37,21 +29,22 @@ export default class UsersController {
   constructor(private userService: UserService) {}
 
   async store({ request, response }: HttpContext) {
+    // VineJS validation (NOT @adonisjs/validator)
     const payload = await request.validateUsing(createUserValidator);
     const user = await this.userService.create(payload);
     return response.created(user);
   }
 
-  async show({ params, response }: HttpContext) {
-    const user = await User.query()
+  async show({ params }: HttpContext) {
+    // Preload relationships to avoid N+1
+    return User.query()
       .where('id', params.id)
       .preload('posts')
       .firstOrFail();
-    return response.ok(user);
   }
 }
 
-// app/validators/user.ts
+// validators/user.ts - VineJS (v6 standard)
 import vine from '@vinejs/vine';
 
 export const createUserValidator = vine.compile(
@@ -62,24 +55,23 @@ export const createUserValidator = vine.compile(
 );
 ```
 
-## Integrates With
-- **DB**: Lucid ORM with PostgreSQL/MySQL/SQLite
-- **Auth**: `@adonisjs/auth` with sessions or API tokens
-- **Queue**: `@adonisjs/redis` with Bull
-- **Mail**: `@adonisjs/mail` with SMTP/Mailgun
+## Version Gotchas
+- **AdonisJS 6.x**: VineJS replaces `@adonisjs/validator`
+- **Path aliases**: Use `#models/user` not `App/Models/User`
+- **IoC**: Use `@inject()` decorator for constructor injection
+- **Lucid**: Always `preload()` relationships
+
+## What NOT to Do
+- ❌ `import { schema } from '@adonisjs/validator'` — Use VineJS
+- ❌ `import User from 'App/Models/User'` — Use `#models/user`
+- ❌ Logic in controllers — Extract to services
+- ❌ Missing `preload()` — Causes N+1 queries
+- ❌ Raw SQL — Use Lucid query builder
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `E_VALIDATION_ERROR` | Check validator rules match request |
-| `Model not found` | Use `firstOrFail()` or handle null |
+| `E_VALIDATION_ERROR` | Check VineJS rules match request |
 | `Cannot inject` | Register provider in `adonisrc.ts` |
-| `Migration failed` | Check database connection, run `node ace migration:status` |
-
-## Prod Ready
-- [ ] Environment variables validated on boot
-- [ ] Database connection pooling configured
-- [ ] Redis for sessions in production
-- [ ] Health check endpoint
-- [ ] Error reporting with Sentry
-- [ ] Static assets served via CDN
+| `Model not found` | Use `firstOrFail()` or handle null |
+| `N+1 queries` | Add `.preload('relation')` |

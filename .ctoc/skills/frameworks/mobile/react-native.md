@@ -1,68 +1,51 @@
 # React Native CTO
-> Cross-platform mobile engineering leader demanding TypeScript-first, performance-optimized native experiences.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npx create-expo-app@latest myapp --template expo-template-blank-typescript
-npx expo start --dev-client
-npx jest --coverage && npx detox test -c ios.sim.debug
+# Or for bare workflow with New Architecture (default since 0.76):
+npx @react-native-community/cli init MyApp
 ```
 
-## Non-Negotiables
-1. TypeScript strict mode with explicit return types on all exports
-2. Expo SDK for new projects, bare workflow only when native modules require it
-3. React Navigation v6+ with typed navigation props
-4. State management via Zustand/Jotai for simple, TanStack Query for server state
-5. Hermes engine enabled for Android and iOS
-6. Error boundaries at route and feature boundaries
+## Claude's Common Mistakes
+1. **Suggests Legacy Architecture patterns** - New Architecture is mandatory since 0.82, bridge code won't compile
+2. **Uses deprecated Expo SDK 51 APIs** - SDK 52+ required, Expo Router v4 patterns differ significantly
+3. **Ignores Hermes V1 requirements** - Static Hermes compilation needs type annotations for optimal performance
+4. **Recommends React Navigation v6 setup** - v7 has breaking changes in typed navigation
+5. **Uses old Metro bundler config** - `metro.config.js` format changed for New Architecture support
 
-## Red Lines
-- Inline styles in production code - use StyleSheet.create or NativeWind
-- Direct bridge calls when JS APIs exist (use Turbo Modules properly)
-- Blocking JS thread with synchronous operations
-- Missing error boundaries causing full app crashes
-- console.log in production builds
-
-## Pattern: Typed Navigation with Screen
+## Correct Patterns (2026)
 ```typescript
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+// Expo Router v4 with typed routes (SDK 52+)
+// app/(tabs)/profile/[id].tsx
+import { useLocalSearchParams, Stack } from 'expo-router';
 
-type RootStackParamList = {
-  Home: undefined;
-  Profile: { userId: string };
-};
+export default function ProfileScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
 
-type ProfileProps = NativeStackScreenProps<RootStackParamList, 'Profile'>;
-
-export function ProfileScreen({ route, navigation }: ProfileProps) {
-  const { userId } = route.params;
   return (
-    <View style={styles.container}>
-      <Text>User: {userId}</Text>
-    </View>
+    <>
+      <Stack.Screen options={{ title: `Profile ${id}` }} />
+      <ProfileContent userId={id} />
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-});
+// Turbo Modules pattern (New Architecture)
+import { TurboModuleRegistry } from 'react-native';
+const MyModule = TurboModuleRegistry.getEnforcing<MyModuleSpec>('MyModule');
 ```
 
-## Integrates With
-- **DB**: WatermelonDB for offline-first, AsyncStorage for simple KV
-- **Auth**: Expo SecureStore + OAuth providers via expo-auth-session
-- **Cache**: TanStack Query with MMKV persister for fast hydration
+## Version Gotchas
+- **0.76-0.81**: New Architecture optional, interop layers for old libs
+- **0.82+**: Legacy Architecture removed, migration mandatory
+- **Expo SDK 52**: React Native 0.76, New Architecture default for new projects
+- **With React Navigation**: v7 requires `@react-navigation/native` separate install
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `VirtualizedLists should never be nested` | Replace outer ScrollView with FlatList's ListHeaderComponent |
-| `Invariant Violation: requireNativeComponent` | Rebuild native deps: `npx expo prebuild --clean` |
-| `Unable to resolve module` | Clear Metro cache: `npx expo start -c` |
-
-## Prod Ready
-- [ ] Hermes enabled, JS bundle optimized with Metro minification
-- [ ] Sentry/Bugsnag configured with source maps uploaded
-- [ ] Deep linking tested on both platforms with universal links
-- [ ] App store assets prepared (screenshots, metadata, privacy manifest)
+## What NOT to Do
+- Do NOT use `NativeModules` bridge calls - use Turbo Modules with JSI
+- Do NOT use `createStackNavigator` without typed params - causes runtime crashes
+- Do NOT run `npx expo start` without `--dev-client` for native modules
+- Do NOT use Expo Go for production testing - always use development builds
+- Do NOT ignore `VirtualizedLists should never be nested` - causes scroll jank

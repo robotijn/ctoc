@@ -1,35 +1,27 @@
 # Pelican CTO
-> Python static site generator - Jinja2 templates, powerful plugin system.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install pelican markdown
 pelican-quickstart
 pelican --autoreload --listen
-pelican content -o output -s publishconf.py
+# Pelican 4.x - Python static site generator
 ```
 
-## Non-Negotiables
-1. Jinja2 templating with proper inheritance
-2. Settings organization (dev vs publish)
-3. Plugin system for extensions
-4. Content metadata (title, date, category, tags)
-5. Proper output structure with SITEURL
+## Claude's Common Mistakes
+1. **Hardcoded URLs** — Use `SITEURL` variable in templates
+2. **Wrong config for production** — Use `publishconf.py` for deployment
+3. **Missing content metadata** — All articles need title, date
+4. **Complex logic in templates** — Use plugins for processing
+5. **No theme customization** — Default theme not production-ready
 
-## Red Lines
-- Business logic in templates - use plugins
-- Missing pelicanconf.py settings
-- No theme customization for production
-- Ignoring cache for build speed
-- Hardcoded URLs instead of SITEURL
-
-## Pattern: Config and Template
+## Correct Patterns (2026)
 ```python
 # pelicanconf.py
 AUTHOR = 'Your Name'
 SITENAME = 'My Site'
-SITEURL = ''
+SITEURL = ''  # Empty for dev
 PATH = 'content'
 
 ARTICLE_PATHS = ['blog']
@@ -46,8 +38,20 @@ THEME = 'themes/mytheme'
 PLUGIN_PATHS = ['plugins']
 PLUGINS = ['sitemap', 'related_posts']
 
-# Feed
+# Feed (disable in dev)
+FEED_ALL_ATOM = None
+```
+
+```python
+# publishconf.py (for production)
+import os
+import sys
+sys.path.append(os.curdir)
+from pelicanconf import *
+
+SITEURL = 'https://example.com'  # REQUIRED for production
 FEED_ALL_ATOM = 'feeds/all.atom.xml'
+DELETE_OUTPUT_DIRECTORY = True
 ```
 
 ```html
@@ -66,6 +70,7 @@ FEED_ALL_ATOM = 'feeds/all.atom.xml'
   {% if article.tags %}
   <div class="tags">
     {% for tag in article.tags %}
+      <!-- Use SITEURL (NOT hardcoded paths) -->
       <a href="{{ SITEURL }}/{{ tag.url }}">{{ tag.name }}</a>
     {% endfor %}
   </div>
@@ -74,24 +79,23 @@ FEED_ALL_ATOM = 'feeds/all.atom.xml'
 {% endblock %}
 ```
 
-## Integrates With
-- **Markdown**: markdown, pelican-render-math
-- **Plugins**: sitemap, related_posts, neighbors
-- **Themes**: pelican-themes repository
-- **Hosting**: GitHub Pages, Netlify, S3
+## Version Gotchas
+- **Pelican 4.x**: Python 3.8+ required; Jinja2 templates
+- **SITEURL**: Empty in dev, full URL in `publishconf.py`
+- **Metadata**: Title and date required in all content
+- **Plugins**: Install from pelican-plugins repository
+
+## What NOT to Do
+- ❌ Hardcoded URLs — Use `{{ SITEURL }}` in templates
+- ❌ `pelicanconf.py` for production — Use `publishconf.py`
+- ❌ Missing metadata — Articles fail to render
+- ❌ Default theme in production — Customize or use community theme
+- ❌ Logic in templates — Write plugins instead
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
 | `No valid files found` | Check ARTICLE_PATHS setting |
 | `Template not found` | Check THEME path |
-| `Metadata error` | Add required front matter to content |
+| `Metadata error` | Add title/date to content front matter |
 | `SITEURL empty` | Use publishconf.py for production |
-
-## Prod Ready
-- [ ] publishconf.py with correct SITEURL
-- [ ] Sitemap plugin enabled
-- [ ] RSS/Atom feed configured
-- [ ] Custom theme developed
-- [ ] Cache enabled (LOAD_CONTENT_CACHE)
-- [ ] Build automated in CI

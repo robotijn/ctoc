@@ -1,31 +1,23 @@
 # Electron CTO
-> Cross-platform desktop apps - web tech in a native shell, with security in mind.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm init electron-app@latest myapp && cd myapp
-npm start
-npm test
+npm init electron-app@latest my-app
+cd my-app && npm start
+# Electron 33+ - requires Node.js 20+
 ```
 
-## Non-Negotiables
-1. Main/renderer process separation - understand the architecture
-2. Context isolation enabled (`contextIsolation: true`)
-3. Preload scripts for secure IPC
-4. IPC channels for process communication
-5. Auto-updates for distribution
+## Claude's Common Mistakes
+1. **`nodeIntegration: true`** — Massive security vulnerability; never enable
+2. **Using remote module** — Deprecated; use IPC instead
+3. **Blocking main process** — Keeps entire app unresponsive
+4. **Missing context isolation** — Required for security; always enable
+5. **No preload script** — Only way to safely expose APIs to renderer
 
-## Red Lines
-- `nodeIntegration: true` - massive security risk
-- Remote module usage - deprecated and dangerous
-- Blocking main process - keeps app responsive
-- Missing security headers (CSP)
-- Loading remote content without validation
-
-## Pattern: Secure IPC Bridge
+## Correct Patterns (2026)
 ```javascript
-// main.js
+// main.js - Main process
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
@@ -35,65 +27,72 @@ function createWindow() {
     height: 800,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
+      contextIsolation: true,    // Required for security
+      nodeIntegration: false,    // NEVER enable
+      sandbox: true,             // Additional protection
     },
   });
 
   mainWindow.loadFile('index.html');
 }
 
-// IPC handlers in main process
+// IPC handlers (main process only)
 ipcMain.handle('db:getUsers', async () => {
   return await database.getAllUsers();
 });
 
 ipcMain.handle('db:createUser', async (event, userData) => {
+  // Validate userData before processing
   return await database.createUser(userData);
 });
 
 app.whenReady().then(createWindow);
 
-// preload.js
+// preload.js - Bridge between main and renderer
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Only expose what renderer needs (whitelist approach)
 contextBridge.exposeInMainWorld('api', {
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   createUser: (data) => ipcRenderer.invoke('db:createUser', data),
-  // Only expose what renderer needs
+  // Never expose ipcRenderer directly!
 });
 
-// renderer.js (runs in browser context)
+// renderer.js - Runs in browser context (no Node.js)
 async function loadUsers() {
-  const users = await window.api.getUsers();
+  const users = await window.api.getUsers();  // Uses preload bridge
   renderUserList(users);
-}
-
-async function createUser(formData) {
-  const user = await window.api.createUser(formData);
-  return user;
 }
 ```
 
-## Integrates With
-- **State**: Redux, MobX, or Zustand in renderer
-- **DB**: SQLite via better-sqlite3 (main process)
-- **Updates**: `electron-updater` for auto-updates
-- **Build**: `electron-builder` for distribution
+## Version Gotchas
+- **Electron 33+**: Enhanced security defaults
+- **Context Isolation**: Required; breaks old tutorials
+- **Sandbox**: Enable for additional security layer
+- **Native modules**: Must be rebuilt for Electron version
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Cannot find module` in renderer | Use preload bridge, not require |
-| `IPC channel not found` | Register handler in main before invoke |
-| `App hangs` | Move blocking work off main process |
-| `White screen on load` | Check devtools for renderer errors |
+## What NOT to Do
+- ❌ `nodeIntegration: true` — Critical security vulnerability
+- ❌ `require('electron').remote` — Deprecated and dangerous
+- ❌ `contextBridge.exposeInMainWorld('ipcRenderer', ipcRenderer)` — Too broad
+- ❌ Blocking main process with sync code — App freezes
+- ❌ Loading untrusted remote content — XSS risk
 
-## Prod Ready
-- [ ] Code signing configured
-- [ ] Auto-updates working
-- [ ] CSP headers set
-- [ ] Sandbox enabled
-- [ ] Crash reporting integrated
-- [ ] Native modules rebuilt for Electron
+## Process Architecture
+| Process | Access | Purpose |
+|---------|--------|---------|
+| Main | Node.js, OS | Window management, native APIs |
+| Renderer | Browser only | UI rendering (via preload bridge) |
+| Preload | Limited Node | Secure IPC bridge |
+
+## Security Checklist
+```javascript
+// webPreferences (always set these)
+webPreferences: {
+  contextIsolation: true,
+  nodeIntegration: false,
+  sandbox: true,
+  webSecurity: true,
+  allowRunningInsecureContent: false,
+}
+```

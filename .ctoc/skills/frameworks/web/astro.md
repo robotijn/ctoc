@@ -1,99 +1,74 @@
 # Astro CTO
-> Content-focused framework - zero JS by default, island architecture for interactivity.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm create astro@latest -- --template basics
+npm create astro@latest
+# Astro 5.x - requires Node.js 18.17.1+ or 20.3.0+
+# Upgrade existing:
+npx @astrojs/upgrade
 npm run dev
-npm run build && npm run preview
 ```
 
-## Non-Negotiables
-1. Islands architecture - hydrate only interactive components
-2. Content collections for structured markdown/MDX
-3. Zero client JS by default - add `client:*` directives intentionally
-4. Framework agnostic - use React/Vue/Svelte where each excels
-5. Static-first, SSR only when needed
+## Claude's Common Mistakes
+1. **MDX version mismatch** — Astro 5 requires @astrojs/mdx v4.0.0+
+2. **Skipping major versions** — Upgrade 3→4→5, not 3→5 directly
+3. **Legacy Content Collections** — Use new Content Layer API for better performance
+4. **Old script behavior** — Astro 5 changes script hoisting; check script tags
+5. **Stale cache issues** — Delete node_modules, .astro, dist when upgrading
 
-## Red Lines
-- Unnecessary `client:load` - use `client:visible` or `client:idle`
-- Missing content collections for structured data
-- JavaScript where HTML/CSS suffices
-- Ignoring image optimization with `@astrojs/image`
-- Over-engineering static content sites
-
-## Pattern: Content Collection with Component Island
+## Correct Patterns (2026)
 ```typescript
-// src/content/config.ts
+// Astro 5: Content Layer API (new)
+// src/content.config.ts
 import { defineCollection, z } from 'astro:content';
+import { glob } from 'astro/loaders';
 
 const blog = defineCollection({
-  type: 'content',
+  loader: glob({ pattern: '**/*.md', base: './src/content/blog' }),
   schema: z.object({
     title: z.string(),
-    description: z.string(),
     pubDate: z.coerce.date(),
-    author: z.string(),
     tags: z.array(z.string()).default([]),
   }),
 });
 
 export const collections = { blog };
 
-// src/pages/blog/[slug].astro
----
-import { getCollection } from 'astro:content';
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import Comments from '../../components/Comments.tsx';
-
-export async function getStaticPaths() {
-  const posts = await getCollection('blog');
-  return posts.map(post => ({
-    params: { slug: post.slug },
-    props: { post },
-  }));
-}
-
-const { post } = Astro.props;
-const { Content } = await post.render();
----
-
-<BaseLayout title={post.data.title}>
-  <article>
-    <h1>{post.data.title}</h1>
-    <time>{post.data.pubDate.toLocaleDateString()}</time>
-    <Content />
-  </article>
-  <Comments client:visible postId={post.slug} />
-</BaseLayout>
+// Client directives (use sparingly)
+// client:load - Critical (nav, forms)
+// client:idle - Low priority (analytics)
+// client:visible - Below fold (comments)
+// client:only="react" - Never SSR
 ```
 
-## Client Directives Decision Tree
-- `client:load` - Critical interactive (nav menus, forms)
-- `client:idle` - Lower priority (analytics, chat widgets)
-- `client:visible` - Below fold (comments, carousels)
-- `client:media` - Conditional (mobile-only components)
-- `client:only` - Never SSR (browser-only APIs)
+## Version Gotchas
+- **v4→v5**: Content Layer API replaces legacy collections
+- **v4→v5**: Scripts no longer hoisted to `<head>` by default
+- **v4→v5**: Conditional scripts not implicitly inlined
+- **v5**: Requires @astrojs/mdx v4.0.0+ for MDX files
+- **Starlight**: Ensure compatible version before Astro 5 upgrade
 
-## Integrates With
-- **CMS**: Astro DB, Contentful, Sanity, or Markdown
-- **UI**: React, Vue, Svelte, or Solid components
-- **Styling**: Tailwind CSS with `@astrojs/tailwind`
-- **Deploy**: Vercel, Netlify, Cloudflare Pages
+## What NOT to Do
+- ❌ `client:load` everywhere — Use `client:visible` or `client:idle`
+- ❌ Upgrading Astro 3→5 directly — Go through v4 first
+- ❌ Keeping old @astrojs/* versions with Astro 5 — Update all integrations
+- ❌ Using legacy content collections — Migrate to Content Layer API
+- ❌ Heavy JS where HTML/CSS suffices — Zero JS is the goal
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Cannot use useState in Astro component` | Move to framework component with `client:*` |
-| `getCollection is not defined` | Import from `astro:content` |
-| `Hydration mismatch` | Ensure component renders same on server/client |
-| `Image not found` | Use `import` for local images, check path |
+## Client Directive Decision
+| Need | Directive |
+|------|-----------|
+| Critical interactive | `client:load` |
+| Lower priority | `client:idle` |
+| Below the fold | `client:visible` |
+| Mobile only | `client:media` |
+| Browser APIs only | `client:only` |
 
-## Prod Ready
-- [ ] Image optimization enabled
-- [ ] Sitemap generated with `@astrojs/sitemap`
-- [ ] RSS feed for blog content
-- [ ] View Transitions API for navigation
-- [ ] Prefetch enabled for faster navigation
-- [ ] Core Web Vitals verified (should be excellent)
+## Troubleshooting
+```bash
+# Clear cache when upgrading
+rm -rf node_modules .astro dist
+npm install
+npm run build
+```

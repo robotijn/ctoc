@@ -1,68 +1,60 @@
 # Perl CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-perlcritic --stern lib/                # Lint
-perltidy -b lib/*.pm                   # Format
-prove -l -v t/                         # Test
-dzil build                             # Build distribution
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude forgets `use strict; use warnings;` — mandatory in every file
+- Claude uses two-arg `open` — use three-arg form with lexical handles
+- Claude uses bareword filehandles — use lexical handles
+- Claude shell-interpolates user input — use list form for system calls
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `perl 5.38+` | Modern features | Perl 5.20 or older |
+| `Perl::Critic` | Static analysis | No linting |
+| `Perl::Tidy` | Formatting | Manual style |
+| `Test2::V0` | Modern testing | Test::Simple |
+| `cpanfile` | Dependency management | Manual installs |
+
+## Patterns Claude Should Use
+```perl
+use strict;
+use warnings;
+use feature qw(signatures say);
+
+# Three-arg open with lexical handle
+sub read_file($filename) {
+    open my $fh, '<', $filename
+        or die "Cannot open $filename: $!";
+    local $/;  # slurp mode
+    my $content = <$fh>;
+    close $fh;
+    return $content;
+}
+
+# List form for system commands (no shell)
+system('ls', '-la', $directory);
+
+# Proper Unicode handling
+use utf8;
+use open qw(:std :utf8);
+
+# Modern OO with signatures
+sub new($class, %args) {
+    return bless \%args, $class;
+}
 ```
 
-## Tools (2024-2025)
-- **Perl 5.38+** - Latest features
-- **Perl::Critic** - Static analysis
-- **Perl::Tidy** - Code formatting
-- **Test2::V0** - Modern testing
-- **Dist::Zilla** - Distribution building
+## Anti-Patterns Claude Generates
+- Missing `use strict; use warnings;` — always include
+- Two-arg `open FILE, $path` — use three-arg lexical form
+- Shell interpolation `system("cmd $var")` — use list form
+- Bareword filehandles — use `my $fh`
+- Missing UTF-8 handling — use `use utf8;` and `:encoding`
 
-## Project Structure
-```
-project/
-├── lib/               # Module code
-├── t/                 # Test files
-├── bin/               # Scripts
-├── cpanfile           # Dependencies
-└── dist.ini           # Dist::Zilla config
-```
-
-## Non-Negotiables
-1. use strict; use warnings; always
-2. Modern Perl features (signatures, postfix deref)
-3. CPAN modules for common tasks
-4. POD documentation for all public APIs
-
-## Red Lines (Reject PR)
-- Missing strict/warnings pragmas
-- CGI.pm for new web code (use Plack)
-- Bareword filehandles (use lexical)
-- Two-argument open
-- Secrets hardcoded in code
-- eval STRING without error handling
-
-## Testing Strategy
-- **Unit**: Test2::V0, <100ms
-- **Integration**: Test::WWW::Mechanize
-- **Mocking**: Test2::Mock
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Context confusion | Understand scalar/list |
-| Regex catastrophic backtracking | Use atomic groups |
-| Memory leaks in closures | Break circular refs |
-| Unicode handling | use utf8; encode/decode |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No regex compilation in loops
-- No unnecessary string copies
-
-## Security Checklist
-- [ ] Input validated and tainted
-- [ ] No shell injection (use list form)
-- [ ] Secrets from environment ($ENV{})
-- [ ] Dependencies audited (CPAN::Audit)
+## Version Gotchas
+- **5.38+**: Stable signatures (no experimental pragma needed)
+- **Unicode**: Declare encoding explicitly everywhere
+- **Regex**: Avoid catastrophic backtracking with atomic groups
+- **Taint mode**: Use `-T` for web/CGI code
+- **With Plack**: Modern web, not CGI.pm

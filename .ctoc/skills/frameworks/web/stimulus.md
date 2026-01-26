@@ -1,35 +1,29 @@
 # Stimulus CTO
-> Modest JavaScript for HTML you already have - controllers, targets, values.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm install @hotwired/stimulus
 # Rails: rails stimulus:install
-# Webpack/Vite: import and register controllers
 ```
 
-## Non-Negotiables
-1. Controller organization by behavior
-2. Targets for DOM element references
-3. Values for reactive state
-4. Actions for event bindings
-5. Outlets for cross-controller communication
+## Claude's Common Mistakes
+1. **DOM queries in controllers** — Use targets, not `querySelector`
+2. **State outside values** — Values are reactive; plain properties aren't
+3. **Missing `static targets`** — Targets must be declared
+4. **Complex logic in controllers** — Keep controllers focused and simple
+5. **Not cleaning up in `disconnect()`** — Remove listeners, timers
 
-## Red Lines
-- DOM queries in controllers - use targets
-- Missing target definitions in static
-- State outside values - loses reactivity
-- Complex JavaScript logic - keep it simple
-- Not using data attributes properly
-
-## Pattern: Interactive Component
+## Correct Patterns (2026)
 ```javascript
 // controllers/users_controller.js
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
+  // Declare targets (not querySelector!)
   static targets = ["list", "form", "input", "count"]
+
+  // Declare values (reactive state)
   static values = {
     url: String,
     loading: { type: Boolean, default: false }
@@ -40,11 +34,11 @@ export default class extends Controller {
   }
 
   async load() {
-    this.loadingValue = true
+    this.loadingValue = true  // Reactive; triggers callback
     try {
       const response = await fetch(this.urlValue)
       const html = await response.text()
-      this.listTarget.innerHTML = html
+      this.listTarget.innerHTML = html  // Use target, not querySelector
       this.updateCount()
     } finally {
       this.loadingValue = false
@@ -58,7 +52,6 @@ export default class extends Controller {
     const response = await fetch(this.urlValue, {
       method: 'POST',
       body: formData,
-      headers: { 'Accept': 'text/html' }
     })
 
     if (response.ok) {
@@ -68,11 +61,10 @@ export default class extends Controller {
   }
 
   updateCount() {
-    const count = this.listTarget.querySelectorAll('li').length
-    this.countTarget.textContent = count
+    this.countTarget.textContent = this.listTarget.children.length
   }
 
-  // Reactive callback when value changes
+  // Reactive callback (fires when value changes)
   loadingValueChanged() {
     this.element.classList.toggle('loading', this.loadingValue)
   }
@@ -93,29 +85,34 @@ export default class extends Controller {
   </form>
 
   <ul data-users-target="list"></ul>
-
   <button data-action="click->users#load">Refresh</button>
 </div>
 ```
 
-## Integrates With
-- **Turbo**: Natural pairing for Hotwire stack
-- **Rails**: `stimulus-rails` gem
-- **Backend**: Any HTML-rendering server
-- **CSS**: Toggle classes for state changes
+## Version Gotchas
+- **Stimulus 3.x**: Outlets for cross-controller communication
+- **Targets**: Must be in `static targets` array
+- **Values**: Must be in `static values` object
+- **TypeScript**: Use `@stimulus-vite-helpers` for types
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Target not found` | Check `data-{name}-target` attribute |
-| `Controller not connecting` | Check `data-controller` attribute |
-| `Value not updating` | Check `{name}ValueChanged` callback |
-| `Action not firing` | Check `data-action` syntax |
+## What NOT to Do
+- ❌ `this.element.querySelector('.list')` — Use `this.listTarget`
+- ❌ `this.loading = true` — Use `this.loadingValue` for reactivity
+- ❌ Missing `static targets = [...]` — Targets won't work
+- ❌ Complex business logic — Extract to services
+- ❌ Event listeners without cleanup — Use `disconnect()`
 
-## Prod Ready
-- [ ] Controllers lazy-loaded
-- [ ] Targets properly defined
-- [ ] Values for all state
-- [ ] Disconnect cleanup
-- [ ] Error handling in async
-- [ ] Accessible interactions
+## Data Attributes
+| Attribute | Purpose |
+|-----------|---------|
+| `data-controller` | Attach controller |
+| `data-[name]-target` | Mark target element |
+| `data-[name]-[key]-value` | Set value |
+| `data-action` | Bind event to method |
+
+## Pairs With
+| Tool | Purpose |
+|------|---------|
+| Turbo | HTML-over-the-wire |
+| Rails | Server framework |
+| Any backend | Server-rendered HTML |

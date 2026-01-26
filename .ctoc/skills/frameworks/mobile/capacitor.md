@@ -1,39 +1,29 @@
 # Capacitor CTO
-> Native runtime engineering leader bridging web apps to native platforms with plugin-first architecture.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm init @capacitor/app
+npm install @capacitor/core @capacitor/cli
 npx cap add ios && npx cap add android
-npx cap sync && npx cap run ios --livereload --external
+npx cap sync
 ```
 
-## Non-Negotiables
-1. Official Capacitor plugins before third-party alternatives
-2. Platform checks with Capacitor.isNativePlatform() before native API calls
-3. Proper permission flows before accessing camera, location, etc.
-4. Native projects (ios/, android/) committed to version control
-5. Plugin error handling with try/catch and graceful fallbacks
+## Claude's Common Mistakes
+1. **Uses Capacitor 5 androidScheme** - v6 defaults to `https`, breaks existing apps
+2. **Ignores Swift Package Manager** - v8 default for iOS, CocoaPods still supported
+3. **Missing permission flows** - Must check/request before camera, location, etc.
+4. **Suggests `isPluginAvailable` for core plugins** - Core plugins always available
+5. **Forgets `npx cap copy`** - Required after web build changes
 
-## Red Lines
-- API keys or secrets in capacitor.config.ts
-- Ignoring native build warnings - they indicate real issues
-- Direct DOM manipulation - let your framework handle rendering
-- Assuming plugin availability without platform checks
-- Skipping deep link and app lifecycle testing
-
-## Pattern: Safe Plugin Access with Fallback
+## Correct Patterns (2026)
 ```typescript
+// Safe plugin access with proper permission flow
 import { Capacitor } from '@capacitor/core';
 import { Geolocation, Position } from '@capacitor/geolocation';
 
 export async function getCurrentLocation(): Promise<Position | null> {
-  if (!Capacitor.isPluginAvailable('Geolocation')) {
-    console.warn('Geolocation not available');
-    return null;
-  }
-
+  // Core plugins don't need isPluginAvailable check
   try {
     const permission = await Geolocation.checkPermissions();
     if (permission.location !== 'granted') {
@@ -48,22 +38,30 @@ export async function getCurrentLocation(): Promise<Position | null> {
     return null;
   }
 }
+
+// capacitor.config.ts for migration from v5
+const config: CapacitorConfig = {
+  appId: 'com.example.app',
+  appName: 'MyApp',
+  webDir: 'dist',
+  android: {
+    // SET THIS for v5->v6 migration to preserve localStorage
+    allowMixedContent: true,
+  },
+  // Only if migrating from v5 with existing data
+  // androidScheme: 'http',
+};
 ```
 
-## Integrates With
-- **DB**: @capacitor/preferences for KV, @capacitor-community/sqlite for relational
-- **Auth**: @capacitor/browser for OAuth flows, secure storage for tokens
-- **Cache**: Web Storage API with native fallback via Preferences
+## Version Gotchas
+- **v6**: `androidScheme: 'https'` default breaks localStorage from v5
+- **v8**: Swift Package Manager default, `npx cap migrate` for CocoaPods
+- **v6+**: NodeJS 18+ required
+- **With Ionic**: Use `@capacitor/` official plugins, not community forks
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Plugin not implemented for web` | Check platform and provide web fallback |
-| `Unable to load asset` | Run `npx cap copy` to sync web assets |
-| `Podfile.lock out of sync` | Run `npx cap update ios` and `pod install` |
-
-## Prod Ready
-- [ ] Native projects updated with `npx cap update`
-- [ ] App permissions declared in Info.plist and AndroidManifest.xml
-- [ ] Live reload disabled for production builds
-- [ ] Capacitor config environment-specific (dev/staging/prod)
+## What NOT to Do
+- Do NOT skip setting `androidScheme: 'http'` when migrating from v5
+- Do NOT modify native projects manually - use config or plugins
+- Do NOT commit `ios/Pods/` - gitignore it, runs `pod install` on sync
+- Do NOT use plugins without checking iOS/Android permission requirements
+- Do NOT forget `npx cap sync` after `npm install` new plugins

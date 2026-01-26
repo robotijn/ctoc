@@ -1,85 +1,62 @@
 # Redis CTO
-> In-memory data structure store for caching, messaging, and real-time data.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name redis -p 6379:6379 redis:7-alpine
-redis-cli PING
-redis-cli --eval tests/script.lua
+# Server
+docker run -d --name redis -p 6379:6379 redis:7.4-alpine
+
+# Clients
+pip install redis          # Python
+npm install redis          # Node.js (use redis, not ioredis for official)
 ```
 
-## Non-Negotiables
-1. Data structure selection matches access pattern
-2. Consistent key naming convention (namespace:type:id)
-3. TTL on all cached data
-4. Pipeline or MULTI for bulk operations
-5. Lua scripts for atomic multi-key operations
-6. Memory limits with eviction policy
+## Claude's Common Mistakes
+1. **Creating new connections per request** - Use connection pooling always
+2. **Using KEYS in production** - Use SCAN for iteration (KEYS blocks)
+3. **Missing TTL on cache keys** - Causes memory bloat
+4. **Ignoring hash field expiration** - v7.4 supports per-field TTL
+5. **Large values (>100KB)** - Split into smaller keys or use streams
 
-## Red Lines
-- `KEYS *` in production (use SCAN)
-- Missing TTL causing memory bloat
-- Large values >100KB per key
-- No persistence for critical data
-- Blocking operations without timeouts
-
-## Pattern: Production Redis Patterns
+## Correct Patterns (2026)
 ```python
 import redis
 
-r = redis.Redis(host='localhost', decode_responses=True)
+# Connection pool (singleton pattern)
+pool = redis.ConnectionPool(
+    host='localhost', port=6379,
+    max_connections=20,
+    decode_responses=True,
+    health_check_interval=30  # Auto-reconnect on stale connections
+)
+r = redis.Redis(connection_pool=pool)
 
-# Key naming convention: namespace:type:id
+# Key naming: namespace:type:id
 USER_KEY = "app:user:{user_id}"
-SESSION_KEY = "app:session:{session_id}"
 
-# Hash for objects
-r.hset(USER_KEY.format(user_id=123), mapping={
-    "name": "Alice",
-    "email": "alice@example.com",
-    "plan": "premium"
-})
-r.expire(USER_KEY.format(user_id=123), 3600)
+# Hash with field-level TTL (Redis 7.4+)
+r.hset(f"app:session:{sid}", mapping={"user": "alice", "role": "admin"})
+r.hexpire(f"app:session:{sid}", 3600, "user", "role")  # Per-field expiry
 
-# Sorted set for leaderboard
-r.zadd("app:leaderboard:daily", {"user:123": 1500, "user:456": 2200})
-top_10 = r.zrevrange("app:leaderboard:daily", 0, 9, withscores=True)
-
-# Pipeline for bulk operations
+# Pipeline for bulk operations (reduces round trips)
 with r.pipeline() as pipe:
-    for user_id in user_ids:
-        pipe.hgetall(USER_KEY.format(user_id=user_id))
+    for uid in user_ids:
+        pipe.hgetall(USER_KEY.format(user_id=uid))
     results = pipe.execute()
 
-# Lua script for atomic operations
-RATE_LIMIT_SCRIPT = """
-local key = KEYS[1]
-local limit = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local current = redis.call('INCR', key)
-if current == 1 then redis.call('EXPIRE', key, window) end
-return current <= limit and 1 or 0
-"""
-rate_limit = r.register_script(RATE_LIMIT_SCRIPT)
+# SCAN instead of KEYS (non-blocking)
+for key in r.scan_iter(match="app:user:*", count=100):
+    process(key)
 ```
 
-## Integrates With
-- **Caching**: Application cache, session store
-- **Messaging**: Pub/Sub, Streams for queues
-- **Search**: RediSearch for full-text
+## Version Gotchas
+- **v7.4**: Hash field expiration (HEXPIRE), BFLOAT16/FLOAT16 for AI vectors
+- **v7.4**: XREAD with `+` to start from last message
+- **Valkey**: Redis fork; GLIDE client auto-multiplexes connections
+- **Cluster**: Use hash tags `{user}:123` to colocate related keys
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `OOM command not allowed` | Configure maxmemory and eviction policy |
-| `CROSSSLOT` in cluster | Use hash tags `{user}:123` |
-| `Connection pool exhausted` | Increase pool size or fix leaks |
-| `SLOWLOG` entries | Optimize commands, add indexes |
-
-## Prod Ready
-- [ ] Memory limits with eviction policy
-- [ ] Persistence configured (RDB/AOF)
-- [ ] Sentinel or Cluster for HA
-- [ ] Key TTLs on all cached data
-- [ ] SLOWLOG monitoring enabled
+## What NOT to Do
+- Do NOT use `KEYS *` in production (blocks server)
+- Do NOT create connection per request (use pool)
+- Do NOT store values >100KB per key
+- Do NOT skip TTL on cached data (memory leak)

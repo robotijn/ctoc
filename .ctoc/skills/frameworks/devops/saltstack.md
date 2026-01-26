@@ -1,29 +1,24 @@
 # SaltStack CTO
-> Event-driven automation leader demanding state-driven configuration with pillar-based secrets.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-salt-call --local state.apply mystate test=True
-salt '*' state.highstate --state-output=changes
-salt-call --local pillar.items && pytest tests/
+# Bootstrap script (recommended)
+curl -L https://bootstrap.saltproject.io | sudo sh -s -- -M
+# Or package manager
+sudo apt-get install salt-master salt-minion
+# Masterless mode
+salt-call --local state.apply
 ```
 
-## Non-Negotiables
-1. State-driven configuration with SLS files
-2. Pillar for secrets and environment-specific data
-3. Jinja templating with proper escaping and defaults
-4. Reactor system for event-driven automation
-5. Salt environments for promotion workflow
+## Claude's Common Mistakes
+1. **Uses cmd.run when state modules exist** - Not idempotent
+2. **Secrets in state files** - Must use pillar with GPG
+3. **Missing requisites** - Causes ordering issues
+4. **Unscoped pillar access** - Cross-minion data leakage
+5. **Skips test=True validation** - Changes without preview
 
-## Red Lines
-- cmd.run when declarative state modules exist
-- Secrets in state files - always use pillar with GPG encryption
-- Missing requisites causing ordering issues
-- Unscoped pillar access allowing cross-minion data leakage
-- State files without test=True validation
-
-## Pattern: State with Pillar and Requisites
+## Correct Patterns (2026)
 ```yaml
 # states/nginx/init.sls
 {% set nginx = salt['pillar.get']('nginx', {}) %}
@@ -51,29 +46,31 @@ nginx_service:
     - require:
       - file: nginx_config
 
-# pillar/nginx.sls
+# pillar/nginx/init.sls (encrypted with GPG)
 nginx:
   workers: 4
   ssl_cert: |
     -----BEGIN CERTIFICATE-----
     {{ salt['vault.read_secret']('secret/nginx/cert') }}
     -----END CERTIFICATE-----
+
+# top.sls for pillar targeting
+base:
+  'web*':
+    - nginx
+  'db*':
+    - postgres
 ```
 
-## Integrates With
-- **DB**: mysql_database and postgres_database states with pillar creds
-- **Auth**: Vault integration via salt.modules.vault
-- **Cache**: redis state module with minion-specific configuration
+## Version Gotchas
+- **Salt 3007+**: Python 3.10+ required
+- **Salt Project**: Renamed from SaltStack, same software
+- **Vault integration**: Preferred over GPG for dynamic secrets
+- **With Reactor**: Event-driven automation for auto-remediation
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Pillar data not available` | Refresh pillar with `salt '*' saltutil.refresh_pillar` |
-| `Requisite not found` | Verify state ID exists, check for typos in require/watch |
-| `Jinja undefined variable` | Use `\| default()` filter or check pillar structure |
-
-## Prod Ready
-- [ ] States tested with kitchen-salt or pytest-salt
-- [ ] Pillar encrypted with GPG or Vault integration
-- [ ] Highstate runs validated in CI before deployment
-- [ ] Event reactor configured for auto-remediation
+## What NOT to Do
+- Do NOT use cmd.run when state modules exist
+- Do NOT put secrets in state files - use encrypted pillar
+- Do NOT skip requisites - causes race conditions
+- Do NOT allow unscoped pillar access - data leakage risk
+- Do NOT apply states without `test=True` first

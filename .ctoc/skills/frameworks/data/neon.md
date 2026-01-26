@@ -1,94 +1,67 @@
 # Neon CTO
-> Serverless PostgreSQL with branching, autoscaling, and instant provisioning.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-neon projects create --name myproject
-neon branches create --name feature-branch
-psql $(neon connection-string)
+npm install @neondatabase/serverless
+# Or CLI
+brew install neonctl && neon auth
 ```
 
-## Non-Negotiables
-1. Branch-based development workflow
-2. Autoscaling compute configuration
-3. Connection pooling for serverless workloads
-4. Compute endpoint sizing for workload
-5. Point-in-time recovery understood
-6. Autosuspend for development branches
+## Claude's Common Mistakes
+1. **Non-pooled connections in serverless** - Always use pooled connection string
+2. **Not using branch workflow** - Branches enable instant dev/staging environments
+3. **Long-running connections** - Neon is optimized for short-lived connections
+4. **Missing autosuspend on dev** - Wastes compute; set suspend timeout
+5. **Direct psql in production** - Use Neon serverless driver for edge/serverless
 
-## Red Lines
-- Long-running connections without pooling
-- Missing branch strategy for development
-- No autosuspend on non-production branches
-- Ignoring compute limits and cold starts
-- No backup verification strategy
-
-## Pattern: Serverless-Optimized Setup
-```bash
-# Create production branch
-neon branches create --name production
-
-# Create feature branch from production
-neon branches create --name feature-auth --parent production
-
-# Get pooled connection string (required for serverless)
-neon connection-string --pooled
-
-# Configure autoscaling (0.5 to 4 compute units)
-neon compute set --branch production --min-cu 0.5 --max-cu 4
-
-# Set autosuspend for dev branches (5 minutes)
-neon compute set --branch feature-auth --suspend-timeout 300
-```
-
+## Correct Patterns (2026)
 ```typescript
-import { neon } from '@neondatabase/serverless';
+import { neon, neonConfig } from '@neondatabase/serverless';
 
-// Serverless-optimized connection
-const sql = neon(process.env.DATABASE_URL!);
-
-// Efficient query pattern for serverless
-async function getUser(id: string) {
-  const [user] = await sql`
-    SELECT id, email, name
-    FROM users
-    WHERE id = ${id}
-  `;
-  return user;
-}
-
-// Transaction support
-import { neonConfig, Pool } from '@neondatabase/serverless';
+// Enable connection caching for serverless
 neonConfig.fetchConnectionCache = true;
 
+// Serverless-optimized connection (HTTP-based)
+const sql = neon(process.env.DATABASE_URL!);
+
+// Efficient query pattern
+const users = await sql`
+  SELECT id, email, name
+  FROM users
+  WHERE status = ${'active'}
+  LIMIT 20
+`;
+
+// Transaction support (pooled connection)
+import { Pool } from '@neondatabase/serverless';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
 const client = await pool.connect();
 try {
   await client.query('BEGIN');
-  // ... transaction queries
+  await client.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [100, from]);
+  await client.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [100, to]);
   await client.query('COMMIT');
 } finally {
   client.release();
 }
 ```
 
-## Integrates With
-- **Frameworks**: Next.js, Vercel, Cloudflare Workers
-- **ORM**: Prisma, Drizzle with pooled connections
-- **PostgreSQL**: Full compatibility, extensions
+```bash
+# Branch workflow
+neon branches create --name feature-auth --parent main
+neon connection-string --branch feature-auth --pooled
+```
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `connection timeout` | Use pooled connection string |
-| `too many connections` | Enable connection pooling |
-| `compute suspended` | Configure autosuspend timeout |
-| `branch not found` | Check branch name with `neon branches list` |
+## Version Gotchas
+- **Pooled vs direct**: Use `-pooler` connection string for serverless
+- **Autoscaling**: Configure min/max compute units for cost control
+- **Branching**: Instant copy-on-write; great for previews
+- **Cold starts**: First query after suspend is slower (~500ms)
 
-## Prod Ready
-- [ ] Connection pooling enabled
-- [ ] Autoscaling configured
-- [ ] Branch workflow established
-- [ ] Autosuspend on dev branches
-- [ ] Point-in-time recovery tested
+## What NOT to Do
+- Do NOT use direct (non-pooled) connections in serverless
+- Do NOT forget autosuspend on development branches
+- Do NOT ignore connection caching in edge functions
+- Do NOT skip branching workflow for dev/staging

@@ -1,46 +1,30 @@
 # AutoGen CTO
-> Multi-agent conversation framework for complex AI workflows.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# AutoGen merging with Semantic Kernel into Microsoft Agent Framework
+# For new projects, consider:
+pip install agent-framework  # Microsoft Agent Framework (preview)
+# Or continue with AutoGen:
 pip install pyautogen
-python -c "from autogen import AssistantAgent; print('OK')"
-pytest tests/ -v
 ```
 
-## Non-Negotiables
-1. Clear agent role definitions with specific capabilities
-2. Well-designed conversation patterns
-3. Human-in-the-loop configuration for safety
-4. Code execution sandboxing (Docker)
-5. Proper termination conditions
-6. Cost tracking for API usage
+## Claude's Common Mistakes
+1. Missing termination conditions causing infinite loops
+2. Code execution without Docker sandboxing
+3. No `max_consecutive_auto_reply` limit
+4. Using AutoGen when Microsoft Agent Framework is better fit
+5. Vague agent roles causing confusion
 
-## Red Lines
-- Unrestricted code execution without sandboxing
-- Missing termination logic causing infinite loops
-- No conversation turn limits
-- Ignoring agent capability boundaries
-- Unsafe Docker configuration
-- No cost limits on API calls
-
-## Pattern: Production Multi-Agent System
+## Correct Patterns (2026)
 ```python
 from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
 from autogen.coding import DockerCommandLineCodeExecutor
 
-# LLM configuration with cost tracking
-config_list = [{
-    "model": "gpt-4o",
-    "api_key": os.environ["OPENAI_API_KEY"],
-}]
-
-llm_config = {
-    "config_list": config_list,
-    "cache_seed": 42,
-    "temperature": 0,
-}
+# LLM config with caching
+config_list = [{"model": "gpt-4o", "api_key": os.environ["OPENAI_API_KEY"]}]
+llm_config = {"config_list": config_list, "cache_seed": 42, "temperature": 0}
 
 # Safe code execution with Docker
 code_executor = DockerCommandLineCodeExecutor(
@@ -49,69 +33,48 @@ code_executor = DockerCommandLineCodeExecutor(
     work_dir="./workspace",
 )
 
-# Define specialized agents
+# Specialized agents with clear roles
 planner = AssistantAgent(
     name="Planner",
-    system_message="You are a planning expert. Break down tasks into steps.",
+    system_message="Break down tasks into clear steps. Output 'TASK_COMPLETE' when done.",
     llm_config=llm_config,
 )
 
 coder = AssistantAgent(
     name="Coder",
-    system_message="You write clean, tested Python code.",
+    system_message="Write clean, tested Python code only.",
     llm_config=llm_config,
 )
 
-reviewer = AssistantAgent(
-    name="Reviewer",
-    system_message="You review code for bugs and improvements.",
-    llm_config=llm_config,
-)
-
-# User proxy with safe execution
+# User proxy with STRICT limits
 user_proxy = UserProxyAgent(
     name="User",
-    human_input_mode="TERMINATE",  # Or "ALWAYS" for human approval
-    max_consecutive_auto_reply=10,
+    human_input_mode="TERMINATE",  # Or "ALWAYS" for approval
+    max_consecutive_auto_reply=10, # CRITICAL: Prevent infinite loops
     code_execution_config={"executor": code_executor},
     is_termination_msg=lambda x: "TASK_COMPLETE" in x.get("content", ""),
 )
 
-# Group chat for collaboration
+# Group chat with round limit
 group_chat = GroupChat(
-    agents=[planner, coder, reviewer, user_proxy],
+    agents=[planner, coder, user_proxy],
     messages=[],
-    max_round=20,
-    speaker_selection_method="auto",
+    max_round=20,  # Hard limit
 )
 
 manager = GroupChatManager(groupchat=group_chat, llm_config=llm_config)
-
-# Start conversation
-user_proxy.initiate_chat(
-    manager,
-    message="Build a web scraper that extracts article titles from news sites.",
-)
+user_proxy.initiate_chat(manager, message="Build a web scraper")
 ```
 
-## Integrates With
-- **LLMs**: OpenAI, Azure OpenAI, Anthropic, local models
-- **Execution**: Docker, Jupyter, local shell
-- **Tools**: Function calling, RAG integration
-- **Observability**: Logging, cost tracking
+## Version Gotchas
+- **2025-2026**: AutoGen merging into Microsoft Agent Framework
+- **Agent Framework GA**: Expected Q1 2026 with stable APIs
+- **Migration**: Similar API but new workflow graph approach
+- **Maintenance**: AutoGen getting security fixes only
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Infinite conversation loop` | Add termination conditions, limit max_round |
-| `Code execution failed` | Check Docker setup, verify image |
-| `API rate limit` | Add delays, implement retries |
-| `Agent confusion` | Clarify system messages, use specific roles |
-
-## Prod Ready
-- [ ] Code execution sandboxed in Docker
-- [ ] Termination conditions defined
-- [ ] Conversation limits set (max_round)
-- [ ] Human-in-the-loop for critical decisions
-- [ ] Cost tracking enabled
-- [ ] Agent roles clearly defined
+## What NOT to Do
+- Do NOT skip termination conditions - causes infinite loops
+- Do NOT execute code without Docker sandboxing
+- Do NOT forget `max_consecutive_auto_reply` limit
+- Do NOT use vague agent system messages
+- Do NOT ignore Microsoft Agent Framework for new projects

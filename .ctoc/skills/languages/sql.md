@@ -1,68 +1,59 @@
 # SQL CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-sqlfluff lint .                        # Lint
-sqlfluff fix .                         # Format
-pg_prove -d testdb tests/              # Test (PostgreSQL)
-flyway migrate                         # Apply migrations
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude concatenates strings into queries — use parameterized queries
+- Claude uses `SELECT *` — specify column names explicitly
+- Claude forgets `LIMIT` on large tables — always bound queries
+- Claude ignores `EXPLAIN ANALYZE` — verify query plans
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `sqlfluff` | Linting and formatting | Manual style |
+| `flyway` / `liquibase` | Migration management | Manual DDL |
+| `pgtap` / `utplsql` | Database testing | No tests |
+| `pg_stat_statements` | Query analysis | Guessing perf |
+| `dbeaver` / `datagrip` | SQL clients | Basic psql |
+
+## Patterns Claude Should Use
+```sql
+-- Always parameterized (application code)
+-- SELECT * FROM users WHERE id = $1
+
+-- Specify columns, not SELECT *
+SELECT id, name, email, created_at
+FROM users
+WHERE status = 'active'
+LIMIT 100;
+
+-- Index foreign keys
+CREATE INDEX idx_orders_user_id ON orders(user_id);
+
+-- Use EXPLAIN ANALYZE to verify plans
+EXPLAIN ANALYZE
+SELECT u.name, COUNT(o.id)
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP BY u.id;
+
+-- Proper pagination (keyset, not OFFSET)
+SELECT * FROM posts
+WHERE created_at < $1  -- last seen timestamp
+ORDER BY created_at DESC
+LIMIT 20;
 ```
 
-## Tools (2024-2025)
-- **sqlfluff** - SQL linter and formatter
-- **Flyway/Liquibase** - Migration management
-- **pgTAP/utPLSQL** - Database testing
-- **DBeaver/DataGrip** - SQL clients
-- **pg_stat_statements** - Query analysis
+## Anti-Patterns Claude Generates
+- String concatenation for queries — SQL injection risk
+- `SELECT *` — specify columns, avoid schema coupling
+- `OFFSET` for pagination — use keyset pagination
+- Missing indexes on FKs — causes slow joins
+- Unbounded queries — always use `LIMIT`
 
-## Project Structure
-```
-project/
-├── migrations/        # Versioned migrations
-├── functions/         # Stored procedures
-├── views/             # View definitions
-├── tests/             # Database tests
-└── seed/              # Test/dev seed data
-```
-
-## Non-Negotiables
-1. Parameterized queries always (no string concat)
-2. Proper indexing on foreign keys and WHERE columns
-3. Transaction boundaries for data integrity
-4. Normalized unless denormalized for performance
-
-## Red Lines (Reject PR)
-- String concatenation for queries (SQL injection)
-- Missing indexes on foreign keys
-- SELECT * in production queries
-- Unbounded queries without LIMIT
-- Missing NOT NULL constraints where required
-- Secrets in migration files
-
-## Testing Strategy
-- **Unit**: pgTAP/utPLSQL for functions
-- **Integration**: Full query tests with test data
-- **Performance**: EXPLAIN ANALYZE on critical queries
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| N+1 query problem | Use JOINs or batch fetching |
-| Index not used | Check EXPLAIN, fix column order |
-| Lock contention | Smaller transactions, row-level locks |
-| Data type mismatch | Explicit casts, proper types |
-
-## Performance Red Lines
-- No full table scans on large tables
-- No correlated subqueries in SELECT
-- No functions on indexed columns in WHERE
-
-## Security Checklist
-- [ ] All queries parameterized
-- [ ] Least privilege for app user
-- [ ] Sensitive columns encrypted
-- [ ] Audit logging on sensitive tables
+## Version Gotchas
+- **PostgreSQL 16+**: Improved JSON, parallel query
+- **N+1 problem**: Use JOINs or batch fetching
+- **Indexes**: Check `EXPLAIN` to verify usage
+- **Locks**: Use row-level locks, small transactions
+- **With ORMs**: Review generated SQL, don't trust blindly

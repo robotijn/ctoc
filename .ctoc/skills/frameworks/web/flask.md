@@ -1,87 +1,86 @@
 # Flask CTO
-> Micro framework, macro discipline - add structure yourself, stay consistent.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install flask flask-sqlalchemy flask-migrate python-dotenv
+pip install flask
+# Flask 3.1.x - requires Python 3.9+
+# With common extensions:
+pip install flask-sqlalchemy flask-migrate python-dotenv
 flask run --debug
-pytest tests/ -v --cov=app
 ```
 
-## Non-Negotiables
-1. Application factory pattern with `create_app()`
-2. Blueprints organize routes by feature domain
-3. Configuration from environment variables, never hardcoded
-4. SQLAlchemy models in separate module, not in routes
-5. Error handlers return consistent JSON structure
+## Claude's Common Mistakes
+1. **Debug mode in production** — Never `FLASK_DEBUG=1` or `app.run(debug=True)` in prod
+2. **Business logic in routes** — Extract to service layer; routes only orchestrate
+3. **Missing CSRF protection** — Use Flask-WTF for forms with `{{ form.csrf_token }}`
+4. **Raw SQL without parameterization** — Use SQLAlchemy ORM or parameterized queries
+5. **Circular imports** — Use application factory pattern with blueprints
 
-## Red Lines
-- Circular imports - use factory pattern and blueprints properly
-- Business logic in route handlers - extract to services
-- Hardcoded configuration values
-- Missing CSRF protection on forms
-- Raw SQL without parameterized queries
-
-## Pattern: Application Factory
+## Correct Patterns (2026)
 ```python
+# Application factory pattern (prevents circular imports)
 # app/__init__.py
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from config import Config
 
 db = SQLAlchemy()
-migrate = Migrate()
 
-def create_app(config_class=Config):
+def create_app(config_class='config.Config'):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
     db.init_app(app)
-    migrate.init_app(app, db)
 
-    from app.api import bp as api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
-
-    from app.errors import register_error_handlers
-    register_error_handlers(app)
+    from app.routes import users_bp
+    app.register_blueprint(users_bp, url_prefix='/api/users')
 
     return app
 
-# app/api/users.py
-from flask import Blueprint, request, jsonify
-from app.services.user_service import UserService
-from app.schemas.user import CreateUserSchema
+# Service layer (not in routes)
+# app/services/user_service.py
+class UserService:
+    @staticmethod
+    def create_user(data: dict) -> User:
+        user = User(**data)
+        db.session.add(user)
+        db.session.commit()
+        return user
 
-bp = Blueprint('users', __name__, url_prefix='/users')
-user_service = UserService()
-
+# Routes call services
 @bp.post('/')
 def create_user():
-    data = CreateUserSchema().load(request.json)
-    user = user_service.create(data)
+    data = request.get_json()
+    # Validate with Marshmallow or Pydantic
+    user = UserService.create_user(data)
     return jsonify(user.to_dict()), 201
 ```
 
-## Integrates With
-- **DB**: SQLAlchemy with Flask-Migrate for migrations
-- **Auth**: Flask-Login for sessions, Flask-JWT-Extended for APIs
-- **Cache**: Flask-Caching with Redis backend
-- **Validation**: Marshmallow or Pydantic for schemas
+## Version Gotchas
+- **Flask 2.x→3.x**: `before_first_request` removed; use app context setup
+- **Flask 3.0+**: Requires Python 3.8+, but 3.9+ recommended
+- **With SQLAlchemy 2.0**: Use `db.session.execute(select(...))` not legacy query
+- **Werkzeug 3.x**: Some internal APIs changed
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `RuntimeError: Working outside of application context` | Use `with app.app_context():` or `current_app` |
-| `ImportError: circular import` | Move imports inside functions or restructure |
-| `BuildError: Could not build url` | Check blueprint registration and endpoint names |
-| `sqlalchemy.exc.DetachedInstanceError` | Access relationships within session scope |
+## What NOT to Do
+- ❌ `app.run(debug=True)` in production — Security vulnerability
+- ❌ `@app.route` with business logic — Use service layer
+- ❌ `cursor.execute(f"SELECT * WHERE id={id}")` — SQL injection
+- ❌ Imports at module level causing circular deps — Use factory pattern
+- ❌ Flask's dev server in production — Use Gunicorn/uWSGI
 
-## Prod Ready
-- [ ] Gunicorn with `--workers` = (2 * CPU) + 1
-- [ ] WSGI middleware for request ID tracing
-- [ ] Structured logging with `structlog`
-- [ ] Health endpoint at `/health`
-- [ ] Rate limiting with `flask-limiter`
-- [ ] CORS configured for allowed origins only
+## Production Deployment
+```bash
+# Production with Gunicorn (workers = 2 * CPU + 1)
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:8000 "app:create_app()"
+```
+
+## Security Checklist
+```python
+# Secure configuration
+app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+```

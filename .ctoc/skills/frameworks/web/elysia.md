@@ -1,34 +1,26 @@
 # Elysia CTO
-> Ergonomic Bun web framework - end-to-end type safety, fast, developer-friendly.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-bun create elysia myapp && cd myapp
-bun run dev
-bun test
+bun create elysia my-app
+cd my-app && bun run dev
+# Elysia 1.x - Bun-first web framework
 ```
 
-## Non-Negotiables
-1. End-to-end type safety with TypeBox
-2. Plugin composition for modularity
-3. Schema validation on all routes
-4. Proper error handling with `onError`
-5. Swagger documentation in development
+## Claude's Common Mistakes
+1. **Missing schema validation** — TypeBox schemas provide type safety AND runtime validation
+2. **Type assertions over inference** — Let Elysia infer types from schemas
+3. **Ignoring plugin order** — Decorators must be registered before use
+4. **No `onError` handler** — Unhandled errors return generic 500
+5. **Swagger in production** — Disable `@elysiajs/swagger` in prod
 
-## Red Lines
-- Missing input validation
-- Type assertions over type inference
-- Ignoring plugin lifecycle hooks
-- Heavy middleware chains - keep plugins focused
-- Skipping schema definitions
-
-## Pattern: Type-Safe CRUD
+## Correct Patterns (2026)
 ```typescript
 import { Elysia, t } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
-import { jwt } from '@elysiajs/jwt';
 
+// Define schemas (provides types AND runtime validation)
 const UserSchema = t.Object({
   email: t.String({ format: 'email' }),
   password: t.String({ minLength: 8 }),
@@ -40,16 +32,24 @@ const UserResponseSchema = t.Object({
 });
 
 const app = new Elysia()
-  .use(swagger())
-  .use(jwt({ name: 'jwt', secret: process.env.JWT_SECRET! }))
-  .decorate('db', new Database())
+  .use(swagger({ path: '/docs' }))  // Only in development
+  .decorate('db', new Database())   // Register before use
+  .onError(({ code, error, set }) => {
+    console.error(error);
+    if (code === 'VALIDATION') {
+      set.status = 400;
+      return { error: error.message };
+    }
+    set.status = 500;
+    return { error: 'Internal server error' };
+  })
   .group('/api', (app) =>
     app
       .post('/users', async ({ body, db }) => {
         const user = await db.createUser(body);
         return user;
       }, {
-        body: UserSchema,
+        body: UserSchema,           // Validates AND types
         response: UserResponseSchema,
         detail: { tags: ['Users'] },
       })
@@ -62,33 +62,40 @@ const app = new Elysia()
         response: UserResponseSchema,
       })
   )
-  .onError(({ code, error }) => {
-    console.error(error);
-    return { error: code === 'VALIDATION' ? error.message : 'Internal error' };
-  })
   .listen(3000);
 
+// Export type for Eden client
 export type App = typeof app;
 ```
 
-## Integrates With
-- **DB**: Any, decorated via `.decorate()`
-- **Auth**: `@elysiajs/jwt` for JWT tokens
-- **Validation**: TypeBox (built-in)
-- **Docs**: `@elysiajs/swagger` for OpenAPI
+## Version Gotchas
+- **Elysia 1.x**: Stable; Bun-first (not Node.js)
+- **TypeBox**: Built-in; provides both types and validation
+- **Eden**: Type-safe client from exported `App` type
+- **Plugins**: Must be registered in correct order
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Type mismatch` | Check schema matches request/response |
-| `Plugin not found` | Ensure `bun add @elysiajs/plugin` |
-| `Decorator not available` | Check plugin order, decorator registration |
-| `VALIDATION error` | Request doesn't match schema |
+## What NOT to Do
+- ❌ Missing `body:` schema — No validation, loses type safety
+- ❌ `as User` type assertions — Let schemas infer types
+- ❌ Using `db` before `.decorate('db', ...)` — Order matters
+- ❌ No `onError` handler — Generic 500 responses
+- ❌ Swagger in `NODE_ENV=production` — Security risk
 
-## Prod Ready
-- [ ] Swagger disabled in production
-- [ ] Error handling with `onError`
-- [ ] Rate limiting with plugin
-- [ ] Health check endpoint
-- [ ] CORS configured properly
-- [ ] Environment variables validated
+## Plugin Order
+```typescript
+new Elysia()
+  .decorate('db', db)        // 1. Decorators first
+  .use(authPlugin)           // 2. Auth middleware
+  .use(swagger())            // 3. Swagger
+  .group('/api', routes)     // 4. Routes last
+```
+
+## Eden Client
+```typescript
+// Client-side (full type safety)
+import { treaty } from '@elysiajs/eden';
+import type { App } from './server';
+
+const api = treaty<App>('localhost:3000');
+const { data } = await api.api.users.post({ email, password });
+```

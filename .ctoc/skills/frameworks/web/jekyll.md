@@ -1,31 +1,24 @@
 # Jekyll CTO
-> Ruby static site generator - GitHub Pages native, Liquid templates.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-gem install bundler jekyll && jekyll new mysite && cd mysite
+gem install bundler jekyll
+jekyll new mysite && cd mysite
 bundle exec jekyll serve --livereload
-bundle exec jekyll build
+# Jekyll 4.x - Ruby static site generator
 ```
 
-## Non-Negotiables
-1. Liquid templating syntax
-2. Front matter on all content
-3. Collections for custom content types
-4. Includes for reusable components
-5. Plugin awareness (especially for GitHub Pages)
+## Claude's Common Mistakes
+1. **Hardcoded URLs** — Use `relative_url` and `absolute_url` filters
+2. **Complex Liquid logic** — Extract to includes
+3. **Ignoring GitHub Pages whitelist** — Some plugins don't work
+4. **Missing front matter** — Required for Liquid processing
+5. **No collections for structured content** — Better than posts for custom types
 
-## Red Lines
-- Complex Liquid logic - use includes
-- Missing layouts for structure
-- No collections for structured content
-- Ignoring GitHub Pages plugin whitelist
-- Hardcoded site URLs
-
-## Pattern: Layout and Collection
+## Correct Patterns (2026)
 ```liquid
-{{! _layouts/post.html }}
+<!-- _layouts/post.html -->
 ---
 layout: default
 ---
@@ -42,13 +35,14 @@ layout: default
   {% if page.tags.size > 0 %}
   <footer>
     {% for tag in page.tags %}
+      <!-- Use relative_url filter (NOT hardcoded paths) -->
       <a href="{{ '/tags/' | append: tag | relative_url }}">{{ tag }}</a>
     {% endfor %}
   </footer>
   {% endif %}
 </article>
 
-{{! _includes/post-list.html }}
+<!-- _includes/post-list.html -->
 {% for post in site.posts limit: include.limit %}
 <article>
   <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
@@ -56,16 +50,10 @@ layout: default
   {{ post.excerpt }}
 </article>
 {% endfor %}
+```
 
-{{! index.html }}
----
-layout: default
-title: Home
----
-<h1>Recent Posts</h1>
-{% include post-list.html limit=5 %}
-
-{{! _config.yml }}
+```yaml
+# _config.yml
 title: My Site
 url: "https://example.com"
 collections:
@@ -80,11 +68,18 @@ defaults:
       layout: "post"
 ```
 
-## Integrates With
-- **Hosting**: GitHub Pages, Netlify, Vercel
-- **CMS**: Forestry, Prose.io, Netlify CMS
-- **Search**: Lunr.js, Algolia
-- **Comments**: Disqus, Staticman
+## Version Gotchas
+- **Jekyll 4.x**: Ruby 2.5+ required; faster builds
+- **GitHub Pages**: Limited plugin whitelist; use Actions for full Jekyll
+- **Liquid**: Use `| relative_url` for all internal links
+- **Collections**: Define in `_config.yml` with `output: true`
+
+## What NOT to Do
+- ❌ Hardcoded paths — Use `| relative_url` filter
+- ❌ Complex Liquid in layouts — Extract to `_includes/`
+- ❌ Missing front matter — Content won't process
+- ❌ Unsupported plugins on GH Pages — Check whitelist
+- ❌ Posts for all content — Use collections for custom types
 
 ## Common Errors
 | Error | Fix |
@@ -93,11 +88,3 @@ defaults:
 | `Page not found` | Check front matter and permalink |
 | `Plugin not working` | Check Gemfile and `_config.yml` |
 | `GitHub Pages build fail` | Use whitelisted plugins only |
-
-## Prod Ready
-- [ ] `JEKYLL_ENV=production` set
-- [ ] Minification with `jekyll-minifier`
-- [ ] Sitemap with `jekyll-sitemap`
-- [ ] SEO with `jekyll-seo-tag`
-- [ ] Feed with `jekyll-feed`
-- [ ] Caching headers configured

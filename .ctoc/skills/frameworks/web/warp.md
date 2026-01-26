@@ -1,29 +1,22 @@
 # Warp CTO
-> Composable Rust web filters - functional, type-safe, Tower-compatible.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-cargo new myapp && cd myapp && cargo add warp tokio serde serde_json
+cargo new myapp && cd myapp
+cargo add warp tokio serde serde_json
+# Warp 0.3+ - requires Rust 1.70+
 cargo run
-cargo test
 ```
 
-## Non-Negotiables
-1. Filter composition with `and()`, `or()`
-2. Proper rejection handling with `recover()`
-3. Async handlers without blocking
-4. Type-safe extractors via filters
-5. Tower service compatibility
+## Claude's Common Mistakes
+1. **Missing `recover()` handler** — Rejections return empty 500 without it
+2. **Deeply nested filter chains** — Extract to helper functions
+3. **Blocking in async filters** — Use `tokio::spawn_blocking`
+4. **Missing custom rejection types** — Implement `Reject` trait
+5. **Not using `with_*` helper filters** — Share state via filter composition
 
-## Red Lines
-- Deeply nested filter chains - use helper functions
-- Ignoring rejections - always add `recover()`
-- Blocking in async filters - use `spawn_blocking`
-- Missing error types for rejections
-- Not using `with_db` style helper filters
-
-## Pattern: Filter Composition
+## Correct Patterns (2026)
 ```rust
 use warp::{Filter, Rejection, Reply, reject};
 use serde::{Deserialize, Serialize};
@@ -35,38 +28,47 @@ struct CreateUser { email: String, password: String }
 #[derive(Serialize)]
 struct User { id: i32, email: String }
 
+// Custom rejection type
 #[derive(Debug)]
 struct NotFound;
 impl reject::Reject for NotFound {}
 
+// Helper filter for shared state
 fn with_db(pool: Arc<PgPool>) -> impl Filter<Extract = (Arc<PgPool>,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || pool.clone())
 }
 
+// Handler
 async fn create_user(pool: Arc<PgPool>, body: CreateUser) -> Result<impl Reply, Rejection> {
-    let user = sqlx::query_as!(User, "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email", body.email, body.password)
-        .fetch_one(pool.as_ref())
-        .await
-        .map_err(|_| reject::custom(NotFound))?;
+    let user = sqlx::query_as!(User,
+        "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email",
+        body.email, body.password
+    )
+    .fetch_one(pool.as_ref())
+    .await
+    .map_err(|_| reject::custom(NotFound))?;
 
-    Ok(warp::reply::with_status(warp::reply::json(&user), warp::http::StatusCode::CREATED))
+    Ok(warp::reply::with_status(
+        warp::reply::json(&user),
+        warp::http::StatusCode::CREATED
+    ))
 }
 
+// Rejection handler (REQUIRED)
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
-    let code;
-    let message;
-
-    if err.is_not_found() || err.find::<NotFound>().is_some() {
-        code = warp::http::StatusCode::NOT_FOUND;
-        message = "Not found";
+    let (code, message) = if err.is_not_found() || err.find::<NotFound>().is_some() {
+        (warp::http::StatusCode::NOT_FOUND, "Not found")
     } else {
-        code = warp::http::StatusCode::INTERNAL_SERVER_ERROR;
-        message = "Internal server error";
-    }
+        (warp::http::StatusCode::INTERNAL_SERVER_ERROR, "Internal error")
+    };
 
-    Ok(warp::reply::with_status(warp::reply::json(&serde_json::json!({ "error": message })), code))
+    Ok(warp::reply::with_status(
+        warp::reply::json(&serde_json::json!({ "error": message })),
+        code
+    ))
 }
 
+// Compose filters
 let pool = Arc::new(create_pool().await);
 
 let users = warp::path("users")
@@ -74,27 +76,36 @@ let users = warp::path("users")
     .and(warp::body::json())
     .and(with_db(pool.clone()))
     .and_then(|body, pool| create_user(pool, body))
-    .recover(handle_rejection);
+    .recover(handle_rejection);  // REQUIRED
 ```
 
-## Integrates With
-- **DB**: SQLx with Arc-wrapped pools
-- **Auth**: Custom filter for JWT extraction
-- **Tracing**: `tracing` crate with warp trace filter
-- **Tower**: Compatible with Tower services
+## Version Gotchas
+- **Warp 0.3+**: Current stable; uses Filter composition
+- **Tower compatible**: Can use Tower middleware
+- **Rejections**: Must implement `Reject` trait for custom errors
+- **recover()**: Required; unhandled rejections return empty 500
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Rejection unhandled` | Add `.recover()` to filter chain |
-| `Type mismatch in and()` | Check filter extract types align |
-| `Future not Send` | Check for non-Send across await |
-| `Cannot infer type` | Add explicit type annotations |
+## What NOT to Do
+- ❌ Missing `.recover()` — Errors return empty responses
+- ❌ Deeply nested `and().and().and()` — Extract to functions
+- ❌ Blocking in handlers — Use `tokio::spawn_blocking`
+- ❌ Plain `Err()` in handlers — Use `reject::custom()`
+- ❌ State without `with_*` filters — Compose with helper filters
 
-## Prod Ready
-- [ ] Rejection handler for all errors
-- [ ] Tracing filter for requests
-- [ ] Graceful shutdown
-- [ ] Health check route
-- [ ] CORS filter configured
-- [ ] TLS with `warp::serve().tls()`
+## Filter Composition
+```rust
+// Extract complex filters to functions
+fn user_routes(pool: Arc<PgPool>) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    let create = warp::post()
+        .and(warp::body::json())
+        .and(with_db(pool.clone()))
+        .and_then(create_user);
+
+    let get = warp::get()
+        .and(warp::path::param())
+        .and(with_db(pool))
+        .and_then(get_user);
+
+    warp::path("users").and(create.or(get))
+}
+```

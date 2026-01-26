@@ -1,29 +1,23 @@
 # Kustomize CTO
-> Kubernetes-native configuration leader demanding base/overlay architecture with zero templating complexity.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-kustomize create --autodetect
-kustomize build overlays/production/ | kubectl apply --dry-run=server -f -
-kubectl apply -k overlays/production/ --server-side
+# Standalone install
+curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+# Or via kubectl (built-in)
+kubectl apply -k overlays/production/
+# Note: kubectl kustomize may lag standalone version
 ```
 
-## Non-Negotiables
-1. Base + overlay directory structure for environment separation
-2. Strategic merge patches for targeted modifications
-3. ConfigMapGenerator and SecretGenerator for dynamic resources
-4. Common labels and annotations via transformers
-5. Server-side apply for conflict resolution
+## Claude's Common Mistakes
+1. **Duplicates manifests across environments** - Use base/overlay pattern
+2. **Inline patches when strategic merge works** - Adds complexity
+3. **Missing namespace in overlays** - Cross-environment conflicts
+4. **Forgets configMapGenerator hash suffixes** - Breaks rollout triggers
+5. **Uses kubectl kustomize for latest features** - Standalone more current
 
-## Red Lines
-- Duplicating manifests across environments - use overlays
-- Inline patches when strategic merge works cleaner
-- Missing namespace in overlays causing cross-environment conflicts
-- Unvalidated transformations going to production
-- kustomization.yaml without explicit resource ordering
-
-## Pattern: Multi-Environment Structure
+## Correct Patterns (2026)
 ```yaml
 # base/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -32,7 +26,7 @@ resources:
   - deployment.yaml
   - service.yaml
 commonLabels:
-  app: myapp
+  app.kubernetes.io/name: myapp
 
 # overlays/production/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -45,27 +39,29 @@ configMapGenerator:
     behavior: merge
     files:
       - config.json
+secretGenerator:
+  - name: app-secrets
+    envs:
+      - secrets.env
+    options:
+      disableNameSuffixHash: false  # Keep hash for rollouts
 patches:
   - path: replica-patch.yaml
 images:
   - name: myapp
-    newTag: v1.2.3
+    newName: registry.example.com/myapp
+    newTag: v1.2.3  # Or use digest for prod
 ```
 
-## Integrates With
-- **DB**: Secrets via external-secrets with SecretGenerator references
-- **Auth**: ConfigMap-driven OIDC config per environment
-- **Cache**: Environment-specific Redis endpoints via patches
+## Version Gotchas
+- **Kustomize 5.x**: Some transformer behaviors changed
+- **kubectl built-in**: May be 1-2 versions behind standalone
+- **With ArgoCD**: Kustomize version in ArgoCD may differ
+- **With Flux**: Use kustomize-controller, respects kustomization.yaml
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `no matches for kind "X" in version "Y"` | Check API version, run `kubectl api-resources` |
-| `resource not found in kustomization` | Add missing file to resources list |
-| `conflict: different values in patch and target` | Use strategic merge or JSON patch for arrays |
-
-## Prod Ready
-- [ ] All environments validated with `kustomize build \| kubeval`
-- [ ] Image tags pinned with digests for production
-- [ ] Secrets externalized via SOPS or external-secrets-operator
-- [ ] CI validates kustomize build succeeds before merge
+## What NOT to Do
+- Do NOT duplicate manifests - use base/overlay structure
+- Do NOT hardcode namespaces in base - set in overlay
+- Do NOT disable configMap hash suffix - breaks rollout detection
+- Do NOT use inline patches for simple changes - strategic merge cleaner
+- Do NOT skip `kustomize build | kubectl apply --dry-run=server`

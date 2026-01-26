@@ -1,97 +1,72 @@
 # Gradio CTO
-> Build and share ML demos in minutes with production-ready interfaces.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install gradio
-python app.py  # Local development
-gradio app.py --share  # Public URL for testing
+# Run: python app.py
+# Share publicly: gradio app.py --share
 ```
 
-## Non-Negotiables
-1. Use `Interface` for simple single-function demos
-2. Use `Blocks` for complex multi-component UIs
-3. Include examples for better UX
-4. Deploy to HuggingFace Spaces for hosting
-5. Add input validation and error handling
-6. Use `queue()` for concurrent requests
+## Claude's Common Mistakes
+1. Missing `queue()` for concurrent requests (blocks users)
+2. No examples provided for user guidance
+3. Using `Interface` when `Blocks` needed for complex UIs
+4. Missing error handling with `gr.Error`
+5. Not using streaming for LLM outputs
 
-## Red Lines
-- No examples for user guidance
-- Blocking functions without queue()
-- Missing error handling
-- No input validation
-- Exposing sensitive model internals
-- Not using progress indicators for slow ops
-
-## Pattern: Production ML Demo
+## Correct Patterns (2026)
 ```python
 import gradio as gr
 from typing import Generator
 
-# Simple Interface
+# Simple Interface with examples
 def classify(image):
-    # Validation
     if image is None:
         raise gr.Error("Please upload an image")
-
-    result = model.predict(image)
-    return {label: float(score) for label, score in result}
+    return model.predict(image)
 
 demo = gr.Interface(
     fn=classify,
     inputs=gr.Image(type="pil", label="Upload Image"),
     outputs=gr.Label(num_top_classes=5),
-    examples=["examples/cat.jpg", "examples/dog.jpg"],
+    examples=["examples/cat.jpg", "examples/dog.jpg"],  # Always provide examples
     title="Image Classifier",
-    description="Upload an image to classify",
 )
 
-# Complex Blocks layout
+# Complex Blocks with streaming
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# ML Assistant")
+    gr.Markdown("# AI Assistant")
 
     with gr.Row():
         with gr.Column(scale=2):
             input_text = gr.Textbox(label="Input", lines=5)
-            with gr.Row():
-                submit_btn = gr.Button("Submit", variant="primary")
-                clear_btn = gr.Button("Clear")
-
+            submit = gr.Button("Submit", variant="primary")
         with gr.Column(scale=3):
-            output_text = gr.Textbox(label="Output", lines=10)
-            confidence = gr.Slider(label="Confidence", interactive=False)
+            output = gr.Textbox(label="Output", lines=10)
 
-    # Streaming output
+    # Streaming generator
     def generate(text: str) -> Generator[str, None, None]:
+        response = ""
         for chunk in model.stream(text):
-            yield chunk
+            response += chunk
+            yield response  # Yield accumulated response
 
-    submit_btn.click(generate, inputs=input_text, outputs=output_text)
-    clear_btn.click(lambda: ("", ""), outputs=[input_text, output_text])
+    submit.click(generate, inputs=input_text, outputs=output)
 
-demo.queue().launch(server_name="0.0.0.0", server_port=7860)
+# ALWAYS enable queue for production
+demo.queue(max_size=20).launch(server_name="0.0.0.0", server_port=7860)
 ```
 
-## Integrates With
-- **Hosting**: HuggingFace Spaces, Docker
-- **Models**: PyTorch, TensorFlow, Transformers
-- **APIs**: FastAPI, Flask
-- **Auth**: HuggingFace OAuth, custom auth
+## Version Gotchas
+- **queue()**: Required for concurrent users - without it, requests block
+- **Streaming**: Yield accumulated text, not just chunks
+- **HuggingFace Spaces**: Deploy with `demo.launch()` in app.py
+- **Auth**: Use `demo.launch(auth=("user", "pass"))` for basic auth
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Queue full` | Increase `max_size` in queue() |
-| `Timeout` | Increase default timeout, use streaming |
-| `Memory error` | Clear GPU cache between requests |
-| `CORS error` | Set allowed_paths in launch() |
-
-## Prod Ready
-- [ ] Examples provided for all inputs
-- [ ] Queue enabled for concurrent requests
-- [ ] Error handling for all user inputs
-- [ ] Progress indicators for slow operations
-- [ ] Deployed to HuggingFace Spaces
-- [ ] Authentication configured if needed
+## What NOT to Do
+- Do NOT skip `demo.queue()` in production
+- Do NOT forget examples for inputs
+- Do NOT use `Interface` for multi-step workflows
+- Do NOT yield just chunks - yield accumulated response
+- Do NOT skip error handling with `gr.Error`

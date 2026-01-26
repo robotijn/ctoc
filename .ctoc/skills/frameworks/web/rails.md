@@ -1,79 +1,84 @@
 # Rails CTO
-> Convention over configuration - follow the Rails Way or have a damn good reason.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-rails new myapp --database=postgresql -T && cd myapp
-rails server
-bundle exec rspec --format documentation
+# Rails 8.1 - requires Ruby 3.2+
+gem install rails
+rails new myapp --database=postgresql
+# Rails 8 includes Kamal 2, Solid Queue, built-in auth generator
+cd myapp && bin/rails server
 ```
 
-## Non-Negotiables
-1. Follow Rails conventions - deviate only with documented justification
-2. Strong parameters on every controller action
-3. Background jobs with Sidekiq for anything over 100ms
-4. N+1 query prevention with `includes`, `preload`, `eager_load`
-5. Database migrations are append-only in production
+## Claude's Common Mistakes
+1. **Using `params.require().permit()` pattern** — Rails 8 uses `params.expect()` for safer handling
+2. **Silencing deprecation warnings** — Fix them; they become errors in next major version
+3. **Skipping intermediate versions** — Upgrade one major version at a time
+4. **Monkey patching gems** — Document thoroughly or submit upstream PR
+5. **N+1 queries** — Use `includes`, `preload`, or `eager_load`
 
-## Red Lines
-- N+1 queries - use Bullet gem to detect
-- Fat controllers - extract to services or concerns
-- Skipping validations with `save(validate: false)`
-- Mass assignment vulnerabilities - always use strong params
-- Callbacks that hide business logic - prefer explicit service objects
-
-## Pattern: Service Object
+## Correct Patterns (2026)
 ```ruby
+# Rails 8: params.expect() instead of require().permit()
+def user_params
+  params.expect(user: [:name, :email, :password])
+end
+
+# Service object pattern
 # app/services/users/create_service.rb
 module Users
   class CreateService
-    def initialize(params:, current_user: nil)
+    def initialize(params:)
       @params = params
-      @current_user = current_user
     end
 
     def call
-      user = User.new(permitted_params)
-
       ActiveRecord::Base.transaction do
-        user.save!
+        user = User.create!(@params)
         UserMailer.welcome(user).deliver_later
-        Analytics.track_signup(user)
+        user
       end
-
-      ServiceResult.success(user)
     rescue ActiveRecord::RecordInvalid => e
-      ServiceResult.failure(e.record.errors)
-    end
-
-    private
-
-    def permitted_params
-      @params.slice(:email, :name, :password, :password_confirmation)
+      Result.failure(e.record.errors)
     end
   end
 end
+
+# Proper eager loading
+# Bad: N+1
+Post.all.each { |p| puts p.author.name }
+
+# Good: Single query
+Post.includes(:author).each { |p| puts p.author.name }
 ```
 
-## Integrates With
-- **DB**: PostgreSQL with `pg`, use database constraints alongside validations
-- **Auth**: Devise with OmniAuth, or Rodauth for modern approach
-- **Cache**: Redis with `redis-rails`, Russian doll caching with `cache`
-- **Jobs**: Sidekiq with `sidekiq-cron` for scheduled tasks
+## Version Gotchas
+- **Rails 7→8**: `params.expect()` replaces `require().permit()`
+- **Rails 8**: Kamal 2 for deployment, Solid Queue for jobs
+- **Rails 8**: Built-in authentication generator
+- **Rails 8.0 EOL**: Bug fixes until May 2026
+- **Rails 8.2**: `update_all` with `distinct`/CTE raises error
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `PG::UndefinedTable` | Run `rails db:migrate` |
-| `NameError: uninitialized constant` | Check class name matches file path |
-| `ActionController::InvalidAuthenticityToken` | Include CSRF token in forms/AJAX |
-| `ActiveRecord::RecordNotUnique` | Add uniqueness validation + DB constraint |
+## What NOT to Do
+- ❌ `params.require(:user).permit(:name)` — Use `params.expect(user: [:name])`
+- ❌ `Rails.logger.silence { }` for deprecations — Fix the warnings
+- ❌ Upgrading Rails 6→8 in one PR — Go through 7.x first
+- ❌ `save(validate: false)` — Almost always a code smell
+- ❌ Forking gems without documentation — Maintain or upstream changes
 
-## Prod Ready
-- [ ] `config/credentials.yml.enc` for secrets
-- [ ] Puma configured with appropriate workers/threads
-- [ ] Asset pipeline or import maps for JS
-- [ ] Database indexes on foreign keys and lookup columns
-- [ ] Health check endpoint at `/up` (Rails 7.1+)
-- [ ] Exception tracking with Sentry or Honeybadger
+## Rails 8 Features
+| Feature | Description |
+|---------|-------------|
+| Kamal 2 | Built-in deployment with Kamal Proxy |
+| Solid Queue | Database-backed job queue (replaces Redis) |
+| Solid Cache | Database-backed caching |
+| Auth Generator | `bin/rails generate authentication` |
+| Propshaft | Default asset pipeline |
+
+## Upgrade Checklist
+```bash
+# Before upgrading
+bundle outdated          # Check gem compatibility
+rails_best_practices .   # Find anti-patterns
+brakeman                 # Security scan
+```

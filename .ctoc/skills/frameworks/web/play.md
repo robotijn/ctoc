@@ -1,29 +1,21 @@
 # Play Framework CTO
-> Reactive Scala/Java web framework - async by default, type-safe routing.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 sbt new playframework/play-scala-seed.g8
-sbt run
-sbt test
+cd myapp && sbt run
+# Play 3.x - Scala/Java reactive web framework
 ```
 
-## Non-Negotiables
-1. Async by default with Futures
-2. Compile-time dependency injection
-3. Twirl templates for type-safe views
-4. Proper action composition
-5. Evolutions for database migrations
+## Claude's Common Mistakes
+1. **Blocking in async actions** — Use separate execution context
+2. **Ignoring Future composition** — Chain with `map`/`flatMap`
+3. **Missing CSRF protection** — Required for forms
+4. **Runtime DI by default** — Prefer compile-time with MacWire
+5. **Not using evolutions** — Database schema drift
 
-## Red Lines
-- Blocking in actions - use async or blocking context
-- Ignoring Future composition
-- Missing CSRF protection
-- Global mutable state
-- Runtime DI when compile-time works
-
-## Pattern: Async Controller
+## Correct Patterns (2026)
 ```scala
 // app/controllers/UserController.scala
 package controllers
@@ -42,18 +34,18 @@ class UserController @Inject()(
 )(implicit ec: ExecutionContext) extends AbstractController(cc) {
 
   implicit val userFormat: Format[User] = Json.format[User]
-  implicit val createUserFormat: Format[CreateUserRequest] = Json.format[CreateUserRequest]
+  implicit val createFormat: Format[CreateUserRequest] = Json.format[CreateUserRequest]
 
   def create: Action[JsValue] = Action.async(parse.json) { request =>
     request.body.validate[CreateUserRequest].fold(
-      errors => Future.successful(BadRequest(Json.obj("error" -> "Invalid request"))),
-      createRequest => {
-        userService.create(createRequest).map { user =>
+      errors => Future.successful(BadRequest(Json.obj("error" -> "Invalid"))),
+      req => {
+        userService.create(req).map { user =>
           Created(Json.toJson(user))
         }.recover {
-          case e: EmailExistsException =>
-            Conflict(Json.obj("error" -> "Email already exists"))
-          case e =>
+          case _: EmailExistsException =>
+            Conflict(Json.obj("error" -> "Email exists"))
+          case _ =>
             InternalServerError(Json.obj("error" -> "Server error"))
         }
       }
@@ -66,10 +58,6 @@ class UserController @Inject()(
       case None => NotFound(Json.obj("error" -> "Not found"))
     }
   }
-
-  def health: Action[AnyContent] = Action {
-    Ok(Json.obj("status" -> "ok"))
-  }
 }
 
 // conf/routes
@@ -78,24 +66,23 @@ POST    /api/users           controllers.UserController.create
 GET     /api/users/:id       controllers.UserController.get(id: Long)
 ```
 
-## Integrates With
-- **DB**: Slick for async DB access
-- **Auth**: Play Silhouette for auth
-- **DI**: Compile-time with MacWire or Guice
-- **Akka**: Akka Streams, Akka HTTP
+## Version Gotchas
+- **Play 3.x**: Pekko replaces Akka; Scala 3 support
+- **Async**: All actions should return `Future[Result]`
+- **ExecutionContext**: Use separate context for blocking I/O
+- **Evolutions**: Enable for database migrations
+
+## What NOT to Do
+- ❌ Blocking in default EC — Use `blockingContext` for I/O
+- ❌ `Await.result` in handlers — Defeats async purpose
+- ❌ Missing CSRF token — Security vulnerability
+- ❌ Runtime DI everywhere — Compile-time is faster to fail
+- ❌ Manual schema changes — Use evolutions
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Deadlock` | Use different execution context for blocking |
+| `Deadlock` | Use separate execution context for blocking |
 | `Route not found` | Check routes file syntax |
 | `JSON parsing failed` | Check case class matches JSON |
 | `CSRF check failed` | Add CSRF token to forms |
-
-## Prod Ready
-- [ ] Production configuration (`application.prod.conf`)
-- [ ] Secret key configured
-- [ ] Evolutions enabled for DB
-- [ ] Logging configured
-- [ ] Health endpoint exposed
-- [ ] TLS configured

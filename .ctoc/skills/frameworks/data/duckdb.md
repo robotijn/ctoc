@@ -1,76 +1,62 @@
 # DuckDB CTO
-> In-process OLAP database for blazing-fast analytical queries.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install duckdb duckdb-engine
-duckdb mydb.duckdb -c "SELECT * FROM data.parquet LIMIT 10"
-pytest tests/ -v
+pip install duckdb>=1.0
+# Python 3.9+ required
 ```
 
-## Non-Negotiables
-1. SQL-first for all transformations
-2. Direct query on Parquet/CSV/JSON without loading
-3. Use persistent database for complex workflows
-4. Leverage automatic parallelization
-5. Memory limits configured for production
-6. Extensions loaded explicitly (`INSTALL httpfs; LOAD httpfs`)
+## Claude's Common Mistakes
+1. **Loading data into memory first** - DuckDB queries files directly (Parquet, CSV)
+2. **Using pandas for transformations** - DuckDB SQL is faster; query DataFrames in-place
+3. **Not closing connections** - Causes lock issues in persistent mode
+4. **Ignoring file format** - Parquet is 100-600x faster than CSV
+5. **Missing extensions** - httpfs/aws needed for S3; load explicitly
 
-## Red Lines
-- Loading entire datasets into memory unnecessarily
-- Ignoring query explain plans
-- Missing indexes on join columns for persistent tables
-- Not using prepared statements for repeated queries
-- Skipping schema validation on external files
-
-## Pattern: Analytics Pipeline
+## Correct Patterns (2026)
 ```python
 import duckdb
 
+# Persistent database with resource limits
 con = duckdb.connect("analytics.duckdb")
 con.execute("SET memory_limit='4GB'")
 con.execute("SET threads=4")
 
-# Query external files directly with schema inference
+# Query files directly (zero-copy, no pandas needed)
 result = con.execute("""
-    WITH sales AS (
-        SELECT * FROM read_parquet('s3://bucket/sales/*.parquet')
-        WHERE date >= '2024-01-01'
-    ),
-    products AS (
-        SELECT * FROM read_csv('products.csv', auto_detect=true)
-    )
     SELECT
-        p.category,
-        DATE_TRUNC('month', s.date) as month,
-        SUM(s.amount) as revenue
-    FROM sales s
-    JOIN products p ON s.product_id = p.id
+        category,
+        DATE_TRUNC('month', date) AS month,
+        SUM(amount) AS revenue
+    FROM read_parquet('s3://bucket/sales/*.parquet')
+    WHERE date >= '2025-01-01'
     GROUP BY ALL
     ORDER BY month, revenue DESC
-""").fetchdf()
+""").df()
+
+# Query pandas DataFrame in-place (no copy)
+import pandas as pd
+df = pd.read_csv("local.csv")
+summary = con.execute("SELECT category, AVG(value) FROM df GROUP BY 1").df()
+
+# S3 access (load extension first)
+con.execute("INSTALL httpfs; LOAD httpfs")
+con.execute("SET s3_region='us-east-1'")
 
 # Export optimized Parquet
-con.execute("COPY (SELECT * FROM result) TO 'output.parquet' (FORMAT PARQUET)")
+con.execute("COPY (SELECT * FROM result) TO 'out.parquet' (FORMAT PARQUET)")
+con.close()  # Always close persistent connections
 ```
 
-## Integrates With
-- **Python**: Native pandas/Polars DataFrame integration
-- **Cloud**: S3/GCS/Azure via httpfs extension
-- **BI**: DBeaver, Metabase, Superset connections
+## Version Gotchas
+- **v1.0+**: Stable API; breaking changes rare
+- **v1.0**: `GROUP BY ALL` for automatic grouping
+- **Extensions**: httpfs, aws, postgres, spatial - install explicitly
+- **With Polars/pandas**: Zero-copy interop via Apache Arrow
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Out of Memory` | Set `memory_limit` or use streaming with COPY |
-| `Invalid Input Error: Parquet` | Check file corruption or use `union_by_name` |
-| `HTTP error` on S3 | Load httpfs extension and set credentials |
-| `Binder Error: column not found` | Use `union_by_name=true` for schema evolution |
-
-## Prod Ready
-- [ ] Memory limits configured appropriately
-- [ ] Thread count tuned for workload
-- [ ] Extensions pre-installed in deployment
-- [ ] Query logging enabled for debugging
-- [ ] Persistent mode for multi-query workflows
+## What NOT to Do
+- Do NOT load CSV into pandas then query (query directly)
+- Do NOT forget to close persistent connections
+- Do NOT use CSV when Parquet is available (huge perf diff)
+- Do NOT skip memory_limit for large workloads (OOM)

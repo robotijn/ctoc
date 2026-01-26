@@ -1,80 +1,64 @@
 # Apache Arrow CTO
-> Language-agnostic columnar memory format for high-performance analytics.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install pyarrow
-python -c "import pyarrow as pa; print(pa.__version__)"
-pytest tests/ -v
+pip install pyarrow>=15.0
+# Includes Parquet, IPC, compute kernels
 ```
 
-## Non-Negotiables
-1. Zero-copy data sharing between processes/languages
-2. Columnar format for analytical workloads
-3. Explicit schema definition for interoperability
-4. Memory mapping for files larger than RAM
-5. Use Arrow IPC for cross-language communication
-6. Parquet for persistent storage, Arrow for compute
+## Claude's Common Mistakes
+1. **Row-by-row processing** - Arrow is columnar; process columns, not rows
+2. **Unnecessary serialization** - Use zero-copy when possible
+3. **Ignoring schema evolution** - Define schemas explicitly for pipelines
+4. **Memory copies on conversion** - pandas/Polars can share Arrow memory
+5. **Wrong compression for use case** - zstd for storage, lz4 for speed
 
-## Red Lines
-- Row-by-row processing of columnar data
-- Ignoring schema evolution in data pipelines
-- Unnecessary serialization/deserialization cycles
-- Memory copies when zero-copy is possible
-- Mixing incompatible Arrow versions across systems
-
-## Pattern: High-Performance Data Pipeline
+## Correct Patterns (2026)
 ```python
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.compute as pc
 
-# Define explicit schema
+# Explicit schema (required for robust pipelines)
 schema = pa.schema([
     ('id', pa.int64()),
     ('timestamp', pa.timestamp('us')),
     ('value', pa.float64()),
-    ('category', pa.dictionary(pa.int32(), pa.string())),
+    ('category', pa.dictionary(pa.int32(), pa.string())),  # Dict encoding
 ])
 
-# Memory-mapped reading for large files
+# Memory-mapped reading (larger than RAM)
 mmap = pa.memory_map('large_data.arrow')
 table = pa.ipc.open_file(mmap).read_all()
 
-# Zero-copy slice (no memory allocation)
-subset = table.slice(0, 1000)
+# Zero-copy slice
+subset = table.slice(0, 1000)  # No memory allocation
 
-# Compute with Arrow kernels (vectorized)
+# Vectorized compute with Arrow kernels
 filtered = table.filter(pc.greater(table['value'], 100))
-aggregated = pc.sum(filtered['value'])
+total = pc.sum(filtered['value'])
 
-# Write optimized Parquet with compression
+# Write optimized Parquet
 pq.write_table(
-    table,
-    'output.parquet',
+    table, 'output.parquet',
     compression='zstd',
     row_group_size=100_000,
     use_dictionary=['category'],
 )
+
+# Zero-copy to pandas (pyarrow backend)
+df = table.to_pandas(types_mapper=pd.ArrowDtype)
 ```
 
-## Integrates With
-- **DataFrames**: pandas, Polars, DuckDB native support
-- **Distributed**: Spark, Dask, Ray via Arrow exchange
-- **Languages**: R, Julia, Rust, C++ with zero-copy
+## Version Gotchas
+- **v15+**: Improved pandas StringDtype integration
+- **Schema evolution**: Use union_by_name for reading mixed schemas
+- **IPC vs Parquet**: IPC for streaming/memory; Parquet for storage
+- **With pandas 2.x**: Use dtype_backend="pyarrow" for zero-copy
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `ArrowInvalid: schema mismatch` | Ensure consistent schemas across sources |
-| `ArrowMemoryError` | Use memory mapping or streaming reads |
-| `ArrowNotImplementedError` | Check Arrow version for feature support |
-| `Parquet read slow` | Use `columns` param to read only needed fields |
-
-## Prod Ready
-- [ ] Schema versioning for data evolution
-- [ ] Memory mapping for large datasets
-- [ ] Parquet with appropriate compression
-- [ ] Dictionary encoding for categorical columns
-- [ ] Arrow version pinned across systems
+## What NOT to Do
+- Do NOT process rows one at a time (use columnar operations)
+- Do NOT convert to pandas without types_mapper (copies data)
+- Do NOT ignore schema mismatches across files
+- Do NOT use gzip compression (zstd is faster and smaller)

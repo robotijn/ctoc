@@ -1,80 +1,62 @@
 # MongoDB CTO
-> Document database for flexible schemas and horizontal scaling.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Server
 docker run -d --name mongo -p 27017:27017 mongo:7
-mongosh --eval "db.adminCommand('ping')"
-mongosh --file tests/queries.js
+
+# Drivers
+pip install pymongo[srv]   # Python (includes DNS for Atlas)
+npm install mongodb        # Node.js official driver
 ```
 
-## Non-Negotiables
-1. Schema design: embed (1:few) vs reference (1:many)
-2. Compound indexes aligned with query patterns
-3. Aggregation pipelines for complex queries
-4. Replica sets for high availability
-5. Sharding for horizontal scale (>100GB)
-6. Write concern configured for durability
+## Claude's Common Mistakes
+1. **New connection per request** - Reuse client instance (singleton pattern)
+2. **Missing compound indexes** - Queries scan entire collection
+3. **Unbounded arrays** - Arrays that grow indefinitely cause document bloat
+4. **No write concern for critical data** - Data loss on replica failover
+5. **Using $where with user input** - JavaScript injection vulnerability
 
-## Red Lines
-- Unbounded arrays growing indefinitely
-- Missing indexes on query predicates
-- `$where` with untrusted input (injection risk)
-- No connection pooling in application
-- Ignoring write concern for critical data
-
-## Pattern: Production Data Modeling
+## Correct Patterns (2026)
 ```javascript
-// Schema design: embed when accessed together
-const orderSchema = {
-  _id: ObjectId(),
-  customerId: ObjectId(),
-  status: "pending",
-  items: [  // Bounded array, always accessed with order
-    { productId: ObjectId(), name: "Widget", quantity: 2, price: 29.99 }
-  ],
-  shipping: { address: "123 Main St", city: "NYC" },
-  createdAt: new Date()
-};
+// Singleton client (reuse across requests)
+import { MongoClient } from 'mongodb';
 
-// Compound index for common query pattern
-db.orders.createIndex({ customerId: 1, createdAt: -1 });
-db.orders.createIndex({ status: 1, createdAt: -1 });
+const client = new MongoClient(process.env.MONGO_URI, {
+  maxPoolSize: 50,              // Connection pool size
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,       // 2-3x slowest query
+  compressors: ['zstd'],        // Compression (MongoDB 4.2+)
+});
 
-// Aggregation pipeline for reporting
-db.orders.aggregate([
-  { $match: { createdAt: { $gte: ISODate("2024-01-01") } } },
-  { $unwind: "$items" },
-  { $group: {
-      _id: "$items.productId",
-      totalQuantity: { $sum: "$items.quantity" },
-      revenue: { $sum: { $multiply: ["$items.quantity", "$items.price"] } }
-  }},
+// Ensure indexes before queries
+await db.orders.createIndex({ customerId: 1, createdAt: -1 });
+await db.orders.createIndex({ status: 1, createdAt: -1 });
+
+// Aggregation with early filtering
+const topProducts = await db.orders.aggregate([
+  { $match: { createdAt: { $gte: new Date('2025-01-01') } } },
+  { $unwind: '$items' },
+  { $group: { _id: '$items.productId', revenue: { $sum: '$items.price' } } },
   { $sort: { revenue: -1 } },
   { $limit: 10 }
-]);
+]).toArray();
 
-// Write with appropriate concern
-db.orders.insertOne(order, { writeConcern: { w: "majority", j: true } });
+// Write concern for critical operations
+await db.orders.insertOne(order, {
+  writeConcern: { w: 'majority', j: true }
+});
 ```
 
-## Integrates With
-- **Drivers**: Official drivers for all major languages
-- **ODM**: Mongoose (Node.js), Motor (Python async)
-- **Cloud**: MongoDB Atlas for managed deployments
+## Version Gotchas
+- **v7**: Improved queryable encryption, time series collections
+- **Atlas**: Use `mongodb+srv://` connection string for DNS seedlist
+- **Mongoose 8**: Now ESM-first; uses `mongodb` driver v6 internally
+- **Motor (Python async)**: Use with asyncio, not pymongo for async
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `BSON too large` | Document >16MB, redesign schema |
-| `Index not used` | Check explain(), ensure index covers query |
-| `Connection pool exhausted` | Increase maxPoolSize |
-| `Write concern timeout` | Check replica set health |
-
-## Prod Ready
-- [ ] Indexes on all query patterns
-- [ ] Replica set with read preference
-- [ ] Connection pooling configured
-- [ ] Schema validation rules
-- [ ] Monitoring via Atlas or Ops Manager
+## What NOT to Do
+- Do NOT create new MongoClient per request
+- Do NOT use $where with untrusted input (injection risk)
+- Do NOT design unbounded arrays (16MB doc limit)
+- Do NOT skip compound indexes on filtered+sorted queries

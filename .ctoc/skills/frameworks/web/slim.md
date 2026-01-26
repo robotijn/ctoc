@@ -1,29 +1,21 @@
 # Slim CTO
-> Micro PHP framework for APIs - PSR-7/15 compliant, middleware-focused.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-composer require slim/slim slim/psr7
+composer require slim/slim slim/psr7 php-di/php-di
 php -S localhost:8080 -t public
-./vendor/bin/phpunit
+# Slim 4.x - PSR-7/15 PHP micro-framework
 ```
 
-## Non-Negotiables
-1. PSR-7 request/response handling
-2. Middleware pipeline for cross-cutting
-3. Dependency container for services
-4. Route groups for organization
-5. Proper error handling middleware
+## Claude's Common Mistakes
+1. **Echo instead of Response** — Always return PSR-7 Response
+2. **Missing body parsing middleware** — Add `addBodyParsingMiddleware()`
+3. **No DI container** — Use PHP-DI for service management
+4. **Skipping route groups** — Organize routes with groups
+5. **No error middleware** — Add `addErrorMiddleware()`
 
-## Red Lines
-- Echo statements in routes - use Response
-- Missing middleware for auth/logging
-- Global state instead of container
-- No container usage for dependencies
-- Skipping input validation
-
-## Pattern: Structured API
+## Correct Patterns (2026)
 ```php
 <?php
 // public/index.php
@@ -34,32 +26,35 @@ use DI\Container;
 
 require __DIR__ . '/../vendor/autoload.php';
 
+// DI Container
 $container = new Container();
 $container->set(UserService::class, fn() => new UserService());
 
 AppFactory::setContainer($container);
 $app = AppFactory::create();
 
-// Middleware
-$app->addBodyParsingMiddleware();
+// Middleware (ORDER MATTERS)
+$app->addBodyParsingMiddleware();  // REQUIRED for JSON
 $app->addRoutingMiddleware();
 $app->addErrorMiddleware(true, true, true);
 
-// Routes
+// Routes with groups
 $app->group('/api', function ($group) {
     $group->post('/users', function (Request $request, Response $response) {
         $data = $request->getParsedBody();
 
         if (empty($data['email'])) {
             $response->getBody()->write(json_encode(['error' => 'Email required']));
-            return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            return $response->withStatus(400)
+                            ->withHeader('Content-Type', 'application/json');
         }
 
         $userService = $this->get(UserService::class);
         $user = $userService->create($data);
 
         $response->getBody()->write(json_encode($user));
-        return $response->withStatus(201)->withHeader('Content-Type', 'application/json');
+        return $response->withStatus(201)
+                        ->withHeader('Content-Type', 'application/json');
     });
 
     $group->get('/users/{id}', function (Request $request, Response $response, array $args) {
@@ -68,7 +63,8 @@ $app->group('/api', function ($group) {
 
         if (!$user) {
             $response->getBody()->write(json_encode(['error' => 'Not found']));
-            return $response->withStatus(404)->withHeader('Content-Type', 'application/json');
+            return $response->withStatus(404)
+                            ->withHeader('Content-Type', 'application/json');
         }
 
         $response->getBody()->write(json_encode($user));
@@ -79,11 +75,18 @@ $app->group('/api', function ($group) {
 $app->run();
 ```
 
-## Integrates With
-- **DB**: Eloquent, Doctrine, or PDO
-- **DI**: PHP-DI or Pimple
-- **Validation**: Respect/Validation or custom
-- **Auth**: JWT middleware or sessions
+## Version Gotchas
+- **Slim 4.x**: PHP 8.0+ required; PSR-7/15 compliant
+- **Body parsing**: `addBodyParsingMiddleware()` for JSON
+- **Container**: Use PHP-DI; register before `AppFactory::create()`
+- **Response**: Always return Response; never echo
+
+## What NOT to Do
+- ❌ `echo` in routes — Write to `$response->getBody()`
+- ❌ Missing `addBodyParsingMiddleware()` — JSON not parsed
+- ❌ Global state — Use DI container
+- ❌ Flat routes — Use `$app->group()` for organization
+- ❌ Missing error middleware — Silent failures
 
 ## Common Errors
 | Error | Fix |
@@ -92,11 +95,3 @@ $app->run();
 | `Container entry not found` | Register in container first |
 | `Headers already sent` | Don't echo before response |
 | `Body not parsed` | Add `addBodyParsingMiddleware()` |
-
-## Prod Ready
-- [ ] Error middleware configured
-- [ ] CORS middleware added
-- [ ] Container for all dependencies
-- [ ] Validation on all inputs
-- [ ] Logging middleware
-- [ ] Health check endpoint

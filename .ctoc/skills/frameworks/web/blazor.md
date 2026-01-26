@@ -1,29 +1,22 @@
 # Blazor CTO
-> C# in the browser - WebAssembly for full .NET, or Server for real-time connections.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-dotnet new blazorwasm -n MyApp && cd MyApp  # or blazorserver
-dotnet run
-dotnet test
+dotnet new blazorwasm -n MyApp  # WebAssembly
+# Or: dotnet new blazorserver -n MyApp
+cd MyApp && dotnet run
+# .NET 9 - Blazor United (Server + WASM)
 ```
 
-## Non-Negotiables
-1. Component architecture with clear boundaries
-2. Proper state management (cascading, services)
-3. JS interop only when necessary
-4. Render optimization with `@key` and `ShouldRender`
-5. Authentication/Authorization configured properly
+## Claude's Common Mistakes
+1. **Missing `@key` on lists** — Causes inefficient re-renders
+2. **Blocking UI thread** — Use async for all I/O operations
+3. **Excessive JS interop** — Use C# where possible
+4. **Calling `StateHasChanged()` everywhere** — Understand render lifecycle
+5. **Massive components** — Split into smaller, focused components
 
-## Red Lines
-- Massive components - split into smaller ones
-- Missing `@key` on lists causing re-render issues
-- Blocking UI thread with sync operations
-- Excessive JS interop - use C# where possible
-- StateHasChanged spam - understand render lifecycle
-
-## Pattern: Component with Service
+## Correct Patterns (2026)
 ```csharp
 // Pages/Users.razor
 @page "/users"
@@ -42,6 +35,7 @@ else
 
     @foreach (var user in _users)
     {
+        <!-- @key is required for efficient updates -->
         <UserCard @key="user.Id" User="user" OnDelete="HandleDelete" />
     }
 }
@@ -52,7 +46,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        _users = await UserService.GetAllAsync();
+        _users = await UserService.GetAllAsync();  // Always async
         _loading = false;
     }
 
@@ -60,6 +54,7 @@ else
     {
         await UserService.DeleteAsync(userId);
         _users.RemoveAll(u => u.Id == userId);
+        // StateHasChanged() auto-called after event handlers
     }
 
     private void ShowCreateForm() => Navigation.NavigateTo("/users/create");
@@ -69,7 +64,6 @@ else
 public class UserService : IUserService
 {
     private readonly HttpClient _http;
-
     public UserService(HttpClient http) => _http = http;
 
     public async Task<List<User>> GetAllAsync()
@@ -77,24 +71,31 @@ public class UserService : IUserService
 }
 ```
 
-## Integrates With
-- **API**: HttpClient with typed clients
-- **Auth**: ASP.NET Identity or Azure AD
-- **State**: Fluxor for Redux pattern, or custom services
-- **UI**: MudBlazor or Radzen component libraries
+## Version Gotchas
+- **.NET 9**: Blazor United combines Server + WASM
+- **Render modes**: Auto, Server, WebAssembly, Static
+- **@key**: Required on loops for efficient diffing
+- **StateHasChanged**: Auto-called after events; rarely needed manually
+
+## What NOT to Do
+- ❌ `foreach` without `@key` — Inefficient re-renders
+- ❌ Sync I/O blocking UI — Always use `async`/`await`
+- ❌ Heavy JS interop — Use C# when possible
+- ❌ `StateHasChanged()` spam — Understand when it's auto-called
+- ❌ 1000-line components — Split into smaller components
+
+## Render Modes (.NET 9)
+| Mode | Runs On | Use For |
+|------|---------|---------|
+| Static | Server (no interactivity) | Content pages |
+| Server | Server (SignalR) | Fast initial load |
+| WebAssembly | Browser | Offline capable |
+| Auto | Server then WASM | Best of both |
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `JSDisconnectedException` | Check Server connection, handle gracefully |
-| `Cannot access disposed object` | Cancel async operations in `Dispose` |
-| `Component not rendering` | Call `StateHasChanged()` after async updates |
-| `NavigationException` | Use `NavigationManager.NavigateTo` not JS |
-
-## Prod Ready
-- [ ] WASM: Compression enabled, AOT compilation
-- [ ] Server: SignalR scaling configured
-- [ ] Error boundaries for graceful failures
-- [ ] Lazy loading for large apps
-- [ ] PWA support configured
-- [ ] Logging with structured output
+| `JSDisconnectedException` | Handle Server mode disconnects |
+| `Cannot access disposed object` | Cancel async in `Dispose` |
+| `Component not rendering` | Check `StateHasChanged()` or `@key` |
+| `NavigationException` | Use `NavigationManager`, not JS |

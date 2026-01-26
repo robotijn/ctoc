@@ -1,53 +1,39 @@
 # Airbyte CTO
-> Open-source ELT platform for data integration at scale.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker compose up -d
-curl http://localhost:8000/api/v1/health
-airbyte-cli connections list
+# Docker (self-hosted)
+git clone https://github.com/airbytehq/airbyte.git
+cd airbyte && docker compose up -d
+# Web UI at http://localhost:8000
 ```
 
-## Non-Negotiables
-1. Source/destination connector pairing validated
-2. Sync mode selection (full refresh vs incremental)
-3. Normalization configured for destination
-4. Connector versions pinned and updated
-5. Self-hosted security hardened
-6. Monitoring and alerting on sync failures
+## Claude's Common Mistakes
+1. **Full refresh when incremental works** - Wastes resources and time
+2. **Missing normalization** - Raw JSON is unusable for analytics
+3. **Outdated connectors** - Pin versions but update regularly
+4. **No sync failure alerting** - Silent failures cause data staleness
+5. **Syncing unnecessary tables** - Select only needed tables/columns
 
-## Red Lines
-- Full refresh when incremental is possible
-- Missing normalization causing raw JSON chaos
-- Outdated connectors with known issues
-- No connection testing before deployment
-- Ignoring sync logs and error patterns
-
-## Pattern: Production ELT Pipeline
+## Correct Patterns (2026)
 ```yaml
-# connection.yaml
+# Connection configuration
 source:
-  name: postgres_production
   connector: source-postgres
   config:
     host: ${POSTGRES_HOST}
     database: production
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
     replication_method:
       method: CDC
       replication_slot: airbyte_slot
-      publication: airbyte_publication
 
 destination:
-  name: snowflake_warehouse
   connector: destination-snowflake
   config:
     host: ${SNOWFLAKE_HOST}
     database: RAW
     schema: PRODUCTION
-    warehouse: AIRBYTE_WH
 
 sync:
   streams:
@@ -56,24 +42,19 @@ sync:
       destination_sync_mode: append_dedup
       cursor_field: updated_at
       primary_key: [id]
-    - name: users
-      sync_mode: incremental
-      destination_sync_mode: append_dedup
-      cursor_field: updated_at
-      primary_key: [id]
 
   schedule:
     type: cron
-    expression: "0 */6 * * *"  # Every 6 hours
+    expression: "0 */6 * * *"
 
   normalization:
     enabled: true
 ```
 
 ```python
-# Airbyte API for programmatic control
 import requests
 
+# Trigger sync via API
 def trigger_sync(connection_id: str):
     response = requests.post(
         f"{AIRBYTE_URL}/api/v1/connections/sync",
@@ -83,22 +64,14 @@ def trigger_sync(connection_id: str):
     return response.json()
 ```
 
-## Integrates With
-- **Sources**: 300+ connectors (databases, APIs, files)
-- **Destinations**: Snowflake, BigQuery, Redshift, S3
-- **Orchestration**: Airflow, Dagster, Prefect operators
+## Version Gotchas
+- **Airbyte Cloud vs OSS**: Cloud has managed connectors, faster updates
+- **CDC setup**: Requires source database configuration (slots, publications)
+- **Connector versions**: Check changelog before upgrading
+- **Normalization**: Optional but recommended for structured destinations
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Sync failed: connection timeout` | Check source connectivity |
-| `Replication slot does not exist` | Create CDC slot manually |
-| `Normalization failed` | Check destination schema permissions |
-| `Rate limit exceeded` | Reduce sync frequency |
-
-## Prod Ready
-- [ ] Incremental sync where possible
-- [ ] Normalization configured
-- [ ] Alerting on sync failures
-- [ ] Connector versions tracked
-- [ ] Resource limits configured
+## What NOT to Do
+- Do NOT use full refresh when incremental is available
+- Do NOT skip normalization (raw JSON is hard to query)
+- Do NOT ignore sync failures (set up alerts)
+- Do NOT sync all tables (select only needed data)

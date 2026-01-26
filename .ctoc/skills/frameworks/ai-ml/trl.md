@@ -1,59 +1,40 @@
 # TRL CTO
-> Train LLMs with reinforcement learning from human feedback (RLHF).
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install trl transformers datasets peft accelerate
-python -c "from trl import SFTTrainer; print('OK')"
-pytest tests/ -v
+# Verify: python -c "from trl import SFTTrainer; print('OK')"
 ```
 
-## Non-Negotiables
-1. SFTTrainer for supervised fine-tuning
-2. DPOTrainer for direct preference optimization
-3. Proper reward model validation for PPO
-4. KL penalty to prevent distribution collapse
-5. PEFT integration for efficiency
-6. Evaluation at every stage
+## Claude's Common Mistakes
+1. Using PPO without validated reward model (unstable)
+2. Missing beta (KL penalty) in DPO causing distribution collapse
+3. Wrong data format for DPO (needs chosen/rejected pairs)
+4. Not using PEFT integration for memory efficiency
+5. Skipping SFT stage before alignment
 
-## Red Lines
-- PPO without validated reward model
-- Missing KL divergence penalty
-- No reference model for regularization
-- Ignoring batch size impact on stability
-- Skipping evaluation checkpoints
-- Training without proper data formatting
-
-## Pattern: Production RLHF Pipeline
+## Correct Patterns (2026)
 ```python
 from trl import SFTTrainer, SFTConfig, DPOTrainer, DPOConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig
 from datasets import load_dataset
 
-# Load base model and tokenizer
-model_id = "meta-llama/Llama-3.1-8B"
-model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype="auto")
-tokenizer = AutoTokenizer.from_pretrained(model_id)
+# Load model and tokenizer
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B")
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
 tokenizer.pad_token = tokenizer.eos_token
 
-# LoRA for efficiency
-peft_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    target_modules=["q_proj", "v_proj"],
-    lora_dropout=0.05,
-)
+# PEFT config for efficiency
+peft_config = LoraConfig(r=16, lora_alpha=32, target_modules=["q_proj", "v_proj"])
 
 # Stage 1: Supervised Fine-Tuning
 sft_config = SFTConfig(
-    output_dir="./sft-output",
+    output_dir="./sft",
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
     num_train_epochs=1,
-    logging_steps=10,
-    save_strategy="epoch",
     fp16=True,
 )
 
@@ -67,14 +48,13 @@ sft_trainer = SFTTrainer(
 )
 sft_trainer.train()
 
-# Stage 2: Direct Preference Optimization (simpler than PPO)
+# Stage 2: DPO (simpler than PPO, no reward model needed)
 # Dataset format: {"prompt": str, "chosen": str, "rejected": str}
 dpo_config = DPOConfig(
-    output_dir="./dpo-output",
+    output_dir="./dpo",
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
-    num_train_epochs=1,
-    beta=0.1,  # KL penalty coefficient
+    beta=0.1,  # KL penalty - CRITICAL for stability
     loss_type="sigmoid",
     fp16=True,
 )
@@ -87,29 +67,17 @@ dpo_trainer = DPOTrainer(
     tokenizer=tokenizer,
 )
 dpo_trainer.train()
-
-# Save final model
-dpo_trainer.model.save_pretrained("./final-model")
 ```
 
-## Integrates With
-- **Training**: Transformers, PEFT, Accelerate
-- **Data**: Datasets, preference data formats
-- **Models**: LLaMA, Mistral, GPT variants
-- **Evaluation**: lm-eval-harness
+## Version Gotchas
+- **DPO vs PPO**: DPO is simpler, no reward model needed
+- **Beta**: 0.1-0.5 typical, higher = more conservative
+- **SFT first**: Always do SFT before DPO/PPO
+- **Data format**: DPO needs chosen/rejected, not just labels
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Reward model collapse` | Increase beta (KL penalty), validate reward model |
-| `Training instability` | Reduce learning rate, increase batch size |
-| `OOM error` | Use gradient checkpointing, reduce seq length |
-| `Data format error` | Verify chosen/rejected format for DPO |
-
-## Prod Ready
-- [ ] SFT completed before alignment
-- [ ] DPO/PPO beta tuned for stability
-- [ ] Reference model used for regularization
-- [ ] Evaluation metrics tracked
-- [ ] Adapter saved for deployment
-- [ ] Training data properly formatted
+## What NOT to Do
+- Do NOT use PPO without a validated reward model
+- Do NOT skip beta parameter in DPO (causes collapse)
+- Do NOT skip SFT stage before alignment
+- Do NOT use wrong data format for DPO
+- Do NOT forget PEFT integration for memory efficiency

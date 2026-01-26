@@ -1,90 +1,63 @@
 # MLflow CTO
-> End-to-end ML lifecycle management and model registry.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install mlflow[extras]
-mlflow server --host 0.0.0.0 --port 5000
-mlflow ui && mlflow models serve -m "models:/model/Production" -p 8000
+# Start server: mlflow server --host 0.0.0.0 --port 5000
+# UI: mlflow ui
 ```
 
-## Non-Negotiables
-1. Track all experiments with autolog
-2. MLflow Projects for reproducibility
-3. Model Registry for versioning and staging
-4. Log all artifacts (models, plots, data samples)
-5. Use signatures and input examples
-6. Tag runs with metadata for searchability
+## Claude's Common Mistakes
+1. Manual logging when autolog works for the framework
+2. Missing model signatures for deployment validation
+3. Not using Model Registry for production versioning
+4. Hardcoded tracking URIs instead of environment config
+5. Skipping input examples causing deployment issues
 
-## Red Lines
-- Manual logging when autolog works
-- No model signatures for deployment
-- Skipping experiment tracking
-- Not using Model Registry for production
-- Missing run tags and descriptions
-- Hardcoded tracking URIs
-
-## Pattern: Production Experiment Tracking
+## Correct Patterns (2026)
 ```python
 import mlflow
 from mlflow.models import infer_signature
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score
 
-# Set tracking URI and experiment
-mlflow.set_tracking_uri("http://mlflow-server:5000")
+# Set tracking URI from environment
+mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"))
 mlflow.set_experiment("production-classifier")
 
-# Enable autolog for scikit-learn
+# Enable autolog for framework (scikit-learn, pytorch, tensorflow, etc.)
 mlflow.sklearn.autolog(log_input_examples=True, log_model_signatures=True)
 
-with mlflow.start_run(run_name="rf-baseline", tags={"team": "ml", "env": "staging"}):
+with mlflow.start_run(run_name="rf-v1", tags={"env": "staging"}):
     # Train model
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
-
-    # Evaluate
     predictions = model.predict(X_test)
-    mlflow.log_metrics({
-        "accuracy": accuracy_score(y_test, predictions),
-        "f1": f1_score(y_test, predictions, average="weighted")
-    })
 
-    # Log model with signature
+    # Log custom metrics
+    mlflow.log_metrics({"accuracy": accuracy, "f1": f1_score})
+
+    # Log model with signature (required for deployment)
     signature = infer_signature(X_train, predictions)
     mlflow.sklearn.log_model(
         model, "model",
         signature=signature,
+        input_example=X_train[:5],
         registered_model_name="production-classifier"
     )
-
-    # Log artifacts
-    mlflow.log_artifact("data/feature_importance.png")
 
 # Promote to production
 client = mlflow.MlflowClient()
 client.transition_model_version_stage("production-classifier", version=1, stage="Production")
 ```
 
-## Integrates With
-- **Training**: PyTorch, TensorFlow, scikit-learn, XGBoost
-- **Deployment**: Docker, Kubernetes, SageMaker, Azure ML
-- **Storage**: S3, Azure Blob, GCS, local filesystem
-- **CI/CD**: GitHub Actions, GitLab CI, Jenkins
+## Version Gotchas
+- **Model Registry**: Required for production deployments
+- **Signatures**: Mandatory for serving validation
+- **Autolog**: Framework-specific - enable for each framework used
+- **Artifacts**: Use artifact repository (S3/GCS) for large files
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `INVALID_PARAMETER_VALUE` | Check parameter types, use correct log functions |
-| `RESOURCE_DOES_NOT_EXIST` | Verify experiment/run exists, check tracking URI |
-| `Model signature mismatch` | Regenerate signature with correct input schema |
-| `Artifact too large` | Use artifact repository, increase storage limits |
-
-## Prod Ready
-- [ ] Tracking server deployed and accessible
-- [ ] All experiments use autolog
-- [ ] Model signatures logged with all models
-- [ ] Model Registry configured for staging/production
-- [ ] Runs tagged with searchable metadata
-- [ ] Artifact storage configured for production scale
+## What NOT to Do
+- Do NOT skip autolog when available for your framework
+- Do NOT deploy without model signatures
+- Do NOT hardcode tracking URIs
+- Do NOT skip input examples
+- Do NOT use local filesystem for production artifacts

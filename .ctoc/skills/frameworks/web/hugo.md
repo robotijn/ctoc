@@ -1,29 +1,21 @@
 # Hugo CTO
-> Fastest static site generator - Go templates, instant builds, zero dependencies.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-hugo new site mysite && cd mysite
-hugo server -D
-hugo --minify
+hugo new site my-site
+cd my-site && hugo server -D
+# Hugo 0.140+ - fastest static site generator
 ```
 
-## Non-Negotiables
-1. Content organization with page bundles
-2. Proper Go templating (logic in partials)
-3. Taxonomies for categorization
-4. Shortcodes for reusable components
-5. Asset pipeline with Hugo Pipes
+## Claude's Common Mistakes
+1. **Complex logic in templates** — Extract to partials
+2. **Hardcoded URLs** — Use `relref` and `absURL`
+3. **Images in `static/`** — Put in `assets/` for Hugo Pipes processing
+4. **Missing `with` guards** — Nil pointer crashes on optional values
+5. **No page bundles** — Use leaf/branch bundles for content organization
 
-## Red Lines
-- Complex logic in templates - use partials
-- Missing archetypes for content types
-- No partials for reusable elements
-- Ignoring page bundles for organization
-- Hardcoded URLs instead of `relref`
-
-## Pattern: List and Single Templates
+## Correct Patterns (2026)
 ```go-html-template
 {{/* layouts/_default/list.html */}}
 {{ define "main" }}
@@ -49,8 +41,8 @@ hugo --minify
 {{ define "main" }}
 <article>
   <h1>{{ .Title }}</h1>
-  <time>{{ .Date.Format "January 2, 2006" }}</time>
 
+  {{/* Guard optional values with `with` */}}
   {{ with .Params.cover }}
     {{ $img := resources.Get . }}
     {{ $img := $img.Resize "800x webp" }}
@@ -58,36 +50,34 @@ hugo --minify
   {{ end }}
 
   {{ .Content }}
-
-  {{ with .GetTerms "tags" }}
-  <div class="tags">
-    {{ range . }}
-      <a href="{{ .Permalink }}">{{ .Title }}</a>
-    {{ end }}
-  </div>
-  {{ end }}
 </article>
 {{ end }}
 ```
 
-## Integrates With
-- **CMS**: Forestry, Netlify CMS, Decap CMS
-- **Hosting**: Netlify, Vercel, GitHub Pages
-- **Search**: Pagefind, Lunr.js
-- **Comments**: Disqus, Utterances
+## Version Gotchas
+- **Hugo 0.140+**: Current; sub-second builds
+- **Hugo Pipes**: Image processing requires `assets/` not `static/`
+- **Page bundles**: Leaf (content) vs branch (section) bundles
+- **Go templates**: `with` creates new scope; use `$.` for parent
+
+## What NOT to Do
+- ❌ Complex logic in templates — Extract to partials
+- ❌ `<a href="/posts/my-post">` — Use `{{ relref . "my-post" }}`
+- ❌ Images in `static/` — No processing; use `assets/`
+- ❌ `{{ .Params.image }}` without `with` — Nil pointer crash
+- ❌ `{{ range }}` without empty check — Renders nothing silently
+
+## Hugo Pipes (Image Processing)
+```go-html-template
+{{ $img := resources.Get "images/photo.jpg" }}
+{{ $resized := $img.Resize "600x webp" }}
+<img src="{{ $resized.RelPermalink }}" alt="..." />
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Template not found` | Check `layouts/` structure matches content |
-| `Nil pointer` | Use `with` to guard optional values |
-| `Page not appearing` | Check front matter `draft: false` |
-| `Image not processing` | Place in `assets/` not `static/` |
-
-## Prod Ready
-- [ ] `hugo --minify` for production
-- [ ] Image processing with Hugo Pipes
-- [ ] Sitemap generated automatically
-- [ ] RSS feed configured
-- [ ] robots.txt in place
-- [ ] Build time < 1 second
+| `Nil pointer` | Add `with` guard for optional values |
+| `Template not found` | Check `layouts/` structure |
+| `Page not appearing` | Set `draft: false` in front matter |
+| `Image not processing` | Move to `assets/`, not `static/` |

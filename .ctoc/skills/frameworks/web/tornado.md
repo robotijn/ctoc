@@ -1,29 +1,21 @@
 # Tornado CTO
-> Python async networking library - non-blocking I/O, WebSocket native.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install tornado
 python server.py
-pytest tests/ -v
+# Tornado 6.x - async Python web server
 ```
 
-## Non-Negotiables
-1. Async handlers with `async def`
-2. IOLoop awareness and proper event handling
-3. Native coroutines (not gen.coroutine)
-4. WebSocket handlers for real-time
-5. Non-blocking HTTP clients (`AsyncHTTPClient`)
+## Claude's Common Mistakes
+1. **Blocking calls in handlers** — Use `run_in_executor` for sync code
+2. **Sync HTTP clients** — Always use `AsyncHTTPClient`
+3. **`gen.coroutine` decorator** — Use native `async def` instead
+4. **Callback pyramids** — Use async/await syntax
+5. **Missing error handling** — Handlers fail silently without try/except
 
-## Red Lines
-- Blocking calls in handlers - use `run_in_executor`
-- Sync HTTP clients - always use `AsyncHTTPClient`
-- Missing error handling in handlers
-- Callback pyramids - use async/await
-- Ignoring connection lifecycle
-
-## Pattern: Async Application
+## Correct Patterns (2026)
 ```python
 import tornado.web
 import tornado.ioloop
@@ -39,12 +31,13 @@ class UserHandler(tornado.web.RequestHandler):
                 self.write({'error': 'email required'})
                 return
 
+            # Async service call (NOT blocking)
             user = await self.application.user_service.create(data)
             self.set_status(201)
             self.write(user.to_dict())
         except Exception as e:
             self.set_status(500)
-            self.write({'error': str(e)})
+            self.write({'error': 'Internal error'})
 
     async def get(self, user_id):
         user = await self.application.user_service.get(int(user_id))
@@ -73,33 +66,45 @@ def make_app():
         (r"/users", UserHandler),
         (r"/users/(\d+)", UserHandler),
         (r"/ws", WebSocketHandler),
-    ], autoreload=True)
+    ])
 
 if __name__ == "__main__":
     app = make_app()
-    app.user_service = UserService()
     app.listen(8888)
     tornado.ioloop.IOLoop.current().start()
 ```
 
-## Integrates With
-- **DB**: `aiopg` or `motor` for async access
-- **HTTP**: `AsyncHTTPClient` for external APIs
-- **WebSocket**: Native support in Tornado
-- **Templates**: Built-in template engine
+## Version Gotchas
+- **Tornado 6.x**: Native async/await; `gen.coroutine` deprecated
+- **IOLoop**: One per thread; don't nest starts
+- **WebSocket**: Native support; ideal for real-time
+- **AsyncHTTPClient**: Required for non-blocking HTTP
+
+## What NOT to Do
+- ❌ `@gen.coroutine` — Use `async def` natively
+- ❌ `requests.get()` in handlers — Use `AsyncHTTPClient`
+- ❌ `time.sleep()` — Use `tornado.gen.sleep()` or `asyncio.sleep()`
+- ❌ Missing try/except — Errors fail silently
+- ❌ Nested IOLoop starts — One IOLoop per thread
+
+## Blocking to Async
+```python
+from concurrent.futures import ThreadPoolExecutor
+executor = ThreadPoolExecutor(max_workers=4)
+
+async def handler(self):
+    # Run blocking code in executor
+    result = await tornado.ioloop.IOLoop.current().run_in_executor(
+        executor,
+        blocking_function,
+        arg1, arg2
+    )
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `RuntimeError: IOLoop already running` | Don't nest IOLoop starts |
-| `Connection reset` | Handle client disconnections gracefully |
-| `Blocking call` | Use `run_in_executor` for sync code |
+| `IOLoop already running` | Don't nest IOLoop.start() |
+| `Connection reset` | Handle disconnects gracefully |
+| `Blocking call detected` | Use `run_in_executor` |
 | `JSON decode error` | Check Content-Type, validate body |
-
-## Prod Ready
-- [ ] Multi-process with `fork_processes`
-- [ ] Graceful shutdown handling
-- [ ] Error logging configured
-- [ ] Health check endpoint
-- [ ] WebSocket ping/pong for keepalive
-- [ ] HTTPS with SSL context

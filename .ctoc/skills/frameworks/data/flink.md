@@ -1,66 +1,62 @@
 # Apache Flink CTO
-> Unified stream and batch processing for real-time analytics at scale.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-./bin/start-cluster.sh
-./bin/flink run -c com.example.Job target/job.jar
-mvn test -Dtest=JobTest
+# PyFlink
+pip install apache-flink
+
+# Or Java/Scala with Maven
+# Use Flink 1.18+ for latest features
 ```
 
-## Non-Negotiables
-1. Event time processing with watermarks for correctness
-2. Proper windowing (tumbling, sliding, session) for aggregations
-3. Checkpointing enabled for fault tolerance
-4. State backends configured (RocksDB for large state)
-5. Backpressure monitoring and handling
-6. Exactly-once semantics for critical data
+## Claude's Common Mistakes
+1. **Processing time for event ordering** - Use event time with watermarks
+2. **Missing checkpoints** - Production needs fault tolerance
+3. **Unbounded state** - Configure state TTL to prevent memory growth
+4. **Synchronous I/O in operators** - Use async I/O for external calls
+5. **HashMapStateBackend for large state** - Use RocksDB
 
-## Red Lines
-- Processing time when event time ordering matters
-- Missing checkpoints in production
-- Unbounded state without TTL
-- Ignoring watermarks causing late data loss
-- Synchronous I/O in operators
+## Correct Patterns (2026)
+```python
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.connectors.kafka import KafkaSource
+from pyflink.common.watermark_strategy import WatermarkStrategy
+from pyflink.common import Duration
 
-## Pattern: Streaming Event Processing
-```java
-StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-env.enableCheckpointing(60000);
-env.setStateBackend(new EmbeddedRocksDBStateBackend());
+env = StreamExecutionEnvironment.get_execution_environment()
+env.enable_checkpointing(60000)  # 60 second intervals
 
-DataStream<Event> events = env
-    .fromSource(kafkaSource, WatermarkStrategy
-        .<Event>forBoundedOutOfOrderness(Duration.ofSeconds(30))
-        .withTimestampAssigner((event, ts) -> event.getTimestamp()),
-        "Kafka Source");
+# Kafka source with event time
+kafka_source = KafkaSource.builder() \
+    .set_bootstrap_servers("localhost:9092") \
+    .set_topics("events") \
+    .set_group_id("flink-processor") \
+    .build()
 
-events
-    .keyBy(Event::getUserId)
-    .window(TumblingEventTimeWindows.of(Time.minutes(5)))
-    .aggregate(new EventAggregator())
-    .addSink(new JdbcSink<>(...));
+# Watermark strategy for out-of-order events
+watermark_strategy = WatermarkStrategy \
+    .for_bounded_out_of_orderness(Duration.of_seconds(30))
 
-env.execute("Event Processor");
+ds = env.from_source(kafka_source, watermark_strategy, "Kafka Source")
+
+# Keyed stream with tumbling window
+result = ds \
+    .key_by(lambda x: x['user_id']) \
+    .window(TumblingEventTimeWindows.of(Time.minutes(5))) \
+    .reduce(lambda a, b: {'count': a['count'] + b['count']})
+
+env.execute("Event Processor")
 ```
 
-## Integrates With
-- **Sources**: Kafka, Kinesis, Pulsar, files
-- **Sinks**: Kafka, JDBC, Elasticsearch, S3
-- **State**: RocksDB, HashMapStateBackend
+## Version Gotchas
+- **v1.18+**: Improved Python API, better Kafka connector
+- **State backends**: RocksDB for >1GB state; heap for small state
+- **Watermarks**: Configure based on expected out-of-orderness
+- **Savepoints**: Required for job upgrades; checkpoints for recovery
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Checkpoint timeout` | Reduce state size or increase timeout |
-| `OutOfMemoryError` | Configure managed memory, use RocksDB |
-| `Watermark stuck` | Check source for idle partitions |
-| `Backpressure high` | Scale parallelism or optimize operators |
-
-## Prod Ready
-- [ ] Checkpointing with appropriate interval
-- [ ] RocksDB state backend for large state
-- [ ] Watermark strategy configured
-- [ ] Monitoring via Flink Dashboard/Prometheus
-- [ ] Savepoint strategy for upgrades
+## What NOT to Do
+- Do NOT use processing time when event order matters
+- Do NOT skip checkpointing in production (data loss on failure)
+- Do NOT let state grow unbounded (configure TTL)
+- Do NOT use synchronous I/O in operators (blocks processing)

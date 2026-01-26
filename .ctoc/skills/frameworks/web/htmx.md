@@ -1,94 +1,96 @@
 # HTMX CTO
-> HTML-driven interactivity - server renders HTML, hypermedia as the engine.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Setup | Dev | Test (with any backend)
-# Add to HTML: <script src="https://unpkg.com/htmx.org@2"></script>
-# Backend-specific dev server
-# Test with any testing framework for your backend
+## Installation (CURRENT - January 2026)
+```html
+<!-- CDN (simplest) -->
+<script src="https://unpkg.com/htmx.org@2"></script>
+<!-- Or npm -->
+npm install htmx.org
 ```
 
-## Non-Negotiables
-1. Server renders HTML fragments - no JSON APIs for UI
-2. Use hx-attributes declaratively, not imperatively
-3. Progressive enhancement - base functionality without JS
-4. HATEOAS principles - server controls navigation
-5. Loading indicators with `hx-indicator`
+## Claude's Common Mistakes
+1. **Using external URLs** — Only use relative URLs; external responses can inject malicious scripts
+2. **JSON APIs for UI** — HTMX expects HTML fragments, not JSON
+3. **Client-side state management** — Server is source of truth; avoid Redux patterns
+4. **Missing CSRF tokens** — Include in forms or `hx-headers` for all mutations
+5. **Forgetting loading indicators** — Use `hx-indicator` for slow operations
 
-## Red Lines
-- JSON APIs when HTML fragments work
-- Over-engineering simple interactions
-- Client-side state management - server is the source of truth
-- Missing loading states on slow operations
-- Ignoring accessibility
-
-## Pattern: CRUD with Partial Updates
+## Correct Patterns (2026)
 ```html
-<!-- List with inline editing -->
-<table id="users-table" hx-get="/users" hx-trigger="load" hx-swap="innerHTML">
-  <tbody id="users-body"></tbody>
-</table>
+<!-- Relative URLs only (security) -->
+<button hx-get="/api/users" hx-target="#users-list">
+  Load Users
+</button>
 
-<!-- Server returns this partial -->
+<!-- CRUD with partials -->
 <tr id="user-1" hx-target="this" hx-swap="outerHTML">
   <td>john@example.com</td>
   <td>
-    <button hx-get="/users/1/edit" hx-target="#user-1">Edit</button>
+    <button hx-get="/users/1/edit">Edit</button>
     <button hx-delete="/users/1"
             hx-confirm="Delete this user?"
-            hx-target="closest tr"
             hx-swap="delete">Delete</button>
   </td>
 </tr>
 
-<!-- Edit form partial returned by /users/1/edit -->
-<tr id="user-1">
-  <td colspan="2">
-    <form hx-put="/users/1" hx-target="#user-1" hx-swap="outerHTML">
-      <input name="email" value="john@example.com" />
-      <button type="submit">Save</button>
-      <button hx-get="/users/1" hx-target="#user-1">Cancel</button>
-    </form>
-  </td>
-</tr>
-
-<!-- Add form with out-of-band swap -->
+<!-- Form with CSRF and loading indicator -->
 <form hx-post="/users" hx-target="#users-body" hx-swap="beforeend">
-  <input name="email" placeholder="Email" required />
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <input name="email" required>
   <button type="submit">
     <span class="htmx-indicator">Adding...</span>
-    <span>Add User</span>
+    Add User
   </button>
 </form>
+
+<!-- Search with debounce -->
+<input type="search"
+       hx-get="/search"
+       hx-trigger="keyup changed delay:300ms"
+       hx-target="#results">
 ```
 
-## Integrates With
-- **Backend**: Any server that renders HTML (Django, Rails, Flask, Go, etc.)
-- **Validation**: Server-side validation, return error HTML
-- **Auth**: Session cookies, server manages state
-- **Extensions**: `hx-boost`, `hx-push-url`, `htmx-ext-*`
+## Version Gotchas
+- **HTMX 2.x**: Current stable; check extensions compatibility
+- **Security**: Never fetch from external domains; XSS risk
+- **CSP**: Configure Content Security Policy for HTMX
+- **Real-time**: Use polling (`hx-trigger="every 5s"`) or SSE
+
+## What NOT to Do
+- ❌ `hx-get="https://external-api.com/data"` — XSS vulnerability
+- ❌ JSON API endpoints for HTMX — Return HTML fragments
+- ❌ Redux/client state for server data — Server is truth
+- ❌ Forms without CSRF protection — Security risk
+- ❌ Slow ops without `hx-indicator` — Bad UX
 
 ## Common Patterns
-| Pattern | Implementation |
-|---------|----------------|
-| Infinite scroll | `hx-get="/items?page=2" hx-trigger="revealed" hx-swap="afterend"` |
+| Pattern | HTMX |
+|---------|------|
+| Infinite scroll | `hx-trigger="revealed" hx-swap="afterend"` |
 | Search debounce | `hx-trigger="keyup changed delay:300ms"` |
-| Modal | `hx-target="#modal" hx-swap="innerHTML"` + show modal |
+| Modal | `hx-target="#modal" hx-swap="innerHTML"` |
 | Polling | `hx-trigger="every 5s"` |
+| History | `hx-push-url="true"` |
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| Content not updating | Check `hx-target` selector, inspect swap |
-| CSRF token missing | Include token in form or `hx-headers` |
-| Flash of unstyled content | Add `htmx.config.defaultSwapStyle = 'morph'` |
-| Back button broken | Use `hx-push-url="true"` |
+## Security Checklist
+```html
+<!-- Always include CSRF -->
+<meta name="csrf-token" content="{{ csrf_token }}">
+<script>
+  htmx.config.headers = {
+    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+  };
+</script>
 
-## Prod Ready
-- [ ] Error responses return user-friendly HTML
-- [ ] Loading indicators on all slow operations
-- [ ] `hx-boost` for SPA-like navigation
-- [ ] CSRF protection on all mutations
-- [ ] Graceful fallback without JavaScript
-- [ ] Request deduplication with `hx-sync`
+<!-- Whitelist allowed attributes/tags when escaping -->
+<!-- Use layered security: validation + encoding + CSP -->
+```
+
+## When to Use HTMX
+| Good Fit | Bad Fit |
+|----------|---------|
+| CRUD dashboards | Real-time collaboration |
+| Content sites | Offline-first apps |
+| Forms & tables | Heavy client interactivity |
+| Internal tools | Complex state machines |

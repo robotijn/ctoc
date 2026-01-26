@@ -1,31 +1,21 @@
 # Ray CTO
-> Unified framework for distributed ML training, tuning, and serving.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install "ray[default,train,tune,serve]"
-ray start --head --port=6379
-ray status && python -c "import ray; ray.init(); print(ray.cluster_resources())"
+# Start cluster: ray start --head
+# Verify: python -c "import ray; ray.init(); print(ray.cluster_resources())"
 ```
 
-## Non-Negotiables
-1. Ray Tune for hyperparameter optimization
-2. Ray Train for distributed training
-3. Ray Serve for model deployment
-4. Ray Data for preprocessing at scale
-5. Use resource specifications for GPU/CPU
-6. Implement checkpointing for fault tolerance
+## Claude's Common Mistakes
+1. Not specifying resource requirements for actors/tasks
+2. Using grid search instead of smarter HPO (ASHA, PBT)
+3. Missing `train.torch.prepare_model()` for distributed training
+4. Not using `train.report()` for checkpointing
+5. Ignoring Ray Data for large-scale preprocessing
 
-## Red Lines
-- Manual distributed training when Ray Train works
-- Grid search instead of smarter HPO
-- Not specifying resource requirements
-- Ignoring fault tolerance
-- Single-node when cluster available
-- No checkpointing for long runs
-
-## Pattern: Distributed Training Pipeline
+## Correct Patterns (2026)
 ```python
 import ray
 from ray import tune, train
@@ -37,10 +27,8 @@ ray.init()
 # Distributed training function
 def train_func(config):
     import torch
-    from torch.nn.parallel import DistributedDataParallel
-
     model = MyModel(config["hidden_size"])
-    model = train.torch.prepare_model(model)
+    model = train.torch.prepare_model(model)  # Required for DDP
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["lr"])
     train_loader = train.torch.prepare_data_loader(get_dataloader())
@@ -53,55 +41,35 @@ def train_func(config):
             optimizer.step()
 
         # Report metrics and checkpoint
-        train.report({"loss": loss.item()}, checkpoint=train.Checkpoint.from_model(model))
+        train.report({"loss": loss.item()},
+                     checkpoint=train.Checkpoint.from_model(model))
 
-# Configure distributed training
+# Distributed trainer
 trainer = TorchTrainer(
     train_func,
     train_loop_config={"hidden_size": 256, "lr": 1e-4, "epochs": 10},
     scaling_config=train.ScalingConfig(num_workers=4, use_gpu=True),
 )
 
-# Hyperparameter tuning with Ray Tune
+# HPO with ASHA scheduler (early stopping)
 tuner = tune.Tuner(
     trainer,
-    param_space={
-        "train_loop_config": {
-            "hidden_size": tune.choice([128, 256, 512]),
-            "lr": tune.loguniform(1e-5, 1e-3),
-        }
-    },
-    tune_config=tune.TuneConfig(
-        metric="loss",
-        mode="min",
-        num_samples=20,
-        scheduler=ASHAScheduler(),
-    ),
+    param_space={"train_loop_config": {"lr": tune.loguniform(1e-5, 1e-3)}},
+    tune_config=tune.TuneConfig(metric="loss", mode="min", num_samples=20,
+                                 scheduler=ASHAScheduler()),
 )
-
 results = tuner.fit()
-best_result = results.get_best_result()
-print(f"Best config: {best_result.config}")
 ```
 
-## Integrates With
-- **Training**: PyTorch, TensorFlow, JAX, XGBoost
-- **HPO**: Optuna, HyperOpt via Ray Tune
-- **Serving**: FastAPI, Gradio via Ray Serve
-- **Orchestration**: Kubernetes, AWS, GCP
+## Version Gotchas
+- **Ray 2.x**: Use `train.torch.prepare_model()` not `ray.train.torch.prepare`
+- **Tune**: ASHA scheduler for early stopping, PBT for adaptive HPO
+- **Serve**: Use `@serve.deployment` decorator for model serving
+- **Data**: Use `ray.data` for preprocessing at scale
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `RayActorError` | Check resource availability, increase memory |
-| `ObjectStoreFullError` | Increase object store size, use spilling |
-| `GPU not found` | Set `use_gpu=True`, check CUDA installation |
-| `Checkpoint not found` | Verify checkpoint path, check storage |
-
-## Prod Ready
-- [ ] Cluster configured and healthy
-- [ ] Resources specified for all actors
-- [ ] Checkpointing enabled for fault tolerance
-- [ ] Hyperparameters tuned with Ray Tune
-- [ ] Models deployed with Ray Serve
-- [ ] Monitoring and logging configured
+## What NOT to Do
+- Do NOT skip resource specifications (CPU/GPU)
+- Do NOT use grid search - use ASHA or Bayesian optimization
+- Do NOT forget `train.torch.prepare_model()` for distributed
+- Do NOT skip checkpointing with `train.report()`
+- Do NOT ignore Ray Data for large datasets

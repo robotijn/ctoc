@@ -1,88 +1,94 @@
 # Svelte CTO
-> Compile-time reactivity - less boilerplate, more performance, surgical updates.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npx sv create myapp  # Select TypeScript, Prettier, ESLint
+npx sv create myapp
+# Select: TypeScript, Prettier, ESLint, Playwright
+cd myapp && npm install
 npm run dev
-npm run test -- --coverage
 ```
 
-## Non-Negotiables
-1. Runes (`$state`, `$derived`, `$effect`) in Svelte 5 - no legacy reactivity
-2. TypeScript with strict mode for all components
-3. Stores only for cross-component state sharing
-4. Component composition over inheritance
-5. Accessibility attributes on interactive elements
+## Claude's Common Mistakes
+1. **Using legacy `$:` reactive syntax** — Svelte 5 uses runes (`$state`, `$derived`, `$effect`)
+2. **Manual array reassignment** — Svelte 5 has deep reactivity; mutation works
+3. **Using `$effect` for derived state** — Use `$derived` for computed values
+4. **Global `$state` in modules** — Not SSR-safe; causes state leakage
+5. **Missing browser guard** — Check `browser` from `$app/environment` for client-only APIs
 
-## Red Lines
-- `$:` reactive statements in Svelte 5 - use runes instead
-- Over-using stores for local component state
-- Complex logic in template expressions
-- Missing `{#key}` block for animated list items
-- Ignoring accessibility (a11y) warnings
-
-## Pattern: Svelte 5 Runes
+## Correct Patterns (2026)
 ```svelte
-<!-- UserList.svelte -->
 <script lang="ts">
-  import { getUsers, type User } from '$lib/api';
+  import { browser } from '$app/environment';
 
-  let { initialUsers = [] }: { initialUsers?: User[] } = $props();
-
-  let users = $state<User[]>(initialUsers);
+  // Svelte 5 Runes
+  let count = $state(0);
+  let items = $state<Item[]>([]);
   let search = $state('');
-  let loading = $state(false);
 
-  let filteredUsers = $derived(
-    users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()))
+  // Use $derived for computed (NOT $effect)
+  let filtered = $derived(
+    items.filter(i => i.name.includes(search))
   );
 
-  async function refresh() {
-    loading = true;
-    try {
-      users = await getUsers();
-    } finally {
-      loading = false;
-    }
+  // $derived.by for complex derivations
+  let stats = $derived.by(() => {
+    const total = items.length;
+    const active = items.filter(i => i.active).length;
+    return { total, active };
+  });
+
+  // Deep reactivity works (no reassignment needed)
+  function addItem(item: Item) {
+    items.push(item);  // This triggers updates in Svelte 5
   }
 
+  // Client-only code guard
   $effect(() => {
-    console.log(`Showing ${filteredUsers.length} users`);
+    if (browser) {
+      localStorage.setItem('count', String(count));
+    }
   });
 </script>
 
-<input bind:value={search} placeholder="Search users..." />
-<button onclick={refresh} disabled={loading}>
-  {loading ? 'Loading...' : 'Refresh'}
-</button>
-
-{#each filteredUsers as user (user.id)}
-  <UserCard {user} />
-{:else}
-  <p>No users found</p>
-{/each}
+<!-- Props with $props() -->
+<script lang="ts">
+  let { user, onSave }: { user: User; onSave: () => void } = $props();
+</script>
 ```
 
-## Integrates With
-- **Routing**: SvelteKit with file-based routing and `+page.ts` load functions
-- **State**: Svelte stores (`writable`, `readable`) for global state
-- **Styling**: Scoped CSS by default, Tailwind CSS optional
-- **Forms**: SvelteKit form actions with progressive enhancement
+## Version Gotchas
+- **Svelte 4→5**: `$:` reactive statements → `$derived`/`$effect`
+- **Svelte 4→5**: `export let` for props → `$props()`
+- **Svelte 4→5**: Deep reactivity added (arrays/objects auto-track)
+- **Svelte 5.46+**: CSP support in render options
+- **Security**: Update for CVEs in @sveltejs/kit and adapter-node
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `$state is not defined` | Upgrade to Svelte 5, check `svelte.config.js` |
-| `Cannot bind to non-local value` | Use `$bindable()` prop or two-way binding |
-| `A11y: element should have aria-label` | Add accessibility attributes |
-| `Hydration mismatch` | Ensure SSR/client render identical content |
+## What NOT to Do
+- ❌ `$: doubled = count * 2` — Use `let doubled = $derived(count * 2)`
+- ❌ `$effect(() => { derivedValue = compute() })` — Use `$derived`
+- ❌ `items = [...items, newItem]` for mutations — Just `items.push(newItem)`
+- ❌ `let { prop } = $props()` in module context — SSR state leak
+- ❌ `window.localStorage` without browser check — SSR will fail
 
-## Prod Ready
-- [ ] SvelteKit adapter configured (Vercel, Node, static)
-- [ ] Prerendering for static pages
-- [ ] Error boundaries with `+error.svelte`
-- [ ] Bundle size analyzed with `vite-bundle-visualizer`
-- [ ] PWA support with `@vite-pwa/sveltekit`
-- [ ] E2E tests with Playwright
+## Svelte 5 Migration
+```javascript
+// Old Svelte 4
+export let name;
+$: greeting = `Hello ${name}`;
+
+// New Svelte 5
+let { name } = $props();
+let greeting = $derived(`Hello ${name}`);
+```
+
+## Runes Quick Reference
+| Rune | Purpose |
+|------|---------|
+| `$state()` | Reactive state |
+| `$derived()` | Computed value |
+| `$derived.by()` | Complex computed |
+| `$effect()` | Side effects |
+| `$effect.pre()` | Before DOM update |
+| `$props()` | Component props |
+| `$bindable()` | Two-way bindable prop |

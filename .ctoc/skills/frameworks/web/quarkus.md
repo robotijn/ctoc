@@ -1,42 +1,23 @@
 # Quarkus CTO
-> Kubernetes-native Java framework - supersonic startup, native compilation.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 quarkus create app myapp && cd myapp
 quarkus dev
-./mvnw test
+# Quarkus 3.x - Kubernetes-native Java framework
 ```
 
-## Non-Negotiables
-1. Dev mode with live reload
-2. Panache for simplified data access
-3. Native compilation ready
-4. CDI for dependency injection
-5. SmallRye specs (MicroProfile)
+## Claude's Common Mistakes
+1. **Blocking reactive endpoints** — Use `Uni`/`Multi` properly
+2. **Runtime reflection** — Breaks native compilation
+3. **Missing `@Transactional`** — Database operations fail
+4. **Private `@Inject` fields** — Use constructor injection
+5. **Ignoring dev services** — Docker auto-provisions DBs in dev
 
-## Red Lines
-- Blocking reactive endpoints
-- Runtime reflection abuse - breaks native
-- Missing health/metrics extensions
-- Ignoring dev services (auto-DB in dev)
-- `@Inject` on private fields without getter
-
-## Pattern: Resource with Panache
+## Correct Patterns (2026)
 ```java
 // src/main/java/com/example/resource/UserResource.java
-package com.example.resource;
-
-import com.example.dto.CreateUserDto;
-import com.example.entity.User;
-import jakarta.transaction.Transactional;
-import jakarta.validation.Valid;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import java.net.URI;
-
 @Path("/users")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -48,7 +29,7 @@ public class UserResource {
         User user = new User();
         user.email = dto.email();
         user.password = dto.password();
-        user.persist();
+        user.persist();  // Panache active record
 
         return Response.created(URI.create("/users/" + user.id))
             .entity(user)
@@ -65,11 +46,6 @@ public class UserResource {
 }
 
 // src/main/java/com/example/entity/User.java
-package com.example.entity;
-
-import io.quarkus.hibernate.orm.panache.PanacheEntity;
-import jakarta.persistence.*;
-
 @Entity
 @Table(name = "users")
 public class User extends PanacheEntity {
@@ -80,26 +56,31 @@ public class User extends PanacheEntity {
         return find("email", email).firstResult();
     }
 }
+
+// src/main/java/com/example/dto/CreateUserDto.java
+public record CreateUserDto(
+    @NotBlank @Email String email,
+    @NotBlank @Size(min = 8) String password
+) {}
 ```
 
-## Integrates With
-- **DB**: Hibernate ORM with Panache
-- **Auth**: Quarkus Security with OIDC
-- **Messaging**: SmallRye Reactive Messaging
-- **REST Client**: REST Client Reactive
+## Version Gotchas
+- **Quarkus 3.x**: Java 17+ required; Jakarta EE namespace
+- **Panache**: Active record pattern; extends `PanacheEntity`
+- **Dev Services**: Auto-provisions PostgreSQL, Kafka, etc. in dev
+- **Native**: Avoid reflection; use `@RegisterForReflection` if needed
+
+## What NOT to Do
+- ❌ Blocking in reactive chains — Use `Uni.createFrom().item()`
+- ❌ Runtime reflection — Breaks native build
+- ❌ Missing `@Transactional` — Database changes not persisted
+- ❌ Private `@Inject` without getter — CDI can't inject
+- ❌ Ignoring dev services — Free auto-provisioning
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `No active transaction` | Add `@Transactional` to method |
-| `Unsatisfied dependency` | Check bean scope, add `@ApplicationScoped` |
+| `No active transaction` | Add `@Transactional` |
+| `Unsatisfied dependency` | Add `@ApplicationScoped` |
 | `Native build failure` | Register for reflection or use Panache |
-| `Dev service not starting` | Check Docker running for dev mode |
-
-## Prod Ready
-- [ ] Native image built: `./mvnw package -Pnative`
-- [ ] Health extension: `/q/health`
-- [ ] Metrics extension: `/q/metrics`
-- [ ] Database pool configured
-- [ ] Graceful shutdown enabled
-- [ ] Container image built
+| `Dev service not starting` | Check Docker is running |

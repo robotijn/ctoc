@@ -1,29 +1,22 @@
 # Buffalo CTO
-> Rapid Go web development - Rails-like productivity for Go developers.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+go install github.com/gobuffalo/cli/cmd/buffalo@latest
 buffalo new myapp --db-type postgres && cd myapp
 buffalo dev
-buffalo test
+# Buffalo 0.18.x - Rails-like Go framework
 ```
 
-## Non-Negotiables
-1. Pop ORM for database operations
-2. Plush templates for views
-3. Resource generators for scaffolding
-4. Proper migrations - never manual schema changes
-5. Background workers for async tasks
+## Claude's Common Mistakes
+1. **Missing Pop middleware** — Add `PopTransaction` for DB operations
+2. **Skipping model validations** — Always use `Validate()` method
+3. **Business logic in handlers** — Extract to services
+4. **Manual schema changes** — Always use migrations
+5. **Ignoring context** — Use `buffalo.Context` properly
 
-## Red Lines
-- Skipping migrations for schema changes
-- Business logic in templates
-- Missing model validations
-- No test coverage
-- Ignoring Buffalo conventions
-
-## Pattern: Resource with Validation
+## Correct Patterns (2026)
 ```go
 // actions/users.go
 type UsersResource struct {
@@ -33,10 +26,10 @@ type UsersResource struct {
 func (v UsersResource) Create(c buffalo.Context) error {
     user := &models.User{}
     if err := c.Bind(user); err != nil {
-        return err
+        return c.Error(http.StatusBadRequest, err)
     }
 
-    // Validate
+    // Validate (REQUIRED)
     verrs, err := user.Validate(c)
     if err != nil {
         return err
@@ -45,7 +38,7 @@ func (v UsersResource) Create(c buffalo.Context) error {
         return c.Render(http.StatusUnprocessableEntity, r.JSON(verrs))
     }
 
-    // Create
+    // Get transaction from context
     tx := c.Value("tx").(*pop.Connection)
     if err := tx.Create(user); err != nil {
         return err
@@ -71,24 +64,23 @@ func (u *User) Validate(tx *pop.Connection) (*validate.Errors, error) {
 }
 ```
 
-## Integrates With
-- **DB**: Pop with PostgreSQL/MySQL/SQLite
-- **Auth**: `buffalo-pop` with sessions
-- **Background**: Grift tasks, workers
-- **Assets**: Webpack for frontend
+## Version Gotchas
+- **Buffalo 0.18.x**: Current stable; Go 1.21+ required
+- **Pop**: Transaction middleware must be configured
+- **Context**: `c.Value("tx")` for database transaction
+- **Migrations**: `buffalo pop migrate` for schema changes
+
+## What NOT to Do
+- ❌ Skipping `Validate()` — Data integrity issues
+- ❌ Missing PopTransaction middleware — No `tx` in context
+- ❌ Manual schema changes — Use `buffalo pop migrate`
+- ❌ Business logic in actions — Extract to services
+- ❌ Ignoring validation errors — Check `verrs.HasAny()`
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `no transaction found` | Check `--api` flag, add PopTransaction middleware |
-| `migration failed` | Check `database.yml`, run `buffalo pop migrate` |
-| `template not found` | Check `templates/` path matches |
-| `bind error` | Check request Content-Type matches handler |
-
-## Prod Ready
-- [ ] Database migrations up to date
-- [ ] Assets compiled with `buffalo build`
-- [ ] Environment-specific configs
-- [ ] Health check endpoint
-- [ ] Error reporting configured
-- [ ] Background workers deployed
+| `no transaction found` | Add PopTransaction middleware |
+| `migration failed` | Check `database.yml` config |
+| `bind error` | Check Content-Type matches handler |
+| `validator nil pointer` | Initialize validator properly |

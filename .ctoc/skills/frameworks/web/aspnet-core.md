@@ -1,35 +1,28 @@
 # ASP.NET Core CTO
-> Microsoft's cross-platform web framework - minimal APIs or MVC, your choice.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-dotnet new webapi -n MyApp && cd MyApp
-dotnet run
-dotnet test
+dotnet new webapi -n MyApp
+cd MyApp && dotnet run
+# .NET 9 - requires SDK 9.0+
 ```
 
-## Non-Negotiables
-1. Dependency injection via built-in container
-2. Minimal APIs or Controllers - be consistent
-3. Entity Framework Core for data access
-4. Middleware pipeline configuration
-5. Configuration via `appsettings.json` and environment
+## Claude's Common Mistakes
+1. **Service locator pattern** — Use constructor injection, not `GetService()`
+2. **Blocking async with `.Result`** — Always `await`; never `.Result` or `.Wait()`
+3. **Missing validation** — Use FluentValidation or DataAnnotations
+4. **DbContext lifetime issues** — Use `AddDbContext` with scoped lifetime
+5. **Hardcoded config** — Use `appsettings.json` and `IConfiguration`
 
-## Red Lines
-- Service locator pattern - use constructor injection
-- Sync over async - always await async calls
-- Missing model validation
-- Hardcoded connection strings - use configuration
-- Blocking async code with `.Result` or `.Wait()`
-
-## Pattern: Minimal API with Validation
+## Correct Patterns (2026)
 ```csharp
-// Program.cs
+// Program.cs - Minimal API pattern
 using FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Register services (DI container)
 builder.Services.AddDbContext<AppDbContext>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -41,6 +34,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Minimal API endpoint with validation
 app.MapPost("/users", async (
     CreateUserDto dto,
     IValidator<CreateUserDto> validator,
@@ -50,17 +44,15 @@ app.MapPost("/users", async (
     if (!validation.IsValid)
         return Results.ValidationProblem(validation.ToDictionary());
 
-    var user = await userService.CreateAsync(dto);
+    var user = await userService.CreateAsync(dto);  // Always await
     return Results.Created($"/users/{user.Id}", user);
 })
 .WithName("CreateUser")
 .WithOpenApi();
 
-app.MapGet("/health", () => Results.Ok("healthy"));
-
 app.Run();
 
-// Validators/CreateUserDtoValidator.cs
+// Validator
 public class CreateUserDtoValidator : AbstractValidator<CreateUserDto>
 {
     public CreateUserDtoValidator()
@@ -69,26 +61,50 @@ public class CreateUserDtoValidator : AbstractValidator<CreateUserDto>
         RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
     }
 }
+
+// Service with constructor injection
+public class UserService : IUserService
+{
+    private readonly AppDbContext _db;
+
+    public UserService(AppDbContext db) => _db = db;
+
+    public async Task<User> CreateAsync(CreateUserDto dto)
+    {
+        var user = new User { Email = dto.Email };
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+        return user;
+    }
+}
 ```
 
-## Integrates With
-- **DB**: Entity Framework Core with migrations
-- **Auth**: ASP.NET Identity or JWT Bearer
-- **Cache**: `IMemoryCache` or Redis via `IDistributedCache`
-- **Messaging**: MassTransit or Azure Service Bus
+## Version Gotchas
+- **.NET 9**: Current; Minimal APIs preferred for new projects
+- **EF Core 9**: Improved performance, new features
+- **Scoped DbContext**: Default lifetime; don't inject into singletons
+- **Async/await**: Never use `.Result` or `.Wait()` (deadlock risk)
+
+## What NOT to Do
+- ❌ `services.GetService<T>()` in code — Use constructor injection
+- ❌ `await task.Result` or `task.Wait()` — Causes deadlocks
+- ❌ Missing `async` on EF Core calls — Always use `Async` methods
+- ❌ DbContext in singleton service — Scoped lifetime required
+- ❌ Secrets in `appsettings.json` — Use User Secrets or env vars
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Unable to resolve service` | Register service in DI container |
-| `Async deadlock` | Use `await` not `.Result` |
-| `DbContext disposed` | Check scope lifetime, use factory |
+| `Unable to resolve service` | Register in DI container |
+| `Async deadlock` | Use `await`, never `.Result` |
+| `DbContext disposed` | Check scoped lifetime |
 | `No route matches` | Check endpoint mapping |
 
-## Prod Ready
-- [ ] `appsettings.Production.json` configured
-- [ ] HTTPS enforced
-- [ ] Logging with Serilog or similar
-- [ ] Health checks at `/health`
-- [ ] Swagger disabled in production
-- [ ] Kestrel limits configured
+## Production Config
+```json
+// appsettings.Production.json
+{
+  "Logging": { "LogLevel": { "Default": "Warning" } },
+  "AllowedHosts": "yourdomain.com"
+}
+```

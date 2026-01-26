@@ -1,45 +1,29 @@
 # Trino CTO
-> Distributed SQL query engine for interactive analytics across data sources.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name trino -p 8080:8080 trinodb/trino
-trino --server localhost:8080 --catalog hive --schema default
-trino --execute "SHOW CATALOGS"
+docker run -d --name trino -p 8080:8080 trinodb/trino:440
+# CLI
+trino --server localhost:8080 --catalog hive
 ```
 
-## Non-Negotiables
-1. Connector configuration per data source
-2. Memory management with JVM and query limits
-3. Cost-based optimizer with table statistics
-4. Resource groups for workload isolation
-5. Query profiling with EXPLAIN ANALYZE
-6. Spill to disk for large queries
+## Claude's Common Mistakes
+1. **Missing table statistics** - Cost-based optimizer needs ANALYZE
+2. **Large broadcast joins** - Causes OOM; use distributed joins
+3. **No resource groups** - Workloads compete without isolation
+4. **Ignoring EXPLAIN** - Essential for query optimization
+5. **Cross-catalog joins without planning** - Can be extremely slow
 
-## Red Lines
-- Cross-catalog joins at scale without optimization
-- Missing table/column statistics
-- Large broadcast joins causing OOM
-- No resource limits for queries
-- Ignoring EXPLAIN output
-
-## Pattern: Optimized Query Configuration
+## Correct Patterns (2026)
 ```sql
--- Catalog configuration (etc/catalog/hive.properties)
--- connector.name=hive
--- hive.metastore.uri=thrift://metastore:9083
--- hive.s3.path-style-access=true
--- hive.s3.endpoint=s3.amazonaws.com
-
--- Set session properties for query optimization
-SET SESSION query_max_memory = '4GB';
-SET SESSION query_max_execution_time = '30m';
-SET SESSION join_distribution_type = 'AUTOMATIC';
-
--- Analyze tables for cost-based optimization
+-- Collect statistics for optimizer
 ANALYZE events;
 ANALYZE events SHOW STATS;
+
+-- Set session properties for optimization
+SET SESSION query_max_memory = '4GB';
+SET SESSION join_distribution_type = 'AUTOMATIC';
 
 -- Efficient query with predicate pushdown
 SELECT
@@ -48,38 +32,33 @@ SELECT
     count(*) AS event_count
 FROM hive.default.events
 WHERE date >= DATE '2024-01-01'  -- Partition pruning
-  AND event_type IN ('click', 'view')
 GROUP BY 1, 2
 ORDER BY 1, event_count DESC;
 
 -- EXPLAIN ANALYZE for profiling
 EXPLAIN ANALYZE
-SELECT * FROM hive.default.events
-WHERE user_id = 12345;
+SELECT * FROM hive.default.events WHERE user_id = 12345;
 
 -- Federated query across catalogs
 SELECT o.*, c.name
 FROM postgresql.public.orders o
-JOIN hive.default.customers c ON o.customer_id = c.id
-WHERE o.created_at > DATE '2024-01-01';
+JOIN hive.default.customers c ON o.customer_id = c.id;
 ```
 
-## Integrates With
-- **Data Lakes**: Hive, Iceberg, Delta Lake, Hudi
-- **Databases**: PostgreSQL, MySQL, MongoDB, Redis
-- **Cloud**: S3, GCS, ADLS via connectors
+```properties
+# Catalog config: etc/catalog/hive.properties
+connector.name=hive
+hive.metastore.uri=thrift://metastore:9083
+```
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Query exceeded memory limit` | Increase limit or enable spill |
-| `No statistics for table` | Run ANALYZE on table |
-| `Connector not found` | Check catalog configuration |
-| `Query killed` | Review resource group limits |
+## Version Gotchas
+- **v440+**: Improved query planning, better Iceberg support
+- **vs Presto**: Trino is the community fork; more active development
+- **Fault-tolerant execution**: Enable for long-running queries
+- **Resource groups**: Essential for multi-tenant deployments
 
-## Prod Ready
-- [ ] Catalogs configured for all sources
-- [ ] Table statistics collected
-- [ ] Resource groups for workload isolation
-- [ ] Memory limits configured
-- [ ] Query profiling for optimization
+## What NOT to Do
+- Do NOT query without table statistics (ANALYZE first)
+- Do NOT use large broadcast joins (distributed join instead)
+- Do NOT skip resource groups for production
+- Do NOT ignore EXPLAIN output for slow queries

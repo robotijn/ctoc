@@ -1,29 +1,21 @@
 # Marko CTO
-> Streaming UI framework - eBay-scale performance, progressive rendering.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npx @marko/create myapp && cd myapp
 npm run dev
-npm run build && npm start
+# Marko 5.x - streaming UI framework from eBay
 ```
 
-## Non-Negotiables
-1. Streaming SSR for time-to-first-byte
-2. Component-based architecture
-3. Concise syntax (no closing tags for void elements)
-4. Proper state management with $
-5. Islands architecture for hydration
+## Claude's Common Mistakes
+1. **React/Vue patterns** — Marko has unique syntax and concepts
+2. **Blocking renders** — Use streaming with `<await>` tag
+3. **Client-heavy architecture** — Leverage SSR streaming
+4. **Missing state prefix** — Use `state.` for reactive properties
+5. **Closing void elements** — Marko uses concise syntax
 
-## Red Lines
-- Blocking render with sync operations
-- Client-only components when SSR works
-- Missing streaming benefits on server
-- Ignoring compiler optimizations
-- Heavy client-side JavaScript
-
-## Pattern: Component with State
+## Correct Patterns (2026)
 ```marko
 // components/counter.marko
 class {
@@ -81,24 +73,23 @@ $ const usersPromise = UserService.getAll();
 </html>
 ```
 
-## Integrates With
-- **Server**: Express, Fastify, Hapi
-- **Build**: @marko/vite, Webpack
-- **State**: Component state, stores
-- **Testing**: @marko/testing-library
+## Version Gotchas
+- **Marko 5.x**: Current stable; compiler-based optimization
+- **Streaming**: Use `<await>` for async data with placeholders
+- **State**: Access via `state.prop`, update via `this.state.prop`
+- **Concise syntax**: No closing tags for void elements
+
+## What NOT to Do
+- ❌ React JSX syntax — Use Marko's native syntax
+- ❌ Blocking fetches — Use `<await>` for streaming
+- ❌ `this.state.count` in template — Use `state.count`
+- ❌ Missing `key` in `<for>` — Required for lists
+- ❌ Client-side data fetching only — Leverage SSR streaming
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Component not found` | Check components/ directory structure |
-| `State not reactive` | Use this.state.prop = value pattern |
+| `Component not found` | Check components/ directory |
+| `State not reactive` | Use `this.state.prop = value` |
 | `Hydration mismatch` | Ensure server/client render same content |
-| `Streaming not working` | Use await tag with promises |
-
-## Prod Ready
-- [ ] Streaming SSR enabled
-- [ ] Selective hydration configured
-- [ ] Bundle size optimized
-- [ ] Error handling with @catch
-- [ ] Loading states with @placeholder
-- [ ] CDN caching for static assets
+| `Streaming not working` | Use `<await>` tag with promises |

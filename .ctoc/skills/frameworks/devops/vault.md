@@ -1,36 +1,25 @@
 # HashiCorp Vault CTO
-> Enterprise secrets management leader demanding dynamic secrets, least-privilege policies, and comprehensive audit.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-vault server -dev -dev-root-token-id="root"
-vault secrets enable -path=secret kv-v2
-vault audit enable file file_path=/var/log/vault/audit.log
+# Ubuntu/Debian
+wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt-get update && sudo apt-get install vault
+# Current: 1.21.x, LTS: 1.19.x
 ```
 
-## Non-Negotiables
-1. Dynamic secrets for databases, cloud providers - no static credentials
-2. Least-privilege policies with path-based access control
-3. Audit logging enabled on all production clusters
-4. Auto-unsealing with cloud KMS for high availability
-5. Namespace isolation for multi-tenant environments
+## Claude's Common Mistakes
+1. **Uses root token in production** - Must use named tokens with policies
+2. **Static secrets when dynamic available** - Database creds should be dynamic
+3. **Missing lease management** - Credential sprawl without TTLs
+4. **No audit logging** - Compliance and security requirement
+5. **Shamir unsealing in automation** - Use auto-unseal with cloud KMS
 
-## Red Lines
-- Root token usage in production - use named tokens with policies
-- Static secrets when dynamic secrets are available
-- Missing lease management causing credential sprawl
-- No audit trail - compliance and security requirement
-- Shamir unsealing in automated systems - use auto-unseal
-
-## Pattern: Database Dynamic Secrets
+## Correct Patterns (2026)
 ```hcl
-# Enable database secrets engine
-path "database/*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
-}
-
-# Configure PostgreSQL connection
+# Database dynamic secrets configuration
 resource "vault_database_secret_backend_connection" "postgres" {
   backend       = "database"
   name          = "mydb"
@@ -41,7 +30,6 @@ resource "vault_database_secret_backend_connection" "postgres" {
   }
 }
 
-# Create readonly role
 resource "vault_database_secret_backend_role" "readonly" {
   backend             = "database"
   name                = "readonly"
@@ -50,34 +38,34 @@ resource "vault_database_secret_backend_role" "readonly" {
     "CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';",
     "GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";"
   ]
-  default_ttl = 3600
-  max_ttl     = 86400
+  default_ttl = 3600    # 1 hour
+  max_ttl     = 86400   # 24 hours
 }
 
-# Application policy
+# Application policy (least privilege)
 path "database/creds/readonly" {
   capabilities = ["read"]
 }
 
-path "secret/data/{{identity.entity.name}}/*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
+path "secret/data/myapp/*" {
+  capabilities = ["read", "list"]
+}
+
+# Deny access to other paths by default
+path "secret/data/*" {
+  capabilities = ["deny"]
 }
 ```
 
-## Integrates With
-- **DB**: Database secrets engine for PostgreSQL, MySQL, MongoDB
-- **Auth**: Kubernetes auth method, OIDC, LDAP
-- **Cache**: Transit engine for encryption-as-a-service
+## Version Gotchas
+- **Vault 1.19**: LTS release with extended support
+- **Vault 1.21+**: Latest features, standard support
+- **Auto-unseal**: Required for HA, use cloud KMS
+- **With Kubernetes**: Use Vault Agent Injector or CSI driver
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `permission denied` | Check policy path, verify token has correct policies |
-| `lease not found` | Lease expired - request new credentials |
-| `connection refused` | Vault sealed - trigger auto-unseal or manual unseal |
-
-## Prod Ready
-- [ ] Auto-unseal configured with cloud KMS
-- [ ] Audit logs shipped to SIEM
-- [ ] Disaster recovery replication enabled
-- [ ] Performance standby nodes for read scaling
+## What NOT to Do
+- Do NOT use root token in production - create named policies
+- Do NOT use static secrets when dynamic available
+- Do NOT skip audit logging - compliance requirement
+- Do NOT use Shamir unsealing in automation - use auto-unseal
+- Do NOT forget lease TTLs - credentials sprawl

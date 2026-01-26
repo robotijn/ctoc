@@ -1,84 +1,63 @@
 # React CTO
-> Component architecture mastery - composition over inheritance, always.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npx create-vite@latest my-app --template react-ts
-npm run dev
-npm test -- --coverage --watchAll=false
+npm install react@^19.0.0 react-dom@^19.0.0
+npm install -D @types/react@^19.0.0 @types/react-dom@^19.0.0
+# Or with Vite (recommended for new projects):
+npm create vite@latest my-app -- --template react-ts
 ```
 
-## Non-Negotiables
-1. Functional components only - no class components
-2. TypeScript for all components and hooks
-3. Custom hooks extract reusable logic from components
-4. Components under 200 lines - split or extract
-5. Colocation: component, styles, tests, types in same folder
+## Claude's Common Mistakes
+1. **Using manual memoization** — React 19's Compiler auto-memoizes; remove unnecessary `useMemo`/`useCallback`
+2. **Still using `forwardRef`** — React 19 passes `ref` as a prop directly to function components
+3. **Using `ReactDOM.render()`** — Must use `createRoot()` API for React 19 concurrent features
+4. **Importing `act` from wrong location** — Import from `react`, not `react-dom/test-utils`
+5. **Using `<Context.Provider>`** — React 19 renders `<Context>` directly as provider
 
-## Red Lines
-- Array index as `key` prop - use stable unique IDs
-- Missing dependencies in `useEffect` dependency array
-- Direct state mutation - always return new references
-- Prop drilling beyond 2 levels - use context or composition
-- `any` type anywhere in the codebase
-
-## Pattern: Custom Hook
+## Correct Patterns (2026)
 ```typescript
-import { useState, useEffect } from 'react';
-
-interface UseAsyncState<T> {
-  data: T | null;
-  loading: boolean;
-  error: Error | null;
+// React 19: ref as prop, no forwardRef needed
+function Input({ ref, ...props }: { ref?: React.Ref<HTMLInputElement> }) {
+  return <input ref={ref} {...props} />;
 }
 
-export function useAsync<T>(asyncFn: () => Promise<T>, deps: unknown[] = []): UseAsyncState<T> {
-  const [state, setState] = useState<UseAsyncState<T>>({
-    data: null,
-    loading: true,
-    error: null,
-  });
+// React 19: Context as provider directly
+const ThemeContext = createContext('light');
+<ThemeContext value="dark">{children}</ThemeContext>
 
-  useEffect(() => {
-    let cancelled = false;
-    setState(s => ({ ...s, loading: true }));
+// React 19: ref cleanup function
+<div ref={(node) => {
+  // setup
+  return () => { /* cleanup */ };
+}} />
 
-    asyncFn()
-      .then(data => !cancelled && setState({ data, loading: false, error: null }))
-      .catch(error => !cancelled && setState({ data: null, loading: false, error }));
-
-    return () => { cancelled = true; };
-  }, deps);
-
-  return state;
-}
+// Async transitions with useTransition
+const [isPending, startTransition] = useTransition();
+startTransition(async () => {
+  await updateData();
+});
 ```
 
-## State Management Decision Tree
-- **Local UI state** -> `useState`
-- **Complex local state** -> `useReducer`
-- **Server/async state** -> TanStack Query (React Query)
-- **Global client state** -> Zustand or Jotai
-- **Form state** -> React Hook Form with Zod
+## Version Gotchas
+- **v18→v19**: `forwardRef` deprecated, use ref as prop
+- **v18→v19**: Context.Provider → Context directly
+- **v18→v19**: Automatic memoization via React Compiler
+- **Security**: Update to 19.0.3+ (CVE-2025-55184, CVE-2025-55183 patches)
 
-## Integrates With
-- **Routing**: React Router v6 with data loaders
-- **Styling**: Tailwind CSS or CSS Modules
-- **API**: TanStack Query for caching and sync
+## What NOT to Do
+- ❌ `useMemo(() => expensiveCalc, [deps])` everywhere — Compiler handles this
+- ❌ `React.forwardRef((props, ref) => ...)` — Just accept `ref` in props
+- ❌ `import { act } from 'react-dom/test-utils'` — Use `import { act } from 'react'`
+- ❌ `useReducer<State, Action>` with type args — Let TypeScript infer
+- ❌ Array index as `key` — Use stable unique IDs
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Cannot update unmounted component` | Add cleanup in useEffect, use AbortController |
-| `Too many re-renders` | Check for state updates in render, missing deps |
-| `Objects are not valid as React child` | Stringify object or map to JSX |
-| `Each child should have unique key` | Add stable `key` prop to list items |
-
-## Prod Ready
-- [ ] Error boundaries wrap major sections
-- [ ] React.lazy for route-based code splitting
-- [ ] Memoization with `useMemo`/`useCallback` where measured
-- [ ] Bundle analyzed with `vite-bundle-visualizer`
-- [ ] Lighthouse score > 90 on all metrics
-- [ ] E2E tests with Playwright for critical paths
+## State Management (2026)
+| Need | Solution |
+|------|----------|
+| Local UI state | `useState` |
+| Complex local | `useReducer` |
+| Server/async | TanStack Query |
+| Global client | Zustand or Jotai |
+| Forms | React Hook Form + Zod |

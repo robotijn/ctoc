@@ -1,40 +1,31 @@
 # NestJS CTO
-> Enterprise Node.js architecture - Angular-inspired, TypeScript-first, testable.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npx @nestjs/cli new myapp
-npm run start:dev
-npm run test:cov
+npm install -g @nestjs/cli
+nest new myapp
+# Select npm or yarn, strict TypeScript recommended
+cd myapp && npm run start:dev
 ```
 
-## Non-Negotiables
-1. Modules organize features - one module per bounded context
-2. DTOs with `class-validator` for all input validation
-3. Dependency injection for all services
-4. Guards for authentication, interceptors for cross-cutting concerns
-5. Custom exceptions extend `HttpException`
+## Claude's Common Mistakes
+1. **Circular dependencies** — Refactor modules or use `forwardRef()` sparingly
+2. **Creating instances with `new` instead of DI** — Let NestJS inject dependencies
+3. **CORS with wildcard origin** — 62% of apps expose data due to `origin: '*'`
+4. **Missing ValidationPipe** — Always enable globally with `whitelist: true`
+5. **Business logic in controllers** — Controllers orchestrate; services contain logic
 
-## Red Lines
-- Circular dependencies between modules - refactor or use `forwardRef`
-- Business logic in controllers - controllers only orchestrate
-- Missing `ValidationPipe` globally or on endpoints
-- `any` type anywhere - strict TypeScript always
-- Database calls in controllers - use repository pattern
-
-## Pattern: Clean Module Structure
+## Correct Patterns (2026)
 ```typescript
-// users/users.module.ts
-@Module({
-  imports: [TypeOrmModule.forFeature([User])],
-  controllers: [UsersController],
-  providers: [UsersService, UsersRepository],
-  exports: [UsersService],
-})
-export class UsersModule {}
+// Global validation pipe (main.ts)
+app.useGlobalPipes(new ValidationPipe({
+  whitelist: true,        // Strip unknown properties
+  forbidNonWhitelisted: true,
+  transform: true,        // Auto-transform to DTO types
+}));
 
-// users/users.service.ts
+// Proper service injection (not `new`)
 @Injectable()
 export class UsersService {
   constructor(
@@ -47,14 +38,13 @@ export class UsersService {
     if (exists) {
       throw new ConflictException('Email already registered');
     }
-
     const user = await this.usersRepository.create(dto);
     this.eventEmitter.emit('user.created', new UserCreatedEvent(user));
     return user;
   }
 }
 
-// users/dto/create-user.dto.ts
+// DTO with validation
 export class CreateUserDto {
   @IsEmail()
   email: string;
@@ -63,26 +53,43 @@ export class CreateUserDto {
   @MinLength(8)
   password: string;
 }
+
+// Secure CORS configuration
+app.enableCors({
+  origin: ['https://myapp.com'],  // Not '*'
+  credentials: true,
+});
 ```
 
-## Integrates With
-- **DB**: TypeORM or Prisma with repository pattern
-- **Auth**: Passport.js with JWT and Guard composition
-- **Cache**: `@nestjs/cache-manager` with Redis
-- **Queue**: BullMQ with `@nestjs/bullmq` for background jobs
+## Version Gotchas
+- **NestJS 10+**: Node.js 18+ required
+- **With TypeORM 0.3**: DataSource replaces Connection
+- **Circular deps**: Common with poorly structured modules; use `forwardRef` carefully
+- **Monorepo**: tsc cannot compile TS in dependencies; use Webpack or nx
+
+## What NOT to Do
+- ❌ `new UsersService()` — Use dependency injection
+- ❌ `origin: '*'` in CORS — Specify allowed origins
+- ❌ Missing `@Injectable()` on services — Required for DI
+- ❌ `forwardRef` everywhere — Refactor circular dependencies
+- ❌ Logic in controllers — Move to services
+
+## Module Structure
+```typescript
+// Feature module pattern
+@Module({
+  imports: [TypeOrmModule.forFeature([User])],
+  controllers: [UsersController],
+  providers: [UsersService, UsersRepository],
+  exports: [UsersService],  // Export for other modules
+})
+export class UsersModule {}
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Nest can't resolve dependencies` | Check imports, add `@Injectable()`, check circular deps |
-| `Cannot determine GraphQL output type` | Add explicit type decorator `@Field(() => Type)` |
-| `Validation failed` | Check DTO decorators match request shape |
-| `EntityMetadataNotFoundError` | Add entity to TypeOrmModule.forFeature() |
-
-## Prod Ready
-- [ ] Global validation pipe with `whitelist: true`
-- [ ] Swagger documentation with `@nestjs/swagger`
-- [ ] Health checks with `@nestjs/terminus`
-- [ ] Rate limiting with `@nestjs/throttler`
-- [ ] Helmet middleware for security headers
-- [ ] Structured logging with Pino or Winston
+| `Nest can't resolve dependencies` | Add `@Injectable()`, check imports |
+| `Circular dependency` | Use `forwardRef()` or refactor |
+| `Cannot determine GraphQL type` | Add `@Field(() => Type)` |
+| `EntityMetadataNotFoundError` | Add entity to `forFeature()` |

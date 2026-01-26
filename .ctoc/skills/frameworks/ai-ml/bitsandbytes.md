@@ -1,52 +1,41 @@
 # bitsandbytes CTO
-> Memory-efficient 8-bit and 4-bit quantization for LLMs.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install bitsandbytes
-python -c "import bitsandbytes as bnb; print(bnb.COMPILED_WITH_CUDA)"
-python -c "from transformers import BitsAndBytesConfig; print('OK')"
+# Verify CUDA: python -c "import bitsandbytes as bnb; print(bnb.COMPILED_WITH_CUDA)"
+# Requires NVIDIA GPU (Ampere or newer recommended)
 ```
 
-## Non-Negotiables
-1. 4-bit (NF4) for inference to minimize memory
-2. 8-bit for training stability when needed
-3. Use NF4 for better quality over FP4
-4. Proper compute dtype (float16/bfloat16)
-5. Double quantization for additional savings
-6. Compatible PEFT integration
+## Claude's Common Mistakes
+1. Missing `bnb_4bit_compute_dtype` causing slow inference
+2. 4-bit training without QLoRA setup (unstable)
+3. Wrong quant_type (use "nf4" for better quality)
+4. Not enabling double quantization for memory savings
+5. Using 8-bit when 4-bit would work
 
-## Red Lines
-- 4-bit training without proper setup (unstable)
-- Missing compute dtype specification
-- Ignoring memory savings opportunities
-- No double quantization for large models
-- Wrong quantization type for use case
-- Incompatible CUDA versions
-
-## Pattern: Production Quantization
+## Correct Patterns (2026)
 ```python
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+from peft import prepare_model_for_kbit_training
 
-# 4-bit configuration for inference
+# 4-bit config for inference (most common)
 bnb_config_4bit = BitsAndBytesConfig(
     load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",  # NF4 for better quality
-    bnb_4bit_compute_dtype=torch.bfloat16,  # Compute in bf16
-    bnb_4bit_use_double_quant=True,  # Further memory savings
+    bnb_4bit_quant_type="nf4",            # Better than fp4
+    bnb_4bit_compute_dtype=torch.bfloat16, # CRITICAL for speed
+    bnb_4bit_use_double_quant=True,        # Extra memory savings
 )
 
-# 8-bit configuration for training stability
+# 8-bit config for training stability (if 4-bit unstable)
 bnb_config_8bit = BitsAndBytesConfig(
     load_in_8bit=True,
     llm_int8_threshold=6.0,
-    llm_int8_has_fp16_weight=False,
 )
 
-# Load model with 4-bit quantization
+# Load model with quantization
 model = AutoModelForCausalLM.from_pretrained(
     "meta-llama/Llama-3.1-8B",
     quantization_config=bnb_config_4bit,
@@ -54,44 +43,25 @@ model = AutoModelForCausalLM.from_pretrained(
     torch_dtype=torch.bfloat16,
 )
 
-# Prepare for k-bit training (QLoRA)
+# For training (QLoRA) - MUST prepare model
 model = prepare_model_for_kbit_training(
     model,
     use_gradient_checkpointing=True,
 )
 
-# Add LoRA for fine-tuning quantized model
-lora_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-    lora_dropout=0.05,
-    bias="none",
-)
-
-model = get_peft_model(model, lora_config)
-model.print_trainable_parameters()
-# Output: trainable params: 0.1% of total
+# Check quantization worked
+print(f"Model memory: {model.get_memory_footprint() / 1e9:.2f} GB")
 ```
 
-## Integrates With
-- **Training**: Transformers, PEFT, TRL
-- **Models**: LLaMA, Mistral, BERT, T5
-- **Hardware**: NVIDIA GPUs (Ampere+)
-- **Inference**: vLLM (via conversion)
+## Version Gotchas
+- **compute_dtype**: Must set for fast inference (bfloat16 or float16)
+- **GPU requirement**: Ampere+ (RTX 30xx/40xx, A100) for best performance
+- **double_quant**: Additional 0.4 bits/param savings
+- **8-bit vs 4-bit**: Use 8-bit if training is unstable with 4-bit
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `CUDA not available` | Install CUDA-compatible bitsandbytes |
-| `Slow inference` | Check compute dtype matches model dtype |
-| `OOM even with quantization` | Enable double_quant, reduce context |
-| `NaN in training` | Switch to 8-bit or increase stability |
-
-## Prod Ready
-- [ ] Quantization type appropriate for use case
-- [ ] Compute dtype matches training dtype
-- [ ] Double quantization enabled for large models
-- [ ] CUDA version compatible
-- [ ] Memory savings validated
-- [ ] PEFT integration tested
+## What NOT to Do
+- Do NOT skip `bnb_4bit_compute_dtype` - causes slow inference
+- Do NOT train with 4-bit without `prepare_model_for_kbit_training()`
+- Do NOT use "fp4" - use "nf4" for better quality
+- Do NOT skip double_quant for large models
+- Do NOT use on non-NVIDIA GPUs

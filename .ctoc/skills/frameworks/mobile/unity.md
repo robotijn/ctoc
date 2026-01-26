@@ -1,81 +1,77 @@
 # Unity CTO
-> Mobile game and XR engineering leader demanding object pooling and memory-conscious development.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-/Applications/Unity/Hub/Editor/2022.3.*/Unity.app/Contents/MacOS/Unity -batchmode -projectPath . -buildTarget iOS
-Unity -executeMethod BuildScript.PerformBuild -quit -batchmode
-Unity -runTests -testPlatform PlayMode -testResults results.xml
+# Install via Unity Hub (required for license management)
+# Unity 6.3 LTS is current stable (6000.3.x)
+# Download: unity.com/download
+
+# CLI build (after Unity installed)
+/Applications/Unity/Hub/Editor/6000.3.*/Unity.app/Contents/MacOS/Unity \
+  -batchmode -projectPath . -buildTarget iOS -quit
 ```
 
-## Non-Negotiables
-1. Object pooling for frequently spawned objects (bullets, particles, enemies)
-2. Asset bundles or Addressables for mobile memory management
-3. IL2CPP for production builds - Mono for development only
-4. Unity Profiler targeting actual mobile devices, not editor
-5. Draw call batching - keep SetPass calls under control
+## Claude's Common Mistakes
+1. **Uses Unity 2022 LTS patterns** - Unity 6 has different versioning (6000.x)
+2. **Calls Find()/GetComponent() in Update** - Cache references in Start/Awake
+3. **Uses Resources folder for large assets** - Use Addressables for mobile
+4. **Ignores object pooling** - Frequent Instantiate causes GC spikes
+5. **Development build settings in production** - IL2CPP required for release
 
-## Red Lines
-- Find() or GetComponent() in Update loops - cache references
-- Garbage collection in hot paths - minimize allocations
-- Resources folder for large assets - use Addressables
-- Development build settings in production
-- Update() when FixedUpdate() or coroutines are appropriate
-
-## Pattern: Generic Object Pool
+## Correct Patterns (2026)
 ```csharp
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Pool;
 
-public class ObjectPool<T> where T : Component
+public class BulletSpawner : MonoBehaviour
 {
-    private readonly T _prefab;
-    private readonly Queue<T> _pool = new Queue<T>();
-    private readonly Transform _parent;
+    [SerializeField] private Bullet bulletPrefab;
 
-    public ObjectPool(T prefab, int initialSize, Transform parent = null)
+    // Unity 6 built-in object pool
+    private ObjectPool<Bullet> _pool;
+
+    private void Awake()
     {
-        _prefab = prefab;
-        _parent = parent;
-        for (int i = 0; i < initialSize; i++)
-        {
-            var obj = Object.Instantiate(_prefab, _parent);
-            obj.gameObject.SetActive(false);
-            _pool.Enqueue(obj);
-        }
+        _pool = new ObjectPool<Bullet>(
+            createFunc: () => Instantiate(bulletPrefab),
+            actionOnGet: b => b.gameObject.SetActive(true),
+            actionOnRelease: b => b.gameObject.SetActive(false),
+            actionOnDestroy: b => Destroy(b.gameObject),
+            defaultCapacity: 50,
+            maxSize: 200
+        );
     }
 
-    public T Get(Vector3 position)
+    public Bullet SpawnBullet(Vector3 position)
     {
-        T obj = _pool.Count > 0 ? _pool.Dequeue() : Object.Instantiate(_prefab, _parent);
-        obj.transform.position = position;
-        obj.gameObject.SetActive(true);
-        return obj;
+        var bullet = _pool.Get();
+        bullet.transform.position = position;
+        bullet.Initialize(_pool);  // Pass pool for self-return
+        return bullet;
     }
+}
 
-    public void Return(T obj)
-    {
-        obj.gameObject.SetActive(false);
-        _pool.Enqueue(obj);
-    }
+public class Bullet : MonoBehaviour
+{
+    private ObjectPool<Bullet> _pool;
+
+    public void Initialize(ObjectPool<Bullet> pool) => _pool = pool;
+
+    public void ReturnToPool() => _pool.Release(this);
 }
 ```
 
-## Integrates With
-- **DB**: SQLite4Unity, PlayerPrefs for simple KV
-- **Auth**: Unity Gaming Services Authentication
-- **Cache**: Addressables with caching, PlayerPrefs for settings
+## Version Gotchas
+- **Unity 6**: Version numbers are 6000.x.x (not 6.x)
+- **Unity 6.3 LTS**: Platform Toolkit API for cross-platform
+- **Unity 6+**: URP recommended, built-in pipeline deprecated for mobile
+- **iOS builds**: Xcode 16+ required for Unity 6
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `MissingReferenceException` | Check object was not destroyed, use null check |
-| `DllNotFoundException` | Ensure native plugins included in build settings |
-| `IL2CPP build failed` | Check for incompatible code, add link.xml preserves |
-
-## Prod Ready
-- [ ] IL2CPP with code stripping optimized via link.xml
-- [ ] Profiled on low-end target devices for thermal limits
-- [ ] Addressables content build automated in CI
-- [ ] Mobile-specific quality settings configured
+## What NOT to Do
+- Do NOT call Find()/GetComponent() in Update - cache in Awake/Start
+- Do NOT use Resources folder for mobile - use Addressables
+- Do NOT skip object pooling for frequently spawned objects
+- Do NOT use Mono scripting backend for release - use IL2CPP
+- Do NOT ignore Profiler on target device - editor performance differs

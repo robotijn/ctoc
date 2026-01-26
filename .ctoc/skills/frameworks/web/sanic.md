@@ -1,29 +1,21 @@
 # Sanic CTO
-> Async Python web server - fast, Flask-like, built for concurrency.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install sanic
+pip install sanic sanic-ext
 sanic server:app --dev
-pytest tests/ -v
+# Sanic 24.x - async Python web framework
 ```
 
-## Non-Negotiables
-1. Async/await everywhere - never block
-2. Blueprints for route organization
-3. Middleware properly ordered
-4. Signal handlers for lifecycle events
-5. Worker configuration for production
+## Claude's Common Mistakes
+1. **Blocking calls in handlers** — Use `run_in_executor` for sync code
+2. **Sync database drivers** — Use async drivers (asyncpg, motor)
+3. **Creating connections in handlers** — Use `before_server_start` signal
+4. **Missing blueprints** — Organize routes with blueprints
+5. **Ignoring worker configuration** — Tune workers for production
 
-## Red Lines
-- Blocking calls in handlers - use `run_in_executor`
-- Missing blueprints for large applications
-- Sync database calls - use async drivers
-- Ignoring worker count - tune for your workload
-- Not using Sanic's request context properly
-
-## Pattern: Structured Application
+## Correct Patterns (2026)
 ```python
 from sanic import Sanic, Blueprint, json
 from sanic.exceptions import NotFound
@@ -41,6 +33,7 @@ users_bp = Blueprint("users", url_prefix="/users")
 @users_bp.post("/")
 @validate(json=CreateUserRequest)
 async def create_user(request, body: CreateUserRequest):
+    # Use app.ctx for shared resources
     user = await request.app.ctx.user_service.create(
         email=body.email,
         password=body.password
@@ -54,6 +47,7 @@ async def get_user(request, user_id: int):
         raise NotFound("User not found")
     return json(user.to_dict())
 
+# Setup connections in signal (NOT in handlers)
 @app.before_server_start
 async def setup_db(app, loop):
     app.ctx.db = await create_db_pool()
@@ -69,24 +63,31 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, workers=4)
 ```
 
-## Integrates With
-- **DB**: `asyncpg`, `databases`, or `tortoise-orm`
-- **Validation**: `sanic-ext` with dataclasses/pydantic
-- **Auth**: `sanic-jwt` or custom middleware
-- **OpenAPI**: Built-in with `sanic-ext`
+## Version Gotchas
+- **Sanic 24.x**: Current stable; improved signals
+- **`app.ctx`**: Application context for shared resources
+- **`before_server_start`**: Where to create DB pools (not handler)
+- **Workers**: Use multiple for production (1 per CPU core)
+
+## What NOT to Do
+- ❌ `requests.get()` in handlers — Use `httpx.AsyncClient`
+- ❌ `psycopg2` — Use `asyncpg` (async driver)
+- ❌ Creating DB pool in handler — Use `before_server_start`
+- ❌ Routes without blueprints in large apps — Hard to maintain
+- ❌ Single worker in production — Use `workers=N`
+
+## Signal Order
+```python
+@app.before_server_start  # 1. Setup (DB connections)
+@app.after_server_start   # 2. After listening
+@app.before_server_stop   # 3. Before shutdown
+@app.after_server_stop    # 4. Cleanup (close connections)
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
+| `attached to different loop` | Create connections in `before_server_start` |
 | `SanicException: no body` | Check Content-Type header |
-| `RuntimeError: attached to different loop` | Create connections in `before_server_start` |
 | `Worker timeout` | Increase timeout or optimize handler |
 | `Blueprint not found` | Register with `app.blueprint()` |
-
-## Prod Ready
-- [ ] Workers configured for CPU count
-- [ ] Graceful shutdown enabled
-- [ ] Request logging middleware
-- [ ] Health check endpoint
-- [ ] CORS configured
-- [ ] HTTPS with SSL certificates

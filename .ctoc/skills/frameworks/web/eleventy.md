@@ -1,48 +1,43 @@
 # Eleventy CTO
-> Flexible static site generator - zero config, any template language.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm init -y && npm install @11ty/eleventy
+npm init -y
+npm install @11ty/eleventy
 npx eleventy --serve
-npm test
+# Eleventy 3.x - zero-config static site generator
 ```
 
-## Non-Negotiables
-1. Data cascade understanding - global, directory, file
-2. Template language choice - Nunjucks, Liquid, or Markdown
-3. Collections for organizing content
-4. Filters and shortcodes for reusable logic
-5. Incremental builds for speed
+## Claude's Common Mistakes
+1. **Complex JavaScript in templates** — Use shortcodes and filters
+2. **Missing data cascade understanding** — Global > directory > file data
+3. **Hardcoded values** — Use `_data/` files for configuration
+4. **No pagination for large collections** — Memory issues
+5. **Missing directory data files** — Reduces front matter duplication
 
-## Red Lines
-- Complex JavaScript in templates - use shortcodes
-- Missing pagination for large collections
-- No data files for site-wide configuration
-- Ignoring permalink structure for SEO
-- Hardcoded values instead of data files
-
-## Pattern: Blog with Collections
+## Correct Patterns (2026)
 ```javascript
 // .eleventy.js
 module.exports = function(eleventyConfig) {
   // Collections
   eleventyConfig.addCollection("posts", collection =>
-    collection.getFilteredByGlob("src/posts/*.md").sort((a, b) =>
-      b.date - a.date
-    )
+    collection.getFilteredByGlob("src/posts/*.md")
+      .sort((a, b) => b.date - a.date)
   );
 
-  // Filters
+  // Filters (NOT complex logic in templates)
   eleventyConfig.addFilter("dateFormat", date =>
     new Date(date).toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric'
     })
   );
 
-  // Shortcodes
+  // Shortcodes for reusable logic
   eleventyConfig.addShortcode("year", () => `${new Date().getFullYear()}`);
+
+  // Image optimization
+  eleventyConfig.addPlugin(require("@11ty/eleventy-img"));
 
   // Passthrough copy
   eleventyConfig.addPassthroughCopy("src/assets");
@@ -57,52 +52,41 @@ module.exports = function(eleventyConfig) {
   };
 };
 
-// src/_data/site.json
+// src/_data/site.json (global data)
 {
   "name": "My Blog",
-  "url": "https://example.com",
-  "author": "Jane Doe"
+  "url": "https://example.com"
 }
 
-// src/posts/posts.json (directory data)
+// src/posts/posts.json (directory data - applies to all posts)
 {
   "layout": "post.njk",
   "tags": "posts"
 }
-
-// src/posts/hello-world.md
----
-title: Hello World
-date: 2024-01-15
----
-This is my first post!
-
-// src/_includes/post.njk
-<article>
-  <h1>{{ title }}</h1>
-  <time>{{ date | dateFormat }}</time>
-  {{ content | safe }}
-</article>
 ```
 
-## Integrates With
-- **CMS**: Netlify CMS, Forestry, or headless CMS
-- **Styling**: PostCSS, Tailwind, or Sass
-- **Images**: `@11ty/eleventy-img` for optimization
-- **Deploy**: Netlify, Vercel, GitHub Pages
+## Version Gotchas
+- **Eleventy 3.x**: Current; ESM support, improved performance
+- **Data cascade**: Global (`_data/`) > directory (folder.json) > front matter
+- **Collections**: Must return sorted arrays
+- **Pagination**: Required for large collections
+
+## What NOT to Do
+- ❌ Complex logic in Nunjucks templates — Use filters/shortcodes
+- ❌ Hardcoded site name everywhere — Use `_data/site.json`
+- ❌ Front matter in every file — Use directory data files
+- ❌ Missing image optimization — Use `@11ty/eleventy-img`
+- ❌ Unsorted collections — Sort in collection definition
+
+## Data Cascade Order
+1. Global data (`_data/*.json`)
+2. Directory data (`folder.json`)
+3. Front matter (per file)
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Template not found` | Check `_includes` path |
-| `Collection empty` | Check glob pattern and front matter |
-| `Date is undefined` | Add `date` to front matter |
+| `Template not found` | Check `_includes/` path |
+| `Collection empty` | Check glob pattern |
+| `Date undefined` | Add `date` to front matter |
 | `Permalink collision` | Ensure unique permalinks |
-
-## Prod Ready
-- [ ] Image optimization configured
-- [ ] Sitemap generated
-- [ ] RSS feed for posts
-- [ ] Minified HTML/CSS
-- [ ] Cache busting for assets
-- [ ] 404 page configured

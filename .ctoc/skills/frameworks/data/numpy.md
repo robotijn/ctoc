@@ -1,30 +1,20 @@
 # NumPy CTO
-> The foundation of scientific computing in Python.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install numpy
-python -c "import numpy as np; np.show_config()"
-pytest tests/ -v --tb=short
+pip install "numpy>=2.0"
+# NumPy 2.0 has breaking changes; check compatibility
 ```
 
-## Non-Negotiables
-1. Vectorized operations over Python loops (100-1000x faster)
-2. Broadcasting for memory-efficient element-wise operations
-3. Explicit dtype specification for numerical precision
-4. Preallocate arrays instead of growing dynamically
-5. Use views over copies when possible
-6. Contiguous memory layouts (C or Fortran order) for performance
+## Claude's Common Mistakes
+1. **Python for loops over arrays** - Use vectorized operations (100-1000x faster)
+2. **Implicit dtype** - Always specify dtype explicitly for precision
+3. **Growing arrays dynamically** - Preallocate with np.empty or np.zeros
+4. **Unnecessary copies** - Use views and in-place operations when possible
+5. **Wrong broadcasting** - Misaligned dimensions cause silent bugs
 
-## Red Lines
-- Python `for` loops iterating over array elements
-- Wrong dtype causing precision loss or overflow
-- Unnecessary copies wasting memory
-- Ignoring memory layout for numerical libraries
-- Using Python lists for numerical computation
-
-## Pattern: Efficient Array Operations
+## Correct Patterns (2026)
 ```python
 import numpy as np
 
@@ -32,35 +22,30 @@ import numpy as np
 data = np.empty((1000, 1000), dtype=np.float64)
 
 # Vectorized operations with broadcasting
-x = np.linspace(0, 1, 1000)[:, np.newaxis]  # Column vector
-y = np.linspace(0, 1, 1000)[np.newaxis, :]  # Row vector
+x = np.linspace(0, 1, 1000)[:, np.newaxis]  # (1000, 1) column
+y = np.linspace(0, 1, 1000)[np.newaxis, :]  # (1, 1000) row
 grid = np.sin(x * np.pi) * np.cos(y * np.pi)  # Broadcasts to (1000, 1000)
 
-# Views for zero-copy slicing
-view = data[::2, ::2]  # Every other element, no copy
-view *= 2  # Modifies original
+# Views for zero-copy slicing (modifies original!)
+view = data[::2, ::2]  # Every other element
+view *= 2  # In-place modification
+
+# Explicit copy when needed
+safe_copy = data[::2, ::2].copy()
 
 # Structured arrays for heterogeneous data
 dt = np.dtype([('id', np.int32), ('value', np.float64)])
 records = np.array([(1, 3.14), (2, 2.71)], dtype=dt)
 ```
 
-## Integrates With
-- **SciPy**: Statistical and scientific functions
-- **scikit-learn**: ML with `.values` arrays
-- **PyTorch/TensorFlow**: Tensor conversion via `np.array()`
+## Version Gotchas
+- **v2.0**: String dtype default changed; NEP 50 promotion rules
+- **v2.0**: numpy.string_ renamed; many aliases removed
+- **v2.0**: Copy behavior changed; copy=False stricter
+- **With PyTorch/TensorFlow**: Check array contiguity for zero-copy
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `ValueError: broadcast shapes` | Align dimensions with `reshape` or `newaxis` |
-| `MemoryError` on large arrays | Use `np.memmap` or chunked processing |
-| `RuntimeWarning: overflow` | Use larger dtype (float32 -> float64) |
-| `IndexError: too many indices` | Check array dimensions with `.shape` |
-
-## Prod Ready
-- [ ] Explicit dtypes on all array creation
-- [ ] Memory profiling for large operations
-- [ ] Vectorized code verified with no Python loops
-- [ ] Contiguous arrays for external library calls
-- [ ] Overflow/underflow handling validated
+## What NOT to Do
+- Do NOT iterate with for loops (use vectorized ops)
+- Do NOT grow arrays with append/concatenate in loops
+- Do NOT ignore dtype (causes precision loss or overflow)
+- Do NOT assume slices are copies (they're views)

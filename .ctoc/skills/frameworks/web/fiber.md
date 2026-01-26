@@ -1,40 +1,35 @@
 # Fiber CTO
-> Express-inspired Go framework - fasthttp underneath, familiar API, high performance.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-go mod init myapp && go get -u github.com/gofiber/fiber/v2
+go mod init myapp
+go get -u github.com/gofiber/fiber/v2
+# Requires Go 1.21+
 go run main.go
-go test -v -cover ./...
 ```
 
-## Non-Negotiables
-1. Middleware chain for logging, recovery, CORS, auth
-2. Input validation with custom validators
-3. Proper error handling with custom error handler
-4. Rate limiting on public endpoints
-5. Graceful shutdown with `app.ShutdownWithTimeout`
+## Claude's Common Mistakes
+1. **Missing input validation** — Always validate with struct tags
+2. **Ignoring errors from handlers** — Fiber handlers return errors; check them
+3. **Prefork mode init issues** — Code runs multiple times; guard initialization
+4. **Unclosed resources** — Always close DB connections, files, etc.
+5. **Missing context timeouts** — Use `context.WithTimeout` for I/O
 
-## Red Lines
-- Missing input validation on any handler
-- Unhandled errors - always check and respond
-- Memory leaks from unclosed resources
-- Storing request-scoped data in global state
-- Blocking without timeouts
-
-## Pattern: Structured Handler
+## Correct Patterns (2026)
 ```go
-// internal/handler/user.go
-package handler
+package main
 
-type UserHandler struct {
-    userService service.UserService
-}
+import (
+    "context"
+    "errors"
+    "time"
 
-func NewUserHandler(us service.UserService) *UserHandler {
-    return &UserHandler{userService: us}
-}
+    "github.com/go-playground/validator/v10"
+    "github.com/gofiber/fiber/v2"
+)
+
+var validate = validator.New()
 
 type CreateUserRequest struct {
     Email    string `json:"email" validate:"required,email"`
@@ -43,24 +38,28 @@ type CreateUserRequest struct {
 
 func (h *UserHandler) Create(c *fiber.Ctx) error {
     var req CreateUserRequest
+
+    // Parse body
     if err := c.BodyParser(&req); err != nil {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
             "error": "invalid request body",
         })
     }
 
+    // Validate struct
     if err := validate.Struct(&req); err != nil {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
             "error": err.Error(),
         })
     }
 
+    // Context with timeout for DB operations
     ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
     defer cancel()
 
     user, err := h.userService.Create(ctx, req.Email, req.Password)
     if err != nil {
-        if errors.Is(err, service.ErrEmailExists) {
+        if errors.Is(err, ErrEmailExists) {
             return c.Status(fiber.StatusConflict).JSON(fiber.Map{
                 "error": "email already registered",
             })
@@ -72,26 +71,51 @@ func (h *UserHandler) Create(c *fiber.Ctx) error {
 
     return c.Status(fiber.StatusCreated).JSON(user)
 }
+
+func main() {
+    app := fiber.New(fiber.Config{
+        ErrorHandler: customErrorHandler,
+    })
+
+    app.Use(recover.New())  // Recovery middleware
+    app.Use(logger.New())   // Logging middleware
+
+    // Graceful shutdown
+    go app.Listen(":3000")
+
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+    <-quit
+
+    app.ShutdownWithTimeout(5 * time.Second)
+}
 ```
 
-## Integrates With
-- **DB**: `sqlx` or `gorm` with `fiber/storage` adapters
-- **Auth**: JWT middleware with `gofiber/jwt`
-- **Cache**: `fiber/storage/redis` for sessions and cache
-- **Validation**: `go-playground/validator` with custom error formatting
+## Version Gotchas
+- **Fiber v2**: Current stable; uses fasthttp underneath
+- **Prefork mode**: `fiber.Config{Prefork: true}` runs init code multiple times
+- **fasthttp**: Not net/http compatible; some middleware won't work
+- **Context**: `c.Context()` returns fasthttp context, not standard
+
+## What NOT to Do
+- ❌ `c.BodyParser(&req)` without error check — May silently fail
+- ❌ `fiber.Config{Prefork: true}` with global init — Code runs per process
+- ❌ Missing `return` after response — Handler continues executing
+- ❌ net/http middleware — Not compatible with fasthttp
+- ❌ DB calls without `context.WithTimeout` — Can hang
+
+## Fiber vs Gin
+| Feature | Fiber | Gin |
+|---------|-------|-----|
+| HTTP library | fasthttp | net/http |
+| Performance | Faster | Standard |
+| Ecosystem | Growing | Mature |
+| net/http compatible | No | Yes |
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `cannot unmarshal` | Check Content-Type header and JSON structure |
-| `context canceled` | Request canceled by client or timeout hit |
-| `prefork: child process error` | Check for init code running multiple times |
-| `too many open connections` | Configure DB pool, close idle connections |
-
-## Prod Ready
-- [ ] Recovery middleware enabled
-- [ ] Structured logging with request ID
-- [ ] Prometheus metrics with `/metrics` endpoint
-- [ ] Health checks at `/health` and `/ready`
-- [ ] Rate limiting per IP and per user
-- [ ] Graceful shutdown handling SIGTERM
+| `cannot unmarshal` | Check Content-Type and JSON structure |
+| `context canceled` | Client disconnected or timeout hit |
+| `prefork: child process error` | Guard init code with `fiber.IsChild()` |
+| `too many open connections` | Configure DB pool size |

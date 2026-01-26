@@ -1,68 +1,60 @@
 # PHP CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-./vendor/bin/phpstan analyse           # Static analysis
-./vendor/bin/php-cs-fixer fix          # Format
-./vendor/bin/phpunit --coverage-text   # Test with coverage
-composer install --no-dev --optimize   # Build for production
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude forgets `declare(strict_types=1)` — add to every file
+- Claude uses `==` — always `===` for strict comparison
+- Claude misses property hooks (PHP 8.4) — eliminates getter/setter boilerplate
+- Claude concatenates SQL strings — use PDO prepared statements
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `php 8.4+` | Property hooks, array_find | PHP 8.2 or older |
+| `phpstan level max` | Static analysis | Lower levels |
+| `php-cs-fixer` | PSR-12 formatting | Manual style |
+| `pest` or `phpunit 11` | Testing | Older PHPUnit |
+| `composer audit` | Security scanning | Manual checks |
+
+## Patterns Claude Should Use
+```php
+<?php
+declare(strict_types=1);
+
+// PHP 8.4 property hooks
+class User
+{
+    public string $name {
+        set => trim($value);
+    }
+
+    public string $email {
+        set {
+            if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                throw new InvalidArgumentException('Invalid email');
+            }
+            $this->email = $value;
+        }
+    }
+}
+
+// PHP 8.4 array functions
+$user = array_find($users, fn($u) => $u->id === $id);
+
+// No parentheses needed (PHP 8.4)
+$name = new User('John')->getName();
 ```
 
-## Tools (2024-2025)
-- **PHP 8.3+** - Typed properties, attributes, enums
-- **Composer** - Dependency management
-- **PHPStan** - Static analysis (level max)
-- **PHP-CS-Fixer** - Code formatting (PSR-12)
-- **PHPUnit 11** - Testing framework
+## Anti-Patterns Claude Generates
+- Missing `declare(strict_types=1)` — type coercion bugs
+- `==` loose equality — use `===`
+- `$_GET['key']` without validation — always validate input
+- `eval()` or variable variables — security risk
+- SQL string concatenation — SQL injection
 
-## Project Structure
-```
-project/
-├── src/               # Production code (PSR-4)
-├── tests/             # Test files
-├── public/            # Web root (index.php only)
-├── composer.json      # Dependencies
-└── phpstan.neon       # PHPStan config (level: max)
-```
-
-## Non-Negotiables
-1. declare(strict_types=1) in every file
-2. Type declarations on all parameters and returns
-3. Use attributes for metadata (not docblocks)
-4. PSR-4 autoloading with proper namespaces
-
-## Red Lines (Reject PR)
-- Missing strict_types declaration
-- Untyped parameters or return types
-- SQL string concatenation (use PDO prepared statements)
-- `eval()` or dynamic includes with user input
-- Secrets in config files (use environment)
-- Superglobals without validation
-
-## Testing Strategy
-- **Unit**: PHPUnit, <100ms, mock dependencies
-- **Integration**: Database transactions, HTTP mocking
-- **E2E**: Codeception or Pest for full stack tests
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Type coercion bugs | strict_types=1 everywhere |
-| SQL injection | PDO prepared statements |
-| Session fixation | session_regenerate_id() on login |
-| File upload attacks | Validate MIME, use safe paths |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No N+1 queries (use eager loading)
-- No blocking in async (use Swoole/RoadRunner)
-
-## Security Checklist
-- [ ] Input validated and sanitized
-- [ ] Outputs escaped (htmlspecialchars, json_encode)
-- [ ] Secrets from environment ($_ENV, getenv)
-- [ ] Dependencies audited (`composer audit`)
+## Version Gotchas
+- **PHP 8.4**: Property hooks, `array_find()`, no-parens instantiation
+- **PHP 8.4**: Session settings deprecations (affects PHP 9)
+- **PHP 8.5**: Released Nov 2025
+- **PHP 8.6**: Pipe operator coming (end of 2026)
+- **With UTF-8**: Always specify encoding in `htmlentities()`

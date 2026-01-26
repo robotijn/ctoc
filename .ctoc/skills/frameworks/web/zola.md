@@ -1,29 +1,22 @@
 # Zola CTO
-> Fast Rust static site generator - single binary, Tera templates, instant builds.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Install: brew install zola / cargo install zola
 zola init mysite && cd mysite
 zola serve
-zola build
+# Zola 0.19.x - fast Rust static site generator
 ```
 
-## Non-Negotiables
-1. Tera templating for layouts
-2. Section organization with `_index.md`
-3. Taxonomies for categorization
-4. Shortcodes for reusable components
-5. Sass compilation built-in
+## Claude's Common Mistakes
+1. **Missing `_index.md`** — Required for every section directory
+2. **Hardcoded URLs** — Use `{{ config.base_url }}` or permalinks
+3. **Complex logic in templates** — Use shortcodes instead
+4. **Wrong front matter format** — Zola uses TOML (`+++`), not YAML
+5. **Ignoring taxonomies** — Define in config before using
 
-## Red Lines
-- Complex logic in templates - use shortcodes
-- Missing `_index.md` for sections
-- No front matter metadata
-- Ignoring syntax highlighting config
-- Hardcoded URLs instead of macros
-
-## Pattern: Section and Template
+## Correct Patterns (2026)
 ```toml
 # config.toml
 base_url = "https://example.com"
@@ -44,7 +37,7 @@ tags = [{ name = "tags" }]
 ```
 
 ```markdown
-# content/blog/_index.md
+<!-- content/blog/_index.md -->
 +++
 title = "Blog"
 sort_by = "date"
@@ -74,12 +67,8 @@ Welcome to my blog!
 
 {% if paginator.previous or paginator.next %}
 <nav>
-  {% if paginator.previous %}
-    <a href="{{ paginator.previous }}">Previous</a>
-  {% endif %}
-  {% if paginator.next %}
-    <a href="{{ paginator.next }}">Next</a>
-  {% endif %}
+  {% if paginator.previous %}<a href="{{ paginator.previous }}">Previous</a>{% endif %}
+  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
 </nav>
 {% endif %}
 {% endblock %}
@@ -88,18 +77,23 @@ Welcome to my blog!
 ```html
 {# templates/shortcodes/youtube.html #}
 <div class="video">
-  <iframe src="https://www.youtube.com/embed/{{ id }}"
-          allowfullscreen></iframe>
+  <iframe src="https://www.youtube.com/embed/{{ id }}" allowfullscreen></iframe>
 </div>
-
-{# Usage in content: {{ youtube(id="dQw4w9WgXcQ") }} #}
+{# Usage: {{ youtube(id="dQw4w9WgXcQ") }} #}
 ```
 
-## Integrates With
-- **Hosting**: Netlify, Vercel, GitHub Pages
-- **Styling**: Sass built-in, Tailwind via CLI
-- **Search**: Built-in search index
-- **Themes**: zola-themes community
+## Version Gotchas
+- **Zola 0.19.x**: Single binary; instant builds
+- **Front matter**: TOML format with `+++` delimiters
+- **Sections**: Every directory needs `_index.md`
+- **Tera**: Template engine with Jinja2-like syntax
+
+## What NOT to Do
+- ❌ Missing `_index.md` in sections — Content not rendered
+- ❌ YAML front matter (`---`) — Use TOML (`+++`)
+- ❌ Hardcoded URLs — Use `{{ page.permalink }}`
+- ❌ Complex template logic — Use shortcodes
+- ❌ Undefined taxonomies — Add to `[taxonomies]` first
 
 ## Common Errors
 | Error | Fix |
@@ -107,12 +101,4 @@ Welcome to my blog!
 | `Section not found` | Add `_index.md` to directory |
 | `Template not found` | Check `templates/` structure |
 | `Taxonomy not defined` | Add to `[taxonomies]` in config |
-| `Syntax highlight broken` | Check theme name in config |
-
-## Prod Ready
-- [ ] `zola build` for production
-- [ ] Sitemap generated automatically
-- [ ] RSS/Atom feed enabled
-- [ ] Syntax highlighting configured
-- [ ] Search index generated
-- [ ] Build time < 100ms
+| `TOML parse error` | Check front matter syntax |

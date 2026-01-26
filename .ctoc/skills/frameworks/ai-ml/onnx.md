@@ -1,45 +1,33 @@
 # ONNX CTO
-> Universal model interchange format for cross-framework deployment.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install onnx onnxruntime onnxruntime-gpu
-python -c "import onnxruntime as ort; print(ort.get_available_providers())"
-pytest tests/ -v
+pip install onnx onnxruntime  # CPU
+pip install onnx onnxruntime-gpu  # NVIDIA GPU
+# Verify: python -c "import onnxruntime as ort; print(ort.get_available_providers())"
 ```
 
-## Non-Negotiables
-1. Export models to ONNX format for portability
-2. ONNX Runtime for production inference
-3. Graph optimization for performance
-4. Validate models with ONNX checker
-5. Use appropriate execution providers
-6. Quantize for edge deployment
+## Claude's Common Mistakes
+1. Not validating model after export with `onnx.checker`
+2. Missing dynamic axes for variable batch sizes
+3. Using CPU provider when CUDA is available
+4. Skipping graph optimization for production
+5. Wrong opset version causing operator issues
 
-## Red Lines
-- Skipping model validation after export
-- Not optimizing graph for production
-- Using CPU provider when GPU available
-- Missing dynamic axes for variable batch sizes
-- Ignoring opset version compatibility
-- No benchmarking before deployment
-
-## Pattern: Production Export and Inference
+## Correct Patterns (2026)
 ```python
 import torch
 import onnx
 import onnxruntime as ort
 from onnxruntime.quantization import quantize_dynamic, QuantType
 
-# Export PyTorch model to ONNX
+# Export with dynamic axes
 model = MyModel().eval()
 dummy_input = torch.randn(1, 3, 224, 224)
 
 torch.onnx.export(
-    model,
-    dummy_input,
-    "model.onnx",
+    model, dummy_input, "model.onnx",
     input_names=["input"],
     output_names=["output"],
     dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
@@ -50,17 +38,12 @@ torch.onnx.export(
 onnx_model = onnx.load("model.onnx")
 onnx.checker.check_model(onnx_model)
 
-# Optimize graph
-from onnxruntime.transformers import optimizer
-optimized = optimizer.optimize_model("model.onnx", model_type="bert")
-optimized.save_model_to_file("model_optimized.onnx")
-
 # Quantize for deployment
-quantize_dynamic("model_optimized.onnx", "model_quantized.onnx", weight_type=QuantType.QInt8)
+quantize_dynamic("model.onnx", "model_quant.onnx", weight_type=QuantType.QInt8)
 
-# Production inference
+# Production inference with GPU
 session = ort.InferenceSession(
-    "model_quantized.onnx",
+    "model_quant.onnx",
     providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
 )
 
@@ -68,24 +51,15 @@ def predict(inputs):
     return session.run(None, {"input": inputs})[0]
 ```
 
-## Integrates With
-- **Frameworks**: PyTorch, TensorFlow, JAX, scikit-learn
-- **Runtimes**: ONNX Runtime, TensorRT, OpenVINO
-- **Deployment**: Triton, TF Serving, edge devices
-- **Optimization**: Neural compressor, ONNX Optimizer
+## Version Gotchas
+- **opset 17+**: Required for modern PyTorch ops
+- **CUDA EP**: Requires matching CUDA toolkit version
+- **Quantization**: INT8 requires calibration data for accuracy
+- **TensorRT**: Use `onnxruntime-gpu` with TensorRT EP for best perf
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Unsupported operator` | Upgrade opset version, use custom ops |
-| `Shape inference failed` | Add explicit shape hints, check dynamic axes |
-| `CUDA out of memory` | Reduce batch size, use quantization |
-| `Model validation failed` | Check ONNX checker output, fix graph issues |
-
-## Prod Ready
-- [ ] Model validated with onnx.checker
-- [ ] Graph optimized for target hardware
-- [ ] Dynamic axes configured for batching
-- [ ] Appropriate execution provider selected
-- [ ] Quantization applied for latency targets
-- [ ] Benchmarked against original framework
+## What NOT to Do
+- Do NOT skip `onnx.checker.check_model()` after export
+- Do NOT hardcode batch size - use dynamic_axes
+- Do NOT use CPUExecutionProvider when GPU available
+- Do NOT deploy without graph optimization
+- Do NOT ignore opset version compatibility

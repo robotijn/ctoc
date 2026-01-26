@@ -1,68 +1,57 @@
 # OCaml CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-dune build @lint                       # Lint
-ocamlformat -i **/*.ml                 # Format
-dune runtest                           # Test
-dune build                             # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude writes partial pattern matches — handle all cases
+- Claude uses `ref` freely — prefer immutable values
+- Claude uses exceptions for control flow — use `Result` type
+- Claude forgets `.mli` interface files — always define public APIs
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `ocaml 5.x` | Multicore support | OCaml 4.x |
+| `dune` | Build system | Manual ocamlfind |
+| `ocamlformat` | Formatting | Manual style |
+| `alcotest` / `ppx_expect` | Testing | Ad-hoc tests |
+| `opam` | Package management | Manual deps |
+
+## Patterns Claude Should Use
+```ocaml
+(* Use Result for error handling, not exceptions *)
+let divide x y : (float, string) result =
+  if y = 0.0 then Error "Division by zero"
+  else Ok (x /. y)
+
+(* Exhaustive pattern matching *)
+let describe = function
+  | [] -> "empty"
+  | [x] -> Printf.sprintf "single: %d" x
+  | x :: y :: _ -> Printf.sprintf "multiple starting with %d, %d" x y
+
+(* Tail recursion for large lists *)
+let sum lst =
+  let rec aux acc = function
+    | [] -> acc
+    | x :: xs -> aux (acc + x) xs
+  in
+  aux 0 lst
+
+(* Define .mli for public modules *)
+(* In module.mli: *)
+val find_user : int -> User.t option
 ```
 
-## Tools (2024-2025)
-- **OCaml 5.x** - Multicore support
-- **dune** - Build system
-- **ocamlformat** - Formatting
-- **ppx_expect/Alcotest** - Testing
-- **opam** - Package management
+## Anti-Patterns Claude Generates
+- Partial pattern matches — always handle all cases
+- `ref` everywhere — prefer immutable values
+- Exceptions for expected errors — use `Result`
+- Missing `.mli` files — define module interfaces
+- `Obj.magic` — almost never justified
 
-## Project Structure
-```
-project/
-├── lib/               # Library code
-├── bin/               # Executables
-├── test/              # Tests
-├── dune-project       # Project config
-└── .ocamlformat       # Format config
-```
-
-## Non-Negotiables
-1. Immutability by default - minimize ref
-2. Exhaustive pattern matching
-3. Type signatures on module interfaces (.mli)
-4. Use Result for error handling
-
-## Red Lines (Reject PR)
-- Partial pattern matches
-- ref without clear justification
-- Ignoring compiler warnings
-- Obj.magic usage
-- Secrets hardcoded in source
-- Missing .mli for public modules
-
-## Testing Strategy
-- **Unit**: Alcotest/ppx_expect, <100ms
-- **Property**: QCheck for invariants
-- **Integration**: Real I/O with test fixtures
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Stack overflow recursion | Use tail recursion |
-| String inefficiency | Use Bytes or Buffer |
-| Exception handling confusion | Prefer Result type |
-| Functor complexity | Use first-class modules |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No excessive boxing (use unboxed types)
-- No lazy evaluation causing space leaks
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] No Obj.magic with user data
-- [ ] Secrets from environment
-- [ ] Dependencies audited (opam audit)
+## Version Gotchas
+- **OCaml 5.x**: Multicore with domains and effects
+- **Result vs Option**: `Result` carries error info
+- **String vs Bytes**: Use `Bytes` for mutable strings
+- **Tail recursion**: Critical for large data
+- **With dune**: Use `(libraries ...)` for deps

@@ -1,38 +1,36 @@
 # Ollama CTO
-> Run large language models locally with production-grade simplicity.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.1:8b-instruct-q4_K_M
-ollama serve && ollama run llama3.1
+# Pull model: ollama pull llama3.2:3b
+# Python client:
+pip install ollama
+# Verify: ollama list
 ```
 
-## Non-Negotiables
-1. Choose appropriate model size for hardware
-2. Use quantized models (Q4_K_M or Q5_K_M) for efficiency
-3. Enable streaming for responsive UX
-4. Use ollama-python for API integration
-5. Configure context length appropriately
-6. Monitor GPU memory usage
+## Claude's Common Mistakes
+1. Using unquantized models on consumer hardware (OOM)
+2. Missing `stream=True` for interactive applications
+3. Not specifying `num_ctx` causing context truncation
+4. Using synchronous client in async applications
+5. Not checking if Ollama server is running
 
-## Red Lines
-- Running unquantized models on consumer hardware
-- Ignoring context length limits
-- Not streaming for interactive applications
-- Using models too large for available VRAM
-- No health checks in production
-- Blocking calls without timeouts
-
-## Pattern: Production API Integration
+## Correct Patterns (2026)
 ```python
 import ollama
 from ollama import AsyncClient
 
-# Synchronous usage
+# Check if model is available
+models = ollama.list()
+if "llama3.2:3b" not in [m["name"] for m in models["models"]]:
+    ollama.pull("llama3.2:3b")
+
+# Synchronous chat with options
 response = ollama.chat(
-    model="llama3.1:8b-instruct-q4_K_M",
+    model="llama3.2:3b",
     messages=[{"role": "user", "content": "Explain quantum computing"}],
     options={"temperature": 0.7, "num_ctx": 4096}
 )
@@ -42,43 +40,29 @@ print(response["message"]["content"])
 async def stream_response(prompt: str):
     client = AsyncClient()
     async for chunk in await client.chat(
-        model="llama3.1:8b-instruct-q4_K_M",
+        model="llama3.2:3b",
         messages=[{"role": "user", "content": prompt}],
         stream=True,
     ):
         yield chunk["message"]["content"]
 
 # Embeddings for RAG
-embeddings = ollama.embeddings(
-    model="nomic-embed-text",
-    prompt="Document text for embedding"
-)
+embeddings = ollama.embeddings(model="nomic-embed-text", prompt="Text to embed")
 vector = embeddings["embedding"]
 
-# Model management
-ollama.pull("llama3.1:8b-instruct-q4_K_M")
-ollama.list()  # List available models
-ollama.show("llama3.1")  # Model details
+# Cloud models (new in 2026)
+# ollama.chat(model="deepseek-v3.1:671b-cloud", ...)
 ```
 
-## Integrates With
-- **Frameworks**: LangChain, LlamaIndex
-- **APIs**: OpenAI-compatible endpoint
-- **Deployment**: Docker, Kubernetes
-- **Hardware**: NVIDIA GPUs, Apple Silicon, CPU
+## Version Gotchas
+- **2026**: Cloud models available (deepseek-v3.1, gpt-oss, kimi-k2)
+- **Quantization**: Use Q4_K_M for best quality/size balance
+- **Context**: Default is 2048 - set `num_ctx` explicitly
+- **OpenAI compat**: `http://localhost:11434/v1/` for OpenAI SDK
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `CUDA out of memory` | Use smaller quantization (Q4_0), reduce num_ctx |
-| `Connection refused` | Ensure `ollama serve` is running |
-| `Model not found` | Run `ollama pull model_name` first |
-| `Timeout` | Increase timeout, check model is loaded |
-
-## Prod Ready
-- [ ] Model pulled and tested locally
-- [ ] Quantization appropriate for hardware
-- [ ] Context length configured for use case
-- [ ] Streaming enabled for user-facing apps
-- [ ] Health endpoint monitored
-- [ ] GPU memory usage profiled
+## What NOT to Do
+- Do NOT run large unquantized models on limited VRAM
+- Do NOT skip streaming for chat applications
+- Do NOT ignore context length limits
+- Do NOT use sync client in async web apps
+- Do NOT forget to start `ollama serve` before API calls

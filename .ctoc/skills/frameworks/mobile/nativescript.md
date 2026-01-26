@@ -1,30 +1,28 @@
 # NativeScript CTO
-> JavaScript-to-native mobile leader demanding direct native API access with no WebView compromise.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Install CLI globally
+npm install -g nativescript
+# Verify environment
+ns doctor
+# Create new project
 ns create myapp --template @nativescript/template-blank-ts
+# Run on device
 ns run ios --bundle
-ns test android && ns build android --release
 ```
 
-## Non-Negotiables
-1. Direct native API access for performance-critical features
-2. Proper Page and Frame lifecycle with navigation callbacks
-3. Webpack bundling with tree-shaking for smaller builds
-4. Android back button handling in navigation callbacks
-5. Platform-specific profiling with Chrome DevTools and native tools
+## Claude's Common Mistakes
+1. **Uses outdated template names** - Templates changed in NS 8.x
+2. **Heavy computation on UI thread** - Must use Workers for intensive tasks
+3. **Uses setTimeout for animations** - Use native animation APIs
+4. **Ignores memory warnings** - Native views need explicit cleanup
+5. **Mixes framework patterns** - Angular/Vue/Svelte have different lifecycles
 
-## Red Lines
-- Heavy computation on UI thread - use Workers
-- setTimeout for animation - use native animation APIs
-- Excessive data binding on large lists - use virtualization
-- Ignoring memory warnings - native views need proper cleanup
-- Mixing Angular/Vue/Svelte patterns in the same project
-
-## Pattern: Observable List with Virtualization
+## Correct Patterns (2026)
 ```typescript
+// Observable list with proper virtualization
 import { Observable, ObservableArray } from '@nativescript/core';
 
 export class ItemsViewModel extends Observable {
@@ -46,27 +44,27 @@ export class ItemsViewModel extends Observable {
     this._items.push(...newItems);
   }
 
-  private async fetchPage(page: number): Promise<Item[]> {
-    const response = await fetch(`/api/items?page=${page}`);
-    return response.json();
+  // Use Worker for heavy computation
+  processDataInWorker(data: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker('./workers/processor');
+      worker.postMessage(data);
+      worker.onmessage = (msg) => resolve(msg.data);
+      worker.onerror = (err) => reject(err);
+    });
   }
 }
 ```
 
-## Integrates With
-- **DB**: @nativescript/sqlite for local, native Realm bindings
-- **Auth**: @nativescript/appauth for OAuth, SecureStorage for tokens
-- **Cache**: @nativescript/core File for assets, ApplicationSettings for KV
+## Version Gotchas
+- **NS 8.8+**: Node-API Engine preview, Tailwind v4 support
+- **NS 8.x**: CLI works with older projects, upgrade CLI first
+- **macOS 12.3+**: Python 2.x removed, alias python3 manually
+- **With Angular**: Version must match NativeScript Angular plugin
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Cannot read property of undefined (native)` | Check native API availability on platform |
-| `JavaScript heap out of memory` | Increase Node memory or fix memory leaks |
-| `Gradle build failed` | Clean with `ns clean` and check Android SDK setup |
-
-## Prod Ready
-- [ ] Webpack bundle analyzed for size optimization
-- [ ] ProGuard/R8 configured for Android
-- [ ] App Transport Security configured for iOS
-- [ ] Firebase Crashlytics or Sentry for crash reporting
+## What NOT to Do
+- Do NOT do heavy computation on UI thread - use Workers
+- Do NOT use setTimeout for animations - use native APIs
+- Do NOT ignore memory warnings - clean up native views
+- Do NOT mix framework patterns in same project
+- Do NOT skip `ns clean` when builds fail mysteriously

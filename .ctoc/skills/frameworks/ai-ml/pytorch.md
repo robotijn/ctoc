@@ -1,77 +1,50 @@
 # PyTorch CTO
-> The industry standard for deep learning research and production deployment.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-python -m torch.distributed.launch --nproc_per_node=4 train.py
-pytest tests/ -v --tb=short && python -m torch.utils.benchmark
+# Requires Python 3.10-3.14. CUDA 12.6 recommended for GPU.
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+# Verify: python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-## Non-Negotiables
-1. Use `torch.compile()` for 2x speedup on PyTorch 2.0+
-2. PyTorch Lightning for structured training loops
-3. DataLoader with `num_workers > 0` and `pin_memory=True`
-4. Mixed precision training with `torch.amp` for memory efficiency
-5. Gradient checkpointing for large models
-6. Set deterministic seeds for reproducibility
+## Claude's Common Mistakes
+1. Using deprecated `pip install torch` without CUDA index URL
+2. Suggesting `.cuda()` instead of portable `.to(device)`
+3. Missing `torch.inference_mode()` for evaluation (faster than `no_grad`)
+4. Using old `torch.distributed.launch` instead of `torchrun`
+5. Not enabling `torch.compile()` for 2x speedup (PyTorch 2.0+)
 
-## Red Lines
-- Manual training loops when Lightning handles it
-- Using `.cuda()` instead of `.to(device)` for portability
-- Not using `torch.inference_mode()` during evaluation
-- GPU memory leaks from not clearing cache
-- Missing `model.eval()` before inference
-- Hardcoded batch sizes without gradient accumulation
-
-## Pattern: Production Training Pipeline
+## Correct Patterns (2026)
 ```python
 import torch
 import lightning as L
-from torch.utils.data import DataLoader
 
-class LitModel(L.LightningModule):
-    def __init__(self, model):
-        super().__init__()
-        self.model = torch.compile(model)
+# Device-agnostic code
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = self.model(x, y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
+# Production model with compile
+model = torch.compile(MyModel()).to(device)
 
-    def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=1e-4)
+# Inference with proper context
+model.eval()
+with torch.inference_mode():
+    output = model(input.to(device))
 
-trainer = L.Trainer(
-    precision="16-mixed",
-    gradient_clip_val=1.0,
-    accumulate_grad_batches=4,
-    callbacks=[L.callbacks.EarlyStopping("val_loss")],
-)
-trainer.fit(model, train_loader, val_loader)
+# DataLoader best practices
+loader = DataLoader(dataset, batch_size=32, num_workers=4,
+                    pin_memory=True, persistent_workers=True)
 ```
 
-## Integrates With
-- **Data**: HuggingFace Datasets, WebDataset for streaming
-- **Tracking**: W&B, MLflow, TensorBoard
-- **Serving**: TorchServe, Triton, ONNX Runtime
-- **Distributed**: DeepSpeed, FSDP, torchrun
+## Version Gotchas
+- **v2.6**: `torch.load` now defaults to `weights_only=True` (breaking change)
+- **v2.6**: Conda no longer supported - use pip only
+- **v2.5+**: `torch.compile` supports Python 3.13
+- **With CUDA**: Must match driver version - use `nvidia-smi` to check
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `CUDA out of memory` | Reduce batch size, enable gradient checkpointing, use mixed precision |
-| `Expected all tensors on same device` | Use `.to(device)` consistently, check DataLoader |
-| `RuntimeError: grad can be implicitly created only for scalar outputs` | Call `.backward()` on scalar loss, use `loss.mean()` |
-| `DataLoader worker exited unexpectedly` | Reduce `num_workers`, check shared memory limits |
-
-## Prod Ready
-- [ ] Model compiled with `torch.compile()`
-- [ ] Mixed precision enabled for GPU efficiency
-- [ ] Checkpointing saves optimizer state and scheduler
-- [ ] Inference uses `torch.inference_mode()` context
-- [ ] Model exported to TorchScript or ONNX
-- [ ] GPU memory profiled with `torch.cuda.memory_summary()`
+## What NOT to Do
+- Do NOT use `model.cuda()` - use `model.to(device)` for portability
+- Do NOT use `torch.no_grad()` for inference - use `torch.inference_mode()`
+- Do NOT skip `model.eval()` before inference
+- Do NOT use `pickle` for saving - use `torch.save` with safetensors
+- Do NOT ignore gradient accumulation for large batch training

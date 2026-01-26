@@ -1,91 +1,66 @@
 # scikit-learn CTO
-> The gold standard for classical machine learning in production.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# v1.8+ requires Python 3.11-3.14
 pip install scikit-learn pandas joblib
-python -c "import sklearn; sklearn.show_versions()"
-pytest tests/ -v --cov=src
+# Verify: python -c "import sklearn; sklearn.show_versions()"
+# Intel acceleration: pip install scikit-learn-intelex
 ```
 
-## Non-Negotiables
-1. Pipelines for preprocessing + model composition
-2. Cross-validation for all model evaluation
-3. GridSearchCV or RandomizedSearchCV for tuning
-4. Feature scaling in pipelines (not separately)
-5. joblib for model persistence
-6. Stratified splits for classification
+## Claude's Common Mistakes
+1. Fitting scaler on test data (data leakage)
+2. Not using Pipeline for preprocessing + model
+3. Using pickle instead of joblib for model persistence
+4. Manual train/test splits without stratification
+5. Evaluating model on training data
 
-## Red Lines
-- Fitting scaler on test data (data leakage)
-- Evaluating on training data
-- Not using pipelines for preprocessing
-- pickle instead of joblib for large models
-- Ignoring class imbalance
-- Manual train/test splits without stratification
-
-## Pattern: Production ML Pipeline
+## Correct Patterns (2026)
 ```python
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score, RandomizedSearchCV, StratifiedKFold
-from sklearn.metrics import classification_report
 import joblib
 
-# Define preprocessing
-numeric_features = ["age", "income", "score"]
-categorical_features = ["category", "region"]
+# Define preprocessing in pipeline (prevents leakage)
+numeric_features = ["age", "income"]
+categorical_features = ["category"]
 
 preprocessor = ColumnTransformer([
     ("num", StandardScaler(), numeric_features),
     ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features),
 ])
 
-# Build pipeline
+# Pipeline ensures preprocessing fits only on training data
 pipeline = Pipeline([
     ("preprocessor", preprocessor),
     ("classifier", RandomForestClassifier(random_state=42))
 ])
 
-# Hyperparameter tuning
-param_dist = {
-    "classifier__n_estimators": [100, 200, 500],
-    "classifier__max_depth": [10, 20, None],
-    "classifier__min_samples_split": [2, 5, 10],
-}
-
+# Stratified cross-validation
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-search = RandomizedSearchCV(pipeline, param_dist, n_iter=20, cv=cv, scoring="f1_weighted")
+scores = cross_val_score(pipeline, X, y, cv=cv, scoring="f1_weighted")
+
+# Hyperparameter tuning
+search = RandomizedSearchCV(pipeline, param_distributions, cv=cv, n_iter=20)
 search.fit(X_train, y_train)
 
-# Evaluate
-print(classification_report(y_test, search.predict(X_test)))
-
-# Save model
+# Save with joblib (not pickle)
 joblib.dump(search.best_estimator_, "model.joblib")
 ```
 
-## Integrates With
-- **Data**: pandas, NumPy, polars
-- **Tuning**: Optuna, Hyperopt
-- **Tracking**: MLflow, W&B
-- **Serving**: FastAPI, Flask, BentoML
+## Version Gotchas
+- **v1.7+**: Requires Python 3.10+
+- **v1.8+**: Requires Python 3.11+, supports free-threaded CPython
+- **v1.6**: Added HDBSCAN, TargetEncoder, many improvements
+- **Intel**: Use `scikit-learn-intelex` for 10-100x speedup
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `NotFittedError` | Call `fit()` before `predict()` or `transform()` |
-| `ValueError: Input contains NaN` | Handle missing values in preprocessing |
-| `Found input variables with inconsistent numbers of samples` | Check X and y have same length |
-| `ConvergenceWarning` | Increase `max_iter` or scale features |
-
-## Prod Ready
-- [ ] Pipeline includes all preprocessing steps
-- [ ] Cross-validation scores reported
-- [ ] Hyperparameters tuned with RandomizedSearchCV
-- [ ] Model saved with joblib
-- [ ] Feature names preserved in pipeline
-- [ ] Class imbalance handled (SMOTE, class_weight)
+## What NOT to Do
+- Do NOT fit scaler on test data - use Pipeline
+- Do NOT use pickle for models - use joblib
+- Do NOT skip stratification for classification
+- Do NOT evaluate on training data
+- Do NOT manually preprocess outside pipeline

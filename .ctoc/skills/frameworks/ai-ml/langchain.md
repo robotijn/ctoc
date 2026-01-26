@@ -1,84 +1,53 @@
 # LangChain CTO
-> The orchestration layer for production LLM applications.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# LangChain 1.0+ released September 2025. Major rewrite.
 pip install langchain langchain-openai langchain-anthropic langgraph langsmith
-langsmith start && python -m pytest tests/ -v
-langchain serve --port 8000
+# Version check: python -c "import langchain; print(langchain.__version__)"
 ```
 
-## Non-Negotiables
-1. LCEL (LangChain Expression Language) for all chains
-2. LangSmith for debugging, tracing, and evaluation
-3. Structured outputs with Pydantic models
-4. Streaming responses for user experience
-5. Proper retry logic with exponential backoff
-6. Token counting and context window management
+## Claude's Common Mistakes
+1. Using LCEL pipe syntax (`prompt | llm | parser`) - deprecated in 1.0
+2. Importing from `langchain` instead of `langchain-community` or provider packages
+3. Using `AgentExecutor` - deprecated, use LangGraph for agents
+4. Recommending `LLMChain` - removed in 1.0
+5. Missing CVE-2025-68664 patch (update to 1.2.5+ immediately)
 
-## Red Lines
-- Legacy Chain classes instead of LCEL
-- Not handling rate limits and API errors
-- Context window overflow without chunking
-- Missing input/output validation
-- Hardcoded prompts without templates
-- No observability in production
-
-## Pattern: Production RAG Chain
+## Correct Patterns (2026)
 ```python
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from langchain_community.vectorstores import Chroma
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.graph import StateGraph
 from pydantic import BaseModel
 
-class Answer(BaseModel):
-    response: str
-    sources: list[str]
+# LangChain 1.0 style - direct model calls
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# Structured output (preferred over output parsers)
+class Response(BaseModel):
+    answer: str
     confidence: float
 
-# Structured output chain
-llm = ChatOpenAI(model="gpt-4o", temperature=0).with_structured_output(Answer)
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-vectorstore = Chroma(embedding_function=embeddings)
-retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+structured_llm = llm.with_structured_output(Response)
+result = structured_llm.invoke("What is RAG?")
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "Answer based on context:\n{context}"),
-    ("human", "{question}")
-])
-
-chain = (
-    {"context": retriever, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-)
-
-# Stream with callbacks
-async for chunk in chain.astream("What is RAG?"):
-    print(chunk, end="", flush=True)
+# Agents now use LangGraph exclusively
+from langgraph.prebuilt import create_react_agent
+agent = create_react_agent(llm, tools=[...])
 ```
 
-## Integrates With
-- **LLMs**: OpenAI, Anthropic, Ollama, vLLM
-- **Vector DBs**: Chroma, Pinecone, Weaviate, Qdrant
-- **Memory**: Redis, PostgreSQL, MongoDB
-- **Agents**: LangGraph for stateful workflows
+## Version Gotchas
+- **v1.0**: LCEL pipes removed - use direct method calls
+- **v1.0**: Agents only via LangGraph, not AgentExecutor
+- **v0.3**: Maintenance until December 2026 (security fixes only)
+- **CVE-2025-68664**: Critical serialization vuln - upgrade to 1.2.5+
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `RateLimitError` | Add `max_retries` to LLM, implement backoff |
-| `Context length exceeded` | Use `RecursiveCharacterTextSplitter`, reduce retrieval k |
-| `OutputParserException` | Use `with_structured_output()` or `PydanticOutputParser` |
-| `Timeout waiting for response` | Set `request_timeout`, use streaming |
-
-## Prod Ready
-- [ ] LangSmith tracing enabled in production
-- [ ] All chains use LCEL syntax
-- [ ] Structured outputs with Pydantic validation
-- [ ] Rate limiting and retry logic implemented
-- [ ] Token usage tracked and logged
-- [ ] Fallback chains for critical paths
+## What NOT to Do
+- Do NOT use `prompt | llm | parser` syntax - deprecated in 1.0
+- Do NOT import from `langchain.llms` - use provider packages
+- Do NOT use `AgentExecutor` - use LangGraph
+- Do NOT run versions < 1.2.5 in production (security vuln)
+- Do NOT skip LangSmith tracing in production

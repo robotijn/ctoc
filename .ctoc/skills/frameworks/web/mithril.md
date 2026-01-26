@@ -1,33 +1,25 @@
 # Mithril.js CTO
-> Hyperscript UI framework - tiny footprint, fast rendering, built-in routing and XHR.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm init -y && npm install mithril
 npx vite
-npm run build
+# Mithril 2.x - hyperscript UI framework (~10KB)
 ```
 
-## Non-Negotiables
-1. Component closures for state encapsulation
-2. m.request for data fetching (auto-redraws)
-3. Route-based architecture with m.route
-4. Proper redraw control (m.redraw)
-5. Minimal vnode allocation in render
+## Claude's Common Mistakes
+1. **React/Vue patterns** — Mithril uses hyperscript, not JSX
+2. **Missing m.request for data** — Auto-redraws after async completion
+3. **Unnecessary m.redraw() calls** — m.request handles this automatically
+4. **Module-level state** — Use closure state in components
+5. **Missing keys in lists** — Required for efficient diffing
 
-## Red Lines
-- Unnecessary redraws - control with m.redraw.sync()
-- Missing keys in dynamic lists
-- Sync XHR calls blocking UI
-- Over-componentization (keep it simple)
-- DOM manipulation outside Mithril
-
-## Pattern: Application with Routing
+## Correct Patterns (2026)
 ```javascript
 import m from 'mithril';
 
-// User service with m.request
+// Service with m.request (auto-redraws!)
 const UserService = {
   list: [],
   loadAll: () => {
@@ -38,30 +30,23 @@ const UserService = {
       UserService.list = result;
     });
   },
-  get: (id) => {
-    return m.request({
-      method: 'GET',
-      url: `/api/users/${id}`
-    });
-  }
+  get: (id) => m.request({ method: 'GET', url: `/api/users/${id}` })
 };
 
-// Component with closure state
+// Component with closure state (NOT module state)
 const UserList = () => {
   let loading = true;
 
   return {
     oninit: () => {
-      UserService.loadAll().then(() => {
-        loading = false;
-      });
+      UserService.loadAll().then(() => { loading = false; });
     },
     view: () => {
       if (loading) return m('div.loading', 'Loading...');
 
       return m('ul.user-list',
         UserService.list.map(user =>
-          m('li', { key: user.id },
+          m('li', { key: user.id },  // ALWAYS include key
             m(m.route.Link, { href: `/users/${user.id}` }, user.name)
           )
         )
@@ -76,9 +61,7 @@ const UserDetail = () => {
 
   return {
     oninit: (vnode) => {
-      UserService.get(vnode.attrs.id).then(result => {
-        user = result;
-      });
+      UserService.get(vnode.attrs.id).then(result => { user = result; });
     },
     view: () => {
       if (!user) return m('div', 'Loading...');
@@ -97,24 +80,23 @@ m.route(document.body, '/users', {
 });
 ```
 
-## Integrates With
-- **Build**: Vite, Webpack, Rollup
-- **State**: Closure state, streams
-- **Testing**: mithril-query, ospec
-- **UI**: Any CSS framework
+## Version Gotchas
+- **Mithril 2.x**: Current stable; tiny footprint (~10KB)
+- **m.request**: Auto-redraws after completion; no manual redraw needed
+- **Closure state**: Encapsulate state in component closures
+- **Hyperscript**: `m('div.class', { attr: 'value' }, children)`
+
+## What NOT to Do
+- ❌ JSX syntax — Use `m()` hyperscript
+- ❌ Manual `m.redraw()` after `m.request` — Automatic
+- ❌ Module-level state — Use closure state
+- ❌ Missing `key` in lists — Breaks diffing
+- ❌ Direct DOM manipulation — Let Mithril handle DOM
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `Redraw not happening` | Check m.request or call m.redraw() |
+| `Redraw not happening` | Use m.request or call m.redraw() |
 | `Key warning` | Add key attribute to list items |
 | `Route not matching` | Check route pattern syntax |
-| `Component not updating` | Use closure state, not module vars |
-
-## Prod Ready
-- [ ] Production build minified
-- [ ] Routes configured with m.route
-- [ ] Error handling in m.request
-- [ ] Loading states implemented
-- [ ] Bundle size minimal (~10KB)
-- [ ] Keys on all dynamic lists
+| `State not updating` | Use closure state, not module vars |

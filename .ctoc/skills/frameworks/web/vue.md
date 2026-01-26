@@ -1,83 +1,92 @@
 # Vue CTO
-> Progressive framework - Composition API for new code, pragmatic adoption.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm create vue@latest  # Select TypeScript, Pinia, Router
+npm create vue@latest
+# Select: TypeScript, Pinia, Router, Vitest, ESLint, Prettier
+# Vue CLI deprecated - use create-vue (Vite-based)
 npm run dev
-npm run test:unit -- --coverage
 ```
 
-## Non-Negotiables
-1. Composition API with `<script setup>` for all new components
-2. TypeScript with strict mode enabled
-3. Pinia for state management - one store per domain
-4. Single-file components with scoped styles
-5. Props validation with TypeScript interfaces or `defineProps`
+## Claude's Common Mistakes
+1. **Using Vue CLI** — Deprecated; use `npm create vue@latest` (Vite-based)
+2. **Heavy template expressions** — Move logic to computed properties
+3. **Watching entire objects** — Watch specific properties, not whole objects
+4. **Using array index as key** — Use unique stable IDs in `v-for`
+5. **v-if with v-for** — Use computed property or template wrapper
 
-## Red Lines
-- Options API in new code - Composition API only
-- Missing prop type definitions
-- Direct state mutation outside Pinia actions
-- `v-for` without `:key` on unique identifier
-- `v-if` with `v-for` on same element
+## Correct Patterns (2026)
+```vue
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue';
 
-## Pattern: Composable with State
-```typescript
-// composables/useUsers.ts
-import { ref, computed } from 'vue';
-import { defineStore } from 'pinia';
-import { useMutation, useQuery } from '@tanstack/vue-query';
-import { api } from '@/lib/api';
-import type { User, CreateUserDTO } from '@/types';
+// Correct: computed for derived state
+const items = ref<Item[]>([]);
+const search = ref('');
 
-export const useUsersStore = defineStore('users', () => {
-  const currentUser = ref<User | null>(null);
+const filteredItems = computed(() =>
+  items.value.filter(i =>
+    i.name.toLowerCase().includes(search.value.toLowerCase())
+  )
+);
 
-  const isAuthenticated = computed(() => currentUser.value !== null);
-
-  async function login(email: string, password: string) {
-    const user = await api.auth.login({ email, password });
-    currentUser.value = user;
-  }
-
-  function logout() {
-    currentUser.value = null;
-  }
-
-  return { currentUser, isAuthenticated, login, logout };
+// Correct: watch specific property, not object
+watch(() => user.value?.id, (newId) => {
+  if (newId) fetchUserDetails(newId);
 });
 
-// In component
-export function useCreateUser() {
-  return useMutation({
-    mutationFn: (data: CreateUserDTO) => api.users.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
-  });
-}
+// Correct: v-model with defineModel (Vue 3.4+)
+const modelValue = defineModel<string>();
+</script>
+
+<template>
+  <!-- Wrong: v-if with v-for on same element -->
+  <!-- <li v-for="item in items" v-if="item.active"> -->
+
+  <!-- Correct: filter in computed -->
+  <li v-for="item in filteredItems" :key="item.id">
+    {{ item.name }}
+  </li>
+
+  <!-- Correct: unique key, not index -->
+  <UserCard v-for="user in users" :key="user.id" :user="user" />
+</template>
 ```
 
-## Integrates With
-- **Routing**: Vue Router 4 with typed routes
-- **State**: Pinia with `@tanstack/vue-query` for server state
-- **Styling**: Tailwind CSS or scoped CSS with CSS modules
-- **Forms**: VeeValidate with Zod schemas
+## Version Gotchas
+- **Vue 3.4+**: `defineModel()` for two-way binding (replaces emit pattern)
+- **Vue 3.5+**: Improved SSR hydration, `useId()` for SSR-safe IDs
+- **Vue 3.6 (upcoming)**: "Alien signals" reactivity optimization
+- **Volar**: Replace Vetur; required for Vue 3 TypeScript support
+- **Nuxt 4**: Coming 2026 with significant changes
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Cannot read property of undefined` | Use optional chaining `?.` or `v-if` guard |
-| `Avoid mutating a prop directly` | Emit event to parent, use `v-model` with `defineModel` |
-| `Maximum recursive updates exceeded` | Check for circular reactive dependencies |
-| `Hydration mismatch` | Ensure SSR/client render same content, use `ClientOnly` |
+## What NOT to Do
+- ❌ `v-for="(item, index) in items" :key="index"` — Use stable unique ID
+- ❌ `{{ items.filter(i => i.active).map(...) }}` — Use computed
+- ❌ `watch(reactiveObject, ...)` — Watch specific properties
+- ❌ Mutating props directly — Emit events or use `defineModel`
+- ❌ Using Options API in new code — Use Composition API
 
-## Prod Ready
-- [ ] Lazy-loaded routes with `defineAsyncComponent`
-- [ ] Error boundaries with `onErrorCaptured`
-- [ ] Tree-shaking verified - no unused imports
-- [ ] Bundle size analyzed with `rollup-plugin-visualizer`
-- [ ] PWA support with `vite-plugin-pwa`
-- [ ] E2E tests with Playwright or Cypress
+## State Management (2026)
+| Need | Solution |
+|------|----------|
+| Local component | `ref()`, `reactive()` |
+| Cross-component | Pinia store |
+| Server state | TanStack Vue Query |
+| Forms | VeeValidate + Zod |
+
+## Pinia Pattern
+```typescript
+// stores/user.ts
+export const useUserStore = defineStore('user', () => {
+  const user = ref<User | null>(null);
+  const isAuthenticated = computed(() => !!user.value);
+
+  async function login(credentials: Credentials) {
+    user.value = await api.auth.login(credentials);
+  }
+
+  return { user, isAuthenticated, login };
+});
+```

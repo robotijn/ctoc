@@ -1,55 +1,44 @@
 # ScyllaDB CTO
-> High-performance Cassandra-compatible database with shard-per-core architecture.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name scylla -p 9042:9042 scylladb/scylla
-cqlsh -e "DESCRIBE KEYSPACES"
-cqlsh -f tests/queries.cql
+docker run -d --name scylla -p 9042:9042 scylladb/scylla:5.4
+# Uses same CQL as Cassandra
+pip install scylla-driver  # Or cassandra-driver
 ```
 
-## Non-Negotiables
-1. All Cassandra data modeling patterns apply
-2. Shard-aware drivers for optimal routing
-3. Workload prioritization (OLTP vs OLAP)
-4. Materialized views for secondary queries
-5. Change Data Capture (CDC) for streaming
-6. Compaction tuning for workload type
+## Claude's Common Mistakes
+1. **Non-shard-aware drivers** - 2-4x latency penalty without token-aware routing
+2. **All Cassandra anti-patterns apply** - Large partitions, wrong indexes, etc.
+3. **Ignoring workload prioritization** - Mix of OLTP/OLAP needs different settings
+4. **Missing shard monitoring** - Uneven shards cause hotspots
+5. **Wrong compaction strategy** - Must match workload type
 
-## Red Lines
-- Non-shard-aware clients (2-4x latency penalty)
-- Large partitions exceeding 100MB
-- Missing compaction tuning
-- Ignoring workload types configuration
-- No monitoring for shard imbalance
-
-## Pattern: Shard-Aware Access
+## Correct Patterns (2026)
 ```python
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 
-# Shard-aware connection for optimal performance
+# Shard-aware connection (CRITICAL for performance)
 cluster = Cluster(
     ['scylla1', 'scylla2', 'scylla3'],
     load_balancing_policy=TokenAwarePolicy(
         DCAwareRoundRobinPolicy(local_dc='dc1')
     ),
-    protocol_version=4,
 )
 session = cluster.connect('app')
 
-# Prepared statement for shard routing
+# Prepared statement for optimal routing
 insert_stmt = session.prepare("""
     INSERT INTO events (partition_id, event_time, event_id, data)
-    VALUES (?, ?, ?, ?)
-    USING TTL ?
+    VALUES (?, ?, ?, ?) USING TTL ?
 """)
 
-# Batch within same partition (efficient)
+# Batch within SAME partition only
 from cassandra.query import BatchStatement
 batch = BatchStatement()
-for event in events:
+for event in events_same_partition:
     batch.add(insert_stmt, (partition_id, event.time, event.id, event.data, 86400))
 session.execute(batch)
 ```
@@ -59,30 +48,21 @@ session.execute(batch)
 ALTER SERVICE LEVEL oltp WITH timeout = '50ms';
 ALTER SERVICE LEVEL analytics WITH timeout = '30s';
 
--- Materialized view for secondary access pattern
+-- Materialized view for secondary access
 CREATE MATERIALIZED VIEW events_by_type AS
     SELECT * FROM events
-    WHERE event_type IS NOT NULL AND partition_id IS NOT NULL
-    PRIMARY KEY (event_type, partition_id, event_time)
-WITH compaction = {'class': 'LeveledCompactionStrategy'};
+    WHERE event_type IS NOT NULL
+    PRIMARY KEY (event_type, partition_id, event_time);
 ```
 
-## Integrates With
+## Version Gotchas
+- **v5.4+**: Improved Alternator (DynamoDB compatibility)
+- **vs Cassandra**: 10x better latency, same CQL
+- **Shard-per-core**: Architecture requires shard-aware drivers
 - **CDC**: Native change data capture to Kafka
-- **Drivers**: Shard-aware Python, Java, Go, Rust drivers
-- **Monitoring**: Prometheus, Grafana dashboards
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Timeout` on reads | Check shard balance, optimize partition |
-| `Large partition` | Redesign partition key |
-| `Compaction falling behind` | Tune compaction or add nodes |
-| `Overloaded` shard | Check for hot partitions |
-
-## Prod Ready
-- [ ] Shard-aware drivers configured
-- [ ] Workload prioritization set
-- [ ] Partition sizes monitored
-- [ ] CDC enabled for streaming needs
-- [ ] Monitoring via ScyllaDB Monitoring Stack
+## What NOT to Do
+- Do NOT use non-shard-aware drivers (huge latency penalty)
+- Do NOT batch across partitions (defeats purpose)
+- Do NOT ignore shard balance monitoring
+- Do NOT apply Cassandra patterns without considering shards

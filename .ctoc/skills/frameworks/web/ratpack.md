@@ -1,32 +1,24 @@
 # Ratpack CTO
-> Lean JVM HTTP applications - non-blocking, promise-based, Netty underneath.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-# Gradle: id 'io.ratpack.ratpack-java' version '2.0.0-rc-1'
+# build.gradle
+plugins { id 'io.ratpack.ratpack-java' version '2.0.0' }
 ./gradlew run
-./gradlew test
+# Ratpack 2.x - lean JVM HTTP framework
 ```
 
-## Non-Negotiables
-1. Promise-based async operations
-2. Handler chains for request flow
-3. Registry for dependency injection
-4. Blocking operations in separate executor
-5. Comprehensive testing support
+## Claude's Common Mistakes
+1. **Blocking in compute threads** — Use `Blocking.get()` for I/O
+2. **Missing Promise subscription** — Call `.then()` or `.operation()`
+3. **No registry for services** — Add to registry in server config
+4. **Ignoring handler chain order** — Last handler wins
+5. **Sync operations in async paths** — Wrap with `Blocking.get()`
 
-## Red Lines
-- Blocking in compute threads - use `Blocking.get()`
-- Missing error handlers in chains
-- Ignoring Promise composition
-- No registry usage for services
-- Sync operations in async paths
-
-## Pattern: Handler Chain
+## Correct Patterns (2026)
 ```java
 import ratpack.server.RatpackServer;
-import ratpack.handling.Context;
 import ratpack.exec.Promise;
 import ratpack.exec.Blocking;
 import ratpack.jackson.Jackson;
@@ -55,11 +47,12 @@ public class App {
                     })
                 )
 
-                .all(ctx -> ctx.clientError(404))
+                .all(ctx -> ctx.clientError(404))  // Fallback
             )
         );
     }
 
+    // Wrap blocking operations with Blocking.get()
     private static Promise<User> createUser(Context ctx, CreateUserDto dto) {
         UserService service = ctx.get(UserService.class);
         return Blocking.get(() -> service.create(dto));
@@ -72,11 +65,18 @@ public class App {
 }
 ```
 
-## Integrates With
-- **DB**: JOOQ, Hibernate via Blocking.get()
-- **Async**: RxJava integration
-- **Testing**: ratpack-test with TestHttpClient
-- **Metrics**: Dropwizard Metrics
+## Version Gotchas
+- **Ratpack 2.x**: Java 17+ required; Netty underneath
+- **Blocking.get()**: Required for all blocking I/O operations
+- **Registry**: Dependency injection via server registry
+- **Promise**: Must subscribe with `.then()` or `.operation()`
+
+## What NOT to Do
+- ❌ Blocking calls in compute threads — Use `Blocking.get()`
+- ❌ Unsubscribed Promises — Call `.then()` or `.operation()`
+- ❌ Missing registry entries — Register services in server config
+- ❌ Sync JDBC calls — Wrap with `Blocking.get()`
+- ❌ No fallback handler — Add `.all()` at end of chain
 
 ## Common Errors
 | Error | Fix |
@@ -84,12 +84,4 @@ public class App {
 | `Blocking call in compute` | Wrap with `Blocking.get()` |
 | `Promise not subscribed` | Call `.then()` or `.operation()` |
 | `Registry entry not found` | Add to registry in server config |
-| `Handler not reached` | Check chain order, add `all()` fallback |
-
-## Prod Ready
-- [ ] Error handler registered
-- [ ] Blocking pool sized
-- [ ] Health check endpoint
-- [ ] Metrics exported
-- [ ] Graceful shutdown
-- [ ] Response compression
+| `Handler not reached` | Check chain order, add `.all()` fallback |

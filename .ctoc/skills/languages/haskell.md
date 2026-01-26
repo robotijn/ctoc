@@ -1,68 +1,61 @@
 # Haskell CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-hlint .                                # Lint
-fourmolu -i src/**/*.hs               # Format
-cabal test --test-show-details=direct  # Test
-cabal build                            # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses partial functions (`head`, `tail`) — use safe alternatives
+- Claude uses `String` for text — use `Text` or `ByteString`
+- Claude forgets strict evaluation — causes space leaks
+- Claude uses old `*` kind syntax — use `Type` instead
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `ghc 9.10+` | GHC2024 edition | Older GHC |
+| `cabal` or `stack` | Build tools | Manual ghc |
+| `hlint` | Linting | No linting |
+| `fourmolu` | Formatting | ormolu (less features) |
+| `hspec` + `QuickCheck` | Testing | Ad-hoc tests |
+
+## Patterns Claude Should Use
+```haskell
+{-# LANGUAGE GHC2024 #-}
+
+-- Use Type instead of *
+import Data.Kind (Type)
+
+-- Safe alternatives to partial functions
+import Data.Maybe (listToMaybe)
+safeHead :: [a] -> Maybe a
+safeHead = listToMaybe
+
+-- Strict fields to avoid space leaks
+data User = User
+  { name :: !Text
+  , age  :: !Int
+  }
+
+-- Required type arguments (GHC 9.10+)
+idVis :: forall a -> a -> a
+idVis _ x = x
+
+-- Use Text, not String
+import Data.Text (Text)
+import qualified Data.Text as T
+
+processText :: Text -> Text
+processText = T.toUpper
 ```
 
-## Tools (2024-2025)
-- **GHC 9.8+** - Latest stable compiler
-- **Cabal/Stack** - Build tools
-- **HLint** - Linting suggestions
-- **fourmolu/ormolu** - Formatting
-- **Hspec** - BDD testing framework
+## Anti-Patterns Claude Generates
+- Partial functions: `head`, `tail`, `!!` — use safe alternatives
+- `String` for text — use `Text` or `ByteString`
+- Lazy fields in data — use `!` for strict fields
+- `*` for kinds — use `Type` from `Data.Kind`
+- Incomplete pattern matches — handle all cases
 
-## Project Structure
-```
-project/
-├── src/               # Library source
-├── app/               # Executable source
-├── test/              # Test files
-├── package.yaml       # hpack config
-└── stack.yaml         # Stack config
-```
-
-## Non-Negotiables
-1. Pure functions by default, IO only at edges
-2. Type signatures on all top-level definitions
-3. Newtypes for domain concepts
-4. Handle all cases in pattern matching
-
-## Red Lines (Reject PR)
-- Partial functions (head, tail, !!)
-- Incomplete pattern matches
-- Lazy IO in production (use streaming)
-- Ignoring compiler warnings (-Wall -Werror)
-- Secrets hardcoded in source
-- String for text (use Text)
-
-## Testing Strategy
-- **Unit**: Hspec/HUnit, <100ms, pure functions
-- **Property**: QuickCheck for invariants
-- **Integration**: Real IO with test fixtures
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Space leaks | Strict fields, deepseq, bang patterns |
-| Partial functions | Use safe alternatives (headMay) |
-| String performance | Use Text or ByteString |
-| Complex monad stacks | Use effect systems (effectful) |
-
-## Performance Red Lines
-- No O(n^2) in hot paths (check append)
-- No lazy evaluation causing space leaks
-- No String for large text processing
-
-## Security Checklist
-- [ ] Input validated at IO boundaries
-- [ ] No unsafePerformIO with user data
-- [ ] Secrets from environment variables
-- [ ] Dependencies audited (stack audit)
+## Version Gotchas
+- **GHC 9.10**: GHC2024 edition, RequiredTypeArguments
+- **GHC2024**: Recommended for new code, more extensions enabled
+- **Type vs ***: Use `Type` from `Data.Kind` in modern code
+- **LLVM backend**: Can produce faster code for numeric work
+- **With effects**: Consider `effectful` over monad transformers

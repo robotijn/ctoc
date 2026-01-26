@@ -1,90 +1,55 @@
 # Prisma CTO
-> Next-generation TypeScript ORM with type-safe database access.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm install prisma @prisma/client
-npx prisma migrate dev --name init
-npx prisma generate && npm test
+npx prisma init  # Creates prisma.config.ts (required in v7)
 ```
 
-## Non-Negotiables
-1. Schema-first design in `prisma/schema.prisma`
-2. Prisma Migrate for all schema changes
-3. Generated client for type-safe queries
-4. Explicit `select` or `include` to avoid over-fetching
-5. Transactions for multi-model operations
-6. Connection pooling with PgBouncer for serverless
+## Claude's Common Mistakes
+1. **Missing prisma.config.ts** - v7 requires config file, not just schema.prisma
+2. **No driver adapter** - v7 requires explicit driver adapters (pg, mysql2, etc.)
+3. **Auto-loading env vars** - v7 doesn't auto-load .env; use dotenv explicitly
+4. **Old client import** - Generator is now `prisma-client`, not `prisma-client-js`
+5. **node_modules output** - v7 generates to project source, not node_modules
 
-## Red Lines
-- Raw SQL when Prisma Client suffices
-- N+1 queries from missing `include`
-- Missing `@@index` on filtered columns
-- Schema changes without migrations
-- Unbounded queries without pagination
-
-## Pattern: Type-Safe Data Access
+## Correct Patterns (2026)
 ```typescript
-import { PrismaClient } from '@prisma/client';
+// prisma.config.ts (REQUIRED in v7)
+import { defineConfig } from 'prisma'
+import { PrismaPg } from '@prisma/adapter-pg'
 
-const prisma = new PrismaClient({
-  log: ['query', 'warn', 'error'],
-});
+export default defineConfig({
+  earlyAccess: true,
+  schema: './prisma/schema.prisma',
+})
 
-// Type-safe query with relations
-async function getOrdersWithCustomer(customerId: string) {
-  return prisma.order.findMany({
-    where: {
-      customerId,
-      status: { in: ['pending', 'processing'] },
-    },
-    select: {
-      id: true,
-      total: true,
-      createdAt: true,
-      items: {
-        select: { productId: true, quantity: true },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 20,
-  });
-}
+// Client setup with driver adapter (v7 pattern)
+import { PrismaClient } from './prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { Pool } from 'pg'
 
-// Transaction for data integrity
-async function transferFunds(fromId: string, toId: string, amount: number) {
-  return prisma.$transaction(async (tx) => {
-    const from = await tx.account.update({
-      where: { id: fromId },
-      data: { balance: { decrement: amount } },
-    });
-    if (from.balance < 0) throw new Error('Insufficient funds');
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const adapter = new PrismaPg(pool)
+const prisma = new PrismaClient({ adapter })
 
-    await tx.account.update({
-      where: { id: toId },
-      data: { balance: { increment: amount } },
-    });
-  });
-}
+// Type-safe query with explicit select
+const orders = await prisma.order.findMany({
+  where: { customerId, status: { in: ['pending', 'processing'] } },
+  select: { id: true, total: true, items: { select: { productId: true } } },
+  take: 20,
+})
 ```
 
-## Integrates With
-- **Databases**: PostgreSQL, MySQL, SQLite, MongoDB, CockroachDB
-- **Frameworks**: Next.js, NestJS, Express
-- **Serverless**: Vercel, AWS Lambda with connection pooling
+## Version Gotchas
+- **v6->v7**: Driver adapters required, prisma.config.ts mandatory
+- **v7 enums**: @map with enums has breaking behavior change
+- **v7 SSL**: node-pg used instead of Rust engine; SSL defaults changed
+- **With Next.js 16**: Turbopack has module resolution issues with prisma-client
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `P2002: Unique constraint failed` | Check for duplicate key or add conflict handling |
-| `P2025: Record not found` | Use `findFirst` or handle null case |
-| `Connection pool exhausted` | Increase pool size or use PgBouncer |
-| `Migration failed` | Check `prisma migrate diff` for conflicts |
-
-## Prod Ready
-- [ ] Migrations in version control
-- [ ] Connection pooling for serverless
-- [ ] Indexes on all filtered columns
-- [ ] Query logging in development
-- [ ] Soft deletes for audit requirements
+## What NOT to Do
+- Do NOT expect DATABASE_URL to auto-load from .env
+- Do NOT use `prisma-client-js` generator (use `prisma-client`)
+- Do NOT skip the driver adapter setup in v7
+- Do NOT import from `@prisma/client` (import from generated location)

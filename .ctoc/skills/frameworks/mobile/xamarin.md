@@ -1,73 +1,53 @@
 # Xamarin CTO
-> Legacy .NET mobile leader - migrate to MAUI for new projects, maintain Xamarin with upgrade path.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-dotnet new xamarinforms -n MyApp
-msbuild /t:Build /p:Configuration=Debug MyApp.sln
-dotnet test MyApp.Tests/MyApp.Tests.csproj
+# XAMARIN SUPPORT ENDED MAY 2024 - MIGRATE TO .NET MAUI
+# For legacy maintenance only:
+dotnet new xamarinforms -n MyApp  # Will fail on .NET 8+
+# Use Visual Studio 2022 17.9 or earlier
 ```
 
-## Non-Negotiables
-1. Migration plan to .NET MAUI - Xamarin support ended May 2024
-2. MVVM pattern with Xamarin.CommunityToolkit or Prism
-3. Xamarin.Essentials for cross-platform device APIs
-4. Shared business logic in .NET Standard 2.0 library
-5. async/await for all I/O operations
+## Claude's Common Mistakes
+1. **Suggests Xamarin for new projects** - Support ended May 2024, use .NET MAUI
+2. **Uses .NET 8 SDK with Xamarin** - Incompatible, requires .NET 6 or earlier
+3. **Recommends Xamarin.Essentials updates** - Package deprecated, use MAUI Essentials
+4. **Ignores migration timeline** - No security patches after May 2024
+5. **Suggests NuGet package updates** - Many packages stopped Xamarin support
 
-## Red Lines
-- Network or database operations on UI thread
-- Platform-specific code without DependencyService abstraction
-- Xamarin.Forms layouts inside ScrollView without explicit sizing
-- Ignoring linker warnings in Release builds
-- Hardcoded device dimensions - use relative layouts
-
-## Pattern: Async Command with MVVM
+## Correct Patterns (2026)
 ```csharp
-public class MainViewModel : BaseViewModel
+// MIGRATION PATTERN: Xamarin.Forms -> .NET MAUI
+// Old Xamarin.Forms
+// public class MainPage : ContentPage { }
+
+// New .NET MAUI equivalent
+public partial class MainPage : ContentPage
 {
-    private readonly IDataService _dataService;
-
-    public IAsyncCommand LoadCommand { get; }
-
-    public MainViewModel(IDataService dataService)
+    public MainPage()
     {
-        _dataService = dataService;
-        LoadCommand = new AsyncCommand(ExecuteLoadAsync);
-    }
-
-    private async Task ExecuteLoadAsync()
-    {
-        if (IsBusy) return;
-        IsBusy = true;
-        try
-        {
-            var items = await _dataService.GetItemsAsync();
-            Items.ReplaceRange(items);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        InitializeComponent();
     }
 }
+
+// Migration checklist:
+// 1. Create new MAUI project
+// 2. Copy shared code (most is compatible)
+// 3. Replace Xamarin.Essentials with MAUI Essentials
+// 4. Update custom renderers to Handlers
+// 5. Test on all platforms
 ```
 
-## Integrates With
-- **DB**: SQLite-net-pcl with async, Realm for sync
-- **Auth**: Xamarin.Essentials WebAuthenticator, SecureStorage for tokens
-- **Cache**: Akavache or MonkeyCache for offline-first
+## Version Gotchas
+- **May 2024**: Official support ended, no more patches
+- **.NET 8+**: Xamarin SDK not included, only MAUI
+- **Visual Studio 2022 17.10+**: Xamarin workload removed
+- **With NuGet packages**: Many stopped Xamarin support in 2024
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Java.Lang.OutOfMemoryError` | Enable ProGuard/R8 and image compression |
-| `NSInternalInconsistencyException` | Main thread violation - wrap in Device.BeginInvokeOnMainThread |
-| `Linker removed required type` | Add [Preserve] attribute or linker.xml configuration |
-
-## Prod Ready
-- [ ] MAUI migration timeline documented
-- [ ] Linking configured (Link SDK or Link All with skips)
-- [ ] App Center or Crashlytics configured for crash reporting
-- [ ] Automated UI tests with Xamarin.UITest
+## What NOT to Do
+- Do NOT start new Xamarin projects - use .NET MAUI
+- Do NOT expect security patches - none since May 2024
+- Do NOT use .NET 8 SDK - Xamarin requires .NET 6 max
+- Do NOT delay migration - longer delay = harder migration
+- Do NOT use community forks - no guaranteed maintenance

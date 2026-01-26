@@ -1,31 +1,26 @@
 # Prometheus CTO
-> Metrics and alerting leader demanding proper naming conventions, cardinality control, and actionable alerts.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-prometheus --config.file=prometheus.yml --web.enable-lifecycle
-promtool check config prometheus.yml && promtool check rules rules/*.yml
-curl -X POST http://localhost:9090/-/reload
+# Download Prometheus 3.x (latest)
+wget https://github.com/prometheus/prometheus/releases/download/v3.9.1/prometheus-3.9.1.linux-amd64.tar.gz
+tar xvfz prometheus-*.tar.gz
+# Or Helm
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack
 ```
 
-## Non-Negotiables
-1. Metric naming conventions: `namespace_subsystem_name_unit`
-2. Label cardinality control - no unbounded label values
-3. Recording rules for dashboard queries and alert dependencies
-4. Alert runbooks linked in annotations
-5. Federation or remote write for multi-cluster scaling
+## Claude's Common Mistakes
+1. **Uses old UI patterns** - Prometheus 3.0 has new UI, old available via flag
+2. **High cardinality labels** - User IDs, request IDs blow up storage
+3. **Missing unit suffixes** - Metrics need _seconds, _bytes, _total
+4. **Alerts without runbooks** - runbook_url annotation required
+5. **Uses Prometheus 2.x config** - Some flags removed in 3.0
 
-## Red Lines
-- High cardinality labels (user IDs, request IDs, timestamps)
-- Missing unit suffixes (_seconds, _bytes, _total)
-- Alerts without runbook_url annotation
-- No retention planning causing disk exhaustion
-- Scrape intervals under 10s without justification
-
-## Pattern: Recording Rules and Alerts
+## Correct Patterns (2026)
 ```yaml
-# prometheus.yml
+# prometheus.yml (v3.x)
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -33,16 +28,25 @@ global:
 rule_files:
   - "rules/*.yml"
 
+scrape_configs:
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
 # rules/http.yml
 groups:
   - name: http_requests
     interval: 30s
     rules:
-      # Recording rule for dashboard
+      # Recording rule for dashboards
       - record: job:http_requests:rate5m
         expr: sum by (job) (rate(http_requests_total[5m]))
 
-      # Alert with runbook
+      # Alert with runbook (REQUIRED)
       - alert: HighErrorRate
         expr: |
           sum(rate(http_requests_total{status=~"5.."}[5m])) by (job)
@@ -55,23 +59,17 @@ groups:
         annotations:
           summary: "High error rate on {{ $labels.job }}"
           runbook_url: "https://wiki.example.com/runbooks/high-error-rate"
-          value: "{{ $value | humanizePercentage }}"
 ```
 
-## Integrates With
-- **DB**: PostgreSQL exporter, MySQL exporter with connection pooling
-- **Auth**: OAuth2 proxy for Prometheus UI access
-- **Cache**: Redis exporter with cardinality-safe labels
+## Version Gotchas
+- **Prometheus 3.0**: New UI, UTF-8 default, removed deprecated flags
+- **Prometheus 3.0**: Upgrade to 2.55 first, then to 3.0
+- **Prometheus 3.5+**: LTS releases available
+- **Agent mode**: `--agent` flag replaces feature flag
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `out of order sample` | Ensure only one scraper per target, check timestamps |
-| `query processing took too long` | Add recording rules for complex queries |
-| `TSDB compaction failed` | Check disk space, verify retention settings |
-
-## Prod Ready
-- [ ] Retention configured based on storage capacity
-- [ ] Recording rules for all dashboard panels
-- [ ] Alertmanager configured with proper routing and silences
-- [ ] Thanos or Cortex for long-term storage and HA
+## What NOT to Do
+- Do NOT use high cardinality labels - blows up storage
+- Do NOT skip unit suffixes on metrics (_seconds, _bytes, _total)
+- Do NOT create alerts without runbook_url annotation
+- Do NOT upgrade directly to 3.0 - go through 2.55 first
+- Do NOT use scrape intervals under 10s without justification

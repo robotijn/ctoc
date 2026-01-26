@@ -1,67 +1,61 @@
 # Nim CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-nimpretty **/*.nim                     # Format
-nim check src/main.nim                 # Type check
-testament all                          # Test
-nim c -d:release src/main.nim          # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude mixes memory management — choose ARC/ORC consistently
+- Claude uses `cast[]` freely — requires strong justification
+- Claude ignores effect system — use for pure function tracking
+- Claude creates complex macros — keep templates/macros simple
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `nim 2.x` | Latest with ORC | Older versions |
+| `nimpretty` | Formatting | Manual style |
+| `testament` | Testing | Ad-hoc tests |
+| `nimble` | Package management | Manual deps |
+| `nimsuggest` | IDE support | No completion |
+
+## Patterns Claude Should Use
+```nim
+# ARC/ORC automatic memory management
+proc processData(data: seq[string]): seq[string] =
+  result = newSeq[string](data.len)
+  for i, item in data:
+    result[i] = item.toUpperAscii()
+
+# Use Result type for errors (not exceptions)
+type
+  Result[T] = object
+    case isOk: bool
+    of true: value: T
+    of false: error: string
+
+proc divide(a, b: float): Result[float] =
+  if b == 0.0:
+    Result[float](isOk: false, error: "Division by zero")
+  else:
+    Result[float](isOk: true, value: a / b)
+
+# Effect tracking with func (pure)
+func add(a, b: int): int = a + b
+
+# Preallocate sequences
+var items = newSeqOfCap[int](1000)
+for i in 0..<1000:
+  items.add(i)
 ```
 
-## Tools (2024-2025)
-- **Nim 2.x** - Latest stable
-- **nimpretty** - Code formatting
-- **testament** - Testing framework
-- **nimble** - Package management
-- **nimsuggest** - IDE support
+## Anti-Patterns Claude Generates
+- Mixing refc and ARC/ORC — choose one memory model
+- `cast[]` without justification — use conversion procs
+- `proc` when `func` works — use `func` for purity
+- Growing seqs in loops — use `newSeqOfCap`
+- Complex macros — prefer templates for simple cases
 
-## Project Structure
-```
-project/
-├── src/               # Source files
-├── tests/             # Test files
-├── nimble             # Package definition
-└── config.nims        # Build configuration
-```
-
-## Non-Negotiables
-1. Proper memory management (ARC/ORC)
-2. Type safety with generics and concepts
-3. Effect system for side effects
-4. Follow Nim style guide
-
-## Red Lines (Reject PR)
-- Memory leaks with manual management
-- Ignoring effect system warnings
-- Unsafe pointer operations
-- Missing test coverage
-- Secrets hardcoded in source
-- cast[] without justification
-
-## Testing Strategy
-- **Unit**: testament or unittest
-- **Integration**: Real I/O tests
-- **Property**: Generate test inputs
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| GC vs manual memory | Choose consistently |
-| Closure capturing | Use explicit capture |
-| Exception handling | Use Result types |
-| Macro complexity | Keep macros simple |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No unnecessary allocations
-- No seq growth in loops (use setLen)
-
-## Security Checklist
-- [ ] Input validated at boundaries
-- [ ] No eval-like operations
-- [ ] Secrets from environment
-- [ ] C interop properly checked
+## Version Gotchas
+- **Nim 2.x**: ORC is default GC, improved stability
+- **ARC vs ORC**: ORC handles cycles, ARC is faster
+- **Effect system**: `func` is pure, `proc` can have side effects
+- **Templates vs macros**: Templates are simpler, prefer them
+- **With C**: Interop is straightforward but needs safety wrappers

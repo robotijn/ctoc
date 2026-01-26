@@ -1,29 +1,21 @@
 # Starlette CTO
-> ASGI framework foundation - minimal, fast, the basis of FastAPI.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install starlette uvicorn
+# Starlette 0.40+ - ASGI foundation (powers FastAPI)
 uvicorn main:app --reload
-pytest tests/ -v
 ```
 
-## Non-Negotiables
-1. ASGI understanding - middleware and lifespan
-2. Middleware composition for cross-cutting concerns
-3. Route classes for resource organization
-4. Background tasks for non-blocking operations
-5. Proper exception handling with handlers
+## Claude's Common Mistakes
+1. **Blocking operations in async endpoints** — Use `run_in_executor` for sync code
+2. **Reading request body twice** — Body can only be consumed once
+3. **Missing lifespan context** — Use for startup/shutdown (DB pools, etc.)
+4. **Ignoring middleware order** — Order matters; earliest runs first/last
+5. **No exception handlers** — Errors return generic 500 without handlers
 
-## Red Lines
-- Blocking operations in async endpoints
-- Missing exception handlers
-- Sync middleware blocking event loop
-- Ignoring lifespan events for startup/shutdown
-- Not using Request/Response properly
-
-## Pattern: Structured Application
+## Correct Patterns (2026)
 ```python
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
@@ -32,6 +24,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
+# Lifespan for startup/shutdown
 @asynccontextmanager
 async def lifespan(app):
     # Startup
@@ -40,31 +33,26 @@ async def lifespan(app):
     # Shutdown
     await app.state.db.close()
 
+# Async endpoint (don't block!)
 async def create_user(request):
-    data = await request.json()
-    # Validate
+    data = await request.json()  # Only read once
     if not data.get('email'):
         return JSONResponse({'error': 'email required'}, status_code=400)
 
     db = request.app.state.db
-    user = await db.execute(
-        "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING *",
-        data['email'], data['password']
+    user = await db.fetchrow(
+        "INSERT INTO users (email) VALUES ($1) RETURNING *",
+        data['email']
     )
     return JSONResponse(dict(user), status_code=201)
 
-async def get_user(request):
-    user_id = request.path_params['user_id']
-    db = request.app.state.db
-    user = await db.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
-    if not user:
-        return JSONResponse({'error': 'not found'}, status_code=404)
-    return JSONResponse(dict(user))
+# Exception handler
+async def server_error(request, exc):
+    return JSONResponse({'error': 'Internal error'}, status_code=500)
 
 routes = [
     Mount('/api', routes=[
         Route('/users', create_user, methods=['POST']),
-        Route('/users/{user_id:int}', get_user, methods=['GET']),
     ]),
 ]
 
@@ -72,27 +60,41 @@ middleware = [
     Middleware(CORSMiddleware, allow_origins=['*']),
 ]
 
-app = Starlette(routes=routes, middleware=middleware, lifespan=lifespan)
+app = Starlette(
+    routes=routes,
+    middleware=middleware,
+    lifespan=lifespan,
+    exception_handlers={500: server_error}
+)
 ```
 
-## Integrates With
-- **DB**: `databases` async package or `asyncpg`
-- **Auth**: Custom middleware with JWT
-- **Validation**: Pydantic models for request parsing
-- **Templates**: Jinja2 with `Starlette.templates`
+## Version Gotchas
+- **Starlette 0.40+**: Foundation for FastAPI; can use standalone
+- **Lifespan**: Replaces on_startup/on_shutdown events
+- **Asyncio**: All endpoints should be async; sync blocks event loop
+- **Request body**: Can only be read once per request
+
+## What NOT to Do
+- ❌ `time.sleep()` in async endpoint — Use `asyncio.sleep()`
+- ❌ `data = await request.json()` twice — Store in variable
+- ❌ Missing `lifespan` for DB connections — Leaks connections
+- ❌ Sync middleware in async app — Blocks event loop
+- ❌ No exception handlers — Returns generic error pages
+
+## Middleware Order
+```python
+# Executes outside-in on request, inside-out on response
+middleware = [
+    Middleware(ErrorMiddleware),     # 1st on request, last on response
+    Middleware(LoggingMiddleware),   # 2nd on request
+    Middleware(AuthMiddleware),      # 3rd on request
+]
+```
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
-| `RuntimeError: Event loop closed` | Use proper lifespan context manager |
-| `Starlette not accepting connections` | Check port binding, run with uvicorn |
-| `Request body already consumed` | Only read body once, store if needed |
-| `Middleware not executing` | Check middleware order in list |
-
-## Prod Ready
-- [ ] Lifespan manages connections
-- [ ] Exception handlers for all error types
-- [ ] Middleware for logging and timing
-- [ ] Health check endpoint
-- [ ] CORS properly configured
-- [ ] Multiple workers with uvicorn
+| `RuntimeError: Event loop closed` | Use lifespan context manager |
+| `Request body already consumed` | Only read body once, store result |
+| `Middleware not executing` | Check middleware list order |
+| `Connection not available` | Initialize in lifespan, store in `app.state` |

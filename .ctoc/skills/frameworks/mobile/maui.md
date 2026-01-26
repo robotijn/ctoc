@@ -1,30 +1,28 @@
 # .NET MAUI CTO
-> Cross-platform .NET mobile leader demanding clean MVVM architecture with modern .NET 8+ patterns.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Install workload
+dotnet workload install maui
+# Create project
 dotnet new maui -n MyApp
-dotnet build -f net8.0-ios && dotnet build -f net8.0-android
-dotnet test MyApp.Tests && dotnet build -t:Run -f net8.0-ios
+# Verify installation
+dotnet workload list
+# Upgrade to .NET 9
+dotnet new global.json --sdk-version 9.0.306 --roll-forward latestPatch
 ```
 
-## Non-Negotiables
-1. CommunityToolkit.Mvvm with source generators for ViewModels
-2. Shell navigation with typed routes and query parameters
-3. MAUI Essentials for device APIs (geolocation, sensors, preferences)
-4. Handlers over custom renderers for platform customization
-5. Testing on all target platforms early and often
+## Claude's Common Mistakes
+1. **Uses .NET 8 patterns for .NET 9** - Workload sets changed, version pinning required
+2. **Ignores CommunityToolkit.Mvvm** - Source generators are the standard pattern
+3. **Uses Xamarin.Essentials namespace** - Replaced by Microsoft.Maui.Essentials
+4. **Skips Xcode 16 requirement** - iOS builds fail without macOS 14.5+
+5. **Missing workload repair** - Broken installs cause cryptic errors
 
-## Red Lines
-- UI logic mixed with business logic - ViewModels must be testable
-- Synchronous I/O calls - always use async/await
-- Nested layouts beyond 3 levels - performance killer on mobile
-- Memory leaks from event subscriptions without cleanup
-- Hardcoded strings - use Resources for localization
-
-## Pattern: Observable ViewModel with Toolkit
+## Correct Patterns (2026)
 ```csharp
+// CommunityToolkit.Mvvm with source generators (.NET 9)
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -45,38 +43,33 @@ public partial class ProfileViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task LoadAsync(string userId)
+    private async Task LoadAsync(string userId, CancellationToken token)
     {
         IsLoading = true;
-        var user = await _userService.GetUserAsync(userId);
-        Name = user.Name;
-        IsLoading = false;
+        try {
+            var user = await _userService.GetUserAsync(userId, token);
+            Name = user.Name;
+        } finally {
+            IsLoading = false;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
-    private async Task SaveAsync()
-    {
-        await _userService.UpdateNameAsync(Name);
-    }
+    private async Task SaveAsync() => await _userService.UpdateNameAsync(Name);
 
     private bool CanSave() => !string.IsNullOrWhiteSpace(Name);
 }
 ```
 
-## Integrates With
-- **DB**: SQLite with Microsoft.Data.Sqlite, EF Core for complex models
-- **Auth**: MSAL for Azure AD, WebAuthenticator for OAuth
-- **Cache**: Preferences for KV, FileSystem for larger data
+## Version Gotchas
+- **.NET 9**: Workload sets require `global.json` for version pinning
+- **.NET 9**: Xcode 16 required for iOS, macOS 14.5 minimum
+- **.NET 9**: iOS 12.2 and Mac Catalyst 15.0 minimum deployment
+- **Windows 11 Oct 2025 Update**: Breaks .NET 8 MAUI projects
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `XFC0000: Cannot resolve type` | Clean solution and rebuild, check XAML namespaces |
-| `Java.Lang.RuntimeException: Canvas` | Reduce layout complexity or enable hardware acceleration |
-| `Unable to find application` | Verify bundle ID matches provisioning profile |
-
-## Prod Ready
-- [ ] AOT compilation enabled for iOS
-- [ ] Trimming configured with proper preserve attributes
-- [ ] App Center or Sentry configured for crash reporting
-- [ ] CI/CD pipeline with platform-specific build agents
+## What NOT to Do
+- Do NOT mix .NET versions without `global.json` pinning
+- Do NOT nest layouts beyond 3 levels - severe performance impact
+- Do NOT use event handlers without unsubscribing - memory leaks
+- Do NOT skip `dotnet workload repair` when builds fail mysteriously
+- Do NOT use Xamarin.Forms NuGet packages - incompatible

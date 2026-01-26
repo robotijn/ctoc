@@ -1,115 +1,100 @@
 # Tauri CTO
-> Lightweight Rust desktop apps - tiny bundles, native performance, secure by default.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-npm create tauri-app@latest && cd myapp
+npm create tauri-app@latest my-app
+cd my-app && npm install
 npm run tauri dev
-cargo test
+# Tauri 2.x - requires Rust 1.70+
 ```
 
-## Non-Negotiables
-1. Rust backend commands for native operations
-2. Allowlist permissions - minimal by default
-3. Event system for async communication
-4. Window management via Rust
-5. Proper CSP configuration
+## Claude's Common Mistakes
+1. **`shell: { all: true }`** — Major security hole; whitelist specific commands
+2. **Blocking main thread** — Use async commands; sync blocks entire app
+3. **Missing allowlist permissions** — Capabilities denied by default
+4. **No error handling in commands** — Rust panics crash the app
+5. **Exposing `invoke` without validation** — Validate all inputs
 
-## Red Lines
-- `shell: { all: true }` - open security hole
-- Missing allowlist - deny by default
-- Blocking main thread - use async commands
-- No error handling in commands
-- Exposing filesystem without validation
-
-## Pattern: Commands and Events
+## Correct Patterns (2026)
 ```rust
 // src-tauri/src/main.rs
 use tauri::Manager;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-struct User {
-    id: i32,
-    email: String,
-}
+struct User { id: i32, email: String }
 
 #[derive(Deserialize)]
-struct CreateUserRequest {
-    email: String,
-    password: String,
-}
+struct CreateUserRequest { email: String, password: String }
 
+// Async command with error handling (not unwrap!)
 #[tauri::command]
 async fn create_user(
     request: CreateUserRequest,
     state: tauri::State<'_, AppState>,
 ) -> Result<User, String> {
-    let user = state.db
+    // Validate input
+    if request.email.is_empty() {
+        return Err("Email required".into());
+    }
+
+    state.db
         .create_user(&request.email, &request.password)
         .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(user)
-}
-
-#[tauri::command]
-async fn get_users(state: tauri::State<'_, AppState>) -> Result<Vec<User>, String> {
-    state.db.get_all_users().await.map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())
 }
 
 fn main() {
     tauri::Builder::default()
         .manage(AppState::new())
-        .invoke_handler(tauri::generate_handler![create_user, get_users])
-        .setup(|app| {
-            // Emit events to frontend
-            let handle = app.handle();
-            std::thread::spawn(move || {
-                loop {
-                    handle.emit_all("heartbeat", "alive").unwrap();
-                    std::thread::sleep(std::time::Duration::from_secs(30));
-                }
-            });
-            Ok(())
-        })
+        .invoke_handler(tauri::generate_handler![create_user])
         .run(tauri::generate_context!())
-        .expect("error running tauri application");
+        .expect("error running tauri");
 }
 
 // Frontend (React/Vue/Svelte)
-import { invoke } from '@tauri-apps/api/tauri';
-import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
-async function createUser(email, password) {
-  return await invoke('create_user', { request: { email, password } });
+async function createUser(email: string, password: string) {
+  try {
+    return await invoke('create_user', {
+      request: { email, password }
+    });
+  } catch (error) {
+    console.error('Command failed:', error);
+  }
 }
-
-// Listen to events
-await listen('heartbeat', (event) => {
-  console.log('Server alive:', event.payload);
-});
 ```
 
-## Integrates With
-- **Frontend**: React, Vue, Svelte, or any web framework
-- **DB**: SQLite via `rusqlite`, or any Rust crate
-- **System**: Native dialogs, notifications, clipboard
-- **Updates**: Built-in updater with signing
+## Version Gotchas
+- **Tauri 2.x**: New permissions system, mobile support
+- **Capabilities**: Define in `src-tauri/capabilities/`
+- **Plugins**: Use official `tauri-plugin-*` crates
+- **Bundle size**: Should be < 10MB (much smaller than Electron)
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Command not found` | Add to `invoke_handler` in main.rs |
-| `Permission denied` | Add capability to allowlist |
-| `Serialization failed` | Check Serde derives on types |
-| `Window not found` | Check window label matches |
+## What NOT to Do
+- ❌ `shell: { all: true }` — Security vulnerability
+- ❌ `unwrap()` in commands — App crashes on error
+- ❌ Sync blocking operations — Use async commands
+- ❌ Missing error handling — Always return `Result`
+- ❌ Broad permissions — Minimal allowlist only
 
-## Prod Ready
-- [ ] Allowlist is minimal
-- [ ] Code signing configured
-- [ ] Auto-updater with signing
-- [ ] CSP configured in `tauri.conf.json`
-- [ ] Error handling in all commands
-- [ ] Bundle size optimized (should be < 10MB)
+## Tauri vs Electron
+| Feature | Tauri | Electron |
+|---------|-------|----------|
+| Bundle size | ~10MB | ~150MB+ |
+| Memory | Lower | Higher |
+| Backend | Rust | Node.js |
+| Security | Stronger | Weaker |
+
+## Security Checklist
+```json
+// src-tauri/capabilities/default.json
+{
+  "permissions": [
+    "core:default",
+    "shell:allow-open"  // Whitelist, not allow-all
+  ]
+}
+```

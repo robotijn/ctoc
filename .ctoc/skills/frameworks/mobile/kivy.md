@@ -1,29 +1,24 @@
 # Kivy CTO
-> Python mobile engineering leader demanding KV language separation and proper threading for responsive UIs.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pip install kivy[full] buildozer
-python main.py
-buildozer android debug deploy run && pytest tests/
+# Use virtual environment
+python -m venv venv && source venv/bin/activate
+pip install kivy[full]
+# For mobile builds
+pip install buildozer  # Android
+pip install kivy-ios   # iOS (macOS only)
 ```
 
-## Non-Negotiables
-1. KV language for UI layout, Python for business logic
-2. RecycleView for large lists with proper viewclass recycling
-3. Clock.schedule_once for UI updates from background threads
-4. Buildozer for Android, kivy-ios for iOS packaging
-5. Profile with Kivy's built-in profiler before optimizing
+## Claude's Common Mistakes
+1. **Updates UI from background threads** - Must use `Clock.schedule_once`
+2. **Uses PIL/Pillow directly** - Use Kivy's Image/Texture for compatibility
+3. **Ignores Buildozer recipe requirements** - Pure Python libs may not work
+4. **Deep widget nesting** - Causes severe performance issues
+5. **Missing daemon=True on threads** - Blocks app exit
 
-## Red Lines
-- Direct UI updates from background threads - causes crashes
-- PIL/Pillow for images - use Kivy's Image and Texture classes
-- Deep widget nesting - flatten layouts for performance
-- Blocking main loop with synchronous operations
-- Ignoring touch event propagation rules
-
-## Pattern: Background Task with Safe UI Update
+## Correct Patterns (2026)
 ```python
 from kivy.app import App
 from kivy.clock import Clock
@@ -33,35 +28,44 @@ from threading import Thread
 class MainScreen(BoxLayout):
     def fetch_data(self):
         def background_task():
-            # Blocking operation runs in thread
+            # Blocking operation in thread
             result = api_client.get_data()
-            # Schedule UI update on main thread
+            # CRITICAL: Schedule UI update on main thread
             Clock.schedule_once(lambda dt: self.on_data_loaded(result))
 
         Thread(target=background_task, daemon=True).start()
 
     def on_data_loaded(self, data):
+        # Safe to update UI here
         self.ids.data_label.text = str(data)
+
+# KV language for layout (keep Python for logic)
+# main.kv
+"""
+MainScreen:
+    orientation: 'vertical'
+    Label:
+        id: data_label
+        text: 'Loading...'
+    Button:
+        text: 'Fetch'
+        on_press: root.fetch_data()
+"""
 
 class MyApp(App):
     def build(self):
         return MainScreen()
 ```
 
-## Integrates With
-- **DB**: SQLite via sqlite3, Peewee for ORM
-- **Auth**: Requests for API auth, keyring for secure storage
-- **Cache**: shelve for Python objects, diskcache for performance
+## Version Gotchas
+- **Kivy 2.3+**: Python 3.8+ required, some APIs changed
+- **Buildozer**: Android SDK/NDK versions must match recipes
+- **kivy-ios**: Requires macOS, Xcode command line tools
+- **With NumPy**: Needs recipe in buildozer.spec requirements
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `AttributeError: App has no attribute 'root'` | Ensure build() returns widget, check App lifecycle |
-| `ValueError: texture already used` | Clone texture before modifying or use unique textures |
-| `Buildozer: Recipe does not exist` | Add recipe to buildozer.spec requirements |
-
-## Prod Ready
-- [ ] Buildozer.spec configured with correct permissions
-- [ ] Android keystore created for release signing
-- [ ] iOS provisioning profile configured in kivy-ios
-- [ ] App size optimized with selective package inclusion
+## What NOT to Do
+- Do NOT update widgets from background threads - causes crashes
+- Do NOT use PIL directly - use Kivy's Image/AsyncImage
+- Do NOT deep nest layouts - flatten for performance
+- Do NOT forget `daemon=True` on threads - blocks app termination
+- Do NOT ignore Buildozer recipe errors - add to spec requirements

@@ -1,68 +1,62 @@
 # Solidity CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-forge fmt --check                      # Check format
-slither .                              # Security analysis
-forge test -vvv                        # Test
-forge build                            # Build
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude uses `tx.origin` for auth — use `msg.sender`
+- Claude forgets reentrancy guards — use OpenZeppelin ReentrancyGuard
+- Claude makes unchecked external calls — check return values
+- Claude uses unbounded loops — gas limit issues
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `foundry` | Modern dev framework | Truffle (legacy) |
+| `slither` | Security analysis | No security checks |
+| `mythril` | Symbolic execution | Just testing |
+| `openzeppelin` | Audited libraries | Custom implementations |
+| `certora`/`halmos` | Formal verification | Just fuzzing |
+
+## Patterns Claude Should Use
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract Vault is ReentrancyGuard, Ownable {
+    mapping(address => uint256) private balances;
+
+    // Checks-Effects-Interactions pattern
+    function withdraw(uint256 amount) external nonReentrant {
+        // Checks
+        require(balances[msg.sender] >= amount, "Insufficient");
+
+        // Effects (update state BEFORE external call)
+        balances[msg.sender] -= amount;
+
+        // Interactions (external call LAST)
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    // Never use tx.origin
+    function isOwner() internal view returns (bool) {
+        return msg.sender == owner();  // NOT tx.origin
+    }
+}
 ```
 
-## Tools (2024-2025)
-- **Foundry** - Modern development framework
-- **Slither** - Static analysis (security)
-- **Mythril** - Symbolic execution
-- **OpenZeppelin** - Audited contract libraries
-- **Hardhat** - Alternative JS ecosystem
+## Anti-Patterns Claude Generates
+- `tx.origin` for authentication — use `msg.sender`
+- External calls without reentrancy guard — use `nonReentrant`
+- Unchecked `.call()` return — always check success
+- Unbounded loops `for (i = 0; i < array.length; i++)` — gas griefing
+- Missing access control — use OpenZeppelin Access
 
-## Project Structure
-```
-project/
-├── src/               # Contracts (.sol)
-├── test/              # Foundry tests
-├── script/            # Deployment scripts
-├── lib/               # Dependencies
-└── foundry.toml       # Config
-```
-
-## Non-Negotiables
-1. Checks-Effects-Interactions pattern
-2. Reentrancy guards on external calls
-3. Use OpenZeppelin for standard patterns
-4. Professional audit before mainnet
-
-## Red Lines (Reject PR)
-- tx.origin for authentication
-- Unchecked external calls
-- Missing reentrancy protection
-- Delegatecall to untrusted contracts
-- Hardcoded addresses (use immutable)
-- Missing access control on critical functions
-
-## Testing Strategy
-- **Unit**: Foundry/Hardhat tests, 100% coverage
-- **Fuzz**: Foundry invariant testing
-- **Formal**: Certora or Halmos verification
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Reentrancy | Use ReentrancyGuard |
-| Integer overflow | Solidity 0.8+ has checks |
-| Front-running | Use commit-reveal |
-| Gas griefing | Limit external calls |
-
-## Performance Red Lines
-- No O(n^2) in gas-sensitive paths
-- No unbounded loops
-- No excessive storage writes
-
-## Security Checklist
-- [ ] All external calls checked
-- [ ] Access control on every public function
-- [ ] Secrets never on-chain
-- [ ] Audit completed before mainnet deploy
+## Version Gotchas
+- **Solidity 0.8+**: Built-in overflow checks
+- **Audit requirement**: Always before mainnet
+- **Checks-Effects-Interactions**: Update state before external calls
+- **Gas optimization**: Storage is expensive, use memory
+- **With upgrades**: Use OpenZeppelin Upgradeable contracts

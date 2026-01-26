@@ -1,68 +1,57 @@
 # MATLAB CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Critical Corrections
+- Claude grows arrays in loops — preallocate with zeros()
+- Claude uses eval() — avoid, use dynamic field names
+- Claude writes loops — vectorize operations
+- Claude uses global variables — pass as arguments
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `matlab r2024+` | Latest features | Old releases |
+| `code analyzer` | Built-in linting | No analysis |
+| `matlab unit test` | Testing | Ad-hoc scripts |
+| `parallel computing toolbox` | HPC | Serial code |
+| `matlab coder` | C/C++ generation | Manual translation |
+
+## Patterns Claude Should Use
 ```matlab
-% Daily workflow (MATLAB commands)
-% git status && git diff --stat        % In terminal
-checkcode('src/')                      % Lint (Code Analyzer)
-% Format: Use MATLAB Editor formatting
-runtests('tests/')                     % Test
-mcc -m src/main.m                      % Compile (optional)
-% git add -p && git commit -m "feat: x" % In terminal
+function result = processData(data, options)
+    % Input validation with arguments block
+    arguments
+        data (:,1) double
+        options.threshold (1,1) double = 0.5
+        options.method (1,:) char {mustBeMember(options.method, {'mean','median'})} = 'mean'
+    end
+
+    % Preallocate output
+    n = length(data);
+    result = zeros(n, 1);
+
+    % Vectorized operations (not loops)
+    mask = data > options.threshold;
+    result(mask) = data(mask) .^ 2;
+
+    % If loop needed, preallocate first
+    % NOT: for i = 1:n, result(i) = ..., end
+end
+
+% Use functions, not scripts
+% Use meaningful variable names, not single letters
 ```
 
-## Tools (2024-2025)
-- **MATLAB R2024+** - Latest release
-- **Code Analyzer** - Built-in linting
-- **MATLAB Unit Test** - Testing framework
-- **MATLAB Coder** - C/C++ code generation
-- **Parallel Computing Toolbox** - HPC
+## Anti-Patterns Claude Generates
+- Array growth: `result(i) = x` in loop — preallocate
+- `eval('varname')` — use dynamic field names
+- Loops instead of vectorization — use matrix ops
+- Global variables — pass as arguments
+- Scripts for reusable code — use functions
 
-## Project Structure
-```
-project/
-├── src/               # Source files (.m)
-├── tests/             # Test files
-├── data/              # Data files
-├── docs/              # Documentation
-└── startup.m          # Path setup
-```
-
-## Non-Negotiables
-1. Vectorized operations over loops
-2. Preallocate arrays before loops
-3. Use functions, not scripts, for reuse
-4. Input validation with arguments block
-
-## Red Lines (Reject PR)
-- Growing arrays in loops (preallocate!)
-- eval() with user input
-- Global variables
-- Missing input validation
-- Hardcoded file paths
-- Secrets in scripts
-
-## Testing Strategy
-- **Unit**: MATLAB Unit Test, <100ms
-- **Integration**: Full workflow tests
-- **Numerical**: Compare against reference
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Array growth in loops | Preallocate with zeros() |
-| Copy-on-write overhead | Use in-place operations |
-| Path dependencies | Use addpath in startup.m |
-| License contention | Check license availability |
-
-## Performance Red Lines
-- No O(n^2) in hot paths
-- No loop-based operations (vectorize)
-- No JIT-defeating patterns
-
-## Security Checklist
-- [ ] Input validated with arguments block
-- [ ] No eval/feval with user input
-- [ ] Secrets from environment (getenv)
-- [ ] File paths sanitized
+## Version Gotchas
+- **R2024+**: Arguments block validation
+- **Vectorization**: 10-100x faster than loops
+- **Column-major**: Access columns together, not rows
+- **Parallel**: Use `parfor` for embarrassingly parallel
+- **With Python**: Use py.* interface for Python calls

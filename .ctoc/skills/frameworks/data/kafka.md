@@ -1,86 +1,72 @@
 # Apache Kafka CTO
-> Distributed event streaming platform for real-time data pipelines.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name kafka -p 9092:9092 apache/kafka:latest
-kafka-topics.sh --create --topic events --bootstrap-server localhost:9092
-kafka-console-producer.sh --topic events --bootstrap-server localhost:9092
+# KRaft mode (no ZooKeeper required since Kafka 3.3+)
+docker run -d --name kafka -p 9092:9092 \
+  -e KAFKA_CFG_NODE_ID=1 \
+  -e KAFKA_CFG_PROCESS_ROLES=broker,controller \
+  -e KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+  bitnami/kafka:3.7
+
+# Client
+pip install confluent-kafka  # Recommended over kafka-python
 ```
 
-## Non-Negotiables
-1. Topic design aligned with access patterns and retention
-2. Partition keys for ordering guarantees within partition
-3. Schema Registry for producer/consumer contracts
-4. Idempotent producers (`enable.idempotence=true`)
-5. Consumer group offsets committed after processing
-6. Dead letter queues for failed message handling
+## Claude's Common Mistakes
+1. **Using ZooKeeper setup** - KRaft mode is default since 3.3+, ZK deprecated
+2. **acks=1 for critical data** - Use acks=all with idempotence for durability
+3. **Auto-commit without processing** - Leads to data loss on crash
+4. **No schema registry** - Deserialization errors cascade through pipeline
+5. **Restarting all consumers at once** - Causes rebalance storms
 
-## Red Lines
-- Unbounded consumer lag without alerting
-- Missing schema validation causing deserialization errors
-- At-most-once delivery for critical data
-- No dead letter queue for poison messages
-- Hardcoded bootstrap servers in code
-
-## Pattern: Reliable Event Processing
+## Correct Patterns (2026)
 ```python
 from confluent_kafka import Producer, Consumer
-from confluent_kafka.schema_registry import SchemaRegistryClient
-from confluent_kafka.schema_registry.avro import AvroSerializer, AvroDeserializer
 
-# Producer with idempotence
-producer_config = {
+# Idempotent producer (exactly-once semantics)
+producer = Producer({
     'bootstrap.servers': 'localhost:9092',
     'enable.idempotence': True,
     'acks': 'all',
-    'retries': 5,
-}
-producer = Producer(producer_config)
+    'linger.ms': 5,        # Batch for throughput (min 5ms recommended)
+    'compression.type': 'zstd',
+})
 
-def delivery_callback(err, msg):
+def delivery_report(err, msg):
     if err:
-        print(f"Delivery failed: {err}")
-    else:
-        print(f"Delivered to {msg.topic()}[{msg.partition()}]")
+        logger.error(f"Delivery failed: {err}")
 
-producer.produce('events', key='user-123', value=event_bytes, callback=delivery_callback)
+producer.produce('events', key='user-123', value=data, callback=delivery_report)
 producer.flush()
 
-# Consumer with manual commit
-consumer_config = {
+# Consumer with manual commit (at-least-once)
+consumer = Consumer({
     'bootstrap.servers': 'localhost:9092',
-    'group.id': 'event-processors',
+    'group.id': 'processors',
     'auto.offset.reset': 'earliest',
     'enable.auto.commit': False,
-}
-consumer = Consumer(consumer_config)
-consumer.subscribe(['events'])
+    'partition.assignment.strategy': 'cooperative-sticky',
+    'group.instance.id': 'processor-1',  # Static membership
+})
 
+consumer.subscribe(['events'])
 while True:
     msg = consumer.poll(1.0)
     if msg and not msg.error():
         process(msg)
-        consumer.commit(msg)  # Commit after successful processing
+        consumer.commit(msg)  # Commit AFTER processing
 ```
 
-## Integrates With
-- **Processing**: Flink, Spark Streaming, ksqlDB
-- **Schema**: Confluent Schema Registry, Apicurio
-- **Monitoring**: Kafka Manager, Confluent Control Center
+## Version Gotchas
+- **v3.3+**: KRaft mode GA; ZooKeeper deprecated
+- **v3.7**: Improved consumer rebalance, tiered storage GA
+- **confluent-kafka vs kafka-python**: confluent-kafka is faster, maintained
+- **Schema Registry**: Required for Avro/Protobuf; prevents breaking changes
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `LEADER_NOT_AVAILABLE` | Wait for topic creation or check broker health |
-| `OffsetOutOfRange` | Reset consumer offset or check retention |
-| `SerializationError` | Verify schema compatibility in registry |
-| `ConsumerGroupRebalance` frequent | Increase `session.timeout.ms` |
-
-## Prod Ready
-- [ ] Schema Registry for all topics
-- [ ] Consumer lag monitoring and alerting
-- [ ] Dead letter queue configured
-- [ ] Idempotent producers enabled
-- [ ] Partition count matched to parallelism
+## What NOT to Do
+- Do NOT use ZooKeeper mode for new deployments
+- Do NOT use acks=0 or acks=1 for critical data
+- Do NOT restart all consumers simultaneously (rebalance storm)
+- Do NOT skip schema registry (silent data corruption)

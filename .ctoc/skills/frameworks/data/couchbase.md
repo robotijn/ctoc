@@ -1,90 +1,59 @@
 # Couchbase CTO
-> Distributed NoSQL with SQL++ (N1QL) and built-in caching.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name couchbase -p 8091:8091 -p 11210:11210 couchbase:enterprise
-curl http://localhost:8091/pools
-cbq -u Administrator -p password -e "SELECT * FROM system:keyspaces"
+docker run -d --name couchbase -p 8091-8096:8091-8096 -p 11210:11210 couchbase:enterprise-7.2
+# Web console at http://localhost:8091
+# Python SDK
+pip install couchbase
 ```
 
-## Non-Negotiables
-1. Document modeling with type prefixes
-2. N1QL queries with proper indexes
-3. Global Secondary Indexes (GSI) for query patterns
-4. Prepared statements for repeated queries
-5. Memory quotas sized appropriately
-6. XDCR for cross-datacenter replication
+## Claude's Common Mistakes
+1. **Missing GSI indexes** - Full bucket scans without indexes
+2. **No prepared statements** - Prevents query plan caching
+3. **Document design without type** - Use type field for filtering
+4. **Large documents (>20MB)** - Exceeds practical limits
+5. **Ignoring N1QL explain** - Check index usage before production
 
-## Red Lines
-- Full bucket scans without indexes
-- Missing GSI on query predicates
-- No prepared statements for hot queries
-- Ignoring bucket memory quotas
-- Large documents exceeding 20MB
-
-## Pattern: Document Model and Queries
+## Correct Patterns (2026)
 ```sql
--- Document design with type prefix
+-- Document key design: type::id
 -- Key: "user::123"
 {
   "type": "user",
-  "id": "123",
   "email": "alice@example.com",
-  "name": "Alice",
-  "createdAt": "2024-01-15T10:00:00Z"
+  "name": "Alice"
 }
 
--- Key: "order::456"
-{
-  "type": "order",
-  "id": "456",
-  "userId": "123",
-  "items": [...],
-  "total": 299.99,
-  "status": "pending"
-}
-
--- Create GSI for common queries
+-- Create GSI for queries (REQUIRED)
 CREATE INDEX idx_users_email ON bucket(email) WHERE type = "user";
 CREATE INDEX idx_orders_user ON bucket(userId, createdAt DESC) WHERE type = "order";
 
--- Prepared statement for user lookup
+-- Prepared statement for hot queries
 PREPARE user_by_email AS
 SELECT META().id, * FROM bucket
 WHERE type = "user" AND email = $email;
 
--- Execute prepared statement
 EXECUTE user_by_email USING {"email": "alice@example.com"};
 
--- N1QL query with proper index usage
+-- N1QL with proper index usage
 SELECT o.*, u.name AS customerName
 FROM bucket o
 JOIN bucket u ON KEYS "user::" || o.userId
-WHERE o.type = "order"
-  AND o.status = "pending"
-  AND o.createdAt > "2024-01-01"
+WHERE o.type = "order" AND o.status = "pending"
 ORDER BY o.createdAt DESC
 LIMIT 20;
 ```
 
-## Integrates With
-- **SDKs**: Official SDKs for Java, .NET, Node.js, Python, Go
-- **Cache**: Built-in memcached protocol support
+## Version Gotchas
+- **v7.2+**: Vector search support, improved SQL++ (N1QL)
+- **Capella**: Managed cloud service with auto-scaling
+- **Eventing**: Server-side functions for triggers
 - **Mobile**: Couchbase Lite for offline-first apps
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `No index available` | Create GSI covering query |
-| `Timeout` on query | Optimize query or add index |
-| `Bucket memory quota exceeded` | Increase quota or evict data |
-| `XDCR replication lag` | Check network and cluster health |
-
-## Prod Ready
-- [ ] GSI indexes for all query patterns
-- [ ] Prepared statements for hot paths
-- [ ] Memory quotas configured
-- [ ] XDCR for disaster recovery
-- [ ] Monitoring via Admin Console
+## What NOT to Do
+- Do NOT query without GSI indexes (full bucket scan)
+- Do NOT skip prepared statements for repeated queries
+- Do NOT store documents >20MB
+- Do NOT ignore EXPLAIN output for queries

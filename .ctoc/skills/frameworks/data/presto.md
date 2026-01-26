@@ -1,37 +1,27 @@
 # Presto CTO
-> Interactive distributed SQL query engine for big data analytics.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-docker run -d --name presto -p 8080:8080 prestodb/presto
-presto --server localhost:8080 --catalog hive --schema default
-presto --execute "SHOW CATALOGS"
+docker run -d --name presto -p 8080:8080 prestodb/presto:0.287
+# CLI
+presto --server localhost:8080 --catalog hive
 ```
 
-## Non-Negotiables
-1. Connector setup with proper properties
-2. Query scheduling and prioritization
-3. Spill to disk for memory-intensive queries
-4. Session properties tuned per workload
-5. Coordinator/worker sizing balanced
-6. Query profiling with EXPLAIN
+## Claude's Common Mistakes
+1. **Confusing Presto and Trino** - Different projects since 2020 fork
+2. **No spill to disk** - Large queries fail without spill enabled
+3. **Missing memory limits** - Causes cluster instability
+4. **Ignoring EXPLAIN** - Essential for understanding query plan
+5. **Unbounded result sets** - Always use LIMIT for exploratory queries
 
-## Red Lines
-- Cartesian joins without explicit CROSS JOIN
-- Missing connector properties for optimization
-- No memory limits causing cluster instability
-- Large unbounded result sets to client
-- Ignoring EXPLAIN output
-
-## Pattern: Production Query Optimization
+## Correct Patterns (2026)
 ```sql
 -- Session configuration for large queries
 SET SESSION query_max_memory_per_node = '2GB';
 SET SESSION spill_enabled = true;
-SET SESSION task_concurrency = 8;
 
--- Efficient aggregation with proper grouping
+-- Efficient aggregation with partition pruning
 SELECT
     date_trunc('day', created_at) AS date,
     status,
@@ -39,54 +29,38 @@ SELECT
     sum(total) AS revenue
 FROM hive.analytics.orders
 WHERE created_at >= DATE '2024-01-01'
-GROUP BY 1, 2
-ORDER BY 1, 2;
+GROUP BY 1, 2;
 
 -- Use EXPLAIN for query planning
 EXPLAIN (TYPE DISTRIBUTED)
-SELECT * FROM hive.analytics.events
-WHERE event_date = '2024-01-15';
+SELECT * FROM hive.analytics.events WHERE event_date = '2024-01-15';
 
 -- Approximate aggregation for large datasets
 SELECT
     approx_distinct(user_id) AS unique_users,
     approx_percentile(latency, 0.99) AS p99_latency
-FROM hive.analytics.requests
-WHERE request_date >= DATE '2024-01-01';
+FROM hive.analytics.requests;
 
--- Efficient join with partition pruning
-SELECT o.id, o.total, c.name
-FROM hive.analytics.orders o
-JOIN hive.analytics.customers c ON o.customer_id = c.id
-WHERE o.order_date >= DATE '2024-01-01'  -- Pushes filter to scan
-  AND o.status = 'completed';
+-- Always LIMIT exploratory queries
+SELECT * FROM large_table LIMIT 100;
 ```
 
 ```properties
-# config.properties for worker
+# config.properties
 query.max-memory=50GB
 query.max-memory-per-node=4GB
-query.max-total-memory-per-node=6GB
 spill-enabled=true
 spiller-spill-path=/tmp/presto/spill
 ```
 
-## Integrates With
-- **Data Lakes**: Hive, Iceberg, Delta Lake
-- **Databases**: MySQL, PostgreSQL, MongoDB
-- **Storage**: S3, HDFS, GCS
+## Version Gotchas
+- **Presto vs Trino**: Presto is Facebook/Meta fork; Trino is community fork
+- **PrestoDB vs PrestoSQL**: PrestoSQL renamed to Trino in 2020
+- **Spill to disk**: Required for queries exceeding memory
+- **Velox**: Meta's new vectorized execution engine for Presto
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Query exceeded per-node memory limit` | Enable spill or increase limit |
-| `Insufficient resources` | Check worker availability |
-| `Task failed` | Review query complexity, add limits |
-| `Connector error` | Verify connector configuration |
-
-## Prod Ready
-- [ ] Connectors configured for all sources
-- [ ] Memory limits per node set
-- [ ] Spill to disk enabled
-- [ ] Resource groups for isolation
-- [ ] Monitoring via JMX/Prometheus
+## What NOT to Do
+- Do NOT confuse Presto with Trino (different projects)
+- Do NOT run without spill enabled (large query failures)
+- Do NOT skip memory limits (cluster instability)
+- Do NOT query without LIMIT for exploration

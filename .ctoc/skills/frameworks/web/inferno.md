@@ -1,34 +1,26 @@
 # Inferno CTO
-> Fastest React-like library - extreme performance, small footprint, React compatibility.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 npm create vite@latest myapp -- --template inferno-ts
-npm run dev
-npm run build && npm run preview
+cd myapp && npm install && npm run dev
+# Inferno 8.x - fastest React-like library
 ```
 
-## Non-Negotiables
-1. Functional components with hooks
-2. inferno-hooks for state management
-3. Linked state for form handling
-4. Proper key usage in lists
-5. Avoid unnecessary re-renders
+## Claude's Common Mistakes
+1. **Using React patterns directly** — Use `linkEvent` for performance
+2. **Inline functions in JSX** — Creates closures on every render
+3. **Missing keys in lists** — Required for virtual DOM diffing
+4. **Forgetting inferno-compat** — Needed for React library compatibility
+5. **Class components by default** — Prefer functional with hooks
 
-## Red Lines
-- Class components when functional works
-- Missing keys in dynamic lists
-- Large component trees without splitting
-- React compat layer overhead when not needed
-- Inline functions causing re-renders
-
-## Pattern: Component with Hooks
+## Correct Patterns (2026)
 ```jsx
 import { useState, useEffect } from 'inferno-hooks';
 import { linkEvent } from 'inferno';
 
-// Event handler pattern - avoids closure allocation
+// linkEvent pattern - avoids closure allocation
 function handleClick(instance, event) {
   instance.setCount(c => c + 1);
 }
@@ -39,6 +31,7 @@ function Counter({ initialCount = 0 }) {
   return (
     <div class="counter">
       <span>Count: {count}</span>
+      {/* Use linkEvent (NOT inline arrow functions) */}
       <button onClick={linkEvent({ setCount }, handleClick)}>
         Increment
       </button>
@@ -64,21 +57,27 @@ function UserList() {
 
   return (
     <ul>
+      {/* ALWAYS include key */}
       {users.map(user => (
         <li key={user.id}>{user.name}</li>
       ))}
     </ul>
   );
 }
-
-export { Counter, UserList };
 ```
 
-## Integrates With
-- **State**: inferno-hooks, inferno-mobx
-- **Router**: inferno-router
-- **Build**: Vite, Webpack, Rollup
-- **Compat**: inferno-compat for React libs
+## Version Gotchas
+- **Inferno 8.x**: Hooks via inferno-hooks; functional preferred
+- **linkEvent**: Performance optimization; avoids closure allocation
+- **inferno-compat**: Required for React library compatibility
+- **class vs className**: Use `class` (not `className`)
+
+## What NOT to Do
+- ❌ `onClick={() => setCount(count + 1)}` — Use `linkEvent`
+- ❌ Missing `key` in lists — Breaks virtual DOM diffing
+- ❌ `className` attribute — Use `class` in Inferno
+- ❌ React libraries without compat — Install `inferno-compat`
+- ❌ Class components — Use functional with hooks
 
 ## Common Errors
 | Error | Fix |
@@ -87,11 +86,3 @@ export { Counter, UserList };
 | `Missing key warning` | Add unique key to list items |
 | `Infinite loop` | Check useEffect dependencies |
 | `React lib not working` | Install inferno-compat |
-
-## Prod Ready
-- [ ] Production build optimized
-- [ ] linkEvent for performance-critical handlers
-- [ ] Code splitting configured
-- [ ] Bundle size analyzed
-- [ ] Server-side rendering (inferno-server)
-- [ ] Error boundaries in place

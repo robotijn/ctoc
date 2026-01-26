@@ -1,67 +1,48 @@
 # Python CTO
-> 20+ years experience. Adamant about quality. Ships production code.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
-```bash
-# Daily workflow
-git status && git diff --stat          # Check state
-ruff check . --fix                     # Lint (auto-fix)
-ruff format .                          # Format
-pytest -v --cov=src --cov-report=term  # Test with coverage
-python -m build                        # Build package
-git add -p && git commit -m "feat: x"  # Commit
+## Critical Corrections
+- Claude suggests `pip install` — use `uv` instead (10-100x faster)
+- Claude uses old `setup.py` patterns — use `pyproject.toml` (PEP 621)
+- Claude forgets free-threaded Python exists (3.13t/3.14t) for true parallelism
+- Claude defaults to `requirements.txt` — prefer `uv.lock` for reproducibility
+
+## Current Tooling (2026)
+| Tool | Use | NOT |
+|------|-----|-----|
+| `uv` | Package management, venvs | `pip`, `pipenv`, `poetry` |
+| `ruff` | Lint + format (one tool) | `flake8` + `black` + `isort` |
+| `mypy --strict` | Type checking | Skipping types |
+| `pytest-cov` | Testing | `unittest` alone |
+| `python3.14t` | Free-threaded builds | GIL-bound threading |
+
+## Patterns Claude Should Use
+```python
+# Modern Python 3.14+ patterns
+from typing import Self
+
+class Config:
+    def with_timeout(self, timeout: int) -> Self:
+        self.timeout = timeout
+        return self
+
+# Use structural pattern matching
+match response.status:
+    case 200: handle_success(response)
+    case 404: raise NotFound()
+    case _: raise UnexpectedStatus(response.status)
 ```
 
-## Tools (2024-2025)
-- **uv** - Package management (10-100x faster than pip)
-- **Ruff** - Lint + format (replaces flake8, black, isort)
-- **mypy** - Type checking (strict mode always)
-- **pytest** - Testing with pytest-cov for coverage
-- **bandit** - Security vulnerability scanning
-
-## Project Structure
-```
-project/
-├── src/project/       # Production code (src layout)
-├── tests/             # Test files mirror src/
-├── docs/              # Documentation
-├── pyproject.toml     # Project config (PEP 621)
-└── .python-version    # Python version (pyenv/uv)
-```
-
-## Non-Negotiables
-1. Type hints everywhere - no untyped public APIs
-2. No bare except - always specific exceptions
-3. Context managers for resources (files, connections)
-4. Tests for business logic (>80% coverage)
-
-## Red Lines (Reject PR)
-- `eval()` or `exec()` with user input
-- SQL string concatenation (use parameterized queries)
-- Mutable default arguments `def f(items=[]):`
-- Secrets hardcoded in code
+## Anti-Patterns Claude Generates
+- `def f(items=[]):` — mutable default argument
+- `except:` or `except Exception:` — swallows everything
+- `import *` — pollutes namespace
 - Missing `if __name__ == "__main__":` guard
+- `os.system()` — use `subprocess.run()` with shell=False
 
-## Testing Strategy
-- **Unit**: Pure functions, <100ms, mock I/O boundaries
-- **Integration**: Real database, containers via testcontainers
-- **E2E**: Critical user flows with pytest-playwright
-
-## Common Pitfalls
-| Pitfall | Fix |
-|---------|-----|
-| Late binding in closures | Use default args `lambda x=x: x` |
-| Global state mutation | Use dependency injection |
-| Import cycles | Restructure or TYPE_CHECKING imports |
-| Silent failures in threads | Use concurrent.futures with exceptions |
-
-## Performance Red Lines
-- No O(n^2) in hot paths (check nested loops)
-- No unbounded memory (use generators for large data)
-- No blocking I/O in async code (use aiofiles, asyncpg)
-
-## Security Checklist
-- [ ] Input validated with Pydantic
-- [ ] Outputs sanitized (XSS, injection)
-- [ ] Secrets from environment (python-dotenv)
-- [ ] Dependencies audited (`pip-audit` or `uv pip audit`)
+## Version Gotchas
+- **3.14**: Current stable (Jan 2026), free-threaded mode (`python3.14t`), improved error messages
+- **3.13**: Free-threaded mode (`python3.13t`), requires `pip>=24.1` for C extensions
+- **3.12**: f-string parser rewrite, may break edge cases
+- **With asyncio**: Never `time.sleep()` — use `await asyncio.sleep()`
+- **With typing**: Use `X | Y` not `Union[X, Y]` (3.10+)

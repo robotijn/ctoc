@@ -1,29 +1,25 @@
 # Pulumi CTO
-> Infrastructure-as-code leader demanding real programming languages with type-safe resource management.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
-pulumi new typescript --name myinfra
-pulumi preview --diff
-pulumi up --yes && pulumi stack export > backup.json
+# Install CLI
+curl -fsSL https://get.pulumi.com | sh
+# Or specific version
+curl -fsSL https://get.pulumi.com | sh -s -- --version 3.217.0
+# Create new project
+pulumi new typescript
+# Python requires 3.10+
 ```
 
-## Non-Negotiables
-1. Stack organization for environment separation (dev/staging/prod)
-2. Component resources for abstraction and reusability
-3. Config and secrets via pulumi config with encryption
-4. Remote state backend (Pulumi Cloud, S3, or Azure Blob)
-5. Policy as Code with CrossGuard for compliance
+## Claude's Common Mistakes
+1. **Hardcodes secrets in code** - Must use pulumi.secret() or config
+2. **Uses local state for production** - Remote backend required
+3. **Missing stack outputs** - Breaks cross-stack references
+4. **Skips preview before up** - Changes without review
+5. **Uses Pulumi 2.x patterns** - v3 has breaking changes
 
-## Red Lines
-- Hardcoded secrets in code - use pulumi.secret() or config
-- Local state files in production - remote backend required
-- Missing stack outputs for cross-stack references
-- No component abstractions for repeated patterns
-- Ignoring preview before up - always review changes
-
-## Pattern: Component Resource with Config
+## Correct Patterns (2026)
 ```typescript
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
@@ -33,13 +29,16 @@ interface WebAppArgs {
   environment: string;
 }
 
+// Component resource for reusability
 class WebApp extends pulumi.ComponentResource {
   public readonly url: pulumi.Output<string>;
+  public readonly instanceId: pulumi.Output<string>;
 
   constructor(name: string, args: WebAppArgs, opts?: pulumi.ComponentResourceOptions) {
     super("custom:app:WebApp", name, {}, opts);
 
     const config = new pulumi.Config();
+    // Secrets handled properly
     const dbPassword = config.requireSecret("dbPassword");
 
     const instance = new aws.ec2.Instance(`${name}-server`, {
@@ -48,32 +47,36 @@ class WebApp extends pulumi.ComponentResource {
       tags: {
         Environment: args.environment,
         ManagedBy: "Pulumi",
+        Name: name,
       },
     }, { parent: this });
 
     this.url = pulumi.interpolate`http://${instance.publicIp}`;
-    this.registerOutputs({ url: this.url });
+    this.instanceId = instance.id;
+
+    // Register outputs for stack references
+    this.registerOutputs({
+      url: this.url,
+      instanceId: this.instanceId,
+    });
   }
 }
 
-export const app = new WebApp("myapp", { environment: pulumi.getStack() });
+// Usage
+const app = new WebApp("myapp", { environment: pulumi.getStack() });
 export const appUrl = app.url;
+export const instanceId = app.instanceId;
 ```
 
-## Integrates With
-- **DB**: RDS/CloudSQL resources with secret config for passwords
-- **Auth**: IAM roles/policies as code with least privilege
-- **Cache**: ElastiCache/Memorystore with security group rules
+## Version Gotchas
+- **Pulumi 3.x**: Python 3.10+ required
+- **Pulumi v1/v2**: No longer supported, migrate to v3
+- **State backends**: Pulumi Cloud, S3, Azure Blob, GCS supported
+- **With CrossGuard**: Policy as Code for compliance
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `error: resource already exists` | Import existing resource with `pulumi import` |
-| `secret config value required` | Set with `pulumi config set --secret KEY VALUE` |
-| `checkpoint file locked` | Cancel pending operation with `pulumi cancel` |
-
-## Prod Ready
-- [ ] Stack policies enforced via CrossGuard
-- [ ] Drift detection enabled with scheduled previews
-- [ ] State backed up with stack export automation
-- [ ] CI/CD pipeline uses service principal, not personal tokens
+## What NOT to Do
+- Do NOT hardcode secrets - use `pulumi.secret()` or config
+- Do NOT use local state in production - use remote backend
+- Do NOT skip `pulumi preview` before `pulumi up`
+- Do NOT forget stack outputs for cross-stack references
+- Do NOT use v1/v2 patterns - migrate to v3

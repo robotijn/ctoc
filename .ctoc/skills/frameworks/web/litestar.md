@@ -1,34 +1,27 @@
 # Litestar CTO
-> Modern Python ASGI framework - fast, typed, batteries included.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install litestar uvicorn
 uvicorn main:app --reload
-pytest tests/ -v
+# Litestar 2.x - modern Python ASGI framework
 ```
 
-## Non-Negotiables
-1. DTO pattern for request/response I/O
-2. Dependency injection for services
-3. OpenAPI documentation auto-generated
-4. Layered architecture with controllers
-5. Msgspec for high-performance serialization
+## Claude's Common Mistakes
+1. **Using FastAPI patterns** — Litestar has different conventions
+2. **Missing DTOs** — Always define input/output schemas
+3. **Skipping dependency injection** — Use `Provide()` for services
+4. **Controller-less routes** — Use Controller classes for organization
+5. **Ignoring msgspec** — Faster than Pydantic for serialization
 
-## Red Lines
-- Missing DTOs - always define input/output schemas
-- Skipping dependency injection - no manual instantiation
-- Blocking operations in async handlers
-- No input validation
-- Ignoring Litestar patterns for FastAPI habits
-
-## Pattern: Controller with DTOs
+## Correct Patterns (2026)
 ```python
 from dataclasses import dataclass
 from litestar import Litestar, Controller, get, post
 from litestar.di import Provide
 from litestar.dto import DataclassDTO
+from litestar.exceptions import NotFoundException
 
 @dataclass
 class CreateUserDTO:
@@ -60,6 +53,7 @@ class UserController(Controller):
             raise NotFoundException("User not found")
         return UserResponseDTO(id=user.id, email=user.email)
 
+# Dependency provider
 async def get_user_service(state: State) -> UserService:
     return UserService(state.db)
 
@@ -69,24 +63,23 @@ app = Litestar(
 )
 ```
 
-## Integrates With
-- **DB**: SQLAlchemy async, Tortoise ORM
-- **Auth**: `litestar-jwt` or custom guards
-- **Validation**: Msgspec or Pydantic DTOs
-- **Docs**: Built-in OpenAPI with Swagger/Redoc
+## Version Gotchas
+- **Litestar 2.x**: Renamed from Starlite; different from FastAPI
+- **DTOs**: Required for proper request/response handling
+- **Dependency Injection**: Use `Provide()`, not FastAPI's `Depends()`
+- **Controllers**: Organize routes into Controller classes
+
+## What NOT to Do
+- ❌ FastAPI patterns — Litestar has its own conventions
+- ❌ Missing DTOs — Always define schemas
+- ❌ `Depends()` — Use `Provide()` for DI
+- ❌ Flat route handlers — Use Controller classes
+- ❌ Pydantic by default — Consider msgspec for performance
 
 ## Common Errors
 | Error | Fix |
 |-------|-----|
 | `ValidationException` | Check DTO matches request body |
-| `NotFoundException` | Raise proper exception, don't return None |
-| `Dependency not found` | Add to controller `dependencies` dict |
-| `Serialization error` | Check DTO is properly decorated |
-
-## Prod Ready
-- [ ] DTOs for all endpoints
-- [ ] Guards for authentication
-- [ ] Exception handlers configured
-- [ ] OpenAPI documented
-- [ ] Health check endpoint
-- [ ] Structured logging enabled
+| `Dependency not found` | Add to controller `dependencies` |
+| `Serialization error` | Add proper DTO decorators |
+| `NotFoundException` | Raise exception, don't return None |

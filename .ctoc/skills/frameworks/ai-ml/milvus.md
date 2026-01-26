@@ -1,40 +1,30 @@
 # Milvus CTO
-> Scalable vector database for enterprise AI workloads.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
 pip install pymilvus
-# Start with Docker Compose
-wget https://github.com/milvus-io/milvus/releases/download/v2.4.0/milvus-standalone-docker-compose.yml -O docker-compose.yml
-docker-compose up -d
-python -c "from pymilvus import connections; connections.connect(); print('OK')"
+# Docker Compose:
+# wget https://github.com/milvus-io/milvus/releases/download/v2.4/milvus-standalone-docker-compose.yml
+# docker-compose up -d
+# Verify: python -c "from pymilvus import connections; connections.connect(); print('OK')"
 ```
 
-## Non-Negotiables
-1. Explicit collection schema definition
-2. Appropriate index type selection (IVF, HNSW)
-3. Partition strategy for data organization
-4. Proper consistency level for use case
-5. Resource management and limits
-6. Index creation after bulk inserts
+## Claude's Common Mistakes
+1. Not loading collection before search
+2. Creating index before bulk insert (slow)
+3. Using FLAT index for large datasets
+4. Wrong consistency level causing stale reads
+5. Missing partition strategy for time-series data
 
-## Red Lines
-- Flat index for large datasets (use IVF/HNSW)
-- Missing partitions for time-series data
-- Wrong consistency level causing stale reads
-- No index creation after insert
-- Ignoring segment size configuration
-- Not loading collection before search
-
-## Pattern: Production Vector Store
+## Correct Patterns (2026)
 ```python
 from pymilvus import (
     connections, Collection, FieldSchema, CollectionSchema,
     DataType, utility
 )
 
-# Connect to Milvus
+# Connect
 connections.connect(host="localhost", port="19530")
 
 # Define schema
@@ -43,55 +33,40 @@ fields = [
     FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
     FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=1536),
     FieldSchema(name="category", dtype=DataType.VARCHAR, max_length=256),
-    FieldSchema(name="timestamp", dtype=DataType.INT64),
 ]
-
 schema = CollectionSchema(fields, description="Document embeddings")
 
 # Create collection with partitions
 collection = Collection("documents", schema)
+collection.create_partition("2026_q1")
+collection.create_partition("2026_q2")
 
-# Create partitions for data organization
-collection.create_partition("docs_2024")
-collection.create_partition("docs_2023")
+# Bulk insert BEFORE creating index
+data = [texts, embeddings, categories]
+collection.insert(data, partition_name="2026_q1")
 
-# Bulk insert data
-data = [
-    texts,      # VARCHAR field
-    embeddings, # FLOAT_VECTOR field
-    categories, # VARCHAR field
-    timestamps, # INT64 field
-]
-collection.insert(data, partition_name="docs_2024")
+# Create index AFTER bulk insert
+collection.create_index(
+    "embedding",
+    {
+        "index_type": "HNSW",  # Best for recall, or IVF_FLAT for large scale
+        "metric_type": "COSINE",
+        "params": {"M": 16, "efConstruction": 256}
+    }
+)
 
-# Create index after bulk insert
-index_params = {
-    "index_type": "IVF_FLAT",
-    "metric_type": "COSINE",
-    "params": {"nlist": 1024}
-}
-# Or use HNSW for better recall
-index_params_hnsw = {
-    "index_type": "HNSW",
-    "metric_type": "COSINE",
-    "params": {"M": 16, "efConstruction": 256}
-}
-
-collection.create_index("embedding", index_params_hnsw)
-
-# Load collection into memory before search
+# MUST load collection before search
 collection.load()
 
-# Search with expression filter
+# Search with partition and filter
 results = collection.search(
     data=[query_embedding],
     anns_field="embedding",
     param={"metric_type": "COSINE", "params": {"ef": 128}},
     limit=10,
-    expr="category == 'api' and timestamp > 1704067200",
-    output_fields=["text", "category"],
-    partition_names=["docs_2024"],
-    consistency_level="Strong",
+    expr="category == 'api'",
+    partition_names=["2026_q1"],
+    consistency_level="Strong",  # Or "Eventually" for speed
 )
 
 # Release when done
@@ -99,24 +74,15 @@ collection.release()
 connections.disconnect("default")
 ```
 
-## Integrates With
-- **Embeddings**: OpenAI, HuggingFace, custom
-- **Frameworks**: LangChain, LlamaIndex, Haystack
-- **Deployment**: Docker, Kubernetes, Milvus Cloud
-- **Storage**: S3, MinIO, local
+## Version Gotchas
+- **Index timing**: Create AFTER bulk insert, not before
+- **Load required**: Must call `collection.load()` before search
+- **Consistency**: "Strong" for accuracy, "Eventually" for speed
+- **Partitions**: Use for time-series or categorical data
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Collection not loaded` | Call collection.load() before search |
-| `Index not found` | Create index with create_index() |
-| `Dimension mismatch` | Check embedding dim matches schema |
-| `Expression syntax error` | Use proper filter syntax with quotes |
-
-## Prod Ready
-- [ ] Schema explicitly defined
-- [ ] Index created after bulk inserts
-- [ ] Partitions organize time-series data
-- [ ] Collection loaded before search
-- [ ] Consistency level appropriate
-- [ ] Resource limits configured
+## What NOT to Do
+- Do NOT search without calling `collection.load()` first
+- Do NOT create index before bulk insert
+- Do NOT use FLAT index for collections > 100K vectors
+- Do NOT forget to release collections when done
+- Do NOT ignore partitions for large time-series data

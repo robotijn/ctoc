@@ -1,40 +1,32 @@
 # Unsloth CTO
-> 2x faster LLM fine-tuning with 80% less memory.
+> Claude Code correction guide. Updated January 2026.
 
-## Commands
+## Installation (CURRENT - January 2026)
 ```bash
-# Setup | Dev | Test
+# Standard installation
+pip install unsloth
+# With all dependencies:
 pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
 pip install --no-deps xformers trl peft accelerate bitsandbytes
-python -c "from unsloth import FastLanguageModel; print('OK')"
+# Requires NVIDIA GPU (consumer GPUs work with 3GB+ VRAM)
 ```
 
-## Non-Negotiables
-1. Use only supported model architectures
-2. Enable 4-bit quantization for memory efficiency
-3. Enable gradient checkpointing for large models
-4. Configure LoRA properly for fine-tuning
-5. Export to GGUF for deployment
-6. Use appropriate sequence length
+## Claude's Common Mistakes
+1. Using unsupported model architectures
+2. Disabling Unsloth's optimized gradient checkpointing
+3. Wrong sequence length causing OOM
+4. Not using Unsloth's training loop optimizations
+5. Skipping GGUF export for deployment
 
-## Red Lines
-- Using unsupported model architectures
-- Disabling gradient checkpointing for large models
-- Wrong sequence length causing memory issues
-- Not using Unsloth's optimized training loop
-- Ignoring export format for deployment
-- Skipping validation after training
-
-## Pattern: Production Fine-Tuning
+## Correct Patterns (2026)
 ```python
 from unsloth import FastLanguageModel
 from trl import SFTTrainer
 from transformers import TrainingArguments
-from datasets import load_dataset
 
-# Load model with Unsloth optimizations
+# Load model with Unsloth optimizations (2x faster, 70% less VRAM)
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="unsloth/Meta-Llama-3.1-8B-bnb-4bit",
+    model_name="unsloth/Meta-Llama-3.1-8B-bnb-4bit",  # Use Unsloth's optimized models
     max_seq_length=2048,
     dtype=None,  # Auto-detect
     load_in_4bit=True,
@@ -49,68 +41,41 @@ model = FastLanguageModel.get_peft_model(
     lora_alpha=16,
     lora_dropout=0,
     bias="none",
-    use_gradient_checkpointing="unsloth",  # Optimized checkpointing
+    use_gradient_checkpointing="unsloth",  # CRITICAL: Unsloth's optimized version
     random_state=42,
 )
 
-# Prepare dataset
-def formatting_func(examples):
-    return [f"### Instruction:\n{inst}\n### Response:\n{resp}"
-            for inst, resp in zip(examples["instruction"], examples["response"])]
-
-dataset = load_dataset("your-dataset", split="train")
-
-# Training with Unsloth optimizations
+# Train with SFTTrainer
 trainer = SFTTrainer(
     model=model,
     tokenizer=tokenizer,
     train_dataset=dataset,
-    formatting_func=formatting_func,
     max_seq_length=2048,
-    dataset_num_proc=2,
     args=TrainingArguments(
         output_dir="outputs",
         per_device_train_batch_size=2,
         gradient_accumulation_steps=4,
-        warmup_steps=5,
-        num_train_epochs=1,
         learning_rate=2e-4,
         fp16=not FastLanguageModel.is_bfloat16_supported(),
         bf16=FastLanguageModel.is_bfloat16_supported(),
-        logging_steps=1,
         optim="adamw_8bit",
-        seed=42,
     ),
 )
-
 trainer.train()
 
-# Save LoRA adapter
-model.save_pretrained("lora_model")
-tokenizer.save_pretrained("lora_model")
-
-# Export to GGUF for llama.cpp
+# Export to GGUF for llama.cpp/Ollama
 model.save_pretrained_gguf("model", tokenizer, quantization_method="q4_k_m")
 ```
 
-## Integrates With
-- **Training**: TRL, Transformers
-- **Models**: LLaMA, Mistral, Phi, Gemma
-- **Export**: GGUF, vLLM, Ollama
-- **Quantization**: bitsandbytes 4-bit
+## Version Gotchas
+- **2026**: Supports 89K context for Llama 3.3 70B on 80GB GPU
+- **Models**: Use `unsloth/*-bnb-4bit` versions for best results
+- **Checkpointing**: Must use `use_gradient_checkpointing="unsloth"`
+- **Export**: GGUF for llama.cpp, GGML deprecated
 
-## Common Errors
-| Error | Fix |
-|-------|-----|
-| `Model not supported` | Check Unsloth supported models list |
-| `CUDA out of memory` | Reduce max_seq_length, batch size |
-| `Slow training` | Ensure using Unsloth's FastLanguageModel |
-| `GGUF export failed` | Install llama.cpp dependencies |
-
-## Prod Ready
-- [ ] Model is Unsloth-supported
-- [ ] 4-bit quantization enabled
-- [ ] Gradient checkpointing set to "unsloth"
-- [ ] LoRA configured properly
-- [ ] GGUF exported for deployment
-- [ ] Training validated on test set
+## What NOT to Do
+- Do NOT use unsupported model architectures
+- Do NOT use `use_gradient_checkpointing=True` - use `"unsloth"`
+- Do NOT skip 4-bit quantization for consumer GPUs
+- Do NOT ignore GGUF export for deployment
+- Do NOT use standard Transformers training loop (loses optimizations)
