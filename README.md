@@ -123,106 +123,80 @@ Product Owner / PM                    Developer
 
 ## The Iron Loop
 
-The Iron Loop is a 12-step process that every feature follows:
+> *"Quality is not negotiable"*
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│                     THE IRON LOOP                           │
-│                                                             │
-│    "Quality is not negotiable"                              │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  PLANNING (Steps 1-3) — ITERATIVE                           │
-│  Repeat until the plan is solid. Anyone can participate.    │
-│  ─────────────────────────────────────────────────────────  │
-│                                                             │
-│  Step 1: ASSESS                                             │
-│          Understand scope, goals, and complexity            │
-│          (includes initial critique)                        │
-│                                                             │
-│  Step 2: PLAN                                               │
-│          Create specification (business or technical)       │
-│          Plans can be high-level or detailed                │
-│                                                             │
-│  Step 3: CRITIQUE                                           │
-│          Review, challenge, and improve the plan            │
-│          → Loop back to Step 1 if needed                    │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  Steps 1-3 can be repeated as many times as needed  │    │
-│  │  until the plan meets your quality standards.       │    │
-│  │                                                     │    │
-│  │  Product Owners & PMs: Stop here and hand off.      │    │
-│  │  Developers: Continue to implementation.            │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                                                             │
-│  ════════════════════════════════════════════════════════   │
-│  After Step 3, you can leave or hand off to developers.     │
-│  Claude Code works autonomously from Step 4 onward.         │
-│  ════════════════════════════════════════════════════════   │
-│                                                             │
-│  IMPLEMENTATION (Steps 4-7)                                 │
-│  Claude Code works alone. Fast iteration.                   │
-│  ─────────────────────────────────────────────────────────  │
-│                                                             │
-│  Step 4: TEST                                               │
-│          Write tests first (they must fail)                 │
-│                                                             │
-│  Step 5: QUALITY                                            │
-│          Run linter, formatter, type checker                │
-│                                                             │
-│  Step 6: IMPLEMENT                                          │
-│          Write code until tests pass                        │
-│                                                             │
-│  Step 7: REVIEW                                             │
-│          Self-review and refactor                           │
-│                                                             │
-│  COMPLETION (Steps 8-12)                                    │
-│  Claude Code ensures production quality.                    │
-│  ─────────────────────────────────────────────────────────  │
-│                                                             │
-│  Step 8: OPTIMIZE                                           │
-│          Check performance                                  │
-│                                                             │
-│  Step 9: SECURE                                             │
-│          Security and accessibility audit                   │
-│                                                             │
-│  Step 10: DOCUMENT                                          │
-│           Update all documentation                          │
-│                                                             │
-│  Step 11: VERIFY                                            │
-│           Run full test suite                               │
-│                                                             │
-│  Step 12: COMMIT                                            │
-│           Commit with proper message                        │
-│                                                             │
-│  ════════════════════════════════════════════════════════   │
-│  Feature complete. Ready for business review.               │
-│  ════════════════════════════════════════════════════════   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+The Iron Loop is a 12-step process that transforms ideas into production-ready features.
 
-### Why 12 Steps?
+### Overview
 
-Each step exists for a reason:
+| Phase | Steps | Who | What Happens |
+|-------|-------|-----|--------------|
+| **Planning** | 1-3 | You + Claude | Define what to build, iterate until solid |
+| **Implementation** | 4-7 | Claude (autonomous) | Build with TDD, self-review |
+| **Completion** | 8-12 | Claude (autonomous) | Optimize, secure, document, ship |
 
-| Step | Purpose | What Happens If Skipped |
-|------|---------|------------------------|
-| Assess | Understand scope | Build the wrong thing |
-| Plan | Know what to build | Chaotic implementation |
-| Critique | Catch issues early | Expensive fixes later |
-| Test | Define success criteria | Don't know if it works |
-| Quality | Clean code | Technical debt accumulates |
-| Implement | Build it | Nothing to ship |
-| Review | Improve code | Maintainability issues |
-| Optimize | Performance | Slow application |
-| Secure | Safety | Vulnerabilities |
-| Document | Knowledge transfer | Others can't maintain it |
-| Verify | Confidence | Regressions slip through |
-| Commit | Save work | Lost progress |
+---
+
+### Phase 1: Planning (Steps 1-3)
+
+**Iterative. Repeat until the plan is solid.**
+
+| Step | Action | Description |
+|:----:|--------|-------------|
+| **1** | **ASSESS** | Understand scope, goals, complexity. Identify risks early. |
+| **2** | **PLAN** | Create specification — business-level or technical. |
+| **3** | **CRITIQUE** | Challenge the plan. Find gaps. Loop back to Step 1 if needed. |
+
+> **Handoff point:** Product Owners & PMs can stop here and hand off to developers.
+> Developers run their own 1-2-3 cycle for the technical implementation.
+
+---
+
+### Phase 2: Implementation (Steps 4-7)
+
+**Claude works autonomously. You can leave.**
+
+| Step | Action | Description |
+|:----:|--------|-------------|
+| **4** | **TEST** | Write tests first. They must fail. |
+| **5** | **QUALITY** | Lint, format, type-check. |
+| **6** | **IMPLEMENT** | Write code until tests pass. |
+| **7** | **REVIEW** | Self-review. Refactor. |
+
+---
+
+### Phase 3: Completion (Steps 8-12)
+
+**Production-ready quality assurance.**
+
+| Step | Action | Description |
+|:----:|--------|-------------|
+| **8** | **OPTIMIZE** | Check performance. |
+| **9** | **SECURE** | Security & accessibility audit. |
+| **10** | **DOCUMENT** | Update all documentation. |
+| **11** | **VERIFY** | Run full test suite. |
+| **12** | **COMMIT** | Commit with proper message. Create feature flag. |
+
+> **Result:** Feature complete. Ready for business review.
+
+---
+
+### Why These Steps?
+
+| Step | If Skipped... |
+|------|---------------|
+| Assess | Build the wrong thing |
+| Plan | Chaotic implementation |
+| Critique | Expensive fixes later |
+| Test | Don't know if it works |
+| Quality | Technical debt accumulates |
+| Implement | Nothing to ship |
+| Review | Maintainability issues |
+| Optimize | Slow application |
+| Secure | Vulnerabilities |
+| Document | Others can't maintain it |
+| Verify | Regressions slip through |
+| Commit | Lost progress |
 
 ---
 
@@ -513,72 +487,67 @@ The feature is ready for testing at /review
 
 ## Business Review
 
-### For Business Users (No Technical Knowledge Needed)
+> Close the loop between development and business.
 
-Go to: `https://yourapp.com/review`
+### For Business Users
 
-You'll see features waiting for your review:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  FEATURES READY FOR REVIEW                                  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  User Authentication                                        │
-│  ─────────────────────────────────────────────────────────  │
-│                                                             │
-│  WHAT IT DOES                                               │
-│  Users can now create accounts and log in.                  │
-│                                                             │
-│  WHAT TO TEST                                               │
-│  □ Create a new account                                     │
-│  □ Log out                                                  │
-│  □ Log back in                                              │
-│  □ Reset your password                                      │
-│                                                             │
-│  [Start Testing]                                            │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-Click **Start Testing** — the feature is enabled for your account only.
-
-After testing, provide your feedback:
-
-- **Approve** — Feature is good, ready to go live
-- **Approve with Changes** — Good, but fix these issues first
-- **Reject** — Needs significant work
-
-### Feedback Flows Back to Developers
-
-When a developer types `ctoc`:
+**No technical knowledge needed.** Go to your app's review page:
 
 ```
-═══════════════════════════════════════════════════════════════
-CTOC
-═══════════════════════════════════════════════════════════════
-
-📬 BUSINESS FEEDBACK RECEIVED
-
-user-authentication was approved with changes
-
-From: Sarah Chen (Product Manager)
-Decision: Approve with Changes
-
-Issues to fix:
-1. [UI/UX, Minor] Password requirements not shown until failure.
-   Should display requirements before user types.
-
-Overall: "Works great! Just show the password rules upfront."
-
-Would you like me to fix this issue?
-
-[1] Yes, fix it now
-[2] Show me details
-[3] I'll handle it later
+https://yourapp.com/review
 ```
 
-Claude Code fixes the issue automatically, and it goes back for re-testing if needed.
+You'll see a simple interface:
+
+| Feature | Status | Action |
+|---------|--------|--------|
+| User Authentication | Ready for Review | **[Start Testing]** |
+| Order Tracking | In Development | — |
+
+#### Testing a Feature
+
+Click **Start Testing** and the feature is enabled *for your account only*.
+
+**Test checklist example:**
+- [ ] Create a new account
+- [ ] Log out
+- [ ] Log back in
+- [ ] Reset your password
+
+#### Your Decision
+
+| Decision | When to Use |
+|----------|-------------|
+| **Approve** | Feature works as expected. Ship it. |
+| **Approve with Changes** | Works, but needs minor fixes first. |
+| **Reject** | Needs significant rework. |
+
+---
+
+### Feedback Loop
+
+Your feedback flows directly back to developers.
+
+**Example:** You approved with changes:
+
+> *"Works great! Just show the password rules upfront instead of after failure."*
+
+The developer sees this immediately:
+
+```
+CTOC: Business feedback received
+
+Feature: user-authentication
+Decision: Approved with Changes
+From: Sarah Chen (PM)
+
+Issue: Password requirements not shown until failure
+Fix: Display requirements before user types
+
+[1] Fix now  [2] Details  [3] Later
+```
+
+Claude Code can fix minor issues automatically. The feature goes back for re-testing if needed.
 
 ---
 
