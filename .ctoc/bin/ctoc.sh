@@ -46,6 +46,13 @@ PROGRESS COMMANDS:
     progress step <n>        Move to Iron Loop step
     progress complete <n>    Complete step and move to next
 
+GIT WORKFLOW COMMANDS:
+    sync                     Pull-rebase-push workflow
+    commit "message"         Stage, validate, commit, and push
+    qc "message"             Quick commit and push
+    status                   Enhanced git status
+    lock-check <file>        Check if file is fresh
+
 COMMUNITY COMMANDS:
     process-issues           Fetch approved skill improvements for processing
 
@@ -309,6 +316,26 @@ main() {
 
         dashboard)
             "$SCRIPT_DIR/progress.sh" dashboard
+            ;;
+
+        sync)
+            "$SCRIPT_DIR/git-workflow.sh" sync "$@"
+            ;;
+
+        commit)
+            "$SCRIPT_DIR/git-workflow.sh" commit "$@"
+            ;;
+
+        qc|quick-commit)
+            "$SCRIPT_DIR/git-workflow.sh" qc "$@"
+            ;;
+
+        status)
+            "$SCRIPT_DIR/git-workflow.sh" status
+            ;;
+
+        lock-check)
+            "$SCRIPT_DIR/git-workflow.sh" lock-check "$@"
             ;;
 
         process-issues)
