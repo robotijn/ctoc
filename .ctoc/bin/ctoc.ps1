@@ -55,6 +55,16 @@ SKILL COMMANDS:
     skills info <name>       Show skill details
     skills feedback <name>   Open issue form to suggest skill improvement
 
+PLAN COMMANDS:
+    plan new <title>         Create a new functional plan
+    plan propose <id>        Submit plan for review
+    plan approve <id>        Approve a plan
+    plan start <id>          Begin work on plan
+    plan implement <id>      Create implementation plan
+    plan complete <id>       Mark plan as implemented
+    plan list [status]       List plans
+    plan status              Show plan dashboard
+
 COMMUNITY COMMANDS:
     process-issues           Fetch approved skill improvements for processing
 
@@ -72,6 +82,8 @@ EXAMPLES:
     ctoc skills add langchain           # Add LangChain guidance
     ctoc skills sync                    # Auto-detect and download skills
     ctoc detect                         # See what technologies are detected
+    ctoc plan new "Add authentication"  # Create a new plan
+    ctoc plan status                    # View plan dashboard
 
 "@
 }
@@ -271,6 +283,10 @@ switch ($Command) {
     "detect" {
         $mode = if ($SubCommand) { $SubCommand } else { "all" }
         & "$ScriptDir/detect.ps1" -Mode $mode
+    }
+
+    "plan" {
+        & "$ScriptDir/plan.ps1" $SubCommand $Args
     }
 
     "process-issues" {
