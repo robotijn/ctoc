@@ -1,0 +1,425 @@
+# Planning Guide
+
+## Overview
+
+CTOC supports two types of planning:
+
+1. **Functional Planning** - What the software should DO (business-oriented)
+2. **Implementation Planning** - HOW the software should work (technical)
+
+Both are important. Functional planning ensures we build the right thing. Implementation planning ensures we build it right.
+
+---
+
+## Functional Planning
+
+**Who:** Anyone (product managers, stakeholders, developers)
+**Focus:** User needs and business requirements
+**No technical knowledge required**
+
+### Process
+
+1. **Describe the problem**
+   - What pain point are we solving?
+   - Who experiences this problem?
+   - How are they solving it now?
+
+2. **Define the users**
+   - Who will use this feature?
+   - What are their goals?
+   - What's their technical skill level?
+
+3. **Describe the solution**
+   - What should users be able to do?
+   - What's the expected workflow?
+   - What does success look like?
+
+4. **Define acceptance criteria**
+   - How do we know it's done?
+   - What must work for this to ship?
+
+### Template
+
+```markdown
+# Feature: [Name]
+
+## Problem
+[What problem does this solve? Who has this problem?]
+
+## Users
+[Who will use this? What do they need?]
+
+## Solution
+[What should users be able to do?]
+
+## User Stories
+- As a [user type], I want to [action] so that [benefit]
+- As a [user type], I want to [action] so that [benefit]
+
+## Acceptance Criteria
+- [ ] User can [action]
+- [ ] System [behavior]
+- [ ] When [condition], then [result]
+
+## Out of Scope
+[What are we NOT building?]
+
+## Questions
+[What do we still need to clarify?]
+```
+
+### Example: Order Tracking
+
+```markdown
+# Feature: Order Tracking
+
+## Problem
+Customers don't know where their orders are after purchase. They call
+support frequently asking "Where is my order?" This creates support
+load and customer frustration.
+
+## Users
+- Customers who have placed an order
+- Non-technical, may be on mobile devices
+- Want quick answers without logging in
+
+## Solution
+Customers can see their order status, package location, and estimated
+delivery date. They receive automatic updates when status changes.
+
+## User Stories
+- As a customer, I want to see my order status so I know it's being processed
+- As a customer, I want to see where my package is so I can plan for delivery
+- As a customer, I want email updates so I don't have to keep checking
+
+## Acceptance Criteria
+- [ ] Customer can view order status from email link (no login required)
+- [ ] Customer can view order status from account dashboard (login required)
+- [ ] Status shows: Confirmed, Processing, Shipped, Out for Delivery, Delivered
+- [ ] Shipped orders show current location
+- [ ] All orders show estimated delivery date
+- [ ] Customer receives email when status changes
+
+## Out of Scope
+- Real-time GPS tracking of delivery vehicle
+- Changing delivery address after shipment
+- In-app push notifications (email only for now)
+
+## Questions
+- How long should tracking links be valid?
+- Should we show tracking for international orders differently?
+```
+
+---
+
+## Implementation Planning
+
+**Who:** Developers, technical leads
+**Focus:** Technical approach and architecture
+**Requires understanding of the codebase**
+
+### Process
+
+1. **Analyze requirements**
+   - Review functional specification
+   - Identify technical constraints
+   - Identify dependencies
+
+2. **Design architecture**
+   - What components are needed?
+   - How do they interact?
+   - What data structures?
+
+3. **Plan implementation**
+   - What files to create/modify?
+   - What database changes?
+   - What APIs?
+
+4. **Identify risks**
+   - What could go wrong?
+   - What's complex?
+   - What needs special attention?
+
+### Template
+
+```markdown
+# Implementation Plan: [Feature Name]
+
+## Overview
+[Brief technical summary]
+
+## Dependencies
+- [Feature/service this depends on]
+- [External API needed]
+
+## Database Changes
+
+### New Tables
+```sql
+CREATE TABLE table_name (
+    id UUID PRIMARY KEY,
+    ...
+);
+```
+
+### Modified Tables
+- table_name: Add column_name (type)
+
+### Indexes
+- CREATE INDEX idx_name ON table(column)
+
+## API Endpoints
+
+### GET /api/resource
+- **Purpose:** [Description]
+- **Auth:** Required / Public
+- **Request:** [Parameters]
+- **Response:** [Schema]
+
+### POST /api/resource
+- **Purpose:** [Description]
+- **Auth:** Required / Public
+- **Request:** [Body schema]
+- **Response:** [Schema]
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| src/feature/models.py | Data models |
+| src/feature/routes.py | API endpoints |
+| src/feature/service.py | Business logic |
+| tests/test_feature.py | Test suite |
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| src/main.py | Register new routes |
+| docs/api.md | Document new endpoints |
+
+## Test Cases
+
+### Unit Tests
+- test_function_happy_path
+- test_function_edge_case
+- test_function_error_handling
+
+### Integration Tests
+- test_api_endpoint_success
+- test_api_endpoint_validation
+- test_api_endpoint_auth
+
+## Security Considerations
+- [Authentication requirements]
+- [Authorization rules]
+- [Input validation needs]
+- [Data encryption needs]
+
+## Performance Considerations
+- [Expected load]
+- [Caching strategy]
+- [Database optimization]
+
+## Risks and Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| [What could go wrong] | [How we prevent/handle it] |
+
+## Open Questions
+- [Technical decisions to make]
+```
+
+### Example: Order Tracking Implementation
+
+```markdown
+# Implementation Plan: Order Tracking
+
+## Overview
+Add order tracking functionality allowing customers to view order status
+and location. Integrates with shipping provider webhooks.
+
+## Dependencies
+- User authentication (existing)
+- Email service (existing)
+- Shipping provider API (ShipStation)
+
+## Database Changes
+
+### New Tables
+```sql
+CREATE TABLE order_tracking_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id),
+    status TEXT NOT NULL,
+    location TEXT,
+    description TEXT,
+    occurred_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_tracking_order_id ON order_tracking_events(order_id);
+CREATE INDEX idx_tracking_occurred_at ON order_tracking_events(occurred_at);
+```
+
+### Modified Tables
+- orders: Add tracking_number (TEXT), carrier (TEXT)
+
+## API Endpoints
+
+### GET /api/orders/:id/tracking
+- **Purpose:** Get tracking info for an order
+- **Auth:** Owner or valid tracking token
+- **Response:**
+```json
+{
+  "order_id": "uuid",
+  "status": "shipped",
+  "estimated_delivery": "2026-01-30",
+  "events": [
+    {
+      "status": "shipped",
+      "location": "Los Angeles, CA",
+      "description": "Package picked up",
+      "occurred_at": "2026-01-25T10:00:00Z"
+    }
+  ]
+}
+```
+
+### GET /api/tracking/:token
+- **Purpose:** Public tracking via email link
+- **Auth:** Valid tracking token
+- **Response:** Same as above
+
+### POST /api/webhooks/shipping
+- **Purpose:** Receive updates from shipping provider
+- **Auth:** Webhook signature verification
+- **Request:** ShipStation webhook payload
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| src/tracking/models.py | OrderTrackingEvent model |
+| src/tracking/routes.py | API endpoints |
+| src/tracking/service.py | Business logic |
+| src/tracking/webhook.py | Webhook handler |
+| src/tracking/email.py | Status update emails |
+| src/tracking/tokens.py | Tracking token generation |
+| tests/test_tracking.py | Test suite |
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| src/main.py | Register tracking routes |
+| src/orders/models.py | Add tracking fields |
+| docs/api.md | Document tracking endpoints |
+
+## Test Cases
+
+### Unit Tests
+- test_generate_tracking_token
+- test_validate_tracking_token
+- test_get_latest_status
+- test_parse_webhook_payload
+
+### Integration Tests
+- test_get_tracking_authenticated
+- test_get_tracking_with_token
+- test_get_tracking_unauthorized
+- test_webhook_creates_event
+- test_webhook_sends_email
+
+## Security Considerations
+- Tracking tokens must be cryptographically random
+- Tokens should expire after 30 days
+- Webhook signature must be verified
+- Rate limit public tracking endpoint
+
+## Performance Considerations
+- Index on order_id for fast lookups
+- Cache latest status (invalidate on webhook)
+- Async email sending
+
+## Risks and Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| Shipping provider API down | Queue failed webhooks, retry |
+| Token enumeration attack | Use UUIDs, rate limit |
+| Email delivery failure | Use reliable provider, log failures |
+
+## Open Questions
+- Should we support multiple carriers?
+- How long to retain tracking events?
+```
+
+---
+
+## Planning Workflow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  1. FUNCTIONAL PLANNING                                     │
+│     (Business person or developer)                          │
+│                                                             │
+│     "What should users be able to do?"                      │
+│                                                             │
+│     Output: Functional Specification                        │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  2. IMPLEMENTATION PLANNING                                 │
+│     (Developer)                                             │
+│                                                             │
+│     "How should we build this?"                             │
+│                                                             │
+│     Output: Implementation Plan                             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  3. CRITIQUE                                                │
+│     (Developer with Claude Code)                            │
+│                                                             │
+│     "What did we miss?"                                     │
+│                                                             │
+│     Output: Refined Plan                                    │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  4. IMPLEMENTATION                                          │
+│     (Claude Code autonomous)                                │
+│                                                             │
+│     Iron Loop Steps 4-12                                    │
+│                                                             │
+│     Output: Working Feature                                 │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Tips
+
+### For Functional Planning
+- Focus on user outcomes, not technical details
+- Use "As a [user], I want [action] so that [benefit]" format
+- Be specific about acceptance criteria
+- Define what's out of scope
+
+### For Implementation Planning
+- Start with data model
+- Then define APIs
+- Then plan the code structure
+- Consider error cases early
+- Think about testing from the start
+
+### For Both
+- Keep plans in version control
+- Update plans as you learn
+- Plans are living documents
+- It's okay to iterate
