@@ -56,6 +56,16 @@ Each technology CTO:
 
 **CTOC transforms how AI assistants write software.** Instead of jumping straight to code, Claude Code follows a disciplined 15-step process: two planning loops followed by autonomous implementation.
 
+### Just Chat
+
+You don't need to learn commands. Just talk naturally:
+
+- *"I need a login system"*
+- *"Let's plan the checkout flow"*
+- *"Build the order tracking feature"*
+
+CTOC understands what you want and guides you through the process. Commands like `ctoc` are just shortcuts for faster interaction — you never have to use them.
+
 ---
 
 ## The Problem
@@ -574,18 +584,18 @@ Ready for business review at /review
 
 ---
 
-## Commands
+## Commands (Optional)
 
-Just type `ctoc` and follow the menu. That's it.
+**You don't need commands.** Just chat naturally — CTOC understands.
 
-For power users:
+But if you want shortcuts:
 
-| Shortcut | Same as |
-|----------|---------|
-| `ctoc f` | Functional plan |
-| `ctoc t` | Technical plan |
-| `ctoc i` | Implement |
-| `ctoc s` | Status |
+| Type | What it does |
+|------|--------------|
+| `ctoc` | Show status and menu |
+| `ctoc f` | Start functional planning |
+| `ctoc t` | Start technical planning |
+| `ctoc i` | Implement a ready feature |
 
 ---
 
