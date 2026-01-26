@@ -1,0 +1,138 @@
+# {{PROJECT_NAME}} — Iron Loop
+
+> Track current work in progress.
+> Updated automatically as features progress.
+
+---
+
+## 🔄 Current Work
+
+**Feature:** {{FEATURE_NAME}}
+**Status:** {{CURRENT_STEP}}
+**Started:** {{START_DATE}}
+
+### Progress
+
+```
+{{PROGRESS_CHECKLIST}}
+```
+
+---
+
+## 📋 Step Details
+
+### Planning Phase (Human Participates)
+
+#### Step 1: ASSESS
+- [ ] Understand the business requirement
+- [ ] Identify affected components
+- [ ] Estimate complexity (S/M/L/XL)
+- [ ] Identify risks and dependencies
+
+#### Step 2: PLAN
+- [ ] Define acceptance criteria
+- [ ] List files to create/modify
+- [ ] Design data structures
+- [ ] Plan API contracts (if applicable)
+
+#### Step 3: CRITIQUE
+- [ ] Review plan for completeness
+- [ ] Check for edge cases
+- [ ] Verify security considerations
+- [ ] Confirm business alignment
+
+---
+
+### Implementation Phase (Claude Works Autonomously)
+
+#### Step 4: TEST
+- [ ] Write failing tests for acceptance criteria
+- [ ] Cover happy path and error cases
+- [ ] Confirm tests actually fail
+
+#### Step 5: QUALITY
+- [ ] Run linter: `{{LINT_COMMAND}}`
+- [ ] Run formatter: `{{FORMAT_COMMAND}}`
+- [ ] Run type checker: `{{TYPECHECK_COMMAND}}`
+
+#### Step 6: IMPLEMENT
+- [ ] Write code to pass tests
+- [ ] Follow project patterns
+- [ ] Use language best practices
+
+#### Step 7: REVIEW
+- [ ] Self-review all changes
+- [ ] Refactor if needed
+- [ ] Check for code smells
+
+---
+
+### Completion Phase (Quality Assurance)
+
+#### Step 8: OPTIMIZE
+- [ ] Check for N+1 queries
+- [ ] Review algorithm complexity
+- [ ] Add caching if needed
+
+#### Step 9: SECURE
+- [ ] Check for injection vulnerabilities
+- [ ] Verify authentication/authorization
+- [ ] Review input validation
+- [ ] Check for secrets in code
+
+#### Step 10: DOCUMENT
+- [ ] Update API documentation
+- [ ] Update README if needed
+- [ ] Add code comments for complex logic
+
+#### Step 11: VERIFY
+- [ ] Run full test suite
+- [ ] Check test coverage
+- [ ] Verify no regressions
+
+#### Step 12: COMMIT
+- [ ] Write descriptive commit message
+- [ ] Follow conventional commits
+- [ ] Feature complete
+
+---
+
+## 🔄 Self-Improvement Protocol
+
+After completing each feature, reflect:
+
+### What Worked Well?
+{{WHAT_WORKED}}
+
+### What Could Be Better?
+{{WHAT_COULD_BE_BETTER}}
+
+### Lessons Learned
+{{LESSONS_LEARNED}}
+
+### CLAUDE.md Updates Needed?
+- [ ] New tool discovered
+- [ ] Common issue identified
+- [ ] Better pattern found
+- [ ] Process improvement
+
+---
+
+## 📊 Metrics
+
+| Metric | Target | Actual |
+|--------|--------|--------|
+| Test Coverage | >80% | {{COVERAGE}}% |
+| Lint Errors | 0 | {{LINT_ERRORS}} |
+| Type Errors | 0 | {{TYPE_ERRORS}} |
+| Security Issues | 0 | {{SECURITY_ISSUES}} |
+
+---
+
+## 📝 Notes
+
+{{IMPLEMENTATION_NOTES}}
+
+---
+
+*Last updated: {{LAST_UPDATED}}*

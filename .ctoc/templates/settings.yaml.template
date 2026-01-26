@@ -1,0 +1,201 @@
+# ═══════════════════════════════════════════════════════════════
+# CTOC Settings
+# Generated on {{DATE}}
+# ═══════════════════════════════════════════════════════════════
+
+# Project Information
+project:
+  name: "{{PROJECT_NAME}}"
+  description: "{{PROJECT_DESCRIPTION}}"
+  version: "0.1.0"
+
+# Detected Languages
+languages:
+{{#LANGUAGES}}
+  {{NAME}}:
+    version: "{{VERSION}}"
+    commands:
+      lint: "{{LINT_COMMAND}}"
+      format: "{{FORMAT_COMMAND}}"
+      typecheck: "{{TYPECHECK_COMMAND}}"
+      test: "{{TEST_COMMAND}}"
+      security: "{{SECURITY_COMMAND}}"
+{{/LANGUAGES}}
+
+# Detected Frameworks
+frameworks:
+{{#FRAMEWORKS}}
+  - name: "{{NAME}}"
+    type: "{{TYPE}}"
+{{/FRAMEWORKS}}
+
+# Data Storage
+supabase:
+  url: "{{SUPABASE_URL}}"
+  anon_key: "{{SUPABASE_ANON_KEY}}"
+  # service_role_key should be in environment variable SUPABASE_SERVICE_ROLE_KEY
+
+# Data Residency
+data_residency:
+  region: "{{DATA_REGION}}"  # eu, us, apac
+  
+  # EU-specific settings
+  eu:
+    supabase_region: "eu-central-1"  # Frankfurt
+    require_gdpr_compliance: true
+
+# Iron Loop Configuration
+iron_loop:
+  # Strictness: strict (default), moderate, relaxed
+  strictness: "strict"
+  
+  # Minimum critique rounds before implementation
+  min_critique_rounds: 2
+  
+  # Test coverage threshold (percentage)
+  coverage_threshold: 80
+  
+  # Auto-commit after successful implementation
+  auto_commit: true
+  
+  # Create feature flags for new features
+  create_feature_flags: true
+
+# Quality Gates
+quality:
+  # Fail on any linter errors
+  fail_on_lint_errors: true
+  
+  # Fail on any type errors
+  fail_on_type_errors: true
+  
+  # Fail on security vulnerabilities
+  fail_on_security_issues: true
+  
+  # Allowed severity levels to pass (critical, high, medium, low)
+  max_allowed_severity: "low"
+
+# Feature Flags
+feature_flags:
+  # Default state for new flags
+  default_enabled: false
+  
+  # Auto-graduate flags after days at 100%
+  auto_graduate_days: 14
+
+# Notifications
+notifications:
+  # Where to send notifications: terminal, email, slack, discord
+  channels:
+    - terminal
+  
+  # Email configuration (if using email)
+  email:
+    provider: ""  # resend, sendgrid, or empty
+    api_key_env: "EMAIL_API_KEY"
+    from_address: ""
+    
+  # Slack configuration (if using slack)  
+  slack:
+    webhook_url_env: "SLACK_WEBHOOK_URL"
+    channel: ""
+
+# Git Integration
+git:
+  # Branch naming convention
+  branch_prefix: "feature/"
+  
+  # Commit message format: conventional, simple
+  commit_format: "conventional"
+  
+  # Auto-push after commit
+  auto_push: false
+  
+  # Main branch name
+  main_branch: "main"
+
+# GitHub Integration
+github:
+  # Enable GitHub integration
+  enabled: false
+  
+  # Use webhooks (recommended) or polling
+  sync_method: "webhooks"  # webhooks, polling
+  
+  # Polling interval in minutes (if using polling)
+  polling_interval: 5
+
+# Admin Dashboard
+admin:
+  # Enable admin dashboard generation
+  enabled: true
+  
+  # Dashboard path
+  path: "/admin"
+  
+  # Require authentication
+  require_auth: true
+  
+  # Require 2FA for admin access
+  require_2fa: false
+
+# Business Review Dashboard  
+review:
+  # Enable business review dashboard
+  enabled: true
+  
+  # Dashboard path
+  path: "/review"
+  
+  # Require authentication
+  require_auth: true
+
+# Logging
+logging:
+  # Log level: debug, info, warn, error
+  level: "info"
+  
+  # Sparse logging (recommended for production)
+  sparse: true
+  
+  # Log to Supabase
+  log_to_supabase: true
+  
+  # Log retention days
+  retention_days: 30
+
+# Analytics
+analytics:
+  # Built-in analytics
+  builtin:
+    enabled: true
+    
+  # External analytics (optional)
+  external:
+    provider: ""  # google, plausible, posthog, mixpanel, or empty
+    
+  # Data retention
+  raw_events_days: 180
+  aggregates_retention: "forever"
+
+# Security
+security:
+  # Scrub PII from error reports
+  scrub_pii_from_errors: true
+  
+  # Scrub PII from logs
+  scrub_pii_from_logs: true
+  
+  # Audit logging
+  audit_log: true
+
+# GDPR Compliance
+gdpr:
+  # Enable GDPR compliance features
+  enabled: {{GDPR_ENABLED}}
+  
+  # Auto-generate privacy policy template
+  generate_privacy_policy: true
+  
+  # Cookie consent required
+  cookie_consent_required: true
