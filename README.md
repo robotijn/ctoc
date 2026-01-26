@@ -54,7 +54,7 @@ Each technology CTO:
 
 ---
 
-**CTOC transforms how AI assistants write software.** Instead of jumping straight to code, Claude Code follows a disciplined 12-step process that professional engineers use.
+**CTOC transforms how AI assistants write software.** Instead of jumping straight to code, Claude Code follows a disciplined 15-step process: two planning loops followed by autonomous implementation.
 
 ---
 
@@ -80,44 +80,20 @@ With CTOC, the same request produces:
 
 ## Who Is This For?
 
-| Role | How CTOC Helps |
-|------|----------------|
-| **Product Owners** | Define business goals and features in plain English. Plan entire product roadmaps, then hand them to developers for implementation. |
-| **Project Managers** | Create comprehensive feature specifications. Iterate on plans with critique until they're ready. Hand off approved plans to development teams. |
-| **Developers** | Receive well-defined plans from POs/PMs, or plan features yourself. Implement with best practices enforced automatically through the Iron Loop. |
-| **Business Users** | Test completed features and provide feedback through a simple web interface |
+| Role | What You Do |
+|------|-------------|
+| **Product Owners / PMs** | Create functional plans — describe *what* to build in plain English |
+| **Developers** | Create technical plans — decide *how* to build it |
+| **Anyone** | Do both — go from idea to working code in one session |
+| **Business Users** | Test and approve completed features |
 
-### The Planning Handoff
+### How It Works
 
-CTOC bridges the gap between business and development:
+1. **Functional Planning** — Define what you want (anyone can do this)
+2. **Technical Planning** — Define how to build it (developers)
+3. **Implementation** — CTOC builds it autonomously
 
-```
-Product Owner / PM                    Developer
-       │                                  │
-       │  1. ASSESS (business goals)      │
-       │  2. PLAN (what, not how)         │
-       │  3. CRITIQUE (refine)            │
-       │         │                        │
-       │    ◄────┼────► (iterate until    │
-       │         │       plan is solid)   │
-       │         │                        │
-       └─────────┼────────────────────────┤
-                 │                        │
-            Handoff                       │
-                 │                        │
-                 └────────────────────────┤
-                                          │
-                         1. ASSESS (technical feasibility)
-                         2. PLAN (how to build it)
-                         3. CRITIQUE (technical review)
-                                │
-                           ◄────┼────► (iterate until
-                                │       approach is solid)
-                                │
-                         4-12. IMPLEMENT autonomously
-```
-
-**Key insight:** Steps 1-3 always include critique and can be repeated as many times as needed. A Product Owner might do 10 rounds of Assess-Plan-Critique before the specification is ready. A Developer might do another 5 rounds for the technical implementation plan.
+Each planning phase is a loop: **Assess → Plan → Refine**. Repeat until you're happy. Then CTOC implements automatically.
 
 ---
 
@@ -125,57 +101,61 @@ Product Owner / PM                    Developer
 
 > *"Quality is not negotiable"*
 
-The Iron Loop is a 12-step process that transforms ideas into production-ready features.
+The Iron Loop is a **15-step process**: two planning loops (6 steps) followed by autonomous implementation (9 steps).
 
 ### Overview
 
-| Phase | Steps | Who | What Happens |
-|-------|-------|-----|--------------|
-| **Planning** | 1-3 | You + Claude | Define what to build, iterate until solid |
-| **Implementation** | 4-7 | Claude (autonomous) | Build with TDD, self-review |
-| **Completion** | 8-12 | Claude (autonomous) | Optimize, secure, document, ship |
+| Phase | Steps | Who | Description |
+|-------|-------|-----|-------------|
+| **Functional Planning** | 1-3 | Anyone | Define *what* to build |
+| **Technical Planning** | 4-6 | Developer | Define *how* to build it |
+| **Implementation** | 7-15 | CTOC (autonomous) | Build, test, secure, ship |
 
 ---
 
-### Phase 1: Planning (Steps 1-3)
+### Loop 1: Functional Planning (Steps 1-3)
 
-**Iterative. Repeat until the plan is solid.**
+**Define what you want. Repeat until the spec is solid.**
 
 | Step | Action | Description |
 |:----:|--------|-------------|
-| **1** | **ASSESS** | Understand scope, goals, complexity. Identify risks early. |
-| **2** | **PLAN** | Create specification — business-level or technical. |
-| **3** | **CRITIQUE** | Challenge the plan. Find gaps. Loop back to Step 1 if needed. |
+| **1** | **ASSESS** | Understand the business need. Who benefits? What problem does it solve? |
+| **2** | **PLAN** | Create functional specification. What should users be able to do? |
+| **3** | **REFINE** | Improve the plan. Add missing details. Loop back to Step 1 if needed. |
 
-> **Handoff point:** Product Owners & PMs can stop here and hand off to developers.
-> Developers run their own 1-2-3 cycle for the technical implementation.
+> POs/PMs can stop here and hand off the functional spec to developers.
 
 ---
 
-### Phase 2: Implementation (Steps 4-7)
+### Loop 2: Technical Planning (Steps 4-6)
 
-**Claude works autonomously. You can leave.**
+**Define how to build it. Repeat until the approach is solid.**
 
 | Step | Action | Description |
 |:----:|--------|-------------|
-| **4** | **TEST** | Write tests first. They must fail. |
-| **5** | **QUALITY** | Lint, format, type-check. |
-| **6** | **IMPLEMENT** | Write code until tests pass. |
-| **7** | **REVIEW** | Self-review. Refactor. |
+| **4** | **ASSESS** | Evaluate technical requirements. What's the complexity? What are the risks? |
+| **5** | **PLAN** | Create technical design. Database, APIs, architecture, files to create. |
+| **6** | **REFINE** | Improve the approach. Consider edge cases. Loop back to Step 4 if needed. |
+
+> After Step 6, you can leave. CTOC implements autonomously.
 
 ---
 
-### Phase 3: Completion (Steps 8-12)
+### Implementation (Steps 7-15)
 
-**Production-ready quality assurance.**
+**CTOC works autonomously. You can leave.**
 
 | Step | Action | Description |
 |:----:|--------|-------------|
-| **8** | **OPTIMIZE** | Check performance. |
-| **9** | **SECURE** | Security & accessibility audit. |
-| **10** | **DOCUMENT** | Update all documentation. |
-| **11** | **VERIFY** | Run full test suite. |
-| **12** | **COMMIT** | Commit with proper message. Create feature flag. |
+| **7** | **TEST** | Write tests first. They must fail. |
+| **8** | **QUALITY** | Lint, format, type-check. |
+| **9** | **IMPLEMENT** | Write code until tests pass. |
+| **10** | **REVIEW** | Self-review. Refactor. |
+| **11** | **OPTIMIZE** | Check performance. |
+| **12** | **SECURE** | Security & accessibility audit. |
+| **13** | **DOCUMENT** | Update all documentation. |
+| **14** | **VERIFY** | Run full test suite. |
+| **15** | **COMMIT** | Commit with proper message. Create feature flag. |
 
 > **Result:** Feature complete. Ready for business review.
 
@@ -185,17 +165,20 @@ The Iron Loop is a 12-step process that transforms ideas into production-ready f
 
 | Step | If Skipped... |
 |------|---------------|
-| Assess | Build the wrong thing |
-| Plan | Chaotic implementation |
-| Critique | Expensive fixes later |
+| Assess (functional) | Build something nobody wants |
+| Plan (functional) | Unclear requirements |
+| Refine (functional) | Missing edge cases |
+| Assess (technical) | Underestimate complexity |
+| Plan (technical) | Chaotic implementation |
+| Refine (technical) | Poor architecture |
 | Test | Don't know if it works |
-| Quality | Technical debt accumulates |
+| Quality | Technical debt |
 | Implement | Nothing to ship |
 | Review | Maintainability issues |
 | Optimize | Slow application |
 | Secure | Vulnerabilities |
 | Document | Others can't maintain it |
-| Verify | Regressions slip through |
+| Verify | Regressions |
 | Commit | Lost progress |
 
 ---
@@ -212,8 +195,14 @@ The Iron Loop is a 12-step process that transforms ideas into production-ready f
 
 Open terminal in your project directory:
 
+**macOS / Linux:**
 ```bash
 curl -sL https://raw.githubusercontent.com/robotijn/ctoc/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/robotijn/ctoc/main/install.ps1 | iex
 ```
 
 You should see:
@@ -251,7 +240,7 @@ Without it, Claude Code asks permission for every file operation:
 - "Can I modify tests/test_auth.py?"
 - "Can I read .ctoc/settings.yaml?"
 
-You'd need to approve hundreds of prompts per feature. The flag allows Claude Code to work autonomously through all 12 Iron Loop steps.
+You'd need to approve hundreds of prompts per feature. The flag allows Claude Code to work autonomously through all 15 Iron Loop steps.
 
 #### Is It Safe?
 
@@ -304,183 +293,149 @@ Type `Y` and answer the configuration questions.
 
 ### Step 4: You're Ready!
 
-After initialization, typing `ctoc` shows your project status:
+After initialization, just type `ctoc` to see your project status and options:
 
 ```
-═══════════════════════════════════════════════════════════════
 CTOC
-═══════════════════════════════════════════════════════════════
 
-✅ ALL CLEAR
-
-No work in progress.
-No planned features.
-No pending reviews.
-
-Your project is ready!
+Functional Plans: 0
+Technical Plans:  0
+Ready to Build:   0
+In Progress:      None
 
 What would you like to do?
 
-[1] Plan a new feature
-[2] View the Kanban board
-[3] Check settings
+[1] Functional plan  — Define what to build
+[2] Technical plan   — Define how to build it
+[3] Full plan        — Both functional and technical
+[4] Implement        — Build a ready feature
+[5] Status           — View all plans
 ```
 
 ---
 
 ## Planning Features
 
-### From Business Goals to Implementation
+Type `ctoc` and choose what you want to do:
 
-CTOC supports the full journey from business idea to working code. Plans can be:
+### Option 1: Functional Plan
 
-- **Small:** A single feature ("add a logout button")
-- **Large:** An entire product roadmap ("build an e-commerce platform")
-- **Business-focused:** What and why (for POs/PMs)
-- **Technical:** How to build it (for developers)
-
-Every plan goes through Assess → Plan → Critique, which **repeats until quality standards are met**. There's always critique — it's built into the process, not optional.
-
-### Functional Planning (For Product Owners & PMs)
-
-Anyone can plan features — you don't need to be technical. Describe what you want in plain English. Create comprehensive specifications, then hand them to developers.
+**Define what to build.** Anyone can do this — no technical knowledge needed.
 
 ```
-User: ctoc plan
-
-Claude Code: What would you like to plan?
+User: ctoc
+> [1] Functional plan
 
 User: Customers should be able to track their orders
 
-Claude Code: Let me understand what you need.
+CTOC: Let me understand what you need...
 
-    Who are these customers?
-    > People who bought something from our store
-    
-    What should they see when tracking?
-    > Order status, where the package is, when it arrives
-    
-    How do they access the tracking?
-    > Click a link in their confirmation email, or log in
-    
-    Should they get updates automatically?
-    > Yes, email them when status changes
-    
-    ───────────────────────────────────────────────────────────
-    
-    FUNCTIONAL SPECIFICATION: order-tracking
-    
-    Customers can:
-    • View their order status
-    • See package location
-    • See estimated delivery date
-    • Receive email updates on status changes
-    
-    Access methods:
-    • Link in confirmation email (no login required)
-    • Account dashboard (login required)
-    
-    ✓ Plan saved
-    
-    This is ready for implementation planning.
+    Who are the users?
+    > People who bought from our store
+
+    What should they see?
+    > Order status, package location, delivery date
+
+    How do they access it?
+    > Email link or login to their account
+
+FUNCTIONAL PLAN: order-tracking
+
+Users can:
+• View order status
+• See package location
+• See estimated delivery
+• Get email updates
+
+Access: Email link (no login) or account dashboard
+
+✓ Saved. Ready for technical planning.
 ```
 
-### Implementation Planning (For Developers)
+### Option 2: Technical Plan
 
-Developers receive functional specs from POs/PMs and add the technical details. They run their own Assess → Plan → Critique cycle for the implementation approach:
-
-```
-User: ctoc plan order-tracking --technical
-
-Claude Code: I see the functional spec. Let me plan the implementation.
-
-    DATABASE
-    • New table: order_tracking_events
-    • Fields: order_id, status, location, timestamp
-    
-    API ENDPOINTS
-    • GET /api/orders/:id/tracking - Get tracking info
-    • POST /api/orders/:id/tracking - Add event (internal)
-    
-    INTEGRATIONS
-    • Shipping provider webhook receiver
-    • Email service for notifications
-    
-    FILES TO CREATE
-    • src/tracking/models.py
-    • src/tracking/routes.py
-    • src/tracking/service.py
-    • src/tracking/email.py
-    • tests/test_tracking.py
-    
-    Does this approach look right?
-```
-
-### Plan As Many Features As You Want
-
-There's no limit. Plan your entire application:
+**Define how to build it.** Pick an existing functional plan or start fresh.
 
 ```
-User: Let's plan the whole e-commerce platform
+User: ctoc
+> [2] Technical plan
+> order-tracking
 
-Claude Code: Great! We'll plan features one by one.
-    
-    [Plans user-authentication]
-    [Plans product-catalog]
-    [Plans shopping-cart]
-    [Plans checkout-flow]
-    [Plans order-tracking]
-    ... (as many as you need)
-    
-    ═══════════════════════════════════════════════════════════
-    
-    You've planned 12 features. All saved to .ctoc/plans/features/
-    
-    Ready to start implementing?
+CTOC: I see the functional spec. Let me plan the implementation...
+
+TECHNICAL PLAN: order-tracking
+
+Database: order_tracking_events table
+API: GET/POST /api/orders/:id/tracking
+Integration: Shipping webhooks, email service
+Files: models.py, routes.py, service.py, email.py
+
+✓ Saved. Ready to implement.
+```
+
+### Option 3: Full Plan
+
+**Go from idea to implementation plan in one session.** CTOC does functional planning, then immediately moves to technical planning.
+
+```
+User: ctoc
+> [3] Full plan
+
+User: I need user authentication
+
+CTOC: [Functional planning loop...]
+      [Technical planning loop...]
+
+Both plans complete. Ready to implement.
+```
+
+### Option 4: Implement
+
+**Build a feature that has both functional and technical plans.**
+
+```
+User: ctoc
+> [4] Implement
+> order-tracking
+
+CTOC: Starting implementation...
+      [Steps 7-15 run autonomously]
+
+✓ Complete. Ready for business review.
 ```
 
 ---
 
 ## Implementing Features
 
-Once features are planned, implement them:
+Once a feature has both functional and technical plans, implement it:
 
 ```
-User: ctoc implement
+User: ctoc
+> [4] Implement
+> user-authentication
 
-Claude Code: Starting implementation: user-authentication
+CTOC: Starting implementation...
 
-    Step 1: ASSESS ✅
-    Step 2: PLAN ✅
-    Step 3: CRITIQUE ✅
-    
-    ════════════════════════════════════════════════════════
-    You can leave now. I'll work through the remaining steps.
-    Come back anytime to check progress.
-    ════════════════════════════════════════════════════════
-    
-    Step 4: TEST 🔨 Writing tests...
-```
+You can leave now. I'll work through Steps 7-15.
 
-Claude Code works through all 12 steps autonomously. When complete:
+Step 7:  TEST      ✓ 8 tests written
+Step 8:  QUALITY   ✓ Lint, format, types OK
+Step 9:  IMPLEMENT ✓ Code complete
+Step 10: REVIEW    ✓ Self-reviewed
+Step 11: OPTIMIZE  ✓ Performance OK
+Step 12: SECURE    ✓ No vulnerabilities
+Step 13: DOCUMENT  ✓ Docs updated
+Step 14: VERIFY    ✓ All tests pass
+Step 15: COMMIT    ✓ Committed
 
-```
-═══════════════════════════════════════════════════════════════
-IMPLEMENTATION COMPLETE: user-authentication
-═══════════════════════════════════════════════════════════════
+COMPLETE: user-authentication
 
-✅ All 12 Iron Loop steps completed
+Files: 8 created
+Tests: 24 passing (94% coverage)
+Security: All checks passed
 
-Results:
-• Files created: 8
-• Tests: 24 passing
-• Coverage: 94%
-• Security: All checks passed
-
-Feature flag created: user_authentication
-Status: OFF (pending business review)
-
-The feature is ready for testing at /review
+Ready for business review at /review
 ```
 
 ---
@@ -553,185 +508,94 @@ Claude Code can fix minor issues automatically. The feature goes back for re-tes
 
 ## Complete Example
 
-Here's a full example of building user authentication with CTOC:
+Building user authentication from idea to production:
 
 ```
-User: ctoc plan
-
-Claude Code: What would you like to plan?
+User: ctoc
+> [3] Full plan
 
 User: I need user authentication with login, signup, and password reset
 
-Claude Code: ═══════════════════════════════════════════════════════════════
-    PLANNING: user-authentication
-    ═══════════════════════════════════════════════════════════════
-    
-    Step 1: ASSESS
-    ───────────────────────────────────────────────────────────────
-    
-    This is a medium-complexity feature involving:
-    • User data storage
-    • Password security (hashing, validation)
-    • Session management
-    • Email sending (for password reset)
-    
-    Risks to mitigate:
-    • SQL injection
-    • Password exposure
-    • Session hijacking
-    • Brute force attacks
-    
-    Step 2: PLAN
-    ───────────────────────────────────────────────────────────────
-    
-    I'll create:
-    • User model with hashed passwords (bcrypt)
-    • Signup with email validation
-    • Login with rate limiting
-    • Session management with secure cookies
-    • Password reset via email link
-    
-    Files:
-    • src/auth/models.py
-    • src/auth/routes.py
-    • src/auth/service.py
-    • src/auth/security.py
-    • tests/test_auth.py
-    
-    Step 3: CRITIQUE
-    ───────────────────────────────────────────────────────────────
-    
-    Reviewing my plan...
-    
-    Issue 1: Missing CSRF protection → Added
-    Issue 2: No account lockout after failures → Added (5 attempts)
-    Issue 3: Password requirements not specified → Added policy
-    
-    Plan approved after 3 critique rounds.
-    
-    Ready to implement? [Y/n]
+CTOC: Starting functional planning...
+
+LOOP 1: FUNCTIONAL PLANNING
+
+Step 1: ASSESS
+What problem does this solve?
+→ Users need secure access to their accounts
+
+Step 2: PLAN
+Users can:
+• Create an account with email/password
+• Log in and log out
+• Reset forgotten password via email
+
+Step 3: REFINE
+✓ Added: Email verification on signup
+✓ Added: "Remember me" option
+Functional plan complete.
+
+LOOP 2: TECHNICAL PLANNING
+
+Step 4: ASSESS
+Complexity: Medium
+Risks: SQL injection, password exposure, brute force
+
+Step 5: PLAN
+• Database: users table with hashed passwords
+• Auth: bcrypt + JWT tokens
+• Security: Rate limiting, CSRF protection
+• Files: models.py, routes.py, service.py, security.py
+
+Step 6: REFINE
+✓ Added: Account lockout after 5 failed attempts
+✓ Added: Password strength requirements
+Technical plan complete.
+
+Ready to implement? [Y/n]
 
 User: Y
 
-Claude Code: Starting autonomous implementation...
+IMPLEMENTATION (Steps 7-15)
 
-    Step 4: TEST
-    ───────────────────────────────────────────────────────────────
-    Writing tests first (they should fail)...
-    
-    ✓ test_signup_success
-    ✓ test_signup_duplicate_email  
-    ✓ test_signup_weak_password
-    ✓ test_login_success
-    ✓ test_login_wrong_password
-    ✓ test_login_rate_limit
-    ✓ test_password_reset_request
-    ✓ test_password_reset_complete
-    
-    8 tests written, all failing (as expected)
-    
-    Step 5: QUALITY
-    ───────────────────────────────────────────────────────────────
-    Running quality checks...
-    
-    ✓ Lint: 0 errors
-    ✓ Format: OK
-    ✓ Types: OK
-    
-    Step 6: IMPLEMENT
-    ───────────────────────────────────────────────────────────────
-    Writing code...
-    
-    Creating src/auth/models.py...
-    Creating src/auth/security.py...
-    Creating src/auth/service.py...
-    Creating src/auth/routes.py...
-    
-    Running tests...
-    ✓ 8/8 tests passing
-    
-    Step 7: REVIEW
-    ───────────────────────────────────────────────────────────────
-    Self-reviewing code...
-    
-    ✓ No code smells detected
-    ✓ Functions are appropriately sized
-    ✓ Naming is clear
-    
-    Step 8: OPTIMIZE
-    ───────────────────────────────────────────────────────────────
-    Checking performance...
-    
-    ✓ Database queries optimized
-    ✓ Index recommended for user.email (added)
-    
-    Step 9: SECURE
-    ───────────────────────────────────────────────────────────────
-    Running security audit...
-    
-    ✓ No vulnerabilities found
-    ✓ Passwords properly hashed (bcrypt)
-    ✓ SQL injection protected (parameterized queries)
-    ✓ CSRF tokens implemented
-    ✓ Rate limiting active
-    
-    Step 10: DOCUMENT
-    ───────────────────────────────────────────────────────────────
-    Updating documentation...
-    
-    ✓ API documentation updated
-    ✓ README updated
-    ✓ Code comments added
-    
-    Step 11: VERIFY
-    ───────────────────────────────────────────────────────────────
-    Running full test suite...
-    
-    ✓ 8 auth tests passing
-    ✓ 42 existing tests still passing
-    ✓ Coverage: 94%
-    
-    Step 12: COMMIT
-    ───────────────────────────────────────────────────────────────
-    
-    ✓ Committed: "feat(auth): Add user authentication system"
-    ✓ Feature flag created: user_authentication
-    
-    ═══════════════════════════════════════════════════════════════
-    IMPLEMENTATION COMPLETE
-    ═══════════════════════════════════════════════════════════════
-    
-    User authentication is ready for business review.
-    
-    Go to /review to test and approve.
+Step 7:  TEST      ✓ 8 tests written (all failing)
+Step 8:  QUALITY   ✓ Lint, format, types OK
+Step 9:  IMPLEMENT ✓ Code complete, tests passing
+Step 10: REVIEW    ✓ Self-reviewed, refactored
+Step 11: OPTIMIZE  ✓ Added index on user.email
+Step 12: SECURE    ✓ No vulnerabilities found
+Step 13: DOCUMENT  ✓ API docs updated
+Step 14: VERIFY    ✓ 50 tests passing, 94% coverage
+Step 15: COMMIT    ✓ feat(auth): Add user authentication
+
+COMPLETE: user-authentication
+Ready for business review at /review
 ```
 
 ---
 
-## Commands Reference
+## Commands
 
-| Command | Description |
-|---------|-------------|
-| `ctoc` | Smart status check with recommended action |
-| `ctoc plan` | Plan a new feature |
-| `ctoc plan list` | See all planned features |
-| `ctoc plan [name]` | View a specific plan |
-| `ctoc implement` | Implement the next planned feature |
-| `ctoc implement [name]` | Implement a specific feature |
-| `ctoc dashboard` | View Kanban board and Iron Loop progress |
-| `ctoc status` | Detailed project status |
-| `ctoc help` | Show all commands |
+Just type `ctoc` and follow the menu. That's it.
+
+For power users:
+
+| Shortcut | Same as |
+|----------|---------|
+| `ctoc f` | Functional plan |
+| `ctoc t` | Technical plan |
+| `ctoc i` | Implement |
+| `ctoc s` | Status |
 
 ---
 
 ## Dashboards
 
-| Dashboard | Access | Users | Purpose |
-|-----------|--------|-------|---------|
-| `ctoc` | Type in Claude Code | Developers, PMs | Status, planning, implementing |
-| `ctoc dashboard` | Type in Claude Code | Developers | Kanban board, Iron Loop progress |
-| `/review` | Web browser | Business users | Test & approve features |
-| `/admin` | Web browser | Operations | Analytics, errors, logs, flags |
+| Dashboard | Who | Purpose |
+|-----------|-----|---------|
+| `ctoc` | Everyone | Plan and build features |
+| `/review` | Business users | Test and approve completed features |
+| `/admin` | Operations | Analytics, logs, feature flags |
 
 ---
 
