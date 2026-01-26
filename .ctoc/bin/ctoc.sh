@@ -40,6 +40,14 @@ PLAN COMMANDS:
     plan list [status]       List plans
     plan status              Show plan dashboard
 
+AGENT COMMANDS:
+    agent list               List all agents (60 total)
+    agent info <name>        Show agent details
+    agent upgrade <name>     Add capability to upgrade queue
+    agent research <name>    Show research queries for agent
+    agent check              Check for agent updates
+    agent apply <name>       Apply pending upgrades
+
 PROGRESS COMMANDS:
     progress                 Quick progress view
     dashboard                Full progress dashboard
@@ -344,6 +352,10 @@ main() {
 
         lock)
             "$SCRIPT_DIR/file-lock.sh" "$@"
+            ;;
+
+        agent)
+            "$SCRIPT_DIR/upgrade-agent.sh" "$@"
             ;;
 
         process-issues)
