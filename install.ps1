@@ -82,9 +82,11 @@ function Get-CoreFiles {
     New-Item -ItemType Directory -Path ".ctoc\skills\languages" -Force | Out-Null
     New-Item -ItemType Directory -Path ".ctoc\skills\frameworks" -Force | Out-Null
     New-Item -ItemType Directory -Path ".ctoc\templates" -Force | Out-Null
+    New-Item -ItemType Directory -Path ".ctoc\agents" -Force | Out-Null
+    New-Item -ItemType Directory -Path ".ctoc\plans" -Force | Out-Null
 
     # Download bin scripts
-    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1", "file-lock.ps1")
+    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1", "file-lock.ps1", "upgrade-agent.ps1")
     foreach ($file in $binFiles) {
         try {
             Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/bin/$file" -OutFile ".ctoc\bin\$file" -UseBasicParsing -ErrorAction Stop
@@ -106,6 +108,11 @@ function Get-CoreFiles {
         Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/CLAUDE.md.template" -OutFile ".ctoc\templates\CLAUDE.md.template" -UseBasicParsing -ErrorAction SilentlyContinue
         Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/IRON_LOOP.md.template" -OutFile ".ctoc\templates\IRON_LOOP.md.template" -UseBasicParsing -ErrorAction SilentlyContinue
         Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/PLANNING.md.template" -OutFile ".ctoc\templates\PLANNING.md.template" -UseBasicParsing -ErrorAction SilentlyContinue
+    } catch { }
+
+    # Download agent versions
+    try {
+        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/agents/versions.yaml" -OutFile ".ctoc\agents\versions.yaml" -UseBasicParsing -ErrorAction SilentlyContinue
     } catch { }
 
     Write-Success "Core files installed"
