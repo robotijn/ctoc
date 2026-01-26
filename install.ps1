@@ -4,27 +4,32 @@
     CTOC - CTO Chief Installation Script for Windows
 .DESCRIPTION
     Installs CTOC (CTO Chief) - Your Army of Virtual CTOs
+    Smart skill loading: Downloads only the skills your project needs.
 .EXAMPLE
     irm https://raw.githubusercontent.com/theaiguys/ctoc/main/install.ps1 | iex
 #>
 
 $ErrorActionPreference = "Stop"
-$CTOC_VERSION = "1.0.0"
+
+$CTOC_VERSION = "2.0.0"
 $CTOC_REPO = "https://github.com/theaiguys/ctoc"
 $CTOC_RAW = "https://raw.githubusercontent.com/theaiguys/ctoc/main"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Helper Functions
+# ═══════════════════════════════════════════════════════════════════════════════
 
 function Write-Banner {
     Write-Host @"
 
-   _____ _______ ____   _____ 
+   _____ _______ ____   _____
   / ____|__   __/ __ \ / ____|
- | |       | | | |  | | |     
- | |       | | | |  | | |     
- | |____   | | | |__| | |____ 
+ | |       | | | |  | | |
+ | |       | | | |  | | |
+ | |____   | | | |__| | |____
   \_____|  |_|  \____/ \_____|
-                              
+
   CTO Chief - Your Army of Virtual CTOs
-  Version $CTOC_VERSION
 
 "@ -ForegroundColor Cyan
 }
@@ -44,107 +49,323 @@ function Write-Warning {
     Write-Host "⚠ $Message" -ForegroundColor Yellow
 }
 
+function Write-Error {
+    param([string]$Message)
+    Write-Host "✗ $Message" -ForegroundColor Red
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Check Directory
+# ═══════════════════════════════════════════════════════════════════════════════
+
 function Test-Directory {
     if (Test-Path "CLAUDE.md") {
         Write-Warning "CLAUDE.md already exists in this directory."
         $response = Read-Host "Overwrite? (y/N)"
-        if ($response -ne 'y' -and $response -ne 'Y') {
+        if ($response -notmatch "^[Yy]$") {
             Write-Host "Aborted."
             exit 1
         }
     }
 }
 
-function Install-Skills {
-    Write-Step "Downloading CTOC skills library..."
-    
-    # Create directory structure
-    $dirs = @(
-        ".ctoc\skills\languages",
-        ".ctoc\skills\frameworks\web",
-        ".ctoc\skills\frameworks\mobile",
-        ".ctoc\skills\frameworks\data",
-        ".ctoc\skills\frameworks\ai-ml",
-        ".ctoc\templates"
-    )
-    
-    foreach ($dir in $dirs) {
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    }
-    
-    # Try git clone first
-    if (Get-Command git -ErrorAction SilentlyContinue) {
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Download Core Files
+# ═══════════════════════════════════════════════════════════════════════════════
+
+function Get-CoreFiles {
+    Write-Step "Downloading CTOC core files..."
+
+    # Create directories
+    New-Item -ItemType Directory -Path ".ctoc\bin" -Force | Out-Null
+    New-Item -ItemType Directory -Path ".ctoc\skills\languages" -Force | Out-Null
+    New-Item -ItemType Directory -Path ".ctoc\skills\frameworks" -Force | Out-Null
+    New-Item -ItemType Directory -Path ".ctoc\templates" -Force | Out-Null
+
+    # Download bin scripts
+    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1")
+    foreach ($file in $binFiles) {
         try {
-            Write-Step "Cloning repository..."
-            git clone --depth 1 $CTOC_REPO .ctoc-temp 2>$null
-            if (Test-Path ".ctoc-temp\.ctoc") {
-                Copy-Item -Recurse -Force ".ctoc-temp\.ctoc\*" ".ctoc\"
-                Remove-Item -Recurse -Force ".ctoc-temp"
-                Write-Success "Skills library installed via git"
-                return
-            }
+            Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/bin/$file" -OutFile ".ctoc\bin\$file" -UseBasicParsing -ErrorAction Stop
         } catch {
-            Write-Warning "Git clone failed, downloading manually..."
+            Write-Warning "Failed to download $file"
         }
     }
-    
-    # Fallback: Download templates at minimum
-    Write-Step "Downloading templates..."
+
+    # Download skills index
     try {
-        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/CLAUDE.md.template" -OutFile ".ctoc\templates\CLAUDE.md.template" -UseBasicParsing
-        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/IRON_LOOP.md.template" -OutFile ".ctoc\templates\IRON_LOOP.md.template" -UseBasicParsing
-        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/PLANNING.md.template" -OutFile ".ctoc\templates\PLANNING.md.template" -UseBasicParsing
+        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/skills.json" -OutFile ".ctoc\skills.json" -UseBasicParsing -ErrorAction Stop
     } catch {
-        Write-Warning "Could not download all templates. For full skills library, clone the repo manually."
+        Write-Error "Failed to download skills.json"
+        exit 1
     }
-    
-    Write-Success "Skills library structure created"
+
+    # Download templates
+    try {
+        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/CLAUDE.md.template" -OutFile ".ctoc\templates\CLAUDE.md.template" -UseBasicParsing -ErrorAction SilentlyContinue
+        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/IRON_LOOP.md.template" -OutFile ".ctoc\templates\IRON_LOOP.md.template" -UseBasicParsing -ErrorAction SilentlyContinue
+        Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/templates/PLANNING.md.template" -OutFile ".ctoc\templates\PLANNING.md.template" -UseBasicParsing -ErrorAction SilentlyContinue
+    } catch { }
+
+    Write-Success "Core files installed"
 }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Detect and Download Skills
+# ═══════════════════════════════════════════════════════════════════════════════
+
+function Get-DetectedSkills {
+    # Load skills index
+    $index = Get-Content ".ctoc\skills.json" -Raw | ConvertFrom-Json
+
+    $languages = @()
+    $frameworks = @()
+
+    # Detect languages
+    foreach ($lang in $index.skills.languages.PSObject.Properties) {
+        $name = $lang.Name
+        foreach ($trigger in $lang.Value.triggers) {
+            if ([string]::IsNullOrEmpty($trigger)) { continue }
+
+            if ($trigger -match '\*') {
+                $pattern = $trigger -replace '^\*', ''
+                $files = Get-ChildItem -Path . -Filter "*$pattern" -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($files) {
+                    $languages += $name
+                    break
+                }
+            } else {
+                if (Test-Path $trigger) {
+                    $languages += $name
+                    break
+                }
+            }
+        }
+    }
+
+    # Detect frameworks
+    $configFiles = @(
+        "pyproject.toml", "requirements.txt", "setup.py",
+        "package.json", "package-lock.json",
+        "Cargo.toml", "go.mod", "go.sum",
+        "pom.xml", "build.gradle", "build.gradle.kts",
+        "Gemfile", "composer.json", "pubspec.yaml",
+        "mix.exs", "deps.edn", "project.clj"
+    )
+
+    $configContent = ""
+    foreach ($file in $configFiles) {
+        if (Test-Path $file) {
+            $configContent += Get-Content $file -Raw -ErrorAction SilentlyContinue
+        }
+    }
+
+    if ($configContent) {
+        foreach ($category in $index.skills.frameworks.PSObject.Properties) {
+            foreach ($framework in $category.Value.PSObject.Properties) {
+                foreach ($keyword in $framework.Value.keywords) {
+                    if ([string]::IsNullOrEmpty($keyword)) { continue }
+                    if ($configContent -match [regex]::Escape($keyword)) {
+                        $frameworks += $framework.Name
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    return @{
+        Languages = $languages | Sort-Object -Unique
+        Frameworks = $frameworks | Sort-Object -Unique
+    }
+}
+
+function Install-Skills {
+    Write-Step "Detecting project technologies..."
+
+    $detected = Get-DetectedSkills
+    $index = Get-Content ".ctoc\skills.json" -Raw | ConvertFrom-Json
+
+    if ($detected.Languages.Count -eq 0 -and $detected.Frameworks.Count -eq 0) {
+        Write-Warning "No technologies detected. Skills can be added later with: ctoc skills add <name>"
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Detected technologies:"
+    foreach ($lang in $detected.Languages) {
+        Write-Host "  - $lang (language)"
+    }
+    foreach ($framework in $detected.Frameworks) {
+        Write-Host "  - $framework (framework)"
+    }
+    Write-Host ""
+
+    Write-Step "Downloading detected skills..."
+
+    $downloadCount = 0
+    $totalSize = 0
+
+    # Download languages
+    foreach ($lang in $detected.Languages) {
+        $langInfo = $index.skills.languages.$lang
+        if ($langInfo) {
+            $path = $langInfo.file
+            $localPath = ".ctoc\skills\$($path -replace '/', '\')"
+            $dir = Split-Path $localPath -Parent
+            if (-not (Test-Path $dir)) {
+                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            }
+            try {
+                Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/skills/$path" -OutFile $localPath -UseBasicParsing -ErrorAction Stop
+                Write-Host "  ✓ $lang"
+                $downloadCount++
+                $totalSize += $langInfo.size
+            } catch {
+                Write-Host "  ✗ $lang (failed)"
+            }
+        }
+    }
+
+    # Download frameworks and their dependencies
+    foreach ($framework in $detected.Frameworks) {
+        # Find framework info
+        $frameworkInfo = $null
+        foreach ($category in $index.skills.frameworks.PSObject.Properties) {
+            if ($category.Value.$framework) {
+                $frameworkInfo = $category.Value.$framework
+                break
+            }
+        }
+
+        if ($frameworkInfo) {
+            # Download required languages first
+            if ($frameworkInfo.requires) {
+                foreach ($req in $frameworkInfo.requires) {
+                    $reqPath = ".ctoc\skills\languages\$req.md"
+                    if (-not (Test-Path $reqPath)) {
+                        $reqInfo = $index.skills.languages.$req
+                        if ($reqInfo) {
+                            $dir = Split-Path $reqPath -Parent
+                            if (-not (Test-Path $dir)) {
+                                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+                            }
+                            try {
+                                Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/skills/$($reqInfo.file)" -OutFile $reqPath -UseBasicParsing -ErrorAction Stop
+                                Write-Host "  ✓ $req (dependency)"
+                                $downloadCount++
+                            } catch { }
+                        }
+                    }
+                }
+            }
+
+            # Download framework
+            $path = $frameworkInfo.file
+            $localPath = ".ctoc\skills\$($path -replace '/', '\')"
+            $dir = Split-Path $localPath -Parent
+            if (-not (Test-Path $dir)) {
+                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            }
+            try {
+                Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/skills/$path" -OutFile $localPath -UseBasicParsing -ErrorAction Stop
+                Write-Host "  ✓ $framework"
+                $downloadCount++
+                $totalSize += $frameworkInfo.size
+            } catch {
+                Write-Host "  ✗ $framework (failed)"
+            }
+        }
+    }
+
+    Write-Host ""
+    Write-Success "Downloaded $downloadCount skills (~$([math]::Round($totalSize / 1024))KB)"
+
+    # Store detected info for later use
+    $script:DetectedLanguages = $detected.Languages
+    $script:DetectedFrameworks = $detected.Frameworks
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Project Setup
+# ═══════════════════════════════════════════════════════════════════════════════
 
 function Get-ProjectSetup {
     Write-Step "Setting up your project..."
     Write-Host ""
-    
-    # Project name
+
+    # Get project name
     $defaultName = Split-Path -Leaf (Get-Location)
     $projectName = Read-Host "Project name [$defaultName]"
-    if ([string]::IsNullOrWhiteSpace($projectName)) { $projectName = $defaultName }
-    
-    # Language selection
-    Write-Host ""
-    Write-Host "Primary language:"
-    Write-Host "  1) Python      6) Go          11) Swift"
-    Write-Host "  2) TypeScript  7) Rust        12) Kotlin"
-    Write-Host "  3) JavaScript  8) C#          13) Other"
-    Write-Host "  4) Java        9) PHP"
-    Write-Host "  5) Ruby       10) Elixir"
-    Write-Host ""
-    $langChoice = Read-Host "Select [1-13]"
-    
-    $language = switch ($langChoice) {
-        "1" { "Python" }
-        "2" { "TypeScript" }
-        "3" { "JavaScript" }
-        "4" { "Java" }
-        "5" { "Ruby" }
-        "6" { "Go" }
-        "7" { "Rust" }
-        "8" { "C#" }
-        "9" { "PHP" }
-        "10" { "Elixir" }
-        "11" { "Swift" }
-        "12" { "Kotlin" }
-        default { Read-Host "Enter language" }
+    if ([string]::IsNullOrEmpty($projectName)) {
+        $projectName = $defaultName
     }
-    
-    # Framework
-    Write-Host ""
-    $framework = Read-Host "Primary framework (optional, e.g., FastAPI, React, Django)"
-    
-    # Description
+
+    # Get primary language
+    $detectedLang = if ($script:DetectedLanguages.Count -gt 0) { $script:DetectedLanguages[0] } else { $null }
+
+    if ($detectedLang) {
+        Write-Host ""
+        Write-Host "Detected primary language: $detectedLang"
+        $response = Read-Host "Use this language? (Y/n)"
+        if ($response -match "^[Nn]$") {
+            $detectedLang = $null
+        }
+    }
+
+    if (-not $detectedLang) {
+        Write-Host ""
+        Write-Host "Primary language:"
+        Write-Host "  1) Python      6) Go          11) Swift"
+        Write-Host "  2) TypeScript  7) Rust        12) Kotlin"
+        Write-Host "  3) JavaScript  8) C#          13) Other"
+        Write-Host "  4) Java        9) PHP"
+        Write-Host "  5) Ruby       10) Elixir"
+        Write-Host ""
+        $langChoice = Read-Host "Select [1-13]"
+
+        $language = switch ($langChoice) {
+            "1" { "Python" }
+            "2" { "TypeScript" }
+            "3" { "JavaScript" }
+            "4" { "Java" }
+            "5" { "Ruby" }
+            "6" { "Go" }
+            "7" { "Rust" }
+            "8" { "C#" }
+            "9" { "PHP" }
+            "10" { "Elixir" }
+            "11" { "Swift" }
+            "12" { "Kotlin" }
+            default { Read-Host "Enter language" }
+        }
+    } else {
+        $language = $detectedLang
+    }
+
+    # Get framework
+    $detectedFramework = if ($script:DetectedFrameworks.Count -gt 0) { $script:DetectedFrameworks[0] } else { $null }
+
+    if ($detectedFramework) {
+        Write-Host ""
+        Write-Host "Detected framework: $detectedFramework"
+        $response = Read-Host "Use this framework? (Y/n)"
+        if ($response -match "^[Nn]$") {
+            $detectedFramework = $null
+        }
+    }
+
+    if (-not $detectedFramework) {
+        Write-Host ""
+        $framework = Read-Host "Primary framework (optional, e.g., FastAPI, React, Django)"
+    } else {
+        $framework = $detectedFramework
+    }
+
+    # Get description
     Write-Host ""
     $description = Read-Host "One-line project description"
-    
+
     return @{
         Name = $projectName
         Language = $language
@@ -155,12 +376,26 @@ function Get-ProjectSetup {
 
 function New-ClaudeMd {
     param($Project)
-    
+
     Write-Step "Generating CLAUDE.md..."
-    
+
+    $langLower = $Project.Language.ToLower() -replace ' ', '-'
+    $frameworkSkillPath = ""
+
+    if ($Project.Framework) {
+        $fwLower = $Project.Framework.ToLower() -replace ' ', '-'
+        $index = Get-Content ".ctoc\skills.json" -Raw | ConvertFrom-Json
+        foreach ($category in $index.skills.frameworks.PSObject.Properties) {
+            if ($category.Value.$fwLower) {
+                $frameworkSkillPath = $category.Value.$fwLower.file
+                break
+            }
+        }
+    }
+
     $frameworkLine = if ($Project.Framework) { "- **Framework:** $($Project.Framework)" } else { "" }
-    $frameworkSkill = if ($Project.Framework) { "- ``.ctoc/skills/frameworks/*/$($Project.Framework.ToLower()).md`` - $($Project.Framework) CTO standards" } else { "" }
-    
+    $frameworkSkillLine = if ($frameworkSkillPath) { "- ``.ctoc/skills/$frameworkSkillPath`` - $($Project.Framework) CTO standards" } else { "" }
+
     $content = @"
 # $($Project.Name)
 
@@ -179,9 +414,23 @@ $frameworkLine
 
 ## Skills Library
 
-Reference skills from ``.ctoc/skills/`` for language and framework-specific guidance:
-- ``.ctoc/skills/languages/$($Project.Language.ToLower()).md`` - $($Project.Language) CTO standards
-$frameworkSkill
+Reference skills from ``.ctoc/skills/`` for language and framework-specific guidance.
+
+**Active Skills:**
+- ``.ctoc/skills/languages/$langLower.md`` - $($Project.Language) CTO standards
+$frameworkSkillLine
+
+**Skill Management:**
+``````powershell
+# See all available skills (261 total)
+.ctoc\bin\ctoc.ps1 skills list
+
+# Add a new skill
+.ctoc\bin\ctoc.ps1 skills add <skill-name>
+
+# Auto-detect and sync skills
+.ctoc\bin\ctoc.ps1 skills sync
+``````
 
 ## Your Standards
 
@@ -227,20 +476,29 @@ Follow the 12-step Iron Loop for all implementation:
 
 See ``IRON_LOOP.md`` for current project status.
 See ``PLANNING.md`` for feature backlog.
+
+## Skill Auto-Sync
+
+When you notice the project using a new technology (new dependencies, new file types),
+automatically run skill sync to download relevant guidance:
+
+``````powershell
+.ctoc\bin\ctoc.ps1 skills sync
+``````
 "@
-    
+
     $content | Out-File -FilePath "CLAUDE.md" -Encoding utf8
     Write-Success "CLAUDE.md created"
 }
 
 function New-IronLoopMd {
     param($Project)
-    
+
     Write-Step "Generating IRON_LOOP.md..."
-    
+
     $date = Get-Date -Format "yyyy-MM-dd"
     $frameworkLine = if ($Project.Framework) { "- Framework: $($Project.Framework)" } else { "" }
-    
+
     $content = @"
 # Iron Loop - $($Project.Name)
 
@@ -250,24 +508,24 @@ function New-IronLoopMd {
 
 | Step | Status | Notes |
 |------|--------|-------|
-| 1. ASSESS | 🟡 In Progress | Initial project setup |
-| 2. PLAN | ⚪ Pending | |
-| 3. RISKS | ⚪ Pending | |
-| 4. PREPARE | ⚪ Pending | |
-| 5. ITERATE | ⚪ Pending | |
-| 6. VALIDATE | ⚪ Pending | |
-| 7. DOCUMENT | ⚪ Pending | |
-| 8. REVIEW | ⚪ Pending | |
-| 9. SHIP | ⚪ Pending | |
-| 10. MONITOR | ⚪ Pending | |
-| 11. LEARN | ⚪ Pending | |
-| 12. IMPROVE | ⚪ Pending | |
+| 1. ASSESS | In Progress | Initial project setup |
+| 2. PLAN | Pending | |
+| 3. RISKS | Pending | |
+| 4. PREPARE | Pending | |
+| 5. ITERATE | Pending | |
+| 6. VALIDATE | Pending | |
+| 7. DOCUMENT | Pending | |
+| 8. REVIEW | Pending | |
+| 9. SHIP | Pending | |
+| 10. MONITOR | Pending | |
+| 11. LEARN | Pending | |
+| 12. IMPROVE | Pending | |
 
 ## Legend
-- ⚪ Pending
-- 🟡 In Progress
-- 🟢 Complete
-- 🔴 Blocked
+- Pending
+- In Progress
+- Complete
+- Blocked
 
 ## Session Log
 
@@ -277,18 +535,18 @@ function New-IronLoopMd {
 - Language: $($Project.Language)
 $frameworkLine
 "@
-    
+
     $content | Out-File -FilePath "IRON_LOOP.md" -Encoding utf8
     Write-Success "IRON_LOOP.md created"
 }
 
 function New-PlanningMd {
     param($Project)
-    
+
     Write-Step "Generating PLANNING.md..."
-    
+
     $frameworkLine = if ($Project.Framework) { "| Framework | $($Project.Framework) | *TODO* |" } else { "" }
-    
+
     $content = @"
 # Planning - $($Project.Name)
 
@@ -332,19 +590,54 @@ $frameworkLine
 
 - *TODO: Questions to resolve*
 "@
-    
+
     $content | Out-File -FilePath "PLANNING.md" -Encoding utf8
     Write-Success "PLANNING.md created"
 }
 
-# Main execution
+function Update-Gitignore {
+    Write-Step "Updating .gitignore..."
+
+    $gitignoreContent = @"
+
+# CTOC - Skills library (optional: can be tracked or ignored)
+# .ctoc/
+"@
+
+    if (Test-Path ".gitignore") {
+        $existing = Get-Content ".gitignore" -Raw -ErrorAction SilentlyContinue
+        if ($existing -notmatch "\.ctoc/") {
+            Add-Content -Path ".gitignore" -Value $gitignoreContent
+        }
+    } else {
+        $gitignoreContent.Trim() | Out-File -FilePath ".gitignore" -Encoding utf8
+    }
+
+    Write-Success ".gitignore updated"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Main
+# ═══════════════════════════════════════════════════════════════════════════════
+
 Write-Banner
+Write-Host "Version $CTOC_VERSION - Smart Skill Loading"
+Write-Host ""
+
 Test-Directory
+Get-CoreFiles
 Install-Skills
 $project = Get-ProjectSetup
 New-ClaudeMd -Project $project
 New-IronLoopMd -Project $project
 New-PlanningMd -Project $project
+Update-Gitignore
+
+# Count downloaded skills
+$skillCount = 0
+if (Test-Path ".ctoc\skills") {
+    $skillCount = (Get-ChildItem ".ctoc\skills" -Recurse -Filter "*.md" -ErrorAction SilentlyContinue | Measure-Object).Count
+}
 
 Write-Host ""
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
@@ -355,7 +648,12 @@ Write-Host "  Files created:"
 Write-Host "    • CLAUDE.md     - CTO instructions for Claude"
 Write-Host "    • IRON_LOOP.md  - Progress tracking"
 Write-Host "    • PLANNING.md   - Feature backlog"
-Write-Host "    • .ctoc\        - Skills library (103 CTO personas)"
+Write-Host "    • .ctoc\        - Skills library ($skillCount skills downloaded)"
+Write-Host ""
+Write-Host "  Skill commands:"
+Write-Host "    • .ctoc\bin\ctoc.ps1 skills list     - See all 261 available skills"
+Write-Host "    • .ctoc\bin\ctoc.ps1 skills add NAME - Add a specific skill"
+Write-Host "    • .ctoc\bin\ctoc.ps1 skills sync     - Auto-detect & download skills"
 Write-Host ""
 Write-Host "  Next steps:"
 Write-Host "    1. Review and customize CLAUDE.md"

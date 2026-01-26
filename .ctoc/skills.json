@@ -1,0 +1,2530 @@
+{
+  "version": "2026.01",
+  "generated": "2026-01-26T14:45:09+01:00",
+  "skills": {
+    "languages": {
+      "abap": {
+        "file": "languages/abap.md",
+        "triggers": [
+          "*.abap"
+        ],
+        "size": 2121
+      },
+      "apex": {
+        "file": "languages/apex.md",
+        "triggers": [
+          "*.cls",
+          "*.trigger",
+          "sfdx-project.json"
+        ],
+        "size": 2401
+      },
+      "assembly": {
+        "file": "languages/assembly.md",
+        "triggers": [
+          "*.asm",
+          "*.s"
+        ],
+        "size": 1843
+      },
+      "bash": {
+        "file": "languages/bash.md",
+        "triggers": [
+          "*.sh",
+          "*.bash"
+        ],
+        "size": 1728
+      },
+      "c": {
+        "file": "languages/c.md",
+        "triggers": [
+          "*.c",
+          "*.h",
+          "Makefile",
+          "CMakeLists.txt"
+        ],
+        "size": 1841
+      },
+      "clojure": {
+        "file": "languages/clojure.md",
+        "triggers": [
+          "*.clj",
+          "*.cljs",
+          "*.cljc",
+          "project.clj",
+          "deps.edn"
+        ],
+        "size": 1988
+      },
+      "cobol": {
+        "file": "languages/cobol.md",
+        "triggers": [
+          "*.cob",
+          "*.cbl"
+        ],
+        "size": 2139
+      },
+      "coffeescript": {
+        "file": "languages/coffeescript.md",
+        "triggers": [
+          "*.coffee"
+        ],
+        "size": 1933
+      },
+      "cpp": {
+        "file": "languages/cpp.md",
+        "triggers": [
+          "*.cpp",
+          "*.cc",
+          "*.cxx",
+          "*.hpp",
+          "*.h",
+          "CMakeLists.txt"
+        ],
+        "size": 1979
+      },
+      "crystal": {
+        "file": "languages/crystal.md",
+        "triggers": [
+          "*.cr",
+          "shard.yml"
+        ],
+        "size": 1844
+      },
+      "csharp": {
+        "file": "languages/csharp.md",
+        "triggers": [
+          "*.cs",
+          "*.csproj",
+          "*.sln"
+        ],
+        "size": 1823
+      },
+      "d": {
+        "file": "languages/d.md",
+        "triggers": [
+          "*.d",
+          "dub.json",
+          "dub.sdl"
+        ],
+        "size": 1955
+      },
+      "dart": {
+        "file": "languages/dart.md",
+        "triggers": [
+          "*.dart",
+          "pubspec.yaml",
+          "pubspec.lock"
+        ],
+        "size": 1874
+      },
+      "elixir": {
+        "file": "languages/elixir.md",
+        "triggers": [
+          "*.ex",
+          "*.exs",
+          "mix.exs"
+        ],
+        "size": 1970
+      },
+      "erlang": {
+        "file": "languages/erlang.md",
+        "triggers": [
+          "*.erl",
+          "*.hrl",
+          "rebar.config"
+        ],
+        "size": 1825
+      },
+      "fortran": {
+        "file": "languages/fortran.md",
+        "triggers": [
+          "*.f",
+          "*.f90",
+          "*.f95"
+        ],
+        "size": 1641
+      },
+      "fsharp": {
+        "file": "languages/fsharp.md",
+        "triggers": [
+          "*.fs",
+          "*.fsx",
+          "*.fsproj"
+        ],
+        "size": 1939
+      },
+      "go": {
+        "file": "languages/go.md",
+        "triggers": [
+          "*.go",
+          "go.mod",
+          "go.sum"
+        ],
+        "size": 1837
+      },
+      "graphql": {
+        "file": "languages/graphql.md",
+        "triggers": [
+          "*.graphql",
+          "*.gql"
+        ],
+        "size": 2376
+      },
+      "groovy": {
+        "file": "languages/groovy.md",
+        "triggers": [
+          "*.groovy",
+          "*.gradle",
+          "Jenkinsfile"
+        ],
+        "size": 1940
+      },
+      "haskell": {
+        "file": "languages/haskell.md",
+        "triggers": [
+          "*.hs",
+          "*.lhs",
+          "*.cabal",
+          "stack.yaml"
+        ],
+        "size": 1838
+      },
+      "java": {
+        "file": "languages/java.md",
+        "triggers": [
+          "*.java",
+          "pom.xml",
+          "build.gradle",
+          "build.gradle.kts"
+        ],
+        "size": 1930
+      },
+      "javascript": {
+        "file": "languages/javascript.md",
+        "triggers": [
+          "*.js",
+          "*.mjs",
+          "*.cjs",
+          "package.json"
+        ],
+        "size": 1883
+      },
+      "julia": {
+        "file": "languages/julia.md",
+        "triggers": [
+          "*.jl",
+          "Project.toml",
+          "Manifest.toml"
+        ],
+        "size": 1917
+      },
+      "kotlin": {
+        "file": "languages/kotlin.md",
+        "triggers": [
+          "*.kt",
+          "*.kts",
+          "build.gradle.kts"
+        ],
+        "size": 1913
+      },
+      "lua": {
+        "file": "languages/lua.md",
+        "triggers": [
+          "*.lua"
+        ],
+        "size": 1857
+      },
+      "matlab": {
+        "file": "languages/matlab.md",
+        "triggers": [
+          "*.m",
+          "*.mat"
+        ],
+        "size": 1877
+      },
+      "nim": {
+        "file": "languages/nim.md",
+        "triggers": [
+          "*.nim",
+          "*.nimble"
+        ],
+        "size": 1968
+      },
+      "objectivec": {
+        "file": "languages/objectivec.md",
+        "triggers": [
+          "*.m",
+          "*.mm"
+        ],
+        "size": 2000
+      },
+      "ocaml": {
+        "file": "languages/ocaml.md",
+        "triggers": [
+          "*.ml",
+          "*.mli",
+          "dune",
+          "dune-project"
+        ],
+        "size": 1834
+      },
+      "perl": {
+        "file": "languages/perl.md",
+        "triggers": [
+          "*.pl",
+          "*.pm",
+          "Makefile.PL",
+          "cpanfile"
+        ],
+        "size": 1855
+      },
+      "php": {
+        "file": "languages/php.md",
+        "triggers": [
+          "*.php",
+          "composer.json",
+          "composer.lock"
+        ],
+        "size": 1867
+      },
+      "powershell": {
+        "file": "languages/powershell.md",
+        "triggers": [
+          "*.ps1",
+          "*.psm1",
+          "*.psd1"
+        ],
+        "size": 1941
+      },
+      "prolog": {
+        "file": "languages/prolog.md",
+        "triggers": [
+          "*.pro"
+        ],
+        "size": 1985
+      },
+      "python": {
+        "file": "languages/python.md",
+        "triggers": [
+          "*.py",
+          "pyproject.toml",
+          "requirements.txt",
+          "setup.py",
+          "Pipfile",
+          "poetry.lock",
+          "uv.lock"
+        ],
+        "size": 1835
+      },
+      "r": {
+        "file": "languages/r.md",
+        "triggers": [
+          "*.R",
+          "*.Rmd",
+          "DESCRIPTION",
+          "NAMESPACE"
+        ],
+        "size": 1974
+      },
+      "ruby": {
+        "file": "languages/ruby.md",
+        "triggers": [
+          "*.rb",
+          "Gemfile",
+          "Gemfile.lock",
+          "Rakefile"
+        ],
+        "size": 1830
+      },
+      "rust": {
+        "file": "languages/rust.md",
+        "triggers": [
+          "*.rs",
+          "Cargo.toml",
+          "Cargo.lock"
+        ],
+        "size": 2015
+      },
+      "scala": {
+        "file": "languages/scala.md",
+        "triggers": [
+          "*.scala",
+          "build.sbt"
+        ],
+        "size": 1812
+      },
+      "scheme": {
+        "file": "languages/scheme.md",
+        "triggers": [
+          "*.scm",
+          "*.ss"
+        ],
+        "size": 1881
+      },
+      "solidity": {
+        "file": "languages/solidity.md",
+        "triggers": [
+          "*.sol",
+          "hardhat.config.js",
+          "truffle-config.js",
+          "foundry.toml"
+        ],
+        "size": 2232
+      },
+      "sql": {
+        "file": "languages/sql.md",
+        "triggers": [
+          "*.sql"
+        ],
+        "size": 1875
+      },
+      "swift": {
+        "file": "languages/swift.md",
+        "triggers": [
+          "*.swift",
+          "Package.swift"
+        ],
+        "size": 1994
+      },
+      "tcl": {
+        "file": "languages/tcl.md",
+        "triggers": [
+          "*.tcl"
+        ],
+        "size": 1846
+      },
+      "terraform": {
+        "file": "languages/terraform.md",
+        "triggers": [
+          "*.tf",
+          "*.tfvars"
+        ],
+        "size": 2074
+      },
+      "typescript": {
+        "file": "languages/typescript.md",
+        "triggers": [
+          "*.ts",
+          "*.tsx",
+          "tsconfig.json"
+        ],
+        "size": 1817
+      },
+      "vba": {
+        "file": "languages/vba.md",
+        "triggers": [
+          "*.vba",
+          "*.bas"
+        ],
+        "size": 2003
+      },
+      "verilog": {
+        "file": "languages/verilog.md",
+        "triggers": [
+          "*.v",
+          "*.sv"
+        ],
+        "size": 2037
+      },
+      "vhdl": {
+        "file": "languages/vhdl.md",
+        "triggers": [
+          "*.vhd",
+          "*.vhdl"
+        ],
+        "size": 2390
+      },
+      "zig": {
+        "file": "languages/zig.md",
+        "triggers": [
+          "*.zig",
+          "build.zig"
+        ],
+        "size": 1946
+      }
+    },
+    "frameworks": {
+      "ai-ml": {
+        "accelerate": {
+          "file": "frameworks/ai-ml/accelerate.md",
+          "keywords": [
+            "accelerate"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2418
+        },
+        "anthropic-sdk": {
+          "file": "frameworks/ai-ml/anthropic-sdk.md",
+          "keywords": [
+            "anthropic"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2536
+        },
+        "autogen": {
+          "file": "frameworks/ai-ml/autogen.md",
+          "keywords": [
+            "autogen",
+            "pyautogen"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2633
+        },
+        "bitsandbytes": {
+          "file": "frameworks/ai-ml/bitsandbytes.md",
+          "keywords": [
+            "bitsandbytes"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2190
+        },
+        "chromadb": {
+          "file": "frameworks/ai-ml/chromadb.md",
+          "keywords": [
+            "chromadb"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2481
+        },
+        "crewai": {
+          "file": "frameworks/ai-ml/crewai.md",
+          "keywords": [
+            "crewai"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2211
+        },
+        "datasets": {
+          "file": "frameworks/ai-ml/datasets.md",
+          "keywords": [
+            "datasets"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2354
+        },
+        "deepspeed": {
+          "file": "frameworks/ai-ml/deepspeed.md",
+          "keywords": [
+            "deepspeed"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2331
+        },
+        "diffusers": {
+          "file": "frameworks/ai-ml/diffusers.md",
+          "keywords": [
+            "diffusers"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2368
+        },
+        "dspy": {
+          "file": "frameworks/ai-ml/dspy.md",
+          "keywords": [
+            "dspy",
+            "dspy-ai"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2494
+        },
+        "fastai": {
+          "file": "frameworks/ai-ml/fastai.md",
+          "keywords": [
+            "fastai"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2151
+        },
+        "ggml": {
+          "file": "frameworks/ai-ml/ggml.md",
+          "keywords": [
+            "ggml"
+          ],
+          "requires": [],
+          "size": 2105
+        },
+        "gradio": {
+          "file": "frameworks/ai-ml/gradio.md",
+          "keywords": [
+            "gradio"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2289
+        },
+        "huggingface-hub": {
+          "file": "frameworks/ai-ml/huggingface-hub.md",
+          "keywords": [
+            "huggingface-hub",
+            "huggingface_hub"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2096
+        },
+        "jax": {
+          "file": "frameworks/ai-ml/jax.md",
+          "keywords": [
+            "jax",
+            "jaxlib"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2737
+        },
+        "keras": {
+          "file": "frameworks/ai-ml/keras.md",
+          "keywords": [
+            "keras"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2172
+        },
+        "langchain": {
+          "file": "frameworks/ai-ml/langchain.md",
+          "keywords": [
+            "langchain"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 1967
+        },
+        "llama-cpp": {
+          "file": "frameworks/ai-ml/llama-cpp.md",
+          "keywords": [
+            "llama-cpp-python",
+            "llama.cpp"
+          ],
+          "requires": [],
+          "size": 2517
+        },
+        "llamaindex": {
+          "file": "frameworks/ai-ml/llamaindex.md",
+          "keywords": [
+            "llama-index",
+            "llama_index"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2378
+        },
+        "milvus": {
+          "file": "frameworks/ai-ml/milvus.md",
+          "keywords": [
+            "pymilvus",
+            "milvus"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2771
+        },
+        "mlflow": {
+          "file": "frameworks/ai-ml/mlflow.md",
+          "keywords": [
+            "mlflow"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2122
+        },
+        "modal": {
+          "file": "frameworks/ai-ml/modal.md",
+          "keywords": [
+            "modal"
+          ],
+          "requires": [],
+          "size": 2695
+        },
+        "ollama": {
+          "file": "frameworks/ai-ml/ollama.md",
+          "keywords": [
+            "ollama"
+          ],
+          "requires": [],
+          "size": 2094
+        },
+        "onnx": {
+          "file": "frameworks/ai-ml/onnx.md",
+          "keywords": [
+            "onnx",
+            "onnxruntime"
+          ],
+          "requires": [],
+          "size": 1973
+        },
+        "openai-sdk": {
+          "file": "frameworks/ai-ml/openai-sdk.md",
+          "keywords": [
+            "openai"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2241
+        },
+        "peft": {
+          "file": "frameworks/ai-ml/peft.md",
+          "keywords": [
+            "peft"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2615
+        },
+        "pgvector": {
+          "file": "frameworks/ai-ml/pgvector.md",
+          "keywords": [
+            "pgvector"
+          ],
+          "requires": [],
+          "size": 2562
+        },
+        "pinecone": {
+          "file": "frameworks/ai-ml/pinecone.md",
+          "keywords": [
+            "pinecone",
+            "pinecone-client"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2458
+        },
+        "pytorch": {
+          "file": "frameworks/ai-ml/pytorch.md",
+          "keywords": [
+            "torch",
+            "pytorch"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 1819
+        },
+        "qdrant": {
+          "file": "frameworks/ai-ml/qdrant.md",
+          "keywords": [
+            "qdrant-client",
+            "qdrant"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2770
+        },
+        "ray": {
+          "file": "frameworks/ai-ml/ray.md",
+          "keywords": [
+            "ray"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2524
+        },
+        "replicate": {
+          "file": "frameworks/ai-ml/replicate.md",
+          "keywords": [
+            "replicate"
+          ],
+          "requires": [],
+          "size": 2827
+        },
+        "scikit-learn": {
+          "file": "frameworks/ai-ml/scikit-learn.md",
+          "keywords": [
+            "scikit-learn",
+            "sklearn"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2266
+        },
+        "semantic-kernel": {
+          "file": "frameworks/ai-ml/semantic-kernel.md",
+          "keywords": [
+            "semantic-kernel"
+          ],
+          "requires": [],
+          "size": 2418
+        },
+        "streamlit": {
+          "file": "frameworks/ai-ml/streamlit.md",
+          "keywords": [
+            "streamlit"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2623
+        },
+        "tensorflow": {
+          "file": "frameworks/ai-ml/tensorflow.md",
+          "keywords": [
+            "tensorflow"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 1812
+        },
+        "tensorrt": {
+          "file": "frameworks/ai-ml/tensorrt.md",
+          "keywords": [
+            "tensorrt"
+          ],
+          "requires": [],
+          "size": 2755
+        },
+        "transformers": {
+          "file": "frameworks/ai-ml/transformers.md",
+          "keywords": [
+            "transformers"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2067
+        },
+        "triton": {
+          "file": "frameworks/ai-ml/triton.md",
+          "keywords": [
+            "triton",
+            "tritonclient"
+          ],
+          "requires": [],
+          "size": 2310
+        },
+        "trl": {
+          "file": "frameworks/ai-ml/trl.md",
+          "keywords": [
+            "trl"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2521
+        },
+        "unsloth": {
+          "file": "frameworks/ai-ml/unsloth.md",
+          "keywords": [
+            "unsloth"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2614
+        },
+        "vllm": {
+          "file": "frameworks/ai-ml/vllm.md",
+          "keywords": [
+            "vllm"
+          ],
+          "requires": [],
+          "size": 2181
+        },
+        "wandb": {
+          "file": "frameworks/ai-ml/wandb.md",
+          "keywords": [
+            "wandb"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2164
+        },
+        "weaviate": {
+          "file": "frameworks/ai-ml/weaviate.md",
+          "keywords": [
+            "weaviate-client",
+            "weaviate"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2816
+        }
+      },
+      "data": {
+        "airbyte": {
+          "file": "frameworks/data/airbyte.md",
+          "keywords": [
+            "airbyte"
+          ],
+          "requires": [],
+          "size": 2104
+        },
+        "airflow": {
+          "file": "frameworks/data/airflow.md",
+          "keywords": [
+            "apache-airflow",
+            "airflow"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2118
+        },
+        "alembic": {
+          "file": "frameworks/data/alembic.md",
+          "keywords": [
+            "alembic"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2070
+        },
+        "arangodb": {
+          "file": "frameworks/data/arangodb.md",
+          "keywords": [
+            "arangojs",
+            "python-arango"
+          ],
+          "requires": [],
+          "size": 2121
+        },
+        "arrow": {
+          "file": "frameworks/data/arrow.md",
+          "keywords": [
+            "pyarrow",
+            "arrow"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2048
+        },
+        "beam": {
+          "file": "frameworks/data/beam.md",
+          "keywords": [
+            "apache-beam"
+          ],
+          "requires": [],
+          "size": 2760
+        },
+        "cassandra": {
+          "file": "frameworks/data/cassandra.md",
+          "keywords": [
+            "cassandra-driver"
+          ],
+          "requires": [],
+          "size": 2104
+        },
+        "clickhouse": {
+          "file": "frameworks/data/clickhouse.md",
+          "keywords": [
+            "clickhouse",
+            "clickhouse-driver"
+          ],
+          "requires": [],
+          "size": 2101
+        },
+        "cockroachdb": {
+          "file": "frameworks/data/cockroachdb.md",
+          "keywords": [
+            "cockroachdb"
+          ],
+          "requires": [],
+          "size": 2357
+        },
+        "couchbase": {
+          "file": "frameworks/data/couchbase.md",
+          "keywords": [
+            "couchbase"
+          ],
+          "requires": [],
+          "size": 1834
+        },
+        "dagster": {
+          "file": "frameworks/data/dagster.md",
+          "keywords": [
+            "dagster"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2347
+        },
+        "dask": {
+          "file": "frameworks/data/dask.md",
+          "keywords": [
+            "dask"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2030
+        },
+        "dbt": {
+          "file": "frameworks/data/dbt.md",
+          "keywords": [
+            "dbt-core",
+            "dbt"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2031
+        },
+        "debezium": {
+          "file": "frameworks/data/debezium.md",
+          "keywords": [
+            "debezium"
+          ],
+          "requires": [],
+          "size": 2164
+        },
+        "delta-lake": {
+          "file": "frameworks/data/delta-lake.md",
+          "keywords": [
+            "delta",
+            "delta-spark"
+          ],
+          "requires": [],
+          "size": 2090
+        },
+        "dgraph": {
+          "file": "frameworks/data/dgraph.md",
+          "keywords": [
+            "dgraph"
+          ],
+          "requires": [],
+          "size": 1930
+        },
+        "drizzle": {
+          "file": "frameworks/data/drizzle.md",
+          "keywords": [
+            "drizzle-orm"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2502
+        },
+        "duckdb": {
+          "file": "frameworks/data/duckdb.md",
+          "keywords": [
+            "duckdb"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2048
+        },
+        "dynamodb": {
+          "file": "frameworks/data/dynamodb.md",
+          "keywords": [
+            "boto3",
+            "@aws-sdk/client-dynamodb"
+          ],
+          "requires": [],
+          "size": 2052
+        },
+        "elasticsearch": {
+          "file": "frameworks/data/elasticsearch.md",
+          "keywords": [
+            "elasticsearch",
+            "@elastic/elasticsearch"
+          ],
+          "requires": [],
+          "size": 2441
+        },
+        "fivetran": {
+          "file": "frameworks/data/fivetran.md",
+          "keywords": [
+            "fivetran"
+          ],
+          "requires": [],
+          "size": 2113
+        },
+        "flink": {
+          "file": "frameworks/data/flink.md",
+          "keywords": [
+            "flink",
+            "pyflink"
+          ],
+          "requires": [],
+          "size": 2155
+        },
+        "great-expectations": {
+          "file": "frameworks/data/great-expectations.md",
+          "keywords": [
+            "great-expectations",
+            "great_expectations"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2230
+        },
+        "hudi": {
+          "file": "frameworks/data/hudi.md",
+          "keywords": [
+            "hudi"
+          ],
+          "requires": [],
+          "size": 2447
+        },
+        "iceberg": {
+          "file": "frameworks/data/iceberg.md",
+          "keywords": [
+            "iceberg",
+            "pyiceberg"
+          ],
+          "requires": [],
+          "size": 2206
+        },
+        "kafka": {
+          "file": "frameworks/data/kafka.md",
+          "keywords": [
+            "kafka",
+            "confluent-kafka",
+            "kafkajs"
+          ],
+          "requires": [],
+          "size": 2425
+        },
+        "meilisearch": {
+          "file": "frameworks/data/meilisearch.md",
+          "keywords": [
+            "meilisearch"
+          ],
+          "requires": [],
+          "size": 2078
+        },
+        "memcached": {
+          "file": "frameworks/data/memcached.md",
+          "keywords": [
+            "pymemcache",
+            "memcached"
+          ],
+          "requires": [],
+          "size": 2345
+        },
+        "mongodb": {
+          "file": "frameworks/data/mongodb.md",
+          "keywords": [
+            "pymongo",
+            "mongodb",
+            "mongoose"
+          ],
+          "requires": [],
+          "size": 2210
+        },
+        "neo4j": {
+          "file": "frameworks/data/neo4j.md",
+          "keywords": [
+            "neo4j"
+          ],
+          "requires": [],
+          "size": 1939
+        },
+        "neon": {
+          "file": "frameworks/data/neon.md",
+          "keywords": [
+            "@neondatabase/serverless"
+          ],
+          "requires": [],
+          "size": 2195
+        },
+        "numpy": {
+          "file": "frameworks/data/numpy.md",
+          "keywords": [
+            "numpy"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 1831
+        },
+        "opensearch": {
+          "file": "frameworks/data/opensearch.md",
+          "keywords": [
+            "opensearch"
+          ],
+          "requires": [],
+          "size": 2289
+        },
+        "pandas": {
+          "file": "frameworks/data/pandas.md",
+          "keywords": [
+            "pandas"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2112
+        },
+        "planetscale": {
+          "file": "frameworks/data/planetscale.md",
+          "keywords": [
+            "@planetscale/database"
+          ],
+          "requires": [],
+          "size": 2020
+        },
+        "polars": {
+          "file": "frameworks/data/polars.md",
+          "keywords": [
+            "polars"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2114
+        },
+        "prefect": {
+          "file": "frameworks/data/prefect.md",
+          "keywords": [
+            "prefect"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2046
+        },
+        "presto": {
+          "file": "frameworks/data/presto.md",
+          "keywords": [
+            "presto"
+          ],
+          "requires": [],
+          "size": 2052
+        },
+        "prisma": {
+          "file": "frameworks/data/prisma.md",
+          "keywords": [
+            "prisma",
+            "@prisma/client"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2028
+        },
+        "questdb": {
+          "file": "frameworks/data/questdb.md",
+          "keywords": [
+            "questdb"
+          ],
+          "requires": [],
+          "size": 2042
+        },
+        "redis": {
+          "file": "frameworks/data/redis.md",
+          "keywords": [
+            "redis",
+            "ioredis"
+          ],
+          "requires": [],
+          "size": 2034
+        },
+        "scylladb": {
+          "file": "frameworks/data/scylladb.md",
+          "keywords": [
+            "scylla"
+          ],
+          "requires": [],
+          "size": 2298
+        },
+        "snowflake": {
+          "file": "frameworks/data/snowflake.md",
+          "keywords": [
+            "snowflake-connector",
+            "snowflake"
+          ],
+          "requires": [],
+          "size": 1879
+        },
+        "spark": {
+          "file": "frameworks/data/spark.md",
+          "keywords": [
+            "pyspark",
+            "spark"
+          ],
+          "requires": [],
+          "size": 2152
+        },
+        "sqlalchemy": {
+          "file": "frameworks/data/sqlalchemy.md",
+          "keywords": [
+            "sqlalchemy"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2331
+        },
+        "sqlite": {
+          "file": "frameworks/data/sqlite.md",
+          "keywords": [
+            "sqlite3",
+            "better-sqlite3"
+          ],
+          "requires": [],
+          "size": 1961
+        },
+        "supabase": {
+          "file": "frameworks/data/supabase.md",
+          "keywords": [
+            "supabase",
+            "@supabase/supabase-js"
+          ],
+          "requires": [],
+          "size": 2327
+        },
+        "timescaledb": {
+          "file": "frameworks/data/timescaledb.md",
+          "keywords": [
+            "timescaledb"
+          ],
+          "requires": [],
+          "size": 2375
+        },
+        "trino": {
+          "file": "frameworks/data/trino.md",
+          "keywords": [
+            "trino"
+          ],
+          "requires": [],
+          "size": 1979
+        },
+        "typesense": {
+          "file": "frameworks/data/typesense.md",
+          "keywords": [
+            "typesense"
+          ],
+          "requires": [],
+          "size": 2415
+        },
+        "vaex": {
+          "file": "frameworks/data/vaex.md",
+          "keywords": [
+            "vaex"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 1833
+        },
+        "valkey": {
+          "file": "frameworks/data/valkey.md",
+          "keywords": [
+            "valkey"
+          ],
+          "requires": [],
+          "size": 1854
+        }
+      },
+      "devops": {
+        "ansible": {
+          "file": "frameworks/devops/ansible.md",
+          "keywords": [
+            "ansible"
+          ],
+          "requires": [],
+          "size": 1989
+        },
+        "chef": {
+          "file": "frameworks/devops/chef.md",
+          "keywords": [
+            "chef"
+          ],
+          "requires": [],
+          "size": 2151
+        },
+        "crossplane": {
+          "file": "frameworks/devops/crossplane.md",
+          "keywords": [
+            "crossplane"
+          ],
+          "requires": [],
+          "size": 2804
+        },
+        "datadog": {
+          "file": "frameworks/devops/datadog.md",
+          "keywords": [
+            "datadog",
+            "ddtrace"
+          ],
+          "requires": [],
+          "size": 2575
+        },
+        "docker": {
+          "file": "frameworks/devops/docker.md",
+          "keywords": [
+            "docker",
+            "dockerfile"
+          ],
+          "requires": [],
+          "size": 2002
+        },
+        "grafana": {
+          "file": "frameworks/devops/grafana.md",
+          "keywords": [
+            "grafana"
+          ],
+          "requires": [],
+          "size": 2560
+        },
+        "helm": {
+          "file": "frameworks/devops/helm.md",
+          "keywords": [
+            "helm"
+          ],
+          "requires": [],
+          "size": 2069
+        },
+        "kubernetes": {
+          "file": "frameworks/devops/kubernetes.md",
+          "keywords": [
+            "kubernetes",
+            "k8s"
+          ],
+          "requires": [],
+          "size": 2488
+        },
+        "kustomize": {
+          "file": "frameworks/devops/kustomize.md",
+          "keywords": [
+            "kustomize"
+          ],
+          "requires": [],
+          "size": 2124
+        },
+        "podman": {
+          "file": "frameworks/devops/podman.md",
+          "keywords": [
+            "podman"
+          ],
+          "requires": [],
+          "size": 1777
+        },
+        "prometheus": {
+          "file": "frameworks/devops/prometheus.md",
+          "keywords": [
+            "prometheus",
+            "prometheus_client"
+          ],
+          "requires": [],
+          "size": 2453
+        },
+        "pulumi": {
+          "file": "frameworks/devops/pulumi.md",
+          "keywords": [
+            "@pulumi",
+            "pulumi"
+          ],
+          "requires": [],
+          "size": 2519
+        },
+        "puppet": {
+          "file": "frameworks/devops/puppet.md",
+          "keywords": [
+            "puppet"
+          ],
+          "requires": [],
+          "size": 2072
+        },
+        "saltstack": {
+          "file": "frameworks/devops/saltstack.md",
+          "keywords": [
+            "salt"
+          ],
+          "requires": [],
+          "size": 2036
+        },
+        "vault": {
+          "file": "frameworks/devops/vault.md",
+          "keywords": [
+            "hashicorp-vault",
+            "hvac"
+          ],
+          "requires": [],
+          "size": 2564
+        }
+      },
+      "mobile": {
+        "beeware": {
+          "file": "frameworks/mobile/beeware.md",
+          "keywords": [
+            "toga",
+            "briefcase"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2468
+        },
+        "capacitor": {
+          "file": "frameworks/mobile/capacitor.md",
+          "keywords": [
+            "@capacitor/core"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2402
+        },
+        "compose-multiplatform": {
+          "file": "frameworks/mobile/compose-multiplatform.md",
+          "keywords": [
+            "org.jetbrains.compose"
+          ],
+          "requires": [
+            "kotlin"
+          ],
+          "size": 2357
+        },
+        "expo": {
+          "file": "frameworks/mobile/expo.md",
+          "keywords": [
+            "expo"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2045
+        },
+        "flutter": {
+          "file": "frameworks/mobile/flutter.md",
+          "keywords": [
+            "flutter"
+          ],
+          "requires": [
+            "dart"
+          ],
+          "size": 2102
+        },
+        "ionic": {
+          "file": "frameworks/mobile/ionic.md",
+          "keywords": [
+            "@ionic/"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2175
+        },
+        "jetpack-compose": {
+          "file": "frameworks/mobile/jetpack-compose.md",
+          "keywords": [
+            "androidx.compose"
+          ],
+          "requires": [
+            "kotlin"
+          ],
+          "size": 2563
+        },
+        "kivy": {
+          "file": "frameworks/mobile/kivy.md",
+          "keywords": [
+            "kivy"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2222
+        },
+        "maui": {
+          "file": "frameworks/mobile/maui.md",
+          "keywords": [
+            "Microsoft.Maui"
+          ],
+          "requires": [
+            "csharp"
+          ],
+          "size": 2450
+        },
+        "nativescript": {
+          "file": "frameworks/mobile/nativescript.md",
+          "keywords": [
+            "nativescript",
+            "@nativescript/core"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2223
+        },
+        "react-native": {
+          "file": "frameworks/mobile/react-native.md",
+          "keywords": [
+            "react-native"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2170
+        },
+        "swiftui": {
+          "file": "frameworks/mobile/swiftui.md",
+          "keywords": [
+            "SwiftUI"
+          ],
+          "requires": [
+            "swift"
+          ],
+          "size": 2344
+        },
+        "unity": {
+          "file": "frameworks/mobile/unity.md",
+          "keywords": [
+            "Unity"
+          ],
+          "requires": [],
+          "size": 2535
+        },
+        "unreal": {
+          "file": "frameworks/mobile/unreal.md",
+          "keywords": [
+            "UnrealEngine"
+          ],
+          "requires": [],
+          "size": 2504
+        },
+        "xamarin": {
+          "file": "frameworks/mobile/xamarin.md",
+          "keywords": [
+            "Xamarin"
+          ],
+          "requires": [
+            "csharp"
+          ],
+          "size": 1797
+        }
+      },
+      "web": {
+        "actix": {
+          "file": "frameworks/web/actix.md",
+          "keywords": [
+            "actix-web"
+          ],
+          "requires": [
+            "rust"
+          ],
+          "size": 3351
+        },
+        "adonis": {
+          "file": "frameworks/web/adonis.md",
+          "keywords": [
+            "adonis",
+            "@adonisjs"
+          ],
+          "requires": [],
+          "size": 2564
+        },
+        "alpinejs": {
+          "file": "frameworks/web/alpinejs.md",
+          "keywords": [
+            "alpinejs"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 2965
+        },
+        "angular": {
+          "file": "frameworks/web/angular.md",
+          "keywords": [
+            "@angular/core"
+          ],
+          "requires": [
+            "typescript"
+          ],
+          "size": 2952
+        },
+        "aspnet-core": {
+          "file": "frameworks/web/aspnet-core.md",
+          "keywords": [
+            "Microsoft.AspNetCore"
+          ],
+          "requires": [
+            "csharp"
+          ],
+          "size": 3322
+        },
+        "astro": {
+          "file": "frameworks/web/astro.md",
+          "keywords": [
+            "astro"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2394
+        },
+        "axum": {
+          "file": "frameworks/web/axum.md",
+          "keywords": [
+            "axum"
+          ],
+          "requires": [
+            "rust"
+          ],
+          "size": 3036
+        },
+        "backbone": {
+          "file": "frameworks/web/backbone.md",
+          "keywords": [
+            "backbone"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 2542
+        },
+        "blazor": {
+          "file": "frameworks/web/blazor.md",
+          "keywords": [
+            "Microsoft.AspNetCore.Components"
+          ],
+          "requires": [
+            "csharp"
+          ],
+          "size": 3065
+        },
+        "bottle": {
+          "file": "frameworks/web/bottle.md",
+          "keywords": [
+            "bottle"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2729
+        },
+        "buffalo": {
+          "file": "frameworks/web/buffalo.md",
+          "keywords": [
+            "gobuffalo/buffalo"
+          ],
+          "requires": [
+            "go"
+          ],
+          "size": 2740
+        },
+        "bun": {
+          "file": "frameworks/web/bun.md",
+          "keywords": [
+            "bun"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2604
+        },
+        "cakephp": {
+          "file": "frameworks/web/cakephp.md",
+          "keywords": [
+            "cakephp/cakephp"
+          ],
+          "requires": [
+            "php"
+          ],
+          "size": 3147
+        },
+        "cherrypy": {
+          "file": "frameworks/web/cherrypy.md",
+          "keywords": [
+            "cherrypy"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2706
+        },
+        "chi": {
+          "file": "frameworks/web/chi.md",
+          "keywords": [
+            "go-chi/chi"
+          ],
+          "requires": [
+            "go"
+          ],
+          "size": 3121
+        },
+        "codeigniter": {
+          "file": "frameworks/web/codeigniter.md",
+          "keywords": [
+            "codeigniter4"
+          ],
+          "requires": [
+            "php"
+          ],
+          "size": 3091
+        },
+        "django": {
+          "file": "frameworks/web/django.md",
+          "keywords": [
+            "django"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2681
+        },
+        "dropwizard": {
+          "file": "frameworks/web/dropwizard.md",
+          "keywords": [
+            "dropwizard"
+          ],
+          "requires": [
+            "java"
+          ],
+          "size": 3457
+        },
+        "echo": {
+          "file": "frameworks/web/echo.md",
+          "keywords": [
+            "labstack/echo"
+          ],
+          "requires": [
+            "go"
+          ],
+          "size": 3209
+        },
+        "electron": {
+          "file": "frameworks/web/electron.md",
+          "keywords": [
+            "electron"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 3075
+        },
+        "eleventy": {
+          "file": "frameworks/web/eleventy.md",
+          "keywords": [
+            "@11ty/eleventy"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 2651
+        },
+        "elysia": {
+          "file": "frameworks/web/elysia.md",
+          "keywords": [
+            "elysia"
+          ],
+          "requires": [
+            "typescript"
+          ],
+          "size": 3121
+        },
+        "ember": {
+          "file": "frameworks/web/ember.md",
+          "keywords": [
+            "ember-source"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2745
+        },
+        "express": {
+          "file": "frameworks/web/express.md",
+          "keywords": [
+            "express"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2795
+        },
+        "falcon": {
+          "file": "frameworks/web/falcon.md",
+          "keywords": [
+            "falcon"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2797
+        },
+        "fastapi": {
+          "file": "frameworks/web/fastapi.md",
+          "keywords": [
+            "fastapi",
+            "starlette"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2602
+        },
+        "fastify": {
+          "file": "frameworks/web/fastify.md",
+          "keywords": [
+            "fastify"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 3116
+        },
+        "fiber": {
+          "file": "frameworks/web/fiber.md",
+          "keywords": [
+            "gofiber/fiber"
+          ],
+          "requires": [
+            "go"
+          ],
+          "size": 3622
+        },
+        "flask": {
+          "file": "frameworks/web/flask.md",
+          "keywords": [
+            "flask"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2692
+        },
+        "gatsby": {
+          "file": "frameworks/web/gatsby.md",
+          "keywords": [
+            "gatsby"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2584
+        },
+        "gin": {
+          "file": "frameworks/web/gin.md",
+          "keywords": [
+            "gin-gonic/gin"
+          ],
+          "requires": [
+            "go"
+          ],
+          "size": 3221
+        },
+        "grails": {
+          "file": "frameworks/web/grails.md",
+          "keywords": [
+            "grails"
+          ],
+          "requires": [
+            "groovy"
+          ],
+          "size": 3099
+        },
+        "hanami": {
+          "file": "frameworks/web/hanami.md",
+          "keywords": [
+            "hanami"
+          ],
+          "requires": [
+            "ruby"
+          ],
+          "size": 2964
+        },
+        "hapi": {
+          "file": "frameworks/web/hapi.md",
+          "keywords": [
+            "@hapi/hapi"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 3061
+        },
+        "hexo": {
+          "file": "frameworks/web/hexo.md",
+          "keywords": [
+            "hexo"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 2374
+        },
+        "hono": {
+          "file": "frameworks/web/hono.md",
+          "keywords": [
+            "hono"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2838
+        },
+        "htmx": {
+          "file": "frameworks/web/htmx.md",
+          "keywords": [
+            "htmx.org"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 3094
+        },
+        "hugo": {
+          "file": "frameworks/web/hugo.md",
+          "keywords": [
+            "hugo"
+          ],
+          "requires": [
+            "go"
+          ],
+          "size": 2492
+        },
+        "inertia": {
+          "file": "frameworks/web/inertia.md",
+          "keywords": [
+            "@inertiajs"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 3423
+        },
+        "inferno": {
+          "file": "frameworks/web/inferno.md",
+          "keywords": [
+            "inferno"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2594
+        },
+        "jekyll": {
+          "file": "frameworks/web/jekyll.md",
+          "keywords": [
+            "jekyll"
+          ],
+          "requires": [
+            "ruby"
+          ],
+          "size": 2550
+        },
+        "knockout": {
+          "file": "frameworks/web/knockout.md",
+          "keywords": [
+            "knockout"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 3005
+        },
+        "koa": {
+          "file": "frameworks/web/koa.md",
+          "keywords": [
+            "koa"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2859
+        },
+        "laravel": {
+          "file": "frameworks/web/laravel.md",
+          "keywords": [
+            "laravel/framework"
+          ],
+          "requires": [
+            "php"
+          ],
+          "size": 2963
+        },
+        "lit": {
+          "file": "frameworks/web/lit.md",
+          "keywords": [
+            "lit"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 3125
+        },
+        "litestar": {
+          "file": "frameworks/web/litestar.md",
+          "keywords": [
+            "litestar"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2841
+        },
+        "marko": {
+          "file": "frameworks/web/marko.md",
+          "keywords": [
+            "marko"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 2403
+        },
+        "micronaut": {
+          "file": "frameworks/web/micronaut.md",
+          "keywords": [
+            "micronaut"
+          ],
+          "requires": [
+            "java",
+            "kotlin"
+          ],
+          "size": 2546
+        },
+        "mithril": {
+          "file": "frameworks/web/mithril.md",
+          "keywords": [
+            "mithril"
+          ],
+          "requires": [
+            "javascript"
+          ],
+          "size": 2782
+        },
+        "mux": {
+          "file": "frameworks/web/mux.md",
+          "keywords": [
+            "gorilla/mux"
+          ],
+          "requires": [
+            "go"
+          ],
+          "size": 3340
+        },
+        "nestjs": {
+          "file": "frameworks/web/nestjs.md",
+          "keywords": [
+            "@nestjs/core"
+          ],
+          "requires": [
+            "typescript"
+          ],
+          "size": 2967
+        },
+        "nextjs": {
+          "file": "frameworks/web/nextjs.md",
+          "keywords": [
+            "next"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2548
+        },
+        "nuxt": {
+          "file": "frameworks/web/nuxt.md",
+          "keywords": [
+            "nuxt"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2760
+        },
+        "pelican": {
+          "file": "frameworks/web/pelican.md",
+          "keywords": [
+            "pelican"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2662
+        },
+        "phalcon": {
+          "file": "frameworks/web/phalcon.md",
+          "keywords": [
+            "phalcon"
+          ],
+          "requires": [
+            "php"
+          ],
+          "size": 3253
+        },
+        "phoenix": {
+          "file": "frameworks/web/phoenix.md",
+          "keywords": [
+            "phoenix"
+          ],
+          "requires": [
+            "elixir"
+          ],
+          "size": 3037
+        },
+        "play": {
+          "file": "frameworks/web/play.md",
+          "keywords": [
+            "com.typesafe.play"
+          ],
+          "requires": [
+            "java",
+            "scala"
+          ],
+          "size": 2949
+        },
+        "poem": {
+          "file": "frameworks/web/poem.md",
+          "keywords": [
+            "poem"
+          ],
+          "requires": [
+            "rust"
+          ],
+          "size": 3387
+        },
+        "preact": {
+          "file": "frameworks/web/preact.md",
+          "keywords": [
+            "preact"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2625
+        },
+        "quarkus": {
+          "file": "frameworks/web/quarkus.md",
+          "keywords": [
+            "quarkus"
+          ],
+          "requires": [
+            "java",
+            "kotlin"
+          ],
+          "size": 2722
+        },
+        "qwik": {
+          "file": "frameworks/web/qwik.md",
+          "keywords": [
+            "@builder.io/qwik"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 3085
+        },
+        "rails": {
+          "file": "frameworks/web/rails.md",
+          "keywords": [
+            "rails"
+          ],
+          "requires": [
+            "ruby"
+          ],
+          "size": 2676
+        },
+        "ratpack": {
+          "file": "frameworks/web/ratpack.md",
+          "keywords": [
+            "ratpack"
+          ],
+          "requires": [
+            "java",
+            "kotlin"
+          ],
+          "size": 3202
+        },
+        "react": {
+          "file": "frameworks/web/react.md",
+          "keywords": [
+            "react",
+            "react-dom"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2358
+        },
+        "remix": {
+          "file": "frameworks/web/remix.md",
+          "keywords": [
+            "@remix-run"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2845
+        },
+        "rocket": {
+          "file": "frameworks/web/rocket.md",
+          "keywords": [
+            "rocket"
+          ],
+          "requires": [
+            "rust"
+          ],
+          "size": 3032
+        },
+        "sanic": {
+          "file": "frameworks/web/sanic.md",
+          "keywords": [
+            "sanic"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 2960
+        },
+        "sinatra": {
+          "file": "frameworks/web/sinatra.md",
+          "keywords": [
+            "sinatra"
+          ],
+          "requires": [
+            "ruby"
+          ],
+          "size": 2607
+        },
+        "slim": {
+          "file": "frameworks/web/slim.md",
+          "keywords": [
+            "slim/slim"
+          ],
+          "requires": [
+            "php"
+          ],
+          "size": 3339
+        },
+        "solid": {
+          "file": "frameworks/web/solid.md",
+          "keywords": [
+            "solid-js"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2680
+        },
+        "spring-boot": {
+          "file": "frameworks/web/spring-boot.md",
+          "keywords": [
+            "spring-boot",
+            "org.springframework.boot"
+          ],
+          "requires": [
+            "java",
+            "kotlin"
+          ],
+          "size": 3033
+        },
+        "starlette": {
+          "file": "frameworks/web/starlette.md",
+          "keywords": [
+            "starlette"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 3227
+        },
+        "stencil": {
+          "file": "frameworks/web/stencil.md",
+          "keywords": [
+            "@stencil/core"
+          ],
+          "requires": [
+            "typescript"
+          ],
+          "size": 2653
+        },
+        "stimulus": {
+          "file": "frameworks/web/stimulus.md",
+          "keywords": [
+            "@hotwired/stimulus"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 3284
+        },
+        "svelte": {
+          "file": "frameworks/web/svelte.md",
+          "keywords": [
+            "svelte"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2864
+        },
+        "sveltekit": {
+          "file": "frameworks/web/sveltekit.md",
+          "keywords": [
+            "@sveltejs/kit"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2951
+        },
+        "symfony": {
+          "file": "frameworks/web/symfony.md",
+          "keywords": [
+            "symfony/"
+          ],
+          "requires": [
+            "php"
+          ],
+          "size": 3554
+        },
+        "tauri": {
+          "file": "frameworks/web/tauri.md",
+          "keywords": [
+            "tauri",
+            "@tauri-apps"
+          ],
+          "requires": [
+            "javascript",
+            "typescript",
+            "rust"
+          ],
+          "size": 2774
+        },
+        "tornado": {
+          "file": "frameworks/web/tornado.md",
+          "keywords": [
+            "tornado"
+          ],
+          "requires": [
+            "python"
+          ],
+          "size": 3345
+        },
+        "turbo": {
+          "file": "frameworks/web/turbo.md",
+          "keywords": [
+            "@hotwired/turbo"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2651
+        },
+        "vertx": {
+          "file": "frameworks/web/vertx.md",
+          "keywords": [
+            "vertx",
+            "io.vertx"
+          ],
+          "requires": [
+            "java",
+            "kotlin"
+          ],
+          "size": 3714
+        },
+        "vue": {
+          "file": "frameworks/web/vue.md",
+          "keywords": [
+            "vue"
+          ],
+          "requires": [
+            "javascript",
+            "typescript"
+          ],
+          "size": 2867
+        },
+        "warp": {
+          "file": "frameworks/web/warp.md",
+          "keywords": [
+            "warp"
+          ],
+          "requires": [
+            "rust"
+          ],
+          "size": 3478
+        },
+        "yii": {
+          "file": "frameworks/web/yii.md",
+          "keywords": [
+            "yiisoft/yii2"
+          ],
+          "requires": [
+            "php"
+          ],
+          "size": 3486
+        },
+        "zola": {
+          "file": "frameworks/web/zola.md",
+          "keywords": [
+            "zola"
+          ],
+          "requires": [
+            "rust"
+          ],
+          "size": 2734
+        }
+      }
+    }
+  }
+}
