@@ -635,6 +635,108 @@ Claude Code reads `CLAUDE.md` at the start of every session and follows these in
 
 ---
 
+## Agent-Powered Automation
+
+CTOC uses **60 specialized agents** to automate quality enforcement throughout the Iron Loop. Each agent is an expert in its domain, running at specific steps to ensure nothing is missed.
+
+### The Agent Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      CTO-Chief (Coordinator)                   │
+│         Orchestrates agents • Resolves conflicts • Guides      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│   │   Testing   │  │   Quality   │  │  Security   │  ...       │
+│   │  9 agents   │  │  8 agents   │  │  5 agents   │            │
+│   └─────────────┘  └─────────────┘  └─────────────┘            │
+│                                                                 │
+│   Step 7: TEST     Step 8: QUALITY   Step 12: SECURE           │
+│   Step 14: VERIFY  Step 10: REVIEW                              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 60 Agents in 16 Categories
+
+| Category | Agents | Purpose |
+|----------|--------|---------|
+| **Coordinator** | 1 | Orchestrates all agents, resolves conflicts |
+| **Testing Writers** | 4 | Write unit, integration, E2E, and property tests |
+| **Testing Runners** | 5 | Execute tests, report coverage, mutation testing |
+| **Quality** | 8 | Type checking, code review, complexity analysis |
+| **Security** | 5 | OWASP scanning, secrets detection, input validation |
+| **Specialized** | 11 | Performance, accessibility, database, API contracts |
+| **Frontend** | 3 | Visual regression, component testing, bundle analysis |
+| **Mobile** | 3 | iOS, Android, React Native validation |
+| **Infrastructure** | 4 | Terraform, Kubernetes, Docker, CI/CD |
+| **Documentation** | 2 | Auto-update docs, generate changelogs |
+| **Compliance** | 3 | GDPR, audit logging, license scanning |
+| **Data/ML** | 3 | Data quality, ML model validation |
+| **Cost** | 1 | Cloud cost optimization |
+| **AI Quality** | 2 | Detect AI hallucinations, review AI-generated code |
+| **Dev Experience** | 2 | Onboarding, deprecation warnings |
+| **Versioning** | 3 | Breaking changes, feature flags, tech debt |
+
+### Lean Activation
+
+Agents only load when needed. Each Iron Loop step activates specific agents:
+
+| Step | Active Agents |
+|------|---------------|
+| **7: TEST** | unit-test-writer, integration-test-writer, e2e-test-writer |
+| **8: QUALITY** | type-checker, smoke-test-runner, ci-pipeline-checker |
+| **10: REVIEW** | code-reviewer, architecture-checker, consistency-checker |
+| **11: OPTIMIZE** | performance-profiler, memory-safety-checker, bundle-analyzer |
+| **12: SECURE** | security-scanner, secrets-detector, dependency-checker |
+| **13: DOCUMENT** | documentation-updater, changelog-generator |
+| **14: VERIFY** | unit-test-runner, integration-test-runner, e2e-test-runner |
+
+### Hook System
+
+CTOC uses hooks to enforce quality automatically:
+
+| Hook | When | What It Does |
+|------|------|--------------|
+| **SessionStart** | Claude Code opens | Detects stack, loads profiles, restores state |
+| **PreToolUse** | Before file edits | Validates against CTO profile red lines |
+| **PostToolUse** | After file edits | Runs quick quality checks |
+| **PreCompact** | Before context compaction | Saves Iron Loop progress |
+| **SessionEnd** | Claude Code closes | Persists state to `~/.ctoc/` |
+
+### Profile Injection
+
+When agents run, they receive the relevant CTO profiles for your stack:
+
+```
+Project: Python + FastAPI
+         ↓
+Stack Detection: pyproject.toml, requirements.txt
+         ↓
+Profile Loading: python.md + fastapi.md
+         ↓
+Agent: security-scanner
+       Receives: Python security checklist + FastAPI auth patterns
+```
+
+This means agents enforce **language-specific** and **framework-specific** best practices automatically.
+
+### State Persistence
+
+Your progress is saved across sessions:
+
+```
+~/.ctoc/
+├── sessions/           # Daily session state
+├── iron-loop/          # Iron Loop progress per project
+└── skills/learned/     # Patterns learned from your usage
+```
+
+Close Claude Code, come back tomorrow — CTOC remembers where you left off.
+
+---
+
 ## Troubleshooting
 
 ### "Command not found: claude"
