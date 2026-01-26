@@ -40,6 +40,12 @@ PLAN COMMANDS:
     plan list [status]       List plans
     plan status              Show plan dashboard
 
+PROGRESS COMMANDS:
+    progress                 Quick progress view
+    dashboard                Full progress dashboard
+    progress step <n>        Move to Iron Loop step
+    progress complete <n>    Complete step and move to next
+
 COMMUNITY COMMANDS:
     process-issues           Fetch approved skill improvements for processing
 
@@ -295,6 +301,14 @@ main() {
 
         plan)
             "$SCRIPT_DIR/plan.sh" "$@"
+            ;;
+
+        progress)
+            "$SCRIPT_DIR/progress.sh" "$@"
+            ;;
+
+        dashboard)
+            "$SCRIPT_DIR/progress.sh" dashboard
             ;;
 
         process-issues)

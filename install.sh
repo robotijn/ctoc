@@ -101,6 +101,7 @@ download_core() {
         "init-claude-md.sh"
         "process-issues.sh"
         "plan.sh"
+        "progress.sh"
     )
 
     for file in "${bin_files[@]}"; do

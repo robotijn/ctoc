@@ -65,6 +65,12 @@ PLAN COMMANDS:
     plan list [status]       List plans
     plan status              Show plan dashboard
 
+PROGRESS COMMANDS:
+    progress                 Quick progress view
+    dashboard                Full progress dashboard
+    progress step <n>        Move to Iron Loop step
+    progress complete <n>    Complete step and move to next
+
 COMMUNITY COMMANDS:
     process-issues           Fetch approved skill improvements for processing
 
@@ -287,6 +293,14 @@ switch ($Command) {
 
     "plan" {
         & "$ScriptDir/plan.ps1" $SubCommand $Args
+    }
+
+    "progress" {
+        & "$ScriptDir/progress.ps1" $SubCommand $Args
+    }
+
+    "dashboard" {
+        & "$ScriptDir/progress.ps1" "dashboard"
     }
 
     "process-issues" {
