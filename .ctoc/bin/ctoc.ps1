@@ -71,6 +71,13 @@ PROGRESS COMMANDS:
     progress step <n>        Move to Iron Loop step
     progress complete <n>    Complete step and move to next
 
+GIT WORKFLOW COMMANDS:
+    sync                     Pull-rebase-push workflow
+    commit "message"         Stage, validate, commit, and push
+    qc "message"             Quick commit and push
+    status                   Enhanced git status
+    lock-check <file>        Check if file is fresh
+
 COMMUNITY COMMANDS:
     process-issues           Fetch approved skill improvements for processing
 
@@ -301,6 +308,26 @@ switch ($Command) {
 
     "dashboard" {
         & "$ScriptDir/progress.ps1" "dashboard"
+    }
+
+    "sync" {
+        & "$ScriptDir/git-workflow.ps1" "sync" $SubCommand
+    }
+
+    "commit" {
+        & "$ScriptDir/git-workflow.ps1" "commit" $SubCommand $Args
+    }
+
+    { $_ -in "qc", "quick-commit" } {
+        & "$ScriptDir/git-workflow.ps1" "qc" $SubCommand
+    }
+
+    "status" {
+        & "$ScriptDir/git-workflow.ps1" "status"
+    }
+
+    "lock-check" {
+        & "$ScriptDir/git-workflow.ps1" "lock-check" $SubCommand
     }
 
     "process-issues" {

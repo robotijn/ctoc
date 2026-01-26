@@ -102,6 +102,7 @@ download_core() {
         "process-issues.sh"
         "plan.sh"
         "progress.sh"
+        "git-workflow.sh"
     )
 
     for file in "${bin_files[@]}"; do
