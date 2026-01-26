@@ -19,11 +19,32 @@ Have an idea? Open an issue with:
 - Why it would be useful
 - How it might work
 
+### Suggest Skill Improvements
+
+CTOC has 261 skills that need continuous updates. Help keep them current:
+
+**Quick way (recommended):**
+```bash
+ctoc skills feedback fastapi    # Opens improvement form for FastAPI skill
+ctoc skills feedback python     # Opens improvement form for Python skill
+```
+
+**Manual way:**
+1. Open a [Skill Improvement Issue](https://github.com/theaiguys/ctoc/issues/new?template=skill-improvement.yml)
+2. Fill in the skill name and what needs updating
+3. Provide sources (docs, release notes) when possible
+4. Community votes help prioritize (use reactions)
+
+**What makes a good suggestion:**
+- Specific: "FastAPI 0.115+ changed response validation" vs "FastAPI is outdated"
+- Sourced: Link to official docs or release notes
+- Actionable: Suggest what should change
+
 ### Add Language/Framework Support
 
 CTOC supports 100+ languages and 200+ frameworks. To add a new one:
 
-1. Create a profile in `profiles/languages/` or `profiles/frameworks/`
+1. Create a profile in `.ctoc/skills/languages/` or `.ctoc/skills/frameworks/`
 2. Include:
    - Detection patterns
    - Quality gate commands (lint, format, test, etc.)

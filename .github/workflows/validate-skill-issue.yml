@@ -1,0 +1,244 @@
+name: Validate Skill Improvement Issue
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+
+jobs:
+  validate:
+    if: contains(github.event.issue.labels.*.name, 'skill-improvement')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse Issue Body
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue?.body || '';
+
+            // Extract skill name from form
+            const skillNameMatch = body.match(/### Skill Name\s*\n\s*(.+)/);
+            const skillName = skillNameMatch ? skillNameMatch[1].trim().toLowerCase() : '';
+
+            // Extract skill type
+            const skillTypeMatch = body.match(/### Skill Type\s*\n\s*(.+)/);
+            const skillType = skillTypeMatch ? skillTypeMatch[1].trim() : '';
+
+            core.setOutput('skill_name', skillName);
+            core.setOutput('skill_type', skillType);
+
+            console.log(`Parsed skill: ${skillName} (${skillType})`);
+
+      - name: Validate Skill Exists
+        id: validate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const skillName = '${{ steps.parse.outputs.skill_name }}';
+
+            if (!skillName) {
+              core.setOutput('valid', 'false');
+              core.setOutput('message', 'Could not parse skill name from issue.');
+              return;
+            }
+
+            // Read skills index
+            const indexPath = '.ctoc/skills.json';
+            if (!fs.existsSync(indexPath)) {
+              core.setOutput('valid', 'true'); // Can't validate, assume OK
+              core.setOutput('message', 'Could not find skills index to validate.');
+              return;
+            }
+
+            const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+
+            // Check languages
+            const isLanguage = index.skills.languages && index.skills.languages[skillName];
+
+            // Check frameworks (nested in categories)
+            let isFramework = false;
+            if (index.skills.frameworks) {
+              for (const category of Object.values(index.skills.frameworks)) {
+                if (category[skillName]) {
+                  isFramework = true;
+                  break;
+                }
+              }
+            }
+
+            const exists = isLanguage || isFramework;
+            core.setOutput('valid', exists ? 'true' : 'false');
+            core.setOutput('message', exists ? 'Skill found!' : `Skill "${skillName}" not found in CTOC index.`);
+
+            console.log(`Skill ${skillName} exists: ${exists}`);
+
+      - name: Handle Invalid Skill
+        if: steps.validate.outputs.valid == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const skillName = '${{ steps.parse.outputs.skill_name }}';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: `## Skill Not Found
+
+The skill **"${skillName}"** was not found in CTOC's skill index.
+
+**To fix this:**
+1. Run \`ctoc skills list\` to see all available skills
+2. Check the exact spelling (case-insensitive)
+3. Edit this issue with the correct skill name
+
+If you're suggesting a **new skill** that doesn't exist yet, please use the [Feature Request](https://github.com/${context.repo.owner}/${context.repo.repo}/issues/new?template=feature_request.md) template instead.
+
+---
+*This check ran automatically. The issue will be re-validated when you edit it.*`
+            });
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              labels: ['invalid-skill']
+            });
+
+      - name: Check Contributor History
+        if: steps.validate.outputs.valid == 'true' && github.event.action == 'opened'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const author = context.payload.issue.user;
+
+            // Calculate account age in days
+            const createdAt = new Date(author.created_at);
+            const now = new Date();
+            const accountAgeDays = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+
+            console.log(`Account @${author.login}: ${accountAgeDays} days old, ${author.public_repos} public repos`);
+
+            // Flag new accounts (< 30 days) or accounts with very few repos
+            if (accountAgeDays < 30 || author.public_repos < 2) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: ['needs-review']
+              });
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: `Thanks for the suggestion, @${author.login}!
+
+Since this is a newer account, this issue has been flagged for manual review. A maintainer will review it shortly.
+
+In the meantime, community members can vote on this issue using reactions to help prioritize it.`
+              });
+            }
+
+      - name: Remove Invalid Label on Fix
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                name: 'invalid-skill'
+              });
+            } catch (e) {
+              // Label might not exist, that's OK
+            }
+
+            // Remove triage label, add validated
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                name: 'triage'
+              });
+            } catch (e) {}
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              labels: ['validated']
+            });
+
+  check-votes:
+    if: github.event_name == 'issue_comment' && contains(github.event.issue.labels.*.name, 'skill-improvement')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Check Vote Threshold
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Get all reactions on the issue
+            const reactions = await github.rest.reactions.listForIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number
+            });
+
+            // Count +1 reactions from accounts > 30 days old
+            let validVotes = 0;
+            const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+
+            for (const reaction of reactions.data) {
+              if (reaction.content === '+1') {
+                const userCreated = new Date(reaction.user.created_at).getTime();
+                if (now - userCreated > thirtyDaysMs) {
+                  validVotes++;
+                }
+              }
+            }
+
+            console.log(`Valid votes: ${validVotes}`);
+
+            // Check if already has ready-to-process label
+            const hasReadyLabel = context.payload.issue.labels.some(l => l.name === 'ready-to-process');
+
+            // If 5+ valid votes and doesn't have needs-review, add ready-to-process
+            const needsReview = context.payload.issue.labels.some(l => l.name === 'needs-review');
+
+            if (validVotes >= 5 && !hasReadyLabel && !needsReview) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: ['ready-to-process']
+              });
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: `This issue has reached the vote threshold and is now **ready to process**!
+
+A maintainer will review and process this skill improvement.`
+              });
+            }

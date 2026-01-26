@@ -28,6 +28,10 @@ SKILL COMMANDS:
     skills search <query>    Search skills by keyword
     skills sync              Detect and download needed skills
     skills info <name>       Show skill details
+    skills feedback <name>   Open issue form to suggest skill improvement
+
+COMMUNITY COMMANDS:
+    process-issues           Fetch approved skill improvements for processing
 
 DETECTION COMMANDS:
     detect                   Detect technologies in current project
@@ -182,6 +186,37 @@ skills_sync() {
     "$SCRIPT_DIR/download.sh" sync
 }
 
+skills_feedback() {
+    local skill="$1"
+    local repo="${CTOC_REPO:-theaiguys/ctoc}"
+    local url="https://github.com/${repo}/issues/new"
+    url+="?template=skill-improvement.yml"
+    url+="&title=%5BSkill%5D+Update+${skill}"
+
+    echo "Opening skill improvement form for: $skill"
+    echo ""
+
+    # Try to open browser
+    if command -v xdg-open &>/dev/null; then
+        xdg-open "$url" 2>/dev/null
+    elif command -v open &>/dev/null; then
+        open "$url"
+    elif command -v wslview &>/dev/null; then
+        wslview "$url"
+    else
+        echo "Please visit:"
+        echo "  $url"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Community Commands
+# ═══════════════════════════════════════════════════════════════════════════════
+
+process_issues() {
+    "$SCRIPT_DIR/process-issues.sh"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Main
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -225,9 +260,17 @@ main() {
                     fi
                     skills_info "$1"
                     ;;
+                feedback)
+                    if [[ $# -eq 0 ]]; then
+                        echo "Usage: ctoc skills feedback <skill-name>"
+                        echo "Opens a GitHub issue form to suggest improvements for the skill."
+                        exit 1
+                    fi
+                    skills_feedback "$1"
+                    ;;
                 *)
                     echo "Unknown skills command: $subcmd"
-                    echo "Available: list, active, add, search, sync, info"
+                    echo "Available: list, active, add, search, sync, info, feedback"
                     exit 1
                     ;;
             esac
@@ -236,6 +279,10 @@ main() {
         detect)
             local mode="${1:-all}"
             "$SCRIPT_DIR/detect.sh" "$mode"
+            ;;
+
+        process-issues)
+            process_issues
             ;;
 
         help|--help|-h)
