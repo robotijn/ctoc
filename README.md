@@ -82,9 +82,42 @@ With CTOC, the same request produces:
 
 | Role | How CTOC Helps |
 |------|----------------|
-| **Developers** | Plan and implement features with best practices enforced automatically |
-| **Product Managers** | Describe what you want in plain English — Claude Code handles the technical translation |
+| **Product Owners** | Define business goals and features in plain English. Plan entire product roadmaps, then hand them to developers for implementation. |
+| **Project Managers** | Create comprehensive feature specifications. Iterate on plans with critique until they're ready. Hand off approved plans to development teams. |
+| **Developers** | Receive well-defined plans from POs/PMs, or plan features yourself. Implement with best practices enforced automatically through the Iron Loop. |
 | **Business Users** | Test completed features and provide feedback through a simple web interface |
+
+### The Planning Handoff
+
+CTOC bridges the gap between business and development:
+
+```
+Product Owner / PM                    Developer
+       │                                  │
+       │  1. ASSESS (business goals)      │
+       │  2. PLAN (what, not how)         │
+       │  3. CRITIQUE (refine)            │
+       │         │                        │
+       │    ◄────┼────► (iterate until    │
+       │         │       plan is solid)   │
+       │         │                        │
+       └─────────┼────────────────────────┤
+                 │                        │
+            Handoff                       │
+                 │                        │
+                 └────────────────────────┤
+                                          │
+                         1. ASSESS (technical feasibility)
+                         2. PLAN (how to build it)
+                         3. CRITIQUE (technical review)
+                                │
+                           ◄────┼────► (iterate until
+                                │       approach is solid)
+                                │
+                         4-12. IMPLEMENT autonomously
+```
+
+**Key insight:** Steps 1-3 always include critique and can be repeated as many times as needed. A Product Owner might do 10 rounds of Assess-Plan-Critique before the specification is ready. A Developer might do another 5 rounds for the technical implementation plan.
 
 ---
 
@@ -101,22 +134,33 @@ The Iron Loop is a 12-step process that every feature follows:
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  PLANNING (Steps 1-3)                                       │
-│  You participate in these steps.                            │
+│  PLANNING (Steps 1-3) — ITERATIVE                           │
+│  Repeat until the plan is solid. Anyone can participate.    │
 │  ─────────────────────────────────────────────────────────  │
 │                                                             │
 │  Step 1: ASSESS                                             │
-│          Understand scope and complexity                    │
+│          Understand scope, goals, and complexity            │
+│          (includes initial critique)                        │
 │                                                             │
 │  Step 2: PLAN                                               │
-│          Create detailed implementation approach            │
+│          Create specification (business or technical)       │
+│          Plans can be high-level or detailed                │
 │                                                             │
 │  Step 3: CRITIQUE                                           │
-│          Review and improve the plan                        │
+│          Review, challenge, and improve the plan            │
+│          → Loop back to Step 1 if needed                    │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Steps 1-3 can be repeated as many times as needed  │    │
+│  │  until the plan meets your quality standards.       │    │
+│  │                                                     │    │
+│  │  Product Owners & PMs: Stop here and hand off.      │    │
+│  │  Developers: Continue to implementation.            │    │
+│  └─────────────────────────────────────────────────────┘    │
 │                                                             │
 │  ════════════════════════════════════════════════════════   │
-│  After Step 3, you can leave.                               │
-│  Claude Code works autonomously from here.                  │
+│  After Step 3, you can leave or hand off to developers.     │
+│  Claude Code works autonomously from Step 4 onward.         │
 │  ════════════════════════════════════════════════════════   │
 │                                                             │
 │  IMPLEMENTATION (Steps 4-7)                                 │
@@ -312,9 +356,20 @@ What would you like to do?
 
 ## Planning Features
 
-### Functional Planning (For Everyone)
+### From Business Goals to Implementation
 
-Anyone can plan features — you don't need to be technical. Describe what you want in plain English.
+CTOC supports the full journey from business idea to working code. Plans can be:
+
+- **Small:** A single feature ("add a logout button")
+- **Large:** An entire product roadmap ("build an e-commerce platform")
+- **Business-focused:** What and why (for POs/PMs)
+- **Technical:** How to build it (for developers)
+
+Every plan goes through Assess → Plan → Critique, which **repeats until quality standards are met**. There's always critique — it's built into the process, not optional.
+
+### Functional Planning (For Product Owners & PMs)
+
+Anyone can plan features — you don't need to be technical. Describe what you want in plain English. Create comprehensive specifications, then hand them to developers.
 
 ```
 User: ctoc plan
@@ -358,7 +413,7 @@ Claude Code: Let me understand what you need.
 
 ### Implementation Planning (For Developers)
 
-Developers add the technical details:
+Developers receive functional specs from POs/PMs and add the technical details. They run their own Assess → Plan → Critique cycle for the implementation approach:
 
 ```
 User: ctoc plan order-tracking --technical
