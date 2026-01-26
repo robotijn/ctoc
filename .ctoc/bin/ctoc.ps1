@@ -76,7 +76,11 @@ GIT WORKFLOW COMMANDS:
     commit "message"         Stage, validate, commit, and push
     qc "message"             Quick commit and push
     status                   Enhanced git status
-    lock-check <file>        Check if file is fresh
+    lock-check <file>        Check if file is fresh (alias for lock check)
+    lock check [files]       Check file freshness
+    lock resolve             Smart conflict resolution
+    lock setup-rerere        Enable git rerere
+    lock worktree new <br>   Create parallel workspace
 
 COMMUNITY COMMANDS:
     process-issues           Fetch approved skill improvements for processing
@@ -327,7 +331,11 @@ switch ($Command) {
     }
 
     "lock-check" {
-        & "$ScriptDir/git-workflow.ps1" "lock-check" $SubCommand
+        & "$ScriptDir/file-lock.ps1" "check" $SubCommand
+    }
+
+    "lock" {
+        & "$ScriptDir/file-lock.ps1" $SubCommand $Args
     }
 
     "process-issues" {

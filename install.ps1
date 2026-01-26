@@ -84,7 +84,7 @@ function Get-CoreFiles {
     New-Item -ItemType Directory -Path ".ctoc\templates" -Force | Out-Null
 
     # Download bin scripts
-    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1")
+    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1", "file-lock.ps1")
     foreach ($file in $binFiles) {
         try {
             Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/bin/$file" -OutFile ".ctoc\bin\$file" -UseBasicParsing -ErrorAction Stop
