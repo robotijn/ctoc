@@ -53,6 +53,10 @@ SKILL COMMANDS:
     skills search <query>    Search skills by keyword
     skills sync              Detect and download needed skills
     skills info <name>       Show skill details
+    skills feedback <name>   Open issue form to suggest skill improvement
+
+COMMUNITY COMMANDS:
+    process-issues           Fetch approved skill improvements for processing
 
 DETECTION COMMANDS:
     detect                   Detect technologies in current project
@@ -195,6 +199,27 @@ function Sync-Skills {
     & "$ScriptDir/download.ps1" "sync"
 }
 
+function Open-SkillFeedback {
+    param([string]$Name)
+
+    $repo = if ($env:CTOC_REPO) { $env:CTOC_REPO } else { "theaiguys/ctoc" }
+    $encodedName = [System.Web.HttpUtility]::UrlEncode($Name)
+    $url = "https://github.com/$repo/issues/new?template=skill-improvement.yml&title=%5BSkill%5D+Update+$encodedName"
+
+    Write-Host "Opening skill improvement form for: $Name"
+    Write-Host ""
+
+    Start-Process $url
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Community Commands
+# ═══════════════════════════════════════════════════════════════════════════════
+
+function Invoke-ProcessIssues {
+    & "$ScriptDir/process-issues.ps1"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Main
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -226,10 +251,18 @@ switch ($Command) {
                 }
                 Get-SkillInfo -Name $Args[0]
             }
+            "feedback" {
+                if ($Args.Count -eq 0) {
+                    Write-Host "Usage: ctoc skills feedback <skill-name>"
+                    Write-Host "Opens a GitHub issue form to suggest improvements for the skill."
+                    exit 1
+                }
+                Open-SkillFeedback -Name $Args[0]
+            }
             "" { Get-SkillsList }
             default {
                 Write-Host "Unknown skills command: $SubCommand"
-                Write-Host "Available: list, active, add, search, sync, info"
+                Write-Host "Available: list, active, add, search, sync, info, feedback"
                 exit 1
             }
         }
@@ -238,6 +271,10 @@ switch ($Command) {
     "detect" {
         $mode = if ($SubCommand) { $SubCommand } else { "all" }
         & "$ScriptDir/detect.ps1" -Mode $mode
+    }
+
+    "process-issues" {
+        Invoke-ProcessIssues
     }
 
     { $_ -in "help", "--help", "-h" } {

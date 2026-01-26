@@ -76,6 +76,75 @@ Components:
 
 ---
 
+## 🔄 Community Skill Improvement System
+
+CTOC uses a GitHub-powered system where users suggest skill improvements via issues, and maintainers process them using Claude Code.
+
+### Processing Skill Improvement Issues
+
+When the user runs `ctoc process-issues`:
+
+1. **Read the issues file** at `/tmp/ctoc-issues-to-process.json` (Linux/macOS) or `$env:TEMP\ctoc-issues-to-process.json` (Windows)
+
+2. **For each issue**, extract:
+   - Skill name from "### Skill Name" section
+   - Skill type (Language or Framework) from "### Skill Type" section
+   - What needs updating from "### What needs updating?" section
+   - Suggested improvement from "### Suggested improvement" section
+   - Sources from "### Sources" section
+
+3. **Process each skill improvement**:
+   a. Locate the current skill file:
+      - Languages: `.ctoc/skills/languages/{name}.md`
+      - Frameworks: `.ctoc/skills/frameworks/{category}/{name}.md`
+   b. Read the current skill content
+   c. Research current best practices using web search if sources aren't provided
+   d. Apply the suggested improvements, validating against authoritative sources
+   e. Update the skill file with improvements
+
+4. **Commit each change** with message format:
+   ```
+   skill: update {skill-name} (fixes #{issue-number})
+   ```
+
+5. **Create a PR** with all changes:
+   - Title: "skill: batch update from community suggestions"
+   - Body: List all issues being addressed
+   - Link to each issue in the PR description
+
+6. **Comment on each issue** linking to the PR:
+   ```
+   Created PR #{pr-number} with the suggested improvements.
+   ```
+
+### Workflow Commands
+
+| Command | Description |
+|---------|-------------|
+| `ctoc skills feedback <name>` | Open browser to suggest improvement for a skill |
+| `ctoc process-issues` | Fetch approved issues for processing |
+
+### Issue Labels
+
+| Label | Meaning |
+|-------|---------|
+| `skill-improvement` | Issue is a skill improvement suggestion |
+| `triage` | Awaiting initial validation |
+| `validated` | Skill exists and issue is properly formatted |
+| `needs-review` | From new account, requires manual review |
+| `invalid-skill` | Skill name not found in index |
+| `ready-to-process` | Has 5+ votes, ready for processing |
+
+### Quality Gates
+
+Before processing an issue:
+1. Verify it has `ready-to-process` label
+2. Check the skill actually exists
+3. Validate sources are authoritative
+4. Ensure suggested changes are improvements, not regressions
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -135,6 +204,13 @@ ctoc/
 | `ctoc update-profile [name]` | Update specific profile with research |
 | `ctoc add-profile [name]` | Add new language/framework profile |
 | `ctoc add-cto-skill [lang]` | Add CTO skill for language |
+
+### For Community Contributions
+
+| Command | Description |
+|---------|-------------|
+| `ctoc skills feedback <name>` | Open issue form to suggest skill improvement |
+| `ctoc process-issues` | Fetch approved skill improvements for processing |
 
 ---
 

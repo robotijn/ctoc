@@ -1,0 +1,164 @@
+name: Check Skill Staleness
+
+on:
+  schedule:
+    - cron: '0 9 * * 0'  # Weekly on Sunday at 9 AM UTC
+  workflow_dispatch:      # Manual trigger
+
+jobs:
+  check-staleness:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find Potentially Stale Skills
+        id: stale
+        run: |
+          STALE_LANGUAGES=()
+          STALE_FRAMEWORKS=()
+
+          # Calculate date 6 months ago
+          SIX_MONTHS_AGO=$(date -d "6 months ago" +%s 2>/dev/null || date -v-6m +%s)
+
+          echo "Checking for skills not updated since $(date -d "@$SIX_MONTHS_AGO" +%Y-%m-%d 2>/dev/null || date -r "$SIX_MONTHS_AGO" +%Y-%m-%d)"
+
+          # Check language skills
+          for file in .ctoc/skills/languages/*.md 2>/dev/null; do
+            [ -f "$file" ] || continue
+
+            # Get git last modified date
+            LAST_MODIFIED=$(git log -1 --format=%ct -- "$file" 2>/dev/null || echo 0)
+
+            if [ "$LAST_MODIFIED" -lt "$SIX_MONTHS_AGO" ] && [ "$LAST_MODIFIED" -gt 0 ]; then
+              SKILL_NAME=$(basename "$file" .md)
+              STALE_LANGUAGES+=("$SKILL_NAME")
+            fi
+          done
+
+          # Check framework skills
+          for file in .ctoc/skills/frameworks/**/*.md 2>/dev/null; do
+            [ -f "$file" ] || continue
+
+            LAST_MODIFIED=$(git log -1 --format=%ct -- "$file" 2>/dev/null || echo 0)
+
+            if [ "$LAST_MODIFIED" -lt "$SIX_MONTHS_AGO" ] && [ "$LAST_MODIFIED" -gt 0 ]; then
+              SKILL_NAME=$(basename "$file" .md)
+              STALE_FRAMEWORKS+=("$SKILL_NAME")
+            fi
+          done
+
+          # Output results
+          echo "stale_languages=${STALE_LANGUAGES[*]}" >> $GITHUB_OUTPUT
+          echo "stale_frameworks=${STALE_FRAMEWORKS[*]}" >> $GITHUB_OUTPUT
+          echo "stale_count=$((${#STALE_LANGUAGES[@]} + ${#STALE_FRAMEWORKS[@]}))" >> $GITHUB_OUTPUT
+
+          echo ""
+          echo "=== Stale Languages (${#STALE_LANGUAGES[@]}) ==="
+          printf '%s\n' "${STALE_LANGUAGES[@]}"
+          echo ""
+          echo "=== Stale Frameworks (${#STALE_FRAMEWORKS[@]}) ==="
+          printf '%s\n' "${STALE_FRAMEWORKS[@]}"
+
+      - name: Check for Recent Versions
+        id: versions
+        if: steps.stale.outputs.stale_count != '0'
+        run: |
+          # This is a placeholder for future enhancement
+          # Could use APIs to check if languages/frameworks have new releases
+          echo "Version checking would go here"
+          echo "For now, relying on community reports"
+
+      - name: Create Staleness Report Issue
+        if: steps.stale.outputs.stale_count != '0'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const staleLanguages = '${{ steps.stale.outputs.stale_languages }}'.split(' ').filter(s => s);
+            const staleFrameworks = '${{ steps.stale.outputs.stale_frameworks }}'.split(' ').filter(s => s);
+            const totalStale = staleLanguages.length + staleFrameworks.length;
+
+            if (totalStale === 0) {
+              console.log('No stale skills found');
+              return;
+            }
+
+            // Check if there's already an open staleness issue
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'staleness-report',
+              state: 'open'
+            });
+
+            if (existingIssues.data.length > 0) {
+              console.log('Staleness report already exists, updating...');
+
+              // Update existing issue
+              const existingIssue = existingIssues.data[0];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `## Weekly Update - ${new Date().toISOString().split('T')[0]}
+
+            **${totalStale} skills** haven't been updated in 6+ months.
+
+            ### Languages (${staleLanguages.length})
+            ${staleLanguages.map(s => `- [ ] ${s}`).join('\n') || 'None'}
+
+            ### Frameworks (${staleFrameworks.length})
+            ${staleFrameworks.map(s => `- [ ] ${s}`).join('\n') || 'None'}`
+              });
+              return;
+            }
+
+            // Create new issue
+            const body = `## Skill Staleness Report
+
+            The following skills haven't been updated in **6+ months** and may need review.
+
+            > This is an automated weekly check. Skills may still be accurate even if not recently updated.
+
+            ---
+
+            ### Languages (${staleLanguages.length})
+
+            ${staleLanguages.map(s => `- [ ] \`${s}\` - [Create improvement issue](https://github.com/${context.repo.owner}/${context.repo.repo}/issues/new?template=skill-improvement.yml&title=%5BSkill%5D+Update+${s})`).join('\n') || 'All language skills are up to date!'}
+
+            ### Frameworks (${staleFrameworks.length})
+
+            ${staleFrameworks.map(s => `- [ ] \`${s}\` - [Create improvement issue](https://github.com/${context.repo.owner}/${context.repo.repo}/issues/new?template=skill-improvement.yml&title=%5BSkill%5D+Update+${s})`).join('\n') || 'All framework skills are up to date!'}
+
+            ---
+
+            ### How to Help
+
+            1. Pick a skill from the list above
+            2. Check if the tool has released new versions or changed best practices
+            3. Click the link to create an improvement issue with specific suggestions
+            4. Or check off skills that are still accurate (comment with findings)
+
+            ### For Maintainers
+
+            Run \`ctoc process-issues\` in Claude Code to batch process approved improvements.
+
+            ---
+
+            *This issue is updated weekly. Close it when all skills have been reviewed.*`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Maintenance] ${totalStale} skills may need updates`,
+              labels: ['staleness-report', 'maintenance', 'help-wanted'],
+              body: body
+            });
+
+      - name: No Stale Skills
+        if: steps.stale.outputs.stale_count == '0'
+        run: |
+          echo "All skills have been updated within the last 6 months!"

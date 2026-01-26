@@ -1,0 +1,85 @@
+name: Skill Improvement
+description: Suggest an update to a language or framework skill
+title: "[Skill] Update {skill-name}"
+labels: ["skill-improvement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve CTOC skills! Your suggestions help keep our 261 skills current.
+
+        Before submitting, please:
+        - Check if a similar issue already exists
+        - Verify the skill name using `ctoc skills list`
+
+  - type: dropdown
+    id: skill-type
+    attributes:
+      label: Skill Type
+      description: Is this a language or framework skill?
+      options:
+        - Language (e.g., Python, Rust, Go)
+        - Framework (e.g., FastAPI, React, Django)
+    validations:
+      required: true
+
+  - type: input
+    id: skill-name
+    attributes:
+      label: Skill Name
+      description: Exact name as it appears in CTOC (use `ctoc skills list` to verify)
+      placeholder: "e.g., fastapi, pytorch, rust"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-needs-update
+    attributes:
+      label: What needs updating?
+      description: What's outdated, wrong, or missing in the current skill?
+      placeholder: |
+        Examples:
+        - Installation command is outdated (pip instead of uv)
+        - Missing guidance on new v2.0 features
+        - Anti-pattern section doesn't cover common mistake X
+        - Best practice Y is no longer recommended
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested-improvement
+    attributes:
+      label: Suggested improvement
+      description: What should the skill say instead? Be as specific as possible.
+      placeholder: |
+        Examples:
+
+        Replace: pip install fastapi
+        With: uv add fastapi
+
+        Add section: ## FastAPI 0.115+ Changes
+        - New response model validation
+        - Deprecation of old middleware syntax
+
+        Remove: Recommendation to use X (deprecated)
+
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources
+      description: Links to official docs, release notes, or authoritative examples (helps us verify)
+      placeholder: |
+        - https://fastapi.tiangolo.com/release-notes/
+        - https://github.com/tiangolo/fastapi/releases/tag/0.115.0
+        - https://docs.python.org/3/whatsnew/3.12.html
+
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Verification
+      description: Please confirm the following
+      options:
+        - label: I have verified the skill name exists in CTOC (`ctoc skills list`)
+          required: true
+        - label: I have checked for existing issues about this skill
+          required: true
