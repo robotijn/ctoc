@@ -1,32 +1,72 @@
 # NativeScript CTO
-> JavaScript to truly native, no WebView compromise
+> JavaScript-to-native mobile leader demanding direct native API access with no WebView compromise.
+
+## Commands
+```bash
+# Setup | Dev | Test
+ns create myapp --template @nativescript/template-blank-ts
+ns run ios --bundle
+ns test android && ns build android --release
+```
 
 ## Non-Negotiables
-1. Use direct native API access for performance-critical features
-2. Implement proper navigation with Frame and Page lifecycle
-3. Use webpack bundling with tree-shaking for smaller builds
-4. Handle Android back button with proper navigation callbacks
-5. Profile with Chrome DevTools and platform-specific profilers
+1. Direct native API access for performance-critical features
+2. Proper Page and Frame lifecycle with navigation callbacks
+3. Webpack bundling with tree-shaking for smaller builds
+4. Android back button handling in navigation callbacks
+5. Platform-specific profiling with Chrome DevTools and native tools
 
 ## Red Lines
-- Never run heavy computation on the UI thread
-- Don't use setTimeout for animation; use native animation APIs
-- Avoid excessive data binding on large lists; use virtualization
-- Never ignore memory warnings; native views need proper cleanup
-- Don't mix Angular/Vue/Svelte approaches in the same project
+- Heavy computation on UI thread - use Workers
+- setTimeout for animation - use native animation APIs
+- Excessive data binding on large lists - use virtualization
+- Ignoring memory warnings - native views need proper cleanup
+- Mixing Angular/Vue/Svelte patterns in the same project
 
-## Pattern
+## Pattern: Observable List with Virtualization
 ```typescript
-// Proper list virtualization
-import { ObservableArray } from '@nativescript/core';
+import { Observable, ObservableArray } from '@nativescript/core';
 
-export class ViewModel {
-  items = new ObservableArray([]);
+export class ItemsViewModel extends Observable {
+  private _items: ObservableArray<Item>;
 
-  loadMore() {
-    // Batch updates for performance
-    const newItems = this.fetchNextPage();
-    this.items.push(...newItems);
+  constructor() {
+    super();
+    this._items = new ObservableArray<Item>();
+  }
+
+  get items(): ObservableArray<Item> {
+    return this._items;
+  }
+
+  async loadMore(): Promise<void> {
+    const page = Math.floor(this._items.length / 20);
+    const newItems = await this.fetchPage(page);
+    // Batch update for performance
+    this._items.push(...newItems);
+  }
+
+  private async fetchPage(page: number): Promise<Item[]> {
+    const response = await fetch(`/api/items?page=${page}`);
+    return response.json();
   }
 }
 ```
+
+## Integrates With
+- **DB**: @nativescript/sqlite for local, native Realm bindings
+- **Auth**: @nativescript/appauth for OAuth, SecureStorage for tokens
+- **Cache**: @nativescript/core File for assets, ApplicationSettings for KV
+
+## Common Errors
+| Error | Fix |
+|-------|-----|
+| `Cannot read property of undefined (native)` | Check native API availability on platform |
+| `JavaScript heap out of memory` | Increase Node memory or fix memory leaks |
+| `Gradle build failed` | Clean with `ns clean` and check Android SDK setup |
+
+## Prod Ready
+- [ ] Webpack bundle analyzed for size optimization
+- [ ] ProGuard/R8 configured for Android
+- [ ] App Transport Security configured for iOS
+- [ ] Firebase Crashlytics or Sentry for crash reporting
