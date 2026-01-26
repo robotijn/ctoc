@@ -92,6 +92,8 @@ download_core() {
     mkdir -p .ctoc/skills/languages
     mkdir -p .ctoc/skills/frameworks
     mkdir -p .ctoc/templates
+    mkdir -p .ctoc/agents
+    mkdir -p .ctoc/plans
 
     # Download bin scripts
     local bin_files=(
@@ -104,6 +106,7 @@ download_core() {
         "progress.sh"
         "git-workflow.sh"
         "file-lock.sh"
+        "upgrade-agent.sh"
     )
 
     for file in "${bin_files[@]}"; do
@@ -123,6 +126,9 @@ download_core() {
     curl -sL "$CTOC_RAW/.ctoc/templates/CLAUDE.md.template" -o ".ctoc/templates/CLAUDE.md.template" 2>/dev/null || true
     curl -sL "$CTOC_RAW/.ctoc/templates/IRON_LOOP.md.template" -o ".ctoc/templates/IRON_LOOP.md.template" 2>/dev/null || true
     curl -sL "$CTOC_RAW/.ctoc/templates/PLANNING.md.template" -o ".ctoc/templates/PLANNING.md.template" 2>/dev/null || true
+
+    # Download agent versions
+    curl -sL "$CTOC_RAW/.ctoc/agents/versions.yaml" -o ".ctoc/agents/versions.yaml" 2>/dev/null || true
 
     print_success "Core files installed"
 }
