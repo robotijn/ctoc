@@ -212,6 +212,51 @@ ctoc/
 | `ctoc skills feedback <name>` | Open issue form to suggest skill improvement |
 | `ctoc process-issues` | Fetch approved skill improvements for processing |
 
+### Plan Lifecycle Commands
+
+| Command | Description |
+|---------|-------------|
+| `ctoc plan new <title>` | Create a new functional plan |
+| `ctoc plan propose <id>` | Submit plan for review |
+| `ctoc plan approve <id>` | Approve a plan |
+| `ctoc plan start <id>` | Begin work on plan |
+| `ctoc plan implement <id>` | Create implementation plan |
+| `ctoc plan complete <id>` | Mark plan as implemented |
+| `ctoc plan status` | Show plan dashboard |
+
+### Git Workflow Commands
+
+| Command | Description |
+|---------|-------------|
+| `ctoc sync` | Pull-rebase-push workflow |
+| `ctoc commit "message"` | Validated commit with Co-Author |
+| `ctoc qc "message"` | Quick commit and push |
+| `ctoc status` | Enhanced git status |
+| `ctoc lock check [files]` | Check file freshness |
+| `ctoc lock resolve` | Smart conflict resolution |
+| `ctoc lock setup-rerere` | Enable git rerere |
+| `ctoc lock worktree new <branch>` | Create parallel workspace |
+
+### Agent Commands
+
+| Command | Description |
+|---------|-------------|
+| `ctoc agent list` | List all 60 agents |
+| `ctoc agent info <name>` | Show agent details |
+| `ctoc agent upgrade <name>` | Add capability to upgrade queue |
+| `ctoc agent research <name>` | Show research queries for agent |
+| `ctoc agent check` | Check for agent updates |
+| `ctoc agent apply <name>` | Apply pending upgrades |
+
+### Progress Commands
+
+| Command | Description |
+|---------|-------------|
+| `ctoc progress` | Quick Iron Loop progress view |
+| `ctoc dashboard` | Full progress dashboard |
+| `ctoc progress step <n>` | Move to Iron Loop step |
+| `ctoc progress complete <n>` | Complete step and advance |
+
 ---
 
 ## 🎭 The CTO Persona
@@ -355,6 +400,60 @@ Every CTO skill MUST include:
 | `PLANNING.md` | Feature planning and backlog |
 | `templates/CLAUDE.md.template` | Template for user projects |
 | `templates/IRON_LOOP.md.template` | Template for user projects |
+
+---
+
+## ⚡ Parallel Execution Guidelines
+
+### Subagent Parallelism Formula
+
+Use: `max(2, CPU_CORES - 4)` concurrent subagents
+
+This ensures:
+- Minimum 2 agents for any system
+- Leaves 4 cores for system/IDE/other processes
+- Scales with available hardware
+
+### Safe Parallelization Matrix
+
+| Operation Type | Parallel Safe? | Notes |
+|----------------|----------------|-------|
+| WebSearch | Yes | No state modification |
+| Read/Glob/Grep | Yes | Read-only |
+| WebFetch | Yes | External fetch |
+| Analysis | Yes | Results can merge |
+| Edit/Write | **NO** | Serialize by file |
+| Bash (read) | Yes | ls, cat, etc. |
+| Bash (write) | **NO** | Serialize |
+| Git operations | **NO** | Use worktrees for parallelism |
+
+### Research Phase Pattern
+
+When exploring a problem, use parallel research:
+
+```
+Launch in parallel (up to max agents):
+├── Agent 1: WebSearch "official docs {topic}"
+├── Agent 2: WebSearch "GitHub implementations {topic}"
+├── Agent 3: WebSearch "security considerations {topic}"
+├── Agent 4: Grep codebase for existing patterns
+└── Agent 5: Read related files
+
+Wait for all results, then synthesize.
+```
+
+### Write Phase Pattern
+
+When implementing, serialize writes:
+
+```
+Sequential execution:
+1. Edit file A
+2. Edit file B
+3. Edit file C
+4. Run tests
+5. Commit
+```
 
 ---
 
