@@ -5,7 +5,7 @@
 
 ---
 
-## 🔄 Current Work
+## Current Work
 
 **Feature:** {{FEATURE_NAME}}
 **Status:** {{CURRENT_STEP}}
@@ -19,9 +19,9 @@
 
 ---
 
-## 📋 Step Details
+## Step Details
 
-### Planning Phase (Human Participates)
+### Planning Phase (Steps 1-6) — Use Parallel Research
 
 #### Step 1: ASSESS
 - [ ] Understand the business requirement
@@ -29,75 +29,116 @@
 - [ ] Estimate complexity (S/M/L/XL)
 - [ ] Identify risks and dependencies
 
-#### Step 2: PLAN
+#### Step 2: ALIGN
+- [ ] Confirm business value
+- [ ] Identify stakeholders
+- [ ] Define success metrics
+- [ ] Validate assumptions with research
+
+#### Step 3: CAPTURE
+- [ ] Document functional requirements
+- [ ] Document non-functional requirements
+- [ ] Identify edge cases
+- [ ] List constraints
+
+#### Step 4: PLAN
 - [ ] Define acceptance criteria
 - [ ] List files to create/modify
 - [ ] Design data structures
 - [ ] Plan API contracts (if applicable)
 
-#### Step 3: CRITIQUE
+#### Step 5: DESIGN
+- [ ] Choose architecture patterns
+- [ ] Define interfaces
+- [ ] Plan error handling
+- [ ] Consider scalability
+
+#### Step 6: SPEC
+- [ ] Write technical specification
+- [ ] Document API contracts
+- [ ] Define data models
 - [ ] Review plan for completeness
-- [ ] Check for edge cases
-- [ ] Verify security considerations
-- [ ] Confirm business alignment
 
 ---
 
-### Implementation Phase (Claude Works Autonomously)
+### Development Phase (Steps 7-10) — Write Code
 
-#### Step 4: TEST
+#### Step 7: TEST
 - [ ] Write failing tests for acceptance criteria
 - [ ] Cover happy path and error cases
 - [ ] Confirm tests actually fail
+- [ ] Test edge cases
 
-#### Step 5: QUALITY
+#### Step 8: QUALITY
 - [ ] Run linter: `{{LINT_COMMAND}}`
 - [ ] Run formatter: `{{FORMAT_COMMAND}}`
 - [ ] Run type checker: `{{TYPECHECK_COMMAND}}`
 
-#### Step 6: IMPLEMENT
+#### Step 9: IMPLEMENT
 - [ ] Write code to pass tests
 - [ ] Follow project patterns
 - [ ] Use language best practices
+- [ ] Handle errors properly
 
-#### Step 7: REVIEW
+#### Step 10: REVIEW
 - [ ] Self-review all changes
 - [ ] Refactor if needed
 - [ ] Check for code smells
+- [ ] Verify naming conventions
 
 ---
 
-### Completion Phase (Quality Assurance)
+### Delivery Phase (Steps 11-15) — Production Ready
 
-#### Step 8: OPTIMIZE
+#### Step 11: OPTIMIZE
 - [ ] Check for N+1 queries
 - [ ] Review algorithm complexity
+- [ ] Profile performance
 - [ ] Add caching if needed
 
-#### Step 9: SECURE
+#### Step 12: SECURE
 - [ ] Check for injection vulnerabilities
 - [ ] Verify authentication/authorization
 - [ ] Review input validation
 - [ ] Check for secrets in code
+- [ ] Run security audit
 
-#### Step 10: DOCUMENT
+#### Step 13: DOCUMENT
 - [ ] Update API documentation
 - [ ] Update README if needed
 - [ ] Add code comments for complex logic
+- [ ] Update changelog
 
-#### Step 11: VERIFY
+#### Step 14: VERIFY
 - [ ] Run full test suite
 - [ ] Check test coverage
 - [ ] Verify no regressions
+- [ ] Manual testing if needed
 
-#### Step 12: COMMIT
+#### Step 15: COMMIT
 - [ ] Write descriptive commit message
 - [ ] Follow conventional commits
+- [ ] Run ctoc sync to push
 - [ ] Feature complete
 
 ---
 
-## 🔄 Self-Improvement Protocol
+## Research Notes
+
+Research conducted during planning phase:
+
+### Web Searches Performed
+{{RESEARCH_QUERIES}}
+
+### Key Findings
+{{RESEARCH_FINDINGS}}
+
+### Sources
+{{RESEARCH_SOURCES}}
+
+---
+
+## Self-Improvement Protocol
 
 After completing each feature, reflect:
 
@@ -118,7 +159,7 @@ After completing each feature, reflect:
 
 ---
 
-## 📊 Metrics
+## Metrics
 
 | Metric | Target | Actual |
 |--------|--------|--------|
@@ -129,7 +170,7 @@ After completing each feature, reflect:
 
 ---
 
-## 📝 Notes
+## Notes
 
 {{IMPLEMENTATION_NOTES}}
 
