@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CTOC - CTO Chief Installation Script
+#  CTOC - CTO Chief Installation Script v1.3.0
 #  "You are the CTO Chief. Claude is your army of CTOs."
 #
-#  Smart skill loading: Downloads only the skills your project needs.
+#  Full repo clone approach: One git clone, all skills available, easy updates.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-CTOC_VERSION="1.1.0"
-CTOC_REPO="https://github.com/robotijn/ctoc"
-CTOC_RAW="https://raw.githubusercontent.com/robotijn/ctoc/main"
+set -euo pipefail
+
+VERSION="1.3.0"
+REPO_URL="https://github.com/robotijn/ctoc.git"
+REPO_RAW="https://raw.githubusercontent.com/robotijn/ctoc/main"
+
+# State
+EXISTING_INSTALL=false
+ALIAS_ADDED=false
+NO_JQ=false
 
 # Colors
 RED='\033[0;31m'
@@ -18,358 +23,491 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-print_banner() {
-    echo -e "${CYAN}"
-    cat << 'BANNER'
-   _____ _______ ____   _____
-  / ____|__   __/ __ \ / ____|
- | |       | | | |  | | |
- | |       | | | |  | | |
- | |____   | | | |__| | |____
-  \_____|  |_|  \____/ \_____|
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Output Helpers
+# ═══════════════════════════════════════════════════════════════════════════════
 
-  CTO Chief - Your Army of Virtual CTOs
-BANNER
-    echo -e "${NC}"
+show_banner() {
+    echo ""
+    echo -e "${CYAN}   ██████╗████████╗ ██████╗  ██████╗${NC}"
+    echo -e "${CYAN}  ██╔════╝╚══██╔══╝██╔═══██╗██╔════╝${NC}"
+    echo -e "${CYAN}  ██║        ██║   ██║   ██║██║     ${NC}"
+    echo -e "${CYAN}  ██║        ██║   ██║   ██║██║     ${NC}"
+    echo -e "${CYAN}  ╚██████╗   ██║   ╚██████╔╝╚██████╗${NC}"
+    echo -e "${CYAN}   ╚═════╝   ╚═╝    ╚═════╝  ╚═════╝${NC}"
+    echo -e "${BOLD}            CTO Chief v$VERSION${NC}"
+    echo ""
+}
+
+print_section() {
+    echo ""
+    echo -e "${BLUE}[$1]${NC}"
 }
 
 print_step() {
-    echo -e "${BLUE}▶${NC} $1"
+    echo -e "  ${GREEN}✓${NC} $1"
 }
 
-print_success() {
-    echo -e "${GREEN}✓${NC} $1"
+print_fail() {
+    echo -e "  ${RED}✗${NC} $1"
 }
 
-print_warning() {
-    echo -e "${YELLOW}⚠${NC} $1"
+print_warn() {
+    echo -e "  ${YELLOW}⚠${NC} $1"
 }
 
-print_error() {
-    echo -e "${RED}✗${NC} $1"
+print_info() {
+    echo -e "  $1"
 }
 
-# Check if we're in a git repository or project directory
-# Smart merge handled by init-claude-md.sh during setup_project
-check_directory() {
-    # Directory check - allow existing CLAUDE.md (will be smart-merged)
-    if [[ ! -d ".git" ]]; then
-        print_warning "Not a git repository. CTOC works best with git."
-        read -p "Continue anyway? (Y/n): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Nn]$ ]]; then
-            echo "Initialize git first: git init"
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Dependency Checking
+# ═══════════════════════════════════════════════════════════════════════════════
+
+check_dependencies() {
+    print_section "Checking dependencies"
+
+    local missing=()
+
+    # Git (required)
+    if command -v git &>/dev/null; then
+        print_step "git"
+    else
+        print_fail "git (required)"
+        missing+=("git")
+    fi
+
+    # jq (optional but recommended)
+    if command -v jq &>/dev/null; then
+        print_step "jq"
+    else
+        print_warn "jq (optional, some features limited)"
+        NO_JQ=true
+    fi
+
+    # claude (optional)
+    if command -v claude &>/dev/null; then
+        print_step "claude (Claude Code CLI)"
+    else
+        print_warn "claude not found"
+        print_info "         Install: npm install -g @anthropic-ai/claude-code"
+    fi
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        echo ""
+        echo -e "${RED}Required dependencies missing. Please install:${NC}"
+        for dep in "${missing[@]}"; do
+            echo "  • $dep"
+        done
+        exit 1
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Project Checking
+# ═══════════════════════════════════════════════════════════════════════════════
+
+check_project() {
+    print_section "Checking project"
+
+    # Git repository
+    if [[ -d ".git" ]]; then
+        print_step "Git repository detected"
+    else
+        print_warn "Not a git repository"
+        echo ""
+        read -p "  Continue anyway? (y/N): " -r response
+        if [[ ! "$response" =~ ^[yY] ]]; then
+            echo "  Initialize git first: git init"
             exit 1
         fi
     fi
-}
 
-# Check for required tools
-check_requirements() {
-    if ! command -v curl &> /dev/null; then
-        print_error "curl is required but not installed."
-        exit 1
-    fi
-
-    if ! command -v jq &> /dev/null; then
-        print_warning "jq is not installed. Installing for skill management..."
-        print_warning "You can install it with: sudo apt install jq (Ubuntu) or brew install jq (macOS)"
-        print_warning "Continuing without smart skill detection..."
-        NO_JQ=true
+    # Check .gitignore
+    if [[ -f ".gitignore" ]]; then
+        if grep -q "^\.ctoc/$" .gitignore 2>/dev/null; then
+            print_step ".ctoc/ in .gitignore"
+        else
+            print_warn ".ctoc/ not in .gitignore (will ask)"
+        fi
     else
-        NO_JQ=false
+        print_warn "No .gitignore (will ask)"
     fi
-}
 
-# Download core CTOC files (bin scripts + skills.json)
-download_core() {
-    print_step "Downloading CTOC core files..."
+    # Detect project types
+    local detected=()
 
-    # Create directories
-    mkdir -p .ctoc/bin
-    mkdir -p .ctoc/skills/languages
-    mkdir -p .ctoc/skills/frameworks
-    mkdir -p .ctoc/templates
-    mkdir -p .ctoc/agents
-    mkdir -p .ctoc/plans
+    if [[ -f "pyproject.toml" ]] || [[ -f "setup.py" ]] || [[ -f "requirements.txt" ]]; then
+        detected+=("Python project")
+    fi
+    if [[ -f "package.json" ]]; then
+        if grep -q '"typescript"' package.json 2>/dev/null; then
+            detected+=("TypeScript project")
+        else
+            detected+=("JavaScript project")
+        fi
+    fi
+    if [[ -f "Cargo.toml" ]]; then
+        detected+=("Rust project")
+    fi
+    if [[ -f "go.mod" ]]; then
+        detected+=("Go project")
+    fi
+    if [[ -f "Gemfile" ]]; then
+        detected+=("Ruby project")
+    fi
+    if [[ -f "pom.xml" ]] || [[ -f "build.gradle" ]] || [[ -f "build.gradle.kts" ]]; then
+        detected+=("Java project")
+    fi
+    if [[ -f "*.csproj" ]] || [[ -f "*.sln" ]]; then
+        detected+=("C# project")
+    fi
 
-    # Download bin scripts
-    local bin_files=(
-        "ctoc.sh"
-        "detect.sh"
-        "download.sh"
-        "init-claude-md.sh"
-        "process-issues.sh"
-        "plan.sh"
-        "progress.sh"
-        "git-workflow.sh"
-        "file-lock.sh"
-        "upgrade-agent.sh"
-        "explore-codebase.sh"
-        "research.sh"
-        "update-check.sh"
-    )
-
-    for file in "${bin_files[@]}"; do
-        curl -sL "$CTOC_RAW/.ctoc/bin/$file" -o ".ctoc/bin/$file" 2>/dev/null || {
-            print_warning "Failed to download $file"
-        }
-        chmod +x ".ctoc/bin/$file" 2>/dev/null || true
+    for proj in "${detected[@]}"; do
+        print_step "$proj"
     done
 
-    # Download skills index
-    curl -sL "$CTOC_RAW/.ctoc/skills.json" -o ".ctoc/skills.json" 2>/dev/null || {
-        print_error "Failed to download skills.json"
+    if [[ ${#detected[@]} -eq 0 ]]; then
+        print_warn "No known project type detected"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Existing Installation Check
+# ═══════════════════════════════════════════════════════════════════════════════
+
+check_existing() {
+    if [[ -d ".ctoc/repo/.git" ]]; then
+        local current_version
+        current_version=$(cat .ctoc/repo/VERSION 2>/dev/null || echo "unknown")
+        print_step "CTOC $current_version found at .ctoc/repo/"
+        EXISTING_INSTALL=true
+        return 0
+    fi
+    EXISTING_INSTALL=false
+    return 1
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Repository Installation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+install_repo() {
+    print_section "Installing CTOC"
+
+    if [[ "$EXISTING_INSTALL" == "true" ]]; then
+        upgrade_repo
+        return
+    fi
+
+    # Fresh installation
+    mkdir -p .ctoc
+
+    print_info "Cloning repository..."
+    if git clone --depth 1 --quiet "$REPO_URL" .ctoc/repo 2>/dev/null; then
+        print_step "Cloned to .ctoc/repo/"
+    else
+        print_fail "Failed to clone repository"
+        echo ""
+        echo "  Try manually: git clone $REPO_URL .ctoc/repo"
         exit 1
+    fi
+
+    # Count skills
+    local skill_count
+    skill_count=$(find .ctoc/repo/.ctoc/skills -name "*.md" 2>/dev/null | wc -l)
+    print_step "$skill_count skills available"
+
+    # Create root-level plan directories (git-tracked)
+    mkdir -p plans/{functional/{draft,approved},implementation/{draft,approved},todo,in_progress,review,done}
+    print_step "Created plan directories (plans/)"
+
+    # Create wrapper script
+    create_wrapper_script
+    print_step "Created wrapper script"
+
+    # Create default settings if not exists
+    if [[ ! -f ".ctoc/settings.yaml" ]]; then
+        local project_name
+        project_name=$(basename "$PWD")
+        local tz
+        tz=$(cat /etc/timezone 2>/dev/null || echo "UTC")
+
+        cat > .ctoc/settings.yaml << SETTINGS
+# CTOC Project Settings
+# This file is project-specific and preserved during updates
+
+project:
+  name: "$project_name"
+  timezone: "$tz"  # For plan dating (distributed teams)
+
+# Research configuration
+research:
+  enabled: true
+  auto_steps: [1, 2, 5, 12]
+
+# Language-specific commands (edit for your project)
+# These are used when Iron Loop is injected into plans
+# Uncomment and modify the sections relevant to your project
+#
+# languages:
+#   typescript:
+#     root: frontend/
+#     lint: "npm run lint"
+#     format: "npm run format"
+#     typecheck: "npm run typecheck"
+#     test: "npm test"
+#     build: "npm run build"
+#   python:
+#     root: backend/
+#     lint: "ruff check"
+#     format: "ruff format --check"
+#     typecheck: "mypy"
+#     test: "pytest"
+
+# Skills read this session (reset on new session)
+# This section is managed automatically
+skills_read: []
+SETTINGS
+        print_step "Created settings.yaml"
+    fi
+
+    # Create counter file for plan naming
+    if [[ ! -f ".ctoc/counter" ]]; then
+        local today
+        today=$(TZ="$tz" date +%Y-%m-%d)
+        echo "${today}:0:${tz}" > .ctoc/counter
+    fi
+}
+
+upgrade_repo() {
+    print_info "Checking for updates..."
+
+    cd .ctoc/repo
+    git fetch --quiet 2>/dev/null || {
+        print_warn "Could not check for updates (offline?)"
+        cd - > /dev/null
+        return 0
     }
 
-    # Download VERSION file for update checking
-    curl -sL "$CTOC_RAW/VERSION" -o ".ctoc/VERSION" 2>/dev/null || true
+    local local_version
+    local_version=$(cat VERSION 2>/dev/null || echo "unknown")
+    local remote_version
+    remote_version=$(git show origin/main:VERSION 2>/dev/null || echo "$local_version")
 
-    # Download templates
-    curl -sL "$CTOC_RAW/.ctoc/templates/CLAUDE.md.template" -o ".ctoc/templates/CLAUDE.md.template" 2>/dev/null || true
-    curl -sL "$CTOC_RAW/.ctoc/templates/IRON_LOOP.md.template" -o ".ctoc/templates/IRON_LOOP.md.template" 2>/dev/null || true
-    curl -sL "$CTOC_RAW/.ctoc/templates/PLANNING.md.template" -o ".ctoc/templates/PLANNING.md.template" 2>/dev/null || true
+    if [[ "$local_version" != "$remote_version" ]]; then
+        echo ""
+        echo -e "  ${CYAN}Update available: $local_version → $remote_version${NC}"
+        echo ""
 
-    # Download agent versions
-    curl -sL "$CTOC_RAW/.ctoc/agents/versions.yaml" -o ".ctoc/agents/versions.yaml" 2>/dev/null || true
+        # Backup project-specific files
+        if [[ -f "../settings.yaml" ]]; then
+            cp -f ../settings.yaml ../settings.yaml.backup 2>/dev/null || true
+        fi
 
-    print_success "Core files installed"
+        git pull --rebase --quiet 2>/dev/null || git reset --hard origin/main --quiet
+        print_step "Pulled latest changes"
+
+        # Restore project-specific files
+        if [[ -f "../settings.yaml.backup" ]]; then
+            mv -f ../settings.yaml.backup ../settings.yaml 2>/dev/null || true
+            print_step "Restored settings"
+        fi
+
+        # Show what's new
+        show_whats_new "$local_version" "$remote_version"
+    else
+        print_step "Already up to date ($local_version)"
+    fi
+
+    cd - > /dev/null
 }
 
-# Detect and download only needed skills
-download_skills() {
-    if [[ "$NO_JQ" == "true" ]]; then
-        print_warning "Skipping smart skill detection (jq not installed)"
-        return
-    fi
-
-    print_step "Detecting project technologies..."
-
-    # Run detection
-    local detected
-    detected=$(.ctoc/bin/detect.sh all json 2>/dev/null || echo '{"languages":[],"frameworks":[]}')
-
-    local languages
-    local frameworks
-    languages=$(echo "$detected" | jq -r '.languages[]' 2>/dev/null || true)
-    frameworks=$(echo "$detected" | jq -r '.frameworks[]' 2>/dev/null || true)
-
-    # Count detected skills
-    local lang_count=0
-    local frame_count=0
-    for l in $languages; do [[ -n "$l" ]] && ((lang_count++)) || true; done
-    for f in $frameworks; do [[ -n "$f" ]] && ((frame_count++)) || true; done
-
-    if [[ $lang_count -eq 0 && $frame_count -eq 0 ]]; then
-        print_warning "No technologies detected. Skills can be added later with: ctoc skills add <name>"
-        return
-    fi
+show_whats_new() {
+    local old_version="$1"
+    local new_version="$2"
 
     echo ""
-    echo "Detected technologies:"
-    for lang in $languages; do
-        [[ -n "$lang" ]] && echo "  - $lang (language)"
-    done
-    for framework in $frameworks; do
-        [[ -n "$framework" ]] && echo "  - $framework (framework)"
-    done
-    echo ""
+    echo -e "${CYAN}What's new in v$new_version:${NC}"
 
-    # Download detected skills
-    print_step "Downloading detected skills..."
+    # Try to show recent commits
+    cd .ctoc/repo
+    local changes
+    changes=$(git log --oneline "v$old_version"..HEAD 2>/dev/null | head -5 || \
+              git log --oneline -5 2>/dev/null || echo "")
 
-    local download_count=0
-    local total_size=0
-
-    # Download languages
-    for lang in $languages; do
-        [[ -z "$lang" ]] && continue
-        local path
-        path=$(jq -r --arg l "$lang" '.skills.languages[$l].file // empty' .ctoc/skills.json)
-        if [[ -n "$path" ]]; then
-            local size
-            size=$(jq -r --arg l "$lang" '.skills.languages[$l].size // 0' .ctoc/skills.json)
-            mkdir -p ".ctoc/skills/$(dirname "$path")"
-            if curl -sL "$CTOC_RAW/.ctoc/skills/$path" -o ".ctoc/skills/$path" 2>/dev/null; then
-                echo "  ✓ $lang"
-                ((download_count++))
-                ((total_size += size))
-            else
-                echo "  ✗ $lang (failed)"
-            fi
-        fi
-    done
-
-    # Download frameworks (and their required languages)
-    for framework in $frameworks; do
-        [[ -z "$framework" ]] && continue
-
-        # Get framework info
-        local path
-        local requires
-        path=$(jq -r --arg f "$framework" '
-            .skills.frameworks | to_entries[] | .value[$f].file // empty
-        ' .ctoc/skills.json | head -1)
-
-        requires=$(jq -r --arg f "$framework" '
-            .skills.frameworks | to_entries[] | .value[$f].requires[]? // empty
-        ' .ctoc/skills.json)
-
-        # Download required languages first
-        for req in $requires; do
-            [[ -z "$req" ]] && continue
-            if [[ ! -f ".ctoc/skills/languages/$req.md" ]]; then
-                local req_path
-                req_path=$(jq -r --arg l "$req" '.skills.languages[$l].file // empty' .ctoc/skills.json)
-                if [[ -n "$req_path" ]]; then
-                    mkdir -p ".ctoc/skills/languages"
-                    if curl -sL "$CTOC_RAW/.ctoc/skills/$req_path" -o ".ctoc/skills/$req_path" 2>/dev/null; then
-                        echo "  ✓ $req (dependency)"
-                        ((download_count++))
-                    fi
-                fi
-            fi
+    if [[ -n "$changes" ]]; then
+        echo "$changes" | while read -r line; do
+            echo "  • $line"
         done
-
-        # Download the framework
-        if [[ -n "$path" ]]; then
-            local size
-            size=$(jq -r --arg f "$framework" '
-                .skills.frameworks | to_entries[] | .value[$f].size // 0
-            ' .ctoc/skills.json | head -1)
-            mkdir -p ".ctoc/skills/$(dirname "$path")"
-            if curl -sL "$CTOC_RAW/.ctoc/skills/$path" -o ".ctoc/skills/$path" 2>/dev/null; then
-                echo "  ✓ $framework"
-                ((download_count++))
-                ((total_size += size))
-            else
-                echo "  ✗ $framework (failed)"
-            fi
-        fi
-    done
-
-    echo ""
-    print_success "Downloaded $download_count skills (~$((total_size / 1024))KB)"
+    else
+        echo "  • Various improvements and bug fixes"
+    fi
+    cd - > /dev/null
 }
 
-# Interactive project setup
-setup_project() {
-    print_step "Setting up your project..."
-    echo
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Wrapper Script Creation
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    # Get project name
-    DEFAULT_NAME=$(basename "$PWD")
-    read -p "Project name [$DEFAULT_NAME]: " PROJECT_NAME
-    PROJECT_NAME=${PROJECT_NAME:-$DEFAULT_NAME}
+create_wrapper_script() {
+    cat > .ctoc/ctoc << 'WRAPPER'
+#!/bin/bash
+# CTOC Wrapper Script
+# Calls the actual script in repo/ and handles background update checks
 
-    # Get primary language (from detected or manual)
-    local detected_langs=""
-    if [[ "$NO_JQ" != "true" && -f ".ctoc/skills.json" ]]; then
-        detected_langs=$(.ctoc/bin/detect.sh languages 2>/dev/null | head -1 || true)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$SCRIPT_DIR/repo"
+
+# Background update check (once per day)
+check_update_background() {
+    local last_check_file="$SCRIPT_DIR/.last-update-check"
+    local now
+    now=$(date +%s)
+    local last_check=0
+
+    [[ -f "$last_check_file" ]] && last_check=$(cat "$last_check_file" 2>/dev/null || echo "0")
+
+    # 86400 seconds = 24 hours
+    if (( now - last_check > 86400 )); then
+        echo "$now" > "$last_check_file"
+        # Run update check in background, suppress all output
+        (
+            cd "$REPO_DIR" 2>/dev/null || exit 0
+            git fetch --quiet 2>/dev/null || exit 0
+            local local_v
+            local_v=$(cat VERSION 2>/dev/null || echo "")
+            local remote_v
+            remote_v=$(git show origin/main:VERSION 2>/dev/null || echo "")
+            if [[ -n "$local_v" && -n "$remote_v" && "$local_v" != "$remote_v" ]]; then
+                # Create a notification file that the main script can check
+                echo "$remote_v" > "$SCRIPT_DIR/.update-available"
+            fi
+        ) &>/dev/null &
+        disown 2>/dev/null || true
     fi
 
-    if [[ -n "$detected_langs" ]]; then
-        echo
-        echo "Detected primary language: $detected_langs"
-        read -p "Use this language? (Y/n): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Nn]$ ]]; then
-            detected_langs=""
+    # Check if we have a pending update notification
+    if [[ -f "$SCRIPT_DIR/.update-available" ]]; then
+        local new_version
+        new_version=$(cat "$SCRIPT_DIR/.update-available" 2>/dev/null || echo "")
+        local current_version
+        current_version=$(cat "$REPO_DIR/VERSION" 2>/dev/null || echo "")
+        if [[ -n "$new_version" && "$new_version" != "$current_version" ]]; then
+            echo -e "\033[0;36mCTOC update available: $current_version → $new_version\033[0m"
+            echo -e "Run: \033[1mctoc update\033[0m"
+            echo ""
+        else
+            # Update was applied, remove notification
+            rm -f "$SCRIPT_DIR/.update-available" 2>/dev/null || true
         fi
     fi
+}
 
-    if [[ -z "$detected_langs" ]]; then
-        echo
-        echo "Primary language:"
-        echo "  1) Python      6) Go          11) Swift"
-        echo "  2) TypeScript  7) Rust        12) Kotlin"
-        echo "  3) JavaScript  8) C#          13) Other"
-        echo "  4) Java        9) PHP"
-        echo "  5) Ruby       10) Elixir"
-        echo
-        read -p "Select [1-13]: " LANG_CHOICE
+# Only check updates if not running a subcommand that does its own check
+case "${1:-}" in
+    update|doctor|version|--version|-v)
+        # Skip background check for these commands
+        ;;
+    *)
+        check_update_background
+        ;;
+esac
 
-        case $LANG_CHOICE in
-            1) LANGUAGE="Python" ;;
-            2) LANGUAGE="TypeScript" ;;
-            3) LANGUAGE="JavaScript" ;;
-            4) LANGUAGE="Java" ;;
-            5) LANGUAGE="Ruby" ;;
-            6) LANGUAGE="Go" ;;
-            7) LANGUAGE="Rust" ;;
-            8) LANGUAGE="C#" ;;
-            9) LANGUAGE="PHP" ;;
-            10) LANGUAGE="Elixir" ;;
-            11) LANGUAGE="Swift" ;;
-            12) LANGUAGE="Kotlin" ;;
+# Call actual script
+exec "$REPO_DIR/.ctoc/bin/ctoc.sh" "$@"
+WRAPPER
+    chmod +x .ctoc/ctoc
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CLAUDE.md Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+configure_claude_md() {
+    print_section "Configuration"
+
+    if [[ -f "CLAUDE.md" ]]; then
+        echo ""
+        echo "  Found existing CLAUDE.md. How should we proceed?"
+        echo ""
+        echo "  [1] Merge (add CTOC sections, keep your content) - Recommended"
+        echo "  [2] Replace (backup old as CLAUDE.md.backup, create new)"
+        echo "  [3] Skip (don't touch CLAUDE.md)"
+        echo ""
+        read -p "  Choice [1-3]: " choice
+        choice=${choice:-1}
+
+        case $choice in
+            1)
+                # Run smart merge using init-claude-md.sh
+                if [[ -x ".ctoc/repo/.ctoc/bin/init-claude-md.sh" ]]; then
+                    .ctoc/repo/.ctoc/bin/init-claude-md.sh integrate "$(basename "$PWD")" "" ""
+                    print_step "Merged CTOC sections into CLAUDE.md"
+                else
+                    print_warn "Could not find init-claude-md.sh, skipping merge"
+                fi
+                ;;
+            2)
+                cp CLAUDE.md CLAUDE.md.backup
+                print_step "Backed up to CLAUDE.md.backup"
+                create_fresh_claude_md
+                ;;
+            3)
+                print_step "Skipped CLAUDE.md"
+                ;;
             *)
-                read -p "Enter language: " LANGUAGE
+                print_warn "Invalid choice, skipping CLAUDE.md"
                 ;;
         esac
     else
-        LANGUAGE="$detected_langs"
+        create_fresh_claude_md
     fi
 
-    # Get framework (optional, from detected or manual)
-    local detected_framework=""
-    if [[ "$NO_JQ" != "true" && -f ".ctoc/skills.json" ]]; then
-        detected_framework=$(.ctoc/bin/detect.sh frameworks 2>/dev/null | head -1 || true)
+    # Create IRON_LOOP.md if not exists
+    if [[ ! -f "IRON_LOOP.md" ]]; then
+        create_iron_loop_md
+        print_step "Created IRON_LOOP.md"
+    else
+        print_step "IRON_LOOP.md already exists"
     fi
 
-    if [[ -n "$detected_framework" ]]; then
-        echo
-        echo "Detected framework: $detected_framework"
-        read -p "Use this framework? (Y/n): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Nn]$ ]]; then
-            detected_framework=""
+    # Generate PROJECT_MAP.md
+    if [[ -x ".ctoc/repo/.ctoc/bin/explore-codebase.sh" ]]; then
+        .ctoc/repo/.ctoc/bin/explore-codebase.sh generate 2>/dev/null && \
+            print_step "Generated .ctoc/PROJECT_MAP.md" || \
+            print_warn "Could not generate PROJECT_MAP.md"
+    fi
+}
+
+create_fresh_claude_md() {
+    local project_name
+    project_name=$(basename "$PWD")
+
+    if [[ -x ".ctoc/repo/.ctoc/bin/init-claude-md.sh" ]]; then
+        .ctoc/repo/.ctoc/bin/init-claude-md.sh integrate "$project_name" "" ""
+        print_step "Created CLAUDE.md"
+    else
+        # Fallback: copy template
+        if [[ -f ".ctoc/repo/.ctoc/templates/CLAUDE.md.template" ]]; then
+            cp ".ctoc/repo/.ctoc/templates/CLAUDE.md.template" CLAUDE.md
+            sed -i "s/{{PROJECT_NAME}}/$project_name/g" CLAUDE.md 2>/dev/null || true
+            print_step "Created CLAUDE.md from template"
+        else
+            print_warn "Could not create CLAUDE.md"
         fi
     fi
-
-    if [[ -z "$detected_framework" ]]; then
-        echo
-        read -p "Primary framework (optional, e.g., FastAPI, React, Django): " FRAMEWORK
-    else
-        FRAMEWORK="$detected_framework"
-    fi
-
-    # Get project description
-    echo
-    read -p "One-line project description: " DESCRIPTION
-
-    # Use smart CLAUDE.md integration (handles existing files)
-    .ctoc/bin/init-claude-md.sh integrate "$PROJECT_NAME" "$LANGUAGE" "$FRAMEWORK"
-
-    generate_iron_loop_md
-    generate_planning_md
-    generate_project_map
 }
 
-generate_project_map() {
-    print_step "Generating PROJECT_MAP.md..."
-
-    if [[ -f ".ctoc/bin/explore-codebase.sh" ]]; then
-        .ctoc/bin/explore-codebase.sh generate 2>/dev/null || {
-            print_warning "Could not generate PROJECT_MAP.md (explore-codebase failed)"
-            return
-        }
-        print_success "PROJECT_MAP.md created"
-    else
-        print_warning "explore-codebase.sh not found, skipping PROJECT_MAP.md"
-    fi
-}
-
-# Note: CLAUDE.md generation is now handled by init-claude-md.sh
-# which supports smart merge with existing CLAUDE.md files
-
-generate_iron_loop_md() {
-    print_step "Generating IRON_LOOP.md..."
+create_iron_loop_md() {
+    local project_name
+    project_name=$(basename "$PWD")
 
     cat > IRON_LOOP.md << IRON_EOF
-# Iron Loop - $PROJECT_NAME
+# Iron Loop - $project_name
 
 > Track progress through the 15-step methodology
 
@@ -399,152 +537,225 @@ generate_iron_loop_md() {
 - 🟢 Complete
 - 🔴 Blocked
 
-## Research Protocol
-
-Before implementing, use parallel web search agents for:
-1. **Validate assumptions** - Search for current best practices (2026)
-2. **Check dependencies** - Search for security advisories
-3. **Find patterns** - Search for similar implementations
-4. **Verify APIs** - Search for current documentation
-
-**Subagent count:** max(2, CPU_CORES - 4)
-
 ## Session Log
 
 ### $(date +%Y-%m-%d)
 - CTOC initialized
-- Project: $PROJECT_NAME
-- Language: $LANGUAGE
-${FRAMEWORK:+- Framework: $FRAMEWORK}
+- Project: $project_name
 IRON_EOF
-
-    print_success "IRON_LOOP.md created"
 }
 
-generate_planning_md() {
-    print_step "Generating PLANNING.md..."
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Git Setup
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    cat > PLANNING.md << PLANNING_EOF
-# Planning - $PROJECT_NAME
-
-> $DESCRIPTION
-
-## Vision
-
-*TODO: Define the vision for this project*
-
-## Architecture
-
-*TODO: High-level architecture decisions*
-
-## Feature Backlog
-
-### Phase 1: Foundation
-- [ ] Project setup
-- [ ] Core architecture
-- [ ] Basic functionality
-
-### Phase 2: Core Features
-- [ ] *TODO: Define features*
-
-### Phase 3: Polish
-- [ ] Testing
-- [ ] Documentation
-- [ ] Performance optimization
-
-## Technical Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Language | $LANGUAGE | *TODO* |
-${FRAMEWORK:+| Framework | $FRAMEWORK | *TODO* |}
-
-## Dependencies
-
-*TODO: Key dependencies and why*
-
-## Open Questions
-
-- *TODO: Questions to resolve*
-PLANNING_EOF
-
-    print_success "PLANNING.md created"
-}
-
-# Add to .gitignore
 setup_gitignore() {
-    print_step "Updating .gitignore..."
+    print_section "Git setup"
 
-    if [[ -f .gitignore ]]; then
-        # Check if .ctoc already in gitignore
-        if ! grep -q "^\.ctoc/$" .gitignore 2>/dev/null; then
-            echo "" >> .gitignore
-            echo "# CTOC - Skills library (optional: can be tracked or ignored)" >> .gitignore
-            echo "# .ctoc/" >> .gitignore
-        fi
-    else
-        cat > .gitignore << 'GITIGNORE'
-# CTOC - Skills library (optional: can be tracked or ignored)
-# .ctoc/
-GITIGNORE
+    # Check if already in .gitignore
+    if grep -q "^\.ctoc/$" .gitignore 2>/dev/null; then
+        print_step ".ctoc/ already in .gitignore"
+        return
     fi
 
-    print_success ".gitignore updated"
+    echo ""
+    echo "  Add .ctoc/ to .gitignore?"
+    echo ""
+    echo "  ${BOLD}Pros:${NC} Keeps repo clean, each dev installs fresh"
+    echo "  ${BOLD}Cons:${NC} Need to run install on each clone"
+    echo ""
+    echo "  Or use git submodule?"
+    echo ""
+    echo "  ${BOLD}Pros:${NC} Version-locked, auto-clones with project"
+    echo "  ${BOLD}Cons:${NC} More complex git workflow"
+    echo ""
+    echo "  [1] Add to .gitignore (Recommended for most projects)"
+    echo "  [2] Use submodule (For teams wanting locked versions)"
+    echo "  [3] Neither (I'll handle it manually)"
+    echo ""
+    read -p "  Choice [1-3]: " choice
+    choice=${choice:-1}
+
+    case $choice in
+        1)
+            # Add to .gitignore
+            if [[ -f .gitignore ]]; then
+                echo "" >> .gitignore
+                echo "# CTOC - CTO Chief (installed per-developer)" >> .gitignore
+                echo ".ctoc/" >> .gitignore
+            else
+                echo "# CTOC - CTO Chief (installed per-developer)" > .gitignore
+                echo ".ctoc/" >> .gitignore
+            fi
+            print_step "Added .ctoc/ to .gitignore"
+            ;;
+        2)
+            # Convert to submodule (advanced)
+            echo ""
+            print_warn "Submodule setup requires manual steps:"
+            echo "    1. Remove .ctoc/repo: rm -rf .ctoc/repo"
+            echo "    2. Add as submodule: git submodule add $REPO_URL .ctoc/repo"
+            echo "    3. Commit the change"
+            ;;
+        3)
+            print_step "Skipped .gitignore setup"
+            ;;
+    esac
 }
 
-# Main
-main() {
-    print_banner
-    echo "Version $CTOC_VERSION - Smart Skill Loading"
-    echo
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Shell Setup
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    check_directory
-    check_requirements
-    download_core
-    download_skills
-    setup_project
-    setup_gitignore
+setup_shell() {
+    print_section "Shell setup"
 
-    # Count downloaded skills
-    local skill_count=0
-    if [[ -d ".ctoc/skills" ]]; then
-        skill_count=$(find .ctoc/skills -name "*.md" -type f 2>/dev/null | wc -l)
+    # Detect shell
+    local shell_name
+    shell_name=$(basename "$SHELL")
+    local shell_rc=""
+
+    case "$shell_name" in
+        bash) shell_rc="$HOME/.bashrc" ;;
+        zsh)  shell_rc="$HOME/.zshrc" ;;
+        fish) shell_rc="$HOME/.config/fish/config.fish" ;;
+    esac
+
+    print_info "Detected shell: $shell_name"
+
+    if [[ -z "$shell_rc" ]]; then
+        print_warn "Unknown shell: $shell_name"
+        print_info "         Add manually: alias ctoc='.ctoc/ctoc'"
+        return
     fi
 
-    echo
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  CTOC v$CTOC_VERSION installed successfully!${NC}"
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-    echo
-    echo "  Files created/updated:"
-    echo "    • CLAUDE.md          - CTO instructions (smart-merged)"
-    echo "    • IRON_LOOP.md       - 15-step progress tracking"
-    echo "    • PLANNING.md        - Feature backlog"
-    echo "    • .ctoc/PROJECT_MAP.md - Codebase quick reference"
-    echo "    • .ctoc/             - Skills library ($skill_count skills downloaded)"
-    echo
-    echo "  Research (WebSearch enabled by default):"
-    echo "    • .ctoc/bin/ctoc.sh research status  - Show research config"
-    echo "    • .ctoc/bin/ctoc.sh research off     - Disable WebSearch"
-    echo "    • .ctoc/bin/ctoc.sh research on      - Re-enable WebSearch"
-    echo
-    echo "  Skill commands:"
-    echo "    • .ctoc/bin/ctoc.sh skills list       - See all 261 available skills"
-    echo "    • .ctoc/bin/ctoc.sh skills add NAME   - Add a specific skill"
-    echo "    • .ctoc/bin/ctoc.sh skills sync       - Auto-detect & download skills"
-    echo "    • .ctoc/bin/ctoc.sh skills feedback   - Suggest skill improvements"
-    echo
-    echo "  GitHub integration (requires gh CLI):"
-    echo "    • .ctoc/bin/ctoc.sh process-issues   - Process community suggestions"
-    echo
-    echo "  Next steps:"
-    echo "    1. Review and customize CLAUDE.md"
-    echo "    2. Run 'claude' in this directory"
-    echo "    3. Claude is now your CTO!"
-    echo
-    echo "  Iron Loop: Use many parallel subagents for research phases!"
-    echo "    Subagent count: max(2, CPU_CORES - 4)"
-    echo
+    # Check if alias already exists
+    if grep -q "alias ctoc=" "$shell_rc" 2>/dev/null || \
+       grep -q "alias ctoc " "$shell_rc" 2>/dev/null; then
+        print_step "Alias already configured in $shell_rc"
+        return
+    fi
+
+    echo ""
+    read -p "  Add 'ctoc' alias to $shell_rc? [Y/n]: " response
+    if [[ ! "$response" =~ ^[nN] ]]; then
+        echo "" >> "$shell_rc"
+        echo "# CTOC - CTO Chief" >> "$shell_rc"
+        if [[ "$shell_name" == "fish" ]]; then
+            echo "alias ctoc '.ctoc/ctoc'" >> "$shell_rc"
+        else
+            echo "alias ctoc='.ctoc/ctoc'" >> "$shell_rc"
+        fi
+        print_step "Alias added to $shell_rc"
+        ALIAS_ADDED=true
+    else
+        print_step "Skipped alias setup"
+        print_info "         Run manually: .ctoc/ctoc"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Final Menu
+# ═══════════════════════════════════════════════════════════════════════════════
+
+show_summary() {
+    local skill_count
+    skill_count=$(find .ctoc/repo/.ctoc/skills -name "*.md" 2>/dev/null | wc -l || echo "261")
+
+    echo ""
+    echo -e "${GREEN}════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}✓ CTOC installed successfully!${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "${BOLD}Summary:${NC}"
+    echo "  • Repository: cloned to .ctoc/repo/"
+    echo "  • Skills: $skill_count available (50 languages, 200+ frameworks)"
+    echo "  • Files: CLAUDE.md, IRON_LOOP.md, .ctoc/"
+    if [[ "$ALIAS_ADDED" == "true" ]]; then
+        echo "  • Alias: ctoc → .ctoc/ctoc"
+    else
+        echo "  • Command: .ctoc/ctoc (or add alias manually)"
+    fi
+    echo "  • Updates: Background check daily"
+    echo ""
+}
+
+show_menu() {
+    echo -e "${BOLD}What would you like to do?${NC}"
+    echo "  [1] Open Claude Code"
+    echo "  [2] Open Claude Code (with --dangerously-skip-permissions)"
+    echo "  [3] Run ctoc doctor (check installation)"
+    echo "  [4] View documentation"
+    echo "  [5] Exit"
+    echo ""
+    read -p "Choice [1-5]: " choice
+
+    case $choice in
+        1)
+            echo ""
+            echo "Starting Claude Code..."
+            exec claude
+            ;;
+        2)
+            echo ""
+            echo "Starting Claude Code (skip permissions)..."
+            exec claude --dangerously-skip-permissions
+            ;;
+        3)
+            echo ""
+            .ctoc/ctoc doctor
+            ;;
+        4)
+            echo ""
+            if command -v xdg-open &>/dev/null; then
+                xdg-open "https://github.com/robotijn/ctoc" 2>/dev/null
+            elif command -v open &>/dev/null; then
+                open "https://github.com/robotijn/ctoc"
+            else
+                echo "Documentation: https://github.com/robotijn/ctoc"
+            fi
+            ;;
+        5|"")
+            echo ""
+            if [[ "$ALIAS_ADDED" == "true" ]]; then
+                echo "Run 'source ~/.bashrc' (or restart terminal) to use the 'ctoc' alias."
+            fi
+            echo "Then run 'claude' to start coding with your CTO!"
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Main
+# ═══════════════════════════════════════════════════════════════════════════════
+
+main() {
+    show_banner
+
+    check_dependencies
+
+    check_project
+
+    # Check for existing installation
+    print_section "Checking existing installation"
+    if check_existing; then
+        # Upgrade flow
+        install_repo
+        show_summary
+        show_menu
+    else
+        # Fresh install flow
+        print_info "No existing installation found"
+        install_repo
+        configure_claude_md
+        setup_gitignore
+        setup_shell
+        show_summary
+        show_menu
+    fi
 }
 
 main "$@"
