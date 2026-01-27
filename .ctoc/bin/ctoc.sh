@@ -751,9 +751,9 @@ skills_search() {
     echo "Frameworks:"
     jq -r --arg q "$query" '
         .skills.frameworks | to_entries[] | .value | to_entries[] |
-        select(.key | ascii_downcase | contains($q | ascii_downcase) or (.value.keywords[]? | ascii_downcase | contains($q | ascii_downcase))) |
+        select(.key | test($q; "i") or (.value.keywords // [] | any(test($q; "i")))) |
         "  - " + .key
-    ' "$index" | sort -u || true
+    ' "$index" 2>/dev/null | sort -u || true
 }
 
 skills_info() {
