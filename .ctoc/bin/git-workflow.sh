@@ -199,8 +199,14 @@ commit_workflow() {
     # Run pre-commit validation
     echo -e "${BLUE}Running pre-commit checks...${NC}"
 
-    # Check for secrets
-    if grep -rn "PRIVATE\|SECRET\|PASSWORD\|API_KEY\|TOKEN" --include="*.env" --include="*.json" --include="*.yaml" --include="*.yml" . 2>/dev/null | grep -v ".git" | grep -v "node_modules"; then
+    # Check for secrets (smarter detection to reduce false positives)
+    # Look for actual secret values, not just env var names
+    local secret_patterns='(PRIVATE_KEY|SECRET_KEY|PASSWORD|ACCESS_TOKEN)=[^$]|sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN.*PRIVATE'
+    local matches
+    matches=$(grep -rn -E "$secret_patterns" --include="*.env" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.txt" . 2>/dev/null | grep -v ".git" | grep -v "node_modules" | grep -v "_env:" | grep -v "key_env:" || true)
+
+    if [[ -n "$matches" ]]; then
+        echo "$matches"
         echo -e "${YELLOW}Warning: Possible secrets detected in files.${NC}"
         echo "Review the above files before committing."
         read -p "Continue? (y/N): " -n 1 -r
