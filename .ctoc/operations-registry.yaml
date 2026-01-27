@@ -287,3 +287,105 @@ large_codebase:
     batch_size: 500                        # Files per batch
     max_depth: 3                           # Directory depth first pass
     expand_on_demand: true                 # Drill deeper when needed
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Command Routing Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+commands:
+  # Deterministic commands - bash handles directly, no Claude needed
+  deterministic:
+    - name: sync
+      script: git-workflow.sh
+      args: sync
+      help: "Pull-rebase-push workflow"
+    - name: commit
+      script: git-workflow.sh
+      args: commit
+      help: "Stage, validate, commit, and push"
+    - name: qc
+      script: git-workflow.sh
+      args: qc
+      help: "Quick commit and push"
+    - name: status
+      script: git-workflow.sh
+      args: status
+      help: "Enhanced git status"
+    - name: version
+      builtin: true
+      help: "Show version"
+    - name: help
+      builtin: true
+      help: "Show help"
+    - name: doctor
+      builtin: true
+      help: "Check installation health"
+    - name: update
+      builtin: true
+      help: "Update CTOC"
+    - name: uninstall
+      builtin: true
+      help: "Remove CTOC"
+
+  # Agent-powered commands - routed to operation agents
+  agent_powered:
+    - name: detect
+      aliases: [technologies, tech, stack]
+      agent: understand
+      help: "Detect technologies (uses understand agent)"
+    - name: understand
+      aliases: [analyze, analysis]
+      agent: understand
+      help: "Semantic codebase understanding"
+    - name: setup
+      aliases: [init, initialize]
+      agent: project-setup
+      help: "Intelligent project setup"
+    - name: plan
+      subcommands:
+        - name: new
+          agent: plan-advisor
+          help: "Create new plan with quality guidance"
+        - name: propose
+          script: plan.sh
+          help: "Submit plan for review"
+        - name: approve
+          script: plan.sh
+          help: "Approve a plan"
+        # ... other plan subcommands stay with plan.sh
+      help: "Plan management"
+    - name: progress
+      aliases: [dashboard]
+      agent: progress-insights
+      help: "Progress insights and analysis"
+    - name: process-issues
+      agent: issue-processor
+      help: "Process GitHub issues"
+
+  # Skills commands - hybrid (bash for list/search, agent for smart features)
+  skills:
+    - name: list
+      script: ctoc.sh
+      help: "List all skills"
+    - name: search
+      script: ctoc.sh
+      help: "Search skills"
+    - name: add
+      script: ctoc.sh
+      help: "Add a skill"
+    - name: sync
+      agent: understand
+      help: "Detect and sync needed skills"
+
+# Intent patterns for fuzzy matching
+intent_patterns:
+  - pattern: ["what", "tech", "using"]
+    route_to: understand
+  - pattern: ["check", "code", "review"]
+    route_to: git-advisor
+  - pattern: ["new", "plan", "feature"]
+    route_to: plan-advisor
+  - pattern: ["setup", "init", "start", "project"]
+    route_to: project-setup
+  - pattern: ["progress", "status", "dashboard"]
+    route_to: progress-insights
