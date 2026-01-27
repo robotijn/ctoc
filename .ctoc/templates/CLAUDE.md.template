@@ -69,14 +69,38 @@ Every feature follows 15 steps in three phases. This is **non-negotiable**.
 
 ---
 
-## Research Protocol
+## Research Protocol (Automatic)
 
-Before implementing any feature, use **parallel web search** to:
+WebSearch is **enabled by default** at key Iron Loop steps. AI knowledge has cutoffs; web search ensures you get current (2026) information.
 
-1. **Validate assumptions** — Search for current best practices (2026)
-2. **Check dependencies** — Search for security advisories
-3. **Find patterns** — Search for similar implementations
-4. **Verify APIs** — Search for current documentation
+### Auto-Research Steps
+
+| Step | Research Focus | Example Queries |
+|------|----------------|-----------------|
+| **1. ASSESS** | Problem domain, existing solutions | "{topic} best practices 2026" |
+| **2. ALIGN** | Business patterns, UX research | "{topic} UX patterns" |
+| **5. DESIGN** | Architecture patterns, scalability | "{topic} architecture {scale}" |
+| **12. SECURE** | CVE lookup, security advisories | "CVE {dependency} 2026" |
+
+### Optional Research Steps (on request)
+
+| Step | Use Case |
+|------|----------|
+| **4. PLAN** | Find similar implementations |
+| **6. SPEC** | Validate API design standards |
+| **11. OPTIMIZE** | Performance benchmarks |
+| **13. DOCUMENT** | Documentation standards |
+
+### Research Configuration
+
+```bash
+ctoc research status          # Show current config (default: ON)
+ctoc research off             # Disable WebSearch
+ctoc research on              # Re-enable WebSearch
+ctoc research steps 1,2,5,12  # Customize auto-research steps
+```
+
+**Disable for:** offline environments, confidential projects, or speed.
 
 ### Research Phase Pattern
 

@@ -193,9 +193,36 @@ security:
 gdpr:
   # Enable GDPR compliance features
   enabled: {{GDPR_ENABLED}}
-  
+
   # Auto-generate privacy policy template
   generate_privacy_policy: true
-  
+
   # Cookie consent required
   cookie_consent_required: true
+
+# Research Configuration (WebSearch)
+research:
+  websearch:
+    # WebSearch is enabled by default - provides current knowledge and best practices
+    enabled: true
+
+    # Steps where WebSearch runs automatically (high value)
+    # 1=ASSESS, 2=ALIGN, 5=DESIGN, 12=SECURE
+    auto_steps: [1, 2, 5, 12]
+
+    # Steps where WebSearch is available on request (medium value)
+    # 4=PLAN, 6=SPEC, 11=OPTIMIZE, 13=DOCUMENT
+    optional_steps: [4, 6, 11, 13]
+
+    # Maximum queries per step (prevents runaway searches)
+    max_queries: 5
+
+    # Query patterns for automatic research
+    query_patterns:
+      assess: "{topic} best practices {{YEAR}}"
+      align: "{topic} UX patterns"
+      design: "{topic} architecture patterns"
+      secure: "CVE {dependency} {{YEAR}}"
+
+    # Disable for: offline environments, confidential projects, or speed
+    # To disable: ctoc research off
