@@ -68,6 +68,12 @@ GIT WORKFLOW COMMANDS:
 COMMUNITY COMMANDS:
     process-issues           Fetch approved skill improvements for processing
 
+RESEARCH COMMANDS:
+    research status          Show current research configuration
+    research on              Enable WebSearch (default)
+    research off             Disable WebSearch
+    research steps <list>    Set auto-research steps (comma-separated)
+
 DETECTION COMMANDS:
     detect                   Detect technologies in current project
     detect languages         Detect only languages
@@ -316,6 +322,10 @@ main() {
         detect)
             local mode="${1:-all}"
             "$SCRIPT_DIR/detect.sh" "$mode"
+            ;;
+
+        research)
+            "$SCRIPT_DIR/research.sh" "$@"
             ;;
 
         plan)

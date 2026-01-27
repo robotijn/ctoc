@@ -107,6 +107,8 @@ download_core() {
         "git-workflow.sh"
         "file-lock.sh"
         "upgrade-agent.sh"
+        "explore-codebase.sh"
+        "research.sh"
     )
 
     for file in "${bin_files[@]}"; do
@@ -339,6 +341,21 @@ setup_project() {
 
     generate_iron_loop_md
     generate_planning_md
+    generate_project_map
+}
+
+generate_project_map() {
+    print_step "Generating PROJECT_MAP.md..."
+
+    if [[ -f ".ctoc/bin/explore-codebase.sh" ]]; then
+        .ctoc/bin/explore-codebase.sh generate 2>/dev/null || {
+            print_warning "Could not generate PROJECT_MAP.md (explore-codebase failed)"
+            return
+        }
+        print_success "PROJECT_MAP.md created"
+    else
+        print_warning "explore-codebase.sh not found, skipping PROJECT_MAP.md"
+    fi
 }
 
 # Note: CLAUDE.md generation is now handled by init-claude-md.sh
@@ -496,10 +513,16 @@ main() {
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     echo
     echo "  Files created/updated:"
-    echo "    • CLAUDE.md     - CTO instructions (smart-merged)"
-    echo "    • IRON_LOOP.md  - 15-step progress tracking"
-    echo "    • PLANNING.md   - Feature backlog"
-    echo "    • .ctoc/        - Skills library ($skill_count skills downloaded)"
+    echo "    • CLAUDE.md          - CTO instructions (smart-merged)"
+    echo "    • IRON_LOOP.md       - 15-step progress tracking"
+    echo "    • PLANNING.md        - Feature backlog"
+    echo "    • .ctoc/PROJECT_MAP.md - Codebase quick reference"
+    echo "    • .ctoc/             - Skills library ($skill_count skills downloaded)"
+    echo
+    echo "  Research (WebSearch enabled by default):"
+    echo "    • .ctoc/bin/ctoc.sh research status  - Show research config"
+    echo "    • .ctoc/bin/ctoc.sh research off     - Disable WebSearch"
+    echo "    • .ctoc/bin/ctoc.sh research on      - Re-enable WebSearch"
     echo
     echo "  Skill commands:"
     echo "    • .ctoc/bin/ctoc.sh skills list       - See all 261 available skills"

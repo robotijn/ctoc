@@ -86,7 +86,7 @@ function Get-CoreFiles {
     New-Item -ItemType Directory -Path ".ctoc\plans" -Force | Out-Null
 
     # Download bin scripts
-    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1", "file-lock.ps1", "upgrade-agent.ps1")
+    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1", "file-lock.ps1", "upgrade-agent.ps1", "explore-codebase.ps1", "research.ps1")
     foreach ($file in $binFiles) {
         try {
             Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/bin/$file" -OutFile ".ctoc\bin\$file" -UseBasicParsing -ErrorAction Stop
@@ -635,6 +635,22 @@ $frameworkLine
     Write-Success "PLANNING.md created"
 }
 
+function New-ProjectMap {
+    Write-Step "Generating PROJECT_MAP.md..."
+
+    $exploreScript = ".ctoc\bin\explore-codebase.ps1"
+    if (Test-Path $exploreScript) {
+        try {
+            & $exploreScript "generate" 2>$null
+            Write-Success "PROJECT_MAP.md created"
+        } catch {
+            Write-Warning "Could not generate PROJECT_MAP.md (explore-codebase failed)"
+        }
+    } else {
+        Write-Warning "explore-codebase.ps1 not found, skipping PROJECT_MAP.md"
+    }
+}
+
 function Update-Gitignore {
     Write-Step "Updating .gitignore..."
 
@@ -671,6 +687,7 @@ $project = Get-ProjectSetup
 New-ClaudeMd -Project $project
 New-IronLoopMd -Project $project
 New-PlanningMd -Project $project
+New-ProjectMap
 Update-Gitignore
 
 # Count downloaded skills
@@ -685,10 +702,16 @@ Write-Host "  CTOC v$CTOC_VERSION installed successfully!" -ForegroundColor Gree
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Files created/updated:"
-Write-Host "    • CLAUDE.md     - CTO instructions (smart-merged)"
-Write-Host "    • IRON_LOOP.md  - 15-step progress tracking"
-Write-Host "    • PLANNING.md   - Feature backlog"
-Write-Host "    • .ctoc\        - Skills library ($skillCount skills downloaded)"
+Write-Host "    • CLAUDE.md          - CTO instructions (smart-merged)"
+Write-Host "    • IRON_LOOP.md       - 15-step progress tracking"
+Write-Host "    • PLANNING.md        - Feature backlog"
+Write-Host "    • .ctoc\PROJECT_MAP.md - Codebase quick reference"
+Write-Host "    • .ctoc\             - Skills library ($skillCount skills downloaded)"
+Write-Host ""
+Write-Host "  Research (WebSearch enabled by default):"
+Write-Host "    • .ctoc\bin\ctoc.ps1 research status  - Show research config"
+Write-Host "    • .ctoc\bin\ctoc.ps1 research off     - Disable WebSearch"
+Write-Host "    • .ctoc\bin\ctoc.ps1 research on      - Re-enable WebSearch"
 Write-Host ""
 Write-Host "  Skill commands:"
 Write-Host "    • .ctoc\bin\ctoc.ps1 skills list       - See all 261 available skills"

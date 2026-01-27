@@ -32,8 +32,15 @@ steps:
       - cto-coordinator
     optional:
       - planning-assistant
-    max_agents: 2
-    estimated_tokens: 4000
+      - research-agent
+    conditions:
+      research-agent:
+        config: research.websearch.enabled
+    research_queries:
+      - "{topic} best practices 2026"
+      - "{topic} common pitfalls"
+    max_agents: 3
+    estimated_tokens: 5000
 
   2:
     name: ALIGN
@@ -43,8 +50,15 @@ steps:
       - cto-coordinator
     optional:
       - planning-assistant
-    max_agents: 2
-    estimated_tokens: 4000
+      - research-agent
+    conditions:
+      research-agent:
+        config: research.websearch.enabled
+    research_queries:
+      - "{topic} UX patterns"
+      - "{topic} business requirements"
+    max_agents: 3
+    estimated_tokens: 5000
 
   3:
     name: CAPTURE
@@ -76,8 +90,16 @@ steps:
       - cto-coordinator
     optional:
       - planning-assistant
-    max_agents: 2
-    estimated_tokens: 4000
+      - research-agent
+    conditions:
+      research-agent:
+        config: research.websearch.enabled
+    research_queries:
+      - "{topic} architecture patterns 2026"
+      - "{topic} scalability best practices"
+      - "microservices vs monolith {scale}"
+    max_agents: 3
+    estimated_tokens: 5000
 
   6:
     name: SPEC
@@ -266,6 +288,7 @@ steps:
       - error-handler-checker
       - accessibility-checker
       - database-reviewer
+      - research-agent
     conditions:
       concurrency-checker:
         language_supports: [go, rust, java, python]
@@ -285,8 +308,14 @@ steps:
         project_has: [frontend]
       database-reviewer:
         project_has: [database]
+      research-agent:
+        config: research.websearch.enabled
+    research_queries:
+      - "CVE {dependency} 2026"
+      - "{framework} security vulnerabilities 2026"
+      - "OWASP {topic} checklist"
     parallel_groups:
-      - [security-scanner, secrets-detector]
+      - [security-scanner, secrets-detector, research-agent]
       - [dependency-checker, input-validation-checker, concurrency-checker]
       - [resilience-checker, health-check-validator, configuration-validator]
       - [docker-security-checker, terraform-validator, kubernetes-checker]
