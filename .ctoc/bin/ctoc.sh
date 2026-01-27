@@ -323,11 +323,11 @@ doctor() {
             print_step "Repository structure (git clone)"
         else
             print_warn "Legacy structure (individual files)"
-            ((warnings++))
+            : $((warnings++))
         fi
     else
         print_fail "CTOC installation not found"
-        ((issues++))
+        : $((issues++))
     fi
 
     # Check wrapper script
@@ -335,7 +335,7 @@ doctor() {
         print_step "Wrapper script exists"
     elif [[ -n "$ctoc_root" ]]; then
         print_warn "Wrapper script missing (using direct path)"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     # Check alias (best effort)
@@ -344,7 +344,7 @@ doctor() {
     else
         print_warn "Alias 'ctoc' not in current shell"
         echo "         Run: source ~/.bashrc (or restart terminal)"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     echo ""
@@ -355,14 +355,14 @@ doctor() {
         print_step "git"
     else
         print_fail "git missing (required)"
-        ((issues++))
+        : $((issues++))
     fi
 
     if command -v jq &>/dev/null; then
         print_step "jq"
     else
         print_warn "jq missing (some features limited)"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     if command -v claude &>/dev/null; then
@@ -370,7 +370,7 @@ doctor() {
     else
         print_warn "claude not installed"
         echo "         Install: npm install -g @anthropic-ai/claude-code"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     echo ""
@@ -387,7 +387,7 @@ doctor() {
         print_step "$skill_count skills available"
     else
         print_warn "No skills found"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     # Check CLAUDE.md
@@ -396,11 +396,11 @@ doctor() {
             print_step "CLAUDE.md has CTOC integration"
         else
             print_warn "CLAUDE.md exists but missing CTOC sections"
-            ((warnings++))
+            : $((warnings++))
         fi
     else
         print_warn "CLAUDE.md not found"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     # Check IRON_LOOP.md
@@ -408,7 +408,7 @@ doctor() {
         print_step "IRON_LOOP.md exists"
     else
         print_warn "IRON_LOOP.md not found"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     # Check plans directory (new location: root plans/)
@@ -419,10 +419,10 @@ doctor() {
     elif [[ -d ".ctoc/plans" ]]; then
         print_warn "Old plans structure found in .ctoc/plans/"
         echo "         Run 'ctoc migrate' to migrate to new structure"
-        ((warnings++))
+        : $((warnings++))
     else
         print_warn "Plans directory not found"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     # Check settings
@@ -430,7 +430,7 @@ doctor() {
         print_step "settings.yaml exists"
     else
         print_warn "settings.yaml not found"
-        ((warnings++))
+        : $((warnings++))
     fi
 
     echo ""
@@ -438,14 +438,19 @@ doctor() {
     # Summary
     if [[ $issues -eq 0 && $warnings -eq 0 ]]; then
         echo -e "${GREEN}✓ All checks passed!${NC}"
+        echo ""
+        return 0
     elif [[ $issues -eq 0 ]]; then
         echo -e "${YELLOW}✓ Installation OK with $warnings warning(s)${NC}"
+        echo ""
+        return 0  # Warnings don't cause failure
     else
         echo -e "${RED}Found $issues critical issue(s) and $warnings warning(s)${NC}"
         echo ""
         echo "Run 'curl -sL https://raw.githubusercontent.com/robotijn/ctoc/main/install.sh | bash' to fix"
+        echo ""
+        return 1  # Only critical issues cause failure
     fi
-    echo ""
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
