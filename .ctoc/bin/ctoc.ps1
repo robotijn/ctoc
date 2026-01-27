@@ -17,7 +17,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Version = "1.0.0"
+$Version = "1.1.0"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Find skills index

@@ -203,16 +203,20 @@ You should see:
 
 ```
 ═══════════════════════════════════════════════════════════════
-CTOC Installer
+CTOC v1.1.0 installed successfully!
 ═══════════════════════════════════════════════════════════════
 
-✓ Created .ctoc/
-✓ Downloaded templates
-✓ Detected: Python, TypeScript
+Files created/updated:
+  • CLAUDE.md          - CTO instructions (smart-merged)
+  • IRON_LOOP.md       - 15-step progress tracking
+  • PLANNING.md        - Feature backlog
+  • .ctoc/PROJECT_MAP.md - Codebase quick reference
+  • .ctoc/             - Skills library (5 skills downloaded)
 
-═══════════════════════════════════════════════════════════════
-CTOC Prepared!
-═══════════════════════════════════════════════════════════════
+Research (WebSearch enabled by default):
+  • ctoc research status  - Show research config
+  • ctoc research off     - Disable WebSearch
+  • ctoc research on      - Re-enable WebSearch
 
 Next steps:
 1. Open Claude Code with: claude --dangerously-skip-permissions
@@ -637,6 +641,15 @@ But if you want shortcuts:
 | `ctoc skills info <name>` | Show skill details |
 | `ctoc skills feedback <name>` | Suggest skill improvement |
 
+### Research Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc research status` | Show WebSearch configuration |
+| `ctoc research on` | Enable WebSearch (default) |
+| `ctoc research off` | Disable WebSearch |
+| `ctoc research steps 1,2,5,12` | Customize auto-research steps |
+
 ### Detection Commands
 
 | Command | What it does |
@@ -739,6 +752,49 @@ If conflicts occur:
 ```bash
 ctoc lock resolve      # Interactive resolution
 ```
+
+---
+
+## WebSearch (Enabled by Default)
+
+CTOC uses **WebSearch by default** to ensure you get current information and best practices. AI knowledge has cutoffs; web search bridges the gap.
+
+### Auto-Research Steps
+
+WebSearch runs automatically at high-value Iron Loop steps:
+
+| Step | Research Focus | Example Queries |
+|------|----------------|-----------------|
+| **1. ASSESS** | Problem domain, existing solutions | "{topic} best practices 2026" |
+| **2. ALIGN** | Business patterns, UX research | "{topic} UX patterns" |
+| **5. DESIGN** | Architecture patterns, scalability | "{topic} architecture patterns" |
+| **12. SECURE** | CVE lookup, security advisories | "CVE {dependency} 2026" |
+
+### Configuration
+
+```bash
+ctoc research status          # Show current config (default: ON)
+ctoc research off             # Disable for offline/confidential work
+ctoc research on              # Re-enable WebSearch
+ctoc research steps 1,2,5,12  # Customize which steps auto-research
+```
+
+**Disable for:** offline environments, confidential projects, or speed optimization.
+
+---
+
+## Codebase Explorer
+
+During installation, CTOC generates a **PROJECT_MAP.md** — a quick reference guide for your codebase.
+
+### What's Included
+
+- **Directory structure** — Tree view of your project
+- **Key files** — Important files with their purposes
+- **Patterns detected** — Auth method, ORM, frameworks, testing
+- **Quick search reference** — Where to find common code
+
+This helps both you and Claude Code navigate the codebase faster.
 
 ---
 
