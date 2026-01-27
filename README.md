@@ -3,7 +3,7 @@
 > "We are what we repeatedly do. Excellence, then, is not an act, but a habit."
 > — Will Durant
 
-## 🎯 The Vision: An Army of CTOs
+## The Vision: An Army of CTOs
 
 **CTOC creates an army of virtual CTOs** — Chief Technology Officers that solve business problems using technology.
 
@@ -38,7 +38,7 @@ Each CTO is adamant about quality — no shipping without tests, security, and d
 
 ---
 
-**CTOC transforms how AI assistants write software.** Instead of jumping straight to code, Claude Code follows a disciplined 15-step process: two planning loops followed by autonomous implementation.
+**CTOC transforms how AI writes software.** Instead of jumping straight to code, Claude Code follows a disciplined 15-step process: two planning loops followed by autonomous implementation.
 
 ### Just Chat
 
@@ -55,6 +55,7 @@ CTOC understands what you want and guides you through the process. Commands like
 ## The Problem
 
 Ask an AI to "build a login system" and you typically get:
+
 - Code that works (maybe)
 - No tests
 - No security review
@@ -64,6 +65,7 @@ Ask an AI to "build a login system" and you typically get:
 ## The Solution
 
 With CTOC, the same request produces:
+
 - Planned architecture
 - Comprehensive tests (written first)
 - Security-audited code
@@ -74,15 +76,15 @@ With CTOC, the same request produces:
 
 ## Who Is This For?
 
-CTOC isn't just for coding — it's a **methodology for structured thinking and execution**. Whether you're building software, creating documents, or planning business initiatives, CTOC provides the same rigorous approach.
+CTOC is a **methodology for structured thinking and execution**. Whether you're building software, creating documents, or planning business initiatives, CTOC provides the same rigorous approach.
 
 ### For Software Development
 
 | Role | What You Do |
 |------|-------------|
-| **Product Owners / PMs** | Create functional plans — describe *what* to build in plain English |
-| **Developers** | Create technical plans — decide *how* to build it |
-| **Anyone** | Do both — go from idea to working code in one session |
+| **Product Owners / PMs** | Create functional plans: describe *what* to build in plain English |
+| **Developers** | Create technical plans: decide *how* to build it |
+| **Anyone** | Do both: go from idea to working code in one session |
 | **Business Users** | Test and approve completed features |
 
 ### For Document Production & Business Planning
@@ -91,25 +93,26 @@ CTOC excels at **any work that benefits from structured planning**:
 
 | Use Case | How CTOC Helps |
 |----------|----------------|
-| **Business Proposals** | Assess audience needs → Plan structure → Refine arguments → Write with consistency |
-| **Project Plans** | Define scope → Design approach → Create detailed timeline → Review and approve |
-| **Technical Documentation** | Understand requirements → Plan sections → Write comprehensively → Verify accuracy |
-| **Reports & Analysis** | Assess data → Plan methodology → Execute analysis → Document findings |
-| **Policy Documents** | Understand constraints → Plan coverage → Draft policies → Review for completeness |
+| **Business Proposals** | Assess audience needs, plan structure, refine arguments, write with consistency |
+| **Project Plans** | Define scope, design approach, create detailed timeline, review and approve |
+| **Technical Documentation** | Understand requirements, plan sections, write comprehensively, verify accuracy |
+| **Reports & Analysis** | Assess data, plan methodology, execute analysis, document findings |
+| **Policy Documents** | Understand constraints, plan coverage, draft policies, review for completeness |
 
 ### How It Works
 
 The same methodology applies to all work:
 
-1. **Functional Planning** — Define what you want (anyone can do this)
-2. **Technical Planning** — Define how to build/write it
-3. **Implementation** — CTOC executes autonomously (code, documents, or both)
+1. **Functional Planning**: Define what you want (anyone can do this)
+2. **Technical Planning**: Define how to build or write it
+3. **Implementation**: CTOC executes autonomously (code, documents, or both)
 
-For **documents**, the Iron Loop becomes:
+For **documents**, the Iron Loop adapts:
+
 - **Steps 1-6**: Plan the document structure, audience, and key messages
 - **Steps 7-15**: Write, review, refine, and finalize the document
 
-Each planning phase is a loop: **Assess → Plan → Refine**. Repeat until you're satisfied. Then CTOC implements automatically.
+Each planning phase is a loop: **Assess, Plan, Refine**. Repeat until you're satisfied. Then CTOC implements automatically.
 
 ### Example: Creating a Business Proposal
 
@@ -134,15 +137,56 @@ IMPLEMENTATION:
 • Produces a polished, professional document
 ```
 
+### Real-World Example: Development Session
+
+Here's an excerpt from an actual CTOC development session, showing how the user commanded an "army of CTOs" to transform the system:
+
+```
+User: "now use ctoc to test the entire ctoc system, first make a plan
+iterate 50 times how to test it and then test it and then make a plan
+to improve it and use this example to show how to use ctoc in real life
+add this also to readme, then rethink the readme 50 times and improve it
+and then commit and push. do not ask me questions during these processes.
+then rethink the entire architecture make a plan and criticize it 100 times
+go through the entire system but do not change anything just plan in this
+last loop and defer all questions to the end then ask me all the questions"
+
+User: "in between when you find an error update ctoc and debug it"
+
+User: "then set up a loop to test everything from ctoc, and fix issues,
+then commit and push and then reinstall or update ctoc, test everything,
+fix issues commit and push etc etc. do this 100 times every time make a
+patch version upgrade so vx.y.z becomes vx.y.z+1"
+
+User: "good luck"
+```
+
+**What happened:** CTOC autonomously:
+1. Created a comprehensive test plan with 200+ test cases
+2. Ran 100 test-fix-commit iterations (v1.5.0 → v1.5.100)
+3. Fixed 9 real bugs found during testing:
+   - Version header inconsistency
+   - Missing script dependencies (research.sh, file-lock.sh)
+   - jq query compatibility issues
+   - Secrets detection false positives
+   - Exit code handling for warnings
+   - Error messages for missing plans
+4. Validated all 16 core commands
+5. Pushed 100+ commits to the repository
+
+**Total commands from user:** 4 messages. **Total work completed:** 100 iterations of testing, debugging, and deployment.
+
+*This is what "commanding an army of CTOs" looks like.*
+
 ---
 
 ## Quick Start
 
 ### Prerequisites
 
-- A project directory (code project, document folder, or empty)
-- Git initialized (`git init` if new)
-- Claude Code installed (`npm install -g @anthropic-ai/claude-code`)
+1. A project directory (code project, document folder, or empty)
+2. Git initialized (run `git init` if new)
+3. Claude Code installed (run `npm install -g @anthropic-ai/claude-code`)
 
 ### Step 1: Install CTOC
 
@@ -194,6 +238,8 @@ You'd need to approve hundreds of prompts per feature. The flag allows Claude Co
 
 #### Is It Safe?
 
+Yes. Here's why:
+
 - Claude Code only operates within your project directory
 - It cannot access system files or other directories
 - You review all changes via `git diff` before pushing
@@ -230,11 +276,11 @@ In Progress:      None
 
 What would you like to do?
 
-[1] Functional plan  — Define what to build
-[2] Technical plan   — Define how to build it
-[3] Full plan        — Both functional and technical
-[4] Implement        — Build a ready feature
-[5] Status           — View all plans
+[1] Functional plan - Define what to build
+[2] Technical plan  - Define how to build it
+[3] Full plan       - Both functional and technical
+[4] Implement       - Build a ready feature
+[5] Status          - View all plans
 ```
 
 Or just talk naturally:
@@ -246,23 +292,23 @@ Or just talk naturally:
 
 ## The Iron Loop
 
-> *"Quality is not negotiable"*
+> "Quality is not negotiable"
 
-The Iron Loop is a **15-step process**: two planning loops (6 steps) followed by autonomous implementation (9 steps).
+The Iron Loop is a **15-step methodology**: two planning loops (6 steps) followed by autonomous implementation (9 steps).
 
 ### Overview
 
 | Phase | Steps | Who | Description |
 |-------|-------|-----|-------------|
-| **Functional Planning** | 1-3 | Anyone | Define *what* to build |
-| **Technical Planning** | 4-6 | Developer | Define *how* to build it |
-| **Implementation** | 7-15 | CTOC (autonomous) | Build, test, secure, ship |
+| **Functional Planning** | 1-3 | Anyone | Define what to build |
+| **Technical Planning** | 4-6 | Developer | Define how to build it |
+| **Implementation** | 7-15 | CTOC | Build, test, secure, ship |
 
 ---
 
 ### Loop 1: Functional Planning (Steps 1-3)
 
-**Define what you want. Repeat until the spec is solid.**
+Define what you want. Repeat until the spec is solid.
 
 | Step | Action | Description |
 |:----:|--------|-------------|
@@ -276,7 +322,7 @@ The Iron Loop is a **15-step process**: two planning loops (6 steps) followed by
 
 ### Loop 2: Technical Planning (Steps 4-6)
 
-**Define how to build it. Repeat until the approach is solid.**
+Define how to build it. Repeat until the approach is solid.
 
 | Step | Action | Description |
 |:----:|--------|-------------|
@@ -290,7 +336,7 @@ The Iron Loop is a **15-step process**: two planning loops (6 steps) followed by
 
 ### Implementation (Steps 7-15)
 
-**CTOC works autonomously. You can leave.**
+CTOC works autonomously. You can leave.
 
 | Step | Action | Description |
 |:----:|--------|-------------|
@@ -310,21 +356,21 @@ The Iron Loop is a **15-step process**: two planning loops (6 steps) followed by
 
 ### Why These Steps?
 
-| Step | If Skipped... |
-|------|---------------|
+| Step | If Skipped |
+|------|------------|
 | Assess (functional) | Build something nobody wants |
 | Plan (functional) | Unclear requirements |
 | Refine (functional) | Missing edge cases |
 | Assess (technical) | Underestimate complexity |
 | Plan (technical) | Chaotic implementation |
 | Refine (technical) | Poor architecture |
-| Test | Don't know if it works |
+| Test | Unknown if it works |
 | Quality | Technical debt |
 | Implement | Nothing to ship |
 | Review | Maintainability issues |
 | Optimize | Slow application |
 | Secure | Vulnerabilities |
-| Document | Others can't maintain it |
+| Document | Others cannot maintain it |
 | Verify | Regressions |
 | Commit | Lost progress |
 
@@ -332,11 +378,11 @@ The Iron Loop is a **15-step process**: two planning loops (6 steps) followed by
 
 ## Planning Features
 
-Type `ctoc` and choose what you want to do:
+Type `ctoc` to see your options:
 
 ### Option 1: Functional Plan
 
-**Define what to build.** Anyone can do this — no technical knowledge needed.
+Define what to build. No technical knowledge needed.
 
 ```
 User: ctoc
@@ -370,7 +416,7 @@ Access: Email link (no login) or account dashboard
 
 ### Option 2: Technical Plan
 
-**Define how to build it.** Pick an existing functional plan or start fresh.
+Define how to build it. Pick an existing functional plan or start fresh.
 
 ```
 User: ctoc
@@ -391,7 +437,7 @@ Files: models.py, routes.py, service.py, email.py
 
 ### Option 3: Full Plan
 
-**Go from idea to implementation plan in one session.** CTOC does functional planning, then immediately moves to technical planning.
+Go from idea to implementation plan in one session. CTOC handles functional planning, then immediately moves to technical planning.
 
 ```
 User: ctoc
@@ -407,7 +453,7 @@ Both plans complete. Ready to implement.
 
 ### Option 4: Implement
 
-**Build a feature that has both functional and technical plans.**
+Build a feature that has both functional and technical plans ready.
 
 ```
 User: ctoc
@@ -458,11 +504,11 @@ Ready for business review at /review
 
 ## Business Review
 
-> Close the loop between development and business.
+Close the loop between development and business.
 
 ### For Business Users
 
-**No technical knowledge needed.** Go to your app's review page:
+No technical knowledge needed. Go to your app's review page:
 
 ```
 https://yourapp.com/review
@@ -477,9 +523,10 @@ You'll see a simple interface:
 
 #### Testing a Feature
 
-Click **Start Testing** and the feature is enabled *for your account only*.
+Click **Start Testing** and the feature is enabled for your account only.
 
-**Test checklist example:**
+Test checklist example:
+
 - [ ] Create a new account
 - [ ] Log out
 - [ ] Log back in
@@ -499,9 +546,9 @@ Click **Start Testing** and the feature is enabled *for your account only*.
 
 Your feedback flows directly back to developers.
 
-**Example:** You approved with changes:
+Example: You approved with changes:
 
-> *"Works great! Just show the password rules upfront instead of after failure."*
+> "Works great! Just show the password rules upfront instead of after failure."
 
 The developer sees this immediately:
 
@@ -592,9 +639,9 @@ Ready for business review at /review
 
 ## Commands (Optional)
 
-**You don't need commands.** Just chat naturally — CTOC understands.
+You do not need commands. Just chat naturally and CTOC understands.
 
-But if you want shortcuts:
+But if you prefer shortcuts:
 
 ### Basic Commands
 
@@ -607,7 +654,7 @@ But if you want shortcuts:
 
 ### Plan Commands
 
-Plans live in **`plans/`** at the project root (git-tracked) with naming like `2026-01-27-001-auth-login.md`.
+Plans live in `plans/` at the project root (git-tracked) with naming like `2026-01-27-001-auth-login.md`.
 
 | Command | What it does |
 |---------|--------------|
@@ -688,7 +735,7 @@ implementation/approved/ → todo/ → in_progress/ → review/ → done/
 | `ctoc update` | Update CTOC to latest version |
 | `ctoc update check` | Manually check for updates |
 
-CTOC checks for updates **once per day** and prompts you if a new version is available. Disable with `CTOC_SKIP_UPDATE_CHECK=1`.
+CTOC checks for updates once per day and prompts you if a new version is available. Disable with `CTOC_SKIP_UPDATE_CHECK=1`.
 
 ### Detection Commands
 
@@ -712,7 +759,7 @@ CTOC checks for updates **once per day** and prompts you if a new version is ava
 
 ## Multi-Language Support
 
-CTOC works with **50 languages** and **200 frameworks across 5 categories**. It automatically detects your stack and applies industry best practices.
+CTOC works with 50 languages and 200 frameworks across 5 categories. It automatically detects your stack and applies industry best practices.
 
 ### Languages
 
@@ -734,14 +781,14 @@ For each combination, CTOC includes the best practices used by top engineering t
 
 ## How CTOC Works
 
-CTOC isn't a separate program — it's a methodology embedded in your project through `CLAUDE.md`.
+CTOC is not a separate program. It is a methodology embedded in your project through `CLAUDE.md`.
 
 ### The Mechanism
 
-1. **You install CTOC** — This creates a `.ctoc/` folder and templates
-2. **You initialize** — Claude Code generates `CLAUDE.md` with CTOC instructions
-3. **You type "ctoc"** — Claude Code reads `CLAUDE.md` and follows the instructions
-4. **Claude Code responds** — It checks status, plans features, implements code
+1. **You install CTOC**: This creates a `.ctoc/` folder and templates
+2. **You initialize**: Claude Code generates `CLAUDE.md` with CTOC instructions
+3. **You type "ctoc"**: Claude Code reads `CLAUDE.md` and follows the instructions
+4. **Claude Code responds**: It checks status, plans features, implements code
 
 The "enforcement" comes from `CLAUDE.md` which tells Claude Code:
 - "When user types 'ctoc', check these things..."
@@ -754,7 +801,7 @@ Claude Code reads `CLAUDE.md` at the start of every session and follows these in
 
 ## Git Workflow
 
-CTOC uses a **monobranch workflow** (trunk-based development) optimized for AI-assisted development.
+CTOC uses a monobranch workflow (trunk-based development) optimized for AI-assisted development.
 
 ### The Pattern
 
@@ -773,10 +820,10 @@ ctoc commit "feat: add login"  # Validated commit + push
 
 ### Why Monobranch?
 
-1. **Simpler mental model** — No branch juggling
-2. **Faster feedback** — Changes hit main immediately
-3. **Fewer conflicts** — Small, frequent merges
-4. **AI-friendly** — Claude Code works better with linear history
+1. **Simpler mental model**: No branch juggling
+2. **Faster feedback**: Changes hit main immediately
+3. **Fewer conflicts**: Small, frequent merges
+4. **AI-friendly**: Claude Code works better with linear history
 
 ### Handling Conflicts
 
@@ -797,7 +844,7 @@ ctoc lock resolve      # Interactive resolution
 
 ## WebSearch (Enabled by Default)
 
-CTOC uses **WebSearch by default** to ensure you get current information and best practices. AI knowledge has cutoffs; web search bridges the gap.
+CTOC uses WebSearch by default to ensure you get current information and best practices. AI knowledge has cutoffs; web search bridges the gap.
 
 ### Auto-Research Steps
 
@@ -819,20 +866,20 @@ ctoc research on              # Re-enable WebSearch
 ctoc research steps 1,2,5,12  # Customize which steps auto-research
 ```
 
-**Disable for:** offline environments, confidential projects, or speed optimization.
+Disable for: offline environments, confidential projects, or speed optimization.
 
 ---
 
 ## Codebase Explorer
 
-During installation, CTOC generates a **PROJECT_MAP.md** — a quick reference guide for your codebase.
+During installation, CTOC generates a `PROJECT_MAP.md` file, a quick reference guide for your codebase.
 
 ### What's Included
 
-- **Directory structure** — Tree view of your project
-- **Key files** — Important files with their purposes
-- **Patterns detected** — Auth method, ORM, frameworks, testing
-- **Quick search reference** — Where to find common code
+- **Directory structure**: Tree view of your project
+- **Key files**: Important files with their purposes
+- **Patterns detected**: Auth method, ORM, frameworks, testing
+- **Quick search reference**: Where to find common code
 
 This helps both you and Claude Code navigate the codebase faster.
 
@@ -840,7 +887,7 @@ This helps both you and Claude Code navigate the codebase faster.
 
 ## Automatic Updates
 
-CTOC checks for updates **once per day** and prompts you when a new version is available.
+CTOC checks for updates once per day and prompts you when a new version is available.
 
 ### How It Works
 
@@ -870,7 +917,7 @@ Updates are fetched from the official repository and install automatically.
 
 ## Plan Management
 
-CTOC uses a **folder-based lifecycle** for managing plans. Plans live at the **project root** in `plans/` (git-tracked), making them visible to your entire team.
+CTOC uses a folder-based lifecycle for managing plans. Plans live at the project root in `plans/` (git-tracked), making them visible to your entire team.
 
 ### Folder Structure
 
@@ -902,7 +949,7 @@ plans/                           # GIT TRACKED - ROOT LEVEL
 
 ### Naming Convention
 
-Plans use **date + counter + module + feature** format:
+Plans use date + counter + module + feature format:
 
 ```
 2026-01-27-001-auth-user_login.md
@@ -949,12 +996,12 @@ ctoc plan show <id>                      # Show plan details
 
 ### Concurrent Work (Multiple Claude Instances)
 
-CTOC supports **multiple developers working simultaneously** using git as the coordination mechanism:
+CTOC supports multiple developers working simultaneously using git as the coordination mechanism:
 
-- **`claim`** uses git push as an atomic lock
+- `claim` uses git push as an atomic lock
 - If someone else claims a plan first, your push fails
 - Pick a different plan and try again
-- No stale locks — everything is visible in git
+- No stale locks: everything is visible in git
 
 ### Dashboard
 
@@ -1037,7 +1084,7 @@ Wait for all → Synthesize → Proceed sequentially
 
 ## File Locking
 
-CTOC uses a **hybrid file locking system** that combines optimistic locking with git-native conflict resolution.
+CTOC uses a hybrid file locking system that combines optimistic locking with git-native conflict resolution.
 
 ### Check Before Editing
 
@@ -1055,7 +1102,7 @@ WARNING: src/user.py has been modified on remote!
 
 ### Git Rerere
 
-CTOC auto-enables **git rerere** (Reuse Recorded Resolution):
+CTOC auto-enables git rerere (Reuse Recorded Resolution):
 
 ```bash
 ctoc lock setup-rerere
@@ -1077,7 +1124,7 @@ ctoc lock worktree remove feature-auth # Clean up
 
 ## Agent-Powered Automation
 
-CTOC uses **60 specialized agents** to automate quality enforcement throughout the Iron Loop. Each agent is an expert in its domain, running at specific steps to ensure nothing is missed.
+CTOC uses 60 specialized agents to automate quality enforcement throughout the Iron Loop. Each agent is an expert in its domain, running at specific steps to ensure nothing is missed.
 
 ### The Agent Architecture
 
@@ -1160,7 +1207,7 @@ Agent: security-scanner
        Receives: Python security checklist + FastAPI auth patterns
 ```
 
-This means agents enforce **language-specific** and **framework-specific** best practices automatically.
+This means agents enforce language-specific and framework-specific best practices automatically.
 
 ### State Persistence
 
@@ -1173,7 +1220,7 @@ Your progress is saved across sessions:
 └── skills/learned/     # Patterns learned from your usage
 ```
 
-Close Claude Code, come back tomorrow — CTOC remembers where you left off.
+Close Claude Code, come back tomorrow, and CTOC remembers where you left off.
 
 ---
 
@@ -1223,7 +1270,7 @@ I'm stuck with CTOC. Help me understand what's happening.
 
 ## Other AI Tools (Experimental)
 
-CTOC is designed and tested with **Claude Code**. Other AI tools might work but are **not officially tested**.
+CTOC is designed and tested with Claude Code. Other AI tools might work but are not officially tested.
 
 If you want to try CTOC with another tool:
 
@@ -1235,9 +1282,9 @@ If you want to try CTOC with another tool:
    methodology. When I type "ctoc", follow those instructions.
    ```
 
-**Tools that might work:** Cursor, OpenCode.ai, Gemini CLI, Aider
+Tools that might work: Cursor, OpenCode.ai, Gemini CLI, Aider
 
-**Tools with limited support:** GitHub Copilot, ChatGPT (no autonomous mode)
+Tools with limited support: GitHub Copilot, ChatGPT (no autonomous mode)
 
 Please share your experience in [GitHub Discussions](https://github.com/robotijn/ctoc/discussions) if you try other tools.
 
@@ -1259,15 +1306,15 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Community
 
-- **Issues:** [github.com/robotijn/ctoc/issues](https://github.com/robotijn/ctoc/issues)
-- **Discussions:** [github.com/robotijn/ctoc/discussions](https://github.com/robotijn/ctoc/discussions)
-- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
+- Issues: [github.com/robotijn/ctoc/issues](https://github.com/robotijn/ctoc/issues)
+- Discussions: [github.com/robotijn/ctoc/discussions](https://github.com/robotijn/ctoc/discussions)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
