@@ -262,9 +262,10 @@ DETECTION COMMANDS:
     detect languages         Detect only languages
     detect frameworks        Detect only frameworks
 
-OPERATION COMMANDS:
-    understand               Semantic codebase understanding (agent-powered)
-    setup                    Intelligent project setup (agent-powered)
+OPERATION COMMANDS (require Claude Code):
+    understand               Semantic codebase understanding
+    setup                    Intelligent project setup
+    process-issues           Process GitHub skill improvement issues
 
 MAINTENANCE COMMANDS:
     doctor                   Check installation health
