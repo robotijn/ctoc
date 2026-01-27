@@ -3,6 +3,30 @@
 #  CTOC - Progress Tracking
 #  Tracks plan progress and provides dashboard views
 # ═══════════════════════════════════════════════════════════════════════════════
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+#  AGENT INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+#  This script works WITH the progress-insights agent for intelligent features.
+#
+#  Division of Responsibility:
+#  ┌─────────────────────────────────────────────────────────────────────────────┐
+#  │  progress.sh (This Script)       │  progress-insights Agent                │
+#  ├──────────────────────────────────┼─────────────────────────────────────────┤
+#  │  - Step tracking (current step,  │  - Meaningful progress analysis         │
+#  │    completion status)            │  - Blockers identification              │
+#  │  - Dashboard rendering           │  - Velocity and trend insights          │
+#  │  - Event recording               │  - Next step recommendations            │
+#  │  - Progress file management      │  - Retrospective summaries              │
+#  │  - Statistics gathering          │  - Quality gate assessments             │
+#  └──────────────────────────────────┴─────────────────────────────────────────┘
+#
+#  Usage:
+#    - Use this script for progress commands (ctoc progress, dashboard, step)
+#    - Invoke progress-insights agent for meaningful analysis and recommendations
+#
+# ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
@@ -14,7 +38,29 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Agent Advice Helper
+# ═══════════════════════════════════════════════════════════════════════════════
+
+request_agent_advice() {
+    local context="${1:-general}"
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}Need intelligent insights?${NC}"
+    echo ""
+    echo "  Invoke the ${CYAN}progress-insights${NC} agent for:"
+    echo "    - Meaningful progress analysis"
+    echo "    - Blockers identification"
+    echo "    - Velocity and trend insights"
+    echo "    - Next step recommendations"
+    echo ""
+    echo -e "  Usage: ${GREEN}ctoc agent invoke progress-insights${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+}
 
 # Progress directories
 PROGRESS_DIR="${HOME}/.ctoc/progress"

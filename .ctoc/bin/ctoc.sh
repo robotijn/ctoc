@@ -34,6 +34,152 @@ print_warn() {
     echo -e "  ${YELLOW}⚠${NC} $1"
 }
 
+print_info() {
+    echo -e "  ${BLUE}ℹ${NC} $1"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Bootstrap Check - Ensure operations system is ready
+# ═══════════════════════════════════════════════════════════════════════════════
+
+bootstrap_check() {
+    local ctoc_dir=".ctoc"
+    local cache_dir="$ctoc_dir/cache"
+
+    # Auto-create cache directory if missing
+    if [[ ! -d "$cache_dir" ]]; then
+        mkdir -p "$cache_dir" 2>/dev/null || true
+    fi
+
+    # Check if operations directory exists (for operations that need it)
+    if [[ ! -d "$ctoc_dir/operations" ]] && [[ ! -d "$ctoc_dir/repo/.ctoc/operations" ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Operations Agent Routing
+# ═══════════════════════════════════════════════════════════════════════════════
+
+get_operations_registry() {
+    # Find operations-registry.yaml in various locations
+    if [[ -f ".ctoc/operations-registry.yaml" ]]; then
+        echo ".ctoc/operations-registry.yaml"
+    elif [[ -f ".ctoc/repo/.ctoc/operations-registry.yaml" ]]; then
+        echo ".ctoc/repo/.ctoc/operations-registry.yaml"
+    else
+        echo ""
+    fi
+}
+
+check_cache_validity() {
+    local cache_file="$1"
+    local ttl_hours="${2:-1}"
+
+    if [[ ! -f "$cache_file" ]]; then
+        return 1
+    fi
+
+    # Get cache file modification time
+    local cache_mtime
+    if [[ "$(uname)" == "Darwin" ]]; then
+        cache_mtime=$(stat -f %m "$cache_file" 2>/dev/null || echo 0)
+    else
+        cache_mtime=$(stat -c %Y "$cache_file" 2>/dev/null || echo 0)
+    fi
+
+    local now
+    now=$(date +%s)
+    local age=$((now - cache_mtime))
+    local ttl_seconds=$((ttl_hours * 3600))
+
+    if [[ $age -gt $ttl_seconds ]]; then
+        return 1
+    fi
+
+    # Check for file changes since cache (simplified - checks common patterns)
+    local project_mtime=0
+    for pattern in "*.py" "*.ts" "*.tsx" "*.js" "*.jsx" "package.json" "pyproject.toml" "Cargo.toml" "go.mod"; do
+        local latest
+        latest=$(find . -maxdepth 3 -name "$pattern" -newer "$cache_file" 2>/dev/null | head -1)
+        if [[ -n "$latest" ]]; then
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+invoke_operation_agent() {
+    local operation_name="$1"
+    shift
+    local args="$*"
+
+    local registry
+    registry=$(get_operations_registry)
+
+    if [[ -z "$registry" ]]; then
+        echo -e "${YELLOW}Operations registry not found.${NC}" >&2
+        echo "Run 'ctoc doctor' to check installation." >&2
+        return 1
+    fi
+
+    # Check if operation exists in registry (simple grep check)
+    if ! grep -q "^  $operation_name:" "$registry" 2>/dev/null; then
+        echo -e "${RED}Unknown operation: $operation_name${NC}" >&2
+        return 1
+    fi
+
+    # Get operation path from registry
+    local operation_path
+    operation_path=$(grep -A1 "^  $operation_name:" "$registry" | grep "path:" | sed 's/.*path: *//' | tr -d '"' | tr -d "'" 2>/dev/null)
+
+    if [[ -z "$operation_path" ]]; then
+        echo -e "${RED}Could not find path for operation: $operation_name${NC}" >&2
+        return 1
+    fi
+
+    # Find the actual operation file
+    local operation_file=""
+    if [[ -f ".ctoc/$operation_path" ]]; then
+        operation_file=".ctoc/$operation_path"
+    elif [[ -f ".ctoc/repo/.ctoc/$operation_path" ]]; then
+        operation_file=".ctoc/repo/.ctoc/$operation_path"
+    fi
+
+    if [[ -z "$operation_file" ]] || [[ ! -f "$operation_file" ]]; then
+        echo -e "${YELLOW}Operation file not found: $operation_path${NC}" >&2
+        echo "The operations system requires agent files to be present." >&2
+        return 1
+    fi
+
+    # Output instruction for Claude Code to invoke via Task tool
+    echo ""
+    echo -e "${CYAN}Invoking $operation_name agent...${NC}"
+    echo ""
+    echo "─────────────────────────────────────────────────────────────────"
+    echo -e "${BOLD}AGENT INVOCATION REQUIRED${NC}"
+    echo "─────────────────────────────────────────────────────────────────"
+    echo ""
+    echo "This operation requires Claude Code's Task tool to execute."
+    echo ""
+    echo "Operation:   $operation_name"
+    echo "Agent file:  $operation_file"
+    if [[ -n "$args" ]]; then
+        echo "Arguments:   $args"
+    fi
+    echo ""
+    echo "To run this operation, use the Task tool with:"
+    echo "  - Read the agent file: $operation_file"
+    echo "  - Follow the instructions in the agent file"
+    echo ""
+    echo "─────────────────────────────────────────────────────────────────"
+
+    return 0
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Help
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -108,6 +254,10 @@ DETECTION COMMANDS:
     detect                   Detect technologies in current project
     detect languages         Detect only languages
     detect frameworks        Detect only frameworks
+
+OPERATION COMMANDS:
+    understand               Semantic codebase understanding (agent-powered)
+    setup                    Intelligent project setup (agent-powered)
 
 MAINTENANCE COMMANDS:
     doctor                   Check installation health
@@ -733,12 +883,74 @@ main() {
 
         detect)
             local mode="${1:-all}"
+            local cache_file=".ctoc/cache/understanding.yaml"
+
+            # Check if we should use cached understanding
+            if check_cache_validity "$cache_file" 1; then
+                echo ""
+                echo -e "${GREEN}Using cached understanding${NC} (< 1 hour old, no file changes)"
+                echo ""
+                cat "$cache_file"
+                echo ""
+                echo -e "${CYAN}Tip:${NC} Run 'ctoc understand' to refresh the analysis."
+                exit 0
+            fi
+
+            # Try to invoke understand agent if available
+            local registry
+            registry=$(get_operations_registry)
+            if [[ -n "$registry" ]] && grep -q "^  understand:" "$registry" 2>/dev/null; then
+                echo ""
+                echo -e "${CYAN}Cache expired or missing. Agent invocation needed.${NC}"
+                invoke_operation_agent "understand" "$mode"
+                exit 0
+            fi
+
+            # Fallback to legacy detect.sh
             if [[ -f "$SCRIPT_DIR/detect.sh" ]]; then
                 "$SCRIPT_DIR/detect.sh" "$mode"
             else
                 echo "detect.sh not found"
                 exit 1
             fi
+            ;;
+
+        understand)
+            # Semantic codebase understanding via agent
+            local cache_file=".ctoc/cache/understanding.yaml"
+
+            # Check cache validity first
+            if check_cache_validity "$cache_file" 1; then
+                echo ""
+                echo -e "${GREEN}Cached understanding is still valid${NC} (< 1 hour old, no file changes)"
+                echo ""
+                echo "Use 'ctoc detect' to view the cached understanding."
+                echo "Use 'ctoc understand --force' to force a refresh."
+                echo ""
+
+                # Check for --force flag
+                if [[ "${1:-}" == "--force" ]] || [[ "${1:-}" == "-f" ]]; then
+                    echo -e "${CYAN}Force refresh requested...${NC}"
+                else
+                    exit 0
+                fi
+            fi
+
+            invoke_operation_agent "understand" "$@"
+            ;;
+
+        setup)
+            # Intelligent project setup via agent
+            if ! bootstrap_check; then
+                echo ""
+                echo -e "${YELLOW}Operations system not fully initialized.${NC}"
+                echo ""
+                echo "The setup operation requires the operations directory structure."
+                echo "Run 'ctoc doctor' to check installation status."
+                echo ""
+            fi
+
+            invoke_operation_agent "project-setup" "$@"
             ;;
 
         research)
@@ -904,6 +1116,23 @@ if [[ -z "${CTOC_FROM_WRAPPER:-}" ]]; then
         check_for_updates 2>/dev/null || true
     fi
 fi
+
+# Bootstrap check - ensure cache directory exists
+if [[ -d ".ctoc" ]] && [[ ! -d ".ctoc/cache" ]]; then
+    mkdir -p ".ctoc/cache" 2>/dev/null || true
+fi
+
+# Show hint if operations directory is missing (only for operation-related commands)
+case "${1:-}" in
+    understand|setup|detect)
+        if [[ ! -d ".ctoc/operations" ]] && [[ ! -d ".ctoc/repo/.ctoc/operations" ]]; then
+            echo -e "${YELLOW}Note:${NC} Operations directory not found." >&2
+            echo "Some agent-powered features may be limited." >&2
+            echo "Run 'ctoc update' to get the latest version." >&2
+            echo "" >&2
+        fi
+        ;;
+esac
 
 check_jq "${1:-}"
 main "$@"

@@ -10,6 +10,31 @@
 #  Naming: YYYY-MM-DD-NNN-module-feature.md
 #  Concurrency: Git push is the atomic operation (no local locks)
 # ═══════════════════════════════════════════════════════════════════════════════
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+#  AGENT INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+#  This script works WITH the plan-advisor agent for intelligent features.
+#
+#  Division of Responsibility:
+#  ┌─────────────────────────────────────────────────────────────────────────────┐
+#  │  plan.sh (This Script)           │  plan-advisor Agent                     │
+#  ├──────────────────────────────────┼─────────────────────────────────────────┤
+#  │  - Deterministic lifecycle       │  - Quality assessment of plans          │
+#  │    transitions (move, claim,     │  - Iron Loop step customization         │
+#  │    complete, etc.)               │  - Dependency analysis                  │
+#  │  - File creation and management  │  - Risk identification                  │
+#  │  - Git-based atomic claiming     │  - Approval recommendations             │
+#  │  - Folder structure maintenance  │  - Context-aware suggestions            │
+#  │  - Iron Loop injection template  │  - Intelligent plan refinement          │
+#  └──────────────────────────────────┴─────────────────────────────────────────┘
+#
+#  Usage:
+#    - Use this script for lifecycle commands (ctoc plan new, claim, complete)
+#    - Invoke plan-advisor agent for intelligent analysis and recommendations
+#
+# ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
@@ -23,6 +48,27 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Agent Advice Helper
+# ═══════════════════════════════════════════════════════════════════════════════
+
+request_agent_advice() {
+    local context="${1:-general}"
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}Need intelligent advice?${NC}"
+    echo ""
+    echo "  Invoke the ${CYAN}plan-advisor${NC} agent for:"
+    echo "    - Quality assessment of your plan"
+    echo "    - Iron Loop step customization for your context"
+    echo "    - Dependency analysis and risk identification"
+    echo "    - Approval recommendations"
+    echo ""
+    echo -e "  Usage: ${GREEN}ctoc agent invoke plan-advisor${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+}
 
 # Plan directories - ROOT level (git tracked)
 PLANS_DIR="plans"

@@ -3,6 +3,30 @@
 #  CTOC - Git Workflow Helpers
 #  Monobranch workflow: pull-rebase-commit-push with safety
 # ═══════════════════════════════════════════════════════════════════════════════
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+#  AGENT INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+#  This script works WITH the git-advisor agent for intelligent features.
+#
+#  Division of Responsibility:
+#  ┌─────────────────────────────────────────────────────────────────────────────┐
+#  │  git-workflow.sh (This Script)   │  git-advisor Agent                      │
+#  ├──────────────────────────────────┼─────────────────────────────────────────┤
+#  │  - Actual git commands           │  - Contextual analysis of changes       │
+#  │    (fetch, rebase, push, etc.)   │  - Commit message suggestions           │
+#  │  - Sync workflow automation      │  - Conflict resolution guidance         │
+#  │  - File freshness checking       │  - Branch strategy recommendations      │
+#  │  - Status reporting              │  - Code review preparation              │
+#  │  - Secret detection              │  - Impact analysis                      │
+#  └──────────────────────────────────┴─────────────────────────────────────────┘
+#
+#  Usage:
+#    - Use this script for git operations (ctoc sync, commit, qc, status)
+#    - Invoke git-advisor agent for intelligent analysis and recommendations
+#
+# ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
@@ -14,7 +38,29 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Agent Advice Helper
+# ═══════════════════════════════════════════════════════════════════════════════
+
+request_agent_advice() {
+    local context="${1:-general}"
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}Need intelligent advice?${NC}"
+    echo ""
+    echo "  Invoke the ${CYAN}git-advisor${NC} agent for:"
+    echo "    - Contextual analysis of your changes"
+    echo "    - Commit message suggestions"
+    echo "    - Conflict resolution guidance"
+    echo "    - Branch strategy recommendations"
+    echo ""
+    echo -e "  Usage: ${GREEN}ctoc agent invoke git-advisor${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Sync: Pull-Rebase-Push
