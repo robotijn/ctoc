@@ -821,12 +821,24 @@ skills_feedback() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 process_issues() {
-    if [[ -f "$SCRIPT_DIR/process-issues.sh" ]]; then
-        "$SCRIPT_DIR/process-issues.sh"
-    else
-        echo "process-issues.sh not found"
-        exit 1
-    fi
+    # Route to issue-processor operation agent
+    echo ""
+    echo -e "${CYAN}Processing GitHub Issues${NC}"
+    echo ""
+    echo "This operation uses the issue-processor agent."
+    echo "The agent will:"
+    echo "  1. Fetch issues with 'ready-to-process' label"
+    echo "  2. Analyze each issue for skill improvements"
+    echo "  3. Apply validated changes"
+    echo ""
+
+    # Try to invoke the operation agent
+    invoke_operation_agent "issue-processor" "$@" 2>/dev/null || {
+        echo "Run this from within Claude Code for full functionality."
+        echo ""
+        echo "Manual alternative:"
+        echo "  gh issue list -l ready-to-process --json number,title,body"
+    }
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1065,22 +1077,65 @@ main() {
             fi
             ;;
 
-        lock-check)
-            if [[ -f "$SCRIPT_DIR/file-lock.sh" ]]; then
-                "$SCRIPT_DIR/file-lock.sh" check "$@"
-            else
-                echo "file-lock.sh not found"
-                exit 1
-            fi
-            ;;
+        lock-check|lock)
+            # Inline file freshness check (no external script needed)
+            local subcmd="${1:-check}"
+            shift || true
 
-        lock)
-            if [[ -f "$SCRIPT_DIR/file-lock.sh" ]]; then
-                "$SCRIPT_DIR/file-lock.sh" "$@"
-            else
-                echo "file-lock.sh not found"
-                exit 1
-            fi
+            case "$subcmd" in
+                check)
+                    local file="${1:-}"
+                    if [[ -z "$file" ]]; then
+                        echo "Usage: ctoc lock check <file>"
+                        exit 1
+                    fi
+                    if [[ ! -f "$file" ]]; then
+                        echo -e "${RED}File not found: $file${NC}"
+                        exit 1
+                    fi
+                    # Check if file has been modified since last commit
+                    if git diff --quiet HEAD -- "$file" 2>/dev/null; then
+                        echo -e "${GREEN}✓ $file is fresh (matches HEAD)${NC}"
+                    else
+                        echo -e "${YELLOW}⚠ $file has local modifications${NC}"
+                    fi
+                    # Check if there are remote changes
+                    git fetch --quiet 2>/dev/null || true
+                    if git diff --quiet HEAD..origin/main -- "$file" 2>/dev/null; then
+                        echo -e "${GREEN}✓ $file is up to date with remote${NC}"
+                    else
+                        echo -e "${YELLOW}⚠ $file may have remote changes${NC}"
+                    fi
+                    ;;
+                resolve)
+                    echo "Resolving conflicts..."
+                    if git mergetool 2>/dev/null; then
+                        echo -e "${GREEN}✓ Conflicts resolved${NC}"
+                    else
+                        echo -e "${YELLOW}Use 'git mergetool' or resolve manually${NC}"
+                    fi
+                    ;;
+                setup-rerere)
+                    git config rerere.enabled true
+                    echo -e "${GREEN}✓ Git rerere enabled${NC}"
+                    ;;
+                worktree)
+                    local action="${1:-}"
+                    local branch="${2:-}"
+                    if [[ "$action" == "new" ]] && [[ -n "$branch" ]]; then
+                        local path="../worktrees/$branch"
+                        git worktree add "$path" -b "$branch" 2>/dev/null || \
+                            git worktree add "$path" "$branch"
+                        echo -e "${GREEN}✓ Worktree created at $path${NC}"
+                    else
+                        echo "Usage: ctoc lock worktree new <branch>"
+                    fi
+                    ;;
+                *)
+                    echo "Usage: ctoc lock [check|resolve|setup-rerere|worktree]"
+                    exit 1
+                    ;;
+            esac
             ;;
 
         agent)
