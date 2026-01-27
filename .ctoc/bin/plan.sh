@@ -380,7 +380,13 @@ propose_plan() {
     local plan_id="$1"
 
     local plan_file
-    plan_file=$(find_plan "$plan_id")
+    plan_file=$(find_plan "$plan_id") || true
+
+    if [[ -z "$plan_file" || ! -f "$plan_file" ]]; then
+        echo -e "${RED}Plan not found: $plan_id${NC}"
+        exit 1
+    fi
+
     local current_stage
     current_stage=$(get_plan_stage "$plan_file")
 
