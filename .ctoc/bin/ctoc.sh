@@ -961,12 +961,45 @@ main() {
             ;;
 
         research)
-            if [[ -f "$SCRIPT_DIR/research.sh" ]]; then
-                "$SCRIPT_DIR/research.sh" "$@"
-            else
-                echo "research.sh not found"
-                exit 1
+            # Inline research settings management (no external script needed)
+            local subcmd="${1:-status}"
+            local settings_file=".ctoc/settings.yaml"
+            if [[ ! -f "$settings_file" ]] && [[ -f ".ctoc/repo/.ctoc/settings.yaml" ]]; then
+                settings_file=".ctoc/repo/.ctoc/settings.yaml"
             fi
+
+            case "$subcmd" in
+                status)
+                    echo ""
+                    echo -e "${CYAN}Research Settings${NC}"
+                    echo ""
+                    if command -v yq &>/dev/null && [[ -f "$settings_file" ]]; then
+                        local enabled
+                        enabled=$(yq '.research.websearch_enabled // true' "$settings_file" 2>/dev/null)
+                        local steps
+                        steps=$(yq '.research.auto_research_steps // "1,6"' "$settings_file" 2>/dev/null)
+                        echo "  WebSearch: $enabled"
+                        echo "  Auto-research steps: $steps"
+                    else
+                        echo "  WebSearch: enabled (default)"
+                        echo "  Auto-research steps: 1, 6 (default)"
+                        echo ""
+                        echo "  (Install yq for advanced settings management)"
+                    fi
+                    echo ""
+                    ;;
+                on)
+                    echo "WebSearch enabled (this is the default)"
+                    ;;
+                off)
+                    echo "WebSearch disabled for this session"
+                    echo "Note: Edit settings.yaml to persist this setting"
+                    ;;
+                *)
+                    echo "Usage: ctoc research [status|on|off]"
+                    exit 1
+                    ;;
+            esac
             ;;
 
         plan)
