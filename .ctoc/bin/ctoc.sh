@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Help
@@ -78,6 +78,10 @@ DETECTION COMMANDS:
     detect                   Detect technologies in current project
     detect languages         Detect only languages
     detect frameworks        Detect only frameworks
+
+UPDATE COMMANDS:
+    update                   Update CTOC to latest version
+    update check             Check for updates
 
 OTHER COMMANDS:
     help                     Show this help
@@ -372,6 +376,26 @@ main() {
             process_issues
             ;;
 
+        update)
+            local subcmd="${1:-now}"
+            shift || true
+            case "$subcmd" in
+                check)
+                    CTOC_SKIP_UPDATE_CHECK="" "$SCRIPT_DIR/update-check.sh"
+                    ;;
+                now|"")
+                    echo "Updating CTOC..."
+                    local install_url="https://raw.githubusercontent.com/${CTOC_REPO:-theaiguys/ctoc}/${CTOC_BRANCH:-main}/install.sh"
+                    curl -fsSL "$install_url" | bash
+                    ;;
+                *)
+                    echo "Unknown update command: $subcmd"
+                    echo "Available: check, now"
+                    exit 1
+                    ;;
+            esac
+            ;;
+
         help|--help|-h)
             show_help
             ;;
@@ -393,6 +417,12 @@ if ! command -v jq &> /dev/null; then
     echo "Error: jq is required but not installed." >&2
     echo "Install it with: sudo apt install jq (Ubuntu/Debian) or brew install jq (macOS)"
     exit 1
+fi
+
+# Check for updates (once per day, silent on failure)
+if [[ -f "$SCRIPT_DIR/update-check.sh" ]]; then
+    source "$SCRIPT_DIR/update-check.sh"
+    check_for_updates 2>/dev/null || true
 fi
 
 main "$@"

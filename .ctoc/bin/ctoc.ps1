@@ -17,7 +17,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Version = "1.1.0"
+$Version = "1.2.0"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Find skills index
@@ -103,6 +103,10 @@ DETECTION COMMANDS:
     detect                   Detect technologies in current project
     detect languages         Detect only languages
     detect frameworks        Detect only frameworks
+
+UPDATE COMMANDS:
+    update                   Update CTOC to latest version
+    update check             Check for updates
 
 OTHER COMMANDS:
     help                     Show this help
@@ -264,6 +268,19 @@ function Invoke-ProcessIssues {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  Update Check (once per day, silent on failure)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+$updateCheckScript = Join-Path $ScriptDir "update-check.ps1"
+if (Test-Path $updateCheckScript) {
+    try {
+        & $updateCheckScript -Silent:$false 2>$null
+    } catch {
+        # Ignore errors from update check
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  Main
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -362,6 +379,33 @@ switch ($Command) {
 
     "process-issues" {
         Invoke-ProcessIssues
+    }
+
+    "update" {
+        switch ($SubCommand) {
+            "check" {
+                $env:CTOC_SKIP_UPDATE_CHECK = ""
+                & "$ScriptDir/update-check.ps1" -Force
+            }
+            { $_ -in "now", "" } {
+                Write-Host "Updating CTOC..."
+                $repo = if ($env:CTOC_REPO) { $env:CTOC_REPO } else { "theaiguys/ctoc" }
+                $branch = if ($env:CTOC_BRANCH) { $env:CTOC_BRANCH } else { "main" }
+                $installUrl = "https://raw.githubusercontent.com/$repo/$branch/install.ps1"
+                try {
+                    $installer = Invoke-WebRequest -Uri $installUrl -UseBasicParsing
+                    Invoke-Expression $installer.Content
+                } catch {
+                    Write-Host "Error: Failed to download installer" -ForegroundColor Red
+                    exit 1
+                }
+            }
+            default {
+                Write-Host "Unknown update command: $SubCommand"
+                Write-Host "Available: check, now"
+                exit 1
+            }
+        }
     }
 
     { $_ -in "help", "--help", "-h" } {

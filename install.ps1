@@ -86,7 +86,7 @@ function Get-CoreFiles {
     New-Item -ItemType Directory -Path ".ctoc\plans" -Force | Out-Null
 
     # Download bin scripts
-    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1", "file-lock.ps1", "upgrade-agent.ps1", "explore-codebase.ps1", "research.ps1")
+    $binFiles = @("ctoc.ps1", "detect.ps1", "download.ps1", "init-claude-md.ps1", "process-issues.ps1", "plan.ps1", "progress.ps1", "git-workflow.ps1", "file-lock.ps1", "upgrade-agent.ps1", "explore-codebase.ps1", "research.ps1", "update-check.ps1")
     foreach ($file in $binFiles) {
         try {
             Invoke-WebRequest -Uri "$CTOC_RAW/.ctoc/bin/$file" -OutFile ".ctoc\bin\$file" -UseBasicParsing -ErrorAction Stop
@@ -102,6 +102,11 @@ function Get-CoreFiles {
         Write-Error "Failed to download skills.json"
         exit 1
     }
+
+    # Download VERSION file for update checking
+    try {
+        Invoke-WebRequest -Uri "$CTOC_RAW/VERSION" -OutFile ".ctoc\VERSION" -UseBasicParsing -ErrorAction SilentlyContinue
+    } catch { }
 
     # Download templates
     try {

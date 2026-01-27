@@ -109,6 +109,7 @@ download_core() {
         "upgrade-agent.sh"
         "explore-codebase.sh"
         "research.sh"
+        "update-check.sh"
     )
 
     for file in "${bin_files[@]}"; do
@@ -123,6 +124,9 @@ download_core() {
         print_error "Failed to download skills.json"
         exit 1
     }
+
+    # Download VERSION file for update checking
+    curl -sL "$CTOC_RAW/VERSION" -o ".ctoc/VERSION" 2>/dev/null || true
 
     # Download templates
     curl -sL "$CTOC_RAW/.ctoc/templates/CLAUDE.md.template" -o ".ctoc/templates/CLAUDE.md.template" 2>/dev/null || true
