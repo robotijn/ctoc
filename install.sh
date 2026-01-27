@@ -8,7 +8,7 @@ set -euo pipefail
 #  Smart skill loading: Downloads only the skills your project needs.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-CTOC_VERSION="3.0.0"
+CTOC_VERSION="1.1.0"
 CTOC_REPO="https://github.com/robotijn/ctoc"
 CTOC_RAW="https://raw.githubusercontent.com/robotijn/ctoc/main"
 
