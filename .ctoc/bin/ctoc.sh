@@ -8,7 +8,13 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="1.5.0"
+
+# Read version from VERSION file
+if [[ -f "$SCRIPT_DIR/../../VERSION" ]]; then
+    VERSION=$(cat "$SCRIPT_DIR/../../VERSION" 2>/dev/null | tr -d '[:space:]')
+else
+    VERSION="unknown"
+fi
 
 # Colors
 RED='\033[0;31m'
