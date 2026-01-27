@@ -1,7 +1,8 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CTOC - CTO Chief CLI v1.3.0
-#  Main entry point for skill management commands
+#  CTOC - CTO Chief CLI
+#  Main entry point for skill management and operations
+#  Version is read from VERSION file
 # ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
@@ -1086,17 +1087,35 @@ main() {
             ;;
 
         *)
-            # Unknown command - try smart-router agent
+            # Unknown command - suggest similar commands or route to smart-router
             echo ""
-            echo -e "${CYAN}Unknown command: $cmd${NC}"
+            echo -e "${YELLOW}Unknown command: $cmd${NC}"
             echo ""
-            echo "Invoking smart-router for intent analysis..."
+
+            # Simple typo detection for common commands
+            case "$cmd" in
+                understnad|udnerstand|undertsand)
+                    echo -e "Did you mean: ${GREEN}ctoc understand${NC}?"
+                    ;;
+                detct|detetc|dtect)
+                    echo -e "Did you mean: ${GREEN}ctoc detect${NC}?"
+                    ;;
+                staus|stauts|statsu)
+                    echo -e "Did you mean: ${GREEN}ctoc status${NC}?"
+                    ;;
+                pln|plna|paln)
+                    echo -e "Did you mean: ${GREEN}ctoc plan${NC}?"
+                    ;;
+                *)
+                    # Try smart-router for intelligent intent analysis
+                    if invoke_operation_agent "smart-router" "$cmd" "$@" 2>/dev/null; then
+                        exit 0
+                    fi
+                    echo "Run 'ctoc help' for available commands."
+                    ;;
+            esac
             echo ""
-            invoke_operation_agent "smart-router" "$cmd" "$@" 2>/dev/null || {
-                echo ""
-                echo "Run 'ctoc help' for available commands."
-                exit 1
-            }
+            exit 1
             ;;
     esac
 }
