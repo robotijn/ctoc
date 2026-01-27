@@ -746,14 +746,11 @@ skills_search() {
         "  - " + .key
     ' "$index" || true
 
-    # Search in framework names and keywords
+    # Search in framework names and keywords (simple grep-based approach)
     echo ""
     echo "Frameworks:"
-    jq -r --arg q "$query" '
-        .skills.frameworks | to_entries[] | .value | to_entries[] |
-        select(.key | test($q; "i") or (.value.keywords // [] | any(test($q; "i")))) |
-        "  - " + .key
-    ' "$index" 2>/dev/null | sort -u || true
+    jq -r '.skills.frameworks | to_entries[] | .value | keys[]' "$index" 2>/dev/null | \
+        grep -i "$query" | sort -u | sed 's/^/  - /' || true
 }
 
 skills_info() {
