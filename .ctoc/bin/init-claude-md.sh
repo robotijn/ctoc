@@ -291,7 +291,7 @@ generate_ctoc_section() {
         fw_lower=$(echo "$framework" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
         framework_section="
 ### Framework: $framework
-See \`.ctoc/skills/frameworks/*/$fw_lower.md\` for framework-specific guidance."
+See \`.ctoc/repo/.ctoc/skills/frameworks/*/$fw_lower.md\` for framework-specific guidance."
     fi
 
     local lang_lower
@@ -309,20 +309,66 @@ Your role is to ensure this project meets the highest standards of engineering e
 - **Primary Language:** $language
 ${framework:+- **Framework:** $framework}
 
-## Skills Library
+## CTOC Command Recognition
 
-Reference skills from \`.ctoc/skills/\` for language and framework-specific guidance.
+When user types **"ctoc"** or CTOC-related commands:
 
-**Active Skills:**
-- \`.ctoc/skills/languages/$lang_lower.md\` - $language CTO standards
-$framework_section
+| Command | Action |
+|---------|--------|
+| \`ctoc\` | Show status: current step, plan counts, suggestions |
+| \`ctoc plan\` | Show plan dashboard |
+| \`ctoc plan new "title"\` | Create new plan in draft/ |
+| \`ctoc doctor\` | Check installation health |
+| \`ctoc update\` | Update CTOC to latest version |
+| \`ctoc [command]\` | Run \`.ctoc/ctoc [command]\` |
 
-**Skill Management:**
-\`\`\`bash
-.ctoc/bin/ctoc.sh skills list       # See all 261 available skills
-.ctoc/bin/ctoc.sh skills add NAME   # Add a specific skill
-.ctoc/bin/ctoc.sh skills sync       # Auto-detect & download skills
-\`\`\`
+**Always use short syntax:** Say \`ctoc plan new\` not \`.ctoc/ctoc plan new\`
+
+### Natural Language Understanding
+
+Map casual requests to CTOC actions:
+
+| User Says | Action |
+|-----------|--------|
+| "I want to plan a feature" | Ask what feature → \`ctoc plan new\` |
+| "Let's plan [X]" | \`ctoc plan new "[X]"\` |
+| "Build [X]" | Check for plan → create or continue |
+| "What's the status?" | \`ctoc plan status\` |
+| "Show plans" | \`ctoc plan list\` |
+
+## CTOC Skill System (Token-Optimized)
+
+### Session Initialization
+
+At the **START of each session**, before any other work:
+
+1. **Detect project technologies** using an Explore subagent:
+   - Scan for: package.json, requirements.txt, pyproject.toml, Cargo.toml, go.mod
+   - Return ONLY: "DETECTED: tech1, tech2, tech3" (~50 tokens)
+
+2. **Store the detected list** mentally for this session
+
+3. **Track skills read** - remember which skills you've read this session
+
+### When to Read Skills
+
+**DO read a skill when:**
+- Creating a **NEW** file of that technology
+- Creating a **NEW** component/module
+- User asks "how should I..." or "best practices for..."
+
+**DON'T read a skill when:**
+- Editing existing files (trust existing patterns)
+- Debugging (use general knowledge first)
+- Small fixes or tweaks
+- Already read that skill this session
+
+### Skill Locations
+
+| Type | Path |
+|------|------|
+| Languages | \`.ctoc/repo/.ctoc/skills/languages/{name}.md\` |
+| Frameworks | \`.ctoc/repo/.ctoc/skills/frameworks/{category}/{name}.md\` |
 
 ## Your Standards
 
@@ -361,7 +407,27 @@ $framework_section
 | 15. COMMIT | Delivery | Ship with confidence |
 
 See \`IRON_LOOP.md\` for current project status.
-See \`PLANNING.md\` for feature backlog.
+
+## Plan Management
+
+Plans live in \`.ctoc/plans/\` with folder-based lifecycle:
+
+\`\`\`
+.ctoc/plans/
+├── draft/           # New plans being designed
+├── proposed/        # Ready for review
+├── approved/        # Approved, ready to start
+├── in_progress/     # Currently being implemented
+├── implemented/     # Completed
+└── superseded/      # Replaced by newer plans
+\`\`\`
+
+### Context Management for Plans
+
+When a new plan is created and written to the planning file:
+- The planning discussion context should be considered complete
+- Suggest clearing context with \`/clear\` before implementation
+- This keeps implementation sessions focused
 
 ## Parallel Execution Guidelines
 
@@ -381,30 +447,16 @@ Use: \`max(2, CPU_CORES - 4)\` concurrent subagents
 | Bash (write) | NO | Serialize |
 | Git operations | NO | Use worktrees for parallelism |
 
-### Research Phase Pattern
-When exploring a problem, use parallel research:
-
-\`\`\`
-Launch in parallel (up to max agents):
-├── Agent 1: WebSearch "official docs {topic}"
-├── Agent 2: WebSearch "GitHub implementations {topic}"
-├── Agent 3: WebSearch "security considerations {topic}"
-├── Agent 4: Grep codebase for existing patterns
-└── Agent 5: Read related files
-
-Wait for all results, then synthesize.
-\`\`\`
-
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| \`ctoc skills sync\` | Download skills for detected technologies |
-| \`ctoc skills feedback <name>\` | Suggest skill improvement |
-| \`ctoc plan new\` | Create a new plan |
+| \`ctoc plan new "title"\` | Create a new plan |
+| \`ctoc plan status\` | View plan dashboard |
+| \`ctoc skills list\` | See all 261 available skills |
 | \`ctoc sync\` | Pull-rebase-push workflow |
-| \`ctoc dashboard\` | View progress |
-| \`ctoc process-issues\` | Process community suggestions |
+| \`ctoc doctor\` | Check installation health |
+| \`ctoc update\` | Update CTOC to latest |
 
 ## Quality Gates
 
@@ -413,15 +465,6 @@ Before committing:
 2. No linting errors
 3. Iron Loop step 14 (VERIFY) complete
 4. Documentation updated
-
-## Skill Auto-Sync
-
-When you notice the project using a new technology (new dependencies, new file types),
-automatically run skill sync to download relevant guidance:
-
-\`\`\`bash
-.ctoc/bin/ctoc.sh skills sync
-\`\`\`
 EOF
 }
 

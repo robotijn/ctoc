@@ -33,6 +33,88 @@ When making decisions, always ask:
 
 ---
 
+## CTOC Command Recognition
+
+When user types **"ctoc"** or CTOC-related commands:
+
+| Command | Action |
+|---------|--------|
+| `ctoc` | Show status: current step, plan counts, suggestions |
+| `ctoc plan` | Show plan dashboard |
+| `ctoc plan new "title"` | Create new plan in draft/ |
+| `ctoc doctor` | Check installation health |
+| `ctoc update` | Update CTOC to latest version |
+| `ctoc [command]` | Run `.ctoc/ctoc [command]` |
+
+**Always use short syntax:** Say `ctoc plan new` not `.ctoc/ctoc plan new`
+
+### Natural Language Understanding
+
+Map casual requests to CTOC actions:
+
+| User Says | Action |
+|-----------|--------|
+| "I want to plan a feature" | Ask what feature → `ctoc plan new` |
+| "Let's plan [X]" | `ctoc plan new "[X]"` |
+| "Build [X]" | Check for plan → create or continue |
+| "What's the status?" | `ctoc plan status` |
+| "Show plans" | `ctoc plan list` |
+
+When user describes feature work:
+1. Check if plan exists for this feature
+2. If not: "Want me to create a plan for '[feature]'?"
+3. If yes: Show plan, ask how to proceed
+
+---
+
+## CTOC Skill System (Token-Optimized)
+
+### Session Initialization
+
+At the **START of each session**, before any other work:
+
+1. **Detect project technologies** using an Explore subagent:
+   - Scan for: package.json, requirements.txt, pyproject.toml, Cargo.toml, go.mod
+   - Return ONLY: "DETECTED: tech1, tech2, tech3" (~50 tokens)
+
+2. **Store the detected list** mentally for this session
+
+3. **Track skills read** - remember which skills you've read this session
+
+### When to Read Skills
+
+**DO read a skill when:**
+- Creating a **NEW** file of that technology
+- Creating a **NEW** component/module
+- User asks "how should I..." or "best practices for..."
+
+**DON'T read a skill when:**
+- Editing existing files (trust existing patterns)
+- Debugging (use general knowledge first)
+- Small fixes or tweaks
+- Already read that skill this session
+
+### Skill Locations
+
+| Type | Path |
+|------|------|
+| Languages | `.ctoc/repo/.ctoc/skills/languages/{name}.md` |
+| Frameworks | `.ctoc/repo/.ctoc/skills/frameworks/{category}/{name}.md` |
+
+### Example Flow
+
+```
+User: "Create a new FastAPI endpoint for user registration"
+
+1. Check: Is FastAPI in detected list? → Yes
+2. Check: Have I read fastapi.md this session? → No
+3. Action: Read .ctoc/repo/.ctoc/skills/frameworks/web/fastapi.md
+4. Apply: Use skill's endpoint patterns, Pydantic models, error handling
+5. Remember: Mark fastapi as read for this session
+```
+
+---
+
 ## The Iron Loop — 15 Steps
 
 Every feature follows 15 steps in three phases. This is **non-negotiable**.
@@ -158,12 +240,76 @@ Sequential execution:
 
 ---
 
+## Plan Management
+
+Plans live in **`plans/`** at the project root (git-tracked):
+
+```
+plans/                           # GIT TRACKED - ROOT LEVEL
+├── functional/
+│   ├── draft/                   # New feature ideas
+│   └── approved/                # Business-approved features
+├── implementation/
+│   ├── draft/                   # Technical design in progress
+│   └── approved/                # Technical design approved
+├── todo/                        # Ready to work (Iron Loop 7-15 INJECTED)
+├── in_progress/                 # Currently being worked on
+├── review/                      # Awaiting business review
+└── done/                        # Completed
+```
+
+### Plan Lifecycle
+
+```
+BUSINESS PHASE (What to build)
+  functional/draft/ ──propose──► functional/approved/ ──approve──►
+
+TECHNICAL PHASE (How to build)
+  implementation/draft/ ──propose──► implementation/approved/ ──start──►
+                                           │
+                                           ▼ (Iron Loop injected)
+EXECUTION PHASE (Build it)
+  todo/ ──claim──► in_progress/ ──complete──► review/ ──accept──► done/
+```
+
+### Plan Commands
+
+| Command | Action |
+|---------|--------|
+| `ctoc plan new "title" [module]` | Create functional plan |
+| `ctoc plan propose <id>` | Submit for approval |
+| `ctoc plan approve <id>` | Approve plan |
+| `ctoc plan implement <id>` | Create implementation plan |
+| `ctoc plan start <id>` | Inject Iron Loop, move to todo |
+| `ctoc plan claim <id>` | Claim from todo (git-atomic) |
+| `ctoc plan complete <id>` | Move to review |
+| `ctoc plan accept <id>` | Accept and move to done |
+| `ctoc plan reject <id> [reason]` | Return with feedback |
+| `ctoc plan status` | Show dashboard |
+
+### Concurrency (Multiple Claude Instances)
+
+Multiple developers can work on different plans safely:
+- **`claim`** uses git push as an atomic lock
+- If someone else claims first, your push fails
+- Pick a different plan and try again
+
+### Context Management for Plans
+
+When a new plan is created and written to the planning file:
+- The planning discussion context should be considered complete
+- Suggest clearing context with `/clear` before implementation
+- This keeps implementation sessions focused
+
+---
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `ctoc plan new "title"` | Create a new plan |
+| `ctoc plan new "title" [module]` | Create a new functional plan |
 | `ctoc plan status` | View plan dashboard |
+| `ctoc plan claim <id>` | Claim and start working on plan |
 | `ctoc progress` | Quick Iron Loop progress |
 | `ctoc dashboard` | Full progress dashboard |
 | `ctoc sync` | Pull-rebase-push workflow |
@@ -171,22 +317,25 @@ Sequential execution:
 | `ctoc skills sync` | Auto-detect and download skills |
 | `ctoc skills feedback` | Suggest skill improvements |
 | `ctoc lock check` | Check file freshness |
+| `ctoc doctor` | Check installation health |
+| `ctoc migrate` | Migrate from old plan structure |
+| `ctoc update` | Update CTOC to latest |
 
 ---
 
 ## Skills Library
 
-Reference skills from `.ctoc/skills/` for language and framework-specific guidance.
+With the new CTOC architecture, **all 261 skills are available** in `.ctoc/repo/.ctoc/skills/`.
 
+**Skill locations:**
+- Languages: `.ctoc/repo/.ctoc/skills/languages/{name}.md`
+- Frameworks: `.ctoc/repo/.ctoc/skills/frameworks/{category}/{name}.md`
+
+**Commands:**
 ```bash
-# See all available skills
-.ctoc/bin/ctoc.sh skills list
-
-# Add a specific skill
-.ctoc/bin/ctoc.sh skills add <skill-name>
-
-# Auto-detect and sync skills
-.ctoc/bin/ctoc.sh skills sync
+ctoc skills list          # See all 261 available skills
+ctoc skills search <q>    # Search skills by keyword
+ctoc skills info <name>   # Show skill details
 ```
 
 ---

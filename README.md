@@ -74,6 +74,10 @@ With CTOC, the same request produces:
 
 ## Who Is This For?
 
+CTOC isn't just for coding — it's a **methodology for structured thinking and execution**. Whether you're building software, creating documents, or planning business initiatives, CTOC provides the same rigorous approach.
+
+### For Software Development
+
 | Role | What You Do |
 |------|-------------|
 | **Product Owners / PMs** | Create functional plans — describe *what* to build in plain English |
@@ -81,13 +85,162 @@ With CTOC, the same request produces:
 | **Anyone** | Do both — go from idea to working code in one session |
 | **Business Users** | Test and approve completed features |
 
+### For Document Production & Business Planning
+
+CTOC excels at **any work that benefits from structured planning**:
+
+| Use Case | How CTOC Helps |
+|----------|----------------|
+| **Business Proposals** | Assess audience needs → Plan structure → Refine arguments → Write with consistency |
+| **Project Plans** | Define scope → Design approach → Create detailed timeline → Review and approve |
+| **Technical Documentation** | Understand requirements → Plan sections → Write comprehensively → Verify accuracy |
+| **Reports & Analysis** | Assess data → Plan methodology → Execute analysis → Document findings |
+| **Policy Documents** | Understand constraints → Plan coverage → Draft policies → Review for completeness |
+
 ### How It Works
 
-1. **Functional Planning** — Define what you want (anyone can do this)
-2. **Technical Planning** — Define how to build it (developers)
-3. **Implementation** — CTOC builds it autonomously
+The same methodology applies to all work:
 
-Each planning phase is a loop: **Assess → Plan → Refine**. Repeat until you're happy. Then CTOC implements automatically.
+1. **Functional Planning** — Define what you want (anyone can do this)
+2. **Technical Planning** — Define how to build/write it
+3. **Implementation** — CTOC executes autonomously (code, documents, or both)
+
+For **documents**, the Iron Loop becomes:
+- **Steps 1-6**: Plan the document structure, audience, and key messages
+- **Steps 7-15**: Write, review, refine, and finalize the document
+
+Each planning phase is a loop: **Assess → Plan → Refine**. Repeat until you're satisfied. Then CTOC implements automatically.
+
+### Example: Creating a Business Proposal
+
+```
+User: I need to write a proposal for expanding into the EU market
+
+CTOC: Let me help you plan this proposal...
+
+FUNCTIONAL PLANNING:
+• Who is the audience? (Board, investors, internal?)
+• What decision do you need them to make?
+• What are the key arguments?
+
+TECHNICAL PLANNING:
+• Document structure and sections
+• Required data and supporting evidence
+• Tone and formatting standards
+
+IMPLEMENTATION:
+• CTOC writes the proposal following your plan
+• Self-reviews for consistency and completeness
+• Produces a polished, professional document
+```
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- A project directory (code project, document folder, or empty)
+- Git initialized (`git init` if new)
+- Claude Code installed (`npm install -g @anthropic-ai/claude-code`)
+
+### Step 1: Install CTOC
+
+Open terminal in your project directory:
+
+**macOS / Linux:**
+```bash
+curl -sL https://raw.githubusercontent.com/robotijn/ctoc/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/robotijn/ctoc/main/install.ps1 | iex
+```
+
+You should see:
+
+```
+═══════════════════════════════════════════════════════════════
+CTOC v1.3.0 installed successfully!
+═══════════════════════════════════════════════════════════════
+
+Files created/updated:
+  • CLAUDE.md          - CTO instructions (smart-merged)
+  • plans/             - Plan management (git-tracked)
+  • .ctoc/             - Skills library (261 skills available)
+
+Next steps:
+1. Open Claude Code with: claude --dangerously-skip-permissions
+2. Type: ctoc
+```
+
+### Step 2: Start Claude Code
+
+**Important:** Use the `--dangerously-skip-permissions` flag:
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+#### Why This Flag?
+
+Without it, Claude Code asks permission for every file operation:
+- "Can I create src/auth/login.py?"
+- "Can I modify tests/test_auth.py?"
+- "Can I read .ctoc/settings.yaml?"
+
+You'd need to approve hundreds of prompts per feature. The flag allows Claude Code to work autonomously through all 15 Iron Loop steps.
+
+#### Is It Safe?
+
+- Claude Code only operates within your project directory
+- It cannot access system files or other directories
+- You review all changes via `git diff` before pushing
+- CTOC instructions prevent destructive actions
+
+#### Make It Permanent (Optional)
+
+```bash
+# Add alias to your shell
+echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.bashrc
+source ~/.bashrc
+
+# Now just use:
+claude
+```
+
+### Step 3: Start Using CTOC
+
+Once Claude Code is open, type:
+
+```
+ctoc
+```
+
+CTOC will show your project status and options:
+
+```
+CTOC
+
+Functional Plans: 0
+Technical Plans:  0
+Ready to Build:   0
+In Progress:      None
+
+What would you like to do?
+
+[1] Functional plan  — Define what to build
+[2] Technical plan   — Define how to build it
+[3] Full plan        — Both functional and technical
+[4] Implement        — Build a ready feature
+[5] Status           — View all plans
+```
+
+Or just talk naturally:
+- *"I need a login system"*
+- *"Help me write a project proposal"*
+- *"Let's plan the documentation"*
 
 ---
 
@@ -174,141 +327,6 @@ The Iron Loop is a **15-step process**: two planning loops (6 steps) followed by
 | Document | Others can't maintain it |
 | Verify | Regressions |
 | Commit | Lost progress |
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- A code project (new or existing)
-- Git initialized (`git init` if new)
-- Claude Code installed (`npm install -g @anthropic-ai/claude-code`)
-
-### Step 1: Install CTOC
-
-Open terminal in your project directory:
-
-**macOS / Linux:**
-```bash
-curl -sL https://raw.githubusercontent.com/robotijn/ctoc/main/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/robotijn/ctoc/main/install.ps1 | iex
-```
-
-You should see:
-
-```
-═══════════════════════════════════════════════════════════════
-CTOC v1.2.0 installed successfully!
-═══════════════════════════════════════════════════════════════
-
-Files created/updated:
-  • CLAUDE.md          - CTO instructions (smart-merged)
-  • IRON_LOOP.md       - 15-step progress tracking
-  • PLANNING.md        - Feature backlog
-  • .ctoc/PROJECT_MAP.md - Codebase quick reference
-  • .ctoc/             - Skills library (5 skills downloaded)
-
-Research (WebSearch enabled by default):
-  • ctoc research status  - Show research config
-  • ctoc research off     - Disable WebSearch
-  • ctoc research on      - Re-enable WebSearch
-
-Next steps:
-1. Open Claude Code with: claude --dangerously-skip-permissions
-2. Type: ctoc
-```
-
-### Step 2: Start Claude Code
-
-**Important:** Use the `--dangerously-skip-permissions` flag:
-
-```bash
-claude --dangerously-skip-permissions
-```
-
-#### Why This Flag?
-
-Without it, Claude Code asks permission for every file operation:
-- "Can I create src/auth/login.py?"
-- "Can I modify tests/test_auth.py?"
-- "Can I read .ctoc/settings.yaml?"
-
-You'd need to approve hundreds of prompts per feature. The flag allows Claude Code to work autonomously through all 15 Iron Loop steps.
-
-#### Is It Safe?
-
-- Claude Code only operates within your project directory
-- It cannot access system files or other directories
-- You review all changes via `git diff` before pushing
-- CTOC instructions prevent destructive actions
-
-#### Make It Permanent (Optional)
-
-```bash
-# Add alias to your shell
-echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.bashrc
-source ~/.bashrc
-
-# Now just use:
-claude
-```
-
-### Step 3: Initialize CTOC
-
-Once Claude Code is open, type:
-
-```
-ctoc
-```
-
-Since CTOC isn't initialized yet, Claude Code will guide you through setup:
-
-```
-═══════════════════════════════════════════════════════════════
-CTOC
-═══════════════════════════════════════════════════════════════
-
-I don't see CTOC initialized in this project.
-
-Detected:
-• Python (FastAPI)
-• TypeScript (Next.js)
-• Git repository ✓
-
-Would you like me to initialize CTOC?
-
-[Y] Yes, initialize
-[N] No
-[?] What is CTOC?
-```
-
-Type `Y` and answer the configuration questions.
-
-### Step 4: You're Ready!
-
-After initialization, just type `ctoc` to see your project status and options:
-
-```
-CTOC
-
-Functional Plans: 0
-Technical Plans:  0
-Ready to Build:   0
-In Progress:      None
-
-What would you like to do?
-
-[1] Functional plan  — Define what to build
-[2] Technical plan   — Define how to build it
-[3] Full plan        — Both functional and technical
-[4] Implement        — Build a ready feature
-[5] Status           — View all plans
-```
 
 ---
 
@@ -589,27 +607,28 @@ But if you want shortcuts:
 
 ### Plan Commands
 
-Plans are organized in **status folders** with naming like `0052-landing-page-login-button.md`.
+Plans live in **`plans/`** at the project root (git-tracked) with naming like `2026-01-27-001-auth-login.md`.
 
 | Command | What it does |
 |---------|--------------|
-| `ctoc plan new <title>` | Create a new plan in `draft/` |
-| `ctoc plan propose <id>` | Move plan to `proposed/` for review |
-| `ctoc plan approve <id>` | Move plan to `approved/` |
-| `ctoc plan start <id>` | Move plan to `in_progress/` |
-| `ctoc plan implement <id>` | Create implementation plan from functional plan |
-| `ctoc plan complete <id>` | Move plan to `implemented/` |
-| `ctoc plan supersede <id>` | Move plan to `superseded/` |
-| `ctoc plan move <id> <status>` | Move plan to any status folder |
-| `ctoc plan list [status]` | List plans (filter by status folder) |
+| `ctoc plan new <title> [module]` | Create functional plan in `functional/draft/` |
+| `ctoc plan propose <id>` | Submit for approval |
+| `ctoc plan approve <id>` | Approve functional plan |
+| `ctoc plan implement <id>` | Create implementation plan |
+| `ctoc plan start <id>` | Inject Iron Loop, move to `todo/` |
+| `ctoc plan claim <id>` | Claim from `todo/` (git-atomic lock) |
+| `ctoc plan complete <id>` | Move to `review/` |
+| `ctoc plan accept <id>` | Accept and move to `done/` |
+| `ctoc plan reject <id> [msg]` | Return with feedback |
+| `ctoc plan abandon <id>` | Release claimed plan |
+| `ctoc plan list [stage]` | List plans by stage |
 | `ctoc plan status` | Show plan dashboard |
 | `ctoc plan show <id>` | Show plan details |
 
 **Plan Lifecycle:**
 ```
-draft/ → proposed/ → approved/ → in_progress/ → implemented/
-                                      ↓
-                                superseded/
+functional/draft/ → functional/approved/ → implementation/draft/ →
+implementation/approved/ → todo/ → in_progress/ → review/ → done/
 ```
 
 ### Progress Commands
@@ -851,58 +870,93 @@ Updates are fetched from the official repository and install automatically.
 
 ## Plan Management
 
-CTOC uses a **folder-based system** for managing plans. The folder a plan is in determines its status — no ambiguity, no database, just files.
+CTOC uses a **folder-based lifecycle** for managing plans. Plans live at the **project root** in `plans/` (git-tracked), making them visible to your entire team.
 
 ### Folder Structure
 
 ```
-.ctoc/plans/
-├── index.yaml          # Counter tracking
-├── draft/              # New plans start here
-├── proposed/           # Awaiting review
-├── approved/           # Ready to implement
-├── in_progress/        # Currently being worked on
-├── implemented/        # Completed
-└── superseded/         # Replaced by newer plans
+plans/                           # GIT TRACKED - ROOT LEVEL
+├── functional/
+│   ├── draft/                   # New feature ideas
+│   └── approved/                # Business-approved features
+├── implementation/
+│   ├── draft/                   # Technical design in progress
+│   └── approved/                # Technical design approved
+├── todo/                        # Ready to work (Iron Loop injected)
+├── in_progress/                 # Currently being worked on
+├── review/                      # Awaiting business review
+└── done/                        # Completed
 ```
+
+### Two-Phase Planning
+
+**Phase 1: Functional (What to build)**
+- Anyone can create functional plans — no technical knowledge needed
+- Describe the user need, not the implementation
+- Business stakeholders approve functional plans
+
+**Phase 2: Implementation (How to build)**
+- Developers create technical designs from approved functional plans
+- Includes architecture, files, APIs, database changes
+- When approved, Iron Loop steps 7-15 are automatically injected
 
 ### Naming Convention
 
-Plans use a **4-digit counter + slug** format:
+Plans use **date + counter + module + feature** format:
 
 ```
-0001-user-authentication.md
-0002-order-tracking.md
-0052-landing-page-login-button.md
+2026-01-27-001-auth-user_login.md
+2026-01-27-002-home_page-footer.md
+2026-01-28-001-api-rate_limiting.md
 ```
-
-This ensures:
-- **Unique IDs** — Counter never repeats
-- **Clear ordering** — Sort by filename = chronological order
-- **Readable names** — Slug describes the feature
-- **Easy reference** — Just use the number: `ctoc plan approve 52`
 
 ### Plan Lifecycle
 
 ```
-draft/ → proposed/ → approved/ → in_progress/ → implemented/
-                                      ↓
-                                superseded/
+BUSINESS PHASE (What to build)
+  functional/draft/ → functional/approved/
+                            ↓
+TECHNICAL PHASE (How to build)
+  implementation/draft/ → implementation/approved/
+                                 ↓ (Iron Loop injected)
+EXECUTION PHASE (Build it)
+  todo/ → in_progress/ → review/ → done/
+              ↓
+        (reject returns to functional/draft/)
 ```
 
-Moving a plan between statuses is as simple as moving a file between folders. CTOC commands do this for you:
+### Plan Commands
 
 ```bash
-ctoc plan new "Add login button"   # Creates 0053-add-login-button.md in draft/
-ctoc plan propose 53               # Moves to proposed/
-ctoc plan approve 53               # Moves to approved/
-ctoc plan start 53                 # Moves to in_progress/
-ctoc plan complete 53              # Moves to implemented/
+# Create plans
+ctoc plan new "Add login button" auth    # Creates in functional/draft/
+
+# Lifecycle transitions
+ctoc plan propose <id>                   # Submit for approval
+ctoc plan approve <id>                   # Approve functional plan
+ctoc plan implement <id>                 # Create implementation plan
+ctoc plan start <id>                     # Inject Iron Loop, move to todo
+ctoc plan claim <id>                     # Claim from todo (git-atomic)
+ctoc plan complete <id>                  # Move to review
+ctoc plan accept <id>                    # Accept and move to done
+ctoc plan reject <id> "feedback"         # Return with feedback
+
+# Status
+ctoc plan status                         # Show dashboard
+ctoc plan list [stage]                   # List plans by stage
+ctoc plan show <id>                      # Show plan details
 ```
 
-### Dashboard
+### Concurrent Work (Multiple Claude Instances)
 
-View all plans by status:
+CTOC supports **multiple developers working simultaneously** using git as the coordination mechanism:
+
+- **`claim`** uses git push as an atomic lock
+- If someone else claims a plan first, your push fails
+- Pick a different plan and try again
+- No stale locks — everything is visible in git
+
+### Dashboard
 
 ```bash
 ctoc plan status
@@ -915,24 +969,26 @@ ctoc plan status
 
 Plan Statistics:
 
-  draft:          2
-  proposed:       1
-  approved:       3
-  in_progress:    1
-  implemented:    12
-  superseded:     2
-  ──────────────────
-  Total:          21
+  functional/draft:       2
+  functional/approved:    1
+  implementation/draft:   1
+  implementation/approved: 2
+  todo:                   3
+  in_progress:            1
+  review:                 1
+  done:                  12
+  ──────────────────────────
+  Total:                  23
 
-Active Plans:
+Active Work:
 [in_progress]
-  0051  Implement checkout flow
+  2026-01-27-001  auth-user_login (claimed by you)
 
-Ready to Start:
-[approved]
-  0048  Add password reset
-  0049  Email notifications
-  0050  User profile page
+Ready to Claim:
+[todo]
+  2026-01-26-003  api-rate_limiting
+  2026-01-26-004  home_page-footer
+  2026-01-27-002  docs-api_reference
 ```
 
 ---

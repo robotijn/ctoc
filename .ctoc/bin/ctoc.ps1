@@ -17,7 +17,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Version = "1.2.0"
+$Version = "1.3.0"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Find skills index
@@ -56,14 +56,20 @@ SKILL COMMANDS:
     skills feedback <name>   Open issue form to suggest skill improvement
 
 PLAN COMMANDS:
-    plan new <title>         Create a new functional plan
-    plan propose <id>        Submit plan for review
-    plan approve <id>        Approve a plan
-    plan start <id>          Begin work on plan
-    plan implement <id>      Create implementation plan
-    plan complete <id>       Mark plan as implemented
-    plan list [status]       List plans
+    plan new <title> [mod]   Create a new functional plan
+    plan propose <id>        Submit plan for approval
+    plan approve <id>        Approve a functional plan
+    plan implement <id>      Create implementation plan from approved
+    plan start <id>          Inject Iron Loop, move to todo
+    plan claim <id>          Claim from todo (git-atomic)
+    plan complete <id>       Move to review
+    plan accept <id>         Accept and move to done
+    plan reject <id> [msg]   Return with feedback
+    plan abandon <id>        Release claimed plan
+    plan list [stage]        List plans by stage
     plan status              Show plan dashboard
+    plan show <id>           Show plan details
+    migrate                  Migrate from old plan structure
 
 AGENT COMMANDS:
     agent list               List all agents (60 total)
@@ -109,6 +115,8 @@ UPDATE COMMANDS:
     update check             Check for updates
 
 OTHER COMMANDS:
+    doctor                   Check installation health
+    migrate                  Migrate from old plan structure
     help                     Show this help
     version                  Show version
 
@@ -268,6 +276,104 @@ function Invoke-ProcessIssues {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  Doctor - Installation Health Check
+# ═══════════════════════════════════════════════════════════════════════════════
+
+function Invoke-Doctor {
+    Write-Host "CTOC Doctor v$Version"
+    Write-Host "==================="
+    Write-Host ""
+
+    $ok = $true
+
+    # Check .ctoc directory
+    if (Test-Path ".ctoc") {
+        Write-Host "[OK] .ctoc directory exists" -ForegroundColor Green
+    } else {
+        Write-Host "[!!] .ctoc directory not found" -ForegroundColor Red
+        $ok = $false
+    }
+
+    # Check .ctoc/repo
+    if (Test-Path ".ctoc\repo") {
+        Write-Host "[OK] .ctoc\repo exists" -ForegroundColor Green
+    } else {
+        Write-Host "[!!] .ctoc\repo not found - run: ctoc update" -ForegroundColor Red
+        $ok = $false
+    }
+
+    # Check plans directory at root
+    if (Test-Path "plans") {
+        Write-Host "[OK] plans/ directory exists at root" -ForegroundColor Green
+
+        # Check lifecycle folders
+        $folders = @(
+            "functional\draft", "functional\approved",
+            "implementation\draft", "implementation\approved",
+            "todo", "in_progress", "review", "done"
+        )
+        $missingFolders = @()
+        foreach ($folder in $folders) {
+            if (-not (Test-Path "plans\$folder")) {
+                $missingFolders += $folder
+            }
+        }
+        if ($missingFolders.Count -eq 0) {
+            Write-Host "[OK] All lifecycle folders present" -ForegroundColor Green
+        } else {
+            Write-Host "[!!] Missing lifecycle folders: $($missingFolders -join ', ')" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "[!!] plans/ directory not found at root" -ForegroundColor Red
+        Write-Host "     Run: ctoc migrate (if upgrading) or reinstall" -ForegroundColor Yellow
+        $ok = $false
+    }
+
+    # Check for old structure that needs migration
+    if (Test-Path ".ctoc\plans") {
+        Write-Host "[!!] Old .ctoc\plans structure detected - run: ctoc migrate" -ForegroundColor Yellow
+    }
+
+    # Check CLAUDE.md
+    if (Test-Path "CLAUDE.md") {
+        Write-Host "[OK] CLAUDE.md exists" -ForegroundColor Green
+    } else {
+        Write-Host "[!!] CLAUDE.md not found" -ForegroundColor Yellow
+    }
+
+    # Check settings.yaml
+    if (Test-Path ".ctoc\settings.yaml") {
+        Write-Host "[OK] .ctoc\settings.yaml exists" -ForegroundColor Green
+    } else {
+        Write-Host "[..] .ctoc\settings.yaml not found (optional)" -ForegroundColor Gray
+    }
+
+    # Check skills
+    if (Test-Path ".ctoc\repo\.ctoc\skills") {
+        $langCount = (Get-ChildItem ".ctoc\repo\.ctoc\skills\languages" -Filter "*.md" -ErrorAction SilentlyContinue | Measure-Object).Count
+        $fwCount = (Get-ChildItem ".ctoc\repo\.ctoc\skills\frameworks" -Recurse -Filter "*.md" -ErrorAction SilentlyContinue | Measure-Object).Count
+        Write-Host "[OK] Skills available: $langCount languages, $fwCount frameworks" -ForegroundColor Green
+    } else {
+        Write-Host "[!!] Skills not found - run: ctoc update" -ForegroundColor Red
+        $ok = $false
+    }
+
+    # Check git
+    if (Test-Path ".git") {
+        Write-Host "[OK] Git repository" -ForegroundColor Green
+    } else {
+        Write-Host "[..] Not a git repository" -ForegroundColor Gray
+    }
+
+    Write-Host ""
+    if ($ok) {
+        Write-Host "All checks passed!" -ForegroundColor Green
+    } else {
+        Write-Host "Some issues found. See recommendations above." -ForegroundColor Yellow
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  Update Check (once per day, silent on failure)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -339,6 +445,14 @@ switch ($Command) {
 
     "plan" {
         & "$ScriptDir/plan.ps1" $SubCommand $Args
+    }
+
+    "migrate" {
+        & "$ScriptDir/plan.ps1" "migrate"
+    }
+
+    "doctor" {
+        Invoke-Doctor
     }
 
     "progress" {
