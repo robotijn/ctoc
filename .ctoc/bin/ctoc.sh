@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="1.3.0"
+VERSION="1.4.0"
 
 # Colors
 RED='\033[0;31m'

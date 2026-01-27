@@ -403,9 +403,52 @@ Every CTO skill MUST include:
 
 ---
 
-## ⚡ Parallel Execution Guidelines
+## ⚡ Subagent Usage Guidelines
 
-### Subagent Parallelism Formula
+### Core Principle: Use Subagents Whenever Possible and Safe
+
+**Subagents are your force multiplier.** Always consider whether work can be parallelized across multiple agents. This is not optional optimization — it's the standard way to work efficiently.
+
+### When to Use Subagents
+
+**ALWAYS use subagents when:**
+- Creating multiple independent files (each file = one agent)
+- Researching multiple topics (each topic = one agent)
+- Analyzing different parts of a codebase
+- Processing multiple items (issues, profiles, tests)
+- Any task that can be decomposed into independent units
+
+**Think before each task:** "Can this be split across agents?"
+
+### Decision Framework
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 SUBAGENT DECISION TREE                  │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Is the work decomposable into independent units?       │
+│                    │                                    │
+│           ┌───────┴───────┐                            │
+│           ▼               ▼                            │
+│          YES             NO                            │
+│           │               │                            │
+│           ▼               ▼                            │
+│    Do units modify      Do it                          │
+│    the same files?      sequentially                   │
+│           │                                            │
+│    ┌──────┴──────┐                                     │
+│    ▼             ▼                                     │
+│   YES           NO                                     │
+│    │             │                                     │
+│    ▼             ▼                                     │
+│ Serialize    PARALLELIZE                               │
+│ writes       WITH SUBAGENTS                            │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+### Parallelism Formula
 
 Use: `max(2, CPU_CORES - 4)` concurrent subagents
 
@@ -422,17 +465,33 @@ This ensures:
 | Read/Glob/Grep | Yes | Read-only |
 | WebFetch | Yes | External fetch |
 | Analysis | Yes | Results can merge |
+| File creation | Yes | Different files only |
 | Edit/Write | **NO** | Serialize by file |
 | Bash (read) | Yes | ls, cat, etc. |
 | Bash (write) | **NO** | Serialize |
 | Git operations | **NO** | Use worktrees for parallelism |
 
-### Research Phase Pattern
+### Pattern: Parallel File Creation
 
-When exploring a problem, use parallel research:
+When creating multiple files (common in CTOC):
 
 ```
-Launch in parallel (up to max agents):
+Launch in parallel:
+├── Agent 1: Create file-a.md
+├── Agent 2: Create file-b.md
+├── Agent 3: Create file-c.md
+├── Agent 4: Create file-d.md
+└── Agent 5: Create file-e.md
+
+All agents work simultaneously → 5x faster
+```
+
+### Pattern: Parallel Research
+
+When exploring a problem:
+
+```
+Launch in parallel:
 ├── Agent 1: WebSearch "official docs {topic}"
 ├── Agent 2: WebSearch "GitHub implementations {topic}"
 ├── Agent 3: WebSearch "security considerations {topic}"
@@ -442,9 +501,9 @@ Launch in parallel (up to max agents):
 Wait for all results, then synthesize.
 ```
 
-### Write Phase Pattern
+### Pattern: Sequential Writes
 
-When implementing, serialize writes:
+When modifying existing files (cannot parallelize):
 
 ```
 Sequential execution:
@@ -453,6 +512,22 @@ Sequential execution:
 3. Edit file C
 4. Run tests
 5. Commit
+```
+
+### Anti-Pattern: Serial When Parallel is Possible
+
+**DON'T do this:**
+```
+1. Create file A
+2. Wait
+3. Create file B
+4. Wait
+5. Create file C
+```
+
+**DO this instead:**
+```
+Parallel: Create files A, B, C simultaneously
 ```
 
 ---

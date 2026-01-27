@@ -1,0 +1,159 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CTOC Settings v1.4.0
+#  Project-level configuration for CTOC
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  General Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+timezone: "UTC"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Operations Configuration (NEW in v1.4.0)
+# ─────────────────────────────────────────────────────────────────────────────
+
+operations:
+  # Model configuration
+  default_model: "claude-opus-4-5-20251101"
+  provider: "anthropic"
+  api_key_env: "ANTHROPIC_API_KEY"
+
+  # Model tiering - quality first, not cost first
+  model_tiers:
+    complex: "opus"      # Deep reasoning, creativity, architecture
+    moderate: "sonnet"   # Pattern matching, analysis
+    simple: "haiku"      # Cached operations only
+
+  # Model selection strategy
+  model_selection:
+    strategy: quality_first
+
+    # Per-agent defaults
+    defaults:
+      understand: opus
+      plan-advisor: opus
+      project-setup: opus
+      git-advisor: sonnet
+      issue-processor: sonnet
+      progress-insights: sonnet
+
+    # Dynamic selection based on context
+    dynamic:
+      enabled: true
+      rules:
+        - if: "codebase_size > 100_files"
+          then: "prefer_opus"
+        - if: "operation_is_cached"
+          then: "haiku_sufficient"
+        - if: "self_improvement_triggered"
+          then: "require_opus"
+
+    # Fallback chain for availability issues
+    fallback_chain: [opus, sonnet, haiku]
+
+  # Self-improvement settings
+  self_improvement:
+    enabled: true
+    critique_loops: 5              # Number of self-critique iterations
+    learn_always: true             # Every run can improve
+    rate_limit: "5/hour"           # Max improvements per hour
+    log_learning: true             # Keep audit trail
+
+  # Caching settings
+  caching:
+    enabled: true
+    structure_ttl: "24h"           # File structure cache
+    insights_ttl: "1h"             # Understanding cache
+    auto_invalidate: true          # Watch for file changes
+    cache_dir: ".ctoc/cache"
+
+  # Privacy settings
+  privacy:
+    gitignore_cache: true          # Add cache/ to .gitignore
+    redact_secrets_in_logs: true   # Don't log detected secrets
+
+  # Performance settings
+  performance:
+    max_parallel_agents: 3         # Concurrent agent limit
+    token_budget_per_operation: 50000
+    timeout: "60s"
+
+  # Cost visibility (optional)
+  cost_visibility:
+    enabled: true
+    show_estimates: true           # Before expensive ops
+    warn_threshold: 10000          # Tokens
+    track_usage: true              # Running total
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Learning Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+learning:
+  # CTO-gated learning propagation
+  cross_agent_learning:
+    mode: cto_gated
+    gatekeeper: cto-chief
+
+    review_timing:
+      high_confidence: immediate   # >0.9 confidence → instant
+      normal: daily_batch          # Accumulated learnings
+      on_demand: true              # User can trigger review
+
+    appeals:
+      allowed: true
+      method: resubmit_with_evidence
+      max_attempts: 3
+
+    cto_criteria:
+      generalizability: 0.7
+      confidence: 0.85
+      consistency_check: true
+      safety_check: true
+
+  # Learning publishing
+  publishing:
+    auto_publish:
+      enabled: true
+      criteria:
+        - cto_approved: true
+        - confidence: ">0.9"
+        - generalizability: ">0.8"
+        - novel: true
+      format: github_issue
+      repo: "robotijn/ctoc"
+      label: "community-learning"
+
+    manual_publish:
+      enabled: true
+      command: "ctoc learning publish <learning-id>"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Research Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+research:
+  enabled: true
+  auto_research_steps: [1, 5, 7]   # ASSESS, DESIGN, TEST
+  websearch: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Git Workflow Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+git:
+  co_author: "Claude Opus 4.5 <noreply@anthropic.com>"
+  auto_sync: true
+  force_with_lease: true           # Safe force push
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  User Preferences (learned from interactions)
+# ─────────────────────────────────────────────────────────────────────────────
+
+user_preferences:
+  # These are learned automatically from user behavior
+  # Format similar to Claude Code's /memory
+  commit_style: null               # Learned: conventional, descriptive, brief
+  approval_preferences: null       # Learned: quick, thorough, ask_always
+  working_patterns: null           # Learned: sequential, parallel, exploratory

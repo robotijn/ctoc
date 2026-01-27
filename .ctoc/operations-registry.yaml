@@ -1,0 +1,289 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CTOC Operations Registry v1.0.0
+#  Defines operation agents that replace bash scripts with Claude-powered intelligence
+# ═══════════════════════════════════════════════════════════════════════════════
+
+schema_version: "1.0.0"
+updated: "2026-01-27"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Core Principles
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+#  1. NEVER block humans - Agents advise only, never prevent user actions
+#  2. Online-first - CTOC requires connectivity for intelligence
+#  3. Quality over speed - 500ms latency acceptable for intelligence
+#  4. Self-improvement - Every run can trigger learning
+#  5. Determinism rule - Bash for deterministic ops (git), Claude for intelligence
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+operations:
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  Core Operations
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  understand:
+    path: operations/core/understand.md
+    model_tier: complex                    # Uses Opus for deep reasoning
+    category: core
+    description: "Semantic codebase understanding - replaces pattern-matching detection"
+    replaces:
+      - detect.sh
+      - explore-codebase.sh
+    tools:
+      - Read
+      - Grep
+      - Glob
+      - WebSearch
+    cache:
+      output: cache/understanding.yaml
+      ttl: 1h
+      invalidate_on:
+        - "*.py"
+        - "*.ts"
+        - "*.tsx"
+        - "*.js"
+        - "*.jsx"
+        - "*.rs"
+        - "*.go"
+        - "*.java"
+        - "*.rb"
+        - "*.php"
+        - "package.json"
+        - "pyproject.toml"
+        - "Cargo.toml"
+        - "go.mod"
+        - "pom.xml"
+        - "Gemfile"
+        - "composer.json"
+    self_improvement:
+      enabled: true
+      can_modify:
+        - operations/core/understand.md    # Only self
+      critique_loops: 5
+      rate_limit: 5/hour
+
+  plan-advisor:
+    path: operations/core/plan-advisor.md
+    model_tier: complex                    # Needs judgment for plan quality
+    category: core
+    description: "Intelligent plan lifecycle management with quality assessment"
+    replaces:
+      - "plan.sh (reasoning portions)"
+    tools:
+      - Read
+      - Grep
+      - Glob
+      - Write
+    depends_on:
+      - understand                         # Needs codebase understanding first
+    bash_fallback: git-atomic.sh           # For atomic git operations
+    self_improvement:
+      enabled: true
+      can_modify:
+        - operations/core/plan-advisor.md
+      critique_loops: 5
+      rate_limit: 5/hour
+
+  git-advisor:
+    path: operations/core/git-advisor.md
+    model_tier: moderate                   # Uses Sonnet - pattern matching sufficient
+    category: core
+    description: "Intelligent git workflow assistance with contextual secrets detection"
+    replaces:
+      - "git-workflow.sh (quality analysis)"
+    tools:
+      - Read
+      - Grep
+      - Glob
+      - Bash
+    bash_fallback: git-atomic.sh
+    self_improvement:
+      enabled: true
+      can_modify:
+        - operations/core/git-advisor.md
+      critique_loops: 5
+      rate_limit: 5/hour
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  Setup Operations
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  project-setup:
+    path: operations/setup/project-setup.md
+    model_tier: complex                    # Needs creativity for CLAUDE.md generation
+    category: setup
+    description: "Intelligent CLAUDE.md generation based on codebase understanding"
+    replaces:
+      - init-claude-md.sh
+    tools:
+      - Read
+      - Grep
+      - Glob
+      - Write
+      - WebSearch
+    depends_on:
+      - understand
+    self_improvement:
+      enabled: true
+      can_modify:
+        - operations/setup/project-setup.md
+      critique_loops: 5
+      rate_limit: 5/hour
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  Workflow Operations
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  issue-processor:
+    path: operations/workflow/issue-processor.md
+    model_tier: moderate                   # Understanding + action
+    category: workflow
+    description: "Intelligent GitHub issue processing with codebase cross-reference"
+    replaces:
+      - process-issues.sh
+    tools:
+      - Read
+      - Grep
+      - Bash
+      - WebSearch
+    depends_on:
+      - understand
+    self_improvement:
+      enabled: true
+      can_modify:
+        - operations/workflow/issue-processor.md
+      critique_loops: 5
+      rate_limit: 5/hour
+
+  progress-insights:
+    path: operations/workflow/progress-insights.md
+    model_tier: moderate                   # Analysis needs intelligence
+    category: workflow
+    description: "Meaningful progress analysis with pattern detection"
+    replaces:
+      - "progress.sh (insights)"
+    tools:
+      - Read
+      - Grep
+    self_improvement:
+      enabled: true
+      can_modify:
+        - operations/workflow/progress-insights.md
+      critique_loops: 5
+      rate_limit: 5/hour
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Model Tiers
+# ═══════════════════════════════════════════════════════════════════════════════
+
+model_tiers:
+  complex: opus                            # Deep reasoning, creativity
+  moderate: sonnet                         # Pattern matching, analysis
+  simple: haiku                            # Cached operations only
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Invocation Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+invocation:
+  primary: automatic
+  mechanisms:
+    - claude_code_task_tool                # When running inside Claude Code
+    - dedicated_runtime                    # Future: standalone runtime
+  auto_select: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Error Handling
+# ═══════════════════════════════════════════════════════════════════════════════
+
+error_handling:
+  api_timeout:
+    action: retry_with_backoff
+    max_retries: 3
+    backoff:
+      - 1s
+      - 5s
+      - 15s
+
+  api_unavailable:
+    action: use_cached_if_valid
+    if_no_cache: show_error_with_explanation
+    message: "Claude unavailable. Using cached understanding from {time_ago}."
+
+  malformed_response:
+    action: retry_once
+    if_still_bad: log_and_show_raw
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Cache Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cache:
+  directory: .ctoc/cache
+  gitignore: true                          # Cache is local, not committed
+
+  understanding:
+    committed:
+      file: understanding.yaml
+      scope: "Committed codebase (what git knows)"
+      updates_on: commit
+    local_changes:
+      file: local-changes.yaml
+      scope: "Uncommitted working tree changes"
+      updates_on: file_change
+      cleared_on: commit
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Learning Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+learning:
+  directory: learnings                     # Root level, git-tracked
+
+  stages:
+    pending: learnings/pending             # Awaiting CTO review
+    approved: learnings/approved           # CTO approved
+    applied: learnings/applied             # Integrated into agents
+
+  critique:
+    self_loops: 5                          # Self-critique iterations
+    cto_loops: 5                           # CTO review iterations
+
+  human_review:
+    triggers:
+      - confidence_below: 0.8
+      - impact: high
+      - cto_uncertain: true
+      - propagation_scope: ">3"
+      - security_relevant: true
+    notification:
+      method: "create .ctoc/human-review-needed.md"
+
+  publishing:
+    auto_publish:
+      enabled: true
+      criteria:
+        - cto_approved: true
+        - confidence: ">0.9"
+        - generalizability: ">0.8"
+        - novel: true
+      format: github_issue
+      repo: "robotijn/ctoc"
+      label: "community-learning"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Large Codebase Strategy
+# ═══════════════════════════════════════════════════════════════════════════════
+
+large_codebase:
+  strategies:
+    - entry_points_first                   # main files, config, exports
+    - hot_files_priority                   # Recently changed
+    - importance_ranking                   # AI ranks files
+    - incremental_analysis                 # Only re-analyze changed files
+  chunking:
+    batch_size: 500                        # Files per batch
+    max_depth: 3                           # Directory depth first pass
+    expand_on_demand: true                 # Drill deeper when needed
