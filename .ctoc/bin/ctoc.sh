@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="1.4.0"
+VERSION="1.5.0"
 
 # Colors
 RED='\033[0;31m'
@@ -1086,9 +1086,17 @@ main() {
             ;;
 
         *)
-            echo "Unknown command: $cmd"
-            echo "Run 'ctoc help' for usage."
-            exit 1
+            # Unknown command - try smart-router agent
+            echo ""
+            echo -e "${CYAN}Unknown command: $cmd${NC}"
+            echo ""
+            echo "Invoking smart-router for intent analysis..."
+            echo ""
+            invoke_operation_agent "smart-router" "$cmd" "$@" 2>/dev/null || {
+                echo ""
+                echo "Run 'ctoc help' for available commands."
+                exit 1
+            }
             ;;
     esac
 }
