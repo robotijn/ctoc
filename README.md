@@ -203,7 +203,7 @@ You should see:
 
 ```
 ═══════════════════════════════════════════════════════════════
-CTOC v1.1.0 installed successfully!
+CTOC v1.2.0 installed successfully!
 ═══════════════════════════════════════════════════════════════
 
 Files created/updated:
@@ -589,16 +589,28 @@ But if you want shortcuts:
 
 ### Plan Commands
 
+Plans are organized in **status folders** with naming like `0052-landing-page-login-button.md`.
+
 | Command | What it does |
 |---------|--------------|
-| `ctoc plan new <title>` | Create a new functional plan |
-| `ctoc plan propose <id>` | Submit plan for review |
-| `ctoc plan approve <id>` | Approve a plan |
-| `ctoc plan start <id>` | Begin work on plan |
-| `ctoc plan implement <id>` | Create implementation plan |
-| `ctoc plan complete <id>` | Mark plan as implemented |
-| `ctoc plan list [status]` | List plans by status |
+| `ctoc plan new <title>` | Create a new plan in `draft/` |
+| `ctoc plan propose <id>` | Move plan to `proposed/` for review |
+| `ctoc plan approve <id>` | Move plan to `approved/` |
+| `ctoc plan start <id>` | Move plan to `in_progress/` |
+| `ctoc plan implement <id>` | Create implementation plan from functional plan |
+| `ctoc plan complete <id>` | Move plan to `implemented/` |
+| `ctoc plan supersede <id>` | Move plan to `superseded/` |
+| `ctoc plan move <id> <status>` | Move plan to any status folder |
+| `ctoc plan list [status]` | List plans (filter by status folder) |
 | `ctoc plan status` | Show plan dashboard |
+| `ctoc plan show <id>` | Show plan details |
+
+**Plan Lifecycle:**
+```
+draft/ → proposed/ → approved/ → in_progress/ → implemented/
+                                      ↓
+                                superseded/
+```
 
 ### Progress Commands
 
@@ -649,6 +661,15 @@ But if you want shortcuts:
 | `ctoc research on` | Enable WebSearch (default) |
 | `ctoc research off` | Disable WebSearch |
 | `ctoc research steps 1,2,5,12` | Customize auto-research steps |
+
+### Update Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc update` | Update CTOC to latest version |
+| `ctoc update check` | Manually check for updates |
+
+CTOC checks for updates **once per day** and prompts you if a new version is available. Disable with `CTOC_SKIP_UPDATE_CHECK=1`.
 
 ### Detection Commands
 
@@ -795,6 +816,124 @@ During installation, CTOC generates a **PROJECT_MAP.md** — a quick reference g
 - **Quick search reference** — Where to find common code
 
 This helps both you and Claude Code navigate the codebase faster.
+
+---
+
+## Automatic Updates
+
+CTOC checks for updates **once per day** and prompts you when a new version is available.
+
+### How It Works
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║               CTOC Update Available!                           ║
+╚════════════════════════════════════════════════════════════════╝
+
+  Current version: 1.1.0
+  New version:     1.2.0
+
+  Would you like to update now? [y/N]
+```
+
+### Configuration
+
+| Setting | Description |
+|---------|-------------|
+| **Default** | Checks once per day, prompts if update available |
+| **Manual check** | `ctoc update check` |
+| **Force update** | `ctoc update` |
+| **Disable** | Set `CTOC_SKIP_UPDATE_CHECK=1` environment variable |
+
+Updates are fetched from the official repository and install automatically.
+
+---
+
+## Plan Management
+
+CTOC uses a **folder-based system** for managing plans. The folder a plan is in determines its status — no ambiguity, no database, just files.
+
+### Folder Structure
+
+```
+.ctoc/plans/
+├── index.yaml          # Counter tracking
+├── draft/              # New plans start here
+├── proposed/           # Awaiting review
+├── approved/           # Ready to implement
+├── in_progress/        # Currently being worked on
+├── implemented/        # Completed
+└── superseded/         # Replaced by newer plans
+```
+
+### Naming Convention
+
+Plans use a **4-digit counter + slug** format:
+
+```
+0001-user-authentication.md
+0002-order-tracking.md
+0052-landing-page-login-button.md
+```
+
+This ensures:
+- **Unique IDs** — Counter never repeats
+- **Clear ordering** — Sort by filename = chronological order
+- **Readable names** — Slug describes the feature
+- **Easy reference** — Just use the number: `ctoc plan approve 52`
+
+### Plan Lifecycle
+
+```
+draft/ → proposed/ → approved/ → in_progress/ → implemented/
+                                      ↓
+                                superseded/
+```
+
+Moving a plan between statuses is as simple as moving a file between folders. CTOC commands do this for you:
+
+```bash
+ctoc plan new "Add login button"   # Creates 0053-add-login-button.md in draft/
+ctoc plan propose 53               # Moves to proposed/
+ctoc plan approve 53               # Moves to approved/
+ctoc plan start 53                 # Moves to in_progress/
+ctoc plan complete 53              # Moves to implemented/
+```
+
+### Dashboard
+
+View all plans by status:
+
+```bash
+ctoc plan status
+```
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║                      CTOC Plan Dashboard                         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Plan Statistics:
+
+  draft:          2
+  proposed:       1
+  approved:       3
+  in_progress:    1
+  implemented:    12
+  superseded:     2
+  ──────────────────
+  Total:          21
+
+Active Plans:
+[in_progress]
+  0051  Implement checkout flow
+
+Ready to Start:
+[approved]
+  0048  Add password reset
+  0049  Email notifications
+  0050  User profile page
+```
 
 ---
 
