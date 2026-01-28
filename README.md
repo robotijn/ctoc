@@ -137,47 +137,6 @@ IMPLEMENTATION:
 • Produces a polished, professional document
 ```
 
-### Real-World Example: Development Session
-
-Here's an excerpt from an actual CTOC development session, showing how the user commanded an "army of CTOs" to transform the system:
-
-```
-User: "now use ctoc to test the entire ctoc system, first make a plan
-iterate 50 times how to test it and then test it and then make a plan
-to improve it and use this example to show how to use ctoc in real life
-add this also to readme, then rethink the readme 50 times and improve it
-and then commit and push. do not ask me questions during these processes.
-then rethink the entire architecture make a plan and criticize it 100 times
-go through the entire system but do not change anything just plan in this
-last loop and defer all questions to the end then ask me all the questions"
-
-User: "in between when you find an error update ctoc and debug it"
-
-User: "then set up a loop to test everything from ctoc, and fix issues,
-then commit and push and then reinstall or update ctoc, test everything,
-fix issues commit and push etc etc. do this 100 times every time make a
-patch version upgrade so vx.y.z becomes vx.y.z+1"
-
-User: "good luck"
-```
-
-**What happened:** CTOC autonomously:
-1. Created a comprehensive test plan with 200+ test cases
-2. Ran 100 test-fix-commit iterations (v1.5.0 → v1.5.100)
-3. Fixed 9 real bugs found during testing:
-   - Version header inconsistency
-   - Missing script dependencies (research.sh, file-lock.sh)
-   - jq query compatibility issues
-   - Secrets detection false positives
-   - Exit code handling for warnings
-   - Error messages for missing plans
-4. Validated all 16 core commands
-5. Pushed 100+ commits to the repository
-
-**Total commands from user:** 4 messages. **Total work completed:** 100 iterations of testing, debugging, and deployment.
-
-*This is what "commanding an army of CTOs" looks like.*
-
 ---
 
 ## Quick Start
@@ -727,6 +686,21 @@ implementation/approved/ → todo/ → in_progress/ → review/ → done/
 | `ctoc research on` | Enable WebSearch (default) |
 | `ctoc research off` | Disable WebSearch |
 | `ctoc research steps 1,2,5,12` | Customize auto-research steps |
+
+### Admin Dashboard
+
+| Command | What it does |
+|---------|--------------|
+| `ctoc admin` | Interactive admin dashboard (TUI) |
+| `ctoc admin agents` | List all agents, status |
+| `ctoc admin learnings` | Show pending/approved learnings |
+| `ctoc admin stats` | Usage statistics |
+| `ctoc admin health` | System health check |
+
+The admin dashboard provides an interactive terminal UI with:
+- Navigation via numbers (1-5), arrows + Enter, or letter shortcuts
+- Expand all toggle with `[e]`
+- Full details view (no truncation when expanded)
 
 ### Update Commands
 
