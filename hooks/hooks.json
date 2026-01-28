@@ -2,6 +2,26 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "tool == \"Edit\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/edit-write-gate.js\""
+          }
+        ],
+        "description": "Check Iron Loop state before Edit operations"
+      },
+      {
+        "matcher": "tool == \"Write\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/edit-write-gate.js\""
+          }
+        ],
+        "description": "Check Iron Loop state before Write operations"
+      },
+      {
         "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(py)$\"",
         "hooks": [
           {

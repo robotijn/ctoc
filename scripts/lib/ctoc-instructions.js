@@ -18,9 +18,10 @@ const { STEP_NAMES } = require('./utils');
  * Generates CTOC instructions for Claude's context
  * @param {Object} stack - Detected project stack
  * @param {Object} ironLoopState - Current Iron Loop state
+ * @param {Object} options - Additional options (updateInfo, settings, gate1Passed, gate2Passed)
  * @returns {string} Formatted instructions for Claude
  */
-function generateCTOCInstructions(stack, ironLoopState) {
+function generateCTOCInstructions(stack, ironLoopState, options = {}) {
   const projectPath = process.cwd();
   const projectName = path.basename(projectPath);
 
@@ -29,19 +30,58 @@ function generateCTOCInstructions(stack, ironLoopState) {
   const framework = stack.primary?.framework || 'none';
   const stackStr = `${language}/${framework}`;
 
-  // Build Iron Loop status
+  // Extract gate status from options
+  const { gate1Passed, gate2Passed } = options;
+
+  // Build Iron Loop status with gate information
   let ironLoopStatus;
   if (ironLoopState.feature) {
     const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
-    ironLoopStatus = `Step ${ironLoopState.currentStep} (${stepName}) | Feature: ${ironLoopState.feature}`;
+    const gate1Status = gate1Passed ? 'Passed' : 'Pending';
+    const gate2Status = gate2Passed ? 'Passed' : 'Pending';
+    ironLoopStatus = `Step ${ironLoopState.currentStep} (${stepName}) | Feature: ${ironLoopState.feature} | Gate 1: ${gate1Status} | Gate 2: ${gate2Status}`;
   } else {
-    ironLoopStatus = 'Ready for new feature';
+    ironLoopStatus = 'Ready for new feature | Gate 1: Pending | Gate 2: Pending';
   }
 
   // Build language-specific skill paths hint
   const skillHint = language !== 'unknown'
     ? `Primary: .ctoc/repo/.ctoc/skills/languages/${language}.md`
     : 'Detect from file extensions when creating files';
+
+  // Extract options
+  const { updateInfo, settings } = options;
+
+  // Build update notification section
+  let updateSection = '';
+  if (updateInfo && updateInfo.available) {
+    const promptSetting = settings?.updates?.prompt_on_startup !== false; // default true
+    if (promptSetting) {
+      updateSection = `
+## Update Available
+
+**CTOC ${updateInfo.current} → ${updateInfo.latest}**
+
+ASK THE USER: "CTOC update available (${updateInfo.current} → ${updateInfo.latest}). Would you like to update now?"
+- If yes: Run \`cd .ctoc/repo && git pull\`
+- If no: Continue without updating
+
+To disable this prompt, set \`updates.prompt_on_startup: false\` in .ctoc/settings.yaml
+`;
+    }
+  }
+
+  // Build greeting instruction
+  const greetingInstruction = `
+## Startup Greeting
+
+**IMPORTANT**: When you first respond to the user, briefly acknowledge CTOC is active:
+- Mention the current Iron Loop step if tracking a feature
+- If an update is available (see above), ask if they want to update
+- Keep it concise (1-2 lines max)
+
+Example: "CTOC active (Step 1: ASSESS). How can I help?"
+`;
 
   return `
 ============================================================
@@ -95,6 +135,34 @@ When creating NEW files, read the relevant skill first:
 - No unhandled errors in production paths
 - No undocumented public APIs
 
+## MANDATORY: Iron Loop Enforcement
+
+### Workflow with Human Decision Gates
+
+**Steps 1-3: Functional Planning**
+- Work WITH user through ASSESS, ALIGN, CAPTURE
+- At step 3: Review the functional requirements
+- **ASK USER**: "Functional planning complete. Ready to proceed to technical planning?"
+- WAIT for human approval before step 4
+
+**Steps 4-6: Technical Planning**
+- Work WITH user through PLAN, DESIGN, SPEC
+- At step 6: Review the technical specification
+- **ASK USER**: "Technical spec complete. Ready to proceed to implementation?"
+- WAIT for human approval before step 7
+
+**Steps 7+: Implementation**
+- ONLY after BOTH human approvals, use Edit/Write tools
+
+### Before ANY Edit/Write:
+1. Check current step (shown in status line above)
+2. If step < 7: STOP. Ask: "Planning not complete. Want to continue planning or skip?"
+3. If step >= 7: Proceed with implementation
+
+### Escape Hatch
+User says "trivial fix", "quick fix", or "skip planning" → proceed directly without planning gates.
+
+${updateSection}${greetingInstruction}
 ---
 These CTOC instructions provide METHODOLOGY (how to work).
 Your project's CLAUDE.md (if exists) provides CONTEXT (what you're building).
