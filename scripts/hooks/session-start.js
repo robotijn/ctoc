@@ -138,7 +138,21 @@ async function main() {
 
     saveSession(session);
 
-    // 5. Output CTOC instructions for Claude's context
+    // 5. Output visible startup banner to stderr (user sees this)
+    const fs = require('fs');
+    let version = 'unknown';
+    try {
+      version = fs.readFileSync(path.join(ctocRoot, 'VERSION'), 'utf8').trim();
+    } catch (e) {}
+
+    const language = stack.primary?.language || 'unknown';
+    const framework = stack.primary?.framework || 'none';
+    const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
+    const featureInfo = ironLoopState.feature ? ` | Feature: ${ironLoopState.feature}` : '';
+
+    console.error(`[CTOC] v${version} | ${language}/${framework} | Step ${ironLoopState.currentStep} (${stepName})${featureInfo}`);
+
+    // 6. Output CTOC instructions for Claude's context
     // This is the key output that makes Claude "become" the CTO
     console.log('');
     console.log(generateCTOCInstructions(stack, ironLoopState));
