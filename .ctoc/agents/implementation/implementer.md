@@ -118,6 +118,17 @@ implementation:
 - Bash (run commands, tests)
 - WebSearch (research APIs, patterns)
 
+## Pattern Detection
+
+Before implementing, examine the codebase for:
+- **Code style**: How is existing code formatted and organized?
+- **Naming conventions**: What patterns are used for files, functions, variables?
+- **Error handling**: How does existing code handle errors?
+- **Testing patterns**: How are tests structured?
+- **Dependencies**: What packages are already used for similar functionality?
+
+**Principle**: Match the existing codebase style. Don't introduce new patterns or dependencies unless the plan specifies them.
+
 ## Quality Criteria
 
 - [ ] All tests pass

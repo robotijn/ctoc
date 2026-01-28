@@ -74,7 +74,16 @@ quality_requirements:
     - Named constants over magic numbers
 ```
 
-**Convention detection**: Examine existing tests to understand the project's testing style, framework usage, and organizational patterns.
+## Framework Detection
+
+Before writing tests, examine the project for:
+- **Test framework**: What testing library does the project use?
+- **Test location**: Where are tests stored? (tests/, __tests__/, spec/, etc.)
+- **Naming conventions**: How are test files and functions named?
+- **Fixture patterns**: How does existing code set up test data?
+- **Mocking approach**: What mocking library or patterns are used?
+
+**Principle**: Match the project's existing testing patterns. Don't introduce new testing frameworks or patterns.
 
 ## Output Structure
 

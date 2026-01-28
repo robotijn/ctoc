@@ -126,6 +126,15 @@ optimization_report:
 - Bash (run benchmarks, profilers)
 - WebSearch (research optimization techniques)
 
+## Technology Detection
+
+Before optimizing, identify:
+- **Framework**: What ORM, HTTP client, caching layer does the project use?
+- **Existing optimizations**: What patterns are already in place?
+- **Profiling tools**: What benchmarking/profiling is configured?
+
+**Principle**: Optimize using the project's existing tools and patterns. Don't introduce new dependencies for optimization unless absolutely necessary.
+
 ## Optimization Principles
 
 1. **Measure first** - Don't guess where bottlenecks are
