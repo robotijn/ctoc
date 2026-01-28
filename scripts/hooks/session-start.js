@@ -292,30 +292,8 @@ async function main() {
 
     const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
 
-    // Build a clean, informative banner
-    let bannerParts = ['[CTOC]'];
-
-    // Only show version if known
-    if (version && version !== 'unknown') {
-      bannerParts.push(`v${version}`);
-    }
-
-    // Show stack only if detected
-    const language = stack.primary?.language;
-    const framework = stack.primary?.framework;
-    if (language) {
-      bannerParts.push(framework ? `${language}/${framework}` : language);
-    }
-
-    // Always show current step
-    bannerParts.push(`Step ${ironLoopState.currentStep} (${stepName})`);
-
-    // Show feature name only if actually tracking one
-    if (ironLoopState.feature) {
-      bannerParts.push(`Feature: ${ironLoopState.feature}`);
-    }
-
-    const banner = bannerParts.join(' | ') + '\n';
+    // Simple, consistent banner
+    const banner = 'CTO Chief active, type ctoc to start\n';
     writeToTerminal(banner);
 
     // 7. Compute gate status for human decision gates
