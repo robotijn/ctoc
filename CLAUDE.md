@@ -237,6 +237,28 @@ ctoc/
 | `ctoc lock setup-rerere` | Enable git rerere |
 | `ctoc lock worktree new <branch>` | Create parallel workspace |
 
+### Versioning Rules
+
+**Semantic Versioning:** `vX.Y.Z` (major.minor.patch)
+
+| Action | Version Change | Who Decides |
+|--------|----------------|-------------|
+| **Default (every commit)** | Patch: `vX.Y.Z` → `vX.Y.Z+1` | Automatic |
+| **Minor version** | Minor: `vX.Y.Z` → `vX.Y+1.0` | User specifies |
+| **Major version** | Major: `vX.Y.Z` → `vX+1.0.0` | User specifies |
+
+**Rules:**
+1. Every commit automatically bumps the **patch** version
+2. User says "minor version" → bump minor, reset patch to 0
+3. User says "major version" → bump major, reset minor and patch to 0
+4. Update `VERSION` file with each commit
+5. Update version references in install scripts if needed
+
+**Examples:**
+- Normal commit: `2.0.5` → `2.0.6`
+- User says "minor release": `2.0.6` → `2.1.0`
+- User says "major release": `2.1.0` → `3.0.0`
+
 ### Agent Commands
 
 | Command | Description |

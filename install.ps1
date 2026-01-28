@@ -54,6 +54,160 @@ function Write-Error {
     Write-Host "✗ $Message" -ForegroundColor Red
 }
 
+# State for hooks installation
+$script:INSTALL_HOOKS = $false
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Node.js Detection and Hooks Setup
+# ═══════════════════════════════════════════════════════════════════════════════
+
+function Test-NodeJs {
+    Write-Step "Checking for Node.js..."
+
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCmd) {
+        $nodeVersion = & node --version
+        Write-Success "Node.js detected: $nodeVersion"
+
+        Write-Host ""
+        Write-Host "CTOC works better with Node.js for:" -ForegroundColor Cyan
+        Write-Host "  • Automatic state persistence (saves your progress)"
+        Write-Host "  • Pre-edit code validation (catches issues early)"
+        Write-Host "  • Commit gating (ensures workflow completion)"
+        Write-Host ""
+        $response = Read-Host "Enable these features? [Y/n]"
+
+        if ($response -match "^[Nn]$") {
+            $script:INSTALL_HOOKS = $false
+            Write-Warning "Hooks disabled. CTOC will work with basic features."
+        } else {
+            $script:INSTALL_HOOKS = $true
+            Write-Success "Hooks will be enabled"
+        }
+    } else {
+        Write-Warning "Node.js not detected"
+        Write-Host ""
+        Write-Host "CTOC works without Node.js, but you'll miss:" -ForegroundColor Yellow
+        Write-Host "  • Automatic state persistence"
+        Write-Host "  • Pre-edit code validation"
+        Write-Host "  • Commit gating"
+        Write-Host ""
+        Write-Host "Install Node.js later to enable these features."
+        Write-Host "  → https://nodejs.org/"
+        Write-Host ""
+
+        $installNode = Read-Host "Would you like to install Node.js now? [y/N]"
+
+        if ($installNode -match "^[Yy]$") {
+            Install-NodeJs
+        } else {
+            $script:INSTALL_HOOKS = $false
+        }
+    }
+}
+
+function Install-NodeJs {
+    Write-Step "Installing Node.js..."
+
+    # Try winget first (Windows 10+)
+    $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
+    if ($wingetCmd) {
+        try {
+            & winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+            # Refresh PATH
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+            $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+            if ($nodeCmd) {
+                Write-Success "Node.js installed successfully via winget: $(& node --version)"
+                $script:INSTALL_HOOKS = $true
+                return
+            }
+        } catch {
+            Write-Warning "winget installation failed, trying chocolatey..."
+        }
+    }
+
+    # Try chocolatey
+    $chocoCmd = Get-Command choco -ErrorAction SilentlyContinue
+    if ($chocoCmd) {
+        try {
+            & choco install nodejs-lts -y
+            # Refresh PATH
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+            $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+            if ($nodeCmd) {
+                Write-Success "Node.js installed successfully via chocolatey: $(& node --version)"
+                $script:INSTALL_HOOKS = $true
+                return
+            }
+        } catch {
+            Write-Warning "chocolatey installation failed"
+        }
+    }
+
+    # Manual installation instructions
+    Write-Host ""
+    Write-Host "Automatic installation not available." -ForegroundColor Yellow
+    Write-Host "Please install Node.js manually from: https://nodejs.org/" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "After installing, re-run this script to enable hooks."
+    $script:INSTALL_HOOKS = $false
+}
+
+function Setup-Hooks {
+    if ($script:INSTALL_HOOKS) {
+        Write-Step "Setting up Claude Code hooks..."
+
+        # Create .claude directory
+        if (-not (Test-Path ".claude")) {
+            New-Item -ItemType Directory -Path ".claude" -Force | Out-Null
+        }
+
+        # Copy hooks configuration
+        $hooksSource = ".ctoc\repo\hooks\hooks.json"
+        $settingsTarget = ".claude\settings.json"
+
+        if (Test-Path $hooksSource) {
+            if (Test-Path $settingsTarget) {
+                # Merge hooks into existing settings
+                try {
+                    $existingSettings = Get-Content $settingsTarget -Raw | ConvertFrom-Json
+                    $hooksSettings = Get-Content $hooksSource -Raw | ConvertFrom-Json
+
+                    # Merge hooks property
+                    $existingSettings | Add-Member -NotePropertyName "hooks" -NotePropertyValue $hooksSettings.hooks -Force
+
+                    $existingSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $settingsTarget -Encoding utf8
+                    Write-Success "Hooks merged into existing .claude/settings.json"
+                } catch {
+                    # Fallback: just copy
+                    Copy-Item $hooksSource $settingsTarget -Force
+                    Write-Warning "Hooks copied to .claude/settings.json (merge failed)"
+                }
+            } else {
+                # No existing settings, just copy
+                Copy-Item $hooksSource $settingsTarget
+                Write-Success "Hooks configured in .claude/settings.json"
+            }
+
+            Write-Host ""
+            Write-Host "Hooks enabled:" -ForegroundColor Cyan
+            Write-Host "  • SessionStart: Auto-detect stack, restore progress"
+            Write-Host "  • PreToolUse: Code validation against CTO profiles"
+            Write-Host "  • PreCompact: Save state before context compaction"
+            Write-Host "  • SessionEnd: Save progress and learnings"
+            Write-Host "  • Stop: Update session state"
+        } else {
+            Write-Warning "hooks.json not found in repo, skipping"
+        }
+    } else {
+        Write-Host "  Hooks not configured (Node.js not available)" -ForegroundColor Gray
+        Write-Host "  Install Node.js later to enable hooks" -ForegroundColor Gray
+    }
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Check Directory
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -688,11 +842,13 @@ Write-Host ""
 Test-Directory
 Get-CoreFiles
 Install-Skills
+Test-NodeJs
 $project = Get-ProjectSetup
 New-ClaudeMd -Project $project
 New-IronLoopMd -Project $project
 New-PlanningMd -Project $project
 New-ProjectMap
+Setup-Hooks
 Update-Gitignore
 
 # Count downloaded skills
@@ -700,6 +856,9 @@ $skillCount = 0
 if (Test-Path ".ctoc\skills") {
     $skillCount = (Get-ChildItem ".ctoc\skills" -Recurse -Filter "*.md" -ErrorAction SilentlyContinue | Measure-Object).Count
 }
+
+# Hooks status
+$hooksStatus = if ($script:INSTALL_HOOKS) { "Enabled (.claude/settings.json)" } else { "Disabled (install Node.js to enable)" }
 
 Write-Host ""
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
@@ -709,7 +868,7 @@ Write-Host ""
 Write-Host "  You are now the CTO Chief commanding:" -ForegroundColor Cyan
 Write-Host "    • 20 core agents (planning + implementation)"
 Write-Host "    • 60 specialist agents (language + framework CTOs)"
-Write-Host "    • 75 total AI agents at your command"
+Write-Host "    • 80 total AI agents at your command"
 Write-Host ""
 Write-Host "  Files created/updated:"
 Write-Host "    • CLAUDE.md          - CTO instructions (smart-merged)"
@@ -717,6 +876,7 @@ Write-Host "    • IRON_LOOP.md       - 15-step progress tracking"
 Write-Host "    • PLANNING.md        - Feature backlog"
 Write-Host "    • .ctoc\PROJECT_MAP.md - Codebase quick reference"
 Write-Host "    • .ctoc\             - Skills library ($skillCount skills downloaded)"
+Write-Host "    • Hooks: $hooksStatus"
 Write-Host ""
 Write-Host "  Research (WebSearch enabled by default):"
 Write-Host "    • .ctoc\bin\ctoc.ps1 research status  - Show research config"

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" python \"${tool_input.file_path}\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/profile-check.js\" python \"${tool_input.file_path}\""
           }
         ],
         "description": "Validate Python code against CTO profile red lines"
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" typescript \"${tool_input.file_path}\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/profile-check.js\" typescript \"${tool_input.file_path}\""
           }
         ],
         "description": "Validate TypeScript code against CTO profile red lines"
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" javascript \"${tool_input.file_path}\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/profile-check.js\" javascript \"${tool_input.file_path}\""
           }
         ],
         "description": "Validate JavaScript code against CTO profile red lines"
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" go \"${tool_input.file_path}\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/profile-check.js\" go \"${tool_input.file_path}\""
           }
         ],
         "description": "Validate Go code against CTO profile red lines"
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/profile-check.js\" rust \"${tool_input.file_path}\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/profile-check.js\" rust \"${tool_input.file_path}\""
           }
         ],
         "description": "Validate Rust code against CTO profile red lines"
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/iron-loop-gate.js\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/iron-loop-gate.js\""
           }
         ],
         "description": "Block commit if Iron Loop steps incomplete"
@@ -68,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/session-start.js\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/session-start.js\""
           }
         ],
         "description": "Detect stack, load CTO profiles, restore Iron Loop state"
@@ -80,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/session-end.js\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/session-end.js\""
           }
         ],
         "description": "Save Iron Loop progress, extract learnings"
@@ -92,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/pre-compact.js\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/pre-compact.js\""
           }
         ],
         "description": "Save state before context compaction"
@@ -104,7 +104,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CTOC_ROOT}/scripts/hooks/on-stop.js\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/on-stop.js\""
           }
         ],
         "description": "Update session state after each response"

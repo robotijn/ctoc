@@ -67,6 +67,9 @@ print_info() {
 #  Dependency Checking
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# State for hooks installation
+INSTALL_HOOKS=false
+
 check_dependencies() {
     print_section "Checking dependencies"
 
@@ -103,6 +106,140 @@ check_dependencies() {
             echo "  • $dep"
         done
         exit 1
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Node.js Detection and Hooks Setup
+# ═══════════════════════════════════════════════════════════════════════════════
+
+check_nodejs() {
+    print_section "Checking for Node.js"
+
+    if command -v node &>/dev/null; then
+        local node_version
+        node_version=$(node --version)
+        print_step "Node.js detected: $node_version"
+
+        echo ""
+        echo -e "${CYAN}CTOC works better with Node.js for:${NC}"
+        echo "  • Automatic state persistence (saves your progress)"
+        echo "  • Pre-edit code validation (catches issues early)"
+        echo "  • Commit gating (ensures workflow completion)"
+        echo ""
+        read -p "  Enable these features? [Y/n]: " response
+
+        if [[ "$response" =~ ^[Nn]$ ]]; then
+            INSTALL_HOOKS=false
+            print_warn "Hooks disabled. CTOC will work with basic features."
+        else
+            INSTALL_HOOKS=true
+            print_step "Hooks will be enabled"
+        fi
+    else
+        print_warn "Node.js not detected"
+        echo ""
+        echo -e "${YELLOW}CTOC works without Node.js, but you'll miss:${NC}"
+        echo "  • Automatic state persistence"
+        echo "  • Pre-edit code validation"
+        echo "  • Commit gating"
+        echo ""
+        echo "Install Node.js later to enable these features."
+        echo "  → https://nodejs.org/"
+        echo ""
+
+        read -p "  Would you like to install Node.js now? [y/N]: " install_node
+
+        if [[ "$install_node" =~ ^[Yy]$ ]]; then
+            install_nodejs
+        else
+            INSTALL_HOOKS=false
+        fi
+    fi
+}
+
+install_nodejs() {
+    print_step "Installing Node.js..."
+
+    # Detect OS and use appropriate package manager
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        if command -v brew &>/dev/null; then
+            brew install node
+        else
+            echo "  Please install Homebrew first: https://brew.sh"
+            INSTALL_HOOKS=false
+            return
+        fi
+    elif [[ -f /etc/debian_version ]]; then
+        # Debian/Ubuntu
+        echo "  Installing Node.js via NodeSource..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - 2>/dev/null
+        sudo apt-get install -y nodejs 2>/dev/null
+    elif [[ -f /etc/redhat-release ]]; then
+        # RHEL/CentOS/Fedora
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash - 2>/dev/null
+        sudo yum install -y nodejs 2>/dev/null
+    elif [[ -f /etc/arch-release ]]; then
+        # Arch Linux
+        sudo pacman -S --noconfirm nodejs npm 2>/dev/null
+    else
+        echo "  Please install Node.js manually: https://nodejs.org/"
+        INSTALL_HOOKS=false
+        return
+    fi
+
+    if command -v node &>/dev/null; then
+        print_step "Node.js installed successfully: $(node --version)"
+        INSTALL_HOOKS=true
+    else
+        print_fail "Node.js installation failed"
+        INSTALL_HOOKS=false
+    fi
+}
+
+setup_hooks() {
+    if [[ "$INSTALL_HOOKS" == "true" ]]; then
+        print_section "Setting up Claude Code hooks"
+
+        # Create .claude directory
+        mkdir -p .claude
+
+        # Copy hooks configuration
+        if [[ -f .ctoc/repo/hooks/hooks.json ]]; then
+            # Check if .claude/settings.json exists
+            if [[ -f .claude/settings.json ]]; then
+                # Merge hooks into existing settings
+                if command -v jq &>/dev/null; then
+                    # Use jq to merge JSON files
+                    jq -s '.[0] * .[1]' .claude/settings.json .ctoc/repo/hooks/hooks.json > .claude/settings.json.tmp
+                    mv .claude/settings.json.tmp .claude/settings.json
+                    print_step "Hooks merged into existing .claude/settings.json"
+                else
+                    # Without jq, just copy (may overwrite existing)
+                    cp .ctoc/repo/hooks/hooks.json .claude/settings.json
+                    print_warn "Hooks copied to .claude/settings.json (jq not available for merge)"
+                fi
+            else
+                # No existing settings, just copy
+                cp .ctoc/repo/hooks/hooks.json .claude/settings.json
+                print_step "Hooks configured in .claude/settings.json"
+            fi
+
+            # Inform user about what was set up
+            echo ""
+            echo -e "${CYAN}Hooks enabled:${NC}"
+            echo "  • SessionStart: Auto-detect stack, restore progress"
+            echo "  • PreToolUse: Code validation against CTO profiles"
+            echo "  • PreCompact: Save state before context compaction"
+            echo "  • SessionEnd: Save progress and learnings"
+            echo "  • Stop: Update session state"
+        else
+            print_warn "hooks.json not found in repo, skipping"
+        fi
+    else
+        print_info "Hooks not configured (Node.js not available)"
+        print_info "         Install Node.js later to enable hooks"
     fi
 }
 
@@ -674,6 +811,11 @@ show_summary() {
     echo "  • Agents: 80 available ($agent_count core + 60 specialists)"
     echo "  • Skills: $skill_count available (50 languages, 200+ frameworks)"
     echo "  • Files: CLAUDE.md, IRON_LOOP.md, .ctoc/"
+    if [[ "$INSTALL_HOOKS" == "true" ]]; then
+        echo "  • Hooks: Enabled (.claude/settings.json)"
+    else
+        echo "  • Hooks: Disabled (install Node.js to enable)"
+    fi
     if [[ "$ALIAS_ADDED" == "true" ]]; then
         echo "  • Alias: ctoc → .ctoc/ctoc"
     else
@@ -747,13 +889,17 @@ main() {
     if check_existing; then
         # Upgrade flow
         install_repo
+        check_nodejs
+        setup_hooks
         show_summary
         show_menu
     else
         # Fresh install flow
         print_info "No existing installation found"
         install_repo
+        check_nodejs
         configure_claude_md
+        setup_hooks
         setup_gitignore
         setup_shell
         show_summary
