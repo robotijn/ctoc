@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CTOC - CTO Chief Installation Script v2.0.0
+#  CTOC - CTO Chief Installation Script (dynamic version)
 #  "You are the CTO Chief. Command your army of 80 AI agents."
 #
 #  Full repo clone approach: One git clone, all agents & skills available, easy updates.
@@ -8,9 +8,9 @@
 
 set -euo pipefail
 
-VERSION="2.0.0"
 REPO_URL="https://github.com/robotijn/ctoc.git"
 REPO_RAW="https://raw.githubusercontent.com/robotijn/ctoc/main"
+VERSION=$(curl -fsSL "$REPO_RAW/VERSION" 2>/dev/null || echo "unknown")
 
 # State
 EXISTING_INSTALL=false
