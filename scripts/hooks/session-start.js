@@ -27,6 +27,7 @@ const {
 
 const { detectStack, profileExists } = require('../lib/stack-detector');
 const { listProfiles } = require('../lib/profile-loader');
+const { generateCTOCInstructions } = require('../lib/ctoc-instructions');
 
 // ============================================================================
 // Main
@@ -133,21 +134,10 @@ async function main() {
 
     saveSession(session);
 
-    // 5. Output summary for Claude
+    // 5. Output CTOC instructions for Claude's context
+    // This is the key output that makes Claude "become" the CTO
     console.log('');
-    console.log('='.repeat(60));
-    console.log('CTOC SESSION INITIALIZED');
-    console.log('='.repeat(60));
-    console.log(`Project: ${projectPath}`);
-    console.log(`Stack: ${stack.primary.language || 'unknown'}/${stack.primary.framework || 'none'}`);
-
-    if (ironLoopState.feature) {
-      console.log(`Feature: ${ironLoopState.feature}`);
-      console.log(`Iron Loop: Step ${ironLoopState.currentStep} (${STEP_NAMES[ironLoopState.currentStep]})`);
-    } else {
-      console.log('Iron Loop: Ready for new feature');
-    }
-    console.log('='.repeat(60));
+    console.log(generateCTOCInstructions(stack, ironLoopState));
 
   } catch (error) {
     console.error(`[CTOC ERROR] Session start failed: ${error.message}`);
