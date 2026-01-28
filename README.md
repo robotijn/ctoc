@@ -34,7 +34,7 @@ When you install CTOC, you gain command of this agent army. The cto-chief plans 
 └───────────┘         └───────────┘         └───────────┘
 ```
 
-**75 agents. 50 languages. 200 frameworks. 14 quality dimensions.**
+**80 agents. 50 languages. 200 frameworks. 14 quality dimensions.**
 
 Each agent is adamant about quality — no shipping without tests, security, and docs. The impl-reviewer (final gate) checks ALL 14 quality dimensions before allowing any commit.
 
@@ -172,7 +172,7 @@ You should see:
 
 Summary:
   • Repository: cloned to .ctoc/repo/
-  • Agents: 75 available (15 core + 60 specialists)
+  • Agents: 80 available (20 core + 60 specialists)
   • Skills: 261 available (50 languages, 200+ frameworks)
   • Files: CLAUDE.md, IRON_LOOP.md, .ctoc/
 
@@ -1022,7 +1022,7 @@ ctoc lock worktree remove feature-auth # Clean up
 
 ## Agent-Powered Automation
 
-**Claude Code IS the runtime.** CTOC v2.0 transforms Claude Code into a coordinated agent system. The CTO Chief commands an army of 60+ highly specialized agents, each an expert in their domain.
+**Claude Code IS the runtime.** CTOC v2.0 transforms Claude Code into a coordinated agent system. The CTO Chief commands an army of 80 highly specialized agents, each an expert in their domain.
 
 ### The CTO Chief & Agent Army
 
@@ -1047,13 +1047,19 @@ You are the **CTO Chief** — the human commander. When you invoke CTOC, the **c
    ┌─────────┐       ┌──────────┐       ┌──────────┐
    │PLANNING │       │IMPLEMENT │       │SPECIALIST│
    │ AGENTS  │       │  AGENTS  │       │  AGENTS  │
-   │ 6 total │       │ 9 total  │       │ 60 total │
+   │ 6 total │       │ 14 total │       │ 60 total │
    └─────────┘       └──────────┘       └──────────┘
+                          │
+                    ┌─────┴─────┐
+                    │  WRITING  │
+                    │  AGENTS   │
+                    │  5 total  │
+                    └───────────┘
 ```
 
-### Core Agent Hierarchy (15 Agents)
+### Core Agent Hierarchy (20 Agents)
 
-The Iron Loop is executed by 15 core agents, coordinated by the cto-chief:
+The Iron Loop is executed by 20 core agents, coordinated by the cto-chief:
 
 **Planning Phase (Steps 1-6)**
 | Agent | Model | Steps | Role |
@@ -1077,9 +1083,21 @@ The Iron Loop is executed by 15 core agents, coordinated by the cto-chief:
 | documenter | sonnet | 14 | Updates documentation |
 | impl-reviewer | opus | 15 | Final review against 14 quality dimensions |
 
+**Writing Agents (Document Creation & Reading)**
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| document-planner | haiku | Fast document structure planning |
+| pdf-writer | sonnet | Create professional PDF documents |
+| docx-writer | sonnet | Create Microsoft Word documents |
+| pptx-writer | sonnet | Create PowerPoint presentations |
+| document-reader | sonnet | Read/extract content from PDF, DOCX, PPTX |
+
+> **Document Creation Workflow**: Plan (seconds) -> Create (automatic) -> Review -> Iterate
+> Dependencies (Python packages) are auto-installed when needed - no setup required.
+
 ### Specialist Agent Army (60 Agents)
 
-Beyond the core 15, the cto-chief can invoke 60 specialist agents for deep expertise:
+Beyond the core 20, the cto-chief can invoke 60 specialist agents for deep expertise:
 
 | Category | Agents | Expertise |
 |----------|--------|-----------|

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CTOC - CTO Chief Installation Script v2.0.0
-#  "You are the CTO Chief. Command your army of 75 AI agents."
+#  "You are the CTO Chief. Command your army of 80 AI agents."
 #
 #  Full repo clone approach: One git clone, all agents & skills available, easy updates.
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -671,7 +671,7 @@ show_summary() {
     echo ""
     echo -e "${BOLD}Summary:${NC}"
     echo "  • Repository: cloned to .ctoc/repo/"
-    echo "  • Agents: 75 available ($agent_count core + 60 specialists)"
+    echo "  • Agents: 80 available ($agent_count core + 60 specialists)"
     echo "  • Skills: $skill_count available (50 languages, 200+ frameworks)"
     echo "  • Files: CLAUDE.md, IRON_LOOP.md, .ctoc/"
     if [[ "$ALIAS_ADDED" == "true" ]]; then

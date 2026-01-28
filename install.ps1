@@ -29,7 +29,7 @@ function Write-Banner {
  | |____   | | | |__| | |____
   \_____|  |_|  \____/ \_____|
 
-  CTO Chief - Command your army of 75 AI agents
+  CTO Chief - Command your army of 80 AI agents
 
 "@ -ForegroundColor Cyan
 }
@@ -707,7 +707,7 @@ Write-Host "  CTOC v$CTOC_VERSION installed successfully!" -ForegroundColor Gree
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host ""
 Write-Host "  You are now the CTO Chief commanding:" -ForegroundColor Cyan
-Write-Host "    • 15 core agents (planning + implementation)"
+Write-Host "    • 20 core agents (planning + implementation)"
 Write-Host "    • 60 specialist agents (language + framework CTOs)"
 Write-Host "    • 75 total AI agents at your command"
 Write-Host ""
