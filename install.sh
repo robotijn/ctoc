@@ -121,43 +121,13 @@ check_nodejs() {
         node_version=$(node --version)
         print_step "Node.js detected: $node_version"
 
-        echo ""
-        echo -e "${CYAN}Node.js enables CTOC auto-start and advanced features:${NC}"
-        echo "  • Auto-start: CTOC activates when you run 'claude'"
-        echo "  • State persistence: Saves your Iron Loop progress"
-        echo "  • Code validation: Checks code against CTO profiles"
-        echo "  • Commit gating: Ensures workflow completion"
-        echo ""
-        echo -e "${BOLD}Without this, CTOC won't auto-activate and you'll need to manually invoke it.${NC}"
-        echo ""
-        read -p "  Enable CTOC auto-start? [Y/n]: " response
-
-        if [[ "$response" =~ ^[Nn]$ ]]; then
-            INSTALL_HOOKS=false
-            print_warn "Hooks disabled. CTOC will work with basic features."
-        else
-            INSTALL_HOOKS=true
-            print_step "Hooks will be enabled"
-        fi
+        # Auto-enable hooks when Node.js is available
+        INSTALL_HOOKS=true
+        print_step "Hooks will be enabled"
     else
         print_warn "Node.js not detected"
-        echo ""
-        echo -e "${YELLOW}CTOC works without Node.js, but you'll miss:${NC}"
-        echo "  • Automatic state persistence"
-        echo "  • Pre-edit code validation"
-        echo "  • Commit gating"
-        echo ""
-        echo "Install Node.js later to enable these features."
-        echo "  → https://nodejs.org/"
-        echo ""
-
-        read -p "  Would you like to install Node.js now? [y/N]: " install_node
-
-        if [[ "$install_node" =~ ^[Yy]$ ]]; then
-            install_nodejs
-        else
-            INSTALL_HOOKS=false
-        fi
+        print_info "         Install Node.js to enable advanced features"
+        INSTALL_HOOKS=false
     fi
 }
 
