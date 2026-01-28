@@ -1,0 +1,92 @@
+# =============================================================================
+#  CTOC Learning Template v2.0
+#
+#  Copy this template to create a new learning:
+#    cp learning.yaml.template pending/2026-01-28-001.yaml
+#
+#  Learning ID format: YYYY-MM-DD-NNN (date + sequence number)
+# =============================================================================
+
+# Unique identifier
+id: "YYYY-MM-DD-NNN"
+
+# Learning type
+# - pattern:      Best practice or successful approach
+# - anti-pattern: What to avoid
+# - preference:   User/project preference
+# - constraint:   Hard requirement or limitation
+type: pattern
+
+# Timestamps
+created: "YYYY-MM-DDTHH:MM:SSZ"
+updated: null
+
+# The learning itself
+learning:
+  # Short descriptive title
+  title: ""
+
+  # Detailed content (what was learned)
+  content: |
+    Description of the learning.
+    Can be multi-line.
+
+  # When this learning applies
+  context: ""
+
+  # Searchable tags
+  tags: []
+
+  # Example (optional)
+  example:
+    before: |
+      # Code before applying learning
+    after: |
+      # Code after applying learning
+
+# Confidence tracking
+confidence:
+  # Initial confidence when captured (0.0 to 1.0)
+  initial: 0.7
+
+  # Current confidence (updates over time)
+  current: 0.7
+
+  # Application statistics
+  applications: 0
+  successes: 0
+  failures: 0
+
+# Re-evaluation schedule
+re_evaluation:
+  # Next scheduled re-evaluation (3 months from creation)
+  next_scheduled: "YYYY-MM-DD"
+
+  # Last time this was re-evaluated
+  last_evaluated: null
+
+  # What triggered last re-evaluation
+  trigger: null  # scheduled | conflict | user
+
+  # Notes from re-evaluation
+  notes: null
+
+# Metadata
+metadata:
+  # Which Iron Loop step captured this
+  source_step: null
+
+  # Which agent captured this
+  source_agent: null
+
+  # Related files in the project
+  related_files: []
+
+  # Related issue/PR if any
+  related_issues: []
+
+# Rejection info (only if rejected)
+rejection:
+  reason: null
+  date: null
+  alternative: null

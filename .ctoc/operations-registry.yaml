@@ -1,391 +1,474 @@
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CTOC Operations Registry v1.0.0
-#  Defines operation agents that replace bash scripts with Claude-powered intelligence
+#  CTOC Operations Registry v2.0.0
+#  Single source of truth for all agents, Iron Loop, and quality matrix
 # ═══════════════════════════════════════════════════════════════════════════════
 
-schema_version: "1.0.0"
-updated: "2026-01-27"
+schema_version: "2.0.0"
+updated: "2026-01-28"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Core Principles
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 #  1. NEVER block humans - Agents advise only, never prevent user actions
-#  2. Online-first - CTOC requires connectivity for intelligence
-#  3. Quality over speed - 500ms latency acceptable for intelligence
+#  2. Claude Code IS the runtime - No separate runtime needed
+#  3. Quality over speed - Accuracy over latency
 #  4. Self-improvement - Every run can trigger learning
-#  5. Determinism rule - Bash for deterministic ops (git), Claude for intelligence
+#  5. Everything is an agent - Tiered by complexity
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 
-operations:
+# Token budget for Claude Code context
+token_budget:
+  per_step: 50000
+  reserved_for_user: 10000
+  available_for_agents: 40000
+
+# Model configuration
+models:
+  default: haiku           # Minimum model (configurable in settings)
+  fallback_chain: [opus, sonnet, haiku]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  AGENTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+agents:
   # ─────────────────────────────────────────────────────────────────────────────
-  #  Core Operations
-  # ─────────────────────────────────────────────────────────────────────────────
-
-  understand:
-    path: operations/core/understand.md
-    model_tier: complex                    # Uses Opus for deep reasoning
-    category: core
-    description: "Semantic codebase understanding - replaces pattern-matching detection"
-    replaces:
-      - detect.sh
-      - explore-codebase.sh
-    tools:
-      - Read
-      - Grep
-      - Glob
-      - WebSearch
-    cache:
-      output: cache/understanding.yaml
-      ttl: 1h
-      invalidate_on:
-        - "*.py"
-        - "*.ts"
-        - "*.tsx"
-        - "*.js"
-        - "*.jsx"
-        - "*.rs"
-        - "*.go"
-        - "*.java"
-        - "*.rb"
-        - "*.php"
-        - "package.json"
-        - "pyproject.toml"
-        - "Cargo.toml"
-        - "go.mod"
-        - "pom.xml"
-        - "Gemfile"
-        - "composer.json"
-    self_improvement:
-      enabled: true
-      can_modify:
-        - operations/core/understand.md    # Only self
-      critique_loops: 5
-      rate_limit: 5/hour
-
-  plan-advisor:
-    path: operations/core/plan-advisor.md
-    model_tier: complex                    # Needs judgment for plan quality
-    category: core
-    description: "Intelligent plan lifecycle management with quality assessment"
-    replaces:
-      - "plan.sh (reasoning portions)"
-    tools:
-      - Read
-      - Grep
-      - Glob
-      - Write
-    depends_on:
-      - understand                         # Needs codebase understanding first
-    bash_fallback: git-atomic.sh           # For atomic git operations
-    self_improvement:
-      enabled: true
-      can_modify:
-        - operations/core/plan-advisor.md
-      critique_loops: 5
-      rate_limit: 5/hour
-
-  git-advisor:
-    path: operations/core/git-advisor.md
-    model_tier: moderate                   # Uses Sonnet - pattern matching sufficient
-    category: core
-    description: "Intelligent git workflow assistance with contextual secrets detection"
-    replaces:
-      - "git-workflow.sh (quality analysis)"
-    tools:
-      - Read
-      - Grep
-      - Glob
-      - Bash
-    bash_fallback: git-atomic.sh
-    self_improvement:
-      enabled: true
-      can_modify:
-        - operations/core/git-advisor.md
-      critique_loops: 5
-      rate_limit: 5/hour
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  #  Setup Operations
+  #  COORDINATOR
   # ─────────────────────────────────────────────────────────────────────────────
 
-  project-setup:
-    path: operations/setup/project-setup.md
-    model_tier: complex                    # Needs creativity for CLAUDE.md generation
-    category: setup
-    description: "Intelligent CLAUDE.md generation based on codebase understanding"
-    replaces:
-      - init-claude-md.sh
-    tools:
-      - Read
-      - Grep
-      - Glob
-      - Write
-      - WebSearch
-    depends_on:
-      - understand
-    self_improvement:
-      enabled: true
-      can_modify:
-        - operations/setup/project-setup.md
-      critique_loops: 5
-      rate_limit: 5/hour
+  cto-chief:
+    path: agents/coordinator/cto-chief.md
+    model: opus
+    category: coordinator
+    description: Central coordinator, learning aggregator, decision maker
+    steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    always_available: true
 
   # ─────────────────────────────────────────────────────────────────────────────
-  #  Workflow Operations
+  #  PLANNING AGENTS (Steps 1-6)
   # ─────────────────────────────────────────────────────────────────────────────
 
-  issue-processor:
-    path: operations/workflow/issue-processor.md
-    model_tier: moderate                   # Understanding + action
-    category: workflow
-    description: "Intelligent GitHub issue processing with codebase cross-reference"
-    replaces:
-      - process-issues.sh
-    tools:
-      - Read
-      - Grep
-      - Bash
-      - WebSearch
-    depends_on:
-      - understand
-    self_improvement:
-      enabled: true
-      can_modify:
-        - operations/workflow/issue-processor.md
-      critique_loops: 5
-      rate_limit: 5/hour
+  functional-planner:
+    path: agents/planning/functional-planner.md
+    model: opus
+    category: planning
+    description: Creates functional plans (steps 1-3)
+    steps: [1, 2, 3]
 
-  progress-insights:
-    path: operations/workflow/progress-insights.md
-    model_tier: moderate                   # Analysis needs intelligence
-    category: workflow
-    description: "Meaningful progress analysis with pattern detection"
-    replaces:
-      - "progress.sh (insights)"
-    tools:
-      - Read
-      - Grep
-    self_improvement:
-      enabled: true
-      can_modify:
-        - operations/workflow/progress-insights.md
-      critique_loops: 5
-      rate_limit: 5/hour
+  functional-reviewer:
+    path: agents/planning/functional-reviewer.md
+    model: opus
+    category: planning
+    description: Reviews functional plans, approves or returns for revision
+    steps: [3]
+    review_gate: true
+    on_reject: goto_step_1
+
+  impl-planner:
+    path: agents/planning/impl-planner.md
+    model: opus
+    category: planning
+    description: Creates implementation plans (steps 4-6)
+    steps: [4, 5, 6]
+
+  impl-plan-reviewer:
+    path: agents/planning/impl-plan-reviewer.md
+    model: opus
+    category: planning
+    description: Reviews implementation plans
+    steps: [6]
+    review_gate: true
+    on_reject: goto_step_4
+
+  iron-loop-integrator:
+    path: agents/planning/iron-loop-integrator.md
+    model: sonnet
+    category: planning
+    description: Injects Iron Loop steps 7-15 into implementation plan
+    steps: [6]
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  IMPLEMENTATION AGENTS (Steps 7-15)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  test-maker:
+    path: agents/implementation/test-maker.md
+    model: opus
+    category: implementation
+    description: Writes tests first (TDD Red)
+    steps: [7]
+
+  quality-checker:
+    path: agents/implementation/quality-checker.md
+    model: sonnet
+    category: implementation
+    description: Lint, format, type-check
+    steps: [8, 10]
+
+  implementer:
+    path: agents/implementation/implementer.md
+    model: sonnet
+    category: implementation
+    description: Setup + Core code + Error handling
+    steps: [9]
+    sub_tasks:
+      - setup_environment
+      - core_implementation
+      - error_handling
+
+  self-reviewer:
+    path: agents/implementation/self-reviewer.md
+    model: opus
+    category: implementation
+    description: Self-review, calls quality-checker
+    steps: [10]
+    invokes: [quality-checker]
+    tdd_loop: true  # Can loop back to step 7
+
+  optimizer:
+    path: agents/implementation/optimizer.md
+    model: sonnet
+    category: implementation
+    description: Performance improvements
+    steps: [11]
+
+  security-scanner:
+    path: agents/implementation/security-scanner.md
+    model: opus
+    category: implementation
+    description: Security vulnerability check
+    steps: [12]
+
+  verifier:
+    path: agents/implementation/verifier.md
+    model: sonnet
+    category: implementation
+    description: Run ALL tests (unit + integration)
+    steps: [13]
+
+  documenter:
+    path: agents/implementation/documenter.md
+    model: sonnet
+    category: implementation
+    description: Update documentation
+    steps: [14]
+
+  impl-reviewer:
+    path: agents/implementation/impl-reviewer.md
+    model: opus
+    category: implementation
+    description: Final review of steps 7-14, can loop back, commits when satisfied
+    steps: [15]
+    review_gate: true
+    smart_rerun: true  # Decides which steps need re-running based on change impact
+    can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
+    highest_standards: true  # Checks all 14 quality dimensions
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Model Tiers
+#  IRON LOOP v2.0
 # ═══════════════════════════════════════════════════════════════════════════════
 
-model_tiers:
-  complex: opus                            # Deep reasoning, creativity
-  moderate: sonnet                         # Pattern matching, analysis
-  simple: haiku                            # Cached operations only
+iron_loop:
+  version: "2.0"
+
+  planning_phase:
+    - step: 1
+      name: ASSESS
+      description: Problem understanding
+      agents: [cto-chief, functional-planner]
+    - step: 2
+      name: ALIGN
+      description: User goals & business objectives
+      agents: [functional-planner]
+    - step: 3
+      name: CAPTURE
+      description: Requirements & success criteria
+      agents: [functional-planner, functional-reviewer]
+      review_gate: functional-reviewer
+    - step: 4
+      name: PLAN
+      description: Technical approach
+      agents: [impl-planner]
+    - step: 5
+      name: DESIGN
+      description: Architecture design
+      agents: [impl-planner]
+    - step: 6
+      name: SPEC
+      description: Detailed specifications
+      agents: [impl-planner, impl-plan-reviewer, iron-loop-integrator]
+      review_gate: impl-plan-reviewer
+
+  implementation_phase:
+    - step: 7
+      name: TEST
+      description: Write tests first (TDD Red)
+      agents: [test-maker]
+    - step: 8
+      name: QUALITY
+      description: Lint, format, type-check
+      agents: [quality-checker]
+    - step: 9
+      name: IMPLEMENT
+      description: Setup + Core code + Error handling
+      agents: [implementer]
+    - step: 10
+      name: REVIEW
+      description: Self-review + re-run quality
+      agents: [self-reviewer, quality-checker]
+      tdd_loop: true  # Can loop back to step 7
+    - step: 11
+      name: OPTIMIZE
+      description: Performance improvements
+      agents: [optimizer]
+    - step: 12
+      name: SECURE
+      description: Security vulnerability check
+      agents: [security-scanner]
+    - step: 13
+      name: VERIFY
+      description: Run ALL tests (unit + integration)
+      agents: [verifier]
+    - step: 14
+      name: DOCUMENT
+      description: Update documentation
+      agents: [documenter]
+    - step: 15
+      name: FINAL-REVIEW
+      description: Reviews 7-14 with highest standards, can loop back, commits when satisfied
+      agents: [impl-reviewer]
+      review_gate: impl-reviewer
+      can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Invocation Configuration
+#  QUALITY MATRIX (14 Dimensions - ISO 25010 aligned)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-invocation:
-  primary: automatic
-  mechanisms:
-    - claude_code_task_tool                # When running inside Claude Code
-    - dedicated_runtime                    # Future: standalone runtime
-  auto_select: true
+quality_matrix:
+  # Default threshold (1.0 = perfect)
+  threshold: 1.0
+
+  dimensions:
+    correctness:
+      - tests_cover_requirements
+      - edge_cases_tested
+      - negative_cases_tested
+      - tests_are_meaningful
+      - business_logic_verified
+
+    completeness:
+      - all_acceptance_criteria_met
+      - implicit_requirements_identified
+      - error_messages_user_friendly
+      - logging_adequate
+
+    maintainability:
+      - follows_project_patterns
+      - no_code_smells
+      - no_duplication
+      - readable_by_junior
+      - single_responsibility
+      - testability_high
+
+    security:
+      - owasp_top_10_checked
+      - input_validation
+      - output_encoding
+      - secrets_not_hardcoded
+      - authentication_verified
+      - authorization_verified
+
+    performance:
+      - no_n_plus_1_queries
+      - no_unbounded_operations
+      - caching_where_appropriate
+      - response_time_acceptable
+
+    reliability:
+      - errors_handled_gracefully
+      - retries_with_backoff
+      - circuit_breakers_where_needed
+      - timeouts_configured
+      - fallbacks_defined
+
+    compatibility:
+      - api_backwards_compatible
+      - data_format_standard
+      - integrations_tested
+
+    usability:
+      - error_messages_helpful
+      - output_clear
+      - documentation_complete
+
+    portability:
+      - no_hardcoded_paths
+      - environment_configurable
+      - platform_independent
+
+    testing:
+      coverage_minimum: 90
+      checks:
+        - unit_tests_exist
+        - integration_tests_exist
+        - happy_path_tested
+        - error_path_tested
+        - test_isolation
+
+    accessibility:
+      default_enabled: true  # For frontend projects
+      configurable: true
+      checks:
+        - wcag_2_2_compliant
+        - keyboard_navigable
+        - screen_reader_compatible
+        - color_contrast_adequate
+
+    observability:
+      checks:
+        - structured_logging
+        - metrics_exposed
+        - health_endpoints
+        - alerting_configured
+
+    safety:
+      checks:
+        - no_harm_to_users
+        - graceful_degradation
+        - data_loss_prevention
+        - human_oversight_possible
+
+    ethics_ai:
+      auto_enable_for: ai_projects
+      checks:
+        - bias_tested
+        - fairness_verified
+        - explainability
+        - human_in_loop
+        - data_consent
+        - privacy_preserved
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Error Handling
-# ═══════════════════════════════════════════════════════════════════════════════
-
-error_handling:
-  api_timeout:
-    action: retry_with_backoff
-    max_retries: 3
-    backoff:
-      - 1s
-      - 5s
-      - 15s
-
-  api_unavailable:
-    action: use_cached_if_valid
-    if_no_cache: show_error_with_explanation
-    message: "Claude unavailable. Using cached understanding from {time_ago}."
-
-  malformed_response:
-    action: retry_once
-    if_still_bad: log_and_show_raw
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Cache Configuration
-# ═══════════════════════════════════════════════════════════════════════════════
-
-cache:
-  directory: .ctoc/cache
-  gitignore: true                          # Cache is local, not committed
-
-  understanding:
-    committed:
-      file: understanding.yaml
-      scope: "Committed codebase (what git knows)"
-      updates_on: commit
-    local_changes:
-      file: local-changes.yaml
-      scope: "Uncommitted working tree changes"
-      updates_on: file_change
-      cleared_on: commit
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Learning Configuration
+#  LEARNING CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
 learning:
-  directory: learnings                     # Root level, git-tracked
+  enabled: true
+  directory: .ctoc/learnings  # Per-project, git-tracked
+  interaction_level: high     # Discuss all learnings with user
 
   stages:
-    pending: learnings/pending             # Awaiting CTO review
-    approved: learnings/approved           # CTO approved
-    applied: learnings/applied             # Integrated into agents
+    pending: pending
+    approved: approved
+    applied: applied
+    rejected: rejected
 
-  critique:
-    self_loops: 5                          # Self-critique iterations
-    cto_loops: 5                           # CTO review iterations
+  confidence:
+    dynamic: true             # Updates on success/failure
+    initial_default: 0.7
+    success_increment: 0.02
+    failure_decrement: 0.05
 
-  human_review:
-    triggers:
-      - confidence_below: 0.8
-      - impact: high
-      - cto_uncertain: true
-      - propagation_scope: ">3"
-      - security_relevant: true
-    notification:
-      method: "create .ctoc/human-review-needed.md"
+  re_evaluation:
+    scheduled: 3_months       # Every 3 months
+    on_conflict: true
+    user_triggered: true
+    use_websearch: true
 
-  publishing:
-    auto_publish:
-      enabled: true
-      criteria:
-        - cto_approved: true
-        - confidence: ">0.9"
-        - generalizability: ">0.8"
-        - novel: true
-      format: github_issue
-      repo: "robotijn/ctoc"
-      label: "community-learning"
+  conflict_resolution:
+    method: user_decides
+    show_pros_cons: true
+
+  export:
+    command: "ctoc learning export"
+    to_global: true           # Can transfer to Claude /memory
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Large Codebase Strategy
+#  CODEBASE INDEX
 # ═══════════════════════════════════════════════════════════════════════════════
 
-large_codebase:
-  strategies:
-    - entry_points_first                   # main files, config, exports
-    - hot_files_priority                   # Recently changed
-    - importance_ranking                   # AI ranks files
-    - incremental_analysis                 # Only re-analyze changed files
-  chunking:
-    batch_size: 500                        # Files per batch
-    max_depth: 3                           # Directory depth first pass
-    expand_on_demand: true                 # Drill deeper when needed
+codebase_index:
+  location:
+    yaml: .ctoc/cache/codebase-index.yaml
+    json: .ctoc/cache/codebase-index.json  # Optimized cache
+
+  tiered_scanning:
+    under_100_files: full_scan
+    100_to_1000_files: quick_plus_hot_path_then_deep_background
+    over_1000_files: quick_plus_hot_path_ask_for_deep
+
+  structure:
+    - entry_points
+    - packages
+    - concepts
+    - dependencies
+    - patterns
+
+  sync:
+    on_file_change: incremental
+    on_commit: verify
+    checksum_mismatch: rebuild_affected
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Command Routing Configuration
+#  ERROR HANDLING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-commands:
-  # Deterministic commands - bash handles directly, no Claude needed
-  deterministic:
-    - name: sync
-      script: git-workflow.sh
-      args: sync
-      help: "Pull-rebase-push workflow"
-    - name: commit
-      script: git-workflow.sh
-      args: commit
-      help: "Stage, validate, commit, and push"
-    - name: qc
-      script: git-workflow.sh
-      args: qc
-      help: "Quick commit and push"
-    - name: status
-      script: git-workflow.sh
-      args: status
-      help: "Enhanced git status"
-    - name: version
-      builtin: true
-      help: "Show version"
-    - name: help
-      builtin: true
-      help: "Show help"
-    - name: doctor
-      builtin: true
-      help: "Check installation health"
-    - name: update
-      builtin: true
-      help: "Update CTOC"
-    - name: uninstall
-      builtin: true
-      help: "Remove CTOC"
+error_handling:
+  agent_failure:
+    action: retry_with_backoff
+    max_retries: 3
+    backoff: [1s, 5s, 15s]
 
-  # Agent-powered commands - routed to operation agents
-  agent_powered:
-    - name: detect
-      aliases: [technologies, tech, stack]
-      agent: understand
-      help: "Detect technologies (uses understand agent)"
-    - name: understand
-      aliases: [analyze, analysis]
-      agent: understand
-      help: "Semantic codebase understanding"
-    - name: setup
-      aliases: [init, initialize]
-      agent: project-setup
-      help: "Intelligent project setup"
-    - name: plan
-      subcommands:
-        - name: new
-          agent: plan-advisor
-          help: "Create new plan with quality guidance"
-        - name: propose
-          script: plan.sh
-          help: "Submit plan for review"
-        - name: approve
-          script: plan.sh
-          help: "Approve a plan"
-        # ... other plan subcommands stay with plan.sh
-      help: "Plan management"
-    - name: progress
-      aliases: [dashboard]
-      agent: progress-insights
-      help: "Progress insights and analysis"
-    - name: process-issues
-      agent: issue-processor
-      help: "Process GitHub issues"
+  api_unavailable:
+    action: queue_and_wait
+    notify_user: true
 
-  # Skills commands - hybrid (bash for list/search, agent for smart features)
-  skills:
-    - name: list
-      script: ctoc.sh
-      help: "List all skills"
-    - name: search
-      script: ctoc.sh
-      help: "Search skills"
-    - name: add
-      script: ctoc.sh
-      help: "Add a skill"
-    - name: sync
-      agent: understand
-      help: "Detect and sync needed skills"
+  invalid_settings:
+    action: interactive_fix
+    prompt_user: true
 
-# Intent patterns for fuzzy matching
-intent_patterns:
-  - pattern: ["what", "tech", "using"]
-    route_to: understand
-  - pattern: ["check", "code", "review"]
-    route_to: git-advisor
-  - pattern: ["new", "plan", "feature"]
-    route_to: plan-advisor
-  - pattern: ["setup", "init", "start", "project"]
-    route_to: project-setup
-  - pattern: ["progress", "status", "dashboard"]
-    route_to: progress-insights
+# ═══════════════════════════════════════════════════════════════════════════════
+#  /ctoc SKILL COMMANDS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+skill_commands:
+  ctoc:
+    description: "CTOC command interface"
+    subcommands:
+      - name: status
+        aliases: [""]  # Default when just /ctoc
+        description: Show CTOC status and available commands
+      - name: plan
+        subcommands:
+          - new
+          - propose
+          - approve
+          - start
+          - implement
+          - complete
+          - status
+          - list
+      - name: progress
+        aliases: [dashboard]
+        description: Show Iron Loop progress
+      - name: admin
+        subcommands:
+          - agents
+          - learnings
+          - stats
+          - health
+      - name: doctor
+        description: Check installation health
+      - name: config
+        subcommands:
+          - show
+          - set
+          - edit
+          - validate
+      - name: learning
+        subcommands:
+          - list
+          - review
+          - export

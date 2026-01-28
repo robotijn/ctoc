@@ -1,0 +1,137 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CTOC Settings v2.0
+#
+#  Location:
+#    Global:  ~/.ctoc/settings.yaml (user defaults)
+#    Project: .ctoc/settings.yaml (overrides global)
+#
+#  Merge behavior: Project values override global values
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Quality Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+quality:
+  # Quality threshold (0.0 to 1.0, where 1.0 = perfect)
+  threshold: 1.0
+
+  # Minimum test coverage percentage
+  test_coverage_minimum: 90
+
+  # Dimension toggles (all enabled by default)
+  dimensions:
+    correctness: true
+    completeness: true
+    maintainability: true
+    security: true
+    performance: true
+    reliability: true
+    compatibility: true
+    usability: true
+    portability: true
+    testing: true
+    accessibility: true      # Default ON for frontend
+    observability: true
+    safety: true
+    ethics_ai: auto          # Auto-enable for AI projects
+
+  # impl-reviewer always explains its reasoning
+  explain_reasoning: true
+
+  # Custom emphasis (multiplier for specific dimensions)
+  # Example: security: 1.5 means 50% more weight on security
+  custom_emphasis: {}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Learning Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+learning:
+  enabled: true
+
+  # How much to discuss learnings with user
+  # high:   Discuss ALL learnings
+  # medium: Only discuss uncertain (confidence < 0.9)
+  # low:    Auto-approve high confidence
+  interaction_level: high
+
+  # Auto-approve threshold (for medium/low levels)
+  auto_approve_threshold: 0.9
+
+  # Re-evaluation schedule
+  re_evaluation_months: 3
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Agent Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+agents:
+  # Minimum model tier (haiku, sonnet, opus)
+  minimum_model: haiku
+
+  # Per-agent model overrides
+  # Example: implementer: opus
+  overrides: {}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Permissions Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+permissions:
+  # Trust level for automated actions
+  # ask:      Ask for confirmation on significant actions
+  # trusted:  Trust CTOC for most actions
+  # paranoid: Confirm everything
+  trust_level: ask
+
+  # Actions that are always auto-approved
+  auto_approve:
+    - read_files
+    - search_files
+    - run_tests
+
+  # Actions that always require confirmation
+  always_ask:
+    - delete_files
+    - git_push
+    - modify_production
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Project Settings (usually in .ctoc/settings.yaml only)
+# ─────────────────────────────────────────────────────────────────────────────
+
+project:
+  # Project type (auto-detected if not specified)
+  # Options: web_api, mobile, cli, data_pipeline, ml, library
+  type: auto
+
+  # Domain (affects quality emphasis)
+  # Options: fintech, healthcare, social, general, internal
+  domain: general
+
+  # Criticality level
+  # Options: high, medium, low
+  criticality: medium
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Admin Dashboard Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+admin:
+  # Stats detail level
+  # basic:    Tokens, cost, calls
+  # detailed: Above + response times, cache hits, errors
+  # full:     Above + per-agent breakdown, trends
+  stats_level: basic
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Research Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+research:
+  # Enable WebSearch for research
+  websearch_enabled: true
+
+  # Steps where auto-research is performed
+  auto_research_steps: [1, 2, 5, 12]
