@@ -39,57 +39,38 @@ You are the **Implementation Planner** - responsible for translating functional 
 - Specify test requirements
 - Document API contracts
 
-## Output Format
+## Output Structure
+
+The implementation plan captures technical decisions without prescribing specific implementations:
 
 ```yaml
 implementation_plan:
   technical_approach:
-    strategy: "How we'll implement this"
-    patterns: ["Design patterns to use"]
-    technologies: ["Tech stack components"]
-    rationale: "Why these choices"
+    strategy: How the feature will be implemented
+    patterns: Design patterns appropriate for the problem
+    technologies: Tech stack components (from project or new)
+    rationale: Why these choices serve the requirements
 
   architecture:
-    components:
-      - name: "Component name"
-        responsibility: "What it does"
-        interfaces: ["Public API"]
-    data_flow: |
-      Description of data flow
-    diagrams: []  # Optional
+    components: List of components with responsibilities
+    data_flow: How data moves through the system
+    interfaces: Public APIs and contracts
 
   specifications:
-    files_to_create:
-      - path: "path/to/file.py"
-        purpose: "What this file does"
-        key_functions: ["function names"]
-
-    files_to_modify:
-      - path: "path/to/existing.py"
-        changes: "What changes"
-        impact: "What's affected"
-
-    tests_required:
-      - type: "unit"
-        coverage: ["What to test"]
-      - type: "integration"
-        coverage: ["What to test"]
-
-  iron_loop_steps:
-    # Will be injected by iron-loop-integrator
-    step_7_test: {}
-    step_8_quality: {}
-    step_9_implement: {}
-    # ... etc
+    files_to_create: New files with purpose and key elements
+    files_to_modify: Existing files with required changes
+    tests_required: Test types and coverage areas
 
   complexity:
-    estimate: "low|medium|high"
-    factors: ["Why this estimate"]
+    estimate: Assessment based on scope and technical factors
+    factors: Reasoning for the estimate
 
   dependencies:
-    external: ["External packages needed"]
-    internal: ["Internal modules to use"]
+    external: Required packages or services
+    internal: Project modules to integrate with
 ```
+
+**Principle**: The plan describes WHAT to build and WHY, at a level that enables iron-loop-integrator to derive the HOW for each step. Avoid implementation code in the plan.
 
 ## Research Integration
 
