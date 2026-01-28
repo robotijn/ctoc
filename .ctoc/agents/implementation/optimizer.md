@@ -134,29 +134,24 @@ optimization_report:
 4. **Document trade-offs** - Explain non-obvious choices
 5. **Verify improvements** - Prove optimizations work
 
-## Common Patterns
+## Common Optimization Patterns
 
-### Database
-```python
-# Before: N+1
-for user in users:
-    print(user.profile.name)
-
-# After: Eager loading
-users = User.query.options(joinedload(User.profile)).all()
-```
+### Database Queries
+- **Problem**: N+1 queries (fetching related data in loops)
+- **Solution**: Use eager loading / batch fetching
+- **Detection**: Look for data access inside iteration loops
 
 ### Caching
-```python
-# Before: Repeated computation
-def get_expensive():
-    return compute()
+- **Problem**: Repeated expensive computations
+- **Solution**: Cache results with appropriate TTL
+- **Detection**: Look for pure functions called multiple times with same inputs
 
-# After: Cached
-@cache(ttl=300)
-def get_expensive():
-    return compute()
-```
+### Algorithm Complexity
+- **Problem**: O(n²) or worse for large datasets
+- **Solution**: Use more efficient algorithms or data structures
+- **Detection**: Nested loops over collections
+
+**Principle**: Apply patterns appropriate to the project's language and frameworks. Research current best practices for the specific technology stack.
 
 ## Hand-off
 

@@ -99,6 +99,21 @@ When planning, research:
 - Performance implications
 - Similar implementations for reference
 
+## Interaction Pattern
+
+### Questions First
+Before diving into technical planning, gather ALL clarifying questions upfront:
+- Technical preferences (patterns, libraries)
+- Constraints (performance, compatibility)
+- Batch questions together, don't drip-feed
+
+### Part by Part
+Walk through the implementation plan section by section:
+- Present technical approach, confirm agreement
+- Present architecture, confirm understanding
+- Present specifications, confirm completeness
+- Don't dump the entire plan at once
+
 ## Tools
 
 - Read, Grep, Glob (understand codebase)

@@ -66,7 +66,7 @@ operations:
     structure_ttl: "24h"           # File structure cache
     insights_ttl: "1h"             # Understanding cache
     auto_invalidate: true          # Watch for file changes
-    cache_dir: ".ctoc/cache"
+    cache_dir: ".local/cache"
 
   # Privacy settings
   privacy:
@@ -85,6 +85,34 @@ operations:
     show_estimates: true           # Before expensive ops
     warn_threshold: 10000          # Tokens
     track_usage: true              # Running total
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Iron Loop Enforcement
+# ─────────────────────────────────────────────────────────────────────────────
+
+enforcement:
+  # Mode: strict (block), soft (warn), off (disabled)
+  mode: strict
+
+  # Files that bypass enforcement (config, docs, etc.)
+  # These can be edited without going through Iron Loop planning
+  whitelist:
+    - "*.md"               # Documentation
+    - "*.yaml"             # Configuration
+    - "*.yml"              # Configuration
+    - "*.json"             # Configuration (package.json, etc.)
+    - "*.toml"             # Configuration (pyproject.toml, etc.)
+    - ".gitignore"         # Git config
+    - ".env*"              # Environment files
+    - ".ctoc/**"           # CTOC internal files
+    - ".local/**"          # Local state files
+
+  # Escape phrases that bypass enforcement
+  escape_phrases:
+    - "skip planning"
+    - "quick fix"
+    - "trivial fix"
+    - "hotfix"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Learning Configuration

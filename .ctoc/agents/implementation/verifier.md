@@ -37,25 +37,31 @@ You are the **Verifier** - responsible for running the complete test suite to ve
 ```yaml
 test_suites:
   unit:
-    command: "pytest tests/unit"
+    approach: Run project's unit test suite
     timeout: 300  # seconds
     required: true
 
   integration:
-    command: "pytest tests/integration"
+    approach: Run project's integration tests
     timeout: 600
     required: true
 
   e2e:
-    command: "pytest tests/e2e"
+    approach: Run end-to-end tests if project has them
     timeout: 900
     required: false  # Project-dependent
 
   smoke:
-    command: "pytest tests/smoke"
+    approach: Run quick smoke tests if defined
     timeout: 60
     run_first: true
 ```
+
+**Detection**: Identify the test framework and commands from:
+- Configuration files (pytest.ini, jest.config.js, etc.)
+- Package manifest test scripts
+- CI/CD configurations
+- Makefile or task runner definitions
 
 ## Coverage Requirements
 
@@ -127,11 +133,13 @@ verification_report:
 
 ## Test Framework Detection
 
-Detect from project:
-- `pytest` (Python)
-- `jest`, `vitest` (JavaScript/TypeScript)
-- `cargo test` (Rust)
-- `go test` (Go)
+Detect the project's test framework by examining:
+- Configuration files in project root
+- Test directory structure and naming conventions
+- Package manifest scripts (test commands)
+- CI/CD pipeline test steps
+
+**Principle**: Use whatever testing approach the project has established. Don't assume a specific framework.
 
 ## Failure Handling
 

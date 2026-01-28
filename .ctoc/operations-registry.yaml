@@ -503,11 +503,13 @@ skill_commands:
         aliases: [dashboard]
         description: Show Iron Loop progress
       - name: admin
+        description: Terminal-based admin dashboard
         subcommands:
-          - agents
-          - learnings
-          - stats
-          - health
+          - kanban     # Show kanban board
+          - agents     # Manage agents
+          - learnings  # Manage learnings
+          - stats      # Show statistics
+          - health     # System health check
       - name: doctor
         description: Check installation health
       - name: config
@@ -518,6 +520,7 @@ skill_commands:
           - validate
       - name: learning
         subcommands:
-          - list
-          - review
-          - export
+          - list       # List local learnings
+          - review     # Review pending learnings
+          - suggest    # Submit learning to GitHub (for regular users)
+          - export     # Export learnings

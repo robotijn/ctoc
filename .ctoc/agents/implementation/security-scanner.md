@@ -80,28 +80,28 @@ security_report:
   risk_level: "critical|high|medium|low|none"
 
   vulnerabilities:
-    - id: "SEC-001"
-      type: "sql_injection"
-      severity: "critical"
-      file: "path/to/file.py"
-      line: 42
-      code: "query = f\"SELECT * FROM users WHERE id={id}\""
-      issue: "SQL injection via string interpolation"
-      fix: "Use parameterized queries"
-      cwe: "CWE-89"
+    - id: "{generated-id}"
+      type: "{vulnerability-type}"
+      severity: "critical|high|medium|low"
+      file: "{affected-file}"
+      line: "{line-number}"
+      code: "{code-snippet}"
+      issue: "{description of the vulnerability}"
+      fix: "{recommended remediation}"
+      cwe: "{CWE-reference}"
 
   secrets_found:
-    - type: "api_key"
-      file: "config.py"
-      line: 10
+    - type: "{secret-type}"
+      file: "{file-path}"
+      line: "{line-number}"
       action: "Remove and rotate"
 
   dependency_issues:
-    - package: "requests"
-      version: "2.25.0"
-      cve: "CVE-2024-12345"
-      severity: "high"
-      fix: "Upgrade to 2.31.0+"
+    - package: "{package-name}"
+      version: "{current-version}"
+      cve: "{CVE-identifier}"
+      severity: "{severity}"
+      fix: "{upgrade instructions}"
 
   auth_issues:
     - issue: "Missing rate limiting"

@@ -101,7 +101,21 @@ CTOC excels at **any work that benefits from structured planning**:
 | **Reports & Analysis** | Assess data, plan methodology, execute analysis, document findings |
 | **Policy Documents** | Understand constraints, plan coverage, draft policies, review for completeness |
 
-### How It Works
+### How It Works: An Iterative Journey
+
+CTOC doesn't rush to code. Each phase is a **conversation loop** where you refine your thinking together with AI:
+
+**Phase 1: Functional Planning (Steps 1-3)**
+↻ Assess → Align → Capture → Review → Refine → Repeat until solid
+
+**Phase 2: Technical Planning (Steps 4-6)**
+↻ Plan → Design → Spec → Review → Refine → Repeat until ready
+
+**Phase 3: Implementation (Steps 7-15)**
+↻ Test → Code → Review → Optimize → Secure → Verify → Document → Final Review
+
+Each loop continues until you're satisfied. There's no timer, no pressure.
+Quality emerges from iteration, not speed.
 
 The same methodology applies to all work:
 
@@ -233,29 +247,75 @@ Once Claude Code is open, type:
 ctoc
 ```
 
-CTOC will show your project status and options:
+CTOC will show your project dashboard and options:
 
 ```
-CTOC
-
-Functional Plans: 0
-Technical Plans:  0
-Ready to Build:   0
-In Progress:      None
-
-What would you like to do?
-
-[1] Functional plan - Define what to build
-[2] Technical plan  - Define how to build it
-[3] Full plan       - Both functional and technical
-[4] Implement       - Build a ready feature
-[5] Status          - View all plans
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  CTOC Dashboard                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  KANBAN                                                                       ║
+║  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐ ║
+║  │BACKLOG │ │FUNCTIONAL│ │TECHNICAL │ │ READY  │ │BUILDING│ │     DONE     │ ║
+║  │(drafts)│ │ PLANNING │ │ PLANNING │ │        │ │        │ │              │ ║
+║  │        │ │(steps1-3)│ │(steps4-6)│ │        │ │(7-15)  │ │ ✓ feature-a  │ ║
+║  │ (2)    │ │ (1)      │ │ (0)      │ │ (1)    │ │ (0)    │ │ ✓ feature-b  │ ║
+║  └────────┘ └──────────┘ └──────────┘ └────────┘ └────────┘ └──────────────┘ ║
+║                                                                               ║
+║  What would you like to do?                                                   ║
+║                                                                               ║
+║  [1] Start a new feature  - "I need..."                                       ║
+║  [2] Continue planning    - Resume in-progress plan                           ║
+║  [3] Implement ready plan - Build approved feature (background)               ║
+║  [4] View all plans       - Detailed plan status                              ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 ```
+
+The columns map to the Iron Loop:
+
+| Column | Iron Loop | What happens |
+|--------|-----------|--------------|
+| **Backlog** | Pre-Iron Loop | Rough ideas, not yet started |
+| **Functional Planning** | Steps 1-3 | ASSESS → ALIGN → CAPTURE (with user) |
+| **Technical Planning** | Steps 4-6 | PLAN → DESIGN → SPEC (with user) |
+| **Ready** | Iron Loop Ready | Plans with steps 7-15 injected, awaiting execution |
+| **Building** | Steps 7-15 | Executing autonomously (background agent) |
+| **Done** | After Step 15 | Recently completed |
+
+- **Backlog → Step 1**: Pick a rough idea to start the Iron Loop
+- **Ready → Building**: Pick an Iron Loop Ready plan to execute in background
 
 Or just talk naturally:
 - *"I need a login system"*
 - *"Help me write a project proposal"*
 - *"Let's plan the documentation"*
+
+---
+
+## Natural Language → Iron Loop
+
+When you say something like "I need a login system", CTOC interprets your intent and automatically begins the Iron Loop:
+
+1. **Interprets**: "Login system" → Feature request
+2. **Starts ASSESS**: "Let's understand what you need..."
+3. **Guides through**: Each step until planning is complete
+4. **Asks all questions upfront**: Before implementation, CTOC gathers all requirements
+5. **Implements autonomously**: Only after approval, as a background agent
+
+You don't need to say "start planning" — CTOC recognizes feature requests and guides you through the structured process naturally.
+
+### Intent Detection
+
+CTOC understands what you want:
+
+| What you say | What CTOC does |
+|--------------|----------------|
+| "I need...", "Build...", "Create...", "Add..." | Start ASSESS (Step 1) |
+| "Fix...", "Bug...", "Broken..." | Start ASSESS with bug context |
+| "Plan...", "Design...", "How should..." | Start appropriate planning step |
+| "Status", "Progress", "Where are we" | Show kanban board |
+| "Implement", "Build it", "Start coding" | Begin implementation (if plan approved) |
 
 ---
 

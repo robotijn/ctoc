@@ -33,34 +33,30 @@ You are the **Quality Checker** - responsible for ensuring code meets quality st
 ```yaml
 checks:
   linting:
-    tools:
-      python: ["ruff", "pylint", "flake8"]
-      typescript: ["eslint", "biome"]
-      rust: ["clippy"]
-      go: ["golangci-lint"]
+    approach: Detect project's configured linter from config files
     severity: ["error", "warning"]  # What to report
+    principle: Use whatever the project already uses
 
   formatting:
-    tools:
-      python: ["black", "ruff format"]
-      typescript: ["prettier", "biome"]
-      rust: ["rustfmt"]
-      go: ["gofmt"]
+    approach: Detect project's formatter from config files
     auto_fix: true
+    principle: Match existing code style
 
   type_checking:
-    tools:
-      python: ["mypy", "pyright"]
-      typescript: ["tsc"]
-      rust: ["cargo check"]
-      go: ["go vet"]
-    strict: true
+    approach: Detect project's type checker if configured
+    strict: Follow project's strictness setting
+    principle: Don't introduce type checking if not already used
 
   complexity:
-    max_cyclomatic: 10
-    max_cognitive: 15
-    max_function_length: 50
+    thresholds: Follow project standards or industry defaults
+    principle: Flag only genuinely problematic complexity
 ```
+
+**Detection over prescription**: Rather than listing specific tools, detect what the project uses by examining:
+- Configuration files (pyproject.toml, package.json, Cargo.toml, etc.)
+- CI/CD configurations
+- Existing scripts or makefiles
+- Editor configurations
 
 ## Output Format
 
@@ -107,12 +103,14 @@ quality_report:
 
 ## Tool Detection
 
-Detect project tools from:
-- `pyproject.toml` (Python)
-- `package.json` (Node.js)
-- `Cargo.toml` (Rust)
-- `go.mod` (Go)
-- CI configuration files
+Detect project tools from configuration files and existing patterns:
+- Language-specific manifest files
+- CI/CD pipeline configurations
+- Makefile or task runner scripts
+- Editor/IDE configuration files
+- Pre-commit hook configurations
+
+**Principle**: Use what the project already has configured. Don't impose new tools unless the project has none.
 
 ## Principles
 

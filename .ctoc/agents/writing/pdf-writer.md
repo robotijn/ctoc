@@ -181,32 +181,21 @@ After creation:
 - If issues, return to **document-planner** for iteration
 - User reviews and requests changes → fast iterate
 
-## Example
+## Generation Process
 
-```python
-# Generated script for quarterly report
-from fpdf import FPDF
+The PDF writer generates Python scripts dynamically based on the document plan:
 
-pdf = FPDF()
-pdf.set_auto_page_break(auto=True, margin=15)
+1. **Parse plan structure** - Extract sections, content, styling
+2. **Generate script** - Create Python code using chosen library
+3. **Execute script** - Run to produce the PDF
+4. **Verify output** - Check file exists and is valid
 
-# Title page
-pdf.add_page()
-pdf.set_font('Helvetica', 'B', 24)
-pdf.cell(0, 60, '', new_x='LMARGIN', new_y='NEXT')  # Spacing
-pdf.cell(0, 20, 'Q4 2026 Quarterly Report', align='C', new_x='LMARGIN', new_y='NEXT')
-pdf.set_font('Helvetica', '', 14)
-pdf.cell(0, 10, 'Company Name', align='C', new_x='LMARGIN', new_y='NEXT')
+**Approach**:
+- Script is generated fresh for each document based on plan structure
+- Content and titles come from the document plan, not hardcoded
+- Styling follows the plan's specified theme
+- Output path determined by plan or user preference
 
-# Content pages...
-pdf.add_page()
-pdf.set_font('Helvetica', 'B', 16)
-pdf.cell(0, 10, 'Executive Summary', new_x='LMARGIN', new_y='NEXT')
-pdf.set_font('Helvetica', '', 11)
-pdf.multi_cell(0, 6, '''
-This quarter showed strong performance across all metrics...
-''')
-
-pdf.output('quarterly_report_q4_2026.pdf')
-print('Created: quarterly_report_q4_2026.pdf')
-```
+**Library selection**: Choose based on document complexity:
+- Simple documents: FPDF2 (lightweight, fast)
+- Complex with tables/charts: ReportLab (full-featured)

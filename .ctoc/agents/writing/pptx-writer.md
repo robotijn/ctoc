@@ -229,74 +229,23 @@ After creation:
 - If issues, return to **document-planner** for iteration
 - User can open in PowerPoint/LibreOffice for final polish
 
-## Example
+## Generation Process
 
-```python
-# Generated script for quarterly business review
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.enum.text import PP_ALIGN
+The PPTX writer generates Python scripts dynamically based on the document plan:
 
-prs = Presentation()
+1. **Parse plan structure** - Extract slides, layouts, content, notes
+2. **Generate script** - Create Python code using python-pptx
+3. **Execute script** - Run to produce the presentation
+4. **Verify output** - Check file exists and is valid
 
-# Title slide
-slide = prs.slides.add_slide(prs.slide_layouts[0])
-slide.shapes.title.text = "Q4 2026 Business Review"
-slide.placeholders[1].text = "Company Name\nJanuary 2027"
+**Approach**:
+- Slide structure follows the document plan's outline
+- Titles, bullets, and notes come from plan content
+- Layout selection based on content type (title, bullets, chart, etc.)
+- Charts and tables generated from plan data specifications
 
-# Agenda slide
-slide = prs.slides.add_slide(prs.slide_layouts[1])
-slide.shapes.title.text = "Agenda"
-tf = slide.placeholders[1].text_frame
-tf.text = "Financial Performance"
-tf.add_paragraph().text = "Key Achievements"
-tf.add_paragraph().text = "Challenges & Lessons"
-tf.add_paragraph().text = "Q1 2027 Outlook"
-
-# Financial slide
-slide = prs.slides.add_slide(prs.slide_layouts[1])
-slide.shapes.title.text = "Financial Performance"
-tf = slide.placeholders[1].text_frame
-tf.text = "Revenue: $10.2M (+15% YoY)"
-tf.add_paragraph().text = "Gross Margin: 72% (+3pp)"
-tf.add_paragraph().text = "Operating Expenses: $6.1M"
-tf.add_paragraph().text = "Net Income: $1.2M"
-
-# Add speaker notes
-notes = slide.notes_slide
-notes.notes_text_frame.text = "Emphasize the margin improvement driven by efficiency gains."
-
-# Key Achievements slide
-slide = prs.slides.add_slide(prs.slide_layouts[1])
-slide.shapes.title.text = "Key Achievements"
-tf = slide.placeholders[1].text_frame
-tf.text = "Launched v2.0 product line"
-tf.add_paragraph().text = "Expanded to 3 new markets"
-tf.add_paragraph().text = "Reduced churn by 25%"
-tf.add_paragraph().text = "Achieved SOC 2 compliance"
-
-# Challenges slide
-slide = prs.slides.add_slide(prs.slide_layouts[1])
-slide.shapes.title.text = "Challenges & Lessons Learned"
-tf = slide.placeholders[1].text_frame
-tf.text = "Supply chain delays impacted Q4 shipments"
-tf.add_paragraph().text = "Talent acquisition remains competitive"
-tf.add_paragraph().text = "Lesson: Build 30-day inventory buffer"
-
-# Outlook slide
-slide = prs.slides.add_slide(prs.slide_layouts[1])
-slide.shapes.title.text = "Q1 2027 Outlook"
-tf = slide.placeholders[1].text_frame
-tf.text = "Target: $11.5M revenue"
-tf.add_paragraph().text = "Launch mobile app"
-tf.add_paragraph().text = "Expand sales team by 20%"
-tf.add_paragraph().text = "Begin Series B preparation"
-
-# Thank you slide
-slide = prs.slides.add_slide(prs.slide_layouts[0])
-slide.shapes.title.text = "Thank You"
-slide.placeholders[1].text = "Questions?"
-
-prs.save('q4_2026_business_review.pptx')
-print('Created: q4_2026_business_review.pptx')
-```
+**Slide layout mapping**:
+- Title content → Layout 0 (Title Slide)
+- Bullet content → Layout 1 (Title and Content)
+- Two-column → Layout 3 (Two Content)
+- Image-focused → Layout 8 (Picture with Caption)
