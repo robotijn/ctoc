@@ -11,6 +11,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const {
   ensureDirectories,
   getCTOCRoot,
@@ -20,6 +21,7 @@ const {
   loadSession,
   saveSession,
   logSessionEvent,
+  loadConfig,
   log,
   warn,
   STEP_NAMES
@@ -28,7 +30,73 @@ const {
 const { detectStack, profileExists } = require('../lib/stack-detector');
 const { listProfiles } = require('../lib/profile-loader');
 const { generateCTOCInstructions } = require('../lib/ctoc-instructions');
-const { checkForUpdates } = require('./update-check');
+const { checkForUpdates, getCurrentVersion, fetchLatestVersion } = require('./update-check');
+
+// ============================================================================
+// Settings
+// ============================================================================
+
+/**
+ * Load project-level settings from .ctoc/settings.yaml
+ */
+function loadProjectSettings() {
+  const settingsPath = path.join(process.cwd(), '.ctoc', 'settings.yaml');
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const content = fs.readFileSync(settingsPath, 'utf8');
+      // Simple YAML parsing for flat settings
+      const settings = {};
+      const lines = content.split('\n');
+      let currentSection = null;
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('#') || trimmed === '') continue;
+
+        // Check for section (no colon at end, or value after colon)
+        const match = trimmed.match(/^(\w+):\s*(.*)$/);
+        if (match) {
+          const [, key, value] = match;
+          if (value === '' || value === '{}' || value === '[]') {
+            // New section
+            currentSection = key;
+            settings[currentSection] = {};
+          } else if (currentSection) {
+            // Value in current section
+            settings[currentSection][key] = parseYamlValue(value);
+          } else {
+            // Top-level value
+            settings[key] = parseYamlValue(value);
+          }
+        } else if (currentSection && trimmed.match(/^\w+:/)) {
+          // Subsection key
+          const subMatch = trimmed.match(/^(\w+):\s*(.*)$/);
+          if (subMatch) {
+            settings[currentSection][subMatch[1]] = parseYamlValue(subMatch[2]);
+          }
+        }
+      }
+      return settings;
+    }
+  } catch (e) {
+    // Silent fail
+  }
+  return {};
+}
+
+function parseYamlValue(value) {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (value === 'null' || value === '~') return null;
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
+  if (/^\d+\.\d+$/.test(value)) return parseFloat(value);
+  // Remove quotes if present
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
 
 // ============================================================================
 // Main
@@ -39,8 +107,29 @@ async function main() {
     // Ensure CTOC directories exist
     ensureDirectories();
 
-    // Check for updates (non-blocking, throttled to once/day)
-    checkForUpdates().catch(() => {});
+    // Check for updates and get update info
+    let updateInfo = null;
+    try {
+      const config = loadConfig();
+      const currentVersion = getCurrentVersion();
+
+      // Check if we have cached latest version from previous check
+      if (config.updates?.latest_version && config.updates.latest_version !== currentVersion) {
+        updateInfo = {
+          available: true,
+          current: currentVersion,
+          latest: config.updates.latest_version
+        };
+      }
+
+      // Trigger background update check (throttled, won't block)
+      checkForUpdates().catch(() => {});
+    } catch (e) {
+      // Silent fail
+    }
+
+    // Load project settings for update prompt configuration
+    const settings = loadProjectSettings();
 
     const projectPath = process.cwd();
     const ctocRoot = getCTOCRoot();
@@ -139,7 +228,6 @@ async function main() {
     saveSession(session);
 
     // 5. Output visible startup banner to stderr (user sees this)
-    const fs = require('fs');
     let version = 'unknown';
     try {
       version = fs.readFileSync(path.join(ctocRoot, 'VERSION'), 'utf8').trim();
@@ -152,10 +240,16 @@ async function main() {
 
     console.error(`[CTOC] v${version} | ${language}/${framework} | Step ${ironLoopState.currentStep} (${stepName})${featureInfo}`);
 
-    // 6. Output CTOC instructions for Claude's context
+    // 6. Compute gate status for human decision gates
+    // Gate 1: Functional planning complete (step 3)
+    // Gate 2: Technical planning complete (step 6)
+    const gate1Passed = ironLoopState.steps[3]?.status === 'completed';
+    const gate2Passed = ironLoopState.steps[6]?.status === 'completed';
+
+    // 7. Output CTOC instructions for Claude's context
     // This is the key output that makes Claude "become" the CTO
     console.log('');
-    console.log(generateCTOCInstructions(stack, ironLoopState));
+    console.log(generateCTOCInstructions(stack, ironLoopState, { updateInfo, settings, gate1Passed, gate2Passed }));
 
   } catch (error) {
     console.error(`[CTOC ERROR] Session start failed: ${error.message}`);
