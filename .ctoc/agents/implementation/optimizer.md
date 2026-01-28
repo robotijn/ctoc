@@ -92,19 +92,18 @@ optimization_report:
 
   analysis:
     bottlenecks_found:
-      - area: "database"
-        issue: "N+1 query"
-        file: "path/to/file.py"
-        line: 42
-        impact: "high"
+      - area: {optimization_area}
+        issue: {problem_description}
+        file: {source_file}
+        impact: "high|medium|low"
 
   optimizations_applied:
-    - area: "database"
-      change: "Added prefetch"
-      file: "path/to/file.py"
-      before: "10 queries"
-      after: "2 queries"
-      verified: true
+    - area: {optimization_area}
+      change: {what_was_changed}
+      file: {source_file}
+      before: {metric_before}
+      after: {metric_after}
+      verified: true|false
 
   skipped:
     - area: "memory"
