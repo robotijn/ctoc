@@ -199,14 +199,9 @@ setup_hooks() {
                 print_step "Hooks configured in .claude/settings.json"
             fi
 
-            # Inform user about what was set up
+            # Brief confirmation
             echo ""
-            echo -e "${CYAN}Hooks enabled:${NC}"
-            echo "  • SessionStart: Auto-detect stack, restore progress"
-            echo "  • PreToolUse: Code validation against CTO profiles"
-            echo "  • PreCompact: Save state before context compaction"
-            echo "  • SessionEnd: Save progress and learnings"
-            echo "  • Stop: Update session state"
+            echo -e "${CYAN}Hooks enabled${NC} - CTOC will automatically detect your stack and track progress"
         else
             print_warn "hooks.json not found in repo, skipping"
         fi
@@ -236,15 +231,9 @@ check_project() {
         fi
     fi
 
-    # Check .gitignore
-    if [[ -f ".gitignore" ]]; then
-        if grep -q "^\.ctoc/$" .gitignore 2>/dev/null; then
-            print_step ".ctoc/ in .gitignore"
-        else
-            print_warn ".ctoc/ not in .gitignore (will ask)"
-        fi
-    else
-        print_warn "No .gitignore (will ask)"
+    # Check .gitignore (silent - will auto-configure)
+    if [[ -f ".gitignore" ]] && grep -q "^\.ctoc/$" .gitignore 2>/dev/null; then
+        print_step ".ctoc/ in .gitignore"
     fi
 
     # Detect project types
@@ -383,6 +372,26 @@ research:
 #     format: "ruff format --check"
 #     typecheck: "mypy"
 #     test: "pytest"
+
+# Iron Loop Enforcement
+# Controls whether Edit/Write operations are blocked before planning is complete
+enforcement:
+  # Mode: strict | soft | off
+  # - strict: Blocks edit/write until both planning gates pass (recommended)
+  # - soft: Warns but allows operations to proceed
+  # - off: No enforcement (not recommended for production projects)
+  mode: strict
+
+  # Escape phrases that bypass strict enforcement
+  # Say any of these to proceed without completing planning
+  escape_phrases:
+    - "skip planning"
+    - "skip iron loop"
+    - "quick fix"
+    - "trivial fix"
+    - "trivial change"
+    - "hotfix"
+    - "urgent"
 
 # Skills read this session (reset on new session)
 # This section is managed automatically
@@ -666,57 +675,23 @@ IRON_EOF
 # ═══════════════════════════════════════════════════════════════════════════════
 
 setup_gitignore() {
-    print_section "Git setup"
+    # Silent setup - just add to .gitignore by default
+    # Users can configure git submodule or other setups themselves
 
     # Check if already in .gitignore
     if grep -q "^\.ctoc/$" .gitignore 2>/dev/null; then
-        print_step ".ctoc/ already in .gitignore"
         return
     fi
 
-    echo ""
-    echo "  Add .ctoc/ to .gitignore?"
-    echo ""
-    echo "  ${BOLD}Pros:${NC} Keeps repo clean, each dev installs fresh"
-    echo "  ${BOLD}Cons:${NC} Need to run install on each clone"
-    echo ""
-    echo "  Or use git submodule?"
-    echo ""
-    echo "  ${BOLD}Pros:${NC} Version-locked, auto-clones with project"
-    echo "  ${BOLD}Cons:${NC} More complex git workflow"
-    echo ""
-    echo "  [1] Add to .gitignore (Recommended for most projects)"
-    echo "  [2] Use submodule (For teams wanting locked versions)"
-    echo "  [3] Neither (I'll handle it manually)"
-    echo ""
-    read -p "  Choice [1-3]: " choice
-    choice=${choice:-1}
-
-    case $choice in
-        1)
-            # Add to .gitignore
-            if [[ -f .gitignore ]]; then
-                echo "" >> .gitignore
-                echo "# CTOC - CTO Chief (installed per-developer)" >> .gitignore
-                echo ".ctoc/" >> .gitignore
-            else
-                echo "# CTOC - CTO Chief (installed per-developer)" > .gitignore
-                echo ".ctoc/" >> .gitignore
-            fi
-            print_step "Added .ctoc/ to .gitignore"
-            ;;
-        2)
-            # Convert to submodule (advanced)
-            echo ""
-            print_warn "Submodule setup requires manual steps:"
-            echo "    1. Remove .ctoc/repo: rm -rf .ctoc/repo"
-            echo "    2. Add as submodule: git submodule add $REPO_URL .ctoc/repo"
-            echo "    3. Commit the change"
-            ;;
-        3)
-            print_step "Skipped .gitignore setup"
-            ;;
-    esac
+    # Auto-add to .gitignore (safe default)
+    if [[ -f .gitignore ]]; then
+        echo "" >> .gitignore
+        echo "# CTOC - CTO Chief (installed per-developer)" >> .gitignore
+        echo ".ctoc/" >> .gitignore
+    else
+        echo "# CTOC - CTO Chief (installed per-developer)" > .gitignore
+        echo ".ctoc/" >> .gitignore
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -188,7 +188,7 @@ function saveIronLoopState(projectPath, state) {
 function createIronLoopState(projectPath, feature, language, framework) {
   return {
     project: projectPath || process.cwd(),
-    feature: feature || 'Unknown Feature',
+    feature: feature || null, // null means no feature being tracked yet
     started: getTimestamp(),
     lastUpdated: getTimestamp(),
     currentStep: 1,
@@ -468,6 +468,222 @@ function getLanguageFromPath(filePath) {
 }
 
 // ============================================================================
+// Plan Artifact Management
+// ============================================================================
+
+/**
+ * Plan types for the two planning gates
+ */
+const PLAN_TYPES = {
+  FUNCTIONAL: 'functional',
+  IMPLEMENTATION: 'implementation'
+};
+
+/**
+ * Plan statuses for artifact lifecycle
+ */
+const PLAN_STATUSES = {
+  DRAFT: 'draft',
+  APPROVED: 'approved'
+};
+
+/**
+ * Gets the path to a plan directory
+ * @param {string} type - 'functional' or 'implementation'
+ * @param {string} status - 'draft' or 'approved'
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {string} Absolute path to the plan directory
+ */
+function getPlanPath(type, status, projectPath = process.cwd()) {
+  if (!Object.values(PLAN_TYPES).includes(type)) {
+    throw new Error(`Invalid plan type: ${type}. Must be 'functional' or 'implementation'.`);
+  }
+  if (!Object.values(PLAN_STATUSES).includes(status)) {
+    throw new Error(`Invalid plan status: ${status}. Must be 'draft' or 'approved'.`);
+  }
+  return path.join(projectPath, 'plans', type, status);
+}
+
+/**
+ * Checks if an approved plan exists for the given type
+ * @param {string} type - 'functional' or 'implementation'
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {Object|null} Plan info {name, path} if exists, null otherwise
+ */
+function hasApprovedPlan(type, projectPath = process.cwd()) {
+  const approvedDir = getPlanPath(type, PLAN_STATUSES.APPROVED, projectPath);
+
+  if (!fs.existsSync(approvedDir)) {
+    return null;
+  }
+
+  try {
+    const files = fs.readdirSync(approvedDir);
+    const mdFiles = files.filter(f => f.endsWith('.md'));
+
+    if (mdFiles.length === 0) {
+      return null;
+    }
+
+    // Return the most recently modified plan
+    const plans = mdFiles.map(file => {
+      const filePath = path.join(approvedDir, file);
+      const stat = fs.statSync(filePath);
+      return {
+        name: file.replace('.md', ''),
+        path: filePath,
+        modified: stat.mtime
+      };
+    });
+
+    plans.sort((a, b) => b.modified - a.modified);
+    return plans[0];
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Checks if a draft plan exists for the given type
+ * @param {string} type - 'functional' or 'implementation'
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {Object|null} Plan info {name, path} if exists, null otherwise
+ */
+function hasDraftPlan(type, projectPath = process.cwd()) {
+  const draftDir = getPlanPath(type, PLAN_STATUSES.DRAFT, projectPath);
+
+  if (!fs.existsSync(draftDir)) {
+    return null;
+  }
+
+  try {
+    const files = fs.readdirSync(draftDir);
+    const mdFiles = files.filter(f => f.endsWith('.md'));
+
+    if (mdFiles.length === 0) {
+      return null;
+    }
+
+    // Return the most recently modified plan
+    const plans = mdFiles.map(file => {
+      const filePath = path.join(draftDir, file);
+      const stat = fs.statSync(filePath);
+      return {
+        name: file.replace('.md', ''),
+        path: filePath,
+        modified: stat.mtime
+      };
+    });
+
+    plans.sort((a, b) => b.modified - a.modified);
+    return plans[0];
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Moves a plan from draft to approved status
+ * @param {string} type - 'functional' or 'implementation'
+ * @param {string} planName - Name of the plan (without .md extension)
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {Object} Result {success, from, to, error?}
+ */
+function movePlanToApproved(type, planName, projectPath = process.cwd()) {
+  const draftDir = getPlanPath(type, PLAN_STATUSES.DRAFT, projectPath);
+  const approvedDir = getPlanPath(type, PLAN_STATUSES.APPROVED, projectPath);
+
+  const fileName = planName.endsWith('.md') ? planName : `${planName}.md`;
+  const fromPath = path.join(draftDir, fileName);
+  const toPath = path.join(approvedDir, fileName);
+
+  try {
+    // Ensure approved directory exists
+    if (!fs.existsSync(approvedDir)) {
+      fs.mkdirSync(approvedDir, { recursive: true });
+    }
+
+    // Check draft exists
+    if (!fs.existsSync(fromPath)) {
+      return {
+        success: false,
+        error: `Draft plan not found: ${fromPath}`
+      };
+    }
+
+    // Move the file
+    fs.renameSync(fromPath, toPath);
+
+    return {
+      success: true,
+      from: fromPath,
+      to: toPath
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e.message
+    };
+  }
+}
+
+/**
+ * Ensures plan directories exist for a project
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ */
+function ensurePlanDirectories(projectPath = process.cwd()) {
+  const planDirs = [
+    path.join(projectPath, 'plans', 'functional', 'draft'),
+    path.join(projectPath, 'plans', 'functional', 'approved'),
+    path.join(projectPath, 'plans', 'implementation', 'draft'),
+    path.join(projectPath, 'plans', 'implementation', 'approved'),
+    path.join(projectPath, 'plans', 'todo'),
+    path.join(projectPath, 'plans', 'in_progress'),
+    path.join(projectPath, 'plans', 'review'),
+    path.join(projectPath, 'plans', 'done')
+  ];
+
+  for (const dir of planDirs) {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  }
+}
+
+/**
+ * Lists all plans of a given type and status
+ * @param {string} type - 'functional' or 'implementation'
+ * @param {string} status - 'draft' or 'approved'
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {Array} List of plan objects {name, path, modified}
+ */
+function listPlans(type, status, projectPath = process.cwd()) {
+  const planDir = getPlanPath(type, status, projectPath);
+
+  if (!fs.existsSync(planDir)) {
+    return [];
+  }
+
+  try {
+    const files = fs.readdirSync(planDir);
+    return files
+      .filter(f => f.endsWith('.md'))
+      .map(file => {
+        const filePath = path.join(planDir, file);
+        const stat = fs.statSync(filePath);
+        return {
+          name: file.replace('.md', ''),
+          path: filePath,
+          modified: stat.mtime
+        };
+      })
+      .sort((a, b) => b.modified - a.modified);
+  } catch (e) {
+    return [];
+  }
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -523,5 +739,15 @@ module.exports = {
   readFileSafe,
   isDirectory,
   getExtension,
-  getLanguageFromPath
+  getLanguageFromPath,
+
+  // Plan Artifact Management
+  PLAN_TYPES,
+  PLAN_STATUSES,
+  getPlanPath,
+  hasApprovedPlan,
+  hasDraftPlan,
+  movePlanToApproved,
+  ensurePlanDirectories,
+  listPlans
 };

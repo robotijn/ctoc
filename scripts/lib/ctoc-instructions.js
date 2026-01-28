@@ -30,8 +30,8 @@ function generateCTOCInstructions(stack, ironLoopState, options = {}) {
   const framework = stack.primary?.framework || 'none';
   const stackStr = `${language}/${framework}`;
 
-  // Extract gate status from options
-  const { gate1Passed, gate2Passed } = options;
+  // Extract gate status and plan status from options
+  const { gate1Passed, gate2Passed, planStatus } = options;
 
   // Build Iron Loop status with gate information
   let ironLoopStatus;
@@ -42,6 +42,33 @@ function generateCTOCInstructions(stack, ironLoopState, options = {}) {
     ironLoopStatus = `Step ${ironLoopState.currentStep} (${stepName}) | Feature: ${ironLoopState.feature} | Gate 1: ${gate1Status} | Gate 2: ${gate2Status}`;
   } else {
     ironLoopStatus = 'Ready for new feature | Gate 1: Pending | Gate 2: Pending';
+  }
+
+  // Build plan status section if we have plan info
+  let planStatusSection = '';
+  if (planStatus) {
+    const funcStatus = planStatus.functional.approved
+      ? `Approved: ${planStatus.functional.approved.name}`
+      : planStatus.functional.draft
+        ? `Draft: ${planStatus.functional.draft.name} (needs approval)`
+        : 'None';
+    const implStatus = planStatus.implementation.approved
+      ? `Approved: ${planStatus.implementation.approved.name}`
+      : planStatus.implementation.draft
+        ? `Draft: ${planStatus.implementation.draft.name} (needs approval)`
+        : 'None';
+
+    if (funcStatus !== 'None' || implStatus !== 'None') {
+      planStatusSection = `
+## Plan Artifacts
+
+| Plan Type | Status |
+|-----------|--------|
+| Functional (Steps 1-3) | ${funcStatus} |
+| Implementation (Steps 4-6) | ${implStatus} |
+
+`;
+    }
   }
 
   // Build language-specific skill paths hint
@@ -134,7 +161,7 @@ When creating NEW files, read the relevant skill first:
 - No secrets in code
 - No unhandled errors in production paths
 - No undocumented public APIs
-
+${planStatusSection}
 ## MANDATORY: Iron Loop Enforcement
 
 ### Workflow with Human Decision Gates

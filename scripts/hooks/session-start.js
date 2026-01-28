@@ -24,7 +24,11 @@ const {
   loadConfig,
   log,
   warn,
-  STEP_NAMES
+  STEP_NAMES,
+  hasApprovedPlan,
+  hasDraftPlan,
+  ensurePlanDirectories,
+  PLAN_TYPES
 } = require('../lib/utils');
 
 const { detectStack, profileExists } = require('../lib/stack-detector');
@@ -233,7 +237,33 @@ async function main() {
       log('Use "/ctoc start <feature-name>" to begin tracking a feature.');
     }
 
-    // 4. Update session tracking
+    // 4. Ensure plan directories exist and check plan status
+    ensurePlanDirectories(projectPath);
+
+    const planStatus = {
+      functional: {
+        approved: hasApprovedPlan(PLAN_TYPES.FUNCTIONAL, projectPath),
+        draft: hasDraftPlan(PLAN_TYPES.FUNCTIONAL, projectPath)
+      },
+      implementation: {
+        approved: hasApprovedPlan(PLAN_TYPES.IMPLEMENTATION, projectPath),
+        draft: hasDraftPlan(PLAN_TYPES.IMPLEMENTATION, projectPath)
+      }
+    };
+
+    if (planStatus.functional.approved) {
+      log(`Functional plan approved: ${planStatus.functional.approved.name}`);
+    } else if (planStatus.functional.draft) {
+      log(`Functional plan in draft: ${planStatus.functional.draft.name} (needs approval)`);
+    }
+
+    if (planStatus.implementation.approved) {
+      log(`Implementation plan approved: ${planStatus.implementation.approved.name}`);
+    } else if (planStatus.implementation.draft) {
+      log(`Implementation plan in draft: ${planStatus.implementation.draft.name} (needs approval)`);
+    }
+
+    // 5. Update session tracking
     const session = loadSession();
 
     // Add this project to session
@@ -255,29 +285,55 @@ async function main() {
     saveSession(session);
 
     // 5. Output visible startup banner to stderr (user sees this)
-    let version = 'unknown';
+    let version = null;
     try {
       version = fs.readFileSync(path.join(ctocRoot, 'VERSION'), 'utf8').trim();
     } catch (e) {}
 
-    const language = stack.primary?.language || 'unknown';
-    const framework = stack.primary?.framework || 'none';
     const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
-    const featureInfo = ironLoopState.feature ? ` | Feature: ${ironLoopState.feature}` : '';
 
-    const banner = `[CTOC] v${version} | ${language}/${framework} | Step ${ironLoopState.currentStep} (${stepName})${featureInfo}\n`;
+    // Build a clean, informative banner
+    let bannerParts = ['[CTOC]'];
+
+    // Only show version if known
+    if (version && version !== 'unknown') {
+      bannerParts.push(`v${version}`);
+    }
+
+    // Show stack only if detected
+    const language = stack.primary?.language;
+    const framework = stack.primary?.framework;
+    if (language) {
+      bannerParts.push(framework ? `${language}/${framework}` : language);
+    }
+
+    // Always show current step
+    bannerParts.push(`Step ${ironLoopState.currentStep} (${stepName})`);
+
+    // Show feature name only if actually tracking one
+    if (ironLoopState.feature) {
+      bannerParts.push(`Feature: ${ironLoopState.feature}`);
+    }
+
+    const banner = bannerParts.join(' | ') + '\n';
     writeToTerminal(banner);
 
-    // 6. Compute gate status for human decision gates
-    // Gate 1: Functional planning complete (step 3)
-    // Gate 2: Technical planning complete (step 6)
-    const gate1Passed = ironLoopState.steps[3]?.status === 'completed';
-    const gate2Passed = ironLoopState.steps[6]?.status === 'completed';
+    // 7. Compute gate status for human decision gates
+    // Gate 1: Functional planning complete (step 3 completed OR approved plan exists)
+    // Gate 2: Technical planning complete (step 6 completed OR approved plan exists)
+    const gate1Passed = ironLoopState.steps[3]?.status === 'completed' || !!planStatus.functional.approved;
+    const gate2Passed = ironLoopState.steps[6]?.status === 'completed' || !!planStatus.implementation.approved;
 
-    // 7. Output CTOC instructions for Claude's context
+    // 8. Output CTOC instructions for Claude's context
     // This is the key output that makes Claude "become" the CTO
     console.log('');
-    console.log(generateCTOCInstructions(stack, ironLoopState, { updateInfo, settings, gate1Passed, gate2Passed }));
+    console.log(generateCTOCInstructions(stack, ironLoopState, {
+      updateInfo,
+      settings,
+      gate1Passed,
+      gate2Passed,
+      planStatus
+    }));
 
   } catch (error) {
     console.error(`[CTOC ERROR] Session start failed: ${error.message}`);
