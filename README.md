@@ -3,38 +3,40 @@
 > "We are what we repeatedly do. Excellence, then, is not an act, but a habit."
 > — Will Durant
 
-## The Vision: An Army of CTOs
+## The Vision: An Army of AI Agents
 
-**CTOC creates an army of virtual CTOs** — Chief Technology Officers that solve business problems using technology.
+**CTOC gives you command of 75+ highly specialized AI agents** — each an expert in their domain, coordinated by a central CTO Chief agent that reports to you.
 
 ### Who Is The CTO Chief?
 
-**You are.**
+**You are the human CTO Chief** — the commander with final authority. The **cto-chief agent** is your AI counterpart that coordinates the entire agent army on your behalf.
 
-When you install CTOC, you become the **CTO Chief** — commanding an army of virtual CTOs, each specialized in a different technology domain.
+When you install CTOC, you gain command of this agent army. The cto-chief plans work, delegates to specialized agents, and reports results back to you.
+
 
 ```
                               Y O U
-                          CTO  Chief
-                               │
-            ┌──────────────────┼──────────────────┐
-            │                  │                  │
-            ▼                  ▼                  ▼
-      ┌──────────┐      ┌──────────┐      ┌──────────┐
-      │  Python  │      │TypeScript│      │   Rust   │  ...50 more
-      │   CTO    │      │   CTO    │      │   CTO    │
-      └────┬─────┘      └────┬─────┘      └────┬─────┘
-           │                 │                 │
-     ┌─────┼─────┐     ┌─────┼─────┐     ┌─────┼─────┐
-     │     │     │     │     │     │     │     │     │
-  FastAPI  │  PyTorch  │   React   │  Actix   │  Rocket
-        Django      Next.js     Vue       Axum
-                                                    ...200 total
+                       Human CTO Chief
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │   cto-chief     │
+                    │ (AI Coordinator)│
+                    └────────┬────────┘
+                             │
+      ┌──────────────────────┼──────────────────────┐
+      │                      │                      │
+      ▼                      ▼                      ▼
+┌───────────┐         ┌───────────┐         ┌───────────┐
+│ PLANNING  │         │IMPLEMENT  │         │SPECIALIST │
+│  AGENTS   │         │  AGENTS   │         │  AGENTS   │
+│  6 total  │         │  9 total  │         │  60 total │
+└───────────┘         └───────────┘         └───────────┘
 ```
 
-**50 languages. 200 frameworks. One methodology.**
+**75 agents. 50 languages. 200 frameworks. 14 quality dimensions.**
 
-Each CTO is adamant about quality — no shipping without tests, security, and docs.
+Each agent is adamant about quality — no shipping without tests, security, and docs. The impl-reviewer (final gate) checks ALL 14 quality dimensions before allowing any commit.
 
 ---
 
@@ -165,7 +167,7 @@ You should see:
 
 ```
 ═══════════════════════════════════════════════════════════════
-CTOC v1.3.0 installed successfully!
+CTOC v2.0.0 installed successfully!
 ═══════════════════════════════════════════════════════════════
 
 Files created/updated:
@@ -295,21 +297,21 @@ Define how to build it. Repeat until the approach is solid.
 
 ### Implementation (Steps 7-15)
 
-CTOC works autonomously. You can leave.
+CTOC works autonomously through its agent army. You can leave.
 
-| Step | Action | Description |
-|:----:|--------|-------------|
-| **7** | **TEST** | Write tests first. They must fail. |
-| **8** | **QUALITY** | Lint, format, type-check. |
-| **9** | **IMPLEMENT** | Write code until tests pass. |
-| **10** | **REVIEW** | Self-review. Refactor. |
-| **11** | **OPTIMIZE** | Check performance. |
-| **12** | **SECURE** | Security & accessibility audit. |
-| **13** | **DOCUMENT** | Update all documentation. |
-| **14** | **VERIFY** | Run full test suite. |
-| **15** | **COMMIT** | Commit with proper message. Create feature flag. |
+| Step | Action | Agent | Description |
+|:----:|--------|-------|-------------|
+| **7** | **TEST** | test-maker | Write tests first. They must fail. |
+| **8** | **QUALITY** | quality-checker | Lint, format, type-check. |
+| **9** | **IMPLEMENT** | implementer | Write code until tests pass. |
+| **10** | **REVIEW** | self-reviewer | Self-review. Can loop back to step 7. |
+| **11** | **OPTIMIZE** | optimizer | Check performance. |
+| **12** | **SECURE** | security-scanner | Security & accessibility audit. |
+| **13** | **VERIFY** | verifier | Run full test suite. |
+| **14** | **DOCUMENT** | documenter | Update all documentation. |
+| **15** | **FINAL-REVIEW** | impl-reviewer | Review against 14 quality dimensions. Commit when satisfied. |
 
-> **Result:** Feature complete. Ready for business review.
+> **Result:** Feature complete. impl-reviewer commits only when ALL 14 quality dimensions pass.
 
 ---
 
@@ -1019,77 +1021,123 @@ ctoc lock worktree remove feature-auth # Clean up
 
 ## Agent-Powered Automation
 
-CTOC uses 60 specialized agents to automate quality enforcement throughout the Iron Loop. Each agent is an expert in its domain, running at specific steps to ensure nothing is missed.
+**Claude Code IS the runtime.** CTOC v2.0 transforms Claude Code into a coordinated agent system. The CTO Chief commands an army of 60+ highly specialized agents, each an expert in their domain.
 
-### The Agent Architecture
+### The CTO Chief & Agent Army
+
+You are the **CTO Chief** — the human commander. When you invoke CTOC, the **cto-chief agent** (your AI counterpart) coordinates an army of specialized agents to execute your vision with precision.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      CTO-Chief (Coordinator)                   │
-│         Orchestrates agents • Resolves conflicts • Guides      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│   │   Testing   │  │   Quality   │  │  Security   │  ...       │
-│   │  9 agents   │  │  8 agents   │  │  5 agents   │            │
-│   └─────────────┘  └─────────────┘  └─────────────┘            │
-│                                                                 │
-│   Step 7: TEST     Step 8: QUALITY   Step 12: SECURE           │
-│   Step 14: VERIFY  Step 10: REVIEW                              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+                         Y O U
+                     CTO Chief (Human)
+                           │
+                           ▼
+         ┌─────────────────────────────────────┐
+         │         cto-chief (opus)            │
+         │  • Central coordinator              │
+         │  • Learning aggregator              │
+         │  • Decision maker                   │
+         │  • Reports back to you              │
+         └─────────────────────────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+   ┌─────────┐       ┌──────────┐       ┌──────────┐
+   │PLANNING │       │IMPLEMENT │       │SPECIALIST│
+   │ AGENTS  │       │  AGENTS  │       │  AGENTS  │
+   │ 6 total │       │ 9 total  │       │ 60 total │
+   └─────────┘       └──────────┘       └──────────┘
 ```
 
-### 60 Agents in 16 Categories
+### Core Agent Hierarchy (15 Agents)
 
-| Category | Agents | Purpose |
-|----------|--------|---------|
-| **Coordinator** | 1 | Orchestrates all agents, resolves conflicts |
-| **Testing Writers** | 4 | Write unit, integration, E2E, and property tests |
-| **Testing Runners** | 5 | Execute tests, report coverage, mutation testing |
-| **Quality** | 8 | Type checking, code review, complexity analysis |
-| **Security** | 5 | OWASP scanning, secrets detection, input validation |
-| **Specialized** | 11 | Performance, accessibility, database, API contracts |
-| **Frontend** | 3 | Visual regression, component testing, bundle analysis |
-| **Mobile** | 3 | iOS, Android, React Native validation |
+The Iron Loop is executed by 15 core agents, coordinated by the cto-chief:
+
+**Planning Phase (Steps 1-6)**
+| Agent | Model | Steps | Role |
+|-------|-------|-------|------|
+| functional-planner | opus | 1-3 | Understands problems, captures requirements |
+| functional-reviewer | opus | 3 | Reviews plans, approves or returns |
+| impl-planner | opus | 4-6 | Creates technical designs |
+| impl-plan-reviewer | opus | 6 | Reviews technical plans |
+| iron-loop-integrator | sonnet | 6 | Injects implementation steps 7-15 |
+
+**Implementation Phase (Steps 7-15)**
+| Agent | Model | Steps | Role |
+|-------|-------|-------|------|
+| test-maker | opus | 7 | Writes tests first (TDD Red) |
+| quality-checker | sonnet | 8, 10 | Lint, format, type-check |
+| implementer | sonnet | 9 | Writes the code |
+| self-reviewer | opus | 10 | Reviews own work, can loop back |
+| optimizer | sonnet | 11 | Performance improvements |
+| security-scanner | opus | 12 | Security vulnerability check |
+| verifier | sonnet | 13 | Runs ALL tests |
+| documenter | sonnet | 14 | Updates documentation |
+| impl-reviewer | opus | 15 | Final review against 14 quality dimensions |
+
+### Specialist Agent Army (60 Agents)
+
+Beyond the core 15, the cto-chief can invoke 60 specialist agents for deep expertise:
+
+| Category | Agents | Expertise |
+|----------|--------|-----------|
+| **Testing Writers** | 4 | Unit, integration, E2E, property tests |
+| **Testing Runners** | 5 | Execute tests, coverage, mutation testing |
+| **Quality** | 8 | Type checking, code review, complexity |
+| **Security** | 5 | OWASP, secrets, dependencies, concurrency |
+| **Specialized** | 11 | Performance, accessibility, database, APIs |
+| **Frontend** | 3 | Visual regression, components, bundles |
+| **Mobile** | 3 | iOS, Android, React Native |
 | **Infrastructure** | 4 | Terraform, Kubernetes, Docker, CI/CD |
-| **Documentation** | 2 | Auto-update docs, generate changelogs |
-| **Compliance** | 3 | GDPR, audit logging, license scanning |
-| **Data/ML** | 3 | Data quality, ML model validation |
-| **Cost** | 1 | Cloud cost optimization |
-| **AI Quality** | 2 | Detect AI hallucinations, review AI-generated code |
-| **Dev Experience** | 2 | Onboarding, deprecation warnings |
+| **Documentation** | 2 | Docs generation, changelogs |
+| **Compliance** | 3 | GDPR, audit, licenses |
+| **Data/ML** | 3 | Data quality, ML validation |
+| **AI Quality** | 2 | Hallucination detection, AI code review |
+| **Dev Experience** | 2 | Onboarding, deprecation |
 | **Versioning** | 3 | Breaking changes, feature flags, tech debt |
 
-### Lean Activation
+### 14 Quality Dimensions (ISO 25010)
 
-Agents only load when needed. Each Iron Loop step activates specific agents:
+The impl-reviewer checks ALL 14 dimensions before approving:
 
-| Step | Active Agents |
-|------|---------------|
-| **7: TEST** | unit-test-writer, integration-test-writer, e2e-test-writer |
-| **8: QUALITY** | type-checker, smoke-test-runner, ci-pipeline-checker |
-| **10: REVIEW** | code-reviewer, architecture-checker, consistency-checker |
-| **11: OPTIMIZE** | performance-profiler, memory-safety-checker, bundle-analyzer |
-| **12: SECURE** | security-scanner, secrets-detector, dependency-checker |
-| **13: DOCUMENT** | documentation-updater, changelog-generator |
-| **14: VERIFY** | unit-test-runner, integration-test-runner, e2e-test-runner |
+| # | Dimension | Key Checks |
+|---|-----------|------------|
+| 1 | Correctness | Tests meaningful, edge cases, business logic |
+| 2 | Completeness | All criteria met, implicit requirements |
+| 3 | Maintainability | Patterns, no smells, readable by junior |
+| 4 | Security | OWASP, validation, auth/authz |
+| 5 | Performance | No N+1, caching, response time |
+| 6 | Reliability | Error handling, retries, fault tolerance |
+| 7 | Compatibility | API backwards compat, integrations |
+| 8 | Usability | Error messages, clear output, docs |
+| 9 | Portability | No hardcoded paths, configurable |
+| 10 | Testing | 90% coverage, isolation, happy+error paths |
+| 11 | Accessibility | WCAG 2.2, screen reader, keyboard |
+| 12 | Observability | Logging, metrics, tracing, alerts |
+| 13 | Safety | No harm, graceful degradation |
+| 14 | Ethics/AI | Bias, fairness, explainability |
 
-### Hook System
+### Learning System
 
-CTOC uses hooks to enforce quality automatically:
+CTOC learns from every interaction:
 
-| Hook | When | What It Does |
-|------|------|--------------|
-| **SessionStart** | Claude Code opens | Detects stack, loads profiles, restores state |
-| **PreToolUse** | Before file edits | Validates against CTO profile red lines |
-| **PostToolUse** | After file edits | Runs quick quality checks |
-| **PreCompact** | Before context compaction | Saves Iron Loop progress |
-| **SessionEnd** | Claude Code closes | Persists state to `~/.ctoc/` |
+```
+.ctoc/learnings/
+├── pending/     # Awaiting your review
+├── approved/    # You confirmed the learning
+├── applied/     # Integrated into agent behavior
+└── rejected/    # Not applicable (documented why)
+```
+
+- **Dynamic confidence**: Learnings gain confidence when they work, lose it when they don't
+- **Re-evaluation**: Every 3 months, on conflicts, or when you request
+- **Per-project**: Learnings are git-tracked with your code
+- **Exportable**: Transfer learnings to other projects
 
 ### Profile Injection
 
-When agents run, they receive the relevant CTO profiles for your stack:
+Agents receive language and framework-specific guidance:
 
 ```
 Project: Python + FastAPI
@@ -1102,20 +1150,7 @@ Agent: security-scanner
        Receives: Python security checklist + FastAPI auth patterns
 ```
 
-This means agents enforce language-specific and framework-specific best practices automatically.
-
-### State Persistence
-
-Your progress is saved across sessions:
-
-```
-~/.ctoc/
-├── sessions/           # Daily session state
-├── iron-loop/          # Iron Loop progress per project
-└── skills/learned/     # Patterns learned from your usage
-```
-
-Close Claude Code, come back tomorrow, and CTOC remembers where you left off.
+This means agents enforce best practices specific to YOUR stack automatically.
 
 ---
 
