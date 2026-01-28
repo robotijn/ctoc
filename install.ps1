@@ -11,9 +11,10 @@
 
 $ErrorActionPreference = "Stop"
 
-$CTOC_VERSION = "2.0.0"
 $CTOC_REPO = "https://github.com/robotijn/ctoc"
 $CTOC_RAW = "https://raw.githubusercontent.com/robotijn/ctoc/main"
+$CTOC_VERSION = (Invoke-RestMethod -Uri "$CTOC_RAW/VERSION" -ErrorAction SilentlyContinue) -replace '\s',''
+if (-not $CTOC_VERSION) { $CTOC_VERSION = "unknown" }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Helper Functions
