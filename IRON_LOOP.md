@@ -64,7 +64,7 @@ IMPLEMENTATION PHASE (Steps 7-15)
 ## Current Work
 
 **Feature:** CTOC v2.0 — Agent System Transformation
-**Status:** Implementation
+**Status:** Implementation Complete
 **Started:** 2026-01-28
 
 ### Progress
@@ -74,7 +74,11 @@ IMPLEMENTATION PHASE (Steps 7-15)
       ├── [x] Delete old bash scripts
       ├── [x] Create operations-registry.yaml v2.0
       ├── [x] Create settings.yaml.template
-      └── [x] Create codebase-index template
+      ├── [x] Create codebase-index template
+      ├── [x] Fix hooks.json paths (${CLAUDE_PROJECT_DIR})
+      ├── [x] Add Node.js detection to install.sh
+      ├── [x] Add hooks setup to install.sh
+      └── [x] Create continuation.yaml state template
 
 [ ✓ ] Phase 2: Management Agents
       ├── [x] cto-chief
@@ -100,12 +104,17 @@ IMPLEMENTATION PHASE (Steps 7-15)
       ├── [x] Learning template
       └── [x] README documentation
 
-[ → ] Phase 5: CLI Admin (TUI)
-      └── [ ] Interactive dashboard
+[ ✓ ] Phase 5: Hooks Installation Fix
+      ├── [x] Update hooks.json with cross-platform paths
+      ├── [x] Add Node.js check to install.sh
+      ├── [x] Add Node.js check to install.ps1
+      ├── [x] Add hooks setup to installers
+      └── [x] Enhanced pre-compact.js with continuation.yaml
 
-[ → ] Phase 6: Documentation
+[ ✓ ] Phase 6: Documentation
       ├── [x] IRON_LOOP.md v2.0
-      └── [ ] Update README sections
+      ├── [x] Update README with Iron Loop explanation
+      └── [x] Create state management README
 ```
 
 ---
@@ -190,9 +199,9 @@ IMPLEMENTATION PHASE (Steps 7-15)
 
 ## Next Steps
 
-1. Complete Phase 5: CLI Admin TUI
-2. Update VERSION to 2.0.0
-3. Final testing of agent invocation
+1. Test hooks installation on fresh project
+2. Verify continuation.yaml saves correctly on compaction
+3. Final testing of agent invocation flow
 4. Commit and push v2.0
 
 ---

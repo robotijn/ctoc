@@ -109,6 +109,13 @@ The same methodology applies to all work:
 2. **Technical Planning**: Define how to build or write it
 3. **Implementation**: CTOC executes autonomously (code, documents, or both)
 
+For **code**, the Iron Loop ensures quality through structured phases:
+
+- **Steps 1-6 (Planning)**: Understand the problem, capture requirements, design the architecture. Two review gates ensure the plan is solid before any code is written.
+- **Steps 7-15 (Implementation)**: Write tests first (TDD), implement code, self-review, optimize, security scan, verify, document. Each step has a specialized agent.
+
+The impl-reviewer (Step 15) checks all **14 quality dimensions** before committing. No shortcuts, no exceptions.
+
 For **documents**, the Iron Loop adapts:
 
 - **Steps 1-6**: Plan the document structure, audience, and key messages
