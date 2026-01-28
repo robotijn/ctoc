@@ -95,33 +95,32 @@ layouts:
   8: Picture with Caption
 ```
 
-## Output Format
+## Output Structure
 
 ```yaml
 pptx_creation:
   status: "success|failed"
 
   output:
-    path: "path/to/output.pptx"
-    slides: 12
-    size_kb: 890
+    path: {output_file_path}
+    slides: {slide_count}
+    size_kb: {file_size}
 
   contents:
-    title_slides: 1
-    content_slides: 8
-    section_headers: 2
-    blank_slides: 1
-    images: 5
-    charts: 2
-    tables: 1
+    title_slides: {count}
+    content_slides: {count}
+    section_headers: {count}
+    images: {count}
+    charts: {count}
+    tables: {count}
 
-  speaker_notes: true
+  speaker_notes: true|false
 
-  errors: []
+  errors: [{any_errors}]
 
   iteration:
-    ready_for_review: true
-    suggested_improvements: []
+    ready_for_review: true|false
+    suggested_improvements: [{suggestions}]
 ```
 
 ## Tools

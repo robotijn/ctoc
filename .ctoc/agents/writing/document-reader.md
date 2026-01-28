@@ -133,47 +133,43 @@ for slide_num, slide in enumerate(prs.slides, 1):
     slides_content.append(slide_data)
 ```
 
-## Output Format
+## Output Structure
 
 ```yaml
 document_content:
-  file: "path/to/document"
+  file: {input_file_path}
   type: "pdf|docx|pptx"
 
   metadata:
-    pages: 10
-    author: "Author Name"
-    created: "2026-01-15"
-    modified: "2026-01-20"
+    pages: {count}
+    author: {if_available}
+    created: {date_if_available}
+    modified: {date_if_available}
 
   structure:
     # For PDF/DOCX
     headings:
-      - level: 1
-        text: "Chapter 1"
-        page: 1
-      - level: 2
-        text: "Section 1.1"
-        page: 2
+      - level: {heading_level}
+        text: {heading_text}
+        page: {page_number}
 
     # For PPTX
     slides:
-      - number: 1
-        title: "Presentation Title"
-        has_notes: true
+      - number: {slide_number}
+        title: {slide_title}
+        has_notes: true|false
 
   content:
-    text: |
-      Full extracted text...
+    text: {extracted_text}
 
     tables:
-      - page: 3
-        headers: ["Col1", "Col2"]
-        rows: [["data", "data"]]
+      - page: {page_number}
+        headers: [{column_headers}]
+        rows: [{row_data}]
 
     images:
-      - page: 2
-        description: "Chart showing revenue"
+      - page: {page_number}
+        description: {image_description_if_analyzable}
 
   extraction_quality:
     text: "high|medium|low"

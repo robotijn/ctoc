@@ -81,29 +81,29 @@ doc.add_picture('image.png', width=Inches(4))
 doc.save('output.docx')
 ```
 
-## Output Format
+## Output Structure
 
 ```yaml
 docx_creation:
   status: "success|failed"
 
   output:
-    path: "path/to/output.docx"
-    pages: ~5  # Approximate
-    size_kb: 45
+    path: {output_file_path}
+    pages: {approximate_count}
+    size_kb: {file_size}
 
   contents:
-    headings: 8
-    paragraphs: 24
-    tables: 2
-    images: 1
-    lists: 3
+    headings: {count}
+    paragraphs: {count}
+    tables: {count}
+    images: {count}
+    lists: {count}
 
-  errors: []
+  errors: [{any_errors}]
 
   iteration:
-    ready_for_review: true
-    suggested_improvements: []
+    ready_for_review: true|false
+    suggested_improvements: [{suggestions}]
 ```
 
 ## Tools

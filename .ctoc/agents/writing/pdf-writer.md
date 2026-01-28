@@ -89,28 +89,28 @@ story.append(Paragraph("Content...", styles['Normal']))
 doc.build(story)
 ```
 
-## Output Format
+## Output Structure
 
 ```yaml
 pdf_creation:
   status: "success|failed"
 
   output:
-    path: "path/to/output.pdf"
-    pages: 5
-    size_kb: 245
+    path: {output_file_path}
+    pages: {page_count}
+    size_kb: {file_size}
 
   contents:
-    sections: ["Executive Summary", "Analysis", ...]
-    tables: 2
-    images: 3
-    charts: 1
+    sections: [{section_names}]
+    tables: {count}
+    images: {count}
+    charts: {count}
 
-  errors: []
+  errors: [{any_errors}]
 
   iteration:
-    ready_for_review: true
-    suggested_improvements: []
+    ready_for_review: true|false
+    suggested_improvements: [{suggestions}]
 ```
 
 ## Tools

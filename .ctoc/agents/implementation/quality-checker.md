@@ -67,22 +67,22 @@ quality_report:
   linting:
     status: "pass|fail"
     issues:
-      - file: "path/to/file.py"
-        line: 42
-        rule: "E501"
-        message: "Line too long"
-        severity: "warning"
+      - file: {source_file}
+        line: {line_number}
+        rule: {rule_code}
+        message: {issue_description}
+        severity: "error|warning"
 
   formatting:
     status: "pass|fail"
-    files_formatted: ["list of auto-formatted files"]
+    files_formatted: [{list of auto-formatted files}]
 
   type_checking:
     status: "pass|fail"
     errors:
-      - file: "path/to/file.py"
-        line: 10
-        message: "Type mismatch"
+      - file: {source_file}
+        line: {line_number}
+        message: {type_error}
 
   complexity:
     status: "pass|fail"
