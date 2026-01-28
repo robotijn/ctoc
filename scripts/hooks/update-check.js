@@ -12,6 +12,26 @@ const VERSION_URL = 'https://raw.githubusercontent.com/robotijn/ctoc/main/VERSIO
 const CHECK_INTERVAL_HOURS = 24;
 
 /**
+ * Compare two semver versions
+ * Returns: 1 if a > b, -1 if a < b, 0 if equal
+ */
+function compareSemver(a, b) {
+  const parseVersion = (v) => {
+    const match = String(v).match(/^v?(\d+)\.(\d+)\.(\d+)/);
+    if (!match) return [0, 0, 0];
+    return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+  };
+
+  const [aMajor, aMinor, aPatch] = parseVersion(a);
+  const [bMajor, bMinor, bPatch] = parseVersion(b);
+
+  if (aMajor !== bMajor) return aMajor > bMajor ? 1 : -1;
+  if (aMinor !== bMinor) return aMinor > bMinor ? 1 : -1;
+  if (aPatch !== bPatch) return aPatch > bPatch ? 1 : -1;
+  return 0;
+}
+
+/**
  * Gets the current installed CTOC version
  */
 function getCurrentVersion() {
@@ -104,8 +124,8 @@ async function checkForUpdates() {
     };
     saveConfig(config);
 
-    // Compare versions (simple string comparison works for semver)
-    if (latestVersion && latestVersion !== currentVersion) {
+    // Only show update if latest is NEWER than current
+    if (latestVersion && compareSemver(latestVersion, currentVersion) > 0) {
       log(`Update available: ${currentVersion} → ${latestVersion}`);
       log(`Run 'ctoc update' to upgrade`);
     }
@@ -115,4 +135,4 @@ async function checkForUpdates() {
   }
 }
 
-module.exports = { checkForUpdates, getCurrentVersion, fetchLatestVersion };
+module.exports = { checkForUpdates, getCurrentVersion, fetchLatestVersion, compareSemver };

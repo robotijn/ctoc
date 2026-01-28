@@ -354,6 +354,12 @@ project:
   name: "$project_name"
   timezone: "$tz"  # For plan dating (distributed teams)
 
+# Update notifications
+# When an update is available, Claude will ask if you want to update
+updates:
+  prompt_on_startup: true   # Ask about updates when starting
+  auto_update: false        # Auto-update without asking (if prompt is off)
+
 # Research configuration
 research:
   enabled: true
@@ -831,6 +837,7 @@ main() {
         install_repo
         check_nodejs
         setup_hooks
+        setup_gitignore
         show_summary
         show_next_steps
     else

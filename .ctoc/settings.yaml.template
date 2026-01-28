@@ -126,6 +126,20 @@ admin:
   stats_level: basic
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Update Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+updates:
+  # Prompt user when updates are available on session start
+  # If true, Claude will ask the user if they want to update
+  # If false, updates are silently checked but not prompted
+  prompt_on_startup: true
+
+  # Auto-update without asking (only if prompt_on_startup is false)
+  # If true, updates are applied automatically in the background
+  auto_update: false
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Research Settings
 # ─────────────────────────────────────────────────────────────────────────────
 

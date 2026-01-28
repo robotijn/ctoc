@@ -30,7 +30,7 @@ const {
 const { detectStack, profileExists } = require('../lib/stack-detector');
 const { listProfiles } = require('../lib/profile-loader');
 const { generateCTOCInstructions } = require('../lib/ctoc-instructions');
-const { checkForUpdates, getCurrentVersion, fetchLatestVersion } = require('./update-check');
+const { checkForUpdates, getCurrentVersion, fetchLatestVersion, compareSemver } = require('./update-check');
 
 // ============================================================================
 // Settings
@@ -99,6 +99,31 @@ function parseYamlValue(value) {
 }
 
 // ============================================================================
+// Terminal Output
+// ============================================================================
+
+/**
+ * Write directly to terminal, bypassing stdout/stderr capture
+ * This allows the banner to be visible to users even when Claude Code
+ * captures hook output into the system prompt.
+ */
+function writeToTerminal(message) {
+  const isWindows = process.platform === 'win32';
+  const terminalDevice = isWindows ? 'CONOUT$' : '/dev/tty';
+
+  try {
+    const fd = fs.openSync(terminalDevice, 'w');
+    fs.writeSync(fd, message);
+    fs.closeSync(fd);
+    return true;
+  } catch (e) {
+    // Fallback to stderr (will go to Claude's context, but at least logged)
+    console.error(message.trim());
+    return false;
+  }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -114,7 +139,9 @@ async function main() {
       const currentVersion = getCurrentVersion();
 
       // Check if we have cached latest version from previous check
-      if (config.updates?.latest_version && config.updates.latest_version !== currentVersion) {
+      // Only show update if latest is NEWER than current
+      if (config.updates?.latest_version &&
+          compareSemver(config.updates.latest_version, currentVersion) > 0) {
         updateInfo = {
           available: true,
           current: currentVersion,
@@ -238,7 +265,8 @@ async function main() {
     const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
     const featureInfo = ironLoopState.feature ? ` | Feature: ${ironLoopState.feature}` : '';
 
-    console.error(`[CTOC] v${version} | ${language}/${framework} | Step ${ironLoopState.currentStep} (${stepName})${featureInfo}`);
+    const banner = `[CTOC] v${version} | ${language}/${framework} | Step ${ironLoopState.currentStep} (${stepName})${featureInfo}\n`;
+    writeToTerminal(banner);
 
     // 6. Compute gate status for human decision gates
     // Gate 1: Functional planning complete (step 3)
