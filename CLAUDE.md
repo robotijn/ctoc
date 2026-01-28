@@ -237,21 +237,41 @@ ctoc/
 | `ctoc lock setup-rerere` | Enable git rerere |
 | `ctoc lock worktree new <branch>` | Create parallel workspace |
 
+### How to Release
+
+**Always use the release script:**
+```bash
+./scripts/release.sh "feat: your feature description"
+```
+
+The script automatically:
+1. Reads current version from `VERSION`
+2. Bumps the patch version
+3. Writes new version to `VERSION`
+4. Stages all changes
+5. Commits with version suffix (e.g., `feat: add feature (v2.0.8)`)
+
+**Never manually:**
+- Edit the VERSION file
+- Type version numbers in commit messages
+
+The script guarantees the commit message version matches the VERSION file.
+
 ### Versioning Rules
 
 **Semantic Versioning:** `vX.Y.Z` (major.minor.patch)
 
 | Action | Version Change | Who Decides |
 |--------|----------------|-------------|
-| **Default (every commit)** | Patch: `vX.Y.Z` → `vX.Y.Z+1` | Automatic |
+| **Default (every commit)** | Patch: `vX.Y.Z` → `vX.Y.Z+1` | Automatic via release.sh |
 | **Minor version** | Minor: `vX.Y.Z` → `vX.Y+1.0` | User specifies |
 | **Major version** | Major: `vX.Y.Z` → `vX+1.0.0` | User specifies |
 
 **Rules:**
-1. Every commit automatically bumps the **patch** version
+1. Every commit automatically bumps the **patch** version via `release.sh`
 2. User says "minor version" → bump minor, reset patch to 0
 3. User says "major version" → bump major, reset minor and patch to 0
-4. Update `VERSION` file with each commit
+4. `release.sh` handles VERSION file updates automatically
 5. Update version references in install scripts if needed
 
 **Examples:**
