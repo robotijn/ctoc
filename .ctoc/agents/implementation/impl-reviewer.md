@@ -132,45 +132,34 @@ quality_dimensions:
     - Privacy preserved
 ```
 
-## Review Output Format
+## Review Output Structure
 
 ```yaml
 final_review:
   status: "approved|needs_work"
 
   dimension_scores:
-    correctness: 1.0
-    completeness: 0.95
-    maintainability: 1.0
-    security: 1.0
-    performance: 0.9
-    reliability: 1.0
-    compatibility: 1.0
-    usability: 1.0
-    portability: 1.0
-    testing: 0.95
-    accessibility: 1.0  # Or N/A
-    observability: 0.85
-    safety: 1.0
-    ethics_ai: "N/A"  # Or score
+    # Score each applicable dimension (0.0-1.0 or N/A)
+    # See 14 Quality Dimensions above
 
-  overall_score: 0.97
+  overall_score: {weighted average}
 
   issues:
-    - dimension: "observability"
-      issue: "Missing structured logging in auth module"
-      severity: "medium"
-      loop_to: 9  # implementer
+    # Any issues found, with severity and which step to address them
+    - dimension: {which quality dimension}
+      issue: {description}
+      severity: "critical|high|medium|low"
+      loop_to: {step number to address}
 
   reasoning: |
-    Overall the implementation is excellent. Minor observability
-    gap identified in auth module. Recommend adding structured
-    logging before final commit.
+    {Explanation of the review findings and decision rationale}
 
   decision:
-    action: "loop_back"  # or "approve"
-    steps_to_rerun: [9, 10]  # if looping
+    action: "approve|loop_back"
+    steps_to_rerun: [list of steps if looping]
 ```
+
+**Principle**: The final review is comprehensive but not pedantic. Focus on issues that materially affect quality. Always explain reasoning.
 
 ## Smart Loop-back Logic
 
