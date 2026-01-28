@@ -34,82 +34,52 @@ Transform the implementation plan into actionable steps for each phase:
 8. **Step 14: DOCUMENT** - List documentation needs
 9. **Step 15: FINAL-REVIEW** - Set impl-reviewer criteria
 
-## Output Format
+## Output Structure
+
+Generate an execution plan for each step, populated from the approved implementation plan:
 
 ```yaml
 iron_loop_execution:
   step_7_test:
     agent: test-maker
-    tasks:
-      - type: "unit"
-        target: "path/to/file.py"
-        coverage: ["Functions to test"]
-      - type: "integration"
-        target: "feature"
-        scenarios: ["Scenarios to test"]
+    # Derived from: specifications.tests_required
+    tasks: [{type, target, coverage from plan}]
 
   step_8_quality:
     agent: quality-checker
-    checks:
-      - lint: true
-      - format: true
-      - type_check: true
-    config:
-      strict: true
+    # Use project's configured checks
+    checks: [detected from project configuration]
 
   step_9_implement:
     agent: implementer
-    sub_tasks:
-      - name: setup_environment
-        actions: ["What to set up"]
-      - name: core_implementation
-        files:
-          - path: "path/to/file.py"
-            implementation: "What to implement"
-      - name: error_handling
-        patterns: ["Error handling approach"]
+    # Derived from: specifications.files_to_create, files_to_modify
+    sub_tasks: [{setup, core, error_handling from plan}]
 
   step_10_review:
     agent: self-reviewer
-    criteria:
-      - "Code follows patterns"
-      - "Tests pass"
-      - "No obvious issues"
+    # Criteria derived from plan's quality requirements
     invokes: [quality-checker]
     tdd_loop: true  # Can return to step 7
 
   step_11_optimize:
     agent: optimizer
-    targets:
-      - area: "Area to optimize"
-        metrics: ["What to measure"]
-    skip_if: "low complexity"
+    # Derived from: complexity estimate and performance requirements
+    skip_if: "low complexity or not performance-critical"
 
   step_12_secure:
     agent: security-scanner
-    scope:
-      - "Files to scan"
-    checks:
-      - owasp_top_10: true
-      - secrets: true
-      - dependencies: true
+    # Scope: all new/modified files from plan
+    checks: [standard security checks]
 
   step_13_verify:
     agent: verifier
-    test_suites:
-      - unit: true
-      - integration: true
-    coverage_threshold: 90
+    # Run project's test suites
+    coverage_threshold: from plan or project standards
 
   step_14_document:
     agent: documenter
-    updates:
-      - type: "docstring"
-        files: ["Files needing docs"]
-      - type: "readme"
-        if_needed: true
-      - type: "changelog"
-        entry: "What changed"
+    # Derived from: what was created/modified
+    updates: [docstrings, readme, changelog as needed]
 
   step_15_final_review:
     agent: impl-reviewer
@@ -117,6 +87,8 @@ iron_loop_execution:
     can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
     commit_on_pass: true
 ```
+
+**Principle**: The execution plan is populated from the implementation plan, not hardcoded. Each step's content is derived from the approved technical specifications.
 
 ## Transformation Rules
 

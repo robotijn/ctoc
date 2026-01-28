@@ -54,25 +54,27 @@ test_types:
 ```yaml
 quality_requirements:
   coverage:
-    minimum: 90%
-    target: 95%
+    follow: project's configured thresholds
+    default: aim for comprehensive coverage of new code
 
   test_attributes:
-    - Fast (milliseconds per test)
+    - Fast (minimize execution time)
     - Isolated (no test interdependency)
-    - Repeatable (same result every time)
-    - Self-validating (pass/fail is clear)
-    - Timely (written before code)
+    - Repeatable (deterministic results)
+    - Self-validating (clear pass/fail)
+    - Timely (written before implementation)
 
   naming:
-    pattern: "test_{function}_{scenario}_{expected_result}"
-    example: "test_login_invalid_password_returns_401"
+    follow: project's existing naming conventions
+    principle: names should describe what is being tested and expected outcome
 
   assertions:
     - One logical assertion per test
     - Clear failure messages
-    - No magic numbers
+    - Named constants over magic numbers
 ```
+
+**Convention detection**: Examine existing tests to understand the project's testing style, framework usage, and organizational patterns.
 
 ## Output Format
 
