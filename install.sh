@@ -122,12 +122,15 @@ check_nodejs() {
         print_step "Node.js detected: $node_version"
 
         echo ""
-        echo -e "${CYAN}CTOC works better with Node.js for:${NC}"
-        echo "  • Automatic state persistence (saves your progress)"
-        echo "  • Pre-edit code validation (catches issues early)"
-        echo "  • Commit gating (ensures workflow completion)"
+        echo -e "${CYAN}Node.js enables CTOC auto-start and advanced features:${NC}"
+        echo "  • Auto-start: CTOC activates when you run 'claude'"
+        echo "  • State persistence: Saves your Iron Loop progress"
+        echo "  • Code validation: Checks code against CTO profiles"
+        echo "  • Commit gating: Ensures workflow completion"
         echo ""
-        read -p "  Enable these features? [Y/n]: " response
+        echo -e "${BOLD}Without this, CTOC won't auto-activate and you'll need to manually invoke it.${NC}"
+        echo ""
+        read -p "  Enable CTOC auto-start? [Y/n]: " response
 
         if [[ "$response" =~ ^[Nn]$ ]]; then
             INSTALL_HOOKS=false
