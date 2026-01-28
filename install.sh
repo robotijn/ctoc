@@ -798,52 +798,19 @@ show_summary() {
     echo ""
 }
 
-show_menu() {
-    echo -e "${BOLD}What would you like to do?${NC}"
-    echo "  [1] Open Claude Code"
-    echo "  [2] Open Claude Code (with --dangerously-skip-permissions)"
-    echo "  [3] Run ctoc doctor (check installation)"
-    echo "  [4] View documentation"
-    echo "  [5] Exit"
+show_next_steps() {
+    echo -e "${BOLD}Next steps:${NC}"
     echo ""
-    read -p "Choice [1-5]: " choice
-
-    case $choice in
-        1)
-            echo ""
-            echo "Starting Claude Code..."
-            exec claude
-            ;;
-        2)
-            echo ""
-            echo "Starting Claude Code (skip permissions)..."
-            exec claude --dangerously-skip-permissions
-            ;;
-        3)
-            echo ""
-            .ctoc/ctoc doctor
-            ;;
-        4)
-            echo ""
-            if command -v xdg-open &>/dev/null; then
-                xdg-open "https://github.com/robotijn/ctoc" 2>/dev/null
-            elif command -v open &>/dev/null; then
-                open "https://github.com/robotijn/ctoc"
-            else
-                echo "Documentation: https://github.com/robotijn/ctoc"
-            fi
-            ;;
-        5|"")
-            echo ""
-            if [[ "$ALIAS_ADDED" == "true" ]]; then
-                echo "Run 'source ~/.bashrc' (or restart terminal) to use the 'ctoc' alias."
-            fi
-            echo "Then run 'claude' to start coding with your CTO!"
-            ;;
-        *)
-            echo "Invalid choice."
-            ;;
-    esac
+    if [[ "$ALIAS_ADDED" == "true" ]]; then
+        echo "  Run 'source ~/.bashrc' (or restart terminal) to use the 'ctoc' alias."
+        echo ""
+    fi
+    echo "  To start Claude Code:"
+    echo -e "    ${CYAN}claude${NC}"
+    echo ""
+    echo "  To start with skip permissions:"
+    echo -e "    ${CYAN}claude --dangerously-skip-permissions${NC}"
+    echo ""
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -865,7 +832,7 @@ main() {
         check_nodejs
         setup_hooks
         show_summary
-        show_menu
+        show_next_steps
     else
         # Fresh install flow
         print_info "No existing installation found"
@@ -876,7 +843,7 @@ main() {
         setup_gitignore
         setup_shell
         show_summary
-        show_menu
+        show_next_steps
     fi
 }
 
