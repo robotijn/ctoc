@@ -85,34 +85,34 @@ tdd_loop:
           reason: "Why needed"
 ```
 
-## Output Format
+## Output Structure
 
 ```yaml
 self_review:
   status: "pass|needs_work|needs_tests"
 
   quality_checker_results:
-    linting: "pass|fail"
-    formatting: "pass|fail"
-    type_checking: "pass|fail"
+    # Results from invoking quality-checker
+    automated_checks: {pass|fail for each check run}
 
   issues_found:
+    # List of issues with severity, location, and suggested fixes
     - severity: "high|medium|low"
-      file: "path/to/file.py"
-      line: 42
-      issue: "Description"
-      suggestion: "How to fix"
+      location: {file and line}
+      issue: {description}
+      suggestion: {how to fix}
 
   test_assessment:
-    coverage: 92
-    gaps:
-      - "Uncovered scenario"
+    coverage: {percentage from coverage tool}
+    gaps: [uncovered scenarios identified]
 
   decision:
     action: "proceed|fix|more_tests"
-    reason: "Why this decision"
-    loop_to: null  # or step number
+    reason: {why this decision was made}
+    loop_to: {step number if looping, null if proceeding}
 ```
+
+**Principle**: The review produces actionable insights, not just pass/fail. Every issue includes a suggestion for resolution.
 
 ## Tools
 

@@ -79,36 +79,37 @@ code_standards:
 6. Self-check against standards
 ```
 
-## Output Format
+## Output Structure
 
 ```yaml
 implementation:
   status: "complete|partial"
 
   files_created:
-    - path: "path/to/new_file.py"
-      purpose: "What it does"
-      lines: 150
+    # List of new files with purpose
+    - path: {actual file path}
+      purpose: {what the file does}
 
   files_modified:
-    - path: "path/to/existing.py"
-      changes: "What was changed"
-      lines_added: 25
-      lines_removed: 5
+    # List of changes to existing files
+    - path: {actual file path}
+      changes: {summary of changes}
 
   dependencies_added:
-    - name: "package-name"
-      version: "1.0.0"
-      reason: "Why needed"
+    # Any new packages required
+    - name: {package}
+      reason: {why needed}
 
   tests_status:
-    passing: 15
-    failing: 0
-    skipped: 0
+    # Current test results
+    passing: {count}
+    failing: {count}
 
   notes:
-    - "Any implementation notes"
+    # Implementation decisions or caveats
 ```
+
+**Principle**: Report what was done factually. Include reasoning for non-obvious decisions. Flag anything that deviates from the plan.
 
 ## Tools
 
