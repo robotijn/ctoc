@@ -11,7 +11,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$CTOC_VERSION = "1.1.0"
+$CTOC_VERSION = "2.0.0"
 $CTOC_REPO = "https://github.com/robotijn/ctoc"
 $CTOC_RAW = "https://raw.githubusercontent.com/robotijn/ctoc/main"
 
@@ -29,7 +29,7 @@ function Write-Banner {
  | |____   | | | |__| | |____
   \_____|  |_|  \____/ \_____|
 
-  CTO Chief - Your Army of Virtual CTOs
+  CTO Chief - Command your army of 75 AI agents
 
 "@ -ForegroundColor Cyan
 }
@@ -705,6 +705,11 @@ Write-Host ""
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host "  CTOC v$CTOC_VERSION installed successfully!" -ForegroundColor Green
 Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host ""
+Write-Host "  You are now the CTO Chief commanding:" -ForegroundColor Cyan
+Write-Host "    • 15 core agents (planning + implementation)"
+Write-Host "    • 60 specialist agents (language + framework CTOs)"
+Write-Host "    • 75 total AI agents at your command"
 Write-Host ""
 Write-Host "  Files created/updated:"
 Write-Host "    • CLAUDE.md          - CTO instructions (smart-merged)"

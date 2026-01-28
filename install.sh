@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CTOC - CTO Chief Installation Script v1.3.0
-#  "You are the CTO Chief. Claude is your army of CTOs."
+#  CTOC - CTO Chief Installation Script v2.0.0
+#  "You are the CTO Chief. Command your army of 75 AI agents."
 #
-#  Full repo clone approach: One git clone, all skills available, easy updates.
+#  Full repo clone approach: One git clone, all agents & skills available, easy updates.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="2.0.0"
 REPO_URL="https://github.com/robotijn/ctoc.git"
 REPO_RAW="https://raw.githubusercontent.com/robotijn/ctoc/main"
 
@@ -661,14 +661,17 @@ setup_shell() {
 show_summary() {
     local skill_count
     skill_count=$(find .ctoc/repo/.ctoc/skills -name "*.md" 2>/dev/null | wc -l || echo "261")
+    local agent_count
+    agent_count=$(find .ctoc/repo/.ctoc/agents -name "*.md" 2>/dev/null | wc -l || echo "15")
 
     echo ""
     echo -e "${GREEN}════════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}✓ CTOC installed successfully!${NC}"
+    echo -e "${GREEN}✓ CTOC v$VERSION installed successfully!${NC}"
     echo -e "${GREEN}════════════════════════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "${BOLD}Summary:${NC}"
     echo "  • Repository: cloned to .ctoc/repo/"
+    echo "  • Agents: 75 available ($agent_count core + 60 specialists)"
     echo "  • Skills: $skill_count available (50 languages, 200+ frameworks)"
     echo "  • Files: CLAUDE.md, IRON_LOOP.md, .ctoc/"
     if [[ "$ALIAS_ADDED" == "true" ]]; then

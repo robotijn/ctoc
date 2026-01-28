@@ -166,14 +166,15 @@ irm https://raw.githubusercontent.com/robotijn/ctoc/main/install.ps1 | iex
 You should see:
 
 ```
-═══════════════════════════════════════════════════════════════
-CTOC v2.0.0 installed successfully!
-═══════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════════
+✓ CTOC v2.0.0 installed successfully!
+════════════════════════════════════════════════════════════════════
 
-Files created/updated:
-  • CLAUDE.md          - CTO instructions (smart-merged)
-  • plans/             - Plan management (git-tracked)
-  • .ctoc/             - Skills library (261 skills available)
+Summary:
+  • Repository: cloned to .ctoc/repo/
+  • Agents: 75 available (15 core + 60 specialists)
+  • Skills: 261 available (50 languages, 200+ frameworks)
+  • Files: CLAUDE.md, IRON_LOOP.md, .ctoc/
 
 Next steps:
 1. Open Claude Code with: claude --dangerously-skip-permissions
