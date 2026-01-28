@@ -456,75 +456,7 @@ Files: 8 created
 Tests: 24 passing (94% coverage)
 Security: All checks passed
 
-Ready for business review at /review
 ```
-
----
-
-## Business Review
-
-Close the loop between development and business.
-
-### For Business Users
-
-No technical knowledge needed. Go to your app's review page:
-
-```
-https://yourapp.com/review
-```
-
-You'll see a simple interface:
-
-| Feature | Status | Action |
-|---------|--------|--------|
-| User Authentication | Ready for Review | **[Start Testing]** |
-| Order Tracking | In Development | — |
-
-#### Testing a Feature
-
-Click **Start Testing** and the feature is enabled for your account only.
-
-Test checklist example:
-
-- [ ] Create a new account
-- [ ] Log out
-- [ ] Log back in
-- [ ] Reset your password
-
-#### Your Decision
-
-| Decision | When to Use |
-|----------|-------------|
-| **Approve** | Feature works as expected. Ship it. |
-| **Approve with Changes** | Works, but needs minor fixes first. |
-| **Reject** | Needs significant rework. |
-
----
-
-### Feedback Loop
-
-Your feedback flows directly back to developers.
-
-Example: You approved with changes:
-
-> "Works great! Just show the password rules upfront instead of after failure."
-
-The developer sees this immediately:
-
-```
-CTOC: Business feedback received
-
-Feature: user-authentication
-Decision: Approved with Changes
-From: Sarah Chen (PM)
-
-Issue: Password requirements not shown until failure
-Fix: Display requirements before user types
-
-[1] Fix now  [2] Details  [3] Later
-```
-
-Claude Code can fix minor issues automatically. The feature goes back for re-testing if needed.
 
 ---
 
@@ -591,7 +523,6 @@ Step 14: VERIFY    ✓ 50 tests passing, 94% coverage
 Step 15: COMMIT    ✓ feat(auth): Add user authentication
 
 COMPLETE: user-authentication
-Ready for business review at /review
 ```
 
 ---
@@ -718,16 +649,6 @@ CTOC checks for updates once per day and prompts you if a new version is availab
 | `ctoc detect` | Detect technologies in project |
 | `ctoc detect languages` | Detect only languages |
 | `ctoc detect frameworks` | Detect only frameworks |
-
----
-
-## Dashboards
-
-| Dashboard | Who | Purpose |
-|-----------|-----|---------|
-| `ctoc` | Everyone | Plan and build features |
-| `/review` | Business users | Test and approve completed features |
-| `/admin` | Operations | Analytics, logs, feature flags |
 
 ---
 
