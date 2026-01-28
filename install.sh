@@ -482,7 +482,7 @@ create_wrapper_script() {
     cat > .ctoc/ctoc << 'WRAPPER'
 #!/bin/bash
 # CTOC Wrapper Script
-# Calls the actual script in repo/ and handles background update checks
+# Calls the Node.js CLI and handles background update checks
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$SCRIPT_DIR/repo"
@@ -542,8 +542,8 @@ case "${1:-}" in
         ;;
 esac
 
-# Call actual script
-exec "$REPO_DIR/.ctoc/bin/ctoc.sh" "$@"
+# Call Node.js CLI
+exec node "$REPO_DIR/.ctoc/bin/ctoc.js" "$@"
 WRAPPER
     chmod +x .ctoc/ctoc
 }
