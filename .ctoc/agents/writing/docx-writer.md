@@ -196,66 +196,22 @@ After creation:
 - If issues, return to **document-planner** for iteration
 - User can open in Word/LibreOffice for final edits
 
-## Example
+## Generation Process
 
-```python
-# Generated script for project proposal
-from docx import Document
-from docx.shared import Pt, Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+The DOCX writer generates Python scripts dynamically based on the document plan:
 
-doc = Document()
+1. **Parse plan structure** - Extract headings, content, tables, images
+2. **Generate script** - Create Python code using python-docx
+3. **Execute script** - Run to produce the document
+4. **Verify output** - Check file exists and is valid
 
-# Title
-title = doc.add_heading('Project Proposal', 0)
-title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+**Approach**:
+- Script structure follows the document plan's hierarchy
+- Content comes from plan, not hardcoded values
+- Styling matches plan specifications
+- Tables and images inserted based on plan structure
 
-# Subtitle
-subtitle = doc.add_paragraph('Prepared for: Client Name')
-subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-doc.add_page_break()
-
-# Table of Contents placeholder
-doc.add_heading('Table of Contents', level=1)
-doc.add_paragraph('[Auto-generated in Word]')
-
-doc.add_page_break()
-
-# Executive Summary
-doc.add_heading('Executive Summary', level=1)
-doc.add_paragraph('''
-This proposal outlines our approach to delivering the requested solution.
-Key highlights include...
-''')
-
-# Project Scope
-doc.add_heading('Project Scope', level=1)
-doc.add_heading('In Scope', level=2)
-for item in ['Feature A', 'Feature B', 'Feature C']:
-    doc.add_paragraph(item, style='List Bullet')
-
-doc.add_heading('Out of Scope', level=2)
-for item in ['Future enhancement X', 'Optional module Y']:
-    doc.add_paragraph(item, style='List Bullet')
-
-# Timeline
-doc.add_heading('Timeline', level=1)
-table = doc.add_table(rows=4, cols=3)
-table.style = 'Table Grid'
-headers = ['Phase', 'Duration', 'Deliverables']
-for i, header in enumerate(headers):
-    table.rows[0].cells[i].text = header
-
-data = [
-    ['Discovery', '2 weeks', 'Requirements doc'],
-    ['Development', '8 weeks', 'Working software'],
-    ['Testing', '2 weeks', 'Test reports'],
-]
-for row_idx, row_data in enumerate(data, 1):
-    for col_idx, cell_data in enumerate(row_data):
-        table.rows[row_idx].cells[col_idx].text = cell_data
-
-doc.save('project_proposal.docx')
-print('Created: project_proposal.docx')
-```
+**Template support**: Can also populate existing templates by:
+- Loading template document
+- Finding and replacing placeholders
+- Preserving template styling

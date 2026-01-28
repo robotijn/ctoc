@@ -39,9 +39,9 @@ function generateCTOCInstructions(stack, ironLoopState, options = {}) {
     const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
     const gate1Status = gate1Passed ? 'Passed' : 'Pending';
     const gate2Status = gate2Passed ? 'Passed' : 'Pending';
-    ironLoopStatus = `Step ${ironLoopState.currentStep} (${stepName}) | Feature: ${ironLoopState.feature} | Gate 1: ${gate1Status} | Gate 2: ${gate2Status}`;
+    ironLoopStatus = `Step ${ironLoopState.currentStep} (${stepName}) | Feature: ${ironLoopState.feature} | What: ${gate1Status} | How: ${gate2Status}`;
   } else {
-    ironLoopStatus = 'Ready for new feature | Gate 1: Pending | Gate 2: Pending';
+    ironLoopStatus = 'Ready for new feature | What: Pending | How: Pending';
   }
 
   // Build plan status section if we have plan info
@@ -132,11 +132,60 @@ Before technical decisions, ask:
 
 | Command | Action |
 |---------|--------|
-| ctoc | Show status |
+| ctoc | Show dashboard + options |
 | ctoc plan new "title" | Create functional plan |
 | ctoc plan status | View plan dashboard |
 | ctoc progress | Iron Loop progress |
+| ctoc admin | Full admin dashboard |
 | ctoc doctor | Check installation |
+
+## When User Types "ctoc"
+
+Display a combined dashboard and options view:
+
+\`\`\`
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  CTOC Dashboard                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  KANBAN                                                                       ║
+║  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐ ║
+║  │BACKLOG │ │FUNCTIONAL│ │TECHNICAL │ │ READY  │ │BUILDING│ │     DONE     │ ║
+║  │(drafts)│ │ PLANNING │ │ PLANNING │ │        │ │        │ │              │ ║
+║  │        │ │(steps1-3)│ │(steps4-6)│ │        │ │(7-15)  │ │ ✓ yesterday  │ ║
+║  │ (2)    │ │ (1)      │ │ (0)      │ │ (1)    │ │ (0)    │ │ ✓ today      │ ║
+║  └────────┘ └──────────┘ └──────────┘ └────────┘ └────────┘ └──────────────┘ ║
+║                                                                               ║
+║  What would you like to do?                                                   ║
+║                                                                               ║
+║  [1] Start a new feature  - "I need..."                                       ║
+║  [2] Continue planning    - Resume in-progress plan                           ║
+║  [3] Implement ready plan - Build approved feature (background)               ║
+║  [4] View all plans       - Detailed plan status                              ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+\`\`\`
+
+### Column Sources
+
+| Column | Iron Loop | Contents |
+|--------|-----------|----------|
+| Backlog | Pre-Iron Loop | Rough ideas, not yet started |
+| Functional Planning | Steps 1-3 | ASSESS → ALIGN → CAPTURE (with user) |
+| Technical Planning | Steps 4-6 | PLAN → DESIGN → SPEC (with user) |
+| Ready | Iron Loop Ready | Plans with steps 7-15 injected, awaiting execution |
+| Building | Steps 7-15 | Executing autonomously (background agent) |
+| Done | After Step 15 | Recently completed (today+yesterday, configurable) |
+
+- **Backlog → Step 1**: Pick an idea to start the Iron Loop
+- **Ready → Building**: Pick an Iron Loop Ready plan to execute in background
+
+### Display Rules
+
+1. Replace counts with actual counts from directories
+2. Show item names in columns when space allows
+3. Done column: show at minimum today's and yesterday's completed items
+4. If Ready column has items, offer to start background implementation
 
 ## Iron Loop (15 Steps) - NON-NEGOTIABLE
 
@@ -164,30 +213,64 @@ When creating NEW files, read the relevant skill first:
 ${planStatusSection}
 ## MANDATORY: Iron Loop Enforcement
 
-### Workflow with Human Decision Gates
+**THIS IS NOT OPTIONAL. YOU WILL NOT PROCEED WITHOUT FOLLOWING THIS.**
 
-**Steps 1-3: Functional Planning**
-- Work WITH user through ASSESS, ALIGN, CAPTURE
-- At step 3: Review the functional requirements
-- **ASK USER**: "Functional planning complete. Ready to proceed to technical planning?"
-- WAIT for human approval before step 4
+### RULE 1: Every Request is a Feature
 
-**Steps 4-6: Technical Planning**
-- Work WITH user through PLAN, DESIGN, SPEC
-- At step 6: Review the technical specification
-- **ASK USER**: "Technical spec complete. Ready to proceed to implementation?"
-- WAIT for human approval before step 7
+When user requests ANY substantial work:
+1. **IMMEDIATELY** create a feature context (mental or explicit)
+2. **START** at Step 1: ASSESS
+3. **DO NOT** skip to implementation
 
-**Steps 7+: Implementation**
-- ONLY after BOTH human approvals, use Edit/Write tools
+Example:
+\`\`\`
+User: "Add a login system"
 
-### Before ANY Edit/Write:
-1. Check current step (shown in status line above)
-2. If step < 7: STOP. Ask: "Planning not complete. Want to continue planning or skip?"
-3. If step >= 7: Proceed with implementation
+WRONG: Start writing login code
+RIGHT: "Let me understand what you need first. [Step 1: ASSESS]
+       - What authentication method?
+       - What user data to store?
+       - Any existing auth to integrate with?"
+\`\`\`
 
-### Escape Hatch
-User says "trivial fix", "quick fix", or "skip planning" → proceed directly without planning gates.
+### RULE 2: No Edit/Write Before Step 7
+
+**YOU WILL NOT** call Edit or Write tools until:
+- Steps 1-3 complete (functional plan approved by user)
+- Steps 4-6 complete (technical plan approved by user)
+- User has explicitly approved proceeding to implementation
+
+If you find yourself about to Edit/Write and you haven't done planning:
+**STOP. GO BACK. DO THE PLANNING.**
+
+### RULE 3: Gates Require Explicit User Approval
+
+At Step 3 (end of functional planning):
+→ "Here's what I understand we're building: [summary]. Ready to plan how to build it?"
+→ WAIT for user confirmation
+
+At Step 6 (end of technical planning):
+→ "Here's the implementation plan: [summary]. Ready to start building?"
+→ WAIT for user confirmation
+
+**DO NOT** auto-approve. **DO NOT** assume approval. **WAIT.**
+
+### RULE 4: Escape Hatch is USER-INITIATED Only
+
+The ONLY way to skip planning:
+- User explicitly says "skip planning", "quick fix", "trivial fix"
+- You NEVER suggest skipping
+- You NEVER skip on your own judgment
+
+### Self-Check Before Any Edit/Write
+
+Before EVERY Edit or Write call, ask yourself:
+1. What feature am I working on?
+2. What step am I on?
+3. Did user approve WHAT we're building (functional)?
+4. Did user approve HOW we'll build it (technical)?
+
+If ANY answer is unclear: **STOP AND ASK.**
 
 ${updateSection}${greetingInstruction}
 ---

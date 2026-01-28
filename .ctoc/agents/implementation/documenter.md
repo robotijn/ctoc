@@ -68,33 +68,20 @@ documentation:
 
 ## Docstring Standards
 
-```yaml
-docstring_format:
-  python: |
-    def function(param: str) -> bool:
-        """Short description.
+**Detect and follow the project's existing documentation conventions:**
 
-        Longer description if needed.
+1. Examine existing documented code for style patterns
+2. Check for documentation linter configurations
+3. Match the format already used in the codebase
+4. If no convention exists, use the language's standard format
 
-        Args:
-            param: Description of param.
-
-        Returns:
-            Description of return value.
-
-        Raises:
-            ValueError: When param is invalid.
-        """
-
-  typescript: |
-    /**
-     * Short description.
-     *
-     * @param param - Description of param
-     * @returns Description of return value
-     * @throws {Error} When something goes wrong
-     */
-```
+**Key documentation elements** (format varies by language):
+- Short description (first line)
+- Detailed description (if complex)
+- Parameters with types and descriptions
+- Return value description
+- Exceptions/errors that can be raised
+- Usage examples for complex functions
 
 ## Output Format
 

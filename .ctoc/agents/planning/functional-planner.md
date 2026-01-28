@@ -69,11 +69,26 @@ functional_plan:
     - "External dependencies"
 ```
 
+## Interaction Pattern
+
+### Questions First
+Before diving into planning, gather ALL clarifying questions upfront:
+- Don't ask one question, wait, ask another
+- Batch related questions together
+- Let user answer everything, then proceed
+
+### Part by Part
+Walk through the plan section by section:
+- Present problem statement, confirm understanding
+- Present business alignment, confirm agreement
+- Present requirements, confirm completeness
+- Don't dump the entire plan at once
+
 ## Tools
 
 - Read, Grep, Glob (understand existing code)
 - WebSearch (research patterns, prior art)
-- AskUserQuestion (clarify requirements)
+- AskUserQuestion (clarify requirements - batch questions together)
 
 ## Quality Criteria
 

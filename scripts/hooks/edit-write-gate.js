@@ -51,6 +51,22 @@ const DEFAULT_ESCAPE_PHRASES = [
 ];
 
 /**
+ * Default whitelist patterns for files that bypass enforcement
+ * These are typically config/docs files that don't need Iron Loop
+ */
+const DEFAULT_WHITELIST = [
+  '*.md',
+  '*.yaml',
+  '*.yml',
+  '*.json',
+  '*.toml',
+  '.gitignore',
+  '.env*',
+  '.ctoc/**',
+  '.local/**'
+];
+
+/**
  * Default enforcement mode
  */
 const DEFAULT_ENFORCEMENT_MODE = 'strict';
@@ -68,7 +84,8 @@ function loadEnforcementSettings(projectPath) {
 
   const defaults = {
     mode: DEFAULT_ENFORCEMENT_MODE,
-    escape_phrases: DEFAULT_ESCAPE_PHRASES
+    escape_phrases: DEFAULT_ESCAPE_PHRASES,
+    whitelist: DEFAULT_WHITELIST
   };
 
   try {
@@ -81,7 +98,8 @@ function loadEnforcementSettings(projectPath) {
 
     return {
       mode: settings.enforcement?.mode || defaults.mode,
-      escape_phrases: settings.enforcement?.escape_phrases || defaults.escape_phrases
+      escape_phrases: settings.enforcement?.escape_phrases || defaults.escape_phrases,
+      whitelist: settings.enforcement?.whitelist || defaults.whitelist
     };
   } catch (e) {
     return defaults;
@@ -169,6 +187,68 @@ function parseYamlValue(value) {
     return value.slice(1, -1);
   }
   return value;
+}
+
+// ============================================================================
+// Whitelist Matching
+// ============================================================================
+
+/**
+ * Convert a glob pattern to a regex
+ * Supports: *, **, ?
+ */
+function globToRegex(pattern) {
+  let regex = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // Escape special regex chars
+    .replace(/\*\*/g, '<<<GLOBSTAR>>>')     // Temp placeholder for **
+    .replace(/\*/g, '[^/]*')                // * matches anything except /
+    .replace(/<<<GLOBSTAR>>>/g, '.*')       // ** matches anything including /
+    .replace(/\?/g, '.');                   // ? matches single char
+
+  return new RegExp('^' + regex + '$');
+}
+
+/**
+ * Check if a file path matches any whitelist pattern
+ */
+function isWhitelisted(filePath, whitelist) {
+  if (!filePath || !whitelist) return false;
+
+  // Normalize path (remove leading ./ or /)
+  const normalized = filePath.replace(/^\.\//, '').replace(/^\//, '');
+
+  for (const pattern of whitelist) {
+    const regex = globToRegex(pattern);
+    if (regex.test(normalized)) {
+      return true;
+    }
+    // Also check just the filename for patterns like "*.md"
+    const filename = path.basename(normalized);
+    if (regex.test(filename)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Get the target file path from tool input
+ * Claude Code passes this via CLAUDE_TOOL_INPUT
+ */
+function getTargetFilePath() {
+  const toolInput = process.env.CLAUDE_TOOL_INPUT || '';
+
+  // Try to parse as JSON (Edit/Write tools send JSON)
+  try {
+    const parsed = JSON.parse(toolInput);
+    return parsed.file_path || parsed.path || null;
+  } catch {
+    // Not JSON, might be in a different format
+    // Look for file_path pattern in the raw input
+    const match = toolInput.match(/file_path['":\s]+([^'"\s,}]+)/);
+    return match ? match[1] : null;
+  }
 }
 
 // ============================================================================
@@ -349,11 +429,44 @@ async function main() {
     process.exit(0);
   }
 
+  // Check if target file is whitelisted (config, docs, etc.)
+  const targetFile = getTargetFilePath();
+  if (targetFile && isWhitelisted(targetFile, settings.whitelist)) {
+    // Whitelisted files bypass enforcement entirely
+    process.exit(0);
+  }
+
   // Load Iron Loop state
   const state = loadIronLoopState(projectPath);
 
-  // If no state or no feature, allow the operation (might be a new project setup)
+  // Check for escape phrase FIRST (before blocking for no feature)
+  const escapePhrase = checkEscapePhrase(settings.escape_phrases);
+
+  // If no state or no feature, check if this is a trivial/quick fix
   if (!state || !state.feature) {
+    if (escapePhrase) {
+      // User said "quick fix" / "trivial" - allow without feature context
+      console.log(`[CTOC] No feature context, but escape phrase "${escapePhrase}" detected. Proceeding.`);
+      process.exit(0);
+    }
+
+    if (settings.mode === 'strict') {
+      // Strict mode: require feature context
+      console.log('\n' + '='.repeat(60));
+      console.log('CTOC IRON LOOP - NO FEATURE CONTEXT');
+      console.log('='.repeat(60));
+      console.log('\nNo active feature. Before editing, you must:');
+      console.log('1. Start a feature: understand what you\'re building');
+      console.log('2. Go through planning (Steps 1-6)');
+      console.log('3. Get user approval at both gates');
+      console.log('\nOR say "quick fix" / "trivial fix" to bypass for small changes.');
+      console.log('\n' + '='.repeat(60) + '\n');
+      console.log('[CTOC] Edit/Write BLOCKED: No feature context.');
+      process.exit(1);
+    }
+
+    // Soft mode: allow but warn
+    console.log('[CTOC] Warning: No feature context. Consider starting the Iron Loop.');
     process.exit(0);
   }
 
@@ -364,8 +477,8 @@ async function main() {
     process.exit(0);
   }
 
-  // Check for escape phrases
-  const escapePhrase = checkEscapePhrase(settings.escape_phrases);
+  // escapePhrase already checked above for no-feature case
+  // Re-use it here for gate validation
 
   // Validate gates
   const gateResult = validateGates(projectPath, state, settings);

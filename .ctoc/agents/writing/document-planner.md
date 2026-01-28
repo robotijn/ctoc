@@ -156,32 +156,26 @@ After planning:
   - **docx-writer** for Word documents
   - **pptx-writer** for PowerPoint presentations
 
-## Example Interaction
+## Example Interaction Flow
 
 ```
 User: "Create a quarterly report PDF"
 
-Document Planner (5 seconds):
-document_plan:
-  type: pdf
-  title: "Q4 2026 Quarterly Report"
-  estimated_pages: 8
+Document Planner (seconds):
+1. Identify document type → PDF report
+2. Propose standard structure based on document type
+3. Ask clarifying questions in one batch
+4. Refine structure based on answers
+5. Hand off to pdf-writer
 
-  structure:
-    sections:
-      - Executive Summary (1 page)
-      - Financial Highlights (2 pages, charts)
-      - Key Achievements (2 pages)
-      - Challenges & Mitigations (1 page)
-      - Next Quarter Outlook (1 page)
-      - Appendix (1 page)
-
-  needs_input:
-    - "Which quarter and year?"
-    - "Include financial data or just narrative?"
-
-  next_action: clarify
+Clarifications to gather:
+- Time period and context
+- Audience and formality level
+- Data sources and what to include
+- Any specific sections required
 
 → After clarification → pdf-writer creates document
 → User reviews → iterate with document-planner
 ```
+
+**Principle**: Plan rapidly, clarify efficiently, iterate quickly. The structure emerges from understanding the purpose, not from templates.
