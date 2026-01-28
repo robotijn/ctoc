@@ -166,6 +166,55 @@ agents:
     can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
     highest_standards: true  # Checks all 14 quality dimensions
 
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  WRITING AGENTS (Document Creation)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  document-planner:
+    path: agents/writing/document-planner.md
+    model: haiku
+    category: writing
+    description: Fast document structure planning for rapid iteration
+    always_available: true
+    dependencies:
+      python: []  # No deps for planning
+
+  pdf-writer:
+    path: agents/writing/pdf-writer.md
+    model: sonnet
+    category: writing
+    description: Create professional PDF documents
+    dependencies:
+      python: [fpdf2, reportlab, Pillow]
+    auto_install: true
+
+  docx-writer:
+    path: agents/writing/docx-writer.md
+    model: sonnet
+    category: writing
+    description: Create Microsoft Word documents
+    dependencies:
+      python: [python-docx, Pillow]
+    auto_install: true
+
+  pptx-writer:
+    path: agents/writing/pptx-writer.md
+    model: sonnet
+    category: writing
+    description: Create PowerPoint presentations
+    dependencies:
+      python: [python-pptx, Pillow]
+    auto_install: true
+
+  document-reader:
+    path: agents/writing/document-reader.md
+    model: sonnet
+    category: writing
+    description: Read and extract content from PDF, DOCX, PPTX files
+    dependencies:
+      python: [PyPDF2, pdfplumber, python-docx, python-pptx, Pillow]
+    auto_install: true
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  IRON LOOP v2.0
 # ═══════════════════════════════════════════════════════════════════════════════
