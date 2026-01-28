@@ -28,6 +28,7 @@ const {
 const { detectStack, profileExists } = require('../lib/stack-detector');
 const { listProfiles } = require('../lib/profile-loader');
 const { generateCTOCInstructions } = require('../lib/ctoc-instructions');
+const { checkForUpdates } = require('./update-check');
 
 // ============================================================================
 // Main
@@ -37,6 +38,9 @@ async function main() {
   try {
     // Ensure CTOC directories exist
     ensureDirectories();
+
+    // Check for updates (non-blocking, throttled to once/day)
+    checkForUpdates().catch(() => {});
 
     const projectPath = process.cwd();
     const ctocRoot = getCTOCRoot();
