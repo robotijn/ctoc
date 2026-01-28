@@ -1,0 +1,132 @@
+# Implementation Plan: {{TITLE}}
+
+> Created: {{DATE}}
+> Status: Draft
+> Author: {{AUTHOR}}
+> Based on: {{FUNCTIONAL_PLAN}}
+
+---
+
+## 4. PLAN - Technical Approach
+
+### Solution Overview
+<!-- High-level description of the technical solution -->
+
+### Technology Choices
+| Component | Technology | Rationale |
+|-----------|------------|-----------|
+| | | |
+
+### Architecture Decision Records (ADRs)
+<!-- Key decisions with context -->
+
+#### ADR-1: {{Decision Title}}
+- **Context**: What is the issue?
+- **Decision**: What did we decide?
+- **Consequences**: What are the trade-offs?
+
+### Risk Assessment
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| | Medium | High | |
+
+---
+
+## 5. DESIGN - Architecture
+
+### System Architecture
+<!-- Diagram or description of system components -->
+
+```
+┌─────────────┐     ┌─────────────┐
+│             │────▶│             │
+│             │     │             │
+└─────────────┘     └─────────────┘
+```
+
+### Data Model
+<!-- Key entities and relationships -->
+
+### API Design
+<!-- Key endpoints or interfaces -->
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| | | |
+
+### Security Design
+<!-- Authentication, authorization, data protection -->
+
+---
+
+## 6. SPEC - Technical Specification
+
+### File Changes
+<!-- What files will be created/modified -->
+| File | Action | Description |
+|------|--------|-------------|
+| | Create | |
+| | Modify | |
+
+### Implementation Steps
+<!-- Ordered steps for implementation -->
+1. [ ] Step 1
+2. [ ] Step 2
+3. [ ] Step 3
+
+### Test Plan
+<!-- What tests will be written -->
+| Test Type | Coverage | Files |
+|-----------|----------|-------|
+| Unit | | |
+| Integration | | |
+| E2E | | |
+
+### Dependencies
+<!-- External dependencies or prerequisite work -->
+- [ ] Dependency 1
+- [ ] Dependency 2
+
+### Rollback Plan
+<!-- How to undo if things go wrong -->
+
+---
+
+## Implementation Checklist
+
+Before starting implementation:
+
+- [ ] Architecture is documented
+- [ ] Data model is designed
+- [ ] API contracts are defined
+- [ ] Security considerations addressed
+- [ ] Test plan is complete
+- [ ] Rollback strategy defined
+- [ ] Dependencies identified
+
+---
+
+## Approval
+
+**Status**: Pending Approval
+
+To approve this plan, the user should confirm:
+"Technical spec complete. Ready to proceed to implementation."
+
+---
+
+## Post-Approval: Iron Loop Steps 7-15
+
+After approval, Claude will proceed with:
+- **Step 7 (TEST)**: Write failing tests first (TDD Red)
+- **Step 8 (QUALITY)**: Set up linting, formatting, type checking
+- **Step 9 (IMPLEMENT)**: Write code to make tests pass (TDD Green)
+- **Step 10 (REVIEW)**: Self-review against CTO standards
+- **Step 11 (OPTIMIZE)**: Performance optimization
+- **Step 12 (SECURE)**: Security audit
+- **Step 13 (DOCUMENT)**: Update documentation
+- **Step 14 (VERIFY)**: Full test suite verification
+- **Step 15 (COMMIT)**: Commit with confidence
+
+---
+
+*This document follows the CTOC Iron Loop methodology (Steps 4-6: PLAN, DESIGN, SPEC)*

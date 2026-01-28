@@ -48,18 +48,38 @@ data_residency:
 iron_loop:
   # Strictness: strict (default), moderate, relaxed
   strictness: "strict"
-  
+
   # Minimum critique rounds before implementation
   min_critique_rounds: 2
-  
+
   # Test coverage threshold (percentage)
   coverage_threshold: 80
-  
+
   # Auto-commit after successful implementation
   auto_commit: true
-  
+
   # Create feature flags for new features
   create_feature_flags: true
+
+# Iron Loop Enforcement
+# Controls whether Edit/Write operations are blocked before planning is complete
+enforcement:
+  # Mode: strict | soft | off
+  # - strict: Blocks edit/write until both planning gates pass (recommended)
+  # - soft: Warns but allows operations to proceed
+  # - off: No enforcement (not recommended for production projects)
+  mode: "strict"
+
+  # Escape phrases that bypass strict enforcement
+  # Say any of these to proceed without completing planning
+  escape_phrases:
+    - "skip planning"
+    - "skip iron loop"
+    - "quick fix"
+    - "trivial fix"
+    - "trivial change"
+    - "hotfix"
+    - "urgent"
 
 # Quality Gates
 quality:

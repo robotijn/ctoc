@@ -1,0 +1,99 @@
+# Functional Plan: {{TITLE}}
+
+> Created: {{DATE}}
+> Status: Draft
+> Author: {{AUTHOR}}
+
+---
+
+## 1. ASSESS - Problem Understanding
+
+### Business Context
+<!-- What business problem are we solving? -->
+
+### Current State
+<!-- What exists today? What's not working? -->
+
+### Impact
+<!-- Who is affected? How significant is this? -->
+
+---
+
+## 2. ALIGN - Business Alignment
+
+### Business Goals
+<!-- What are the specific business objectives? -->
+
+### Success Metrics
+<!-- How will we measure success? Be specific. -->
+- [ ] Metric 1:
+- [ ] Metric 2:
+- [ ] Metric 3:
+
+### Stakeholders
+<!-- Who needs to approve? Who will use this? -->
+| Stakeholder | Role | Approval Needed |
+|-------------|------|-----------------|
+| | | |
+
+### Constraints
+<!-- Budget, timeline, technical, regulatory constraints -->
+
+---
+
+## 3. CAPTURE - Requirements
+
+### Functional Requirements
+<!-- What must the system do? -->
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-1 | | Must | |
+| FR-2 | | Must | |
+| FR-3 | | Should | |
+
+### Non-Functional Requirements
+<!-- Performance, security, scalability requirements -->
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-1 | Performance | |
+| NFR-2 | Security | |
+| NFR-3 | Scalability | |
+
+### User Stories
+<!-- Who wants what and why -->
+```
+As a [user type]
+I want to [action]
+So that [benefit]
+```
+
+### Out of Scope
+<!-- Explicitly what we are NOT doing -->
+-
+-
+
+---
+
+## Approval Checklist
+
+Before moving to technical planning:
+
+- [ ] Business problem clearly defined
+- [ ] Success metrics are measurable
+- [ ] Requirements are complete and prioritized
+- [ ] Stakeholders have reviewed
+- [ ] Constraints are documented
+- [ ] Scope boundaries are clear
+
+---
+
+## Approval
+
+**Status**: Pending Approval
+
+To approve this plan, the user should confirm:
+"Functional planning complete. Ready to proceed to technical planning."
+
+---
+
+*This document follows the CTOC Iron Loop methodology (Steps 1-3: ASSESS, ALIGN, CAPTURE)*
