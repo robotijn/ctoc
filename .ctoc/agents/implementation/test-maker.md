@@ -76,26 +76,26 @@ quality_requirements:
 
 **Convention detection**: Examine existing tests to understand the project's testing style, framework usage, and organizational patterns.
 
-## Output Format
+## Output Structure
 
 ```yaml
 tests_created:
   files:
-    - path: "tests/test_feature.py"
+    # List of test files created
+    - path: {test_file_path}
       tests:
-        - name: "test_function_happy_path"
-          type: "unit"
-          description: "Tests normal operation"
-        - name: "test_function_edge_case"
-          type: "unit"
-          description: "Tests boundary condition"
+        - name: {test_name}
+          type: "unit|integration|e2e"
+          description: {what this test verifies}
 
   coverage:
-    target_files: ["src/feature.py"]
-    estimated_coverage: "95%"
+    target_files: [{files being tested}]
+    estimated_coverage: {percentage}
 
   status: "red"  # Tests fail (no implementation yet)
 ```
+
+**Principle**: Tests are created based on the plan's specifications and requirements, not hardcoded. Test organization follows the project's existing patterns.
 
 ## Tools
 

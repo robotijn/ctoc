@@ -83,7 +83,7 @@ documentation:
 - Exceptions/errors that can be raised
 - Usage examples for complex functions
 
-## Output Format
+## Output Structure
 
 ```yaml
 documentation_report:
@@ -91,31 +91,33 @@ documentation_report:
 
   updates:
     docstrings:
-      - file: "src/auth.py"
-        function: "login"
-        added: true
+      # List of functions/classes documented
+      - file: {source_file}
+        element: {function or class name}
+        added: true|false
 
     readme:
-      updated: true
-      sections: ["API Changes"]
+      updated: true|false
+      sections: [{updated sections}]
 
     changelog:
-      added: true
-      entry: |
-        ### Added
-        - User authentication via OAuth
+      added: true|false
+      entry: {changelog text}
 
     api_docs:
-      updated: true
-      format: "OpenAPI 3.1"
+      updated: true|false
+      format: {documentation format used}
 
   skipped:
-    - type: "architecture_diagram"
-      reason: "No structural changes"
+    # Documentation types intentionally skipped
+    - type: {doc_type}
+      reason: {why skipped}
 
   warnings:
-    - "Consider updating onboarding docs"
+    # Suggestions for future documentation improvements
 ```
+
+**Principle**: Document what changed based on the actual implementation. Changelog entries are derived from the feature, not templated.
 
 ## Tools
 

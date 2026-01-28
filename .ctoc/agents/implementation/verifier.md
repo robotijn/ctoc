@@ -81,49 +81,49 @@ coverage:
     - "__init__.py"
 ```
 
-## Output Format
+## Output Structure
 
 ```yaml
 verification_report:
   status: "pass|fail"
 
   tests:
-    total: 150
-    passed: 148
-    failed: 2
-    skipped: 0
-    errors: 0
-    duration: "45.2s"
+    total: {count}
+    passed: {count}
+    failed: {count}
+    skipped: {count}
+    duration: {time}
 
   failures:
-    - test: "test_login_invalid_password"
-      file: "tests/test_auth.py"
-      line: 42
-      error: "AssertionError: Expected 401, got 200"
-      stdout: "..."
+    # Details for each failed test
+    - test: {test_name}
+      file: {test_file}
+      error: {error_message}
 
   coverage:
-    overall: 92.5
+    overall: {percentage}
     by_file:
-      - file: "src/auth.py"
-        line: 95
-        branch: 88
-      - file: "src/users.py"
-        line: 90
-        branch: 82
+      # Coverage per source file
+      - file: {source_file}
+        line: {line_coverage}
+        branch: {branch_coverage}
     uncovered:
-      - file: "src/auth.py"
-        lines: [45, 67, 89]
+      # Files with coverage gaps
+      - file: {source_file}
+        lines: [{uncovered_lines}]
 
   performance:
     slowest_tests:
-      - test: "test_large_data_import"
-        duration: "5.2s"
+      - test: {test_name}
+        duration: {time}
 
   artifacts:
-    coverage_report: "htmlcov/index.html"
-    junit_xml: "test-results.xml"
+    # Generated reports
+    coverage_report: {path}
+    junit_xml: {path if generated}
 ```
+
+**Principle**: Report actual test results factually. Include enough detail for debugging failures but don't overwhelm with passing test details.
 
 ## Tools
 
