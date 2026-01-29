@@ -1,16 +1,16 @@
 #!/bin/bash
-# CTOC Release Script - Ensures version consistency
+# CTOC Release Script - Sequential Commit Queue
 # Usage: ./scripts/release.sh "commit message"
 #
-# This script:
-# 1. Reads current version from VERSION file
-# 2. Bumps the patch version
-# 3. Writes new version to VERSION
-# 4. Stages all changes
-# 5. Commits with auto-generated version suffix
+# This script uses the commit queue for sequential version bumping,
+# preventing race conditions when multiple agents commit in parallel.
 #
-# The version in the commit message is READ from the file after bumping,
-# so it's impossible for version mismatch to occur.
+# The script:
+# 1. Acquires an exclusive lock
+# 2. Bumps the patch version atomically
+# 3. Stages all changes
+# 4. Commits with auto-generated version suffix
+# 5. Releases the lock
 
 set -euo pipefail
 
@@ -29,38 +29,31 @@ fi
 
 cd "$CTOC_ROOT"
 
-# Read current version
-if [[ ! -f VERSION ]]; then
-    echo "Error: VERSION file not found"
+# Use Node.js commit queue for atomic operations
+RESULT=$(node -e "
+const queue = require('./scripts/lib/commit-queue.js');
+const result = queue.directCommit('$MESSAGE');
+if (result.success) {
+    console.log('SUCCESS:' + result.version + ':' + (result.previousVersion || ''));
+} else {
+    console.error('ERROR:' + result.error);
+    process.exit(1);
+}
+")
+
+# Parse result
+if [[ "$RESULT" == SUCCESS:* ]]; then
+    VERSION=$(echo "$RESULT" | cut -d: -f2)
+    PREV_VERSION=$(echo "$RESULT" | cut -d: -f3)
+
+    echo ""
+    echo "Released v${VERSION}"
+    if [[ -n "$PREV_VERSION" ]]; then
+        echo "  (bumped from v${PREV_VERSION})"
+    fi
+    echo ""
+    echo "To push: git push origin main"
+else
+    echo "Release failed: $RESULT"
     exit 1
 fi
-
-VERSION=$(cat VERSION)
-IFS='.' read -r major minor patch <<< "$VERSION"
-
-# Validate version format
-if [[ -z "$major" || -z "$minor" || -z "$patch" ]]; then
-    echo "Error: Invalid version format in VERSION file: $VERSION"
-    echo "Expected format: X.Y.Z"
-    exit 1
-fi
-
-# Bump patch version
-NEW_VERSION="${major}.${minor}.$((patch + 1))"
-
-# Write new version
-echo "$NEW_VERSION" > VERSION
-
-# Stage all changes including VERSION
-git add -A
-
-# Commit with auto-generated version suffix
-# Use --no-verify to skip pre-commit/commit-msg hooks since we handle versioning here
-git commit --no-verify -m "${MESSAGE} (v${NEW_VERSION})
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
-
-echo ""
-echo "Released v${NEW_VERSION}"
-echo ""
-echo "To push: git push origin main"

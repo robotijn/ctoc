@@ -1,14 +1,14 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  CTOC Operations Registry v2.0.0
+# ===============================================================================
+#  CTOC Operations Registry v2.1.0
 #  Single source of truth for all agents, Iron Loop, and quality matrix
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
-schema_version: "2.0.0"
-updated: "2026-01-28"
+schema_version: "2.1.0"
+updated: "2026-01-29"
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Core Principles
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #
 #  1. NEVER block humans - Agents advise only, never prevent user actions
 #  2. Claude Code IS the runtime - No separate runtime needed
@@ -16,7 +16,7 @@ updated: "2026-01-28"
 #  4. Self-improvement - Every run can trigger learning
 #  5. Everything is an agent - Tiered by complexity
 #
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Token budget for Claude Code context
 token_budget:
@@ -29,14 +29,14 @@ models:
   default: haiku           # Minimum model (configurable in settings)
   fallback_chain: [opus, sonnet, haiku]
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  AGENTS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 agents:
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
   #  COORDINATOR
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
 
   cto-chief:
     path: agents/coordinator/cto-chief.md
@@ -46,16 +46,18 @@ agents:
     steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     always_available: true
 
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
   #  PLANNING AGENTS (Steps 1-6)
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
 
-  functional-planner:
-    path: agents/planning/functional-planner.md
+  product-owner:
+    path: agents/planning/product-owner.md
     model: opus
     category: planning
-    description: Creates functional plans (steps 1-3)
+    description: Creates functional plans with BDD specs (steps 1-3)
     steps: [1, 2, 3]
+    methodology: BDD
+    output_format: user_stories_with_scenarios
 
   functional-reviewer:
     path: agents/planning/functional-reviewer.md
@@ -66,15 +68,15 @@ agents:
     review_gate: true
     on_reject: goto_step_1
 
-  impl-planner:
-    path: agents/planning/impl-planner.md
+  implementation-planner:
+    path: agents/planning/implementation-planner.md
     model: opus
     category: planning
     description: Creates implementation plans (steps 4-6)
     steps: [4, 5, 6]
 
-  impl-plan-reviewer:
-    path: agents/planning/impl-plan-reviewer.md
+  implementation-plan-reviewer:
+    path: agents/planning/implementation-plan-reviewer.md
     model: opus
     category: planning
     description: Reviews implementation plans
@@ -89,9 +91,9 @@ agents:
     description: Injects Iron Loop steps 7-15 into implementation plan
     steps: [6]
 
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
   #  IMPLEMENTATION AGENTS (Steps 7-15)
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
 
   test-maker:
     path: agents/implementation/test-maker.md
@@ -131,8 +133,9 @@ agents:
     path: agents/implementation/optimizer.md
     model: sonnet
     category: implementation
-    description: Performance improvements
+    description: Performance improvements and code simplification
     steps: [11]
+    gate: all_tests_must_pass
 
   security-scanner:
     path: agents/implementation/security-scanner.md
@@ -155,8 +158,8 @@ agents:
     description: Update documentation
     steps: [14]
 
-  impl-reviewer:
-    path: agents/implementation/impl-reviewer.md
+  implementation-reviewer:
+    path: agents/implementation/implementation-reviewer.md
     model: opus
     category: implementation
     description: Final review of steps 7-14, can loop back, commits when satisfied
@@ -166,9 +169,9 @@ agents:
     can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
     highest_standards: true  # Checks all 14 quality dimensions
 
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
   #  WRITING AGENTS (Document Creation)
-  # ─────────────────────────────────────────────────────────────────────────────
+  # -----------------------------------------------------------------------------
 
   document-planner:
     path: agents/writing/document-planner.md
@@ -215,41 +218,71 @@ agents:
       python: [PyPDF2, pdfplumber, python-docx, python-pptx, Pillow]
     auto_install: true
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  IRON LOOP v2.0
-# ═══════════════════════════════════════════════════════════════════════════════
+  # -----------------------------------------------------------------------------
+  #  ADMIN AGENTS
+  # -----------------------------------------------------------------------------
+
+  dashboard:
+    path: agents/admin/dashboard.md
+    model: sonnet
+    category: admin
+    description: Terminal-based admin dashboard with kanban view
+    always_available: true
+
+  learning-applier:
+    path: agents/admin/learning-applier.md
+    model: sonnet
+    category: admin
+    description: Applies approved learnings to agent behavior
+
+  learning-suggester:
+    path: agents/admin/learning-suggester.md
+    model: sonnet
+    category: admin
+    description: Suggests new learnings based on interactions
+
+# ===============================================================================
+#  IRON LOOP v2.1
+# ===============================================================================
 
 iron_loop:
-  version: "2.0"
+  version: "2.1"
 
-  planning_phase:
+  # Phase 1: Functional Planning (Product Owner)
+  functional_planning:
     - step: 1
       name: ASSESS
       description: Problem understanding
-      agents: [cto-chief, functional-planner]
+      agents: [cto-chief, product-owner]
     - step: 2
       name: ALIGN
       description: User goals & business objectives
-      agents: [functional-planner]
+      agents: [product-owner]
     - step: 3
       name: CAPTURE
-      description: Requirements & success criteria
-      agents: [functional-planner, functional-reviewer]
+      description: Requirements as BDD specs (user stories + scenarios)
+      agents: [product-owner, functional-reviewer]
       review_gate: functional-reviewer
+      human_gate: true  # User must approve before Phase 2
+
+  # Phase 2: Implementation Planning (Technical)
+  implementation_planning:
     - step: 4
       name: PLAN
       description: Technical approach
-      agents: [impl-planner]
+      agents: [implementation-planner]
     - step: 5
       name: DESIGN
       description: Architecture design
-      agents: [impl-planner]
+      agents: [implementation-planner]
     - step: 6
       name: SPEC
       description: Detailed specifications
-      agents: [impl-planner, impl-plan-reviewer, iron-loop-integrator]
-      review_gate: impl-plan-reviewer
+      agents: [implementation-planner, implementation-plan-reviewer, iron-loop-integrator]
+      review_gate: implementation-plan-reviewer
+      human_gate: true  # User must approve before Iron Loop Ready
 
+  # Phase 3: Implementation (Autonomous)
   implementation_phase:
     - step: 7
       name: TEST
@@ -270,7 +303,7 @@ iron_loop:
       tdd_loop: true  # Can loop back to step 7
     - step: 11
       name: OPTIMIZE
-      description: Performance improvements
+      description: Performance improvements + code simplification
       agents: [optimizer]
     - step: 12
       name: SECURE
@@ -287,13 +320,59 @@ iron_loop:
     - step: 15
       name: FINAL-REVIEW
       description: Reviews 7-14 with highest standards, can loop back, commits when satisfied
-      agents: [impl-reviewer]
-      review_gate: impl-reviewer
+      agents: [implementation-reviewer]
+      review_gate: implementation-reviewer
       can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
+      human_gate: true  # User must approve commit/push
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  KANBAN BOARD (5 Columns)
+# ===============================================================================
+
+kanban:
+  columns:
+    - id: functional_planning
+      name: "Functional Planning"
+      description: "Steps 1-3: Product Owner drafts BDD specs"
+      steps: [1, 2, 3]
+      human_gate_after: true
+
+    - id: implementation_planning
+      name: "Implementation Planning"
+      description: "Steps 4-6: Technical approach and architecture"
+      steps: [4, 5, 6]
+      human_gate_after: true
+
+    - id: iron_loop_ready
+      name: "Iron Loop Ready"
+      description: "Plan complete, awaiting execution start"
+      steps: []
+
+    - id: in_development
+      name: "In Development"
+      description: "Steps 7-14: Autonomous implementation"
+      steps: [7, 8, 9, 10, 11, 12, 13, 14]
+      action_names:
+        7: "Testing"
+        8: "Quality Check"
+        9: "Implementing"
+        10: "Self Review"
+        11: "Optimizing"
+        12: "Security Scan"
+        13: "Verifying"
+        14: "Documenting"
+
+    - id: final_review
+      name: "Final Review"
+      description: "Step 15: Human approval for commit"
+      steps: [15]
+      human_gate_after: true
+
+  # No WIP limits - user decides how much to work on
+
+# ===============================================================================
 #  QUALITY MATRIX (14 Dimensions - ISO 25010 aligned)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 quality_matrix:
   # Default threshold (1.0 = perfect)
@@ -399,9 +478,9 @@ quality_matrix:
         - data_consent
         - privacy_preserved
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  LEARNING CONFIGURATION
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 learning:
   enabled: true
@@ -434,9 +513,9 @@ learning:
     command: "ctoc learning export"
     to_global: true           # Can transfer to Claude /memory
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CODEBASE INDEX
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 codebase_index:
   location:
@@ -460,9 +539,9 @@ codebase_index:
     on_commit: verify
     checksum_mismatch: rebuild_affected
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ERROR HANDLING
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 error_handling:
   agent_failure:
@@ -478,9 +557,9 @@ error_handling:
     action: interactive_fix
     prompt_user: true
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  /ctoc SKILL COMMANDS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 skill_commands:
   ctoc:

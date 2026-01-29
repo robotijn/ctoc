@@ -36,7 +36,7 @@ quality:
     safety: true
     ethics_ai: auto          # Auto-enable for AI projects
 
-  # impl-reviewer always explains its reasoning
+  # implementation-reviewer always explains its reasoning
   explain_reasoning: true
 
   # Custom emphasis (multiplier for specific dimensions)
