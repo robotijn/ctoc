@@ -133,27 +133,21 @@ function parseYamlSettings(content) {
       continue;
     }
 
-    // Check for subsection (2 spaces, key followed by colon)
-    const subsectionMatch = line.match(/^  (\w+):(\s*)$/);
-    if (subsectionMatch && currentSection) {
-      currentSubsection = subsectionMatch[1];
-      settings[currentSection][currentSubsection] = {};
+    // Check for key-value pair at section level (has value after colon)
+    const sectionKVMatch = line.match(/^  (\w+):\s*(.+)$/);
+    if (sectionKVMatch && currentSection) {
+      const [, key, value] = sectionKVMatch;
+      settings[currentSection][key] = parseYamlValue(value);
       inArray = false;
       continue;
     }
 
-    // Check for key-value pair at section level
-    const sectionKVMatch = line.match(/^  (\w+):\s*(.+)$/);
-    if (sectionKVMatch && currentSection && !currentSubsection) {
-      const [, key, value] = sectionKVMatch;
-      settings[currentSection][key] = parseYamlValue(value);
-      continue;
-    }
-
-    // Check for array start
-    const arrayMatch = line.match(/^  (\w+):\s*$/);
-    if (arrayMatch && currentSection) {
-      arrayKey = arrayMatch[1];
+    // Check for array start or subsection (key followed by colon, no value)
+    // We treat these the same - if next lines are array items, it's an array
+    // Otherwise it becomes an empty object (subsection placeholder)
+    const keyOnlyMatch = line.match(/^  (\w+):\s*$/);
+    if (keyOnlyMatch && currentSection) {
+      arrayKey = keyOnlyMatch[1];
       settings[currentSection][arrayKey] = [];
       inArray = true;
       continue;
@@ -161,7 +155,8 @@ function parseYamlSettings(content) {
 
     // Check for array item
     if (inArray && currentSection && arrayKey) {
-      const itemMatch = line.match(/^\s+-\s*["']?([^"']+)["']?$/);
+      // Match array item, handling optional quotes and inline comments
+      const itemMatch = line.match(/^\s+-\s*["']?([^"'#]+)["']?/);
       if (itemMatch) {
         settings[currentSection][arrayKey].push(itemMatch[1].trim());
         continue;

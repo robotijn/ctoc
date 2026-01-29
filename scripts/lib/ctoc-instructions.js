@@ -77,7 +77,34 @@ function generateCTOCInstructions(stack, ironLoopState, options = {}) {
     : 'Detect from file extensions when creating files';
 
   // Extract options
-  const { updateInfo, settings } = options;
+  const { updateInfo, settings, backgroundImplementationInfo } = options;
+
+  // Build background implementation section
+  let backgroundSection = '';
+  if (backgroundImplementationInfo && backgroundImplementationInfo.queuedPlans > 0) {
+    const planCount = backgroundImplementationInfo.queuedPlans;
+    const planNames = backgroundImplementationInfo.planNames.slice(0, 3).join(', ');
+    const moreCount = planCount > 3 ? ` (+${planCount - 3} more)` : '';
+
+    backgroundSection = `
+## Background Implementation Available
+
+**${planCount} plan${planCount > 1 ? 's' : ''} queued for implementation:**
+${planNames}${moreCount}
+
+The user has been shown the background implementation menu.
+Wait for their selection (1, 2, 2a-2j, 3, or S) before proceeding.
+
+**When user selects:**
+- **1 (Per plan)**: Ask permission before starting each plan
+- **2 (Check-in)**: Start implementation, pause at selected interval for check-in
+- **2a-2j**: Check-in at specific intervals (5, 10, 15, 20, 30, 45, 60, 90, 120, 180 min)
+- **3 (Auto-continue)**: Implement all plans without asking
+- **S (Skip)**: Don't start background implementation now
+
+${backgroundImplementationInfo.showUsageLink ? 'Usage link shown: https://claude.ai/settings/usage' : ''}
+`;
+  }
 
   // Build update notification section
   let updateSection = '';
@@ -215,6 +242,18 @@ ${planStatusSection}
 
 **THIS IS NOT OPTIONAL. YOU WILL NOT PROCEED WITHOUT FOLLOWING THIS.**
 
+### CRITICAL: Hook Enforcement Active
+
+**THIS WILL BE ENFORCED BY HOOKS - YOU CANNOT BYPASS THIS.**
+
+The edit-write-gate hook will BLOCK your Edit/Write operations if:
+- No feature context exists (you must start Iron Loop)
+- Current step < 7 (planning phases not complete)
+- No escape phrase detected from user
+
+**If you attempt Edit/Write before Step 7, you WILL BE BLOCKED.**
+The ONLY way to bypass: user explicitly says "skip planning" or "quick fix".
+
 ### RULE 1: Every Request is a Feature
 
 When user requests ANY substantial work:
@@ -239,6 +278,10 @@ RIGHT: "Let me understand what you need first. [Step 1: ASSESS]
 - Steps 1-3 complete (functional plan approved by user)
 - Steps 4-6 complete (technical plan approved by user)
 - User has explicitly approved proceeding to implementation
+
+**HOOK ENFORCEMENT:** The edit-write-gate hook monitors all Edit/Write calls.
+If step < 7, your operation will be BLOCKED with exit code 1.
+This is not a suggestion - it is technical enforcement.
 
 If you find yourself about to Edit/Write and you haven't done planning:
 **STOP. GO BACK. DO THE PLANNING.**
@@ -271,7 +314,7 @@ Before EVERY Edit or Write call, ask yourself:
 4. Did user approve HOW we'll build it (technical)?
 
 If ANY answer is unclear: **STOP AND ASK.**
-
+${backgroundSection}
 ${updateSection}${greetingInstruction}
 ---
 These CTOC instructions provide METHODOLOGY (how to work).

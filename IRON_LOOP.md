@@ -22,7 +22,10 @@ PHASE 2: IMPLEMENTATION PLANNING (Steps 4-6) - Technical Role
 5. DESIGN        Architecture design                [implementation-planner]
 6. SPEC          Detailed specifications            [implementation-plan-reviewer] ◄──┐
    └─► Reject? Back to Step 4 ─────────────────────────────────────────────────────────┘
-   └─► Approve → [iron-loop-integrator] injects 7-15
+   └─► Approve → [iron-loop-plan-integrator] + [iron-loop-plan-critic] refine
+       ├── 10 rounds max refinement (5-dimension rubric)
+       ├── All 5/5? → Iron-solid execution plan
+       └── Max rounds? → Auto-approve + Deferred Questions for Step 15
    └─► HUMAN GATE: User approves technical approach
 
 PHASE 3: IMPLEMENTATION (Steps 7-15) - Autonomous
@@ -181,6 +184,83 @@ This ensures crashed sessions are distinguishable from cleanly ended ones.
 
 ---
 
+## Integrator + Critic Loop
+
+When an implementation plan is approved at Step 6, the **Integrator** and **Critic** agents work together to create an iron-solid execution plan through iterative refinement.
+
+### How It Works
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│              INTEGRATOR + CRITIC REFINEMENT LOOP                  │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Input: Approved Implementation Plan                              │
+│                                                                   │
+│  Round 1:                                                         │
+│    [Integrator] → Creates detailed execution plan (Steps 7-15)   │
+│    [Critic]     → Scores 5 dimensions (all must be 5/5)          │
+│                                                                   │
+│  If any < 5:                                                      │
+│    Critic provides: reason + suggested fix                        │
+│    Integrator refines plan                                        │
+│    Loop continues...                                              │
+│                                                                   │
+│  Termination:                                                     │
+│    - All 5/5: Iron-solid plan ready                              │
+│    - Max rounds (10): Auto-approve + Deferred Questions          │
+│                                                                   │
+│  Output: plans/execution/{plan-name}.md                          │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 5-Dimension Rubric
+
+| Dimension | Key Checks |
+|-----------|------------|
+| **Completeness** | All steps have actions? All modules covered? 80% test coverage baseline? |
+| **Clarity** | Unambiguous instructions? Single responsibility? Self-documenting? |
+| **Edge Cases** | Error handling? Fallback behavior? Rollback plan? Timeout handling? |
+| **Efficiency** | Minimal steps? No redundancy? Parallelizable? Token budget reasonable? |
+| **Security** | OWASP Top 10? Input validation? No secrets? Protected endpoints? |
+
+### Deferred Questions
+
+When max rounds (10) is reached and some dimensions still score < 5, unresolved issues become **Deferred Questions**. These are:
+
+1. Stored with the execution plan
+2. Presented to the user at Step 15 (FINAL-REVIEW)
+3. Formatted with context, options, and pros/cons
+
+Example:
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║  DEFERRED QUESTION 1 of 2                                            ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  Context: Round 7 - edge_cases scored 4/5                            ║
+║  Issue:   Network timeout handling not specified                     ║
+║  Step:    9 (IMPLEMENT)                                              ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  How should network timeouts be handled?                             ║
+║                                                                      ║
+║  [A] Retry 3 times with exponential backoff                          ║
+║  [B] Fail immediately with clear error message                       ║
+║  [C] Make retry count a user setting — *Recommended*                 ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+### Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `integration.max_rounds` | 10 | Maximum refinement rounds |
+| `integration.quality_threshold` | 5 | All dimensions must meet this |
+| `integration.auto_approve_after_max` | true | Auto-approve after max rounds |
+| `integration.defer_unresolved` | true | Store unresolved as Deferred Questions |
+
+---
+
 ## 3 Human Gates
 
 | Gate | Transition | User Decision |
@@ -268,7 +348,8 @@ This ensures crashed sessions are distinguishable from cleanly ended ones.
 | functional-reviewer | opus | 3 | Review Gate |
 | implementation-planner | opus | 4-6 | Technical Planning |
 | implementation-plan-reviewer | opus | 6 | Review Gate |
-| iron-loop-integrator | sonnet | 6 | Transition |
+| iron-loop-plan-integrator | opus | 6 | Creates execution plans |
+| iron-loop-plan-critic | opus | 6 | Reviews execution plans (5-dim rubric) |
 | test-maker | opus | 7 | TDD Red |
 | quality-checker | sonnet | 8,10 | Quality |
 | implementer | sonnet | 9 | Code |
@@ -293,7 +374,8 @@ This ensures crashed sessions are distinguishable from cleanly ended ones.
 │   ├── functional-reviewer.md
 │   ├── implementation-planner.md   # RENAMED from impl-planner
 │   ├── implementation-plan-reviewer.md  # RENAMED from impl-plan-reviewer
-│   └── iron-loop-integrator.md
+│   ├── iron-loop-plan-integrator.md     # NEW - Creates execution plans
+│   └── iron-loop-plan-critic.md         # NEW - 5-dimension rubric review
 ├── implementation/
 │   ├── test-maker.md
 │   ├── quality-checker.md
@@ -342,6 +424,25 @@ This ensures crashed sessions are distinguishable from cleanly ended ones.
 - Learning system: per-project, git-tracked
 - Phase 1 uses BDD methodology (user stories + scenarios)
 - 3 human gates ensure user control at key transitions
+
+---
+
+### Plans Directory
+```
+plans/
+├── functional/
+│   ├── draft/              # Functional plans being written
+│   └── approved/           # Approved functional plans
+├── implementation/
+│   ├── draft/              # Implementation plans being written
+│   └── approved/           # Approved implementation plans
+├── execution/              # NEW - Iron-solid execution plans
+│   └── {date}-{name}.md    # Generated by Integrator+Critic loop
+├── todo/                   # Backlog
+├── in_progress/            # Currently being worked on
+├── review/                 # Awaiting review
+└── done/                   # Completed
+```
 
 ---
 
