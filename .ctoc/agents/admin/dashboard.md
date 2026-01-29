@@ -17,39 +17,39 @@ You are the **Dashboard Agent** - responsible for displaying the CTOC admin dash
 
 ## Terminal UI Layout
 
-### Full Dashboard View (5 Columns)
+### Full Dashboard View (6 Columns)
 ```
-+-----------------------------------------------------------------------------+
-|  CTOC Dashboard                                                    v2.1.0   |
-+-----------------------------------------------------------------------------+
-|                                                                             |
-|  KANBAN                                                                     |
-|  +------------+ +------------+ +------------+ +------------+ +------------+ |
-|  | FUNCTIONAL | |IMPLEMENTAT.| | IRON LOOP  | |    IN      | |   FINAL    | |
-|  |  PLANNING  | |  PLANNING  | |   READY    | | DEVELOPMENT| |  REVIEW    | |
-|  +------------+ +------------+ +------------+ +------------+ +------------+ |
-|  | o login    | | o api-auth | | o payments | | > user-mgmt| | * reports  | |
-|  |   Aligning | |   Designing| |            | | Implementing| |            | |
-|  | o dashboard| |            | |            | |            | |            | |
-|  |   Assessing| |            | |            | |            | |            | |
-|  +------------+ +------------+ +------------+ +------------+ +------------+ |
-|       |              |                                             |        |
-|    [HUMAN]        [HUMAN]                                       [HUMAN]     |
-|                                                                             |
-|  METRICS                                                                    |
-|  --------                                                                   |
-|  Lead Time (avg):    4.2 days    |  Throughput:     2.1 features/week       |
-|  Cycle Time (avg):   2.8 days    |  In Progress:    3 items                 |
-|                                                                             |
-|  What would you like to do?                                                 |
-|                                                                             |
-|  [1] Start a new feature  - "I need..."                                     |
-|  [2] Continue planning    - Resume in-progress plan          (2 in progress)|
-|  [3] Implement ready plan - Build approved feature               (1 ready) |
-|  [4] Review ready items   - Approve completed work                (1 ready)|
-|  [5] View all plans       - Detailed plan status                            |
-|                                                                             |
-+-----------------------------------------------------------------------------+
++-------------------------------------------------------------------------------------------+
+|  CTOC Dashboard                                                                  v2.1.0   |
++-------------------------------------------------------------------------------------------+
+|                                                                                           |
+|  KANBAN                                                                                   |
+|  +----------+ +----------+ +----------+ +----------+ +----------+ +----------+            |
+|  |FUNCTIONAL| |  IMPL    | |  READY   | | BUILDING | |  HUMAN   | |   DONE   |            |
+|  | PLANNING | | PLANNING | |          | |  (7-14)  | |  REVIEW  | |          |            |
+|  +----------+ +----------+ +----------+ +----------+ +----------+ +----------+            |
+|  | o login  | | o api-auth| | payments | | > user   | | * reports| | ✓ auth   |            |
+|  | Aligning | | Designing | |          | | Step 9   | | Awaiting | | ✓ config |            |
+|  | o dash   | |           | |          | |          | |          | |          |            |
+|  | Assessing| |           | |          | |          | |          | |          |            |
+|  +----------+ +----------+ +----------+ +----------+ +----------+ +----------+            |
+|       |            |                                      |                               |
+|    [HUMAN]      [HUMAN]                                [HUMAN]                            |
+|                                                                                           |
+|  METRICS                                                                                  |
+|  --------                                                                                 |
+|  Lead Time (avg):    4.2 days    |  Throughput:     2.1 features/week                     |
+|  Cycle Time (avg):   2.8 days    |  In Progress:    3 items                               |
+|                                                                                           |
+|  What would you like to do?                                                               |
+|                                                                                           |
+|  [1] Start a new feature  - "I need..."                                                   |
+|  [2] Continue planning    - Resume in-progress plan                      (2 in progress) |
+|  [3] Implement ready plan - Build approved feature                           (1 ready)   |
+|  [4] Review completed     - Approve for DONE (human_review_gate)             (1 ready)   |
+|  [5] View all plans       - Detailed plan status                                          |
+|                                                                                           |
++-------------------------------------------------------------------------------------------+
 ```
 
 **Note**: Values are populated dynamically from actual project data.
@@ -86,7 +86,7 @@ Menu options are shown/hidden based on available items in the kanban columns:
 |  [2] View all plans       - Detailed plan status                            |
 ```
 
-### 5 Kanban Columns
+### 6 Kanban Columns
 
 | Column | Steps | Description | Human Gate |
 |--------|-------|-------------|------------|
@@ -94,7 +94,10 @@ Menu options are shown/hidden based on available items in the kanban columns:
 | Implementation Planning | 4-6 | Technical approach and architecture | Yes - After approval |
 | Iron Loop Ready | - | Plan complete, awaiting execution | No |
 | In Development | 7-14 | Autonomous implementation | No |
-| Final Review | 15 | Human approval for commit | Yes - Commit/Back |
+| Human Review | 15 | Human approval before DONE | Yes - Approve/Back |
+| Done | - | Completed and approved | - |
+
+**Note:** The Human Review column enforces the `implementation.human_review_gate` setting (default: true). Features cannot move to DONE without explicit human approval.
 
 ### Action Names in "In Development" Column
 

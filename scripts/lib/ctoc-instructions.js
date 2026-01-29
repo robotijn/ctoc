@@ -171,26 +171,27 @@ Before technical decisions, ask:
 Display a combined dashboard and options view:
 
 \`\`\`
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║  CTOC Dashboard                                                               ║
-╠═══════════════════════════════════════════════════════════════════════════════╣
-║                                                                               ║
-║  KANBAN                                                                       ║
-║  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐ ║
-║  │BACKLOG │ │FUNCTIONAL│ │TECHNICAL │ │ READY  │ │BUILDING│ │     DONE     │ ║
-║  │(drafts)│ │ PLANNING │ │ PLANNING │ │        │ │        │ │              │ ║
-║  │        │ │(steps1-3)│ │(steps4-6)│ │        │ │(7-15)  │ │ ✓ yesterday  │ ║
-║  │ (2)    │ │ (1)      │ │ (0)      │ │ (1)    │ │ (0)    │ │ ✓ today      │ ║
-║  └────────┘ └──────────┘ └──────────┘ └────────┘ └────────┘ └──────────────┘ ║
-║                                                                               ║
-║  What would you like to do?                                                   ║
-║                                                                               ║
-║  [1] Start a new feature  - "I need..."                                       ║
-║  [2] Continue planning    - Resume in-progress plan                           ║
-║  [3] Implement ready plan - Build approved feature (background)               ║
-║  [4] View all plans       - Detailed plan status                              ║
-║                                                                               ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════════════════════════════╗
+║  CTOC Dashboard                                                                           ║
+╠═══════════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                           ║
+║  KANBAN                                                                                   ║
+║  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐  ║
+║  │BACKLOG │ │FUNCTIONAL│ │TECHNICAL │ │ READY  │ │BUILDING│ │ REVIEW │ │     DONE     │  ║
+║  │(drafts)│ │ PLANNING │ │ PLANNING │ │        │ │ (7-14) │ │[HUMAN] │ │              │  ║
+║  │        │ │(steps1-3)│ │(steps4-6)│ │        │ │        │ │        │ │ ✓ yesterday  │  ║
+║  │ (2)    │ │ (1)      │ │ (0)      │ │ (1)    │ │ (0)    │ │ (1)    │ │ ✓ today      │  ║
+║  └────────┘ └──────────┘ └──────────┘ └────────┘ └────────┘ └────────┘ └──────────────┘  ║
+║                                                                                           ║
+║  What would you like to do?                                                               ║
+║                                                                                           ║
+║  [1] Start a new feature  - "I need..."                                                   ║
+║  [2] Continue planning    - Resume in-progress plan                                       ║
+║  [3] Implement ready plan - Build approved feature (background)                           ║
+║  [4] Review completed     - Approve for DONE (human_review_gate)                          ║
+║  [5] View all plans       - Detailed plan status                                          ║
+║                                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════════════════════╝
 \`\`\`
 
 ### Column Sources
@@ -201,11 +202,14 @@ Display a combined dashboard and options view:
 | Functional Planning | Steps 1-3 | ASSESS → ALIGN → CAPTURE (with user) |
 | Technical Planning | Steps 4-6 | PLAN → DESIGN → SPEC (with user) |
 | Ready | Iron Loop Ready | Plans with steps 7-15 injected, awaiting execution |
-| Building | Steps 7-15 | Executing autonomously (background agent) |
-| Done | After Step 15 | Recently completed (today+yesterday, configurable) |
+| Building | Steps 7-14 | Executing autonomously (background agent) |
+| Review [HUMAN] | Step 15 | Awaiting human approval (human_review_gate: true) |
+| Done | After approval | Recently completed (today+yesterday, configurable) |
 
 - **Backlog → Step 1**: Pick an idea to start the Iron Loop
 - **Ready → Building**: Pick an Iron Loop Ready plan to execute in background
+- **Building → Review**: Implementation complete, awaiting human approval
+- **Review → Done**: Human approves, feature moves to DONE
 
 ### Display Rules
 
