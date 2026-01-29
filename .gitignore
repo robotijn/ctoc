@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+mcp/node_modules/
+
+# Test artifacts
+.ctoc/state/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

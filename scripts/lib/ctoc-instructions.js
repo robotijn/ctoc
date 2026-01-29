@@ -168,7 +168,10 @@ Before technical decisions, ask:
 
 ## When User Types "ctoc"
 
-Display a combined dashboard and options view:
+**Note:** If MCP integration is configured, CTOC commands are available as native tools:
+\`ctoc_status\`, \`ctoc_admin\`, \`ctoc_kanban\`, \`ctoc_progress\`, \`ctoc_plan_status\`, \`ctoc_doctor\`, \`ctoc_start\`, \`ctoc_step\`
+
+Without MCP, display a combined dashboard and options view:
 
 \`\`\`
 ╔═══════════════════════════════════════════════════════════════════════════════════════════╗
