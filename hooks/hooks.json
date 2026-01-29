@@ -9,7 +9,7 @@
             "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/edit-write-gate.js\""
           }
         ],
-        "description": "Check Iron Loop state before Edit operations"
+        "description": "HOLY ENFORCEMENT: Check Iron Loop state before Edit operations"
       },
       {
         "matcher": "tool == \"Write\"",
@@ -19,7 +19,27 @@
             "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/edit-write-gate.js\""
           }
         ],
-        "description": "Check Iron Loop state before Write operations"
+        "description": "HOLY ENFORCEMENT: Check Iron Loop state before Write operations"
+      },
+      {
+        "matcher": "tool == \"NotebookEdit\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/edit-write-gate.js\""
+          }
+        ],
+        "description": "HOLY ENFORCEMENT: Check Iron Loop state before NotebookEdit operations"
+      },
+      {
+        "matcher": "tool == \"Bash\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/bash-gate.js\""
+          }
+        ],
+        "description": "HOLY ENFORCEMENT: Block Bash write commands before Step 7"
       },
       {
         "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(py)$\"",
@@ -79,7 +99,7 @@
             "command": "node \"${CLAUDE_PROJECT_DIR}/.ctoc/repo/scripts/hooks/iron-loop-gate.js\""
           }
         ],
-        "description": "Block commit if Iron Loop steps incomplete"
+        "description": "HOLY ENFORCEMENT: Block git commit if Iron Loop incomplete"
       }
     ],
     "SessionStart": [
