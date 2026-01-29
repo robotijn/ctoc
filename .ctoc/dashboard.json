@@ -1,0 +1,51 @@
+{
+  "generated": "2026-01-29T14:40:06.867Z",
+  "version": "2.0.32",
+  "kanban": {
+    "backlog": 0,
+    "functional": 0,
+    "technical": 0,
+    "ready": 0,
+    "building": 0,
+    "review": 0,
+    "done": 6
+  },
+  "git": {
+    "modified": 1,
+    "untracked": 9,
+    "deleted": 1,
+    "total": 11
+  },
+  "commits": [
+    {
+      "hash": "f654dd5",
+      "message": "feat: sequential commit queue with file locking (v2.0.32)"
+    },
+    {
+      "hash": "f8a88f2",
+      "message": "feat: add REVIEW [HUMAN] column to admin dashboard (v2.0.31)"
+    },
+    {
+      "hash": "87ca074",
+      "message": "feat: Iron Loop Integrator + Critic - 10-round refinement system (v2.0.28)"
+    },
+    {
+      "hash": "a305e06",
+      "message": "feat: Crash Recovery - detect interrupted sessions with R/S/D options (v2.0.27)"
+    },
+    {
+      "hash": "7d729af",
+      "message": "feat: Auto-Update - ctoc update command with git/tarball support (v2.0.25)"
+    }
+  ],
+  "queue": {
+    "pending": 0,
+    "processing": 0,
+    "completed": 0,
+    "failed": 0,
+    "total": 0,
+    "isLocked": false,
+    "lastProcessed": null,
+    "currentVersion": "0.0.0"
+  }
+}

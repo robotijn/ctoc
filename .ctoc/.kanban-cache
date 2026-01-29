@@ -1,0 +1,4 @@
+feat: sequential commit queue with file locking (v2.0.32)
+feat: add REVIEW [HUMAN] column to admin dashboard (v2.0.31)
+feat: Iron Loop Integrator + Critic - 10-round refinement system (v2.0.28)
+feat: Crash Recovery - detect interrupted sessions with R/S/D options (v2.0.27)
