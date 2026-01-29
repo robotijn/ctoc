@@ -212,6 +212,93 @@ setup_hooks() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  MCP Server Setup
+# ═══════════════════════════════════════════════════════════════════════════════
+
+setup_mcp() {
+    if [[ "$INSTALL_HOOKS" != "true" ]]; then
+        print_info "MCP not configured (Node.js not available)"
+        return
+    fi
+
+    print_section "Setting up MCP Server"
+
+    local PROJECT_ROOT
+    PROJECT_ROOT="$(pwd)"
+    local MCP_DIR="$PROJECT_ROOT/.ctoc/repo/mcp"
+    local MCP_INDEX="$MCP_DIR/index.js"
+    # LOCAL .claude/settings.json is required (project-specific path)
+    local LOCAL_SETTINGS=".claude/settings.json"
+    # GLOBAL ~/.claude/settings.json is optional
+    local GLOBAL_SETTINGS="$HOME/.claude/settings.json"
+
+    # Install MCP dependencies
+    if [[ -d "$MCP_DIR" ]]; then
+        print_info "Installing MCP dependencies..."
+        (cd "$MCP_DIR" && npm install --silent 2>/dev/null) || {
+            print_warn "Failed to install MCP dependencies"
+            print_info "         Run manually: cd .ctoc/repo/mcp && npm install"
+            return
+        }
+        print_step "MCP dependencies installed"
+    else
+        print_warn "MCP directory not found"
+        return
+    fi
+
+    local MCP_CONFIG
+    MCP_CONFIG=$(cat <<EOF
+{
+  "mcpServers": {
+    "ctoc": {
+      "command": "node",
+      "args": ["$MCP_INDEX"]
+    }
+  }
+}
+EOF
+)
+
+    # 1. Configure MCP in LOCAL .claude/settings.json (required)
+    mkdir -p ".claude"
+    if [[ -f "$LOCAL_SETTINGS" ]]; then
+        if command -v jq &>/dev/null; then
+            echo "$MCP_CONFIG" | jq -s '.[0] * .[1]' "$LOCAL_SETTINGS" - > "$LOCAL_SETTINGS.tmp"
+            mv "$LOCAL_SETTINGS.tmp" "$LOCAL_SETTINGS"
+            print_step "MCP server configured in .claude/settings.json (local)"
+        else
+            # Append MCP config manually
+            print_warn "jq not available, MCP config may need manual merge"
+        fi
+    else
+        echo "$MCP_CONFIG" > "$LOCAL_SETTINGS"
+        print_step "MCP server configured in .claude/settings.json (local)"
+    fi
+
+    # 2. Optionally configure MCP in GLOBAL ~/.claude/settings.json
+    mkdir -p "$HOME/.claude"
+    if [[ -f "$GLOBAL_SETTINGS" ]]; then
+        if command -v jq &>/dev/null; then
+            # Check if ctoc is already in global settings
+            if jq -e '.mcpServers.ctoc' "$GLOBAL_SETTINGS" >/dev/null 2>&1; then
+                print_info "MCP server already in ~/.claude/settings.json (global)"
+            else
+                echo "$MCP_CONFIG" | jq -s '.[0] * .[1]' "$GLOBAL_SETTINGS" - > "$GLOBAL_SETTINGS.tmp"
+                mv "$GLOBAL_SETTINGS.tmp" "$GLOBAL_SETTINGS"
+                print_step "MCP server also added to ~/.claude/settings.json (global)"
+            fi
+        fi
+    else
+        # Create global settings with MCP config
+        echo "$MCP_CONFIG" > "$GLOBAL_SETTINGS"
+        print_step "MCP server configured in ~/.claude/settings.json (global)"
+    fi
+
+    echo ""
+    echo -e "${CYAN}MCP Server enabled${NC} - CTOC tools available as native Claude commands"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  Project Checking
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -812,6 +899,7 @@ main() {
         install_repo
         check_nodejs
         setup_hooks
+        setup_mcp
         setup_gitignore
         show_summary
         show_next_steps
@@ -822,6 +910,7 @@ main() {
         check_nodejs
         configure_claude_md
         setup_hooks
+        setup_mcp
         setup_gitignore
         setup_shell
         show_summary

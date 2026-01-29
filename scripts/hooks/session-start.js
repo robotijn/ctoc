@@ -60,6 +60,85 @@ function generateDashboardState(projectPath) {
 }
 
 // ============================================================================
+// MCP Configuration Check
+// ============================================================================
+
+/**
+ * Check if MCP server is configured in Claude settings
+ * Checks LOCAL .claude/settings.json first (takes precedence), then GLOBAL
+ * Returns: { configured: boolean, mcpIndex: string|null, error: string|null, location: string|null }
+ */
+function checkMCPConfiguration() {
+  const os = require('os');
+  const projectRoot = process.cwd();
+  const localSettingsPath = path.join(projectRoot, '.claude', 'settings.json');
+  const globalSettingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+  const mcpIndexPath = path.join(projectRoot, '.ctoc', 'repo', 'mcp', 'index.js');
+
+  // Check if MCP server files exist
+  if (!fs.existsSync(mcpIndexPath)) {
+    return {
+      configured: false,
+      mcpIndex: null,
+      error: 'MCP server not found at .ctoc/repo/mcp/index.js',
+      location: null
+    };
+  }
+
+  // Check if node_modules exists (npm install was run)
+  const nodeModulesPath = path.join(projectRoot, '.ctoc', 'repo', 'mcp', 'node_modules');
+  if (!fs.existsSync(nodeModulesPath)) {
+    return {
+      configured: false,
+      mcpIndex: mcpIndexPath,
+      error: 'MCP dependencies not installed. Run: cd .ctoc/repo/mcp && npm install',
+      location: null
+    };
+  }
+
+  // Check LOCAL .claude/settings.json first (takes precedence)
+  if (fs.existsSync(localSettingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf8'));
+      if (settings.mcpServers?.ctoc) {
+        return {
+          configured: true,
+          mcpIndex: mcpIndexPath,
+          error: null,
+          location: 'local'
+        };
+      }
+    } catch (e) {
+      // Continue to check global
+    }
+  }
+
+  // Check GLOBAL ~/.claude/settings.json as fallback
+  if (fs.existsSync(globalSettingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+      if (settings.mcpServers?.ctoc) {
+        return {
+          configured: true,
+          mcpIndex: mcpIndexPath,
+          error: null,
+          location: 'global'
+        };
+      }
+    } catch (e) {
+      // Fall through to error
+    }
+  }
+
+  return {
+    configured: false,
+    mcpIndex: mcpIndexPath,
+    error: 'MCP server "ctoc" not found in .claude/settings.json or ~/.claude/settings.json',
+    location: null
+  };
+}
+
+// ============================================================================
 // Settings
 // ============================================================================
 
@@ -140,6 +219,16 @@ async function main() {
   try {
     // Ensure CTOC directories exist
     ensureDirectories();
+
+    // Check MCP configuration (required for CTOC to function)
+    const mcpStatus = checkMCPConfiguration();
+    if (!mcpStatus.configured) {
+      log(`[CTOC] MCP ERROR: ${mcpStatus.error}`);
+      log('[CTOC] CTOC requires MCP server to be configured.');
+      log('[CTOC] Run: cd .ctoc/repo/mcp && npm install');
+      log('[CTOC] Then restart Claude Code to load MCP tools.');
+      // Continue anyway but CTOC commands won't work properly
+    }
 
     // Check for updates and get update info
     let updateInfo = null;

@@ -168,58 +168,20 @@ Before technical decisions, ask:
 
 ## When User Types "ctoc"
 
-**Note:** If MCP integration is configured, CTOC commands are available as native tools:
-\`ctoc_status\`, \`ctoc_admin\`, \`ctoc_kanban\`, \`ctoc_progress\`, \`ctoc_plan_status\`, \`ctoc_doctor\`, \`ctoc_start\`, \`ctoc_step\`
+CTOC commands are available as native MCP tools. Use the appropriate tool directly:
 
-Without MCP, display a combined dashboard and options view:
+| Tool | Purpose |
+|------|---------|
+| \`ctoc_status\` | Quick project status |
+| \`ctoc_admin\` | Full admin dashboard with kanban |
+| \`ctoc_kanban\` | Kanban board only |
+| \`ctoc_progress\` | Iron Loop progress |
+| \`ctoc_plan_status\` | Plan dashboard |
+| \`ctoc_doctor\` | Health check |
+| \`ctoc_start\` | Start tracking a feature |
+| \`ctoc_step\` | Move to Iron Loop step |
 
-\`\`\`
-╔═══════════════════════════════════════════════════════════════════════════════════════════╗
-║  CTOC Dashboard                                                                           ║
-╠═══════════════════════════════════════════════════════════════════════════════════════════╣
-║                                                                                           ║
-║  KANBAN                                                                                   ║
-║  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐  ║
-║  │BACKLOG │ │FUNCTIONAL│ │TECHNICAL │ │ READY  │ │BUILDING│ │ REVIEW │ │     DONE     │  ║
-║  │(drafts)│ │ PLANNING │ │ PLANNING │ │        │ │ (7-14) │ │[HUMAN] │ │              │  ║
-║  │        │ │(steps1-3)│ │(steps4-6)│ │        │ │        │ │        │ │ ✓ yesterday  │  ║
-║  │ (2)    │ │ (1)      │ │ (0)      │ │ (1)    │ │ (0)    │ │ (1)    │ │ ✓ today      │  ║
-║  └────────┘ └──────────┘ └──────────┘ └────────┘ └────────┘ └────────┘ └──────────────┘  ║
-║                                                                                           ║
-║  What would you like to do?                                                               ║
-║                                                                                           ║
-║  [1] Start a new feature  - "I need..."                                                   ║
-║  [2] Continue planning    - Resume in-progress plan                                       ║
-║  [3] Implement ready plan - Build approved feature (background)                           ║
-║  [4] Review completed     - Approve for DONE (human_review_gate)                          ║
-║  [5] View all plans       - Detailed plan status                                          ║
-║                                                                                           ║
-╚═══════════════════════════════════════════════════════════════════════════════════════════╝
-\`\`\`
-
-### Column Sources
-
-| Column | Iron Loop | Contents |
-|--------|-----------|----------|
-| Backlog | Pre-Iron Loop | Rough ideas, not yet started |
-| Functional Planning | Steps 1-3 | ASSESS → ALIGN → CAPTURE (with user) |
-| Technical Planning | Steps 4-6 | PLAN → DESIGN → SPEC (with user) |
-| Ready | Iron Loop Ready | Plans with steps 7-15 injected, awaiting execution |
-| Building | Steps 7-14 | Executing autonomously (background agent) |
-| Review [HUMAN] | Step 15 | Awaiting human approval (human_review_gate: true) |
-| Done | After approval | Recently completed (today+yesterday, configurable) |
-
-- **Backlog → Step 1**: Pick an idea to start the Iron Loop
-- **Ready → Building**: Pick an Iron Loop Ready plan to execute in background
-- **Building → Review**: Implementation complete, awaiting human approval
-- **Review → Done**: Human approves, feature moves to DONE
-
-### Display Rules
-
-1. Replace counts with actual counts from directories
-2. Show item names in columns when space allows
-3. Done column: show at minimum today's and yesterday's completed items
-4. If Ready column has items, offer to start background implementation
+**When user types "ctoc", call \`ctoc_admin\` tool to show the dashboard.**
 
 ## Iron Loop (15 Steps) - NON-NEGOTIABLE
 
