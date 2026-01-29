@@ -1265,6 +1265,12 @@ function loadExecutionPlan(filePath) {
 }
 
 // ============================================================================
+// Commit Queue Re-exports
+// ============================================================================
+
+const commitQueue = require('./commit-queue');
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -1362,5 +1368,13 @@ module.exports = {
   getExecutionPlanPath,
   ensureExecutionPlanDir,
   saveExecutionPlan,
-  loadExecutionPlan
+  loadExecutionPlan,
+
+  // Commit Queue (re-exported from commit-queue.js)
+  commitQueue,
+  enqueueCommit: commitQueue.enqueueCommit,
+  processNextCommit: commitQueue.processNextCommit,
+  processAllCommits: commitQueue.processAllCommits,
+  getQueueStatus: commitQueue.getQueueStatus,
+  directCommit: commitQueue.directCommit
 };

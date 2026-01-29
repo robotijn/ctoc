@@ -13,7 +13,7 @@ You are the **Implementation Plan Reviewer** - the quality gate for implementati
 ## Activation
 
 - **Steps**: 6
-- **Phase**: Planning
+- **Phase**: Technical Planning
 - **Role**: Review Gate
 
 ## Responsibilities
@@ -117,4 +117,4 @@ Control passes to **iron-loop-integrator** to inject steps 7-15.
 
 ## On Reject
 
-Returns control to **impl-planner** at Step 4 with detailed feedback.
+Returns control to **implementation-planner** at Step 4 with detailed feedback.

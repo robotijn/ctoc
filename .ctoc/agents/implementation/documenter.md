@@ -164,7 +164,7 @@ skip_documentation_when:
 ## Hand-off
 
 After documentation:
-- Pass to **impl-reviewer** (Step 15) for final review
+- Pass to **implementation-reviewer** (Step 15) for final review
 
 Documentation is the last step before final review.
 
