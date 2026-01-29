@@ -1,0 +1,18 @@
+# CTOC Kanban State
+lastUpdated: "2026-01-29T14:30:13.872Z"
+done:
+  - name: "Commit Queue"
+    version: "v2.0.32"
+    completedAt: "2026-01-29T14:30:13.872Z"
+  - name: "Integrator+Critic"
+    version: "v2.0.28"
+    completedAt: "2026-01-29T14:30:13.871Z"
+  - name: "Crash Recovery"
+    version: "v2.0.27"
+    completedAt: "2026-01-29T14:30:13.871Z"
+  - name: "Auto-Update"
+    version: "v2.0.25"
+    completedAt: "2026-01-29T14:30:13.871Z"
+  - name: "WebSearch"
+    version: "v2.0.24"
+    completedAt: "2026-01-29T14:30:13.870Z"

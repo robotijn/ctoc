@@ -1271,6 +1271,18 @@ function loadExecutionPlan(filePath) {
 const commitQueue = require('./commit-queue');
 
 // ============================================================================
+// Plan Archive Re-exports
+// ============================================================================
+
+const PlanArchive = require('./plan-archive');
+
+// ============================================================================
+// Kanban Re-exports
+// ============================================================================
+
+const Kanban = require('./kanban');
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -1376,5 +1388,11 @@ module.exports = {
   processNextCommit: commitQueue.processNextCommit,
   processAllCommits: commitQueue.processAllCommits,
   getQueueStatus: commitQueue.getQueueStatus,
-  directCommit: commitQueue.directCommit
+  directCommit: commitQueue.directCommit,
+
+  // Plan Archive
+  PlanArchive,
+
+  // Kanban
+  Kanban
 };

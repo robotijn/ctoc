@@ -45,6 +45,19 @@ const { listProfiles } = require('../lib/profile-loader');
 const { generateCTOCInstructions } = require('../lib/ctoc-instructions');
 const { checkForUpdates, getCurrentVersion, fetchLatestVersion, compareSemver } = require('./update-check');
 
+// Dashboard state generator (for fast ctoc kanban/admin reads)
+function generateDashboardState(projectPath) {
+  try {
+    const dashboardGen = require('../lib/dashboard-state');
+  } catch (e) {
+    // Generate inline if module call fails
+    const { execSync } = require('child_process');
+    try {
+      execSync('node scripts/lib/dashboard-state.js', { cwd: projectPath, stdio: 'ignore' });
+    } catch {}
+  }
+}
+
 // ============================================================================
 // Settings
 // ============================================================================
@@ -359,6 +372,9 @@ async function main() {
     });
 
     saveSession(session);
+
+    // 5b. Generate dashboard state for fast ctoc kanban/admin reads
+    generateDashboardState(projectPath);
 
     // 5. Output visible startup banner to stderr (user sees this)
     let version = null;
