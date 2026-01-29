@@ -733,6 +733,51 @@ The admin dashboard provides an interactive terminal UI with:
 
 CTOC checks for updates once per day and prompts you if a new version is available. Disable with `CTOC_SKIP_UPDATE_CHECK=1`.
 
+### MCP Integration (Native Tools)
+
+CTOC can integrate with Claude Code as an MCP server, providing native tools for faster and more reliable operation.
+
+**Benefits:**
+- Reduced token usage (~500 tokens saved per dashboard command)
+- Faster execution (direct function calls vs. parsing)
+- Consistent output (deterministic tool responses)
+
+**Setup:**
+
+Add to your Claude Code settings (`~/.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "ctoc": {
+      "command": "node",
+      "args": ["<path-to-project>/.ctoc/repo/mcp/index.js"]
+    }
+  }
+}
+```
+
+Replace `<path-to-project>` with your project's absolute path.
+
+**First-time setup:**
+
+```bash
+cd .ctoc/repo/mcp && npm install
+```
+
+**Available Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `ctoc_status` | Quick project status |
+| `ctoc_admin` | Full admin dashboard |
+| `ctoc_kanban` | Kanban board |
+| `ctoc_progress` | Iron Loop progress |
+| `ctoc_plan_status` | Plan dashboard |
+| `ctoc_doctor` | Health check |
+| `ctoc_start` | Start tracking a feature |
+| `ctoc_step` | Move to Iron Loop step |
+
 ### Detection Commands
 
 | Command | What it does |
