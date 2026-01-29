@@ -36,7 +36,7 @@ When you install CTOC, you gain command of this agent army. The cto-chief plans 
 
 **80 agents. 50 languages. 200 frameworks. 14 quality dimensions.**
 
-Each agent is adamant about quality — no shipping without tests, security, and docs. The impl-reviewer (final gate) checks ALL 14 quality dimensions before allowing any commit.
+Each agent is adamant about quality — no shipping without tests, security, and docs. The implementation-reviewer (final gate) checks ALL 14 quality dimensions before allowing any commit.
 
 ---
 
@@ -128,7 +128,7 @@ For **code**, the Iron Loop ensures quality through structured phases:
 - **Steps 1-6 (Planning)**: Understand the problem, capture requirements, design the architecture. Two review gates ensure the plan is solid before any code is written.
 - **Steps 7-15 (Implementation)**: Write tests first (TDD), implement code, self-review, optimize, security scan, verify, document. Each step has a specialized agent.
 
-The impl-reviewer (Step 15) checks all **14 quality dimensions** before committing. No shortcuts, no exceptions.
+The implementation-reviewer (Step 15) checks all **14 quality dimensions** before committing. No shortcuts, no exceptions.
 
 For **documents**, the Iron Loop adapts:
 
@@ -210,6 +210,16 @@ Next steps:
 claude --dangerously-skip-permissions
 ```
 
+#### Inside Claude Code: Enable Bypass Permissions
+
+After starting Claude Code with the flag above, toggle the **Bypass Permissions** setting to ON:
+
+1. Press `Shift + ?` to open settings (or type `/config`)
+2. Find "Bypass Permissions"
+3. Toggle to **ON**
+
+This ensures Claude Code can work autonomously through all 15 Iron Loop steps without interruption.
+
 #### Why This Flag?
 
 Without it, Claude Code asks permission for every file operation:
@@ -250,41 +260,49 @@ ctoc
 CTOC will show your project dashboard and options:
 
 ```
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║  CTOC Dashboard                                                               ║
-╠═══════════════════════════════════════════════════════════════════════════════╣
-║                                                                               ║
-║  KANBAN                                                                       ║
-║  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐ ║
-║  │BACKLOG │ │FUNCTIONAL│ │TECHNICAL │ │ READY  │ │BUILDING│ │     DONE     │ ║
-║  │(drafts)│ │ PLANNING │ │ PLANNING │ │        │ │        │ │              │ ║
-║  │        │ │(steps1-3)│ │(steps4-6)│ │        │ │(7-15)  │ │ ✓ feature-a  │ ║
-║  │ (2)    │ │ (1)      │ │ (0)      │ │ (1)    │ │ (0)    │ │ ✓ feature-b  │ ║
-║  └────────┘ └──────────┘ └──────────┘ └────────┘ └────────┘ └──────────────┘ ║
-║                                                                               ║
-║  What would you like to do?                                                   ║
-║                                                                               ║
-║  [1] Start a new feature  - "I need..."                                       ║
-║  [2] Continue planning    - Resume in-progress plan                           ║
-║  [3] Implement ready plan - Build approved feature (background)               ║
-║  [4] View all plans       - Detailed plan status                              ║
-║                                                                               ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
++-----------------------------------------------------------------------------+
+|  CTOC Dashboard                                                    v2.1.0   |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  KANBAN                                                                     |
+|  +------------+ +------------+ +------------+ +------------+ +------------+ |
+|  | FUNCTIONAL | |IMPLEMENTAT.| | IRON LOOP  | |    IN      | |   FINAL    | |
+|  |  PLANNING  | |  PLANNING  | |   READY    | | DEVELOPMENT| |  REVIEW    | |
+|  +------------+ +------------+ +------------+ +------------+ +------------+ |
+|  | o login    | | o api-auth | | o payments | | > user-mgmt| | * reports  | |
+|  |   Aligning | |   Designing| |            | | Implementing| |            | |
+|  | o dashboard| |            | |            | |            | |            | |
+|  |   Assessing| |            | |            | |            | |            | |
+|  +------------+ +------------+ +------------+ +------------+ +------------+ |
+|       |              |                                             |        |
+|    [HUMAN]        [HUMAN]                                       [HUMAN]     |
+|                                                                             |
+|  What would you like to do?                                                 |
+|                                                                             |
+|  [1] Start a new feature  - "I need..."                                     |
+|  [2] Continue planning    - Resume in-progress plan          (2 in progress)|
+|  [3] Implement ready plan - Build approved feature               (1 ready) |
+|  [4] Review ready items   - Approve completed work                (1 ready)|
+|  [5] View all plans       - Detailed plan status                            |
+|                                                                             |
++-----------------------------------------------------------------------------+
+
+Options are dynamic - they only appear when items are available in the corresponding column.
+For example, "Review ready items" only shows when there are items in Final Review.
 ```
 
-The columns map to the Iron Loop:
+The 5 columns map to the Iron Loop with 3 human gates:
 
-| Column | Iron Loop | What happens |
-|--------|-----------|--------------|
-| **Backlog** | Pre-Iron Loop | Rough ideas, not yet started |
-| **Functional Planning** | Steps 1-3 | ASSESS → ALIGN → CAPTURE (with user) |
-| **Technical Planning** | Steps 4-6 | PLAN → DESIGN → SPEC (with user) |
-| **Ready** | Iron Loop Ready | Plans with steps 7-15 injected, awaiting execution |
-| **Building** | Steps 7-15 | Executing autonomously (background agent) |
-| **Done** | After Step 15 | Recently completed |
+| Column | Steps | What happens | Human Gate |
+|--------|-------|--------------|------------|
+| **Functional Planning** | 1-3 | Product Owner drafts BDD specs | Yes - After approval |
+| **Implementation Planning** | 4-6 | Technical approach and architecture | Yes - After approval |
+| **Iron Loop Ready** | - | Plan complete, awaiting execution | - |
+| **In Development** | 7-14 | Autonomous implementation | - |
+| **Final Review** | 15 | Approve completed work for commit | Yes - Commit/Back |
 
-- **Backlog → Step 1**: Pick a rough idea to start the Iron Loop
-- **Ready → Building**: Pick an Iron Loop Ready plan to execute in background
+- **[HUMAN]** markers show where user approval is required
+- In Development shows action names (Testing, Implementing, Optimizing, etc.)
 
 Or just talk naturally:
 - *"I need a login system"*
@@ -377,9 +395,9 @@ CTOC works autonomously through its agent army. You can leave.
 | **12** | **SECURE** | security-scanner | Security & accessibility audit. |
 | **13** | **VERIFY** | verifier | Run full test suite. |
 | **14** | **DOCUMENT** | documenter | Update all documentation. |
-| **15** | **FINAL-REVIEW** | impl-reviewer | Review against 14 quality dimensions. Commit when satisfied. |
+| **15** | **FINAL-REVIEW** | implementation-reviewer | Review against 14 quality dimensions. Commit when satisfied. |
 
-> **Result:** Feature complete. impl-reviewer commits only when ALL 14 quality dimensions pass.
+> **Result:** Feature complete. implementation-reviewer commits only when ALL 14 quality dimensions pass.
 
 ---
 
@@ -1131,10 +1149,10 @@ The Iron Loop is executed by 20 core agents, coordinated by the cto-chief:
 **Planning Phase (Steps 1-6)**
 | Agent | Model | Steps | Role |
 |-------|-------|-------|------|
-| functional-planner | opus | 1-3 | Understands problems, captures requirements |
-| functional-reviewer | opus | 3 | Reviews plans, approves or returns |
-| impl-planner | opus | 4-6 | Creates technical designs |
-| impl-plan-reviewer | opus | 6 | Reviews technical plans |
+| product-owner | opus | 1-3 | Creates BDD specs (user stories + scenarios) |
+| functional-reviewer | opus | 3 | Reviews functional plans, approves or returns |
+| implementation-planner | opus | 4-6 | Creates technical designs |
+| implementation-plan-reviewer | opus | 6 | Reviews technical plans |
 | iron-loop-integrator | sonnet | 6 | Injects implementation steps 7-15 |
 
 **Implementation Phase (Steps 7-15)**
@@ -1148,7 +1166,7 @@ The Iron Loop is executed by 20 core agents, coordinated by the cto-chief:
 | security-scanner | opus | 12 | Security vulnerability check |
 | verifier | sonnet | 13 | Runs ALL tests |
 | documenter | sonnet | 14 | Updates documentation |
-| impl-reviewer | opus | 15 | Final review against 14 quality dimensions |
+| implementation-reviewer | opus | 15 | Final review against 14 quality dimensions |
 
 **Writing Agents (Document Creation & Reading)**
 | Agent | Model | Purpose |
@@ -1185,7 +1203,7 @@ Beyond the core 20, the cto-chief can invoke 60 specialist agents for deep exper
 
 ### 14 Quality Dimensions (ISO 25010)
 
-The impl-reviewer checks ALL 14 dimensions before approving:
+The implementation-reviewer checks ALL 14 dimensions before approving:
 
 | # | Dimension | Key Checks |
 |---|-----------|------------|
