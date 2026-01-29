@@ -6,15 +6,67 @@
  * - Numbered items across all columns
  * - Legend display below kanban
  * - Item lookup by number for human review
+ * - Supports both old nested and new flat directory structures
  */
 
 const fs = require('fs');
 const path = require('path');
+const terminalUI = require('./terminal-ui');
+
+// New flat directory structure
+const PLAN_DIRS = {
+  FUNCTIONAL_DRAFT: '1_functional_draft',
+  FUNCTIONAL_APPROVED: '2_functional_approved',
+  TECHNICAL_DRAFT: '3_technical_draft',
+  TECHNICAL_APPROVED: '4_technical_approved',
+  IRON_LOOP: '5_iron_loop',
+  BUILDING: '6_building',
+  REVIEW: '7_ready_for_review',
+  DONE: '8_done'
+};
 
 class Kanban {
   constructor(root) {
     this.root = root || path.resolve(__dirname, '../..');
     this.statePath = path.join(this.root, '.ctoc', 'kanban.yaml');
+    // Detect which directory structure exists
+    this.useNewStructure = this._detectNewStructure();
+  }
+
+  // Check if new flat directory structure exists
+  _detectNewStructure() {
+    const newDir = path.join(this.root, 'plans', PLAN_DIRS.FUNCTIONAL_DRAFT);
+    return fs.existsSync(newDir);
+  }
+
+  // Get the directory path for a column, supporting both old and new structures
+  _getColumnDir(column) {
+    if (this.useNewStructure) {
+      // New flat structure
+      const mapping = {
+        backlog: PLAN_DIRS.FUNCTIONAL_DRAFT,
+        functional: PLAN_DIRS.FUNCTIONAL_APPROVED,
+        technical: PLAN_DIRS.TECHNICAL_DRAFT,
+        ready: PLAN_DIRS.TECHNICAL_APPROVED,
+        iron_loop: PLAN_DIRS.IRON_LOOP,
+        building: PLAN_DIRS.BUILDING,
+        review: PLAN_DIRS.REVIEW,
+        done: PLAN_DIRS.DONE
+      };
+      return mapping[column] || column;
+    } else {
+      // Old nested structure
+      const mapping = {
+        backlog: 'functional/draft',
+        functional: 'functional/approved',
+        technical: 'implementation/draft',
+        ready: 'implementation/approved',
+        building: 'in_progress',
+        review: 'review',
+        done: 'done'
+      };
+      return mapping[column] || column;
+    }
   }
 
   // Count .md files in a directory
@@ -162,25 +214,18 @@ class Kanban {
     const items = {};
     let num = 1;
 
-    // Column order for numbering: backlog, functional, technical, ready, building, review, done
-    const columns = [
-      { key: 'backlog', dir: 'plans/functional/draft' },
-      { key: 'functional', dir: 'plans/functional/approved' },
-      { key: 'technical', dir: 'plans/implementation/draft' },
-      { key: 'ready', dir: 'plans/implementation/approved' },
-      { key: 'building', dir: 'plans/in_progress' },
-      { key: 'review', dir: 'plans/review' },
-      { key: 'done', dir: 'plans/done' }
-    ];
+    // Column order for numbering
+    const columnKeys = ['backlog', 'functional', 'technical', 'ready', 'building', 'review', 'done'];
 
-    for (const col of columns) {
-      const fileItems = this.list(col.dir, col.key);
+    for (const key of columnKeys) {
+      const dir = 'plans/' + this._getColumnDir(key);
+      const fileItems = this.list(dir, key);
       for (const item of fileItems) {
         items[num] = {
           number: num,
           name: item.name,
           displayName: item.displayName,
-          column: col.key,
+          column: key,
           path: item.path,
           modified: item.modified
         };
@@ -199,86 +244,48 @@ class Kanban {
 
   // Get full kanban data
   getData() {
-    const doneFiles = this.list('plans/done', 'done');
+    const columnKeys = ['backlog', 'functional', 'technical', 'ready', 'building', 'review', 'done'];
+
+    const columns = {};
+    const items = {};
+
+    for (const key of columnKeys) {
+      const dir = 'plans/' + this._getColumnDir(key);
+      const fileItems = this.list(dir, key);
+      columns[key] = fileItems.length;
+      items[key] = fileItems;
+    }
+
     return {
       version: this.getVersion(),
-      columns: {
-        backlog: this.count('plans/functional/draft'),
-        functional: this.count('plans/functional/approved'),
-        technical: this.count('plans/implementation/draft'),
-        ready: this.count('plans/implementation/approved'),
-        building: this.count('plans/in_progress'),
-        review: this.count('plans/review'),
-        done: doneFiles.length
-      },
-      items: {
-        backlog: this.list('plans/functional/draft', 'backlog'),
-        functional: this.list('plans/functional/approved', 'functional'),
-        technical: this.list('plans/implementation/draft', 'technical'),
-        ready: this.list('plans/implementation/approved', 'ready'),
-        building: this.list('plans/in_progress', 'building'),
-        review: this.list('plans/review', 'review'),
-        done: doneFiles
-      },
-      numberedItems: this.getNumberedItems()
+      columns,
+      items,
+      numberedItems: this.getNumberedItems(),
+      useNewStructure: this.useNewStructure
     };
   }
 
   // Generate legend from numbered items
   generateLegend(numberedItems, maxItems = 20) {
-    const entries = Object.entries(numberedItems).slice(0, maxItems);
-    if (entries.length === 0) return '  (no items)';
-
-    // Group by column for better display
-    const byColumn = {};
-    for (const [num, item] of entries) {
-      if (!byColumn[item.column]) byColumn[item.column] = [];
-      byColumn[item.column].push({ num, item });
-    }
-
-    const lines = [];
-    const columnLabels = {
-      backlog: 'Backlog',
-      functional: 'Functional',
-      technical: 'Technical',
-      ready: 'Ready',
-      building: 'Building',
-      review: 'Review',
-      done: 'Done'
-    };
-
-    for (const [col, items] of Object.entries(byColumn)) {
-      const label = columnLabels[col] || col;
-      const itemList = items.map(({ num, item }) => `[${num}] ${item.displayName.slice(0, 20)}`).join('  ');
-      lines.push(`  ${label}: ${itemList}`);
-    }
-
-    return lines.join('\n');
+    // Use terminal-ui legend function
+    return terminalUI.legend(numberedItems, maxItems);
   }
 
   // Render kanban board with legend
   render() {
     const d = this.getData();
-    const c = d.columns;
     const legend = this.generateLegend(d.numberedItems);
-    const version = d.version.padEnd(8);
 
-    return `
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  CTOC KANBAN                                                      v${version}  ║
-╠═════════╤══════════╤══════════╤═════════╤═════════╤═════════╤════════════════╣
-║ BACKLOG │FUNCTIONAL│TECHNICAL │  READY  │BUILDING │ REVIEW  │     DONE       ║
-║ (draft) │(steps1-3)│(steps4-6)│         │ (7-14)  │ [HUMAN] │                ║
-╠═════════╪══════════╪══════════╪═════════╪═════════╪═════════╪════════════════╣
-║   (${String(c.backlog).padStart(2)})  │   (${String(c.functional).padStart(2)})   │   (${String(c.technical).padStart(2)})   │  (${String(c.ready).padStart(2)})   │  (${String(c.building).padStart(2)})   │  (${String(c.review).padStart(2)})   │     (${String(c.done).padStart(2)})       ║
-╚═════════╧══════════╧══════════╧═════════╧═════════╧═════════╧════════════════╝
+    // Use terminal-ui kanban board
+    const board = terminalUI.kanbanBoard(d);
+
+    return `${board}
 
 Legend:
 ${legend}
 
 Actions:
-  [N] New feature    [R#] Review item #    [V#] View item #
-`.trim();
+  [N] New feature    [R#] Review item #    [V#] View item #`;
   }
 
   // Render compact admin view

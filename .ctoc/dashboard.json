@@ -1,6 +1,6 @@
 {
-  "generated": "2026-01-29T14:40:06.867Z",
-  "version": "2.0.32",
+  "generated": "2026-01-29T15:13:14.296Z",
+  "version": "2.0.33",
   "kanban": {
     "backlog": 0,
     "functional": 0,
@@ -8,15 +8,19 @@
     "ready": 0,
     "building": 0,
     "review": 0,
-    "done": 6
+    "done": 7
   },
   "git": {
     "modified": 1,
-    "untracked": 9,
+    "untracked": 0,
     "deleted": 1,
-    "total": 11
+    "total": 2
   },
   "commits": [
+    {
+      "hash": "21ec280",
+      "message": "feat: Interactive Kanban + Done Archive - numbered items, legend, human review flow (v2.0.33)"
+    },
     {
       "hash": "f654dd5",
       "message": "feat: sequential commit queue with file locking (v2.0.32)"
@@ -32,10 +36,6 @@
     {
       "hash": "a305e06",
       "message": "feat: Crash Recovery - detect interrupted sessions with R/S/D options (v2.0.27)"
-    },
-    {
-      "hash": "7d729af",
-      "message": "feat: Auto-Update - ctoc update command with git/tarball support (v2.0.25)"
     }
   ],
   "queue": {

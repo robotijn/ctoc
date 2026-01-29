@@ -44,6 +44,7 @@ const { detectStack, profileExists } = require('../lib/stack-detector');
 const { listProfiles } = require('../lib/profile-loader');
 const { generateCTOCInstructions } = require('../lib/ctoc-instructions');
 const { checkForUpdates, getCurrentVersion, fetchLatestVersion, compareSemver } = require('./update-check');
+const terminalUI = require('../lib/terminal-ui');
 
 // Dashboard state generator (for fast ctoc kanban/admin reads)
 function generateDashboardState(projectPath) {
@@ -125,29 +126,11 @@ function parseYamlValue(value) {
 }
 
 // ============================================================================
-// Terminal Output
+// Terminal Output (using terminal-ui module)
 // ============================================================================
 
-/**
- * Write directly to terminal, bypassing stdout/stderr capture
- * This allows the banner to be visible to users even when Claude Code
- * captures hook output into the system prompt.
- */
-function writeToTerminal(message) {
-  const isWindows = process.platform === 'win32';
-  const terminalDevice = isWindows ? 'CONOUT$' : '/dev/tty';
-
-  try {
-    const fd = fs.openSync(terminalDevice, 'w');
-    fs.writeSync(fd, message);
-    fs.closeSync(fd);
-    return true;
-  } catch (e) {
-    // Fallback to stderr (will go to Claude's context, but at least logged)
-    console.error(message.trim());
-    return false;
-  }
-}
+// Use terminal-ui's writeToTerminal for cross-platform support
+const writeToTerminal = terminalUI.writeToTerminal;
 
 // ============================================================================
 // Main

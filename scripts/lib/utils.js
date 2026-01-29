@@ -583,7 +583,47 @@ const PLAN_STATUSES = {
 };
 
 /**
+ * New flat directory structure for plans
+ * Maps logical names to directory names
+ */
+const PLAN_DIRS = {
+  FUNCTIONAL_DRAFT: '1_functional_draft',
+  FUNCTIONAL_APPROVED: '2_functional_approved',
+  TECHNICAL_DRAFT: '3_technical_draft',
+  TECHNICAL_APPROVED: '4_technical_approved',
+  IRON_LOOP: '5_iron_loop',
+  BUILDING: '6_building',
+  REVIEW: '7_ready_for_review',
+  DONE: '8_done'
+};
+
+/**
+ * Maps old nested paths to new flat directories
+ * Used for backward compatibility during transition
+ */
+const PLAN_DIR_MAPPING = {
+  'functional/draft': PLAN_DIRS.FUNCTIONAL_DRAFT,
+  'functional/approved': PLAN_DIRS.FUNCTIONAL_APPROVED,
+  'implementation/draft': PLAN_DIRS.TECHNICAL_DRAFT,
+  'implementation/approved': PLAN_DIRS.TECHNICAL_APPROVED,
+  'in_progress': PLAN_DIRS.BUILDING,
+  'review': PLAN_DIRS.REVIEW,
+  'done': PLAN_DIRS.DONE
+};
+
+/**
+ * Checks if new flat plan structure exists
+ * @param {string} projectPath - Project root path
+ * @returns {boolean} True if new structure exists
+ */
+function hasNewPlanStructure(projectPath = process.cwd()) {
+  const newDir = path.join(projectPath, 'plans', PLAN_DIRS.FUNCTIONAL_DRAFT);
+  return fs.existsSync(newDir);
+}
+
+/**
  * Gets the path to a plan directory
+ * Supports both old nested and new flat structures
  * @param {string} type - 'functional' or 'implementation'
  * @param {string} status - 'draft' or 'approved'
  * @param {string} projectPath - Project root path (defaults to cwd)
@@ -596,7 +636,31 @@ function getPlanPath(type, status, projectPath = process.cwd()) {
   if (!Object.values(PLAN_STATUSES).includes(status)) {
     throw new Error(`Invalid plan status: ${status}. Must be 'draft' or 'approved'.`);
   }
+
+  // Check if new flat structure exists
+  if (hasNewPlanStructure(projectPath)) {
+    // Use new flat structure
+    if (type === PLAN_TYPES.FUNCTIONAL) {
+      return path.join(projectPath, 'plans',
+        status === PLAN_STATUSES.DRAFT ? PLAN_DIRS.FUNCTIONAL_DRAFT : PLAN_DIRS.FUNCTIONAL_APPROVED);
+    } else {
+      return path.join(projectPath, 'plans',
+        status === PLAN_STATUSES.DRAFT ? PLAN_DIRS.TECHNICAL_DRAFT : PLAN_DIRS.TECHNICAL_APPROVED);
+    }
+  }
+
+  // Fall back to old nested structure
   return path.join(projectPath, 'plans', type, status);
+}
+
+/**
+ * Gets the path to a plan directory by logical name
+ * @param {string} dirName - Logical directory name from PLAN_DIRS
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {string} Absolute path to the plan directory
+ */
+function getPlanDirPath(dirName, projectPath = process.cwd()) {
+  return path.join(projectPath, 'plans', dirName);
 }
 
 /**
@@ -724,21 +788,45 @@ function movePlanToApproved(type, planName, projectPath = process.cwd()) {
 
 /**
  * Ensures plan directories exist for a project
+ * Creates new flat structure by default, maintains old structure if it exists
  * @param {string} projectPath - Project root path (defaults to cwd)
+ * @param {boolean} useNewStructure - Force new flat structure (default: true)
  */
-function ensurePlanDirectories(projectPath = process.cwd()) {
-  const planDirs = [
-    path.join(projectPath, 'plans', 'functional', 'draft'),
-    path.join(projectPath, 'plans', 'functional', 'approved'),
-    path.join(projectPath, 'plans', 'implementation', 'draft'),
-    path.join(projectPath, 'plans', 'implementation', 'approved'),
-    path.join(projectPath, 'plans', 'todo'),
-    path.join(projectPath, 'plans', 'in_progress'),
-    path.join(projectPath, 'plans', 'review'),
-    path.join(projectPath, 'plans', 'done')
+function ensurePlanDirectories(projectPath = process.cwd(), useNewStructure = true) {
+  const plansDir = path.join(projectPath, 'plans');
+
+  // Check if any structure exists
+  const hasOldStructure = fs.existsSync(path.join(plansDir, 'functional'));
+  const hasNew = hasNewPlanStructure(projectPath);
+
+  if (useNewStructure || (!hasOldStructure && !hasNew)) {
+    // Create new flat structure
+    const newDirs = Object.values(PLAN_DIRS).map(dir =>
+      path.join(plansDir, dir)
+    );
+    // Also add execution dir
+    newDirs.push(path.join(plansDir, 'execution'));
+
+    for (const dir of newDirs) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+  }
+
+  // Always maintain old structure too for backward compatibility
+  const oldDirs = [
+    path.join(plansDir, 'functional', 'draft'),
+    path.join(plansDir, 'functional', 'approved'),
+    path.join(plansDir, 'implementation', 'draft'),
+    path.join(plansDir, 'implementation', 'approved'),
+    path.join(plansDir, 'todo'),
+    path.join(plansDir, 'in_progress'),
+    path.join(plansDir, 'review'),
+    path.join(plansDir, 'done')
   ];
 
-  for (const dir of planDirs) {
+  for (const dir of oldDirs) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -887,36 +975,16 @@ function shouldShowUsageLink(frequency, lastShown) {
 // Background Implementation Menu
 // ============================================================================
 
+// Import terminal-ui for menu generation
+const terminalUI = require('./terminal-ui');
+
 /**
  * Generates the background implementation settings menu
  * @param {number} planCount - Number of plans queued for implementation
  * @returns {string} Formatted menu string for display
  */
 function generateBackgroundMenu(planCount) {
-  const planWord = planCount === 1 ? 'plan' : 'plans';
-
-  return `
-+======================================================================+
-|  Background Implementation Settings                                  |
-+======================================================================+
-|  You have ${planCount} ${planWord} queued for implementation.                       |
-|                                                                      |
-|  How should background implementation proceed?                       |
-|                                                                      |
-|  [1] Per plan      - Ask permission before each plan                 |
-|  [2] Check-in      - Ask permission at intervals:                    |
-|      [2a] Every 5 min   [2f] Every 45 min                            |
-|      [2b] Every 10 min  [2g] Every 60 min                            |
-|      [2c] Every 15 min  [2h] Every 90 min                            |
-|      [2d] Every 20 min  [2i] Every 120 min                           |
-|      [2e] Every 30 min  [2j] Every 180 min                           |
-|  [3] Auto-continue - Implement all queued plans without asking       |
-|                                                                      |
-|  [S] Skip          - Don't start background implementation now       |
-|                                                                      |
-|  Check usage: https://claude.ai/settings/usage                       |
-+======================================================================+
-`.trim();
+  return terminalUI.backgroundMenu(planCount);
 }
 
 // ============================================================================
@@ -945,24 +1013,7 @@ function shouldShowCheckIn(startTime, intervalMinutes, currentTime = Date.now())
  * @returns {string} Formatted check-in prompt
  */
 function generateCheckInPrompt(elapsed, plansCompleted, plansRemaining) {
-  const minutes = Math.floor(elapsed / (60 * 1000));
-
-  return `
-+======================================================================+
-|  Background Implementation Check-in                                  |
-+======================================================================+
-|                                                                      |
-|  Time elapsed: ${String(minutes).padEnd(4)} minutes                                     |
-|  Plans completed: ${String(plansCompleted).padEnd(4)}                                         |
-|  Plans remaining: ${String(plansRemaining).padEnd(4)}                                         |
-|                                                                      |
-|  [C] Continue      - Keep implementing                               |
-|  [P] Pause         - Pause after current plan                        |
-|  [S] Stop          - Stop background implementation                  |
-|                                                                      |
-|  Check usage: https://claude.ai/settings/usage                       |
-+======================================================================+
-`.trim();
+  return terminalUI.checkInPrompt(elapsed, plansCompleted, plansRemaining);
 }
 
 // ============================================================================
@@ -1133,39 +1184,7 @@ function createDeferredQuestion(round, dimension, score) {
  * @returns {string} Formatted display string
  */
 function formatDeferredQuestion(question, questionNumber, totalQuestions) {
-  const stepName = STEP_NAMES[question.step] || 'Unknown';
-  const optionsTable = question.options.map(opt => {
-    const rec = opt.recommended === true ? ' *Recommended*' : '';
-    return `  | ${opt.id.padEnd(6)} | ${opt.description}${rec}`;
-  }).join('\n');
-
-  const prosConsTable = question.options.map(opt => {
-    return `  | ${opt.id.padEnd(6)} | ${opt.pros.padEnd(25)} | ${opt.cons}`;
-  }).join('\n');
-
-  return `
-+======================================================================+
-|  DEFERRED QUESTION ${questionNumber} of ${totalQuestions}${' '.repeat(Math.max(0, 40 - String(questionNumber).length - String(totalQuestions).length))}|
-+======================================================================+
-|                                                                      |
-|  Context: ${question.context.padEnd(54)}|
-|  Issue:   ${question.issue.substring(0, 54).padEnd(54)}|
-|  Step:    ${question.step} (${stepName})${' '.repeat(Math.max(0, 47 - stepName.length))}|
-|                                                                      |
-+----------------------------------------------------------------------+
-|                                                                      |
-|  ${question.question.padEnd(66)}|
-|                                                                      |
-|  Options:                                                            |
-${optionsTable}
-|                                                                      |
-|  Pros/Cons:                                                          |
-|  | Option | Pros                      | Cons                       |
-|  |--------|---------------------------|----------------------------|
-${prosConsTable}
-|                                                                      |
-+======================================================================+
-`.trim();
+  return terminalUI.deferredQuestion(question, questionNumber, totalQuestions, STEP_NAMES);
 }
 
 /**
@@ -1353,7 +1372,11 @@ module.exports = {
   // Plan Artifact Management
   PLAN_TYPES,
   PLAN_STATUSES,
+  PLAN_DIRS,
+  PLAN_DIR_MAPPING,
   getPlanPath,
+  getPlanDirPath,
+  hasNewPlanStructure,
   hasApprovedPlan,
   hasDraftPlan,
   movePlanToApproved,
