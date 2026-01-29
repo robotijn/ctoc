@@ -62,9 +62,9 @@ Based on the learning content, determine which agent(s) should be updated:
 
 | Learning Topic | Likely Agents |
 |----------------|---------------|
-| User interaction patterns | cto-chief, functional-planner |
-| Planning workflow | functional-planner, impl-planner |
-| Code quality | quality-checker, impl-reviewer |
+| User interaction patterns | cto-chief, product-owner |
+| Planning workflow | product-owner, implementation-planner |
+| Code quality | quality-checker, implementation-reviewer |
 | Testing patterns | test-maker, verifier |
 | Security insights | security-scanner |
 | Documentation | documenter |
@@ -101,6 +101,7 @@ Be concise. The user doesn't need to see implementation details.
 - Read (read learning file and agent files)
 - Edit (update agent files)
 - Bash (move learning to archived/)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Principles
 

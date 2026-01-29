@@ -118,6 +118,7 @@ pdf_creation:
 - Write (create Python script)
 - Bash (run script, install dependencies)
 - Read (read source content)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Generation Process
 

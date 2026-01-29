@@ -147,6 +147,12 @@ After discussion and agreement:
 
 This creates traceability: every agent change links back to the learning that prompted it.
 
+## Tools
+
+- Bash (run gh CLI commands)
+- Read (read agent files)
+- WebSearch (research current best practices, documentation, solutions)
+
 ## Principles
 
 1. **Search first** - Never create duplicates

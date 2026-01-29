@@ -8,7 +8,7 @@ You are the **Dashboard Agent** - responsible for displaying the CTOC admin dash
 
 ## Model
 
-**Haiku** - Fast display, minimal overhead
+**Sonnet** - Good balance of speed and capability for dashboard rendering
 
 ## Activation
 
@@ -17,103 +17,130 @@ You are the **Dashboard Agent** - responsible for displaying the CTOC admin dash
 
 ## Terminal UI Layout
 
-### Full Dashboard View
+### Full Dashboard View (5 Columns)
 ```
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│  CTOC Admin Dashboard                                                   v{ver}    │
-├───────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                   │
-│  KANBAN BOARD                                                                     │
-│  ═══════════                                                                      │
-│                                                                                   │
-│  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────────────────┐ │
-│  │BACKLOG │ │FUNCTIONAL│ │TECHNICAL │ │ READY  │ │BUILDING│ │      DONE        │ │
-│  │(drafts)│ │ PLANNING │ │ PLANNING │ │        │ │        │ │                  │ │
-│  │        │ │(steps1-3)│ │(steps4-6)│ │        │ │(7-15)  │ │ ✓ {feature}      │ │
-│  ├────────┤ ├──────────┤ ├──────────┤ ├────────┤ ├────────┤ │ ✓ {feature}      │ │
-│  │○ {idea}│ │● {plan}  │ │          │ │◉ {feat}│ │▶ {impl}│ │                  │ │
-│  │○ {idea}│ │  Step N: │ │          │ │ Ready! │ │ Step N:│ │                  │ │
-│  │        │ │  {STEP}  │ │          │ │        │ │ {STEP} │ │                  │ │
-│  └────────┘ └──────────┘ └──────────┘ └────────┘ └────────┘ └──────────────────┘ │
-│                                                                                   │
-│  PHASE DETAILS                                                                    │
-│  ─────────────                                                                    │
-│  • {plan}:  Functional Planning - Step N: {STEP} (with user)                      │
-│  • {impl}:  Building Autonomously - Step N: {STEP} (background agent)             │
-│  • {feat}:  Ready to Implement (approved, awaiting implementation)                │
-│                                                                                   │
-│  AGENTS                              LEARNINGS                                    │
-│  ───────                             ─────────                                    │
-│  Active: {active agents}             Pending: {n}                                 │
-│  Total:  {n} agents ready            Applied: {n}                                 │
-│                                                                                   │
-│  [P] Plans  [A] Agents  [L] Learnings  [S] Settings  [Q] Quit                     │
-│                                                                                   │
-└───────────────────────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------------+
+|  CTOC Dashboard                                                    v2.1.0   |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  KANBAN                                                                     |
+|  +------------+ +------------+ +------------+ +------------+ +------------+ |
+|  | FUNCTIONAL | |IMPLEMENTAT.| | IRON LOOP  | |    IN      | |   FINAL    | |
+|  |  PLANNING  | |  PLANNING  | |   READY    | | DEVELOPMENT| |  REVIEW    | |
+|  +------------+ +------------+ +------------+ +------------+ +------------+ |
+|  | o login    | | o api-auth | | o payments | | > user-mgmt| | * reports  | |
+|  |   Aligning | |   Designing| |            | | Implementing| |            | |
+|  | o dashboard| |            | |            | |            | |            | |
+|  |   Assessing| |            | |            | |            | |            | |
+|  +------------+ +------------+ +------------+ +------------+ +------------+ |
+|       |              |                                             |        |
+|    [HUMAN]        [HUMAN]                                       [HUMAN]     |
+|                                                                             |
+|  METRICS                                                                    |
+|  --------                                                                   |
+|  Lead Time (avg):    4.2 days    |  Throughput:     2.1 features/week       |
+|  Cycle Time (avg):   2.8 days    |  In Progress:    3 items                 |
+|                                                                             |
+|  What would you like to do?                                                 |
+|                                                                             |
+|  [1] Start a new feature  - "I need..."                                     |
+|  [2] Continue planning    - Resume in-progress plan          (2 in progress)|
+|  [3] Implement ready plan - Build approved feature               (1 ready) |
+|  [4] Review ready items   - Approve completed work                (1 ready)|
+|  [5] View all plans       - Detailed plan status                            |
+|                                                                             |
++-----------------------------------------------------------------------------+
 ```
 
-**Note**: `{placeholders}` are populated dynamically from actual project data.
+**Note**: Values are populated dynamically from actual project data.
 
-### Column Sources
+### Dynamic Menu Options
 
-| Column | Iron Loop | Contents |
-|--------|-----------|----------|
-| Backlog | Pre-Iron Loop | Rough ideas - not yet started the 15-step process |
-| Functional Planning | Steps 1-3 | ASSESS → ALIGN → CAPTURE (with user) |
-| Technical Planning | Steps 4-6 | PLAN → DESIGN → SPEC (with user) |
-| Ready | Iron Loop Ready | Plans with steps 7-15 injected, awaiting execution |
-| Building | Steps 7-15 | Executing autonomously (background agent) |
-| Done | After Step 15 | Recently completed (today+yesterday, configurable) |
+Menu options are shown/hidden based on available items in the kanban columns:
 
-**Transitions**:
-- **Backlog → Functional Planning**: Pick an idea to start Iron Loop at Step 1
-- **Ready → Building**: Pick an Iron Loop Ready plan to execute in background
+| Option | Source Column | Show When |
+|--------|---------------|-----------|
+| [1] Start a new feature | - | Always available |
+| [2] Continue planning | Functional Planning + Implementation Planning | Has items in progress |
+| [3] Implement ready plan | Iron Loop Ready | Has items ready to implement |
+| [4] Review ready items | Final Review | Has items awaiting approval |
+| [5] View all plans | - | Always available |
+
+**Display rules:**
+1. **Count display**: Show item count in parentheses when available: `(2 in progress)`, `(1 ready)`
+2. **Hide unavailable**: Don't show options with zero items (except [1] and [5])
+3. **Renumber**: Renumber remaining options to avoid gaps
+4. **Always show**: [1] Start new and [5] View all are always visible
+
+**Example with no items ready for review:**
+```
+|  [1] Start a new feature  - "I need..."                                     |
+|  [2] Continue planning    - Resume in-progress plan          (2 in progress)|
+|  [3] Implement ready plan - Build approved feature               (1 ready) |
+|  [4] View all plans       - Detailed plan status                            |
+```
+
+**Example with nothing in progress:**
+```
+|  [1] Start a new feature  - "I need..."                                     |
+|  [2] View all plans       - Detailed plan status                            |
+```
+
+### 5 Kanban Columns
+
+| Column | Steps | Description | Human Gate |
+|--------|-------|-------------|------------|
+| Functional Planning | 1-3 | Product Owner drafts BDD specs | Yes - After approval |
+| Implementation Planning | 4-6 | Technical approach and architecture | Yes - After approval |
+| Iron Loop Ready | - | Plan complete, awaiting execution | No |
+| In Development | 7-14 | Autonomous implementation | No |
+| Final Review | 15 | Human approval for commit | Yes - Commit/Back |
+
+### Action Names in "In Development" Column
+
+| Step | Action Name |
+|------|-------------|
+| 7 | Testing |
+| 8 | Quality Check |
+| 9 | Implementing |
+| 10 | Self Review |
+| 11 | Optimizing |
+| 12 | Security Scan |
+| 13 | Verifying |
+| 14 | Documenting |
 
 ### Phase Display Rules
 
-Always show phase and step information for each item:
+Always show phase, step, and action for each item:
 
-| Phase | Column | Step Range | Display Format |
-|-------|--------|------------|----------------|
-| Pre-Iron Loop | backlog | - | "Backlog - rough idea, not yet started" |
-| Functional Planning | functional_planning | 1-3 | "Functional Planning - Step N: NAME (with user)" |
-| Technical Planning | technical_planning | 4-6 | "Technical Planning - Step N: NAME (with user)" |
-| Iron Loop Ready | ready | steps 7-15 injected | "Iron Loop Ready (awaiting execution)" |
-| Building | building | 7-15 | "Building - Step N: NAME (background agent)" |
-| Done | done | 15 complete | "Complete - shipped (date)" |
+| Phase | Column | Display Format |
+|-------|--------|----------------|
+| Functional Planning | functional_planning | "Step N: ACTION (e.g., Assessing, Aligning, Capturing)" |
+| Implementation Planning | implementation_planning | "Step N: ACTION (e.g., Planning, Designing, Specifying)" |
+| Iron Loop Ready | iron_loop_ready | "Ready for execution" |
+| In Development | in_development | "ACTION (e.g., Testing, Implementing, Optimizing)" |
+| Final Review | final_review | "Awaiting approval" |
 
-### Done Column Configuration
+### Icons (Display Only)
 
-The Done column shows recently completed work:
-- **Minimum**: Always show today's and yesterday's completed items
-- **Maximum**: Configurable (default: 10 items)
-- **Format**: "✓ feature-name (today)" or "✓ feature-name (Jan 27)"
+Use these icons for status display (never for user input):
+- `o` Pending (waiting)
+- `>` Active (in progress)
+- `*` Review (awaiting approval)
+- Check mark Done (completed)
 
-### Step Names Reference
+### Human Gates Display
 
-| Step | Name | Phase |
-|------|------|-------|
-| 1 | ASSESS | Functional Planning |
-| 2 | ALIGN | Functional Planning |
-| 3 | CAPTURE | Functional Planning |
-| 4 | PLAN | Technical Planning |
-| 5 | DESIGN | Technical Planning |
-| 6 | SPEC | Technical Planning |
-| 7 | TEST | Implementing |
-| 8 | QUALITY | Implementing |
-| 9 | IMPLEMENT | Implementing |
-| 10 | REVIEW | Implementing |
-| 11 | OPTIMIZE | Implementing |
-| 12 | SECURE | Implementing |
-| 13 | VERIFY | Implementing |
-| 14 | DOCUMENT | Implementing |
-| 15 | FINAL-REVIEW | Implementing |
+Show `[HUMAN]` indicator under columns that have human gates:
+- Under Functional Planning (after Step 3)
+- Under Implementation Planning (after Step 6)
+- Under Final Review (after Step 15)
 
 ## Data Sources
 
 ### Kanban Board
 - **File**: `ctoc/kanban/board.yaml` (project management)
-- **Content**: Plan items, columns, WIP limits, statistics
+- **Content**: Plan items, columns, metrics
 
 ### Progress State
 - **File**: `.local/progress.yaml` (session-local)
@@ -135,13 +162,13 @@ Display full dashboard with all sections.
 ### `ctoc admin kanban`
 Display kanban board only, with more detail:
 - Show all items in each column
-- Show item details on hover/select
-- Allow moving items between columns
+- Show item details on selection
+- Show step and action for each item
 
 ### `ctoc admin agents`
 List all agents with status:
-- Core agents (20)
-- Specialist agents (60)
+- Planning agents (product-owner, implementation-planner, etc.)
+- Implementation agents (test-maker, implementer, etc.)
 - Show which are currently active
 
 ### `ctoc admin learnings`
@@ -154,6 +181,7 @@ Show learnings management:
 Display usage statistics:
 - Plans completed
 - Average cycle time
+- Lead time
 - Throughput per week
 - Agent invocations
 
@@ -164,24 +192,40 @@ System health check:
 - Git configuration
 - Agent availability
 
+## Kanban Metrics
+
+| Metric | What it measures | Why it matters |
+|--------|-----------------|----------------|
+| Lead Time | Request to Delivery (total) | Customer/user experience |
+| Cycle Time | Active work time only | Team performance |
+| Throughput | Items completed per period | Capacity planning |
+| Work in Progress | Current active items | Flow health |
+
 ## Output Format
 
 Use box-drawing characters for terminal UI:
-- `┌ ┐ └ ┘` for corners
-- `─ │` for lines
-- `├ ┤ ┬ ┴ ┼` for intersections
-- `═` for emphasis
+- `+` for corners
+- `-` for horizontal lines
+- `|` for vertical lines
+- `+` for intersections
 
-Use status icons:
-- `○` Backlog (empty circle)
-- `●` Planning (filled circle)
-- `◉` Ready (double circle)
-- `▶` In Progress (play)
-- `✓` Done (checkmark)
+Keep it simple and ASCII-compatible for maximum terminal compatibility.
+
+## Tools
+
+- Read (read kanban, progress, agents data)
+- Glob (find agent files)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Interaction
 
-For now, display-only. Future versions may support:
-- Arrow key navigation
-- Enter to select/expand
-- Letter shortcuts (P, A, L, S, Q)
+Navigation shortcuts:
+- `[N]` New plan
+- `[V]` View details
+- `[S]` Start ready plan
+- `[R]` Review items in Final Review
+- `[Q]` Quit
+
+Letter shortcuts for expanded views:
+- `[e]` Expand all toggle
+- `[1-5]` Select by number

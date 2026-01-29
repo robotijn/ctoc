@@ -96,6 +96,7 @@ rejection:
 
 - Read (review plan documents)
 - Grep, Glob (verify against codebase)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Principles
 
@@ -106,4 +107,4 @@ rejection:
 
 ## On Reject
 
-Returns control to **functional-planner** at Step 1 with detailed feedback.
+Returns control to **product-owner** at Step 1 with detailed feedback.
