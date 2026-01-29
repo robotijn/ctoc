@@ -22,31 +22,16 @@ const {
   loadSettings,
   saveSettings,
   shouldShowCheckIn,
-  generateCheckInPrompt,
   DEFAULT_SETTINGS
 } = require('../lib/utils');
+const terminalUI = require('../lib/terminal-ui');
 
 // ============================================================================
-// Terminal Output
+// Terminal Output (using terminal-ui module)
 // ============================================================================
 
-/**
- * Write directly to terminal, bypassing stdout/stderr capture
- */
-function writeToTerminal(message) {
-  const isWindows = process.platform === 'win32';
-  const terminalDevice = isWindows ? 'CONOUT$' : '/dev/tty';
-
-  try {
-    const fd = fs.openSync(terminalDevice, 'w');
-    fs.writeSync(fd, message);
-    fs.closeSync(fd);
-    return true;
-  } catch (e) {
-    // Silent fail - don't disrupt the on-stop hook
-    return false;
-  }
-}
+// Use terminal-ui's writeToTerminal for cross-platform support
+const writeToTerminal = terminalUI.writeToTerminal;
 
 // ============================================================================
 // Main
@@ -97,8 +82,8 @@ async function main() {
             const plansRemaining = bgImpl.totalPlans - plansCompleted;
 
             // Output check-in prompt to terminal
-            const checkInPrompt = generateCheckInPrompt(elapsed, plansCompleted, plansRemaining);
-            writeToTerminal('\n' + checkInPrompt + '\n');
+            const prompt = terminalUI.checkInPrompt(elapsed, plansCompleted, plansRemaining);
+            writeToTerminal('\n' + prompt + '\n');
 
             // Update last check-in time
             state.backgroundImplementation.lastCheckIn = getTimestamp();
