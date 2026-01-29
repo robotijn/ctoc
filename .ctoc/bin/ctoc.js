@@ -591,56 +591,295 @@ function cmdReset() {
     print(`${colors.green}✓${colors.reset} Iron Loop state reset`);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Update Command - Supports both git and tarball installation methods
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GITHUB_REPO = 'robotijn/ctoc';
+const TARBALL_URL = `https://github.com/${GITHUB_REPO}/archive/refs/heads/main.tar.gz`;
+const RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+
+/**
+ * Check if the CTOC installation is a git repository
+ */
+function isGitInstallation() {
+    const gitPath = path.join(REPO_ROOT, '.git');
+    return fileExists(gitPath);
+}
+
+/**
+ * Backup user settings before update
+ * Returns an object with backed up content
+ */
+function backupUserSettings() {
+    const backup = {};
+
+    // Backup settings.yaml
+    const settingsPath = path.join(CTOC_DIR, 'settings.yaml');
+    if (fileExists(settingsPath)) {
+        backup.settings = fs.readFileSync(settingsPath);
+        backup.settingsPath = settingsPath;
+    }
+
+    // Backup state directory
+    const statePath = path.join(CTOC_DIR, 'state');
+    if (fileExists(statePath)) {
+        backup.stateDir = statePath;
+        backup.stateFiles = {};
+        try {
+            const files = fs.readdirSync(statePath);
+            for (const file of files) {
+                const filePath = path.join(statePath, file);
+                if (fs.statSync(filePath).isFile()) {
+                    backup.stateFiles[file] = fs.readFileSync(filePath);
+                }
+            }
+        } catch (e) {
+            // Ignore errors reading state
+        }
+    }
+
+    return backup;
+}
+
+/**
+ * Restore user settings after update
+ */
+function restoreUserSettings(backup) {
+    // Restore settings.yaml
+    if (backup.settings && backup.settingsPath) {
+        try {
+            fs.writeFileSync(backup.settingsPath, backup.settings);
+        } catch (e) {
+            printWarn('Could not restore settings.yaml');
+        }
+    }
+
+    // Restore state files
+    if (backup.stateDir && backup.stateFiles) {
+        try {
+            if (!fileExists(backup.stateDir)) {
+                fs.mkdirSync(backup.stateDir, { recursive: true });
+            }
+            for (const [file, content] of Object.entries(backup.stateFiles)) {
+                fs.writeFileSync(path.join(backup.stateDir, file), content);
+            }
+        } catch (e) {
+            printWarn('Could not restore state files');
+        }
+    }
+}
+
+/**
+ * Update via git pull (for git-cloned installations)
+ */
+function updateViaGit(localVersion) {
+    print('  Using git pull method...');
+
+    // Fetch latest - use cwd option instead of process.chdir
+    execSync('git fetch --quiet', { cwd: REPO_ROOT, encoding: 'utf8' });
+
+    // Check remote version
+    let remoteVersion;
+    try {
+        remoteVersion = execSync('git show origin/main:VERSION', {
+            cwd: REPO_ROOT,
+            encoding: 'utf8'
+        }).trim();
+    } catch (e) {
+        remoteVersion = localVersion;
+    }
+
+    if (localVersion === remoteVersion) {
+        print(`${colors.green}✓${colors.reset} Already up to date (v${localVersion})`);
+        print('');
+        return { updated: false, version: localVersion };
+    }
+
+    print(`  Update available: v${localVersion} → v${remoteVersion}`);
+    print('  Pulling latest changes...');
+
+    // Pull latest - use cwd option
+    execSync('git pull --rebase --quiet', { cwd: REPO_ROOT, encoding: 'utf8' });
+
+    const newVersion = getVersion();
+
+    // Show recent changes
+    try {
+        const changes = execSync(
+            `git log --oneline v${localVersion}..HEAD 2>/dev/null | head -5`,
+            { cwd: REPO_ROOT, encoding: 'utf8' }
+        ).trim();
+        if (changes) {
+            print('');
+            print(`${colors.cyan}Recent changes:${colors.reset}`);
+            for (const line of changes.split('\n')) {
+                print(`  • ${line}`);
+            }
+        }
+    } catch (e) {
+        // Ignore errors showing changes
+    }
+
+    return { updated: true, version: newVersion };
+}
+
+/**
+ * Update via tarball download (for non-git installations)
+ */
+function updateViaTarball(localVersion) {
+    print('  Using tarball download method...');
+
+    // Check if curl or wget is available
+    let downloadCmd;
+    try {
+        execSync('which curl', { encoding: 'utf8' });
+        downloadCmd = 'curl';
+    } catch (e) {
+        try {
+            execSync('which wget', { encoding: 'utf8' });
+            downloadCmd = 'wget';
+        } catch (e2) {
+            throw new Error('Neither curl nor wget found. Please install curl or wget to update.');
+        }
+    }
+
+    // Create temp directory for download
+    const os = require('os');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-update-'));
+    const tarballPath = path.join(tmpDir, 'ctoc.tar.gz');
+    const extractDir = path.join(tmpDir, 'extracted');
+
+    try {
+        // Download tarball
+        print('  Downloading latest release...');
+        if (downloadCmd === 'curl') {
+            execSync(`curl -sL "${TARBALL_URL}" -o "${tarballPath}"`, {
+                encoding: 'utf8',
+                timeout: 60000
+            });
+        } else {
+            execSync(`wget -q "${TARBALL_URL}" -O "${tarballPath}"`, {
+                encoding: 'utf8',
+                timeout: 60000
+            });
+        }
+
+        // Verify download
+        if (!fileExists(tarballPath)) {
+            throw new Error('Download failed - tarball not found');
+        }
+
+        const stats = fs.statSync(tarballPath);
+        if (stats.size < 1000) {
+            throw new Error('Download failed - tarball too small');
+        }
+
+        // Extract tarball
+        print('  Extracting...');
+        fs.mkdirSync(extractDir, { recursive: true });
+        execSync(`tar -xzf "${tarballPath}" -C "${extractDir}"`, { encoding: 'utf8' });
+
+        // Find extracted directory (usually ctoc-main)
+        const extractedDirs = fs.readdirSync(extractDir);
+        if (extractedDirs.length === 0) {
+            throw new Error('Extraction failed - no files found');
+        }
+        const sourceDir = path.join(extractDir, extractedDirs[0]);
+
+        // Read new version
+        const newVersionPath = path.join(sourceDir, 'VERSION');
+        if (!fileExists(newVersionPath)) {
+            throw new Error('Invalid tarball - VERSION file not found');
+        }
+        const newVersion = fs.readFileSync(newVersionPath, 'utf8').trim();
+
+        if (localVersion === newVersion) {
+            print(`${colors.green}✓${colors.reset} Already up to date (v${localVersion})`);
+            return { updated: false, version: localVersion };
+        }
+
+        print(`  Update available: v${localVersion} → v${newVersion}`);
+        print('  Installing update...');
+
+        // Copy new files to repo root (excluding user-specific files)
+        const excludeFiles = ['.git', 'node_modules', '.ctoc/state', '.ctoc/settings.yaml'];
+
+        function copyDir(src, dest) {
+            if (!fs.existsSync(dest)) {
+                fs.mkdirSync(dest, { recursive: true });
+            }
+            const entries = fs.readdirSync(src);
+            for (const entry of entries) {
+                // Skip excluded files at root level
+                if (excludeFiles.includes(entry)) continue;
+
+                const srcPath = path.join(src, entry);
+                const destPath = path.join(dest, entry);
+                const stat = fs.statSync(srcPath);
+
+                if (stat.isDirectory()) {
+                    copyDir(srcPath, destPath);
+                } else {
+                    fs.copyFileSync(srcPath, destPath);
+                }
+            }
+        }
+
+        copyDir(sourceDir, REPO_ROOT);
+
+        return { updated: true, version: newVersion };
+
+    } finally {
+        // Clean up temp directory
+        try {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+        } catch (e) {
+            // Ignore cleanup errors
+        }
+    }
+}
+
+/**
+ * Main update command handler
+ */
 function cmdUpdate() {
     print('');
     print(`${colors.cyan}Checking for updates...${colors.reset}`);
 
+    const localVersion = getVersion();
+
     try {
-        process.chdir(REPO_ROOT);
+        // Backup user settings before update
+        const backup = backupUserSettings();
 
-        // Fetch latest
-        execSync('git fetch --quiet', { encoding: 'utf8' });
-
-        const localVersion = getVersion();
-        let remoteVersion;
-        try {
-            remoteVersion = execSync('git show origin/main:VERSION', { encoding: 'utf8' }).trim();
-        } catch (e) {
-            remoteVersion = localVersion;
+        let result;
+        if (isGitInstallation()) {
+            result = updateViaGit(localVersion);
+        } else {
+            result = updateViaTarball(localVersion);
         }
 
-        if (localVersion === remoteVersion) {
-            print(`${colors.green}✓${colors.reset} Already up to date (v${localVersion})`);
+        // Restore user settings after update
+        restoreUserSettings(backup);
+
+        if (result.updated) {
             print('');
-            return;
+            print(`${colors.green}✓${colors.reset} Updated to v${result.version}`);
         }
-
-        print(`Update available: ${localVersion} → ${remoteVersion}`);
-        print('Updating...');
-
-        // Pull latest
-        execSync('git pull --rebase --quiet', { encoding: 'utf8' });
-
-        const newVersion = getVersion();
         print('');
-        print(`${colors.green}✓${colors.reset} Updated to v${newVersion}`);
-        print('');
-
-        // Show recent changes
-        try {
-            const changes = execSync(`git log --oneline v${localVersion}..HEAD 2>/dev/null | head -5`, { encoding: 'utf8' }).trim();
-            if (changes) {
-                print(`${colors.cyan}Recent changes:${colors.reset}`);
-                for (const line of changes.split('\n')) {
-                    print(`  • ${line}`);
-                }
-                print('');
-            }
-        } catch (e) {}
 
     } catch (e) {
         print(`${colors.red}Error:${colors.reset} Update failed`);
-        print(e.message);
+        print(`  ${e.message}`);
+        print('');
+        print('You can manually update by:');
+        if (isGitInstallation()) {
+            print(`  cd ${REPO_ROOT} && git pull`);
+        } else {
+            print('  curl -sL https://raw.githubusercontent.com/robotijn/ctoc/main/install.sh | bash');
+        }
+        print('');
         process.exit(1);
     }
 }

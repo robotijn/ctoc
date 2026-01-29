@@ -897,7 +897,18 @@ CTOC checks for updates once per day and prompts you when a new version is avail
 | **Force update** | `ctoc update` |
 | **Disable** | Set `CTOC_SKIP_UPDATE_CHECK=1` environment variable |
 
-Updates are fetched from the official repository and install automatically.
+### Update Methods
+
+CTOC automatically detects your installation type and uses the appropriate update method:
+
+| Installation Type | Update Method | How to Check |
+|-------------------|---------------|--------------|
+| **Git clone** | `git pull` | `.ctoc/repo/.git` exists |
+| **Tarball/installer** | Download latest tarball | No `.git` directory |
+
+Both methods preserve your user settings (`settings.yaml`) and state files.
+
+Updates are fetched from the official repository (https://github.com/robotijn/ctoc) over HTTPS.
 
 ---
 
