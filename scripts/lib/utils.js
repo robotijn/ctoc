@@ -54,6 +54,48 @@ const STEP_DESCRIPTIONS = {
   15: 'Commit with verification'
 };
 
+/**
+ * Default settings for display and implementation behavior
+ */
+const DEFAULT_SETTINGS = {
+  display: {
+    usage_link_frequency: 'daily',    // 'always', 'daily', 'never'
+    step_bar_color: 'orange',         // any color name
+    feature_bar_style: 'rainbow'      // 'rainbow' or single color
+  },
+  implementation: {
+    mode: 'background',               // 'background', 'foreground'
+    permission: 'check-in',           // 'per-plan', 'check-in', 'auto-continue'
+    check_in_interval: 15             // minutes: 5,10,15,20,30,45,60,90,120,180
+  }
+};
+
+/**
+ * Valid check-in interval options (in minutes)
+ */
+const CHECK_IN_INTERVALS = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180];
+
+/**
+ * Integrator-Critic Loop Settings
+ */
+const INTEGRATION_SETTINGS = {
+  max_rounds: 10,
+  quality_threshold: 5,
+  auto_approve_after_max: true,
+  defer_unresolved: true
+};
+
+/**
+ * Critic Rubric Dimensions (all must score 5/5 to pass)
+ */
+const RUBRIC_DIMENSIONS = {
+  COMPLETENESS: 'completeness',
+  CLARITY: 'clarity',
+  EDGE_CASES: 'edge_cases',
+  EFFICIENCY: 'efficiency',
+  SECURITY: 'security'
+};
+
 // ============================================================================
 // Directory Management
 // ============================================================================
@@ -200,7 +242,10 @@ function createIronLoopState(projectPath, feature, language, framework) {
       implementation: [],
       documentation: []
     },
-    blockers: []
+    blockers: [],
+    // Crash recovery fields
+    sessionStatus: 'active',
+    lastActivity: getTimestamp()
   };
 }
 
@@ -226,6 +271,56 @@ function updateIronLoopStep(projectPath, stepNumber, status, summary, agent) {
   state.lastUpdated = getTimestamp();
   saveIronLoopState(projectPath, state);
   return state;
+}
+
+/**
+ * Updates the lastActivity timestamp in Iron Loop state
+ * Called by on-stop hook to track activity
+ * @param {string} projectPath - Project root path
+ */
+function updateLastActivity(projectPath) {
+  const state = loadIronLoopState(projectPath);
+  if (state) {
+    state.lastActivity = getTimestamp();
+    saveIronLoopState(projectPath, state);
+  }
+}
+
+/**
+ * Checks if a session was interrupted during implementation
+ * Used for crash recovery detection
+ * @param {Object} state - Iron Loop state
+ * @returns {boolean} True if session was interrupted
+ */
+function isInterruptedSession(state) {
+  if (!state) return false;
+  if (state.sessionStatus !== 'active') return false;
+  // Check currentStep is a valid number in implementation range (steps 7-15)
+  if (typeof state.currentStep !== 'number' || state.currentStep < 7 || state.currentStep > 15) return false;
+
+  const lastActivity = new Date(state.lastActivity);
+  const hoursSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60);
+
+  // Only detect if activity was within last 24 hours (prevents false positives from old abandoned sessions)
+  return hoursSince < 24;
+}
+
+/**
+ * Formats the time since last activity in human-readable form
+ * @param {string} lastActivity - ISO timestamp
+ * @returns {string} Human-readable time difference
+ */
+function formatTimeSince(lastActivity) {
+  const lastTime = new Date(lastActivity);
+  const hoursSince = (Date.now() - lastTime.getTime()) / (1000 * 60 * 60);
+
+  if (hoursSince < 1) {
+    const minutes = Math.round(hoursSince * 60);
+    return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+  } else {
+    const hours = Math.round(hoursSince);
+    return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+  }
 }
 
 // ============================================================================
@@ -684,6 +779,492 @@ function listPlans(type, status, projectPath = process.cwd()) {
 }
 
 // ============================================================================
+// Project Settings Management
+// ============================================================================
+
+/**
+ * Gets the settings file path for a project
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {string} Path to settings.json file
+ */
+function getSettingsPath(projectPath = process.cwd()) {
+  return path.join(projectPath, '.ctoc', 'settings.json');
+}
+
+/**
+ * Loads project settings, returning defaults if not found
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {Object} Settings object with all required fields
+ */
+function loadSettings(projectPath = process.cwd()) {
+  const settingsPath = getSettingsPath(projectPath);
+
+  if (!fs.existsSync(settingsPath)) {
+    return { ...DEFAULT_SETTINGS };
+  }
+
+  try {
+    const content = fs.readFileSync(settingsPath, 'utf8');
+    const loaded = JSON.parse(content);
+
+    // Deep merge with defaults to ensure all fields exist
+    return {
+      display: {
+        ...DEFAULT_SETTINGS.display,
+        ...(loaded.display || {})
+      },
+      implementation: {
+        ...DEFAULT_SETTINGS.implementation,
+        ...(loaded.implementation || {})
+      }
+    };
+  } catch (e) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+/**
+ * Saves project settings
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @param {Object} settings - Settings object to save
+ */
+function saveSettings(projectPath = process.cwd(), settings) {
+  const settingsDir = path.join(projectPath, '.ctoc');
+  const settingsPath = getSettingsPath(projectPath);
+
+  // Ensure .ctoc directory exists
+  if (!fs.existsSync(settingsDir)) {
+    fs.mkdirSync(settingsDir, { recursive: true });
+  }
+
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+}
+
+// ============================================================================
+// Queued Plans Management
+// ============================================================================
+
+/**
+ * Gets all approved implementation plans that are queued for execution
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {Array} List of plan objects {name, path, modified}
+ */
+function getQueuedPlans(projectPath = process.cwd()) {
+  return listPlans(PLAN_TYPES.IMPLEMENTATION, PLAN_STATUSES.APPROVED, projectPath);
+}
+
+// ============================================================================
+// Usage Link Display Logic
+// ============================================================================
+
+/**
+ * Determines if usage link should be shown based on frequency setting
+ * @param {string} frequency - 'always', 'daily', or 'never'
+ * @param {string|null} lastShown - ISO date string of last shown date, or null
+ * @returns {boolean} True if usage link should be shown
+ */
+function shouldShowUsageLink(frequency, lastShown) {
+  if (frequency === 'always') {
+    return true;
+  }
+
+  if (frequency === 'never') {
+    return false;
+  }
+
+  // Default to 'daily' behavior
+  if (!lastShown) {
+    return true;
+  }
+
+  const today = getToday();
+  const lastShownDate = lastShown.split('T')[0]; // Handle both date and datetime strings
+
+  return today !== lastShownDate;
+}
+
+// ============================================================================
+// Background Implementation Menu
+// ============================================================================
+
+/**
+ * Generates the background implementation settings menu
+ * @param {number} planCount - Number of plans queued for implementation
+ * @returns {string} Formatted menu string for display
+ */
+function generateBackgroundMenu(planCount) {
+  const planWord = planCount === 1 ? 'plan' : 'plans';
+
+  return `
++======================================================================+
+|  Background Implementation Settings                                  |
++======================================================================+
+|  You have ${planCount} ${planWord} queued for implementation.                       |
+|                                                                      |
+|  How should background implementation proceed?                       |
+|                                                                      |
+|  [1] Per plan      - Ask permission before each plan                 |
+|  [2] Check-in      - Ask permission at intervals:                    |
+|      [2a] Every 5 min   [2f] Every 45 min                            |
+|      [2b] Every 10 min  [2g] Every 60 min                            |
+|      [2c] Every 15 min  [2h] Every 90 min                            |
+|      [2d] Every 20 min  [2i] Every 120 min                           |
+|      [2e] Every 30 min  [2j] Every 180 min                           |
+|  [3] Auto-continue - Implement all queued plans without asking       |
+|                                                                      |
+|  [S] Skip          - Don't start background implementation now       |
+|                                                                      |
+|  Check usage: https://claude.ai/settings/usage                       |
++======================================================================+
+`.trim();
+}
+
+// ============================================================================
+// Check-in Timing Logic
+// ============================================================================
+
+/**
+ * Determines if a check-in prompt should be shown based on elapsed time
+ * @param {number} startTime - Timestamp when background implementation started
+ * @param {number} intervalMinutes - Check-in interval in minutes
+ * @param {number} currentTime - Current timestamp (defaults to Date.now())
+ * @returns {boolean} True if check-in prompt should be shown
+ */
+function shouldShowCheckIn(startTime, intervalMinutes, currentTime = Date.now()) {
+  const intervalMs = intervalMinutes * 60 * 1000;
+  const elapsed = currentTime - startTime;
+
+  return elapsed >= intervalMs;
+}
+
+/**
+ * Generates the check-in prompt for background implementation
+ * @param {number} elapsed - Elapsed time in milliseconds
+ * @param {number} plansCompleted - Number of plans completed so far
+ * @param {number} plansRemaining - Number of plans remaining
+ * @returns {string} Formatted check-in prompt
+ */
+function generateCheckInPrompt(elapsed, plansCompleted, plansRemaining) {
+  const minutes = Math.floor(elapsed / (60 * 1000));
+
+  return `
++======================================================================+
+|  Background Implementation Check-in                                  |
++======================================================================+
+|                                                                      |
+|  Time elapsed: ${String(minutes).padEnd(4)} minutes                                     |
+|  Plans completed: ${String(plansCompleted).padEnd(4)}                                         |
+|  Plans remaining: ${String(plansRemaining).padEnd(4)}                                         |
+|                                                                      |
+|  [C] Continue      - Keep implementing                               |
+|  [P] Pause         - Pause after current plan                        |
+|  [S] Stop          - Stop background implementation                  |
+|                                                                      |
+|  Check usage: https://claude.ai/settings/usage                       |
++======================================================================+
+`.trim();
+}
+
+// ============================================================================
+// Integrator-Critic Loop Functions
+// ============================================================================
+
+/**
+ * Validates an execution plan structure
+ * @param {Object} plan - The execution plan to validate
+ * @returns {Object} Validation result {valid, errors}
+ */
+function validateExecutionPlan(plan) {
+  const errors = [];
+
+  if (!plan) {
+    return { valid: false, errors: ['Plan is null or undefined'] };
+  }
+
+  // Check required steps 7-15
+  const requiredSteps = [7, 8, 9, 10, 11, 12, 13, 14, 15];
+  for (const step of requiredSteps) {
+    const stepKey = `step_${step}`;
+    if (!plan[stepKey]) {
+      errors.push(`Missing step ${step}`);
+    } else {
+      // Each step must have an agent assigned
+      if (!plan[stepKey].agent) {
+        errors.push(`Step ${step} missing agent`);
+      }
+      // Each step must have tasks or actions
+      if (!plan[stepKey].tasks && !plan[stepKey].actions && !plan[stepKey].checks) {
+        errors.push(`Step ${step} missing tasks/actions/checks`);
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Validates critic scores for all 5 dimensions
+ * @param {Object} scores - The scores object with dimension keys
+ * @returns {Object} Validation result {valid, errors, allPassed}
+ */
+function validateCriticScores(scores) {
+  const errors = [];
+
+  if (!scores) {
+    return { valid: false, errors: ['Scores is null or undefined'], allPassed: false };
+  }
+
+  const dimensions = Object.values(RUBRIC_DIMENSIONS);
+  let allPassed = true;
+
+  for (const dim of dimensions) {
+    if (scores[dim] === undefined) {
+      errors.push(`Missing score for dimension: ${dim}`);
+      allPassed = false;
+    } else if (typeof scores[dim].score !== 'number') {
+      errors.push(`Score for ${dim} is not a number`);
+      allPassed = false;
+    } else if (scores[dim].score < 1 || scores[dim].score > 5) {
+      errors.push(`Score for ${dim} out of range (1-5): ${scores[dim].score}`);
+      allPassed = false;
+    } else if (scores[dim].score < 5) {
+      allPassed = false;
+      // Must have reason and suggestion if not 5
+      if (!scores[dim].reason) {
+        errors.push(`Score ${dim} < 5 but missing reason`);
+      }
+      if (!scores[dim].suggestion) {
+        errors.push(`Score ${dim} < 5 but missing suggestion`);
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    allPassed
+  };
+}
+
+/**
+ * Validates deferred question format
+ * @param {Object} question - The deferred question
+ * @returns {Object} Validation result {valid, errors}
+ */
+function validateDeferredQuestion(question) {
+  const errors = [];
+
+  if (!question) {
+    return { valid: false, errors: ['Question is null or undefined'] };
+  }
+
+  // Required fields
+  if (!question.context) errors.push('Missing context');
+  if (!question.issue) errors.push('Missing issue');
+  if (!question.step) errors.push('Missing step');
+  if (!question.question) errors.push('Missing question text');
+
+  // Options validation
+  if (!question.options || !Array.isArray(question.options)) {
+    errors.push('Missing or invalid options array');
+  } else if (question.options.length < 2) {
+    errors.push('Must have at least 2 options');
+  } else {
+    for (let i = 0; i < question.options.length; i++) {
+      const opt = question.options[i];
+      if (!opt.id) errors.push(`Option ${i} missing id`);
+      if (!opt.description) errors.push(`Option ${i} missing description`);
+      if (!opt.pros) errors.push(`Option ${i} missing pros`);
+      if (!opt.cons) errors.push(`Option ${i} missing cons`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Creates a deferred question from unresolved critic feedback
+ * @param {number} round - The round number where the issue occurred
+ * @param {string} dimension - The dimension that didn't pass
+ * @param {Object} score - The score object with reason and suggestion
+ * @returns {Object} Formatted deferred question
+ */
+function createDeferredQuestion(round, dimension, score) {
+  return {
+    context: `Round ${round} - ${dimension} scored ${score.score}/5`,
+    issue: score.reason,
+    step: score.affectedStep || 9,
+    question: `How should we address: ${score.reason}?`,
+    options: [
+      {
+        id: 'A',
+        description: score.suggestion || 'Apply suggested fix',
+        pros: 'Addresses the issue directly',
+        cons: 'May require additional implementation time'
+      },
+      {
+        id: 'B',
+        description: 'Defer to future iteration',
+        pros: 'Can ship current work faster',
+        cons: 'Creates technical debt'
+      },
+      {
+        id: 'C',
+        description: 'Accept current state with known limitation',
+        pros: 'No changes required',
+        cons: 'Issue remains unresolved',
+        recommended: false
+      }
+    ]
+  };
+}
+
+/**
+ * Formats a deferred question for display to the user
+ * @param {Object} question - The deferred question object
+ * @param {number} questionNumber - Current question number
+ * @param {number} totalQuestions - Total number of questions
+ * @returns {string} Formatted display string
+ */
+function formatDeferredQuestion(question, questionNumber, totalQuestions) {
+  const stepName = STEP_NAMES[question.step] || 'Unknown';
+  const optionsTable = question.options.map(opt => {
+    const rec = opt.recommended === true ? ' *Recommended*' : '';
+    return `  | ${opt.id.padEnd(6)} | ${opt.description}${rec}`;
+  }).join('\n');
+
+  const prosConsTable = question.options.map(opt => {
+    return `  | ${opt.id.padEnd(6)} | ${opt.pros.padEnd(25)} | ${opt.cons}`;
+  }).join('\n');
+
+  return `
++======================================================================+
+|  DEFERRED QUESTION ${questionNumber} of ${totalQuestions}${' '.repeat(Math.max(0, 40 - String(questionNumber).length - String(totalQuestions).length))}|
++======================================================================+
+|                                                                      |
+|  Context: ${question.context.padEnd(54)}|
+|  Issue:   ${question.issue.substring(0, 54).padEnd(54)}|
+|  Step:    ${question.step} (${stepName})${' '.repeat(Math.max(0, 47 - stepName.length))}|
+|                                                                      |
++----------------------------------------------------------------------+
+|                                                                      |
+|  ${question.question.padEnd(66)}|
+|                                                                      |
+|  Options:                                                            |
+${optionsTable}
+|                                                                      |
+|  Pros/Cons:                                                          |
+|  | Option | Pros                      | Cons                       |
+|  |--------|---------------------------|----------------------------|
+${prosConsTable}
+|                                                                      |
++======================================================================+
+`.trim();
+}
+
+/**
+ * Gets the execution plan directory path
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ * @returns {string} Path to execution plans directory
+ */
+function getExecutionPlanPath(projectPath = process.cwd()) {
+  return path.join(projectPath, 'plans', 'execution');
+}
+
+/**
+ * Ensures execution plan directory exists
+ * @param {string} projectPath - Project root path (defaults to cwd)
+ */
+function ensureExecutionPlanDir(projectPath = process.cwd()) {
+  const execDir = getExecutionPlanPath(projectPath);
+  if (!fs.existsSync(execDir)) {
+    fs.mkdirSync(execDir, { recursive: true });
+  }
+}
+
+/**
+ * Saves an execution plan to the execution plans directory
+ * @param {string} projectPath - Project root path
+ * @param {string} planName - Name of the plan (without .md extension)
+ * @param {Object} plan - The execution plan object
+ * @param {Array} deferredQuestions - Any deferred questions from the loop
+ * @returns {Object} Result {success, path, error?}
+ */
+function saveExecutionPlan(projectPath, planName, plan, deferredQuestions = []) {
+  try {
+    ensureExecutionPlanDir(projectPath);
+
+    const execDir = getExecutionPlanPath(projectPath);
+    const fileName = planName.endsWith('.md') ? planName : `${planName}.md`;
+    const filePath = path.join(execDir, fileName);
+
+    // Format as markdown with YAML front matter
+    let content = `# Execution Plan: ${planName}\n\n`;
+    content += `**Generated:** ${getTimestamp()}\n`;
+    content += `**Status:** Ready for execution\n\n`;
+
+    content += `## Execution Steps\n\n`;
+    content += '```yaml\n';
+    content += JSON.stringify(plan, null, 2).replace(/"/g, '');
+    content += '\n```\n\n';
+
+    if (deferredQuestions.length > 0) {
+      content += `## Deferred Questions\n\n`;
+      content += `These questions will be presented at Step 15 (FINAL-REVIEW):\n\n`;
+      for (let i = 0; i < deferredQuestions.length; i++) {
+        content += `### Question ${i + 1}\n\n`;
+        content += `- **Context:** ${deferredQuestions[i].context}\n`;
+        content += `- **Issue:** ${deferredQuestions[i].issue}\n`;
+        content += `- **Step:** ${deferredQuestions[i].step}\n`;
+        content += `- **Question:** ${deferredQuestions[i].question}\n\n`;
+      }
+    }
+
+    fs.writeFileSync(filePath, content, 'utf8');
+
+    return {
+      success: true,
+      path: filePath
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e.message
+    };
+  }
+}
+
+/**
+ * Loads an execution plan from file
+ * @param {string} filePath - Path to the execution plan file
+ * @returns {Object|null} The execution plan or null if not found
+ */
+function loadExecutionPlan(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    // Parse the YAML block from the markdown
+    const yamlMatch = content.match(/```yaml\n([\s\S]*?)\n```/);
+    if (yamlMatch) {
+      // Simple parse for our structure (not full YAML)
+      return JSON.parse(yamlMatch[1].replace(/(\w+):/g, '"$1":'));
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -697,6 +1278,8 @@ module.exports = {
   STEP_NAMES,
   STEP_DESCRIPTIONS,
   EXTENSION_MAP,
+  DEFAULT_SETTINGS,
+  CHECK_IN_INTERVALS,
 
   // Directory Management
   ensureDirectories,
@@ -717,6 +1300,9 @@ module.exports = {
   saveIronLoopState,
   createIronLoopState,
   updateIronLoopStep,
+  updateLastActivity,
+  isInterruptedSession,
+  formatTimeSince,
 
   // Session Management
   loadSession,
@@ -728,6 +1314,11 @@ module.exports = {
   loadConfig,
   getDefaultConfig,
   saveConfig,
+
+  // Project Settings Management
+  getSettingsPath,
+  loadSettings,
+  saveSettings,
 
   // Output Utilities
   log,
@@ -749,5 +1340,27 @@ module.exports = {
   hasDraftPlan,
   movePlanToApproved,
   ensurePlanDirectories,
-  listPlans
+  listPlans,
+  getQueuedPlans,
+
+  // Usage Link Display
+  shouldShowUsageLink,
+
+  // Background Implementation
+  generateBackgroundMenu,
+  shouldShowCheckIn,
+  generateCheckInPrompt,
+
+  // Integrator-Critic Loop
+  INTEGRATION_SETTINGS,
+  RUBRIC_DIMENSIONS,
+  validateExecutionPlan,
+  validateCriticScores,
+  validateDeferredQuestion,
+  createDeferredQuestion,
+  formatDeferredQuestion,
+  getExecutionPlanPath,
+  ensureExecutionPlanDir,
+  saveExecutionPlan,
+  loadExecutionPlan
 };

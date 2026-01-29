@@ -36,8 +36,9 @@ async function main() {
     const ironLoopState = loadIronLoopState(projectPath);
 
     if (ironLoopState) {
-      // Update last modified timestamp
+      // Update last modified timestamp and mark session as cleanly ended
       ironLoopState.lastUpdated = getTimestamp();
+      ironLoopState.sessionStatus = 'ended'; // Mark clean exit for crash recovery
       saveIronLoopState(projectPath, ironLoopState);
 
       const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';

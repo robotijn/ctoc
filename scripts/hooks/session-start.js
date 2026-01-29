@@ -28,7 +28,16 @@ const {
   hasApprovedPlan,
   hasDraftPlan,
   ensurePlanDirectories,
-  PLAN_TYPES
+  PLAN_TYPES,
+  isInterruptedSession,
+  formatTimeSince,
+  getQueuedPlans,
+  shouldShowUsageLink,
+  generateBackgroundMenu,
+  loadSettings,
+  saveSettings,
+  DEFAULT_SETTINGS,
+  getToday
 } = require('../lib/utils');
 
 const { detectStack, profileExists } = require('../lib/stack-detector');
@@ -204,8 +213,33 @@ async function main() {
 
     // 3. Load or create Iron Loop state
     let ironLoopState = loadIronLoopState(projectPath);
+    let interruptedSession = false;
 
     if (ironLoopState) {
+      // Check for interrupted implementation session (crash recovery)
+      if (isInterruptedSession(ironLoopState)) {
+        interruptedSession = true;
+        const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
+        const timeSince = formatTimeSince(ironLoopState.lastActivity);
+        const featureName = ironLoopState.feature || 'Unknown feature';
+
+        // Display recovery menu to terminal (visible to user)
+        const recoveryMenu = `
++------------------------------------------------------------+
+|  INTERRUPTED IMPLEMENTATION DETECTED                       |
++------------------------------------------------------------+
+|  Plan: ${featureName.padEnd(49)}|
+|  Step: ${ironLoopState.currentStep} (${stepName})`.padEnd(61) + `|
+|  Last activity: ${timeSince}`.padEnd(61) + `|
+|                                                            |
+|  [R] Resume - Continue from where it stopped               |
+|  [S] Restart - Start implementation fresh from Step 7      |
+|  [D] Discard - Abandon this implementation                 |
++------------------------------------------------------------+
+`;
+        writeToTerminal(recoveryMenu);
+      }
+
       // Resuming existing work
       const stepName = STEP_NAMES[ironLoopState.currentStep] || 'Unknown';
       log(`Resuming feature: "${ironLoopState.feature}"`);
@@ -224,6 +258,11 @@ async function main() {
       if (ironLoopState.blockers && ironLoopState.blockers.length > 0) {
         warn(`Blockers: ${ironLoopState.blockers.join(', ')}`);
       }
+
+      // Update session status to active and refresh lastActivity
+      ironLoopState.sessionStatus = 'active';
+      ironLoopState.lastActivity = new Date().toISOString();
+      saveIronLoopState(projectPath, ironLoopState);
     } else {
       // New session - create placeholder state
       // The actual feature name will be set when the user starts working
@@ -233,6 +272,7 @@ async function main() {
         stack.primary.language,
         stack.primary.framework
       );
+      saveIronLoopState(projectPath, ironLoopState);
       log('New session started. Iron Loop state initialized.');
       log('Use "/ctoc start <feature-name>" to begin tracking a feature.');
     }
@@ -261,6 +301,42 @@ async function main() {
       log(`Implementation plan approved: ${planStatus.implementation.approved.name}`);
     } else if (planStatus.implementation.draft) {
       log(`Implementation plan in draft: ${planStatus.implementation.draft.name} (needs approval)`);
+    }
+
+    // 4b. Check for queued plans and show background implementation menu
+    const queuedPlans = getQueuedPlans(projectPath);
+    let backgroundImplementationInfo = null;
+
+    if (queuedPlans.length > 0 && !interruptedSession) {
+      // Load project settings for implementation preferences
+      const projectSettings = loadSettings(projectPath);
+
+      // Check if we should show the usage link based on frequency
+      const usageLinkFrequency = projectSettings.display?.usage_link_frequency || DEFAULT_SETTINGS.display.usage_link_frequency;
+      const lastUsageLinkShown = projectSettings._lastUsageLinkShown || null;
+      const showUsageLink = shouldShowUsageLink(usageLinkFrequency, lastUsageLinkShown);
+
+      // Update last shown date if we're showing the link
+      if (showUsageLink && usageLinkFrequency === 'daily') {
+        projectSettings._lastUsageLinkShown = getToday();
+        saveSettings(projectPath, projectSettings);
+      }
+
+      // Generate and display the background implementation menu
+      const menu = generateBackgroundMenu(queuedPlans.length);
+      writeToTerminal('\n' + menu + '\n');
+
+      // Store info for Claude's context
+      backgroundImplementationInfo = {
+        queuedPlans: queuedPlans.length,
+        planNames: queuedPlans.map(p => p.name),
+        showUsageLink,
+        defaultMode: projectSettings.implementation?.mode || DEFAULT_SETTINGS.implementation.mode,
+        defaultPermission: projectSettings.implementation?.permission || DEFAULT_SETTINGS.implementation.permission,
+        defaultCheckInInterval: projectSettings.implementation?.check_in_interval || DEFAULT_SETTINGS.implementation.check_in_interval
+      };
+
+      log(`${queuedPlans.length} plans queued for background implementation`);
     }
 
     // 5. Update session tracking
@@ -310,7 +386,8 @@ async function main() {
       settings,
       gate1Passed,
       gate2Passed,
-      planStatus
+      planStatus,
+      backgroundImplementationInfo
     }));
 
   } catch (error) {

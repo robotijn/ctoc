@@ -1,41 +1,210 @@
-# CTOC — Iron Loop v2.0
+# CTOC — Iron Loop v2.1
 
 > **Iron Loop is CTOC's methodology for quality software delivery.**
 > This file tracks the current work in progress.
 
 ---
 
-## Iron Loop v2.0 Overview
+## Iron Loop v2.1 Overview
 
 ```
-PLANNING PHASE (Steps 1-6) - Opus model
-────────────────────────────────────────
-1. ASSESS        Problem understanding           [functional-planner]
-2. ALIGN         User goals & business objectives [functional-planner]
-3. CAPTURE       Requirements & success criteria  [functional-reviewer] ◄─┐
-   └─► Reject? Back to Step 1 ────────────────────────────────────────────┘
+PHASE 1: FUNCTIONAL PLANNING (Steps 1-3) - Product Owner Role
+─────────────────────────────────────────────────────────────
+1. ASSESS        Problem understanding              [product-owner]
+2. ALIGN         User goals & business objectives   [product-owner]
+3. CAPTURE       Requirements as BDD specs          [functional-reviewer] ◄──┐
+   └─► Reject? Back to Step 1 ─────────────────────────────────────────────────┘
+   └─► HUMAN GATE: User approves functional plan
 
-4. PLAN          Technical approach              [impl-planner]
-5. DESIGN        Architecture design             [impl-planner]
-6. SPEC          Detailed specifications         [impl-plan-reviewer] ◄─┐
-   └─► Reject? Back to Step 4 ────────────────────────────────────────┘
+PHASE 2: IMPLEMENTATION PLANNING (Steps 4-6) - Technical Role
+─────────────────────────────────────────────────────────────
+4. PLAN          Technical approach                 [implementation-planner]
+5. DESIGN        Architecture design                [implementation-planner]
+6. SPEC          Detailed specifications            [implementation-plan-reviewer] ◄──┐
+   └─► Reject? Back to Step 4 ─────────────────────────────────────────────────────────┘
    └─► Approve → [iron-loop-integrator] injects 7-15
+   └─► HUMAN GATE: User approves technical approach
 
-IMPLEMENTATION PHASE (Steps 7-15)
-────────────────────────────────────────
-7.  TEST         Write tests first (TDD Red)     [test-maker]
-8.  QUALITY      Lint, format, type-check        [quality-checker]
-9.  IMPLEMENT    Setup + Code + Error handling   [implementer]
-10. REVIEW       Self-review + quality re-check  [self-reviewer] ◄───────┐
-    └─► TDD Loop: Need more tests? → Back to Step 7 ─────────────────────┘
+PHASE 3: IMPLEMENTATION (Steps 7-15) - Autonomous
+─────────────────────────────────────────────────────────────
+7.  TEST         Write tests first (TDD Red)        [test-maker]
+8.  QUALITY      Lint, format, type-check           [quality-checker]
+9.  IMPLEMENT    Setup + Code + Error handling      [implementer]
+10. REVIEW       Self-review + quality re-check     [self-reviewer] ◄───────────┐
+    └─► TDD Loop: Need more tests? → Back to Step 7 ────────────────────────────┘
 
-11. OPTIMIZE     Performance improvements        [optimizer]
-12. SECURE       Security vulnerability check    [security-scanner]
-13. VERIFY       Run ALL tests                   [verifier]
-14. DOCUMENT     Update documentation            [documenter]
-15. FINAL-REVIEW Reviews 7-14, highest standards [impl-reviewer]
+11. OPTIMIZE     Performance + code simplification  [optimizer]
+12. SECURE       Security vulnerability check       [security-scanner]
+13. VERIFY       Run ALL tests                      [verifier]
+14. DOCUMENT     Update documentation               [documenter]
+15. FINAL-REVIEW Reviews 7-14, highest standards    [implementation-reviewer]
     └─► Issues? Smart loop to affected step
-    └─► Satisfied? COMMIT & PUSH
+    └─► HUMAN GATE: User approves commit/push
+```
+
+---
+
+## Phase 1: Product Owner Role (BDD Methodology)
+
+Phase 1 acts as **Product Owner** for the project:
+
+### What It Does
+- Understands what user needs (ASSESS)
+- Aligns with business goals (ALIGN)
+- Captures requirements as implementable specs (CAPTURE)
+
+### BDD Output Format
+All features are captured as:
+1. **User Stories** - "As a [user], I can [action] so that [benefit]"
+2. **Behavior Scenarios** - Given/When/Then (Gherkin format)
+3. **Definition of Done** - Automated test conditions
+
+```gherkin
+Feature: User Login
+
+  User Story: As a registered user, I can log in so that I access my account
+
+  Scenario: Successful login
+    Given I am on the login page
+    And I have a valid account
+    When I enter my email and password
+    And I click "Log In"
+    Then I should see my dashboard
+    And I should see a welcome message
+
+  Scenario: Invalid password
+    Given I am on the login page
+    When I enter wrong password
+    Then I should see "Invalid credentials"
+    And I should remain on login page
+```
+
+### Escape Hatch
+Even trivial requests get a mini-plan with test. User can override with:
+- "skip planning"
+- "quick fix"
+- "trivial fix"
+
+---
+
+## Hook Enforcement
+
+The Iron Loop is enforced by the `edit-write-gate.js` hook, which runs before every Edit/Write operation.
+
+### How It Works
+
+```
+On Edit/Write tool call:
+├── Load Iron Loop state
+├── Check enforcement mode (strict/soft/off)
+├── Check if file is whitelisted (*.md, *.yaml, .ctoc/**)
+│   └── If whitelisted → ALLOW
+├── Check for escape phrase in user message
+│   └── If found → ALLOW
+├── Check currentStep
+│   ├── If step >= 7 → ALLOW
+│   └── If step < 7 → BLOCK (exit 1)
+```
+
+### Enforcement Modes
+
+| Mode | Behavior |
+|------|----------|
+| `strict` | Block Edit/Write if planning incomplete (default) |
+| `soft` | Warn but allow Edit/Write |
+| `off` | No enforcement |
+
+Configure in `.ctoc/settings.yaml`:
+```yaml
+enforcement:
+  mode: strict
+```
+
+### Whitelisted Files
+
+These file types bypass enforcement (config/docs that don't need Iron Loop):
+- `*.md` - Markdown files
+- `*.yaml`, `*.yml` - Config files
+- `*.json` - Config files
+- `.ctoc/**` - CTOC configuration
+- `.local/**` - Local state
+
+### Escape Phrases
+
+User can bypass enforcement by saying:
+- "skip planning"
+- "skip iron loop"
+- "quick fix"
+- "trivial fix"
+- "trivial change"
+- "hotfix"
+- "urgent"
+
+---
+
+## Crash Recovery
+
+When an implementation session (Steps 7-15) is interrupted (crash, terminal close, etc.), CTOC automatically detects this on the next session start and offers recovery options.
+
+### Detection Criteria
+
+A session is considered interrupted if:
+1. `sessionStatus` is "active" (not cleanly ended)
+2. `currentStep` is between 7 and 15 (implementation phase)
+3. `lastActivity` is within the last 24 hours
+
+### Recovery Menu
+
+When an interrupted session is detected, the user sees:
+
+```
++------------------------------------------------------------+
+|  INTERRUPTED IMPLEMENTATION DETECTED                       |
++------------------------------------------------------------+
+|  Plan: [feature-name]                                      |
+|  Step: 9 (IMPLEMENT)                                       |
+|  Last activity: 2 hours ago                                |
+|                                                            |
+|  [R] Resume - Continue from where it stopped               |
+|  [S] Restart - Start implementation fresh from Step 7      |
+|  [D] Discard - Abandon this implementation                 |
++------------------------------------------------------------+
+```
+
+### Session Lifecycle
+
+- **Session Start**: Sets `sessionStatus: "active"`, updates `lastActivity`
+- **Every Response**: Updates `lastActivity` timestamp
+- **Clean Exit**: Sets `sessionStatus: "ended"`
+
+This ensures crashed sessions are distinguishable from cleanly ended ones.
+
+---
+
+## 3 Human Gates
+
+| Gate | Transition | User Decision |
+|------|------------|---------------|
+| Gate 1 | Functional → Implementation | "Approve functional plan?" |
+| Gate 2 | Implementation → Iron Loop Ready | "Approve technical approach?" |
+| Gate 3 | Final Review → Done | "Commit/push or send back?" |
+
+---
+
+## Kanban Board (5 Columns)
+
+```
++------------+ +------------+ +------------+ +------------+ +------------+
+| FUNCTIONAL | |IMPLEMENTAT.| | IRON LOOP  | |    IN      | |   FINAL    |
+|  PLANNING  | |  PLANNING  | |   READY    | | DEVELOPMENT| |  REVIEW    |
++------------+ +------------+ +------------+ +------------+ +------------+
+| Steps 1-3  | | Steps 4-6  | | Awaiting   | | Steps 7-14 | |  Step 15   |
+| Product    | | Technical  | | execution  | | Shows      | | Human gate |
+| Owner BDD  | | approach   | | start      | | action:    | | Commit or  |
+|            | | architect. | |            | | "Testing"  | | send back  |
++------------+ +------------+ +------------+ +------------+ +------------+
+      |              |                                             |
+   [HUMAN]        [HUMAN]                                       [HUMAN]
 ```
 
 ---
@@ -63,58 +232,29 @@ IMPLEMENTATION PHASE (Steps 7-15)
 
 ## Current Work
 
-**Feature:** CTOC v2.0 — Agent System Transformation
-**Status:** Implementation Complete
-**Started:** 2026-01-28
+**Feature:** CTOC v2.1 — Product Owner Role Redesign
+**Status:** Implementation In Progress
+**Started:** 2026-01-29
 
 ### Progress
 
 ```
-[ ✓ ] Phase 1: Foundation
-      ├── [x] Delete old bash scripts
-      ├── [x] Create operations-registry.yaml v2.0
-      ├── [x] Create settings.yaml.template
-      ├── [x] Create codebase-index template
-      ├── [x] Fix hooks.json paths (${CLAUDE_PROJECT_DIR})
-      ├── [x] Add Node.js detection to install.sh
-      ├── [x] Add hooks setup to install.sh
-      └── [x] Create continuation.yaml state template
+[ ✓ ] Phase 1: Agent Renaming
+      ├── [x] Create product-owner.md (replaces functional-planner.md)
+      ├── [x] Rename impl-planner → implementation-planner
+      ├── [x] Rename impl-plan-reviewer → implementation-plan-reviewer
+      ├── [x] Rename impl-reviewer → implementation-reviewer
+      └── [x] Delete old functional-planner.md
 
-[ ✓ ] Phase 2: Management Agents
-      ├── [x] cto-chief
-      ├── [x] functional-planner
-      ├── [x] functional-reviewer
-      ├── [x] impl-planner
-      ├── [x] impl-plan-reviewer
-      └── [x] iron-loop-integrator
+[ ✓ ] Phase 2: Core File Updates
+      ├── [x] Update cto-chief.md with new patterns
+      ├── [x] Update operations-registry.yaml
+      ├── [x] Update IRON_LOOP.md (this file)
+      └── [x] Update settings.yaml (keyboard_layout)
 
-[ ✓ ] Phase 3: Implementation Agents
-      ├── [x] test-maker
-      ├── [x] quality-checker
-      ├── [x] implementer
-      ├── [x] self-reviewer
-      ├── [x] optimizer
-      ├── [x] security-scanner
-      ├── [x] verifier
-      ├── [x] documenter
-      └── [x] impl-reviewer
-
-[ ✓ ] Phase 4: Learning System
-      ├── [x] Learning file structure
-      ├── [x] Learning template
-      └── [x] README documentation
-
-[ ✓ ] Phase 5: Hooks Installation Fix
-      ├── [x] Update hooks.json with cross-platform paths
-      ├── [x] Add Node.js check to install.sh
-      ├── [x] Add Node.js check to install.ps1
-      ├── [x] Add hooks setup to installers
-      └── [x] Enhanced pre-compact.js with continuation.yaml
-
-[ ✓ ] Phase 6: Documentation
-      ├── [x] IRON_LOOP.md v2.0
-      ├── [x] Update README with Iron Loop explanation
-      └── [x] Create state management README
+[   ] Phase 3: Kanban Board
+      ├── [ ] Create ctoc/kanban/board.yaml
+      └── [ ] Update dashboard.md agent
 ```
 
 ---
@@ -124,24 +264,24 @@ IMPLEMENTATION PHASE (Steps 7-15)
 | Agent | Model | Steps | Role |
 |-------|-------|-------|------|
 | cto-chief | opus | 1-15 | Coordinator |
-| functional-planner | opus | 1-3 | Planning |
+| product-owner | opus | 1-3 | BDD Specs (Product Owner) |
 | functional-reviewer | opus | 3 | Review Gate |
-| impl-planner | opus | 4-6 | Planning |
-| impl-plan-reviewer | opus | 6 | Review Gate |
+| implementation-planner | opus | 4-6 | Technical Planning |
+| implementation-plan-reviewer | opus | 6 | Review Gate |
 | iron-loop-integrator | sonnet | 6 | Transition |
 | test-maker | opus | 7 | TDD Red |
 | quality-checker | sonnet | 8,10 | Quality |
 | implementer | sonnet | 9 | Code |
 | self-reviewer | opus | 10 | Review |
-| optimizer | sonnet | 11 | Performance |
+| optimizer | sonnet | 11 | Performance + Simplification |
 | security-scanner | opus | 12 | Security |
 | verifier | sonnet | 13 | Testing |
 | documenter | sonnet | 14 | Docs |
-| impl-reviewer | opus | 15 | Final Gate |
+| implementation-reviewer | opus | 15 | Final Gate |
 
 ---
 
-## Files Created
+## Files Structure
 
 ### Agents
 ```
@@ -149,30 +289,40 @@ IMPLEMENTATION PHASE (Steps 7-15)
 ├── coordinator/
 │   └── cto-chief.md
 ├── planning/
-│   ├── functional-planner.md
+│   ├── product-owner.md            # NEW - BDD specs
 │   ├── functional-reviewer.md
-│   ├── impl-planner.md
-│   ├── impl-plan-reviewer.md
+│   ├── implementation-planner.md   # RENAMED from impl-planner
+│   ├── implementation-plan-reviewer.md  # RENAMED from impl-plan-reviewer
 │   └── iron-loop-integrator.md
-└── implementation/
-    ├── test-maker.md
-    ├── quality-checker.md
-    ├── implementer.md
-    ├── self-reviewer.md
-    ├── optimizer.md
-    ├── security-scanner.md
-    ├── verifier.md
-    ├── documenter.md
-    └── impl-reviewer.md
+├── implementation/
+│   ├── test-maker.md
+│   ├── quality-checker.md
+│   ├── implementer.md
+│   ├── self-reviewer.md
+│   ├── optimizer.md
+│   ├── security-scanner.md
+│   ├── verifier.md
+│   ├── documenter.md
+│   └── implementation-reviewer.md  # RENAMED from impl-reviewer
+├── admin/
+│   ├── dashboard.md
+│   ├── learning-applier.md
+│   └── learning-suggester.md
+└── writing/
+    ├── document-planner.md
+    ├── pdf-writer.md
+    ├── docx-writer.md
+    ├── pptx-writer.md
+    └── document-reader.md
 ```
 
 ### Configuration
 ```
 .ctoc/
-├── operations-registry.yaml    # v2.0.0 — Single source of truth
-├── settings.yaml.template      # Configuration template
+├── operations-registry.yaml    # v2.1.0 — Single source of truth
+├── settings.yaml               # Configuration (with keyboard_layout)
 ├── cache/
-│   └── codebase-index.yaml.template
+│   └── codebase-index.yaml
 └── learnings/
     ├── README.md
     ├── learning.yaml.template
@@ -182,28 +332,6 @@ IMPLEMENTATION PHASE (Steps 7-15)
     └── rejected/
 ```
 
-### Deleted
-```
-.ctoc/bin/                      # All bash scripts removed
-├── ctoc.sh                     # Replaced by agents
-├── ctoc-slim.sh
-├── plan.sh
-├── progress.sh
-├── git-workflow.sh
-├── git-atomic.sh
-├── update-check.sh
-└── upgrade-agent.sh
-```
-
----
-
-## Next Steps
-
-1. Test hooks installation on fresh project
-2. Verify continuation.yaml saves correctly on compaction
-3. Final testing of agent invocation flow
-4. Commit and push v2.0
-
 ---
 
 ## Notes
@@ -212,7 +340,9 @@ IMPLEMENTATION PHASE (Steps 7-15)
 - Everything is an agent (tiered by complexity)
 - Model minimum: Haiku (configurable to sonnet/opus)
 - Learning system: per-project, git-tracked
+- Phase 1 uses BDD methodology (user stories + scenarios)
+- 3 human gates ensure user control at key transitions
 
 ---
 
-*Last updated: 2026-01-28*
+*Last updated: 2026-01-29*
