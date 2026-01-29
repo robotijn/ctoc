@@ -114,20 +114,56 @@ check_dependencies() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 check_nodejs() {
-    print_section "Checking for Node.js"
+    print_section "Checking for Node.js (REQUIRED)"
 
     if command -v node &>/dev/null; then
         local node_version
         node_version=$(node --version)
+
+        # Check minimum version (18+)
+        local major_version
+        major_version=$(echo "$node_version" | sed 's/v//' | cut -d. -f1)
+
+        if [[ "$major_version" -lt 18 ]]; then
+            echo ""
+            echo -e "${RED}═══════════════════════════════════════════════════════════════════${NC}"
+            echo -e "${RED}  FATAL: Node.js 18+ is REQUIRED for CTOC v3.0${NC}"
+            echo -e "${RED}═══════════════════════════════════════════════════════════════════${NC}"
+            echo ""
+            echo "  Detected: $node_version (too old)"
+            echo "  Required: v18.0.0 or higher"
+            echo ""
+            echo "  The Iron Loop cannot be enforced without modern Node.js."
+            echo "  Update Node.js and try again."
+            echo ""
+            echo "  Installation: https://nodejs.org/"
+            echo ""
+            exit 1
+        fi
+
         print_step "Node.js detected: $node_version"
 
         # Auto-enable hooks when Node.js is available
         INSTALL_HOOKS=true
-        print_step "Hooks will be enabled"
+        print_step "Hooks will be enabled (Holy Enforcement v3.0)"
     else
-        print_warn "Node.js not detected"
-        print_info "         Install Node.js to enable advanced features"
-        INSTALL_HOOKS=false
+        echo ""
+        echo -e "${RED}═══════════════════════════════════════════════════════════════════${NC}"
+        echo -e "${RED}  FATAL: Node.js is REQUIRED for CTOC v3.0${NC}"
+        echo -e "${RED}═══════════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo "  The Iron Loop cannot be enforced without Node.js."
+        echo "  This is a non-negotiable requirement in CTOC v3.0."
+        echo ""
+        echo "  Install Node.js 18+ and try again."
+        echo ""
+        echo "  Installation options:"
+        echo "    - https://nodejs.org/ (recommended)"
+        echo "    - nvm: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
+        echo "    - brew install node (macOS)"
+        echo "    - apt install nodejs (Debian/Ubuntu)"
+        echo ""
+        exit 1
     fi
 }
 
