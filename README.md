@@ -214,6 +214,9 @@ claude --dangerously-skip-permissions
 
 After starting Claude Code with the flag above, toggle the **Bypass Permissions** setting to ON:
 
+**Quick way:** Press `Shift + Tab` to toggle Bypass Permissions directly.
+
+**Or via settings:**
 1. Press `Shift + ?` to open settings (or type `/config`)
 2. Find "Bypass Permissions"
 3. Toggle to **ON**
