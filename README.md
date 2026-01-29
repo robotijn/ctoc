@@ -1077,6 +1077,53 @@ Launch in parallel:
 Wait for all → Synthesize → Proceed sequentially
 ```
 
+### Background Implementation
+
+When you have approved implementation plans queued, CTOC shows a menu at session start:
+
+```
++======================================================================+
+|  Background Implementation Settings                                  |
++======================================================================+
+|  You have 3 plans queued for implementation.                         |
+|                                                                      |
+|  How should background implementation proceed?                       |
+|                                                                      |
+|  [1] Per plan      - Ask permission before each plan                 |
+|  [2] Check-in      - Ask permission at intervals (5-180 min)         |
+|  [3] Auto-continue - Implement all queued plans without asking       |
+|  [S] Skip          - Don't start background implementation now       |
+|                                                                      |
+|  Check usage: https://claude.ai/settings/usage                       |
++======================================================================+
+```
+
+### Settings
+
+Configure background implementation in `.ctoc/settings.json`:
+
+```json
+{
+  "display": {
+    "usage_link_frequency": "daily",
+    "step_bar_color": "orange",
+    "feature_bar_style": "rainbow"
+  },
+  "implementation": {
+    "mode": "background",
+    "permission": "check-in",
+    "check_in_interval": 15
+  }
+}
+```
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| `display.usage_link_frequency` | `always`, `daily`, `never` | `daily` | How often to show usage link |
+| `implementation.mode` | `background`, `foreground` | `background` | Default implementation mode |
+| `implementation.permission` | `per-plan`, `check-in`, `auto-continue` | `check-in` | How to request permission |
+| `implementation.check_in_interval` | 5-180 (minutes) | 15 | Check-in interval when using check-in mode |
+
 ---
 
 ## File Locking
