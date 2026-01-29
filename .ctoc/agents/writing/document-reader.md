@@ -182,6 +182,7 @@ document_content:
 - Read (read file if text-based)
 - Bash (run Python extraction scripts)
 - Write (create extraction scripts)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Use Cases
 

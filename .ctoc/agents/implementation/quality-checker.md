@@ -100,6 +100,7 @@ quality_report:
 - Read (examine code)
 - Write (apply auto-fixes)
 - Grep (find patterns)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Tool Detection
 

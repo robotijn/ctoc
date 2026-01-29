@@ -130,6 +130,7 @@ verification_report:
 - Bash (run test commands)
 - Read (examine test output)
 - Grep (analyze failures)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Test Framework Detection
 

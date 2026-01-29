@@ -119,6 +119,7 @@ self_review:
 - Read, Grep, Glob (review code)
 - Task (invoke quality-checker)
 - Bash (run tests, check coverage)
+- WebSearch (research current best practices, documentation, solutions)
 
 ## Decision Framework
 
