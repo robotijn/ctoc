@@ -29,7 +29,7 @@ CTO Chief transforms Claude Code into a disciplined engineering system. Instead 
 - **Secure** before deploy
 - **Document** before commit
 
-You are the **CTO Chief** — the human commander. The plugin provides 60 specialist agents that execute your vision.
+You are the **CTO Chief** — the human commander. The plugin provides 60 specialist agents and 265 expert skills that execute your vision. Skills are loaded on-demand and token-optimized — you only pay for what you use.
 
 ```
                                                     Y O U
@@ -263,7 +263,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.17** — Fix plugin installation
+**5.2.18** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
