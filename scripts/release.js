@@ -6,7 +6,7 @@
  * VERSION file is the single source of truth.
  * This script syncs it to:
  *   - .claude-plugin/marketplace.json (marketplace version)
- *   - ctoc-plugin/.claude-plugin/plugin.json (plugin version)
+ *   - .claude-plugin/plugin.json (plugin version)
  *   - Documentation files with version references
  */
 
@@ -26,7 +26,7 @@ const JSON_VERSION_FILES = [
     ]
   },
   {
-    file: 'ctoc-plugin/.claude-plugin/plugin.json',
+    file: '.claude-plugin/plugin.json',
     updates: [
       { path: ['version'] }
     ]
@@ -37,7 +37,7 @@ const JSON_VERSION_FILES = [
 // Note: Schema versions (e.g., operations-registry.yaml) are separate
 const VERSION_UPDATES = [
   {
-    file: 'ctoc-plugin/commands/dashboard.md',
+    file: 'commands/dashboard.md',
     pattern: /CTOC - CTO Chief v[\d.]+/g,
     replacement: (v) => `CTOC - CTO Chief v${v}`
   }
