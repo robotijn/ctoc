@@ -10,6 +10,9 @@ const { signState, verifyState, hashPath, CTOC_HOME } = require('./crypto');
 
 const STATE_DIR = path.join(CTOC_HOME, 'state');
 
+// State schema version (bump when state structure changes, not on every release)
+const STATE_SCHEMA_VERSION = '4.0.0';
+
 const STEP_NAMES = {
   1: 'ASSESS',
   2: 'ALIGN',
@@ -70,7 +73,7 @@ function getStatePath(projectPath) {
 function createState(projectPath, feature, language, framework) {
   const now = new Date().toISOString();
   return {
-    _version: '4.0.0',
+    _version: STATE_SCHEMA_VERSION,
     project: projectPath || process.cwd(),
     feature: feature || null,
     started: now,
@@ -103,7 +106,7 @@ function loadState(projectPath) {
     // Check if unsigned (legacy v2.x state)
     if (!state._signature) {
       // Migrate to signed format
-      const signedState = signState({ ...state, _version: '4.0.0', _migrated_at: new Date().toISOString() });
+      const signedState = signState({ ...state, _version: STATE_SCHEMA_VERSION, _migrated_at: new Date().toISOString() });
       fs.writeFileSync(statePath, JSON.stringify(signedState, null, 2));
       return { state: signedState, valid: true, migrated: true };
     }

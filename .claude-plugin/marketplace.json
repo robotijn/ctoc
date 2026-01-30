@@ -1,7 +1,7 @@
 {
-  "name": "ctoc-dev-ctoc",
+  "name": "cto-chief",
   "owner": {
-    "name": "CTOC",
+    "name": "robotijn",
     "email": "ctoc-dev@proton.me"
   },
   "metadata": {
@@ -12,13 +12,13 @@
     {
       "name": "ctoc",
       "source": "./ctoc-plugin",
-      "description": "Your virtual CTO enforcing the Iron Loop methodology for quality software delivery. 60 specialist agents, 261 skills, 15-step process with TDD, security audits, and cryptographic enforcement.",
+      "description": "Your virtual CTO enforcing the Iron Loop methodology. 60 specialist agents, 261 skills, 15 quality gates.",
       "version": "5.0.3",
       "author": {
-        "name": "CTOC"
+        "name": "robotijn"
       },
-      "homepage": "https://github.com/ctoc-dev/ctoc",
-      "repository": "https://github.com/ctoc-dev/ctoc",
+      "homepage": "https://github.com/robotijn/ctoc",
+      "repository": "https://github.com/robotijn/ctoc",
       "license": "MIT",
       "keywords": [
         "cto",
@@ -28,17 +28,9 @@
         "methodology",
         "planning",
         "security",
-        "code-review",
         "agents"
       ],
-      "category": "productivity",
-      "tags": [
-        "methodology",
-        "testing",
-        "security",
-        "quality",
-        "agents"
-      ]
+      "category": "productivity"
     }
   ]
 }

@@ -1,10 +1,10 @@
 {
   "$schema": "https://claude.ai/schemas/plugin.json",
   "name": "ctoc",
-  "version": "5.0.0",
+  "version": "5.0.3",
   "description": "CTO Chief - Your virtual CTO enforcing the Iron Loop methodology for quality software delivery. Includes 60 specialized agents and 261 skills.",
   "author": "CTOC",
-  "homepage": "https://github.com/ctoc-dev/ctoc",
+  "homepage": "https://github.com/robotijn/ctoc",
   "license": "MIT",
   "commands": [
     "commands/ctoc.md",
@@ -107,38 +107,168 @@
     "compliance"
   ],
   "agentCategories": {
-    "coordinator": ["cto-chief"],
-    "testing-writers": ["unit-test-writer", "integration-test-writer", "e2e-test-writer", "property-test-writer"],
-    "testing-runners": ["unit-test-runner", "integration-test-runner", "e2e-test-runner", "smoke-test-runner", "mutation-test-runner"],
-    "quality": ["type-checker", "code-reviewer", "architecture-checker", "consistency-checker", "code-smell-detector", "duplicate-code-detector", "dead-code-detector", "complexity-analyzer"],
-    "security": ["security-scanner", "secrets-detector", "dependency-checker", "input-validation-checker", "concurrency-checker"],
-    "specialized": ["performance-profiler", "memory-safety-checker", "accessibility-checker", "database-reviewer", "api-contract-validator", "translation-checker", "observability-checker", "error-handler-checker", "resilience-checker", "health-check-validator", "configuration-validator"],
-    "frontend": ["visual-regression-checker", "component-tester", "bundle-analyzer"],
-    "mobile": ["ios-checker", "android-checker", "react-native-bridge-checker"],
-    "infrastructure": ["terraform-validator", "kubernetes-checker", "docker-security-checker", "ci-pipeline-checker"],
-    "documentation": ["documentation-updater", "changelog-generator"],
-    "compliance": ["gdpr-compliance-checker", "audit-log-checker", "license-scanner"],
-    "data-ml": ["data-quality-checker", "ml-model-validator", "feature-store-validator"],
-    "cost": ["cloud-cost-analyzer"],
-    "ai-quality": ["hallucination-detector", "ai-code-quality-reviewer"],
-    "devex": ["onboarding-validator", "api-deprecation-checker"],
-    "versioning": ["backwards-compatibility-checker", "feature-flag-auditor", "technical-debt-tracker"]
+    "coordinator": [
+      "cto-chief"
+    ],
+    "testing-writers": [
+      "unit-test-writer",
+      "integration-test-writer",
+      "e2e-test-writer",
+      "property-test-writer"
+    ],
+    "testing-runners": [
+      "unit-test-runner",
+      "integration-test-runner",
+      "e2e-test-runner",
+      "smoke-test-runner",
+      "mutation-test-runner"
+    ],
+    "quality": [
+      "type-checker",
+      "code-reviewer",
+      "architecture-checker",
+      "consistency-checker",
+      "code-smell-detector",
+      "duplicate-code-detector",
+      "dead-code-detector",
+      "complexity-analyzer"
+    ],
+    "security": [
+      "security-scanner",
+      "secrets-detector",
+      "dependency-checker",
+      "input-validation-checker",
+      "concurrency-checker"
+    ],
+    "specialized": [
+      "performance-profiler",
+      "memory-safety-checker",
+      "accessibility-checker",
+      "database-reviewer",
+      "api-contract-validator",
+      "translation-checker",
+      "observability-checker",
+      "error-handler-checker",
+      "resilience-checker",
+      "health-check-validator",
+      "configuration-validator"
+    ],
+    "frontend": [
+      "visual-regression-checker",
+      "component-tester",
+      "bundle-analyzer"
+    ],
+    "mobile": [
+      "ios-checker",
+      "android-checker",
+      "react-native-bridge-checker"
+    ],
+    "infrastructure": [
+      "terraform-validator",
+      "kubernetes-checker",
+      "docker-security-checker",
+      "ci-pipeline-checker"
+    ],
+    "documentation": [
+      "documentation-updater",
+      "changelog-generator"
+    ],
+    "compliance": [
+      "gdpr-compliance-checker",
+      "audit-log-checker",
+      "license-scanner"
+    ],
+    "data-ml": [
+      "data-quality-checker",
+      "ml-model-validator",
+      "feature-store-validator"
+    ],
+    "cost": [
+      "cloud-cost-analyzer"
+    ],
+    "ai-quality": [
+      "hallucination-detector",
+      "ai-code-quality-reviewer"
+    ],
+    "devex": [
+      "onboarding-validator",
+      "api-deprecation-checker"
+    ],
+    "versioning": [
+      "backwards-compatibility-checker",
+      "feature-flag-auditor",
+      "technical-debt-tracker"
+    ]
   },
   "ironLoopStepMapping": {
-    "1-assess": ["cto-chief"],
-    "2-align": ["cto-chief"],
-    "3-capture": ["cto-chief"],
-    "4-plan": ["cto-chief", "architecture-checker"],
-    "5-design": ["cto-chief", "architecture-checker", "api-contract-validator"],
-    "6-spec": ["cto-chief"],
-    "7-test": ["unit-test-writer", "integration-test-writer", "e2e-test-writer", "property-test-writer"],
-    "8-quality": ["type-checker", "complexity-analyzer", "smoke-test-runner", "code-smell-detector"],
-    "9-implement": ["cto-chief"],
-    "10-review": ["code-reviewer", "architecture-checker", "accessibility-checker", "security-scanner"],
-    "11-optimize": ["performance-profiler", "memory-safety-checker", "bundle-analyzer"],
-    "12-secure": ["security-scanner", "secrets-detector", "dependency-checker", "gdpr-compliance-checker"],
-    "13-document": ["documentation-updater", "changelog-generator"],
-    "14-verify": ["unit-test-runner", "integration-test-runner", "e2e-test-runner", "smoke-test-runner", "mutation-test-runner"],
-    "15-commit": ["backwards-compatibility-checker", "feature-flag-auditor", "technical-debt-tracker"]
+    "1-assess": [
+      "cto-chief"
+    ],
+    "2-align": [
+      "cto-chief"
+    ],
+    "3-capture": [
+      "cto-chief"
+    ],
+    "4-plan": [
+      "cto-chief",
+      "architecture-checker"
+    ],
+    "5-design": [
+      "cto-chief",
+      "architecture-checker",
+      "api-contract-validator"
+    ],
+    "6-spec": [
+      "cto-chief"
+    ],
+    "7-test": [
+      "unit-test-writer",
+      "integration-test-writer",
+      "e2e-test-writer",
+      "property-test-writer"
+    ],
+    "8-quality": [
+      "type-checker",
+      "complexity-analyzer",
+      "smoke-test-runner",
+      "code-smell-detector"
+    ],
+    "9-implement": [
+      "cto-chief"
+    ],
+    "10-review": [
+      "code-reviewer",
+      "architecture-checker",
+      "accessibility-checker",
+      "security-scanner"
+    ],
+    "11-optimize": [
+      "performance-profiler",
+      "memory-safety-checker",
+      "bundle-analyzer"
+    ],
+    "12-secure": [
+      "security-scanner",
+      "secrets-detector",
+      "dependency-checker",
+      "gdpr-compliance-checker"
+    ],
+    "13-document": [
+      "documentation-updater",
+      "changelog-generator"
+    ],
+    "14-verify": [
+      "unit-test-runner",
+      "integration-test-runner",
+      "e2e-test-runner",
+      "smoke-test-runner",
+      "mutation-test-runner"
+    ],
+    "15-commit": [
+      "backwards-compatibility-checker",
+      "feature-flag-auditor",
+      "technical-debt-tracker"
+    ]
   }
 }
