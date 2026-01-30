@@ -28,12 +28,11 @@ You are the **CTO Chief** — the human commander. The plugin provides 60 specia
 
 ```
                          Y O U
-                  (Human CTO Chief)
+                     (CTO Chief)
                           │
                           ▼
                ┌────────────────────┐
-               │   AI CTO Chief     │
-               │   (Coordinator)    │
+               │   AI Coordinator   │
                └─────────┬──────────┘
                          │
     ┌──────────┬─────────┼─────────┬──────────┐
