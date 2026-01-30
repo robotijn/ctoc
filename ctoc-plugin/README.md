@@ -3,8 +3,7 @@
 > **Your Virtual CTO** — Command an army of 60 AI agents, backed by 261 expert skills.
 
 ```
-/plugin marketplace add robotijn/ctoc
-/plugin install ctoc
+/plugin add https://github.com/robotijn/ctoc
 ```
 
 ---
@@ -51,45 +50,17 @@ You are the **CTO Chief** — the human commander. The plugin gives you command 
 
 ## Installation
 
-### Step 1: Add the CTOC Marketplace
-
-From within Claude Code, run:
-
-```
-/plugin marketplace add robotijn/ctoc
-```
-
-This registers the CTOC plugin catalog with Claude Code.
-
-### Step 2: Install the Plugin
-
-```
-/plugin install ctoc
-```
-
-That's it. The plugin activates immediately.
-
-### Alternative: Manual Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/robotijn/ctoc.git
-cd ctoc
-
-# Add to Claude Code (from within Claude Code)
-/plugin marketplace add ./
-/plugin install ctoc
-```
-
-### Verify Installation
-
 From within Claude Code:
 
 ```
-/plugin
+/plugin add https://github.com/robotijn/ctoc
 ```
 
-Go to the **Installed** tab. You should see `ctoc` listed. Type `/ctoc` to see the dashboard.
+That's it. Restart Claude Code and the plugin activates.
+
+### Verify Installation
+
+Type `/ctoc` to see the dashboard.
 
 ---
 
@@ -486,16 +457,15 @@ Create `~/.ctoc/settings.json` for customization:
 
 ### "Plugin not found"
 
-Re-add the marketplace and reinstall:
+Reinstall:
 
 ```
-/plugin marketplace add robotijn/ctoc
-/plugin install ctoc
+/plugin add https://github.com/robotijn/ctoc
 ```
 
 ### "State signature invalid"
 
-The state file was tampered with. Reset:
+Reset state:
 
 ```bash
 rm ~/.ctoc/state/*.json
@@ -503,20 +473,12 @@ rm ~/.ctoc/state/*.json
 
 ### "Skill not loading"
 
-Skills are embedded in the plugin. If issues persist:
+Reinstall the plugin:
 
 ```
-/plugin uninstall ctoc
-/plugin install ctoc
+/plugin remove ctoc
+/plugin add https://github.com/robotijn/ctoc
 ```
-
-### Plugin Manager
-
-Run `/plugin` to open the interactive plugin manager where you can:
-- **Discover** tab: Browse available plugins
-- **Installed** tab: View and manage installed plugins
-- **Marketplaces** tab: Manage plugin sources
-- **Errors** tab: View any plugin loading errors
 
 ### Getting Help
 
