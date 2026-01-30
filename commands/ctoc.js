@@ -5,10 +5,15 @@
  */
 
 const readline = require('readline');
+const fs = require('fs');
+const path = require('path');
 const { c, clear, line, renderTabs, renderTabIndicator, setupKeyboard, cleanup, renderBreadcrumb } = require('../lib/tui');
 const { TABS, getTabNames, nextTab, prevTab } = require('../lib/tabs');
 const { NavStack } = require('../lib/state');
 const { startAutoSync, stopAutoSync } = require('../lib/sync');
+
+// Read version from VERSION file
+const VERSION = fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim();
 
 // Import tab modules
 const overviewTab = require('../tabs/overview');
@@ -59,6 +64,9 @@ function render() {
 
   const tabNames = getTabNames();
   let output = '';
+
+  // Header with version
+  output += `${c.dim}CTOC v${VERSION}${c.reset}\n`;
 
   // Tab bar
   output += renderTabs(tabNames, app.tabIndex) + '\n';
