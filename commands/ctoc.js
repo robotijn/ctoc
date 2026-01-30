@@ -195,6 +195,9 @@ function resetTabState() {
   app.viewContent = null;
   app.directInput = '';
   app.inputValue = '';
+
+  // Reset tab-specific modules
+  if (overviewTab.reset) overviewTab.reset();
 }
 
 // Handle window resize
