@@ -3,8 +3,10 @@
 > **Your Virtual CTO** — 60 AI agents. 261 expert skills. 15 quality gates.
 
 ```
-/plugin add https://github.com/robotijn/ctoc
+/plugin marketplace add robotijn/ctoc
 ```
+
+Then: `/plugin` → **Discover** → install **ctoc**
 
 GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 
@@ -52,10 +54,12 @@ You are the **CTO Chief** — the human commander. The plugin provides 60 specia
 From Claude Code:
 
 ```
-/plugin add https://github.com/robotijn/ctoc
+/plugin marketplace add robotijn/ctoc
 ```
 
-Verify with `/plugin` → **Installed** tab → `ctoc` should be listed.
+Then open `/plugin` → **Discover** tab → install **ctoc**
+
+Verify: `/plugin` → **Installed** tab → `ctoc` should be listed.
 
 ---
 
@@ -229,8 +233,9 @@ CTO Chief embodies a senior engineering leader who:
 
 **Plugin not found** — reinstall:
 ```
-/plugin add https://github.com/robotijn/ctoc
+/plugin marketplace add robotijn/ctoc
 ```
+Then: `/plugin` → Discover → install ctoc
 
 **State invalid** — reset:
 ```bash
