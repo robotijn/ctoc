@@ -1,11 +1,11 @@
-# CTOC — Iron Loop v2.1
+# CTOC — Iron Loop
 
 > **Iron Loop is CTOC's methodology for quality software delivery.**
 > This file tracks the current work in progress.
 
 ---
 
-## Iron Loop v2.1 Overview
+## Iron Loop Overview
 
 ```
 PHASE 1: FUNCTIONAL PLANNING (Steps 1-3) - Product Owner Role
@@ -312,7 +312,7 @@ Example:
 
 ## Current Work
 
-**Feature:** CTOC v2.1 — Product Owner Role Redesign
+**Feature:** Product Owner Role Redesign
 **Status:** Implementation In Progress
 **Started:** 2026-01-29
 
