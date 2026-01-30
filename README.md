@@ -4,9 +4,8 @@
 
 ```
 /plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
-
-Then: `/plugin` → **Discover** → install **ctoc**
 
 GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 
@@ -55,9 +54,8 @@ From Claude Code:
 
 ```
 /plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
-
-Then open `/plugin` → **Discover** tab → install **ctoc**
 
 Verify: `/plugin` → **Installed** tab → `ctoc` should be listed.
 
@@ -234,8 +232,8 @@ CTO Chief embodies a senior engineering leader who:
 **Plugin not found** — reinstall:
 ```
 /plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
-Then: `/plugin` → Discover → install ctoc
 
 **State invalid** — reset:
 ```bash
