@@ -15,8 +15,23 @@ GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 
 | Command | Description |
 |---------|-------------|
-| `/ctoc` | Interactive dashboard |
-| `/ctoc:update` | Force-update (workaround for [Claude Code #19197](https://github.com/anthropics/claude-code/issues/19197)) |
+| `/ctoc` | Interactive dashboard (run in terminal) or status report (via Claude) |
+| `/ctoc:update` | Update to latest version (instant, no restart) |
+
+### Updating CTOC
+
+```
+/ctoc:update
+```
+
+This is a **temporary workaround** due to Claude Code restrictions where `/plugin update` doesn't reliably update plugins ([#19197](https://github.com/anthropics/claude-code/issues/19197)).
+
+**How it works:**
+- Uses git to pull latest changes directly from GitHub
+- No restart required — changes are live immediately
+- Self-healing: auto-clones if cache is missing or corrupted
+
+Once the Claude Code bug is fixed, `/plugin update ctoc` will be the recommended method.
 
 ---
 
@@ -269,7 +284,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.28** — Fix plugin installation
+**5.2.29** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
