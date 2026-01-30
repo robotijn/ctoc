@@ -142,9 +142,67 @@ function syncToMarketplace() {
 }
 
 /**
- * Release: bump version and sync to marketplace
+ * Sync VERSION to plugin.json
+ */
+function syncToPluginJson() {
+  const root = getPluginRoot();
+  const pluginFile = path.join(root, 'ctoc-plugin', '.claude-plugin', 'plugin.json');
+
+  if (!fs.existsSync(pluginFile)) {
+    return { success: false, error: 'plugin.json not found' };
+  }
+
+  const version = getVersion();
+  const plugin = JSON.parse(fs.readFileSync(pluginFile, 'utf8'));
+  plugin.version = version;
+
+  fs.writeFileSync(pluginFile, JSON.stringify(plugin, null, 2) + '\n');
+
+  return { success: true, version };
+}
+
+/**
+ * Sync VERSION to README.md
+ * Updates the version line: **X.Y.Z** — description
+ */
+function syncToReadme() {
+  const root = getPluginRoot();
+  const readmeFile = path.join(root, 'README.md');
+
+  if (!fs.existsSync(readmeFile)) {
+    return { success: false, error: 'README.md not found' };
+  }
+
+  const version = getVersion();
+  let content = fs.readFileSync(readmeFile, 'utf8');
+
+  // Match pattern: **X.Y.Z** — (at start of line in ## Version section)
+  content = content.replace(
+    /^\*\*\d+\.\d+\.\d+\*\* — /m,
+    `**${version}** — `
+  );
+
+  fs.writeFileSync(readmeFile, content);
+
+  return { success: true, version };
+}
+
+/**
+ * Sync VERSION to all files
+ * @returns {{marketplace: boolean, plugin: boolean, readme: boolean}}
+ */
+function syncAll() {
+  return {
+    marketplace: syncToMarketplace().success,
+    plugin: syncToPluginJson().success,
+    readme: syncToReadme().success
+  };
+}
+
+/**
+ * Release: bump version and sync to all files
  * @param {'patch'|'minor'|'major'} type - Bump type (default: patch)
- * @returns {{oldVersion: string, newVersion: string, synced: boolean}}
+ * @returns {{oldVersion: string, newVersion: string, synced: {marketplace: boolean, plugin: boolean, readme: boolean}}}
  *
  * @example
  * release()          // patch: X.Y.Z → X.Y.Z+1
@@ -156,12 +214,12 @@ function release(type = 'patch') {
   const newVersion = bump(oldVersion, type);
 
   setVersion(newVersion);
-  const syncResult = syncToMarketplace();
+  const synced = syncAll();
 
   return {
     oldVersion,
     newVersion,
-    synced: syncResult.success
+    synced
   };
 }
 
@@ -310,6 +368,9 @@ module.exports = {
   bump,
   setVersion,
   syncToMarketplace,
+  syncToPluginJson,
+  syncToReadme,
+  syncAll,
   release,
   fetchLatestVersion,
   checkForUpdates,
