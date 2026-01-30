@@ -13,6 +13,11 @@
 
 GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 
+| Command | Description |
+|---------|-------------|
+| `/ctoc` | Interactive terminal interface |
+| `/ctoc:update` | Force-update plugin (clears stale cache) |
+
 ---
 
 ## What is CTO Chief?
@@ -41,17 +46,9 @@ You are the **CTO Chief** — the human commander. The plugin provides 60 specia
 │Testing│ │Quality│ │Secure │ │ Infra │ │Special │ │  App  │ │  AI   │ │Data/ML│ │  Ops  │ │  =60  │
 │   9   │ │   8   │ │   5   │ │   4   │ │   11   │ │   6   │ │   2   │ │   3   │ │  11   │ │       │
 └───────┘ └───────┘ └───────┘ └───────┘ └────────┘ └───────┘ └───────┘ └───────┘ └───────┘ └───────┘
-
-Testing: unit, integration, e2e, smoke, mutation runners + unit, integration, e2e, property writers
-Quality: architecture, code-review, code-smell, complexity, consistency, dead-code, duplicate, type
-Security: security-scan, secrets, dependencies, input-validation, concurrency
-Infrastructure: terraform, kubernetes, docker, ci-pipeline
-Specialized: performance, memory, accessibility, database, api-contract, config, error, health, observability, resilience, i18n
-App: bundle, component, visual-regression, ios, android, react-native
-AI Quality: hallucination-detector, ai-code-reviewer
-Data/ML: data-quality, ml-model, feature-store
-Ops: docs, changelog, audit, gdpr, license, cost, deprecation, onboarding, backwards-compat, feature-flags, tech-debt
 ```
+
+**Agent Categories:** [Testing](agents/testing/) (9) · [Quality](agents/quality/) (8) · [Security](agents/security/) (5) · [Infrastructure](agents/infrastructure/) (4) · [Specialized](agents/specialized/) (11) · [Frontend](agents/frontend/) (3) · [Mobile](agents/mobile/) (3) · [AI Quality](agents/ai-quality/) (2) · [Data/ML](agents/data-ml/) (3) · [Documentation](agents/documentation/) (2) · [Compliance](agents/compliance/) (3) · [Cost](agents/cost/) (1) · [DevEx](agents/devex/) (2) · [Versioning](agents/versioning/) (3)
 
 ---
 
@@ -97,59 +94,40 @@ claude
 
 ## The Iron Loop
 
-15 steps across 4 phases:
+15 steps across 4 phases — [Full methodology →](IRON_LOOP.md)
 
-```
-FUNCTIONAL PLANNING (1-3)
-  1. ASSESS   Understand the problem
-  2. ALIGN    Business alignment
-  3. CAPTURE  Requirements as specs
-     └─► GATE 1: User approves what to build
+| Phase | Steps | Description |
+|-------|-------|-------------|
+| [**Functional Planning**](IRON_LOOP.md#phase-1-product-owner-role-bdd-methodology) | 1-3 | ASSESS → ALIGN → CAPTURE · *Gate 1: User approves what to build* |
+| [**Technical Planning**](IRON_LOOP.md#iron-loop-overview) | 4-6 | PLAN → DESIGN → SPEC · *Gate 2: User approves how to build* |
+| [**Implementation**](IRON_LOOP.md#hook-enforcement) | 7-10 | TEST → QUALITY → IMPLEMENT → REVIEW |
+| [**Delivery**](IRON_LOOP.md#3-human-gates) | 11-15 | OPTIMIZE → SECURE → DOCUMENT → VERIFY → COMMIT · *Gate 3: User approves commit* |
 
-TECHNICAL PLANNING (4-6)
-  4. PLAN     Technical approach
-  5. DESIGN   Architecture decisions
-  6. SPEC     Detailed specifications
-     └─► GATE 2: User approves how to build
-
-IMPLEMENTATION (7-10)
-  7. TEST      Write tests first (TDD)
-  8. QUALITY   Lint, format, type-check
-  9. IMPLEMENT Write code
-  10. REVIEW   Self-review
-
-DELIVERY (11-15)
-  11. OPTIMIZE  Performance tuning
-  12. SECURE    Security audit
-  13. DOCUMENT  Update docs
-  14. VERIFY    Full test suite
-  15. COMMIT    Ship with confidence
-      └─► GATE 3: User approves commit
-```
+Key features: [Hook Enforcement](IRON_LOOP.md#hook-enforcement) · [Crash Recovery](IRON_LOOP.md#crash-recovery) · [Integrator + Critic Loop](IRON_LOOP.md#integrator--critic-loop) · [14 Quality Dimensions](IRON_LOOP.md#14-quality-dimensions-iso-25010-aligned)
 
 ---
 
 ## Agents
 
-60 specialist agents across 16 categories:
+60 specialist agents across 15 categories — [Browse all →](agents/)
 
-| Category | Agents | Examples |
-|----------|--------|----------|
-| Coordinator | 1 | Orchestrates the entire workflow |
-| Testing | 9 | unit, integration, e2e, property, mutation |
-| Quality | 8 | types, architecture, complexity, code smells |
-| Security | 5 | scanning, secrets, dependencies, validation |
-| Specialized | 11 | performance, memory, accessibility, database |
-| Frontend | 3 | visual regression, components, bundles |
-| Mobile | 3 | iOS, Android, React Native |
-| Infrastructure | 4 | Terraform, Kubernetes, Docker, CI/CD |
-| Documentation | 2 | docs, changelog |
-| Compliance | 3 | GDPR, audit, licenses |
-| Data/ML | 3 | data quality, models, feature stores |
-| Cost | 1 | cloud cost analysis |
-| AI Quality | 2 | hallucination, AI code review |
-| DevEx | 2 | onboarding, deprecation |
-| Versioning | 3 | backwards compat, feature flags, tech debt |
+| Category | # | Agents |
+|----------|---|--------|
+| [Coordinator](agents/coordinator/) | 1 | [cto-chief](agents/coordinator/cto-chief.md) |
+| [Testing](agents/testing/) | 9 | [unit](agents/testing/runners/unit-test-runner.md), [integration](agents/testing/runners/integration-test-runner.md), [e2e](agents/testing/runners/e2e-test-runner.md), [mutation](agents/testing/runners/mutation-test-runner.md), [smoke](agents/testing/runners/smoke-test-runner.md) + [writers](agents/testing/writers/) |
+| [Quality](agents/quality/) | 8 | [architecture](agents/quality/architecture-checker.md), [code-review](agents/quality/code-reviewer.md), [complexity](agents/quality/complexity-analyzer.md), [type-check](agents/quality/type-checker.md), [code-smell](agents/quality/code-smell-detector.md), [dead-code](agents/quality/dead-code-detector.md), [duplicate](agents/quality/duplicate-code-detector.md), [consistency](agents/quality/consistency-checker.md) |
+| [Security](agents/security/) | 5 | [scanner](agents/security/security-scanner.md), [secrets](agents/security/secrets-detector.md), [dependencies](agents/security/dependency-checker.md), [input-validation](agents/security/input-validation-checker.md), [concurrency](agents/security/concurrency-checker.md) |
+| [Specialized](agents/specialized/) | 11 | [performance](agents/specialized/performance-profiler.md), [memory](agents/specialized/memory-safety-checker.md), [accessibility](agents/specialized/accessibility-checker.md), [database](agents/specialized/database-reviewer.md), [api-contract](agents/specialized/api-contract-validator.md), [config](agents/specialized/configuration-validator.md), [error](agents/specialized/error-handler-checker.md), [health](agents/specialized/health-check-validator.md), [observability](agents/specialized/observability-checker.md), [resilience](agents/specialized/resilience-checker.md), [i18n](agents/specialized/translation-checker.md) |
+| [Frontend](agents/frontend/) | 3 | [bundle](agents/frontend/bundle-analyzer.md), [component](agents/frontend/component-tester.md), [visual-regression](agents/frontend/visual-regression-checker.md) |
+| [Mobile](agents/mobile/) | 3 | [ios](agents/mobile/ios-checker.md), [android](agents/mobile/android-checker.md), [react-native](agents/mobile/react-native-bridge-checker.md) |
+| [Infrastructure](agents/infrastructure/) | 4 | [terraform](agents/infrastructure/terraform-validator.md), [kubernetes](agents/infrastructure/kubernetes-checker.md), [docker](agents/infrastructure/docker-security-checker.md), [ci-pipeline](agents/infrastructure/ci-pipeline-checker.md) |
+| [Documentation](agents/documentation/) | 2 | [docs](agents/documentation/documentation-updater.md), [changelog](agents/documentation/changelog-generator.md) |
+| [Compliance](agents/compliance/) | 3 | [gdpr](agents/compliance/gdpr-compliance-checker.md), [audit](agents/compliance/audit-log-checker.md), [license](agents/compliance/license-scanner.md) |
+| [Data/ML](agents/data-ml/) | 3 | [data-quality](agents/data-ml/data-quality-checker.md), [ml-model](agents/data-ml/ml-model-validator.md), [feature-store](agents/data-ml/feature-store-validator.md) |
+| [Cost](agents/cost/) | 1 | [cloud-cost](agents/cost/cloud-cost-analyzer.md) |
+| [AI Quality](agents/ai-quality/) | 2 | [hallucination](agents/ai-quality/hallucination-detector.md), [ai-code-review](agents/ai-quality/ai-code-quality-reviewer.md) |
+| [DevEx](agents/devex/) | 2 | [onboarding](agents/devex/onboarding-validator.md), [deprecation](agents/devex/api-deprecation-checker.md) |
+| [Versioning](agents/versioning/) | 3 | [backwards-compat](agents/versioning/backwards-compatibility-checker.md), [feature-flags](agents/versioning/feature-flag-auditor.md), [tech-debt](agents/versioning/technical-debt-tracker.md) |
 
 Agents spawn **conditionally** based on your project and current Iron Loop step.
 
@@ -157,28 +135,22 @@ Agents spawn **conditionally** based on your project and current Iron Loop step.
 
 ## Skills
 
-261 embedded skills for instant expert knowledge:
+265 embedded skills for instant expert knowledge — [Browse all →](skills/)
 
-| Type | Count | Examples |
-|------|-------|----------|
-| Languages | 50 | Python, TypeScript, Go, Rust, Java, C#, Swift, Kotlin |
-| Web | 85 | React, Next.js, Vue, Django, FastAPI, Rails, Spring Boot |
-| AI/ML | 44 | PyTorch, LangChain, Hugging Face, MLflow |
-| Data | 52 | PostgreSQL, MongoDB, Redis, Kafka, Spark |
-| DevOps | 15 | Docker, Kubernetes, Terraform, Helm |
-| Mobile | 15 | React Native, Flutter, SwiftUI |
+| Type | # | Examples |
+|------|---|----------|
+| [Languages](skills/languages/) | 50 | [Python](skills/languages/python.md), [TypeScript](skills/languages/typescript.md), [Go](skills/languages/go.md), [Rust](skills/languages/rust.md), [Java](skills/languages/java.md), [C#](skills/languages/csharp.md), [Swift](skills/languages/swift.md), [Kotlin](skills/languages/kotlin.md) |
+| [Web](skills/frameworks/web/) | 85 | [React](skills/frameworks/web/react.md), [Next.js](skills/frameworks/web/nextjs.md), [Vue](skills/frameworks/web/vue.md), [Django](skills/frameworks/web/django.md), [FastAPI](skills/frameworks/web/fastapi.md), [Rails](skills/frameworks/web/rails.md), [Spring Boot](skills/frameworks/web/spring-boot.md) |
+| [AI/ML](skills/frameworks/ai-ml/) | 44 | [PyTorch](skills/frameworks/ai-ml/pytorch.md), [LangChain](skills/frameworks/ai-ml/langchain.md), [Hugging Face](skills/frameworks/ai-ml/huggingface.md), [MLflow](skills/frameworks/ai-ml/mlflow.md) |
+| [Data](skills/frameworks/data/) | 52 | [PostgreSQL](skills/frameworks/data/postgresql.md), [MongoDB](skills/frameworks/data/mongodb.md), [Redis](skills/frameworks/data/redis.md), [Kafka](skills/frameworks/data/kafka.md), [Spark](skills/frameworks/data/spark.md) |
+| [DevOps](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Terraform](skills/frameworks/devops/terraform.md), [Helm](skills/frameworks/devops/helm.md) |
+| [Mobile](skills/frameworks/mobile/) | 15 | [React Native](skills/frameworks/mobile/react-native.md), [Flutter](skills/frameworks/mobile/flutter.md), [SwiftUI](skills/frameworks/mobile/swiftui.md) |
 
-Stack detected automatically from your project files.
+Stack detected automatically from your project files. Also includes: [CTO Persona](skills/cto-persona.md) · [Iron Loop](skills/iron-loop.md) · [Quality Standards](skills/quality-standards.md) · [Enforcement](skills/enforcement.md)
 
 ---
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `/ctoc` | Interactive terminal interface |
-
-### Interactive Interface
+## Interactive Interface
 
 The `/ctoc` command opens a full terminal UI with tabs:
 
@@ -291,7 +263,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.16** — Fix plugin installation
+**5.2.17** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
