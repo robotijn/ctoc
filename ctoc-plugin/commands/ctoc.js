@@ -149,8 +149,8 @@ function handleKey(str, key) {
     return;
   }
 
-  // Settings shortcut (global)
-  if (key.sequence === 's' && app.mode === 'list') {
+  // Settings shortcut (Overview tab only)
+  if (key.sequence === 's' && app.mode === 'list' && TABS[app.tabIndex].id === 'overview') {
     app.tabIndex = TABS.findIndex(t => t.id === 'tools');
     app.toolMode = '3'; // Settings
     app.settingsTabIndex = 0;
