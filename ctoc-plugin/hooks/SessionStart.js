@@ -46,71 +46,10 @@ function findProjectRoot(startDir) {
 }
 
 /**
- * Auto-update plugin path in .claude/settings.local.json
- * Ensures the plugin is correctly registered regardless of directory structure
- */
-function autoUpdatePluginPath() {
-  const pluginRoot = getPluginRoot();
-  const projectRoot = findProjectRoot(pluginRoot);
-  const settingsDir = path.join(projectRoot, '.claude');
-  const settingsFile = path.join(settingsDir, 'settings.local.json');
-
-  // Calculate relative path from project root to plugin
-  const relativePath = path.relative(projectRoot, pluginRoot);
-  const expectedKey = `ctoc@${relativePath}`;
-
-  // Ensure .claude directory exists
-  if (!fs.existsSync(settingsDir)) {
-    fs.mkdirSync(settingsDir, { recursive: true });
-  }
-
-  // Read existing settings or create new
-  let settings = { enabledPlugins: {} };
-  if (fs.existsSync(settingsFile)) {
-    try {
-      settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-      if (!settings.enabledPlugins) {
-        settings.enabledPlugins = {};
-      }
-    } catch (e) {
-      settings = { enabledPlugins: {} };
-    }
-  }
-
-  // Check if plugin is already correctly registered
-  if (settings.enabledPlugins[expectedKey] === true) {
-    return { updated: false, path: expectedKey };
-  }
-
-  // Remove any old ctoc@ entries
-  const oldKeys = Object.keys(settings.enabledPlugins).filter(k => k.startsWith('ctoc@'));
-  for (const key of oldKeys) {
-    delete settings.enabledPlugins[key];
-  }
-
-  // Add correct plugin path
-  settings.enabledPlugins[expectedKey] = true;
-
-  // Write updated settings
-  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
-
-  return { updated: true, path: expectedKey, oldKeys };
-}
-
-/**
  * Main session start handler
  */
 async function main() {
-  const projectPath = process.cwd();
-
-  // 0. Auto-update plugin path in settings (ensures correct registration)
-  const pluginUpdate = autoUpdatePluginPath();
-  if (pluginUpdate.updated) {
-    writeToTerminal(`[CTOC] Plugin path updated: ${pluginUpdate.path}\n`);
-    if (pluginUpdate.oldKeys && pluginUpdate.oldKeys.length > 0) {
-      writeToTerminal(`       Removed old paths: ${pluginUpdate.oldKeys.join(', ')}\n`);
-    }
-  }
+  const projectPath = findProjectRoot(process.cwd());
 
   // 1. Detect project stack
   const stack = detectStack(projectPath);
@@ -163,7 +102,7 @@ async function main() {
     'plans/2_functional_approved',
     'plans/3_technical_draft',
     'plans/4_technical_approved',
-    'plans/5_iron_loop',
+    'plans/5_todo',
     'plans/6_building',
     'plans/7_ready_for_review',
     'plans/8_done',
