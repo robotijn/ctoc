@@ -12,8 +12,7 @@ const { loadState, createState, saveState, STEP_NAMES, isInterruptedSession, for
 const { detectStack } = require('../lib/stack-detector');
 const { dashboard, writeToTerminal } = require('../lib/ui');
 const { CTOC_HOME } = require('../lib/crypto');
-
-const VERSION = '4.0.0';
+const { getVersion, checkForUpdates } = require('../lib/version');
 
 /**
  * Main session start handler
@@ -65,29 +64,45 @@ async function main() {
     saveState(projectPath, state);
   }
 
-  // 5. Ensure plans directory exists
-  const plansDir = path.join(projectPath, 'plans');
-  const planSubdirs = [
-    'functional/draft',
-    'functional/approved',
-    'implementation/draft',
-    'implementation/approved',
-    'in_progress',
-    'review',
-    'done'
+  // 5. Ensure project directories exist (created on first run)
+  const directories = [
+    // Plans workflow (numbered for clarity)
+    'plans/1_functional_draft',
+    'plans/2_functional_approved',
+    'plans/3_technical_draft',
+    'plans/4_technical_approved',
+    'plans/5_iron_loop',
+    'plans/6_building',
+    'plans/7_ready_for_review',
+    'plans/8_done',
+    // Learnings system
+    'learnings/pending',
+    'learnings/approved',
+    'learnings/applied'
   ];
 
-  for (const subdir of planSubdirs) {
-    const dir = path.join(plansDir, subdir);
+  for (const subdir of directories) {
+    const dir = path.join(projectPath, subdir);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
   }
 
-  // 6. Output banner to terminal
-  writeToTerminal('CTO Chief active (v' + VERSION + '), type /ctoc to start\n');
+  // 6. Check for updates (async, non-blocking)
+  const version = getVersion();
+  checkForUpdates().then(update => {
+    if (update.updateAvailable) {
+      writeToTerminal(`\n[CTOC] Update available: ${update.currentVersion} → ${update.latestVersion}\n`);
+      writeToTerminal(`       Run: git pull origin main\n`);
+    }
+  }).catch(() => {
+    // Silent fail - don't block session start
+  });
 
-  // 7. Output context for Claude (to stdout for hook consumption)
+  // 7. Output banner to terminal
+  writeToTerminal('CTO Chief active (v' + version + '), type /ctoc to start\n');
+
+  // 8. Output context for Claude (to stdout for hook consumption)
   const context = generateContext(stack, state);
   console.log(context);
 }

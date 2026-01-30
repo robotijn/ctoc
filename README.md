@@ -3,9 +3,11 @@
 > **Your Virtual CTO** — 60 AI agents. 261 expert skills. 15 quality gates.
 
 ```
-/plugin marketplace add ctoc-dev/ctoc
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
+
+GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 
 ---
 
@@ -51,8 +53,8 @@ You are the **CTO Chief** — the human commander. The plugin provides 60 specia
 From Claude Code:
 
 ```
-/plugin marketplace add ctoc-dev/ctoc
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
 
 Verify with `/plugin` → **Installed** tab → `ctoc` should be listed.
@@ -229,8 +231,8 @@ CTO Chief embodies a senior engineering leader who:
 
 **Plugin not found** — reinstall:
 ```
-/plugin marketplace add ctoc-dev/ctoc
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
 
 **State invalid** — reset:
@@ -247,7 +249,37 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.0.2** — Plugin-only release
+**5.0.3** — Streamlined plugin release
+
+- Update check on session start (checks GitHub, cached 24h)
+- Removed legacy scripts and duplicate files
+- Single source of truth: `ctoc-plugin/`
+
+---
+
+## For Developers
+
+Version management:
+
+```javascript
+const { release, getVersion, checkForUpdates } = require('./ctoc-plugin/lib/version');
+
+getVersion()       // → '5.0.3'
+release()          // → bumps patch: 5.0.3 → 5.0.4
+release('minor')   // → bumps minor: 5.0.3 → 5.1.0
+release('major')   // → bumps major: 5.0.3 → 6.0.0
+
+// Async update check
+const update = await checkForUpdates();
+if (update.updateAvailable) {
+  console.log(`${update.currentVersion} → ${update.latestVersion}`);
+}
+```
+
+Files synced by `node scripts/sync-version.js`:
+- `VERSION` (source of truth)
+- `.claude-plugin/marketplace.json`
+- `ctoc-plugin/.claude-plugin/plugin.json`
 
 ---
 
@@ -259,9 +291,9 @@ MIT — See [LICENSE](LICENSE)
 
 ## Links
 
-- [Repository](https://github.com/ctoc-dev/ctoc)
-- [Issues](https://github.com/ctoc-dev/ctoc/issues)
-- [Discussions](https://github.com/ctoc-dev/ctoc/discussions)
+- [Repository](https://github.com/robotijn/ctoc)
+- [Issues](https://github.com/robotijn/ctoc/issues)
+- [Discussions](https://github.com/robotijn/ctoc/discussions)
 
 ---
 

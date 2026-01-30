@@ -3,8 +3,8 @@
 > **Your Virtual CTO** — Command an army of 60 AI agents, backed by 261 expert skills.
 
 ```
-/plugin marketplace add ctoc-dev/ctoc
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
 
 ---
@@ -56,7 +56,7 @@ You are the **CTO Chief** — the human commander. The plugin gives you command 
 From within Claude Code, run:
 
 ```
-/plugin marketplace add ctoc-dev/ctoc
+/plugin marketplace add robotijn/ctoc
 ```
 
 This registers the CTOC plugin catalog with Claude Code.
@@ -64,7 +64,7 @@ This registers the CTOC plugin catalog with Claude Code.
 ### Step 2: Install the Plugin
 
 ```
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin install ctoc
 ```
 
 That's it. The plugin activates immediately.
@@ -73,12 +73,12 @@ That's it. The plugin activates immediately.
 
 ```bash
 # Clone the repository
-git clone https://github.com/ctoc-dev/ctoc.git
+git clone https://github.com/robotijn/ctoc.git
 cd ctoc
 
 # Add to Claude Code (from within Claude Code)
 /plugin marketplace add ./
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin install ctoc
 ```
 
 ### Verify Installation
@@ -426,11 +426,12 @@ ctoc-plugin/
 │   ├── PreToolUse.Write.js
 │   └── PreToolUse.Bash.js
 ├── lib/                       # Core libraries
-│   ├── state-manager.js
-│   ├── crypto.js
-│   ├── stack-detector.js
-│   ├── skill-loader.js
-│   └── ui.js
+│   ├── state-manager.js      # Iron Loop state persistence
+│   ├── crypto.js             # HMAC-SHA256 signing
+│   ├── stack-detector.js     # Auto-detect project stack
+│   ├── skill-loader.js       # Load embedded skills
+│   ├── version.js            # Version bump & update check
+│   └── ui.js                 # Terminal UI components
 └── data/
     └── skills-index.json     # Index of all 261 skills
 ```
@@ -488,8 +489,8 @@ Create `~/.ctoc/settings.json` for customization:
 Re-add the marketplace and reinstall:
 
 ```
-/plugin marketplace add ctoc-dev/ctoc
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin marketplace add robotijn/ctoc
+/plugin install ctoc
 ```
 
 ### "State signature invalid"
@@ -505,8 +506,8 @@ rm ~/.ctoc/state/*.json
 Skills are embedded in the plugin. If issues persist:
 
 ```
-/plugin uninstall ctoc@ctoc-dev-ctoc
-/plugin install ctoc@ctoc-dev-ctoc
+/plugin uninstall ctoc
+/plugin install ctoc
 ```
 
 ### Plugin Manager
@@ -529,12 +530,13 @@ Runs a comprehensive health check.
 
 ## Version
 
-**5.0.0** — Knowledge Preservation Release
+**5.0.3** — Streamlined Release
 
-- 60 specialist agents (was 5)
+- 60 specialist agents across 16 categories
 - 261 embedded skills (50 languages + 211 frameworks)
-- Complete Iron Loop step-to-agent mapping
-- Embedded-first skill loading (no extra network requests)
+- Update check on session start (GitHub, cached 24h)
+- Version management library (`lib/version.js`)
+- Removed legacy duplicates, single source of truth
 
 ---
 
@@ -546,9 +548,9 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Links
 
-- **Repository**: [github.com/ctoc-dev/ctoc](https://github.com/ctoc-dev/ctoc)
-- **Issues**: [github.com/ctoc-dev/ctoc/issues](https://github.com/ctoc-dev/ctoc/issues)
-- **Discussions**: [github.com/ctoc-dev/ctoc/discussions](https://github.com/ctoc-dev/ctoc/discussions)
+- **Repository**: [github.com/robotijn/ctoc](https://github.com/robotijn/ctoc)
+- **Issues**: [github.com/robotijn/ctoc/issues](https://github.com/robotijn/ctoc/issues)
+- **Discussions**: [github.com/robotijn/ctoc/discussions](https://github.com/robotijn/ctoc/discussions)
 
 ---
 
