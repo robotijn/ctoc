@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "CTO Chief - Your virtual CTO enforcing the Iron Loop methodology",
-    "version": "5.0.0"
+    "version": "5.0.1"
   },
   "plugins": [
     {
       "name": "ctoc",
       "source": "./ctoc-plugin",
       "description": "Your virtual CTO enforcing the Iron Loop methodology for quality software delivery. 60 specialist agents, 261 skills, 15-step process with TDD, security audits, and cryptographic enforcement.",
-      "version": "5.0.0",
+      "version": "5.0.1",
       "author": {
         "name": "CTOC"
       },

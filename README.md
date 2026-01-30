@@ -529,7 +529,7 @@ Runs a comprehensive health check.
 
 ## Version
 
-**5.0.0** — Knowledge Preservation Release
+**5.0.1** — Cleanup Release
 
 - 60 specialist agents (was 5)
 - 261 embedded skills (50 languages + 211 frameworks)
