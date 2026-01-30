@@ -259,12 +259,13 @@ rm ~/.ctoc/state/*.json
 Version management:
 
 ```javascript
-const { release, getVersion, checkForUpdates } = require('./ctoc-plugin/lib/version');
+const { release, getVersion, syncAll, checkForUpdates } = require('./ctoc-plugin/lib/version');
 
-getVersion()       // → '5.0.3'
-release()          // → bumps patch: 5.0.3 → 5.0.4
-release('minor')   // → bumps minor: 5.0.3 → 5.1.0
-release('major')   // → bumps major: 5.0.3 → 6.0.0
+getVersion()       // → '5.0.5'
+release()          // → bumps patch: 5.0.5 → 5.0.6, syncs all files
+release('minor')   // → bumps minor: 5.0.5 → 5.1.0, syncs all files
+release('major')   // → bumps major: 5.0.5 → 6.0.0, syncs all files
+syncAll()          // → syncs current version to all files without bumping
 
 // Async update check
 const update = await checkForUpdates();
@@ -273,10 +274,11 @@ if (update.updateAvailable) {
 }
 ```
 
-Files synced by `node scripts/sync-version.js`:
+Files synced automatically by `release()`:
 - `VERSION` (source of truth)
 - `.claude-plugin/marketplace.json`
 - `ctoc-plugin/.claude-plugin/plugin.json`
+- `README.md` (version line)
 
 ---
 
