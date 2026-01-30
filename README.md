@@ -284,12 +284,24 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.29** — Fix plugin installation
+**5.2.30** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
 - Update check on session start (checks GitHub, cached 24h)
 - Single source of truth: `ctoc-plugin/`
+
+---
+
+## Releasing
+
+Every commit bumps the **patch** version automatically (e.g., `5.2.29` → `5.2.30`).
+
+For larger changes, ask for:
+- **"minor release"** → `5.2.29` → `5.3.0` (new features, backward compatible)
+- **"major release"** → `5.2.29` → `6.0.0` (breaking changes)
+
+The release script syncs the version across all files automatically.
 
 ---
 
