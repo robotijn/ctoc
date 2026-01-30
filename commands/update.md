@@ -1,9 +1,9 @@
 ---
-description: Force-update CTOC plugin (clears stale cache)
+description: Update CTOC to latest version (instant, no restart)
 disable-model-invocation: true
 ---
 
-Force-update the CTOC plugin to the latest version by clearing the stale cache:
+Update CTOC to the latest version from GitHub:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/commands/update.js"

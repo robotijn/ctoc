@@ -2,8 +2,8 @@
 /**
  * CTOC Update Command
  *
- * Workaround for Claude Code bug where /plugin update doesn't clear cache.
- * See: https://github.com/anthropics/claude-code/issues/19197
+ * Smart update system that uses git directly in the cache directory.
+ * No restart required - updates are instant.
  */
 
 const fs = require('fs');
@@ -12,78 +12,109 @@ const { execSync } = require('child_process');
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const PLUGINS_DIR = path.join(HOME, '.claude', 'plugins');
-const CACHE_DIR = path.join(PLUGINS_DIR, 'cache', 'robotijn');
-const MARKETPLACE_DIR = path.join(PLUGINS_DIR, 'marketplaces', 'robotijn');
+const CACHE_DIR = path.join(PLUGINS_DIR, 'cache', 'robotijn', 'ctoc');
 const INSTALLED_FILE = path.join(PLUGINS_DIR, 'installed_plugins.json');
+const REPO_URL = 'https://github.com/robotijn/ctoc.git';
 
 // ANSI colors
-const GREEN = '\x1b[32m';
-const YELLOW = '\x1b[33m';
-const CYAN = '\x1b[36m';
-const RED = '\x1b[31m';
-const RESET = '\x1b[0m';
-const BOLD = '\x1b[1m';
+const c = {
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  cyan: '\x1b[36m',
+  red: '\x1b[31m',
+  dim: '\x1b[2m',
+  bold: '\x1b[1m',
+  reset: '\x1b[0m'
+};
 
 function log(icon, msg) {
   console.log(`${icon} ${msg}`);
 }
 
-function rmDir(dir) {
-  if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    return true;
-  }
-  return false;
+function exec(cmd, cwd) {
+  return execSync(cmd, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
-function updateMarketplace() {
-  if (!fs.existsSync(MARKETPLACE_DIR)) {
-    return { success: false, error: 'Marketplace not found' };
+function isGitRepo(dir) {
+  try {
+    exec('git rev-parse --git-dir', dir);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureGitCache() {
+  // If cache doesn't exist or isn't a git repo, clone fresh
+  if (!fs.existsSync(CACHE_DIR) || !isGitRepo(CACHE_DIR)) {
+    log('📦', 'Setting up git-based cache...');
+
+    // Remove old cache if exists
+    if (fs.existsSync(CACHE_DIR)) {
+      fs.rmSync(CACHE_DIR, { recursive: true, force: true });
+    }
+
+    // Ensure parent directory exists
+    const parentDir = path.dirname(CACHE_DIR);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+
+    // Clone the repo
+    execSync(`git clone --depth 1 ${REPO_URL} "${CACHE_DIR}"`, { stdio: 'pipe' });
+    log(`${c.green}✓${c.reset}`, 'Git cache initialized');
+    return { fresh: true };
   }
 
+  return { fresh: false };
+}
+
+function getCurrentVersion() {
+  const versionFile = path.join(CACHE_DIR, 'VERSION');
+  if (fs.existsSync(versionFile)) {
+    return fs.readFileSync(versionFile, 'utf8').trim();
+  }
+  return null;
+}
+
+function getCurrentSha() {
   try {
-    // Get current version before update
-    const oldSha = execSync('git rev-parse --short HEAD', {
-      cwd: MARKETPLACE_DIR,
-      encoding: 'utf8'
-    }).trim();
+    return exec('git rev-parse --short HEAD', CACHE_DIR);
+  } catch {
+    return null;
+  }
+}
 
-    // Fetch and reset to latest
-    execSync('git fetch origin', { cwd: MARKETPLACE_DIR, stdio: 'pipe' });
+function checkForUpdates() {
+  try {
+    // Fetch latest
+    exec('git fetch origin', CACHE_DIR);
 
-    // Get default branch
-    let branch = 'main';
-    try {
-      branch = execSync('git symbolic-ref refs/remotes/origin/HEAD', {
-        cwd: MARKETPLACE_DIR,
-        encoding: 'utf8'
-      }).trim().replace('refs/remotes/origin/', '');
-    } catch {
-      // Fallback to main
-    }
+    // Get local and remote HEADs
+    const localSha = exec('git rev-parse HEAD', CACHE_DIR);
+    const remoteSha = exec('git rev-parse origin/main', CACHE_DIR);
 
-    execSync(`git reset --hard origin/${branch}`, { cwd: MARKETPLACE_DIR, stdio: 'pipe' });
+    return {
+      hasUpdates: localSha !== remoteSha,
+      localSha: localSha.slice(0, 7),
+      remoteSha: remoteSha.slice(0, 7)
+    };
+  } catch (err) {
+    return { hasUpdates: false, error: err.message };
+  }
+}
 
-    // Get new version
-    const newSha = execSync('git rev-parse --short HEAD', {
-      cwd: MARKETPLACE_DIR,
-      encoding: 'utf8'
-    }).trim();
-
-    // Try to read VERSION file
-    let version = null;
-    const versionFile = path.join(MARKETPLACE_DIR, 'VERSION');
-    if (fs.existsSync(versionFile)) {
-      version = fs.readFileSync(versionFile, 'utf8').trim();
-    }
-
-    return { success: true, oldSha, newSha, branch, version };
+function pullUpdates() {
+  try {
+    // Reset to origin/main (handles any local changes)
+    exec('git reset --hard origin/main', CACHE_DIR);
+    return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }
 }
 
-function updateInstalledPlugins(newSha, version) {
+function updateInstalledPlugins(sha, version) {
   if (!fs.existsSync(INSTALLED_FILE)) {
     return false;
   }
@@ -94,15 +125,11 @@ function updateInstalledPlugins(newSha, version) {
 
     if (data.plugins && data.plugins[pluginKey]) {
       for (const entry of data.plugins[pluginKey]) {
-        entry.gitCommitSha = newSha;
+        entry.gitCommitSha = sha;
         entry.lastUpdated = new Date().toISOString();
+        entry.installPath = CACHE_DIR;
         if (version) {
           entry.version = version;
-          // Update install path to new version
-          const oldPath = entry.installPath;
-          if (oldPath && oldPath.includes('/cache/robotijn/ctoc/')) {
-            entry.installPath = path.join(CACHE_DIR, 'ctoc', version);
-          }
         }
       }
       fs.writeFileSync(INSTALLED_FILE, JSON.stringify(data, null, 2) + '\n');
@@ -114,52 +141,71 @@ function updateInstalledPlugins(newSha, version) {
   return false;
 }
 
+function getRemoteVersion() {
+  try {
+    // Read VERSION from origin/main without checking out
+    const version = exec('git show origin/main:VERSION', CACHE_DIR);
+    return version;
+  } catch {
+    return null;
+  }
+}
+
 function main() {
-  console.log(`\n${BOLD}${CYAN}CTOC Update${RESET}`);
+  console.log(`\n${c.bold}${c.cyan}CTOC Update${c.reset}`);
   console.log('─'.repeat(40));
 
-  // Step 1: Update marketplace repo
-  log('📡', 'Updating marketplace...');
-  const result = updateMarketplace();
+  // Step 1: Ensure cache is a git repo
+  const cacheResult = ensureGitCache();
 
-  if (!result.success) {
-    log(`${RED}✗${RESET}`, `Marketplace update failed: ${result.error}`);
-    console.log(`\n${YELLOW}Try: /plugin marketplace add https://github.com/robotijn/ctoc${RESET}`);
+  const oldVersion = getCurrentVersion();
+  const oldSha = getCurrentSha();
+
+  // Step 2: Check for updates
+  log('🔍', 'Checking for updates...');
+  const check = checkForUpdates();
+
+  if (check.error) {
+    log(`${c.red}✗${c.reset}`, `Error: ${check.error}`);
     process.exit(1);
   }
 
-  const versionInfo = result.version ? `v${result.version}` : result.newSha;
-  if (result.oldSha === result.newSha) {
-    log(`${GREEN}✓${RESET}`, `Already at latest (${versionInfo})`);
-  } else {
-    log(`${GREEN}✓${RESET}`, `Updated: ${result.oldSha} → ${versionInfo}`);
+  if (!check.hasUpdates && !cacheResult.fresh) {
+    const version = oldVersion ? `v${oldVersion}` : oldSha;
+    log(`${c.green}✓${c.reset}`, `Already at latest (${version})`);
+    console.log('─'.repeat(40));
+    console.log(`\n${c.dim}No restart required.${c.reset}\n`);
+    return;
   }
 
-  // Step 2: Clear stale cache
-  log('🗑️ ', 'Clearing stale cache...');
-  if (rmDir(CACHE_DIR)) {
-    log(`${GREEN}✓${RESET}`, 'Cache cleared');
-  } else {
-    log(`${YELLOW}○${RESET}`, 'No cache to clear');
+  // Get what we're updating to
+  const newVersion = getRemoteVersion();
+
+  // Step 3: Pull updates
+  log('📥', 'Pulling updates...');
+  const pullResult = pullUpdates();
+
+  if (!pullResult.success) {
+    log(`${c.red}✗${c.reset}`, `Pull failed: ${pullResult.error}`);
+    process.exit(1);
   }
 
-  // Step 3: Update installed_plugins.json
-  log('📝', 'Updating plugin metadata...');
-  const fullSha = execSync('git rev-parse HEAD', {
-    cwd: MARKETPLACE_DIR,
-    encoding: 'utf8'
-  }).trim();
+  const newSha = getCurrentSha();
+  const displayOld = oldVersion ? `v${oldVersion}` : oldSha;
+  const displayNew = newVersion ? `v${newVersion}` : newSha;
 
-  if (updateInstalledPlugins(fullSha, result.version)) {
-    log(`${GREEN}✓${RESET}`, 'Metadata updated');
-  } else {
-    log(`${YELLOW}○${RESET}`, 'No metadata to update');
-  }
+  log(`${c.green}✓${c.reset}`, `Updated: ${displayOld} → ${c.bold}${displayNew}${c.reset}`);
+
+  // Step 4: Update metadata
+  log('📝', 'Updating metadata...');
+  const fullSha = exec('git rev-parse HEAD', CACHE_DIR);
+  updateInstalledPlugins(fullSha, newVersion);
+  log(`${c.green}✓${c.reset}`, 'Metadata updated');
 
   // Done
   console.log('─'.repeat(40));
-  console.log(`\n${BOLD}${GREEN}✓ Update complete!${RESET}`);
-  console.log(`\n${YELLOW}⚠ Restart Claude Code to load the new version.${RESET}\n`);
+  console.log(`\n${c.bold}${c.green}✓ Update complete!${c.reset}`);
+  console.log(`\n${c.dim}No restart required - changes are live.${c.reset}\n`);
 }
 
 main();
