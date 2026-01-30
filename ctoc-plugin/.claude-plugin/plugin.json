@@ -1,7 +1,7 @@
 {
   "name": "ctoc",
-  "version": "5.2.2",
-  "description": "CTO Chief - Your virtual CTO enforcing the Iron Loop methodology for quality software delivery. Includes 60 specialized agents and 261 skills.",
+  "version": "5.2.3",
+  "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
   "author": {
     "name": "robotijn"
   },
