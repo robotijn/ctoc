@@ -1,6 +1,6 @@
 {
-  "generated": "2026-01-29T15:13:14.296Z",
-  "version": "2.0.33",
+  "generated": "2026-01-30T09:13:42.578Z",
+  "version": "5.0.0",
   "kanban": {
     "backlog": 0,
     "functional": 0,
@@ -8,34 +8,34 @@
     "ready": 0,
     "building": 0,
     "review": 0,
-    "done": 7
+    "done": 10
   },
   "git": {
-    "modified": 1,
-    "untracked": 0,
+    "modified": 2,
+    "untracked": 1,
     "deleted": 1,
-    "total": 2
+    "total": 4
   },
   "commits": [
     {
-      "hash": "21ec280",
-      "message": "feat: Interactive Kanban + Done Archive - numbered items, legend, human review flow (v2.0.33)"
+      "hash": "cc29a09",
+      "message": "feat: CTOC Plugin v5.0.0 - Knowledge Preservation Release (v5.0.0)"
     },
     {
-      "hash": "f654dd5",
-      "message": "feat: sequential commit queue with file locking (v2.0.32)"
+      "hash": "d6978c5",
+      "message": "feat: ctoc update now configures MCP server (v3.0.0)"
     },
     {
-      "hash": "f8a88f2",
-      "message": "feat: add REVIEW [HUMAN] column to admin dashboard (v2.0.31)"
+      "hash": "f834b1c",
+      "message": "feat: Holy Iron Loop Enforcement v3.0.0 - Absolute enforcement (v3.0.0)"
     },
     {
-      "hash": "87ca074",
-      "message": "feat: Iron Loop Integrator + Critic - 10-round refinement system (v2.0.28)"
+      "hash": "0333bb8",
+      "message": "feat: enforce MCP server - remove manual dashboard generation (v2.1.0)"
     },
     {
-      "hash": "a305e06",
-      "message": "feat: Crash Recovery - detect interrupted sessions with R/S/D options (v2.0.27)"
+      "hash": "033f7bd",
+      "message": "feat: CTOC MCP Server - native tool integration (v2.1.0)"
     }
   ],
   "queue": {
@@ -46,6 +46,6 @@
     "total": 0,
     "isLocked": false,
     "lastProcessed": null,
-    "currentVersion": "0.0.0"
+    "currentVersion": "5.0.0"
   }
 }
