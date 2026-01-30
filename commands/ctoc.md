@@ -6,5 +6,5 @@ disable-model-invocation: true
 Run the CTOC interactive TUI dashboard:
 
 ```bash
-node ~/.claude/plugins/cache/robotijn/ctoc/main/commands/ctoc.js
+node "${CLAUDE_PLUGIN_ROOT}/commands/ctoc.js"
 ```

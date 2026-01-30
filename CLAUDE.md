@@ -134,8 +134,8 @@ When the user runs `ctoc process-issues`:
 
 3. **Process each skill improvement**:
    a. Locate the current skill file:
-      - Languages: `ctoc-plugin/skills/languages/{name}.md`
-      - Frameworks: `ctoc-plugin/skills/frameworks/{category}/{name}.md`
+      - Languages: `skills/languages/{name}.md`
+      - Frameworks: `skills/frameworks/{category}/{name}.md`
    b. Read the current skill content
    c. Research current best practices using web search if sources aren't provided
    d. Apply the suggested improvements, validating against authoritative sources
@@ -194,12 +194,11 @@ ctoc/
 ├── CONTRIBUTING.md        # Contributor guide
 ├── VERSION                # Current version
 │
-├── ctoc-plugin/           # The main plugin (source of truth)
-│   ├── agents/            # 60 agent definitions
-│   ├── skills/            # 265 language & framework skills
-│   ├── hooks/             # Claude Code hooks
-│   ├── tools/             # MCP tools
-│   └── lib/               # Shared utilities
+├── agents/                # 60 agent definitions
+├── skills/                # 265 language & framework skills
+├── hooks/                 # Claude Code hooks
+├── commands/              # Slash commands
+├── lib/                   # Shared utilities
 │
 ├── .ctoc/                 # Configuration & templates
 │   ├── settings.yaml      # User settings
@@ -207,11 +206,13 @@ ctoc/
 │   ├── operations/        # Operation guides
 │   └── learnings/         # Learning system
 │
-├── .claude-plugin/        # Marketplace distribution
-│   └── marketplace.json
+├── .claude-plugin/        # Plugin & marketplace config
+│   ├── marketplace.json   # Marketplace definition
+│   ├── plugin.json        # Plugin metadata
+│   └── hooks.json         # Hook definitions
 │
 ├── scripts/               # Build utilities
-│   └── sync-version.js    # Syncs VERSION to marketplace.json
+│   └── release.js         # Version sync script
 │
 └── plans/                 # Project plans (numbered)
 ```
@@ -319,7 +320,7 @@ Three files contain version information:
 |------|---------|
 | `VERSION` | **Source of truth** — edit this file |
 | `.claude-plugin/marketplace.json` | Marketplace display version |
-| `ctoc-plugin/.claude-plugin/plugin.json` | Plugin metadata version |
+| `.claude-plugin/plugin.json` | Plugin metadata version |
 
 **ALWAYS run `node scripts/release.js` after changing VERSION.**
 
@@ -494,7 +495,9 @@ Every CTO skill MUST include:
 | `CLAUDE.md` | This file — project instructions |
 | `IRON_LOOP.md` | Iron Loop methodology reference |
 | `README.md` | User documentation |
-| `ctoc-plugin/` | Main plugin (agents, skills, hooks, tools) |
+| `agents/` | 60 agent definitions |
+| `skills/` | 265 language & framework skills |
+| `commands/` | Slash commands |
 | `.ctoc/templates/` | Templates for user projects |
 
 ---
