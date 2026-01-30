@@ -54,29 +54,25 @@ You are the **CTO Chief** — the human commander. The plugin provides 60 specia
 
 From Claude Code:
 
+**Step 1:** Add the marketplace
 ```
 /plugin marketplace add https://github.com/robotijn/ctoc
 ```
+
+**Step 2:** Install the plugin
 ```
 /plugin install ctoc
 ```
 
-Verify: `/plugin` → **Installed** tab → `ctoc` should be listed.
-
-### Enable Auto-Update (Recommended)
-
-To receive automatic updates on Claude Code startup:
-
+**Step 3:** Enable auto-update (important!)
 1. Run `/plugin`
 2. Go to **Marketplaces** tab (use Tab key)
 3. Select `robotijn`
 4. Select **Enable auto-update**
 
-**Note:** Due to a known issue, `/plugin update` may not refresh files. If updates aren't appearing:
-```bash
-rm -rf ~/.claude/plugins/cache/robotijn/
-```
-Then restart Claude Code and run `/plugin install ctoc`.
+This ensures you always have the latest version on startup.
+
+Verify: `/plugin` → **Installed** tab → `ctoc` should be listed.
 
 ---
 
