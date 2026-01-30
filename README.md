@@ -15,8 +15,8 @@ GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 
 | Command | Description |
 |---------|-------------|
-| `/ctoc` | Interactive terminal interface |
-| `/ctoc:update` | Force-update plugin (clears stale cache) |
+| `/ctoc` | Interactive dashboard |
+| `/ctoc:update` | Force-update (workaround for [Claude Code #19197](https://github.com/anthropics/claude-code/issues/19197)) |
 
 ---
 
@@ -32,20 +32,19 @@ CTO Chief transforms Claude Code into a disciplined engineering system. Instead 
 You are the **CTO Chief** — the human commander. The plugin provides 60 specialist agents and 265 expert skills that execute your vision. Skills are loaded on-demand and token-optimized — you only pay for what you use.
 
 ```
-                                        Y O U
-                                    (CTO Chief)
-                                         │
-                              ┌──────────┴──────────┐
-                              │   AI Coordinator    │
-                              └──────────┬──────────┘
-                                         │
-    ┌───────┬───────┬───────┬───────┬────┴────┬───────┬───────┬───────┬───────┐
-    │       │       │       │       │         │       │       │       │       │
-    ▼       ▼       ▼       ▼       ▼         ▼       ▼       ▼       ▼       ▼
-┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐
-│ Test  ││Quality││Secure ││ Infra ││Special││  App  ││  AI   ││ Data  ││  Ops  │
-│   9   ││   8   ││   5   ││   4   ││   11  ││   6   ││   2   ││   3   ││  11   │
-└───────┘└───────┘└───────┘└───────┘└───────┘└───────┘└───────┘└───────┘└───────┘
+                       YOU (CTO Chief)
+                              │
+                   ┌──────────┴──────────┐
+                   │    AI Coordinator   │
+                   └──────────┬──────────┘
+                              │
+       ┌──────────┬───────────┼───────────┬──────────┐
+       │          │           │           │          │
+       ▼          ▼           ▼           ▼          ▼
+  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+  │ Testing│ │ Quality│ │Security│ │  Infra │ │Frontend│
+  │    9   │ │    8   │ │    5   │ │    4   │ │    3   │
+  └────────┘ └────────┘ └────────┘ └────────┘ └────────┘
 ```
 
 **Agent Categories:** [Testing](agents/testing/) (9) · [Quality](agents/quality/) (8) · [Security](agents/security/) (5) · [Infrastructure](agents/infrastructure/) (4) · [Specialized](agents/specialized/) (11) · [Frontend](agents/frontend/) (3) · [Mobile](agents/mobile/) (3) · [AI Quality](agents/ai-quality/) (2) · [Data/ML](agents/data-ml/) (3) · [Documentation](agents/documentation/) (2) · [Compliance](agents/compliance/) (3) · [Cost](agents/cost/) (1) · [DevEx](agents/devex/) (2) · [Versioning](agents/versioning/) (3)
@@ -234,17 +233,13 @@ Run inside Claude Code:
 /ctoc:update
 ```
 
-Then restart Claude Code to load the new version:
-```bash
-exit
-claude
-```
-
-**Keep your context?** Restart with:
+Then restart to load the new version:
 ```bash
 exit
 claude --continue
 ```
+
+> **Note:** `/ctoc:update` works around a [known Claude Code bug](https://github.com/anthropics/claude-code/issues/19197) where `/plugin update` doesn't refresh cached files. The Anthropic team is working on a fix.
 
 ---
 
@@ -276,7 +271,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.21** — Fix plugin installation
+**5.2.22** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
