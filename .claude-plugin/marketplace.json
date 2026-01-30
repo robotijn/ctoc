@@ -29,7 +29,8 @@
         "security",
         "agents"
       ],
-      "category": "productivity"
+      "category": "productivity",
+      "source": "./"
     }
   ]
 }
