@@ -72,7 +72,11 @@ To receive automatic updates on Claude Code startup:
 3. Select `robotijn`
 4. Select **Enable auto-update**
 
-This makes future updates automatic.
+**Note:** Due to a known issue, `/plugin update` may not refresh files. If updates aren't appearing:
+```bash
+rm -rf ~/.claude/plugins/cache/robotijn/
+```
+Then restart Claude Code and run `/plugin install ctoc`.
 
 ---
 
@@ -286,7 +290,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.0.21** — Fix plugin installation
+**5.2.12** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
