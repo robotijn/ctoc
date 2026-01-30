@@ -69,18 +69,6 @@ This registers the CTOC plugin catalog with Claude Code.
 
 That's it. The plugin activates immediately.
 
-### Alternative: Manual Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/ctoc-dev/ctoc.git
-cd ctoc
-
-# Add to Claude Code (from within Claude Code)
-/plugin marketplace add ./
-/plugin install ctoc@ctoc-dev-ctoc
-```
-
 ### Verify Installation
 
 From within Claude Code:
