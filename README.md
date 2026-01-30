@@ -227,27 +227,40 @@ CTO Chief embodies a senior engineering leader who:
 
 ---
 
+## Updating
+
+Run inside Claude Code:
+```
+/ctoc:update
+```
+
+Then restart Claude Code to load the new version:
+```bash
+exit
+claude
+```
+
+**Keep your context?** Restart with:
+```bash
+exit
+claude --continue
+```
+
+---
+
 ## Troubleshooting
 
 **Plugin not found** — reinstall:
 ```
 /plugin marketplace add https://github.com/robotijn/ctoc
-```
-```
 /plugin install ctoc
 ```
 
-**Old marketplace cached** — clear and re-add:
-```bash
-rm -rf ~/.claude/plugins/marketplaces/robotijn-ctoc
+**Plugin stale after update** — force refresh:
 ```
-Then in Claude Code:
+/ctoc:update
 ```
-/plugin marketplace add https://github.com/robotijn/ctoc
-```
-```
-/plugin install ctoc
-```
+Then restart Claude Code.
 
 **State invalid** — reset:
 ```bash
@@ -263,7 +276,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.18** — Fix plugin installation
+**5.2.19** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
