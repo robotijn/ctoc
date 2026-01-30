@@ -5,15 +5,15 @@
     "email": "tijn@theaiguys.com"
   },
   "metadata": {
-    "description": "CTO Chief - Your virtual CTO enforcing the Iron Loop methodology",
-    "version": "5.0.20"
+    "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
+    "version": "5.2.5"
   },
   "plugins": [
     {
       "name": "ctoc",
       "source": "./ctoc-plugin",
-      "description": "Your virtual CTO enforcing the Iron Loop methodology. 60 specialist agents, 261 skills, 15 quality gates.",
-      "version": "5.0.20",
+      "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
+      "version": "5.2.5",
       "author": {
         "name": "robotijn"
       },
