@@ -1,7 +1,7 @@
 {
   "$schema": "https://claude.ai/schemas/plugin.json",
   "name": "ctoc",
-  "version": "5.0.5",
+  "version": "5.0.6",
   "description": "CTO Chief - Your virtual CTO enforcing the Iron Loop methodology for quality software delivery. Includes 60 specialized agents and 261 skills.",
   "author": "CTOC",
   "homepage": "https://github.com/robotijn/ctoc",
