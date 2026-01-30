@@ -3,7 +3,8 @@
 > **Your Virtual CTO** — Command an army of 60 AI agents, backed by 261 expert skills.
 
 ```
-claude plugin add ctoc
+/plugin marketplace add ctoc-dev/ctoc
+/plugin install ctoc@ctoc-dev-ctoc
 ```
 
 ---
@@ -50,32 +51,45 @@ You are the **CTO Chief** — the human commander. The plugin gives you command 
 
 ## Installation
 
-### From Claude Code Marketplace (Recommended)
+### Step 1: Add the CTOC Marketplace
 
-```bash
-claude plugin add ctoc
+From within Claude Code, run:
+
+```
+/plugin marketplace add ctoc-dev/ctoc
 ```
 
-That's it. The plugin activates automatically on your next Claude Code session.
+This registers the CTOC plugin catalog with Claude Code.
 
-### Manual Installation
+### Step 2: Install the Plugin
+
+```
+/plugin install ctoc@ctoc-dev-ctoc
+```
+
+That's it. The plugin activates immediately.
+
+### Alternative: Manual Installation
 
 ```bash
-# Clone the plugin
+# Clone the repository
 git clone https://github.com/ctoc-dev/ctoc.git
-cd ctoc/ctoc-plugin
+cd ctoc
 
-# Add to Claude Code
-claude plugin add .
+# Add to Claude Code (from within Claude Code)
+/plugin marketplace add ./
+/plugin install ctoc@ctoc-dev-ctoc
 ```
 
 ### Verify Installation
 
-```bash
-claude plugin list
+From within Claude Code:
+
+```
+/plugin
 ```
 
-You should see `ctoc` in the list. Start Claude Code and type `/ctoc` to see the dashboard.
+Go to the **Installed** tab. You should see `ctoc` listed. Type `/ctoc` to see the dashboard.
 
 ---
 
@@ -471,8 +485,11 @@ Create `~/.ctoc/settings.json` for customization:
 
 ### "Plugin not found"
 
-```bash
-claude plugin add ctoc
+Re-add the marketplace and reinstall:
+
+```
+/plugin marketplace add ctoc-dev/ctoc
+/plugin install ctoc@ctoc-dev-ctoc
 ```
 
 ### "State signature invalid"
@@ -487,10 +504,18 @@ rm ~/.ctoc/state/*.json
 
 Skills are embedded in the plugin. If issues persist:
 
-```bash
-claude plugin remove ctoc
-claude plugin add ctoc
 ```
+/plugin uninstall ctoc@ctoc-dev-ctoc
+/plugin install ctoc@ctoc-dev-ctoc
+```
+
+### Plugin Manager
+
+Run `/plugin` to open the interactive plugin manager where you can:
+- **Discover** tab: Browse available plugins
+- **Installed** tab: View and manage installed plugins
+- **Marketplaces** tab: Manage plugin sources
+- **Errors** tab: View any plugin loading errors
 
 ### Getting Help
 
@@ -515,7 +540,7 @@ Runs a comprehensive health check.
 
 ## License
 
-MIT License. See [LICENSE](../LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
