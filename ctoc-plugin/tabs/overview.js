@@ -38,7 +38,7 @@ function render(projectPath = process.cwd()) {
   }
 
   output += '\n';
-  output += renderFooter(['←/→ tabs', 'q quit', '? help']);
+  output += renderFooter(['←/→ tabs', 's settings', 'q quit', '? help']);
 
   return output;
 }

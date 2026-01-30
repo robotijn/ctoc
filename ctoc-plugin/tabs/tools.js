@@ -1,24 +1,26 @@
 /**
  * Tools Tab
- * Doctor, Update, Settings
+ * Doctor, Update, Settings (with sub-tabs)
  */
 
 const fs = require('fs');
 const path = require('path');
-const { c, line, renderActionMenu, renderInput, renderFooter } = require('../lib/tui');
-const { getSettings, saveSettings } = require('../lib/state');
+const { c, line, renderTabs, renderFooter } = require('../lib/tui');
+const {
+  SETTINGS_TABS,
+  SETTINGS_SCHEMA,
+  loadSettings,
+  saveSettings,
+  toggleSetting,
+  setSetting,
+  getCategorySchema
+} = require('../lib/settings');
+const { getLastSync, manualSync } = require('../lib/sync');
 
 const TOOLS = [
   { key: '1', label: 'Doctor', description: 'Health check & troubleshooting' },
   { key: '2', label: 'Update', description: 'Check for CTOC updates' },
   { key: '3', label: 'Settings', description: 'Configure CTOC' }
-];
-
-const SETTINGS_OPTIONS = [
-  { key: 'autoPick', label: 'Auto-pick from queue', type: 'toggle' },
-  { key: 'maxParallelAgents', label: 'Max parallel agents', type: 'number' },
-  { key: 'showElapsed', label: 'Show elapsed time', type: 'toggle' },
-  { key: 'finishedItemsToShow', label: 'Finished items to show', type: 'number' }
 ];
 
 function render(app) {
@@ -51,10 +53,17 @@ function renderDoctor(app) {
   const allPass = checks.every(c => c.pass);
   output += `\n${allPass ? c.green + 'All checks passed.' + c.reset : c.red + 'Some checks failed.' + c.reset}\n\n`;
 
+  // Last sync info
+  const lastSync = getLastSync();
+  if (lastSync) {
+    output += `${c.dim}Last sync: ${lastSync.toLocaleTimeString()}${c.reset}\n\n`;
+  }
+
   output += line() + '\n\n';
   output += `1. Run checks again\n`;
   output += `2. Repair state\n`;
-  output += `3. View logs\n\n`;
+  output += `3. Sync now\n`;
+  output += `4. View logs\n\n`;
   output += `Ask a question: ${app.doctorInput || ''}_\n\n`;
   output += renderFooter(['b back', 'q quit']);
 
@@ -87,23 +96,41 @@ function renderUpdate(app) {
 }
 
 function renderSettings(app) {
-  const settings = getSettings(app.projectPath);
+  const settings = loadSettings(app.projectPath);
+  const tabNames = SETTINGS_TABS.map(t => t.name);
+  const currentTab = SETTINGS_TABS[app.settingsTabIndex || 0];
+  const schema = getCategorySchema(currentTab.id);
 
   let output = '\n';
   output += `${c.bold}Tools › Settings${c.reset}\n\n`;
 
-  SETTINGS_OPTIONS.forEach((opt, i) => {
-    const arrow = app.settingIndex === i ? '→' : ' ';
-    const value = settings[opt.key];
-    const valueStr = opt.type === 'toggle'
-      ? (value ? `${c.green}ON${c.reset}` : `${c.dim}OFF${c.reset}`)
-      : `${c.cyan}${value}${c.reset}`;
+  // Settings sub-tabs
+  output += renderTabs(tabNames, app.settingsTabIndex || 0) + '\n';
+  output += line() + '\n\n';
 
-    output += `${arrow} ${i + 1}. ${opt.label.padEnd(30)} ${valueStr}\n`;
+  // Current category settings
+  output += `${c.bold}${schema.label}${c.reset}\n\n`;
+
+  schema.settings.forEach((setting, i) => {
+    const arrow = app.settingIndex === i ? '→' : ' ';
+    const value = settings[currentTab.id]?.[setting.key] ?? setting.default;
+
+    let valueStr;
+    if (setting.type === 'toggle') {
+      valueStr = value ? `${c.green}ON${c.reset}` : `${c.dim}OFF${c.reset}`;
+    } else if (setting.type === 'select') {
+      valueStr = `${c.cyan}${value}${c.reset}`;
+    } else if (setting.type === 'list') {
+      valueStr = `${c.dim}[${value.length} items]${c.reset}`;
+    } else {
+      valueStr = `${c.cyan}${value}${c.reset}`;
+    }
+
+    output += `${arrow} ${i + 1}. ${setting.label.padEnd(35)} ${valueStr}\n`;
   });
 
   output += '\n';
-  output += renderFooter(['↑/↓ nav', 'Enter toggle/edit', 'b back', 'q quit']);
+  output += renderFooter(['←/→ category', '↑/↓ nav', 'Enter toggle/edit', 'b back', 'q quit']);
 
   return output;
 }
@@ -119,24 +146,24 @@ function runHealthChecks(projectPath) {
   });
 
   // Hooks configured
-  const hooksPath = path.join(pluginPath, '..', '.claude-plugin', 'hooks.json');
+  const hooksPath = path.join(pluginPath, '.claude-plugin', 'hooks.json');
   checks.push({
     label: 'Hooks configured',
     pass: fs.existsSync(hooksPath)
   });
 
-  // State directory
-  const stateDir = path.join(projectPath, '.ctoc', 'state');
+  // Settings file
+  const settingsPath = path.join(projectPath, '.ctoc', 'settings.json');
   checks.push({
-    label: 'State directory exists',
-    pass: fs.existsSync(stateDir) || true // OK if doesn't exist yet
+    label: 'Settings file exists',
+    pass: fs.existsSync(settingsPath)
   });
 
   // Plans directory
   const plansDir = path.join(projectPath, 'plans');
   checks.push({
     label: 'Plans directory exists',
-    pass: fs.existsSync(plansDir) || true
+    pass: fs.existsSync(plansDir)
   });
 
   // Node version
@@ -162,9 +189,10 @@ function getVersion() {
 function handleKey(key, app) {
   if (!app.toolIndex) app.toolIndex = 0;
   if (!app.settingIndex) app.settingIndex = 0;
+  if (!app.settingsTabIndex) app.settingsTabIndex = 0;
 
   // Main tools list
-  if (app.mode === 'list' || app.mode === 'tools') {
+  if (!app.toolMode) {
     if (key.name === 'up') {
       app.toolIndex = Math.max(0, app.toolIndex - 1);
       return true;
@@ -178,8 +206,11 @@ function handleKey(key, app) {
       app.toolMode = toolKey;
       if (toolKey === '2') {
         app.latestVersion = null;
-        // Would check for updates here
         app.latestVersion = getVersion(); // For now, just show current
+      }
+      if (toolKey === '3') {
+        app.settingsTabIndex = 0;
+        app.settingIndex = 0;
       }
       return true;
     }
@@ -192,15 +223,17 @@ function handleKey(key, app) {
       app.doctorInput = '';
       return true;
     }
-    if (key.sequence === '1') {
-      // Re-run checks (just refresh)
+    if (key.sequence === '3') {
+      // Sync now
+      const result = manualSync(app.projectPath);
+      app.message = result.synced ? '✓ Synced successfully' : `Sync: ${result.reason || result.error}`;
       return true;
     }
     if (key.name === 'backspace') {
       app.doctorInput = (app.doctorInput || '').slice(0, -1);
       return true;
     }
-    if (key.sequence && key.sequence.length === 1 && !key.ctrl && key.sequence !== '1' && key.sequence !== '2' && key.sequence !== '3') {
+    if (key.sequence && key.sequence.length === 1 && !key.ctrl && !'123'.includes(key.sequence)) {
       app.doctorInput = (app.doctorInput || '') + key.sequence;
       return true;
     }
@@ -216,8 +249,22 @@ function handleKey(key, app) {
 
   // Settings mode
   if (app.toolMode === '3') {
+    const currentTab = SETTINGS_TABS[app.settingsTabIndex];
+    const schema = getCategorySchema(currentTab.id);
+
     if (key.name === 'escape' || key.name === 'b') {
       app.toolMode = null;
+      return true;
+    }
+    // Switch settings tabs
+    if (key.name === 'left') {
+      app.settingsTabIndex = (app.settingsTabIndex - 1 + SETTINGS_TABS.length) % SETTINGS_TABS.length;
+      app.settingIndex = 0;
+      return true;
+    }
+    if (key.name === 'right') {
+      app.settingsTabIndex = (app.settingsTabIndex + 1) % SETTINGS_TABS.length;
+      app.settingIndex = 0;
       return true;
     }
     if (key.name === 'up') {
@@ -225,16 +272,15 @@ function handleKey(key, app) {
       return true;
     }
     if (key.name === 'down') {
-      app.settingIndex = Math.min(SETTINGS_OPTIONS.length - 1, app.settingIndex + 1);
+      app.settingIndex = Math.min(schema.settings.length - 1, app.settingIndex + 1);
       return true;
     }
     if (key.name === 'return') {
-      const opt = SETTINGS_OPTIONS[app.settingIndex];
-      const settings = getSettings(app.projectPath);
-      if (opt.type === 'toggle') {
-        settings[opt.key] = !settings[opt.key];
-        saveSettings(settings, app.projectPath);
+      const setting = schema.settings[app.settingIndex];
+      if (setting.type === 'toggle') {
+        toggleSetting(currentTab.id, setting.key, app.projectPath);
       }
+      // TODO: handle other types (number input, select cycling)
       return true;
     }
   }

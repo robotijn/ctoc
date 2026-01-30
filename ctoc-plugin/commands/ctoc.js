@@ -8,6 +8,7 @@ const readline = require('readline');
 const { c, clear, line, renderTabs, renderTabIndicator, setupKeyboard, cleanup, renderBreadcrumb } = require('../lib/tui');
 const { TABS, getTabNames, nextTab, prevTab } = require('../lib/tabs');
 const { NavStack } = require('../lib/state');
+const { startAutoSync, stopAutoSync } = require('../lib/sync');
 
 // Import tab modules
 const overviewTab = require('../tabs/overview');
@@ -42,6 +43,7 @@ const app = {
   // Tab-specific state
   toolIndex: 0,
   toolMode: null,
+  settingsTabIndex: 0,
   settingIndex: 0,
   finishedOffset: 0,
   finishedIndex: 0,
@@ -147,6 +149,16 @@ function handleKey(str, key) {
     return;
   }
 
+  // Settings shortcut (global)
+  if (key.sequence === 's' && app.mode === 'list') {
+    app.tabIndex = TABS.findIndex(t => t.id === 'tools');
+    app.toolMode = '3'; // Settings
+    app.settingsTabIndex = 0;
+    app.settingIndex = 0;
+    render();
+    return;
+  }
+
   // Back navigation
   if ((key.name === 'b' || key.name === 'escape') && app.mode === 'view') {
     app.mode = 'list';
@@ -187,6 +199,15 @@ function handleResize() {
 function main() {
   // Handle resize
   process.stdout.on('resize', handleResize);
+
+  // Start auto-sync
+  startAutoSync(app.projectPath);
+
+  // Cleanup on exit
+  process.on('exit', () => {
+    stopAutoSync();
+    cleanup();
+  });
 
   // Setup keyboard
   setupKeyboard(handleKey);
