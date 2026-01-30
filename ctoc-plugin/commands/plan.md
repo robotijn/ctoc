@@ -1,11 +1,11 @@
-# /ctoc plan - Plan Status
+# /ctoc:plan - Plan Status
 
 Show plan dashboard with functional and implementation plans.
 
 ## Usage
 
 ```
-/ctoc plan
+/ctoc:plan
 ```
 
 ## Behavior

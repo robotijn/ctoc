@@ -15,10 +15,102 @@ const { CTOC_HOME } = require('../lib/crypto');
 const { getVersion, checkForUpdates } = require('../lib/version');
 
 /**
+ * Get the plugin root directory (where .claude-plugin folder is)
+ */
+function getPluginRoot() {
+  // hooks/SessionStart.js -> go up one level to plugin root
+  let dir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(dir, '.claude-plugin'))) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  return path.dirname(__dirname);
+}
+
+/**
+ * Find project root by looking for .git or .claude directory
+ */
+function findProjectRoot(startDir) {
+  let dir = startDir;
+  for (let i = 0; i < 10; i++) {
+    if (fs.existsSync(path.join(dir, '.git')) || fs.existsSync(path.join(dir, '.claude'))) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.cwd();
+}
+
+/**
+ * Auto-update plugin path in .claude/settings.local.json
+ * Ensures the plugin is correctly registered regardless of directory structure
+ */
+function autoUpdatePluginPath() {
+  const pluginRoot = getPluginRoot();
+  const projectRoot = findProjectRoot(pluginRoot);
+  const settingsDir = path.join(projectRoot, '.claude');
+  const settingsFile = path.join(settingsDir, 'settings.local.json');
+
+  // Calculate relative path from project root to plugin
+  const relativePath = path.relative(projectRoot, pluginRoot);
+  const expectedKey = `ctoc@${relativePath}`;
+
+  // Ensure .claude directory exists
+  if (!fs.existsSync(settingsDir)) {
+    fs.mkdirSync(settingsDir, { recursive: true });
+  }
+
+  // Read existing settings or create new
+  let settings = { enabledPlugins: {} };
+  if (fs.existsSync(settingsFile)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+      if (!settings.enabledPlugins) {
+        settings.enabledPlugins = {};
+      }
+    } catch (e) {
+      settings = { enabledPlugins: {} };
+    }
+  }
+
+  // Check if plugin is already correctly registered
+  if (settings.enabledPlugins[expectedKey] === true) {
+    return { updated: false, path: expectedKey };
+  }
+
+  // Remove any old ctoc@ entries
+  const oldKeys = Object.keys(settings.enabledPlugins).filter(k => k.startsWith('ctoc@'));
+  for (const key of oldKeys) {
+    delete settings.enabledPlugins[key];
+  }
+
+  // Add correct plugin path
+  settings.enabledPlugins[expectedKey] = true;
+
+  // Write updated settings
+  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
+
+  return { updated: true, path: expectedKey, oldKeys };
+}
+
+/**
  * Main session start handler
  */
 async function main() {
   const projectPath = process.cwd();
+
+  // 0. Auto-update plugin path in settings (ensures correct registration)
+  const pluginUpdate = autoUpdatePluginPath();
+  if (pluginUpdate.updated) {
+    writeToTerminal(`[CTOC] Plugin path updated: ${pluginUpdate.path}\n`);
+    if (pluginUpdate.oldKeys && pluginUpdate.oldKeys.length > 0) {
+      writeToTerminal(`       Removed old paths: ${pluginUpdate.oldKeys.join(', ')}\n`);
+    }
+  }
 
   // 1. Detect project stack
   const stack = detectStack(projectPath);
@@ -100,7 +192,7 @@ async function main() {
   });
 
   // 7. Output banner to terminal
-  writeToTerminal('CTO Chief active (v' + version + '), type /ctoc to start\n');
+  writeToTerminal('✓ CTOC v' + version + ' installed — type /ctoc to start\n');
 
   // 8. Output context for Claude (to stdout for hook consumption)
   const context = generateContext(stack, state);

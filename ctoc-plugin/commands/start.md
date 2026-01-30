@@ -1,11 +1,11 @@
-# /ctoc start - Start Feature Tracking
+# /ctoc:start - Start Feature Tracking
 
 Start tracking a new feature in the Iron Loop.
 
 ## Usage
 
 ```
-/ctoc start <feature-name>
+/ctoc:start <feature-name>
 ```
 
 ## Arguments

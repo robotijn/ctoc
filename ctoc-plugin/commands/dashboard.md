@@ -1,16 +1,16 @@
-# /ctoc - Dashboard
+# /ctoc:dashboard - Dashboard
 
 Show the CTOC dashboard with project status, Iron Loop state, and available actions.
 
 ## Usage
 
 ```
-/ctoc
+/ctoc:dashboard
 ```
 
 ## Behavior
 
-When the user runs `/ctoc`, display:
+When the user runs `/ctoc:dashboard`, display:
 
 1. **Project Info**: Name, detected stack (languages/frameworks)
 2. **Iron Loop State**: Current feature, step, gate status
@@ -51,11 +51,11 @@ CTOC - CTO Chief v4.0.0
   Gate 2:  ✓ Passed
 
 Commands:
-  /ctoc start <name>   Start tracking a feature
-  /ctoc step <n>       Move to step n
-  /ctoc progress       Show detailed progress
-  /ctoc plan           Show plan status
-  /ctoc doctor         Health check
+  /ctoc:start <name>   Start tracking a feature
+  /ctoc:step <n>       Move to step n
+  /ctoc:progress       Show detailed progress
+  /ctoc:plan           Show plan status
+  /ctoc:doctor         Health check
 ```
 
 ## Notes
