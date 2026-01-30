@@ -27,27 +27,22 @@ CTO Chief transforms Claude Code into a disciplined engineering system. Instead 
 You are the **CTO Chief** — the human commander. The plugin provides 60 specialist agents that execute your vision.
 
 ```
-                           Y O U
-                    (Human CTO Chief)
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │   Coordinator   │
-                  └────────┬────────┘
-                           │
-     ┌─────────────────────┼─────────────────────┐
-     │                     │                     │
-     ▼                     ▼                     ▼
-┌─────────┐          ┌─────────┐          ┌─────────┐
-│ Testing │          │ Quality │          │Security │
-│9 agents │          │8 agents │          │5 agents │
-└─────────┘          └─────────┘          └─────────┘
-     │                     │                     │
-     ▼                     ▼                     ▼
-┌─────────┐          ┌─────────┐          ┌─────────┐
-│  Infra  │          │  DevEx  │          │  More   │
-│7 agents │          │5 agents │          │26 agents│
-└─────────┘          └─────────┘          └─────────┘
+                         Y O U
+                  (Human CTO Chief)
+                          │
+                          ▼
+               ┌────────────────────┐
+               │   AI CTO Chief     │
+               │   (Coordinator)    │
+               └─────────┬──────────┘
+                         │
+    ┌──────────┬─────────┼─────────┬──────────┐
+    │          │         │         │          │
+    ▼          ▼         ▼         ▼          ▼
+┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐
+│Testing ││Quality ││Security││  Infra ││  More  │
+│   9    ││   8    ││   5    ││   7    ││   31   │
+└────────┘└────────┘└────────┘└────────┘└────────┘
 ```
 
 ---
