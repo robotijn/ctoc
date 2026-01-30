@@ -80,15 +80,13 @@ claude
 
 Shows your project dashboard with Iron Loop status.
 
-### 3. Start Working
-
-Just talk naturally:
+### 3. Start a Feature
 
 ```
-I need a login system with email verification
+/ctoc:start "user authentication"
 ```
 
-CTOC automatically engages the Iron Loop — planning before coding, testing before shipping.
+This begins tracking and engages the Iron Loop — planning before coding, testing before shipping.
 
 ---
 
