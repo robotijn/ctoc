@@ -251,7 +251,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.0.6** — Streamlined plugin release
+**5.0.7** — Streamlined plugin release
 
 - Update check on session start (checks GitHub, cached 24h)
 - Removed legacy scripts and duplicate files
