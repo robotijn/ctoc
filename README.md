@@ -9,6 +9,8 @@
 /plugin install ctoc
 ```
 
+**Enable auto-update:** `/plugin` → Marketplaces tab → `robotijn` → Enable auto-update
+
 GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 
 ---
