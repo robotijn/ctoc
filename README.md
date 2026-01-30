@@ -32,20 +32,15 @@ CTO Chief transforms Claude Code into a disciplined engineering system. Instead 
 You are the **CTO Chief** — the human commander. The plugin provides 60 specialist agents and 265 expert skills that execute your vision. Skills are loaded on-demand and token-optimized — you only pay for what you use.
 
 ```
-                                   YOU (CTO Chief)
-                                          │
-                               ┌──────────┴──────────┐
-                               │    AI Coordinator   │
-                               └──────────┬──────────┘
-                                          │
-   ┌───────┬───────┬───────┬───────┬──────┴──────┬───────┬───────┬───────┬───────┐
-   │       │       │       │       │             │       │       │       │       │
-   ▼       ▼       ▼       ▼       ▼             ▼       ▼       ▼       ▼       ▼
-┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐
-│Test │ │Qlty │ │ Sec │ │Infra│ │Front│ │Mobil│ │Data │ │Compl│ │Vers │ │  AI │
-│  9  │ │  8  │ │  5  │ │  4  │ │  3  │ │  3  │ │  3  │ │  3  │ │  3  │ │  2  │
-└─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘
-    + Specialized (11) · Docs (2) · DevEx (2) · Cost (1) · Coordinator (1) = 60 total
+YOU (CTO Chief)
+       |
+       v
+  AI Coordinator --> 60 Specialist Agents
+       |
+       +-- Testing (9)      Quality (8)     Security (5)    Infrastructure (4)
+       +-- Specialized (11) Frontend (3)    Mobile (3)      Data/ML (3)
+       +-- Compliance (3)   Versioning (3)  AI Quality (2)  Documentation (2)
+       +-- DevEx (2)        Cost (1)        Coordinator (1)
 ```
 
 **Agent Categories:** [Testing](agents/testing/) (9) · [Quality](agents/quality/) (8) · [Security](agents/security/) (5) · [Infrastructure](agents/infrastructure/) (4) · [Specialized](agents/specialized/) (11) · [Frontend](agents/frontend/) (3) · [Mobile](agents/mobile/) (3) · [AI Quality](agents/ai-quality/) (2) · [Data/ML](agents/data-ml/) (3) · [Documentation](agents/documentation/) (2) · [Compliance](agents/compliance/) (3) · [Cost](agents/cost/) (1) · [DevEx](agents/devex/) (2) · [Versioning](agents/versioning/) (3)
@@ -272,7 +267,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.26** — Fix plugin installation
+**5.2.27** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
