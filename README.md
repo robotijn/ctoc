@@ -77,15 +77,6 @@ claude
 /ctoc
 ```
 
-**3. Start working**
-
-Just talk naturally:
-```
-I need a login system with email verification
-```
-
-CTO Chief automatically guides you through the Iron Loop.
-
 ---
 
 ## The Iron Loop
