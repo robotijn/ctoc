@@ -192,7 +192,7 @@ async function main() {
   });
 
   // 7. Output banner to terminal
-  writeToTerminal('✓ CTOC v' + version + ' installed — type /ctoc to start\n');
+  writeToTerminal('ctoc v' + version + ' active\n');
 
   // 8. Output context for Claude (to stdout for hook consumption)
   const context = generateContext(stack, state);
