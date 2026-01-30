@@ -63,6 +63,17 @@ From Claude Code:
 
 Verify: `/plugin` → **Installed** tab → `ctoc` should be listed.
 
+### Enable Auto-Update (Recommended)
+
+To receive automatic updates on Claude Code startup:
+
+1. Run `/plugin`
+2. Go to **Marketplaces** tab (use Tab key)
+3. Select `robotijn`
+4. Select **Enable auto-update**
+
+This makes future updates automatic.
+
 ---
 
 ## Quick Start
