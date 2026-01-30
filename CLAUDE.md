@@ -5,6 +5,45 @@
 
 ---
 
+## ⛔⛔⛔ ABSOLUTE RULE: MARKETPLACE ONLY ⛔⛔⛔
+
+### THIS IS THE #1 RULE. VIOLATING IT BREAKS EVERYTHING.
+
+**CTOC MUST ALWAYS BE INSTALLED FROM THE ONLINE MARKETPLACE.**
+
+**NEVER, UNDER ANY CIRCUMSTANCES:**
+- Point `installed_plugins.json` to local directories
+- Point `installPath` to `ctoc-public/ctoc-plugin` or ANY local path
+- Create functions that modify `~/.claude/plugins/` files
+- Write code that auto-updates plugin paths
+- Suggest "fixing" stale cache by using local paths
+- Modify `settings.local.json` to enable local plugin paths
+
+**THE ONLY CORRECT WORKFLOW:**
+
+```
+# To install CTOC:
+/plugin marketplace add https://github.com/robotijn/ctoc
+/plugin install ctoc
+
+# To update CTOC after pushing changes:
+/plugin update ctoc
+
+# If plugin is stale/broken:
+# 1. Delete ~/.claude/plugins/cache/robotijn/
+# 2. Delete ~/.claude/plugins/marketplaces/robotijn/
+# 3. Restart Claude Code
+# 4. /plugin install ctoc
+```
+
+**WHY THIS MATTERS:**
+- Local paths break for other users
+- Local paths don't test the real installation flow
+- Marketplace is the ONLY supported distribution method
+- Cache issues are solved by `/plugin update`, NOT local paths
+
+---
+
 ## 🎯 Project Vision
 
 **The USER is the CTO Chief** — commanding an army of virtual CTOs.
