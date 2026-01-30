@@ -64,7 +64,7 @@ Components:
 - `profiles/frameworks/*` — Framework best practices  
 - `profiles/cto-skills/*` — CTO persona skills
 - `templates/*` — CLAUDE.md, IRON_LOOP.md, PLANNING.md templates
-- `install.sh` / `install.ps1` — Installation scripts
+- Plugin marketplace — Installation via `/plugin marketplace add`
 
 ### Self-Improvement Rules
 
@@ -171,8 +171,8 @@ ctoc/
 ├── .claude-plugin/        # Marketplace distribution
 │   └── marketplace.json
 │
-├── install.sh             # Unix installer
-├── install.ps1            # Windows installer
+├── scripts/               # Build utilities
+│   └── sync-version.js    # Syncs VERSION to marketplace.json
 │
 └── plans/                 # Project plans (numbered)
 ```
