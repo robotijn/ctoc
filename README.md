@@ -1,6 +1,6 @@
 # CTO Chief
 
-> **Your Virtual CTO** — 60 AI agents. 261 expert skills. 15 quality gates.
+> **Your Virtual CTO** — 60 AI agents. 265 expert skills. 15 quality gates.
 
 ```
 /plugin marketplace add https://github.com/robotijn/ctoc
