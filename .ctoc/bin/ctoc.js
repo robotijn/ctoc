@@ -841,6 +841,81 @@ function updateViaTarball(localVersion) {
 }
 
 /**
+ * Setup MCP server configuration
+ */
+function setupMcp() {
+    const mcpDir = path.join(REPO_ROOT, 'mcp');
+    const mcpIndex = path.join(mcpDir, 'index.js');
+
+    if (!fileExists(mcpDir)) {
+        return { success: false, error: 'MCP directory not found' };
+    }
+
+    // Install MCP dependencies
+    try {
+        print('  Installing MCP dependencies...');
+        execSync('npm install --silent', { cwd: mcpDir, encoding: 'utf8', stdio: 'pipe' });
+    } catch (e) {
+        return { success: false, error: 'Failed to install MCP dependencies' };
+    }
+
+    // MCP configuration
+    const mcpConfig = {
+        mcpServers: {
+            ctoc: {
+                command: 'node',
+                args: [mcpIndex]
+            }
+        }
+    };
+
+    // Configure LOCAL .claude/settings.json
+    const localClaudeDir = path.join(PROJECT_ROOT, '.claude');
+    const localSettings = path.join(localClaudeDir, 'settings.json');
+
+    if (!fileExists(localClaudeDir)) {
+        fs.mkdirSync(localClaudeDir, { recursive: true });
+    }
+
+    try {
+        let settings = {};
+        if (fileExists(localSettings)) {
+            settings = readJson(localSettings) || {};
+        }
+        settings.mcpServers = settings.mcpServers || {};
+        settings.mcpServers.ctoc = mcpConfig.mcpServers.ctoc;
+        writeJson(localSettings, settings);
+        printStep('MCP configured in .claude/settings.json (local)');
+    } catch (e) {
+        printWarn('Could not configure local MCP settings');
+    }
+
+    // Configure GLOBAL ~/.claude/settings.json
+    const os = require('os');
+    const globalClaudeDir = path.join(os.homedir(), '.claude');
+    const globalSettings = path.join(globalClaudeDir, 'settings.json');
+
+    if (!fileExists(globalClaudeDir)) {
+        fs.mkdirSync(globalClaudeDir, { recursive: true });
+    }
+
+    try {
+        let settings = {};
+        if (fileExists(globalSettings)) {
+            settings = readJson(globalSettings) || {};
+        }
+        settings.mcpServers = settings.mcpServers || {};
+        settings.mcpServers.ctoc = mcpConfig.mcpServers.ctoc;
+        writeJson(globalSettings, settings);
+        printStep('MCP configured in ~/.claude/settings.json (global)');
+    } catch (e) {
+        printWarn('Could not configure global MCP settings');
+    }
+
+    return { success: true };
+}
+
+/**
  * Main update command handler
  */
 function cmdUpdate() {
@@ -863,9 +938,19 @@ function cmdUpdate() {
         // Restore user settings after update
         restoreUserSettings(backup);
 
+        // Setup MCP server after update
+        print('');
+        print(`${colors.cyan}Configuring MCP server...${colors.reset}`);
+        const mcpResult = setupMcp();
+        if (!mcpResult.success) {
+            printWarn(`MCP setup: ${mcpResult.error}`);
+        }
+
         if (result.updated) {
             print('');
             print(`${colors.green}✓${colors.reset} Updated to v${result.version}`);
+            print('');
+            print(`${colors.yellow}Restart Claude Code${colors.reset} to load MCP tools.`);
         }
         print('');
 
