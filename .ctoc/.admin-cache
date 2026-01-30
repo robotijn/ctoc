@@ -1,5 +1,0 @@
-MODIFIED=2
-UNTRACKED=11
-COMMITS='f654dd5 feat: sequential commit queue with file locking (v2.0.32)
-f8a88f2 feat: add REVIEW [HUMAN] column to admin dashboard (v2.0.31)
-87ca074 feat: Iron Loop Integrator + Critic - 10-round refinement system (v2.0.28)'

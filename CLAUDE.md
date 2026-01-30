@@ -95,8 +95,8 @@ When the user runs `ctoc process-issues`:
 
 3. **Process each skill improvement**:
    a. Locate the current skill file:
-      - Languages: `.ctoc/skills/languages/{name}.md`
-      - Frameworks: `.ctoc/skills/frameworks/{category}/{name}.md`
+      - Languages: `ctoc-plugin/skills/languages/{name}.md`
+      - Frameworks: `ctoc-plugin/skills/frameworks/{category}/{name}.md`
    b. Read the current skill content
    c. Research current best practices using web search if sources aren't provided
    d. Apply the suggested improvements, validating against authoritative sources
@@ -150,34 +150,31 @@ Before processing an issue:
 ```
 ctoc/
 ├── CLAUDE.md              # This file (dogfooding!)
-├── IRON_LOOP.md           # Current work in progress
-├── PLANNING.md            # Feature planning
+├── IRON_LOOP.md           # Iron Loop methodology
 ├── README.md              # User documentation
 ├── CONTRIBUTING.md        # Contributor guide
-├── CHANGELOG.md           # Version history
+├── VERSION                # Current version
 │
-├── profiles/
-│   ├── languages/         # Language profiles (100+)
-│   │   └── {lang}.yaml
-│   ├── frameworks/        # Framework profiles (200+)
-│   │   └── {framework}.yaml
-│   └── cto-skills/        # CTO persona per language
-│       └── {lang}-cto.md
+├── ctoc-plugin/           # The main plugin (source of truth)
+│   ├── agents/            # 60 agent definitions
+│   ├── skills/            # 265 language & framework skills
+│   ├── hooks/             # Claude Code hooks
+│   ├── tools/             # MCP tools
+│   └── lib/               # Shared utilities
 │
-├── templates/
-│   ├── CLAUDE.md.template
-│   ├── IRON_LOOP.md.template
-│   ├── PLANNING.md.template
-│   └── settings.yaml.template
+├── .ctoc/                 # Configuration & templates
+│   ├── settings.yaml      # User settings
+│   ├── templates/         # File templates
+│   ├── operations/        # Operation guides
+│   └── learnings/         # Learning system
+│
+├── .claude-plugin/        # Marketplace distribution
+│   └── marketplace.json
 │
 ├── install.sh             # Unix installer
 ├── install.ps1            # Windows installer
 │
-├── database/
-│   └── schema.sql         # Review system schema
-│
-└── admin/
-    └── review/            # Business review interface
+└── plans/                 # Project plans (numbered)
 ```
 
 ---
@@ -239,23 +236,17 @@ ctoc/
 
 ### How to Release
 
-**Always use the release script:**
-```bash
-./scripts/release.sh "feat: your feature description"
+**Commit format:** Include version in commit messages:
+```
+feat: your feature description (vX.Y.Z)
 ```
 
-The script automatically:
-1. Reads current version from `VERSION`
-2. Bumps the patch version
-3. Writes new version to `VERSION`
-4. Stages all changes
-5. Commits with version suffix (e.g., `feat: add feature (v2.0.8)`)
+**Steps:**
+1. Update `VERSION` file with new version
+2. Make your changes
+3. Commit with version in message
 
-**Never manually:**
-- Edit the VERSION file
-- Type version numbers in commit messages
-
-The script guarantees the commit message version matches the VERSION file.
+**Version format:** `vX.Y.Z` (e.g., v5.0.1)
 
 ### Versioning Rules
 
@@ -438,10 +429,10 @@ Every CTO skill MUST include:
 | File | Purpose |
 |------|---------|
 | `CLAUDE.md` | This file — project instructions |
-| `IRON_LOOP.md` | Current work in progress |
-| `PLANNING.md` | Feature planning and backlog |
-| `templates/CLAUDE.md.template` | Template for user projects |
-| `templates/IRON_LOOP.md.template` | Template for user projects |
+| `IRON_LOOP.md` | Iron Loop methodology reference |
+| `README.md` | User documentation |
+| `ctoc-plugin/` | Main plugin (agents, skills, hooks, tools) |
+| `.ctoc/templates/` | Templates for user projects |
 
 ---
 
