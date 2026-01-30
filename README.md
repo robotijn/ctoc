@@ -160,12 +160,29 @@ Stack detected automatically from your project files.
 
 | Command | Description |
 |---------|-------------|
-| `/ctoc` | Dashboard |
-| `/ctoc start <name>` | Start tracking a feature |
-| `/ctoc step <n>` | Move to step n |
-| `/ctoc progress` | Detailed progress |
-| `/ctoc plan` | Plan dashboard |
-| `/ctoc doctor` | Health check |
+| `/ctoc` | Interactive terminal interface |
+
+### Interactive Interface
+
+The `/ctoc` command opens a full terminal UI with tabs:
+
+| Tab | Purpose |
+|-----|---------|
+| Overview | Plan counts, agent status |
+| Functional | Manage functional plan drafts |
+| Implementation | Manage implementation plan drafts |
+| Review | Review completed implementations |
+| Todo | FIFO queue for agent work |
+| Progress | In-progress and finished items |
+| Tools | Doctor, Update, Settings |
+
+**Navigation:**
+- `←/→` Switch tabs
+- `↑/↓` Navigate lists
+- `1-9` Jump to item
+- `Enter` Select
+- `b` Back
+- `q` Quit
 
 Or just talk naturally — CTO Chief understands intent.
 
