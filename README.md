@@ -27,21 +27,30 @@ CTO Chief transforms Claude Code into a disciplined engineering system. Instead 
 You are the **CTO Chief** — the human commander. The plugin provides 60 specialist agents that execute your vision.
 
 ```
-                         Y O U
-                     (CTO Chief)
-                          │
-                          ▼
-               ┌────────────────────┐
-               │   AI Coordinator   │
-               └─────────┬──────────┘
-                         │
-    ┌──────────┬─────────┼─────────┬──────────┐
-    │          │         │         │          │
-    ▼          ▼         ▼         ▼          ▼
-┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐
-│Testing ││Quality ││Security││  Infra ││  More  │
-│   9    ││   8    ││   5    ││   7    ││   31   │
-└────────┘└────────┘└────────┘└────────┘└────────┘
+                                                    Y O U
+                                                (CTO Chief)
+                                                     │
+                                          ┌──────────┴──────────┐
+                                          │   AI Coordinator    │
+                                          └──────────┬──────────┘
+                                                     │
+    ┌─────────┬─────────┬─────────┬─────────┬────────┼────────┬─────────┬─────────┬─────────┐
+    │         │         │         │         │        │        │         │         │         │
+    ▼         ▼         ▼         ▼         ▼        ▼        ▼         ▼         ▼         ▼
+┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌────────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐
+│Testing│ │Quality│ │Secure │ │ Infra │ │Special │ │  App  │ │  AI   │ │Data/ML│ │  Ops  │ │  =60  │
+│   9   │ │   8   │ │   5   │ │   4   │ │   11   │ │   6   │ │   2   │ │   3   │ │  11   │ │       │
+└───────┘ └───────┘ └───────┘ └───────┘ └────────┘ └───────┘ └───────┘ └───────┘ └───────┘ └───────┘
+
+Testing: unit, integration, e2e, smoke, mutation runners + unit, integration, e2e, property writers
+Quality: architecture, code-review, code-smell, complexity, consistency, dead-code, duplicate, type
+Security: security-scan, secrets, dependencies, input-validation, concurrency
+Infrastructure: terraform, kubernetes, docker, ci-pipeline
+Specialized: performance, memory, accessibility, database, api-contract, config, error, health, observability, resilience, i18n
+App: bundle, component, visual-regression, ios, android, react-native
+AI Quality: hallucination-detector, ai-code-reviewer
+Data/ML: data-quality, ml-model, feature-store
+Ops: docs, changelog, audit, gdpr, license, cost, deprecation, onboarding, backwards-compat, feature-flags, tech-debt
 ```
 
 ---
@@ -282,7 +291,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.15** — Fix plugin installation
+**5.2.16** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
