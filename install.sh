@@ -214,125 +214,68 @@ setup_hooks() {
         # Create .claude directory
         mkdir -p .claude
 
-        # Copy hooks configuration
-        if [[ -f .ctoc/repo/hooks/hooks.json ]]; then
-            # Check if .claude/settings.json exists
-            if [[ -f .claude/settings.json ]]; then
-                # Merge hooks into existing settings
-                if command -v jq &>/dev/null; then
-                    # Use jq to merge JSON files
-                    jq -s '.[0] * .[1]' .claude/settings.json .ctoc/repo/hooks/hooks.json > .claude/settings.json.tmp
-                    mv .claude/settings.json.tmp .claude/settings.json
-                    print_step "Hooks merged into existing .claude/settings.json"
-                else
-                    # Without jq, just copy (may overwrite existing)
-                    cp .ctoc/repo/hooks/hooks.json .claude/settings.json
-                    print_warn "Hooks copied to .claude/settings.json (jq not available for merge)"
-                fi
-            else
-                # No existing settings, just copy
-                cp .ctoc/repo/hooks/hooks.json .claude/settings.json
-                print_step "Hooks configured in .claude/settings.json"
-            fi
+        local PROJECT_ROOT
+        PROJECT_ROOT="$(pwd)"
+        local HOOKS_DIR="\${CLAUDE_PROJECT_DIR}/.ctoc/repo/ctoc-plugin/hooks"
 
-            # Brief confirmation
-            echo ""
-            echo -e "${CYAN}Hooks enabled${NC} - CTOC will automatically detect your stack and track progress"
+        # Generate hooks configuration
+        local HOOKS_CONFIG
+        HOOKS_CONFIG=$(cat <<EOF
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "tool == \"Edit\"",
+        "hooks": [{"type": "command", "command": "node \"$HOOKS_DIR/PreToolUse.Edit.js\""}],
+        "description": "Check Iron Loop state before Edit operations"
+      },
+      {
+        "matcher": "tool == \"Write\"",
+        "hooks": [{"type": "command", "command": "node \"$HOOKS_DIR/PreToolUse.Write.js\""}],
+        "description": "Check Iron Loop state before Write operations"
+      },
+      {
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"git commit\"",
+        "hooks": [{"type": "command", "command": "node \"$HOOKS_DIR/PreToolUse.Bash.js\""}],
+        "description": "Check Iron Loop state before git commit"
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [{"type": "command", "command": "node \"$HOOKS_DIR/SessionStart.js\""}],
+        "description": "Detect stack, load CTO profiles, restore Iron Loop state"
+      }
+    ]
+  }
+}
+EOF
+)
+
+        # Write or merge hooks configuration
+        if [[ -f .claude/settings.json ]]; then
+            if command -v jq &>/dev/null; then
+                echo "$HOOKS_CONFIG" | jq -s '.[0] * .[1]' .claude/settings.json - > .claude/settings.json.tmp
+                mv .claude/settings.json.tmp .claude/settings.json
+                print_step "Hooks merged into existing .claude/settings.json"
+            else
+                echo "$HOOKS_CONFIG" > .claude/settings.json
+                print_warn "Hooks written to .claude/settings.json (jq not available for merge)"
+            fi
         else
-            print_warn "hooks.json not found in repo, skipping"
+            echo "$HOOKS_CONFIG" > .claude/settings.json
+            print_step "Hooks configured in .claude/settings.json"
         fi
+
+        echo ""
+        echo -e "${CYAN}Hooks enabled${NC} - CTOC will automatically detect your stack and track progress"
     else
         print_info "Hooks not configured (Node.js not available)"
         print_info "         Install Node.js later to enable hooks"
     fi
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  MCP Server Setup
-# ═══════════════════════════════════════════════════════════════════════════════
-
-setup_mcp() {
-    if [[ "$INSTALL_HOOKS" != "true" ]]; then
-        print_info "MCP not configured (Node.js not available)"
-        return
-    fi
-
-    print_section "Setting up MCP Server"
-
-    local PROJECT_ROOT
-    PROJECT_ROOT="$(pwd)"
-    local MCP_DIR="$PROJECT_ROOT/.ctoc/repo/mcp"
-    local MCP_INDEX="$MCP_DIR/index.js"
-    # LOCAL .claude/settings.json is required (project-specific path)
-    local LOCAL_SETTINGS=".claude/settings.json"
-    # GLOBAL ~/.claude/settings.json is optional
-    local GLOBAL_SETTINGS="$HOME/.claude/settings.json"
-
-    # Install MCP dependencies
-    if [[ -d "$MCP_DIR" ]]; then
-        print_info "Installing MCP dependencies..."
-        (cd "$MCP_DIR" && npm install --silent 2>/dev/null) || {
-            print_warn "Failed to install MCP dependencies"
-            print_info "         Run manually: cd .ctoc/repo/mcp && npm install"
-            return
-        }
-        print_step "MCP dependencies installed"
-    else
-        print_warn "MCP directory not found"
-        return
-    fi
-
-    local MCP_CONFIG
-    MCP_CONFIG=$(cat <<EOF
-{
-  "mcpServers": {
-    "ctoc": {
-      "command": "node",
-      "args": ["$MCP_INDEX"]
-    }
-  }
-}
-EOF
-)
-
-    # 1. Configure MCP in LOCAL .claude/settings.json (required)
-    mkdir -p ".claude"
-    if [[ -f "$LOCAL_SETTINGS" ]]; then
-        if command -v jq &>/dev/null; then
-            echo "$MCP_CONFIG" | jq -s '.[0] * .[1]' "$LOCAL_SETTINGS" - > "$LOCAL_SETTINGS.tmp"
-            mv "$LOCAL_SETTINGS.tmp" "$LOCAL_SETTINGS"
-            print_step "MCP server configured in .claude/settings.json (local)"
-        else
-            # Append MCP config manually
-            print_warn "jq not available, MCP config may need manual merge"
-        fi
-    else
-        echo "$MCP_CONFIG" > "$LOCAL_SETTINGS"
-        print_step "MCP server configured in .claude/settings.json (local)"
-    fi
-
-    # 2. Optionally configure MCP in GLOBAL ~/.claude/settings.json
-    mkdir -p "$HOME/.claude"
-    if [[ -f "$GLOBAL_SETTINGS" ]]; then
-        if command -v jq &>/dev/null; then
-            # Check if ctoc is already in global settings
-            if jq -e '.mcpServers.ctoc' "$GLOBAL_SETTINGS" >/dev/null 2>&1; then
-                print_info "MCP server already in ~/.claude/settings.json (global)"
-            else
-                echo "$MCP_CONFIG" | jq -s '.[0] * .[1]' "$GLOBAL_SETTINGS" - > "$GLOBAL_SETTINGS.tmp"
-                mv "$GLOBAL_SETTINGS.tmp" "$GLOBAL_SETTINGS"
-                print_step "MCP server also added to ~/.claude/settings.json (global)"
-            fi
-        fi
-    else
-        # Create global settings with MCP config
-        echo "$MCP_CONFIG" > "$GLOBAL_SETTINGS"
-        print_step "MCP server configured in ~/.claude/settings.json (global)"
-    fi
-
-    echo ""
-    echo -e "${CYAN}MCP Server enabled${NC} - CTOC tools available as native Claude commands"
-}
+# MCP Server removed in v5.0.1 - replaced by plugin tools
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Project Checking
@@ -440,7 +383,7 @@ install_repo() {
 
     # Count skills
     local skill_count
-    skill_count=$(find .ctoc/repo/.ctoc/skills -name "*.md" 2>/dev/null | wc -l)
+    skill_count=$(find .ctoc/repo/ctoc-plugin/skills -name "*.md" 2>/dev/null | wc -l)
     print_step "$skill_count skills available"
 
     # Create root-level plan directories (git-tracked)
@@ -604,69 +547,20 @@ show_whats_new() {
 create_wrapper_script() {
     cat > .ctoc/ctoc << 'WRAPPER'
 #!/bin/bash
-# CTOC Wrapper Script
-# Calls the Node.js CLI and handles background update checks
+# CTOC Wrapper Script (v5.0.1+)
+# CTOC is now a Claude Code plugin - use /ctoc commands in Claude Code
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$SCRIPT_DIR/repo"
-
-# Background update check (once per day)
-check_update_background() {
-    local last_check_file="$SCRIPT_DIR/.last-update-check"
-    local now
-    now=$(date +%s)
-    local last_check=0
-
-    [[ -f "$last_check_file" ]] && last_check=$(cat "$last_check_file" 2>/dev/null || echo "0")
-
-    # 86400 seconds = 24 hours
-    if (( now - last_check > 86400 )); then
-        echo "$now" > "$last_check_file"
-        # Run update check in background, suppress all output
-        (
-            cd "$REPO_DIR" 2>/dev/null || exit 0
-            git fetch --quiet 2>/dev/null || exit 0
-            local local_v
-            local_v=$(cat VERSION 2>/dev/null || echo "")
-            local remote_v
-            remote_v=$(git show origin/main:VERSION 2>/dev/null || echo "")
-            if [[ -n "$local_v" && -n "$remote_v" && "$local_v" != "$remote_v" ]]; then
-                # Create a notification file that the main script can check
-                echo "$remote_v" > "$SCRIPT_DIR/.update-available"
-            fi
-        ) &>/dev/null &
-        disown 2>/dev/null || true
-    fi
-
-    # Check if we have a pending update notification
-    if [[ -f "$SCRIPT_DIR/.update-available" ]]; then
-        local new_version
-        new_version=$(cat "$SCRIPT_DIR/.update-available" 2>/dev/null || echo "")
-        local current_version
-        current_version=$(cat "$REPO_DIR/VERSION" 2>/dev/null || echo "")
-        if [[ -n "$new_version" && "$new_version" != "$current_version" ]]; then
-            echo -e "\033[0;36mCTOC update available: $current_version → $new_version\033[0m"
-            echo -e "Run: \033[1mctoc update\033[0m"
-            echo ""
-        else
-            # Update was applied, remove notification
-            rm -f "$SCRIPT_DIR/.update-available" 2>/dev/null || true
-        fi
-    fi
-}
-
-# Only check updates if not running a subcommand that does its own check
-case "${1:-}" in
-    update|doctor|version|--version|-v)
-        # Skip background check for these commands
-        ;;
-    *)
-        check_update_background
-        ;;
-esac
-
-# Call Node.js CLI
-exec node "$REPO_DIR/.ctoc/bin/ctoc.js" "$@"
+echo ""
+echo "CTOC is now a Claude Code plugin."
+echo ""
+echo "Usage:"
+echo "  1. Start Claude Code: claude"
+echo "  2. Use /ctoc commands: /ctoc, /ctoc start, /ctoc progress"
+echo ""
+echo "Or install via plugin marketplace:"
+echo "  /plugin marketplace add ctoc-dev/ctoc"
+echo "  /plugin install ctoc@ctoc-dev-ctoc"
+echo ""
 WRAPPER
     chmod +x .ctoc/ctoc
 }
@@ -874,9 +768,9 @@ setup_shell() {
 
 show_summary() {
     local skill_count
-    skill_count=$(find .ctoc/repo/.ctoc/skills -name "*.md" 2>/dev/null | wc -l || echo "261")
+    skill_count=$(find .ctoc/repo/ctoc-plugin/skills -name "*.md" 2>/dev/null | wc -l || echo "261")
     local agent_count
-    agent_count=$(find .ctoc/repo/.ctoc/agents -name "*.md" 2>/dev/null | wc -l || echo "15")
+    agent_count=$(find .ctoc/repo/ctoc-plugin/agents -name "*.md" 2>/dev/null | wc -l || echo "60")
 
     echo ""
     echo -e "${GREEN}════════════════════════════════════════════════════════════════════${NC}"
@@ -935,7 +829,6 @@ main() {
         install_repo
         check_nodejs
         setup_hooks
-        setup_mcp
         setup_gitignore
         show_summary
         show_next_steps
@@ -946,7 +839,6 @@ main() {
         check_nodejs
         configure_claude_md
         setup_hooks
-        setup_mcp
         setup_gitignore
         setup_shell
         show_summary
