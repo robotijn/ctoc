@@ -46,56 +46,10 @@ function findProjectRoot(startDir) {
 }
 
 /**
- * Auto-update installed_plugins.json to point to local plugin directory
- * This ensures the plugin always loads from the development source, not cache
- */
-function autoUpdatePluginPath() {
-  const pluginRoot = getPluginRoot();
-  const homeDir = process.env.HOME || process.env.USERPROFILE;
-  const installedPluginsFile = path.join(homeDir, '.claude', 'plugins', 'installed_plugins.json');
-
-  if (!fs.existsSync(installedPluginsFile)) {
-    return { updated: false };
-  }
-
-  try {
-    const data = JSON.parse(fs.readFileSync(installedPluginsFile, 'utf8'));
-    const ctocEntry = data.plugins?.['ctoc@robotijn']?.[0];
-
-    if (!ctocEntry) {
-      return { updated: false };
-    }
-
-    // Check if already pointing to local development path
-    if (ctocEntry.installPath === pluginRoot) {
-      return { updated: false, path: pluginRoot };
-    }
-
-    // Update to local path
-    const oldPath = ctocEntry.installPath;
-    ctocEntry.installPath = pluginRoot;
-    ctocEntry.version = getVersion();
-    ctocEntry.lastUpdated = new Date().toISOString();
-
-    fs.writeFileSync(installedPluginsFile, JSON.stringify(data, null, 2) + '\n');
-
-    return { updated: true, oldPath, newPath: pluginRoot };
-  } catch (e) {
-    return { updated: false, error: e.message };
-  }
-}
-
-/**
  * Main session start handler
  */
 async function main() {
   const projectPath = findProjectRoot(process.cwd());
-
-  // 0. Auto-update plugin path to local development directory
-  const pluginUpdate = autoUpdatePluginPath();
-  if (pluginUpdate.updated) {
-    writeToTerminal(`[CTOC] Plugin path updated to local: ${pluginUpdate.newPath}\n`);
-  }
 
   // 1. Detect project stack
   const stack = detectStack(projectPath);
