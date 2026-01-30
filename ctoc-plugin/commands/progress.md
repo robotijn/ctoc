@@ -1,11 +1,11 @@
-# /ctoc progress - Show Progress
+# /ctoc:progress - Show Progress
 
 Show detailed Iron Loop progress for the current feature.
 
 ## Usage
 
 ```
-/ctoc progress
+/ctoc:progress
 ```
 
 ## Behavior

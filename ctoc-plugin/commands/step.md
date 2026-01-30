@@ -1,11 +1,11 @@
-# /ctoc step - Move to Step
+# /ctoc:step - Move to Step
 
 Move to a specific Iron Loop step.
 
 ## Usage
 
 ```
-/ctoc step <number>
+/ctoc:step <number>
 ```
 
 ## Arguments
@@ -35,7 +35,7 @@ const projectPath = process.cwd();
 const stateResult = loadState(projectPath);
 
 if (!stateResult.state || !stateResult.state.feature) {
-  throw new Error('No feature being tracked. Use /ctoc start first.');
+  throw new Error('No feature being tracked. Use /ctoc:start first.');
 }
 
 const state = stateResult.state;

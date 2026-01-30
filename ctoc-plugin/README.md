@@ -60,7 +60,7 @@ That's it. Restart Claude Code and the plugin activates.
 
 ### Verify Installation
 
-Type `/ctoc` to see the dashboard.
+Type `/ctoc:dashboard` to see the dashboard.
 
 ---
 
@@ -75,29 +75,15 @@ claude
 ### 2. Check Status
 
 ```
-/ctoc
+/ctoc:dashboard
 ```
 
 Shows your project dashboard with Iron Loop status.
 
 ### 3. Start a Feature
 
-Just talk naturally:
-
 ```
-I need a login system with email verification
-```
-
-CTOC automatically begins the Iron Loop:
-1. **ASSESS** — Understands what you need
-2. **ALIGN** — Confirms business value
-3. **CAPTURE** — Documents requirements
-4. ... through all 15 steps
-
-Or use the command:
-
-```
-/ctoc start "user authentication"
+/ctoc:start "user authentication"
 ```
 
 ---
@@ -230,23 +216,12 @@ Skills are loaded instantly from embedded files — no additional network reques
 
 | Command | Description |
 |---------|-------------|
-| `/ctoc` | Show dashboard with current status |
-| `/ctoc start <name>` | Start tracking a new feature |
-| `/ctoc step <n>` | Move to step n (1-15) |
-| `/ctoc progress` | Show detailed Iron Loop progress |
-| `/ctoc plan` | Show plan dashboard |
-| `/ctoc doctor` | Run health check |
-
-### Natural Language
-
-You don't need commands. Just talk:
-
-| You say... | CTOC does... |
-|------------|--------------|
-| "I need a login system" | Starts ASSESS (Step 1) |
-| "Fix the payment bug" | Starts ASSESS with bug context |
-| "What's the status?" | Shows dashboard |
-| "Ready to implement" | Advances to Step 7 |
+| `/ctoc:dashboard` | Show dashboard with current status |
+| `/ctoc:start <name>` | Start tracking a new feature |
+| `/ctoc:step <n>` | Move to step n (1-15) |
+| `/ctoc:progress` | Show detailed Iron Loop progress |
+| `/ctoc:plan` | Show plan dashboard |
+| `/ctoc:doctor` | Run health check |
 
 ---
 
@@ -361,12 +336,12 @@ ctoc-plugin/
 ├── .claude-plugin/
 │   └── plugin.json           # Plugin manifest
 ├── commands/                  # 6 slash commands
-│   ├── ctoc.md
-│   ├── ctoc-start.md
-│   ├── ctoc-step.md
-│   ├── ctoc-progress.md
-│   ├── ctoc-plan.md
-│   └── ctoc-doctor.md
+│   ├── dashboard.md
+│   ├── start.md
+│   ├── step.md
+│   ├── progress.md
+│   ├── plan.md
+│   └── doctor.md
 ├── agents/                    # 60 specialist agents
 │   ├── coordinator/          # 1 coordinator
 │   ├── testing/              # 9 test agents
@@ -483,7 +458,7 @@ Reinstall the plugin:
 ### Getting Help
 
 ```
-/ctoc doctor
+/ctoc:doctor
 ```
 
 Runs a comprehensive health check.

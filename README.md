@@ -267,7 +267,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.0.11** — Fix plugin install command format
+**5.0.12** — Fix plugin install command format
 
 - Update check on session start (checks GitHub, cached 24h)
 - Removed legacy scripts and duplicate files

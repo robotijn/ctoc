@@ -1,11 +1,11 @@
-# /ctoc doctor - Health Check
+# /ctoc:doctor - Health Check
 
 Run installation health check for CTOC.
 
 ## Usage
 
 ```
-/ctoc doctor
+/ctoc:doctor
 ```
 
 ## Behavior
