@@ -237,7 +237,7 @@ Run inside Claude Code:
 Then restart to load the new version:
 ```bash
 exit
-claude --continue
+claude --dangerously-skip-permissions --continue
 ```
 
 > **Note:** `/ctoc:update` works around a [known Claude Code bug](https://github.com/anthropics/claude-code/issues/19197) where `/plugin update` doesn't refresh cached files. The Anthropic team is working on a fix.
@@ -272,7 +272,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.2.23** — Fix plugin installation
+**5.2.24** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
