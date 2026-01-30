@@ -6,7 +6,7 @@
 /plugin marketplace add https://github.com/robotijn/ctoc
 ```
 ```
-/plugin install ctoc@ctoc
+/plugin install ctoc
 ```
 
 GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
@@ -58,7 +58,7 @@ From Claude Code:
 /plugin marketplace add https://github.com/robotijn/ctoc
 ```
 ```
-/plugin install ctoc@ctoc
+/plugin install ctoc
 ```
 
 Verify: `/plugin` → **Installed** tab → `ctoc` should be listed.
@@ -229,7 +229,7 @@ CTO Chief embodies a senior engineering leader who:
 /plugin marketplace add https://github.com/robotijn/ctoc
 ```
 ```
-/plugin install ctoc@ctoc
+/plugin install ctoc
 ```
 
 **Old marketplace cached** — clear and re-add:
@@ -241,7 +241,7 @@ Then in Claude Code:
 /plugin marketplace add https://github.com/robotijn/ctoc
 ```
 ```
-/plugin install ctoc@ctoc
+/plugin install ctoc
 ```
 
 **State invalid** — reset:
@@ -258,10 +258,11 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.0.14** — Fix plugin install command format
+**5.0.21** — Fix plugin installation
 
+- Fixed hooks.json location for plugin installation
+- Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
 - Update check on session start (checks GitHub, cached 24h)
-- Removed legacy scripts and duplicate files
 - Single source of truth: `ctoc-plugin/`
 
 ---
