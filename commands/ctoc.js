@@ -251,9 +251,9 @@ function main() {
     out += `├────────────────┼────────┼─────────────────┤\n`;
     out += `│ Functional     │ ${String(counts.functional).padEnd(6)}│ ${status(counts.functional, 'No drafts', counts.functional + ' drafts').padEnd(16)}│\n`;
     out += `│ Implementation │ ${String(counts.implementation).padEnd(6)}│ ${status(counts.implementation, 'No drafts', counts.implementation + ' drafts').padEnd(16)}│\n`;
-    out += `│ Review         │ ${String(counts.review).padEnd(6)}│ ${status(counts.review, 'Queue empty', counts.review + ' pending').padEnd(16)}│\n`;
     out += `│ Todo           │ ${String(counts.todo).padEnd(6)}│ ${status(counts.todo, 'Queue empty', counts.todo + ' queued').padEnd(16)}│\n`;
     out += `│ In Progress    │ ${String(counts.inProgress).padEnd(6)}│ ${status(counts.inProgress, 'None active', counts.inProgress + ' active').padEnd(16)}│\n`;
+    out += `│ Review         │ ${String(counts.review).padEnd(6)}│ ${status(counts.review, 'Queue empty', counts.review + ' pending').padEnd(16)}│\n`;
     out += `│ Done           │ ${String(counts.done || 0).padEnd(6)}│ ${status(counts.done, 'None yet', (counts.done || 0) + ' completed').padEnd(16)}│\n`;
     out += `└────────────────┴────────┴─────────────────┘\n\n`;
 
