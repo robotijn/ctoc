@@ -1,6 +1,6 @@
 {
   "name": "ctoc",
-  "version": "5.3.6",
+  "version": "5.3.7",
   "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
   "author": {
     "name": "robotijn"
@@ -18,17 +18,5 @@
     "testing",
     "security",
     "compliance"
-  ],
-  "commands": [
-    {
-      "name": "ctoc",
-      "description": "Show CTOC dashboard status and menu",
-      "file": "commands/ctoc.md"
-    },
-    {
-      "name": "ctoc:update",
-      "description": "Update CTOC to the latest version",
-      "file": "commands/update.md"
-    }
   ]
 }
