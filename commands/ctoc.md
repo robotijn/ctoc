@@ -44,9 +44,44 @@ User describes action: `create`, `edit`, `rename`, `delete`, `approve`, `move`
 | edit | Edit existing plan |
 | rename | Rename a plan |
 | delete | Delete a plan |
+| **discuss** | **Critique plan, ask questions, refine** |
 | approve | Move to next stage |
 | move | Move to specific stage |
 | view | View plan contents |
+
+## Discuss Action (Iron Loop Critical Review)
+
+When user says "discuss" on a plan:
+
+1. **Critique** - Find gaps, question assumptions, identify risks
+
+2. **Present Options** - For each decision point show:
+   - All viable options
+   - Pros and cons of each
+   - **Recommended option with reasoning**
+
+3. **Ask Questions** - Clarify ambiguous requirements
+
+4. **Refine** - Update plan based on user input
+
+**IMPORTANT RULES:**
+- **User controls discussion** - NEVER say "discussion complete"
+- **Always show discuss option** - User can loop as many times as needed
+- **User decides when ready** - Only user can approve or end discussion
+- **Show reasoning** - Explain WHY you recommend something
+
+**Option Format:**
+```
+Option A: [name]
+  Pros: ...
+  Cons: ...
+
+Option B: [name]
+  Pros: ...
+  Cons: ...
+
+→ Recommended: [A/B] because [reasoning]
+```
 
 ## Handling User Input
 
