@@ -3,6 +3,146 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+// Import the actual functions
+const {
+  hasIronLoopSteps,
+  validateForTodo,
+  generateIronLoopTemplate,
+  IRON_LOOP_MARKER
+} = require('../lib/iron-loop');
+
+// Helper to create temp files for testing
+function createTempPlan(content) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'iron-loop-test-'));
+  const tempFile = path.join(tempDir, 'test-plan.md');
+  fs.writeFileSync(tempFile, content);
+  return tempFile;
+}
+
+function cleanupTempFile(filePath) {
+  try {
+    fs.unlinkSync(filePath);
+    fs.rmdirSync(path.dirname(filePath));
+  } catch (e) {
+    // Ignore cleanup errors
+  }
+}
+
+// Test hasIronLoopSteps() returns false for plan without marker
+function testHasIronLoopStepsWithoutMarker() {
+  const planContent = `# Test Plan
+
+## Problem Statement
+Need to implement feature X.
+
+## Requirements
+- Requirement 1
+- Requirement 2
+`;
+  const tempFile = createTempPlan(planContent);
+  try {
+    const result = hasIronLoopSteps(tempFile);
+    assert.strictEqual(result, false, 'Should return false when marker is missing');
+    console.log('✓ hasIronLoopSteps() returns false for plan without marker');
+  } finally {
+    cleanupTempFile(tempFile);
+  }
+}
+
+// Test hasIronLoopSteps() returns true for plan with marker
+function testHasIronLoopStepsWithMarker() {
+  const planContent = `# Test Plan
+
+## Problem Statement
+Need to implement feature X.
+
+${IRON_LOOP_MARKER}
+
+### Step 7: TEST
+- [ ] Write tests
+`;
+  const tempFile = createTempPlan(planContent);
+  try {
+    const result = hasIronLoopSteps(tempFile);
+    assert.strictEqual(result, true, 'Should return true when marker is present');
+    console.log('✓ hasIronLoopSteps() returns true for plan with marker');
+  } finally {
+    cleanupTempFile(tempFile);
+  }
+}
+
+// Test validateForTodo() returns error when steps missing
+function testValidateForTodoWithoutSteps() {
+  const planContent = `# Test Plan
+
+## Problem Statement
+Need to implement feature X.
+`;
+  const tempFile = createTempPlan(planContent);
+  try {
+    const result = validateForTodo(tempFile);
+    assert.strictEqual(result.valid, false, 'Should be invalid without steps');
+    assert.ok(result.error, 'Should have error message');
+    assert.ok(result.error.includes('missing'), 'Error should mention missing steps');
+    console.log('✓ validateForTodo() returns error when steps missing');
+  } finally {
+    cleanupTempFile(tempFile);
+  }
+}
+
+// Test validateForTodo() returns valid when steps present
+function testValidateForTodoWithSteps() {
+  const planContent = `# Test Plan
+
+## Problem Statement
+Need to implement feature X.
+
+${IRON_LOOP_MARKER}
+
+### Step 7: TEST
+- [ ] Write tests
+`;
+  const tempFile = createTempPlan(planContent);
+  try {
+    const result = validateForTodo(tempFile);
+    assert.strictEqual(result.valid, true, 'Should be valid with steps');
+    assert.strictEqual(result.error, undefined, 'Should have no error');
+    console.log('✓ validateForTodo() returns valid when steps present');
+  } finally {
+    cleanupTempFile(tempFile);
+  }
+}
+
+// Test generateIronLoopTemplate() returns valid markdown
+function testGenerateIronLoopTemplateReturnsValidMarkdown() {
+  const planContent = '# Test Plan';
+  const template = generateIronLoopTemplate(planContent);
+
+  // Check marker is present
+  assert.ok(template.includes(IRON_LOOP_MARKER), 'Should include Iron Loop marker');
+
+  // Check all steps 7-15 are present
+  for (let step = 7; step <= 15; step++) {
+    assert.ok(template.includes(`Step ${step}:`), `Should include Step ${step}`);
+  }
+
+  // Check checkboxes are present
+  assert.ok(template.includes('- [ ]'), 'Should include checkboxes');
+
+  console.log('✓ generateIronLoopTemplate() returns valid markdown');
+}
+
+// Test IRON_LOOP_MARKER constant
+function testIronLoopMarkerConstant() {
+  assert.ok(IRON_LOOP_MARKER, 'IRON_LOOP_MARKER should be defined');
+  assert.strictEqual(typeof IRON_LOOP_MARKER, 'string', 'IRON_LOOP_MARKER should be a string');
+  assert.ok(IRON_LOOP_MARKER.includes('Iron Loop'), 'IRON_LOOP_MARKER should contain "Iron Loop"');
+  console.log('✓ IRON_LOOP_MARKER constant is properly defined');
+}
 
 // Test integrate() returns valid markdown with Steps 7-15
 function testIntegrateReturnsValidMarkdown() {
@@ -265,6 +405,18 @@ function testClearAgentStatusResetsState() {
 
 // Run all tests
 console.log('\nIron Loop Automation Tests\n');
+
+// Tests for new functions from iron-loop-auto-integration.md plan
+console.log('--- New validation functions ---');
+testHasIronLoopStepsWithoutMarker();
+testHasIronLoopStepsWithMarker();
+testValidateForTodoWithoutSteps();
+testValidateForTodoWithSteps();
+testGenerateIronLoopTemplateReturnsValidMarkdown();
+testIronLoopMarkerConstant();
+
+// Existing simulated tests
+console.log('\n--- Existing integration tests ---');
 testIntegrateReturnsValidMarkdown();
 testCritiqueReturnsScoresObject();
 testRefineLoopExitsOnAllFives();
