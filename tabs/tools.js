@@ -75,24 +75,42 @@ function renderUpdate(app) {
   output += `${c.bold}Tools › Update${c.reset}\n\n`;
 
   const current = getVersion();
-  output += `  Current version:  ${c.bold}${current}${c.reset}\n`;
+  output += `  Current version:  ${c.bold}${current}${c.reset}\n\n`;
 
-  if (app.latestVersion) {
-    output += `  Latest version:   ${c.bold}${app.latestVersion}${c.reset}\n\n`;
-    if (app.latestVersion !== current) {
-      output += `  ${c.green}Update available!${c.reset}\n\n`;
-      output += `  1. Update now\n`;
-    } else {
-      output += `  ${c.dim}You are up to date.${c.reset}\n`;
-    }
+  if (app.updateMessage) {
+    output += `  ${app.updateMessage}\n\n`;
   } else {
-    output += `  Latest version:   ${c.dim}checking...${c.reset}\n`;
+    output += `  1. ${c.bold}Force update${c.reset} - Clear cache and reinstall\n\n`;
+    output += `  ${c.dim}This clears the plugin cache and prompts reinstall.${c.reset}\n`;
   }
 
   output += '\n';
   output += renderFooter(['b back', 'q quit']);
 
   return output;
+}
+
+function forceUpdate() {
+  const os = require('os');
+  const homeDir = os.homedir();
+  const cacheDir = path.join(homeDir, '.claude', 'plugins', 'cache', 'robotijn');
+  const marketDir = path.join(homeDir, '.claude', 'plugins', 'marketplaces', 'robotijn');
+
+  let cleared = [];
+
+  // Clear cache directory
+  if (fs.existsSync(cacheDir)) {
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    cleared.push('cache');
+  }
+
+  // Clear marketplace directory
+  if (fs.existsSync(marketDir)) {
+    fs.rmSync(marketDir, { recursive: true, force: true });
+    cleared.push('marketplace');
+  }
+
+  return cleared;
 }
 
 function renderSettings(app) {
@@ -205,8 +223,7 @@ function handleKey(key, app) {
       const toolKey = key.name === 'return' ? TOOLS[app.toolIndex].key : key.sequence;
       app.toolMode = toolKey;
       if (toolKey === '2') {
-        app.latestVersion = null;
-        app.latestVersion = getVersion(); // For now, just show current
+        app.updateMessage = null;
       }
       if (toolKey === '3') {
         app.settingsTabIndex = 0;
@@ -243,6 +260,16 @@ function handleKey(key, app) {
   if (app.toolMode === '2') {
     if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.toolMode = null;
+      app.updateMessage = null;
+      return true;
+    }
+    if (key.sequence === '1') {
+      const cleared = forceUpdate();
+      if (cleared.length > 0) {
+        app.updateMessage = `${c.green}✓ Cache cleared.${c.reset}\n\n  ${c.bold}Restart Claude Code${c.reset}, then run:\n  ${c.cyan}/plugin install ctoc${c.reset}`;
+      } else {
+        app.updateMessage = `${c.dim}Cache already clear.${c.reset}\n\n  Run: ${c.cyan}/plugin install ctoc${c.reset}`;
+      }
       return true;
     }
   }
