@@ -221,27 +221,105 @@ function main() {
     app.navStack.push('Overview');
     render();
   } else {
-    // Non-interactive: output JSON for Claude to interpret
-    const { getPlanCounts, getAgentStatus } = require('../lib/state');
+    // Non-interactive: rich status display for Claude
+    const { getPlanCounts, getAgentStatus, readPlans, getPlansDir } = require('../lib/state');
     const counts = getPlanCounts(app.projectPath);
     const agent = getAgentStatus(app.projectPath);
 
-    const status = {
-      version: VERSION,
-      plans: counts,
-      agent: agent,
-      tabs: ['Overview', 'Functional', 'Implementation', 'Review', 'Todo', 'Progress', 'Tools'],
-      actions: {
-        overview: ['release'],
-        functional: ['new', 'view', 'assign'],
-        implementation: ['view', 'approve', 'reject'],
-        review: ['approve', 'reject'],
-        todo: ['start', 'skip'],
-        tools: ['doctor', 'update', 'settings']
-      }
+    // Read plans from each directory
+    const plansDir = getPlansDir(app.projectPath);
+    const plans = {
+      functional: readPlans(plansDir, 'functional', 'draft'),
+      implementation: readPlans(plansDir, 'implementation', 'draft'),
+      review: readPlans(plansDir, 'implementation', 'review'),
+      todo: readPlans(plansDir, 'implementation', 'approved'),
+      inProgress: readPlans(plansDir, 'implementation', 'in-progress'),
+      done: readPlans(plansDir, 'implementation', 'done')
     };
 
-    console.log('CTOC_DASHBOARD_DATA:' + JSON.stringify(status));
+    // Build rich status output
+    let out = '';
+    out += `CTOC v${VERSION}\n`;
+    out += `${'─'.repeat(60)}\n\n`;
+
+    // Pipeline overview
+    out += `PIPELINE\n`;
+    out += `  Functional      ${counts.functional} drafts\n`;
+    out += `  Implementation  ${counts.implementation} drafts\n`;
+    out += `  Review          ${counts.review} pending\n`;
+    out += `  Todo            ${counts.todo} queued\n`;
+    out += `  In Progress     ${counts.inProgress} active\n`;
+    out += `  Done            ${counts.done || 0} completed\n\n`;
+
+    // Agent status
+    out += `AGENT\n`;
+    if (agent.active) {
+      out += `  ● Active: ${agent.name}\n`;
+      out += `    Step ${agent.step}/15 - ${agent.phase}\n`;
+      if (agent.task) out += `    Task: ${agent.task}\n`;
+    } else {
+      out += `  ○ Idle\n`;
+    }
+    out += '\n';
+
+    // List actual plans if any exist
+    if (plans.functional.length > 0) {
+      out += `FUNCTIONAL DRAFTS\n`;
+      plans.functional.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
+      out += '\n';
+    }
+    if (plans.implementation.length > 0) {
+      out += `IMPLEMENTATION DRAFTS\n`;
+      plans.implementation.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
+      out += '\n';
+    }
+    if (plans.review.length > 0) {
+      out += `REVIEW QUEUE\n`;
+      plans.review.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
+      out += '\n';
+    }
+    if (plans.todo.length > 0) {
+      out += `TODO QUEUE\n`;
+      plans.todo.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
+      out += '\n';
+    }
+    if (plans.inProgress.length > 0) {
+      out += `IN PROGRESS\n`;
+      plans.inProgress.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
+      out += '\n';
+    }
+
+    // Recommended actions based on state
+    out += `${'─'.repeat(60)}\n`;
+    out += `RECOMMENDED ACTIONS\n`;
+
+    if (counts.functional === 0 && counts.implementation === 0 && counts.todo === 0) {
+      out += `  → "create functional plan" - start a new feature\n`;
+    }
+    if (counts.functional > 0) {
+      out += `  → "show functional plans" - view drafts\n`;
+      out += `  → "approve functional plan [name]" - move to implementation\n`;
+    }
+    if (counts.implementation > 0) {
+      out += `  → "show implementation plans" - view drafts\n`;
+      out += `  → "start implementation [name]" - begin work\n`;
+    }
+    if (counts.review > 0) {
+      out += `  → "show review queue" - see pending reviews\n`;
+      out += `  → "approve review [name]" - approve for implementation\n`;
+    }
+    if (counts.todo > 0) {
+      out += `  → "show todo" - see queued work\n`;
+      out += `  → "start next" - begin next queued item\n`;
+    }
+    if (agent.active) {
+      out += `  → "show progress" - see current implementation status\n`;
+    }
+    out += `  → "release" - bump version (patch/minor/major)\n`;
+    out += `  → "update" - update CTOC to latest\n`;
+    out += `  → "settings" - view/change settings\n`;
+
+    console.log(out);
   }
 }
 

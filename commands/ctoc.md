@@ -1,54 +1,35 @@
 ---
-description: Launch the CTOC interactive dashboard
+description: Show CTOC dashboard status and recommended actions
 ---
 
-## CTOC Interactive Dashboard
-
-First, get the current status:
+Show the CTOC dashboard:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/commands/ctoc.js"
 ```
 
-The output will contain `CTOC_DASHBOARD_DATA:` followed by JSON with:
-- `version`: Current CTOC version
-- `plans`: Counts for functional, implementation, review, todo, inProgress
-- `agent`: Current agent status (active, name, step, phase)
-- `tabs`: Available tabs
-- `actions`: Available actions per tab
+This displays:
+- Pipeline status (functional/implementation/review/todo/in-progress/done counts)
+- Agent status (idle or active with current step)
+- Lists of actual plans in each stage
+- Recommended actions based on current state
 
-**Present this as an interactive dashboard using AskUserQuestion:**
+**Follow-up commands the user might say:**
 
-1. Show a formatted status summary (version, plan counts, agent status)
-2. Ask user which tab/action they want using AskUserQuestion with options:
-   - Overview (release)
-   - Functional Plans (new, view, assign)
-   - Implementation Plans (view, approve, reject)
-   - Review Queue (approve, reject)
-   - Todo Queue (start, skip)
-   - Tools (doctor, update, settings)
-   - Exit
+| Command | Action |
+|---------|--------|
+| "create functional plan" | Create new functional requirements plan |
+| "show functional plans" | List functional drafts |
+| "show implementation plans" | List implementation drafts |
+| "show review queue" | List pending reviews |
+| "show todo" | List queued work items |
+| "show progress" | Show current implementation progress |
+| "approve [plan]" | Approve a plan to next stage |
+| "start [plan]" | Begin implementation of a plan |
+| "release" | Bump version and release |
+| "release minor" | Minor version bump |
+| "release major" | Major version bump |
+| "update" | Update CTOC to latest version |
+| "settings" | Show/change CTOC settings |
 
-3. Based on selection, either:
-   - Show more details (list plans, show content)
-   - Perform action (run corresponding command)
-   - Return to main menu
-
-4. Continue looping until user selects Exit
-
-**Example flow:**
-```
-CTOC v5.2.32
-
-Plans: 2 functional, 1 implementation, 0 review, 3 todo
-Agent: Idle
-
-[AskUserQuestion: Which tab? Overview/Functional/Implementation/Review/Todo/Tools/Exit]
--> User selects "Functional"
-
-[AskUserQuestion: Functional Plans (2 drafts) - What action? View list/Create new/Back]
--> User selects "View list"
-
-[Show list of functional plans]
-[AskUserQuestion: Select plan or Back]
-```
+Execute the appropriate action based on user's natural language request.
