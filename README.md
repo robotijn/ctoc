@@ -284,7 +284,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.3.1** — Fix plugin installation
+**5.3.2** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
