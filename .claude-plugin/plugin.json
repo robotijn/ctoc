@@ -1,6 +1,6 @@
 {
   "name": "ctoc",
-  "version": "5.3.7",
+  "version": "5.3.8",
   "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
   "author": {
     "name": "robotijn"
@@ -18,5 +18,6 @@
     "testing",
     "security",
     "compliance"
-  ]
+  ],
+  "commands": "./commands/"
 }
