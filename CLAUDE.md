@@ -356,6 +356,20 @@ node scripts/release.js
 
 ---
 
+## CTOC Menu Behavior
+
+When working with CTOC plans, ALWAYS follow these rules:
+
+1. **Show numbered menus after every response** — No CTOC response without a contextual menu footer
+2. **Auto-enter discussion mode when creating plans** — Critique the plan, find gaps, question assumptions before showing menu
+3. **Use AskUserQuestion for decisions** — Put recommended option first with "(Recommended)" in label
+4. **Use [1][2][3]...[0] format, no letters** — Sequential numbers only, [0] is always back/cancel
+5. **Auto-generate implementation details** — When a plan moves to implementation stage, list specific files and changes
+
+These rules ensure consistent, keyboard-driven navigation through the CTOC workflow.
+
+---
+
 ## 🎭 The CTO Persona
 
 Every language profile includes a **CTO Skill** — a persona that embodies:

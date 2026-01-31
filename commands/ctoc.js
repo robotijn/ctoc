@@ -257,45 +257,20 @@ function main() {
     out += `│ Done           │ ${String(counts.done || 0).padEnd(6)}│ ${status(counts.done, 'None yet', (counts.done || 0) + ' completed').padEnd(16)}│\n`;
     out += `└────────────────┴────────┴─────────────────┘\n\n`;
 
-    // Agent status
+    // Agent status - derive from in-progress count
+    const isAgentActive = counts.inProgress > 0;
     out += `AGENT\n`;
-    if (agent.active) {
-      out += `  ● Active: ${agent.name}\n`;
-      out += `    Step ${agent.step}/15 - ${agent.phase}\n`;
-      if (agent.task) out += `    Task: ${agent.task}\n`;
+    if (isAgentActive) {
+      // Get the plan name from in-progress folder
+      const inProgressPlans = plans.inProgress;
+      const currentPlan = inProgressPlans.length > 0 ? (inProgressPlans[0].title || inProgressPlans[0].name) : 'unknown';
+      out += `  ● Active: ${currentPlan}\n`;
     } else {
       out += `  ○ Idle\n`;
     }
     out += '\n';
 
-    // List actual plans if any exist
-    if (plans.functional.length > 0) {
-      out += `FUNCTIONAL DRAFTS\n`;
-      plans.functional.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
-      out += '\n';
-    }
-    if (plans.implementation.length > 0) {
-      out += `IMPLEMENTATION DRAFTS\n`;
-      plans.implementation.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
-      out += '\n';
-    }
-    if (plans.review.length > 0) {
-      out += `REVIEW QUEUE\n`;
-      plans.review.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
-      out += '\n';
-    }
-    if (plans.todo.length > 0) {
-      out += `TODO QUEUE\n`;
-      plans.todo.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
-      out += '\n';
-    }
-    if (plans.inProgress.length > 0) {
-      out += `IN PROGRESS\n`;
-      plans.inProgress.forEach((p, i) => out += `  ${i+1}. ${p.title || p.name}\n`);
-      out += '\n';
-    }
-
-    // Fixed menu - always show all options (static, never changes)
+    // Menu - option 7 changes based on agent state
     out += `${'─'.repeat(60)}\n`;
     out += `MENU\n\n`;
     out += `  [1] functional       Browse functional plans\n`;
@@ -305,11 +280,13 @@ function main() {
     out += `  [5] review           Browse review queue\n`;
     out += `  [6] done             Browse completed\n`;
     out += `  ─────────────────────────────────────\n`;
-    out += `  [s] start            Implement next from todo\n`;
-    out += `  [r] refresh          Refresh dashboard\n`;
-    out += `  [7] release          Bump version\n`;
-    out += `  [8] update           Update CTOC\n`;
-    out += `  [9] settings         Configuration\n`;
+    if (isAgentActive) {
+      out += `  [7] stop after       Finish current, then stop\n`;
+    } else {
+      out += `  [7] start            Execute next from todo\n`;
+    }
+    out += `  [8] release          Bump version\n`;
+    out += `  [9] update           Update CTOC\n`;
     out += `  [0] back             Exit dashboard\n`;
 
     console.log(out);
