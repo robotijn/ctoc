@@ -102,7 +102,7 @@ function renderReleaseSection(currentVersion) {
 function handleKey(key, app) {
   if (releaseMode) {
     // Release mode key handling
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       releaseMode = false;
       return true;
     }

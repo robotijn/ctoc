@@ -19,7 +19,7 @@ const ACTIONS = [
 ];
 
 function render(app) {
-  const plansDir = path.join(getPlansDir(app.projectPath), 'functional', 'draft');
+  const plansDir = path.join(getPlansDir(app.projectPath), 'functional');
   const plans = readPlans(plansDir);
 
   let output = '\n';
@@ -65,7 +65,7 @@ The plan will be:
 }
 
 function handleKey(key, app) {
-  const plansDir = path.join(getPlansDir(app.projectPath), 'functional', 'draft');
+  const plansDir = path.join(getPlansDir(app.projectPath), 'functional');
   const plans = readPlans(plansDir);
 
   if (plans.length === 0) {
@@ -111,7 +111,7 @@ function handleKey(key, app) {
 
   // Action menu
   if (app.mode === 'actions') {
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.mode = 'list';
       return true;
     }

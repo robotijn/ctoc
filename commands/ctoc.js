@@ -226,15 +226,15 @@ function main() {
     const counts = getPlanCounts(app.projectPath);
     const agent = getAgentStatus(app.projectPath);
 
-    // Read plans from each directory
+    // Read plans from each directory (flat structure)
     const plansDir = getPlansDir(app.projectPath);
     const plans = {
-      functional: readPlans(plansDir, 'functional', 'draft'),
-      implementation: readPlans(plansDir, 'implementation', 'draft'),
-      review: readPlans(plansDir, 'implementation', 'review'),
-      todo: readPlans(plansDir, 'implementation', 'approved'),
-      inProgress: readPlans(plansDir, 'implementation', 'in-progress'),
-      done: readPlans(plansDir, 'implementation', 'done')
+      functional: readPlans(path.join(plansDir, 'functional')),
+      implementation: readPlans(path.join(plansDir, 'implementation')),
+      review: readPlans(path.join(plansDir, 'review')),
+      todo: readPlans(path.join(plansDir, 'todo')),
+      inProgress: readPlans(path.join(plansDir, 'in-progress')),
+      done: readPlans(path.join(plansDir, 'done'))
     };
 
     // Helper for status text
@@ -295,7 +295,7 @@ function main() {
       out += '\n';
     }
 
-    // Fixed menu - always show all options
+    // Fixed menu - always show all options (static, never changes)
     out += `${'─'.repeat(60)}\n`;
     out += `MENU\n\n`;
     out += `  [1] functional       Browse functional plans\n`;
@@ -305,11 +305,12 @@ function main() {
     out += `  [5] review           Browse review queue\n`;
     out += `  [6] done             Browse completed\n`;
     out += `  ─────────────────────────────────────\n`;
+    out += `  [s] start            Implement next from todo\n`;
+    out += `  [r] refresh          Refresh dashboard\n`;
     out += `  [7] release          Bump version\n`;
     out += `  [8] update           Update CTOC\n`;
     out += `  [9] settings         Configuration\n`;
-    out += `\n  Actions: create, edit, rename, delete, approve, move\n`;
-    out += `  Example: "1" then "create new feature"\n`;
+    out += `  [0] back             Exit dashboard\n`;
 
     console.log(out);
   }

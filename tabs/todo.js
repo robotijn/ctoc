@@ -78,7 +78,7 @@ function handleKey(key, app) {
 
   // Action menu
   if (app.mode === 'actions') {
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.mode = 'list';
       return true;
     }
