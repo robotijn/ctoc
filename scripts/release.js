@@ -53,6 +53,15 @@ function getVersion() {
   return version;
 }
 
+function bumpPatch() {
+  const current = getVersion();
+  const parts = current.split('.');
+  parts[2] = parseInt(parts[2], 10) + 1;
+  const newVersion = parts.join('.');
+  fs.writeFileSync(VERSION_FILE, newVersion + '\n');
+  return newVersion;
+}
+
 function updateJsonVersionFiles(version) {
   const updated = [];
 
@@ -120,20 +129,18 @@ function updateVersionInFiles(version) {
 }
 
 function main() {
-  const version = getVersion();
+  // Always bump patch version
+  const oldVersion = getVersion();
+  const version = bumpPatch();
   console.log(`CTOC Release v${version}`);
   console.log('─'.repeat(40));
+  console.log(`  Bumped: ${oldVersion} → ${version}`);
 
   console.log('\nSyncing version to JSON files...');
-  const jsonUpdated = updateJsonVersionFiles(version);
+  updateJsonVersionFiles(version);
 
   console.log('\nUpdating version references in docs...');
-  const docsUpdated = updateVersionInFiles(version);
-
-  const totalUpdated = jsonUpdated.length + docsUpdated.length;
-  if (totalUpdated === 0) {
-    console.log('  All files already at v' + version);
-  }
+  updateVersionInFiles(version);
 
   console.log('\nDone.');
 }
