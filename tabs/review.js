@@ -7,6 +7,7 @@ const path = require('path');
 const { c, line, renderList, renderActionMenu, renderInput, renderFooter } = require('../lib/tui');
 const { readPlans, getPlansDir } = require('../lib/state');
 const { approvePlan, rejectPlan } = require('../lib/actions');
+const { readStatus, getStatusIcon } = require('../lib/background');
 
 const ACTIONS = [
   { key: '1', label: 'View functional plan' },

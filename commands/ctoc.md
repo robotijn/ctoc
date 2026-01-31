@@ -546,3 +546,276 @@ When user says "discuss" or selects discuss option:
 | delete | Remove plan |
 | rename | Rename plan |
 | move | Move to specific stage |
+
+---
+
+## Background Processing Rules (MANDATORY)
+
+**Core Principle:** Give control back to the user immediately. Background agents handle heavy lifting asynchronously.
+
+### Rule B1: Spawn on Transition
+
+Every stage transition spawns a background agent for the NEXT stage's work:
+
+| Transition | Background Agent | Purpose |
+|------------|------------------|---------|
+| create functional | Research Assistant | Find related code, check duplicates |
+| functional → implementation | Implementation Planner | Generate impl details (3-5 rounds) |
+| implementation → todo | Iron Loop Integrator | Generate Steps 7-15 |
+| in-progress → review | Review Preparer | Generate review summary |
+| select discuss | Critic | Pre-generate critique points |
+
+**How to spawn:**
+```javascript
+Task({
+  subagent_type: "general-purpose",
+  run_in_background: true,
+  prompt: "<agent-specific prompt>"
+})
+```
+
+### Rule B2: Status Indicators
+
+Show processing status in lists with icons:
+
+| Icon | Status | Meaning |
+|------|--------|---------|
+| `○` | none | No background work pending |
+| `◐` | working | Background agent working |
+| `●` | complete | Background work complete |
+| `⚠` | needs-input | Background agent hit a question |
+| `✗` | timeout | Agent timed out (5 min) |
+
+Plans display as: `[1] ◐ my-plan.md` (working) or `[1] ● my-plan.md` (ready)
+
+### Rule B3: Immediate Return
+
+After spawning any background agent:
+1. Show confirmation message with agent name
+2. **Return to list immediately**
+3. Do NOT wait for agent to complete
+4. User can continue working on other plans
+
+**Example flow:**
+```
+User: [3] approve (on functional plan)
+Claude:
+  1. Moves plan to implementation/
+  2. Writes status file (working)
+  3. Shows: "✓ Moved to implementation. Spawning Implementation Planner..."
+  4. Spawns background Task()
+  5. Returns to functional list immediately
+```
+
+### Rule B4: Status Files
+
+Background agents write status to `{plan-path}.status`:
+
+```json
+{
+  "agent": "implementation-planner",
+  "status": "working",
+  "started": "2025-01-31T12:00:00Z",
+  "completed": null,
+  "message": "Generating implementation details...",
+  "updatedAt": "2025-01-31T12:00:00Z"
+}
+```
+
+When complete:
+```json
+{
+  "agent": "implementation-planner",
+  "status": "complete",
+  "started": "2025-01-31T12:00:00Z",
+  "completed": "2025-01-31T12:00:30Z",
+  "message": "Generated 5 files to modify",
+  "updatedAt": "2025-01-31T12:00:30Z"
+}
+```
+
+### Rule B5: Lazy Loading Results
+
+When user VIEWS a plan:
+1. Check status file for processing state
+2. If `complete` → results are already in plan file, show normally
+3. If `working` → show "⏳ Processing..." with agent name and elapsed time
+4. If `needs-input` → show the question and prompt for input
+5. If `timeout` → show retry option
+
+**Display for working status:**
+```
+⏳ Implementation Planner working... (30s)
+
+The background agent is generating implementation details.
+You can wait or press [0] to go back.
+
+  [R] Retry    Start a new agent
+  [0] Back     Return to list
+```
+
+### Rule B6: Agent Timeout
+
+Background agents timeout after 5 minutes:
+- Status changes to `timeout`
+- User can retry via `[R] Retry` option in menu
+- Stale status files are cleaned up periodically
+
+### Background Agent Prompts
+
+#### Research Assistant (on plan creation)
+```
+Task({
+  subagent_type: "general-purpose",
+  run_in_background: true,
+  prompt: "Research context for new plan at {plan-path}.
+
+    1. Search codebase for related patterns (Grep/Glob)
+    2. Check for similar existing plans in plans/ (avoid duplicates)
+    3. Identify relevant files that will likely be touched
+    4. Generate initial discussion points/questions
+
+    WRITE findings to plan file under '## Research Notes'
+    UPDATE status file to 'complete' when done:
+    fs.writeFileSync('{plan-path}.status', JSON.stringify({
+      agent: 'research-assistant',
+      status: 'complete',
+      message: 'Found {n} related files'
+    }))
+  "
+})
+```
+
+#### Implementation Planner (functional → implementation)
+```
+Task({
+  subagent_type: "general-purpose",
+  run_in_background: true,
+  prompt: "Generate implementation plan for {plan-path}.
+
+    LOOP (3-5 rounds):
+    1. Read the functional requirements
+    2. Generate implementation details:
+       - Files to modify/create
+       - Code changes per file
+       - Dependencies needed
+       - CLI exposure if applicable
+    3. Self-critique:
+       - Are requirements fully addressed?
+       - Any security concerns?
+       - Is it testable?
+       - Edge cases covered?
+    4. Refine based on critique
+    5. If score >= 4/5 on all dimensions, exit early
+
+    WRITE result to plan file under '## Implementation Details'
+    UPDATE status file to 'complete'
+  "
+})
+```
+
+#### Iron Loop Integrator (implementation → todo)
+```
+Task({
+  subagent_type: "general-purpose",
+  run_in_background: true,
+  prompt: "Apply Iron Loop to {plan-path}.
+
+    1. Generate Steps 7-15 based on implementation plan
+    2. Self-critique each step for clarity, testability, specificity
+    3. Refine until actionable (max 3 rounds)
+    4. Append Steps 7-15 to the plan file
+    5. Update status file to 'complete'
+  "
+})
+```
+
+#### Review Preparer (in-progress → review)
+```
+Task({
+  subagent_type: "general-purpose",
+  run_in_background: true,
+  prompt: "Prepare review summary for {plan-path}.
+
+    1. Compare implementation to original functional requirements
+    2. Verify test coverage (check for test files created)
+    3. Check for TODO/FIXME comments left behind
+    4. Identify any deviations from plan
+    5. Generate review checklist
+
+    WRITE to plan file under '## Review Summary'
+    UPDATE status file to 'complete'
+  "
+})
+```
+
+#### Critic (discussion mode)
+```
+Task({
+  subagent_type: "general-purpose",
+  run_in_background: true,
+  prompt: "Critique plan at {plan-path}.
+
+    1. Find gaps in requirements
+    2. Question assumptions
+    3. Identify risks
+    4. Suggest alternatives
+    5. Rate overall readiness (1-5)
+
+    WRITE critique to {plan-path}.critique file
+    UPDATE status file to 'complete'
+  "
+})
+```
+
+### Workflow Example
+
+```
+User: ctoc plan new "Add dark mode"
+Claude: ✓ Created plans/functional/add-dark-mode.md
+        Spawning Research Assistant in background...
+
+[Functional] (3 plans)
+  [1] ○ other-plan.md
+  [2] ○ another-plan.md
+  [3] ◐ add-dark-mode.md    ← Research running
+  ─────────────────────
+  [4] create
+  [0] back
+
+# User can immediately work on other plans while research runs
+
+# 10 seconds later, user checks again:
+[Functional] (3 plans)
+  [1] ○ other-plan.md
+  [2] ○ another-plan.md
+  [3] ● add-dark-mode.md    ← Research complete, has notes
+
+User: 3
+Claude: [shows plan with Research Notes section already populated]
+
+User: 4 (approve)
+Claude: ✓ Moved to implementation. Spawning Implementation Planner...
+
+[Functional] (2 plans)       ← Back to functional list
+  [1] ○ other-plan.md
+  [2] ○ another-plan.md
+  ─────────────────────
+  [3] create
+  [0] back
+
+# User continues working. Meanwhile, implementation details are being generated.
+
+User: 0 → 2 (go to implementation tab)
+
+[Implementation] (1 plan)
+  [1] ● add-dark-mode.md    ← Already has full implementation details!
+```
+
+### Summary
+
+**Before:** User waits 5-30 seconds at each transition while Claude processes.
+
+**After:** User gets control back immediately. Background agents prepare the next stage's content. By the time user looks at a plan, it's already been processed and refined.
+
+**Key Principle:** The terminal belongs to the user. Claude works in the background.
