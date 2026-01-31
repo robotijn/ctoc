@@ -206,70 +206,43 @@ function handleResize() {
   render();
 }
 
-// Render static status for non-interactive mode
-function renderStatic() {
-  const { getPlanCounts, getAgentStatus } = require('../lib/state');
-  const counts = getPlanCounts(app.projectPath);
-  const agent = getAgentStatus(app.projectPath);
-
-  let output = '';
-  output += `${c.bold}CTOC${c.reset} ${c.dim}v${VERSION}${c.reset}\n\n`;
-
-  output += `${c.bold}Plans${c.reset}\n`;
-  output += `  Functional      ${c.cyan}${counts.functional}${c.reset} drafts\n`;
-  output += `  Implementation  ${c.cyan}${counts.implementation}${c.reset} drafts\n`;
-  output += `  Review          ${c.cyan}${counts.review}${c.reset} pending\n`;
-  output += `  Todo            ${c.cyan}${counts.todo}${c.reset} queued\n`;
-  output += `  In Progress     ${c.cyan}${counts.inProgress}${c.reset} active\n\n`;
-
-  output += line() + '\n\n';
-
-  output += `${c.bold}Agent Status${c.reset}\n`;
-  if (agent.active) {
-    output += `  ${c.green}●${c.reset} Running       ${c.bold}${agent.name}${c.reset}\n`;
-    output += `                  Step ${agent.step}/15 ${c.cyan}${agent.phase}${c.reset}\n`;
-    if (agent.task) {
-      output += `                  Task: ${agent.task}\n`;
-    }
-    if (agent.elapsed) {
-      output += `                  Elapsed: ${c.dim}${agent.elapsed}${c.reset}\n`;
-    }
-  } else {
-    output += `  ${c.dim}○ Idle          No implementation in progress${c.reset}\n`;
-  }
-
-  output += '\n';
-  output += `${c.dim}Run directly in terminal for interactive mode${c.reset}\n`;
-
-  console.log(output);
-}
-
 // Main entry point
 function main() {
-  // Non-interactive mode: print static status and exit
-  if (!process.stdin.isTTY) {
-    renderStatic();
-    process.exit(0);
+  // Check if running in interactive terminal
+  if (process.stdin.isTTY) {
+    // Full TUI mode
+    process.stdout.on('resize', handleResize);
+    startAutoSync(app.projectPath);
+    process.on('exit', () => {
+      stopAutoSync();
+      cleanup();
+    });
+    setupKeyboard(handleKey);
+    app.navStack.push('Overview');
+    render();
+  } else {
+    // Non-interactive: output JSON for Claude to interpret
+    const { getPlanCounts, getAgentStatus } = require('../lib/state');
+    const counts = getPlanCounts(app.projectPath);
+    const agent = getAgentStatus(app.projectPath);
+
+    const status = {
+      version: VERSION,
+      plans: counts,
+      agent: agent,
+      tabs: ['Overview', 'Functional', 'Implementation', 'Review', 'Todo', 'Progress', 'Tools'],
+      actions: {
+        overview: ['release'],
+        functional: ['new', 'view', 'assign'],
+        implementation: ['view', 'approve', 'reject'],
+        review: ['approve', 'reject'],
+        todo: ['start', 'skip'],
+        tools: ['doctor', 'update', 'settings']
+      }
+    };
+
+    console.log('CTOC_DASHBOARD_DATA:' + JSON.stringify(status));
   }
-
-  // Handle resize
-  process.stdout.on('resize', handleResize);
-
-  // Start auto-sync
-  startAutoSync(app.projectPath);
-
-  // Cleanup on exit
-  process.on('exit', () => {
-    stopAutoSync();
-    cleanup();
-  });
-
-  // Setup keyboard
-  setupKeyboard(handleKey);
-
-  // Initial render
-  app.navStack.push('Overview');
-  render();
 }
 
 // Run
