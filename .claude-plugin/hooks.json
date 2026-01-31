@@ -2,12 +2,8 @@
   "hooks": {
     "SessionStart": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/SessionStart.js\""
-          }
-        ]
+        "type": "command",
+        "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/SessionStart.js\""
       }
     ],
     "PreToolUse": [
