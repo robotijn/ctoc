@@ -295,46 +295,19 @@ function main() {
       out += '\n';
     }
 
-    // Numbered actions based on state
+    // Fixed menu - always show all options
     out += `${'─'.repeat(60)}\n`;
-    out += `ACTIONS (type number or command)\n\n`;
-
-    let n = 1;
-    const actions = [];
-
-    // Dynamic actions based on state
-    if (counts.functional === 0 && counts.implementation === 0 && counts.todo === 0) {
-      actions.push({ cmd: 'create functional plan', desc: 'start a new feature' });
-    }
-    if (counts.functional > 0) {
-      actions.push({ cmd: 'show functional', desc: `view ${counts.functional} drafts` });
-    }
-    if (counts.implementation > 0) {
-      actions.push({ cmd: 'show implementation', desc: `view ${counts.implementation} drafts` });
-    }
-    if (counts.todo > 0) {
-      actions.push({ cmd: 'show todo', desc: `view ${counts.todo} queued` });
-    }
-    if (counts.inProgress > 0) {
-      actions.push({ cmd: 'show progress', desc: `view ${counts.inProgress} active` });
-    }
-    if (counts.review > 0) {
-      actions.push({ cmd: 'show review', desc: `view ${counts.review} pending` });
-    }
-    if (counts.done > 0) {
-      actions.push({ cmd: 'show done', desc: `view ${counts.done} completed` });
-    }
-
-    // Always available
-    actions.push({ cmd: 'release', desc: 'bump version (patch/minor/major)' });
-    actions.push({ cmd: 'update', desc: 'update CTOC to latest' });
-    actions.push({ cmd: 'settings', desc: 'view/change settings' });
-
-    actions.forEach((a, i) => {
-      out += `  [${i + 1}] ${a.cmd.padEnd(24)} ${a.desc}\n`;
-    });
-
-    out += `\n  Type a number (1-${actions.length}) or describe what you want.\n`;
+    out += `MENU (type number or command)\n\n`;
+    out += `  [1] functional      View/create functional plans\n`;
+    out += `  [2] implementation  View/create implementation plans\n`;
+    out += `  [3] todo            View todo queue\n`;
+    out += `  [4] in progress     View active work\n`;
+    out += `  [5] review          View review queue\n`;
+    out += `  [6] done            View completed items\n`;
+    out += `  [7] release         Bump version (patch/minor/major)\n`;
+    out += `  [8] update          Update CTOC to latest\n`;
+    out += `  [9] settings        View/change settings\n`;
+    out += `\n  Type 1-9 or describe what you want.\n`;
 
     console.log(out);
   }
