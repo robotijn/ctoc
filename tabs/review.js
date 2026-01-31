@@ -96,7 +96,7 @@ function handleKey(key, app) {
 
   // Action menu with direct typing
   if (app.mode === 'actions') {
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.mode = 'list';
       app.directInput = '';
       return true;

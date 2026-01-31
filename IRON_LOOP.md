@@ -259,6 +259,19 @@ Example:
 | `integration.auto_approve_after_max` | true | Auto-approve after max rounds |
 | `integration.defer_unresolved` | true | Store unresolved as Deferred Questions |
 
+### Implementation
+
+The Integrator + Critic loop is implemented in `lib/iron-loop.js`:
+
+| Function | Purpose |
+|----------|---------|
+| `integrate(planPath)` | Generates Steps 7-15 from plan requirements |
+| `critique(planPath)` | Scores execution plan on 5 dimensions |
+| `refineLoop(planPath, maxRounds)` | Orchestrates the loop until all 5/5 or max rounds |
+| `appendDeferredQuestions(planPath, questions)` | Appends unresolved issues to plan |
+
+The loop is triggered automatically when a plan moves from `implementation/draft/` to `implementation/approved/` (todo queue) via the `approvePlan()` function in `lib/actions.js`.
+
 ---
 
 ## 3 Human Gates

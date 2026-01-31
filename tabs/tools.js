@@ -218,7 +218,7 @@ function handleKey(key, app) {
 
   // Doctor mode
   if (app.toolMode === '1') {
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.toolMode = null;
       app.doctorInput = '';
       return true;
@@ -241,7 +241,7 @@ function handleKey(key, app) {
 
   // Update mode
   if (app.toolMode === '2') {
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.toolMode = null;
       return true;
     }
@@ -252,7 +252,7 @@ function handleKey(key, app) {
     const currentTab = SETTINGS_TABS[app.settingsTabIndex];
     const schema = getCategorySchema(currentTab.id);
 
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.toolMode = null;
       return true;
     }

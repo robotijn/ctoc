@@ -116,7 +116,7 @@ function handleKey(key, app) {
   }
 
   if (app.mode === 'view') {
-    if (key.name === 'escape' || key.name === 'b') {
+    if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.mode = 'list';
       return true;
     }
