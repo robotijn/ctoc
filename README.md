@@ -92,12 +92,24 @@ Verify: `/plugin` → **Installed** tab → `ctoc` should be listed.
 
 ## Quick Start
 
-**1. Start Claude Code**
+**1. Start Claude Code with permissions bypass**
 ```bash
-claude
+claude --dangerously-skip-permissions
 ```
 
-**2. Check status**
+This flag allows CTOC agents to run without constant permission prompts. It's safe when:
+- You're on a feature branch (not main)
+- You have git to revert unwanted changes
+- You're in a sandboxed dev environment
+
+**2. Resume a previous session (optional)**
+```bash
+claude --dangerously-skip-permissions --continue
+```
+
+The `--continue` flag resumes your last conversation, preserving context.
+
+**3. Check status**
 ```
 /ctoc
 ```
@@ -241,7 +253,7 @@ CTO Chief embodies a senior engineering leader who:
 
 ## Updating
 
-Run inside Claude Code:
+**Use `/ctoc:update` instead of `/plugin update ctoc`:**
 ```
 /ctoc:update
 ```
@@ -252,7 +264,35 @@ exit
 claude --dangerously-skip-permissions --continue
 ```
 
-> **Note:** `/ctoc:update` works around a [known Claude Code bug](https://github.com/anthropics/claude-code/issues/19197) where `/plugin update` doesn't refresh cached files. The Anthropic team is working on a fix.
+### Why `/ctoc:update`?
+
+The built-in `/plugin update` command has two issues:
+
+1. **Stale cache bug** — [#19197](https://github.com/anthropics/claude-code/issues/19197) causes `/plugin update` to not refresh cached files properly
+
+2. **Local scope detection** — When running from a directory that contains the plugin source (like `ctoc-build`), Claude Code auto-sets `scope: local` which pins the plugin to a specific project instead of being globally available
+
+`/ctoc:update` fixes both:
+- Fetches latest from GitHub
+- Installs to cache with correct version
+- Forces `scope: global` in the plugin registry
+- Cleans up old versions
+
+### Command-line flags
+
+| Flag | Purpose |
+|------|---------|
+| `--dangerously-skip-permissions` | Bypass permission prompts for tool calls |
+| `--continue` | Resume previous conversation with full context |
+
+**Recommended workflow:**
+```bash
+# Start new session
+claude --dangerously-skip-permissions
+
+# Or resume previous session
+claude --dangerously-skip-permissions --continue
+```
 
 ---
 
@@ -284,7 +324,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**5.3.2** — Fix plugin installation
+**5.3.3** — Fix plugin installation
 
 - Fixed hooks.json location for plugin installation
 - Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
