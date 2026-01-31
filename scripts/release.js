@@ -129,12 +129,10 @@ function updateVersionInFiles(version) {
 }
 
 function main() {
-  // Always bump patch version
-  const oldVersion = getVersion();
-  const version = bumpPatch();
+  // Read version from VERSION file (source of truth)
+  const version = getVersion();
   console.log(`CTOC Release v${version}`);
   console.log('─'.repeat(40));
-  console.log(`  Bumped: ${oldVersion} → ${version}`);
 
   console.log('\nSyncing version to JSON files...');
   updateJsonVersionFiles(version);
