@@ -297,17 +297,19 @@ function main() {
 
     // Fixed menu - always show all options
     out += `${'─'.repeat(60)}\n`;
-    out += `MENU (type number or command)\n\n`;
-    out += `  [1] functional      View/create functional plans\n`;
-    out += `  [2] implementation  View/create implementation plans\n`;
-    out += `  [3] todo            View todo queue\n`;
-    out += `  [4] in progress     View active work\n`;
-    out += `  [5] review          View review queue\n`;
-    out += `  [6] done            View completed items\n`;
-    out += `  [7] release         Bump version (patch/minor/major)\n`;
-    out += `  [8] update          Update CTOC to latest\n`;
-    out += `  [9] settings        View/change settings\n`;
-    out += `\n  Type 1-9 or describe what you want.\n`;
+    out += `MENU\n\n`;
+    out += `  [1] functional       Browse functional plans\n`;
+    out += `  [2] implementation   Browse implementation plans\n`;
+    out += `  [3] todo             Browse todo queue\n`;
+    out += `  [4] in progress      Browse active work\n`;
+    out += `  [5] review           Browse review queue\n`;
+    out += `  [6] done             Browse completed\n`;
+    out += `  ─────────────────────────────────────\n`;
+    out += `  [7] release          Bump version\n`;
+    out += `  [8] update           Update CTOC\n`;
+    out += `  [9] settings         Configuration\n`;
+    out += `\n  Actions: create, edit, rename, delete, approve, move\n`;
+    out += `  Example: "1" then "create new feature"\n`;
 
     console.log(out);
   }

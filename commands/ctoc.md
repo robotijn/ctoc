@@ -1,5 +1,5 @@
 ---
-description: Show CTOC dashboard status and recommended actions
+description: Show CTOC dashboard status and menu
 ---
 
 Show the CTOC dashboard:
@@ -8,31 +8,48 @@ Show the CTOC dashboard:
 node "${CLAUDE_PLUGIN_ROOT}/commands/ctoc.js"
 ```
 
-This displays:
-- Pipeline status (functional/implementation/review/todo/in-progress/done counts)
-- Agent status (idle or active with current step)
-- Lists of actual plans in each stage
-- Recommended actions based on current state
+## Dashboard Shows
 
-**Follow-up commands the user might say:**
+- Pipeline table (Functional → Implementation → Todo → In Progress → Review → Done)
+- Agent status (idle or active)
+- Fixed menu with 9 options
 
-| Command | Action |
-|---------|--------|
-| "create functional plan" | Create new functional requirements plan |
-| "show functional plans" | List functional drafts |
-| "show implementation plans" | List implementation drafts |
-| "show review queue" | List pending reviews |
-| "show todo" | List queued work items |
-| "show progress" | Show current implementation progress |
-| "approve [plan]" | Approve a plan to next stage |
-| "start [plan]" | Begin implementation of a plan |
-| "release" | Bump version and release |
-| "release minor" | Minor version bump |
-| "release major" | Major version bump |
-| "update" | Update CTOC to latest version |
-| "settings" | Show/change CTOC settings |
+## User Workflow
 
-Execute the appropriate action based on user input:
-- **Number** (1, 2, 3...): Map to the action shown at that index
-- **Command**: Execute the named command directly
+**Step 1: Browse a stage (1-6)**
+User types `1` to browse functional plans folder.
+
+**Step 2: Take action**
+User describes action: `create`, `edit`, `rename`, `delete`, `approve`, `move`
+
+## Menu Options
+
+| # | Stage | Folder |
+|---|-------|--------|
+| 1 | functional | `plans/functional/draft/` |
+| 2 | implementation | `plans/implementation/draft/` |
+| 3 | todo | `plans/implementation/approved/` |
+| 4 | in progress | `plans/implementation/in-progress/` |
+| 5 | review | `plans/implementation/review/` |
+| 6 | done | `plans/implementation/done/` |
+| 7 | release | Bump version |
+| 8 | update | Update CTOC |
+| 9 | settings | Configuration |
+
+## Actions Per Stage
+
+| Action | Description |
+|--------|-------------|
+| create | Create new plan in current stage |
+| edit | Edit existing plan |
+| rename | Rename a plan |
+| delete | Delete a plan |
+| approve | Move to next stage |
+| move | Move to specific stage |
+| view | View plan contents |
+
+## Handling User Input
+
+- **Number (1-9)**: Browse that stage or execute command
+- **Action + target**: Execute action (e.g., "create user auth feature")
 - **Natural language**: Interpret and execute
