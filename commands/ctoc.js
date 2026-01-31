@@ -237,19 +237,25 @@ function main() {
       done: readPlans(plansDir, 'implementation', 'done')
     };
 
+    // Helper for status text
+    const status = (count, empty, active) => count > 0 ? active : empty;
+
     // Build rich status output
     let out = '';
     out += `CTOC v${VERSION}\n`;
     out += `${'─'.repeat(60)}\n\n`;
 
-    // Pipeline overview
-    out += `PIPELINE\n`;
-    out += `  Functional      ${counts.functional} drafts\n`;
-    out += `  Implementation  ${counts.implementation} drafts\n`;
-    out += `  Review          ${counts.review} pending\n`;
-    out += `  Todo            ${counts.todo} queued\n`;
-    out += `  In Progress     ${counts.inProgress} active\n`;
-    out += `  Done            ${counts.done || 0} completed\n\n`;
+    // Pipeline overview table
+    out += `┌────────────────┬────────┬─────────────────┐\n`;
+    out += `│ Stage          │ Count  │ Status          │\n`;
+    out += `├────────────────┼────────┼─────────────────┤\n`;
+    out += `│ Functional     │ ${String(counts.functional).padEnd(6)}│ ${status(counts.functional, 'No drafts', counts.functional + ' drafts').padEnd(16)}│\n`;
+    out += `│ Implementation │ ${String(counts.implementation).padEnd(6)}│ ${status(counts.implementation, 'No drafts', counts.implementation + ' drafts').padEnd(16)}│\n`;
+    out += `│ Review         │ ${String(counts.review).padEnd(6)}│ ${status(counts.review, 'Queue empty', counts.review + ' pending').padEnd(16)}│\n`;
+    out += `│ Todo           │ ${String(counts.todo).padEnd(6)}│ ${status(counts.todo, 'Queue empty', counts.todo + ' queued').padEnd(16)}│\n`;
+    out += `│ In Progress    │ ${String(counts.inProgress).padEnd(6)}│ ${status(counts.inProgress, 'None active', counts.inProgress + ' active').padEnd(16)}│\n`;
+    out += `│ Done           │ ${String(counts.done || 0).padEnd(6)}│ ${status(counts.done, 'None yet', (counts.done || 0) + ' completed').padEnd(16)}│\n`;
+    out += `└────────────────┴────────┴─────────────────┘\n\n`;
 
     // Agent status
     out += `AGENT\n`;
