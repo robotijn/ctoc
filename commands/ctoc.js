@@ -295,35 +295,46 @@ function main() {
       out += '\n';
     }
 
-    // Recommended actions based on state
+    // Numbered actions based on state
     out += `${'─'.repeat(60)}\n`;
-    out += `RECOMMENDED ACTIONS\n`;
+    out += `ACTIONS (type number or command)\n\n`;
 
+    let n = 1;
+    const actions = [];
+
+    // Dynamic actions based on state
     if (counts.functional === 0 && counts.implementation === 0 && counts.todo === 0) {
-      out += `  → "create functional plan" - start a new feature\n`;
+      actions.push({ cmd: 'create functional plan', desc: 'start a new feature' });
     }
     if (counts.functional > 0) {
-      out += `  → "show functional plans" - view drafts\n`;
-      out += `  → "approve functional plan [name]" - move to implementation\n`;
+      actions.push({ cmd: 'show functional', desc: `view ${counts.functional} drafts` });
     }
     if (counts.implementation > 0) {
-      out += `  → "show implementation plans" - view drafts\n`;
-      out += `  → "start implementation [name]" - begin work\n`;
-    }
-    if (counts.review > 0) {
-      out += `  → "show review queue" - see pending reviews\n`;
-      out += `  → "approve review [name]" - approve for implementation\n`;
+      actions.push({ cmd: 'show implementation', desc: `view ${counts.implementation} drafts` });
     }
     if (counts.todo > 0) {
-      out += `  → "show todo" - see queued work\n`;
-      out += `  → "start next" - begin next queued item\n`;
+      actions.push({ cmd: 'show todo', desc: `view ${counts.todo} queued` });
     }
-    if (agent.active) {
-      out += `  → "show progress" - see current implementation status\n`;
+    if (counts.inProgress > 0) {
+      actions.push({ cmd: 'show progress', desc: `view ${counts.inProgress} active` });
     }
-    out += `  → "release" - bump version (patch/minor/major)\n`;
-    out += `  → "update" - update CTOC to latest\n`;
-    out += `  → "settings" - view/change settings\n`;
+    if (counts.review > 0) {
+      actions.push({ cmd: 'show review', desc: `view ${counts.review} pending` });
+    }
+    if (counts.done > 0) {
+      actions.push({ cmd: 'show done', desc: `view ${counts.done} completed` });
+    }
+
+    // Always available
+    actions.push({ cmd: 'release', desc: 'bump version (patch/minor/major)' });
+    actions.push({ cmd: 'update', desc: 'update CTOC to latest' });
+    actions.push({ cmd: 'settings', desc: 'view/change settings' });
+
+    actions.forEach((a, i) => {
+      out += `  [${i + 1}] ${a.cmd.padEnd(24)} ${a.desc}\n`;
+    });
+
+    out += `\n  Type a number (1-${actions.length}) or describe what you want.\n`;
 
     console.log(out);
   }

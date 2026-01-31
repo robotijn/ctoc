@@ -32,4 +32,7 @@ This displays:
 | "update" | Update CTOC to latest version |
 | "settings" | Show/change CTOC settings |
 
-Execute the appropriate action based on user's natural language request.
+Execute the appropriate action based on user input:
+- **Number** (1, 2, 3...): Map to the action shown at that index
+- **Command**: Execute the named command directly
+- **Natural language**: Interpret and execute
