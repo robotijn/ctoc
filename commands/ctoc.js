@@ -287,8 +287,8 @@ function main() {
       out += `  [7] start            Execute next from todo\n`;
     }
     out += `  [8] release          Bump version\n`;
-    out += `  [9] update           Update CTOC\n`;
-    out += `  [0] back             Exit dashboard\n`;
+    out += `  [9] dashboard        Refresh view\n`;
+    out += `  [0] update           Update CTOC\n`;
 
     console.log(out);
   }
