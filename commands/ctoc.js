@@ -288,7 +288,7 @@ function main() {
     }
     out += `  [8] release          Bump version\n`;
     out += `  [9] dashboard        Refresh view\n`;
-    out += `  [0] update           Update CTOC\n`;
+    out += `  [0] update           Update CTOC system\n`;
 
     console.log(out);
   }
