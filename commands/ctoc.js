@@ -11,6 +11,7 @@ const { c, clear, line, renderTabs, renderTabIndicator, setupKeyboard, cleanup, 
 const { TABS, getTabNames, nextTab, prevTab } = require('../lib/tabs');
 const { NavStack } = require('../lib/state');
 const { startAutoSync, stopAutoSync } = require('../lib/sync');
+const { findProjectRoot } = require('../lib/project-root');
 
 // Read version from VERSION file
 const VERSION = fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim();
@@ -36,7 +37,7 @@ const tabModules = {
 
 // Application state
 const app = {
-  projectPath: process.cwd(),
+  projectPath: findProjectRoot(),
   width: process.stdout.columns || 80,
   tabIndex: 0,
   mode: 'list',

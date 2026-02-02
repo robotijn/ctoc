@@ -13,6 +13,7 @@ const { detectStack } = require('../lib/stack-detector');
 const { dashboard, writeToTerminal } = require('../lib/ui');
 const { CTOC_HOME } = require('../lib/crypto');
 const { getVersion, checkForUpdates } = require('../lib/version');
+const { findProjectRoot: findRoot } = require('../lib/project-root');
 
 /**
  * Get the plugin root directory (where .claude-plugin folder is)
@@ -30,19 +31,11 @@ function getPluginRoot() {
 }
 
 /**
- * Find project root by looking for .git or .claude directory
+ * Find project root by looking for .git, .ctoc, or plans directory
+ * Uses the shared utility from lib/project-root.js
  */
 function findProjectRoot(startDir) {
-  let dir = startDir;
-  for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, '.git')) || fs.existsSync(path.join(dir, '.claude'))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
+  return findRoot(startDir);
 }
 
 /**
