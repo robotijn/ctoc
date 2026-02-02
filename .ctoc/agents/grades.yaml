@@ -1,0 +1,191 @@
+# Agent Grades
+#
+# This file tracks the quality scores of all 66 agents after going through
+# the Agent-Critic 10-round improvement loop.
+#
+# Schema:
+#   agent-name:
+#     score: 0-10 (overall score)
+#     status: perfect|accepted_with_notes|needs_attention|bootstrap
+#     rounds: number of rounds completed
+#     lastUpdated: ISO timestamp
+#     history: array of round scores
+#
+# Scoring System:
+#   10    = PERFECT (extremely rare)
+#   9     = Excellent, only edge cases remain
+#   7-8   = Good quality, still has issues
+#   5-6   = Functional but weak, needs improvement
+#   3-4   = Major gaps, significant rework needed
+#   0-2   = Fundamentally broken, must rewrite
+#
+# Status Values:
+#   perfect           - Achieved score 10
+#   accepted_with_notes - Score >= 8, accepted with documented issues
+#   needs_attention   - Score < 8, requires further work
+#   bootstrap         - Initial version, not yet critiqued
+#   pending           - Queued for improvement loop
+#
+# Example:
+#   security-scanner:
+#     score: 9.2
+#     status: accepted_with_notes
+#     rounds: 7
+#     lastUpdated: "2025-02-02T12:00:00Z"
+#     history:
+#       - round: 1
+#         overall: 5.4
+#         issues: 12
+#       - round: 2
+#         overall: 6.8
+#         issues: 8
+#       - round: 7
+#         overall: 9.2
+#         issues: 1
+
+# Pipeline Agents (Phase 1)
+# These agents are created first and bootstrap themselves
+
+agent-critic:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+  notes: "Bootstrap required - must achieve score 10 before reviewing other agents"
+
+# Pipeline Infrastructure Agents (Phase 2)
+# Created after Agent-Critic is bootstrapped
+
+agent-writer:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+agent-tester:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+agent-qa:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+agent-publisher:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+# Core Agents (Phase 3)
+# First batch of agents to go through improvement loop
+
+code-reviewer:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+complexity-analyzer:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+code-smell-detector:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+duplicate-code-detector:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+security-scanner:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+secrets-detector:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+input-validation-checker:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+dependency-checker:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+unit-test-writer:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+cto-chief:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+# Planning Agents (Phase 4)
+
+product-owner:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+functional-reviewer:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+architect:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+impl-plan-reviewer:
+  score: 0
+  status: pending
+  rounds: 0
+  lastUpdated: "2025-02-02T00:00:00Z"
+  history: []
+
+# Remaining 56 agents (Phase 5) - will be populated as they are processed

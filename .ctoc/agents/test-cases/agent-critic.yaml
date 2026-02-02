@@ -1,0 +1,278 @@
+# Test Cases for Agent-Critic
+#
+# These test cases validate that Agent-Critic correctly scores
+# and critiques agent definitions.
+
+test_suite:
+  agent: "agent-critic"
+  version: 1
+  description: "Validation tests for the Agent-Critic scoring system"
+
+test_cases:
+  # Unit Tests - Individual Dimension Scoring
+
+  - name: "score_specificity_vague_instructions"
+    description: "Agent with vague instructions should score low on specificity"
+    category: "unit"
+    input:
+      target: |
+        # Test Agent
+        ## Detection Methods
+        Check for issues in the code.
+        Look for problems and report them.
+    expected:
+      scores:
+        specificity:
+          max: 4
+      issues:
+        - dimension: "specificity"
+          contains: "vague"
+
+  - name: "score_specificity_concrete_methods"
+    description: "Agent with concrete methods should score high on specificity"
+    category: "unit"
+    input:
+      target: |
+        # Test Agent
+        ## Detection Methods
+        ### SQL Injection
+        ```regex
+        /["']?\s*\+\s*[\w.]+\s*\+\s*["']?/
+        ```
+        Threshold: 0 matches allowed (any match is a finding)
+    expected:
+      scores:
+        specificity:
+          min: 7
+
+  - name: "score_completeness_missing_sections"
+    description: "Agent missing required sections should score low"
+    category: "unit"
+    input:
+      target: |
+        # Test Agent
+        ## Role
+        I check code.
+    expected:
+      scores:
+        completeness:
+          max: 5
+      issues:
+        - dimension: "completeness"
+          contains: "missing"
+
+  - name: "score_boundaries_no_antiscope"
+    description: "Agent without anti-scope should score low on boundaries"
+    category: "unit"
+    input:
+      target: |
+        # Test Agent
+        ## Role
+        I check everything.
+        ## Detection Methods
+        All the things.
+    expected:
+      scores:
+        boundaries:
+          max: 5
+      issues:
+        - dimension: "boundaries"
+          contains: "anti-scope"
+
+  - name: "score_boundaries_clear_antiscope"
+    description: "Agent with clear anti-scope should score well"
+    category: "unit"
+    input:
+      target: |
+        # Test Agent
+        ## Role
+        I check security issues.
+        ## Anti-Scope
+        - Performance: Deferred to performance-profiler
+        - Code style: Deferred to code-reviewer
+    expected:
+      scores:
+        boundaries:
+          min: 7
+
+  - name: "score_actionability_no_fixes"
+    description: "Agent without fix suggestions should score low"
+    category: "unit"
+    input:
+      target: |
+        # Test Agent
+        ## Detection Methods
+        Find SQL injection.
+        ## Output Format
+        Report the line number.
+    expected:
+      scores:
+        actionability:
+          max: 5
+      issues:
+        - dimension: "actionability"
+          contains: "fix"
+
+  - name: "score_integration_schema_mismatch"
+    description: "Agent with non-standard output should score low on integration"
+    category: "unit"
+    input:
+      target: |
+        # Test Agent
+        ## Output Format
+        Just print a message to stdout.
+    expected:
+      scores:
+        integration:
+          max: 4
+      issues:
+        - dimension: "integration"
+          contains: "schema"
+
+  # Integration Tests - Full Agent Critique
+
+  - name: "full_critique_poor_agent"
+    description: "Complete critique of a poorly defined agent"
+    category: "integration"
+    input:
+      target: |
+        # Bad Agent
+        ## Role
+        Check stuff.
+        ## Methods
+        Look at code.
+    expected:
+      scores:
+        overall:
+          max: 4
+      verdict: "REFINE"
+      issues:
+        min_count: 5
+
+  - name: "full_critique_good_agent"
+    description: "Complete critique of a well-defined agent"
+    category: "integration"
+    input:
+      target: |
+        # Security Scanner
+
+        ---
+        name: security-scanner
+        description: Detects security vulnerabilities in code
+        tools: Read, Grep
+        model: opus
+        ---
+
+        ## Role
+        Senior security engineer with 20+ years experience.
+        Specializes in OWASP Top 10 vulnerabilities.
+
+        ## Scope
+        - SQL Injection
+        - XSS
+        - Command Injection
+
+        ## Detection Methods
+        ### SQL Injection
+        ```regex
+        /["']?\s*\+\s*[\w.]+/
+        ```
+        Threshold: 0 matches
+
+        ## Anti-Scope
+        - Performance: Deferred to performance-profiler
+        - Code style: Deferred to code-reviewer
+
+        ## Output Format
+        ```yaml
+        findings:
+          - type: "sql_injection"
+            severity: "high"
+            location:
+              file: "path"
+              line: 42
+            confidence: "HIGH"
+        ```
+
+        ## Escalation
+        Escalate to CTO Chief for unknown patterns.
+    expected:
+      scores:
+        overall:
+          min: 6
+      verdict: "REFINE"
+
+  # Edge Cases
+
+  - name: "handle_empty_agent"
+    description: "Should handle empty input gracefully"
+    category: "edge_case"
+    input:
+      target: ""
+    expected:
+      scores:
+        overall: 0
+      verdict: "REFINE"
+      issues:
+        - dimension: "completeness"
+          severity: "high"
+
+  - name: "handle_malformed_yaml"
+    description: "Should handle malformed frontmatter"
+    category: "edge_case"
+    input:
+      target: |
+        # Agent
+        ---
+        name: [invalid yaml
+        ---
+    expected:
+      error: null
+      scores:
+        integration:
+          max: 3
+
+  - name: "self_critique"
+    description: "Agent-Critic should critique itself consistently"
+    category: "integration"
+    input:
+      target: "@self"
+      selfCritique: true
+    expected:
+      scores:
+        overall:
+          min: 7
+      issues:
+        max_count: 10
+
+  # Regression Tests
+
+  - name: "detect_overlap_with_other_agents"
+    description: "Should detect scope overlap with other agents"
+    category: "unit"
+    input:
+      target: |
+        # Duplicate Detector
+        ## Scope
+        - Duplicate code detection
+        - Code complexity analysis  # Overlaps with complexity-analyzer
+    expected:
+      issues:
+        - dimension: "boundaries"
+          contains: "overlap"
+
+  - name: "consistent_scoring"
+    description: "Same input should produce consistent scores"
+    category: "integration"
+    input:
+      target: |
+        # Test Agent
+        ## Role
+        Test role.
+        ## Methods
+        Test methods.
+      repeat: 3
+    expected:
+      scores:
+        variance:
+          max: 0.1
