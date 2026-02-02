@@ -202,15 +202,38 @@ CONDITIONAL:
   translation-checker    (IF: i18n changes)
 ```
 
-### Step 14: VERIFY - Spawn Test Runners
+### Step 14: VERIFY - Run Quality Gate (ALL CHECKS IN PARALLEL)
+
+**Use the quality-gate-runner agent** - it runs EVERYTHING in parallel:
 
 ```
-PARALLEL:
-  unit-test-runner       (REQUIRED - always spawn)
-  integration-test-runner (IF: integration tests exist)
-  e2e-test-runner        (IF: e2e tests exist)
-  smoke-test-runner      (REQUIRED - always spawn)
-  mutation-test-runner   (IF: critical code paths)
+SINGLE AGENT (runs all in parallel internally):
+  quality-gate-runner    (REQUIRED - THE definitive verify step)
+
+WHAT IT RUNS IN PARALLEL:
+  ├── Unit Tests         (pytest / jest / go test / cargo test)
+  ├── Integration Tests  (if exist)
+  ├── E2E Tests          (if exist)
+  ├── Linting            (ruff / eslint / golangci-lint / clippy)
+  ├── Type Checking      (mypy / tsc / go vet)
+  ├── Format Check       (ruff format / prettier / gofmt / cargo fmt)
+  ├── Security Audit     (pip-audit / npm audit / govulncheck / cargo audit)
+  └── Coverage Check     (threshold enforcement)
+
+PARALLEL EXECUTION SAVES ~75% TIME:
+  Sequential: ~180s
+  Parallel:   ~45s
+```
+
+**Alternative (if quality-gate-runner unavailable):**
+```
+PARALLEL (spawn all at once):
+  unit-test-runner       (REQUIRED)
+  integration-test-runner (IF: tests exist)
+  e2e-test-runner        (IF: tests exist)
+  smoke-test-runner      (REQUIRED)
+  type-checker           (REQUIRED)
+  security-scanner       (REQUIRED)
 ```
 
 ### Step 15: COMMIT - Final Verification
