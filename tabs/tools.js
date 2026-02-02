@@ -75,7 +75,15 @@ function renderUpdate(app) {
   output += `${c.bold}Tools › Update${c.reset}\n\n`;
 
   const current = getVersion();
-  output += `  Current version:  ${c.bold}${current}${c.reset}\n\n`;
+  output += `  Current version:  ${c.bold}${current}${c.reset}\n`;
+
+  if (app.latestVersion) {
+    output += `  Latest version:   ${c.bold}${app.latestVersion}${c.reset}\n`;
+    if (app.latestVersion !== current) {
+      output += `  ${c.yellow}Update available!${c.reset}\n`;
+    }
+  }
+  output += '\n';
 
   if (app.updateMessage) {
     output += `  ${app.updateMessage}\n\n`;

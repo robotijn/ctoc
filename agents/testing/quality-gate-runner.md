@@ -187,6 +187,224 @@ check:
 	@./scripts/quality-gate.sh
 ```
 
+## Phase 0: Detect CI Configuration & Extract Exact Commands
+
+**CRITICAL: Run tests EXACTLY as CI does. No shortcuts.**
+
+### CI Detection Priority
+
+```bash
+# Detect CI configuration in order of priority
+detect_ci_config() {
+  if [ -d ".github/workflows" ]; then
+    echo "github-actions"
+    CI_FILES=$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null)
+  elif [ -f ".gitlab-ci.yml" ]; then
+    echo "gitlab"
+    CI_FILES=".gitlab-ci.yml"
+  elif [ -f "azure-pipelines.yml" ]; then
+    echo "azure"
+    CI_FILES="azure-pipelines.yml"
+  elif [ -f ".circleci/config.yml" ]; then
+    echo "circleci"
+    CI_FILES=".circleci/config.yml"
+  elif [ -f "Jenkinsfile" ]; then
+    echo "jenkins"
+    CI_FILES="Jenkinsfile"
+  elif [ -f "bitbucket-pipelines.yml" ]; then
+    echo "bitbucket"
+    CI_FILES="bitbucket-pipelines.yml"
+  else
+    echo "none"
+    CI_FILES=""
+  fi
+}
+```
+
+### Extract Commands from CI Config
+
+Parse CI files to get EXACT test commands:
+
+```bash
+# Extract test/lint/typecheck commands from GitHub Actions
+extract_github_actions_commands() {
+  for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+    [ -f "$workflow" ] || continue
+
+    echo "=== Parsing $workflow ==="
+
+    # Extract run commands (simple grep, full parsing would use yq)
+    grep -E '^\s*-?\s*run:' "$workflow" | while read -r line; do
+      CMD=$(echo "$line" | sed 's/.*run:\s*//' | tr -d '"' | tr -d "'")
+
+      # Categorize command
+      case "$CMD" in
+        *test*|*jest*|*vitest*|*pytest*|*"go test"*)
+          echo "TEST: $CMD"
+          ;;
+        *lint*|*eslint*|*ruff*|*golangci*)
+          echo "LINT: $CMD"
+          ;;
+        *typecheck*|*tsc*|*mypy*|*"go vet"*)
+          echo "TYPES: $CMD"
+          ;;
+        *playwright*)
+          echo "E2E: $CMD"
+          ;;
+        *audit*|*snyk*|*trivy*)
+          echo "SECURITY: $CMD"
+          ;;
+      esac
+    done
+  done
+}
+```
+
+### Run Exact CI Commands Locally
+
+```bash
+#!/bin/bash
+# run-as-ci.sh - Run EXACTLY what CI runs
+
+set -e
+echo "🔍 Detecting CI configuration..."
+
+CI_TYPE=$(detect_ci_config)
+echo "CI Type: $CI_TYPE"
+
+if [ "$CI_TYPE" = "none" ]; then
+  echo "⚠️  No CI configuration found. Using default checks."
+  # Fall back to standard detection
+  exit 0
+fi
+
+echo ""
+echo "════════════════════════════════════════════════════════════"
+echo "  RUNNING TESTS EXACTLY AS CI DOES"
+echo "════════════════════════════════════════════════════════════"
+echo ""
+
+# Parse CI config and run commands
+case $CI_TYPE in
+  github-actions)
+    # For each workflow that has test jobs
+    for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+      [ -f "$workflow" ] || continue
+
+      # Skip non-test workflows
+      if ! grep -qE 'test|lint|check|verify' "$workflow"; then
+        continue
+      fi
+
+      echo "📋 Running commands from: $workflow"
+      echo ""
+
+      # Extract and run each command
+      # Using yq for proper YAML parsing (install: pip install yq)
+      if command -v yq &> /dev/null; then
+        yq -r '.jobs[].steps[].run // empty' "$workflow" | while read -r cmd; do
+          [ -z "$cmd" ] && continue
+
+          # Skip setup commands
+          case "$cmd" in
+            *checkout*|*setup-node*|*setup-python*|*"npm ci"*|*"npm install"*|*"pip install"*)
+              echo "⏭️  Skipping setup: ${cmd:0:50}..."
+              continue
+              ;;
+          esac
+
+          echo "▶️  Running: $cmd"
+          eval "$cmd" || {
+            echo "❌ FAILED: $cmd"
+            exit 1
+          }
+          echo "✅ Passed"
+          echo ""
+        done
+      else
+        # Fallback: simple grep parsing
+        grep -E '^\s*-?\s*run:' "$workflow" | sed 's/.*run:\s*//' | tr -d '"' | while read -r cmd; do
+          [ -z "$cmd" ] && continue
+
+          # Skip setup commands
+          case "$cmd" in
+            *checkout*|*setup-node*|*"npm ci"*|*"npm install"*)
+              continue
+              ;;
+          esac
+
+          echo "▶️  Running: $cmd"
+          eval "$cmd" || {
+            echo "❌ FAILED: $cmd"
+            exit 1
+          }
+          echo "✅ Passed"
+        done
+      fi
+    done
+    ;;
+
+  gitlab)
+    echo "📋 Running commands from: .gitlab-ci.yml"
+    # Similar parsing for GitLab CI
+    yq -r '.[] | .script[]? // empty' .gitlab-ci.yml | while read -r cmd; do
+      # ... same execution logic
+      echo "▶️  Running: $cmd"
+      eval "$cmd" || exit 1
+    done
+    ;;
+esac
+
+echo ""
+echo "════════════════════════════════════════════════════════════"
+echo "  ✅ ALL CI CHECKS PASSED LOCALLY"
+echo "════════════════════════════════════════════════════════════"
+```
+
+### Verification Check (Reviewer's Responsibility)
+
+The reviewer MUST verify that CI commands were run locally:
+
+```markdown
+## CI Parity Checklist
+
+Before approving any code for push:
+
+- [ ] CI configuration detected: {github-actions|gitlab|azure|none}
+- [ ] CI test commands extracted
+- [ ] ALL CI test commands run locally
+- [ ] ALL CI lint commands run locally
+- [ ] ALL CI type-check commands run locally
+- [ ] ALL CI security scans run locally
+- [ ] Results match expected CI behavior
+
+**If ANY CI command was NOT run locally:**
+1. ❌ BLOCK the push
+2. Run the missing commands
+3. Re-verify all pass
+4. Only then allow push
+```
+
+### Quick Command: Check CI Parity
+
+```bash
+# Add to package.json or Makefile
+{
+  "scripts": {
+    "ci-local": "./scripts/run-as-ci.sh",
+    "prepush": "npm run ci-local"
+  }
+}
+
+# Or Makefile
+ci-local:
+	@./scripts/run-as-ci.sh
+
+prepush: ci-local
+```
+
+---
+
 ## Phase 1: Detect Stack & Available Checks
 
 First, detect what's available in the project:

@@ -1,0 +1,92 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * Example E2E tests
+ * These tests verify critical user journeys
+ */
+
+test.describe('Homepage', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('should load successfully', async ({ page }) => {
+    // Wait for the page to be fully loaded
+    await expect(page).toHaveTitle(/.+/);
+  });
+
+  test('should have visible main content', async ({ page }) => {
+    // Adjust selector to match your application
+    const main = page.locator('main, [role="main"], #root, #app');
+    await expect(main.first()).toBeVisible();
+  });
+
+  test('should be accessible', async ({ page }) => {
+    // Basic accessibility check
+    const body = page.locator('body');
+    await expect(body).toBeVisible();
+
+    // Check for ARIA landmarks
+    const landmarks = page.locator(
+      '[role="banner"], [role="navigation"], [role="main"], header, nav, main'
+    );
+    const count = await landmarks.count();
+    expect(count).toBeGreaterThan(0);
+  });
+});
+
+test.describe('Navigation', () => {
+  test('should navigate between pages', async ({ page }) => {
+    await page.goto('/');
+
+    // Find navigation links
+    const navLinks = page.locator('nav a, header a');
+    const linkCount = await navLinks.count();
+
+    if (linkCount > 0) {
+      // Click the first navigation link
+      const firstLink = navLinks.first();
+      const href = await firstLink.getAttribute('href');
+
+      if (href && !href.startsWith('http') && href !== '/') {
+        await firstLink.click();
+        // Verify navigation occurred
+        await expect(page).not.toHaveURL('/');
+      }
+    }
+  });
+});
+
+test.describe('Performance', () => {
+  test('should load within performance budget', async ({ page }) => {
+    const startTime = Date.now();
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    const loadTime = Date.now() - startTime;
+
+    // Page should load within 5 seconds
+    expect(loadTime).toBeLessThan(5000);
+  });
+});
+
+test.describe('Responsive Design', () => {
+  test('should display correctly on mobile', async ({ page }) => {
+    // Set mobile viewport
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/');
+
+    // Check that content is still visible
+    const main = page.locator('main, [role="main"], #root, #app');
+    await expect(main.first()).toBeVisible();
+  });
+
+  test('should display correctly on tablet', async ({ page }) => {
+    // Set tablet viewport
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto('/');
+
+    // Check that content is still visible
+    const main = page.locator('main, [role="main"], #root, #app');
+    await expect(main.first()).toBeVisible();
+  });
+});

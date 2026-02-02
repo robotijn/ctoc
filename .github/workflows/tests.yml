@@ -1,0 +1,55 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Run tests
+        run: |
+          echo "Running all tests..."
+          FAILED=0
+          PASSED=0
+
+          for f in tests/*.test.js; do
+            echo "Testing: $(basename $f)"
+            if node --test --test-force-exit "$f" 2>&1; then
+              PASSED=$((PASSED + 1))
+            else
+              echo "::error::Test failed: $f"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+
+          echo ""
+          echo "================================"
+          echo "Results: $PASSED passed, $FAILED failed"
+          echo "================================"
+
+          if [ $FAILED -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Node.js version: ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY

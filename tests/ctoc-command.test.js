@@ -114,14 +114,14 @@ describe('CTOC Command - renderStatic()', () => {
     const { getPlanCounts } = require('../lib/state');
 
     // Create plans structure with some files
-    fs.mkdirSync(path.join(tempDir, 'plans', 'functional', 'draft'), { recursive: true });
-    fs.mkdirSync(path.join(tempDir, 'plans', 'implementation', 'draft'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'plans', 'functional'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'plans', 'implementation'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'plans', 'review'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'plans', 'todo'), { recursive: true });
 
-    // Add some plan files
-    fs.writeFileSync(path.join(tempDir, 'plans', 'functional', 'draft', 'plan1.md'), '# Plan 1');
-    fs.writeFileSync(path.join(tempDir, 'plans', 'functional', 'draft', 'plan2.md'), '# Plan 2');
+    // Add some plan files (directly in folder, not subdirectories)
+    fs.writeFileSync(path.join(tempDir, 'plans', 'functional', 'plan1.md'), '# Plan 1');
+    fs.writeFileSync(path.join(tempDir, 'plans', 'functional', 'plan2.md'), '# Plan 2');
     fs.writeFileSync(path.join(tempDir, 'plans', 'todo', 'plan3.md'), '# Plan 3');
 
     const counts = getPlanCounts(tempDir);
