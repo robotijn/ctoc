@@ -1,0 +1,253 @@
+# CTOC Pre-commit Configuration for Python Projects (v10 RED/BLUE hardened)
+# Install: pip install pre-commit && pre-commit install
+#
+# RED/BLUE TEAM HARDENING NOTES:
+# - R1: Pinned versions for reproducibility
+# - R2: Security scanning with bandit + safety
+# - R3: Type checking with mypy
+# - R4: Import sorting to prevent merge conflicts
+# - R5: Secrets detection as first check
+# - B1: Ruff for fast linting (10-100x faster than pylint)
+# - B2: Black for consistent formatting
+# - B3: Parallel execution where safe
+# - B4: Comprehensive but fast checks
+# - B5: Auto-fix where safe
+
+# Pre-commit framework version
+minimum_pre_commit_version: "3.0.0"
+
+# Fail fast on first error (set to true for stricter enforcement)
+fail_fast: false
+
+# Default Python version
+default_language_version:
+  python: python3.11
+
+default_stages: [commit]
+
+repos:
+  # ==============================================================================
+  # SECRETS DETECTION (First! Block secrets before anything else)
+  # ==============================================================================
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+        name: Detect secrets with gitleaks
+        stages: [commit, push]
+
+  # ==============================================================================
+  # BASIC HYGIENE
+  # ==============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File hygiene
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: [--fix=lf]
+
+      # Python-specific
+      - id: check-ast
+        name: Check Python AST validity
+
+      - id: debug-statements
+        name: Check for debug statements (pdb, breakpoint)
+
+      - id: check-docstring-first
+        name: Check docstring is first
+
+      - id: name-tests-test
+        name: Ensure test files are named correctly
+        args: [--pytest-test-first]
+
+      # Config file validation
+      - id: check-json
+        name: Validate JSON files
+
+      - id: check-yaml
+        name: Validate YAML files
+
+      - id: check-toml
+        name: Validate TOML files
+
+      # Git hygiene
+      - id: check-merge-conflict
+        name: Check for merge conflict markers
+
+      - id: check-added-large-files
+        name: Block large files (>5MB)
+        args: [--maxkb=5120]
+
+      - id: no-commit-to-branch
+        name: Prevent commits to main/master
+        args: [--branch, main, --branch, master]
+
+      # Security
+      - id: detect-private-key
+        name: Detect private keys
+
+      - id: detect-aws-credentials
+        name: Detect AWS credentials
+
+  # ==============================================================================
+  # PYTHON LINTING & FORMATTING (Ruff - Fast!)
+  # ==============================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      # Linting (replaces flake8, isort, pylint for most cases)
+      - id: ruff
+        name: Ruff linter
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+
+      # Formatting (replaces black)
+      - id: ruff-format
+        name: Ruff formatter
+        types_or: [python, pyi]
+
+  # ==============================================================================
+  # TYPE CHECKING
+  # ==============================================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Mypy type checking
+        # Run on all Python files, not just staged (for accuracy)
+        pass_filenames: false
+        args: [--config-file=pyproject.toml]
+        additional_dependencies:
+          - types-requests
+          - types-PyYAML
+          - types-toml
+        # Skip if no mypy config exists
+        files: ^(src|tests)/.*\.py$
+
+  # ==============================================================================
+  # SECURITY SCANNING
+  # ==============================================================================
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.7
+    hooks:
+      - id: bandit
+        name: Bandit security scan
+        args: [-c, pyproject.toml, -r]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: ^tests/
+
+  # Safety check for dependencies (on push only, slow)
+  - repo: local
+    hooks:
+      - id: safety
+        name: Safety dependency check
+        entry: safety check
+        language: system
+        pass_filenames: false
+        stages: [push]
+        files: ^(requirements.*\.txt|poetry\.lock|Pipfile\.lock|pyproject\.toml)$
+
+  # ==============================================================================
+  # DOCUMENTATION
+  # ==============================================================================
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        name: Check docstring style
+        args: [--convention=google]
+        exclude: ^(tests/|docs/)
+
+  # ==============================================================================
+  # COMMIT MESSAGE
+  # ==============================================================================
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        name: Validate commit message (conventional)
+        stages: [commit-msg]
+
+  # ==============================================================================
+  # OPTIONAL: ADDITIONAL CHECKS
+  # ==============================================================================
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        name: Lint Markdown files
+        args: [--fix]
+        types: [markdown]
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: Lint shell scripts
+        types: [shell]
+
+  # YAML linting (stricter than check-yaml)
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        name: Lint YAML files
+        args: [-d, relaxed]
+
+# ==============================================================================
+# Ruff Configuration (add to pyproject.toml)
+# ==============================================================================
+# [tool.ruff]
+# target-version = "py311"
+# line-length = 88
+# select = [
+#     "E",      # pycodestyle errors
+#     "W",      # pycodestyle warnings
+#     "F",      # Pyflakes
+#     "I",      # isort
+#     "B",      # flake8-bugbear
+#     "C4",     # flake8-comprehensions
+#     "UP",     # pyupgrade
+#     "ARG",    # flake8-unused-arguments
+#     "SIM",    # flake8-simplify
+#     "S",      # flake8-bandit
+#     "RUF",    # Ruff-specific
+# ]
+# ignore = [
+#     "S101",   # Use of assert (OK in tests)
+# ]
+#
+# [tool.ruff.per-file-ignores]
+# "tests/**" = ["S101", "ARG"]
+#
+# [tool.mypy]
+# python_version = "3.11"
+# strict = true
+# warn_return_any = true
+# warn_unused_configs = true
+#
+# [tool.bandit]
+# skips = ["B101"]  # assert_used
+# exclude_dirs = ["tests"]
+
+# ==============================================================================
+# CI/CD Integration
+# ==============================================================================
+ci:
+  autofix_commit_msg: "style: auto-fix from pre-commit hooks"
+  autofix_prs: true
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autoupdate_schedule: weekly
+  skip: [safety, mypy]  # Skip slow hooks in CI autofix
+  submodules: false

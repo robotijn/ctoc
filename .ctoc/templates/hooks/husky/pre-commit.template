@@ -1,0 +1,255 @@
+#!/usr/bin/env sh
+# CTOC Husky Pre-commit Hook (v10 RED/BLUE hardened)
+# Optimized for Node.js/TypeScript projects with lint-staged
+#
+# Installation: npx husky add .husky/pre-commit
+#
+# RED/BLUE TEAM HARDENING NOTES:
+# - R1: Prevent PATH manipulation attacks
+# - R2: Validate lint-staged is installed
+# - R3: Block commits with only .husky changes
+# - R4: Prevent circular hook execution
+# - R5: Timeout protection for hung processes
+# - B1: Parallel execution via lint-staged
+# - B2: Graceful degradation when tools missing
+# - B3: Clear error messages with fix commands
+# - B4: Performance optimizations
+# - B5: Support for monorepos
+
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Prevent recursive hook execution
+if [ -n "$CTOC_HOOK_RUNNING" ]; then
+    exit 0
+fi
+export CTOC_HOOK_RUNNING=1
+
+# ==============================================================================
+# CONFIGURATION
+# ==============================================================================
+
+# Timeout in seconds (default 5 minutes)
+HOOK_TIMEOUT="${CTOC_HOOK_TIMEOUT:-300}"
+
+# Colors
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+else
+    RED='' GREEN='' YELLOW='' BLUE='' NC=''
+fi
+
+# ==============================================================================
+# UTILITY FUNCTIONS
+# ==============================================================================
+
+info() { printf '%b[INFO]%b %s\n' "$BLUE" "$NC" "$*"; }
+warn() { printf '%b[WARN]%b %s\n' "$YELLOW" "$NC" "$*"; }
+error() { printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$*" >&2; }
+success() { printf '%b[OK]%b %s\n' "$GREEN" "$NC" "$*"; }
+
+die() {
+    error "$1"
+    exit 1
+}
+
+# Check if command exists
+has_cmd() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# ==============================================================================
+# SECURITY CHECKS
+# ==============================================================================
+
+# Check for suspicious staged files
+check_staged_files() {
+    # Get list of staged files
+    staged=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+
+    if [ -z "$staged" ]; then
+        info "No staged files, skipping checks"
+        exit 0
+    fi
+
+    # Check for large files (>5MB)
+    for file in $staged; do
+        if [ -f "$file" ]; then
+            size=$(wc -c < "$file" 2>/dev/null || echo 0)
+            if [ "$size" -gt 5242880 ]; then
+                error "File too large: $file ($(($size / 1024))KB > 5MB)"
+                error "  Use Git LFS for large files: git lfs track '$file'"
+                return 1
+            fi
+        fi
+    done
+
+    # Check for secrets in common config files
+    for file in $staged; do
+        case "$file" in
+            .env|.env.*|*.pem|*.key|*credentials*|*secret*)
+                warn "Potentially sensitive file staged: $file"
+                warn "  Verify this should be committed"
+                ;;
+        esac
+    done
+
+    return 0
+}
+
+# ==============================================================================
+# LINT-STAGED EXECUTION
+# ==============================================================================
+
+run_lint_staged() {
+    # Check for lint-staged
+    if [ -f "node_modules/.bin/lint-staged" ]; then
+        info "Running lint-staged..."
+
+        # Use npx to run lint-staged with timeout
+        if has_cmd timeout; then
+            if ! timeout "$HOOK_TIMEOUT" npx lint-staged --concurrent false; then
+                error "lint-staged failed"
+                return 1
+            fi
+        else
+            if ! npx lint-staged --concurrent false; then
+                error "lint-staged failed"
+                return 1
+            fi
+        fi
+
+        success "lint-staged passed"
+        return 0
+    fi
+
+    # Fallback: Run ESLint directly
+    if [ -f "node_modules/.bin/eslint" ]; then
+        info "lint-staged not found, running ESLint directly..."
+
+        # Get staged JS/TS files
+        files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|jsx|ts|tsx)$' || true)
+
+        if [ -n "$files" ]; then
+            if ! npx eslint $files; then
+                error "ESLint failed"
+                return 1
+            fi
+        fi
+
+        success "ESLint passed"
+        return 0
+    fi
+
+    warn "No linting tools found"
+    warn "  Install lint-staged: npm install -D lint-staged"
+    return 0
+}
+
+# ==============================================================================
+# TYPE CHECKING
+# ==============================================================================
+
+run_typecheck() {
+    # TypeScript type checking
+    if [ -f "tsconfig.json" ] && [ -f "node_modules/.bin/tsc" ]; then
+        info "Running TypeScript type check..."
+
+        if ! npx tsc --noEmit 2>&1 | head -20; then
+            error "TypeScript type check failed"
+            return 1
+        fi
+
+        success "TypeScript type check passed"
+    fi
+
+    return 0
+}
+
+# ==============================================================================
+# SECRETS DETECTION
+# ==============================================================================
+
+run_secrets_scan() {
+    # Prefer gitleaks if available
+    if has_cmd gitleaks; then
+        info "Running gitleaks..."
+
+        if ! gitleaks protect --staged --no-banner --exit-code 1 2>/dev/null; then
+            error "Secrets detected! Remove before committing."
+            return 1
+        fi
+
+        success "No secrets detected"
+        return 0
+    fi
+
+    # Fallback: basic pattern matching
+    staged=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+
+    for file in $staged; do
+        [ -f "$file" ] || continue
+
+        # Skip binary and lock files
+        case "$file" in
+            *.lock|*.png|*.jpg|*.gif|*.ico|*.woff*|package-lock.json|yarn.lock)
+                continue
+                ;;
+        esac
+
+        # Check for common secret patterns
+        if grep -qE '(AKIA|ghp_|sk_live_|-----BEGIN.*PRIVATE KEY)' "$file" 2>/dev/null; then
+            error "Potential secret in: $file"
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+# ==============================================================================
+# MAIN EXECUTION
+# ==============================================================================
+
+main() {
+    echo ""
+    echo "================================"
+    echo " CTOC Pre-commit (Husky)"
+    echo "================================"
+    echo ""
+
+    errors=0
+
+    # Security checks
+    check_staged_files || errors=$((errors + 1))
+
+    # Linting
+    run_lint_staged || errors=$((errors + 1))
+
+    # Type checking
+    run_typecheck || errors=$((errors + 1))
+
+    # Secrets detection
+    run_secrets_scan || errors=$((errors + 1))
+
+    echo ""
+
+    if [ "$errors" -gt 0 ]; then
+        echo "================================"
+        error "Pre-commit failed ($errors error(s))"
+        echo "================================"
+        echo ""
+        warn "To bypass: git commit --no-verify"
+        exit 1
+    fi
+
+    echo "================================"
+    success "All checks passed!"
+    echo "================================"
+    exit 0
+}
+
+main

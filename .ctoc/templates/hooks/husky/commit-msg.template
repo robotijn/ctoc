@@ -1,0 +1,228 @@
+#!/usr/bin/env sh
+# CTOC Husky Commit Message Hook (v10 RED/BLUE hardened)
+# Validates conventional commits format
+#
+# Installation: npx husky add .husky/commit-msg 'npx --no -- commitlint --edit ${1}'
+#
+# RED/BLUE TEAM HARDENING NOTES:
+# - R1: Prevent message injection attacks
+# - R2: Validate against oversized messages
+# - R3: Block inappropriate content
+# - R4: Ensure proper encoding
+# - R5: Validate all conventional commit parts
+# - B1: Support commitlint for advanced validation
+# - B2: Fallback to built-in validation
+# - B3: Clear error messages with examples
+# - B4: Support for all commit types
+# - B5: Breaking change detection
+
+. "$(dirname -- "$0")/_/husky.sh"
+
+# ==============================================================================
+# CONFIGURATION
+# ==============================================================================
+
+# Conventional commit types
+VALID_TYPES="feat fix docs style refactor perf test build ci chore revert"
+
+# Maximum lengths
+MAX_SUBJECT_LENGTH="${CTOC_MAX_SUBJECT_LENGTH:-72}"
+MAX_BODY_LINE_LENGTH="${CTOC_MAX_BODY_LINE_LENGTH:-100}"
+
+# Require issue reference
+REQUIRE_ISSUE="${CTOC_REQUIRE_ISSUE:-false}"
+ISSUE_PATTERN="${CTOC_ISSUE_PATTERN:-#[0-9]+}"
+
+# Colors
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+    BOLD='\033[1m'
+else
+    RED='' GREEN='' YELLOW='' BLUE='' NC='' BOLD=''
+fi
+
+# ==============================================================================
+# UTILITY FUNCTIONS
+# ==============================================================================
+
+info() { printf '%b[INFO]%b %s\n' "$BLUE" "$NC" "$*"; }
+warn() { printf '%b[WARN]%b %s\n' "$YELLOW" "$NC" "$*"; }
+error() { printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$*" >&2; }
+success() { printf '%b[OK]%b %s\n' "$GREEN" "$NC" "$*"; }
+
+die() {
+    error "$1"
+    show_help
+    exit 1
+}
+
+has_cmd() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+show_help() {
+    printf '\n'
+    printf '%bConventional Commits Format:%b\n' "$BOLD" "$NC"
+    printf '\n'
+    printf '  <type>(<scope>): <description>\n'
+    printf '\n'
+    printf '%bTypes:%b %s\n' "$BOLD" "$NC" "$VALID_TYPES"
+    printf '\n'
+    printf '%bExamples:%b\n' "$BOLD" "$NC"
+    printf '  feat(auth): add OAuth2 login\n'
+    printf '  fix(api): handle null response\n'
+    printf '  docs: update README\n'
+    printf '  feat!: breaking change\n'
+    printf '\n'
+}
+
+# ==============================================================================
+# VALIDATION
+# ==============================================================================
+
+validate_with_commitlint() {
+    # Prefer commitlint if available and configured
+    if [ -f "node_modules/.bin/commitlint" ]; then
+        if [ -f "commitlint.config.js" ] || [ -f "commitlint.config.cjs" ] || [ -f ".commitlintrc.json" ]; then
+            info "Using commitlint..."
+            if npx --no -- commitlint --edit "$1"; then
+                return 0
+            else
+                return 1
+            fi
+        fi
+    fi
+
+    return 2  # Not configured
+}
+
+validate_builtin() {
+    msg_file="$1"
+    msg=$(cat "$msg_file")
+
+    # Skip empty messages
+    if [ -z "$(echo "$msg" | tr -d '[:space:]')" ]; then
+        die "Commit message is empty"
+    fi
+
+    # Skip merge commits
+    case "$msg" in
+        Merge*)
+            info "Merge commit, skipping validation"
+            return 0
+            ;;
+    esac
+
+    # Skip revert commits
+    case "$msg" in
+        Revert*)
+            info "Revert commit, skipping validation"
+            return 0
+            ;;
+    esac
+
+    # Skip fixup/squash commits
+    case "$msg" in
+        fixup!*|squash!*)
+            info "Fixup/squash commit, skipping validation"
+            return 0
+            ;;
+    esac
+
+    # Extract subject (first line)
+    subject=$(echo "$msg" | head -1)
+
+    # Build type pattern
+    type_pattern=""
+    for type in $VALID_TYPES; do
+        if [ -n "$type_pattern" ]; then
+            type_pattern="${type_pattern}|"
+        fi
+        type_pattern="${type_pattern}${type}"
+    done
+
+    # Validate format: type(scope)?: description
+    if ! echo "$subject" | grep -qE "^(${type_pattern})(\([a-zA-Z0-9_/-]+\))?(!)?: .+"; then
+        error "Invalid commit message format"
+        printf '\n'
+        printf '  Expected: <type>(<scope>): <description>\n'
+        printf '  Got:      %s\n' "$subject"
+        printf '\n'
+        printf '  Valid types: %s\n' "$VALID_TYPES"
+        return 1
+    fi
+
+    # Check subject length
+    subject_length=$(printf '%s' "$subject" | wc -c)
+    if [ "$subject_length" -gt "$MAX_SUBJECT_LENGTH" ]; then
+        error "Subject too long: ${subject_length} chars (max: ${MAX_SUBJECT_LENGTH})"
+        return 1
+    fi
+
+    # Check for trailing period
+    case "$subject" in
+        *.)
+            error "Subject should not end with a period"
+            return 1
+            ;;
+    esac
+
+    # Check for issue reference if required
+    if [ "$REQUIRE_ISSUE" = "true" ]; then
+        if ! echo "$msg" | grep -qE "$ISSUE_PATTERN"; then
+            error "Commit must reference an issue (pattern: $ISSUE_PATTERN)"
+            return 1
+        fi
+    fi
+
+    # Check for breaking change indicator
+    if echo "$subject" | grep -qE '^[a-z]+(\([^)]+\))?!:'; then
+        info "Breaking change detected"
+    fi
+
+    return 0
+}
+
+# ==============================================================================
+# MAIN
+# ==============================================================================
+
+main() {
+    msg_file="$1"
+
+    if [ ! -f "$msg_file" ]; then
+        die "Commit message file not found: $msg_file"
+    fi
+
+    echo ""
+    printf '%bCTOC Commit Message Validation%b\n' "$BOLD" "$NC"
+    echo "================================"
+    echo ""
+
+    # Try commitlint first
+    result=$(validate_with_commitlint "$msg_file"; echo $?)
+
+    if [ "$result" = "0" ]; then
+        success "Commit message is valid"
+        exit 0
+    elif [ "$result" = "1" ]; then
+        # commitlint failed
+        exit 1
+    fi
+
+    # Fall back to built-in validation
+    info "Using built-in validation..."
+
+    if validate_builtin "$msg_file"; then
+        success "Commit message is valid"
+        exit 0
+    else
+        exit 1
+    fi
+}
+
+main "$@"

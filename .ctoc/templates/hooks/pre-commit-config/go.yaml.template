@@ -1,0 +1,271 @@
+# CTOC Pre-commit Configuration for Go Projects (v10 RED/BLUE hardened)
+# Install: pip install pre-commit && pre-commit install
+#
+# RED/BLUE TEAM HARDENING NOTES:
+# - R1: Pinned versions for reproducibility
+# - R2: Security scanning with gosec
+# - R3: Vulnerability scanning with govulncheck
+# - R4: Race condition detection
+# - R5: Secrets detection as first check
+# - B1: golangci-lint for comprehensive linting
+# - B2: gofmt/goimports for formatting
+# - B3: go vet for static analysis
+# - B4: Parallel execution where safe
+# - B5: Fast feedback loop
+
+# Pre-commit framework version
+minimum_pre_commit_version: "3.0.0"
+
+# Fail fast on first error
+fail_fast: false
+
+default_stages: [commit]
+
+repos:
+  # ==============================================================================
+  # SECRETS DETECTION (First! Block secrets before anything else)
+  # ==============================================================================
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+        name: Detect secrets with gitleaks
+        stages: [commit, push]
+
+  # ==============================================================================
+  # BASIC HYGIENE
+  # ==============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File hygiene
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: [--fix=lf]
+
+      # Config file validation
+      - id: check-json
+        name: Validate JSON files
+
+      - id: check-yaml
+        name: Validate YAML files
+
+      - id: check-toml
+        name: Validate TOML files
+
+      # Git hygiene
+      - id: check-merge-conflict
+        name: Check for merge conflict markers
+
+      - id: check-added-large-files
+        name: Block large files (>5MB)
+        args: [--maxkb=5120]
+
+      - id: no-commit-to-branch
+        name: Prevent commits to main/master
+        args: [--branch, main, --branch, master]
+
+      # Security
+      - id: detect-private-key
+        name: Detect private keys
+
+      - id: detect-aws-credentials
+        name: Detect AWS credentials
+
+  # ==============================================================================
+  # GO FORMATTING
+  # ==============================================================================
+  - repo: local
+    hooks:
+      # gofmt - standard Go formatting
+      - id: gofmt
+        name: Go format (gofmt)
+        entry: gofmt -w -s
+        language: system
+        types: [go]
+        pass_filenames: true
+
+      # goimports - format + organize imports
+      - id: goimports
+        name: Go imports (goimports)
+        entry: goimports -w -local github.com/yourorg
+        language: system
+        types: [go]
+        pass_filenames: true
+
+  # ==============================================================================
+  # GO LINTING
+  # ==============================================================================
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.55.2
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint
+        args: [--fix]
+        types: [go]
+
+  # ==============================================================================
+  # GO BUILD & VET
+  # ==============================================================================
+  - repo: local
+    hooks:
+      # go vet - static analysis
+      - id: go-vet
+        name: Go vet
+        entry: go vet ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      # go build - compilation check
+      - id: go-build
+        name: Go build check
+        entry: go build ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      # go mod tidy - clean up dependencies
+      - id: go-mod-tidy
+        name: Go mod tidy
+        entry: go mod tidy
+        language: system
+        files: go\.(mod|sum)$
+        pass_filenames: false
+
+  # ==============================================================================
+  # GO TESTING (on push only)
+  # ==============================================================================
+  - repo: local
+    hooks:
+      # go test - run tests
+      - id: go-test
+        name: Go test
+        entry: go test -race -short ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+        stages: [push]
+
+  # ==============================================================================
+  # SECURITY SCANNING
+  # ==============================================================================
+  - repo: https://github.com/securego/gosec
+    rev: v2.18.2
+    hooks:
+      - id: gosec
+        name: Gosec security scanner
+        args: [-exclude-dir=vendor, -exclude-dir=testdata, ./...]
+        types: [go]
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      # govulncheck - vulnerability scanning (on push only)
+      - id: govulncheck
+        name: Go vulnerability check
+        entry: govulncheck ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+        stages: [push]
+
+  # ==============================================================================
+  # COMMIT MESSAGE
+  # ==============================================================================
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.10.0
+    hooks:
+      - id: commitlint
+        name: Validate commit message
+        stages: [commit-msg]
+        additional_dependencies: ["@commitlint/config-conventional"]
+
+  # ==============================================================================
+  # OPTIONAL: ADDITIONAL CHECKS
+  # ==============================================================================
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        name: Lint Markdown files
+        args: [--fix]
+        types: [markdown]
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: Lint shell scripts
+        types: [shell]
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        name: Lint YAML files
+        args: [-d, relaxed]
+
+# ==============================================================================
+# golangci-lint Configuration (.golangci.yml)
+# ==============================================================================
+# run:
+#   timeout: 5m
+#   skip-dirs:
+#     - vendor
+#     - testdata
+#
+# linters:
+#   enable:
+#     - errcheck       # Check for unchecked errors
+#     - gosimple       # Simplify code
+#     - govet          # Go vet
+#     - ineffassign    # Detect ineffectual assignments
+#     - staticcheck    # Static analysis
+#     - typecheck      # Type checking
+#     - unused         # Unused code
+#     - gofmt          # Format check
+#     - goimports      # Import organization
+#     - gosec          # Security
+#     - misspell       # Spelling
+#     - unconvert      # Unnecessary conversions
+#     - unparam        # Unused parameters
+#     - nakedret       # Naked returns
+#     - prealloc       # Preallocate slices
+#     - bodyclose      # HTTP body close
+#     - noctx          # Context in HTTP
+#     - exportloopref  # Loop variable capture
+#
+# linters-settings:
+#   errcheck:
+#     check-type-assertions: true
+#     check-blank: true
+#
+#   govet:
+#     check-shadowing: true
+#
+#   gosec:
+#     excludes:
+#       - G104  # Unhandled errors (covered by errcheck)
+
+# ==============================================================================
+# CI/CD Integration
+# ==============================================================================
+ci:
+  autofix_commit_msg: "style: auto-fix from pre-commit hooks"
+  autofix_prs: true
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autoupdate_schedule: weekly
+  skip: [go-test, govulncheck]  # Skip slow hooks in CI autofix
+  submodules: false

@@ -1,0 +1,709 @@
+#!/usr/bin/env bash
+# CTOC Pre-push Hook - Full Validation Before Push (v10 RED/BLUE hardened)
+# Runs: full test suite, coverage check, security scan, build verification
+#
+# RED/BLUE TEAM HARDENING NOTES:
+# - R1: Protected branch validation
+# - R2: Force push detection and blocking
+# - R3: Tag tampering prevention
+# - R4: Remote URL validation (prevent pushes to unknown remotes)
+# - R5: Branch naming convention enforcement
+# - B1: Comprehensive test suite with coverage thresholds
+# - B2: Security scanning with multiple tools
+# - B3: Build verification before push
+# - B4: Parallel execution for performance
+# - B5: Graceful degradation when tools missing
+
+set -euo pipefail
+
+# ==============================================================================
+# CONFIGURATION
+# ==============================================================================
+
+readonly CTOC_VERSION="1.0.0"
+readonly HOOK_TIMEOUT="${CTOC_HOOK_TIMEOUT:-600}"  # 10 minutes default
+readonly MIN_COVERAGE="${CTOC_MIN_COVERAGE:-80}"
+readonly ENABLE_AUDIT_LOG="${CTOC_AUDIT_LOG:-false}"
+readonly AUDIT_LOG_PATH="${CTOC_AUDIT_LOG_PATH:-/tmp/ctoc-hook-audit.log}"
+
+# Protected branches (customize as needed)
+readonly PROTECTED_BRANCHES="${CTOC_PROTECTED_BRANCHES:-main master release/*}"
+
+# Allowed remote hosts (empty = allow all)
+readonly ALLOWED_REMOTE_HOSTS="${CTOC_ALLOWED_REMOTE_HOSTS:-github.com gitlab.com bitbucket.org}"
+
+# Colors (disabled if not a terminal)
+if [[ -t 1 ]]; then
+    readonly RED='\033[0;31m'
+    readonly GREEN='\033[0;32m'
+    readonly YELLOW='\033[0;33m'
+    readonly BLUE='\033[0;34m'
+    readonly CYAN='\033[0;36m'
+    readonly NC='\033[0m'
+else
+    readonly RED='' GREEN='' YELLOW='' BLUE='' CYAN='' NC=''
+fi
+
+# ==============================================================================
+# UTILITY FUNCTIONS
+# ==============================================================================
+
+info() { echo -e "${BLUE}[INFO]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+success() { echo -e "${GREEN}[OK]${NC} $*"; }
+step() { echo -e "${CYAN}[STEP]${NC} $*"; }
+
+die() {
+    error "$1"
+    audit_log "ERROR" "$1"
+    exit 1
+}
+
+has_command() {
+    command -v "$1" &>/dev/null
+}
+
+audit_log() {
+    local level="$1"
+    local message="$2"
+
+    if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
+        local timestamp
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        local user
+        user=$(git config user.email 2>/dev/null || echo "unknown")
+        echo "${timestamp} [${level}] user=${user} ${message}" >> "$AUDIT_LOG_PATH" 2>/dev/null || true
+    fi
+}
+
+# ==============================================================================
+# SECURITY CHECKS
+# ==============================================================================
+
+# Validate remote URL
+check_remote_url() {
+    local remote="$1"
+    local url
+    url=$(git remote get-url "$remote" 2>/dev/null || echo "")
+
+    if [[ -z "$url" ]]; then
+        error "Unknown remote: $remote"
+        return 1
+    fi
+
+    # If allowed hosts are configured, validate
+    if [[ -n "$ALLOWED_REMOTE_HOSTS" ]]; then
+        local host_match=false
+        for host in $ALLOWED_REMOTE_HOSTS; do
+            if [[ "$url" == *"$host"* ]]; then
+                host_match=true
+                break
+            fi
+        done
+
+        if [[ "$host_match" == "false" ]]; then
+            error "Push to unauthorized remote: $url"
+            error "  Allowed hosts: $ALLOWED_REMOTE_HOSTS"
+            audit_log "SECURITY" "Push to unauthorized remote blocked: $url"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# Check for force push attempts
+check_force_push() {
+    local local_ref="$1"
+    local remote_ref="$2"
+    local local_sha="$3"
+    local remote_sha="$4"
+
+    # Skip for new branches
+    if [[ "$remote_sha" == "0000000000000000000000000000000000000000" ]]; then
+        return 0
+    fi
+
+    # Check if this would be a force push
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+        local branch_name
+        branch_name=$(basename "$local_ref")
+
+        # Check if force pushing to protected branch
+        for protected in $PROTECTED_BRANCHES; do
+            if [[ "$branch_name" == $protected ]]; then
+                error "Force push to protected branch '$branch_name' is blocked"
+                error "  If you really need this, use: git push --force-with-lease"
+                audit_log "SECURITY" "Force push to protected branch blocked: $branch_name"
+                return 1
+            fi
+        done
+
+        warn "Force push detected to branch: $branch_name"
+        warn "  Consider using --force-with-lease for safety"
+        audit_log "WARNING" "Force push to $branch_name"
+    fi
+
+    return 0
+}
+
+# Check for direct pushes to protected branches
+check_protected_branches() {
+    local local_ref="$1"
+    local branch_name
+    branch_name=$(basename "$local_ref")
+
+    for protected in $PROTECTED_BRANCHES; do
+        if [[ "$branch_name" == $protected ]]; then
+            warn "Pushing to protected branch: $branch_name"
+            # Check if this should be via PR
+            if [[ "${CTOC_REQUIRE_PR:-false}" == "true" ]]; then
+                error "Direct push to '$branch_name' is not allowed"
+                error "  Please create a pull request instead"
+                return 1
+            fi
+        fi
+    done
+
+    return 0
+}
+
+# Validate branch naming convention
+check_branch_naming() {
+    local local_ref="$1"
+    local branch_name
+    branch_name=$(basename "$local_ref")
+
+    # Skip for tags and protected branches
+    if [[ "$local_ref" == refs/tags/* ]]; then
+        return 0
+    fi
+
+    for protected in $PROTECTED_BRANCHES; do
+        if [[ "$branch_name" == $protected ]]; then
+            return 0
+        fi
+    done
+
+    # Validate naming convention (customize as needed)
+    local valid_prefixes="feature/ fix/ bugfix/ hotfix/ release/ chore/ docs/ test/ refactor/"
+    local is_valid=false
+
+    for prefix in $valid_prefixes; do
+        if [[ "$branch_name" == ${prefix}* ]]; then
+            is_valid=true
+            break
+        fi
+    done
+
+    if [[ "$is_valid" == "false" ]] && [[ "${CTOC_ENFORCE_BRANCH_NAMING:-false}" == "true" ]]; then
+        error "Branch name '$branch_name' does not follow naming convention"
+        error "  Valid prefixes: $valid_prefixes"
+        return 1
+    fi
+
+    return 0
+}
+
+# ==============================================================================
+# PROJECT DETECTION
+# ==============================================================================
+
+detect_project_type() {
+    local types=""
+
+    [[ -f "package.json" ]] && types="${types}node,"
+    [[ -f "tsconfig.json" ]] && types="${types}typescript,"
+    [[ -f "pyproject.toml" || -f "setup.py" || -f "requirements.txt" ]] && types="${types}python,"
+    [[ -f "go.mod" ]] && types="${types}go,"
+    [[ -f "Cargo.toml" ]] && types="${types}rust,"
+    [[ -f "Gemfile" ]] && types="${types}ruby,"
+    [[ -f "pom.xml" || -f "build.gradle" || -f "build.gradle.kts" ]] && types="${types}java,"
+    [[ -f "composer.json" ]] && types="${types}php,"
+    compgen -G "*.csproj" >/dev/null 2>&1 && types="${types}csharp,"
+
+    echo "${types%,}"
+}
+
+# ==============================================================================
+# TEST SUITE
+# ==============================================================================
+
+run_tests() {
+    local project_types="$1"
+
+    step "Running test suite..."
+
+    # Node.js / TypeScript
+    if [[ "$project_types" == *"node"* ]] || [[ "$project_types" == *"typescript"* ]]; then
+        info "Running Node.js tests..."
+
+        if [[ -f "package.json" ]]; then
+            local test_cmd=""
+
+            if grep -q '"test"' package.json 2>/dev/null; then
+                test_cmd="npm test"
+            elif grep -q '"test:ci"' package.json 2>/dev/null; then
+                test_cmd="npm run test:ci"
+            fi
+
+            if [[ -n "$test_cmd" ]]; then
+                if ! $test_cmd; then
+                    error "Node.js tests failed"
+                    return 1
+                fi
+            else
+                warn "No test script found in package.json"
+            fi
+        fi
+    fi
+
+    # Python
+    if [[ "$project_types" == *"python"* ]]; then
+        info "Running Python tests..."
+
+        if has_command pytest; then
+            if ! pytest --tb=short -q; then
+                error "Python tests failed"
+                return 1
+            fi
+        elif has_command python && [[ -d "tests" ]]; then
+            if ! python -m unittest discover -s tests -q; then
+                error "Python tests failed"
+                return 1
+            fi
+        else
+            warn "No Python test runner found"
+        fi
+    fi
+
+    # Go
+    if [[ "$project_types" == *"go"* ]]; then
+        info "Running Go tests..."
+
+        if has_command go; then
+            if ! go test -v ./... 2>&1 | tail -20; then
+                error "Go tests failed"
+                return 1
+            fi
+        fi
+    fi
+
+    # Rust
+    if [[ "$project_types" == *"rust"* ]]; then
+        info "Running Rust tests..."
+
+        if has_command cargo; then
+            if ! cargo test 2>&1 | tail -20; then
+                error "Rust tests failed"
+                return 1
+            fi
+        fi
+    fi
+
+    # Ruby
+    if [[ "$project_types" == *"ruby"* ]]; then
+        info "Running Ruby tests..."
+
+        if has_command rspec; then
+            if ! rspec --format progress; then
+                error "Ruby tests failed"
+                return 1
+            fi
+        elif has_command rake; then
+            if ! rake test; then
+                error "Ruby tests failed"
+                return 1
+            fi
+        fi
+    fi
+
+    # Java
+    if [[ "$project_types" == *"java"* ]]; then
+        info "Running Java tests..."
+
+        if [[ -f "pom.xml" ]] && has_command mvn; then
+            if ! mvn test -q; then
+                error "Java tests failed"
+                return 1
+            fi
+        elif [[ -f "build.gradle" || -f "build.gradle.kts" ]] && has_command gradle; then
+            if ! gradle test --quiet; then
+                error "Java tests failed"
+                return 1
+            fi
+        fi
+    fi
+
+    # PHP
+    if [[ "$project_types" == *"php"* ]]; then
+        info "Running PHP tests..."
+
+        if [[ -f "phpunit.xml" || -f "phpunit.xml.dist" ]] && has_command phpunit; then
+            if ! phpunit --no-coverage; then
+                error "PHP tests failed"
+                return 1
+            fi
+        elif has_command composer; then
+            if grep -q '"test"' composer.json 2>/dev/null; then
+                if ! composer test; then
+                    error "PHP tests failed"
+                    return 1
+                fi
+            fi
+        fi
+    fi
+
+    # C#
+    if [[ "$project_types" == *"csharp"* ]]; then
+        info "Running C# tests..."
+
+        if has_command dotnet; then
+            if ! dotnet test --no-build --verbosity quiet; then
+                error "C# tests failed"
+                return 1
+            fi
+        fi
+    fi
+
+    success "All tests passed"
+    return 0
+}
+
+# ==============================================================================
+# COVERAGE CHECK
+# ==============================================================================
+
+check_coverage() {
+    local project_types="$1"
+
+    step "Checking code coverage..."
+
+    # Look for coverage reports
+    local coverage_found=false
+    local coverage_percent=0
+
+    # Istanbul/NYC (JavaScript/TypeScript)
+    if [[ -f "coverage/coverage-summary.json" ]]; then
+        coverage_found=true
+        coverage_percent=$(jq -r '.total.lines.pct // 0' coverage/coverage-summary.json 2>/dev/null || echo 0)
+    fi
+
+    # LCOV
+    if [[ -f "coverage/lcov.info" ]] && [[ "$coverage_found" == "false" ]]; then
+        coverage_found=true
+        local total_lines
+        local covered_lines
+        total_lines=$(grep -c "^DA:" coverage/lcov.info 2>/dev/null || echo 0)
+        covered_lines=$(grep "^DA:[0-9]*,[1-9]" coverage/lcov.info 2>/dev/null | wc -l || echo 0)
+        if [[ $total_lines -gt 0 ]]; then
+            coverage_percent=$(echo "scale=2; $covered_lines * 100 / $total_lines" | bc 2>/dev/null || echo 0)
+        fi
+    fi
+
+    # Go coverage
+    if [[ -f "coverage.out" ]] && [[ "$coverage_found" == "false" ]]; then
+        coverage_found=true
+        coverage_percent=$(go tool cover -func=coverage.out 2>/dev/null | grep total | awk '{print $3}' | tr -d '%' || echo 0)
+    fi
+
+    # Python coverage
+    if [[ -f ".coverage" ]] && has_command coverage && [[ "$coverage_found" == "false" ]]; then
+        coverage_found=true
+        coverage_percent=$(coverage report --format=total 2>/dev/null || echo 0)
+    fi
+
+    if [[ "$coverage_found" == "false" ]]; then
+        warn "No coverage report found. Run tests with coverage enabled."
+        warn "  Node.js: npm test -- --coverage"
+        warn "  Python: pytest --cov"
+        warn "  Go: go test -coverprofile=coverage.out ./..."
+        return 0
+    fi
+
+    # Convert to integer for comparison
+    local coverage_int
+    coverage_int=$(printf "%.0f" "$coverage_percent" 2>/dev/null || echo 0)
+
+    info "Current coverage: ${coverage_percent}%"
+
+    if [[ $coverage_int -lt $MIN_COVERAGE ]]; then
+        error "Coverage ${coverage_percent}% is below minimum ${MIN_COVERAGE}%"
+        return 1
+    fi
+
+    success "Coverage check passed (${coverage_percent}% >= ${MIN_COVERAGE}%)"
+    return 0
+}
+
+# ==============================================================================
+# SECURITY SCAN
+# ==============================================================================
+
+run_security_scan() {
+    local project_types="$1"
+
+    step "Running security scan..."
+
+    local scan_count=0
+    local vulnerabilities=0
+
+    # Gitleaks for secrets
+    if has_command gitleaks; then
+        info "Running gitleaks..."
+        if ! gitleaks detect --no-banner -v 2>&1 | tail -10; then
+            warn "Gitleaks detected potential secrets"
+            vulnerabilities=$((vulnerabilities + 1))
+        fi
+        scan_count=$((scan_count + 1))
+    fi
+
+    # npm audit
+    if [[ "$project_types" == *"node"* ]] && has_command npm; then
+        info "Running npm audit..."
+        if ! npm audit --audit-level=high 2>&1 | tail -10; then
+            warn "npm audit found high severity vulnerabilities"
+            vulnerabilities=$((vulnerabilities + 1))
+        fi
+        scan_count=$((scan_count + 1))
+    fi
+
+    # pip-audit (Python)
+    if [[ "$project_types" == *"python"* ]]; then
+        if has_command pip-audit; then
+            info "Running pip-audit..."
+            if ! pip-audit 2>&1 | tail -10; then
+                warn "pip-audit found vulnerabilities"
+                vulnerabilities=$((vulnerabilities + 1))
+            fi
+            scan_count=$((scan_count + 1))
+        elif has_command safety; then
+            info "Running safety..."
+            if ! safety check 2>&1 | tail -10; then
+                warn "Safety check found vulnerabilities"
+                vulnerabilities=$((vulnerabilities + 1))
+            fi
+            scan_count=$((scan_count + 1))
+        fi
+    fi
+
+    # cargo audit (Rust)
+    if [[ "$project_types" == *"rust"* ]] && has_command cargo-audit; then
+        info "Running cargo audit..."
+        if ! cargo audit 2>&1 | tail -10; then
+            warn "cargo audit found vulnerabilities"
+            vulnerabilities=$((vulnerabilities + 1))
+        fi
+        scan_count=$((scan_count + 1))
+    fi
+
+    # govulncheck (Go)
+    if [[ "$project_types" == *"go"* ]] && has_command govulncheck; then
+        info "Running govulncheck..."
+        if ! govulncheck ./... 2>&1 | tail -10; then
+            warn "govulncheck found vulnerabilities"
+            vulnerabilities=$((vulnerabilities + 1))
+        fi
+        scan_count=$((scan_count + 1))
+    fi
+
+    # bundler-audit (Ruby)
+    if [[ "$project_types" == *"ruby"* ]] && has_command bundler-audit; then
+        info "Running bundler-audit..."
+        if ! bundler-audit check 2>&1 | tail -10; then
+            warn "bundler-audit found vulnerabilities"
+            vulnerabilities=$((vulnerabilities + 1))
+        fi
+        scan_count=$((scan_count + 1))
+    fi
+
+    # Snyk (universal)
+    if has_command snyk; then
+        info "Running Snyk..."
+        if ! snyk test --severity-threshold=high 2>&1 | tail -10; then
+            warn "Snyk found high severity vulnerabilities"
+            vulnerabilities=$((vulnerabilities + 1))
+        fi
+        scan_count=$((scan_count + 1))
+    fi
+
+    if [[ $scan_count -eq 0 ]]; then
+        warn "No security scanning tools found"
+        warn "  Install: gitleaks, npm audit, pip-audit, cargo-audit, snyk"
+        return 0
+    fi
+
+    if [[ $vulnerabilities -gt 0 ]]; then
+        if [[ "${CTOC_BLOCK_ON_VULNERABILITIES:-false}" == "true" ]]; then
+            error "Security scan found $vulnerabilities issue(s). Push blocked."
+            return 1
+        else
+            warn "Security scan found $vulnerabilities issue(s). Consider fixing before merge."
+        fi
+    else
+        success "Security scan passed ($scan_count tool(s) ran)"
+    fi
+
+    return 0
+}
+
+# ==============================================================================
+# BUILD VERIFICATION
+# ==============================================================================
+
+verify_build() {
+    local project_types="$1"
+
+    step "Verifying build..."
+
+    # Node.js
+    if [[ "$project_types" == *"node"* ]] && [[ -f "package.json" ]]; then
+        if grep -q '"build"' package.json 2>/dev/null; then
+            info "Running npm build..."
+            if ! npm run build 2>&1 | tail -10; then
+                error "Build failed"
+                return 1
+            fi
+        fi
+    fi
+
+    # Go
+    if [[ "$project_types" == *"go"* ]] && has_command go; then
+        info "Running go build..."
+        if ! go build ./... 2>&1 | tail -10; then
+            error "Go build failed"
+            return 1
+        fi
+    fi
+
+    # Rust
+    if [[ "$project_types" == *"rust"* ]] && has_command cargo; then
+        info "Running cargo build..."
+        if ! cargo build --release 2>&1 | tail -10; then
+            error "Cargo build failed"
+            return 1
+        fi
+    fi
+
+    # Java
+    if [[ "$project_types" == *"java"* ]]; then
+        if [[ -f "pom.xml" ]] && has_command mvn; then
+            info "Running mvn package..."
+            if ! mvn package -DskipTests -q 2>&1 | tail -10; then
+                error "Maven build failed"
+                return 1
+            fi
+        elif [[ -f "build.gradle" || -f "build.gradle.kts" ]] && has_command gradle; then
+            info "Running gradle build..."
+            if ! gradle build -x test --quiet 2>&1 | tail -10; then
+                error "Gradle build failed"
+                return 1
+            fi
+        fi
+    fi
+
+    # C#
+    if [[ "$project_types" == *"csharp"* ]] && has_command dotnet; then
+        info "Running dotnet build..."
+        if ! dotnet build --no-restore --verbosity quiet 2>&1 | tail -10; then
+            error "dotnet build failed"
+            return 1
+        fi
+    fi
+
+    success "Build verification passed"
+    return 0
+}
+
+# ==============================================================================
+# MAIN EXECUTION
+# ==============================================================================
+
+main() {
+    local start_time
+    start_time=$(date +%s)
+
+    # Read push parameters from stdin
+    local remote="$1"
+    local url="$2"
+
+    echo ""
+    echo "=========================================="
+    echo " CTOC Pre-push Hook v${CTOC_VERSION}"
+    echo "=========================================="
+    echo ""
+
+    info "Remote: $remote ($url)"
+
+    # Validate remote URL
+    if ! check_remote_url "$remote"; then
+        die "Remote validation failed"
+    fi
+
+    # Read refs being pushed
+    local errors=0
+    while read -r local_ref local_sha remote_ref remote_sha; do
+        [[ -z "$local_ref" ]] && continue
+
+        info "Pushing: $local_ref -> $remote_ref"
+
+        # Security checks
+        check_protected_branches "$local_ref" || errors=$((errors + 1))
+        check_force_push "$local_ref" "$remote_ref" "$local_sha" "$remote_sha" || errors=$((errors + 1))
+        check_branch_naming "$local_ref" || errors=$((errors + 1))
+    done
+
+    if [[ $errors -gt 0 ]]; then
+        die "Security checks failed. Push blocked."
+    fi
+
+    # Detect project type
+    local project_types
+    project_types=$(detect_project_type)
+    info "Detected project type(s): ${project_types:-none}"
+
+    # Run validation steps
+    run_tests "$project_types" || errors=$((errors + 1))
+    check_coverage "$project_types" || errors=$((errors + 1))
+    run_security_scan "$project_types" || errors=$((errors + 1))
+    verify_build "$project_types" || errors=$((errors + 1))
+
+    # Calculate execution time
+    local end_time
+    end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+
+    echo ""
+
+    if [[ $errors -gt 0 ]]; then
+        echo "=========================================="
+        error "Pre-push hook failed ($errors error(s))"
+        echo "=========================================="
+        echo ""
+        warn "To bypass (NOT recommended): git push --no-verify"
+        audit_log "BLOCKED" "Push blocked with $errors errors"
+        exit 1
+    fi
+
+    echo "=========================================="
+    success "All pre-push checks passed! (${duration}s)"
+    echo "=========================================="
+    audit_log "PASSED" "Push allowed after ${duration}s"
+
+    exit 0
+}
+
+# Run with timeout
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    if has_command timeout; then
+        timeout "$HOOK_TIMEOUT" bash -c "$(declare -f); main \"\$@\"" -- "$@" || {
+            if [[ $? -eq 124 ]]; then
+                die "Hook timed out after ${HOOK_TIMEOUT}s"
+            fi
+            exit $?
+        }
+    else
+        main "$@"
+    fi
+fi

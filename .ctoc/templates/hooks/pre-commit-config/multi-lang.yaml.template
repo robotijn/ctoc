@@ -1,0 +1,377 @@
+# CTOC Pre-commit Configuration for Multi-Language Projects (v10 RED/BLUE hardened)
+# Install: pip install pre-commit && pre-commit install
+#
+# Supports: TypeScript, Python, Go, Rust, Ruby, PHP, Java, Shell, Markdown, YAML
+#
+# RED/BLUE TEAM HARDENING NOTES:
+# - R1: Pinned versions for reproducibility
+# - R2: Universal secrets detection
+# - R3: Language-agnostic security scanning
+# - R4: Consistent commit message format
+# - R5: File type validation
+# - B1: Conditional hooks based on file types
+# - B2: Performance optimized (parallel where safe)
+# - B3: Auto-fix where safe
+# - B4: Graceful degradation for missing tools
+# - B5: Monorepo support
+
+# Pre-commit framework version
+minimum_pre_commit_version: "3.0.0"
+
+# Don't fail fast - show all errors
+fail_fast: false
+
+default_stages: [commit]
+
+repos:
+  # ==============================================================================
+  # SECRETS DETECTION (First! Universal for all languages)
+  # ==============================================================================
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+        name: Detect secrets with gitleaks
+        stages: [commit, push]
+
+  # ==============================================================================
+  # UNIVERSAL FILE HYGIENE
+  # ==============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File hygiene
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        args: [--markdown-linebreak-ext=md]
+
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: [--fix=lf]
+
+      # Config file validation
+      - id: check-json
+        name: Validate JSON files
+
+      - id: check-yaml
+        name: Validate YAML files
+        args: [--unsafe]
+
+      - id: check-toml
+        name: Validate TOML files
+
+      - id: check-xml
+        name: Validate XML files
+
+      # Git hygiene
+      - id: check-merge-conflict
+        name: Check for merge conflict markers
+
+      - id: check-added-large-files
+        name: Block large files (>5MB)
+        args: [--maxkb=5120]
+
+      - id: no-commit-to-branch
+        name: Prevent commits to main/master
+        args: [--branch, main, --branch, master]
+
+      - id: check-case-conflict
+        name: Check for case conflicts
+
+      - id: check-symlinks
+        name: Check for broken symlinks
+
+      - id: check-executables-have-shebangs
+        name: Ensure executables have shebangs
+
+      - id: check-shebang-scripts-are-executable
+        name: Ensure shebang scripts are executable
+
+      # Security
+      - id: detect-private-key
+        name: Detect private keys
+
+      - id: detect-aws-credentials
+        name: Detect AWS credentials
+
+  # ==============================================================================
+  # TYPESCRIPT / JAVASCRIPT
+  # ==============================================================================
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint (JS/TS)
+        entry: npx eslint --fix --max-warnings=0
+        language: system
+        types_or: [javascript, jsx, ts, tsx]
+        pass_filenames: true
+        # Only run if package.json exists
+        files: ^(?=.*\.(js|jsx|ts|tsx)$)
+
+      - id: prettier
+        name: Prettier (JS/TS/JSON/CSS/MD)
+        entry: npx prettier --write --ignore-unknown
+        language: system
+        types_or: [javascript, jsx, ts, tsx, json, yaml, css, scss, markdown]
+        pass_filenames: true
+
+      - id: tsc
+        name: TypeScript type check
+        entry: npx tsc --noEmit
+        language: system
+        types: [ts, tsx]
+        pass_filenames: false
+        require_serial: true
+
+  # ==============================================================================
+  # PYTHON
+  # ==============================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        name: Ruff linter (Python)
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+
+      - id: ruff-format
+        name: Ruff formatter (Python)
+        types_or: [python, pyi]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Mypy type checking (Python)
+        pass_filenames: false
+        types: [python]
+        additional_dependencies: [types-requests, types-PyYAML]
+
+  # ==============================================================================
+  # GO
+  # ==============================================================================
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: Go format (gofmt)
+        entry: gofmt -w -s
+        language: system
+        types: [go]
+        pass_filenames: true
+
+      - id: go-vet
+        name: Go vet
+        entry: go vet ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.55.2
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint (Go)
+        args: [--fix]
+        types: [go]
+
+  # ==============================================================================
+  # RUST
+  # ==============================================================================
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: Cargo format (Rust)
+        entry: cargo fmt --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: Cargo clippy (Rust)
+        entry: cargo clippy -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+  # ==============================================================================
+  # RUBY
+  # ==============================================================================
+  - repo: https://github.com/rubocop/rubocop
+    rev: v1.59.0
+    hooks:
+      - id: rubocop
+        name: RuboCop (Ruby)
+        args: [--autocorrect-all]
+        types: [ruby]
+
+  # ==============================================================================
+  # PHP
+  # ==============================================================================
+  - repo: local
+    hooks:
+      - id: php-lint
+        name: PHP syntax check
+        entry: php -l
+        language: system
+        types: [php]
+        pass_filenames: true
+
+      - id: phpcs
+        name: PHP CodeSniffer
+        entry: phpcs
+        language: system
+        types: [php]
+        pass_filenames: true
+
+  # ==============================================================================
+  # SHELL
+  # ==============================================================================
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: ShellCheck (Shell)
+        types: [shell]
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.7.0-4
+    hooks:
+      - id: shfmt
+        name: shfmt (Shell format)
+        args: [-w, -i, "2", -ci]
+        types: [shell]
+
+  # ==============================================================================
+  # MARKDOWN & DOCUMENTATION
+  # ==============================================================================
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        name: Markdown lint
+        args: [--fix]
+        types: [markdown]
+
+  # ==============================================================================
+  # YAML & CONFIG FILES
+  # ==============================================================================
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        name: YAML lint
+        args: [-d, relaxed]
+        types: [yaml]
+
+  # ==============================================================================
+  # DOCKER
+  # ==============================================================================
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Hadolint (Dockerfile)
+        types: [dockerfile]
+
+  # ==============================================================================
+  # SECURITY SCANNING (Universal)
+  # ==============================================================================
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets (Yelp)
+        args: [--baseline, .secrets.baseline]
+        exclude: package.lock.json|poetry.lock|go.sum
+
+  # ==============================================================================
+  # COMMIT MESSAGE
+  # ==============================================================================
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.10.0
+    hooks:
+      - id: commitlint
+        name: Validate commit message (conventional)
+        stages: [commit-msg]
+        additional_dependencies: ["@commitlint/config-conventional"]
+
+  # ==============================================================================
+  # DEPENDENCY SECURITY (on push only)
+  # ==============================================================================
+  - repo: local
+    hooks:
+      - id: npm-audit
+        name: npm security audit
+        entry: npm audit --audit-level=high
+        language: system
+        pass_filenames: false
+        files: ^package-lock\.json$
+        stages: [push]
+
+      - id: pip-audit
+        name: pip security audit
+        entry: pip-audit
+        language: system
+        pass_filenames: false
+        files: ^requirements.*\.txt$
+        stages: [push]
+
+      - id: cargo-audit
+        name: cargo security audit
+        entry: cargo audit
+        language: system
+        pass_filenames: false
+        files: ^Cargo\.lock$
+        stages: [push]
+
+      - id: bundler-audit
+        name: bundler security audit
+        entry: bundler-audit check
+        language: system
+        pass_filenames: false
+        files: ^Gemfile\.lock$
+        stages: [push]
+
+# ==============================================================================
+# CI/CD Integration
+# ==============================================================================
+# GitHub Actions example:
+#
+# - name: Run pre-commit
+#   uses: pre-commit/action@v3.0.0
+#   with:
+#     extra_args: --all-files
+#
+# Or manually:
+# - name: Run pre-commit
+#   run: |
+#     pip install pre-commit
+#     pre-commit run --all-files
+
+ci:
+  autofix_commit_msg: "style: auto-fix from pre-commit hooks"
+  autofix_prs: true
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autoupdate_schedule: weekly
+  skip: [npm-audit, pip-audit, cargo-audit, bundler-audit, mypy, tsc]
+  submodules: false
+
+# ==============================================================================
+# commitlint.config.js
+# ==============================================================================
+# module.exports = {
+#   extends: ['@commitlint/config-conventional'],
+#   rules: {
+#     'type-enum': [2, 'always', [
+#       'feat', 'fix', 'docs', 'style', 'refactor',
+#       'perf', 'test', 'build', 'ci', 'chore', 'revert'
+#     ]],
+#     'subject-case': [2, 'always', 'lower-case'],
+#     'header-max-length': [2, 'always', 72],
+#     'body-max-line-length': [2, 'always', 100],
+#   },
+# };

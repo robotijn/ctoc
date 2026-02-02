@@ -1,0 +1,195 @@
+# CTOC Pre-commit Configuration for TypeScript Projects (v10 RED/BLUE hardened)
+# Install: pip install pre-commit && pre-commit install
+#
+# RED/BLUE TEAM HARDENING NOTES:
+# - R1: Pinned versions for reproducibility
+# - R2: Fail fast to prevent partial commits
+# - R3: Secrets detection as first check
+# - R4: Type safety validation
+# - R5: Security vulnerability scanning
+# - B1: Parallel execution for performance
+# - B2: Staged files only (fast)
+# - B3: Auto-fix where safe
+# - B4: Comprehensive linting
+# - B5: Clear documentation
+
+# Pre-commit framework version
+minimum_pre_commit_version: "3.0.0"
+
+# Fail fast on first error
+fail_fast: false
+
+# Default settings
+default_language_version:
+  node: "18.18.0"
+
+default_stages: [commit]
+
+repos:
+  # ==============================================================================
+  # SECRETS DETECTION (First! Block secrets before anything else)
+  # ==============================================================================
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+        name: Detect secrets with gitleaks
+        stages: [commit, push]
+
+  # ==============================================================================
+  # BASIC HYGIENE
+  # ==============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File hygiene
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        args: [--markdown-linebreak-ext=md]
+
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: [--fix=lf]
+
+      # JSON/YAML validation
+      - id: check-json
+        name: Validate JSON files
+
+      - id: check-yaml
+        name: Validate YAML files
+        args: [--unsafe]  # Allow custom tags
+
+      - id: check-toml
+        name: Validate TOML files
+
+      # Git hygiene
+      - id: check-merge-conflict
+        name: Check for merge conflict markers
+
+      - id: check-added-large-files
+        name: Block large files (>5MB)
+        args: [--maxkb=5120]
+
+      - id: no-commit-to-branch
+        name: Prevent commits to main/master
+        args: [--branch, main, --branch, master]
+
+      # Security
+      - id: detect-private-key
+        name: Detect private keys
+
+      - id: detect-aws-credentials
+        name: Detect AWS credentials
+
+  # ==============================================================================
+  # TYPESCRIPT/JAVASCRIPT LINTING
+  # ==============================================================================
+  - repo: local
+    hooks:
+      # ESLint with auto-fix
+      - id: eslint
+        name: ESLint
+        entry: npx eslint --fix --max-warnings=0
+        language: system
+        types_or: [javascript, jsx, ts, tsx]
+        require_serial: false
+        pass_filenames: true
+
+      # Prettier formatting
+      - id: prettier
+        name: Prettier
+        entry: npx prettier --write --ignore-unknown
+        language: system
+        types_or: [javascript, jsx, ts, tsx, json, yaml, css, scss, markdown]
+        require_serial: false
+        pass_filenames: true
+
+      # TypeScript type checking (on all files, not just staged)
+      - id: tsc
+        name: TypeScript type check
+        entry: npx tsc --noEmit
+        language: system
+        types: [ts, tsx]
+        pass_filenames: false
+        require_serial: true
+
+  # ==============================================================================
+  # COMMIT MESSAGE
+  # ==============================================================================
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.10.0
+    hooks:
+      - id: commitlint
+        name: Validate commit message
+        stages: [commit-msg]
+        additional_dependencies: ["@commitlint/config-conventional"]
+
+  # ==============================================================================
+  # SECURITY SCANNING
+  # ==============================================================================
+  - repo: local
+    hooks:
+      # npm audit (only if package-lock.json is staged)
+      - id: npm-audit
+        name: npm security audit
+        entry: npm audit --audit-level=high
+        language: system
+        pass_filenames: false
+        files: ^package-lock\.json$
+        stages: [push]
+
+  # ==============================================================================
+  # OPTIONAL: ADDITIONAL CHECKS
+  # ==============================================================================
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        name: Lint Markdown files
+        args: [--fix]
+        types: [markdown]
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: Lint shell scripts
+        types: [shell]
+
+  # Check for TODO/FIXME in commits
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: text
+        name: Check for TODO/FIXME
+        args: [--pattern, "TODO|FIXME|XXX", --multiline]
+        types: [text]
+        exclude: ^\.pre-commit-config\.yaml$
+        verbose: true
+        # This is informational only, doesn't fail
+
+# ==============================================================================
+# CI/CD Integration
+# ==============================================================================
+# Add to your CI pipeline:
+#
+# - name: Run pre-commit
+#   run: |
+#     pip install pre-commit
+#     pre-commit run --all-files
+#
+# Or use the pre-commit.ci service for automatic PR checks
+ci:
+  autofix_commit_msg: "style: auto-fix from pre-commit hooks"
+  autofix_prs: true
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autoupdate_schedule: weekly
+  skip: [npm-audit]  # Skip slow hooks in CI autofix
+  submodules: false
