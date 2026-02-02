@@ -276,15 +276,35 @@ ctoc/
 
 ### How to Release
 
+When user selects **[8] release** from dashboard, show this menu:
+
+```
+[Release]
+
+  Commit only:
+  [1] patch        vX.Y.Z → vX.Y.Z+1
+  [2] minor        vX.Y.Z → vX.Y+1.0
+  [3] major        vX.Y.Z → vX+1.0.0
+
+  Commit + Push:
+  [4] patch+push   vX.Y.Z → vX.Y.Z+1 + push
+  [5] minor+push   vX.Y.Z → vX.Y+1.0 + push
+  [6] major+push   vX.Y.Z → vX+1.0.0 + push
+
+  [0] back
+```
+
+**Steps (for any option):**
+1. Update `VERSION` file with new version
+2. Run `node scripts/release.js` to sync all files
+3. Stage all version-related files
+4. Commit with message: `feat/fix: description (vX.Y.Z)`
+5. If option 4-6: Push to origin
+
 **Commit format:** Include version in commit messages:
 ```
 feat: your feature description (vX.Y.Z)
 ```
-
-**Steps:**
-1. Update `VERSION` file with new version
-2. Make your changes
-3. Commit with version in message
 
 **Version format:** `vX.Y.Z` (e.g., v5.0.1)
 
