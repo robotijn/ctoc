@@ -129,6 +129,75 @@ If a test fails intermittently:
 2. If still fails, report as flaky
 3. Suggest fixes (async issues, timing, shared state)
 
+## CRITICAL: NO SILENT FAILURES
+
+**Tests must NEVER silently fail.** This is non-negotiable.
+
+### What "Silent Failure" Means
+- Test catches exception and passes anyway
+- Test skips without explicit reason
+- Test has empty assertion (always passes)
+- Fixture fails to load but test continues
+- Database/network unavailable but test "passes"
+
+### Rules
+1. **Missing dependencies = LOUD FAIL**
+   ```javascript
+   // BAD: Silent failure
+   let db;
+   try { db = await connectDB(); } catch { db = null; }
+   if (!db) return; // Test passes silently!
+
+   // GOOD: Explicit failure
+   const db = await connectDB(); // Throws if unavailable
+   ```
+
+2. **Skip with reason, never silently**
+   ```javascript
+   // BAD
+   if (!process.env.DB_URL) return;
+
+   // GOOD
+   test.skip(!process.env.DB_URL, 'Requires DB_URL environment variable');
+   ```
+
+3. **Fixtures must fail loudly**
+   ```javascript
+   // BAD
+   beforeEach(async () => {
+     try { await setupDB(); } catch { /* ignore */ }
+   });
+
+   // GOOD
+   beforeEach(async () => {
+     await setupDB(); // Fails test if setup fails
+   });
+   ```
+
+4. **Assert something meaningful**
+   ```javascript
+   // BAD
+   test('user exists', () => {
+     const user = getUser();
+     // No assertion - always passes!
+   });
+
+   // GOOD
+   test('user exists', () => {
+     const user = getUser();
+     assert(user, 'User should exist');
+     assert.equal(user.name, 'expected');
+   });
+   ```
+
+### Why This Matters
+- Silent failures hide bugs
+- We can't learn from failures we don't see
+- CI appears green while code is broken
+- Technical debt accumulates invisibly
+
+**If a test cannot run, it must FAIL. Period.**
+
 ## CI Integration
 
 Tests should:

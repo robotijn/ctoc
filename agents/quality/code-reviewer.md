@@ -152,3 +152,81 @@ None
 - Commented-out code
 - Console.log/print statements
 - Hardcoded URLs or credentials
+
+## CRITICAL: Test Code Review - NO SILENT FAILURES
+
+When reviewing test code, **BLOCK** if you find:
+
+### Blocking Test Patterns
+
+1. **Empty catch blocks in tests**
+   ```javascript
+   // BLOCK THIS
+   try { await action(); } catch { }
+   ```
+
+2. **Early returns without assertions**
+   ```javascript
+   // BLOCK THIS
+   if (!data) return;
+   ```
+
+3. **Tests without assertions**
+   ```javascript
+   // BLOCK THIS
+   test('exists', () => { getUser(); });
+   ```
+
+4. **Fixtures that swallow errors**
+   ```javascript
+   // BLOCK THIS
+   beforeEach(() => { try { setup(); } catch {} });
+   ```
+
+5. **Conditional skips without clear reason**
+   ```javascript
+   // BLOCK THIS
+   if (!process.env.DB) return;
+
+   // REQUIRE THIS
+   test.skipIf(!process.env.DB, 'requires DB')
+   ```
+
+### Why This is BLOCK-worthy
+- Silent failures hide bugs from CI
+- We cannot learn from failures we don't see
+- Technical debt accumulates invisibly
+- Builds appear green while code is broken
+
+**If a test cannot fail loudly, it must not pass quietly.**
+
+## Docker Project Testing Requirements
+
+If the project has a `Dockerfile` or `docker-compose.yml`, **BLOCK** if missing:
+
+1. **Docker Image Build Test**
+   - Must verify image builds successfully
+   - Part of CI pipeline, not just local
+
+2. **Container Health Check**
+   - Start container
+   - Hit health endpoint
+   - Verify response
+
+3. **E2E with Containerized App**
+   - Use docker-compose for E2E tests
+   - Test the actual containerized application
+   - Not just the source code
+
+```yaml
+# Example CI step
+- name: Build and Test Container
+  run: |
+    docker build -t app:test .
+    docker run -d --name test-app -p 3000:3000 app:test
+    sleep 5
+    curl --fail http://localhost:3000/health
+    docker stop test-app
+```
+
+**No deploy without container test. Period.**

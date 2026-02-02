@@ -429,6 +429,54 @@ The loop is triggered automatically when a plan moves from `implementation/draft
 
 ---
 
+## Quality Non-Negotiables
+
+### 1. NO SILENT TEST FAILURES
+
+**Tests must NEVER silently fail.** This is the #1 quality rule.
+
+| Pattern | Status | Why |
+|---------|--------|-----|
+| Empty catch blocks | ❌ BLOCK | Hides failures |
+| Early return without assertion | ❌ BLOCK | Test passes without testing |
+| Tests without assertions | ❌ BLOCK | Always passes |
+| Fixture errors swallowed | ❌ BLOCK | Setup failures hidden |
+| Skip without reason | ❌ BLOCK | Unclear why skipped |
+
+**If a test cannot run, it must FAIL LOUDLY. Period.**
+
+### 2. Docker Projects Must Test Containers
+
+If the project has `Dockerfile` or `docker-compose.yml`:
+
+| Check | When | Why |
+|-------|------|-----|
+| Docker image builds | CI | Catches build issues |
+| Container health check | Before deploy | Verifies startup |
+| E2E against container | Before deploy | Tests what ships |
+
+```bash
+# Required sequence
+docker build -t app:test .
+docker run -d -p 3000:3000 app:test
+curl --fail http://localhost:3000/health
+BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+**No deploy without container verification. Period.**
+
+### 3. Tests Run Exactly As CI
+
+Local tests must:
+- Use same commands as CI
+- Use same flags (e.g., `--test-force-exit`)
+- Use same environment variables
+- Fail for the same reasons
+
+**If it passes locally but fails in CI, your local setup is wrong.**
+
+---
+
 ## Notes
 
 - Claude Code IS the runtime — no separate runtime needed

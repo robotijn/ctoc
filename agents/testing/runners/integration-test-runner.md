@@ -103,3 +103,58 @@ docker-compose -f docker-compose.test.yml down -v
 - Queries executed: 234
 - Slowest query: 120ms (ORDER BY without index)
 ```
+
+## CRITICAL: NO SILENT FAILURES
+
+**Tests must NEVER silently fail.** This is non-negotiable.
+
+### Integration Test Specific Rules
+
+1. **Service unavailable = FAIL, not skip**
+   ```javascript
+   // BAD: Silently passes when DB is down
+   beforeAll(async () => {
+     try { db = await connectDB(); } catch { db = null; }
+   });
+   test('user query', () => {
+     if (!db) return; // SILENT FAILURE!
+   });
+
+   // GOOD: Fails loudly
+   beforeAll(async () => {
+     db = await connectDB(); // Throws if unavailable
+   });
+   ```
+
+2. **Fixtures that depend on DB must fail explicitly**
+   ```javascript
+   // BAD
+   async function seedTestData() {
+     try { await db.insert(testUsers); } catch { /* ignore */ }
+   }
+
+   // GOOD
+   async function seedTestData() {
+     if (!db) throw new Error('DB required for seeding');
+     await db.insert(testUsers);
+   }
+   ```
+
+3. **Environment checks at test start**
+   ```javascript
+   // At the TOP of your test file
+   const requiredEnv = ['DATABASE_URL', 'REDIS_URL'];
+   for (const env of requiredEnv) {
+     if (!process.env[env]) {
+       throw new Error(`Missing required env: ${env}`);
+     }
+   }
+   ```
+
+4. **Connection failures are test failures**
+   - No database? FAIL
+   - No Redis? FAIL
+   - No network? FAIL
+   - These are not skips, they are failures that need fixing
+
+**If a test cannot run due to missing infrastructure, it must FAIL. Period.**

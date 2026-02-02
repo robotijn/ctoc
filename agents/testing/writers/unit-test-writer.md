@@ -154,6 +154,76 @@ func TestAddTableDriven(t *testing.T) {
 - Edge case: Handle unicode in usernames
 ```
 
+## CRITICAL: NO SILENT FAILURES
+
+**Write tests that CANNOT silently fail.** This is non-negotiable.
+
+### Anti-Patterns to NEVER Write
+
+```javascript
+// ❌ BAD: Empty catch = silent failure
+test('fetches user', async () => {
+  try {
+    const user = await fetchUser(1);
+    expect(user.name).toBe('John');
+  } catch {
+    // Silent failure - test passes even when it shouldn't!
+  }
+});
+
+// ❌ BAD: Early return without assertion
+test('processes data', () => {
+  const data = getData();
+  if (!data) return; // SILENT FAILURE!
+  expect(data.valid).toBe(true);
+});
+
+// ❌ BAD: No assertion at all
+test('user exists', () => {
+  const user = getUser();
+  // Passes but tests nothing!
+});
+
+// ❌ BAD: Fixture failure ignored
+beforeEach(async () => {
+  try { await seedDB(); } catch { /* ignored */ }
+});
+```
+
+### Patterns to ALWAYS Use
+
+```javascript
+// ✅ GOOD: Explicit failure
+test('fetches user', async () => {
+  const user = await fetchUser(1); // Throws on failure
+  expect(user.name).toBe('John');
+});
+
+// ✅ GOOD: Assert instead of early return
+test('processes data', () => {
+  const data = getData();
+  expect(data).toBeTruthy(); // Fails if no data
+  expect(data.valid).toBe(true);
+});
+
+// ✅ GOOD: Skip with explicit reason
+test.skipIf(!process.env.DB_URL, 'requires DB')('db test', () => {
+  // Clear why it's skipped
+});
+
+// ✅ GOOD: Fixture failures fail the test
+beforeEach(async () => {
+  await seedDB(); // Throws if fails - test fails
+});
+```
+
+### Why This Matters
+- Silent failures hide bugs
+- We can't learn from failures we don't see
+- CI appears green while code is broken
+
+**If a test cannot make an assertion, it must FAIL. Period.**
+
 ## Checklist Before Returning
 
 - [ ] Tests are runnable (no syntax errors)
@@ -161,3 +231,6 @@ func TestAddTableDriven(t *testing.T) {
 - [ ] Tests cover happy path + edge cases
 - [ ] Tests are isolated (no shared state)
 - [ ] Test names are descriptive
+- [ ] **NO empty catch blocks**
+- [ ] **NO early returns without assertions**
+- [ ] **NO tests without assertions**
