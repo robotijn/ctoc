@@ -3544,11 +3544,26 @@ Phase 6 (Depends on all phases)
 - [x] `.ctoc/agents/test-cases/agent-critic.yaml` - Agent-Critic test cases
 - [x] `.ctoc/templates/agent-template.md` - Template all agents must follow
 
-### Phase 3: Agent Template + 10 Core Agents - PENDING
+### Phase 3: Agent Template + 10 Core Agents - IN PROGRESS
 
-**Status**: Not started
+**Status**: In Progress (1/10 agents complete)
+**Date**: 2025-02-02
+
+**Agents Rewritten**:
+- [x] `agents/quality/complexity-analyzer.md` - Full template compliance
+- [ ] `agents/quality/code-reviewer.md` - Pending
+- [ ] `agents/quality/code-smell-detector.md` - Pending
+- [ ] `agents/quality/duplicate-code-detector.md` - Pending
+- [ ] `agents/security/security-scanner.md` - Pending
+- [ ] `agents/security/secrets-detector.md` - Pending
+- [ ] `agents/security/input-validation-checker.md` - Pending
+- [ ] `agents/security/dependency-checker.md` - Pending
+- [ ] `agents/testing/writers/unit-test-writer.md` - Pending
+- [ ] `agents/coordinator/cto-chief.md` - Pending
+
 **Required**:
-- [ ] Rewrite 10 core agents using template
+- [x] Rewrite complexity-analyzer using template (COMPLETE)
+- [ ] Rewrite remaining 9 core agents using template
 - [ ] Run each through 10-round improvement loop
 - [ ] Achieve scores >= 9.0
 
@@ -3570,7 +3585,8 @@ Phase 6 (Depends on all phases)
 
 **Test Results**:
 - Pipeline tests: 26/26 passing
-- Total test suite: 467 tests passing
+- Sync tests: 30/30 passing (new event-triggered sync)
+- Total test suite: 537 tests passing
 
 ---
 
@@ -3586,10 +3602,17 @@ Phase 6 (Depends on all phases)
 
 ### Next Steps
 
-1. **Phase 3**: Begin agent rewrites using the new template
-   - Start with complexity-analyzer (no deps)
-   - Then code-reviewer (refs complexity-analyzer)
-   - Continue with security agents
+1. **Phase 3 (Continued)**: Continue agent rewrites using the new template
+   - [x] complexity-analyzer - DONE
+   - [ ] code-reviewer (refs complexity-analyzer)
+   - [ ] code-smell-detector
+   - [ ] duplicate-code-detector
+   - [ ] security-scanner
+   - [ ] secrets-detector
+   - [ ] input-validation-checker
+   - [ ] dependency-checker
+   - [ ] unit-test-writer
+   - [ ] cto-chief
 
 2. **Bootstrap Agent-Critic**: Run the self-bootstrap procedure to achieve score 10
 

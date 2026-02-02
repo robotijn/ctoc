@@ -639,22 +639,22 @@ jobs:
 
 ## Success Criteria
 
-- [ ] CI config parser supports GitHub Actions, GitLab CI, Jenkins, CircleCI
+- [x] CI config parser supports GitHub Actions, GitLab CI, Jenkins, CircleCI
 - [ ] Docker-based execution for environment parity
 - [ ] Docker fallback to local with one-time warning (remembered)
-- [ ] Container image auto-detection from CI config
-- [ ] Local CI runner executes EXACT same checks as remote CI
-- [ ] Tests MUST run (not just be created)
-- [ ] Hanging tests detected and reported (timeout)
-- [ ] Pre-review hook blocks review until CI passes (no bypass)
-- [ ] Pre-push Git hook blocks push until CI passes (no bypass)
-- [ ] NO bypass mechanism exists (absolute gate)
+- [x] Container image auto-detection from CI config
+- [x] Local CI runner executes EXACT same checks as remote CI
+- [x] Tests MUST run (not just be created)
+- [x] Hanging tests detected and reported (timeout)
+- [x] Pre-review hook blocks review until CI passes (no bypass)
+- [x] Pre-push Git hook blocks push until CI passes (no bypass)
+- [x] NO bypass mechanism exists (absolute gate)
 - [ ] Iron Loop Step 14 enforces Local CI Gate
 - [ ] `ctoc ci` command for manual runs
-- [ ] CI Config Wizard when no CI exists (interactive strictness options)
-- [ ] Wizard explains pros/cons of each strictness level
-- [ ] Generated CI config matches user's strictness choices
-- [ ] If local gate passes, CI is GUARANTEED to pass
+- [x] CI Config Wizard when no CI exists (interactive strictness options)
+- [x] Wizard explains pros/cons of each strictness level
+- [x] Generated CI config matches user's strictness choices
+- [x] If local gate passes, CI is GUARANTEED to pass
 
 ## Business Value
 
