@@ -227,6 +227,14 @@ PLAYWRIGHT AUTO-DETECTION:
   - Supports sharding for CI parallelism
   - Reports per-browser results
 
+COVERAGE ENFORCEMENT (CI/CD CRITERIA):
+  - Strict mode:    80% lines, 75% branches
+  - Strictest mode: 90% lines, 85% branches
+  - Legacy mode:    50% lines, 40% branches
+  - NEW CODE always requires 85%+ coverage
+  - Integrates with Codecov/Coveralls
+  - Fails CI if below threshold
+
 PARALLEL EXECUTION SAVES ~75% TIME:
   Sequential: ~180s
   Parallel:   ~45s

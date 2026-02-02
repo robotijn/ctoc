@@ -477,11 +477,216 @@ npm run quality-gate || {
 }
 ```
 
+## Code Coverage Enforcement (CI/CD Criteria)
+
+### Coverage Thresholds by Mode
+
+| Mode | Line | Branch | Function | Statement |
+|------|------|--------|----------|-----------|
+| **Strict** | 80% | 75% | 80% | 80% |
+| **Strictest** | 90% | 85% | 90% | 90% |
+| **Legacy** | 50% | 40% | 50% | 50% |
+
+### Detection & Execution
+
+```bash
+# Detect coverage tool and run with enforcement
+detect_and_run_coverage() {
+  local MODE=${CTOC_MODE:-strict}
+
+  # Set thresholds based on mode
+  case $MODE in
+    strictest) LINE_THRESH=90; BRANCH_THRESH=85 ;;
+    legacy)    LINE_THRESH=50; BRANCH_THRESH=40 ;;
+    *)         LINE_THRESH=80; BRANCH_THRESH=75 ;;  # strict default
+  esac
+
+  # TypeScript/JavaScript (Jest/Vitest)
+  if [ -f "package.json" ]; then
+    if grep -q '"vitest"' package.json; then
+      npx vitest run --coverage --coverage.thresholds.lines=$LINE_THRESH \
+        --coverage.thresholds.branches=$BRANCH_THRESH \
+        --coverage.thresholds.functions=$LINE_THRESH
+    elif grep -q '"jest"' package.json; then
+      npx jest --coverage --coverageThreshold='{"global":{"lines":'$LINE_THRESH',"branches":'$BRANCH_THRESH'}}'
+    fi
+  fi
+
+  # Python (pytest-cov)
+  if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+    pytest --cov=src --cov-fail-under=$LINE_THRESH --cov-report=term-missing
+  fi
+
+  # Go
+  if [ -f "go.mod" ]; then
+    go test -coverprofile=coverage.out ./...
+    COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
+    if (( $(echo "$COVERAGE < $LINE_THRESH" | bc -l) )); then
+      echo "❌ Coverage $COVERAGE% below threshold $LINE_THRESH%"
+      exit 1
+    fi
+  fi
+
+  # Rust (cargo-tarpaulin)
+  if [ -f "Cargo.toml" ]; then
+    cargo tarpaulin --fail-under $LINE_THRESH
+  fi
+}
+```
+
+### Coverage in Parallel Script
+
+```bash
+#!/bin/bash
+RESULTS_DIR=$(mktemp -d)
+MODE=${CTOC_MODE:-strict}
+
+# Set thresholds
+case $MODE in
+  strictest) LINE=90; BRANCH=85 ;;
+  legacy)    LINE=50; BRANCH=40 ;;
+  *)         LINE=80; BRANCH=75 ;;
+esac
+
+# Run coverage as part of tests (captures both)
+if [ -f "package.json" ]; then
+  (npm run test -- --coverage --coverageThreshold='{"global":{"lines":'$LINE',"branches":'$BRANCH'}}' 2>&1 \
+    | tee "$RESULTS_DIR/coverage.log"; echo $? > "$RESULTS_DIR/coverage.exit") &
+elif [ -f "pyproject.toml" ]; then
+  (pytest --cov=src --cov-fail-under=$LINE --cov-branch 2>&1 \
+    | tee "$RESULTS_DIR/coverage.log"; echo $? > "$RESULTS_DIR/coverage.exit") &
+elif [ -f "go.mod" ]; then
+  (go test -coverprofile=coverage.out ./... && \
+    go tool cover -func=coverage.out | grep total 2>&1 \
+    | tee "$RESULTS_DIR/coverage.log"; echo $? > "$RESULTS_DIR/coverage.exit") &
+fi
+
+wait
+
+# Check coverage passed
+if [ -f "$RESULTS_DIR/coverage.exit" ]; then
+  if [ "$(cat $RESULTS_DIR/coverage.exit)" != "0" ]; then
+    echo "❌ Coverage below threshold ($LINE% lines, $BRANCH% branches)"
+    exit 1
+  fi
+fi
+```
+
+### Coverage Report Format
+
+```markdown
+### Coverage Report
+
+**Mode**: strict
+**Thresholds**: 80% lines, 75% branches
+
+| Metric | Value | Threshold | Status |
+|--------|-------|-----------|--------|
+| Lines | 87.3% | 80% | ✅ PASS |
+| Branches | 78.2% | 75% | ✅ PASS |
+| Functions | 91.0% | 80% | ✅ PASS |
+| Statements | 86.5% | 80% | ✅ PASS |
+
+#### Uncovered Files (< 50%)
+| File | Coverage | Reason |
+|------|----------|--------|
+| `src/legacy/old-api.ts` | 23% | Legacy code, consider removal |
+| `src/utils/debug.ts` | 0% | Debug-only, excluded from prod |
+
+#### New Code Coverage
+| File | Coverage | Status |
+|------|----------|--------|
+| `src/features/checkout.ts` | 94% | ✅ Above 85% new code threshold |
+| `src/services/payment.ts` | 88% | ✅ Above 85% new code threshold |
+
+#### Coverage Trend
+```
+Last 5 runs: 82% → 84% → 85% → 86% → 87% ↑
+```
+```
+
+### CI/CD Integration Examples
+
+#### GitHub Actions (with coverage gate)
+
+```yaml
+- name: Run tests with coverage
+  run: npm run test -- --coverage
+
+- name: Check coverage thresholds
+  run: |
+    COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+    if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+      echo "::error::Coverage $COVERAGE% is below 80% threshold"
+      exit 1
+    fi
+
+- name: Upload coverage to Codecov
+  uses: codecov/codecov-action@v4
+  with:
+    fail_ci_if_error: true
+
+- name: Coverage comment on PR
+  uses: MishaKav/jest-coverage-comment@main
+  with:
+    coverage-summary-path: coverage/coverage-summary.json
+```
+
+#### GitLab CI
+
+```yaml
+test:
+  script:
+    - npm run test -- --coverage
+  coverage: '/Lines\s*:\s*(\d+\.?\d*)%/'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+```
+
+### Codecov/Coveralls Integration
+
+```yaml
+# codecov.yml
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 2%  # Allow 2% drop
+    patch:
+      default:
+        target: 85%  # New code must be 85%+
+
+  # Fail PR if coverage drops
+  range: "70...100"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+```
+
 ## Red Lines (Never Pass With)
 
 - ❌ ANY failing test
 - ❌ ANY lint error (warnings OK with justification)
 - ❌ ANY type error
 - ❌ HIGH/CRITICAL security vulnerability
-- ❌ Coverage below threshold for NEW code
+- ❌ **Coverage below threshold** (enforced per mode)
+- ❌ **New code below 85% coverage** (always enforced)
 - ❌ Unformatted code (auto-fix should handle this)
+
+## Coverage Quick Reference
+
+| Tool | Threshold Flag | Report Flag |
+|------|----------------|-------------|
+| Jest | `--coverageThreshold='{"global":{"lines":80}}'` | `--coverage` |
+| Vitest | `--coverage.thresholds.lines=80` | `--coverage` |
+| pytest | `--cov-fail-under=80` | `--cov=src` |
+| go test | (check manually) | `-coverprofile=c.out` |
+| cargo tarpaulin | `--fail-under 80` | (default) |
+| nyc | `--check-coverage --lines 80` | `--reporter=text` |
