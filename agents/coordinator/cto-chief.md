@@ -204,14 +204,33 @@ CONDITIONAL:
 
 ### Step 14: VERIFY - Run Quality Gate LOCALLY (ALL CHECKS IN PARALLEL)
 
-**⚠️ IRON RULE: All checks must pass LOCALLY before push.**
-
-If it fails in CI/CD, it should have failed locally first. CI/CD failures mean you didn't verify locally.
-
 ```
-NEVER: Push and "see if CI passes"
-NEVER: Skip local tests because "CI will catch it"
-ALWAYS: Run full quality gate locally before commit
+╔═══════════════════════════════════════════════════════════════╗
+║              ⛔ ZERO SURPRISES POLICY ⛔                        ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                                ║
+║   NO FRONTEND SURPRISES.                                      ║
+║   NO BACKEND SURPRISES.                                       ║
+║   NO SURPRISES. PERIOD.                                       ║
+║                                                                ║
+║   Run EVERY CI/CD check locally BEFORE pushing.               ║
+║   If CI fails, YOU failed to verify locally.                  ║
+║                                                                ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+**MANDATORY before push:**
+```bash
+# Frontend
+npm run lint && npm run typecheck && npm run test
+
+# Backend
+ruff check . && mypy . && pytest
+
+# E2E (if exists)
+npx playwright test
+
+# ALL must pass. ANY failure = DO NOT PUSH.
 ```
 
 **Use the quality-gate-runner agent** - it runs EVERYTHING in parallel:
