@@ -202,7 +202,17 @@ CONDITIONAL:
   translation-checker    (IF: i18n changes)
 ```
 
-### Step 14: VERIFY - Run Quality Gate (ALL CHECKS IN PARALLEL)
+### Step 14: VERIFY - Run Quality Gate LOCALLY (ALL CHECKS IN PARALLEL)
+
+**⚠️ IRON RULE: All checks must pass LOCALLY before push.**
+
+If it fails in CI/CD, it should have failed locally first. CI/CD failures mean you didn't verify locally.
+
+```
+NEVER: Push and "see if CI passes"
+NEVER: Skip local tests because "CI will catch it"
+ALWAYS: Run full quality gate locally before commit
+```
 
 **Use the quality-gate-runner agent** - it runs EVERYTHING in parallel:
 
