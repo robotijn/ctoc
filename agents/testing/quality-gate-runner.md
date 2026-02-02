@@ -224,6 +224,137 @@ Task 4: {
 | Security | `npm audit` | `pip-audit` | `govulncheck` | `cargo audit` | ✅ YES |
 | Integration | `npm run test:int` | `pytest tests/integration` | `go test -tags=integration` | `cargo test --features=integration` | IF EXISTS |
 | E2E | `npm run test:e2e` | `pytest tests/e2e` | - | - | IF EXISTS |
+| **Playwright** | `npx playwright test` | `pytest --browser` | - | - | **IF EXISTS** |
+
+## Playwright E2E Tests (Critical for Web Apps)
+
+### Detection
+
+Check if Playwright is available:
+
+```bash
+# Check for Playwright config
+if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
+  echo "Playwright detected"
+  PLAYWRIGHT_AVAILABLE=true
+fi
+
+# Check package.json for playwright
+if grep -q '"@playwright/test"' package.json 2>/dev/null; then
+  echo "Playwright in dependencies"
+  PLAYWRIGHT_AVAILABLE=true
+fi
+
+# Check for playwright test directory
+if [ -d "tests/e2e" ] || [ -d "e2e" ] || [ -d "tests/playwright" ]; then
+  echo "Playwright test directory found"
+fi
+```
+
+### Running Playwright Tests
+
+```bash
+# Standard Playwright execution
+npx playwright test
+
+# With specific browser (parallel by default)
+npx playwright test --project=chromium --project=firefox --project=webkit
+
+# CI mode (no UI, all browsers)
+npx playwright test --reporter=html --reporter=github
+
+# Only changed tests (faster CI)
+npx playwright test --only-changed
+
+# With sharding for parallel CI
+npx playwright test --shard=1/4  # Run on 4 CI nodes
+```
+
+### Playwright in Parallel Script
+
+Add to the parallel execution:
+
+```bash
+#!/bin/bash
+set -e
+
+RESULTS_DIR=$(mktemp -d)
+
+# Core checks (always run)
+(npm run test 2>&1 | tee "$RESULTS_DIR/tests.log"; echo $? > "$RESULTS_DIR/tests.exit") &
+(npm run lint 2>&1 | tee "$RESULTS_DIR/lint.log"; echo $? > "$RESULTS_DIR/lint.exit") &
+(npm run typecheck 2>&1 | tee "$RESULTS_DIR/types.log"; echo $? > "$RESULTS_DIR/types.exit") &
+(npm audit --audit-level=high 2>&1 | tee "$RESULTS_DIR/audit.log"; echo $? > "$RESULTS_DIR/audit.exit") &
+
+# Playwright E2E (if available)
+if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
+  echo "Running Playwright tests..."
+  (npx playwright test --reporter=list 2>&1 | tee "$RESULTS_DIR/playwright.log"; echo $? > "$RESULTS_DIR/playwright.exit") &
+fi
+
+# Wait for all
+wait
+
+# Check Playwright results
+if [ -f "$RESULTS_DIR/playwright.exit" ]; then
+  PLAYWRIGHT_EXIT=$(cat "$RESULTS_DIR/playwright.exit")
+  if [ "$PLAYWRIGHT_EXIT" != "0" ]; then
+    echo "❌ Playwright E2E tests FAILED"
+    FAILED=$((FAILED + 1))
+  else
+    echo "✅ Playwright E2E tests PASSED"
+  fi
+fi
+```
+
+### Playwright-Specific Reporting
+
+```markdown
+### Playwright E2E Results
+
+| Browser | Status | Tests | Duration |
+|---------|--------|-------|----------|
+| Chromium | ✅ PASS | 45/45 | 32.1s |
+| Firefox | ✅ PASS | 45/45 | 38.4s |
+| WebKit | ✅ PASS | 45/45 | 35.2s |
+
+**Total**: 135 tests across 3 browsers
+**Screenshots**: 0 failures (no screenshots captured)
+**Videos**: Disabled in CI mode
+**Traces**: Available for failed tests
+
+#### Slow Tests (> 5s)
+- `checkout.spec.ts > complete purchase flow`: 8.2s
+- `auth.spec.ts > OAuth login redirect`: 6.1s
+
+#### Flaky Tests (retried)
+- None detected
+```
+
+### Playwright CI Configuration
+
+For GitHub Actions parallel execution:
+
+```yaml
+# .github/workflows/playwright.yml
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.shard }}
+          path: playwright-report/
+```
 
 ## Output Format
 

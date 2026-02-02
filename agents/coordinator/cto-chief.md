@@ -214,11 +214,18 @@ WHAT IT RUNS IN PARALLEL:
   ├── Unit Tests         (pytest / jest / go test / cargo test)
   ├── Integration Tests  (if exist)
   ├── E2E Tests          (if exist)
+  ├── **Playwright**     (if playwright.config.ts exists - ALL BROWSERS)
   ├── Linting            (ruff / eslint / golangci-lint / clippy)
   ├── Type Checking      (mypy / tsc / go vet)
   ├── Format Check       (ruff format / prettier / gofmt / cargo fmt)
   ├── Security Audit     (pip-audit / npm audit / govulncheck / cargo audit)
   └── Coverage Check     (threshold enforcement)
+
+PLAYWRIGHT AUTO-DETECTION:
+  - Detects playwright.config.ts or playwright.config.js
+  - Runs all browser projects (Chromium, Firefox, WebKit)
+  - Supports sharding for CI parallelism
+  - Reports per-browser results
 
 PARALLEL EXECUTION SAVES ~75% TIME:
   Sequential: ~180s
