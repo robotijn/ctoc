@@ -222,7 +222,6 @@ MENU
   [7] start            Execute next from todo
   [8] release          Bump version
   [9] dashboard        Refresh view
-  [0] commands         Show all CTOC commands
 ```
 
 ### Dashboard Menu (Agent Running)
@@ -239,7 +238,6 @@ MENU
   [7] stop after       Finish current, then stop
   [8] release          Bump version
   [9] dashboard        Refresh view
-  [0] commands         Show all CTOC commands
 ```
 
 **Note:** Dashboard shows counts only, not individual plan names. Browse a stage to see plans.
@@ -375,7 +373,6 @@ MENU
   [7] start            Execute next from todo
   [8] release          Bump version
   [9] dashboard        Refresh view
-  [0] commands         Show all CTOC commands
 ```
 
 ## Browse View Format

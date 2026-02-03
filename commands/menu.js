@@ -288,7 +288,6 @@ function main() {
     }
     out += `  [8] release          Bump version\n`;
     out += `  [9] dashboard        Refresh view\n`;
-    out += `  [0] commands         Show all CTOC commands\n`;
 
     console.log(out);
   }
