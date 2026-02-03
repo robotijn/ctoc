@@ -385,6 +385,27 @@ When working with CTOC plans, ALWAYS follow these rules:
 3. **Use AskUserQuestion for decisions** — Put recommended option first with "(Recommended)" in label
 4. **Use [1][2][3]...[0] format, no letters** — Sequential numbers only, [0] is always back/cancel
 5. **Auto-generate implementation details** — When a plan moves to implementation stage, list specific files and changes
+6. **ALWAYS ask questions when gaps found** — Never just list gaps; ask specific questions to resolve each one
+
+### Rule 6: Mandatory Questions for Gaps (ENFORCED)
+
+When discussing plans and you identify gaps, issues, or unclear areas:
+
+❌ **WRONG:** "Here are the gaps I found: 1, 2, 3."
+✅ **RIGHT:** "I found these gaps. For each one, I need your input:"
+
+**For every gap identified, you MUST:**
+1. State the gap clearly
+2. Ask a specific question to resolve it
+3. Offer options if applicable (use AskUserQuestion tool)
+
+**Example:**
+```
+Gap: Settings location unclear
+→ Question: Should settings be global (~/.ctoc/) or per-project (.ctoc/)?
+  [1] Global (Recommended) - One config for all projects
+  [2] Per-project - Each project has own settings
+```
 
 These rules ensure consistent, keyboard-driven navigation through the CTOC workflow.
 

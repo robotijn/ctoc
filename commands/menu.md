@@ -524,7 +524,7 @@ When user says "discuss" or selects discuss option:
    → Recommended: {A/B} because {reasoning}
    ```
 
-3. **Ask Questions** - Clarify ambiguous requirements
+3. **ASK QUESTIONS** - Clarify ambiguous requirements
 
 4. **Refine** - Update plan based on user input
 
@@ -533,6 +533,44 @@ When user says "discuss" or selects discuss option:
 - Always show discuss option
 - User decides when ready - only user can approve
 - Show reasoning for recommendations
+
+### ⚠️ MANDATORY: Ask Questions When Gaps Found
+
+**This is NON-NEGOTIABLE.** When you identify gaps, issues, or unclear areas in a plan:
+
+1. **DO NOT** just list gaps and wait
+2. **DO NOT** silently fix gaps yourself
+3. **ALWAYS** ask the user specific questions about each gap
+
+**Format:**
+```
+═══════════════════════════════════════════════════════════════
+                    GAPS IDENTIFIED
+═══════════════════════════════════════════════════════════════
+
+1. {Gap description}
+   → Question: {Specific question to resolve this gap}
+
+2. {Gap description}
+   → Question: {Specific question to resolve this gap}
+
+═══════════════════════════════════════════════════════════════
+```
+
+**Use AskUserQuestion tool** when you need to choose between approaches:
+- Present 2-4 options with clear descriptions
+- Put recommended option first with "(Recommended)" label
+- Let user decide - don't assume
+
+**Examples of good questions:**
+- "Should settings be stored globally (~/.ctoc/) or per-project (.ctoc/)?"
+- "Should this be a user command or internal-only?"
+- "Which approach do you prefer: A (simpler) or B (more flexible)?"
+
+**Examples of BAD behavior (NEVER do this):**
+- ❌ "Here are the gaps: 1, 2, 3. Let me know what you think."
+- ❌ Listing gaps without asking how to resolve them
+- ❌ Making assumptions about user preferences without asking
 
 ## Actions Per Stage
 
