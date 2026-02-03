@@ -397,15 +397,26 @@ When discussing plans and you identify gaps, issues, or unclear areas:
 **For every gap identified, you MUST:**
 1. State the gap clearly
 2. Ask a specific question to resolve it
-3. Offer options if applicable (use AskUserQuestion tool)
+3. Offer options WITH PROS AND CONS for each option
 
-**Example:**
+**MANDATORY FORMAT - Every option needs pros/cons:**
 ```
 Gap: Settings location unclear
-→ Question: Should settings be global (~/.ctoc/) or per-project (.ctoc/)?
-  [1] Global (Recommended) - One config for all projects
-  [2] Per-project - Each project has own settings
+→ Question: Should settings be global or per-project?
+
+  [1] Global (~/.ctoc/) (Recommended)
+      ✅ One config for all projects
+      ✅ Runner setup is machine-wide anyway
+      ❌ Can't have different settings per project
+
+  [2] Per-project (.ctoc/)
+      ✅ Each project can have unique settings
+      ✅ Settings travel with the repo
+      ❌ Must configure for every project
+      ❌ Runner is machine-wide, doesn't match
 ```
+
+**NEVER ask a question without showing pros/cons for each answer.**
 
 These rules ensure consistent, keyboard-driven navigation through the CTOC workflow.
 

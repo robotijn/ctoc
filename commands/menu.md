@@ -542,34 +542,49 @@ When user says "discuss" or selects discuss option:
 2. **DO NOT** silently fix gaps yourself
 3. **ALWAYS** ask the user specific questions about each gap
 
-**Format:**
+**MANDATORY FORMAT - Every question needs pros/cons for EACH option:**
 ```
 ═══════════════════════════════════════════════════════════════
                     GAPS IDENTIFIED
 ═══════════════════════════════════════════════════════════════
 
 1. {Gap description}
-   → Question: {Specific question to resolve this gap}
+   → Question: {Specific question}
+
+   [1] {Option A} (Recommended)
+       ✅ Pro 1
+       ✅ Pro 2
+       ❌ Con 1
+
+   [2] {Option B}
+       ✅ Pro 1
+       ❌ Con 1
+       ❌ Con 2
 
 2. {Gap description}
-   → Question: {Specific question to resolve this gap}
+   → Question: {Specific question}
+
+   [1] {Option A}
+       ✅ Pro 1
+       ❌ Con 1
+
+   [2] {Option B}
+       ✅ Pro 1
+       ❌ Con 1
 
 ═══════════════════════════════════════════════════════════════
 ```
 
-**Use AskUserQuestion tool** when you need to choose between approaches:
-- Present 2-4 options with clear descriptions
+**RULES for questions:**
+- EVERY option MUST have pros (✅) and cons (❌)
 - Put recommended option first with "(Recommended)" label
+- Minimum 1 pro and 1 con per option
 - Let user decide - don't assume
-
-**Examples of good questions:**
-- "Should settings be stored globally (~/.ctoc/) or per-project (.ctoc/)?"
-- "Should this be a user command or internal-only?"
-- "Which approach do you prefer: A (simpler) or B (more flexible)?"
 
 **Examples of BAD behavior (NEVER do this):**
 - ❌ "Here are the gaps: 1, 2, 3. Let me know what you think."
 - ❌ Listing gaps without asking how to resolve them
+- ❌ Asking questions without showing pros/cons
 - ❌ Making assumptions about user preferences without asking
 
 ## Actions Per Stage
