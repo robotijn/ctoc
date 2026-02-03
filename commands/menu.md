@@ -1,11 +1,11 @@
 ---
-description: Show CTOC dashboard status and menu
+description: CTOC Dashboard - Your Virtual CTO command center
 ---
 
-Show the CTOC dashboard:
+Show the CTOC dashboard and menu:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/commands/ctoc.js"
+node "${CLAUDE_PLUGIN_ROOT}/commands/menu.js"
 ```
 
 ---
@@ -221,8 +221,8 @@ MENU
   ─────────────────────────────────────
   [7] start            Execute next from todo
   [8] release          Bump version
-  [9] update           Update CTOC
-  [0] back             Exit dashboard
+  [9] dashboard        Refresh view
+  [0] commands         Show all CTOC commands
 ```
 
 ### Dashboard Menu (Agent Running)
@@ -238,8 +238,8 @@ MENU
   ─────────────────────────────────────
   [7] stop after       Finish current, then stop
   [8] release          Bump version
-  [9] update           Update CTOC
-  [0] back             Exit dashboard
+  [9] dashboard        Refresh view
+  [0] commands         Show all CTOC commands
 ```
 
 **Note:** Dashboard shows counts only, not individual plan names. Browse a stage to see plans.
@@ -372,10 +372,10 @@ MENU
   [5] review           Browse review queue
   [6] done             Browse completed
   ─────────────────────────────────────
-  [7] release          Bump version
-  [8] update           Update CTOC
-  [9] settings         Configuration
-  [0] back             Exit dashboard
+  [7] start            Execute next from todo
+  [8] release          Bump version
+  [9] dashboard        Refresh view
+  [0] commands         Show all CTOC commands
 ```
 
 ## Browse View Format
