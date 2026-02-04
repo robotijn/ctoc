@@ -1,0 +1,386 @@
+# CTOC Quality Gate Configuration
+# ================================
+# This file configures the smart quality gate system.
+# Copy to your project's .ctoc/quality-config.yaml and customize.
+
+# =============================================================================
+# TIER CONFIGURATION
+# =============================================================================
+# Tier 1: Blocking checks (must pass before push)
+# Tier 2: Warning checks (should fix, doesn't block)
+# Tier 3: Review checks (at stage transitions)
+# Tier 4: CI-only checks (full verification on push)
+
+tiers:
+  tier1:
+    blocking: true
+    timeout: 60000  # 60 seconds max
+    checks:
+      - lint
+      - typecheck
+      - affected-tests
+      - secrets
+      - critical-cves
+
+  tier2:
+    blocking: false
+    timeout: 120000  # 2 minutes max
+    checks:
+      - coverage:
+          threshold: 80
+          failOn: decrease  # 'decrease' or 'absolute'
+      - complexity:
+          cyclomatic: 10    # Max cyclomatic complexity per function
+          cognitive: 15     # Max cognitive complexity per function
+          linesPerFunction: 50
+          nestingDepth: 4
+      - duplication:
+          minLines: 6       # Minimum lines to consider duplicate
+          threshold: 3      # Max allowed duplicate blocks
+      - medium-cves
+
+  tier3:
+    blocking: false
+    runAt: stage-transition  # When to run these checks
+    timeout: 180000  # 3 minutes max
+    checks:
+      - documentation:
+          publicApiCoverage: 80  # % of public APIs documented
+      - circular-deps:
+          maxNewCycles: 0        # Block any new circular dependencies
+      - bundle-size:
+          maxDelta: 10           # Max % increase in bundle size
+          maxAbsolute: null      # Max absolute size (bytes), null = no limit
+      - api-compat:
+          breakingChanges: warn  # 'block', 'warn', or 'ignore'
+      - benchmarks:
+          maxRegression: 10      # Max % performance regression
+      - integration-tests
+
+  tier4:
+    # CI-only checks - not run locally
+    ciOnly: true
+    checks:
+      - full-tests
+      - e2e
+      - mutation:
+          minScore: 70
+      - memory-leaks
+      - license-compliance:
+          allowed:
+            - MIT
+            - Apache-2.0
+            - BSD-2-Clause
+            - BSD-3-Clause
+            - ISC
+          blocked:
+            - GPL-3.0
+            - AGPL-3.0
+      - security-audit
+      - accessibility
+
+# =============================================================================
+# COVERAGE MAP SETTINGS
+# =============================================================================
+# Controls the file→test mapping for smart test selection
+
+coverage:
+  # Days before coverage map is considered stale
+  mapRefreshDays: 7
+
+  # Run full suite if file not in coverage map
+  fallbackToFull: true
+
+  # Files that trigger full test suite rebuild
+  configFiles:
+    - tsconfig.json
+    - jest.config.js
+    - jest.config.ts
+    - pytest.ini
+    - pyproject.toml
+    - setup.cfg
+    - vitest.config.ts
+    - .eslintrc*
+    - .prettierrc*
+
+  # Patterns to exclude from coverage tracking
+  excludePatterns:
+    - "**/*.d.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/__pycache__/**"
+    - "**/venv/**"
+
+# =============================================================================
+# CACHE SETTINGS
+# =============================================================================
+# Quality state persistence
+
+cache:
+  # Max age before cache is invalidated (hours)
+  maxAgeHours: 24
+
+  # Location relative to project root
+  location: .ctoc/quality-state
+
+  # Clean up old cache files automatically
+  autoCleanup: true
+  cleanupAgeDays: 7
+
+# =============================================================================
+# PUSH SETTINGS
+# =============================================================================
+# Controls auto-push behavior
+
+push:
+  # Automatically push after successful quality checks
+  autoPush: true
+
+  # Remote to push to
+  remote: origin
+
+  # Branch to push (null = current branch)
+  branch: null
+
+  # Allow push with Tier 2 warnings
+  allowWarnings: false
+
+  # Retry on transient push failures
+  retryCount: 2
+  retryDelay: 5000  # milliseconds
+
+# =============================================================================
+# FLAKY TEST HANDLING
+# =============================================================================
+# Zero tolerance for flaky tests
+
+flakyTests:
+  # Number of retries to confirm flakiness
+  retryCount: 2
+
+  # Delay between retries (milliseconds)
+  retryDelay: 1000
+
+  # Action on flaky detection: 'block', 'warn', 'ignore'
+  action: block
+
+  # Track flaky test history
+  trackHistory: true
+
+# =============================================================================
+# SECURITY SETTINGS
+# =============================================================================
+# Secret detection and CVE scanning
+
+security:
+  # Secret detection patterns (regex)
+  secretPatterns:
+    - "(?i)(api[_-]?key|apikey)['\"]?\\s*[:=]\\s*['\"][a-zA-Z0-9]{16,}"
+    - "(?i)(secret|password|passwd|pwd)['\"]?\\s*[:=]\\s*['\"][^'\"]{8,}"
+    - "(?i)(aws[_-]?access[_-]?key|aws[_-]?secret)"
+    - "(?i)bearer\\s+[a-zA-Z0-9\\-\\._~\\+\\/]+"
+    - "ghp_[a-zA-Z0-9]{36}"  # GitHub personal access token
+    - "gho_[a-zA-Z0-9]{36}"  # GitHub OAuth token
+    - "sk-[a-zA-Z0-9]{48}"   # OpenAI API key
+
+  # Files to always scan for secrets
+  alwaysScan:
+    - "*.env*"
+    - "*.config*"
+    - "*.json"
+    - "*.yaml"
+    - "*.yml"
+
+  # Files to never scan
+  neverScan:
+    - "*.lock"
+    - "*.md"
+    - "*.txt"
+    - "**/fixtures/**"
+    - "**/testdata/**"
+
+  # CVE severity levels that block
+  cveBlockSeverity:
+    - critical
+    - high
+
+  # CVE severity levels that warn
+  cveWarnSeverity:
+    - medium
+
+# =============================================================================
+# LANGUAGE-SPECIFIC COMMANDS
+# =============================================================================
+# Define lint, typecheck, test, and coverage commands per language
+
+languages:
+  javascript:
+    detect:
+      - package.json
+    lint: eslint .
+    typecheck: null  # No typecheck for plain JS
+    test: npm test
+    coverage: npm test -- --coverage --coverageReporters=json
+    securityAudit: npm audit
+
+  typescript:
+    detect:
+      - tsconfig.json
+    lint: eslint .
+    typecheck: tsc --noEmit
+    test: npm test
+    coverage: npm test -- --coverage --coverageReporters=json
+    securityAudit: npm audit
+
+  python:
+    detect:
+      - pyproject.toml
+      - setup.py
+      - requirements.txt
+    lint: ruff check .
+    typecheck: mypy .
+    test: pytest
+    coverage: pytest --cov --cov-report=json
+    securityAudit: pip-audit
+
+  go:
+    detect:
+      - go.mod
+    lint: golangci-lint run
+    typecheck: go build ./...
+    test: go test ./...
+    coverage: go test -coverprofile=coverage.out ./...
+    securityAudit: govulncheck ./...
+
+  rust:
+    detect:
+      - Cargo.toml
+    lint: cargo clippy -- -D warnings
+    typecheck: cargo check
+    test: cargo test
+    coverage: cargo llvm-cov --json
+    securityAudit: cargo audit
+
+  java:
+    detect:
+      - pom.xml
+      - build.gradle
+    lint: ./gradlew checkstyleMain || mvn checkstyle:check
+    typecheck: ./gradlew compileJava || mvn compile
+    test: ./gradlew test || mvn test
+    coverage: ./gradlew jacocoTestReport || mvn jacoco:report
+    securityAudit: ./gradlew dependencyCheckAnalyze || mvn org.owasp:dependency-check-maven:check
+
+  csharp:
+    detect:
+      - "*.csproj"
+      - "*.sln"
+    lint: dotnet format --verify-no-changes
+    typecheck: dotnet build --no-restore
+    test: dotnet test --no-build
+    coverage: dotnet test --collect:"XPlat Code Coverage"
+    securityAudit: dotnet list package --vulnerable
+
+  ruby:
+    detect:
+      - Gemfile
+    lint: rubocop
+    typecheck: null  # No static typecheck for Ruby
+    test: bundle exec rspec
+    coverage: COVERAGE=true bundle exec rspec
+    securityAudit: bundle audit check
+
+# =============================================================================
+# MONOREPO SETTINGS
+# =============================================================================
+# Package-scoped quality checks for monorepos
+
+monorepo:
+  # Enable monorepo mode
+  enabled: false
+
+  # Package directory patterns
+  packagePatterns:
+    - "packages/*"
+    - "apps/*"
+    - "libs/*"
+
+  # Shared code directories (changes trigger all dependents)
+  sharedDirs:
+    - "shared"
+    - "common"
+    - "lib"
+
+  # Use workspace-aware commands
+  useWorkspaces: true
+
+# =============================================================================
+# NOTIFICATION SETTINGS
+# =============================================================================
+# How to notify on completion
+
+notifications:
+  # Notification method: 'terminal', 'desktop', 'both'
+  method: terminal
+
+  # Show notifications for
+  showOn:
+    - success
+    - failure
+    - warning
+
+  # Desktop notification settings (if method includes 'desktop')
+  desktop:
+    sound: true
+    timeout: 5000  # milliseconds
+
+# =============================================================================
+# INTERRUPTED CHECK RECOVERY
+# =============================================================================
+# Handle interrupted quality checks
+
+recovery:
+  # Use atomic writes for cache files
+  atomicWrites: true
+
+  # PID lockfile for concurrency detection
+  useLockfile: true
+
+  # Self-heal on startup if previous run was interrupted
+  selfHeal: true
+
+  # Stale lock timeout (seconds)
+  staleLockTimeout: 300
+
+# =============================================================================
+# TOOL DETECTION
+# =============================================================================
+# Behavior when required tools are missing
+
+toolDetection:
+  # Check if tools exist before running
+  checkBeforeRun: true
+
+  # Show install command if tool is missing
+  showInstallHint: true
+
+  # Fail silently vs error loudly
+  failOnMissing: true
+
+# =============================================================================
+# OVERRIDES
+# =============================================================================
+# Per-file or per-directory overrides
+
+overrides:
+  # Example: Disable complexity check for generated files
+  # - pattern: "**/generated/**"
+  #   disable:
+  #     - complexity
+  #     - duplication
+
+  # Example: Higher coverage threshold for core modules
+  # - pattern: "src/core/**"
+  #   coverage:
+  #     threshold: 90

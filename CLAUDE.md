@@ -184,6 +184,78 @@ Before processing an issue:
 
 ---
 
+## 🔄 Smart Quality Gate System
+
+CTOC uses a **background quality agent** that runs tests without blocking commits.
+
+### How It Works
+
+```
+git commit ───► post-commit hook spawns background agent
+(instant)              │
+                       ▼
+              Running: lint, typecheck, affected tests, security
+                       │
+               ┌───────┴───────┐
+               ▼               ▼
+            PASS ✅         FAIL ❌
+               │               │
+          git push        Don't push
+          "Pushed!"       "Fix: ..."
+```
+
+### Quality Tiers
+
+| Tier | When | Checks | Blocking? |
+|------|------|--------|-----------|
+| Tier 1 | Every commit | lint, typecheck, affected tests, secrets, critical CVEs | Yes (blocks push) |
+| Tier 2 | Every commit | coverage, complexity, duplication, medium CVEs | No (warnings) |
+| Tier 3 | Stage transitions | docs, circular deps, bundle size, benchmarks | At transition |
+| Tier 4 | CI only | full tests, e2e, mutation, memory, license | CI |
+
+### Key Behaviors
+
+- **Commits are instant** — Never blocks, background agent handles quality
+- **Smart test selection** — Only tests affected by changes run (via coverage map)
+- **Auto-push on success** — When all Tier 1+2 pass, auto-pushes to remote
+- **Retry on failure** — Any subsequent commit (or amend) retries quality checks
+- **Zero tolerance for flaky tests** — Retry 2x, then block until fixed
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `ctoc quality` | Run Tier 1 checks on changed files |
+| `ctoc quality --full` | Run all tiers |
+| `ctoc quality status` | Show current quality state |
+| `ctoc push` | Manual quality check + push |
+| `ctoc coverage-map rebuild` | Rebuild file→test mapping |
+
+### Configuration
+
+Quality checks are configured in `.ctoc/quality-config.yaml`. Key settings:
+
+```yaml
+tiers:
+  tier1:
+    blocking: true
+    checks: [lint, typecheck, affected-tests, secrets, critical-cves]
+  tier2:
+    blocking: false
+    checks:
+      - coverage: { threshold: 80 }
+      - complexity: { cyclomatic: 10, cognitive: 15 }
+
+push:
+  autoPush: true  # Auto-push on success
+  allowWarnings: false  # Don't push with Tier 2 warnings
+
+flakyTests:
+  action: block  # Zero tolerance
+```
+
+---
+
 ## 📁 Project Structure
 
 ```
