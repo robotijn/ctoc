@@ -225,7 +225,8 @@ function main() {
     render();
   } else {
     // Non-interactive: rich status display for Claude
-    const { getPlanCounts, getVisionCounts, getAgentStatus, readPlans, getPlansDir } = require('../lib/state');
+    const { getPlanCounts, getAgentStatus, readPlans, getPlansDir } = require('../lib/state');
+    const { getVisionCounts } = require('../tabs/vision');
     const counts = getPlanCounts(app.projectPath);
     const visionCounts = getVisionCounts(app.projectPath);
     const agent = getAgentStatus(app.projectPath);
