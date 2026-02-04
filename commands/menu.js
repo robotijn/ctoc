@@ -18,6 +18,7 @@ const VERSION = fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').t
 
 // Import tab modules
 const overviewTab = require('../tabs/overview');
+const visionTab = require('../tabs/vision');
 const functionalTab = require('../tabs/functional');
 const implementationTab = require('../tabs/implementation');
 const reviewTab = require('../tabs/review');
@@ -27,6 +28,7 @@ const toolsTab = require('../tabs/tools');
 
 const tabModules = {
   overview: overviewTab,
+  vision: visionTab,
   functional: functionalTab,
   implementation: implementationTab,
   review: reviewTab,
@@ -223,8 +225,9 @@ function main() {
     render();
   } else {
     // Non-interactive: rich status display for Claude
-    const { getPlanCounts, getAgentStatus, readPlans, getPlansDir } = require('../lib/state');
+    const { getPlanCounts, getVisionCounts, getAgentStatus, readPlans, getPlansDir } = require('../lib/state');
     const counts = getPlanCounts(app.projectPath);
+    const visionCounts = getVisionCounts(app.projectPath);
     const agent = getAgentStatus(app.projectPath);
 
     // Read plans from each directory (flat structure)
@@ -250,6 +253,7 @@ function main() {
     out += `┌────────────────┬────────┬─────────────────┐\n`;
     out += `│ Stage          │ Count  │ Status          │\n`;
     out += `├────────────────┼────────┼─────────────────┤\n`;
+    out += `│ Vision         │ ${String(visionCounts.total).padEnd(6)}│ ${status(visionCounts.total, 'No visions', visionCounts.exploring + ' exploring').padEnd(16)}│\n`;
     out += `│ Functional     │ ${String(counts.functional).padEnd(6)}│ ${status(counts.functional, 'No drafts', counts.functional + ' drafts').padEnd(16)}│\n`;
     out += `│ Implementation │ ${String(counts.implementation).padEnd(6)}│ ${status(counts.implementation, 'No drafts', counts.implementation + ' drafts').padEnd(16)}│\n`;
     out += `│ Todo           │ ${String(counts.todo).padEnd(6)}│ ${status(counts.todo, 'Queue empty', counts.todo + ' queued').padEnd(16)}│\n`;
@@ -288,6 +292,7 @@ function main() {
     }
     out += `  [8] release          Bump version\n`;
     out += `  [9] dashboard        Refresh view\n`;
+    out += `  [0] vision           Explore a new idea\n`;
 
     console.log(out);
   }

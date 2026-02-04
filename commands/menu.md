@@ -222,6 +222,7 @@ MENU
   [7] start            Execute next from todo
   [8] release          Bump version
   [9] dashboard        Refresh view
+  [0] vision           Explore a new idea
 ```
 
 ### Dashboard Menu (Agent Running)
@@ -238,9 +239,33 @@ MENU
   [7] stop after       Finish current, then stop
   [8] release          Bump version
   [9] dashboard        Refresh view
+  [0] vision           Explore a new idea
 ```
 
 **Note:** Dashboard shows counts only, not individual plan names. Browse a stage to see plans.
+
+### Vision Mode Menu
+```
+[Vision] ({count} exploring)
+
+  [1] {vision-1.md}    Continue exploration
+  [2] {vision-2.md}    Continue exploration
+  ─────────────────────────────────────
+  [{n}] new            Start exploring new idea
+  [0] back             Return to dashboard
+```
+
+### Vision Action Menu (after selecting a vision)
+```
+[Vision] {vision-name}
+
+  [1] continue    Resume interactive exploration
+  [2] view        Show vision document
+  [3] convert     Convert to functional plan (if ready)
+  [4] rename      Rename vision
+  [5] delete      Delete vision
+  [0] back        Return to list
+```
 
 ### Browse List Menu
 ```
@@ -302,6 +327,99 @@ MENU
 
 ---
 
+## Vision Mode Rules
+
+### Rule V1: Interactive Exploration
+
+Vision Mode uses the **AskUserQuestion tool** for EVERY question. This creates an interactive, guided experience.
+
+**Format for every question:**
+```javascript
+AskUserQuestion({
+  questions: [{
+    question: "Specific question about their idea?",
+    header: "Short Label",
+    options: [
+      { label: "Option A (Recommended)", description: "✅ Pro 1, ✅ Pro 2, ❌ Con 1" },
+      { label: "Option B", description: "✅ Pro 1, ❌ Con 1, ❌ Con 2" },
+      { label: "Option C", description: "✅ Pro 1, ❌ Con 1" }
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+### Rule V2: Auto-Save After Every Answer
+
+After EACH user answer, immediately update the vision file:
+1. Read current vision file
+2. Update relevant section with answer (change ⏳ to ✓)
+3. Update `lastUpdated` timestamp
+4. Recalculate progress (n/5 phases)
+5. Add to discussion history
+6. Write file back
+
+**Never lose user input.** If connection drops, all previous answers are preserved.
+
+### Rule V3: Drive to Concrete
+
+Vision Mode's goal is CONCRETE plans, not vague ideas:
+
+- Every question should NARROW possibilities
+- Offer specific options, not open-ended questions
+- If user gives vague answer via "Other", follow up with more specific options
+- After 3-5 questions per phase, user should have clarity
+
+**Signs vision is ready for conversion:**
+1. Problem statement is crisp and specific
+2. Success criteria are measurable
+3. Scope has clear boundaries
+4. Risks are identified
+
+### Rule V4: Five-Phase Flow
+
+**Phase 1: Problem Discovery** (3 questions)
+- What problem? Who experiences it? How painful?
+
+**Phase 2: Value Proposition** (2 questions)
+- How measure success? What's the impact?
+
+**Phase 3: Scope Definition** (3 questions)
+- Minimum viable? What's out? Dependencies?
+
+**Phase 4: Risk Assessment** (3 questions)
+- What could fail? What's unknown? Assumptions?
+
+**Phase 5: Summary & Conversion** (1 question)
+- Review summary, convert or refine
+
+### Rule V5: Conversion Flow
+
+When user approves vision summary:
+
+1. Create `plans/functional/{slug}.md` with:
+   - Title from vision
+   - Problem from Phase 1
+   - Success criteria from Phase 2
+   - Scope from Phase 3
+   - Risks from Phase 4
+
+2. Update vision status to `converted`
+
+3. Return user to functional plans list
+
+### Rule V6: Learning Integration
+
+Before starting a vision session:
+1. Read `.ctoc/learnings/vision.md`
+2. Apply good question patterns
+3. Avoid documented anti-patterns
+4. Use domain-specific insights
+
+After session, if new insights emerged, offer to update learnings file.
+
+---
+
 ## Iron Loop Auto-Pilot
 
 **IMPORTANT:** Check after showing dashboard:
@@ -348,6 +466,7 @@ CTOC v{version}
 ┌────────────────┬────────┬─────────────────┐
 │ Stage          │ Count  │ Status          │
 ├────────────────┼────────┼─────────────────┤
+│ Vision         │ {n}    │ {n} exploring   │
 │ Functional     │ {n}    │ {status}        │
 │ Implementation │ {n}    │ {status}        │
 │ Todo           │ {n}    │ {status}        │
@@ -373,6 +492,7 @@ MENU
   [7] start            Execute next from todo
   [8] release          Bump version
   [9] dashboard        Refresh view
+  [0] vision           Explore a new idea
 ```
 
 ## Browse View Format

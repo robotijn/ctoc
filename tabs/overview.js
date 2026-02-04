@@ -6,6 +6,7 @@
 const { c, line, renderFooter } = require('../lib/tui');
 const { getPlanCounts, getAgentStatus } = require('../lib/state');
 const { getVersion, bump } = require('../lib/version');
+const { getVisionCounts } = require('./vision');
 
 // Release mode state
 let releaseMode = false;
@@ -25,12 +26,15 @@ function render(app) {
   output += renderReleaseSection(version);
   output += '\n';
 
-  output += `${c.bold}Plans${c.reset}\n`;
+  const vision = getVisionCounts(projectPath);
+
+  output += `${c.bold}Pipeline${c.reset}\n`;
+  output += `  Vision          ${c.magenta}${vision.total}${c.reset} ${vision.exploring > 0 ? `(${vision.exploring} exploring)` : ''}\n`;
   output += `  Functional      ${c.cyan}${counts.functional}${c.reset} drafts\n`;
   output += `  Implementation  ${c.cyan}${counts.implementation}${c.reset} drafts\n`;
-  output += `  Review          ${c.cyan}${counts.review}${c.reset} pending\n`;
   output += `  Todo            ${c.cyan}${counts.todo}${c.reset} queued\n`;
-  output += `  In Progress     ${c.cyan}${counts.inProgress}${c.reset} active\n\n`;
+  output += `  In Progress     ${c.cyan}${counts.inProgress}${c.reset} active\n`;
+  output += `  Review          ${c.cyan}${counts.review}${c.reset} pending\n\n`;
 
   output += line() + '\n\n';
 
