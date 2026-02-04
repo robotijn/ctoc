@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * CTOC Update Command
- * Forces global scope to fix Claude Code's local scope detection
+ * CTOC Self-Updater
+ * Works around Claude Code plugin cache bug
+ *
+ * Issues: #21995, #16866, #14061
  */
 
 const fs = require('fs');
@@ -23,9 +25,32 @@ function run(cmd, opts = {}) {
   }
 }
 
+function getCurrentVersion() {
+  // Get version from currently running plugin
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (pluginRoot) {
+    const versionFile = path.join(pluginRoot, 'VERSION');
+    if (fs.existsSync(versionFile)) {
+      return fs.readFileSync(versionFile, 'utf8').trim();
+    }
+  }
+  return 'unknown';
+}
+
+function getLatestVersion() {
+  const versionFile = path.join(MARKETPLACE_DIR, 'VERSION');
+  if (fs.existsSync(versionFile)) {
+    return fs.readFileSync(versionFile, 'utf8').trim();
+  }
+  return null;
+}
+
 function update() {
+  const currentVersion = getCurrentVersion();
+
   console.log('CTOC Update');
   console.log('─'.repeat(40));
+  console.log(`Current version: ${currentVersion}`);
 
   // 1. Fetch latest from GitHub
   console.log('\n1. Fetching latest from GitHub...');
@@ -38,14 +63,26 @@ function update() {
   }
 
   // 2. Get new version
-  const versionFile = path.join(MARKETPLACE_DIR, 'VERSION');
-  const newVersion = fs.readFileSync(versionFile, 'utf8').trim();
-  console.log(`   Found version: ${newVersion}`);
+  const newVersion = getLatestVersion();
+  if (!newVersion) {
+    console.error('   Could not determine latest version');
+    process.exit(1);
+  }
+  console.log(`   Latest version: ${newVersion}`);
 
-  // 3. Get commit SHA
+  // 3. Check if already up to date
+  if (currentVersion === newVersion) {
+    console.log('\n' + '─'.repeat(40));
+    console.log(`✓ Already up to date (v${newVersion})`);
+    return;
+  }
+
+  console.log(`\n   Updating: ${currentVersion} → ${newVersion}`);
+
+  // 4. Get commit SHA
   const commitSha = run(`git -C "${MARKETPLACE_DIR}" rev-parse --short HEAD`);
 
-  // 4. Copy to cache
+  // 5. Copy to cache
   const cacheVersionDir = path.join(CACHE_DIR, newVersion);
   console.log('\n2. Installing to cache...');
 
@@ -65,36 +102,50 @@ function update() {
   }
   console.log(`   Installed to: ${cacheVersionDir}`);
 
-  // 5. Update installed_plugins.json with GLOBAL scope
-  console.log('\n3. Updating plugin registry (global scope)...');
+  // 6. Update installed_plugins.json
+  console.log('\n3. Updating plugin registry...');
 
-  const installed = {
-    version: 2,
-    plugins: {
-      'ctoc@robotijn': [
-        {
-          scope: 'global',  // CRITICAL: Force global scope
-          installPath: cacheVersionDir,
-          version: newVersion,
-          installedAt: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          gitCommitSha: commitSha
-        }
-      ]
+  // Preserve existing plugins, only update ctoc
+  let installed = { version: 2, plugins: {} };
+  if (fs.existsSync(INSTALLED_FILE)) {
+    try {
+      installed = JSON.parse(fs.readFileSync(INSTALLED_FILE, 'utf8'));
+    } catch (e) {
+      // Use default if file is corrupted
     }
-  };
+  }
+
+  // Preserve original installedAt if exists
+  const existingEntry = installed.plugins?.['ctoc@robotijn']?.[0];
+  const installedAt = existingEntry?.installedAt || new Date().toISOString();
+
+  installed.plugins['ctoc@robotijn'] = [
+    {
+      scope: 'user',
+      installPath: cacheVersionDir,
+      version: newVersion,
+      installedAt: installedAt,
+      lastUpdated: new Date().toISOString(),
+      gitCommitSha: commitSha
+    }
+  ];
 
   fs.writeFileSync(INSTALLED_FILE, JSON.stringify(installed, null, 2));
-  console.log('   Registry updated with scope: global');
+  console.log('   Registry updated');
 
-  // 6. Clean old versions
+  // 7. Clean old versions
   console.log('\n4. Cleaning old versions...');
-  const versions = fs.readdirSync(CACHE_DIR).filter(v => v !== newVersion);
-  for (const v of versions) {
-    fs.rmSync(path.join(CACHE_DIR, v), { recursive: true });
-    console.log(`   Removed: ${v}`);
-  }
-  if (versions.length === 0) {
+  try {
+    const versions = fs.readdirSync(CACHE_DIR).filter(v => v !== newVersion);
+    for (const v of versions) {
+      fs.rmSync(path.join(CACHE_DIR, v), { recursive: true });
+      console.log(`   Removed: ${v}`);
+    }
+    if (versions.length === 0) {
+      console.log('   No old versions to remove');
+    }
+  } catch (e) {
+    // Cache dir might not exist yet
     console.log('   No old versions to remove');
   }
 
