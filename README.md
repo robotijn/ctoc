@@ -16,7 +16,7 @@ GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 | Command | Description |
 |---------|-------------|
 | `/ctoc` | Interactive dashboard (run in terminal) or status report (via Claude) |
-| `/ctoc:update` | Update to latest version (instant, no restart) |
+| `/ctoc:update` | Update to latest version |
 
 ### Updating CTOC
 
@@ -24,14 +24,13 @@ GitHub: [robotijn/ctoc](https://github.com/robotijn/ctoc)
 /ctoc:update
 ```
 
-This is a **temporary workaround** due to Claude Code restrictions where `/plugin update` doesn't reliably update plugins ([#19197](https://github.com/anthropics/claude-code/issues/19197)).
+This is a **workaround** for a Claude Code bug where `/plugin update` doesn't refresh the cache ([#21995](https://github.com/anthropics/claude-code/issues/21995)).
 
 **How it works:**
-- Uses git to pull latest changes directly from GitHub
-- No restart required — changes are live immediately
-- Self-healing: auto-clones if cache is missing or corrupted
-
-Once the Claude Code bug is fixed, `/plugin update ctoc` will be the recommended method.
+- Fetches latest from GitHub
+- Compares versions and skips if already current
+- Clears and repopulates plugin cache
+- Restart Claude Code to use the new version
 
 ---
 
@@ -266,17 +265,13 @@ claude --dangerously-skip-permissions --continue
 
 ### Why `/ctoc:update`?
 
-The built-in `/plugin update` command has two issues:
+The built-in `/plugin update` command has a bug ([#21995](https://github.com/anthropics/claude-code/issues/21995)) where it updates the git repo but doesn't refresh the plugin cache.
 
-1. **Stale cache bug** — [#19197](https://github.com/anthropics/claude-code/issues/19197) causes `/plugin update` to not refresh cached files properly
-
-2. **Local scope detection** — When running from a directory that contains the plugin source (like `ctoc-build`), Claude Code auto-sets `scope: local` which pins the plugin to a specific project instead of being globally available
-
-`/ctoc:update` fixes both:
-- Fetches latest from GitHub
-- Installs to cache with correct version
-- Forces `scope: global` in the plugin registry
-- Cleans up old versions
+`/ctoc:update` works around this by:
+- Fetching latest from GitHub
+- Clearing and repopulating the cache
+- Updating the plugin registry
+- Cleaning up old versions
 
 ### Command-line flags
 
