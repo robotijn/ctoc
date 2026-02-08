@@ -246,6 +246,15 @@ The user can iterate (edit, add, remove stubs) until satisfied, then approve for
 - **Vision Decomposer** only activates when the vision contains 2+ independent workstreams
 - **Product Owner** only activates after human approves the decomposition
 
+### Decision 15: Auto-push Remote Conflict
+
+**Pull-rebase then push:**
+- If `git push` fails (remote ahead), auto `git pull --rebase`
+- Re-run affected tests on rebased code
+- Push again if tests pass
+- If rebase conflicts → notify user "Conflict on push, run `ctoc sync`"
+- Never force-push
+
 ## Quality Gate Taxonomy
 
 ```
@@ -1035,7 +1044,7 @@ languages:
 | `agents/quality/architecture-checker.md` | CREATE | Circular deps, layers |
 | `agents/quality/performance-validator.md` | CREATE | Benchmarks, bundle size |
 | `agents/quality/quality-gate.md` | CREATE | Orchestrator agent |
-| `agents/planning/vision-decomposer.md` | MODIFY | Update existing agent with human checkpoint flow |
+| `agents/planning/vision-decomposer.md` | MODIFY | Merge: keep Story Mapping methodology + add human checkpoint + stub-based output |
 | `agents/planning/product-owner.md` | CREATE | Functional plan refinement |
 | `lib/vision-decomposer.js` | CREATE | Vision parsing + stub creation |
 | `hooks/post-commit.js` | CREATE | Triggers background agent |
