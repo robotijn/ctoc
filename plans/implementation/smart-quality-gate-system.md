@@ -1,3 +1,9 @@
+---
+approved_by: human
+approved_at: 2026-02-08T16:12:08.328Z
+gate_crossed: functional → implementation
+---
+
 # REVISION 1
 
 ## Rejection Feedback
@@ -255,6 +261,22 @@ The user can iterate (edit, add, remove stubs) until satisfied, then approve for
 - If rebase conflicts → notify user "Conflict on push, run `ctoc sync`"
 - Never force-push
 
+### Decision 16: Coverage Map Without Coverage Tooling
+
+**Import analysis as primary fallback:**
+- Parse test files for `require`/`import` statements to build file→test map
+- No coverage runner needed — just static analysis of imports
+- Similar to how Jest's `--findRelatedTests` works internally
+- Fallback chain: coverage reports → import analysis → filename heuristics → full suite
+
+### Decision 17: Claude Quality Integration
+
+**Notify on non-success only:**
+- Claude sees quality results when: tests fail, warnings triggered, deprecated deps found, security issues detected
+- Silent on clean pass (no context noise)
+- Implementation: PostToolUse hook reads `.ctoc/quality-state/status.json`, injects into Claude context when status ≠ `pass`
+- User can configure to always-on or always-off via `.ctoc/quality-config.yaml`
+
 ## Quality Gate Taxonomy
 
 ```
@@ -262,7 +284,7 @@ The user can iterate (edit, add, remove stubs) until satisfied, then approve for
 │                    QUALITY GATE TIERS                            │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  TIER 1: BLOCKING (Must pass before commit)        ~5-30s       │
+│  TIER 1: BLOCKING (Must pass before push)          ~5-30s       │
 │  ──────────────────────────────────────────                     │
 │  ✓ Lint/format passed                                           │
 │  ✓ Type check passed                                            │
@@ -1118,7 +1140,7 @@ This plan covers two independent systems. Build them in this order:
 - [ ] git commit never blocks (instant)
 - [ ] Background agent auto-starts on commit
 - [ ] Smart test runner only runs affected tests
-- [ ] Coverage map built from coverage reports
+- [ ] Coverage map built from coverage reports or import analysis
 - [ ] Auto-push on all checks pass
 - [ ] Terminal notification on completion
 - [ ] Tier 1 failures block push (not commit)
@@ -1134,6 +1156,8 @@ This plan covers two independent systems. Build them in this order:
 - [ ] Each functional stub links back to parent vision
 - [ ] Monorepo package-scoped checks
 - [ ] Works with existing CTOC workflow
+- [ ] Auto-push handles remote conflicts via pull-rebase + re-test
+- [ ] Quality failures/warnings inject into Claude context via PostToolUse hook
 
 ## Success Metrics
 
