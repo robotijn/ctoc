@@ -9,30 +9,13 @@ title: "Enforce Iron Loop Step Labels"
 created: "2026-02-03T10:15:00Z"
 priority: HIGH
 type: bug-fix
-depends_on: smart-quality-gate-system.md
 ---
 
 ## Dependencies
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    IMPLEMENTATION ORDER                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. smart-quality-gate-system.md    ← IMPLEMENT FIRST           │
-│     Creates: `ctoc quality` command                             │
-│     Creates: quality-state cache                                │
-│     Creates: coverage-map.json                                  │
-│                                                                  │
-│  2. enforce-iron-loop-step-labels.md  ← THIS PLAN (after #1)    │
-│     Uses: `ctoc quality` in Step 13                             │
-│     Uses: coverage data for Step 7 decisions                    │
-│     Uses: quality-state for validation                          │
-│                                                                  │
-│  ⛔ DO NOT implement this plan until #1 is complete             │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+**None.** This plan is independent and can be implemented immediately.
+
+Step 13 (VERIFY) uses fallback logic: tries `ctoc quality` first, falls back to direct lint/type/test commands if quality gates aren't available yet. When `smart-quality-gate-system` ships later, Step 13 will automatically use it — no changes needed here.
 
 # Enforce Iron Loop Step Labels
 
@@ -226,7 +209,7 @@ Quality checks before code exists are pointless. Step 8 is now SETUP.
 │          ↑ No code exists yet! Pointless.                       │
 │                                                                  │
 │  NEW (correct):                                                 │
-│  Step 8: SETUP - Prepare environment                            │
+│  Step 8: PREPARE - Prepare environment                            │
 │          - Install dependencies if needed                       │
 │          - Check prerequisites                                  │
 │          - Verify dev environment ready                         │
@@ -425,7 +408,7 @@ Labels must START WITH the canonical label. Optional suffix allowed for context.
 | Step | Must start with | Examples |
 |------|-----------------|----------|
 | 7 | TEST | `TEST`, `TEST (TDD Red)` |
-| 8 | SETUP | `SETUP`, `SETUP (dependencies)` |
+| 8 | PREPARE | `SETUP`, `SETUP (dependencies)` |
 | 9 | IMPLEMENT | `IMPLEMENT`, `IMPLEMENT (all files)` |
 | 10 | REVIEW | `REVIEW`, `REVIEW (logic only)` |
 | 11 | OPTIMIZE | `OPTIMIZE`, `OPTIMIZE (if needed)` |

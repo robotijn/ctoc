@@ -1173,3 +1173,786 @@ This plan covers two independent systems. Build them in this order:
 ---
 
 *"Fast feedback loops create better code. Make the right thing easy."*
+
+---
+
+## Implementation Details
+
+### Existing Code Status
+
+Analysis of the codebase reveals that Phase A P0/P1 files **already exist** with substantial implementations. This section documents the current state, remaining gaps, and the exact integration work needed to make the system operational end-to-end.
+
+#### Files Already Implemented
+
+| File | Status | Lines | Completeness |
+|------|--------|-------|--------------|
+| `lib/quality-state.js` | EXISTS | 315 | ~90% complete |
+| `lib/hash-utils.js` | EXISTS | 316 | ~95% complete |
+| `lib/quality-agent.js` | EXISTS | 378 | ~75% complete |
+| `hooks/post-commit.js` | EXISTS | 89 | ~90% complete |
+| `lib/coverage-map.js` | EXISTS | 529 | ~85% complete |
+| `lib/tool-detector.js` | EXISTS | 349 | ~80% complete |
+| `lib/quality-gate.js` | EXISTS | 684 | ~80% complete (threshold evaluation) |
+| `lib/quality-config.js` | EXISTS | 583 | ~85% complete (20 languages) |
+| `agents/testing/smart-test-runner.md` | EXISTS | 283 | ~95% complete |
+| `agents/quality/quality-gate.md` | EXISTS | 391 | ~95% complete |
+| `agents/testing/coverage-mapper.md` | EXISTS | - | EXISTS |
+| `agents/security/security-scanner.md` | EXISTS | - | EXISTS |
+| `agents/security/dependency-auditor.md` | EXISTS | - | EXISTS |
+| `agents/quality/complexity-analyzer.md` | EXISTS | - | EXISTS |
+| `agents/quality/architecture-checker.md` | EXISTS | - | EXISTS |
+| `agents/quality/performance-validator.md` | EXISTS | - | EXISTS |
+| `.ctoc/quality-state/status.json` | EXISTS | 24 | Initialized with defaults |
+
+---
+
+### P0: `lib/quality-state.js` — Gaps and Integration
+
+**File:** `/home/tijn/ctoc/lib/quality-state.js` (315 lines, exists)
+
+**Current state:** Fully functional cache read/write with atomic writes, lockfile management, PID-based stale detection, and self-healing recovery. All core functions are implemented.
+
+**Exported API (already working):**
+
+```javascript
+// Core operations
+ensureStateDir()              // Creates .ctoc/quality-state/ if missing
+atomicWrite(filePath, data)   // Write temp file -> rename (corruption-safe)
+safeRead(filePath, default)   // JSON.parse with fallback
+
+// Lock management
+acquireLock()    // Returns true if acquired, false if another process running
+releaseLock()    // Only releases if current process owns the lock
+isProcessAlive(pid)  // Check if PID is running (for stale lock detection)
+
+// Status management
+getStatus()                    // Returns current status.json or defaults
+updateStatus(updates)          // Merge updates into status.json
+setRunning(triggeredBy)        // Mark state as "running"
+setCompleted(passed, summary)  // Mark as "pass"/"fail" with summary
+recoverIfNeeded()              // Detect interrupted runs, reset to "unknown"
+
+// File hashes (delegates to hash-utils)
+getFileHashes()                // Read file-hashes.json
+updateFileHashes(hashes)       // Merge new hashes into cache
+
+// Coverage map
+getCoverageMap()               // Read coverage-map.json
+updateCoverageMap(map)         // Write full map
+needsCoverageMapRebuild()      // Check age and emptiness
+```
+
+**Gap 1: STATE_DIR uses `process.cwd()` instead of project root**
+
+The current implementation:
+```javascript
+const STATE_DIR = path.join(process.cwd(), '.ctoc', 'quality-state');
+```
+
+This is fragile because `process.cwd()` may differ when called from git hooks versus normal execution. Must use `findProjectRoot()` from `lib/project-root.js`.
+
+**Fix required:**
+```javascript
+const { findProjectRoot } = require('./project-root');
+
+function getStateDir() {
+  const root = findProjectRoot();
+  return path.join(root, '.ctoc', 'quality-state');
+}
+```
+
+All dependent paths (`STATUS_FILE`, `LOCK_FILE`, `FILE_HASHES`, `COVERAGE_MAP`) must become functions or be lazily computed, since `findProjectRoot()` may not be available at module load time when invoked from a git hook.
+
+**Gap 2: Tier-level status updates missing**
+
+`updateStatus()` merges at the top level but the plan requires per-tier status updates. Need:
+
+```javascript
+/**
+ * Update a specific tier's status
+ * @param {string} tierName - 'tier1', 'tier2', or 'tier3'
+ * @param {Object} tierResult - { status, checkedAt, warnings?, details? }
+ */
+function updateTierStatus(tierName, tierResult) {
+  const status = getStatus();
+  status.tiers[tierName] = {
+    ...status.tiers[tierName],
+    ...tierResult,
+    checkedAt: new Date().toISOString()
+  };
+  atomicWrite(getStatusFilePath(), status);
+  return status;
+}
+```
+
+**Gap 3: Git HEAD tracking not wired**
+
+`getStatus()` returns `gitHead: null` by default but never gets populated. The quality agent must set this when starting:
+
+```javascript
+function setRunning(triggeredBy = 'manual') {
+  const gitHead = getGitHead(); // from quality-agent.js or inline
+  return updateStatus({
+    overallStatus: 'running',
+    gitHead,
+    lastRun: { ... }
+  });
+}
+```
+
+**Gap 4: `.gitignore` entry missing**
+
+The `.ctoc/quality-state/` directory is NOT in `.gitignore`. The plan specifies it should be gitignored (Decision 4: Local-only cache). Must add:
+
+```
+# Quality state cache (local-only, per-developer)
+.ctoc/quality-state/
+```
+
+**Integration point with `lib/background.js`:**
+
+`quality-state.js` operates independently from the existing `lib/background.js` status tracking. They serve different purposes:
+- `background.js`: Tracks plan-level background agents (research, implementation-planner, etc.)
+- `quality-state.js`: Tracks quality check state (tests, lint, security)
+
+No direct integration needed, but the `PostToolUse.status-check.js` hook should be extended (per Decision 17) to also read `quality-state/status.json` and inject quality context when status is not `pass`.
+
+---
+
+### P0: `lib/hash-utils.js` — Gaps and Integration
+
+**File:** `/home/tijn/ctoc/lib/hash-utils.js` (316 lines, exists)
+
+**Current state:** Fully functional. All required functions are implemented and working.
+
+**Exported API (already working):**
+
+```javascript
+// Core hashing
+hashFile(filePath)           // SHA256 of file contents, returns hex string or null
+hashString(content)          // SHA256 of string content
+hashFiles(filePaths)         // Map of filePath -> hash for multiple files
+hashFilesComposite(paths)    // Single combined hash for set of files
+
+// Change detection
+hasFileChanged(filePath, cachedHash)     // Compare current vs cached, returns { changed, reason, currentHash, cachedHash }
+findChangedFiles(filePaths, cachedHashes) // Categorize files: changed[], unchanged[], missing[], newFiles[]
+
+// Utilities
+createHashEntry(filePath)    // { hash, lastModified, size } for coverage map entries
+verifyFileIntegrity(path, expected)  // Timing-safe comparison
+hashDirectory(dirPath, options)      // Recursive directory hashing (for monorepo)
+```
+
+**Gaps: None significant.**
+
+This module is complete and ready for integration. The only minor note:
+
+- Uses `crypto.timingSafeEqual` for `verifyFileIntegrity()` which is good security practice but is only used for integrity verification, not for the normal change-detection path (`findChangedFiles` uses simple `!==` comparison, which is correct for non-security-sensitive hash comparison).
+
+**Integration with `quality-state.js`:**
+
+The data flow is:
+```
+quality-agent.js
+  -> gets changed files from git
+  -> calls hash-utils.findChangedFiles(files, qualityState.getFileHashes())
+  -> runs tests on changed files
+  -> calls qualityState.updateFileHashes(newHashes)
+```
+
+This integration is already wired in `quality-agent.js` implicitly (the agent runs tests on all changes), but **not explicitly using the hash-based incremental approach yet**. See quality-agent.js gaps below.
+
+---
+
+### P0: `lib/quality-agent.js` — Gaps and Integration
+
+**File:** `/home/tijn/ctoc/lib/quality-agent.js` (378 lines, exists)
+
+**Current state:** Functional skeleton that runs lint, typecheck, tests, and security scan sequentially. Missing the smart test selection (hash-based), tiered orchestration, and proper error reporting.
+
+**Current flow:**
+```
+main()
+  -> recoverIfNeeded()
+  -> acquireLock()
+  -> setRunning()
+  -> detectTools()                    // from tool-detector.js
+  -> runLint(tools)                   // sequential
+  -> runTypecheck(tools)              // sequential
+  -> runTests(tools)                  // runs ALL tests, not affected-only
+  -> runSecurityScan()                // basic secret grep
+  -> setCompleted(allPassed, summary)
+  -> if allPassed && onSuccess=='push': git push
+  -> releaseLock()
+```
+
+**Gap 1: No smart test selection (the core value proposition)**
+
+The current `runTests()` runs the full test suite (`npm test` / `pytest` / etc.). It does NOT:
+- Check file hashes to find changed files
+- Look up coverage map for affected tests
+- Run only affected tests
+- Fall back to heuristics when coverage map is missing
+
+**Required change:** Replace `runTests(tools)` with smart test selection:
+
+```javascript
+const { findChangedFiles } = require('./hash-utils');
+const { getFileHashes, updateFileHashes } = require('./quality-state');
+const { findAffectedTests } = require('./coverage-map');
+
+async function runSmartTests(tools) {
+  console.log('\n Running tests...');
+
+  // 1. Get changed files from git
+  const changedResult = runCommand('git diff HEAD~1 --name-only', { silent: true, allowFail: true });
+  const gitChangedFiles = (changedResult.output || '').split('\n').filter(f => f.trim());
+
+  // 2. Compare hashes to find actually-changed files
+  const cachedHashes = getFileHashes();
+  const hashResult = findChangedFiles(
+    gitChangedFiles.map(f => path.resolve(f)),
+    cachedHashes
+  );
+
+  if (hashResult.changed.length === 0) {
+    console.log('   No file content changes detected. Cache valid.');
+    return { passed: true, passed: 0, failed: 0, skipped: 0, flaky: 0, cached: true };
+  }
+
+  // 3. Find affected tests via coverage map
+  const affected = findAffectedTests(hashResult.changed, cachedHashes);
+
+  if (affected.requiresFullSuite) {
+    console.log(`   Full suite required: ${affected.reason}`);
+    // Fall back to full suite
+    return runFullTests(tools);
+  }
+
+  if (affected.tests.length === 0) {
+    console.log('   No tests affected by changes.');
+    return { passed: true, passed: 0, failed: 0, skipped: 0, flaky: 0 };
+  }
+
+  // 4. Run only affected tests
+  console.log(`   Running ${affected.tests.length} affected tests...`);
+  const result = runSpecificTests(tools, affected.tests);
+
+  // 5. Update hash cache on success
+  if (result.passed) {
+    updateFileHashes(hashResult.currentHashes);
+  }
+
+  return result;
+}
+```
+
+**Gap 2: No tiered execution**
+
+The current agent runs all checks as one flat list. The plan requires Tier 1 (blocking) and Tier 2 (warning) separation:
+
+```javascript
+async function runTieredChecks(tools) {
+  // Tier 1: BLOCKING
+  const tier1 = {
+    lint: await runLint(tools),
+    typecheck: await runTypecheck(tools),
+    tests: await runSmartTests(tools),
+    security: await runSecurityScan()
+  };
+
+  const tier1Passed = Object.values(tier1).every(r => r.passed);
+  qualityState.updateTierStatus('tier1', {
+    status: tier1Passed ? 'pass' : 'fail',
+    checks: tier1
+  });
+
+  if (!tier1Passed) {
+    return { tier1, tier2: null, allPassed: false, action: 'block' };
+  }
+
+  // Tier 2: WARNING (run only if Tier 1 passed)
+  // Note: Tier 2 checks are aspirational for v1; start with empty
+  const tier2 = {};
+  qualityState.updateTierStatus('tier2', {
+    status: 'pass',
+    checks: tier2
+  });
+
+  return { tier1, tier2, allPassed: true, action: 'push' };
+}
+```
+
+**Gap 3: `runCommand()` does not support running specific test files**
+
+The current implementation calls the generic test command (e.g., `npm test`). Need:
+
+```javascript
+/**
+ * Run specific test files
+ * @param {Object} tools - Detected tools per language
+ * @param {string[]} testFiles - Specific test file paths
+ */
+function runSpecificTests(tools, testFiles) {
+  // For Jest: npx jest --findRelatedTests file1.js file2.js
+  // For pytest: pytest test1.py test2.py
+  // For go: go test ./specific/package/...
+
+  for (const [lang, langTools] of Object.entries(tools)) {
+    if (!langTools.test) continue;
+
+    let cmd;
+    if (langTools.testFramework === 'jest') {
+      cmd = `npx jest ${testFiles.join(' ')}`;
+    } else if (langTools.testFramework === 'vitest') {
+      cmd = `npx vitest run ${testFiles.join(' ')}`;
+    } else if (langTools.testFramework === 'pytest') {
+      cmd = `pytest ${testFiles.join(' ')}`;
+    } else {
+      // Fallback: run full suite
+      cmd = langTools.test;
+    }
+
+    const result = runCommand(cmd, { allowFail: true, silent: true });
+    // ... parse result
+  }
+}
+```
+
+**Gap 4: `pushToRemote()` does not handle remote conflicts (Decision 15)**
+
+The plan requires pull-rebase-then-push on conflict:
+
+```javascript
+function pushToRemote() {
+  try {
+    runCommand('git push', { silent: false });
+    return true;
+  } catch (err) {
+    if (err.message.includes('rejected') || err.message.includes('non-fast-forward')) {
+      console.log('   Remote ahead, rebasing...');
+      try {
+        runCommand('git pull --rebase', { silent: false });
+        // Re-run affected tests on rebased code
+        // Then push again
+        runCommand('git push', { silent: false });
+        return true;
+      } catch (rebaseErr) {
+        console.log('   Conflict during rebase. Run `ctoc sync` to resolve.');
+        return false;
+      }
+    }
+    return false;
+  }
+}
+```
+
+**Gap 5: Duplicate property name bug in `runTests()`**
+
+Lines 149-151 and 173-176 in the existing code have duplicate `passed` properties:
+```javascript
+return {
+  passed: false,    // boolean - is this pass or fail
+  passed: totalPassed,  // number - BUG: overwrites the boolean above
+  ...
+};
+```
+
+This must be fixed by renaming the count property:
+```javascript
+return {
+  passed: false,
+  passCount: totalPassed,
+  failed: totalFailed + 1,
+  ...
+};
+```
+
+**Integration points:**
+
+| Consumer | How it uses quality-agent.js |
+|----------|----------------------------|
+| `hooks/post-commit.js` | Spawns as detached background process |
+| `PostToolUse.status-check.js` | Reads resulting `status.json` (Decision 17, not yet wired) |
+| `lib/cmd-quality.js` | Could invoke directly for `ctoc quality` command (not yet wired) |
+| `lib/actions.js` | Could trigger at stage transition for Tier 3 (not yet wired) |
+
+---
+
+### P0: `hooks/post-commit.js` — Gaps and Integration
+
+**File:** `/home/tijn/ctoc/hooks/post-commit.js` (89 lines, exists)
+
+**Current state:** Functional. Correctly spawns the quality agent as a detached background process. Has proper skip conditions (merge, rebase, env var).
+
+**Exported API:**
+```javascript
+main()         // Entry point: shouldRun() -> startAgent()
+shouldRun()    // Check CTOC_SKIP_QUALITY, merge/rebase state
+startAgent()   // Spawn quality-agent.js detached with stdio: 'ignore'
+```
+
+**Gap 1: Not registered in `.claude-plugin/hooks.json`**
+
+The current `hooks.json` has `SessionStart`, `PostToolUse`, `PreToolUse` hooks but **no post-commit hook registration**. This is because Claude Code plugin hooks and git hooks are different systems:
+
+- Claude Code hooks: `SessionStart`, `PreToolUse`, `PostToolUse` (in `.claude-plugin/hooks.json`)
+- Git hooks: `post-commit`, `pre-commit`, etc. (in `.git/hooks/`)
+
+The `post-commit.js` must be installed as a **git hook**, not a Claude Code hook. This requires a setup step.
+
+**Integration approach:**
+
+The `hooks-installer.js` (already exists at `lib/hooks-installer.js`) should be extended to install the post-commit hook:
+
+```javascript
+// In lib/hooks-installer.js or via ctoc init:
+function installPostCommitHook(projectRoot) {
+  const hooksDir = path.join(projectRoot, '.git', 'hooks');
+  const hookPath = path.join(hooksDir, 'post-commit');
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, '..');
+  const agentHookPath = path.join(pluginRoot, 'hooks', 'post-commit.js');
+
+  // Create hook script that delegates to our post-commit.js
+  const hookContent = `#!/bin/sh
+# CTOC post-commit hook - triggers background quality agent
+node "${agentHookPath}" 2>/dev/null &
+`;
+
+  fs.writeFileSync(hookPath, hookContent, { mode: 0o755 });
+}
+```
+
+**Gap 2: Agent path resolution**
+
+The current code uses `__dirname` to find the quality agent:
+```javascript
+const agentPath = path.join(__dirname, '..', 'lib', 'quality-agent.js');
+```
+
+This works when the hook runs from the plugin directory but may fail when installed as a git hook in the user's project. The hook should use `CLAUDE_PLUGIN_ROOT` env var or find the plugin root dynamically.
+
+**Gap 3: PostToolUse integration for Decision 17**
+
+Per Decision 17 (Claude Quality Integration), the `PostToolUse.status-check.js` hook should also check quality state and inject context on non-pass. This requires adding to the existing hook:
+
+```javascript
+// In hooks/PostToolUse.status-check.js, add after existing agent check:
+
+function checkQualityState() {
+  const statusPath = path.join(process.cwd(), '.ctoc', 'quality-state', 'status.json');
+  if (!fs.existsSync(statusPath)) return;
+
+  try {
+    const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
+
+    if (status.overallStatus === 'fail') {
+      console.log('\n[QUALITY GATE FAILED] Background quality checks detected failures.');
+      console.log(`Status: ${status.overallStatus}`);
+      if (status.summary) {
+        if (status.summary.tests?.failed > 0) {
+          console.log(`  Tests: ${status.summary.tests.failed} failed`);
+        }
+        if (status.summary.lint?.errors > 0) {
+          console.log(`  Lint: ${status.summary.lint.errors} errors`);
+        }
+        if (status.summary.security?.critical > 0) {
+          console.log(`  Security: ${status.summary.security.critical} critical`);
+        }
+      }
+      console.log('Fix issues and commit again to retry.');
+    }
+  } catch {
+    // Fail open
+  }
+}
+```
+
+---
+
+### P1: Smart Test Runner Agent — Integration Details
+
+**File:** `/home/tijn/ctoc/agents/testing/smart-test-runner.md` (283 lines, exists)
+
+**Current state:** Complete agent definition with algorithm, fallback rules, test commands per language, flaky test detection, cache structure, heuristic discovery, and output format. This agent definition is ready to use.
+
+**Integration:** The agent definition is a reference document for Claude. The actual test execution logic lives in `lib/quality-agent.js` (the `runSmartTests()` function described above). The agent markdown tells Claude how to use the tools; the lib module provides the runtime infrastructure.
+
+**No code changes needed** to this file. The gap is in `lib/quality-agent.js` which needs to implement the algorithm described in this agent definition.
+
+---
+
+### P1: Quality Gate Orchestrator Agent — Integration Details
+
+**File:** `/home/tijn/ctoc/agents/quality/quality-gate.md` (391 lines, exists)
+
+**Current state:** Complete agent definition with tiered orchestration flow, decision matrix, output format, cache management, agent dispatch configuration, error handling, and performance targets.
+
+**Integration:** This agent orchestrates by dispatching sub-agents via the `Task` tool. The runtime infrastructure is split between:
+
+1. `lib/quality-agent.js` — The background runner that executes checks directly
+2. `lib/quality-gate.js` — The `QualityGate` class that evaluates metrics against thresholds
+3. `lib/quality-state.js` — The cache that stores results
+
+**Wiring needed:**
+
+The `quality-agent.js` currently does NOT use `QualityGate` class from `quality-gate.js`. After running checks, it should evaluate results through the gate:
+
+```javascript
+const { QualityGate } = require('./quality-gate');
+
+// After running all checks:
+const gate = new QualityGate(projectRoot, { mode: 'strict' });
+const gateResult = gate.evaluate({
+  coverage: coverageMetrics,
+  security: securityMetrics,
+  codeQuality: { lintErrors: results.lint.errors, lintWarnings: results.lint.warnings },
+  complexity: complexityMetrics
+});
+
+// Use gateResult.passed to decide push vs block
+```
+
+---
+
+### P1: `lib/cmd-quality.js` — Integration with Background Agent
+
+**File:** `/home/tijn/ctoc/lib/cmd-quality.js` (574 lines, exists)
+
+**Current state:** Full quality command implementation with init, check, dashboard, report, and trend subcommands. Uses `QualityScorer`, `CoverageChecker`, `ArchitectureDetector`, `DashboardRenderer`, and `QualityReporter`.
+
+**Gap: No integration with the background quality agent or quality state cache**
+
+The `runQualityCheck()` function runs its own set of checks independently. It should also:
+
+1. Read `quality-state/status.json` to show background agent status
+2. Optionally trigger a manual quality agent run for `ctoc quality --run`
+3. Show quality state in the `ctoc quality status` command
+
+**Required addition:**
+
+```javascript
+const qualityState = require('./quality-state');
+
+async function showStatus() {
+  const status = qualityState.getStatus();
+
+  const lines = [];
+  lines.push('Quality Gate Status');
+  lines.push('===================');
+  lines.push(`Overall: ${status.overallStatus}`);
+  lines.push(`Git HEAD: ${status.gitHead || 'unknown'}`);
+  lines.push(`Last run: ${status.lastRun?.completedAt || 'never'}`);
+  lines.push(`Duration: ${status.lastRun?.duration ? (status.lastRun.duration / 1000).toFixed(1) + 's' : '-'}`);
+  lines.push(`Triggered by: ${status.lastRun?.triggeredBy || '-'}`);
+  lines.push('');
+
+  // Tier statuses
+  for (const [tier, data] of Object.entries(status.tiers)) {
+    lines.push(`${tier}: ${data.status} (${data.checkedAt || 'never'})`);
+  }
+
+  return { success: true, message: lines.join('\n') };
+}
+```
+
+---
+
+### Data Flow Diagram (End-to-End)
+
+```
+git commit
+    |
+    v
+hooks/post-commit.js
+    |  spawn detached
+    v
+lib/quality-agent.js (background process)
+    |
+    |-- 1. qualityState.recoverIfNeeded()
+    |-- 2. qualityState.acquireLock()
+    |-- 3. qualityState.setRunning('post-commit')
+    |-- 4. toolDetector.detectTools()
+    |
+    |-- 5. TIER 1 (blocking):
+    |   |-- runLint(tools)          -> lint results
+    |   |-- runTypecheck(tools)     -> typecheck results
+    |   |-- runSmartTests(tools):
+    |   |   |-- git diff HEAD~1 --name-only  -> changed files
+    |   |   |-- hashUtils.findChangedFiles(files, qualityState.getFileHashes())
+    |   |   |-- coverageMap.findAffectedTests(changedFiles)
+    |   |   |-- run specific tests OR full suite
+    |   |   |-- qualityState.updateFileHashes(newHashes)
+    |   |   '-> test results
+    |   |-- runSecurityScan()       -> security results
+    |   '-- qualityState.updateTierStatus('tier1', results)
+    |
+    |-- 6. TIER 2 (warning, only if Tier 1 passed):
+    |   |-- (future: complexity, coverage, duplication)
+    |   '-- qualityState.updateTierStatus('tier2', results)
+    |
+    |-- 7. qualityState.setCompleted(allPassed, summary)
+    |
+    |-- 8. if allPassed:
+    |   |-- pushToRemote() with pull-rebase on conflict
+    |   '-- console.log('Pushed!')
+    |-- 8. if failed:
+    |   '-- console.log('Fix issues...')
+    |
+    '-- 9. qualityState.releaseLock()
+
+
+PostToolUse.status-check.js (on every tool use):
+    |-- Read .ctoc/quality-state/status.json
+    |-- if status != 'pass' and status != 'unknown':
+    |   '-- Inject quality failure context into Claude conversation
+    '-- (existing: check for pending plan agents)
+
+
+ctoc quality status (manual command):
+    |-- Read .ctoc/quality-state/status.json
+    '-- Display tiered results + last run info
+```
+
+---
+
+### Module Dependency Graph (P0-P1 Only)
+
+```
+hooks/post-commit.js
+    '-> lib/quality-agent.js
+           |-> lib/quality-state.js
+           |       '-> lib/project-root.js
+           |-> lib/hash-utils.js (crypto, fs, path)
+           |-> lib/tool-detector.js (fs, path, child_process)
+           |-> lib/coverage-map.js
+           |       |-> lib/hash-utils.js
+           |       '-> lib/quality-state.js (atomicWrite, safeRead)
+           '-> lib/quality-gate.js (QualityGate class)
+
+hooks/PostToolUse.status-check.js
+    '-> reads .ctoc/quality-state/status.json (file I/O, no module dep)
+```
+
+---
+
+### Configuration Requirements
+
+**File: `.ctoc/quality-config.yaml`** (template already defined in plan)
+
+For P0/P1, the minimum viable config is:
+
+```yaml
+# Minimum viable quality config
+tiers:
+  tier1:
+    blocking: true
+    checks: [lint, typecheck, affected-tests, secrets]
+
+push:
+  autoPush: true
+  allowWarnings: false
+
+cache:
+  location: .ctoc/quality-state
+```
+
+Full config parsing is deferred to P2 (`lib/tool-detector.js` `readUserConfig()` currently returns raw content without YAML parsing).
+
+---
+
+### `.gitignore` Changes Required
+
+Add to `/home/tijn/ctoc/.gitignore`:
+
+```
+# Quality state cache (local-only, per-developer)
+.ctoc/quality-state/
+```
+
+This prevents quality state from being committed (Decision 4: Local-only cache).
+
+---
+
+### Testing Strategy for P0-P1
+
+Since the quality gate system is infrastructure code that runs in the background, testing focuses on:
+
+1. **Unit tests for `lib/hash-utils.js`:**
+   - `hashFile()` returns consistent SHA256 for same content
+   - `findChangedFiles()` correctly categorizes changed/unchanged/new/missing
+   - `hashDirectory()` respects exclusion patterns
+
+2. **Unit tests for `lib/quality-state.js`:**
+   - `atomicWrite()` survives interrupted writes (write then check file exists and is valid JSON)
+   - `acquireLock()` prevents double-acquisition
+   - `acquireLock()` cleans stale locks from dead PIDs
+   - `setRunning()` / `setCompleted()` round-trip through `getStatus()`
+   - `recoverIfNeeded()` resets stuck "running" state
+
+3. **Unit tests for `lib/coverage-map.js`:**
+   - `findAffectedTests()` returns mapped tests for known files
+   - `findAffectedTests()` falls back to heuristics for unmapped files
+   - `findAffectedTests()` requires full suite when config files change
+   - `findTestsByHeuristic()` finds co-located tests
+
+4. **Integration test for `lib/quality-agent.js`:**
+   - Mock `execSync` to simulate lint/test/security commands
+   - Verify state transitions: unknown -> running -> pass/fail
+   - Verify lock acquire/release lifecycle
+   - Verify push is called on pass, not called on fail
+
+5. **Hook test for `hooks/post-commit.js`:**
+   - Verify `shouldRun()` returns false during merge/rebase
+   - Verify `startAgent()` spawns detached process
+   - Verify `CTOC_SKIP_QUALITY=1` suppresses agent
+
+---
+
+### Implementation Order (within P0-P1)
+
+```
+Step 1: Fix quality-state.js
+   - Replace process.cwd() with findProjectRoot()
+   - Add updateTierStatus()
+   - Add gitHead tracking in setRunning()
+   - Fix: add .ctoc/quality-state/ to .gitignore
+
+Step 2: Wire quality-agent.js smart test selection
+   - Import hash-utils and coverage-map
+   - Implement runSmartTests() using findChangedFiles + findAffectedTests
+   - Implement runSpecificTests() with framework-specific commands
+   - Fix duplicate `passed` property bug
+   - Add tiered execution (tier1 blocking, tier2 warning)
+
+Step 3: Wire push conflict handling
+   - Implement pull-rebase-push in pushToRemote()
+   - Add re-test on rebased code
+
+Step 4: Wire PostToolUse quality context injection
+   - Extend PostToolUse.status-check.js to read quality state
+   - Inject failure context into Claude conversation
+
+Step 5: Wire git hook installation
+   - Extend lib/hooks-installer.js to install post-commit hook
+   - Handle CLAUDE_PLUGIN_ROOT for cross-project installation
+
+Step 6: Wire cmd-quality.js status command
+   - Add showStatus() reading from quality-state
+   - Connect to ctoc quality status menu option
+```
+
+---
+
+### Risk Assessment
+
+| Risk | Mitigation |
+|------|------------|
+| Background agent orphaned on crash | PID-based lock with stale detection (already implemented) |
+| `process.cwd()` differs in git hooks | Replace with `findProjectRoot()` (Step 1) |
+| YAML config parsing without library | Defer full YAML parsing to P2; use JSON fallback for P0 |
+| Coverage map never built (no coverage tooling) | Import analysis fallback in `findTestsByHeuristic()` (already implemented) |
+| Tests pass locally but fail on push | Pull-rebase + re-test handles remote conflicts (Step 3) |
+| Quality agent blocks terminal | Already spawned detached with `stdio: 'ignore'` |
+| Multiple commits before agent finishes | Lock prevents concurrent runs; latest commit triggers new run |
