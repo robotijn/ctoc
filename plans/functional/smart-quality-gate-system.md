@@ -193,17 +193,20 @@ A vision document is a high-level idea. Before it becomes actionable, an agent d
 
 ```
 vision/my-idea.md
-    ↓ (Vision Decomposer Agent)
+    ↓ (Vision Decomposer Agent: parse into chunks)
     ├── functional/my-idea-auth.md        (stub)
     ├── functional/my-idea-ui.md          (stub)
     └── functional/my-idea-api.md         (stub)
-    ↓ (Product Owner Agent refines each)
+    ↓ HUMAN CHECKPOINT: user reviews decomposition
+    ↓ (user can add/remove/rename/merge stubs)
+    ↓ (user approves: "decomposition looks good")
+    ↓ (Product Owner Agent refines each approved stub)
     ├── functional/my-idea-auth.md        (refined, ready for review)
     ├── functional/my-idea-ui.md          (refined, ready for review)
     └── functional/my-idea-api.md         (refined, ready for review)
 ```
 
-This is NOT a human gate — it's an **agent gate** where AI does the decomposition, but the human reviews the resulting functional plans before they progress.
+This is a **hybrid gate**: agent decomposes → human validates decomposition → agent refines. The human checkpoint ensures correct granularity, no scope overlap, no missing features, and right priority ordering.
 
 ## Quality Gate Taxonomy
 
