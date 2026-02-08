@@ -1,37 +1,11 @@
 ---
-approved_by: human
-approved_at: 2026-02-08T16:12:08.328Z
-gate_crossed: functional → implementation
----
-
-# REVISION 1
-
-## Rejection Feedback
-
-There is also a vision → functional gate with an agent that parses the vision into smaller chunks to create initial functional plans for the product owner agent to work on. The quality gate system needs to account for this vision→functional transition and integrate with the product owner agent workflow.
-
----
-
----
-revision: 1
-rejection_reason: "There is also a vision → functional gate with an agent that parses the vision into smaller chunks to"
-tag: rejected
-approved_by: human
-approved_at: 2026-02-03T10:00:00Z
-gate_crossed: functional → implementation
----
-
----
-approved_by: human
-approved_at: 2026-02-04T13:00:00Z
-gate_crossed: implementation → todo
----
-
----
 title: "Smart Quality Gate System"
 created: "2026-02-03T09:45:00Z"
 priority: HIGH
 type: feature
+approved_by: human
+approved_at: 2026-02-08T16:12:08.328Z
+gate_crossed: functional → implementation
 ---
 
 # Smart Quality Gate System
@@ -173,84 +147,11 @@ NEW approach:
 - Both `git commit --amend` and new commit auto-trigger
 - Developer chooses their preferred workflow
 
-### Decision 14: Vision → Functional Gate
+### Decision 14: Vision Pipeline (extracted)
 
-**Agent-driven decomposition:**
+**Moved to separate plan:** `plans/functional/vision-pipeline.md`
 
-A vision document is a high-level idea. Before it becomes actionable, an agent decomposes it into smaller functional plans:
-
-1. **Vision Decomposer Agent** parses the vision document:
-   - Extracts distinct features/components
-   - Identifies dependencies between chunks
-   - Creates initial functional plan stubs (1 per feature)
-   - Each stub has: problem statement, scope, rough acceptance criteria
-
-2. **Product Owner Agent** refines each stub:
-   - Validates business alignment
-   - Adds detailed acceptance criteria
-   - Prioritizes the plans
-   - Identifies gaps and asks clarifying questions
-
-3. **Gate validation** before decomposition:
-   - Vision has clear problem statement
-   - Vision has defined scope/boundaries
-   - Vision has success criteria
-   - Vision identifies target users/stakeholders
-
-```
-vision/my-idea.md
-    ↓ (Vision Decomposer Agent: parse into chunks)
-    ├── functional/my-idea-auth.md        (stub)
-    ├── functional/my-idea-ui.md          (stub)
-    └── functional/my-idea-api.md         (stub)
-    ↓ HUMAN CHECKPOINT: user reviews decomposition
-    ↓ (user can add/remove/rename/merge stubs)
-    ↓ (user approves: "decomposition looks good")
-    ↓ (Product Owner Agent refines each approved stub)
-    ├── functional/my-idea-auth.md        (refined, ready for review)
-    ├── functional/my-idea-ui.md          (refined, ready for review)
-    └── functional/my-idea-api.md         (refined, ready for review)
-```
-
-This is a **hybrid gate**: agent decomposes → human validates decomposition → agent refines. The human checkpoint ensures correct granularity, no scope overlap, no missing features, and right priority ordering.
-
-**Human Checkpoint UI:**
-
-When the Vision Decomposer creates stubs, the user sees:
-
-```
-Vision "my-idea" decomposed into 3 functional plans:
-
-| # | Stub                    | Scope                          | Depends on |
-|---|-------------------------|--------------------------------|------------|
-| 1 | my-idea-auth.md         | Authentication + authorization | -          |
-| 2 | my-idea-api.md          | REST API endpoints             | 1          |
-| 3 | my-idea-ui.md           | Frontend dashboard             | 2          |
-```
-
-Then AskUserQuestion:
-```
-"Review the decomposition. What do you want to do?"
-Options:
-- "Looks good — refine all" → PO Agent refines each stub
-- "Edit stubs" → User can rename/merge/split/remove stubs
-- "Add a stub" → User describes a missing piece
-- "Start over" → Discard and re-decompose
-```
-
-The user can iterate (edit, add, remove stubs) until satisfied, then approve for PO Agent refinement.
-
-**Agent Boundaries:**
-
-| Agent | Responsibility | Input → Output |
-|-------|---------------|----------------|
-| Vision Advisor | Discovery: idea → concrete vision summary | User's idea → `plans/vision/{slug}.md` |
-| Vision Decomposer | Splitting: vision → functional stubs | Vision file → multiple stub files in `plans/functional/` |
-| Product Owner | Refinement: stub → detailed plan | Stub file → refined plan with acceptance criteria |
-
-- **Vision Advisor** handles single-plan visions directly (skip decomposer, convert straight to functional)
-- **Vision Decomposer** only activates when the vision contains 2+ independent workstreams
-- **Product Owner** only activates after human approves the decomposition
+The vision-to-functional decomposition pipeline (Vision Decomposer Agent, Product Owner Agent, human checkpoint UI) is now tracked independently.
 
 ### Decision 15: Auto-push Remote Conflict
 
@@ -843,79 +744,6 @@ User can acknowledge warnings and proceed.
 Overrides are logged for audit trail.
 ```
 
-### 9. Vision Decomposer Agent
-
-**File:** `agents/planning/vision-decomposer.md`
-
-```markdown
-# Vision Decomposer Agent
-
-## Role
-Parse vision documents into smaller, actionable functional plan stubs.
-
-## Trigger
-- When user approves a vision for decomposition
-- Manual: `ctoc vision decompose <vision-file>`
-
-## Process
-1. Read the vision document
-2. Identify distinct features/components/workstreams
-3. Analyze dependencies between chunks
-4. For each chunk, create a functional plan stub:
-   - Problem statement (derived from vision)
-   - Scope (bounded to this chunk)
-   - Rough acceptance criteria
-   - Dependencies on other chunks
-5. Write stubs to plans/functional/
-
-## Output
-Multiple functional plan files, each focused on one feature.
-Each has metadata linking back to the parent vision.
-
-## Quality Checks
-- Each stub must have a clear problem statement
-- No stub should overlap in scope with another
-- Dependencies must be acyclic
-- Each stub is small enough for one implementation cycle
-```
-
-### 10. Product Owner Agent
-
-**File:** `agents/planning/product-owner.md`
-
-```markdown
-# Product Owner Agent
-
-## Role
-Refine functional plan stubs into detailed, actionable plans.
-
-## Trigger
-- After Vision Decomposer creates stubs
-- On demand for any functional plan needing refinement
-
-## Process
-1. Read the functional plan stub
-2. Validate business alignment:
-   - Does this serve users?
-   - What's the ROI?
-   - Is this the right priority?
-3. Add detailed acceptance criteria:
-   - User-facing behaviors
-   - Edge cases
-   - Non-functional requirements
-4. Identify gaps and ask clarifying questions
-5. Prioritize relative to other plans in pipeline
-
-## Output
-Refined functional plan with complete acceptance criteria,
-priority ranking, and business justification.
-
-## Quality Checks
-- Must have >= 3 acceptance criteria
-- Must have clear scope boundaries
-- Must have defined success metrics
-```
-
 ## Configuration
 
 ### .ctoc/quality-config.yaml
@@ -999,10 +827,7 @@ languages:
 │                    FULL CTOC PIPELINE WITH GATES                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│   vision/ ──────────────────────────────────────────────────     │
-│     ↓ (Vision Decomposer Agent: parse into chunks)              │
-│     ↓ (Product Owner Agent: refine each chunk)                  │
-│   functional/ (multiple plans created)                           │
+│   functional/ (plans created by user or vision pipeline)         │
 │     ↓ (HUMAN GATE: user approves → implementation)              │
 │   implementation/ (detail technical approach)                    │
 │     ↓ (HUMAN GATE: user approves → todo)                        │
@@ -1066,9 +891,6 @@ languages:
 | `agents/quality/architecture-checker.md` | CREATE | Circular deps, layers |
 | `agents/quality/performance-validator.md` | CREATE | Benchmarks, bundle size |
 | `agents/quality/quality-gate.md` | CREATE | Orchestrator agent |
-| `agents/planning/vision-decomposer.md` | MODIFY | Merge: keep Story Mapping methodology + add human checkpoint + stub-based output |
-| `agents/planning/product-owner.md` | CREATE | Functional plan refinement |
-| `lib/vision-decomposer.js` | CREATE | Vision parsing + stub creation |
 | `hooks/post-commit.js` | CREATE | Triggers background agent |
 | `lib/quality-agent.js` | CREATE | Background quality runner |
 | `lib/quality-state.js` | CREATE | Cache read/write utilities |
@@ -1106,10 +928,6 @@ languages:
 
 ## Implementation Priority & Sequencing
 
-This plan covers two independent systems. Build them in this order:
-
-### Phase A: Quality Gate Core (build first)
-
 | Priority | Agent/Component | Why first |
 |----------|----------------|-----------|
 | P0 | `lib/quality-state.js` + `lib/hash-utils.js` | Foundation — everything depends on the cache |
@@ -1124,16 +942,7 @@ This plan covers two independent systems. Build them in this order:
 | P4 | Performance Validator Agent | Nice to have for v1 |
 | P4 | Dependency Auditor Agent | Nice to have for v1 |
 
-### Phase B: Vision Pipeline (build after Phase A or in parallel)
-
-| Priority | Agent/Component | Why |
-|----------|----------------|-----|
-| P0 | `lib/vision-decomposer.js` | Core parsing + stub creation logic |
-| P0 | Update `agents/planning/vision-decomposer.md` | Add human checkpoint flow |
-| P1 | `agents/planning/product-owner.md` | Stub refinement |
-| P1 | Human checkpoint UI in menu | AskUserQuestion flow for decomposition review |
-
-**Phase A and Phase B are independent** — they can be implemented in parallel or sequentially. Phase A is higher priority because it affects every commit, while Phase B only affects vision→functional transitions.
+**Note:** Vision Pipeline (previously Phase B) has been extracted to `plans/functional/vision-pipeline.md`.
 
 ## Acceptance Criteria
 
@@ -1150,10 +959,6 @@ This plan covers two independent systems. Build them in this order:
 - [ ] Quality state persists across sessions
 - [ ] Cross-platform via Node.js abstractions
 - [ ] Hybrid detection: config → auto-detect → skills → prompt
-- [ ] Vision Decomposer Agent creates functional stubs from visions
-- [ ] Product Owner Agent refines stubs with acceptance criteria
-- [ ] Vision → functional gate validates vision readiness before decomposition
-- [ ] Each functional stub links back to parent vision
 - [ ] Monorepo package-scoped checks
 - [ ] Works with existing CTOC workflow
 - [ ] Auto-push handles remote conflicts via pull-rebase + re-test
