@@ -167,6 +167,44 @@ NEW approach:
 - Both `git commit --amend` and new commit auto-trigger
 - Developer chooses their preferred workflow
 
+### Decision 14: Vision → Functional Gate
+
+**Agent-driven decomposition:**
+
+A vision document is a high-level idea. Before it becomes actionable, an agent decomposes it into smaller functional plans:
+
+1. **Vision Decomposer Agent** parses the vision document:
+   - Extracts distinct features/components
+   - Identifies dependencies between chunks
+   - Creates initial functional plan stubs (1 per feature)
+   - Each stub has: problem statement, scope, rough acceptance criteria
+
+2. **Product Owner Agent** refines each stub:
+   - Validates business alignment
+   - Adds detailed acceptance criteria
+   - Prioritizes the plans
+   - Identifies gaps and asks clarifying questions
+
+3. **Gate validation** before decomposition:
+   - Vision has clear problem statement
+   - Vision has defined scope/boundaries
+   - Vision has success criteria
+   - Vision identifies target users/stakeholders
+
+```
+vision/my-idea.md
+    ↓ (Vision Decomposer Agent)
+    ├── functional/my-idea-auth.md        (stub)
+    ├── functional/my-idea-ui.md          (stub)
+    └── functional/my-idea-api.md         (stub)
+    ↓ (Product Owner Agent refines each)
+    ├── functional/my-idea-auth.md        (refined, ready for review)
+    ├── functional/my-idea-ui.md          (refined, ready for review)
+    └── functional/my-idea-api.md         (refined, ready for review)
+```
+
+This is NOT a human gate — it's an **agent gate** where AI does the decomposition, but the human reviews the resulting functional plans before they progress.
+
 ## Quality Gate Taxonomy
 
 ```
@@ -733,6 +771,79 @@ User can acknowledge warnings and proceed.
 Overrides are logged for audit trail.
 ```
 
+### 9. Vision Decomposer Agent
+
+**File:** `agents/planning/vision-decomposer.md`
+
+```markdown
+# Vision Decomposer Agent
+
+## Role
+Parse vision documents into smaller, actionable functional plan stubs.
+
+## Trigger
+- When user approves a vision for decomposition
+- Manual: `ctoc vision decompose <vision-file>`
+
+## Process
+1. Read the vision document
+2. Identify distinct features/components/workstreams
+3. Analyze dependencies between chunks
+4. For each chunk, create a functional plan stub:
+   - Problem statement (derived from vision)
+   - Scope (bounded to this chunk)
+   - Rough acceptance criteria
+   - Dependencies on other chunks
+5. Write stubs to plans/functional/
+
+## Output
+Multiple functional plan files, each focused on one feature.
+Each has metadata linking back to the parent vision.
+
+## Quality Checks
+- Each stub must have a clear problem statement
+- No stub should overlap in scope with another
+- Dependencies must be acyclic
+- Each stub is small enough for one implementation cycle
+```
+
+### 10. Product Owner Agent
+
+**File:** `agents/planning/product-owner.md`
+
+```markdown
+# Product Owner Agent
+
+## Role
+Refine functional plan stubs into detailed, actionable plans.
+
+## Trigger
+- After Vision Decomposer creates stubs
+- On demand for any functional plan needing refinement
+
+## Process
+1. Read the functional plan stub
+2. Validate business alignment:
+   - Does this serve users?
+   - What's the ROI?
+   - Is this the right priority?
+3. Add detailed acceptance criteria:
+   - User-facing behaviors
+   - Edge cases
+   - Non-functional requirements
+4. Identify gaps and ask clarifying questions
+5. Prioritize relative to other plans in pipeline
+
+## Output
+Refined functional plan with complete acceptance criteria,
+priority ranking, and business justification.
+
+## Quality Checks
+- Must have >= 3 acceptance criteria
+- Must have clear scope boundaries
+- Must have defined success metrics
+```
+
 ## Configuration
 
 ### .ctoc/quality-config.yaml
@@ -813,7 +924,26 @@ languages:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    CTOC + BACKGROUND QUALITY AGENT               │
+│                    FULL CTOC PIPELINE WITH GATES                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   vision/ ──────────────────────────────────────────────────     │
+│     ↓ (Vision Decomposer Agent: parse into chunks)              │
+│     ↓ (Product Owner Agent: refine each chunk)                  │
+│   functional/ (multiple plans created)                           │
+│     ↓ (HUMAN GATE: user approves → implementation)              │
+│   implementation/ (detail technical approach)                    │
+│     ↓ (HUMAN GATE: user approves → todo)                        │
+│   todo/ → in-progress/                                          │
+│     ↓                                                           │
+│   ...code changes + quality gates (see below)...                │
+│     ↓                                                           │
+│   review/ → done/ (HUMAN GATE: user approves)                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    BACKGROUND QUALITY AGENT                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │   todo/ → in-progress/                                          │
@@ -864,6 +994,9 @@ languages:
 | `agents/quality/architecture-checker.md` | CREATE | Circular deps, layers |
 | `agents/quality/performance-validator.md` | CREATE | Benchmarks, bundle size |
 | `agents/quality/quality-gate.md` | CREATE | Orchestrator agent |
+| `agents/planning/vision-decomposer.md` | CREATE | Vision → functional decomposition |
+| `agents/planning/product-owner.md` | CREATE | Functional plan refinement |
+| `lib/vision-decomposer.js` | CREATE | Vision parsing + stub creation |
 | `hooks/post-commit.js` | CREATE | Triggers background agent |
 | `lib/quality-agent.js` | CREATE | Background quality runner |
 | `lib/quality-state.js` | CREATE | Cache read/write utilities |
@@ -914,6 +1047,10 @@ languages:
 - [ ] Quality state persists across sessions
 - [ ] Cross-platform via Node.js abstractions
 - [ ] Hybrid detection: config → auto-detect → skills → prompt
+- [ ] Vision Decomposer Agent creates functional stubs from visions
+- [ ] Product Owner Agent refines stubs with acceptance criteria
+- [ ] Vision → functional gate validates vision readiness before decomposition
+- [ ] Each functional stub links back to parent vision
 - [ ] Monorepo package-scoped checks
 - [ ] Works with existing CTOC workflow
 
