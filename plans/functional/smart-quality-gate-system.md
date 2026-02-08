@@ -208,6 +208,44 @@ vision/my-idea.md
 
 This is a **hybrid gate**: agent decomposes → human validates decomposition → agent refines. The human checkpoint ensures correct granularity, no scope overlap, no missing features, and right priority ordering.
 
+**Human Checkpoint UI:**
+
+When the Vision Decomposer creates stubs, the user sees:
+
+```
+Vision "my-idea" decomposed into 3 functional plans:
+
+| # | Stub                    | Scope                          | Depends on |
+|---|-------------------------|--------------------------------|------------|
+| 1 | my-idea-auth.md         | Authentication + authorization | -          |
+| 2 | my-idea-api.md          | REST API endpoints             | 1          |
+| 3 | my-idea-ui.md           | Frontend dashboard             | 2          |
+```
+
+Then AskUserQuestion:
+```
+"Review the decomposition. What do you want to do?"
+Options:
+- "Looks good — refine all" → PO Agent refines each stub
+- "Edit stubs" → User can rename/merge/split/remove stubs
+- "Add a stub" → User describes a missing piece
+- "Start over" → Discard and re-decompose
+```
+
+The user can iterate (edit, add, remove stubs) until satisfied, then approve for PO Agent refinement.
+
+**Agent Boundaries:**
+
+| Agent | Responsibility | Input → Output |
+|-------|---------------|----------------|
+| Vision Advisor | Discovery: idea → concrete vision summary | User's idea → `plans/vision/{slug}.md` |
+| Vision Decomposer | Splitting: vision → functional stubs | Vision file → multiple stub files in `plans/functional/` |
+| Product Owner | Refinement: stub → detailed plan | Stub file → refined plan with acceptance criteria |
+
+- **Vision Advisor** handles single-plan visions directly (skip decomposer, convert straight to functional)
+- **Vision Decomposer** only activates when the vision contains 2+ independent workstreams
+- **Product Owner** only activates after human approves the decomposition
+
 ## Quality Gate Taxonomy
 
 ```
@@ -997,7 +1035,7 @@ languages:
 | `agents/quality/architecture-checker.md` | CREATE | Circular deps, layers |
 | `agents/quality/performance-validator.md` | CREATE | Benchmarks, bundle size |
 | `agents/quality/quality-gate.md` | CREATE | Orchestrator agent |
-| `agents/planning/vision-decomposer.md` | CREATE | Vision → functional decomposition |
+| `agents/planning/vision-decomposer.md` | MODIFY | Update existing agent with human checkpoint flow |
 | `agents/planning/product-owner.md` | CREATE | Functional plan refinement |
 | `lib/vision-decomposer.js` | CREATE | Vision parsing + stub creation |
 | `hooks/post-commit.js` | CREATE | Triggers background agent |
@@ -1034,6 +1072,37 @@ languages:
 | Tier 1+2 (affected tests) | 5-60s | Runs in background |
 | Tier 3 (stage transition) | 30-60s | At review transition |
 | Coverage map rebuild | 1-5min | On triggers (see Decision 2) |
+
+## Implementation Priority & Sequencing
+
+This plan covers two independent systems. Build them in this order:
+
+### Phase A: Quality Gate Core (build first)
+
+| Priority | Agent/Component | Why first |
+|----------|----------------|-----------|
+| P0 | `lib/quality-state.js` + `lib/hash-utils.js` | Foundation — everything depends on the cache |
+| P0 | `lib/quality-agent.js` + `hooks/post-commit.js` | Core loop — background agent + trigger |
+| P1 | Smart Test Runner Agent | Most impactful — affected-tests-only |
+| P1 | Quality Gate Orchestrator | Coordinates all checks |
+| P2 | `lib/tool-detector.js` | Detect frameworks per language |
+| P2 | `lib/coverage-map.js` + mapper agent | Enables smart test selection |
+| P3 | Security Scanner Agent | Can start as `npm audit` wrapper |
+| P3 | Complexity Analyzer Agent | Can start as eslint-plugin wrapper |
+| P4 | Architecture Checker Agent | Nice to have for v1 |
+| P4 | Performance Validator Agent | Nice to have for v1 |
+| P4 | Dependency Auditor Agent | Nice to have for v1 |
+
+### Phase B: Vision Pipeline (build after Phase A or in parallel)
+
+| Priority | Agent/Component | Why |
+|----------|----------------|-----|
+| P0 | `lib/vision-decomposer.js` | Core parsing + stub creation logic |
+| P0 | Update `agents/planning/vision-decomposer.md` | Add human checkpoint flow |
+| P1 | `agents/planning/product-owner.md` | Stub refinement |
+| P1 | Human checkpoint UI in menu | AskUserQuestion flow for decomposition review |
+
+**Phase A and Phase B are independent** — they can be implemented in parallel or sequentially. Phase A is higher priority because it affects every commit, while Phase B only affects vision→functional transitions.
 
 ## Acceptance Criteria
 
