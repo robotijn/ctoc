@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-02-08T16:28:28.071Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-02-04T12:00:00Z
 gate_crossed: functional → implementation
@@ -195,9 +202,9 @@ Step 7: TEST (TDD Red)
 - [ ] Run tests - expect RED (failing)
 ```
 
-### Rule 3: Step 8 is SETUP (Not QUALITY)
+### Rule 3: Step 8 is PREPARE (Not QUALITY)
 
-Quality checks before code exists are pointless. Step 8 is now SETUP.
+Quality checks before code exists are pointless. Step 8 is now PREPARE.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -341,7 +348,7 @@ Step 15: FINAL-REVIEW
 ### Rule 5: Order Matters
 
 ```
-TEST → QUALITY → IMPLEMENT → REVIEW → OPTIMIZE → SECURE → VERIFY → DOCUMENT → FINAL-REVIEW
+TEST → PREPARE → IMPLEMENT → REVIEW → OPTIMIZE → SECURE → VERIFY → DOCUMENT → FINAL-REVIEW
   7       8          9         10        11        12       13        14          15
 
 The order ensures:
@@ -366,7 +373,7 @@ You MUST use these exact step labels in this exact order:
 | Step | Label | Purpose | NEVER Replace With |
 |------|-------|---------|-------------------|
 | 7 | TEST | Write tests first (TDD Red) | "Identify coverage" |
-| 8 | QUALITY | Lint, format, type-check | - |
+| 8 | PREPARE | Prepare environment, install deps | "QUALITY" |
 | 9 | IMPLEMENT | ALL code changes | Multiple IMPLEMENT steps |
 | 10 | REVIEW | Self-review | IMPLEMENT |
 | 11 | OPTIMIZE | Performance | IMPLEMENT |
@@ -444,7 +451,7 @@ Existing plans in todo/ may have wrong labels. Auto-fix them before execution.
 │     14 → DOCUMENT                                               │
 │     15 → FINAL-REVIEW                                           │
 │                                                                  │
-│  3. If "QUALITY" at Step 8 → rename to "SETUP"                  │
+│  3. If "QUALITY" at Step 8 → rename to "PREPARE"                  │
 │                                                                  │
 │  4. Run Critic to validate:                                     │
 │     - All 9 labels present?                                     │
@@ -730,3 +737,46 @@ Expected: Critic scores 0/5, requires correct order
 ---
 
 *"The Iron Loop is not a suggestion. It's a quality guarantee."*
+
+
+---
+
+## Execution Plan (Steps 7-15)
+
+### Step 7: TEST (TDD Red)
+- [ ] Write tests for the implementation
+
+### Step 8: QUALITY
+- [ ] Run lint on new files
+- [ ] Run format on new files
+- [ ] Verify no syntax errors
+
+### Step 9: IMPLEMENT
+- [ ] Implement the feature according to requirements
+
+### Step 10: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling
+
+### Step 11: OPTIMIZE
+- [ ] Check for redundant operations
+- [ ] Ensure non-blocking where possible
+
+### Step 12: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+
+### Step 13: VERIFY
+- [ ] Run all tests
+- [ ] Manual verification
+
+### Step 14: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+
+### Step 15: FINAL-REVIEW
+- [ ] Review steps 7-14 completed correctly
+- [ ] All tests passing
+- [ ] Ready for human review
