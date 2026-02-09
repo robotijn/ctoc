@@ -113,13 +113,17 @@ describe('State Manager Constants', () => {
   test('STEP_NAMES contains all 15 steps', () => {
     assert.strictEqual(Object.keys(stateManager.STEP_NAMES).length, 15);
     assert.strictEqual(stateManager.STEP_NAMES[1], 'ASSESS');
-    assert.strictEqual(stateManager.STEP_NAMES[15], 'COMMIT');
+    assert.strictEqual(stateManager.STEP_NAMES[8], 'PREPARE');
+    assert.strictEqual(stateManager.STEP_NAMES[13], 'VERIFY');
+    assert.strictEqual(stateManager.STEP_NAMES[15], 'FINAL-REVIEW');
   });
 
   test('STEP_DESCRIPTIONS contains all 15 steps', () => {
     assert.strictEqual(Object.keys(stateManager.STEP_DESCRIPTIONS).length, 15);
     assert.ok(stateManager.STEP_DESCRIPTIONS[1].includes('Assess'));
-    assert.ok(stateManager.STEP_DESCRIPTIONS[15].includes('Commit'));
+    assert.ok(stateManager.STEP_DESCRIPTIONS[8].includes('Prepare'));
+    assert.ok(stateManager.STEP_DESCRIPTIONS[13].includes('quality'));
+    assert.ok(stateManager.STEP_DESCRIPTIONS[15].includes('Final'));
   });
 
   test('STATE_DIR points to ~/.ctoc/state', () => {

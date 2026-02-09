@@ -157,11 +157,11 @@ Need to implement feature X.
 - Requirement 2
 `;
 
-  // Expected output format
+  // Expected output format - canonical step labels
   const expectedSections = [
     '## Execution Plan (Steps 7-15)',
     '### Step 7: TEST',
-    '### Step 8: QUALITY',
+    '### Step 8: PREPARE',
     '### Step 9: IMPLEMENT',
     '### Step 10: REVIEW',
     '### Step 11: OPTIMIZE',
@@ -171,15 +171,15 @@ Need to implement feature X.
     '### Step 15: FINAL-REVIEW'
   ];
 
-  // Simulated integrate result
+  // Simulated integrate result with canonical labels
   const integratedContent = `
 ## Execution Plan (Steps 7-15)
 
 ### Step 7: TEST
 - [ ] Write tests
 
-### Step 8: QUALITY
-- [ ] Lint and format
+### Step 8: PREPARE
+- [ ] Install dependencies
 
 ### Step 9: IMPLEMENT
 - [ ] Implement feature
@@ -194,7 +194,7 @@ Need to implement feature X.
 - [ ] Security review
 
 ### Step 13: VERIFY
-- [ ] Run tests
+- [ ] Run lint + type check + tests
 
 ### Step 14: DOCUMENT
 - [ ] Update docs

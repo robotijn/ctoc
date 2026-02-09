@@ -30,20 +30,77 @@ PHASE 2: IMPLEMENTATION PLANNING (Steps 4-6) - Technical Role
 
 PHASE 3: IMPLEMENTATION (Steps 7-15) - Autonomous
 ─────────────────────────────────────────────────────────────
-7.  TEST         Write tests first (TDD Red)        [test-maker]
-8.  QUALITY      Lint, format, type-check           [quality-checker]
-9.  IMPLEMENT    Setup + Code + Error handling      [implementer]
-10. REVIEW       Self-review + quality re-check     [self-reviewer] ◄───────────┐
+7.  TEST         Write tests FIRST (TDD Red)        [test-maker]
+8.  PREPARE      Prepare environment, install deps  [quality-checker]
+9.  IMPLEMENT    ALL code changes (single step)     [implementer]
+10. REVIEW       Self-review checkpoint             [self-reviewer] ◄───────────┐
     └─► TDD Loop: Need more tests? → Back to Step 7 ────────────────────────────┘
 
 11. OPTIMIZE     Performance + code simplification  [optimizer]
 12. SECURE       Security vulnerability check       [security-scanner]
-13. VERIFY       Run ALL tests                      [verifier]
+13. VERIFY       Run ALL quality checks (gate)      [verifier]
 14. DOCUMENT     Update documentation               [documenter]
-15. FINAL-REVIEW Reviews 7-14, highest standards    [implementation-reviewer]
+15. FINAL-REVIEW Verify steps 7-14, human gate      [implementation-reviewer]
     └─► Issues? Smart loop to affected step
     └─► HUMAN GATE: User approves commit/push
 ```
+
+---
+
+## MANDATORY Step Labels (Steps 7-15)
+
+The following step labels are MANDATORY and must NOT be modified, replaced, or reordered. They define the quality process.
+
+```
+TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUMENT -> FINAL-REVIEW
+  7       8          9           10        11         12        13        14          15
+```
+
+| Step | Label | Purpose | NEVER Replace With |
+|------|-------|---------|-------------------|
+| 7 | TEST | Write tests FIRST (TDD Red) | "Identify coverage" |
+| 8 | PREPARE | Prepare environment, install deps | "QUALITY", "SETUP" |
+| 9 | IMPLEMENT | ALL code changes (single step with sub-items) | Multiple IMPLEMENT steps |
+| 10 | REVIEW | Self-review checkpoint (logic only) | IMPLEMENT |
+| 11 | OPTIMIZE | Performance and simplification | IMPLEMENT |
+| 12 | SECURE | Security vulnerability check | IMPLEMENT |
+| 13 | VERIFY | Run ALL quality checks (lint, type, tests, coverage) | Manual verification |
+| 14 | DOCUMENT | Update documentation | VERIFY |
+| 15 | FINAL-REVIEW | Verify steps 7-14, ready for human gate | VERIFY, COMMIT |
+
+### Key Rules
+
+1. **Step 7 is TDD** - Must WRITE tests, not just "identify existing coverage"
+2. **Step 8 is PREPARE** (not QUALITY) - Quality checks before code exists are pointless
+3. **Step 9 is ONE step** - Multiple files = sub-items under Step 9, NOT separate IMPLEMENT steps
+4. **Step 13 is automated VERIFY** - Lint, type check, ALL tests, coverage >= 80%, 0 skipped, 0 flaky
+5. **Step 15 is FINAL-REVIEW** (not COMMIT) - Manual verification belongs here, not in Step 13
+6. **Order matters** - OPTIMIZE and SECURE may change code, so VERIFY must come AFTER them
+
+### Step 13 VERIFY: Quality Gate
+
+Step 13 is the single quality gate. ALL checks must pass before proceeding:
+
+```
+Step 13: VERIFY
+  - Run lint (eslint, ruff, golangci-lint)
+  - Run type check (tsc, mypy, go vet)
+  - Run ALL tests
+  - Check coverage >= 80%
+  - 0 skipped tests
+  - 0 flaky tests
+
+  If ANY check fails -> KICKBACK:
+  - Lint errors      -> Step 9 (IMPLEMENT)
+  - Type errors      -> Step 9 (IMPLEMENT)
+  - Tests fail       -> Step 9 (IMPLEMENT)
+  - Security issue   -> Step 12 (SECURE)
+  - Perf regression  -> Step 11 (OPTIMIZE)
+```
+
+### Validation
+
+Step labels are validated programmatically by `lib/plan-validator.js` and enforced by `hooks/validate-plan-steps.js`. Plans with wrong labels are REJECTED before execution.
 
 ---
 
@@ -363,15 +420,15 @@ The loop is triggered automatically when a plan moves from `implementation/draft
 | implementation-plan-reviewer | opus | 6 | Review Gate |
 | iron-loop-plan-integrator | opus | 6 | Creates execution plans |
 | iron-loop-plan-critic | opus | 6 | Reviews execution plans (5-dim rubric) |
-| test-maker | opus | 7 | TDD Red |
-| quality-checker | sonnet | 8,10 | Quality |
-| implementer | sonnet | 9 | Code |
-| self-reviewer | opus | 10 | Review |
+| test-maker | opus | 7 | TDD Red (write tests FIRST) |
+| quality-checker | sonnet | 8 | Prepare environment |
+| implementer | sonnet | 9 | ALL code changes |
+| self-reviewer | opus | 10 | Self-review checkpoint |
 | optimizer | sonnet | 11 | Performance + Simplification |
-| security-scanner | opus | 12 | Security |
-| verifier | sonnet | 13 | Testing |
-| documenter | sonnet | 14 | Docs |
-| implementation-reviewer | opus | 15 | Final Gate |
+| security-scanner | opus | 12 | Security vulnerability check |
+| verifier | sonnet | 13 | Quality gate (lint, type, tests) |
+| documenter | sonnet | 14 | Documentation |
+| implementation-reviewer | opus | 15 | Final review + human gate |
 
 ---
 

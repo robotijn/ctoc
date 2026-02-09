@@ -197,3 +197,29 @@ docker-compose -f docker-compose.e2e.yml down -v
    - Flaky tests must still fail when they fail
    - Retry mechanisms are fine, but log each attempt
    - After max retries, FAIL LOUDLY
+
+## Zero Tolerance: Flaky E2E Tests
+
+**0 flaky tests allowed.** This is a BLOCKING rule at Step 13 (VERIFY).
+
+| Situation | Action |
+|-----------|--------|
+| Timing issue | Add explicit waits, not arbitrary sleeps |
+| Animation interference | Wait for animation completion |
+| Network race condition | Mock or wait for network idle |
+| Shared state pollution | Isolate test data per test |
+| Browser-specific failure | Fix for all browsers or mark platform-specific with reason |
+
+Flaky test handling:
+1. Retry up to 2 times automatically
+2. If still fails after 2 retries -> BLOCK Step 13
+3. Fix the root cause before proceeding
+4. NEVER mark as "known flaky" and ignore
+
+## Zero Tolerance: Skipped E2E Tests
+
+**0 skipped tests allowed.**
+
+- If an E2E test can't run: FIX IT or DELETE IT
+- Platform-specific skips must have explicit justification
+- "Will fix later" is NOT a valid skip reason

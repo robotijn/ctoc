@@ -277,7 +277,7 @@ describe('Tab Modules - render()', () => {
       assert.ok(output.includes('CTOC'), 'Should show CTOC title');
       assert.ok(output.includes('2.0.0'), 'Should show version');
       assert.ok(output.includes('5'), 'Should show functional count');
-      assert.ok(output.includes('Plans'), 'Should show Plans section');
+      assert.ok(output.includes('Pipeline'), 'Should show Pipeline section');
     });
 
     test('renders active agent status', () => {

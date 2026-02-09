@@ -34,11 +34,11 @@ A plan moves to review ONLY when ALL steps 7-15 are complete:
 ```markdown
 ### Step 7: TEST
 - [x] All tests written
-- [x] All tests passing
+- [x] Tests fail initially (TDD Red)
 
-### Step 8: QUALITY
-- [x] Lint passes
-- [x] Type check passes
+### Step 8: PREPARE
+- [x] Environment ready
+- [x] Dependencies installed
 
 ... (all must be [x])
 
@@ -46,6 +46,28 @@ A plan moves to review ONLY when ALL steps 7-15 are complete:
 - [x] All steps complete
 - [x] Ready for review
 ```
+
+### Rule 4: HUMAN GATES - FORBIDDEN TRANSITIONS
+
+You are EXPLICITLY FORBIDDEN from these transitions:
+
+| From | To | Why | Revert To |
+|------|-----|-----|-----------|
+| ANY | implementation/ | Human gate 1 | functional/ |
+| ANY | todo/ | Human gate 2 | implementation/ |
+| ANY | done/ | Human gate 3 | review/ |
+
+Your ONLY allowed transitions:
+- todo/ → in-progress/ (picking up work)
+- in-progress/ → review/ (completing work)
+
+If asked to cross a human gate, REFUSE:
+```
+⛔ CANNOT COMPLY - This is a HUMAN GATE requiring user approval via menu.
+```
+
+A pre-tool hook monitors ALL tool calls. If you somehow move a plan across
+a human gate without the approval marker, it will be automatically reverted.
 
 ## Execution Flow
 
@@ -125,17 +147,21 @@ For each step 7-15:
 3. **Mark** checkbox `[x]` when complete
 4. **Verify** step is fully done before moving to next
 
-### Step 7: TEST
-- Write tests first (TDD)
+### Step 7: TEST (TDD Red)
+- Write tests FIRST (TDD - not just identify coverage)
 - Run tests, expect failures (red)
 - Tests define expected behavior
+- Test error conditions
 
-### Step 8: QUALITY
-- Run linter: `npm run lint` or equivalent
-- Run type check: `npm run typecheck` or equivalent
-- Fix any issues before proceeding
+### Step 8: PREPARE
+- Install dependencies if needed
+- Check prerequisites
+- Verify dev environment ready
+- Create directories/config if needed
 
 ### Step 9: IMPLEMENT
+- ALL code changes in this single step
+- Multiple files = sub-items, NOT separate IMPLEMENT steps
 - Write code to make tests pass
 - Follow the implementation plan exactly
 - Don't add unrequested features
@@ -146,19 +172,23 @@ For each step 7-15:
 - Verify error handling
 
 ### Step 11: OPTIMIZE
-- Profile if needed
 - Remove redundant operations
+- Optimize critical paths
+- Simplify complex code
 - Don't over-optimize
 
 ### Step 12: SECURE
-- Validate inputs
+- Validate inputs (no path traversal)
 - Check for secrets exposure
 - Safe file operations
 
 ### Step 13: VERIFY
-- Run ALL tests (not just new ones)
-- Run exactly as CI does: `node --test --test-force-exit tests/*.test.js`
-- Manual verification if specified
+- Run lint + type check
+- Run ALL tests (TDD Green) - not just new ones
+- Run exactly as CI does
+- Check coverage >= 80%
+- 0 skipped, 0 flaky tests
+- If ANY check fails -> kickback to relevant step
 
 ### Step 14: DOCUMENT
 - Update docs if needed
@@ -167,7 +197,8 @@ For each step 7-15:
 
 ### Step 15: FINAL-REVIEW
 - All previous steps complete
-- All tests passing
+- All quality checks passed
+- Manual verification if needed
 - Ready for human review
 
 ## Stop Flag

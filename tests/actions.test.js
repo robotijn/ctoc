@@ -87,14 +87,14 @@ function testIronLoopApplication() {
 
   const ironLoopSteps = [
     '### Step 7: TEST',
-    '### Step 8: QUALITY',
+    '### Step 8: PREPARE',
     '### Step 9: IMPLEMENT',
     '### Step 10: REVIEW',
     '### Step 11: OPTIMIZE',
     '### Step 12: SECURE',
-    '### Step 13: DOCUMENT',
-    '### Step 14: VERIFY',
-    '### Step 15: COMMIT'
+    '### Step 13: VERIFY',
+    '### Step 14: DOCUMENT',
+    '### Step 15: FINAL-REVIEW'
   ];
 
   const withIronLoop = {
@@ -104,7 +104,9 @@ function testIronLoopApplication() {
 
   assert.strictEqual(withIronLoop.metadata.iron_loop, true);
   assert.ok(withIronLoop.content.includes('Step 7: TEST'));
-  assert.ok(withIronLoop.content.includes('Step 15: COMMIT'));
+  assert.ok(withIronLoop.content.includes('Step 8: PREPARE'));
+  assert.ok(withIronLoop.content.includes('Step 13: VERIFY'));
+  assert.ok(withIronLoop.content.includes('Step 15: FINAL-REVIEW'));
   console.log('✓ Iron Loop application');
 }
 

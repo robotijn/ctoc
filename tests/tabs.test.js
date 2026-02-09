@@ -16,7 +16,7 @@ const {
 // Test TABS constant structure
 function testTabsConstant() {
   assert.ok(Array.isArray(TABS), 'TABS is an array');
-  assert.strictEqual(TABS.length, 7, 'TABS has 7 entries');
+  assert.strictEqual(TABS.length, 8, 'TABS has 8 entries');
 
   // Verify each tab has required properties
   TABS.forEach((tab, i) => {
@@ -27,7 +27,7 @@ function testTabsConstant() {
   });
 
   // Verify expected tabs exist
-  const expectedIds = ['overview', 'functional', 'implementation', 'review', 'todo', 'progress', 'tools'];
+  const expectedIds = ['overview', 'vision', 'functional', 'implementation', 'review', 'todo', 'progress', 'tools'];
   const actualIds = TABS.map(t => t.id);
   assert.deepStrictEqual(actualIds, expectedIds, 'Tab IDs match expected order');
 
@@ -39,9 +39,9 @@ function testGetTabNames() {
   const names = getTabNames();
 
   assert.ok(Array.isArray(names), 'Returns an array');
-  assert.strictEqual(names.length, 7, 'Returns 7 names');
+  assert.strictEqual(names.length, 8, 'Returns 8 names');
 
-  const expectedNames = ['Overview', 'Functional', 'Implementation', 'Review', 'Todo', 'Progress', 'Tools'];
+  const expectedNames = ['Overview', 'Vision', 'Functional', 'Implementation', 'Review', 'Todo', 'Progress', 'Tools'];
   assert.deepStrictEqual(names, expectedNames, 'Tab names match expected order');
 
   // Verify all are strings
@@ -87,13 +87,13 @@ function testGetTabByIndex() {
   assert.ok(first, 'Found first tab');
   assert.strictEqual(first.id, 'overview', 'First tab is overview');
 
-  const last = getTabByIndex(6);
+  const last = getTabByIndex(7);
   assert.ok(last, 'Found last tab');
   assert.strictEqual(last.id, 'tools', 'Last tab is tools');
 
-  const middle = getTabByIndex(3);
+  const middle = getTabByIndex(4);
   assert.ok(middle, 'Found middle tab');
-  assert.strictEqual(middle.id, 'review', 'Index 3 is review');
+  assert.strictEqual(middle.id, 'review', 'Index 4 is review');
 
   // Test out of bounds
   const outOfBounds = getTabByIndex(100);
@@ -109,12 +109,13 @@ function testGetTabByIndex() {
 function testGetTabIndex() {
   // Test existing tabs
   assert.strictEqual(getTabIndex('overview'), 0, 'overview is at index 0');
-  assert.strictEqual(getTabIndex('functional'), 1, 'functional is at index 1');
-  assert.strictEqual(getTabIndex('implementation'), 2, 'implementation is at index 2');
-  assert.strictEqual(getTabIndex('review'), 3, 'review is at index 3');
-  assert.strictEqual(getTabIndex('todo'), 4, 'todo is at index 4');
-  assert.strictEqual(getTabIndex('progress'), 5, 'progress is at index 5');
-  assert.strictEqual(getTabIndex('tools'), 6, 'tools is at index 6');
+  assert.strictEqual(getTabIndex('vision'), 1, 'vision is at index 1');
+  assert.strictEqual(getTabIndex('functional'), 2, 'functional is at index 2');
+  assert.strictEqual(getTabIndex('implementation'), 3, 'implementation is at index 3');
+  assert.strictEqual(getTabIndex('review'), 4, 'review is at index 4');
+  assert.strictEqual(getTabIndex('todo'), 5, 'todo is at index 5');
+  assert.strictEqual(getTabIndex('progress'), 6, 'progress is at index 6');
+  assert.strictEqual(getTabIndex('tools'), 7, 'tools is at index 7');
 
   // Test non-existent tab
   assert.strictEqual(getTabIndex('nonexistent'), -1, 'Returns -1 for unknown id');
@@ -132,13 +133,14 @@ function testNextTab() {
   assert.strictEqual(nextTab(3), 4, '3 -> 4');
   assert.strictEqual(nextTab(4), 5, '4 -> 5');
   assert.strictEqual(nextTab(5), 6, '5 -> 6');
+  assert.strictEqual(nextTab(6), 7, '6 -> 7');
 
   // Test wrap-around
-  assert.strictEqual(nextTab(6), 0, '6 wraps to 0');
+  assert.strictEqual(nextTab(7), 0, '7 wraps to 0');
 
   // Test full cycle
   let current = 0;
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 8; i++) {
     current = nextTab(current);
   }
   assert.strictEqual(current, 0, 'Full cycle returns to start');
@@ -156,12 +158,14 @@ function testPrevTab() {
   assert.strictEqual(prevTab(2), 1, '2 -> 1');
   assert.strictEqual(prevTab(1), 0, '1 -> 0');
 
+  assert.strictEqual(prevTab(1), 0, '1 -> 0');
+
   // Test wrap-around
-  assert.strictEqual(prevTab(0), 6, '0 wraps to 6');
+  assert.strictEqual(prevTab(0), 7, '0 wraps to 7');
 
   // Test full cycle backwards
   let current = 0;
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 8; i++) {
     current = prevTab(current);
   }
   assert.strictEqual(current, 0, 'Full backwards cycle returns to start');

@@ -9,7 +9,7 @@ model: sonnet
 
 ## Role
 
-You run the test suite and report results. This is Step 14 (VERIFY) - the final check before commit.
+You run the test suite and report results. This is part of Step 13 (VERIFY) - the quality gate that must pass before documentation and final review.
 
 ## Test Commands by Language
 
@@ -122,12 +122,37 @@ cargo test -- --nocapture
 Fix the 2 failing tests before commit.
 ```
 
-## Handling Flaky Tests
+## Zero Tolerance: Skipped Tests
+
+**0 skipped tests allowed.** This is a BLOCKING rule at Step 13 (VERIFY).
+
+| Situation | Action |
+|-----------|--------|
+| Test can't run | FIX IT (make it runnable) |
+| Test is obsolete | DELETE IT |
+| Platform-specific | Use conditional skip with explicit reason ONLY |
+
+Valid skip (the ONLY exception):
+```javascript
+test.skip(os !== 'linux', 'Linux-only feature');
+```
+
+Invalid skips (BLOCKING - Step 13 will fail):
+```javascript
+test.skip('TODO: fix later');       // NOT ALLOWED
+test.skip();                         // NOT ALLOWED
+it.skip('some test', () => { ... }); // NOT ALLOWED without platform reason
+```
+
+## Zero Tolerance: Flaky Tests
+
+**0 flaky tests allowed.** This is a BLOCKING rule at Step 13 (VERIFY).
 
 If a test fails intermittently:
-1. Retry once automatically
-2. If still fails, report as flaky
-3. Suggest fixes (async issues, timing, shared state)
+1. Retry up to 2 times automatically
+2. If still fails after retries, report as flaky and BLOCK
+3. Fix the root cause (async issues, timing, shared state)
+4. NEVER mark as "pre-existing" or ignore
 
 ## CRITICAL: NO SILENT FAILURES
 

@@ -5,6 +5,9 @@ mcp/node_modules/
 # Test artifacts
 .ctoc/state/
 
+# Quality state cache (local-only, per-developer)
+.ctoc/quality-state/
+
 # OS files
 .DS_Store
 Thumbs.db

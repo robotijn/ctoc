@@ -69,10 +69,11 @@
 - [ ] Confirm tests actually fail
 - [ ] Test edge cases
 
-#### Step 8: QUALITY
-- [ ] Run linter: `{{LINT_COMMAND}}`
-- [ ] Run formatter: `{{FORMAT_COMMAND}}`
-- [ ] Run type checker: `{{TYPECHECK_COMMAND}}`
+#### Step 8: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
 
 #### Step 9: IMPLEMENT
 - [ ] Write code to pass tests
@@ -103,23 +104,24 @@
 - [ ] Check for secrets in code
 - [ ] Run security audit
 
-#### Step 13: DOCUMENT
+#### Step 13: VERIFY
+- [ ] Run linter: `{{LINT_COMMAND}}`
+- [ ] Run type checker: `{{TYPECHECK_COMMAND}}`
+- [ ] Run full test suite (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+#### Step 14: DOCUMENT
 - [ ] Update API documentation
 - [ ] Update README if needed
 - [ ] Add code comments for complex logic
 - [ ] Update changelog
 
-#### Step 14: VERIFY
-- [ ] Run full test suite
-- [ ] Check test coverage
-- [ ] Verify no regressions
-- [ ] Manual testing if needed
-
-#### Step 15: COMMIT
-- [ ] Write descriptive commit message
-- [ ] Follow conventional commits
-- [ ] Run ctoc sync to push
-- [ ] Feature complete
+#### Step 15: FINAL-REVIEW
+- [ ] Verify steps 7-14 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
 
 ---
 

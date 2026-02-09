@@ -5,6 +5,37 @@
 
 ---
 
+## ⛔ HUMAN GATES - CRITICAL RULE
+
+Three stage transitions REQUIRE human approval. NEVER cross these automatically:
+
+| Gate | From → To | Revert To | User Action |
+|------|-----------|-----------|-------------|
+| 🔒 1 | functional → implementation | functional | Menu: [3] approve |
+| 🔒 2 | implementation → todo | implementation | Menu: [4] approve |
+| 🔒 3 | review → done | review | Menu: [2] approve |
+
+**Rules:**
+- NEVER move plans across these gates without user selecting approve
+- If asked to "complete" a plan or "move to done" → REFUSE, explain human gate
+- A pre-tool hook monitors ALL tool calls for violations and auto-reverts
+
+**Violation Response:**
+1. Plan automatically reverted to previous stage
+2. Incident logged to `.ctoc/logs/gate-violations.json`
+3. User alerted immediately
+
+**Approval Marker:**
+When a plan crosses a human gate via menu, this marker is added:
+```yaml
+approved_by: human
+approved_at: {timestamp}
+gate_crossed: {from} → {to}
+```
+Plans in human gate destinations without this marker are automatically reverted.
+
+---
+
 ## ⛔⛔⛔ ABSOLUTE RULE: MARKETPLACE ONLY ⛔⛔⛔
 
 ### THIS IS THE #1 RULE. VIOLATING IT BREAKS EVERYTHING.
@@ -707,6 +738,35 @@ This ensures:
 | Bash (read) | Yes | ls, cat, etc. |
 | Bash (write) | **NO** | Serialize |
 | Git operations | **NO** | Use worktrees for parallelism |
+| **Plan implementation** | **NO** | **ALWAYS sequential — see below** |
+
+### CRITICAL: Plan Implementation is ALWAYS Sequential
+
+**Todo plans MUST be implemented one at a time, NEVER in parallel.**
+
+```
+CORRECT:
+  1. Pick oldest plan from todo/
+  2. Implement fully (all steps)
+  3. Move to review/
+  4. Pick next plan from todo/
+  5. Repeat
+
+WRONG:
+  Spawn 3 agents for 3 todo plans simultaneously
+```
+
+**Why:**
+- Plans may modify overlapping files (merge conflicts)
+- Later plans may depend on earlier plan's changes
+- Sequential is predictable and debuggable
+- One agent completing cleanly is better than 3 agents fighting
+
+**When user says "start" or "process todo":**
+1. Spawn ONE agent
+2. Agent processes ALL todo plans sequentially (FIFO order)
+3. Agent moves each completed plan to in-progress/ then review/
+4. Agent stops when todo/ is empty
 
 ### Pattern: Parallel File Creation
 

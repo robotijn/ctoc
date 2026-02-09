@@ -10,6 +10,47 @@ The plan content including:
 - Requirements
 - Implementation Plan (if present)
 
+## MANDATORY Step Labels (DO NOT MODIFY)
+
+You MUST use these exact step labels in this exact order:
+
+| Step | Label | Purpose | NEVER Replace With |
+|------|-------|---------|-------------------|
+| 7 | TEST | Write tests first (TDD Red) | "Identify coverage" |
+| 8 | PREPARE | Prepare environment, install deps | "QUALITY", "SETUP" |
+| 9 | IMPLEMENT | ALL code changes (single step) | Multiple IMPLEMENT steps |
+| 10 | REVIEW | Self-review checkpoint | IMPLEMENT |
+| 11 | OPTIMIZE | Performance and simplification | IMPLEMENT |
+| 12 | SECURE | Security vulnerability check | IMPLEMENT |
+| 13 | VERIFY | Run ALL quality checks (lint, type, tests) | Manual verification |
+| 14 | DOCUMENT | Update documentation | VERIFY |
+| 15 | FINAL-REVIEW | Ready for human review | VERIFY, COMMIT |
+
+### Anti-Patterns to Avoid
+
+- Multiple IMPLEMENT steps (merge into one with sub-items)
+- "Identify coverage" in TEST step (must WRITE tests)
+- VERIFY after DOCUMENT (VERIFY is Step 13, DOCUMENT is Step 14)
+- Manual verification in VERIFY (belongs in FINAL-REVIEW)
+- Skipping REVIEW, OPTIMIZE, or SECURE (all are mandatory)
+- Using QUALITY as a step label (Step 8 is PREPARE, quality checks go in Step 13 VERIFY)
+- Using COMMIT as a step label (Step 15 is FINAL-REVIEW)
+
+### IMPLEMENT is ONE Step with Sub-items
+
+All code changes go in Step 9. Multiple files = multiple sub-items, NOT multiple steps.
+
+```
+WRONG:
+Step 9:  IMPLEMENT Update file A
+Step 10: IMPLEMENT Update file B
+
+CORRECT:
+Step 9: IMPLEMENT
+- [ ] Update file A with new function
+- [ ] Update file B with integration
+```
+
 ## Output
 
 Generate a markdown section with detailed, actionable steps:
@@ -22,11 +63,13 @@ Generate a markdown section with detailed, actionable steps:
 - [ ] Test function A returns expected output
 - [ ] Test function B handles edge cases
 - [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
 
-### Step 8: QUALITY
-- [ ] Run lint on new files
-- [ ] Run format on new files
-- [ ] Verify no syntax/type errors
+### Step 8: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
 
 ### Step 9: IMPLEMENT
 - [ ] Create `lib/{feature}.js` with functions
@@ -40,9 +83,9 @@ Generate a markdown section with detailed, actionable steps:
 - [ ] Check error handling completeness
 
 ### Step 11: OPTIMIZE
-- [ ] Check for redundant file reads
-- [ ] Ensure non-blocking operations where possible
-- [ ] Profile critical paths
+- [ ] Remove redundant file reads
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
 
 ### Step 12: SECURE
 - [ ] Validate file paths (no path traversal)
@@ -51,9 +94,10 @@ Generate a markdown section with detailed, actionable steps:
 - [ ] Safe file permissions
 
 ### Step 13: VERIFY
-- [ ] Run all tests: node tests/{feature}.test.js
-- [ ] Manual test: {specific scenario}
-- [ ] Integration test: {specific workflow}
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
 
 ### Step 14: DOCUMENT
 - [ ] Update relevant docs
@@ -61,8 +105,9 @@ Generate a markdown section with detailed, actionable steps:
 - [ ] Update CHANGELOG if needed
 
 ### Step 15: FINAL-REVIEW
-- [ ] Review steps 7-14 completed correctly
-- [ ] All tests passing
+- [ ] Verify steps 7-14 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
 - [ ] Ready for human review
 ```
 

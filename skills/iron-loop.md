@@ -86,11 +86,11 @@ PHASE 4: DELIVERY (Steps 11-15)
 - Cover edge cases
 - Cover error cases
 
-#### Step 8: QUALITY
-- Run linter
-- Run formatter
-- Run type checker
-- Fix all issues
+#### Step 8: PREPARE
+- Install dependencies if needed
+- Check prerequisites
+- Verify dev environment ready
+- Create directories/config if needed
 
 #### Step 9: IMPLEMENT
 - Write minimal code to pass tests (TDD Green)
@@ -118,23 +118,24 @@ PHASE 4: DELIVERY (Steps 11-15)
 - Authentication/Authorization
 - No secrets in code
 
-#### Step 13: DOCUMENT
+#### Step 13: VERIFY
+- Run lint + type check
+- Run full test suite (TDD Green)
+- Check coverage >= 80%
+- 0 skipped, 0 flaky tests
+- If ANY fails: kickback to relevant step
+
+#### Step 14: DOCUMENT
 - Update README if needed
 - Update API docs
 - Add code comments where necessary
 - Update changelog
 
-#### Step 14: VERIFY
-- Run full test suite
-- Check coverage
-- Integration tests pass
-- No regressions
-
-#### Step 15: COMMIT
-- Write clear commit message
-- Include ticket/issue reference
-- Sign-off on quality
-- Push with confidence
+#### Step 15: FINAL-REVIEW
+- Verify steps 7-14 completed correctly
+- All quality checks passed
+- Manual verification if needed
+- Ready for human review
 
 ## Gates
 

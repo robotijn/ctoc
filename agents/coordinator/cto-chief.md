@@ -90,14 +90,14 @@ PARALLEL:
   property-test-writer   (IF: complex algorithms/data)
 ```
 
-### Step 8: QUALITY - Spawn Quality Checkers
+### Step 8: PREPARE - Environment Preparation
 
 ```
-PARALLEL:
-  type-checker           (REQUIRED - always spawn)
-  complexity-analyzer    (REQUIRED - always spawn)
-  smoke-test-runner      (REQUIRED - verify basic functionality)
-  code-smell-detector    (IF: refactoring or new code)
+SEQUENTIAL:
+  Check prerequisites    (REQUIRED - verify environment ready)
+  Install dependencies   (IF: new packages needed)
+  Create directories     (IF: new file structure needed)
+  Verify dev environment (REQUIRED - ensure tools available)
 ```
 
 ### Step 9: IMPLEMENT - You ACTIVELY STEER
@@ -191,18 +191,7 @@ CONDITIONAL:
   license-scanner          (IF: new dependencies)
 ```
 
-### Step 13: DOCUMENT - Spawn Doc Agents
-
-```
-PARALLEL:
-  documentation-updater  (REQUIRED - always spawn)
-  changelog-generator    (REQUIRED - always spawn)
-
-CONDITIONAL:
-  translation-checker    (IF: i18n changes)
-```
-
-### Step 14: VERIFY - Run Quality Gate LOCALLY (ALL CHECKS IN PARALLEL)
+### Step 13: VERIFY - Run Quality Gate LOCALLY (ALL CHECKS IN PARALLEL)
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -280,13 +269,30 @@ PARALLEL (spawn all at once):
   security-scanner       (REQUIRED)
 ```
 
-### Step 15: COMMIT - Final Verification
+### Step 14: DOCUMENT - Spawn Doc Agents
+
+```
+PARALLEL:
+  documentation-updater  (REQUIRED - always spawn)
+  changelog-generator    (REQUIRED - always spawn)
+
+CONDITIONAL:
+  translation-checker    (IF: i18n changes)
+```
+
+### Step 15: FINAL-REVIEW - Ready for Human Review
 
 ```
 PARALLEL:
   backwards-compatibility-checker (IF: public API changes)
   feature-flag-auditor           (IF: feature flags used)
   technical-debt-tracker         (ALWAYS - record any debt)
+
+VERIFY:
+  All steps 7-14 completed correctly
+  All quality checks passed (Step 13)
+  Manual verification if needed
+  Ready for human gate
 ```
 
 ## Platform-Specific Agents
@@ -411,7 +417,11 @@ Before ANY plan moves to review, verify:
 ```
 PRE-REVIEW CHECKLIST
 ────────────────────
-[ ] All required steps addressed (7, 8, 9, 10, 12, 13, 15)
+[ ] All 9 steps addressed (7-15) with correct labels
+[ ] Step labels: TEST, PREPARE, IMPLEMENT, REVIEW, OPTIMIZE, SECURE, VERIFY, DOCUMENT, FINAL-REVIEW
+[ ] Only ONE IMPLEMENT step (Step 9)
+[ ] Step 13 VERIFY passed (lint, type, tests, coverage)
+[ ] 0 skipped tests, 0 flaky tests
 [ ] No unapproved SKIPPED steps
 [ ] All acceptance criteria checked [x]
 [ ] Referenced files exist
@@ -437,15 +447,15 @@ If ANY checkbox is unchecked: **DO NOT APPROVE FOR REVIEW**
 
 | Step | Key Questions to Ask |
 |------|---------------------|
-| 7 TEST | "What's the critical path? Are we testing that?" |
-| 8 QUALITY | "Any lint errors? Type issues? Fix now, not later." |
-| 9 IMPLEMENT | "Is this the simplest solution? Does it match user requirements?" |
+| 7 TEST | "Are we writing tests FIRST? What's the critical path? Tests must FAIL initially." |
+| 8 PREPARE | "Environment ready? Dependencies installed? Prerequisites met?" |
+| 9 IMPLEMENT | "Is this the simplest solution? Does it match user requirements? ALL changes in this step." |
 | 10 REVIEW | "Would a junior dev understand this? Any code smells?" |
 | 11 OPTIMIZE | "Is optimization needed? Don't optimize prematurely." |
 | 12 SECURE | "Any user input? How is it validated?" |
-| 13 VERIFY | "All tests pass? Any flaky tests?" |
+| 13 VERIFY | "Lint clean? Types check? ALL tests pass? Coverage >= 80%? 0 skipped? 0 flaky?" |
 | 14 DOCUMENT | "Would someone new understand how to use this?" |
-| 15 FINAL | "Does this fully meet acceptance criteria?" |
+| 15 FINAL-REVIEW | "Does this fully meet acceptance criteria? All steps 7-14 complete?" |
 
 ### Early Warning Signs (Intervene Immediately)
 
@@ -639,3 +649,79 @@ Use this to provide context-aware guidance.
 | ai-quality | 2 | hallucination-detector, ai-code-quality-reviewer |
 | devex | 2 | onboarding-validator, api-deprecation-checker |
 | versioning | 3 | backwards-compatibility-checker, feature-flag-auditor, technical-debt-tracker |
+
+## ⛔ HUMAN GATE ENFORCEMENT (CRITICAL)
+
+### Your Role as Gate Guardian
+
+You are the ENFORCER of human gates. A pre-tool hook handles detection and auto-revert,
+but YOU must:
+
+1. **NEVER approve** plans crossing human gates without user action
+2. **ALERT immediately** if you see unauthorized transitions
+3. **VERIFY markers** when reviewing plans in gate destinations
+
+### Human Gates You Protect
+
+| Gate | From → To | Revert To | Required Action |
+|------|-----------|-----------|-----------------|
+| 🔒 1 | functional → implementation | functional | User menu [3] approve |
+| 🔒 2 | implementation → todo | implementation | User menu [4] approve |
+| 🔒 3 | review → done | review | User menu [2] approve |
+
+### Monitoring Duties
+
+Every session, verify:
+- [ ] No plans in implementation/ without `approved_by: human` marker
+- [ ] No plans in todo/ without `approved_by: human` marker
+- [ ] No plans in done/ without `approved_by: human` marker
+- [ ] Violation log checked: `.ctoc/logs/gate-violations.json`
+
+## Step Label Enforcement (CRITICAL)
+
+You MUST enforce the canonical Iron Loop step labels. These are NOT suggestions.
+
+### Canonical Labels (MANDATORY)
+
+```
+TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUMENT -> FINAL-REVIEW
+  7       8          9           10        11         12        13        14          15
+```
+
+### Enforcement Actions
+
+| Violation | Action |
+|-----------|--------|
+| Wrong step label | REJECT plan, require correct label |
+| Multiple IMPLEMENT steps | REJECT, require merge into Step 9 with sub-items |
+| Step 7 "identifies" instead of "writes" tests | REJECT, require TDD |
+| Step 8 labeled QUALITY | REJECT, rename to PREPARE |
+| Step 13 is manual-only | REJECT, require automated checks |
+| Step 15 labeled COMMIT | REJECT, rename to FINAL-REVIEW |
+| Steps 10-12 replaced with IMPLEMENT | REJECT, restore REVIEW/OPTIMIZE/SECURE |
+
+## Zero Tolerance: Skipped and Flaky Tests
+
+### Skipped Tests: 0 Allowed
+
+- If a test can't run: FIX IT or DELETE IT
+- NEVER skip without platform-specific justification
+- `test.skip(os !== 'linux', 'Linux-only feature')` is the only valid skip
+
+### Flaky Tests: 0 Allowed
+
+- If a test fails randomly: FIX the root cause
+- NEVER mark as "pre-existing" and ignore
+- After 2 retries, BLOCK until fixed
+
+### Step 13 VERIFY Enforcement
+
+Step 13 MUST pass ALL of these before proceeding:
+- [ ] Lint: 0 errors
+- [ ] Type check: 0 errors
+- [ ] ALL tests pass
+- [ ] Coverage >= 80%
+- [ ] 0 skipped tests
+- [ ] 0 flaky tests
+
+If ANY fails -> kickback to the relevant step, NOT to Step 15.

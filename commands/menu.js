@@ -211,6 +211,18 @@ function handleResize() {
 
 // Main entry point
 function main() {
+  // Check for non-interactive JSON mode (subcommands passed as args)
+  // Usage: node menu.js [browse functional | plan stage/file | validate stage/file | menu commands]
+  const cliArgs = process.argv.slice(2);
+
+  if (cliArgs.length > 0) {
+    // Non-interactive JSON mode: delegate to menu-screens state machine
+    const { route } = require('../lib/menu-screens');
+    const result = route(cliArgs, app.projectPath);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
   // Check if running in interactive terminal
   if (process.stdin.isTTY) {
     // Full TUI mode
@@ -224,78 +236,10 @@ function main() {
     app.navStack.push('Overview');
     render();
   } else {
-    // Non-interactive: rich status display for Claude
-    const { getPlanCounts, getAgentStatus, readPlans, getPlansDir } = require('../lib/state');
-    const { getVisionCounts } = require('../tabs/vision');
-    const counts = getPlanCounts(app.projectPath);
-    const visionCounts = getVisionCounts(app.projectPath);
-    const agent = getAgentStatus(app.projectPath);
-
-    // Read plans from each directory (flat structure)
-    const plansDir = getPlansDir(app.projectPath);
-    const plans = {
-      functional: readPlans(path.join(plansDir, 'functional')),
-      implementation: readPlans(path.join(plansDir, 'implementation')),
-      review: readPlans(path.join(plansDir, 'review')),
-      todo: readPlans(path.join(plansDir, 'todo')),
-      inProgress: readPlans(path.join(plansDir, 'in-progress')),
-      done: readPlans(path.join(plansDir, 'done'))
-    };
-
-    // Helper for status text
-    const status = (count, empty, active) => count > 0 ? active : empty;
-
-    // Build rich status output
-    let out = '';
-    out += `CTOC v${VERSION}\n`;
-    out += `${'─'.repeat(60)}\n\n`;
-
-    // Pipeline overview table
-    out += `┌────────────────┬────────┬─────────────────┐\n`;
-    out += `│ Stage          │ Count  │ Status          │\n`;
-    out += `├────────────────┼────────┼─────────────────┤\n`;
-    out += `│ Vision         │ ${String(visionCounts.total).padEnd(6)}│ ${status(visionCounts.total, 'No visions', visionCounts.exploring + ' exploring').padEnd(16)}│\n`;
-    out += `│ Functional     │ ${String(counts.functional).padEnd(6)}│ ${status(counts.functional, 'No drafts', counts.functional + ' drafts').padEnd(16)}│\n`;
-    out += `│ Implementation │ ${String(counts.implementation).padEnd(6)}│ ${status(counts.implementation, 'No drafts', counts.implementation + ' drafts').padEnd(16)}│\n`;
-    out += `│ Todo           │ ${String(counts.todo).padEnd(6)}│ ${status(counts.todo, 'Queue empty', counts.todo + ' queued').padEnd(16)}│\n`;
-    out += `│ In Progress    │ ${String(counts.inProgress).padEnd(6)}│ ${status(counts.inProgress, 'None active', counts.inProgress + ' active').padEnd(16)}│\n`;
-    out += `│ Review         │ ${String(counts.review).padEnd(6)}│ ${status(counts.review, 'Queue empty', counts.review + ' pending').padEnd(16)}│\n`;
-    out += `│ Done           │ ${String(counts.done || 0).padEnd(6)}│ ${status(counts.done, 'None yet', (counts.done || 0) + ' completed').padEnd(16)}│\n`;
-    out += `└────────────────┴────────┴─────────────────┘\n\n`;
-
-    // Agent status - derive from in-progress count
-    const isAgentActive = counts.inProgress > 0;
-    out += `AGENT\n`;
-    if (isAgentActive) {
-      // Get the plan name from in-progress folder
-      const inProgressPlans = plans.inProgress;
-      const currentPlan = inProgressPlans.length > 0 ? (inProgressPlans[0].title || inProgressPlans[0].name) : 'unknown';
-      out += `  ● Active: ${currentPlan}\n`;
-    } else {
-      out += `  ○ Idle\n`;
-    }
-    out += '\n';
-
-    // Menu - option 7 changes based on agent state
-    out += `${'─'.repeat(60)}\n`;
-    out += `MENU\n\n`;
-    out += `  [1] functional       Browse functional plans\n`;
-    out += `  [2] implementation   Browse implementation plans\n`;
-    out += `  [3] todo             Browse todo queue\n`;
-    out += `  [4] in progress      Browse active work\n`;
-    out += `  [5] review           Browse review queue\n`;
-    out += `  [6] done             Browse completed\n`;
-    out += `  ─────────────────────────────────────\n`;
-    if (isAgentActive) {
-      out += `  [7] stop after       Finish current, then stop\n`;
-    } else {
-      out += `  [7] start            Execute next from todo\n`;
-    }
-    out += `  [8] release          Bump version\n`;
-    out += `  [9] dashboard        Refresh view\n`;
-    out += `  [0] vision           Explore a new idea\n`;
-
-    console.log(out);
+    // Non-interactive with no args: JSON dashboard output for Claude
+    const { route } = require('../lib/menu-screens');
+    const result = route([], app.projectPath);
+    console.log(JSON.stringify(result, null, 2));
   }
 }
 
