@@ -1,0 +1,29 @@
+[
+  {
+    "id": "v-1770554304050",
+    "timestamp": "2026-02-08T12:38:24.050Z",
+    "plan": "test-gate-violation.md",
+    "violation": "Moved to done/ without approval",
+    "action": "REVERTED to review/",
+    "status": "pending_reapproval",
+    "resolvedAt": null
+  },
+  {
+    "id": "v-1770554304091",
+    "timestamp": "2026-02-08T12:38:24.091Z",
+    "plan": "test-gate-violation.md",
+    "violation": "Moved to todo/ without approval",
+    "action": "REVERTED to implementation/",
+    "status": "pending_reapproval",
+    "resolvedAt": null
+  },
+  {
+    "id": "v-1770554304114",
+    "timestamp": "2026-02-08T12:38:24.114Z",
+    "plan": "test-gate-violation.md",
+    "violation": "Moved to implementation/ without approval",
+    "action": "REVERTED to functional/",
+    "status": "pending_reapproval",
+    "resolvedAt": null
+  }
+]
