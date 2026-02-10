@@ -123,10 +123,10 @@ The `--continue` flag resumes your last conversation, preserving context.
 |-------|-------|-------------|
 | [**Functional Planning**](IRON_LOOP.md#phase-1-product-owner-role-bdd-methodology) | 1-3 | ASSESS → ALIGN → CAPTURE · *Gate 1: User approves what to build* |
 | [**Technical Planning**](IRON_LOOP.md#iron-loop-overview) | 4-6 | PLAN → DESIGN → SPEC · *Gate 2: User approves how to build* |
-| [**Implementation**](IRON_LOOP.md#hook-enforcement) | 7-10 | TEST → QUALITY → IMPLEMENT → REVIEW |
-| [**Delivery**](IRON_LOOP.md#3-human-gates) | 11-15 | OPTIMIZE → SECURE → DOCUMENT → VERIFY → COMMIT · *Gate 3: User approves commit* |
+| [**Implementation**](IRON_LOOP.md#hook-enforcement) | 7-10 | TEST → PREPARE → IMPLEMENT → REVIEW |
+| [**Delivery**](IRON_LOOP.md#3-human-gates) | 11-15 | OPTIMIZE → SECURE → VERIFY → DOCUMENT → FINAL-REVIEW · *Gate 3: User approves commit* |
 
-Key features: [Hook Enforcement](IRON_LOOP.md#hook-enforcement) · [Crash Recovery](IRON_LOOP.md#crash-recovery) · [Integrator + Critic Loop](IRON_LOOP.md#integrator--critic-loop) · [14 Quality Dimensions](IRON_LOOP.md#14-quality-dimensions-iso-25010-aligned)
+Key features: [Hook Enforcement](IRON_LOOP.md#hook-enforcement) · [Crash Recovery](IRON_LOOP.md#crash-recovery) · [Integrator + Critic Loop](IRON_LOOP.md#integrator--critic-loop) · [14 Quality Dimensions](IRON_LOOP.md#14-quality-dimensions-iso-25010-aligned) · [Smart Quality Gates](#smart-quality-gates)
 
 ---
 
@@ -173,27 +173,31 @@ Stack detected automatically from your project files. Also includes: [CTO Person
 
 ---
 
-## Interactive Interface
+## Interactive Dashboard
 
-The `/ctoc` command opens a full terminal UI with tabs:
+The `/ctoc` command opens an interactive dashboard with numbered menus:
 
-| Tab | Purpose |
-|-----|---------|
-| Overview | Plan counts, agent status |
+| Screen | Purpose |
+|--------|---------|
+| Pipeline | Plan counts per stage, navigate to any stage |
 | Functional | Manage functional plan drafts |
 | Implementation | Manage implementation plan drafts |
+| Todo | FIFO queue for agent work (sequential processing) |
 | Review | Review completed implementations |
-| Todo | FIFO queue for agent work |
 | Progress | In-progress and finished items |
-| Tools | Doctor, Update, Settings |
+| Commands | Release, Doctor, Update, Settings |
 
-**Navigation:**
-- `←/→` Switch tabs
-- `↑/↓` Navigate lists
-- `1-9` Jump to item
-- `Enter` Select
-- `b` Back
-- `q` Quit
+**Navigation:** Select by number `[1]` `[2]` `[3]`... `[0]` for back/cancel.
+
+**Plan Pipeline:**
+```
+vision → functional → implementation → todo → in-progress → review → done
+```
+
+**3 Human Gates** — transitions that require your explicit approval:
+1. Functional → Implementation (approve *what* to build)
+2. Implementation → Todo (approve *how* to build)
+3. Review → Done (approve the result)
 
 Or just talk naturally — CTO Chief understands intent.
 
@@ -210,14 +214,42 @@ CTO Chief blocks premature actions:
    Edit/Write allowed from: Step 7 (TEST)
 ```
 
-**Commit blocked** until verification complete (Steps 1-13)
+**Commit blocked** until verification complete (Steps 1-12)
 ```
 ❌ BLOCKED: Commit blocked
    Current step: 10 (REVIEW)
-   Commit allowed from: Step 14 (VERIFY)
+   Commit allowed from: Step 13 (VERIFY)
 ```
 
 **Escape hatch** — say "skip planning" or "quick fix" to bypass.
+
+---
+
+## Smart Quality Gates
+
+Background quality agent runs checks without blocking your workflow:
+
+```
+git commit ───► post-commit hook spawns background agent
+(instant)              │
+                       ▼
+              Running: lint, typecheck, affected tests, security
+                       │
+               ┌───────┴───────┐
+               ▼               ▼
+            PASS            FAIL
+               │               │
+          auto-push        "Fix: ..."
+```
+
+| Tier | When | Checks | Blocking? |
+|------|------|--------|-----------|
+| Tier 1 | Every commit | lint, typecheck, affected tests, secrets, critical CVEs | Yes (blocks push) |
+| Tier 2 | Every commit | coverage, complexity, duplication, medium CVEs | No (warnings) |
+| Tier 3 | Stage transitions | docs, circular deps, bundle size, benchmarks | At transition |
+| Tier 4 | CI only | full tests, e2e, mutation, memory, license | CI |
+
+**Smart test selection** — only tests affected by changes run, via coverage map.
 
 ---
 
@@ -319,12 +351,15 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**6.1.18** — Fix plugin installation
+**6.1.18** — Smart Quality Gates & Plan Pipeline
 
-- Fixed hooks.json location for plugin installation
-- Renamed marketplace to `robotijn` (plugin is now `ctoc@robotijn`)
-- Update check on session start (checks GitHub, cached 24h)
-- Single source of truth: `ctoc-plugin/`
+- Smart Quality Gate system with tiered checks (Tier 1 blocks push, Tier 2 warns)
+- Plan pipeline: vision → functional → implementation → todo → review → done
+- 3 human gates enforcing approval at stage transitions
+- Deterministic plan navigation state machine (`lib/menu-screens.js`)
+- Canonical Iron Loop step labels enforced (Steps 7-15)
+- Background quality agent with smart test selection via coverage maps
+- Sequential todo plan processing (FIFO, never parallel)
 
 ---
 
@@ -345,12 +380,12 @@ The release script syncs the version across all files automatically.
 Version management:
 
 ```javascript
-const { release, getVersion, syncAll, checkForUpdates } = require('./ctoc-plugin/lib/version');
+const { release, getVersion, syncAll, checkForUpdates } = require('./lib/version');
 
-getVersion()       // → '5.0.5'
-release()          // → bumps patch: 5.0.5 → 5.0.6, syncs all files
-release('minor')   // → bumps minor: 5.0.5 → 5.1.0, syncs all files
-release('major')   // → bumps major: 5.0.5 → 6.0.0, syncs all files
+getVersion()       // → '6.1.18'
+release()          // → bumps patch: 6.1.18 → 6.1.19, syncs all files
+release('minor')   // → bumps minor: 6.1.18 → 6.2.0, syncs all files
+release('major')   // → bumps major: 6.1.18 → 7.0.0, syncs all files
 syncAll()          // → syncs current version to all files without bumping
 
 // Async update check
@@ -363,8 +398,13 @@ if (update.updateAvailable) {
 Files synced automatically by `release()`:
 - `VERSION` (source of truth)
 - `.claude-plugin/marketplace.json`
-- `ctoc-plugin/.claude-plugin/plugin.json`
+- `.claude-plugin/plugin.json`
 - `README.md` (version line)
+
+Run tests:
+```bash
+node --test tests/*.test.js
+```
 
 ---
 
