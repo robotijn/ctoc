@@ -351,7 +351,7 @@ rm ~/.ctoc/state/*.json
 
 ## Version
 
-**6.1.19** — Smart Quality Gates & Plan Pipeline
+**6.1.20** — Smart Quality Gates & Plan Pipeline
 
 - Smart Quality Gate system with tiered checks (Tier 1 blocks push, Tier 2 warns)
 - Plan pipeline: vision → functional → implementation → todo → review → done

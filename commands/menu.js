@@ -217,8 +217,10 @@ function main() {
 
   if (cliArgs.length > 0) {
     // Non-interactive JSON mode: delegate to menu-screens state machine
+    // Split single-string args ("browse functional" → ["browse", "functional"])
     const { route } = require('../lib/menu-screens');
-    const result = route(cliArgs, app.projectPath);
+    const splitArgs = cliArgs.flatMap(arg => arg.split(/\s+/));
+    const result = route(splitArgs, app.projectPath);
     console.log(JSON.stringify(result, null, 2));
     return;
   }
