@@ -6,7 +6,7 @@ type: feature
 extracted_from: smart-quality-gate-system
 approved_by: human
 approved_at: 2026-02-08T17:30:00.000Z
-gate_crossed: functional → implementation
+gate_crossed: implementation → todo
 ---
 
 # Vision Pipeline: Vision-to-Functional Decomposition

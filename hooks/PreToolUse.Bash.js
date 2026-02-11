@@ -154,6 +154,33 @@ async function main() {
     process.exit(0);
   }
 
+  // D4: Block raw mv/cp of plan files between stage directories
+  // All plan transitions MUST go through approvePlan() in lib/actions.js
+  const PLAN_STAGES = 'functional|implementation|todo|in-progress|review|done';
+  const PLAN_MOVE_PATTERN = new RegExp(
+    `\\b(mv|cp)\\b.*plans\\/(${PLAN_STAGES})\\/`
+  );
+
+  // Whitelist: node scripts/move-plan.js (controlled API for agents)
+  const isMoveScript = /\bnode\b.*scripts\/move-plan\.js\b/.test(command);
+
+  if (PLAN_MOVE_PATTERN.test(command) && !isMoveScript) {
+    const c = colors;
+    let output = '\n';
+    output += '='.repeat(70) + '\n';
+    output += `${c.red}HUMAN GATE ENFORCEMENT — PLAN MOVE BLOCKED${c.reset}\n`;
+    output += '='.repeat(70) + '\n\n';
+    output += 'BLOCKED COMMAND:\n';
+    output += `  ${command.length > 60 ? command.substring(0, 57) + '...' : command}\n\n`;
+    output += `${c.yellow}REASON:${c.reset} Plan files cannot be moved with raw mv/cp.\n`;
+    output += 'All plan transitions must go through the menu:\n';
+    output += '  Approve -> validates -> checks human gate -> moves file\n\n';
+    output += `${c.cyan}Use the dashboard menu to approve plan transitions.${c.reset}\n`;
+    output += '\n' + '='.repeat(70) + '\n';
+    writeToTerminal(output);
+    process.exit(1);
+  }
+
   // Load state
   const stateResult = loadState(projectPath);
   const state = stateResult.state;

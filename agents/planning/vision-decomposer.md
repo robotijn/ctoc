@@ -29,6 +29,20 @@ Vision (The Big Picture)
 - Manual: User selects "Convert → functional plan" on a vision
 - Command: `ctoc vision decompose <name>`
 
+**Single-plan bypass:** If the vision maps to a single functional plan (only 1 goal/workstream identified during Phase 1), the Vision Advisor handles the conversion directly. The Decomposer only activates for 2+ independent workstreams.
+
+## Pre-Decomposition Gate
+
+Before decomposing, validate vision readiness by calling `validateVisionReadiness()` from `lib/vision-decomposer.js`.
+
+**Gate checks:**
+- Problem statement present
+- Target audience defined
+- Success criteria defined
+- Scope/boundaries defined (warning if missing)
+
+If validation fails (blocking errors), show errors to user and ask them to complete the vision first (link back to Vision Advisor). If only warnings, show them and allow proceeding.
+
 ## Process
 
 ### Phase 1: Extract Goals (2-4 goals)
@@ -89,42 +103,51 @@ Create MVP slice (horizontal) across activities:
 - **Vertical (Feature):** All stories for one activity = complete feature
 - **Incremental:** Simplest version first, enhance later
 
-### Phase 5: Create Functional Plans
+### Phase 5: Create Functional Plan Stubs
 
-For each goal or slice, generate a functional plan:
+For each goal or slice, create a stub using `createStub()` from `lib/vision-decomposer.js`.
+Or call `decomposeVision(visionPath, goals)` to create all stubs at once.
 
-```markdown
----
-title: "[Goal or MVP name]"
-created: "[timestamp]"
-source: "vision/[vision-name].md"
-priority: [HIGH/MEDIUM/LOW]
-type: feature
----
-
-# [Title]
-
-## Problem Statement
-[Extracted from vision Phase 1]
-
-## Success Criteria
-[Extracted from vision Phase 2]
-
-## User Stories
-
-### [Activity 1]
-- [ ] [Story 1.1]
-- [ ] [Story 1.2]
-
-### [Activity 2]
-- [ ] [Story 2.1]
-
-## Scope
-[Extracted from vision Phase 3]
-
-## Risks
-[Extracted from vision Phase 4]
+Stub frontmatter template:
+```yaml
+type: stub
+parent_vision: "vision/{slug}.md"
+status: stub
+depends_on: "{dependency slugs or none}"
 ```
+
+Keep existing Story Mapping structure (Goals -> Activities -> Stories) but output as stubs, not full plans. The Product Owner Agent refines stubs into complete functional plans.
+
+### Phase 6: Human Checkpoint
+
+After creating stubs, present the stub table to the user:
+
+```
+Vision "{name}" decomposed into {N} functional plans:
+
+| # | Stub                    | Scope                          | Depends on |
+|---|-------------------------|--------------------------------|------------|
+| 1 | {vision}-{goal-1}.md    | {scope description}            | -          |
+| 2 | {vision}-{goal-2}.md    | {scope description}            | 1          |
+| 3 | {vision}-{goal-3}.md    | {scope description}            | 2          |
+```
+
+Then use AskUserQuestion with these options:
+1. "Looks good -- refine all" -> Hand off to Product Owner Agent
+2. "Edit stubs" -> User can rename/merge/split/remove stubs
+3. "Add a stub" -> User describes a missing piece, create via `createStub()`
+4. "Start over" -> Call `removeStub()` for all stubs and restart from Phase 1
+
+The user can iterate (edit, add, remove stubs) until satisfied, then approve for PO Agent refinement.
+
+## Handoff to Product Owner
+
+When user approves decomposition ("Looks good -- refine all"):
+
+1. For each stub, write status file via `writeStatus(stubPath, { agent: 'product-owner', status: 'working', message: 'Refining stub...' })`
+2. Call `initProductOwnerAgent(stubPath)` from `lib/actions.js` for each stub
+3. Call `completeVision(visionPath)` from `lib/vision-decomposer.js` to move vision to `plans/done/` with `type: vision`
+4. Return control to the conversation (PO Agent runs as background agent per stub)
 
 ## Interactive Mode
 
@@ -176,6 +199,8 @@ Updates vision document:
 - Read (vision document)
 - Write (functional plans)
 - AskUserQuestion (interactive decisions)
+- `lib/vision-decomposer.js` (validateVisionReadiness, decomposeVision, createStub, completeVision, listStubs, removeStub)
+- `lib/actions.js` (initProductOwnerAgent)
 
 ## Success Criteria
 

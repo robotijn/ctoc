@@ -26,6 +26,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 | `plan {stage}/{file}` | Plan actions |
 | `plan {stage}/{file} more` | Plan more actions |
 | `plan {stage}/{file} discuss` | Discussion menu |
+| `stubs {slug}` | Vision stubs browse (human checkpoint) |
 | `validate {stage}/{file}` | Pre-transition validation |
 
 ### Claude Actions (handle in conversation)
@@ -40,8 +41,12 @@ The command outputs JSON: `{ text, ask, actions }`.
 | `claude:delete {ref}` | Delete plan file, return to stage list |
 | `claude:reject {ref} {dest}` | Reject plan to destination stage |
 | `claude:vision` | Enter Vision Mode |
-| `claude:start-agent` | Spawn background executor agent |
-| `claude:stop-agent` | Set stop flag for agent |
+| `claude:decompose {slug}` | Run Vision Decomposer on a ready vision |
+| `claude:approve-stubs {slug}` | Hand off stubs to PO Agent, move vision to done/ |
+| `claude:edit-stubs {slug}` | Present stub table, allow user to modify stubs |
+| `claude:add-stub {slug}` | Create a new stub for an in-progress decomposition |
+| `claude:start-agent` | Call startAgent(). If started: implement the plan sequentially (Steps 7-15). After each plan completes (moved to review), call advanceAgent() to get next plan or stop. |
+| `claude:stop-agent` | Call stopAgent(). Shows confirmation message. Agent will finish current plan then stop. |
 | `claude:sync` | Run fullPlansSync(), show result |
 
 ### Rules
