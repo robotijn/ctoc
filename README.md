@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.23-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.24-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-85-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
@@ -37,7 +37,14 @@ claude
 /ctoc
 ```
 
-That's it. CTO Chief detects your stack and is ready to work.
+That's it. CTO Chief detects your stack and shows a dashboard.
+
+**3.** Tell Claude what you want to build:
+```
+Add a /health endpoint that returns service status
+```
+
+CTO Chief will create a plan and ask for your approval before writing any code. Use numbered menus (`[1]`, `[2]`, `[3]`) to navigate.
 
 <!-- TODO: Record dashboard GIF with charmbracelet/vhs or gifski -->
 <!-- <p align="center"><img src="docs/assets/dashboard-demo.gif" alt="CTO Chief in action" width="700"><br><em>From idea to tested, secure code in one session</em></p> -->
@@ -75,31 +82,54 @@ That's it. CTO Chief detects your stack and is ready to work.
 | Quality verification | Automated gate (Step 13) | Manual | Manual | None |
 | Specialist agents | 85 across 19 categories | None | DIY | None |
 
-### Example: Adding a Feature
+### Example Session
 
 ```
-You: "Add a /health endpoint that returns service status"
+You: Add a /health endpoint that returns service status
 
-CTO Chief:
-  Steps 1-3: Creates functional plan with BDD scenarios
-  Gate 1:    You approve the plan
+CTO Chief creates a functional plan...
 
-  Steps 4-6: Designs implementation with file paths and test strategy
-  Gate 2:    You approve the approach
+  Feature: Health Endpoint
+    Scenario: Service is healthy
+      Given the server is running
+      When GET /health is called
+      Then respond 200 with { "status": "ok" }
 
-  Step 7:    Writes failing test for /health endpoint
-  Step 8:    Scans existing code for dependency issues
-  Step 9:    Implements the endpoint
-  Step 10:   Self-reviews for correctness
-  Step 11:   Optimizes response time
-  Step 12:   Scans for security issues
-  Step 13:   Runs lint + typecheck + ALL tests (pass)
-  Step 14:   Updates API documentation
-  Step 15:   Presents result for your review
-  Gate 3:    You approve → committed and pushed
+  [1] Approve plan (Recommended)
+  [2] Discuss changes
+  [0] Cancel
+
+You: 1
+
+CTO Chief designs the implementation...
+
+  Files to create:
+    src/routes/health.ts        — route handler
+    tests/routes/health.test.ts — test (written first)
+  Files to modify:
+    src/app.ts                  — register route
+
+  [1] Approve approach (Recommended)
+  [2] Discuss changes
+  [0] Cancel
+
+You: 1
+
+CTO Chief writes tests, implements, verifies...
+  Step 7:  ✓ Test written (failing — TDD red)
+  Step 9:  ✓ Code implemented (test passes — TDD green)
+  Step 13: ✓ Lint, typecheck, all tests pass, 94% coverage
+  Step 15: Ready for your review
+
+  [1] Approve and commit
+  [2] Request changes
+  [0] Cancel
+
+You: 1
+  ✓ Committed and pushed
 ```
 
-Result: A tested, documented, security-scanned endpoint in one session.
+Three approvals. One tested, documented, security-scanned endpoint.
 
 ---
 
@@ -184,11 +214,11 @@ Agents spawn conditionally based on your project and current Iron Loop step.
 | [Languages](skills/languages/) | 50 | [Python](skills/languages/python.md), [TypeScript](skills/languages/typescript.md), [Go](skills/languages/go.md), [Rust](skills/languages/rust.md), [Java](skills/languages/java.md), [C#](skills/languages/csharp.md), [Swift](skills/languages/swift.md), [Kotlin](skills/languages/kotlin.md), [Ruby](skills/languages/ruby.md), [PHP](skills/languages/php.md) |
 | [Web](skills/frameworks/web/) | 85 | [React](skills/frameworks/web/react.md), [Next.js](skills/frameworks/web/nextjs.md), [Vue](skills/frameworks/web/vue.md), [Django](skills/frameworks/web/django.md), [FastAPI](skills/frameworks/web/fastapi.md), [Rails](skills/frameworks/web/rails.md), [Spring Boot](skills/frameworks/web/spring-boot.md), [Express](skills/frameworks/web/express.md) |
 | [AI/ML](skills/frameworks/ai-ml/) | 44 | [PyTorch](skills/frameworks/ai-ml/pytorch.md), [LangChain](skills/frameworks/ai-ml/langchain.md), [Hugging Face](skills/frameworks/ai-ml/huggingface-hub.md), [MLflow](skills/frameworks/ai-ml/mlflow.md), [TensorFlow](skills/frameworks/ai-ml/tensorflow.md) |
-| [Data](skills/frameworks/data/) | 52 | [PostgreSQL](skills/frameworks/data/postgresql.md), [MongoDB](skills/frameworks/data/mongodb.md), [Redis](skills/frameworks/data/redis.md), [Kafka](skills/frameworks/data/kafka.md), [Spark](skills/frameworks/data/spark.md), [Elasticsearch](skills/frameworks/data/elasticsearch.md) |
-| [DevOps](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Terraform](skills/frameworks/devops/terraform.md), [Helm](skills/frameworks/devops/helm.md), [GitHub Actions](skills/frameworks/devops/github-actions.md) |
+| [Data](skills/frameworks/data/) | 52 | [MongoDB](skills/frameworks/data/mongodb.md), [Redis](skills/frameworks/data/redis.md), [Kafka](skills/frameworks/data/kafka.md), [Spark](skills/frameworks/data/spark.md), [Elasticsearch](skills/frameworks/data/elasticsearch.md), [DuckDB](skills/frameworks/data/duckdb.md) |
+| [DevOps](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Helm](skills/frameworks/devops/helm.md), [Ansible](skills/frameworks/devops/ansible.md), [Pulumi](skills/frameworks/devops/pulumi.md) |
 | [Mobile](skills/frameworks/mobile/) | 15 | [React Native](skills/frameworks/mobile/react-native.md), [Flutter](skills/frameworks/mobile/flutter.md), [SwiftUI](skills/frameworks/mobile/swiftui.md), [Jetpack Compose](skills/frameworks/mobile/jetpack-compose.md) |
 
-| [Testing](skills/testing/) | 15 | [Playwright](skills/testing/playwright.md), coverage tools, test patterns |
+| [Testing](skills/testing/) | 15 | [Playwright](skills/testing/playwright/), coverage tools, test patterns |
 | [Security](skills/security/) | 5 | OWASP, input validation, secrets management |
 | [Architecture](skills/architecture/) | 7 | Patterns, dependency analysis, design |
 | [Quality Configs](skills/quality-configs/) | 61 | Per-language lint, format, and test configs |
@@ -338,6 +368,15 @@ Then restart Claude Code to load the new version.
 ```
 Then restart Claude Code.
 
+**"Edit blocked" or "planning incomplete" error:**
+CTO Chief blocks code edits until planning is done (Step 7+). This is intentional. Options:
+1. Complete the planning steps first (recommended)
+2. Say "quick fix" or "trivial change" to bypass for small edits
+3. Set enforcement to `soft` in `.ctoc/settings.yaml` for warnings instead of blocks
+
+**Dashboard shows no plans:**
+Start by describing what you want to build. CTO Chief creates the plan for you.
+
 **Health check:**
 ```
 /ctoc doctor
@@ -361,7 +400,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./lib/version');
 
-getVersion()       // → '6.1.23'
+getVersion()       // → '6.1.24'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -398,6 +437,6 @@ MPL 2.0 — See [LICENSE](LICENSE)
 
 ---
 
-**6.1.23** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.24** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

@@ -37,11 +37,6 @@ const JSON_VERSION_FILES = [
 // Note: Schema versions (e.g., operations-registry.yaml) are separate
 const VERSION_UPDATES = [
   {
-    file: 'commands/dashboard.md',
-    pattern: /CTOC - CTO Chief v[\d.]+/g,
-    replacement: (v) => `CTOC - CTO Chief v${v}`
-  },
-  {
     file: 'README.md',
     pattern: /^\*\*\d+\.\d+\.\d+\*\*/m,
     replacement: (v) => `**${v}**`

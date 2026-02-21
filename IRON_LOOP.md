@@ -2,6 +2,8 @@
 
 > **Iron Loop is CTOC's methodology for quality software delivery.**
 > From ideation to working implementation, every feature follows 15 steps.
+>
+> **You do not need to memorize this.** CTO Chief guides you through each step automatically. This document is a reference for when you want to understand why CTO Chief asks a particular question, or when you want to customize the process.
 
 ---
 
@@ -389,6 +391,25 @@ Each dimension scored 1-5. All must reach 5/5 for auto-approval.
 | **Security** | OWASP Top 10, input validation, no secrets, protected endpoints | Missing auth checks, unvalidated input |
 | **Observability** | Logging at key points, metrics for monitoring, error tracing, health checks | Silent failures, no monitoring hooks |
 
+### Example Critic Response
+
+```
+Round 3 of 10:
+
+  Completeness:   5/5
+  Clarity:        5/5
+  Edge Cases:     3/5 — Step 9 does not specify behavior when database
+                         is unreachable. Add: "If DB down, /health
+                         returns 503 with { status: 'degraded' }."
+  Efficiency:     5/5
+  Security:       5/5
+  Observability:  4/5 — No logging on health check failure.
+                         Add: "Log warning on 503 response."
+
+  Result: NOT APPROVED — 2 dimensions below 5/5.
+  Integrator will refine and re-submit.
+```
+
 ### Deferred Questions
 
 When max rounds (10) is reached and some dimensions still score < 5, unresolved issues become **Deferred Questions** presented at Step 15 (FINAL-REVIEW) with context, options, and pros/cons.
@@ -404,7 +425,7 @@ When max rounds (10) is reached and some dimensions still score < 5, unresolved 
 
 ### Implementation
 
-Implemented in `lib/iron-loop.js`. Triggered automatically when a plan moves from `implementation/draft/` to `implementation/approved/` via `approvePlan()` in `lib/actions.js`.
+Implemented in `lib/iron-loop.js`. Triggered automatically when an implementation plan is approved via `approvePlan()` in `lib/actions.js`. Plan status is tracked in YAML frontmatter, not subdirectories.
 
 ---
 

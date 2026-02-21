@@ -42,7 +42,7 @@ These files are always editable:
 Same rules as Edit/Write gate
 
 ### Commit Commands Blocked When:
-1. Current step < 14 (VERIFY)
+1. Current step < 14 (DOCUMENT)
 2. No feature context
 3. Gates not passed
 

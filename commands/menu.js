@@ -149,8 +149,8 @@ function renderView(content) {
 
 // Handle keyboard input
 function handleKey(str, key) {
-  // Global keys
-  if (key.name === 'q') {
+  // Global keys (don't quit if user is typing in an input field)
+  if (key.name === 'q' && !app.directInput && !app.inputValue && app.mode !== 'reject-input') {
     cleanup();
     process.exit(0);
   }
