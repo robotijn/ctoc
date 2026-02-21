@@ -1,842 +1,263 @@
-# CTOC Project — CLAUDE.md
+# CTOC Project Instructions
 
-> **This is the CLAUDE.md for the CTOC project itself.**
-> CTOC dogfoods its own methodology.
-
----
-
-## ⛔ HUMAN GATES - CRITICAL RULE
-
-Three stage transitions REQUIRE human approval. NEVER cross these automatically:
-
-| Gate | From → To | Revert To | User Action |
-|------|-----------|-----------|-------------|
-| 🔒 1 | functional → implementation | functional | Menu: [3] approve |
-| 🔒 2 | implementation → todo | implementation | Menu: [4] approve |
-| 🔒 3 | review → done | review | Menu: [2] approve |
-
-**Rules:**
-- NEVER move plans across these gates without user selecting approve
-- If asked to "complete" a plan or "move to done" → REFUSE, explain human gate
-- A pre-tool hook monitors ALL tool calls for violations and auto-reverts
-
-**Violation Response:**
-1. Plan automatically reverted to previous stage
-2. Incident logged to `.ctoc/logs/gate-violations.json`
-3. User alerted immediately
-
-**Approval Marker:**
-When a plan crosses a human gate via menu, this marker is added:
-```yaml
-approved_by: human
-approved_at: {timestamp}
-gate_crossed: {from} → {to}
-```
-Plans in human gate destinations without this marker are automatically reverted.
+> CTOC dogfoods its own Iron Loop. The USER is the **CTO Chief** commanding virtual CTOs.
+> When context is compacted, PRESERVE (in priority order): 1) human gate rules, 2) current task state + circuit breaker, 3) marketplace rule, 4) test commands, 5) cross-platform rules.
 
 ---
 
-## ⛔⛔⛔ ABSOLUTE RULE: MARKETPLACE ONLY ⛔⛔⛔
+## Critical Rules
 
-### THIS IS THE #1 RULE. VIOLATING IT BREAKS EVERYTHING.
+### 1. Human Gates (3 Mandatory Approval Points)
 
-**CTOC MUST ALWAYS BE INSTALLED FROM THE ONLINE MARKETPLACE.**
+Three transitions REQUIRE human approval. NEVER cross these automatically.
 
-**NEVER, UNDER ANY CIRCUMSTANCES:**
-- Point `installed_plugins.json` to local directories
-- Point `installPath` to `ctoc-public/ctoc-plugin` or ANY local path
-- Create functions that modify `~/.claude/plugins/` files
-- Write code that auto-updates plugin paths
-- Suggest "fixing" stale cache by using local paths
-- Modify `settings.local.json` to enable local plugin paths
+| Gate | Transition | Revert To | Why |
+|------|------------|-----------|-----|
+| Gate 1 | functional -> implementation | functional | Prevents building the wrong thing |
+| Gate 2 | implementation -> todo | implementation | Prevents wrong technical approach |
+| Gate 3 | review -> done | review | Prevents shipping unreviewed code |
 
-**THE ONLY CORRECT WORKFLOW:**
+**Enforcement**: Pre-tool hook monitors ALL tool calls. Violations auto-revert the plan, log to `.ctoc/logs/gate-violations.json`, and alert the user. Plans at gate destinations need an `approved_by: human` marker or they get reverted.
+
+**If asked to "complete" or "move to done"**: REFUSE. Explain the human gate requirement.
+
+### 2. Marketplace Only
+
+CTOC is ALWAYS installed from the online marketplace. NEVER point to local paths.
 
 ```
-# To install CTOC:
-/plugin marketplace add https://github.com/robotijn/ctoc
-/plugin install ctoc
-
-# To update CTOC after pushing changes:
-/plugin update ctoc
-
-# If plugin is stale/broken:
-# 1. Delete ~/.claude/plugins/cache/robotijn/
-# 2. Delete ~/.claude/plugins/marketplaces/robotijn/
-# 3. Restart Claude Code
-# 4. /plugin install ctoc
+# Install:   /plugin marketplace add https://github.com/robotijn/ctoc && /plugin install ctoc
+# Update:    /plugin update ctoc
+# Fix stale: Delete the robotijn cache/marketplace dirs under your Claude plugins folder, restart, reinstall
+#   Linux/macOS: ~/.claude/plugins/cache/robotijn/ and ~/.claude/plugins/marketplaces/robotijn/
+#   Windows: %USERPROFILE%\.claude\plugins\cache\robotijn\ and %USERPROFILE%\.claude\plugins\marketplaces\robotijn\
 ```
 
-**WHY THIS MATTERS:**
-- Local paths break for other users
-- Local paths don't test the real installation flow
-- Marketplace is the ONLY supported distribution method
-- Cache issues are solved by `/plugin update`, NOT local paths
+NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use local directories.
 
 ---
 
-## 🎯 Project Vision
+## Test & Verify
 
-**The USER is the CTO Chief** — commanding an army of virtual CTOs.
-
-```
-USER (CTO Chief)
-    │
-    ├── Defines business problems
-    ├── Approves technical direction  
-    └── Has final say
-         │
-         ▼
-    Super CTO (Alignment Layer)
-         │
-         ├── Aligns business with technology
-         ├── Selects appropriate tech CTOs
-         └── Coordinates implementation
-              │
-              ▼
-    Technical CTOs (Implementation Layer)
-         │
-         ├── Python CTO → FastAPI, Django, PyTorch...
-         ├── TypeScript CTO → Next.js, React...
-         ├── Rust CTO → Actix, Axum...
-         └── ...
+```bash
+node --test tests/*.test.js          # Run all 39 test files (cross-platform)
+node scripts/release.js              # Sync VERSION to all JSON files
 ```
 
-Each Technical CTO embodies a **senior engineering leader** who:
-- Is **adamant** about engineering excellence
-- **Refuses to compromise** on quality, security, or maintainability  
-- Makes technology decisions that **serve the business**
-
-The name **CTOC** = **CTO Chief** — that's the user, commanding this army.
+All tests must show `# fail 0`. If any test fails, fix before committing. The VERSION file is the single source of truth for version numbers. Do NOT use `run-all.js` (it doesn't exist).
 
 ---
 
-## 🔄 Self-Improvement Protocol
+## Release
 
-CTOC is a **self-improving system**. After installation, it bootstraps and improves itself.
+| Step | Command |
+|------|---------|
+| 1. Update VERSION | Edit `VERSION` file (e.g., `6.1.22`) |
+| 2. Sync versions | `node scripts/release.js` |
+| 3. Stage & commit | `feat/fix: description (vX.Y.Z)` |
+| 4. Push (if requested) | `git push origin main` |
 
-### How Self-Improvement Works
+Commit messages ALWAYS include the version: `feat: feature name (v6.1.22)`
 
-1. **Profile Learning**: When Claude Code encounters a new pattern, tool, or best practice, it updates the relevant profile
-2. **Iron Loop Refinement**: The methodology itself improves based on what works
-3. **CTO Skill Enhancement**: Each language's CTO persona learns from real implementations
+Semantic versioning: patch (default every commit), minor (user says "minor"), major (user says "major").
 
-### Triggering Self-Improvement
+### Release Menu
 
-When implementing any feature in CTOC itself:
-
+When user selects `[8] release` from dashboard, show:
 ```
-ctoc improve [component]
-```
-
-Components:
-- `profiles/languages/*` — Language best practices
-- `profiles/frameworks/*` — Framework best practices  
-- `profiles/cto-skills/*` — CTO persona skills
-- `templates/*` — CLAUDE.md, IRON_LOOP.md, PLANNING.md templates
-- Plugin marketplace — Installation via `/plugin marketplace add`
-
-### Self-Improvement Rules
-
-1. **Research First**: Before updating any profile, search for current best practices (2024-2025)
-2. **Cite Sources**: Document where best practices come from
-3. **Test Changes**: All profile changes must include validation
-4. **Backward Compatible**: Never break existing installations
-5. **Document Everything**: Every change gets documented in CHANGELOG
-
----
-
-## 🔄 Community Skill Improvement System
-
-CTOC uses a GitHub-powered system where users suggest skill improvements via issues, and maintainers process them using Claude Code.
-
-### Processing Skill Improvement Issues
-
-When the user runs `ctoc process-issues`:
-
-1. **Read the issues file** at `/tmp/ctoc-issues-to-process.json` (Linux/macOS) or `$env:TEMP\ctoc-issues-to-process.json` (Windows)
-
-2. **For each issue**, extract:
-   - Skill name from "### Skill Name" section
-   - Skill type (Language or Framework) from "### Skill Type" section
-   - What needs updating from "### What needs updating?" section
-   - Suggested improvement from "### Suggested improvement" section
-   - Sources from "### Sources" section
-
-3. **Process each skill improvement**:
-   a. Locate the current skill file:
-      - Languages: `skills/languages/{name}.md`
-      - Frameworks: `skills/frameworks/{category}/{name}.md`
-   b. Read the current skill content
-   c. Research current best practices using web search if sources aren't provided
-   d. Apply the suggested improvements, validating against authoritative sources
-   e. Update the skill file with improvements
-
-4. **Commit each change** with message format:
-   ```
-   skill: update {skill-name} (fixes #{issue-number})
-   ```
-
-5. **Create a PR** with all changes:
-   - Title: "skill: batch update from community suggestions"
-   - Body: List all issues being addressed
-   - Link to each issue in the PR description
-
-6. **Comment on each issue** linking to the PR:
-   ```
-   Created PR #{pr-number} with the suggested improvements.
-   ```
-
-### Workflow Commands
-
-| Command | Description |
-|---------|-------------|
-| `ctoc skills feedback <name>` | Open browser to suggest improvement for a skill |
-| `ctoc process-issues` | Fetch approved issues for processing |
-
-### Issue Labels
-
-| Label | Meaning |
-|-------|---------|
-| `skill-improvement` | Issue is a skill improvement suggestion |
-| `triage` | Awaiting initial validation |
-| `validated` | Skill exists and issue is properly formatted |
-| `needs-review` | From new account, requires manual review |
-| `invalid-skill` | Skill name not found in index |
-| `ready-to-process` | Has 5+ votes, ready for processing |
-
-### Quality Gates
-
-Before processing an issue:
-1. Verify it has `ready-to-process` label
-2. Check the skill actually exists
-3. Validate sources are authoritative
-4. Ensure suggested changes are improvements, not regressions
-
----
-
-## 🔄 Smart Quality Gate System
-
-CTOC uses a **background quality agent** that runs tests without blocking commits.
-
-### How It Works
-
-```
-git commit ───► post-commit hook spawns background agent
-(instant)              │
-                       ▼
-              Running: lint, typecheck, affected tests, security
-                       │
-               ┌───────┴───────┐
-               ▼               ▼
-            PASS ✅         FAIL ❌
-               │               │
-          git push        Don't push
-          "Pushed!"       "Fix: ..."
-```
-
-### Quality Tiers
-
-| Tier | When | Checks | Blocking? |
-|------|------|--------|-----------|
-| Tier 1 | Every commit | lint, typecheck, affected tests, secrets, critical CVEs | Yes (blocks push) |
-| Tier 2 | Every commit | coverage, complexity, duplication, medium CVEs | No (warnings) |
-| Tier 3 | Stage transitions | docs, circular deps, bundle size, benchmarks | At transition |
-| Tier 4 | CI only | full tests, e2e, mutation, memory, license | CI |
-
-### Key Behaviors
-
-- **Commits are instant** — Never blocks, background agent handles quality
-- **Smart test selection** — Only tests affected by changes run (via coverage map)
-- **Auto-push on success** — When all Tier 1+2 pass, auto-pushes to remote
-- **Retry on failure** — Any subsequent commit (or amend) retries quality checks
-- **Zero tolerance for flaky tests** — Retry 2x, then block until fixed
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `ctoc quality` | Run Tier 1 checks on changed files |
-| `ctoc quality --full` | Run all tiers |
-| `ctoc quality status` | Show current quality state |
-| `ctoc push` | Manual quality check + push |
-| `ctoc coverage-map rebuild` | Rebuild file→test mapping |
-
-### Configuration
-
-Quality checks are configured in `.ctoc/quality-config.yaml`. Key settings:
-
-```yaml
-tiers:
-  tier1:
-    blocking: true
-    checks: [lint, typecheck, affected-tests, secrets, critical-cves]
-  tier2:
-    blocking: false
-    checks:
-      - coverage: { threshold: 80 }
-      - complexity: { cyclomatic: 10, cognitive: 15 }
-
-push:
-  autoPush: true  # Auto-push on success
-  allowWarnings: false  # Don't push with Tier 2 warnings
-
-flakyTests:
-  action: block  # Zero tolerance
+[1] patch        vX.Y.Z+1      [4] patch+push
+[2] minor        vX.Y+1.0      [5] minor+push
+[3] major        vX+1.0.0      [6] major+push
+[0] back
 ```
 
 ---
 
-## 📁 Project Structure
+## Architecture
 
 ```
 ctoc/
-├── CLAUDE.md              # This file (dogfooding!)
-├── IRON_LOOP.md           # Iron Loop methodology
-├── README.md              # User documentation
-├── CONTRIBUTING.md        # Contributor guide
-├── VERSION                # Current version
-│
-├── agents/                # 60 agent definitions
-├── skills/                # 265 language & framework skills
-├── hooks/                 # Claude Code hooks
-├── commands/              # Slash commands
-├── lib/                   # Shared utilities
-│
-├── .ctoc/                 # Configuration & templates
-│   ├── settings.yaml      # User settings
-│   ├── templates/         # File templates
-│   ├── operations/        # Operation guides
-│   └── learnings/         # Learning system
-│
-├── .claude-plugin/        # Plugin & marketplace config
-│   ├── marketplace.json   # Marketplace definition
-│   ├── plugin.json        # Plugin metadata
-│   └── hooks.json         # Hook definitions
-│
-├── scripts/               # Build utilities
-│   └── release.js         # Version sync script
-│
-└── plans/                 # Project plans (numbered)
+  CLAUDE.md              This file — start here
+  IRON_LOOP.md           Methodology (15 steps, 3 phases, 3 human gates)
+  VERSION                Source of truth for version
+  agents/                85 agent definitions across 19 categories
+  skills/                360 language & framework skill files
+  commands/              8 slash commands (menu.js, push.md, quality.md, vision.md)
+  hooks/                 10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
+  lib/                   71 JS modules (state, quality, security, planning, UI, analysis)
+  scripts/               Build utilities (release.js, move-plan.js, coverage map)
+  tabs/                  8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)
+  tests/                 39 test files
+  .ctoc/                 Config, templates, operations, learnings
+  .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
+  plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
+                         Note: in_progress is a plan state tracked in YAML frontmatter, not a separate directory
 ```
 
----
-
-## 🛠️ Commands
-
-### For Contributors
-
-| Command | Description |
-|---------|-------------|
-| `ctoc` | Check CTOC project status |
-| `ctoc plan` | Plan a new feature for CTOC |
-| `ctoc implement` | Implement planned feature |
-| `ctoc improve profiles` | Update language/framework profiles |
-| `ctoc improve cto-skills` | Update CTO persona skills |
-| `ctoc validate` | Validate all profiles and templates |
-| `ctoc test` | Run test suite |
-
-### For Self-Improvement
-
-| Command | Description |
-|---------|-------------|
-| `ctoc research [topic]` | Research current best practices |
-| `ctoc update-profile [name]` | Update specific profile with research |
-| `ctoc add-profile [name]` | Add new language/framework profile |
-| `ctoc add-cto-skill [lang]` | Add CTO skill for language |
-
-### For Community Contributions
-
-| Command | Description |
-|---------|-------------|
-| `ctoc skills feedback <name>` | Open issue form to suggest skill improvement |
-| `ctoc process-issues` | Fetch approved skill improvements for processing |
-
-### Plan Lifecycle Commands
-
-| Command | Description |
-|---------|-------------|
-| `ctoc plan new <title>` | Create a new functional plan |
-| `ctoc plan propose <id>` | Submit plan for review |
-| `ctoc plan approve <id>` | Approve a plan |
-| `ctoc plan start <id>` | Begin work on plan |
-| `ctoc plan implement <id>` | Create implementation plan |
-| `ctoc plan complete <id>` | Mark plan as implemented |
-| `ctoc plan status` | Show plan dashboard |
-
-### Git Workflow Commands
-
-| Command | Description |
-|---------|-------------|
-| `ctoc sync` | Pull-rebase-push workflow |
-| `ctoc commit "message"` | Validated commit with Co-Author |
-| `ctoc qc "message"` | Quick commit and push |
-| `ctoc status` | Enhanced git status |
-| `ctoc lock check [files]` | Check file freshness |
-| `ctoc lock resolve` | Smart conflict resolution |
-| `ctoc lock setup-rerere` | Enable git rerere |
-| `ctoc lock worktree new <branch>` | Create parallel workspace |
-
-### How to Release
-
-When user selects **[8] release** from dashboard, show this menu:
-
-```
-[Release]
-
-  Commit only:
-  [1] patch        vX.Y.Z → vX.Y.Z+1
-  [2] minor        vX.Y.Z → vX.Y+1.0
-  [3] major        vX.Y.Z → vX+1.0.0
-
-  Commit + Push:
-  [4] patch+push   vX.Y.Z → vX.Y.Z+1 + push
-  [5] minor+push   vX.Y.Z → vX.Y+1.0 + push
-  [6] major+push   vX.Y.Z → vX+1.0.0 + push
-
-  [0] back
-```
-
-**Steps (for any option):**
-1. Update `VERSION` file with new version
-2. Run `node scripts/release.js` to sync all files
-3. Stage all version-related files
-4. Commit with message: `feat/fix: description (vX.Y.Z)`
-5. If option 4-6: Push to origin
-
-**Commit format:** Include version in commit messages:
-```
-feat: your feature description (vX.Y.Z)
-```
-
-**Version format:** `vX.Y.Z` (e.g., v5.0.1)
-
-### Versioning Rules
-
-**Semantic Versioning:** `vX.Y.Z` (major.minor.patch)
-
-| Action | Version Change | Who Decides |
-|--------|----------------|-------------|
-| **Default (every commit)** | Patch: `vX.Y.Z` → `vX.Y.Z+1` | Automatic via release.js |
-| **Minor version** | Minor: `vX.Y.Z` → `vX.Y+1.0` | User specifies |
-| **Major version** | Major: `vX.Y.Z` → `vX+1.0.0` | User specifies |
-
-**Rules:**
-1. Every commit automatically bumps the **patch** version via `release.js`
-2. User says "minor version" → bump minor, reset patch to 0
-3. User says "major version" → bump major, reset minor and patch to 0
-4. `release.js` handles VERSION file updates automatically
-5. Update version references in install scripts if needed
-
-**Examples:**
-- Normal commit: `2.0.5` → `2.0.6`
-- User says "minor release": `2.0.6` → `2.1.0`
-- User says "major release": `2.1.0` → `3.0.0`
-
-### Version File Management
-
-**⚠️ CRITICAL: VERSION file is the single source of truth.**
-
-Three files contain version information:
+**Key entry points:**
 
 | File | Purpose |
 |------|---------|
-| `VERSION` | **Source of truth** — edit this file |
-| `.claude-plugin/marketplace.json` | Marketplace display version |
-| `.claude-plugin/plugin.json` | Plugin metadata version |
-
-**ALWAYS run `node scripts/release.js` after changing VERSION.**
-
-This script syncs the version from VERSION to both JSON files automatically.
-
-```bash
-# After updating VERSION file:
-cd ctoc-public
-node scripts/release.js
-```
-
-**Never manually edit version numbers in JSON files** — they will get out of sync.
-
-### Agent Commands
-
-| Command | Description |
-|---------|-------------|
-| `ctoc agent list` | List all 60 agents |
-| `ctoc agent info <name>` | Show agent details |
-| `ctoc agent upgrade <name>` | Add capability to upgrade queue |
-| `ctoc agent research <name>` | Show research queries for agent |
-| `ctoc agent check` | Check for agent updates |
-| `ctoc agent apply <name>` | Apply pending upgrades |
-
-### Progress Commands
-
-| Command | Description |
-|---------|-------------|
-| `ctoc progress` | Quick Iron Loop progress view |
-| `ctoc dashboard` | Full progress dashboard |
-| `ctoc progress step <n>` | Move to Iron Loop step |
-| `ctoc progress complete <n>` | Complete step and advance |
+| `commands/menu.js` | Dashboard router and UI |
+| `lib/actions.js` | Plan operations (create, move, approve) |
+| `lib/state.js` | Plan state management |
+| `lib/quality-gate.js` | Quality enforcement |
+| `lib/iron-loop.js` | Step validation and Integrator+Critic |
+| `lib/init-project.js` | Project initialization |
+| `hooks/PreToolUse.Bash.js` | Human gates + enforcement |
+| `.ctoc/operations-registry.yaml` | Agent registry, kanban config |
 
 ---
 
-## CTOC Menu Behavior
+## Iron Loop Summary
 
-When working with CTOC plans, ALWAYS follow these rules:
+15 steps across 3 phases. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
 
-1. **Show numbered menus after every response** — No CTOC response without a contextual menu footer
-2. **Auto-enter discussion mode when creating plans** — Critique the plan, find gaps, question assumptions before showing menu
-3. **Use AskUserQuestion for decisions** — Put recommended option first with "(Recommended)" in label
-4. **Use [1][2][3]...[0] format, no letters** — Sequential numbers only, [0] is always back/cancel
-5. **Auto-generate implementation details** — When a plan moves to implementation stage, list specific files and changes
-6. **ALWAYS ask questions when gaps found** — Never just list gaps; ask specific questions to resolve each one
+| Step | Label | Agent | Phase |
+|------|-------|-------|-------|
+| 1 | ASSESS | product-owner (sonnet) | Phase 1: Functional |
+| 2 | ALIGN | product-owner (sonnet) | |
+| 3 | CAPTURE | functional-reviewer (opus) | Gate 1: User approves plan |
+| 4 | PLAN | implementation-planner (opus) | Phase 2: Technical |
+| 5 | DESIGN | implementation-planner (opus) | |
+| 6 | SPEC | implementation-plan-reviewer (opus) then integrator+critic (10 rounds) | Gate 2: User approves approach |
+| 7 | TEST | test-maker (opus) | Phase 3: Implementation |
+| 8 | PREPARE | quality-checker (sonnet) | |
+| 9 | IMPLEMENT | implementer (sonnet) | |
+| 10 | REVIEW | self-reviewer (opus) | |
+| 11 | OPTIMIZE | optimizer (sonnet) | |
+| 12 | SECURE | security-scanner (opus) | |
+| 13 | VERIFY | verifier (sonnet) | |
+| 14 | DOCUMENT | documenter (sonnet) | |
+| 15 | FINAL-REVIEW | implementation-reviewer (opus) | Gate 3: User approves result |
 
-### Rule 6: Mandatory Questions for Gaps (ENFORCED)
+**Step labels are MANDATORY** — validated by `lib/plan-validator.js` (library) and enforced at runtime by `hooks/validate-plan-steps.js` (hook). Plans with wrong labels are REJECTED.
 
-When discussing plans and you identify gaps, issues, or unclear areas:
+**Step 9 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
 
-❌ **WRONG:** "Here are the gaps I found: 1, 2, 3."
-✅ **RIGHT:** "I found these gaps. For each one, I need your input:"
+**Step 13 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in IRON_LOOP.md.
 
-**For every gap identified, you MUST:**
-1. State the gap clearly
-2. Ask a specific question to resolve it
-3. Offer options WITH PROS AND CONS for each option
+**Circuit breaker**: Max 3 kickbacks to the same step, max 5 total kickbacks per plan. If exceeded, escalate to user with a summary of what keeps failing and why.
 
-**MANDATORY FORMAT - Every option needs pros/cons:**
+**Escape phrases** bypass Iron Loop enforcement when the overhead would exceed the change itself: "skip planning", "quick fix", "trivial fix", "hotfix", "urgent".
+
+### Common Failures (and What to Do)
+
+| Symptom | Root Cause | Fix |
+|---------|-----------|-----|
+| Step 13 keeps failing on same test | Flaky test or wrong assertion | Fix the test at Step 7, not Step 9 |
+| Circuit breaker trips | Misunderstood requirement | Escalate to user; likely needs re-planning |
+| Step 9 creates files not in the plan | Scope creep | Add to plan or split into second plan |
+| Step 12 finds critical vulnerability | Missing security in design | Kickback to Step 4 if architectural |
+| Coverage < 80% after Step 7 | Tests too shallow | Review test cases; add edge case + error path tests |
+
+---
+
+## Menu System Rules
+
+1. **Numbered menus after every CTOC response** — `[1][2][3]...[0]`, where `[0]` is always back/cancel
+2. **Discussion mode when creating plans** — critique, find gaps, question assumptions before showing menu
+3. **Recommended option first** with `(Recommended)` label
+4. **Auto-generate implementation details** when plans move to implementation stage
+5. **Every gap gets a question with pros/cons** — never just list gaps. Use `+`/`-` for pros/cons (not emojis)
+
 ```
 Gap: Settings location unclear
-→ Question: Should settings be global or per-project?
-
   [1] Global (~/.ctoc/) (Recommended)
-      ✅ One config for all projects
-      ✅ Runner setup is machine-wide anyway
-      ❌ Can't have different settings per project
-
+      + One config for all projects   - Can't vary per project
   [2] Per-project (.ctoc/)
-      ✅ Each project can have unique settings
-      ✅ Settings travel with the repo
-      ❌ Must configure for every project
-      ❌ Runner is machine-wide, doesn't match
-```
-
-**NEVER ask a question without showing pros/cons for each answer.**
-
-These rules ensure consistent, keyboard-driven navigation through the CTOC workflow.
-
----
-
-## 🎭 The CTO Persona
-
-Every language profile includes a **CTO Skill** — a persona that embodies:
-
-### Core Principles
-
-1. **Business Alignment First**
-   - "What business problem are we solving?"
-   - "What's the ROI of this technical decision?"
-   - "How does this serve our users?"
-
-2. **Engineering Excellence**
-   - "We don't ship code without tests"
-   - "Security is not optional"
-   - "Technical debt is real debt"
-
-3. **Pragmatic Leadership**
-   - "Perfect is the enemy of good"
-   - "Ship early, iterate often"
-   - "Measure everything that matters"
-
-4. **Team Empowerment**
-   - "Make the right thing easy"
-   - "Automate everything repeatable"
-   - "Document for your future self"
-
-### CTO Skill Structure
-
-Each `profiles/cto-skills/{lang}-cto.md` contains:
-
-```markdown
-# {Language} CTO Skill
-
-## Identity
-You are a senior CTO with 20+ years of {Language} experience...
-
-## Decision Framework
-When making technical decisions...
-
-## Code Review Stance
-When reviewing code, you are adamant about...
-
-## Business Alignment
-You always connect technical decisions to...
-
-## Red Lines (Never Compromise)
-- Security vulnerabilities
-- Missing tests for critical paths
-- Undocumented APIs
-- Unhandled errors in production paths
+      + Settings travel with repo     - Must configure every project
 ```
 
 ---
 
-## 🔧 Development Workflow
+## Subagent Guidelines
 
-### Adding a New Language Profile
+**Plans: ALWAYS sequential.** Process todo plans one at a time, FIFO order. Never parallelize plan implementation — plans may modify overlapping files and later plans may depend on earlier changes.
 
-1. Research current best practices (2024-2025)
-2. Create `profiles/languages/{lang}.yaml`
-3. Create `profiles/cto-skills/{lang}-cto.md`
-4. Add tests in `tests/profiles/`
-5. Update README.md language list
+**Everything else: Parallelize when independent.**
 
-### Adding a New Framework Profile
+| Safe to parallelize | Must serialize |
+|---------------------|----------------|
+| WebSearch, Read, Glob, Grep, WebFetch | Edit, Write (same file) |
+| File creation (different files) | Git operations |
+| Analysis, research | Plan implementation |
 
-1. Research current best practices (2024-2025)
-2. Create `profiles/frameworks/{framework}.yaml`
-3. Link to parent language profile
-4. Add tests in `tests/profiles/`
-5. Update README.md framework list
-
-### Updating Existing Profiles
-
-1. Research what has changed
-2. Document changes with sources
-3. Update profile yaml
-4. Run validation: `ctoc validate`
-5. Update CHANGELOG.md
+Example — creating 5 skill files: launch 5 agents in parallel (each writes a different file). Researching a topic: launch parallel WebSearch + Grep + Read agents, then synthesize results.
 
 ---
 
-## ✅ Quality Standards
+## Quality Non-Negotiables
 
-### Profile Requirements
+### No Silent Test Failures
 
-Every profile MUST include:
+Tests must NEVER silently pass. These patterns are BLOCKED:
+- Empty catch blocks that swallow errors
+- Early return without assertion (test "passes" without testing)
+- Tests without assertions (always green)
+- Skipped tests without documented reason
+- Mocked-away core logic (testing the mock, not the code)
 
-- [ ] Tools section with current (2024-2025) recommendations
-- [ ] Commands for lint, format, test, build
-- [ ] Project structure template
-- [ ] Best practices with rationale
-- [ ] Common issues to check
-- [ ] Configuration examples
+**If a test cannot run, it must FAIL LOUDLY.**
 
-### CTO Skill Requirements
+### Test Quality Checklist
 
-Every CTO skill MUST include:
-
-- [ ] Clear identity and expertise
-- [ ] Decision framework
-- [ ] Business alignment focus
-- [ ] Red lines (non-negotiables)
-- [ ] Code review standards
-
-### Documentation Requirements
-
-- [ ] All public functions documented
-- [ ] README.md always current
-- [ ] CHANGELOG.md updated for every change
-- [ ] Examples for every feature
+Before marking Step 13 (VERIFY) as passed:
+- [ ] Every test has at least one meaningful assertion
+- [ ] Error paths are tested, not just happy paths
+- [ ] Mocks are minimal — only external dependencies, never core logic
+- [ ] No test depends on execution order
+- [ ] Coverage >= 80% on new code
 
 ---
 
-## 🚀 Current Focus
+## Cross-Platform Requirement
 
-### Immediate Priorities
-
-1. Complete all language profiles (100+)
-2. Complete all framework profiles (200+)
-3. Add CTO skills for every language
-4. Add Data framework profiles (top 20)
-5. Add AI/ML framework profiles (top 20)
-
-### Quality Goals
-
-- Every profile researched from authoritative sources
-- Every profile includes current (2024-2025) best practices
-- Every profile tested and validated
+All code MUST run on Windows, macOS, and Linux. Use:
+- `path.join()` not string concatenation for paths
+- `fs.promises` for async file operations
+- `process.platform` checks when OS-specific behavior is needed
+- `os.homedir()` not hardcoded `~`
+- No bash scripts as entry points (Node.js only)
 
 ---
 
-## 📚 Key Files
+## Project Init Procedure
 
-| File | Purpose |
-|------|---------|
-| `CLAUDE.md` | This file — project instructions |
-| `IRON_LOOP.md` | Iron Loop methodology reference |
-| `README.md` | User documentation |
-| `agents/` | 60 agent definitions |
-| `skills/` | 265 language & framework skills |
-| `commands/` | Slash commands |
-| `.ctoc/templates/` | Templates for user projects |
+When initializing a new project with CTOC (`ctoc init`):
 
----
+1. **Detect**: Scan for languages, frameworks, tools (via `lib/stack-detector.js`)
+2. **Generate**: Create tailored `CLAUDE.md` from `.ctoc/templates/CLAUDE.md.template`
+3. **Configure**: Set up `.ctoc/settings.yaml` with detected stack
+4. **Quality**: Configure quality gates based on detected tools
+5. **Plans**: Create `plans/` directory structure
+6. **Iron Loop**: Initialize state in `.ctoc/state/`
 
-## ⚡ Subagent Usage Guidelines
+The generated CLAUDE.md includes: CTO persona, Iron Loop steps, detected tools, quality commands, plan management, and skill system integration.
 
-### Core Principle: Use Subagents Whenever Possible and Safe
-
-**Subagents are your force multiplier.** Always consider whether work can be parallelized across multiple agents. This is not optional optimization — it's the standard way to work efficiently.
-
-### When to Use Subagents
-
-**ALWAYS use subagents when:**
-- Creating multiple independent files (each file = one agent)
-- Researching multiple topics (each topic = one agent)
-- Analyzing different parts of a codebase
-- Processing multiple items (issues, profiles, tests)
-- Any task that can be decomposed into independent units
-
-**Think before each task:** "Can this be split across agents?"
-
-### Decision Framework
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                 SUBAGENT DECISION TREE                  │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  Is the work decomposable into independent units?       │
-│                    │                                    │
-│           ┌───────┴───────┐                            │
-│           ▼               ▼                            │
-│          YES             NO                            │
-│           │               │                            │
-│           ▼               ▼                            │
-│    Do units modify      Do it                          │
-│    the same files?      sequentially                   │
-│           │                                            │
-│    ┌──────┴──────┐                                     │
-│    ▼             ▼                                     │
-│   YES           NO                                     │
-│    │             │                                     │
-│    ▼             ▼                                     │
-│ Serialize    PARALLELIZE                               │
-│ writes       WITH SUBAGENTS                            │
-│                                                        │
-└────────────────────────────────────────────────────────┘
-```
-
-### Parallelism Formula
-
-Use: `max(2, CPU_CORES - 4)` concurrent subagents
-
-This ensures:
-- Minimum 2 agents for any system
-- Leaves 4 cores for system/IDE/other processes
-- Scales with available hardware
-
-### Safe Parallelization Matrix
-
-| Operation Type | Parallel Safe? | Notes |
-|----------------|----------------|-------|
-| WebSearch | Yes | No state modification |
-| Read/Glob/Grep | Yes | Read-only |
-| WebFetch | Yes | External fetch |
-| Analysis | Yes | Results can merge |
-| File creation | Yes | Different files only |
-| Edit/Write | **NO** | Serialize by file |
-| Bash (read) | Yes | ls, cat, etc. |
-| Bash (write) | **NO** | Serialize |
-| Git operations | **NO** | Use worktrees for parallelism |
-| **Plan implementation** | **NO** | **ALWAYS sequential — see below** |
-
-### CRITICAL: Plan Implementation is ALWAYS Sequential
-
-**Todo plans MUST be implemented one at a time, NEVER in parallel.**
-
-```
-CORRECT:
-  1. Pick oldest plan from todo/
-  2. Implement fully (all steps)
-  3. Move to review/
-  4. Pick next plan from todo/
-  5. Repeat
-
-WRONG:
-  Spawn 3 agents for 3 todo plans simultaneously
-```
-
-**Why:**
-- Plans may modify overlapping files (merge conflicts)
-- Later plans may depend on earlier plan's changes
-- Sequential is predictable and debuggable
-- One agent completing cleanly is better than 3 agents fighting
-
-**When user says "start" or "process todo":**
-1. Spawn ONE agent
-2. Agent processes ALL todo plans sequentially (FIFO order)
-3. Agent moves each completed plan to in-progress/ then review/
-4. Agent stops when todo/ is empty
-
-### Pattern: Parallel File Creation
-
-When creating multiple files (common in CTOC):
-
-```
-Launch in parallel:
-├── Agent 1: Create file-a.md
-├── Agent 2: Create file-b.md
-├── Agent 3: Create file-c.md
-├── Agent 4: Create file-d.md
-└── Agent 5: Create file-e.md
-
-All agents work simultaneously → 5x faster
-```
-
-### Pattern: Parallel Research
-
-When exploring a problem:
-
-```
-Launch in parallel:
-├── Agent 1: WebSearch "official docs {topic}"
-├── Agent 2: WebSearch "GitHub implementations {topic}"
-├── Agent 3: WebSearch "security considerations {topic}"
-├── Agent 4: Grep codebase for existing patterns
-└── Agent 5: Read related files
-
-Wait for all results, then synthesize.
-```
-
-### Pattern: Sequential Writes
-
-When modifying existing files (cannot parallelize):
-
-```
-Sequential execution:
-1. Edit file A
-2. Edit file B
-3. Edit file C
-4. Run tests
-5. Commit
-```
-
-### Anti-Pattern: Serial When Parallel is Possible
-
-**DON'T do this:**
-```
-1. Create file A
-2. Wait
-3. Create file B
-4. Wait
-5. Create file C
-```
-
-**DO this instead:**
-```
-Parallel: Create files A, B, C simultaneously
-```
+Template: `.ctoc/templates/CLAUDE.md.template`
+Generator: `lib/init-project.js`
 
 ---
 
-## 🔗 References
+## Self-Improvement
 
-- [Iron Loop Methodology](./IRON_LOOP.md)
-- [Contributing Guide](./CONTRIBUTING.md)
-- [Profile Schema](./docs/PROFILE_SCHEMA.md)
-- [CTO Skill Guide](./docs/CTO_SKILL_GUIDE.md)
+CTOC improves itself. When implementing features:
+- WebSearch authoritative sources for current best practices before updating profiles
+- All profile changes need validation (`ctoc validate`)
+- Document changes in commit messages with version
+- Never break existing installations (backward compatible)
 
----
+**STOP — Do NOT self-improve when:**
+- **Implementing a user feature** — stay focused on the task, do not opportunistically "improve" unrelated profiles
+- **The improvement is speculative** — must be based on confirmed patterns across 2+ projects
+- **It would modify hook behavior or gate logic** — requires explicit user approval (these are safety-critical paths)
 
-*"We are what we repeatedly do. Excellence, then, is not an act, but a habit."*
-— Will Durant
+### Processing Community Skill Issues (`ctoc process-issues`)
+
+1. Read issues from `/tmp/ctoc-issues-to-process.json` (or `$env:TEMP` on Windows)
+2. For each issue: extract skill name, type, suggested improvement, and sources
+3. Locate skill file (`skills/languages/{name}.md` or `skills/frameworks/{category}/{name}.md`)
+4. Apply improvements, validating against authoritative sources via WebSearch
+5. Commit: `skill: update {skill-name} (fixes #{issue-number})`
+6. Create PR linking all processed issues

@@ -43,8 +43,18 @@ const VERSION_UPDATES = [
   },
   {
     file: 'README.md',
-    pattern: /^\*\*\d+\.\d+\.\d+\*\* — /m,
-    replacement: (v) => `**${v}** — `
+    pattern: /^\*\*\d+\.\d+\.\d+\*\*/m,
+    replacement: (v) => `**${v}**`
+  },
+  {
+    file: 'README.md',
+    pattern: /version-\d+\.\d+\.\d+-blue/g,
+    replacement: (v) => `version-${v}-blue`
+  },
+  {
+    file: 'README.md',
+    pattern: /getVersion\(\)\s+\/\/\s*→\s*'\d+\.\d+\.\d+'/,
+    replacement: (v) => `getVersion()       // → '${v}'`
   }
 ];
 

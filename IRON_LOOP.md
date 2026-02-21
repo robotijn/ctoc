@@ -1,7 +1,7 @@
-# CTOC — Iron Loop
+# CTOC -- Iron Loop
 
 > **Iron Loop is CTOC's methodology for quality software delivery.**
-> This file tracks the current work in progress.
+> From ideation to working implementation, every feature follows 15 steps.
 
 ---
 
@@ -9,47 +9,70 @@
 
 ```
 PHASE 1: FUNCTIONAL PLANNING (Steps 1-3) - Product Owner Role
-─────────────────────────────────────────────────────────────
+-------------------------------------------------------------
 1. ASSESS        Problem understanding              [product-owner]
 2. ALIGN         User goals & business objectives   [product-owner]
-3. CAPTURE       Requirements as BDD specs          [functional-reviewer] ◄──┐
-   └─► Reject? Back to Step 1 ─────────────────────────────────────────────────┘
-   └─► HUMAN GATE: User approves functional plan
+3. CAPTURE       Requirements as BDD specs          [functional-reviewer] <--|
+   |-> Reject? Back to Step 1 ------------------------------------------|
+   |-> HUMAN GATE: User approves functional plan
 
 PHASE 2: IMPLEMENTATION PLANNING (Steps 4-6) - Technical Role
-─────────────────────────────────────────────────────────────
+-------------------------------------------------------------
 4. PLAN          Technical approach                 [implementation-planner]
 5. DESIGN        Architecture design                [implementation-planner]
-6. SPEC          Detailed specifications            [implementation-plan-reviewer] ◄──┐
-   └─► Reject? Back to Step 4 ─────────────────────────────────────────────────────────┘
-   └─► Approve → [iron-loop-plan-integrator] + [iron-loop-plan-critic] refine
-       ├── 10 rounds max refinement (5-dimension rubric)
-       ├── All 5/5? → Iron-solid execution plan
-       └── Max rounds? → Auto-approve + Deferred Questions for Step 15
-   └─► HUMAN GATE: User approves technical approach
+6. SPEC          Detailed specifications            [implementation-plan-reviewer] <--|
+   |-> Reject? Back to Step 4 ---------------------------------------------------|
+   |-> Approve -> [iron-loop-plan-integrator] + [iron-loop-plan-critic] refine
+       |-- 10 rounds max refinement (6-dimension rubric)
+       |-- All 5/5? -> Iron-solid execution plan
+       |-- Max rounds? -> Auto-approve + Deferred Questions for Step 15
+   |-> HUMAN GATE: User approves technical approach
 
 PHASE 3: IMPLEMENTATION (Steps 7-15) - Autonomous
-─────────────────────────────────────────────────────────────
+-------------------------------------------------------------
 7.  TEST         Write tests FIRST (TDD Red)        [test-maker]
-8.  PREPARE      Prepare environment, install deps  [quality-checker]
+8.  PREPARE      Prepare environment + shift-left   [quality-checker]
 9.  IMPLEMENT    ALL code changes (single step)     [implementer]
-10. REVIEW       Self-review checkpoint             [self-reviewer] ◄───────────┐
-    └─► TDD Loop: Need more tests? → Back to Step 7 ────────────────────────────┘
+10. REVIEW       Self-review checkpoint             [self-reviewer] <---|
+    |-> TDD Loop: Need more tests? -> Back to Step 7 ------------------|
 
 11. OPTIMIZE     Performance + code simplification  [optimizer]
 12. SECURE       Security vulnerability check       [security-scanner]
 13. VERIFY       Run ALL quality checks (gate)      [verifier]
 14. DOCUMENT     Update documentation               [documenter]
 15. FINAL-REVIEW Verify steps 7-14, human gate      [implementation-reviewer]
-    └─► Issues? Smart loop to affected step
-    └─► HUMAN GATE: User approves commit/push
+    |-> Issues? Smart kickback to affected step
+    |-> HUMAN GATE: User approves commit/push
 ```
+
+---
+
+## Definitions of Ready
+
+Each phase has entry criteria. Work cannot proceed until these are met.
+
+### Phase 1 Entry (Steps 1-3)
+- Problem statement exists (even if informal)
+- User is available for clarification
+- No duplicate plan already in progress
+
+### Phase 2 Entry (Steps 4-6)
+- Functional plan approved by user (Gate 1 passed)
+- BDD scenarios defined with Given/When/Then
+- Definition of Done is testable and measurable
+
+### Phase 3 Entry (Steps 7-15)
+- Implementation plan approved by user (Gate 2 passed)
+- Integrator+Critic loop completed (all 5/5 or max rounds)
+- Execution plan has concrete file paths and actions
+- No blocking dependencies on other in-progress plans
+- *Guideline*: plan touches <= 15 files (if more, consider splitting into multiple plans)
 
 ---
 
 ## MANDATORY Step Labels (Steps 7-15)
 
-The following step labels are MANDATORY and must NOT be modified, replaced, or reordered. They define the quality process.
+These step labels are MANDATORY and must NOT be modified, replaced, or reordered. They define the quality process.
 
 ```
 TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUMENT -> FINAL-REVIEW
@@ -59,7 +82,7 @@ TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUME
 | Step | Label | Purpose | NEVER Replace With |
 |------|-------|---------|-------------------|
 | 7 | TEST | Write tests FIRST (TDD Red) | "Identify coverage" |
-| 8 | PREPARE | Prepare environment, install deps | "QUALITY", "SETUP" |
+| 8 | PREPARE | Prepare environment, install deps, shift-left scans | "QUALITY", "SETUP" |
 | 9 | IMPLEMENT | ALL code changes (single step with sub-items) | Multiple IMPLEMENT steps |
 | 10 | REVIEW | Self-review checkpoint (logic only) | IMPLEMENT |
 | 11 | OPTIMIZE | Performance and simplification | IMPLEMENT |
@@ -71,11 +94,25 @@ TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUME
 ### Key Rules
 
 1. **Step 7 is TDD** - Must WRITE tests, not just "identify existing coverage"
-2. **Step 8 is PREPARE** (not QUALITY) - Quality checks before code exists are pointless
+2. **Step 8 is PREPARE** (not QUALITY) - Prepare environment AND run shift-left scans (SAST/SCA on existing code)
 3. **Step 9 is ONE step** - Multiple files = sub-items under Step 9, NOT separate IMPLEMENT steps
 4. **Step 13 is automated VERIFY** - Lint, type check, ALL tests, coverage >= 80%, 0 skipped, 0 flaky
 5. **Step 15 is FINAL-REVIEW** (not COMMIT) - Manual verification belongs here, not in Step 13
 6. **Order matters** - OPTIMIZE and SECURE may change code, so VERIFY must come AFTER them
+
+### Step 8 PREPARE: Shift-Left Security
+
+Step 8 now includes shift-left security scanning (research: catching defects early costs 10-100x less):
+
+```
+Step 8: PREPARE
+  - Install/verify dependencies
+  - Verify build tools are available
+  - Run SAST on existing code touching the same modules
+  - Run SCA to check for known vulnerable dependencies
+  - Establish performance baselines for affected areas
+  - Report findings (info only, does not block - code doesn't exist yet)
+```
 
 ### Step 13 VERIFY: Quality Gate
 
@@ -85,18 +122,63 @@ Step 13 is the single quality gate. ALL checks must pass before proceeding:
 Step 13: VERIFY
   - Run lint (eslint, ruff, golangci-lint)
   - Run type check (tsc, mypy, go vet)
-  - Run ALL tests
-  - Check coverage >= 80%
+  - Run ALL tests (not just affected - full regression)
+  - Check coverage >= 80% on new code
   - 0 skipped tests
-  - 0 flaky tests
+  - 0 flaky tests (retry 2x, then block)
+  - Run SAST on new/changed code
+  - Run SCA on updated dependencies
 
-  If ANY check fails -> KICKBACK:
+  If ANY check fails -> SMART KICKBACK:
   - Lint errors      -> Step 9 (IMPLEMENT)
   - Type errors      -> Step 9 (IMPLEMENT)
   - Tests fail       -> Step 9 (IMPLEMENT)
   - Security issue   -> Step 12 (SECURE)
   - Perf regression  -> Step 11 (OPTIMIZE)
+  - Coverage < 80%   -> Step 7 (TEST)
 ```
+
+### Idempotent Steps
+
+Every step MUST be safe to re-run. If a kickback sends execution back to a previous step, all subsequent steps re-execute cleanly. This means:
+- Step 7 (TEST): Check for existing tests before creating duplicates
+- Step 8 (PREPARE): Verify state before installing (don't re-install what exists)
+- Step 9 (IMPLEMENT): Check git diff before making changes already applied
+- Step 13 (VERIFY): Always runs fresh (no cached results)
+
+### Proportional Loop Depth
+
+Not every change needs the full 15-step ceremony. Match rigor to risk:
+
+| Change Size | Steps | When |
+|-------------|-------|------|
+| **Micro** (typo, config, < 5 lines) | 7, 9, 13, 15 | Escape phrase or trivial classification |
+| **Standard** (feature, bugfix) | All 15 steps | Default for all plans |
+| **Major** (architecture, security, breaking change) | All 15 + extended Integrator+Critic (15 rounds) | User flags as major, or auto-detected from scope |
+
+Micro changes skip PREPARE, REVIEW, OPTIMIZE, SECURE, DOCUMENT — but never skip TEST or VERIFY.
+
+### Circuit Breaker
+
+Kickbacks are normal — they mean the quality gate is working. But infinite loops are not.
+
+| Limit | Threshold | Action |
+|-------|-----------|--------|
+| Same-step kickbacks | 3 | Stop. Escalate to user with diagnosis. |
+| Total kickbacks per plan | 5 | Stop. Present full kickback history + root cause analysis. |
+
+When the circuit breaker trips, present:
+1. Which steps keep failing and why
+2. What was tried each time
+3. Recommended path forward (fix approach vs. descope vs. manual intervention)
+
+### Roadmap
+
+Future enhancements (not yet implemented):
+
+- **Step Timing** — Record duration per step to identify bottlenecks and optimize the loop
+- **Failure Budgets** — Track quality failures across plans monthly; alert when threshold exceeded
+- **Retrospective Feedback Loop** — Auto-generate retrospective every 5 completed plans (what worked, what didn't, improvement actions)
 
 ### Validation
 
@@ -118,6 +200,7 @@ All features are captured as:
 1. **User Stories** - "As a [user], I can [action] so that [benefit]"
 2. **Behavior Scenarios** - Given/When/Then (Gherkin format)
 3. **Definition of Done** - Automated test conditions
+4. **Acceptance Criteria** - Measurable success conditions
 
 ```gherkin
 Feature: User Login
@@ -137,6 +220,12 @@ Feature: User Login
     When I enter wrong password
     Then I should see "Invalid credentials"
     And I should remain on login page
+
+  Definition of Done:
+    - All scenarios pass as automated tests
+    - Login attempt rate limiting is implemented
+    - Session management follows OWASP guidelines
+    - Error messages don't leak user existence
 ```
 
 ### Escape Hatch
@@ -149,21 +238,21 @@ Even trivial requests get a mini-plan with test. User can override with:
 
 ## Hook Enforcement
 
-The Iron Loop is enforced by the `edit-write-gate.js` hook, which runs before every Edit/Write operation.
+The Iron Loop is enforced by hooks that run before every Edit/Write operation.
 
 ### How It Works
 
 ```
 On Edit/Write tool call:
-├── Load Iron Loop state
-├── Check enforcement mode (strict/soft/off)
-├── Check if file is whitelisted (*.md, *.yaml, .ctoc/**)
-│   └── If whitelisted → ALLOW
-├── Check for escape phrase in user message
-│   └── If found → ALLOW
-├── Check currentStep
-│   ├── If step >= 7 → ALLOW
-│   └── If step < 7 → BLOCK (exit 1)
+|-- Load Iron Loop state
+|-- Check enforcement mode (strict/soft/off)
+|-- Check if file is whitelisted (*.md, *.yaml, .ctoc/**)
+|   |-- If whitelisted -> ALLOW
+|-- Check for escape phrase in user message
+|   |-- If found -> ALLOW
+|-- Check currentStep
+|   |-- If step >= 7 -> ALLOW
+|   |-- If step < 7 -> BLOCK (exit 1)
 ```
 
 ### Enforcement Modes
@@ -192,19 +281,15 @@ These file types bypass enforcement (config/docs that don't need Iron Loop):
 ### Escape Phrases
 
 User can bypass enforcement by saying:
-- "skip planning"
-- "skip iron loop"
-- "quick fix"
-- "trivial fix"
-- "trivial change"
-- "hotfix"
-- "urgent"
+- "skip planning" / "skip iron loop"
+- "quick fix" / "trivial fix" / "trivial change"
+- "hotfix" / "urgent"
 
 ---
 
 ## Crash Recovery
 
-When an implementation session (Steps 7-15) is interrupted (crash, terminal close, etc.), CTOC automatically detects this on the next session start and offers recovery options.
+When an implementation session (Steps 7-15) is interrupted, CTOC automatically detects and offers recovery. Detection is implemented in `hooks/SessionStart.js` with state managed by `lib/state-manager.js`.
 
 ### Detection Criteria
 
@@ -213,99 +298,62 @@ A session is considered interrupted if:
 2. `currentStep` is between 7 and 15 (implementation phase)
 3. `lastActivity` is within the last 24 hours
 
-### Recovery Menu
+### Recovery Options
 
-When an interrupted session is detected, the user sees:
-
-```
-+------------------------------------------------------------+
-|  INTERRUPTED IMPLEMENTATION DETECTED                       |
-+------------------------------------------------------------+
-|  Plan: [feature-name]                                      |
-|  Step: 9 (IMPLEMENT)                                       |
-|  Last activity: 2 hours ago                                |
-|                                                            |
-|  [R] Resume - Continue from where it stopped               |
-|  [S] Restart - Start implementation fresh from Step 7      |
-|  [D] Discard - Abandon this implementation                 |
-+------------------------------------------------------------+
-```
+| Option | What It Does |
+|--------|-------------|
+| Resume | Continue from the last completed step |
+| Restart | Start implementation fresh from Step 7 (tests preserved) |
+| Discard | Abandon this implementation entirely |
 
 ### Session Lifecycle
 
 - **Session Start**: Sets `sessionStatus: "active"`, updates `lastActivity`
-- **Every Response**: Updates `lastActivity` timestamp
+- **Every Step Completion**: Updates `lastActivity` and `lastCompletedStep`
 - **Clean Exit**: Sets `sessionStatus: "ended"`
-
-This ensures crashed sessions are distinguishable from cleanly ended ones.
 
 ---
 
 ## Integrator + Critic Loop
 
-When an implementation plan is approved at Step 6, the **Integrator** and **Critic** agents work together to create an iron-solid execution plan through iterative refinement.
+When an implementation plan is approved at Step 6, the **Integrator** and **Critic** agents refine it into an iron-solid execution plan.
 
 ### How It Works
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│              INTEGRATOR + CRITIC REFINEMENT LOOP                  │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  Input: Approved Implementation Plan                              │
-│                                                                   │
-│  Round 1:                                                         │
-│    [Integrator] → Creates detailed execution plan (Steps 7-15)   │
-│    [Critic]     → Scores 5 dimensions (all must be 5/5)          │
-│                                                                   │
-│  If any < 5:                                                      │
-│    Critic provides: reason + suggested fix                        │
-│    Integrator refines plan                                        │
-│    Loop continues...                                              │
-│                                                                   │
-│  Termination:                                                     │
-│    - All 5/5: Iron-solid plan ready                              │
-│    - Max rounds (10): Auto-approve + Deferred Questions          │
-│                                                                   │
-│  Output: plans/execution/{plan-name}.md                          │
-│                                                                   │
-└──────────────────────────────────────────────────────────────────┘
+Input: Approved Implementation Plan
+
+  Round N:
+    [Integrator] -> Creates/refines execution plan (Steps 7-15)
+    [Critic]     -> Scores 6 dimensions (all must be 5/5)
+
+  If any < 5:
+    Critic provides: reason + suggested fix
+    Integrator refines, loop continues...
+
+  Termination:
+    - All 5/5: Iron-solid plan ready
+    - Max rounds (10): Auto-approve + Deferred Questions
+
+  Output: Execution plan appended to the plan file in plans/implementation/
 ```
 
-### 5-Dimension Rubric
+### 6-Dimension Rubric
 
-| Dimension | Key Checks |
-|-----------|------------|
-| **Completeness** | All steps have actions? All modules covered? 80% test coverage baseline? |
-| **Clarity** | Unambiguous instructions? Single responsibility? Self-documenting? |
-| **Edge Cases** | Error handling? Fallback behavior? Rollback plan? Timeout handling? |
-| **Efficiency** | Minimal steps? No redundancy? Parallelizable? Token budget reasonable? |
-| **Security** | OWASP Top 10? Input validation? No secrets? Protected endpoints? |
+Each dimension scored 1-5. All must reach 5/5 for auto-approval.
+
+| Dimension | Score 5/5 Means | Common Failure Modes |
+|-----------|-----------------|---------------------|
+| **Completeness** | All steps have actions, all modules covered, 80% coverage baseline | Missing edge case handling, incomplete rollback plan |
+| **Clarity** | Unambiguous instructions, single responsibility, self-documenting | Vague "update as needed", multi-purpose steps |
+| **Edge Cases** | Error handling, fallback behavior, rollback plan, timeout handling | Happy path only, no error recovery |
+| **Efficiency** | Minimal steps, no redundancy, parallelizable, token budget reasonable | Redundant checks, over-engineered steps |
+| **Security** | OWASP Top 10, input validation, no secrets, protected endpoints | Missing auth checks, unvalidated input |
+| **Observability** | Logging at key points, metrics for monitoring, error tracing, health checks | Silent failures, no monitoring hooks |
 
 ### Deferred Questions
 
-When max rounds (10) is reached and some dimensions still score < 5, unresolved issues become **Deferred Questions**. These are:
-
-1. Stored with the execution plan
-2. Presented to the user at Step 15 (FINAL-REVIEW)
-3. Formatted with context, options, and pros/cons
-
-Example:
-```
-╔══════════════════════════════════════════════════════════════════════╗
-║  DEFERRED QUESTION 1 of 2                                            ║
-╠══════════════════════════════════════════════════════════════════════╣
-║  Context: Round 7 - edge_cases scored 4/5                            ║
-║  Issue:   Network timeout handling not specified                     ║
-║  Step:    9 (IMPLEMENT)                                              ║
-╠══════════════════════════════════════════════════════════════════════╣
-║  How should network timeouts be handled?                             ║
-║                                                                      ║
-║  [A] Retry 3 times with exponential backoff                          ║
-║  [B] Fail immediately with clear error message                       ║
-║  [C] Make retry count a user setting — *Recommended*                 ║
-╚══════════════════════════════════════════════════════════════════════╝
-```
+When max rounds (10) is reached and some dimensions still score < 5, unresolved issues become **Deferred Questions** presented at Step 15 (FINAL-REVIEW) with context, options, and pros/cons.
 
 ### Settings
 
@@ -318,16 +366,7 @@ Example:
 
 ### Implementation
 
-The Integrator + Critic loop is implemented in `lib/iron-loop.js`:
-
-| Function | Purpose |
-|----------|---------|
-| `integrate(planPath)` | Generates Steps 7-15 from plan requirements |
-| `critique(planPath)` | Scores execution plan on 5 dimensions |
-| `refineLoop(planPath, maxRounds)` | Orchestrates the loop until all 5/5 or max rounds |
-| `appendDeferredQuestions(planPath, questions)` | Appends unresolved issues to plan |
-
-The loop is triggered automatically when a plan moves from `implementation/draft/` to `implementation/approved/` (todo queue) via the `approvePlan()` function in `lib/actions.js`.
+Implemented in `lib/iron-loop.js`. Triggered automatically when a plan moves from `implementation/draft/` to `implementation/approved/` via `approvePlan()` in `lib/actions.js`.
 
 ---
 
@@ -335,154 +374,73 @@ The loop is triggered automatically when a plan moves from `implementation/draft
 
 | Gate | Transition | User Decision |
 |------|------------|---------------|
-| Gate 1 | Functional → Implementation | "Approve functional plan?" |
-| Gate 2 | Implementation → Iron Loop Ready | "Approve technical approach?" |
-| Gate 3 | Final Review → Done | "Commit/push or send back?" |
+| Gate 1 | Functional -> Implementation | "Approve functional plan?" |
+| Gate 2 | Implementation -> Todo | "Approve technical approach?" |
+| Gate 3 | Final Review -> Done | "Commit/push or send back?" |
 
 ---
 
-## Kanban Board (5 Columns)
+## Kanban Board (7 Columns)
 
 ```
-+------------+ +------------+ +------------+ +------------+ +------------+
-| FUNCTIONAL | |IMPLEMENTAT.| | IRON LOOP  | |    IN      | |   FINAL    |
-|  PLANNING  | |  PLANNING  | |   READY    | | DEVELOPMENT| |  REVIEW    |
-+------------+ +------------+ +------------+ +------------+ +------------+
-| Steps 1-3  | | Steps 4-6  | | Awaiting   | | Steps 7-14 | |  Step 15   |
-| Product    | | Technical  | | execution  | | Shows      | | Human gate |
-| Owner BDD  | | approach   | | start      | | action:    | | Commit or  |
-|            | | architect. | |            | | "Testing"  | | send back  |
-+------------+ +------------+ +------------+ +------------+ +------------+
-      |              |                                             |
-   [HUMAN]        [HUMAN]                                       [HUMAN]
++----------+ +----------+ +----------+ +----------+ +----------+ +----------+ +----------+
+|  vision  | |functional| |implement.| |   todo   | |in_progress| | review  | |   done   |
++----------+ +----------+ +----------+ +----------+ +----------+ +----------+ +----------+
+| Ideas    | | Steps 1-3| | Steps 4-6| | Backlog  | | Steps 7-14| | Step 15 | |Completed |
+|          | | BDD specs| | Technical| | Ready to | | Active    | | Human   | |          |
+|          | |          | | approach | | start    | | work      | | gate    | |          |
++----------+ +----------+ +----------+ +----------+ +----------+ +----------+ +----------+
+               |             |                                       |
+            [HUMAN]       [HUMAN]                                 [HUMAN]
 ```
+
+Column order follows the plan lifecycle left-to-right. `in_progress` is a logical state tracked in plan YAML frontmatter; plans physically remain in `todo/` until moved to `review/`.
 
 ---
 
 ## 14 Quality Dimensions (ISO 25010 aligned)
 
-| # | Dimension | Key Checks |
-|---|-----------|------------|
-| 1 | Correctness | Tests meaningful, edge cases, business logic |
-| 2 | Completeness | All criteria met, implicit requirements |
-| 3 | Maintainability | Patterns, no smells, readable by junior |
-| 4 | Security | OWASP, validation, auth/authz |
-| 5 | Performance | No N+1, caching, response time |
-| 6 | Reliability | Error handling, retries, fault tolerance |
-| 7 | Compatibility | API backwards compat, integrations |
-| 8 | Usability | Error messages, clear output, docs |
-| 9 | Portability | No hardcoded paths, configurable |
-| 10 | Testing | 90% coverage, isolation, happy+error paths |
-| 11 | Accessibility | WCAG 2.2, screen reader, keyboard |
-| 12 | Observability | Logging, metrics, tracing, alerts |
-| 13 | Safety | No harm, graceful degradation |
-| 14 | Ethics/AI | Bias, fairness, explainability |
-
----
-
-## Current Work
-
-**Feature:** Product Owner Role Redesign
-**Status:** Implementation In Progress
-**Started:** 2026-01-29
-
-### Progress
-
-```
-[ ✓ ] Phase 1: Agent Renaming
-      ├── [x] Create product-owner.md (replaces functional-planner.md)
-      ├── [x] Rename impl-planner → implementation-planner
-      ├── [x] Rename impl-plan-reviewer → implementation-plan-reviewer
-      ├── [x] Rename impl-reviewer → implementation-reviewer
-      └── [x] Delete old functional-planner.md
-
-[ ✓ ] Phase 2: Core File Updates
-      ├── [x] Update cto-chief.md with new patterns
-      ├── [x] Update operations-registry.yaml
-      ├── [x] Update IRON_LOOP.md (this file)
-      └── [x] Update settings.yaml (keyboard_layout)
-
-[   ] Phase 3: Kanban Board
-      ├── [ ] Create ctoc/kanban/board.yaml
-      └── [ ] Update dashboard.md agent
-```
+| # | Dimension | Key Checks | Evaluated At |
+|---|-----------|------------|-------------|
+| 1 | Correctness | Tests meaningful, edge cases, business logic | Step 10 (REVIEW), Step 13 (VERIFY) |
+| 2 | Completeness | All criteria met, implicit requirements | Step 10 (REVIEW), Step 15 (FINAL-REVIEW) |
+| 3 | Maintainability | Patterns, no smells, readable by junior | Step 10 (REVIEW), Step 11 (OPTIMIZE) |
+| 4 | Security | OWASP, validation, auth/authz | Step 8 (PREPARE), Step 12 (SECURE) |
+| 5 | Performance | No N+1, caching, response time | Step 11 (OPTIMIZE), Step 13 (VERIFY) |
+| 6 | Reliability | Error handling, retries, fault tolerance | Step 10 (REVIEW), Step 15 (FINAL-REVIEW) |
+| 7 | Compatibility | API backwards compat, integrations | Step 10 (REVIEW) |
+| 8 | Usability | Error messages, clear output, docs | Step 14 (DOCUMENT), Step 15 (FINAL-REVIEW) |
+| 9 | Portability | No hardcoded paths, cross-platform | Step 10 (REVIEW), Step 13 (VERIFY) |
+| 10 | Testing | 80%+ coverage on new code, isolation, happy+error paths | Step 7 (TEST), Step 13 (VERIFY) |
+| 11 | Accessibility | WCAG 2.2, screen reader, keyboard | Step 10 (REVIEW), Step 15 (FINAL-REVIEW) |
+| 12 | Observability | Logging, metrics, tracing, alerts | Step 10 (REVIEW), Step 15 (FINAL-REVIEW) |
+| 13 | Safety | No harm, graceful degradation | Step 12 (SECURE), Step 15 (FINAL-REVIEW) |
+| 14 | Ethics/AI | Bias, fairness, explainability | Step 15 (FINAL-REVIEW) |
 
 ---
 
 ## Agent Registry
 
+Model assignments indicate recommended complexity tier. Actual model depends on user configuration.
+
 | Agent | Model | Steps | Role |
 |-------|-------|-------|------|
 | cto-chief | opus | 1-15 | Coordinator |
-| product-owner | opus | 1-3 | BDD Specs (Product Owner) |
+| product-owner | sonnet | 1-3 | BDD Specs (Product Owner) |
 | functional-reviewer | opus | 3 | Review Gate |
 | implementation-planner | opus | 4-6 | Technical Planning |
 | implementation-plan-reviewer | opus | 6 | Review Gate |
 | iron-loop-plan-integrator | opus | 6 | Creates execution plans |
-| iron-loop-plan-critic | opus | 6 | Reviews execution plans (5-dim rubric) |
+| iron-loop-plan-critic | opus | 6 | Reviews execution plans (6-dim rubric) |
 | test-maker | opus | 7 | TDD Red (write tests FIRST) |
-| quality-checker | sonnet | 8 | Prepare environment |
+| quality-checker | sonnet | 8 | Prepare environment + shift-left |
 | implementer | sonnet | 9 | ALL code changes |
 | self-reviewer | opus | 10 | Self-review checkpoint |
 | optimizer | sonnet | 11 | Performance + Simplification |
 | security-scanner | opus | 12 | Security vulnerability check |
-| verifier | sonnet | 13 | Quality gate (lint, type, tests) |
+| verifier | sonnet | 13 | Quality gate (lint, type, tests, SAST) |
 | documenter | sonnet | 14 | Documentation |
 | implementation-reviewer | opus | 15 | Final review + human gate |
-
----
-
-## Files Structure
-
-### Agents
-```
-.ctoc/agents/
-├── coordinator/
-│   └── cto-chief.md
-├── planning/
-│   ├── product-owner.md            # NEW - BDD specs
-│   ├── functional-reviewer.md
-│   ├── implementation-planner.md   # RENAMED from impl-planner
-│   ├── implementation-plan-reviewer.md  # RENAMED from impl-plan-reviewer
-│   ├── iron-loop-plan-integrator.md     # NEW - Creates execution plans
-│   └── iron-loop-plan-critic.md         # NEW - 5-dimension rubric review
-├── implementation/
-│   ├── test-maker.md
-│   ├── quality-checker.md
-│   ├── implementer.md
-│   ├── self-reviewer.md
-│   ├── optimizer.md
-│   ├── security-scanner.md
-│   ├── verifier.md
-│   ├── documenter.md
-│   └── implementation-reviewer.md  # RENAMED from impl-reviewer
-├── admin/
-│   ├── dashboard.md
-│   ├── learning-applier.md
-│   └── learning-suggester.md
-└── writing/
-    ├── document-planner.md
-    ├── pdf-writer.md
-    ├── docx-writer.md
-    ├── pptx-writer.md
-    └── document-reader.md
-```
-
-### Configuration
-```
-.ctoc/
-├── operations-registry.yaml    # v2.1.0 — Single source of truth
-├── settings.yaml               # Configuration (with keyboard_layout)
-├── cache/
-│   └── codebase-index.yaml
-└── learnings/
-    ├── README.md
-    ├── learning.yaml.template
-    ├── pending/
-    ├── approved/
-    ├── applied/
-    └── rejected/
-```
 
 ---
 
@@ -494,74 +452,53 @@ The loop is triggered automatically when a plan moves from `implementation/draft
 
 | Pattern | Status | Why |
 |---------|--------|-----|
-| Empty catch blocks | ❌ BLOCK | Hides failures |
-| Early return without assertion | ❌ BLOCK | Test passes without testing |
-| Tests without assertions | ❌ BLOCK | Always passes |
-| Fixture errors swallowed | ❌ BLOCK | Setup failures hidden |
-| Skip without reason | ❌ BLOCK | Unclear why skipped |
+| Empty catch blocks | BLOCK | Hides failures |
+| Early return without assertion | BLOCK | Test passes without testing |
+| Tests without assertions | BLOCK | Always passes |
+| Fixture errors swallowed | BLOCK | Setup failures hidden |
+| Skip without reason | BLOCK | Unclear why skipped |
 
 **If a test cannot run, it must FAIL LOUDLY. Period.**
 
 ### 2. Docker Projects Must Test Containers
 
-If the project has `Dockerfile` or `docker-compose.yml`:
-
-| Check | When | Why |
-|-------|------|-----|
-| Docker image builds | CI | Catches build issues |
-| Container health check | Before deploy | Verifies startup |
-| E2E against container | Before deploy | Tests what ships |
-
-```bash
-# Required sequence
-docker build -t app:test .
-docker run -d -p 3000:3000 app:test
-curl --fail http://localhost:3000/health
-BASE_URL=http://localhost:3000 npm run test:e2e
-```
-
-**No deploy without container verification. Period.**
+If the project has `Dockerfile` or `docker-compose.yml`: build, health-check, and test against the container before deploy.
 
 ### 3. Tests Run Exactly As CI
 
-Local tests must:
-- Use same commands as CI
-- Use same flags (e.g., `--test-force-exit`)
-- Use same environment variables
-- Fail for the same reasons
+Local tests must use the same commands, flags, and environment as CI. If it passes locally but fails in CI, local setup is wrong.
 
-**If it passes locally but fails in CI, your local setup is wrong.**
+### 4. Zero Tolerance for Flaky Tests
+
+Flaky tests erode trust in the entire quality system. A flaky test is retried 2x. If it still flickers, it is marked as a blocking issue that must be fixed before any new features proceed.
+
+---
+
+## Plans Directory
+
+```
+plans/
+|-- vision/                 # Ideas and explorations (pre-planning)
+|-- functional/             # Steps 1-3 plans (BDD specs)
+|-- implementation/         # Steps 4-6 plans (technical approach)
+|-- todo/                   # Backlog (ready for execution)
+|-- review/                 # Awaiting final human review (Step 15)
+|-- done/                   # Completed
+```
+
+Plan state (draft vs. approved, in-progress tracking) is managed via YAML frontmatter inside each plan file, not via subdirectories. The `execution/` output from the Integrator+Critic loop is embedded in the plan file itself.
 
 ---
 
 ## Notes
 
-- Claude Code IS the runtime — no separate runtime needed
-- Everything is an agent (tiered by complexity)
-- Model minimum: Haiku (configurable to sonnet/opus)
+- Claude Code IS the runtime -- no separate runtime needed
+- Everything is an agent (tiered by complexity: haiku/sonnet/opus)
 - Learning system: per-project, git-tracked
 - Phase 1 uses BDD methodology (user stories + scenarios)
 - 3 human gates ensure user control at key transitions
+- All code must be cross-platform (Windows, macOS, Linux)
 
 ---
 
-### Plans Directory
-```
-plans/
-├── functional/
-│   ├── draft/              # Functional plans being written
-│   └── approved/           # Approved functional plans
-├── implementation/
-│   ├── draft/              # Implementation plans being written
-│   └── approved/           # Approved implementation plans
-├── execution/              # NEW - Iron-solid execution plans
-│   └── {date}-{name}.md    # Generated by Integrator+Critic loop
-├── todo/                   # Backlog
-├── in_progress/            # Currently being worked on
-├── review/                 # Awaiting review
-└── done/                   # Completed
-```
-
----
-
-*Last updated: 2026-01-29*
+*Last updated: 2026-02-21*
