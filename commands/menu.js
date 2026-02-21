@@ -14,7 +14,12 @@ const { startAutoSync, stopAutoSync } = require('../lib/sync');
 const { findProjectRoot } = require('../lib/project-root');
 
 // Read version from VERSION file
-const VERSION = fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim();
+let VERSION;
+try {
+  VERSION = fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim();
+} catch {
+  VERSION = '?.?.?';
+}
 
 // Import tab modules
 const overviewTab = require('../tabs/overview');
@@ -36,6 +41,9 @@ const tabModules = {
   progress: progressTab,
   tools: toolsTab
 };
+
+// Message display timer (prevents render races on rapid key presses)
+let messageTimer = null;
 
 // Application state
 const app = {
@@ -103,10 +111,11 @@ function render() {
     output += tabModule.render(app);
   }
 
-  // Status message
+  // Status message (clear previous timer to prevent render races)
+  if (messageTimer) clearTimeout(messageTimer);
   if (app.message) {
     output += `\n${c.green}${app.message}${c.reset}\n`;
-    setTimeout(() => {
+    messageTimer = setTimeout(() => {
       app.message = null;
       render();
     }, 2000);
@@ -124,8 +133,8 @@ function renderView(content) {
   const maxLines = process.stdout.rows - 10 || 30;
   const displayLines = lines.slice(0, maxLines);
 
-  displayLines.forEach(line => {
-    output += line + '\n';
+  displayLines.forEach(displayLine => {
+    output += displayLine + '\n';
   });
 
   if (lines.length > maxLines) {

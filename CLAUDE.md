@@ -139,7 +139,7 @@ ctoc/
 
 **Circuit breaker**: Max 3 kickbacks to the same step, max 5 total kickbacks per plan. If exceeded, escalate to user with a summary of what keeps failing and why.
 
-**Escape phrases** bypass Iron Loop enforcement when the overhead would exceed the change itself: "skip planning", "quick fix", "trivial fix", "hotfix", "urgent".
+**Escape phrases** bypass Iron Loop enforcement when the overhead would exceed the change itself: "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent".
 
 ### Common Failures (and What to Do)
 

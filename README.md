@@ -6,8 +6,11 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.22-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.23-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
+  <img alt="Agents" src="https://img.shields.io/badge/agents-85-orange">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
+  <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
 CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **15-step Iron Loop** — plan before code, test before ship, secure before deploy. 85 specialist agents handle everything from TDD to security scanning while 3 human gates ensure you approve every decision. The result: AI that writes production-quality code on the first try.
@@ -36,8 +39,11 @@ claude
 
 That's it. CTO Chief detects your stack and is ready to work.
 
-<!-- TODO: Add dashboard screenshot/GIF here -->
-<!-- <img src="docs/assets/dashboard-demo.gif" alt="CTO Chief dashboard" width="700"> -->
+<!-- TODO: Record dashboard GIF with charmbracelet/vhs or gifski -->
+<!-- <p align="center"><img src="docs/assets/dashboard-demo.gif" alt="CTO Chief in action" width="700"><br><em>From idea to tested, secure code in one session</em></p> -->
+
+> [!NOTE]
+> CTO Chief is open source and actively developed. [Issues](https://github.com/robotijn/ctoc/issues), [PRs](https://github.com/robotijn/ctoc/pulls), and [skill improvement suggestions](https://github.com/robotijn/ctoc/issues/new?template=skill-improvement.yml) are welcome.
 
 > [!TIP]
 > For autonomous agent workflows, use `claude --dangerously-skip-permissions` to avoid repeated tool-call prompts. This is safe on feature branches where git can revert changes. Add `--continue` to resume a previous session.
@@ -56,7 +62,44 @@ That's it. CTO Chief detects your stack and is ready to work.
 | Testing | "I'll add tests later" | TDD — tests written before code (Step 7) |
 | Security | Hope for the best | Shift-left scanning (Step 8) + full audit (Step 12) |
 | Your control | Watch and hope | 3 approval gates — nothing ships without you |
-| Quality | Manual review catches ~60% | Automated: lint, typecheck, tests, 80%+ coverage |
+| Quality | Manual review only | Automated: lint, typecheck, tests, 80%+ coverage |
+
+### How CTO Chief Compares
+
+| | CTO Chief | Cursor Rules | Raw Claude Code | GitHub Copilot |
+|--|-----------|-------------|----------------|----------------|
+| Planning before coding | 6-step plan with adversarial review | Manual rules file | None | None |
+| TDD enforcement | Automatic (Step 7) | Manual | Manual | None |
+| Security scanning | Built-in (Steps 8, 12) | Manual | Manual | None |
+| Human approval gates | 3 mandatory checkpoints | None | None | None |
+| Quality verification | Automated gate (Step 13) | Manual | Manual | None |
+| Specialist agents | 85 across 19 categories | None | DIY | None |
+
+### Example: Adding a Feature
+
+```
+You: "Add a /health endpoint that returns service status"
+
+CTO Chief:
+  Steps 1-3: Creates functional plan with BDD scenarios
+  Gate 1:    You approve the plan
+
+  Steps 4-6: Designs implementation with file paths and test strategy
+  Gate 2:    You approve the approach
+
+  Step 7:    Writes failing test for /health endpoint
+  Step 8:    Scans existing code for dependency issues
+  Step 9:    Implements the endpoint
+  Step 10:   Self-reviews for correctness
+  Step 11:   Optimizes response time
+  Step 12:   Scans for security issues
+  Step 13:   Runs lint + typecheck + ALL tests (pass)
+  Step 14:   Updates API documentation
+  Step 15:   Presents result for your review
+  Gate 3:    You approve → committed and pushed
+```
+
+Result: A tested, documented, security-scanned endpoint in one session.
 
 ---
 
@@ -90,7 +133,7 @@ Phase 3: IMPLEMENTATION (Steps 7-15)
   Gate 3: You approve the result
 ```
 
-**Enforcement** — Hooks block premature code edits (before planning) and premature commits (before verification). Escape phrases: "skip planning", "quick fix", "trivial fix", "hotfix", "urgent".
+**Enforcement** — Hooks block premature code edits (before planning) and premature commits (before verification). Escape phrases: "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent".
 
 ---
 
@@ -145,7 +188,11 @@ Agents spawn conditionally based on your project and current Iron Loop step.
 | [DevOps](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Terraform](skills/frameworks/devops/terraform.md), [Helm](skills/frameworks/devops/helm.md), [GitHub Actions](skills/frameworks/devops/github-actions.md) |
 | [Mobile](skills/frameworks/mobile/) | 15 | [React Native](skills/frameworks/mobile/react-native.md), [Flutter](skills/frameworks/mobile/flutter.md), [SwiftUI](skills/frameworks/mobile/swiftui.md), [Jetpack Compose](skills/frameworks/mobile/jetpack-compose.md) |
 
-Also includes: [CTO Persona](skills/cto-persona.md) · [Iron Loop](skills/iron-loop.md) · [Quality Standards](skills/quality-standards.md) · [Enforcement](skills/enforcement.md)
+| [Testing](skills/testing/) | 15 | [Playwright](skills/testing/playwright.md), coverage tools, test patterns |
+| [Security](skills/security/) | 5 | OWASP, input validation, secrets management |
+| [Architecture](skills/architecture/) | 7 | Patterns, dependency analysis, design |
+| [Quality Configs](skills/quality-configs/) | 61 | Per-language lint, format, and test configs |
+| Core | 6 | [CTO Persona](skills/cto-persona.md), [Iron Loop](skills/iron-loop.md), [Quality Standards](skills/quality-standards.md), [Enforcement](skills/enforcement.md) |
 
 </details>
 
@@ -168,10 +215,11 @@ The `/ctoc` command opens an interactive dashboard with 8 tabs:
 | Progress | In-progress and finished items |
 | Commands | Release, Doctor, Update, Settings |
 
-**Plan pipeline:**
+**Plan pipeline** (directories under `plans/`):
 ```
-vision → functional → implementation → todo → in-progress → review → done
+vision → functional → implementation → todo → [in-progress] → review → done
 ```
+*`in-progress` is a state tracked in plan YAML frontmatter, not a separate directory.*
 
 **3 human gates** — transitions that require your explicit approval:
 1. Functional → Implementation *(approve what to build)*
@@ -188,8 +236,10 @@ CTO Chief blocks premature actions with hooks:
 
 | Action | Blocked Until | Escape Phrases |
 |--------|--------------|----------------|
-| Edit/Write code | Planning complete (Step 7+) | "skip planning", "quick fix", "trivial fix" |
+| Edit/Write code | Planning complete (Step 7+) | "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change" |
 | Git commit | Documentation complete (Step 14+) | "hotfix", "urgent" |
+
+Config and documentation files are **whitelisted** and never blocked: `*.md`, `*.yaml`, `*.yml`, `*.json`, `.ctoc/**`.
 
 ---
 
@@ -216,13 +266,26 @@ git commit → background agent runs: lint, typecheck, tests, security
 
 ---
 
-## Philosophy
+## How It Works
 
-Security > correctness > performance > cleverness. Every decision starts with three questions:
+```
+You ──── /ctoc ────► Dashboard
+                        │
+                  ┌─────┴─────┐
+                  ▼           ▼
+            Plan Pipeline   Commands
+                  │
+    ┌─────────────┼─────────────┐
+    ▼             ▼             ▼
+ Phase 1       Phase 2       Phase 3
+ (What)        (How)         (Build)
+ Steps 1-3     Steps 4-6     Steps 7-15
+    │             │             │
+ [GATE 1]     [GATE 2]     [GATE 3]
+ You approve   You approve   You approve
+```
 
-1. What business problem does this solve?
-2. How will we know it works?
-3. What happens if it fails?
+Priority: security > correctness > performance > cleverness.
 
 ---
 
@@ -287,6 +350,8 @@ Then restart Claude Code.
 
 **Requirements:** Claude Code >= 1.0.0, Node.js >= 18.0.0
 
+See [CLAUDE.md](CLAUDE.md) for full contributor instructions and [IRON_LOOP.md](IRON_LOOP.md) for methodology details.
+
 **Run tests:**
 ```bash
 node --test tests/*.test.js
@@ -296,7 +361,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./lib/version');
 
-getVersion()       // → '6.1.22'
+getVersion()       // → '6.1.23'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -333,6 +398,6 @@ MPL 2.0 — See [LICENSE](LICENSE)
 
 ---
 
-**6.1.22** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.23** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

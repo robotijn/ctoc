@@ -60,16 +60,10 @@ const VERSION_UPDATES = [
 
 function getVersion() {
   const version = fs.readFileSync(VERSION_FILE, 'utf8').trim();
+  if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(`Invalid version format in ${VERSION_FILE}: "${version}" (expected X.Y.Z)`);
+  }
   return version;
-}
-
-function bumpPatch() {
-  const current = getVersion();
-  const parts = current.split('.');
-  parts[2] = parseInt(parts[2], 10) + 1;
-  const newVersion = parts.join('.');
-  fs.writeFileSync(VERSION_FILE, newVersion + '\n');
-  return newVersion;
 }
 
 function updateJsonVersionFiles(version) {
@@ -84,7 +78,13 @@ function updateJsonVersionFiles(version) {
     }
 
     const content = fs.readFileSync(filePath, 'utf8');
-    const json = JSON.parse(content);
+    let json;
+    try {
+      json = JSON.parse(content);
+    } catch (err) {
+      console.error(`  ERROR: ${config.file} contains invalid JSON: ${err.message}`);
+      continue;
+    }
     let changed = false;
 
     for (const update of config.updates) {
@@ -93,8 +93,14 @@ function updateJsonVersionFiles(version) {
       const lastKey = pathCopy.pop();
 
       for (const key of pathCopy) {
+        if (obj == null || typeof obj !== 'object') {
+          console.error(`  ERROR: ${config.file} missing expected path: ${update.path.join('.')}`);
+          obj = null;
+          break;
+        }
         obj = obj[key];
       }
+      if (obj == null) continue;
 
       if (obj[lastKey] !== version) {
         obj[lastKey] = version;
@@ -139,18 +145,23 @@ function updateVersionInFiles(version) {
 }
 
 function main() {
-  // Read version from VERSION file (source of truth)
-  const version = getVersion();
-  console.log(`CTOC Release v${version}`);
-  console.log('─'.repeat(40));
+  try {
+    // Read version from VERSION file (source of truth)
+    const version = getVersion();
+    console.log(`CTOC Release v${version}`);
+    console.log('─'.repeat(40));
 
-  console.log('\nSyncing version to JSON files...');
-  updateJsonVersionFiles(version);
+    console.log('\nSyncing version to JSON files...');
+    updateJsonVersionFiles(version);
 
-  console.log('\nUpdating version references in docs...');
-  updateVersionInFiles(version);
+    console.log('\nUpdating version references in docs...');
+    updateVersionInFiles(version);
 
-  console.log('\nDone.');
+    console.log('\nDone.');
+  } catch (err) {
+    console.error(`Release failed: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 main();

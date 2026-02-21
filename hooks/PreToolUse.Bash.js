@@ -189,7 +189,7 @@ async function main() {
   // Check for git commit
   if (isCommitCommand(command)) {
     if (currentStep < MINIMUM_STEP_FOR_COMMIT) {
-      const reason = `Commit requires step ${MINIMUM_STEP_FOR_COMMIT}+ (VERIFY). Current: ${currentStep}`;
+      const reason = `Commit requires step ${MINIMUM_STEP_FOR_COMMIT}+ (DOCUMENT). Current: ${currentStep}`;
       writeToTerminal(formatBlocked(command, state, reason, 'COMMIT'));
       process.exit(1);
     }

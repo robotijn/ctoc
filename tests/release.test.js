@@ -104,6 +104,9 @@ Some content here.
 
 function getVersion(versionFile) {
   const version = fs.readFileSync(versionFile, 'utf8').trim();
+  if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(`Invalid version format in ${versionFile}: "${version}" (expected X.Y.Z)`);
+  }
   return version;
 }
 
@@ -118,7 +121,12 @@ function updateJsonVersionFiles(version, root, jsonVersionFiles) {
     }
 
     const content = fs.readFileSync(filePath, 'utf8');
-    const json = JSON.parse(content);
+    let json;
+    try {
+      json = JSON.parse(content);
+    } catch (err) {
+      continue;
+    }
     let changed = false;
 
     for (const update of config.updates) {
@@ -127,8 +135,13 @@ function updateJsonVersionFiles(version, root, jsonVersionFiles) {
       const lastKey = pathCopy.pop();
 
       for (const key of pathCopy) {
+        if (obj == null || typeof obj !== 'object') {
+          obj = null;
+          break;
+        }
         obj = obj[key];
       }
+      if (obj == null) continue;
 
       if (obj[lastKey] !== version) {
         obj[lastKey] = version;
@@ -594,24 +607,26 @@ describe('Edge Cases', () => {
   test('handles empty VERSION file', () => {
     fs.writeFileSync(TEST_VERSION_FILE, '');
 
-    const version = getVersion(TEST_VERSION_FILE);
-    assert.strictEqual(version, '');
+    assert.throws(() => {
+      getVersion(TEST_VERSION_FILE);
+    }, /Invalid version format/);
   });
 
   test('handles VERSION file with only whitespace', () => {
     fs.writeFileSync(TEST_VERSION_FILE, '   \n\t  \n');
 
-    const version = getVersion(TEST_VERSION_FILE);
-    assert.strictEqual(version, '');
+    assert.throws(() => {
+      getVersion(TEST_VERSION_FILE);
+    }, /Invalid version format/);
   });
 
   test('handles malformed JSON gracefully', () => {
     createVersionFile('2.0.0');
     fs.writeFileSync(TEST_PLUGIN_FILE, 'not valid json');
 
-    assert.throws(() => {
-      updateJsonVersionFiles('2.0.0', TEST_DIR, JSON_VERSION_FILES);
-    }, /JSON/);
+    // Should not throw -- gracefully skips malformed files
+    const updated = updateJsonVersionFiles('2.0.0', TEST_DIR, JSON_VERSION_FILES);
+    assert.ok(Array.isArray(updated));
   });
 
   test('handles deeply nested JSON path', () => {

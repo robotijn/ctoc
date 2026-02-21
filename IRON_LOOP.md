@@ -5,6 +5,43 @@
 
 ---
 
+## Why Iron Loop Exists
+
+AI coding assistants write code fast. Too fast. Without discipline, they produce code that solves the wrong problem, breaks existing features, ships vulnerabilities, and is unmaintainable.
+
+Iron Loop is the discipline. It forces AI to plan before coding, test before implementing, and verify before shipping. The methodology is enforced by hooks, not honor — if an agent tries to write code before planning, the hook blocks it; if it skips verification, the quality gate fails.
+
+Three checkpoints give the human final authority:
+1. **You approve what to build** (after functional planning)
+2. **You approve how to build it** (after technical planning)
+3. **You approve the result** (after implementation and verification)
+
+Nothing ships without your explicit approval.
+
+---
+
+## The 15 Steps at a Glance
+
+| Step | Name | One-Liner |
+|------|------|-----------|
+| 1 | ASSESS | Understand the problem before proposing solutions |
+| 2 | ALIGN | Connect the solution to user goals and business value |
+| 3 | CAPTURE | Write requirements as testable BDD scenarios |
+| 4 | PLAN | Choose the technical approach with tradeoffs documented |
+| 5 | DESIGN | Define the architecture: components, interfaces, data flow |
+| 6 | SPEC | Refine until the plan survives 10 rounds of adversarial review |
+| 7 | TEST | Write failing tests first — code does not exist yet |
+| 8 | PREPARE | Set up the environment and scan existing code for risks |
+| 9 | IMPLEMENT | Write all the code in one step, sub-items for each file |
+| 10 | REVIEW | Self-review: does this code do what the plan said? |
+| 11 | OPTIMIZE | Simplify, remove redundancy, improve performance |
+| 12 | SECURE | Scan for vulnerabilities: OWASP Top 10, input validation, secrets |
+| 13 | VERIFY | Automated gate: lint + typecheck + ALL tests + coverage >= 80% |
+| 14 | DOCUMENT | Update docs to match the code that was actually written |
+| 15 | FINAL-REVIEW | Human reviews the result and decides: ship, fix, or scrap |
+
+---
+
 ## Iron Loop Overview
 
 ```
@@ -150,13 +187,16 @@ Every step MUST be safe to re-run. If a kickback sends execution back to a previ
 
 Not every change needs the full 15-step ceremony. Match rigor to risk:
 
-| Change Size | Steps | When |
-|-------------|-------|------|
-| **Micro** (typo, config, < 5 lines) | 7, 9, 13, 15 | Escape phrase or trivial classification |
-| **Standard** (feature, bugfix) | All 15 steps | Default for all plans |
-| **Major** (architecture, security, breaking change) | All 15 + extended Integrator+Critic (15 rounds) | User flags as major, or auto-detected from scope |
+| Change Type | Example | Steps to Run | Steps Skipped |
+|-------------|---------|-------------|---------------|
+| **Typo/config** | Fix spelling, update timeout | 9, 13 | All others |
+| **Bug fix (obvious)** | Off-by-one in loop | 7, 9, 13, 15 | 1-6, 8, 10-12, 14 |
+| **Standard feature** | Add copy-to-clipboard button | All 15 | None |
+| **Architecture change** | Replace REST with GraphQL | All 15 + extended I+C (15 rounds) | None |
 
-Micro changes skip PREPARE, REVIEW, OPTIMIZE, SECURE, DOCUMENT — but never skip TEST or VERIFY.
+**The rule**: You can skip PREPARE, REVIEW, OPTIMIZE, SECURE, DOCUMENT. You can NEVER skip TEST (7) or VERIFY (13).
+
+Escape phrases to enter micro mode: "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent".
 
 ### Circuit Breaker
 
@@ -229,10 +269,8 @@ Feature: User Login
 ```
 
 ### Escape Hatch
-Even trivial requests get a mini-plan with test. User can override with:
-- "skip planning"
-- "quick fix"
-- "trivial fix"
+Even trivial requests get a mini-plan with test. User can override with any escape phrase:
+"skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent"
 
 ---
 
@@ -490,14 +528,21 @@ Plan state (draft vs. approved, in-progress tracking) is managed via YAML frontm
 
 ---
 
-## Notes
+## Expected Step Duration
 
-- Claude Code IS the runtime -- no separate runtime needed
-- Everything is an agent (tiered by complexity: haiku/sonnet/opus)
-- Learning system: per-project, git-tracked
-- Phase 1 uses BDD methodology (user stories + scenarios)
-- 3 human gates ensure user control at key transitions
-- All code must be cross-platform (Windows, macOS, Linux)
+These are guidelines, not hard limits. If a step takes significantly longer, the plan may need splitting.
+
+| Step | Expected Duration | If Longer, Consider |
+|------|-------------------|---------------------|
+| 1-3 (Functional) | 5-15 minutes | Problem may be poorly defined |
+| 4-5 (Technical) | 10-30 minutes | Plan may need splitting |
+| 6 (Integrator+Critic) | 5-20 minutes | Max 10 rounds, auto-approve if stuck |
+| 7 (TEST) | 5-15 minutes | Too many test cases; focus on critical paths |
+| 8 (PREPARE) | 2-5 minutes | Environment issues; fix before proceeding |
+| 9 (IMPLEMENT) | 10-60 minutes | Plan touches too many files (>15 = split) |
+| 10-12 (Review cycle) | 5-10 minutes each | Findings may require kickback |
+| 13 (VERIFY) | 2-5 minutes | Failures trigger smart kickback |
+| 14-15 (Finalize) | 5-10 minutes | Should be fast if earlier steps were thorough |
 
 ---
 
