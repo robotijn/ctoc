@@ -636,22 +636,25 @@ Use this to provide context-aware guidance.
 
 | Category | Count | Agents |
 |----------|-------|--------|
-| coordinator | 1 | cto-chief |
-| testing/writers | 4 | unit-test-writer, integration-test-writer, e2e-test-writer, property-test-writer |
-| testing/runners | 5 | unit-test-runner, integration-test-runner, e2e-test-runner, smoke-test-runner, mutation-test-runner |
-| quality | 8 | type-checker, code-reviewer, architecture-checker, consistency-checker, code-smell-detector, duplicate-code-detector, dead-code-detector, complexity-analyzer |
-| security | 5 | security-scanner, secrets-detector, dependency-checker, input-validation-checker, concurrency-checker |
-| specialized | 11 | performance-profiler, memory-safety-checker, accessibility-checker, database-reviewer, api-contract-validator, translation-checker, observability-checker, error-handler-checker, resilience-checker, health-check-validator, configuration-validator |
-| frontend | 3 | visual-regression-checker, component-tester, bundle-analyzer |
-| mobile | 3 | ios-checker, android-checker, react-native-bridge-checker |
-| infrastructure | 4 | terraform-validator, kubernetes-checker, docker-security-checker, ci-pipeline-checker |
-| documentation | 2 | documentation-updater, changelog-generator |
+| testing | 14 | unit-test-runner, integration-test-runner, e2e-test-runner, mutation-test-runner, smoke-test-runner, quality-gate-runner, playwright-qa, coverage-enforcer, coverage-mapper, smart-test-runner, unit-test-writer, e2e-test-writer, integration-test-writer, property-test-writer |
+| quality | 11 | architecture-checker, code-reviewer, complexity-analyzer, complexity-reducer, type-checker, code-smell-detector, dead-code-detector, duplicate-code-detector, consistency-checker, quality-gate, performance-validator |
+| specialized | 11 | performance-profiler, memory-safety-checker, accessibility-checker, database-reviewer, api-contract-validator, configuration-validator, error-handler-checker, health-check-validator, observability-checker, resilience-checker, translation-checker |
+| security | 7 | security-scanner, secrets-detector, dependency-checker, dependency-auditor, input-validation-checker, concurrency-checker, sast-scanner |
+| infrastructure | 5 | terraform-validator, kubernetes-checker, docker-security-checker, ci-pipeline-checker, ci-runner-setup |
+| pipeline | 5 | agent-writer, agent-critic, agent-tester, agent-qa, agent-publisher |
+| planning | 4 | vision-advisor, vision-decomposer, product-owner, implementation-planner |
+| iron-loop | 3 | iron-loop-integrator, iron-loop-critic, iron-loop-executor |
 | compliance | 3 | gdpr-compliance-checker, audit-log-checker, license-scanner |
 | data-ml | 3 | data-quality-checker, ml-model-validator, feature-store-validator |
-| cost | 1 | cloud-cost-analyzer |
-| ai-quality | 2 | hallucination-detector, ai-code-quality-reviewer |
-| devex | 2 | onboarding-validator, api-deprecation-checker |
+| frontend | 3 | bundle-analyzer, component-tester, visual-regression-checker |
+| mobile | 3 | ios-checker, android-checker, react-native-bridge-checker |
 | versioning | 3 | backwards-compatibility-checker, feature-flag-auditor, technical-debt-tracker |
+| ai-quality | 2 | hallucination-detector, ai-code-quality-reviewer |
+| architecture | 2 | pattern-detector, dependency-analyzer |
+| devex | 2 | onboarding-validator, api-deprecation-checker |
+| documentation | 2 | documentation-updater, changelog-generator |
+| coordinator | 1 | cto-chief |
+| cost | 1 | cloud-cost-analyzer |
 
 ## ⛔ HUMAN GATE ENFORCEMENT (CRITICAL)
 

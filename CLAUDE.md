@@ -81,8 +81,8 @@ ctoc/
   IRON_LOOP.md           Methodology (15 steps, 3 phases, 3 human gates)
   VERSION                Source of truth for version
   agents/                85 agent definitions across 19 categories
-  skills/                360 language & framework skill files
-  commands/              8 slash commands (menu.js, push.md, quality.md, vision.md)
+  skills/                358 language & framework skill files
+  commands/              8 slash commands
   hooks/                 10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
   lib/                   71 JS modules (state, quality, security, planning, UI, analysis)
   scripts/               Build utilities (release.js, move-plan.js, coverage map)
@@ -91,7 +91,7 @@ ctoc/
   .ctoc/                 Config, templates, operations, learnings
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
-                         Note: in_progress is a plan state tracked in YAML frontmatter, not a separate directory
+                         Note: in-progress is a plan state tracked in YAML frontmatter, not a separate directory
 ```
 
 **Key entry points:**
@@ -104,7 +104,8 @@ ctoc/
 | `lib/quality-gate.js` | Quality enforcement |
 | `lib/iron-loop.js` | Step validation and Integrator+Critic |
 | `lib/init-project.js` | Project initialization |
-| `hooks/PreToolUse.Bash.js` | Human gates + enforcement |
+| `hooks/PreToolUse.Bash.js` | Edit/commit enforcement |
+| `hooks/human-gate-check.js` | Human gate violation detection + auto-revert |
 | `.ctoc/operations-registry.yaml` | Agent registry, kanban config |
 
 ---
@@ -243,13 +244,13 @@ Generator: `lib/init-project.js`
 ## Self-Improvement
 
 CTOC improves itself. When implementing features:
-- WebSearch authoritative sources for current best practices before updating profiles
+- WebSearch authoritative sources for current best practices before updating skills
 - All profile changes need validation (`ctoc validate`)
 - Document changes in commit messages with version
 - Never break existing installations (backward compatible)
 
 **STOP — Do NOT self-improve when:**
-- **Implementing a user feature** — stay focused on the task, do not opportunistically "improve" unrelated profiles
+- **Implementing a user feature** — stay focused on the task, do not opportunistically "improve" unrelated skills
 - **The improvement is speculative** — must be based on confirmed patterns across 2+ projects
 - **It would modify hook behavior or gate logic** — requires explicit user approval (these are safety-critical paths)
 

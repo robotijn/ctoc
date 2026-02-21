@@ -297,33 +297,30 @@ On Edit/Write tool call:
 
 ### Enforcement Modes
 
-| Mode | Behavior |
-|------|----------|
-| `strict` | Block Edit/Write if planning incomplete (default) |
-| `soft` | Warn but allow Edit/Write |
-| `off` | No enforcement |
+Currently only `strict` mode is implemented. `soft` and `off` are planned.
 
-Configure in `.ctoc/settings.yaml`:
-```yaml
-enforcement:
-  mode: strict
-```
+| Mode | Behavior | Status |
+|------|----------|--------|
+| `strict` | Block Edit/Write if planning incomplete (default) | Implemented |
+| `soft` | Warn but allow Edit/Write | Planned |
+| `off` | No enforcement | Planned |
 
 ### Whitelisted Files
 
-These file types bypass enforcement (config/docs that don't need Iron Loop):
-- `*.md` - Markdown files
-- `*.yaml`, `*.yml` - Config files
-- `*.json` - Config files
+These files bypass enforcement (hooks allow them regardless of step):
 - `.ctoc/**` - CTOC configuration
 - `.local/**` - Local state
+- `plans/*.md` - Plan files
+- `.gitignore`, `.gitattributes` - Git configuration
 
 ### Escape Phrases
 
-User can bypass enforcement by saying:
+User can bypass enforcement by including these phrases in their message. Claude interprets them and adjusts behavior accordingly:
 - "skip planning" / "skip iron loop"
 - "quick fix" / "trivial fix" / "trivial change"
 - "hotfix" / "urgent"
+
+Note: Escape phrases are interpreted by Claude via CLAUDE.md instructions, not enforced programmatically by hooks.
 
 ---
 
@@ -442,18 +439,18 @@ Implemented in `lib/iron-loop.js`. Triggered automatically when an implementatio
 ## Kanban Board (7 Columns)
 
 ```
-+----------+ +----------+ +----------+ +----------+ +----------+ +----------+ +----------+
-|  vision  | |functional| |implement.| |   todo   | |in_progress| | review  | |   done   |
-+----------+ +----------+ +----------+ +----------+ +----------+ +----------+ +----------+
-| Ideas    | | Steps 1-3| | Steps 4-6| | Backlog  | | Steps 7-14| | Step 15 | |Completed |
-|          | | BDD specs| | Technical| | Ready to | | Active    | | Human   | |          |
-|          | |          | | approach | | start    | | work      | | gate    | |          |
-+----------+ +----------+ +----------+ +----------+ +----------+ +----------+ +----------+
-               |             |                                       |
-            [HUMAN]       [HUMAN]                                 [HUMAN]
++----------+ +----------+ +----------+ +----------+ +-----------+ +----------+ +----------+
+|  vision  | |functional| |implement.| |   todo   | |in-progress| |  review  | |   done   |
++----------+ +----------+ +----------+ +----------+ +-----------+ +----------+ +----------+
+| Ideas    | | Steps 1-3| | Steps 4-6| | Backlog  | | Steps 7-14| | Step 15  | |Completed |
+|          | | BDD specs| | Technical| | Ready to | | Active    | | Human    | |          |
+|          | |          | | approach | | start    | | work      | | gate     | |          |
++----------+ +----------+ +----------+ +----------+ +-----------+ +----------+ +----------+
+               |             |                                        |
+            [HUMAN]       [HUMAN]                                  [HUMAN]
 ```
 
-Column order follows the plan lifecycle left-to-right. `in_progress` is a logical state tracked in plan YAML frontmatter; plans physically remain in `todo/` until moved to `review/`.
+Column order follows the plan lifecycle left-to-right. `in-progress` is a logical state tracked in plan YAML frontmatter; plans physically remain in `todo/` until moved to `review/`.
 
 ---
 

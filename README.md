@@ -6,10 +6,10 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.24-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.25-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-85-orange">
-  <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-358-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
@@ -136,7 +136,7 @@ Three approvals. One tested, documented, security-scanned endpoint.
 ## Key Features
 
 - **85 specialist agents** across 19 categories — testing, security, quality, infrastructure, and more
-- **360 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile
+- **358 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile, and more
 - **Iron Loop methodology** — 15 steps across 3 phases with 3 human gates
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
 - **Smart quality gates** — Background checks that don't block commits, block pushes
@@ -204,7 +204,7 @@ Agents spawn conditionally based on your project and current Iron Loop step.
 
 ## Skills
 
-360 embedded skills for instant expert knowledge — [browse all →](skills/)
+358 expert skills for instant domain knowledge — [browse all →](skills/)
 
 <details>
 <summary><strong>Full skill breakdown</strong></summary>
@@ -218,10 +218,12 @@ Agents spawn conditionally based on your project and current Iron Loop step.
 | [DevOps](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Helm](skills/frameworks/devops/helm.md), [Ansible](skills/frameworks/devops/ansible.md), [Pulumi](skills/frameworks/devops/pulumi.md) |
 | [Mobile](skills/frameworks/mobile/) | 15 | [React Native](skills/frameworks/mobile/react-native.md), [Flutter](skills/frameworks/mobile/flutter.md), [SwiftUI](skills/frameworks/mobile/swiftui.md), [Jetpack Compose](skills/frameworks/mobile/jetpack-compose.md) |
 
-| [Testing](skills/testing/) | 15 | [Playwright](skills/testing/playwright/), coverage tools, test patterns |
+| [Testing](skills/testing/) | 14 | [Playwright](skills/testing/playwright/), coverage tools, test patterns |
 | [Security](skills/security/) | 5 | OWASP, input validation, secrets management |
 | [Architecture](skills/architecture/) | 7 | Patterns, dependency analysis, design |
-| [Quality Configs](skills/quality-configs/) | 61 | Per-language lint, format, and test configs |
+| [Complexity](skills/complexity/) | 3 | Metrics, limits, refactoring patterns |
+| [Quality](skills/quality/) | 2 | Quality metrics and scoring |
+| [Quality Configs](skills/quality-configs/) | 60 | Per-language lint, format, and test configs |
 | Core | 6 | [CTO Persona](skills/cto-persona.md), [Iron Loop](skills/iron-loop.md), [Quality Standards](skills/quality-standards.md), [Enforcement](skills/enforcement.md) |
 
 </details>
@@ -269,7 +271,7 @@ CTO Chief blocks premature actions with hooks:
 | Edit/Write code | Planning complete (Step 7+) | "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change" |
 | Git commit | Documentation complete (Step 14+) | "hotfix", "urgent" |
 
-Config and documentation files are **whitelisted** and never blocked: `*.md`, `*.yaml`, `*.yml`, `*.json`, `.ctoc/**`.
+Config and CTOC files are **whitelisted** and never blocked: `.ctoc/**`, `.local/**`, `plans/*.md`, `.gitignore`, `.gitattributes`.
 
 ---
 
@@ -377,9 +379,9 @@ CTO Chief blocks code edits until planning is done (Step 7+). This is intentiona
 **Dashboard shows no plans:**
 Start by describing what you want to build. CTO Chief creates the plan for you.
 
-**Health check:**
+**Health check** (say to Claude):
 ```
-/ctoc doctor
+ctoc doctor
 ```
 
 </details>
@@ -400,7 +402,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./lib/version');
 
-getVersion()       // → '6.1.24'
+getVersion()       // → '6.1.25'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -412,7 +414,7 @@ Files synced by `release()`: `VERSION` (source of truth), `.claude-plugin/market
 ```
 ctoc/
 ├── agents/          85 agent definitions (19 categories)
-├── skills/          360 language & framework skills
+├── skills/          358 language & framework skills
 ├── commands/        8 slash commands
 ├── hooks/           10 Claude Code hooks
 ├── lib/             71 JS modules
@@ -437,6 +439,6 @@ MPL 2.0 — See [LICENSE](LICENSE)
 
 ---
 
-**6.1.24** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.25** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
