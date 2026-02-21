@@ -147,27 +147,38 @@ describe('CTOC Command - renderStatic()', () => {
   test('getAgentStatus returns active agent info', () => {
     const { getAgentStatus } = require('../lib/state');
 
-    // Create state file
+    // Create lock file with current PID (so isPidAlive returns true)
+    fs.mkdirSync(path.join(tempDir, '.ctoc'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tempDir, '.ctoc', 'agent.lock'),
+      JSON.stringify({
+        pid: process.pid,
+        plan: 'test-plan',
+        agentId: 'test-agent-123',
+        startedAt: new Date().toISOString()
+      })
+    );
+
+    // Create state file with supplementary info
     fs.mkdirSync(path.join(tempDir, '.ctoc', 'state'), { recursive: true });
     fs.writeFileSync(
       path.join(tempDir, '.ctoc', 'state', 'agent.json'),
       JSON.stringify({
-        active: true,
-        name: 'test-implementation',
         step: 7,
         phase: 'IMPLEMENT',
-        task: 'Building feature',
-        startedAt: new Date().toISOString()
+        task: 'Building feature'
       })
     );
 
     const status = getAgentStatus(tempDir);
 
     assert.strictEqual(status.active, true, 'Agent is active');
-    assert.strictEqual(status.name, 'test-implementation', 'Agent name is correct');
     assert.strictEqual(status.step, 7, 'Step is correct');
     assert.strictEqual(status.phase, 'IMPLEMENT', 'Phase is correct');
     assert.ok(status.elapsed, 'Elapsed time is calculated');
+
+    // Clean up lock file
+    fs.unlinkSync(path.join(tempDir, '.ctoc', 'agent.lock'));
 
     console.log('  getAgentStatus returns active agent info');
   });

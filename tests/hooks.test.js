@@ -490,8 +490,9 @@ describe('SessionStart - State Management', () => {
     it('has correct step names', () => {
       assert.strictEqual(STEP_NAMES[1], 'ASSESS');
       assert.strictEqual(STEP_NAMES[7], 'TEST');
-      assert.strictEqual(STEP_NAMES[14], 'VERIFY');
-      assert.strictEqual(STEP_NAMES[15], 'COMMIT');
+      assert.strictEqual(STEP_NAMES[13], 'VERIFY');
+      assert.strictEqual(STEP_NAMES[14], 'DOCUMENT');
+      assert.strictEqual(STEP_NAMES[15], 'FINAL-REVIEW');
     });
   });
 

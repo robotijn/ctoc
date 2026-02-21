@@ -26,13 +26,26 @@ function run(cmd, opts = {}) {
 }
 
 function getCurrentVersion() {
-  // Get version from currently running plugin
+  // Try CLAUDE_PLUGIN_ROOT env var
   const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
   if (pluginRoot) {
     const versionFile = path.join(pluginRoot, 'VERSION');
     if (fs.existsSync(versionFile)) {
       return fs.readFileSync(versionFile, 'utf8').trim();
     }
+  }
+  // Derive from script location (e.g., .../ctoc/6.1.22/commands/update.js)
+  const scriptDir = path.resolve(__dirname, '..');
+  const versionFile = path.join(scriptDir, 'VERSION');
+  if (fs.existsSync(versionFile)) {
+    return fs.readFileSync(versionFile, 'utf8').trim();
+  }
+  // Last resort: read from cache directory names
+  if (fs.existsSync(CACHE_DIR)) {
+    const versions = fs.readdirSync(CACHE_DIR).filter(d =>
+      fs.statSync(path.join(CACHE_DIR, d)).isDirectory()
+    );
+    if (versions.length === 1) return versions[0];
   }
   return 'unknown';
 }
