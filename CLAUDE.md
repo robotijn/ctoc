@@ -7,12 +7,13 @@
 
 ## Critical Rules
 
-### 1. Human Gates (3 Mandatory Approval Points)
+### 1. Human Gates (4 Mandatory Approval Points)
 
-Three transitions REQUIRE human approval. NEVER cross these automatically.
+Four transitions REQUIRE human approval. NEVER cross these automatically.
 
 | Gate | Transition | Revert To | Why |
 |------|------------|-----------|-----|
+| Gate 0 | vision -> functional | vision | Prevents exploring the wrong idea |
 | Gate 1 | functional -> implementation | functional | Prevents building the wrong thing |
 | Gate 2 | implementation -> todo | implementation | Prevents wrong technical approach |
 | Gate 3 | review -> done | review | Prevents shipping unreviewed code |
@@ -41,7 +42,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 
 ```bash
 node --test tests/*.test.js          # Run all 39 test files (cross-platform)
-node scripts/release.js              # Sync VERSION to all JSON files
+node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
 All tests must show `# fail 0`. If any test fails, fix before committing. The VERSION file is the single source of truth for version numbers. Do NOT use `run-all.js` (it doesn't exist).
@@ -53,7 +54,7 @@ All tests must show `# fail 0`. If any test fails, fix before committing. The VE
 | Step | Command |
 |------|---------|
 | 1. Update VERSION | Edit `VERSION` file (e.g., `6.1.26`) |
-| 2. Sync versions | `node scripts/release.js` |
+| 2. Sync versions | `node src/scripts/release.js` |
 | 3. Stage & commit | `feat/fix: description (vX.Y.Z)` |
 | 4. Push (if requested) | `git push origin main` |
 
@@ -78,17 +79,19 @@ When user selects `[8] release` from dashboard, show:
 ```
 ctoc/
   CLAUDE.md              This file — start here
-  IRON_LOOP.md           Methodology (16 steps, 4 phases, 3 human gates)
   VERSION                Source of truth for version
+  docs/                  IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+  src/                   Source code directory
+    commands/            8 slash commands
+    hooks/               10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
+    lib/                 71 JS modules (state, quality, security, planning, UI, analysis)
+    scripts/             Build utilities (release.js, move-plan.js, coverage map)
+    tabs/                8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)
+    data/                Static data files
   agents/                85 agent definitions across 19 categories
   skills/                360 language & framework skill files
-  commands/              8 slash commands
-  hooks/                 10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-  lib/                   71 JS modules (state, quality, security, planning, UI, analysis)
-  scripts/               Build utilities (release.js, move-plan.js, coverage map)
-  tabs/                  8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)
   tests/                 39 test files
-  .ctoc/                 Config, templates, operations, learnings
+  .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
                          Note: in-progress is a plan state tracked in YAML frontmatter, not a separate directory
@@ -98,21 +101,21 @@ ctoc/
 
 | File | Purpose |
 |------|---------|
-| `commands/menu.js` | Dashboard router and UI |
-| `lib/actions.js` | Plan operations (create, move, approve) |
-| `lib/state.js` | Plan state management |
-| `lib/quality-gate.js` | Quality enforcement |
-| `lib/iron-loop.js` | Step validation and Integrator+Critic |
-| `lib/init-project.js` | Project initialization |
-| `hooks/PreToolUse.Bash.js` | Edit/commit enforcement |
-| `hooks/human-gate-check.js` | Human gate violation detection + auto-revert |
+| `src/commands/menu.js` | Dashboard router and UI |
+| `src/lib/actions.js` | Plan operations (create, move, approve) |
+| `src/lib/state.js` | Plan state management |
+| `src/lib/quality-gate.js` | Quality enforcement |
+| `src/lib/iron-loop.js` | Step validation and Integrator+Critic |
+| `src/lib/init-project.js` | Project initialization |
+| `src/hooks/PreToolUse.Bash.js` | Edit/commit enforcement |
+| `src/hooks/human-gate-check.js` | Human gate violation detection + auto-revert |
 | `.ctoc/operations-registry.yaml` | Agent registry, kanban config |
 
 ---
 
 ## Iron Loop Summary
 
-16 steps across 4 phases. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
+16 steps across 4 phases. Full details in [IRON_LOOP.md](./docs/IRON_LOOP.md).
 
 **Steps 1-7 are collaborative**: agents ask questions, present options, and wait for the user's decision. They work WITH the user, not in isolation. **Steps 8-16 are automated**: agents execute without interruption, user reviews at Gate 3.
 
@@ -120,7 +123,7 @@ ctoc/
 
 | Step | Label | Agent | Phase |
 |------|-------|-------|-------|
-| 1 | IDEATE | vision-advisor, product-owner (sonnet) | Ideation (optional) |
+| 1 | IDEATE | vision-advisor, product-owner (sonnet) | Ideation — Gate 0: User approves vision |
 | 2 | ASSESS | product-owner (sonnet) | Phase 1: Functional |
 | 3 | ALIGN | product-owner (sonnet) | |
 | 4 | CAPTURE | functional-reviewer (opus) | Gate 1: User approves plan |
@@ -137,11 +140,11 @@ ctoc/
 | 15 | DOCUMENT | documenter (sonnet) | |
 | 16 | FINAL-REVIEW | implementation-reviewer (opus) | Gate 3: User approves result |
 
-**Step labels are MANDATORY** — validated by `lib/plan-validator.js` (library) and enforced at runtime by `hooks/validate-plan-steps.js` (hook). Plans with wrong labels are REJECTED.
+**Step labels are MANDATORY** — validated by `src/lib/plan-validator.js` (library) and enforced at runtime by `src/hooks/validate-plan-steps.js` (hook). Plans with wrong labels are REJECTED.
 
 **Step 10 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
 
-**Step 14 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in IRON_LOOP.md.
+**Step 14 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in [IRON_LOOP.md](./docs/IRON_LOOP.md).
 
 **Circuit breaker**: Max 3 kickbacks to the same step, max 5 total kickbacks per plan. If exceeded, escalate to user with a summary of what keeps failing and why.
 
@@ -232,7 +235,7 @@ All code MUST run on Windows, macOS, and Linux. Use:
 
 When initializing a new project with CTOC (`ctoc init`):
 
-1. **Detect**: Scan for languages, frameworks, tools (via `lib/stack-detector.js`)
+1. **Detect**: Scan for languages, frameworks, tools (via `src/lib/stack-detector.js`)
 2. **Generate**: Create tailored `CLAUDE.md` from `.ctoc/templates/CLAUDE.md.template`
 3. **Configure**: Set up `.ctoc/settings.yaml` with detected stack
 4. **Quality**: Configure quality gates based on detected tools
@@ -242,7 +245,7 @@ When initializing a new project with CTOC (`ctoc init`):
 The generated CLAUDE.md includes: CTO persona, Iron Loop steps, detected tools, quality commands, plan management, and skill system integration.
 
 Template: `.ctoc/templates/CLAUDE.md.template`
-Generator: `lib/init-project.js`
+Generator: `src/lib/init-project.js`
 
 ---
 

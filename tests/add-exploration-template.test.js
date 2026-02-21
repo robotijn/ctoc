@@ -10,9 +10,9 @@ let addExplorationTemplate;
 
 describe('Add Exploration Template Tests', () => {
   beforeEach(() => {
-    delete require.cache[require.resolve('../scripts/add-exploration-template.js')];
+    delete require.cache[require.resolve('../src/scripts/add-exploration-template.js')];
     try {
-      addExplorationTemplate = require('../scripts/add-exploration-template.js');
+      addExplorationTemplate = require('../src/scripts/add-exploration-template.js');
     } catch (e) {
       addExplorationTemplate = null;
     }

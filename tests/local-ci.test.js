@@ -20,7 +20,7 @@ const {
   detectDefaultContainer,
   CHECK_TYPES,
   CI_SYSTEMS
-} = require('../lib/ci-parser');
+} = require('../src/lib/ci-parser');
 
 const {
   runCommand,
@@ -29,14 +29,14 @@ const {
   checkTestsExist,
   TEST_STATUS,
   DEFAULT_TIMEOUT
-} = require('../lib/test-runner');
+} = require('../src/lib/test-runner');
 
 const {
   runLocalCI,
   getChecks,
   willCIPass,
   CI_STATUS
-} = require('../lib/local-ci');
+} = require('../src/lib/local-ci');
 
 describe('CI Parser', () => {
   describe('CHECK_TYPES', () => {

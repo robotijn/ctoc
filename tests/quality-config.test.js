@@ -36,9 +36,9 @@ function cleanupTempDir(dir) {
 // Test: QualityConfig class exists and can be instantiated
 function testQualityConfigExists() {
   try {
-    QualityConfig = require('../lib/quality-config').QualityConfig;
-    MODES = require('../lib/quality-config').MODES;
-    LANGUAGES = require('../lib/quality-config').LANGUAGES;
+    QualityConfig = require('../src/lib/quality-config').QualityConfig;
+    MODES = require('../src/lib/quality-config').MODES;
+    LANGUAGES = require('../src/lib/quality-config').LANGUAGES;
 
     const config = new QualityConfig('/tmp/test');
     assert.ok(config, 'QualityConfig should be instantiable');

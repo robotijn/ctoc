@@ -33,8 +33,8 @@ function cleanup() {
 // Re-require the module after setting up mock
 function getModule() {
   // Clear cache to pick up mocked homedir
-  delete require.cache[require.resolve('../lib/runner-settings')];
-  return require('../lib/runner-settings');
+  delete require.cache[require.resolve('../src/lib/runner-settings')];
+  return require('../src/lib/runner-settings');
 }
 
 // Test getDefaultSettings function

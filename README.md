@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.28-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.29-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-85-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy. 85 specialist agents handle everything from TDD to security scanning while 3 human gates ensure you approve every decision. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy. 85 specialist agents handle everything from TDD to security scanning while 4 human gates ensure you approve every decision. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -71,7 +71,7 @@ CTO Chief starts with ideation — agents explore your idea with you, ask clarif
 | Planning | None — straight to code | Functional + implementation plan, reviewed by you |
 | Testing | "I'll add tests later" | TDD — tests written before code (Step 8) |
 | Security | Hope for the best | Shift-left scanning (Step 9) + full audit (Step 13) |
-| Your control | Watch and hope | 3 approval gates — nothing ships without you |
+| Your control | Watch and hope | 4 approval gates — nothing ships without you |
 | Quality | Manual review only | Automated: lint, typecheck, tests, 80%+ coverage |
 
 ### How CTO Chief Compares
@@ -82,7 +82,7 @@ CTO Chief starts with ideation — agents explore your idea with you, ask clarif
 | Planning before coding | 6-step plan with adversarial review | Manual rules file | None | None |
 | TDD enforcement | Automatic (Step 8) | Manual | Manual | None |
 | Security scanning | Built-in (Steps 9, 13) | Manual | Manual | None |
-| Human approval gates | 3 mandatory checkpoints | None | None | None |
+| Human approval gates | 4 mandatory checkpoints | None | None | None |
 | Quality verification | Automated gate (Step 14) | Manual | Manual | None |
 | Specialist agents | 85 across 19 categories | None | DIY | None |
 
@@ -174,7 +174,7 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
 - **85 specialist agents** across 19 categories — testing, security, quality, infrastructure, and more
 - **360 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile, and more
-- **Iron Loop methodology** — 16 steps across 4 phases with 3 human gates
+- **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
 - **Smart quality gates** — Background checks that don't block commits, block pushes
 - **Stack detection** — Auto-detects your languages, frameworks, and tools
@@ -184,14 +184,14 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 
 ## The Iron Loop
 
-16 steps, 4 phases, 3 human gates — [full methodology →](IRON_LOOP.md)
+16 steps, 4 phases, 4 human gates — [full methodology →](docs/IRON_LOOP.md)
 
 ```
 COLLABORATIVE (Steps 1-7) — agents ask questions, you decide
 ──────────────────────────────────────────────────────────────
-Step 1: IDEATION (optional)
+Step 1: IDEATION
   IDEATE — product-owner agent explores your idea with you
-  Skip if you already have a specific, implementation-ready request
+  Gate 0: You approve the idea to explore
 
 Steps 2-4: FUNCTIONAL PLANNING
   ASSESS → ALIGN → CAPTURE — agents ask what to build, you approve
@@ -304,7 +304,8 @@ vision → functional → implementation → todo → [in-progress] → review �
 ```
 *`in-progress` is a state tracked in plan YAML frontmatter, not a separate directory.*
 
-**3 human gates** — transitions that require your explicit approval:
+**4 human gates** — transitions that require your explicit approval:
+0. Vision → Functional *(approve the idea to explore)*
 1. Functional → Implementation *(approve what to build)*
 2. Implementation → Todo *(approve how to build it)*
 3. Review → Done *(approve the result)*
@@ -442,7 +443,7 @@ ctoc doctor
 
 **Requirements:** Claude Code >= 1.0.0, Node.js >= 18.0.0
 
-See [CLAUDE.md](CLAUDE.md) for full contributor instructions and [IRON_LOOP.md](IRON_LOOP.md) for methodology details.
+See [CLAUDE.md](CLAUDE.md) for full contributor instructions and [IRON_LOOP.md](docs/IRON_LOOP.md) for methodology details.
 
 **Run tests:**
 ```bash
@@ -451,9 +452,9 @@ node --test tests/*.test.js
 
 **Version management:**
 ```javascript
-const { release, getVersion, syncAll, checkForUpdates } = require('./lib/version');
+const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.1.28'
+getVersion()       // → '6.1.29'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -464,15 +465,18 @@ Files synced by `release()`: `VERSION` (source of truth), `.claude-plugin/market
 **Project structure:**
 ```
 ctoc/
+├── docs/            IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+├── src/
+│   ├── commands/    8 slash commands
+│   ├── hooks/       10 Claude Code hooks
+│   ├── lib/         71 JS modules
+│   ├── tabs/        8 dashboard tabs
+│   ├── scripts/     Build utilities
+│   └── data/        Static data files
 ├── agents/          85 agent definitions (19 categories)
 ├── skills/          360 language & framework skills
-├── commands/        8 slash commands
-├── hooks/           10 Claude Code hooks
-├── lib/             71 JS modules
-├── tabs/            8 dashboard tabs
 ├── tests/           39 test files
-├── scripts/         Build utilities
-├── .ctoc/           Config, templates, learnings
+├── .ctoc/           Config, templates, operations
 └── .claude-plugin/  Plugin metadata
 ```
 
@@ -492,6 +496,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.1.28** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.29** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

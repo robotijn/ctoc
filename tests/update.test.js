@@ -73,7 +73,7 @@ test('Git remote points to GitHub', () => {
 
 // Test: Update script exists
 test('Update script is executable', () => {
-  const updateScript = path.join(__dirname, '..', 'commands', 'update.js');
+  const updateScript = path.join(__dirname, '..', 'src', 'commands', 'update.js');
   assert(fs.existsSync(updateScript), 'update.js should exist');
 
   const content = fs.readFileSync(updateScript, 'utf8');
@@ -85,7 +85,7 @@ test('Update script is executable', () => {
 
 // Test: No local path references
 test('No local development paths in update script', () => {
-  const updateScript = path.join(__dirname, '..', 'commands', 'update.js');
+  const updateScript = path.join(__dirname, '..', 'src', 'commands', 'update.js');
   const content = fs.readFileSync(updateScript, 'utf8');
 
   const badPatterns = [

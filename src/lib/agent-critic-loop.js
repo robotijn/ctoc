@@ -67,7 +67,7 @@ const SELF_CRITIQUE_QUESTIONS = {
  * @returns {Promise<{finalScore: number, rounds: number, history: Array}>}
  */
 async function bootstrapAgentCritic() {
-  const agentCriticPath = path.join(__dirname, '../agents/pipeline/agent-critic.md');
+  const agentCriticPath = path.join(__dirname, '..', '..', 'agents', 'pipeline', 'agent-critic.md');
   let currentVersion = await fs.readFile(agentCriticPath, 'utf8');
   let round = 1;
   let score = 0;

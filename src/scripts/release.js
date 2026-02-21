@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.dirname(__dirname);
+const ROOT = path.resolve(__dirname, '..', '..');
 const VERSION_FILE = path.join(ROOT, 'VERSION');
 
 // JSON files that need version updates

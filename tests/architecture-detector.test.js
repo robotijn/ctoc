@@ -45,8 +45,8 @@ function cleanupTempDir(dir) {
 // Test: ArchitectureDetector class exists and can be instantiated
 function testArchitectureDetectorExists() {
   try {
-    ArchitectureDetector = require('../lib/architecture-detector').ArchitectureDetector;
-    PATTERNS = require('../lib/architecture-detector').PATTERNS;
+    ArchitectureDetector = require('../src/lib/architecture-detector').ArchitectureDetector;
+    PATTERNS = require('../src/lib/architecture-detector').PATTERNS;
 
     const detector = new ArchitectureDetector('/tmp/test');
     assert.ok(detector, 'ArchitectureDetector should be instantiable');

@@ -33,8 +33,8 @@ describe('Menu Screens Tests', () => {
     // For testing, we use the projectPath param
 
     // Fresh require
-    delete require.cache[require.resolve('../lib/menu-screens.js')];
-    menuScreens = require('../lib/menu-screens.js');
+    delete require.cache[require.resolve('../src/lib/menu-screens.js')];
+    menuScreens = require('../src/lib/menu-screens.js');
   });
 
   afterEach(() => {

@@ -326,7 +326,7 @@ class QualityConfig {
    */
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
-    this.pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, '..');
+    this.pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, '..', '..');
   }
 
   /**

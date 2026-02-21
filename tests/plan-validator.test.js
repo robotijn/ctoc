@@ -25,8 +25,8 @@ describe('Plan Validator Tests', () => {
 
     fs.mkdirSync(path.join(testDir, '.ctoc'), { recursive: true });
 
-    delete require.cache[require.resolve('../lib/plan-validator.js')];
-    validator = require('../lib/plan-validator.js');
+    delete require.cache[require.resolve('../src/lib/plan-validator.js')];
+    validator = require('../src/lib/plan-validator.js');
   });
 
   afterEach(() => {

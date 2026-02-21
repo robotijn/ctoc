@@ -406,7 +406,7 @@ describe('PreToolUse.Edit/Write - Whitelist Logic', () => {
 
 describe('SessionStart - Stack Detection', () => {
   // Import real stack detector
-  const { detectStack, detectLanguages, detectFrameworks, LANGUAGE_PATTERNS } = require('../lib/stack-detector');
+  const { detectStack, detectLanguages, detectFrameworks, LANGUAGE_PATTERNS } = require('../src/lib/stack-detector');
 
   describe('Language Detection Logic', () => {
     it('returns array for any directory', () => {
@@ -461,7 +461,7 @@ describe('SessionStart - State Management', () => {
     STEP_NAMES,
     isInterruptedSession,
     formatTimeSince
-  } = require('../lib/state-manager');
+  } = require('../src/lib/state-manager');
 
   describe('State Creation', () => {
     it('creates state with default values', () => {
@@ -571,7 +571,7 @@ describe('SessionStart - State Management', () => {
 // ============================================================================
 
 describe('Gate Approval Verification', () => {
-  const { verifyGateApproval, createGateApproval } = require('../lib/state-manager');
+  const { verifyGateApproval, createGateApproval } = require('../src/lib/state-manager');
 
   describe('Valid Gate Approvals', () => {
     it('accepts valid gate 1 approval', () => {
@@ -799,7 +799,7 @@ describe('Tool Input Parsing', () => {
 // ============================================================================
 
 describe('UI Formatting', () => {
-  const { blocked, colors } = require('../lib/ui');
+  const { blocked, colors } = require('../src/lib/ui');
 
   describe('Blocked Message Formatting', () => {
     it('formats blocked message with state', () => {
@@ -852,7 +852,7 @@ describe('UI Formatting', () => {
 // ============================================================================
 
 describe('Crypto Module', () => {
-  const { signState, verifyState, hashPath, canonicalStringify } = require('../lib/crypto');
+  const { signState, verifyState, hashPath, canonicalStringify } = require('../src/lib/crypto');
 
   describe('State Signing', () => {
     it('signs state and adds _signature field', () => {
@@ -1086,7 +1086,7 @@ describe('Integration Scenarios', () => {
         gate2_approval: createMockGateApproval(2)
       });
 
-      const { verifyGateApproval } = require('../lib/state-manager');
+      const { verifyGateApproval } = require('../src/lib/state-manager');
       const gate1Valid = verifyGateApproval(1, state).valid;
       const gate2Valid = verifyGateApproval(2, state).valid;
 

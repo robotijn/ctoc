@@ -26,7 +26,7 @@ function cleanupTempDir(dir) {
 // Test: FrameworkDetector class exists and can be instantiated
 function testFrameworkDetectorExists() {
   try {
-    const module = require('../lib/framework-detector');
+    const module = require('../src/lib/framework-detector');
     FrameworkDetector = module.FrameworkDetector;
     FRAMEWORKS = module.FRAMEWORKS;
     detectFramework = module.detectFramework;

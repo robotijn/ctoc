@@ -3,7 +3,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/SessionStart.js\""
+        "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/src/hooks/SessionStart.js\""
       }
     ],
     "PostToolUse": [
@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/PostToolUse.status-check.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/src/hooks/PostToolUse.status-check.js\""
           }
         ]
       }
@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/PreToolUse.Edit.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/src/hooks/PreToolUse.Edit.js\""
           }
         ]
       },
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/PreToolUse.Write.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/src/hooks/PreToolUse.Write.js\""
           }
         ]
       },
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/PreToolUse.Bash.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/src/hooks/PreToolUse.Bash.js\""
           }
         ]
       },
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/human-gate-check.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/src/hooks/human-gate-check.js\""
           }
         ]
       }

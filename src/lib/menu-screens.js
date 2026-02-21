@@ -63,7 +63,7 @@ function getProjectPath(projectPath) {
 function getVersion(projectPath) {
   try {
     // When used as plugin, __dirname is the lib/ dir of the plugin
-    const versionPath = path.join(__dirname, '..', 'VERSION');
+    const versionPath = path.join(__dirname, '..', '..', 'VERSION');
     return fs.readFileSync(versionPath, 'utf8').trim();
   } catch {
     return '?.?.?';

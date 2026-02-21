@@ -14,7 +14,7 @@ const https = require('https');
 const { CTOC_HOME } = require('./crypto');
 
 const CACHE_DIR = path.join(CTOC_HOME, 'cache', 'skills');
-const PLUGIN_DIR = path.join(__dirname, '..');
+const PLUGIN_DIR = path.join(__dirname, '..', '..');
 const EMBEDDED_SKILLS_DIR = path.join(PLUGIN_DIR, 'skills');
 const SKILLS_INDEX_URL = 'https://raw.githubusercontent.com/ctoc-dev/ctoc/main/ctoc-plugin/data/skills-index.json';
 const SKILL_BASE_URL = 'https://raw.githubusercontent.com/ctoc-dev/ctoc/main/.ctoc/skills';
@@ -120,7 +120,7 @@ function loadEmbeddedSkill(skillName, type, category = null) {
  */
 async function loadSkillsIndex() {
   // First, try local embedded index
-  const localIndex = path.join(PLUGIN_DIR, 'data', 'skills-index.json');
+  const localIndex = path.join(__dirname, '..', 'data', 'skills-index.json');
   if (fs.existsSync(localIndex)) {
     try {
       return JSON.parse(fs.readFileSync(localIndex, 'utf8'));

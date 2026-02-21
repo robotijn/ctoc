@@ -12,9 +12,9 @@ let strategicClassifier;
 describe('Strategic Classifier Tests', () => {
   beforeEach(() => {
     // Clear module cache to get fresh module
-    delete require.cache[require.resolve('../lib/strategic-classifier.js')];
+    delete require.cache[require.resolve('../src/lib/strategic-classifier.js')];
     try {
-      strategicClassifier = require('../lib/strategic-classifier.js');
+      strategicClassifier = require('../src/lib/strategic-classifier.js');
     } catch (e) {
       // Module doesn't exist yet, tests will fail appropriately
       strategicClassifier = null;

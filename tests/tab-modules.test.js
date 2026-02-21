@@ -185,7 +185,7 @@ function mockSync(mocks = {}) {
 }
 
 // Mock tui module (returns real functions since they're pure)
-const realTui = require('../lib/tui');
+const realTui = require('../src/lib/tui');
 function mockTui() {
   return {
     c: realTui.c,
@@ -211,42 +211,42 @@ function mockTui() {
  */
 function loadTabWithMocks(tabName, mocks = {}) {
   // Clear module cache for the tab and its dependencies
-  const tabPath = require.resolve(`../tabs/${tabName}`);
+  const tabPath = require.resolve(`../src/tabs/${tabName}`);
   delete require.cache[tabPath];
-  delete require.cache[require.resolve('../lib/state')];
-  delete require.cache[require.resolve('../lib/actions')];
-  delete require.cache[require.resolve('../lib/version')];
-  delete require.cache[require.resolve('../lib/settings')];
-  delete require.cache[require.resolve('../lib/sync')];
+  delete require.cache[require.resolve('../src/lib/state')];
+  delete require.cache[require.resolve('../src/lib/actions')];
+  delete require.cache[require.resolve('../src/lib/version')];
+  delete require.cache[require.resolve('../src/lib/settings')];
+  delete require.cache[require.resolve('../src/lib/sync')];
 
   // Mock require for dependencies
   const Module = require('module');
   const originalRequire = Module.prototype.require;
 
   Module.prototype.require = function(id) {
-    if (id === '../lib/state' || id.endsWith('/lib/state')) {
+    if (id === '../src/lib/state' || id.endsWith('/lib/state')) {
       return mockState(mocks.state);
     }
-    if (id === '../lib/actions' || id.endsWith('/lib/actions')) {
+    if (id === '../src/lib/actions' || id.endsWith('/lib/actions')) {
       return mockActions(mocks.actions);
     }
-    if (id === '../lib/version' || id.endsWith('/lib/version')) {
+    if (id === '../src/lib/version' || id.endsWith('/lib/version')) {
       return mockVersion(mocks.version);
     }
-    if (id === '../lib/settings' || id.endsWith('/lib/settings')) {
+    if (id === '../src/lib/settings' || id.endsWith('/lib/settings')) {
       return mockSettings(mocks.settings);
     }
-    if (id === '../lib/sync' || id.endsWith('/lib/sync')) {
+    if (id === '../src/lib/sync' || id.endsWith('/lib/sync')) {
       return mockSync(mocks.sync);
     }
-    if (id === '../lib/tui' || id.endsWith('/lib/tui')) {
+    if (id === '../src/lib/tui' || id.endsWith('/lib/tui')) {
       return mockTui();
     }
     return originalRequire.apply(this, arguments);
   };
 
   try {
-    return require(`../tabs/${tabName}`);
+    return require(`../src/tabs/${tabName}`);
   } finally {
     Module.prototype.require = originalRequire;
   }

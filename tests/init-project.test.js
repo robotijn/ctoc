@@ -19,7 +19,7 @@ const {
   QUALITY_COMMANDS,
   PLAN_DIRS,
   CTOC_DIRS
-} = require('../lib/init-project');
+} = require('../src/lib/init-project');
 
 // Helper to create a temp directory
 function createTempDir() {

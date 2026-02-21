@@ -26,7 +26,7 @@ function cleanupTempDir(dir) {
 // Test: PlaywrightScaffolder class exists and can be instantiated
 function testPlaywrightScaffolderExists() {
   try {
-    const module = require('../lib/playwright-scaffolder');
+    const module = require('../src/lib/playwright-scaffolder');
     PlaywrightScaffolder = module.PlaywrightScaffolder;
     setupPlaywright = module.setupPlaywright;
 

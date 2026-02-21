@@ -11,7 +11,7 @@ const {
   getTabIndex,
   nextTab,
   prevTab
-} = require('../lib/tabs');
+} = require('../src/lib/tabs');
 
 // Test TABS constant structure
 function testTabsConstant() {

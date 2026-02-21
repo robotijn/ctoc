@@ -18,7 +18,7 @@ const {
   toggleSetting,
   getCategorySchema,
   getSettingsTabs
-} = require('../lib/settings.js');
+} = require('../src/lib/settings.js');
 
 // Create a temporary test directory
 let testDir;

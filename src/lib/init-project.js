@@ -561,8 +561,8 @@ function initProject(projectDir, options = {}) {
   const detected = { projectName, languages, frameworks, qualityCommands };
 
   // 2. Find template
-  const templatePath = path.join(__dirname, '..', '.ctoc', 'templates', 'CLAUDE.md.template');
-  const ironLoopTemplatePath = path.join(__dirname, '..', '.ctoc', 'templates', 'IRON_LOOP.md.template');
+  const templatePath = path.join(__dirname, '..', '..', '.ctoc', 'templates', 'CLAUDE.md.template');
+  const ironLoopTemplatePath = path.join(__dirname, '..', '..', '.ctoc', 'templates', 'IRON_LOOP.md.template');
 
   // 3. Generate CLAUDE.md
   const claudeMdPath = path.join(projectDir, 'CLAUDE.md');

@@ -27,8 +27,8 @@ function cleanupTempDir(dir) {
 // Test: CoverageChecker class exists and can be instantiated
 function testCoverageCheckerExists() {
   try {
-    CoverageChecker = require('../lib/coverage-checker').CoverageChecker;
-    THRESHOLDS = require('../lib/coverage-checker').THRESHOLDS;
+    CoverageChecker = require('../src/lib/coverage-checker').CoverageChecker;
+    THRESHOLDS = require('../src/lib/coverage-checker').THRESHOLDS;
 
     const checker = new CoverageChecker('strict');
     assert.ok(checker, 'CoverageChecker should be instantiable');

@@ -19,8 +19,8 @@ describe('Transition Log Tests', () => {
     fs.mkdirSync(path.join(testDir, '.ctoc', 'logs'), { recursive: true });
 
     // Fresh require
-    delete require.cache[require.resolve('../lib/transition-log.js')];
-    transitionLog = require('../lib/transition-log.js');
+    delete require.cache[require.resolve('../src/lib/transition-log.js')];
+    transitionLog = require('../src/lib/transition-log.js');
   });
 
   afterEach(() => {

@@ -27,7 +27,7 @@ function getPluginRoot() {
     }
     dir = path.dirname(dir);
   }
-  return path.dirname(__dirname);
+  return path.join(__dirname, '..', '..');
 }
 
 /**

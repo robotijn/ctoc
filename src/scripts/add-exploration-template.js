@@ -249,7 +249,7 @@ function findAgentFiles(dir) {
 function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
-  const agentsDir = path.resolve(__dirname, '../agents');
+  const agentsDir = path.resolve(__dirname, '..', '..', 'agents');
 
   console.log('Add Exploration Template to Agents');
   console.log('==================================');

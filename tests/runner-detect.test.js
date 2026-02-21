@@ -19,7 +19,7 @@ const {
   checkExistingRunner,
   runAllChecks,
   formatPrerequisites
-} = require('../lib/runner-detect');
+} = require('../src/lib/runner-detect');
 
 // Test REQUIREMENTS constants
 function testRequirements() {

@@ -3,7 +3,7 @@
  */
 
 const assert = require('assert');
-const tui = require('../lib/tui.js');
+const tui = require('../src/lib/tui.js');
 
 // Test color codes
 function testColors() {

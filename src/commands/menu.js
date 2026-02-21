@@ -16,7 +16,7 @@ const { findProjectRoot } = require('../lib/project-root');
 // Read version from VERSION file
 let VERSION;
 try {
-  VERSION = fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim();
+  VERSION = fs.readFileSync(path.join(__dirname, '..', '..', 'VERSION'), 'utf8').trim();
 } catch {
   VERSION = '?.?.?';
 }

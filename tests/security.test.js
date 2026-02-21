@@ -10,10 +10,10 @@ const path = require('path');
 const os = require('os');
 
 // Import modules
-const { SASTRunner, SEVERITY: SAST_SEVERITY, CWE_SEVERITY_MAP, TOOL_CONFIGS } = require('../lib/sast-runner');
-const { DependencyAuditor, SEVERITY: DEP_SEVERITY, PACKAGE_MANAGERS } = require('../lib/dependency-auditor');
-const { SecretsScanner, SECRET_TYPES, SECRET_PATTERNS, DEFAULT_EXCLUDES } = require('../lib/secrets-scanner');
-const { QualityGate, GATE_STATUS, DEFAULT_THRESHOLDS } = require('../lib/quality-gate');
+const { SASTRunner, SEVERITY: SAST_SEVERITY, CWE_SEVERITY_MAP, TOOL_CONFIGS } = require('../src/lib/sast-runner');
+const { DependencyAuditor, SEVERITY: DEP_SEVERITY, PACKAGE_MANAGERS } = require('../src/lib/dependency-auditor');
+const { SecretsScanner, SECRET_TYPES, SECRET_PATTERNS, DEFAULT_EXCLUDES } = require('../src/lib/secrets-scanner');
+const { QualityGate, GATE_STATUS, DEFAULT_THRESHOLDS } = require('../src/lib/quality-gate');
 
 // Test fixtures
 const TEST_DIR = path.join(os.tmpdir(), 'ctoc-security-test-' + Date.now());

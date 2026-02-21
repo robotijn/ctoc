@@ -35,7 +35,7 @@ function getCurrentVersion() {
     }
   }
   // Derive from script location (e.g., .../ctoc/6.1.22/commands/update.js)
-  const scriptDir = path.resolve(__dirname, '..');
+  const scriptDir = path.resolve(__dirname, '..', '..');
   const versionFile = path.join(scriptDir, 'VERSION');
   if (fs.existsSync(versionFile)) {
     return fs.readFileSync(versionFile, 'utf8').trim();

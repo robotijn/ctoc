@@ -13,7 +13,7 @@ const {
   validateForTodo,
   generateIronLoopTemplate,
   IRON_LOOP_MARKER
-} = require('../lib/iron-loop');
+} = require('../src/lib/iron-loop');
 
 // Helper to create temp files for testing
 function createTempPlan(content) {

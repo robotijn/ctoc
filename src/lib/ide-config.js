@@ -47,8 +47,8 @@ const IDE_TYPES = {
 function getTemplatesDir() {
   // Look for templates in multiple locations
   const possiblePaths = [
-    path.join(__dirname, '..', '.ctoc', 'templates', 'ide'),
-    path.join(__dirname, '..', 'templates', 'ide'),
+    path.join(__dirname, '..', '..', '.ctoc', 'templates', 'ide'),
+    path.join(__dirname, '..', '..', 'templates', 'ide'),
     path.join(process.cwd(), '.ctoc', 'templates', 'ide'),
   ];
 

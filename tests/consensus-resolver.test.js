@@ -10,9 +10,9 @@ let consensusResolver;
 
 describe('Consensus Resolver Tests', () => {
   beforeEach(() => {
-    delete require.cache[require.resolve('../lib/consensus-resolver.js')];
+    delete require.cache[require.resolve('../src/lib/consensus-resolver.js')];
     try {
-      consensusResolver = require('../lib/consensus-resolver.js');
+      consensusResolver = require('../src/lib/consensus-resolver.js');
     } catch (e) {
       consensusResolver = null;
     }

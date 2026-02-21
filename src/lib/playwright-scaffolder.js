@@ -19,7 +19,7 @@ const { FrameworkDetector } = require('./framework-detector');
  * @returns {string} Template content
  */
 function loadTemplate(templateName) {
-  const templateDir = path.join(__dirname, '..', '.ctoc', 'templates', 'testing');
+  const templateDir = path.join(__dirname, '..', '..', '.ctoc', 'templates', 'testing');
   const templatePath = path.join(templateDir, templateName);
 
   if (fs.existsSync(templatePath)) {

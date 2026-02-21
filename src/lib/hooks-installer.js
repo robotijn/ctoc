@@ -37,7 +37,7 @@ const SYSTEMS = {
   NATIVE: 'native'
 };
 
-const TEMPLATE_DIR = path.join(__dirname, '..', '.ctoc', 'templates', 'hooks');
+const TEMPLATE_DIR = path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hooks');
 
 // ==============================================================================
 // UTILITY FUNCTIONS
@@ -487,7 +487,7 @@ class NativeHooksInstaller {
  * @returns {Object} Installation result { installed, skipped, error }
  */
 function installPostCommitHook(projectRoot, options = {}) {
-  const pluginRoot = options.pluginRoot || process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, '..');
+  const pluginRoot = options.pluginRoot || process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, '..', '..');
   const hooksDir = getGitHooksDir(projectRoot);
   const hookPath = path.join(hooksDir, 'post-commit');
   const agentHookPath = path.join(pluginRoot, 'hooks', 'post-commit.js');

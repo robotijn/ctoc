@@ -10,9 +10,9 @@ let deepExplorer;
 
 describe('Deep Explorer Tests', () => {
   beforeEach(() => {
-    delete require.cache[require.resolve('../lib/deep-explorer.js')];
+    delete require.cache[require.resolve('../src/lib/deep-explorer.js')];
     try {
-      deepExplorer = require('../lib/deep-explorer.js');
+      deepExplorer = require('../src/lib/deep-explorer.js');
     } catch (e) {
       deepExplorer = null;
     }

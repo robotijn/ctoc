@@ -14,7 +14,7 @@ const {
   detectFrameworks,
   detectStack,
   matchGlob
-} = require('../lib/stack-detector');
+} = require('../src/lib/stack-detector');
 
 // Create temp directory for isolated tests
 const tempDir = path.join(os.tmpdir(), 'stack-detector-test-' + Date.now());

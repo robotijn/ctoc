@@ -57,7 +57,7 @@ Nothing ships without your explicit approval.
 COLLABORATIVE — agents ask, you decide
 ═══════════════════════════════════════════════════════════════
 
-IDEATION (Step 1, Optional) - Vision Phase
+IDEATION (Step 1) - Vision Phase
 -------------------------------------------------------------
 User dumps an idea → product-owner + vision agents explore it
   |-- "What problem are we solving?" (agent asks)
@@ -65,6 +65,7 @@ User dumps an idea → product-owner + vision agents explore it
   |-- "What are the constraints?" (you answer)
   |-- Decompose into actionable plans (together)
   |-> Skip if the user already has a clear, specific request
+  |-> HUMAN GATE: User approves vision before functional planning
   |-> Output: one or more plans ready for Phase 1
 
 PHASE 1: FUNCTIONAL PLANNING (Steps 2-4) - Product Owner Role
@@ -261,7 +262,7 @@ Future enhancements (not yet implemented):
 
 ### Validation
 
-Step labels are validated programmatically by `lib/plan-validator.js` and enforced by `hooks/validate-plan-steps.js`. Plans with wrong labels are REJECTED before execution.
+Step labels are validated programmatically by `src/lib/plan-validator.js` and enforced by `src/hooks/validate-plan-steps.js`. Plans with wrong labels are REJECTED before execution.
 
 ---
 
@@ -363,7 +364,7 @@ Note: Escape phrases are interpreted by Claude via CLAUDE.md instructions, not e
 
 ## Crash Recovery
 
-When an implementation session (Steps 8-16) is interrupted, CTOC automatically detects and offers recovery. Detection is implemented in `hooks/SessionStart.js` with state managed by `lib/state-manager.js`.
+When an implementation session (Steps 8-16) is interrupted, CTOC automatically detects and offers recovery. Detection is implemented in `src/hooks/SessionStart.js` with state managed by `src/lib/state-manager.js`.
 
 ### Detection Criteria
 
@@ -459,14 +460,15 @@ When max rounds (10) is reached and some dimensions still score < 5, unresolved 
 
 ### Implementation
 
-Implemented in `lib/iron-loop.js`. Triggered automatically when an implementation plan is approved via `approvePlan()` in `lib/actions.js`. Plan status is tracked in YAML frontmatter, not subdirectories.
+Implemented in `src/lib/iron-loop.js`. Triggered automatically when an implementation plan is approved via `approvePlan()` in `src/lib/actions.js`. Plan status is tracked in YAML frontmatter, not subdirectories.
 
 ---
 
-## 3 Human Gates
+## 4 Human Gates
 
 | Gate | Transition | User Decision |
 |------|------------|---------------|
+| Gate 0 | Vision -> Functional | "Approve idea to explore?" |
 | Gate 1 | Functional -> Implementation | "Approve functional plan?" |
 | Gate 2 | Implementation -> Todo | "Approve technical approach?" |
 | Gate 3 | Final Review -> Done | "Commit/push or send back?" |

@@ -165,7 +165,7 @@ function runHealthChecks(projectPath) {
   const checks = [];
 
   // Plugin installed
-  const pluginPath = path.join(__dirname, '..');
+  const pluginPath = path.join(__dirname, '..', '..');
   checks.push({
     label: 'Plugin installed correctly',
     pass: fs.existsSync(pluginPath)

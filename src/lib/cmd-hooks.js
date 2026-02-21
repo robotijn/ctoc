@@ -103,8 +103,8 @@ async function initHooks(options) {
         system: detectedSystem,
         projectType: type === 'auto' ? stack.primary.language || 'multi-lang' : type,
         wouldInstall: HOOK_TYPES.filter(h =>
-          fs.existsSync(path.join(__dirname, '..', '.ctoc', 'templates', 'hooks', `${h}.sh.template`)) ||
-          fs.existsSync(path.join(__dirname, '..', '.ctoc', 'templates', 'hooks', 'husky', `${h}.template`))
+          fs.existsSync(path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hooks', `${h}.sh.template`)) ||
+          fs.existsSync(path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hooks', 'husky', `${h}.template`))
         ),
         message: generateDryRunMessage(detectedSystem, stack)
       };

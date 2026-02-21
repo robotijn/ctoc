@@ -33,11 +33,11 @@ const mockStateManager = {
 };
 
 // Register mock before loading ui module
-require.cache[require.resolve('../lib/state-manager')] = {
+require.cache[require.resolve('../src/lib/state-manager')] = {
   exports: mockStateManager
 };
 
-const ui = require('../lib/ui');
+const ui = require('../src/lib/ui');
 
 // ============================================================================
 // Shared Test Fixtures

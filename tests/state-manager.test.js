@@ -57,7 +57,7 @@ function createTestGateApproval(gateNumber, overrides = {}) {
  * Gets the state file path for the test project
  */
 function getTestStatePath() {
-  const { hashPath } = require('../lib/crypto');
+  const { hashPath } = require('../src/lib/crypto');
   const hash = hashPath(TEST_PROJECT_PATH);
   return path.join(TEST_STATE_DIR, `${hash}.json`);
 }
@@ -80,7 +80,7 @@ function cleanupTestState() {
  * Saves state directly to file (bypassing signing for test setup)
  */
 function saveTestStateDirectly(state) {
-  const { signState } = require('../lib/crypto');
+  const { signState } = require('../src/lib/crypto');
   const statePath = getTestStatePath();
 
   if (!fs.existsSync(TEST_STATE_DIR)) {
@@ -108,7 +108,7 @@ function loadTestStateDirectly() {
 // =============================================================================
 
 describe('State Manager Constants', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   test('STEP_NAMES contains all 16 steps', () => {
     assert.strictEqual(Object.keys(stateManager.STEP_NAMES).length, 16);
@@ -137,7 +137,7 @@ describe('State Manager Constants', () => {
 // =============================================================================
 
 describe('State Initialization', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   beforeEach(() => {
     cleanupTestState();
@@ -215,7 +215,7 @@ describe('State Initialization', () => {
 // =============================================================================
 
 describe('State Loading', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   beforeEach(() => {
     cleanupTestState();
@@ -300,7 +300,7 @@ describe('State Loading', () => {
 // =============================================================================
 
 describe('State Writing', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   beforeEach(() => {
     cleanupTestState();
@@ -422,7 +422,7 @@ describe('State Writing', () => {
 // =============================================================================
 
 describe('Gate Approvals', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   test('createGateApproval returns valid approval object', () => {
     const approval = stateManager.createGateApproval(
@@ -508,7 +508,7 @@ describe('Gate Approvals', () => {
 // =============================================================================
 
 describe('Session Interruption Detection', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   test('isInterruptedSession returns false for null state', () => {
     assert.strictEqual(stateManager.isInterruptedSession(null), false);
@@ -600,7 +600,7 @@ describe('Session Interruption Detection', () => {
 // =============================================================================
 
 describe('Time Formatting', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   test('formatTimeSince formats minutes correctly', () => {
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -655,7 +655,7 @@ describe('Time Formatting', () => {
 // =============================================================================
 
 describe('Edge Cases and Error Handling', () => {
-  const stateManager = require('../lib/state-manager');
+  const stateManager = require('../src/lib/state-manager');
 
   beforeEach(() => {
     cleanupTestState();

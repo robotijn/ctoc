@@ -51,7 +51,7 @@ describe('Sync Manager Tests', () => {
     };
 
     // Clear module cache to allow fresh require with mocks
-    delete require.cache[require.resolve('../lib/sync.js')];
+    delete require.cache[require.resolve('../src/lib/sync.js')];
   });
 
   afterEach(() => {
@@ -67,13 +67,13 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const lastSync = syncModule.getLastSync();
       assert.strictEqual(lastSync, null, 'Last sync should be null initially');
@@ -89,15 +89,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = ''; // No changes
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.syncPlans('/test/project');
 
@@ -115,15 +115,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = 'M plans/test-plan.md'; // Has changes
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.syncPlans('/test/project');
 
@@ -160,13 +160,13 @@ describe('Sync Manager Tests', () => {
       return '';
     };
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.syncPlans('/test/project');
 
@@ -186,15 +186,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = '';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.manualSync('/test/project');
 
@@ -213,7 +213,7 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
 
     // Disable sync
@@ -221,8 +221,8 @@ describe('Sync Manager Tests', () => {
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.startAutoSync('/test/project');
 
@@ -241,15 +241,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = ''; // No changes
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.startAutoSync('/test/project');
 
@@ -272,15 +272,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = '';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.startAutoSync('/test/project');
       syncModule.stopAutoSync();
@@ -300,7 +300,7 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
 
     // Disable auto-move
@@ -308,8 +308,8 @@ describe('Sync Manager Tests', () => {
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.moveToReviewAfterPush('/test/plan.md', '/test/project');
 
@@ -328,7 +328,7 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
@@ -350,8 +350,8 @@ describe('Sync Manager Tests', () => {
     fs.renameSync = (from, to) => { renameCalls.push({ from, to }); };
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.moveToReviewAfterPush('/test/project/plans/draft/my-plan.md', '/test/project');
 
@@ -376,7 +376,7 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
@@ -394,8 +394,8 @@ describe('Sync Manager Tests', () => {
     fs.renameSync = (from, to) => { renameCalls.push({ from, to }); };
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.moveToReviewAfterPush('/test/project/plans/draft/my-plan.md', '/test/project');
 
@@ -418,15 +418,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = '';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.syncPlans('/custom/project/path');
 
@@ -446,15 +446,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = 'M plans/test.md'; // Has changes
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const before = syncModule.getLastSync();
       assert.strictEqual(before, null, 'Last sync should be null initially');
@@ -477,15 +477,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = ''; // No changes
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.syncPlans('/test/project');
 
@@ -516,13 +516,13 @@ describe('Sync Manager Tests', () => {
       return '';
     };
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.syncPlans('/test/project');
 
@@ -541,15 +541,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = 'M plans/test.md';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.syncPlans('/test/project');
 
@@ -570,7 +570,7 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
 
     // Custom interval
@@ -580,8 +580,8 @@ describe('Sync Manager Tests', () => {
     fileSystem.gitStatus = '';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       // We can't easily test the actual interval timing,
       // but we verify it starts without error
@@ -600,15 +600,15 @@ describe('Sync Manager Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = '';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       // Start twice - should not create duplicate intervals
       syncModule.startAutoSync('/test/project');
@@ -628,8 +628,8 @@ describe('Sync Manager Tests', () => {
 // Note: These tests require fresh module loads, so we use a require at module level
 // to ensure the new exports are available
 const syncModuleFresh = (() => {
-  delete require.cache[require.resolve('../lib/sync.js')];
-  return require('../lib/sync.js');
+  delete require.cache[require.resolve('../src/lib/sync.js')];
+  return require('../src/lib/sync.js');
 })();
 
 describe('Event-Triggered Sync Tests', () => {
@@ -721,7 +721,7 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
@@ -753,15 +753,15 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitLog = 'abc123 Remote commit\ndef456 Another remote commit';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.checkRemoteChanges('/test/project');
 
@@ -781,15 +781,15 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.fetchError = 'Network unreachable';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const result = syncModule.checkRemoteChanges('/test/project');
 
@@ -808,15 +808,15 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     fileSystem.gitStatus = 'M plans/test-plan.md';
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.autoCommitPlan('create', 'test-plan.md', '/test/project');
 
@@ -846,13 +846,13 @@ describe('Event-Triggered Sync Tests', () => {
       return '';
     };
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       // Test create
       syncModule.autoCommitPlan('create', 'new-plan.md', '/test/project');
@@ -888,13 +888,13 @@ describe('Event-Triggered Sync Tests', () => {
       return '';
     };
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       syncModule.autoCommitPlan('approve', 'approved-plan.md', '/test/project', { from: 'todo', to: 'in-progress' });
 
@@ -933,7 +933,7 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
@@ -974,7 +974,7 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
@@ -1013,7 +1013,7 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
@@ -1044,7 +1044,7 @@ describe('Event-Triggered Sync Tests', () => {
       return '';
     };
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
     settings.getSetting = mockGetSetting;
 
@@ -1054,8 +1054,8 @@ describe('Event-Triggered Sync Tests', () => {
     fs.existsSync = () => true;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const conflicts = syncModule.detectConflicts('/test/project');
 
@@ -1076,7 +1076,7 @@ describe('Event-Triggered Sync Tests', () => {
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
-    const settings = require('../lib/settings.js');
+    const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
 
     // Custom settings
@@ -1089,8 +1089,8 @@ describe('Event-Triggered Sync Tests', () => {
     settings.getSetting = mockGetSetting;
 
     try {
-      delete require.cache[require.resolve('../lib/sync.js')];
-      syncModule = require('../lib/sync.js');
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
 
       const config = syncModule.getSyncConfig('/test/project');
 

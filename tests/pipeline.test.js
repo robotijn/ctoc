@@ -22,7 +22,7 @@ const {
   PERFECT_SCORE,
   ACCEPTANCE_THRESHOLD,
   MAX_ROUNDS
-} = require('../lib/agent-critic-loop');
+} = require('../src/lib/agent-critic-loop');
 
 const {
   PipelineOrchestrator,
@@ -30,7 +30,7 @@ const {
   STAGES,
   createOrchestrator,
   runSingleAgent
-} = require('../lib/pipeline-orchestrator');
+} = require('../src/lib/pipeline-orchestrator');
 
 const {
   calculateOverallScore,
@@ -44,7 +44,7 @@ const {
   generateSummary,
   STATUS,
   DIMENSION_WEIGHTS
-} = require('../lib/grading-system');
+} = require('../src/lib/grading-system');
 
 // Test fixtures
 const FIXTURE_DIR = path.join(os.tmpdir(), 'ctoc-pipeline-test');

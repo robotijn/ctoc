@@ -10,9 +10,9 @@ let reviewReporter;
 
 describe('Review Reporter Tests', () => {
   beforeEach(() => {
-    delete require.cache[require.resolve('../lib/review-reporter.js')];
+    delete require.cache[require.resolve('../src/lib/review-reporter.js')];
     try {
-      reviewReporter = require('../lib/review-reporter.js');
+      reviewReporter = require('../src/lib/review-reporter.js');
     } catch (e) {
       reviewReporter = null;
     }

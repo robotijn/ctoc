@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 
 // Import the module under test
-const skillLoader = require('../lib/skill-loader');
+const skillLoader = require('../src/lib/skill-loader');
 
 // Test constants
 const PLUGIN_DIR = path.join(__dirname, '..');

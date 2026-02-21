@@ -91,7 +91,7 @@ describe('CTOC Command - renderStatic()', () => {
   });
 
   test('getPlanCounts returns zero counts for empty project', () => {
-    const { getPlanCounts } = require('../lib/state');
+    const { getPlanCounts } = require('../src/lib/state');
 
     // Create minimal plans structure
     fs.mkdirSync(path.join(tempDir, 'plans', 'functional', 'draft'), { recursive: true });
@@ -111,7 +111,7 @@ describe('CTOC Command - renderStatic()', () => {
   });
 
   test('getPlanCounts counts plans correctly', () => {
-    const { getPlanCounts } = require('../lib/state');
+    const { getPlanCounts } = require('../src/lib/state');
 
     // Create plans structure with some files
     fs.mkdirSync(path.join(tempDir, 'plans', 'functional'), { recursive: true });
@@ -134,7 +134,7 @@ describe('CTOC Command - renderStatic()', () => {
   });
 
   test('getAgentStatus returns inactive when no state file', () => {
-    const { getAgentStatus } = require('../lib/state');
+    const { getAgentStatus } = require('../src/lib/state');
 
     const status = getAgentStatus(tempDir);
 
@@ -145,7 +145,7 @@ describe('CTOC Command - renderStatic()', () => {
   });
 
   test('getAgentStatus returns active agent info', () => {
-    const { getAgentStatus } = require('../lib/state');
+    const { getAgentStatus } = require('../src/lib/state');
 
     // Create lock file with current PID (so isPidAlive returns true)
     fs.mkdirSync(path.join(tempDir, '.ctoc'), { recursive: true });
@@ -237,7 +237,7 @@ describe('CTOC Command - Non-TTY Detection', () => {
 
   test('renderStatic components are importable', () => {
     // Verify the state functions used by renderStatic are importable
-    const { getPlanCounts, getAgentStatus } = require('../lib/state');
+    const { getPlanCounts, getAgentStatus } = require('../src/lib/state');
 
     assert.strictEqual(typeof getPlanCounts, 'function', 'getPlanCounts is a function');
     assert.strictEqual(typeof getAgentStatus, 'function', 'getAgentStatus is a function');
@@ -246,7 +246,7 @@ describe('CTOC Command - Non-TTY Detection', () => {
   });
 
   test('TUI color codes are available', () => {
-    const { c } = require('../lib/tui');
+    const { c } = require('../src/lib/tui');
 
     assert.ok(c.reset, 'reset code exists');
     assert.ok(c.bold, 'bold code exists');
@@ -260,7 +260,7 @@ describe('CTOC Command - Non-TTY Detection', () => {
 
 describe('CTOC Command - Output Formatting', () => {
   test('line() generates horizontal rule', () => {
-    const { line } = require('../lib/tui');
+    const { line } = require('../src/lib/tui');
 
     const result = line(40);
     // Line includes dim color codes and dashes

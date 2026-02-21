@@ -21,7 +21,7 @@ const {
   isPidAlive,
   getLockPath,
   getStopPath
-} = require('../lib/agent-lock');
+} = require('../src/lib/agent-lock');
 
 describe('Agent Lock Tests', () => {
   let testDir;

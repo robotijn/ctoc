@@ -10,7 +10,7 @@ const os = require('os');
 const crypto = require('crypto');
 
 // Import the crypto module under test
-const ctocCrypto = require('../lib/crypto.js');
+const ctocCrypto = require('../src/lib/crypto.js');
 
 function test(name, fn) {
   try {

@@ -10,7 +10,7 @@ const path = require('path');
 const os = require('os');
 
 // Import the module under test
-const version = require('../lib/version');
+const version = require('../src/lib/version');
 
 // Create a temporary directory for test files
 const TEST_DIR = path.join(os.tmpdir(), `ctoc-version-test-${Date.now()}`);
