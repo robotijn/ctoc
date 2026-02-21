@@ -47,6 +47,16 @@ Nothing ships without your explicit approval.
 ## Iron Loop Overview
 
 ```
+IDEATION (Optional) - Vision Phase
+-------------------------------------------------------------
+User dumps an idea → product-owner + vision agents explore it
+  |-- What problem are we solving?
+  |-- Who benefits and how?
+  |-- What are the constraints?
+  |-- Decompose into actionable plans
+  |-> Skip if the user already has a clear, specific request
+  |-> Output: one or more plans ready for Phase 1
+
 PHASE 1: FUNCTIONAL PLANNING (Steps 1-3) - Product Owner Role
 -------------------------------------------------------------
 1. ASSESS        Problem understanding              [product-owner]
@@ -67,7 +77,7 @@ PHASE 2: IMPLEMENTATION PLANNING (Steps 4-6) - Technical Role
        |-- Max rounds? -> Auto-approve + Deferred Questions for Step 15
    |-> HUMAN GATE: User approves technical approach
 
-PHASE 3: IMPLEMENTATION (Steps 7-15) - Autonomous
+PHASE 3: IMPLEMENTATION (Steps 7-15) - Execution
 -------------------------------------------------------------
 7.  TEST         Write tests FIRST (TDD Red)        [test-maker]
 8.  PREPARE      Prepare environment + shift-left   [quality-checker]
@@ -83,6 +93,20 @@ PHASE 3: IMPLEMENTATION (Steps 7-15) - Autonomous
     |-> Issues? Smart kickback to affected step
     |-> HUMAN GATE: User approves commit/push
 ```
+
+### Why Ideation Matters
+
+Without ideation, Claude Code tends to jump straight to writing code — bypassing hooks and gates by treating requests as "trivial." The ideation phase gives the AI a structured entry point: explore the idea first, shape it with the product-owner agent, then flow naturally into the 15-step loop.
+
+**When to use ideation:**
+- You have a vague idea ("I want better error handling")
+- You want to explore before committing to a direction
+- You want the product-owner agent to ask the right questions
+
+**When to skip ideation:**
+- You have a precise, specific request ("Add a /health endpoint returning 200 OK")
+- You're fixing a known bug with clear reproduction steps
+- You say any escape phrase ("quick fix", "trivial change", etc.)
 
 ---
 

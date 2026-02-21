@@ -41,10 +41,12 @@ That's it. CTO Chief detects your stack and shows a dashboard.
 
 **3.** Tell Claude what you want to build:
 ```
-Add a /health endpoint that returns service status
+I want a way to monitor if my service is healthy
 ```
 
-CTO Chief will create a plan and ask for your approval before writing any code. Use numbered menus (`[1]`, `[2]`, `[3]`) to navigate.
+CTO Chief starts with ideation — the product-owner agent explores your idea, asks clarifying questions, and shapes it into a plan. You approve at every step. Use numbered menus (`[1]`, `[2]`, `[3]`) to navigate.
+
+> Already know exactly what you want? Just be specific: "Add a /health endpoint returning 200 OK" — CTO Chief skips ideation and goes straight to planning.
 
 <!-- TODO: Record dashboard GIF with charmbracelet/vhs or gifski -->
 <!-- <p align="center"><img src="docs/assets/dashboard-demo.gif" alt="CTO Chief in action" width="700"><br><em>From idea to tested, secure code in one session</em></p> -->
@@ -85,9 +87,23 @@ CTO Chief will create a plan and ask for your approval before writing any code. 
 ### Example Session
 
 ```
-You: Add a /health endpoint that returns service status
+You: I want a way to check if the service is running
 
-CTO Chief creates a functional plan...
+CTO Chief starts with ideation (Vision tab)...
+
+  Idea: Service Health Monitoring
+  The product-owner agent explores your idea:
+  - What should "running" mean? Just HTTP 200, or DB/cache status too?
+  - Who consumes this? Load balancer, monitoring tool, humans?
+  - Should it expose version info?
+
+  [1] Simple /health endpoint (Recommended)
+  [2] Full observability suite
+  [0] Cancel
+
+You: 1
+
+CTO Chief creates a functional plan (product-owner agent)...
 
   Feature: Health Endpoint
     Scenario: Service is healthy
@@ -131,6 +147,9 @@ You: 1
 
 Three approvals. One tested, documented, security-scanned endpoint.
 
+> [!TIP]
+> **Ideation is optional.** If you already know exactly what you want, say it directly (e.g., "Add a /health endpoint returning 200 OK") and CTO Chief skips to functional planning. Ideation is most valuable when you have a vague idea that needs shaping.
+
 ---
 
 ## Key Features
@@ -150,6 +169,10 @@ Three approvals. One tested, documented, security-scanned endpoint.
 15 steps, 3 phases, 3 human gates — [full methodology →](IRON_LOOP.md)
 
 ```
+Ideation (optional):
+  Dump your idea → product-owner agent explores and refines it
+  Skip this if you already know what you want
+
 Phase 1: FUNCTIONAL PLANNING (Steps 1-3)
   ASSESS → ALIGN → CAPTURE
   Gate 1: You approve what to build
@@ -162,6 +185,8 @@ Phase 3: IMPLEMENTATION (Steps 7-15)
   TEST → PREPARE → IMPLEMENT → REVIEW → OPTIMIZE → SECURE → VERIFY → DOCUMENT → FINAL-REVIEW
   Gate 3: You approve the result
 ```
+
+**Why start with ideation?** Without it, Claude will try to jump straight to code. The ideation phase forces the AI to understand your intent before planning begins. This is what prevents hooks and gates from being bypassed — the AI has a structured path to follow instead of guessing.
 
 **Enforcement** — Hooks block premature code edits (before planning) and premature commits (before verification). Escape phrases: "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent".
 
@@ -305,16 +330,16 @@ You ──── /ctoc ────► Dashboard
                         │
                   ┌─────┴─────┐
                   ▼           ▼
-            Plan Pipeline   Commands
+            Plan Pipeline   Tools
                   │
-    ┌─────────────┼─────────────┐
-    ▼             ▼             ▼
- Phase 1       Phase 2       Phase 3
- (What)        (How)         (Build)
- Steps 1-3     Steps 4-6     Steps 7-15
-    │             │             │
- [GATE 1]     [GATE 2]     [GATE 3]
- You approve   You approve   You approve
+  ┌───────────────┼────────────────┐──────────────┐
+  ▼               ▼                ▼              ▼
+Ideation       Phase 1          Phase 2        Phase 3
+(Vision)       (What)           (How)          (Build)
+Optional       Steps 1-3        Steps 4-6      Steps 7-15
+  │               │                │              │
+  │            [GATE 1]        [GATE 2]       [GATE 3]
+  └──► skip    You approve     You approve    You approve
 ```
 
 Priority: security > correctness > performance > cleverness.

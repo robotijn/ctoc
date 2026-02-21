@@ -52,12 +52,12 @@ All tests must show `# fail 0`. If any test fails, fix before committing. The VE
 
 | Step | Command |
 |------|---------|
-| 1. Update VERSION | Edit `VERSION` file (e.g., `6.1.22`) |
+| 1. Update VERSION | Edit `VERSION` file (e.g., `6.1.26`) |
 | 2. Sync versions | `node scripts/release.js` |
 | 3. Stage & commit | `feat/fix: description (vX.Y.Z)` |
 | 4. Push (if requested) | `git push origin main` |
 
-Commit messages ALWAYS include the version: `feat: feature name (v6.1.22)`
+Commit messages ALWAYS include the version: `feat: feature name (vX.Y.Z)`
 
 Semantic versioning: patch (default every commit), minor (user says "minor"), major (user says "major").
 
@@ -81,7 +81,7 @@ ctoc/
   IRON_LOOP.md           Methodology (15 steps, 3 phases, 3 human gates)
   VERSION                Source of truth for version
   agents/                85 agent definitions across 19 categories
-  skills/                358 language & framework skill files
+  skills/                360 language & framework skill files
   commands/              8 slash commands
   hooks/                 10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
   lib/                   71 JS modules (state, quality, security, planning, UI, analysis)
@@ -112,7 +112,9 @@ ctoc/
 
 ## Iron Loop Summary
 
-15 steps across 3 phases. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
+Ideation (optional) + 15 steps across 3 phases. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
+
+**Ideation**: User dumps an idea → product-owner + vision agents explore and decompose it into plans. Skip if the request is already specific. This is the recommended entry point — it prevents Claude from bypassing the planning pipeline.
 
 | Step | Label | Agent | Phase |
 |------|-------|-------|-------|
