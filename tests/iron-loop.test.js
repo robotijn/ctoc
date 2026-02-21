@@ -62,7 +62,7 @@ Need to implement feature X.
 
 ${IRON_LOOP_MARKER}
 
-### Step 7: TEST
+### Step 8: TEST
 - [ ] Write tests
 `;
   const tempFile = createTempPlan(planContent);
@@ -103,7 +103,7 @@ Need to implement feature X.
 
 ${IRON_LOOP_MARKER}
 
-### Step 7: TEST
+### Step 8: TEST
 - [ ] Write tests
 `;
   const tempFile = createTempPlan(planContent);
@@ -125,8 +125,8 @@ function testGenerateIronLoopTemplateReturnsValidMarkdown() {
   // Check marker is present
   assert.ok(template.includes(IRON_LOOP_MARKER), 'Should include Iron Loop marker');
 
-  // Check all steps 7-15 are present
-  for (let step = 7; step <= 15; step++) {
+  // Check all steps 8-16 are present
+  for (let step = 8; step <= 16; step++) {
     assert.ok(template.includes(`Step ${step}:`), `Should include Step ${step}`);
   }
 
@@ -144,7 +144,7 @@ function testIronLoopMarkerConstant() {
   console.log('✓ IRON_LOOP_MARKER constant is properly defined');
 }
 
-// Test integrate() returns valid markdown with Steps 7-15
+// Test integrate() returns valid markdown with Steps 8-16
 function testIntegrateReturnsValidMarkdown() {
   // Mock integrate function behavior
   const planContent = `# Test Plan
@@ -159,47 +159,47 @@ Need to implement feature X.
 
   // Expected output format - canonical step labels
   const expectedSections = [
-    '## Execution Plan (Steps 7-15)',
-    '### Step 7: TEST',
-    '### Step 8: PREPARE',
-    '### Step 9: IMPLEMENT',
-    '### Step 10: REVIEW',
-    '### Step 11: OPTIMIZE',
-    '### Step 12: SECURE',
-    '### Step 13: VERIFY',
-    '### Step 14: DOCUMENT',
-    '### Step 15: FINAL-REVIEW'
+    '## Execution Plan (Steps 8-16)',
+    '### Step 8: TEST',
+    '### Step 9: PREPARE',
+    '### Step 10: IMPLEMENT',
+    '### Step 11: REVIEW',
+    '### Step 12: OPTIMIZE',
+    '### Step 13: SECURE',
+    '### Step 14: VERIFY',
+    '### Step 15: DOCUMENT',
+    '### Step 16: FINAL-REVIEW'
   ];
 
   // Simulated integrate result with canonical labels
   const integratedContent = `
-## Execution Plan (Steps 7-15)
+## Execution Plan (Steps 8-16)
 
-### Step 7: TEST
+### Step 8: TEST
 - [ ] Write tests
 
-### Step 8: PREPARE
+### Step 9: PREPARE
 - [ ] Install dependencies
 
-### Step 9: IMPLEMENT
+### Step 10: IMPLEMENT
 - [ ] Implement feature
 
-### Step 10: REVIEW
+### Step 11: REVIEW
 - [ ] Self-review
 
-### Step 11: OPTIMIZE
+### Step 12: OPTIMIZE
 - [ ] Optimize performance
 
-### Step 12: SECURE
+### Step 13: SECURE
 - [ ] Security review
 
-### Step 13: VERIFY
+### Step 14: VERIFY
 - [ ] Run lint + type check + tests
 
-### Step 14: DOCUMENT
+### Step 15: DOCUMENT
 - [ ] Update docs
 
-### Step 15: FINAL-REVIEW
+### Step 16: FINAL-REVIEW
 - [ ] Final review
 `;
 
@@ -217,7 +217,7 @@ Need to implement feature X.
     'integrate() should include checkboxes'
   );
 
-  console.log('✓ integrate() returns valid markdown with Steps 7-15');
+  console.log('✓ integrate() returns valid markdown with Steps 8-16');
 }
 
 // Test critique() returns scores object with 5 dimensions
@@ -234,7 +234,7 @@ function testCritiqueReturnsScoresObject() {
     feedback: [
       {
         dimension: 'clarity',
-        issue: 'Step 9 is too vague',
+        issue: 'Step 10 is too vague',
         suggestion: 'List specific functions'
       },
       {
@@ -332,7 +332,7 @@ function testRefineLoopExitsAfterMaxRounds() {
       status: 'max-rounds',
       rounds,
       deferredQuestions: [
-        { dimension: 'clarity', feedback: 'Step 9 remains vague' }
+        { dimension: 'clarity', feedback: 'Step 10 remains vague' }
       ]
     };
   }
@@ -380,7 +380,7 @@ function testSetAgentStatusWritesToState() {
   // Verify structure
   assert.strictEqual(agentStatus.active, true, 'Should have active flag');
   assert.ok(agentStatus.plan, 'Should have plan name');
-  assert.ok(agentStatus.step >= 7 && agentStatus.step <= 15, 'Step should be 7-15');
+  assert.ok(agentStatus.step >= 8 && agentStatus.step <= 16, 'Step should be 8-16');
   assert.ok(agentStatus.startedAt, 'Should have startedAt timestamp');
 
   console.log('✓ setAgentStatus() writes to state file');

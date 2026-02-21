@@ -54,7 +54,7 @@ const createActiveAgentStatus = (overrides = {}) => ({
   active: true,
   name: 'test-plan',
   step: 5,
-  totalSteps: 15,
+  totalSteps: 16,
   phase: 'IMPLEMENT',
   task: 'Test task',
   elapsed: '5m',

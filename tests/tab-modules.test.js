@@ -300,7 +300,7 @@ describe('Tab Modules - render()', () => {
 
       assert.ok(output.includes('Running'), 'Should show running status');
       assert.ok(output.includes('test-agent'), 'Should show agent name');
-      assert.ok(output.includes('Step 7/15'), 'Should show step');
+      assert.ok(output.includes('Step 7/16'), 'Should show step');
       assert.ok(output.includes('TEST'), 'Should show phase');
     });
 
@@ -516,7 +516,7 @@ describe('Tab Modules - render()', () => {
 
       assert.ok(output.includes('1 active'), 'Should show one active');
       assert.ok(output.includes('active-agent'), 'Should show agent name');
-      assert.ok(output.includes('Step 9/15'), 'Should show step');
+      assert.ok(output.includes('Step 9/16'), 'Should show step');
       assert.ok(output.includes('IMPLEMENT'), 'Should show phase');
     });
 

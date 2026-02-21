@@ -110,20 +110,20 @@ function loadTestStateDirectly() {
 describe('State Manager Constants', () => {
   const stateManager = require('../lib/state-manager');
 
-  test('STEP_NAMES contains all 15 steps', () => {
-    assert.strictEqual(Object.keys(stateManager.STEP_NAMES).length, 15);
-    assert.strictEqual(stateManager.STEP_NAMES[1], 'ASSESS');
-    assert.strictEqual(stateManager.STEP_NAMES[8], 'PREPARE');
-    assert.strictEqual(stateManager.STEP_NAMES[13], 'VERIFY');
-    assert.strictEqual(stateManager.STEP_NAMES[15], 'FINAL-REVIEW');
+  test('STEP_NAMES contains all 16 steps', () => {
+    assert.strictEqual(Object.keys(stateManager.STEP_NAMES).length, 16);
+    assert.strictEqual(stateManager.STEP_NAMES[1], 'IDEATE');
+    assert.strictEqual(stateManager.STEP_NAMES[8], 'TEST');
+    assert.strictEqual(stateManager.STEP_NAMES[13], 'SECURE');
+    assert.strictEqual(stateManager.STEP_NAMES[15], 'DOCUMENT');
   });
 
-  test('STEP_DESCRIPTIONS contains all 15 steps', () => {
-    assert.strictEqual(Object.keys(stateManager.STEP_DESCRIPTIONS).length, 15);
-    assert.ok(stateManager.STEP_DESCRIPTIONS[1].includes('Assess'));
-    assert.ok(stateManager.STEP_DESCRIPTIONS[8].includes('Prepare'));
-    assert.ok(stateManager.STEP_DESCRIPTIONS[13].includes('quality'));
-    assert.ok(stateManager.STEP_DESCRIPTIONS[15].includes('Final'));
+  test('STEP_DESCRIPTIONS contains all 16 steps', () => {
+    assert.strictEqual(Object.keys(stateManager.STEP_DESCRIPTIONS).length, 16);
+    assert.ok(stateManager.STEP_DESCRIPTIONS[1].includes('idea'));
+    assert.ok(stateManager.STEP_DESCRIPTIONS[8].includes('TDD'));
+    assert.ok(stateManager.STEP_DESCRIPTIONS[13].includes('Security'));
+    assert.ok(stateManager.STEP_DESCRIPTIONS[15].includes('documentation'));
   });
 
   test('STATE_DIR points to ~/.ctoc/state', () => {
@@ -519,12 +519,12 @@ describe('Session Interruption Detection', () => {
     assert.strictEqual(stateManager.isInterruptedSession(state), false);
   });
 
-  test('isInterruptedSession returns false for early steps (1-6)', () => {
+  test('isInterruptedSession returns false for early steps (1-7)', () => {
     const state = createTestState({ currentStep: 5, sessionStatus: 'active' });
     assert.strictEqual(stateManager.isInterruptedSession(state), false);
   });
 
-  test('isInterruptedSession returns true for implementation steps (7-15)', () => {
+  test('isInterruptedSession returns true for implementation steps (8-16)', () => {
     const recentActivity = new Date().toISOString();
     const state = createTestState({
       currentStep: 9,
@@ -535,9 +535,9 @@ describe('Session Interruption Detection', () => {
     assert.strictEqual(stateManager.isInterruptedSession(state), true);
   });
 
-  test('isInterruptedSession returns true for step 7 (TEST)', () => {
+  test('isInterruptedSession returns true for step 8 (TEST)', () => {
     const state = createTestState({
-      currentStep: 7,
+      currentStep: 8,
       sessionStatus: 'active',
       lastActivity: new Date().toISOString()
     });
@@ -545,9 +545,9 @@ describe('Session Interruption Detection', () => {
     assert.strictEqual(stateManager.isInterruptedSession(state), true);
   });
 
-  test('isInterruptedSession returns true for step 15 (COMMIT)', () => {
+  test('isInterruptedSession returns true for step 16 (FINAL-REVIEW)', () => {
     const state = createTestState({
-      currentStep: 15,
+      currentStep: 16,
       sessionStatus: 'active',
       lastActivity: new Date().toISOString()
     });
@@ -585,9 +585,9 @@ describe('Session Interruption Detection', () => {
     assert.strictEqual(stateManager.isInterruptedSession(state), false);
   });
 
-  test('isInterruptedSession returns false for step 16 (out of range)', () => {
+  test('isInterruptedSession returns false for step 17 (out of range)', () => {
     const state = createTestState({
-      currentStep: 16,
+      currentStep: 17,
       sessionStatus: 'active',
       lastActivity: new Date().toISOString()
     });
@@ -682,7 +682,7 @@ describe('Edge Cases and Error Handling', () => {
 
   test('State with all steps completed loads correctly', () => {
     const steps = {};
-    for (let i = 1; i <= 15; i++) {
+    for (let i = 1; i <= 16; i++) {
       steps[i] = {
         status: 'completed',
         timestamp: new Date().toISOString(),
@@ -690,12 +690,12 @@ describe('Edge Cases and Error Handling', () => {
       };
     }
 
-    const testState = createTestState({ steps, currentStep: 16 });
+    const testState = createTestState({ steps, currentStep: 17 });
     saveTestStateDirectly(testState);
 
     const result = stateManager.loadState(TEST_PROJECT_PATH);
     assert.strictEqual(result.valid, true);
-    assert.strictEqual(Object.keys(result.state.steps).length, 15);
+    assert.strictEqual(Object.keys(result.state.steps).length, 16);
   });
 
   test('State with both gate approvals loads correctly', () => {

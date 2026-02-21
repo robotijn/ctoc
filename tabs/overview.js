@@ -41,7 +41,7 @@ function render(app) {
   output += `${c.bold}Agent Status${c.reset}\n`;
   if (agent.active) {
     output += `  ${c.green}●${c.reset} Running       ${c.bold}${agent.name}${c.reset}\n`;
-    output += `                  Step ${agent.step}/15 ${c.cyan}${agent.phase}${c.reset}\n`;
+    output += `                  Step ${agent.step}/16 ${c.cyan}${agent.phase}${c.reset}\n`;
     if (agent.task) {
       output += `                  Task: ${agent.task}\n`;
     }

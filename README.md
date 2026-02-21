@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.27-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.28-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-85-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **15-step Iron Loop** — plan before code, test before ship, secure before deploy. 85 specialist agents handle everything from TDD to security scanning while 3 human gates ensure you approve every decision. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy. 85 specialist agents handle everything from TDD to security scanning while 3 human gates ensure you approve every decision. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -41,10 +41,10 @@ That's it. CTO Chief detects your stack and shows a dashboard.
 
 **3.** Tell Claude what you want to build:
 ```
-I want a way to monitor if my service is healthy
+I want a SaaS product with AI to help creative writers when they get stuck
 ```
 
-CTO Chief starts with ideation — the product-owner agent explores your idea, asks clarifying questions, and shapes it into a plan. You approve at every step. Use numbered menus (`[1]`, `[2]`, `[3]`) to navigate.
+CTO Chief starts with ideation — agents explore your idea with you, ask clarifying questions, and shape it into actionable plans. **Steps 1-7 are collaborative**: agents ask, you decide. **Steps 8-16 are automated**: agents execute, you review the result. Use numbered menus (`[1]`, `[2]`, `[3]`) to navigate.
 
 > Already know exactly what you want? Just be specific: "Add a /health endpoint returning 200 OK" — CTO Chief skips ideation and goes straight to planning.
 
@@ -63,13 +63,14 @@ CTO Chief starts with ideation — the product-owner agent explores your idea, a
 
 **Without CTO Chief** — AI writes code immediately, skips tests, ignores security. You spend hours debugging, refactoring, and adding missing error handling.
 
-**With CTO Chief** — AI plans first, writes tests first, scans for vulnerabilities, and asks for your approval at 3 checkpoints. You review working, tested, secure code.
+**With CTO Chief** — You start with an idea. A product-owner agent explores it with you, asks the right questions, and shapes it into a plan. Only then does AI write code — tests first, security scanned, with your approval at every checkpoint.
 
 | | Without | With CTO Chief |
 |--|---------|----------------|
-| Planning | None — straight to code | Functional + implementation plan, reviewed |
-| Testing | "I'll add tests later" | TDD — tests written before code (Step 7) |
-| Security | Hope for the best | Shift-left scanning (Step 8) + full audit (Step 12) |
+| Ideation | None — AI guesses what you want | Product-owner agent explores your idea, asks questions, shapes the plan |
+| Planning | None — straight to code | Functional + implementation plan, reviewed by you |
+| Testing | "I'll add tests later" | TDD — tests written before code (Step 8) |
+| Security | Hope for the best | Shift-left scanning (Step 9) + full audit (Step 13) |
 | Your control | Watch and hope | 3 approval gates — nothing ships without you |
 | Quality | Manual review only | Automated: lint, typecheck, tests, 80%+ coverage |
 
@@ -77,86 +78,103 @@ CTO Chief starts with ideation — the product-owner agent explores your idea, a
 
 | | CTO Chief | Cursor Rules | Raw Claude Code | GitHub Copilot |
 |--|-----------|-------------|----------------|----------------|
+| Ideation with product owner | AI explores your idea before planning | None | None | None |
 | Planning before coding | 6-step plan with adversarial review | Manual rules file | None | None |
-| TDD enforcement | Automatic (Step 7) | Manual | Manual | None |
-| Security scanning | Built-in (Steps 8, 12) | Manual | Manual | None |
+| TDD enforcement | Automatic (Step 8) | Manual | Manual | None |
+| Security scanning | Built-in (Steps 9, 13) | Manual | Manual | None |
 | Human approval gates | 3 mandatory checkpoints | None | None | None |
-| Quality verification | Automated gate (Step 13) | Manual | Manual | None |
+| Quality verification | Automated gate (Step 14) | Manual | Manual | None |
 | Specialist agents | 85 across 19 categories | None | DIY | None |
 
 ### Example Session
 
 ```
-You: I want a way to check if the service is running
+You: I want a SaaS product with AI to help creative writers when they get stuck
 
-CTO Chief starts with ideation (Vision tab)...
-
-  Idea: Service Health Monitoring
-  The product-owner agent explores your idea:
-  - What should "running" mean? Just HTTP 200, or DB/cache status too?
-  - Who consumes this? Load balancer, monitoring tool, humans?
-  - Should it expose version info?
-
-  [1] Simple /health endpoint (Recommended)
-  [2] Full observability suite
-  [0] Cancel
-
-You: 1
-
-CTO Chief creates a functional plan (product-owner agent)...
-
-  Feature: Health Endpoint
-    Scenario: Service is healthy
-      Given the server is running
-      When GET /health is called
-      Then respond 200 with { "status": "ok" }
-
-  [1] Approve plan (Recommended)
-  [2] Discuss changes
-  [0] Cancel
+╭─ IDEATION ─────────────────────────────────────────────────╮
+│ Product-owner agent explores your idea:                    │
+│                                                            │
+│ "What kind of stuck? Writer's block, plot holes, or       │
+│  character development? Who's the target — novelists,      │
+│  screenwriters, bloggers? Free tier or paid only?"         │
+│                                                            │
+│ You discuss back and forth. The agent shapes your idea     │
+│ into 3 plans:                                              │
+│   Plan 1: AI prompt generator for writer's block           │
+│   Plan 2: Character voice coach                            │
+│   Plan 3: Plot continuity checker                          │
+│                                                            │
+│ [1] Start with Plan 1 (Recommended)                        │
+│ [2] Start with Plan 2                                      │
+│ [3] Start with Plan 3                                      │
+╰────────────────────────────────────────────────────────────╯
 
 You: 1
 
-CTO Chief designs the implementation...
+╭─ FUNCTIONAL PLANNING (Steps 2-4) ─────────────────────────╮
+│ Product-owner agent writes BDD scenarios WITH you:         │
+│                                                            │
+│ "Should the AI suggest full paragraphs or just prompts?    │
+│  What if the writer rejects the suggestion — retry or      │
+│  offer alternatives?"                                      │
+│                                                            │
+│   Scenario: Writer requests help                           │
+│     Given a writer is stuck on chapter 3                   │
+│     When they describe their block                         │
+│     Then AI generates 3 creative prompts                   │
+│                                                            │
+│ GATE 1: [1] Approve plan  [2] Discuss  [0] Cancel          │
+╰────────────────────────────────────────────────────────────╯
 
-  Files to create:
-    src/routes/health.ts        — route handler
-    tests/routes/health.test.ts — test (written first)
-  Files to modify:
-    src/app.ts                  — register route
+You: 1
 
-  [1] Approve approach (Recommended)
-  [2] Discuss changes
-  [0] Cancel
+╭─ TECHNICAL PLANNING (Steps 5-7) ─────────────────────────╮
+│ Implementation-planner agent designs the architecture:     │
+│                                                            │
+│ "Next.js frontend, FastAPI backend, Claude API for         │
+│  generation. 4 files to create, 1 to modify."             │
+│                                                            │
+│ Integrator+Critic refine the plan (10 rounds)...           │
+│                                                            │
+│ GATE 2: [1] Approve approach  [2] Discuss  [0] Cancel      │
+╰────────────────────────────────────────────────────────────╯
 
 You: 1
 
-CTO Chief writes tests, implements, verifies...
-  Step 7:  ✓ Test written (failing — TDD red)
-  Step 9:  ✓ Code implemented (test passes — TDD green)
-  Step 13: ✓ Lint, typecheck, all tests pass, 94% coverage
-  Step 15: Ready for your review
-
-  [1] Approve and commit
-  [2] Request changes
-  [0] Cancel
+╭─ IMPLEMENTATION (Steps 8-16, automated) ──────────────────╮
+│ Agents execute without interruption:                       │
+│                                                            │
+│  Step 8:  ✓ Tests written (TDD red)                        │
+│  Step 9:  ✓ Dependencies installed, shift-left scan clean  │
+│  Step 10: ✓ Code implemented (TDD green)                   │
+│  Step 11: ✓ Self-review passed                             │
+│  Step 12: ✓ Optimized                                      │
+│  Step 13: ✓ Security scan clean                            │
+│  Step 14: ✓ All tests pass, 91% coverage                   │
+│  Step 15: ✓ Docs updated                                   │
+│  Step 16: Ready for your review                            │
+│                                                            │
+│ GATE 3: [1] Approve and commit  [2] Changes  [0] Cancel    │
+╰────────────────────────────────────────────────────────────╯
 
 You: 1
-  ✓ Committed and pushed
+  ✓ Committed and pushed. Plan 1 done — 2 more plans queued.
 ```
 
-Three approvals. One tested, documented, security-scanned endpoint.
+Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents execute, you review.
 
 > [!TIP]
-> **Ideation is optional.** If you already know exactly what you want, say it directly (e.g., "Add a /health endpoint returning 200 OK") and CTO Chief skips to functional planning. Ideation is most valuable when you have a vague idea that needs shaping.
+> **Ideation is optional.** If you already know exactly what you want, say it directly (e.g., "Add a /health endpoint returning 200 OK") and CTO Chief skips to planning. Ideation is most valuable when you have a broad idea that needs shaping — like building a full SaaS product from a single sentence.
 
 ---
 
 ## Key Features
 
+- **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
+- **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
 - **85 specialist agents** across 19 categories — testing, security, quality, infrastructure, and more
 - **360 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile, and more
-- **Iron Loop methodology** — 15 steps across 3 phases with 3 human gates
+- **Iron Loop methodology** — 16 steps across 4 phases with 3 human gates
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
 - **Smart quality gates** — Background checks that don't block commits, block pushes
 - **Stack detection** — Auto-detects your languages, frameworks, and tools
@@ -166,25 +184,33 @@ Three approvals. One tested, documented, security-scanned endpoint.
 
 ## The Iron Loop
 
-15 steps, 3 phases, 3 human gates — [full methodology →](IRON_LOOP.md)
+16 steps, 4 phases, 3 human gates — [full methodology →](IRON_LOOP.md)
 
 ```
-Ideation (optional):
-  Dump your idea → product-owner agent explores and refines it
-  Skip this if you already know what you want
+COLLABORATIVE (Steps 1-7) — agents ask questions, you decide
+──────────────────────────────────────────────────────────────
+Step 1: IDEATION (optional)
+  IDEATE — product-owner agent explores your idea with you
+  Skip if you already have a specific, implementation-ready request
 
-Phase 1: FUNCTIONAL PLANNING (Steps 1-3)
-  ASSESS → ALIGN → CAPTURE
+Steps 2-4: FUNCTIONAL PLANNING
+  ASSESS → ALIGN → CAPTURE — agents ask what to build, you approve
   Gate 1: You approve what to build
 
-Phase 2: IMPLEMENTATION PLANNING (Steps 4-6)
-  PLAN → DESIGN → SPEC
+Steps 5-7: IMPLEMENTATION PLANNING
+  PLAN → DESIGN → SPEC — agents ask how to build it, you approve
   Gate 2: You approve how to build it
 
-Phase 3: IMPLEMENTATION (Steps 7-15)
+AUTOMATED (Steps 8-16) — agents execute, you review
+──────────────────────────────────────────────────────────────
+Steps 8-16: IMPLEMENTATION
   TEST → PREPARE → IMPLEMENT → REVIEW → OPTIMIZE → SECURE → VERIFY → DOCUMENT → FINAL-REVIEW
   Gate 3: You approve the result
 ```
+
+**Steps 1-7 are collaborative.** Agents don't just generate — they ask questions, present options with pros and cons, and wait for your decision. The product-owner agent shapes your idea; the implementation-planner designs the architecture. You are always in control.
+
+**Steps 8-16 are automated.** Once you approve the plan, agents execute all 9 steps without interruption: write tests, implement code, review, optimize, scan for vulnerabilities, verify quality, update docs. You review the final result at Gate 3.
 
 **Why start with ideation?** Without it, Claude will try to jump straight to code. The ideation phase forces the AI to understand your intent before planning begins. This is what prevents hooks and gates from being bypassed — the AI has a structured path to follow instead of guessing.
 
@@ -293,8 +319,8 @@ CTO Chief blocks premature actions with hooks:
 
 | Action | Blocked Until | Escape Phrases |
 |--------|--------------|----------------|
-| Edit/Write code | Planning complete (Step 7+) | "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent" |
-| Git commit | Documentation complete (Step 14+) | "hotfix", "urgent" |
+| Edit/Write code | Planning complete (Step 8+) | "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent" |
+| Git commit | Documentation complete (Step 15+) | "hotfix", "urgent" |
 
 Config and CTOC files are **whitelisted** and never blocked: `.ctoc/**`, `.local/**`, `plans/*.md`, `.gitignore`, `.gitattributes`.
 
@@ -334,9 +360,9 @@ You ──── /ctoc ────► Dashboard
                   │
   ┌───────────────┼────────────────┐──────────────┐
   ▼               ▼                ▼              ▼
-Ideation       Phase 1          Phase 2        Phase 3
-(Vision)       (What)           (How)          (Build)
-Optional       Steps 1-3        Steps 4-6      Steps 7-15
+Phase 1        Phase 2          Phase 3        Phase 4
+(Ideation)     (What)           (How)          (Build)
+Step 1 (opt)   Steps 2-4        Steps 5-7      Steps 8-16
   │               │                │              │
   │            [GATE 1]        [GATE 2]       [GATE 3]
   └──► skip    You approve     You approve    You approve
@@ -396,7 +422,7 @@ Then restart Claude Code to load the new version.
 Then restart Claude Code.
 
 **"Edit blocked" or "planning incomplete" error:**
-CTO Chief blocks code edits until planning is done (Step 7+). This is intentional. Options:
+CTO Chief blocks code edits until planning is done (Step 8+). This is intentional. Options:
 1. Complete the planning steps first (recommended)
 2. Say "quick fix" or "trivial change" to bypass for small edits
 3. Set enforcement to `soft` in `.ctoc/settings.yaml` for warnings instead of blocks
@@ -427,7 +453,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./lib/version');
 
-getVersion()       // → '6.1.27'
+getVersion()       // → '6.1.28'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -466,6 +492,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.1.27** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.28** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

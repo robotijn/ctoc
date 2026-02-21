@@ -78,7 +78,7 @@ When user selects `[8] release` from dashboard, show:
 ```
 ctoc/
   CLAUDE.md              This file — start here
-  IRON_LOOP.md           Methodology (15 steps, 3 phases, 3 human gates)
+  IRON_LOOP.md           Methodology (16 steps, 4 phases, 3 human gates)
   VERSION                Source of truth for version
   agents/                85 agent definitions across 19 categories
   skills/                360 language & framework skill files
@@ -112,33 +112,36 @@ ctoc/
 
 ## Iron Loop Summary
 
-Ideation (optional) + 15 steps across 3 phases. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
+16 steps across 4 phases. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
 
-**Ideation**: User dumps an idea → product-owner + vision agents explore and decompose it into plans. Skip if the request is already specific. This is the recommended entry point — it prevents Claude from bypassing the planning pipeline.
+**Steps 1-7 are collaborative**: agents ask questions, present options, and wait for the user's decision. They work WITH the user, not in isolation. **Steps 8-16 are automated**: agents execute without interruption, user reviews at Gate 3.
+
+**Step 1 (IDEATE)**: User dumps an idea → vision-advisor + product-owner agents explore and decompose it into plans. Skip if the request is already specific. This is the recommended entry point — it prevents Claude from bypassing the planning pipeline.
 
 | Step | Label | Agent | Phase |
 |------|-------|-------|-------|
-| 1 | ASSESS | product-owner (sonnet) | Phase 1: Functional |
-| 2 | ALIGN | product-owner (sonnet) | |
-| 3 | CAPTURE | functional-reviewer (opus) | Gate 1: User approves plan |
-| 4 | PLAN | implementation-planner (opus) | Phase 2: Technical |
-| 5 | DESIGN | implementation-planner (opus) | |
-| 6 | SPEC | implementation-plan-reviewer (opus) then integrator+critic (10 rounds) | Gate 2: User approves approach |
-| 7 | TEST | test-maker (opus) | Phase 3: Implementation |
-| 8 | PREPARE | quality-checker (sonnet) | |
-| 9 | IMPLEMENT | implementer (sonnet) | |
-| 10 | REVIEW | self-reviewer (opus) | |
-| 11 | OPTIMIZE | optimizer (sonnet) | |
-| 12 | SECURE | security-scanner (opus) | |
-| 13 | VERIFY | verifier (sonnet) | |
-| 14 | DOCUMENT | documenter (sonnet) | |
-| 15 | FINAL-REVIEW | implementation-reviewer (opus) | Gate 3: User approves result |
+| 1 | IDEATE | vision-advisor, product-owner (sonnet) | Ideation (optional) |
+| 2 | ASSESS | product-owner (sonnet) | Phase 1: Functional |
+| 3 | ALIGN | product-owner (sonnet) | |
+| 4 | CAPTURE | functional-reviewer (opus) | Gate 1: User approves plan |
+| 5 | PLAN | implementation-planner (opus) | Phase 2: Technical |
+| 6 | DESIGN | implementation-planner (opus) | |
+| 7 | SPEC | implementation-plan-reviewer (opus) then integrator+critic (10 rounds) | Gate 2: User approves approach |
+| 8 | TEST | test-maker (opus) | Phase 3: Implementation |
+| 9 | PREPARE | quality-checker (sonnet) | |
+| 10 | IMPLEMENT | implementer (sonnet) | |
+| 11 | REVIEW | self-reviewer (opus) | |
+| 12 | OPTIMIZE | optimizer (sonnet) | |
+| 13 | SECURE | security-scanner (opus) | |
+| 14 | VERIFY | verifier (sonnet) | |
+| 15 | DOCUMENT | documenter (sonnet) | |
+| 16 | FINAL-REVIEW | implementation-reviewer (opus) | Gate 3: User approves result |
 
 **Step labels are MANDATORY** — validated by `lib/plan-validator.js` (library) and enforced at runtime by `hooks/validate-plan-steps.js` (hook). Plans with wrong labels are REJECTED.
 
-**Step 9 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
+**Step 10 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
 
-**Step 13 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in IRON_LOOP.md.
+**Step 14 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in IRON_LOOP.md.
 
 **Circuit breaker**: Max 3 kickbacks to the same step, max 5 total kickbacks per plan. If exceeded, escalate to user with a summary of what keeps failing and why.
 
@@ -148,11 +151,11 @@ Ideation (optional) + 15 steps across 3 phases. Full details in [IRON_LOOP.md](.
 
 | Symptom | Root Cause | Fix |
 |---------|-----------|-----|
-| Step 13 keeps failing on same test | Flaky test or wrong assertion | Fix the test at Step 7, not Step 9 |
+| Step 14 keeps failing on same test | Flaky test or wrong assertion | Fix the test at Step 8, not Step 10 |
 | Circuit breaker trips | Misunderstood requirement | Escalate to user; likely needs re-planning |
-| Step 9 creates files not in the plan | Scope creep | Add to plan or split into second plan |
-| Step 12 finds critical vulnerability | Missing security in design | Kickback to Step 4 if architectural |
-| Coverage < 80% after Step 7 | Tests too shallow | Review test cases; add edge case + error path tests |
+| Step 10 creates files not in the plan | Scope creep | Add to plan or split into second plan |
+| Step 13 finds critical vulnerability | Missing security in design | Kickback to Step 5 if architectural |
+| Coverage < 80% after Step 8 | Tests too shallow | Review test cases; add edge case + error path tests |
 
 ---
 
@@ -205,7 +208,7 @@ Tests must NEVER silently pass. These patterns are BLOCKED:
 
 ### Test Quality Checklist
 
-Before marking Step 13 (VERIFY) as passed:
+Before marking Step 14 (VERIFY) as passed:
 - [ ] Every test has at least one meaningful assertion
 - [ ] Error paths are tested, not just happy paths
 - [ ] Mocks are minimal — only external dependencies, never core logic

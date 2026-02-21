@@ -8,7 +8,7 @@
  *
  * Canonical order:
  * TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUMENT -> FINAL-REVIEW
- *   7       8          9           10        11         12        13        14          15
+ *   8       9          10          11        12         13        14        15          16
  *
  * Exit codes:
  * - 0: Validation passed
@@ -22,27 +22,27 @@ const path = require('path');
  * Canonical step labels - these are MANDATORY and must NOT be changed.
  */
 const CANONICAL_LABELS = {
-  7: 'TEST',
-  8: 'PREPARE',
-  9: 'IMPLEMENT',
-  10: 'REVIEW',
-  11: 'OPTIMIZE',
-  12: 'SECURE',
-  13: 'VERIFY',
-  14: 'DOCUMENT',
-  15: 'FINAL-REVIEW'
+  8: 'TEST',
+  9: 'PREPARE',
+  10: 'IMPLEMENT',
+  11: 'REVIEW',
+  12: 'OPTIMIZE',
+  13: 'SECURE',
+  14: 'VERIFY',
+  15: 'DOCUMENT',
+  16: 'FINAL-REVIEW'
 };
 
 /**
  * Known wrong labels that are commonly used by mistake.
  */
 const WRONG_LABEL_MAP = {
-  'QUALITY': { correctStep: null, message: 'QUALITY is not a valid step label. Step 8 should be PREPARE, Step 13 should be VERIFY.' },
-  'SETUP': { correctStep: 8, message: 'SETUP should be PREPARE (Step 8).' },
-  'COMMIT': { correctStep: null, message: 'COMMIT is not a valid step label. Step 15 should be FINAL-REVIEW.' },
-  'CODE': { correctStep: null, message: 'CODE is not a valid step label. Step 9 should be IMPLEMENT.' },
-  'CHECK': { correctStep: null, message: 'CHECK is not a valid step label. Use VERIFY (Step 13) or REVIEW (Step 10).' },
-  'TESTING': { correctStep: null, message: 'TESTING is not a valid step label. Step 7 should be TEST.' }
+  'QUALITY': { correctStep: null, message: 'QUALITY is not a valid step label. Step 9 should be PREPARE, Step 14 should be VERIFY.' },
+  'SETUP': { correctStep: 9, message: 'SETUP should be PREPARE (Step 9).' },
+  'COMMIT': { correctStep: null, message: 'COMMIT is not a valid step label. Step 16 should be FINAL-REVIEW.' },
+  'CODE': { correctStep: null, message: 'CODE is not a valid step label. Step 10 should be IMPLEMENT.' },
+  'CHECK': { correctStep: null, message: 'CHECK is not a valid step label. Use VERIFY (Step 14) or REVIEW (Step 11).' },
+  'TESTING': { correctStep: null, message: 'TESTING is not a valid step label. Step 8 should be TEST.' }
 };
 
 /**
@@ -89,18 +89,18 @@ function validatePlanStepLabels(planPath) {
   const implementMatches = content.match(/Step\s*(\d+)[:\s]+IMPLEMENT/gi) || [];
   if (implementMatches.length > 1) {
     errors.push(
-      `Found ${implementMatches.length} IMPLEMENT steps. Only Step 9 should be IMPLEMENT. ` +
-      `Merge all code changes as sub-items under a single Step 9: IMPLEMENT.`
+      `Found ${implementMatches.length} IMPLEMENT steps. Only Step 10 should be IMPLEMENT. ` +
+      `Merge all code changes as sub-items under a single Step 10: IMPLEMENT.`
     );
   }
 
   // Check Step 7 writes tests (not just identifies)
-  const step7Match = content.match(/Step\s*7[:\s]+TEST[^\n]*\n([\s\S]*?)(?=###\s*Step\s*8|$)/i);
-  if (step7Match) {
-    const step7Content = step7Match[1];
-    if (/identify.*coverage|review.*pattern/i.test(step7Content) &&
-        !/write.*test|create.*test/i.test(step7Content)) {
-      errors.push('Step 7 (TEST) must WRITE tests first (TDD), not just identify existing coverage.');
+  const step8Match = content.match(/Step\s*8[:\s]+TEST[^\n]*\n([\s\S]*?)(?=###\s*Step\s*9|$)/i);
+  if (step8Match) {
+    const step8Content = step8Match[1];
+    if (/identify.*coverage|review.*pattern/i.test(step8Content) &&
+        !/write.*test|create.*test/i.test(step8Content)) {
+      errors.push('Step 8 (TEST) must WRITE tests first (TDD), not just identify existing coverage.');
     }
   }
 
@@ -125,39 +125,39 @@ function autoFixStepLabels(planPath) {
   let content = fs.readFileSync(planPath, 'utf8');
   const changes = [];
 
-  // Fix QUALITY -> PREPARE at Step 8
-  const qualityPattern = /(Step\s*8[:\s]+)QUALITY/gi;
+  // Fix QUALITY -> PREPARE at Step 9
+  const qualityPattern = /(Step\s*9[:\s]+)QUALITY/gi;
   if (qualityPattern.test(content)) {
     content = content.replace(qualityPattern, '$1PREPARE');
-    changes.push('Step 8: Renamed QUALITY to PREPARE');
+    changes.push('Step 9: Renamed QUALITY to PREPARE');
   }
 
-  // Fix SETUP -> PREPARE at Step 8
-  const setupPattern = /(Step\s*8[:\s]+)SETUP/gi;
+  // Fix SETUP -> PREPARE at Step 9
+  const setupPattern = /(Step\s*9[:\s]+)SETUP/gi;
   if (setupPattern.test(content)) {
     content = content.replace(setupPattern, '$1PREPARE');
-    changes.push('Step 8: Renamed SETUP to PREPARE');
+    changes.push('Step 9: Renamed SETUP to PREPARE');
   }
 
-  // Fix DOCUMENT at Step 13 -> VERIFY (old order)
-  const docAt13Pattern = /(Step\s*13[:\s]+)DOCUMENT/gi;
-  if (docAt13Pattern.test(content)) {
-    content = content.replace(docAt13Pattern, '$1VERIFY');
-    changes.push('Step 13: Renamed DOCUMENT to VERIFY');
+  // Fix DOCUMENT at Step 14 -> VERIFY (old order)
+  const docAt14Pattern = /(Step\s*14[:\s]+)DOCUMENT/gi;
+  if (docAt14Pattern.test(content)) {
+    content = content.replace(docAt14Pattern, '$1VERIFY');
+    changes.push('Step 14: Renamed DOCUMENT to VERIFY');
   }
 
-  // Fix VERIFY at Step 14 -> DOCUMENT (old order)
-  const verifyAt14Pattern = /(Step\s*14[:\s]+)VERIFY/gi;
-  if (verifyAt14Pattern.test(content)) {
-    content = content.replace(verifyAt14Pattern, '$1DOCUMENT');
-    changes.push('Step 14: Renamed VERIFY to DOCUMENT');
+  // Fix VERIFY at Step 15 -> DOCUMENT (old order)
+  const verifyAt15Pattern = /(Step\s*15[:\s]+)VERIFY/gi;
+  if (verifyAt15Pattern.test(content)) {
+    content = content.replace(verifyAt15Pattern, '$1DOCUMENT');
+    changes.push('Step 15: Renamed VERIFY to DOCUMENT');
   }
 
-  // Fix COMMIT at Step 15 -> FINAL-REVIEW
-  const commitPattern = /(Step\s*15[:\s]+)COMMIT/gi;
+  // Fix COMMIT at Step 16 -> FINAL-REVIEW
+  const commitPattern = /(Step\s*16[:\s]+)COMMIT/gi;
   if (commitPattern.test(content)) {
     content = content.replace(commitPattern, '$1FINAL-REVIEW');
-    changes.push('Step 15: Renamed COMMIT to FINAL-REVIEW');
+    changes.push('Step 16: Renamed COMMIT to FINAL-REVIEW');
   }
 
   if (changes.length > 0) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CTOC Write Gate Hook
- * Blocks Write operations before Step 7 (implementation phase)
+ * Blocks Write operations before Step 8 (implementation phase)
  *
  * Part of the "Holy Trinity" of enforcement
  *
@@ -16,7 +16,7 @@ const fs = require('fs');
 const { loadState, verifyGateApproval, STEP_NAMES } = require('../lib/state-manager');
 const { blocked, writeToTerminal } = require('../lib/ui');
 
-const MINIMUM_STEP = 7;
+const MINIMUM_STEP = 8;
 
 /**
  * Files that are always allowed (whitelist)
@@ -97,7 +97,7 @@ async function main() {
     writeToTerminal('\n[CTOC] WRITE BLOCKED: No feature context.\n');
     writeToTerminal('Before writing files, you must:\n');
     writeToTerminal('1. Start a feature with /ctoc start <name>\n');
-    writeToTerminal('2. Complete planning (Steps 1-6)\n');
+    writeToTerminal('2. Complete planning (Steps 1-7)\n');
     writeToTerminal('3. Get user approval at both gates\n\n');
     process.exit(1);
   }

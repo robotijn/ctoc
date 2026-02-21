@@ -121,33 +121,33 @@ iron_loop: true
 ## Scope
 Do things.
 
-## Execution Plan (Steps 7-15)
+## Execution Plan (Steps 8-16)
 
-### Step 7: TEST
+### Step 8: TEST
 - [ ] Write tests for auth flow
 
-### Step 8: PREPARE
+### Step 9: PREPARE
 - [ ] Run lint on new files
 
-### Step 9: IMPLEMENT
+### Step 10: IMPLEMENT
 - [ ] Implement auth routes
 
-### Step 10: REVIEW
+### Step 11: REVIEW
 - [ ] Self-review code
 
-### Step 11: OPTIMIZE
+### Step 12: OPTIMIZE
 - [ ] Check performance
 
-### Step 12: SECURE
+### Step 13: SECURE
 - [ ] Validate inputs
 
-### Step 13: VERIFY
+### Step 14: VERIFY
 - [ ] Run all tests
 
-### Step 14: DOCUMENT
+### Step 15: DOCUMENT
 - [ ] Update docs
 
-### Step 15: FINAL-REVIEW
+### Step 16: FINAL-REVIEW
 - [ ] Final review
 `;
     const planPath = createPlan('todo', 'ready-plan', fullPlan);

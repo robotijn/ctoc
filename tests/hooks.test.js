@@ -371,7 +371,7 @@ describe('PreToolUse.Edit/Write - Whitelist Logic', () => {
     });
   });
 
-  describe('Non-Whitelisted Files - Require Step 7+', () => {
+  describe('Non-Whitelisted Files - Require Step 8+', () => {
     it('blocks regular source files', () => {
       assert.strictEqual(isWhitelisted('src/index.js'), false);
       assert.strictEqual(isWhitelisted('lib/utils.ts'), false);
@@ -483,16 +483,17 @@ describe('SessionStart - State Management', () => {
   });
 
   describe('Step Names', () => {
-    it('has all 15 step names', () => {
-      assert.strictEqual(Object.keys(STEP_NAMES).length, 15);
+    it('has all 16 step names', () => {
+      assert.strictEqual(Object.keys(STEP_NAMES).length, 16);
     });
 
     it('has correct step names', () => {
-      assert.strictEqual(STEP_NAMES[1], 'ASSESS');
-      assert.strictEqual(STEP_NAMES[7], 'TEST');
-      assert.strictEqual(STEP_NAMES[13], 'VERIFY');
-      assert.strictEqual(STEP_NAMES[14], 'DOCUMENT');
-      assert.strictEqual(STEP_NAMES[15], 'FINAL-REVIEW');
+      assert.strictEqual(STEP_NAMES[1], 'IDEATE');
+      assert.strictEqual(STEP_NAMES[2], 'ASSESS');
+      assert.strictEqual(STEP_NAMES[8], 'TEST');
+      assert.strictEqual(STEP_NAMES[14], 'VERIFY');
+      assert.strictEqual(STEP_NAMES[15], 'DOCUMENT');
+      assert.strictEqual(STEP_NAMES[16], 'FINAL-REVIEW');
     });
   });
 
@@ -509,7 +510,7 @@ describe('SessionStart - State Management', () => {
       assert.strictEqual(isInterruptedSession(state), false);
     });
 
-    it('returns false for planning phase (step < 7)', () => {
+    it('returns false for planning phase (step < 8)', () => {
       const state = createMockState({
         sessionStatus: 'active',
         currentStep: 5
@@ -656,8 +657,8 @@ describe('Gate Approval Verification', () => {
 // ============================================================================
 
 describe('Hook Step Enforcement', () => {
-  const MINIMUM_STEP_FOR_WRITE = 7;
-  const MINIMUM_STEP_FOR_COMMIT = 14;
+  const MINIMUM_STEP_FOR_WRITE = 8;
+  const MINIMUM_STEP_FOR_COMMIT = 15;
 
   describe('Write/Edit Operations', () => {
     it('blocks at step 1', () => {
@@ -665,41 +666,41 @@ describe('Hook Step Enforcement', () => {
       assert.ok(currentStep < MINIMUM_STEP_FOR_WRITE, 'Should block at step 1');
     });
 
-    it('blocks at step 6', () => {
-      const currentStep = 6;
-      assert.ok(currentStep < MINIMUM_STEP_FOR_WRITE, 'Should block at step 6');
-    });
-
-    it('allows at step 7', () => {
+    it('blocks at step 7', () => {
       const currentStep = 7;
-      assert.ok(currentStep >= MINIMUM_STEP_FOR_WRITE, 'Should allow at step 7');
+      assert.ok(currentStep < MINIMUM_STEP_FOR_WRITE, 'Should block at step 7');
     });
 
-    it('allows at step 15', () => {
-      const currentStep = 15;
-      assert.ok(currentStep >= MINIMUM_STEP_FOR_WRITE, 'Should allow at step 15');
+    it('allows at step 8', () => {
+      const currentStep = 8;
+      assert.ok(currentStep >= MINIMUM_STEP_FOR_WRITE, 'Should allow at step 8');
+    });
+
+    it('allows at step 16', () => {
+      const currentStep = 16;
+      assert.ok(currentStep >= MINIMUM_STEP_FOR_WRITE, 'Should allow at step 16');
     });
   });
 
   describe('Commit Operations', () => {
-    it('blocks at step 7', () => {
-      const currentStep = 7;
-      assert.ok(currentStep < MINIMUM_STEP_FOR_COMMIT, 'Should block commit at step 7');
+    it('blocks at step 8', () => {
+      const currentStep = 8;
+      assert.ok(currentStep < MINIMUM_STEP_FOR_COMMIT, 'Should block commit at step 8');
     });
 
-    it('blocks at step 13', () => {
-      const currentStep = 13;
-      assert.ok(currentStep < MINIMUM_STEP_FOR_COMMIT, 'Should block commit at step 13');
-    });
-
-    it('allows at step 14', () => {
+    it('blocks at step 14', () => {
       const currentStep = 14;
-      assert.ok(currentStep >= MINIMUM_STEP_FOR_COMMIT, 'Should allow commit at step 14');
+      assert.ok(currentStep < MINIMUM_STEP_FOR_COMMIT, 'Should block commit at step 14');
     });
 
     it('allows at step 15', () => {
       const currentStep = 15;
       assert.ok(currentStep >= MINIMUM_STEP_FOR_COMMIT, 'Should allow commit at step 15');
+    });
+
+    it('allows at step 16', () => {
+      const currentStep = 16;
+      assert.ok(currentStep >= MINIMUM_STEP_FOR_COMMIT, 'Should allow commit at step 16');
     });
   });
 });
@@ -807,7 +808,7 @@ describe('UI Formatting', () => {
         currentStep: 3
       });
 
-      const output = blocked('Step 3 < 7 - planning not complete', state, 'EDIT');
+      const output = blocked('Step 3 < 8 - planning not complete', state, 'EDIT');
 
       assert.ok(output.includes('BLOCKED'), 'Should include BLOCKED');
       assert.ok(output.includes('test-feature'), 'Should include feature name');
@@ -961,7 +962,7 @@ describe('Crypto Module', () => {
 // ============================================================================
 
 describe('Integration Scenarios', () => {
-  describe('Planning Phase (Steps 1-6)', () => {
+  describe('Planning Phase (Steps 1-7)', () => {
     it('should block Edit on non-whitelisted files at step 3', () => {
       const state = createMockState({
         feature: 'new-feature',
@@ -971,7 +972,7 @@ describe('Integration Scenarios', () => {
 
       // Check whitelist
       const isWhitelisted = false; // src/index.js is not whitelisted
-      const shouldBlock = !isWhitelisted && state.currentStep < 7;
+      const shouldBlock = !isWhitelisted && state.currentStep < 8;
 
       assert.strictEqual(shouldBlock, true, 'Should block edit at step 3');
     });
@@ -999,29 +1000,29 @@ describe('Integration Scenarios', () => {
     });
   });
 
-  describe('Implementation Phase (Steps 7-10)', () => {
-    it('should allow Edit on source files at step 9', () => {
+  describe('Implementation Phase (Steps 8-11)', () => {
+    it('should allow Edit on source files at step 10', () => {
       const state = createMockState({
         feature: 'new-feature',
-        currentStep: 9,
+        currentStep: 10,
         gate1_approval: createMockGateApproval(1),
         gate2_approval: createMockGateApproval(2)
       });
 
-      const shouldAllow = state.currentStep >= 7;
-      assert.strictEqual(shouldAllow, true, 'Should allow edit at step 9');
+      const shouldAllow = state.currentStep >= 8;
+      assert.strictEqual(shouldAllow, true, 'Should allow edit at step 10');
     });
 
-    it('should allow Bash write commands at step 7', () => {
+    it('should allow Bash write commands at step 8', () => {
       const state = createMockState({
         feature: 'new-feature',
-        currentStep: 7,
+        currentStep: 8,
         gate1_approval: createMockGateApproval(1),
         gate2_approval: createMockGateApproval(2)
       });
 
-      const shouldAllow = state.currentStep >= 7;
-      assert.strictEqual(shouldAllow, true, 'Should allow bash write at step 7');
+      const shouldAllow = state.currentStep >= 8;
+      assert.strictEqual(shouldAllow, true, 'Should allow bash write at step 8');
     });
 
     it('should block git commit at step 10', () => {
@@ -1030,33 +1031,33 @@ describe('Integration Scenarios', () => {
         currentStep: 10
       });
 
-      const shouldBlock = state.currentStep < 14;
+      const shouldBlock = state.currentStep < 15;
       assert.strictEqual(shouldBlock, true, 'Should block commit at step 10');
     });
   });
 
-  describe('Delivery Phase (Steps 11-15)', () => {
-    it('should allow git commit at step 14', () => {
-      const state = createMockState({
-        feature: 'new-feature',
-        currentStep: 14
-      });
-
-      const shouldAllow = state.currentStep >= 14;
-      assert.strictEqual(shouldAllow, true, 'Should allow commit at step 14');
-    });
-
-    it('should allow all operations at step 15', () => {
+  describe('Delivery Phase (Steps 12-16)', () => {
+    it('should allow git commit at step 15', () => {
       const state = createMockState({
         feature: 'new-feature',
         currentStep: 15
       });
 
-      const canEdit = state.currentStep >= 7;
-      const canCommit = state.currentStep >= 14;
+      const shouldAllow = state.currentStep >= 15;
+      assert.strictEqual(shouldAllow, true, 'Should allow commit at step 15');
+    });
 
-      assert.strictEqual(canEdit, true, 'Should allow edit at step 15');
-      assert.strictEqual(canCommit, true, 'Should allow commit at step 15');
+    it('should allow all operations at step 16', () => {
+      const state = createMockState({
+        feature: 'new-feature',
+        currentStep: 16
+      });
+
+      const canEdit = state.currentStep >= 8;
+      const canCommit = state.currentStep >= 15;
+
+      assert.strictEqual(canEdit, true, 'Should allow edit at step 16');
+      assert.strictEqual(canCommit, true, 'Should allow commit at step 16');
     });
   });
 

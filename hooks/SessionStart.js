@@ -145,13 +145,13 @@ Project: ${path.basename(process.cwd())}
 Stack: ${stack.languages.join('/') || 'unknown'}
 Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}
 
-## Iron Loop (15 Steps) - NON-NEGOTIABLE
+## Iron Loop (16 Steps) - NON-NEGOTIABLE
 
-PLANNING (1-6) -> DEVELOPMENT (7-10) -> DELIVERY (11-15)
+IDEATION (1) -> PLANNING (2-7) -> DEVELOPMENT (8-11) -> DELIVERY (12-16)
 
-1:ASSESS -> 2:ALIGN -> 3:CAPTURE -> 4:PLAN -> 5:DESIGN -> 6:SPEC
-7:TEST -> 8:PREPARE -> 9:IMPLEMENT -> 10:REVIEW
-11:OPTIMIZE -> 12:SECURE -> 13:VERIFY -> 14:DOCUMENT -> 15:FINAL-REVIEW
+1:IDEATE -> 2:ASSESS -> 3:ALIGN -> 4:CAPTURE -> 5:PLAN -> 6:DESIGN -> 7:SPEC
+8:TEST -> 9:PREPARE -> 10:IMPLEMENT -> 11:REVIEW
+12:OPTIMIZE -> 13:SECURE -> 14:VERIFY -> 15:DOCUMENT -> 16:FINAL-REVIEW
 
 ## Commands
 
@@ -159,12 +159,12 @@ PLANNING (1-6) -> DEVELOPMENT (7-10) -> DELIVERY (11-15)
 |---------|--------|
 | /ctoc | Interactive dashboard (all features) |
 
-## MANDATORY: Edit/Write Blocked Before Step 7
+## MANDATORY: Edit/Write Blocked Before Step 8
 
 The Iron Loop is enforced by hooks. You CANNOT Edit or Write files until:
-- Steps 1-3 complete (functional plan approved)
-- Steps 4-6 complete (technical plan approved)
-- Current step >= 7
+- Steps 1-4 complete (functional plan approved)
+- Steps 5-7 complete (technical plan approved)
+- Current step >= 8
 
 This is cryptographically enforced. There are no escape phrases.
 

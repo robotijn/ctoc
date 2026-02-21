@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * CTOC Bash Gate Hook
- * Blocks file-writing Bash commands before Step 7
- * Blocks git commit before Step 14
+ * Blocks file-writing Bash commands before Step 8
+ * Blocks git commit before Step 15
  *
  * Exit codes:
  * - 0: Command allowed
@@ -12,8 +12,8 @@
 const { loadState, STEP_NAMES } = require('../lib/state-manager');
 const { writeToTerminal, colors } = require('../lib/ui');
 
-const MINIMUM_STEP_FOR_WRITE = 7;
-const MINIMUM_STEP_FOR_COMMIT = 14;
+const MINIMUM_STEP_FOR_WRITE = 8;
+const MINIMUM_STEP_FOR_COMMIT = 15;
 
 /**
  * Patterns that indicate file-writing commands

@@ -76,7 +76,7 @@ function testAgentStatus() {
     active: true,
     name: 'user-auth-flow',
     step: 9,
-    totalSteps: 15,
+    totalSteps: 16,
     phase: 'IMPLEMENT',
     task: 'Implement login endpoint',
     startedAt: new Date('2026-01-30T10:00:00'),

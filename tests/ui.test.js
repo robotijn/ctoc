@@ -8,26 +8,27 @@ const assert = require('node:assert');
 // Mock state-manager before requiring ui
 const mockStateManager = {
   STEP_NAMES: {
-    1: 'ASSESS', 2: 'ALIGN', 3: 'CAPTURE', 4: 'PLAN', 5: 'DESIGN', 6: 'SPEC',
-    7: 'TEST', 8: 'QUALITY', 9: 'IMPLEMENT', 10: 'REVIEW', 11: 'OPTIMIZE',
-    12: 'SECURE', 13: 'DOCUMENT', 14: 'VERIFY', 15: 'COMMIT'
+    1: 'IDEATE', 2: 'ASSESS', 3: 'ALIGN', 4: 'CAPTURE', 5: 'PLAN', 6: 'DESIGN', 7: 'SPEC',
+    8: 'TEST', 9: 'PREPARE', 10: 'IMPLEMENT', 11: 'REVIEW',
+    12: 'OPTIMIZE', 13: 'SECURE', 14: 'VERIFY', 15: 'DOCUMENT', 16: 'FINAL-REVIEW'
   },
   STEP_DESCRIPTIONS: {
-    1: 'Assess the problem and context',
-    2: 'Align with user goals and business objectives',
-    3: 'Capture requirements and success criteria',
-    4: 'Plan the technical approach',
-    5: 'Design the architecture',
-    6: 'Write detailed specifications',
-    7: 'Write failing tests (TDD Red)',
-    8: 'Run quality checks (lint, format, type-check)',
-    9: 'Implement to make tests pass (TDD Green)',
-    10: 'Code review against CTO profile',
-    11: 'Optimize for performance',
-    12: 'Security audit',
-    13: 'Update documentation',
-    14: 'Run full test suite',
-    15: 'Commit with verification'
+    1: 'Explore and shape the idea with the product-owner agent (optional)',
+    2: 'Assess the problem and context',
+    3: 'Align with user goals and business objectives',
+    4: 'Capture requirements and success criteria',
+    5: 'Plan the technical approach',
+    6: 'Design the architecture',
+    7: 'Write detailed specifications',
+    8: 'Write failing tests (TDD Red)',
+    9: 'Prepare environment (install deps, check prerequisites)',
+    10: 'Implement ALL code changes (TDD Green)',
+    11: 'Self-review checkpoint (logic, integration, error handling)',
+    12: 'Performance optimization and simplification',
+    13: 'Security vulnerability check',
+    14: 'Run ALL quality checks (lint, type, tests, coverage)',
+    15: 'Update documentation',
+    16: 'Final review - verify steps 8-15 complete'
   }
 };
 
@@ -85,11 +86,12 @@ const fixtures = {
 
   gate1PassedState: {
     feature: 'Add user authentication',
-    currentStep: 4,
+    currentStep: 5,
     steps: {
       1: { status: 'completed', timestamp: '2024-01-01T00:00:00Z' },
       2: { status: 'completed', timestamp: '2024-01-01T01:00:00Z' },
-      3: { status: 'completed', timestamp: '2024-01-01T02:00:00Z' }
+      3: { status: 'completed', timestamp: '2024-01-01T02:00:00Z' },
+      4: { status: 'completed', timestamp: '2024-01-01T02:30:00Z' }
     },
     gate1_approval: { timestamp: '2024-01-01T03:00:00Z', user_confirmed: true },
     gate2_approval: null
@@ -97,14 +99,15 @@ const fixtures = {
 
   bothGatesPassedState: {
     feature: 'Add user authentication',
-    currentStep: 7,
+    currentStep: 8,
     steps: {
       1: { status: 'completed', timestamp: '2024-01-01T00:00:00Z' },
       2: { status: 'completed', timestamp: '2024-01-01T01:00:00Z' },
       3: { status: 'completed', timestamp: '2024-01-01T02:00:00Z' },
-      4: { status: 'completed', timestamp: '2024-01-01T04:00:00Z' },
-      5: { status: 'completed', timestamp: '2024-01-01T05:00:00Z' },
-      6: { status: 'completed', timestamp: '2024-01-01T06:00:00Z' }
+      4: { status: 'completed', timestamp: '2024-01-01T02:30:00Z' },
+      5: { status: 'completed', timestamp: '2024-01-01T04:00:00Z' },
+      6: { status: 'completed', timestamp: '2024-01-01T05:00:00Z' },
+      7: { status: 'completed', timestamp: '2024-01-01T06:00:00Z' }
     },
     gate1_approval: { timestamp: '2024-01-01T03:00:00Z', user_confirmed: true },
     gate2_approval: { timestamp: '2024-01-01T07:00:00Z', user_confirmed: true }
@@ -112,16 +115,17 @@ const fixtures = {
 
   implementationState: {
     feature: 'Add user authentication',
-    currentStep: 9,
+    currentStep: 10,
     steps: {
       1: { status: 'completed', timestamp: '2024-01-01T00:00:00Z' },
       2: { status: 'completed', timestamp: '2024-01-01T01:00:00Z' },
       3: { status: 'completed', timestamp: '2024-01-01T02:00:00Z' },
-      4: { status: 'completed', timestamp: '2024-01-01T04:00:00Z' },
-      5: { status: 'completed', timestamp: '2024-01-01T05:00:00Z' },
-      6: { status: 'completed', timestamp: '2024-01-01T06:00:00Z' },
-      7: { status: 'completed', timestamp: '2024-01-01T08:00:00Z' },
-      8: { status: 'completed', timestamp: '2024-01-01T09:00:00Z' }
+      4: { status: 'completed', timestamp: '2024-01-01T02:30:00Z' },
+      5: { status: 'completed', timestamp: '2024-01-01T04:00:00Z' },
+      6: { status: 'completed', timestamp: '2024-01-01T05:00:00Z' },
+      7: { status: 'completed', timestamp: '2024-01-01T06:00:00Z' },
+      8: { status: 'completed', timestamp: '2024-01-01T08:00:00Z' },
+      9: { status: 'completed', timestamp: '2024-01-01T09:00:00Z' }
     },
     gate1_approval: { timestamp: '2024-01-01T03:00:00Z', user_confirmed: true },
     gate2_approval: { timestamp: '2024-01-01T07:00:00Z', user_confirmed: true }
@@ -226,30 +230,37 @@ describe('colors object', () => {
 // ============================================================================
 
 describe('getPhase', () => {
-  const planningSteps = [1, 2, 3, 4, 5, 6];
-  const developmentSteps = [7, 8, 9, 10];
-  const deliverySteps = [11, 12, 13, 14, 15];
+  const ideationSteps = [1];
+  const planningSteps = [2, 3, 4, 5, 6, 7];
+  const developmentSteps = [8, 9, 10, 11];
+  const deliverySteps = [12, 13, 14, 15, 16];
 
-  it('returns Planning for steps 1-6', () => {
+  it('returns Ideation for step 1', () => {
+    for (const step of ideationSteps) {
+      assert.strictEqual(ui.getPhase(step), 'Ideation', `Step ${step} should be Ideation`);
+    }
+  });
+
+  it('returns Planning for steps 2-7', () => {
     for (const step of planningSteps) {
       assert.strictEqual(ui.getPhase(step), 'Planning', `Step ${step} should be Planning`);
     }
   });
 
-  it('returns Development for steps 7-10', () => {
+  it('returns Development for steps 8-11', () => {
     for (const step of developmentSteps) {
       assert.strictEqual(ui.getPhase(step), 'Development', `Step ${step} should be Development`);
     }
   });
 
-  it('returns Delivery for steps 11-15', () => {
+  it('returns Delivery for steps 12-16', () => {
     for (const step of deliverySteps) {
       assert.strictEqual(ui.getPhase(step), 'Delivery', `Step ${step} should be Delivery`);
     }
   });
 
-  it('returns Delivery for steps beyond 15', () => {
-    assert.strictEqual(ui.getPhase(16), 'Delivery');
+  it('returns Delivery for steps beyond 16', () => {
+    assert.strictEqual(ui.getPhase(17), 'Delivery');
     assert.strictEqual(ui.getPhase(100), 'Delivery');
   });
 });
@@ -352,8 +363,8 @@ describe('dashboard', () => {
       const plain = stripAnsi(output);
 
       assert.ok(plain.includes('Step:'));
-      assert.ok(plain.includes('2/15'));
-      assert.ok(plain.includes('ALIGN'));
+      assert.ok(plain.includes('2/16'));
+      assert.ok(plain.includes('ASSESS'));
       assert.ok(plain.includes('Planning'));
     });
   });
@@ -439,20 +450,21 @@ describe('progress', () => {
   });
 
   describe('phase grouping', () => {
-    it('shows all three phases', () => {
+    it('shows all four phases', () => {
       const output = ui.progress(fixtures.earlyPlanningState);
       const plain = stripAnsi(output);
 
-      assert.ok(plain.includes('Planning (1-6)'));
-      assert.ok(plain.includes('Development (7-10)'));
-      assert.ok(plain.includes('Delivery (11-15)'));
+      assert.ok(plain.includes('Ideation (1)'));
+      assert.ok(plain.includes('Planning (2-7)'));
+      assert.ok(plain.includes('Development (8-11)'));
+      assert.ok(plain.includes('Delivery (12-16)'));
     });
 
-    it('shows all 15 steps', () => {
+    it('shows all 16 steps', () => {
       const output = ui.progress(fixtures.earlyPlanningState);
       const plain = stripAnsi(output);
 
-      for (let i = 1; i <= 15; i++) {
+      for (let i = 1; i <= 16; i++) {
         const stepName = mockStateManager.STEP_NAMES[i];
         assert.ok(plain.includes(stepName), `Missing step: ${stepName}`);
       }
@@ -496,8 +508,8 @@ describe('progress', () => {
       const plain = stripAnsi(output);
 
       assert.ok(plain.includes('Gates'));
-      assert.ok(plain.includes('Gate 1 (after step 3)'));
-      assert.ok(plain.includes('Gate 2 (after step 6)'));
+      assert.ok(plain.includes('Gate 1 (after step 4)'));
+      assert.ok(plain.includes('Gate 2 (after step 7)'));
     });
 
     it('shows correct gate status for early planning', () => {
@@ -549,9 +561,9 @@ describe('adminDashboard', () => {
       const output = ui.adminDashboard(fixtures.emptyKanban, fixtures.cleanGit, version);
 
       assert.ok(output.includes('(draft)'));
-      assert.ok(output.includes('(steps1-3)'));
-      assert.ok(output.includes('(steps4-6)'));
-      assert.ok(output.includes('(7-14)'));
+      assert.ok(output.includes('(steps2-4)'));
+      assert.ok(output.includes('(steps5-7)'));
+      assert.ok(output.includes('(8-15)'));
       assert.ok(output.includes('[HUMAN]'));
     });
 
@@ -758,14 +770,14 @@ describe('blocked', () => {
       const plain = stripAnsi(output);
 
       assert.ok(plain.includes('Current Step: 2'));
-      assert.ok(plain.includes('ALIGN'));
+      assert.ok(plain.includes('ASSESS'));
     });
 
-    it('shows required step is 7', () => {
+    it('shows required step is 8', () => {
       const output = ui.blocked('Test reason', fixtures.earlyPlanningState, 'Edit');
       const plain = stripAnsi(output);
 
-      assert.ok(plain.includes('Required Step: 7 (TEST)'));
+      assert.ok(plain.includes('Required Step: 8 (TEST)'));
     });
 
     it('handles null state gracefully', () => {
@@ -809,9 +821,9 @@ describe('blocked', () => {
       const plain = stripAnsi(output);
 
       assert.ok(plain.includes('TO PROCEED:'));
-      assert.ok(plain.includes('Complete planning steps 1-3'));
+      assert.ok(plain.includes('Complete ideation + planning steps 1-4'));
       assert.ok(plain.includes('Get user approval at Gate 1'));
-      assert.ok(plain.includes('Complete planning steps 4-6'));
+      assert.ok(plain.includes('Complete planning steps 5-7'));
       assert.ok(plain.includes('Get user approval at Gate 2'));
       assert.ok(plain.includes('Edit/Write operations are allowed'));
     });

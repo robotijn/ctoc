@@ -27,7 +27,7 @@ function render(app) {
 
   if (agent.active) {
     output += `  ${c.green}●${c.reset} ${c.bold}${agent.name}${c.reset}\n`;
-    output += `    Step ${agent.step}/15 ${c.cyan}${agent.phase}${c.reset}\n`;
+    output += `    Step ${agent.step}/16 ${c.cyan}${agent.phase}${c.reset}\n`;
     if (agent.task) output += `    Task: ${agent.task}\n`;
     if (agent.elapsed) output += `    Elapsed: ${c.dim}${agent.elapsed}${c.reset}\n`;
   } else {
