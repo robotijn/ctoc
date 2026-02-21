@@ -5,11 +5,11 @@
 
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
-  <a href="LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.25-blue">
+  <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.26-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-85-orange">
-  <img alt="Skills" src="https://img.shields.io/badge/skills-358-blue">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
@@ -136,7 +136,7 @@ Three approvals. One tested, documented, security-scanned endpoint.
 ## Key Features
 
 - **85 specialist agents** across 19 categories — testing, security, quality, infrastructure, and more
-- **358 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile, and more
+- **360 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile, and more
 - **Iron Loop methodology** — 15 steps across 3 phases with 3 human gates
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
 - **Smart quality gates** — Background checks that don't block commits, block pushes
@@ -204,7 +204,7 @@ Agents spawn conditionally based on your project and current Iron Loop step.
 
 ## Skills
 
-358 expert skills for instant domain knowledge — [browse all →](skills/)
+360 expert skills for instant domain knowledge — [browse all →](skills/)
 
 <details>
 <summary><strong>Full skill breakdown</strong></summary>
@@ -218,12 +218,12 @@ Agents spawn conditionally based on your project and current Iron Loop step.
 | [DevOps](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Helm](skills/frameworks/devops/helm.md), [Ansible](skills/frameworks/devops/ansible.md), [Pulumi](skills/frameworks/devops/pulumi.md) |
 | [Mobile](skills/frameworks/mobile/) | 15 | [React Native](skills/frameworks/mobile/react-native.md), [Flutter](skills/frameworks/mobile/flutter.md), [SwiftUI](skills/frameworks/mobile/swiftui.md), [Jetpack Compose](skills/frameworks/mobile/jetpack-compose.md) |
 
-| [Testing](skills/testing/) | 14 | [Playwright](skills/testing/playwright/), coverage tools, test patterns |
+| [Testing](skills/testing/) | 15 | [Playwright](skills/testing/playwright/), coverage tools, test patterns |
 | [Security](skills/security/) | 5 | OWASP, input validation, secrets management |
 | [Architecture](skills/architecture/) | 7 | Patterns, dependency analysis, design |
 | [Complexity](skills/complexity/) | 3 | Metrics, limits, refactoring patterns |
 | [Quality](skills/quality/) | 2 | Quality metrics and scoring |
-| [Quality Configs](skills/quality-configs/) | 60 | Per-language lint, format, and test configs |
+| [Quality Configs](skills/quality-configs/) | 61 | Per-language lint, format, and test configs |
 | Core | 6 | [CTO Persona](skills/cto-persona.md), [Iron Loop](skills/iron-loop.md), [Quality Standards](skills/quality-standards.md), [Enforcement](skills/enforcement.md) |
 
 </details>
@@ -239,13 +239,13 @@ The `/ctoc` command opens an interactive dashboard with 8 tabs:
 | Tab | Purpose |
 |-----|---------|
 | Pipeline | Plan counts per stage, navigate to any stage |
-| Vision | Explore and decompose ideas into plans |
-| Functional | Manage functional plan drafts |
-| Implementation | Manage implementation plan drafts |
-| Todo | FIFO queue for agent work |
+| Vision | Start here — dump ideas, explore, decompose into plans |
+| Functional | Product owner refines ideas into BDD specs |
+| Implementation | Technical approach and architecture |
 | Review | Review completed implementations |
+| Todo | FIFO queue for agent work |
 | Progress | In-progress and finished items |
-| Commands | Release, Doctor, Update, Settings |
+| Tools | Release, Doctor, Update, Settings |
 
 **Plan pipeline** (directories under `plans/`):
 ```
@@ -268,7 +268,7 @@ CTO Chief blocks premature actions with hooks:
 
 | Action | Blocked Until | Escape Phrases |
 |--------|--------------|----------------|
-| Edit/Write code | Planning complete (Step 7+) | "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change" |
+| Edit/Write code | Planning complete (Step 7+) | "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent" |
 | Git commit | Documentation complete (Step 14+) | "hotfix", "urgent" |
 
 Config and CTOC files are **whitelisted** and never blocked: `.ctoc/**`, `.local/**`, `plans/*.md`, `.gitignore`, `.gitattributes`.
@@ -402,7 +402,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./lib/version');
 
-getVersion()       // → '6.1.25'
+getVersion()       // → '6.1.26'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -414,7 +414,7 @@ Files synced by `release()`: `VERSION` (source of truth), `.claude-plugin/market
 ```
 ctoc/
 ├── agents/          85 agent definitions (19 categories)
-├── skills/          358 language & framework skills
+├── skills/          360 language & framework skills
 ├── commands/        8 slash commands
 ├── hooks/           10 Claude Code hooks
 ├── lib/             71 JS modules
@@ -431,7 +431,9 @@ ctoc/
 
 ## License
 
-MPL 2.0 — See [LICENSE](LICENSE)
+[PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0) — See [LICENSE](LICENSE)
+
+Use CTOC freely for any project. You may not offer CTOC itself or a derivative as a competing product or service without permission. For commercial licensing inquiries, contact the licensor.
 
 ## Links
 
@@ -439,6 +441,6 @@ MPL 2.0 — See [LICENSE](LICENSE)
 
 ---
 
-**6.1.25** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.26** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
