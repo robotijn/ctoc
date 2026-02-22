@@ -41,7 +41,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ## Test & Verify
 
 ```bash
-node --test tests/*.test.js          # Run all 39 test files (cross-platform)
+node --test tests/*.test.js          # Run all 40 test files (cross-platform)
 node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
@@ -84,13 +84,13 @@ ctoc/
   src/                   Source code directory
     commands/            8 slash commands
     hooks/               10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-    lib/                 71 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 72 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)
     data/                Static data files
-  agents/                85 agent definitions across 19 categories
+  agents/                86 agent definitions across 19 categories
   skills/                360 language & framework skill files
-  tests/                 39 test files
+  tests/                 40 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

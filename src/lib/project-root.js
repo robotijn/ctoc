@@ -32,7 +32,7 @@ function findProjectRoot(startDir = process.cwd()) {
       // Verify it's a CTOC plans directory (has expected subdirs)
       const plansDir = path.join(dir, 'plans');
       if (fs.statSync(plansDir).isDirectory()) {
-        const subDirs = ['functional', 'implementation', 'todo', 'done', 'in-progress', 'review'];
+        const subDirs = ['vision', 'functional', 'implementation', 'todo', 'done', 'in-progress', 'review'];
         const hasCtocPlans = subDirs.some(sub => fs.existsSync(path.join(plansDir, sub)));
         if (hasCtocPlans) {
           return dir;
@@ -46,7 +46,7 @@ function findProjectRoot(startDir = process.cwd()) {
     }
 
     // Priority 3: Common project root files
-    const projectFiles = ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'pom.xml', 'build.gradle'];
+    const projectFiles = ['CLAUDE.md', 'package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'pom.xml', 'build.gradle'];
     for (const file of projectFiles) {
       if (fs.existsSync(path.join(dir, file))) {
         return dir;

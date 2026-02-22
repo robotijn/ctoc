@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.32-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.33-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-86-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
@@ -56,6 +56,29 @@ CTO Chief starts with ideation — agents explore your idea with you, ask clarif
 
 > [!TIP]
 > For autonomous agent workflows, use `claude --dangerously-skip-permissions` to avoid repeated tool-call prompts. This is safe on feature branches where git can revert changes. Add `--continue` to resume a previous session.
+
+---
+
+## Project Init
+
+To set up CTO Chief methodology on an existing project:
+
+```
+ctoc init
+```
+
+This runs an interactive setup that:
+
+1. **Detects your stack** — scans for languages (12), frameworks (20+), and tools (linters, test runners, bundlers)
+2. **Generates a tailored `CLAUDE.md`** — project-specific instructions including detected tools, quality commands, and Iron Loop steps
+3. **Configures `.ctoc/settings.yaml`** — quality gates, enforcement mode, and agent settings tuned to your stack
+4. **Creates `plans/` directory structure** — `vision/`, `functional/`, `implementation/`, `todo/`, `review/`, `done/`
+5. **Initializes Iron Loop state** in `.ctoc/state/`
+
+The generated `CLAUDE.md` becomes the single source of truth for how Claude works in your project — CTO persona, planning pipeline, test commands, and quality standards.
+
+> [!TIP]
+> You don't need to run `ctoc init` manually. If you just start talking to Claude with CTO Chief installed, it will guide you. `ctoc init` is useful when you want to pre-configure a project or customize the generated `CLAUDE.md`.
 
 ---
 
@@ -498,7 +521,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.1.32'
+getVersion()       // → '6.1.33'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -540,6 +563,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.1.32** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.33** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

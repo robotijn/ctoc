@@ -90,15 +90,14 @@ async function main() {
 
   // 5. Ensure project directories exist (created on first run)
   const directories = [
-    // Plans workflow (numbered for clarity)
-    'plans/1_functional_draft',
-    'plans/2_functional_approved',
-    'plans/3_technical_draft',
-    'plans/4_technical_approved',
-    'plans/5_todo',
-    'plans/6_building',
-    'plans/7_ready_for_review',
-    'plans/8_done',
+    // Plans workflow (matches init-project.js PLAN_DIRS)
+    'plans/vision',
+    'plans/functional',
+    'plans/implementation',
+    'plans/todo',
+    'plans/in-progress',
+    'plans/review',
+    'plans/done',
     // Learnings system
     'learnings/pending',
     'learnings/approved',
