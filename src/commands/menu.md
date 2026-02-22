@@ -5,7 +5,7 @@ description: CTOC Dashboard - Your Virtual CTO command center
 Run the state machine to get the current screen as JSON:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/commands/menu.js"
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"
 ```
 
 ## State Machine Protocol
