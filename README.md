@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.31-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.32-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
-  <img alt="Agents" src="https://img.shields.io/badge/agents-85-orange">
+  <img alt="Agents" src="https://img.shields.io/badge/agents-86-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy. 85 specialist agents handle everything from TDD to security scanning while 4 human gates ensure you approve every decision. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy. 86 specialist agents handle everything from TDD to security scanning while 4 human gates ensure you approve every decision. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -172,10 +172,11 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 
 - **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
-- **85 specialist agents** across 19 categories — testing, security, quality, infrastructure, and more
+- **86 specialist agents** across 19 categories — testing, security, quality, infrastructure, and more
 - **360 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile, and more
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
+- **Deployment pipeline** — Configurable dev → staging → production promotion triggered automatically after Gate 3 approval
 - **Smart quality gates** — Background checks that don't block commits, block pushes
 - **Stack detection** — Auto-detects your languages, frameworks, and tools
 - **On-demand loading** — Skills load only when needed; you only pay for what you use
@@ -220,7 +221,7 @@ Steps 8-16: IMPLEMENTATION
 
 ## Agents
 
-85 specialist agents across 19 categories — [browse all →](agents/)
+86 specialist agents across 19 categories — [browse all →](agents/)
 
 <details>
 <summary><strong>Full agent list</strong></summary>
@@ -231,7 +232,7 @@ Steps 8-16: IMPLEMENTATION
 | [Quality](agents/quality/) | 11 | [architecture](agents/quality/architecture-checker.md), [code-review](agents/quality/code-reviewer.md), [complexity](agents/quality/complexity-analyzer.md), [complexity-reducer](agents/quality/complexity-reducer.md), [type-check](agents/quality/type-checker.md), [code-smell](agents/quality/code-smell-detector.md), [dead-code](agents/quality/dead-code-detector.md), [duplicate](agents/quality/duplicate-code-detector.md), [consistency](agents/quality/consistency-checker.md), [quality-gate](agents/quality/quality-gate.md), [performance](agents/quality/performance-validator.md) |
 | [Specialized](agents/specialized/) | 11 | [performance](agents/specialized/performance-profiler.md), [memory](agents/specialized/memory-safety-checker.md), [accessibility](agents/specialized/accessibility-checker.md), [database](agents/specialized/database-reviewer.md), [api-contract](agents/specialized/api-contract-validator.md), [config](agents/specialized/configuration-validator.md), [error](agents/specialized/error-handler-checker.md), [health](agents/specialized/health-check-validator.md), [observability](agents/specialized/observability-checker.md), [resilience](agents/specialized/resilience-checker.md), [i18n](agents/specialized/translation-checker.md) |
 | [Security](agents/security/) | 7 | [scanner](agents/security/security-scanner.md), [secrets](agents/security/secrets-detector.md), [dependencies](agents/security/dependency-checker.md), [dependency-auditor](agents/security/dependency-auditor.md), [input-validation](agents/security/input-validation-checker.md), [concurrency](agents/security/concurrency-checker.md), [sast](agents/security/sast-scanner.md) |
-| [Infrastructure](agents/infrastructure/) | 5 | [terraform](agents/infrastructure/terraform-validator.md), [kubernetes](agents/infrastructure/kubernetes-checker.md), [docker](agents/infrastructure/docker-security-checker.md), [ci-pipeline](agents/infrastructure/ci-pipeline-checker.md), [ci-runner](agents/infrastructure/ci-runner-setup.md) |
+| [Infrastructure](agents/infrastructure/) | 6 | [terraform](agents/infrastructure/terraform-validator.md), [kubernetes](agents/infrastructure/kubernetes-checker.md), [docker](agents/infrastructure/docker-security-checker.md), [ci-pipeline](agents/infrastructure/ci-pipeline-checker.md), [ci-runner](agents/infrastructure/ci-runner-setup.md), [deployment-setup](agents/infrastructure/deployment-setup.md) |
 | [Pipeline](agents/pipeline/) | 5 | [writer](agents/pipeline/agent-writer.md), [critic](agents/pipeline/agent-critic.md), [tester](agents/pipeline/agent-tester.md), [qa](agents/pipeline/agent-qa.md), [publisher](agents/pipeline/agent-publisher.md) |
 | [Planning](agents/planning/) | 4 | [vision-advisor](agents/planning/vision-advisor.md), [vision-decomposer](agents/planning/vision-decomposer.md), [product-owner](agents/planning/product-owner.md), [implementation-planner](agents/planning/implementation-planner.md) |
 | [Iron Loop](agents/iron-loop/) | 3 | [integrator](agents/iron-loop/iron-loop-integrator.md), [critic](agents/iron-loop/iron-loop-critic.md), [executor](agents/iron-loop/iron-loop-executor.md) |
@@ -350,6 +351,49 @@ git commit → background agent runs: lint, typecheck, tests, security
 
 ---
 
+## Deployment Pipeline
+
+After Gate 3 approval (review → done), CTO Chief can automatically promote your code through environments:
+
+```
+Gate 3 approved → development → staging → production
+                      │            │           │
+                  git-branch   git-branch   git-branch
+                  git-tag      webhook      script
+                  webhook      script       docker
+                  script       docker       ssh
+                  docker       ssh
+                  ssh
+```
+
+**Configurable per environment** — choose a deployment strategy (git-branch, git-tag, webhook, script, docker, ssh), set approval mode (auto or manual), and enable auto-rollback on failure. Any environment can be skipped.
+
+**Setup** — run the `deployment-setup` agent for an interactive walkthrough, or configure directly in `.ctoc/settings.yaml`:
+
+```yaml
+deployment:
+  enabled: true
+  environments:
+    - name: staging
+      enabled: true
+      strategy: git-branch
+      branch: deploy/staging
+    - name: production
+      enabled: true
+      strategy: git-branch
+      branch: deploy/production
+  approval:
+    staging: auto
+    production: manual    # pause and ask before production
+  rollback:
+    auto_rollback: true
+    keep_history: 10
+```
+
+**Status tracking** — deployment history and latest status are stored in `.ctoc/deployments/`. Each entry records environment, status (success/failed/rolled-back), timestamp, commit, and plan name.
+
+---
+
 ## How It Works
 
 ```
@@ -454,7 +498,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.1.31'
+getVersion()       // → '6.1.32'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -475,7 +519,7 @@ ctoc/
 │   └── data/        Static data files
 ├── agents/          85 agent definitions (19 categories)
 ├── skills/          360 language & framework skills
-├── tests/           39 test files
+├── tests/           40 test files
 ├── .ctoc/           Config, templates, operations
 └── .claude-plugin/  Plugin metadata
 ```
@@ -496,6 +540,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.1.31** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.32** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

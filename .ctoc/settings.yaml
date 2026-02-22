@@ -190,3 +190,47 @@ user_preferences:
   # latin: Use letters (A-Z) and numbers (1-7)
   # numeric-only: Use only numbers
   keyboard_layout: "latin"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Deployment Pipeline Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+deployment:
+  # Master switch for deployment pipeline
+  # When enabled, Gate 3 approval (review -> done) triggers automated deployment
+  enabled: false
+
+  # Environment definitions — pipeline runs in order, skipping disabled envs
+  # Strategies: git-branch, git-tag, webhook, script, docker, ssh
+  environments:
+    - name: development
+      enabled: false
+      strategy: git-branch       # Push to deploy/development branch
+      branch: deploy/development
+
+    - name: staging
+      enabled: false
+      strategy: git-branch       # Push to deploy/staging branch
+      branch: deploy/staging
+
+    - name: production
+      enabled: false
+      strategy: git-branch       # Push to deploy/production branch
+      branch: deploy/production
+
+  # Approval requirements per environment
+  # auto: deploy immediately after previous env succeeds
+  # manual: pause and ask user before deploying
+  approval:
+    staging: auto
+    production: manual           # Recommended: always require human approval for prod
+
+  # Webhook notifications
+  notifications:
+    on_success: []               # URLs to POST on successful deployment
+    on_failure: []               # URLs to POST on failed deployment
+
+  # Rollback configuration
+  rollback:
+    auto_rollback: true          # Automatically rollback on failure
+    keep_history: 10             # Number of deployment records to keep

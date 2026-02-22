@@ -241,6 +241,17 @@ agents:
     category: admin
     description: Suggests new learnings based on interactions
 
+  # -----------------------------------------------------------------------------
+  #  INFRASTRUCTURE AGENTS
+  # -----------------------------------------------------------------------------
+
+  deployment-setup:
+    path: agents/infrastructure/deployment-setup.md
+    model: sonnet
+    category: infrastructure
+    description: Interactive deployment pipeline setup — guides users through environment, strategy, and approval configuration
+    always_available: true
+
 # ===============================================================================
 #  IRON LOOP v2.1
 # ===============================================================================

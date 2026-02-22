@@ -117,6 +117,22 @@ function approvePlan(planPath, projectPath) {
       // Note: implementation→todo already has Iron Loop applied synchronously
       // The Iron Loop integrator runs as part of applyIronLoop()
 
+      // Trigger deployment pipeline after Gate 3 (review -> done)
+      if (from === 'review' && to === 'done') {
+        try {
+          const { getDeploymentConfig, runDeploymentPipeline } = require('./deployment');
+          const config = getDeploymentConfig(root);
+          if (config.enabled) {
+            // Run asynchronously — don't block the plan transition
+            runDeploymentPipeline(newPath, root).catch(err => {
+              console.error('Deployment pipeline failed:', err.message);
+            });
+          }
+        } catch (deployErr) {
+          console.error('Deployment trigger failed:', deployErr.message);
+        }
+      }
+
       // Log transition to audit trail
       try {
         logTransition({

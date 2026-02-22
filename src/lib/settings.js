@@ -12,7 +12,8 @@ const SETTINGS_TABS = [
   { id: 'workflow', name: 'Workflow' },
   { id: 'learning', name: 'Learning' },
   { id: 'git', name: 'Git' },
-  { id: 'privacy', name: 'Privacy' }
+  { id: 'privacy', name: 'Privacy' },
+  { id: 'deployment', name: 'Deployment' }
 ];
 
 const SETTINGS_SCHEMA = {
@@ -71,6 +72,17 @@ const SETTINGS_SCHEMA = {
       { key: 'gitignoreCache', label: 'Add cache to .gitignore', type: 'toggle', default: true },
       { key: 'redactSecrets', label: 'Redact secrets in logs', type: 'toggle', default: true },
       { key: 'showCostEstimates', label: 'Show cost estimates', type: 'toggle', default: true }
+    ]
+  },
+  deployment: {
+    label: 'Deployment Settings',
+    settings: [
+      { key: 'enabled', label: 'Deployment pipeline enabled', type: 'toggle', default: false },
+      { key: 'developmentEnabled', label: 'Development environment', type: 'toggle', default: false },
+      { key: 'stagingEnabled', label: 'Staging environment', type: 'toggle', default: false },
+      { key: 'productionEnabled', label: 'Production environment', type: 'toggle', default: false },
+      { key: 'productionApproval', label: 'Production approval', type: 'select', options: ['auto', 'manual'], default: 'manual' },
+      { key: 'autoRollback', label: 'Auto-rollback on failure', type: 'toggle', default: true }
     ]
   }
 };
