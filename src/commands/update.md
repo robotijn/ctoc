@@ -6,7 +6,7 @@ disable-model-invocation: true
 Update CTOC to the latest version from GitHub:
 
 ```bash
-node "$(ls -d ~/.claude/plugins/cache/robotijn/ctoc/*/src/commands/update.js 2>/dev/null | head -1)" 2>/dev/null || node "${CLAUDE_PLUGIN_ROOT}/src/commands/update.js"
+node "$(ls -d ~/.claude/plugins/cache/robotijn/ctoc/*/src/commands/update.js ~/.claude/plugins/cache/robotijn/ctoc/*/commands/update.js 2>/dev/null | head -1 || echo NOTFOUND)" 2>&1 || echo "[CTOC] Update script not found in cache. Reinstall: /plugin marketplace add https://github.com/robotijn/ctoc && /plugin install ctoc"
 ```
 
 This command works around the Claude Code plugin cache bug by:

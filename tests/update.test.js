@@ -102,4 +102,83 @@ test('No local development paths in update script', () => {
   }
 });
 
+// Test: Clone-or-fetch logic exists
+test('Update script has clone-or-fetch logic', () => {
+  const updateScript = path.join(__dirname, '..', 'src', 'commands', 'update.js');
+  const content = fs.readFileSync(updateScript, 'utf8');
+
+  assert(content.includes('git clone'), 'Should have git clone for fresh installs');
+  assert(content.includes('.git'), 'Should check for .git directory');
+  assert(content.includes('robotijn/ctoc.git') || content.includes('robotijn/ctoc'),
+    'Clone URL should point to robotijn/ctoc');
+});
+
+// Test: Clone handles missing marketplace dir
+test('Clone logic handles missing marketplace dir', () => {
+  const updateScript = path.join(__dirname, '..', 'src', 'commands', 'update.js');
+  const content = fs.readFileSync(updateScript, 'utf8');
+
+  // Must check if .git exists before deciding clone vs fetch
+  assert(content.includes("existsSync(path.join(MARKETPLACE_DIR, '.git'))"),
+    'Should check for .git inside MARKETPLACE_DIR');
+  // Must create dir with recursive option
+  assert(content.includes('recursive: true'),
+    'Should use recursive mkdir for marketplace dir');
+  // Must remove broken dir before cloning
+  assert(content.includes('rmSync'),
+    'Should remove broken marketplace dir before cloning');
+});
+
+// Test: Error message is meaningful
+test('Error message mentions GitHub', () => {
+  const updateScript = path.join(__dirname, '..', 'src', 'commands', 'update.js');
+  const content = fs.readFileSync(updateScript, 'utf8');
+
+  assert(content.includes('Failed to fetch from GitHub'),
+    'Error message should mention GitHub');
+  assert(!content.match(/Failed to fetch\.\s*Check network/),
+    'Should not have vague "Check network connection" without mentioning GitHub');
+});
+
+// Test: update.md tries both path patterns
+test('update.md tries both old and new cache paths', () => {
+  const updateMd = path.join(__dirname, '..', 'src', 'commands', 'update.md');
+  const content = fs.readFileSync(updateMd, 'utf8');
+
+  assert(content.includes('*/src/commands/update.js'),
+    'Should try new path (src/commands/)');
+  assert(content.includes('*/commands/update.js'),
+    'Should try old path (commands/)');
+});
+
+// Test: update.md does not suppress errors
+test('update.md does not suppress node errors', () => {
+  const updateMd = path.join(__dirname, '..', 'src', 'commands', 'update.md');
+  const content = fs.readFileSync(updateMd, 'utf8');
+
+  // The node call should use 2>&1, not 2>/dev/null
+  // Only the ls glob should suppress errors (2>/dev/null on ls is fine)
+  const lines = content.split('\n');
+  for (const line of lines) {
+    if (line.includes('node "$(') && line.includes('2>/dev/null')) {
+      // 2>/dev/null on the ls inside $() is OK, but not on the outer node call
+      // Check: the part after the closing ) should NOT have 2>/dev/null
+      const afterSubshell = line.split(')"')[1] || '';
+      assert(!afterSubshell.includes('2>/dev/null'),
+        'node call should not suppress stderr with 2>/dev/null');
+    }
+  }
+});
+
+// Test: update.md has fallback message
+test('update.md has fallback reinstall message', () => {
+  const updateMd = path.join(__dirname, '..', 'src', 'commands', 'update.md');
+  const content = fs.readFileSync(updateMd, 'utf8');
+
+  assert(content.includes('Reinstall') || content.includes('reinstall'),
+    'Should mention reinstall as fallback');
+  assert(content.includes('plugin marketplace add'),
+    'Should include marketplace add command in fallback');
+});
+
 console.log('# All update tests passed!');

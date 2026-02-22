@@ -65,13 +65,24 @@ function update() {
   console.log('─'.repeat(40));
   console.log(`Current version: ${currentVersion}`);
 
-  // 1. Fetch latest from GitHub
+  // 1. Clone or fetch latest from GitHub
   console.log('\n1. Fetching latest from GitHub...');
   try {
-    run(`git -C "${MARKETPLACE_DIR}" fetch origin`);
-    run(`git -C "${MARKETPLACE_DIR}" reset --hard origin/main`);
+    const hasGit = fs.existsSync(path.join(MARKETPLACE_DIR, '.git'));
+    if (!hasGit) {
+      // No .git dir — clone fresh (handles missing dir, broken state, cleared cache)
+      if (fs.existsSync(MARKETPLACE_DIR)) {
+        fs.rmSync(MARKETPLACE_DIR, { recursive: true });
+      }
+      fs.mkdirSync(MARKETPLACE_DIR, { recursive: true });
+      run(`git clone https://github.com/robotijn/ctoc.git "${MARKETPLACE_DIR}"`);
+      console.log('   Cloned fresh from GitHub');
+    } else {
+      run(`git -C "${MARKETPLACE_DIR}" fetch origin`);
+      run(`git -C "${MARKETPLACE_DIR}" reset --hard origin/main`);
+    }
   } catch (e) {
-    console.error('   Failed to fetch. Check network connection.');
+    console.error('   Failed to fetch from GitHub. Check network connection.');
     process.exit(1);
   }
 
