@@ -1,12 +1,12 @@
 <p align="center">
   <strong>CTO Chief</strong><br>
-  <em>Stop AI from writing code before it thinks.</em>
+  <em>The CTO your AI never had.</em>
 </p>
 
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.1.33-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.1.34-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-86-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
@@ -521,7 +521,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.1.33'
+getVersion()       // → '6.1.34'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -563,6 +563,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.1.33** · Built by [@robotijn](https://github.com/robotijn)
+**6.1.34** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
