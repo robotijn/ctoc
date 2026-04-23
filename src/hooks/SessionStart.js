@@ -10,9 +10,7 @@ const fs = require('fs');
 // Note: For Claude Code plugins, hooks are loaded relative to the plugin root
 const { loadState, createState, saveState, STEP_NAMES, isInterruptedSession, formatTimeSince } = require('../lib/state-manager');
 const { detectStack } = require('../lib/stack-detector');
-const { dashboard, writeToTerminal } = require('../lib/ui');
-const { CTOC_HOME } = require('../lib/crypto');
-const { getVersion, checkForUpdates } = require('../lib/version');
+const { getVersion } = require('../lib/version');
 const { findProjectRoot: findRoot } = require('../lib/project-root');
 
 /**
@@ -111,34 +109,30 @@ async function main() {
     }
   }
 
-  // 6. Check for updates (async, non-blocking)
+  // 6. Check for updates (sync cache check only — no stderr output in hooks)
   const version = getVersion();
-  checkForUpdates().then(update => {
-    if (update.updateAvailable) {
-      writeToTerminal(`\n[CTOC] Update available: ${update.currentVersion} → ${update.latestVersion}\n`);
-      writeToTerminal(`       Run: git pull origin main\n`);
-    }
-  }).catch(() => {
-    // Silent fail - don't block session start
-  });
+  const { checkForUpdatesSync } = require('../lib/version');
+  const updateInfo = checkForUpdatesSync();
 
-  // 7. Output banner to terminal
-  writeToTerminal('ctoc v' + version + ' active\n');
+  // 7. Build context (all output goes to stdout — stderr triggers Claude Code hook errors)
 
   // 8. Output context for Claude (to stdout for hook consumption)
-  const context = generateContext(stack, state);
+  const context = generateContext(stack, state, version, updateInfo);
   console.log(context);
 }
 
 /**
  * Generate CTOC context instructions for Claude
  */
-function generateContext(stack, state) {
+function generateContext(stack, state, version, updateInfo) {
   const stepName = state?.feature ? STEP_NAMES[state.currentStep] : 'Ready';
+  const updateLine = updateInfo?.updateAvailable
+    ? `\nUpdate available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion} (run: git pull origin main)`
+    : '';
 
   return `
 ============================================================
-CTOC ENABLED - Your Virtual CTO is Active
+CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
 ============================================================
 Project: ${path.basename(process.cwd())}
 Stack: ${stack.languages.join('/') || 'unknown'}
