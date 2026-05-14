@@ -56,10 +56,11 @@ describe('CTO Chief — sole top-level coordinator', () => {
     assert.match(ctoBlock[0], /top_level:\s*true/, 'registry must mark top_level: true');
   });
 
-  it('CLAUDE.md has an Agent Hierarchy section naming CTO Chief', () => {
+  it('CLAUDE.md has an Agent Architecture / Hierarchy section naming CTO Chief', () => {
     const content = fs.readFileSync(CLAUDE_MD_PATH, 'utf8');
-    assert.match(content, /##\s+Agent Hierarchy/, 'CLAUDE.md must include "## Agent Hierarchy"');
-    assert.match(content, /CTO Chief.*sole top-level/i, 'must explicitly name CTO Chief as sole top-level');
+    // v7 used "Agent Hierarchy", v8 uses "Agent Architecture". Accept either.
+    assert.match(content, /##\s+Agent (Hierarchy|Architecture)/, 'CLAUDE.md must declare the agent hierarchy/architecture');
+    assert.match(content, /CTO Chief.*(sole top-level|only agent with top-level)/i, 'must explicitly name CTO Chief as the unique top-level coordinator');
   });
 
   it('no OTHER agent file declares role: top-level-coordinator (uniqueness)', () => {

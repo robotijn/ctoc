@@ -5,15 +5,29 @@
 
 ---
 
-## Agent Hierarchy (v7)
+## Agent Architecture (v8, 4 tiers)
 
-There is exactly one top-level coordinator agent: **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`). Every other agent and skill is dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
+CTOC v8 organizes the agent layer into four tiers. See [`docs/AGENT_ARCHITECTURE.md`](./docs/AGENT_ARCHITECTURE.md) for the full spec.
 
 ```
-USER (human CTO) → CTO CHIEF (sole top-level) → { sub-orchestrators, specialists, skills }
+Tier 0  CTO CHIEF (1)              top-level, sole dispatcher
+Tier 1  Sub-orchestrators (16)     incl. NEW synthesizer (cross-pillar)
+Tier 2  Specialist skills (72)     leaf agents → skills, structured outputs
+Tier 3  Scouts (5, Haiku)          fast pre-screens, short-circuit deep dispatches
 ```
 
-CTO Chief is the **final approver** before any plan crosses Gate 3 (review → done). It verifies the 14 quality dimensions and the human-approval marker exist before approving. When sub-orchestrator outputs conflict, CTO Chief decides — not majority vote, not first-to-finish.
+**CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`) is the only agent with top-level authority. All other agents and skills are dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer, synthesizer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
+
+```
+USER (human CTO) → CTO CHIEF (Tier 0) → SCOUTS (Tier 3, parallel)
+                                       → SUB-ORCHESTRATORS (Tier 1)
+                                       → SPECIALISTS (Tier 2)
+                                       → SYNTHESIZER (Tier 1, cross-pillar)
+```
+
+CTO Chief is the **final approver** before any plan crosses Gate 3 (review → done). It verifies the 14 quality dimensions and the human-approval marker exist before approving. When sub-orchestrator outputs conflict, the **synthesizer** produces a minimal change list using priority rules (Security > Correctness > Maintainability > Performance > Readability > Consistency); CTO Chief approves.
+
+Every dispatch is logged to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml` per the [`DISPATCH_PROTOCOL.md`](./docs/DISPATCH_PROTOCOL.md). Structural invariants are enforced by `tests/architecture-invariants.test.js`.
 
 ---
 

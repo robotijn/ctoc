@@ -1,0 +1,155 @@
+# ===============================================================================
+#  Known-Bad Dependencies — curated CVE list for scouts/dep-scout
+#  Refreshed monthly. Used by Tier 3 dep-scout for fast manifest scanning.
+#  Schema: see .ctoc/architecture/dispatch-schema.yaml
+# ===============================================================================
+
+schema_version: "1.0"
+last_refreshed: "2026-05-14"
+source: "Curated from npm/pip/cargo/go advisory databases"
+
+packages:
+  # ---- npm ----
+  - name: lodash
+    ecosystem: npm
+    vulnerable_versions: "< 4.17.21"
+    cve: CVE-2021-23337
+    cvss: 9.8
+    severity: critical
+    title: Prototype Pollution
+
+  - name: axios
+    ecosystem: npm
+    vulnerable_versions: "< 1.6.0"
+    cve: CVE-2023-45857
+    cvss: 9.1
+    severity: high
+    title: Server-Side Request Forgery
+
+  - name: minimist
+    ecosystem: npm
+    vulnerable_versions: "< 1.2.6"
+    cve: CVE-2021-44906
+    cvss: 9.8
+    severity: critical
+    title: Prototype Pollution
+
+  - name: node-fetch
+    ecosystem: npm
+    vulnerable_versions: "< 2.6.7"
+    cve: CVE-2022-0235
+    cvss: 6.1
+    severity: medium
+    title: Exposure of Sensitive Information
+
+  - name: ws
+    ecosystem: npm
+    vulnerable_versions: "< 7.5.10 || >= 8.0.0 < 8.17.1"
+    cve: CVE-2024-37890
+    cvss: 7.5
+    severity: high
+    title: DoS via unbounded headers
+
+  - name: tar
+    ecosystem: npm
+    vulnerable_versions: "< 6.1.9"
+    cve: CVE-2021-37712
+    cvss: 8.1
+    severity: high
+    title: Symlink path traversal
+
+  # ---- pypi ----
+  - name: requests
+    ecosystem: pypi
+    vulnerable_versions: "< 2.32.0"
+    cve: CVE-2024-35195
+    cvss: 7.5
+    severity: high
+    title: Session verify bypass
+
+  - name: cryptography
+    ecosystem: pypi
+    vulnerable_versions: "< 42.0.0"
+    cve: CVE-2024-26130
+    cvss: 7.5
+    severity: high
+    title: NULL pointer dereference
+
+  - name: Pillow
+    ecosystem: pypi
+    vulnerable_versions: "< 10.3.0"
+    cve: CVE-2024-28219
+    cvss: 8.1
+    severity: high
+    title: Buffer overflow in _imagingcms
+
+  - name: urllib3
+    ecosystem: pypi
+    vulnerable_versions: "< 2.2.2"
+    cve: CVE-2024-37891
+    cvss: 4.4
+    severity: medium
+    title: Proxy-Authorization leak
+
+  - name: PyYAML
+    ecosystem: pypi
+    vulnerable_versions: "< 5.4"
+    cve: CVE-2020-14343
+    cvss: 9.8
+    severity: critical
+    title: RCE via unsafe loader
+
+  # ---- go ----
+  - name: golang.org/x/crypto
+    ecosystem: go
+    vulnerable_versions: "< v0.31.0"
+    cve: CVE-2024-45337
+    cvss: 9.1
+    severity: critical
+    title: SSH key authentication bypass
+
+  - name: golang.org/x/net
+    ecosystem: go
+    vulnerable_versions: "< v0.33.0"
+    cve: CVE-2024-45338
+    cvss: 7.5
+    severity: high
+    title: HTML parser DoS
+
+  # ---- cargo ----
+  - name: openssl
+    ecosystem: cargo
+    vulnerable_versions: "< 0.10.66"
+    cve: RUSTSEC-2024-0357
+    severity: high
+    title: Use-after-free in BIO
+
+  - name: tokio
+    ecosystem: cargo
+    vulnerable_versions: "< 1.36.0"
+    cve: RUSTSEC-2024-0019
+    severity: medium
+    title: Stack overflow in tracing-subscriber
+
+  # ---- rubygems ----
+  - name: nokogiri
+    ecosystem: rubygems
+    vulnerable_versions: "< 1.16.5"
+    cve: CVE-2024-34459
+    cvss: 7.5
+    severity: high
+    title: Out-of-bounds read in libxml2
+
+  - name: rails
+    ecosystem: rubygems
+    vulnerable_versions: "< 7.1.3.4"
+    cve: CVE-2024-32464
+    cvss: 8.1
+    severity: high
+    title: Possible ReDoS in ActionMailer
+
+# Curation policy:
+#   - Only HIGH and CRITICAL CVEs (CVSS >= 7.0)
+#   - Add new entries when CVE is publicly disclosed AND fix is available
+#   - Remove entries 12 months after first appearance (long tail moves to Tier 2 audit)
+#   - dep-scout uses this list verbatim; the deep dependency-auditor uses live advisory DBs

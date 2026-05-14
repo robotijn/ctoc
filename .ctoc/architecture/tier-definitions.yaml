@@ -1,0 +1,227 @@
+# ===============================================================================
+#  CTOC Architecture v8 — Tier Definitions
+#  Machine-readable registry of the four-tier agent hierarchy.
+#  See docs/AGENT_ARCHITECTURE.md for the human-readable spec.
+# ===============================================================================
+
+schema_version: "1.0"
+architecture_version: "8.0"
+updated: "2026-05-14"
+
+tiers:
+
+  tier_0:
+    name: top-level-coordinator
+    description: "Sole dispatcher. Owns audit trail. Approves all gate crossings."
+    member_count: 1
+    members:
+      - cto-chief
+    model_default: opus
+    effort_budget:
+      max_tokens: unbounded
+      max_tool_calls: unbounded
+      max_subagents: unbounded
+    invariants:
+      - "Exactly one agent has role: top-level-coordinator"
+      - "Only Tier 0 issues dispatches"
+      - "Resolves cross-pillar conflicts (via synthesizer)"
+    enforced_by: tests/cto-chief-toplevel.test.js
+
+  tier_1:
+    name: sub-orchestrator
+    description: "Specialized coordinators. Recommend dispatches; never execute peer dispatches directly."
+    member_count: 16
+    members:
+      - planning/vision-advisor
+      - planning/vision-decomposer
+      - planning/product-owner
+      - planning/implementation-planner
+      - planning/functional-reviewer
+      - planning/implementation-plan-reviewer
+      - iron-loop/iron-loop-integrator
+      - iron-loop/iron-loop-critic
+      - iron-loop/iron-loop-executor
+      - pipeline/agent-writer
+      - pipeline/agent-critic
+      - pipeline/agent-tester
+      - pipeline/agent-qa
+      - pipeline/agent-publisher
+      - implementation/implementation-reviewer
+      - coordinator/synthesizer            # NEW in v8
+    model_default: opus
+    model_optimized_for: opus-4-7
+    effort_budget:
+      max_tokens: 200000
+      max_tool_calls: 100
+      max_subagents: 10
+    required_frontmatter:
+      - tier: 1
+      - effort: high
+      - reads_ancestry: true
+      - async_choice_protocol: enabled
+      - model_optimized_for: opus-4-7
+      - reports_to: cto-chief
+      - dispatch_protocol: v1
+    invariants:
+      - "reports_to MUST equal 'cto-chief'"
+      - "Reads full plan ancestry before acting"
+      - "Defer-and-continue on ambiguity (no stubs)"
+    enforced_by: tests/architecture-invariants.test.js
+
+  tier_2:
+    name: specialist
+    description: "Domain experts. Single-purpose. Structured findings output."
+    member_count: 72
+    member_categories:
+      - quality: 11
+      - testing: 14
+      - documentation: 2
+      - security: 7
+      - specialized: 11
+      - infrastructure: 5
+      - frontend: 3
+      - mobile: 3
+      - compliance: 3
+      - data-ml: 3
+      - versioning: 3
+      - ai-quality: 2
+      - architecture: 2
+      - devex: 2
+      - cost: 1
+    model_default: opus | sonnet           # category-dependent
+    effort_budget:
+      max_tokens: 50000
+      max_tool_calls: 30
+      max_subagents: 0                     # leaf agents do not dispatch
+    required_frontmatter:
+      - tier: 2
+      - effort_level: low | medium | high
+      - effort_budget: { max_tokens, max_tool_calls, max_subagents }
+      - parallel_safe: true | false
+      - model_optimized_for: opus-4-7
+      - dispatch_protocol: v1
+      - confidence_calibration: enabled
+    output_contract: docs/DISPATCH_PROTOCOL.md#response-schema
+    invariants:
+      - "Returns YAML findings list (may be empty)"
+      - "Each finding has severity, type, message, confidence, citations"
+      - "Cannot dispatch other agents"
+    enforced_by: tests/architecture-invariants.test.js
+
+  tier_3:
+    name: scout
+    description: "Haiku-tier pre-screens. Fast pass/flag decision; short-circuits Tier 2 if pass."
+    member_count: 5
+    members:
+      - scouts/syntax-scout
+      - scouts/secret-scout
+      - scouts/dep-scout
+      - scouts/lint-scout
+      - scouts/test-scout
+    model_default: haiku
+    model_optimized_for: haiku-4-5
+    effort_budget:
+      max_tokens: 4000
+      max_tool_calls: 5
+      max_subagents: 0
+    required_frontmatter:
+      - tier: 3
+      - effort: low
+      - effort_budget: { max_tokens: 4000, max_tool_calls: 5, max_subagents: 0 }
+      - model: haiku
+      - model_optimized_for: haiku-4-5
+      - parallel_safe: true
+      - dispatch_protocol: v1
+    expected_output:
+      decision: pass | flag | error
+      pillar: <pillar-name>
+      reason: <one-line>
+      next_specialist: <category/name>     # if flag
+    cost_rationale: |
+      A Haiku scout is ~10-50x cheaper than the Opus/Sonnet specialist it short-circuits.
+      On a clean codebase, 4 of 5 scouts return 'pass', eliminating 4 deep dispatches per gate.
+    invariants:
+      - "Must return pass | flag | error decision"
+      - "Cannot dispatch other agents"
+      - "Latency target ≤ 200ms"
+    enforced_by: tests/architecture-invariants.test.js
+
+# ===============================================================================
+#  Dispatch graph
+# ===============================================================================
+
+dispatch_rules:
+
+  who_can_dispatch:
+    tier_0: [tier_1, tier_2, tier_3]      # CTO Chief dispatches everything
+    tier_1: []                            # Sub-orchestrators recommend, do not execute
+    tier_2: []                            # Specialists never dispatch
+    tier_3: []                            # Scouts never dispatch
+
+  recommendation_authority:
+    tier_1: [tier_2]                      # Sub-orchestrators recommend Tier 2 specialists
+    tier_3: [tier_2]                      # Scouts recommend the corresponding Tier 2 specialist when flagging
+
+  cross_tier_communication:
+    via: dispatch_protocol_v1
+    audit_path: .ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml
+
+# ===============================================================================
+#  Pillar mapping (for synthesizer cross-pillar integration)
+# ===============================================================================
+
+pillars:
+  readability:
+    primary_specialists: [quality/code-reviewer, quality/code-smell-detector]
+    primary_scout: scouts/syntax-scout
+
+  maintainability:
+    primary_specialists: [quality/complexity-analyzer, quality/dead-code-detector, quality/duplicate-code-detector]
+    primary_scout: scouts/lint-scout
+
+  reliability:
+    primary_specialists: [testing/coverage-enforcer, specialized/error-handler-checker, specialized/resilience-checker]
+    primary_scout: scouts/test-scout
+
+  performance:
+    primary_specialists: [quality/performance-validator, specialized/performance-profiler, frontend/bundle-analyzer]
+    primary_scout: null                    # no scout-level performance check yet
+
+  security:
+    primary_specialists: [security/security-scanner, security/sast-scanner, security/secrets-detector]
+    primary_scout: scouts/secret-scout
+
+# ===============================================================================
+#  Conflict resolution priority (synthesizer uses this)
+# ===============================================================================
+
+conflict_resolution_priority:
+  - security        # Security beats everything else
+  - correctness     # Correctness beats performance
+  - maintainability # Maintainability beats cleverness
+  - performance
+  - readability
+  - consistency
+
+# ===============================================================================
+#  Self-improvement loop
+# ===============================================================================
+
+self_improvement:
+  grading:
+    storage: .ctoc/agents/grades.yaml
+    grader_cadence: monthly
+    trigger_for_remodernization:
+      precision_high_below: 0.85
+      degrading_for_consecutive_months: 3
+
+  brief_refresh:
+    storage: .ctoc/audit/skill-conversion/category-briefs.md
+    refresh_cadence: monthly
+    refresh_trigger: agent_grade_drop
+    method: websearch + diff against previous brief
+
+  isolation_tests:
+    storage: tests/skill-loading.test.js
+    requirement: trigger corpus match ≥ 90%
+    failure_consequence: specialist removed from dispatchable set

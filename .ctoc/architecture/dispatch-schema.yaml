@@ -1,0 +1,241 @@
+# ===============================================================================
+#  CTOC Dispatch Protocol v1 — JSON Schema (in YAML form)
+#  Used to validate dispatch request/response blocks in audit logs.
+# ===============================================================================
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ctoc-dispatch-v1"
+
+definitions:
+
+  dispatch_request:
+    type: object
+    required: [id, protocol_version, issued_by, issued_at, target_agent, target_tier, goal, plan_ancestry, effort_budget]
+    properties:
+      id:
+        type: string
+        pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"     # ULID
+      protocol_version:
+        type: integer
+        const: 1
+      issued_by:
+        type: string
+        const: "cto-chief"
+      issued_at:
+        type: string
+        format: date-time
+      target_agent:
+        type: string
+        pattern: "^[a-z][a-z0-9-]+/[a-z][a-z0-9-]+$"
+      target_tier:
+        type: integer
+        minimum: 1
+        maximum: 3
+      goal:
+        type: string
+        minLength: 10
+      plan_ancestry:
+        type: object
+        properties:
+          vision: { type: [string, "null"] }
+          canvas: { type: [string, "null"] }
+          functional: { type: [string, "null"] }
+          implementation: { type: [string, "null"] }
+          todo: { type: [string, "null"] }
+          step: { type: [integer, "null"], minimum: 1, maximum: 16 }
+      context:
+        type: object
+        properties:
+          files:
+            type: array
+            items:
+              type: object
+              required: [path, sha]
+              properties:
+                path: { type: string }
+                sha: { type: string, pattern: "^[a-f0-9]{4,40}$" }
+                lines: { type: array, items: { type: integer }, minItems: 2, maxItems: 2 }
+          changed_lines_only: { type: boolean }
+          related_diffs:
+            type: array
+            items: { type: string }
+      effort_budget:
+        type: object
+        required: [max_tokens, max_tool_calls, max_subagents]
+        properties:
+          max_tokens: { type: integer, minimum: 1 }
+          max_tool_calls: { type: integer, minimum: 0 }
+          max_subagents: { type: integer, minimum: 0 }
+          deadline_seconds: { type: integer, minimum: 1 }
+      expected_output:
+        type: object
+        properties:
+          contract: { type: string }
+          min_confidence_per_finding:
+            type: string
+            enum: [HIGH, MEDIUM, LOW]
+          require_citations: { type: boolean }
+          require_brief_url_per_pattern: { type: boolean }
+      priority:
+        type: string
+        enum: [low, normal, high, critical]
+        default: normal
+
+  dispatch_response:
+    type: object
+    required: [dispatch_id, protocol_version, agent, agent_version, completed_at, findings, self_assessment, metadata]
+    properties:
+      dispatch_id:
+        type: string
+        pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+      protocol_version:
+        type: integer
+        const: 1
+      agent:
+        type: string
+      agent_version:
+        type: string
+      completed_at:
+        type: string
+        format: date-time
+      duration_ms:
+        type: integer
+        minimum: 0
+
+      findings:
+        type: array
+        items:
+          $ref: "#/definitions/finding"
+
+      self_assessment:
+        type: object
+        required: [coverage, confidence_overall]
+        properties:
+          coverage:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          confidence_overall:
+            type: string
+            enum: [HIGH, MEDIUM, LOW]
+          limitations:
+            type: array
+            items: { type: string }
+          unknowns:
+            type: array
+            items: { type: string }
+
+      metadata:
+        type: object
+        required: [tokens_used, tool_calls]
+        properties:
+          tokens_used: { type: integer, minimum: 0 }
+          tool_calls: { type: integer, minimum: 0 }
+          subagents_dispatched: { type: integer, minimum: 0 }
+          model: { type: string }
+
+  finding:
+    type: object
+    required: [id, severity, type, file, message, confidence, citations]
+    properties:
+      id:
+        type: string
+      severity:
+        type: string
+        enum: [critical, high, medium, low, info]
+      type:
+        type: string
+      file:
+        type: string
+      line_range:
+        type: array
+        items: { type: integer, minimum: 1 }
+        minItems: 1
+        maxItems: 2
+      message:
+        type: string
+      rationale:
+        type: string
+      suggestion:
+        type: string
+      confidence:
+        type: string
+        enum: [HIGH, MEDIUM, LOW]
+      confidence_rationale:
+        type: string
+        # Required when confidence == HIGH
+      citations:
+        type: object
+        required: [evidence]
+        properties:
+          brief_url:
+            type: string
+            format: uri
+          evidence:
+            type: array
+            items:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string }
+                line_range: { type: array, items: { type: integer }, maxItems: 2 }
+                sha: { type: string }
+            minItems: 1
+      tags:
+        type: array
+        items: { type: string }
+
+  scout_response:
+    # Tier 3 scouts use a simplified response form.
+    type: object
+    required: [dispatch_id, protocol_version, agent, decision, pillar]
+    properties:
+      dispatch_id:
+        type: string
+      protocol_version:
+        type: integer
+        const: 1
+      agent:
+        type: string
+      decision:
+        type: string
+        enum: [pass, flag, error]
+      pillar:
+        type: string
+      reason:
+        type: string
+      next_specialist:
+        type: string
+        # Required when decision == flag
+      metadata:
+        type: object
+        properties:
+          tokens_used: { type: integer }
+          tool_calls: { type: integer }
+          duration_ms: { type: integer }
+
+  audit_entry:
+    type: object
+    required: [request, response]
+    properties:
+      request:
+        $ref: "#/definitions/dispatch_request"
+      response:
+        oneOf:
+          - $ref: "#/definitions/dispatch_response"
+          - $ref: "#/definitions/scout_response"
+      outcome:
+        type: object
+        properties:
+          status:
+            type: string
+            enum: [completed, timeout, error, rejected]
+          reason: { type: string }
+          graded_at: { type: [string, "null"] }
+          grade:
+            type: object
+            properties:
+              accepted: { type: integer }
+              false_positive: { type: integer }
+              kickback: { type: integer }
+              precision: { type: number }

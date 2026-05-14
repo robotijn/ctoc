@@ -16,6 +16,14 @@ effort_level: low
 model_optimized_for: opus-4-7
 tools: Read, Grep, Glob
 model: sonnet
+tier: 2
+dispatch_protocol: v1
+confidence_calibration: enabled
+parallel_safe: true
+effort_budget:
+  max_tokens: 10000
+  max_tool_calls: 10
+  max_subagents: 0
 ---
 
 # Consistency Checker (skill)

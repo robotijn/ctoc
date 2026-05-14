@@ -18,6 +18,14 @@ effort_level: high
 model_optimized_for: opus-4-7
 tools: Bash, Read, Grep
 model: opus
+tier: 2
+dispatch_protocol: v1
+confidence_calibration: enabled
+parallel_safe: true
+effort_budget:
+  max_tokens: 50000
+  max_tool_calls: 30
+  max_subagents: 0
 ---
 
 # Concurrency Checker (skill)
