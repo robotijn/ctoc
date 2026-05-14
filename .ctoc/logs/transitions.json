@@ -26,5 +26,33 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-05-14T16:37:44.273Z",
+    "plan": "B1-orchestrator-agent-modernization.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-05-14T16:37:44.275Z",
+    "plan": "B2-leaf-agents-to-skills-and-skill-sweep.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
