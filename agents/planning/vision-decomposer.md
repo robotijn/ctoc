@@ -8,6 +8,7 @@ reads_ancestry: true
 async_choice_protocol: enabled
 model_optimized_for: opus-4-7
 reports_to: cto-chief
+tier: 1
 ---
 
 # Vision Decomposer Agent

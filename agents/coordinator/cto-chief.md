@@ -33,6 +33,7 @@ dispatches:
   - pipeline/*
   - iron-loop/*
 reports_to: user
+tier: 0
 ---
 
 ## Top-Level Authority — Sole Coordinator (v7+v8)

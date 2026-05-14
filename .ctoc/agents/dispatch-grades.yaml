@@ -1,0 +1,25 @@
+# ===============================================================================
+#  v8 Dispatch-derived agent grades.
+#  Populated by src/lib/v8-dispatcher.js's updateGrade() after audit outcomes.
+#  See docs/DISPATCH_PROTOCOL.md#confidence-calibration
+#
+#  Schema (per agent):
+#    <category/name>:
+#      precision_high: 0.0-1.0    fraction of HIGH findings that were accepted
+#      precision_med:  0.0-1.0    fraction of MEDIUM findings accepted
+#      precision_low:  0.0-1.0    fraction of LOW findings accepted
+#      total_high:     <int>      count of HIGH findings emitted
+#      total_med:      <int>      count of MEDIUM findings emitted
+#      total_low:      <int>      count of LOW findings emitted
+#      recall_estimate: 0.0-1.0   estimated recall from kickback signals
+#      last_updated:   <iso8601>
+#      trend:          improving | stable | degrading
+#
+#  Agents with precision_high < 0.85 are flagged for re-modernization
+#  (re-WebSearch the category brief, refresh the skill body).
+#
+#  This is SEPARATE from .ctoc/agents/grades.yaml (which tracks the legacy
+#  bootstrap-pipeline improvement-loop scores).
+# ===============================================================================
+
+# (no grades yet — populated as dispatches occur)

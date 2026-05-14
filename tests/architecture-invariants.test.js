@@ -86,6 +86,12 @@ describe('v8 Architecture — Tier 0 (CTO Chief)', () => {
     assert.match(fm, /top_level:\s*true/);
   });
 
+  it('declares tier: 0', () => {
+    const p = path.join(projectRoot, 'agents', 'coordinator', 'cto-chief.md');
+    const { fm } = readFM(p);
+    assert.match(fm, /^tier:\s*0$/m);
+  });
+
   it('is the ONLY agent declaring role: top-level-coordinator', () => {
     const agents = walkAgentFiles(path.join(projectRoot, 'agents'));
     const offenders = [];
@@ -104,6 +110,22 @@ describe('v8 Architecture — Tier 0 (CTO Chief)', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
+  const TIER_1_AGENTS = [
+    'agents/coordinator/synthesizer.md',
+    'agents/iron-loop/iron-loop-integrator.md',
+    'agents/iron-loop/iron-loop-critic.md',
+    'agents/iron-loop/iron-loop-executor.md',
+    'agents/pipeline/agent-writer.md',
+    'agents/pipeline/agent-critic.md',
+    'agents/pipeline/agent-tester.md',
+    'agents/pipeline/agent-qa.md',
+    'agents/pipeline/agent-publisher.md',
+    'agents/planning/vision-advisor.md',
+    'agents/planning/vision-decomposer.md',
+    'agents/planning/product-owner.md',
+    'agents/planning/implementation-planner.md',
+  ];
+
   it('synthesizer agent exists at agents/coordinator/synthesizer.md', () => {
     const p = path.join(projectRoot, 'agents', 'coordinator', 'synthesizer.md');
     assert.ok(fs.existsSync(p), 'synthesizer.md must exist');
@@ -117,10 +139,29 @@ describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
     assert.match(fm, /dispatch_protocol:\s*v1/, 'synthesizer must declare dispatch_protocol: v1');
   });
 
-  it('synthesizer is NOT itself top-level (no role: top-level-coordinator)', () => {
-    const p = path.join(projectRoot, 'agents', 'coordinator', 'synthesizer.md');
-    const c = fs.readFileSync(p, 'utf8');
-    assert.doesNotMatch(c, /role:\s*top-level-coordinator/, 'synthesizer must NOT be top-level');
+  it('every Tier 1 agent declares tier: 1', () => {
+    for (const rel of TIER_1_AGENTS) {
+      const p = path.join(projectRoot, rel);
+      assert.ok(fs.existsSync(p), `${rel} must exist`);
+      const { fm } = readFM(p);
+      assert.match(fm, /^tier:\s*1$/m, `${rel} must declare tier: 1`);
+    }
+  });
+
+  it('every Tier 1 agent declares reports_to: cto-chief', () => {
+    for (const rel of TIER_1_AGENTS) {
+      const p = path.join(projectRoot, rel);
+      const { fm } = readFM(p);
+      assert.match(fm, /reports_to:\s*cto-chief/, `${rel} must report to cto-chief`);
+    }
+  });
+
+  it('no Tier 1 agent claims role: top-level-coordinator (uniqueness)', () => {
+    for (const rel of TIER_1_AGENTS) {
+      const p = path.join(projectRoot, rel);
+      const c = fs.readFileSync(p, 'utf8');
+      assert.doesNotMatch(c, /role:\s*top-level-coordinator/, `${rel} must NOT be top-level`);
+    }
   });
 });
 

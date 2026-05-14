@@ -1,0 +1,90 @@
+# ===============================================================================
+#  Example dispatch — illustrates the v8 protocol shape.
+#  Not a real audit entry; lives under example/ so date-based grouping skips it.
+#  See docs/DISPATCH_PROTOCOL.md for the full schema.
+# ===============================================================================
+
+request:
+  id: 01J9X8Y2KZQ3M5N7P9R2T4V6W8
+  protocol_version: 1
+  issued_by: cto-chief
+  issued_at: 2026-05-14T12:34:56Z
+  target_agent: quality/code-reviewer
+  target_tier: 2
+  goal: "Review the auth refactor in src/auth/ for code quality issues."
+  plan_ancestry:
+    vision: plans/done/auth-refactor.md
+    canvas: plans/done/auth-refactor-canvas.md
+    functional: plans/done/auth-refactor-functional.md
+    implementation: plans/in-progress/auth-refactor-impl.md
+    todo: null
+    step: 11
+  context:
+    files:
+      - path: src/auth/middleware.py
+        sha: 9d2c4f6e
+        lines: [1, 240]
+      - path: src/auth/handlers.py
+        sha: 4a8b1c3d
+        lines: [1, 180]
+    changed_lines_only: true
+  effort_budget:
+    max_tokens: 50000
+    max_tool_calls: 30
+    max_subagents: 0
+    deadline_seconds: 300
+  expected_output:
+    contract: docs/DISPATCH_PROTOCOL.md#response-schema
+    min_confidence_per_finding: MEDIUM
+    require_citations: true
+    require_brief_url_per_pattern: true
+  priority: normal
+
+response:
+  dispatch_id: 01J9X8Y2KZQ3M5N7P9R2T4V6W8
+  protocol_version: 1
+  agent: quality/code-reviewer
+  agent_version: 6.4.8
+  completed_at: 2026-05-14T12:35:42Z
+  duration_ms: 4523
+  findings:
+    - id: code-reviewer/2026-05-14/001
+      severity: high
+      type: long_function
+      file: src/auth/middleware.py
+      line_range: [45, 132]
+      message: "validate_token() is 87 lines, exceeds 50-line SRP threshold."
+      rationale: |
+        The function combines request parsing, signature verification,
+        and audit logging — three responsibilities in one function.
+      suggestion: |
+        Extract three helpers:
+        1. parse_token_header(request) -> Token
+        2. verify_signature(token, key) -> bool
+        3. record_audit_entry(token, outcome)
+      confidence: HIGH
+      confidence_rationale: "Deterministic measurement (line count + AST nesting depth)."
+      citations:
+        brief_url: https://www.codeant.ai/blogs/what-are-the-five-pillars-of-code-quality
+        evidence:
+          - file: src/auth/middleware.py
+            line_range: [45, 132]
+            sha: 9d2c4f6e
+      tags: [readability, maintainability, SRP]
+  self_assessment:
+    coverage: 0.95
+    confidence_overall: HIGH
+    limitations:
+      - "Dynamic imports not fully traced."
+    unknowns: []
+  metadata:
+    tokens_used: 12450
+    tool_calls: 8
+    subagents_dispatched: 0
+    model: opus-4-7
+
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null
