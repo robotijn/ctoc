@@ -231,6 +231,40 @@ checks:
     description: "Disaster recovery runbook documented (Notion / runbooks/)"
 
   # ─────────────────────────────────────────────────────────
+  # Code quality gate (refinement-loop alignment, v6.9.9)
+  # ─────────────────────────────────────────────────────────
+  - id: zero_warnings_all_toolchains
+    severity: block
+    owner: programmer
+    description: "Zero warnings across all toolchains (compiler, linter, type-checker, deprecation notices, peer-dep mismatches)"
+    validation: |
+      Every CI job runs with warnings-as-errors. Any of the following is a block:
+        - eslint / ruff / clippy emits any warning at warn level
+        - tsc emits a 'TS' diagnostic at any severity
+        - npm install reports peer-dependency mismatches
+        - pip / cargo / go reports a deprecated API usage
+        - browser console emits a React/Vue/Svelte warning during E2E
+      Pin warnings-as-errors in CI config (e.g., `--max-warnings 0`, `"strict": true`).
+    rationale: |
+      A warning is a latent bug. Enterprise customers run security scans that
+      surface warning-class findings as compliance gaps. The next major-version
+      upgrade strips the soft-warn affordance and the warning becomes a
+      customer-visible failure. Refinement loop classifies all warnings as
+      critical-severity findings (see agents/_shared/warnings-are-critical.md).
+
+  - id: zero_open_cves
+    severity: block
+    owner: programmer
+    description: "Zero open CVEs in production dependencies (any severity)"
+    validation: |
+      npm audit --audit-level=low (or pip-audit, cargo audit) returns 0 findings.
+      Snyk / Dependabot dashboard shows zero open vulnerabilities.
+    rationale: |
+      Enterprise procurement scans for known CVEs as part of vendor risk
+      assessment. A 'low' CVE blocks the security questionnaire. Refinement-loop
+      critic-mode classifies CVEs at any severity as critical.
+
+  # ─────────────────────────────────────────────────────────
   # Performance
   # ─────────────────────────────────────────────────────────
   - id: api_p95_under_500ms

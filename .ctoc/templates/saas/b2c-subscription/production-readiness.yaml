@@ -197,6 +197,38 @@ checks:
     description: "Verified you can restore from a backup (don't wait for incident to find out it's broken)"
 
   # ─────────────────────────────────────────────────────────
+  # Code quality gate (refinement-loop alignment, v6.9.9)
+  # ─────────────────────────────────────────────────────────
+  - id: zero_warnings_all_toolchains
+    severity: block
+    owner: programmer
+    description: "Zero warnings across all toolchains (compiler, linter, type-checker, deprecation notices, peer-dep mismatches)"
+    validation: |
+      Every CI job runs with warnings-as-errors. Any of the following is a block:
+        - eslint / ruff / clippy emits any warning at warn level
+        - tsc emits a 'TS' diagnostic at any severity
+        - npm install reports peer-dependency mismatches
+        - pip / cargo / go reports a deprecated API usage
+        - browser console emits a React/Vue/Svelte warning during E2E
+      Pin warnings-as-errors in CI config (e.g., `--max-warnings 0`, `"strict": true`).
+    rationale: |
+      A warning is a latent bug. The next major-version upgrade strips the
+      soft-warn affordance and the warning becomes a customer-visible failure.
+      Refinement loop classifies all warnings as critical-severity findings
+      (see agents/_shared/warnings-are-critical.md).
+
+  - id: zero_open_cves
+    severity: block
+    owner: programmer
+    description: "Zero open CVEs in production dependencies (any severity)"
+    validation: |
+      npm audit --audit-level=low (or pip-audit, cargo audit) returns 0 findings.
+      Snyk / Dependabot dashboard shows zero open vulnerabilities.
+    rationale: |
+      A 'low' CVE today is the foothold for a chained exploit tomorrow.
+      Refinement-loop critic-mode classifies CVEs at any severity as critical.
+
+  # ─────────────────────────────────────────────────────────
   # Performance baseline
   # ─────────────────────────────────────────────────────────
   - id: lcp_under_2_5s
