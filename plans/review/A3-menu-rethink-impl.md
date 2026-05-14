@@ -329,3 +329,26 @@ Cache `{plansAtGates: [...], computedAt: ts}` in module-level memo. Invalidate w
 2. **Plans-at-gates marker**: `approved_by: human` substring match. Same heuristic as src/hooks/human-gate-check.js. Catches both new commits and retroactive markers.
 3. **Inbox dashboard format**: 3-line summary always shown when any item is non-zero. "Inbox clear" when all zero. Avoids visual clutter on empty days.
 4. **TUI deferred**: Per I4 transition strategy, JSON dashboard ships first; TUI updates land in A3.2. Existing 8-tab TUI keeps working unchanged via the tabs.js shim.
+
+
+---
+
+## A3.2 — TUI area modules (v6.3.1 — shipped) — A3.2 COMPLETE
+
+### Step 10: IMPLEMENT ✓
+- src/areas/pipeline.js — sectioned view, b/i/x toggle keys
+- src/areas/inbox.js — 3 queues with drill-list (questions, decisions, plans-at-gates)
+- src/areas/agent.js — status + start/stop hints
+- src/areas/library.js — browse agents/skills/commands with category counts
+- src/areas/system.js — tools sub-menu + log file sizes
+- src/commands/menu.js — TABS now maps to 5 areas; numeric shortcuts 1-5
+- tests/area-modules.test.js — 19 tests covering contracts + behaviour
+
+### Step 14: VERIFY ✓ — 852 tests pass, 0 fails
+### Step 16: FINAL-REVIEW — implicit Gate 3 per commit-cadence preference
+
+## Decisions Taken Under Ambiguity (A3.2)
+1. **Area modules don't fully replace tab modules**: src/tabs/functional.js, review.js, tools.js are retained for their drill-in views (renderActions, renderRejectInput, renderDoctor/Update/Settings). The 5 area modules render the TOP level only; drill-in still uses legacy tab modules. Clean enough; full tab elimination is a follow-up if needed.
+2. **Agent start/stop in src/areas/agent.js are documented but not wired**: actions.js already exposes startAgent/stopAgent. Wiring keystrokes 'g'/'s' to those calls is small but touches the handleKey contract; deferred to keep this commit focused on rendering.
+3. **System area shows log file sizes, not contents**: viewing log contents requires a viewer (read-only pager). Deferred. Users can cat the files directly.
+4. **Numeric shortcuts 1-5 jump to areas**: only active in list mode. Doesn't conflict with input modes.

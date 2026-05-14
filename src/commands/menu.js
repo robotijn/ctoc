@@ -21,25 +21,28 @@ try {
   VERSION = '?.?.?';
 }
 
-// Import tab modules
-const overviewTab = require('../tabs/overview');
-const visionTab = require('../tabs/vision');
+// CTOC v7 (A3.2): import 5 area modules. Legacy tab modules remain on disk
+// but are no longer directly mounted by the TUI — Pipeline area folds
+// overview/vision/functional/implementation/review/todo into one view.
+const pipelineArea = require('../areas/pipeline');
+const inboxArea = require('../areas/inbox');
+const agentArea = require('../areas/agent');
+const libraryArea = require('../areas/library');
+const systemArea = require('../areas/system');
+
+// Legacy tab modules retained so functional/review/etc. drill-in flows that
+// reference `functionalTab.renderActions`, `reviewTab.renderRejectInput`
+// continue to work during A3.2 transition.
 const functionalTab = require('../tabs/functional');
-const implementationTab = require('../tabs/implementation');
 const reviewTab = require('../tabs/review');
-const todoTab = require('../tabs/todo');
-const progressTab = require('../tabs/progress');
 const toolsTab = require('../tabs/tools');
 
 const tabModules = {
-  overview: overviewTab,
-  vision: visionTab,
-  functional: functionalTab,
-  implementation: implementationTab,
-  review: reviewTab,
-  todo: todoTab,
-  progress: progressTab,
-  tools: toolsTab
+  pipeline: pipelineArea,
+  inbox: inboxArea,
+  agent: agentArea,
+  library: libraryArea,
+  system: systemArea,
 };
 
 // Message display timer (prevents render races on rapid key presses)
@@ -103,11 +106,12 @@ function render() {
     output += functionalTab.renderAssignConfirm(app.selectedPlan);
   } else if (app.mode === 'reject-input' && reviewTab.renderRejectInput) {
     output += reviewTab.renderRejectInput(app);
-  } else if (currentTab.id === 'tools' && app.toolMode) {
+  } else if (currentTab.id === 'system' && app.toolMode) {
+    // Legacy tools sub-modes (doctor/update/settings) reachable from System area
     if (app.toolMode === '1') output += toolsTab.renderDoctor(app);
     else if (app.toolMode === '2') output += toolsTab.renderUpdate(app);
     else if (app.toolMode === '3') output += toolsTab.renderSettings(app);
-  } else if (tabModule.render) {
+  } else if (tabModule && tabModule.render) {
     output += tabModule.render(app);
   }
 
@@ -169,14 +173,25 @@ function handleKey(str, key) {
     return;
   }
 
-  // Settings shortcut (Overview tab only)
-  if (key.sequence === 's' && app.mode === 'list' && TABS[app.tabIndex].id === 'overview') {
-    app.tabIndex = TABS.findIndex(t => t.id === 'tools');
+  // Settings shortcut: jump to System area's Settings sub-mode
+  if (key.sequence === 's' && app.mode === 'list' && TABS[app.tabIndex].id === 'pipeline') {
+    app.tabIndex = TABS.findIndex(t => t.id === 'system');
     app.toolMode = '3'; // Settings
     app.settingsTabIndex = 0;
     app.settingIndex = 0;
     render();
     return;
+  }
+
+  // Numeric area shortcuts (1-5)
+  if (/^[1-5]$/.test(key.sequence) && app.mode === 'list') {
+    const idx = parseInt(key.sequence, 10) - 1;
+    if (idx < TABS.length) {
+      app.tabIndex = idx;
+      resetTabState();
+      render();
+      return;
+    }
   }
 
   // Back navigation
