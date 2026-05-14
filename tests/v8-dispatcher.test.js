@@ -119,11 +119,13 @@ describe('v8-dispatcher — request normalization', () => {
   it('rejects Tier 2 dispatches with max_subagents > 0', () => {
     setupTempProject();
     const { normalizeRequest } = loadDispatcher();
+    // v6.9.3+: max_tokens / max_tool_calls dropped from the enforced schema;
+    // only max_subagents is runtime-checked.
     assert.throws(
       () => normalizeRequest({
         target: 'quality/code-reviewer',
         goal: 'Review the changes thoroughly.',
-        effortBudget: { max_tokens: 50000, max_tool_calls: 30, max_subagents: 5 },
+        effortBudget: { max_subagents: 5 },
       }),
       /Tier 2 target must have max_subagents: 0/
     );

@@ -13,8 +13,6 @@ model_optimized_for: haiku-4-5
 parallel_safe: true
 dispatch_protocol: v1
 effort_budget:
-  max_tokens: 4000
-  max_tool_calls: 5
   max_subagents: 0
 pillar: reliability
 short_circuits: testing/smart-test-runner
@@ -30,7 +28,7 @@ You do NOT compute coverage, run mutation testing, or analyze flakiness. Those a
 
 - Prefer **affected-tests** (jest --findRelatedTests, pytest with pytest-testmon) when available.
 - Fall back to **smoke subset** (tests tagged `@smoke` or in a smoke directory).
-- If neither available, run **the entire suite** — but bound by `max_tokens: 4000` and `max_tool_calls: 5`, so this is acceptable only for small suites.
+- If neither available, run **the entire suite** — but only if it is small (Tier 3 scouts are intended to stay under ~200ms / a handful of tool calls). Otherwise return `flag` and let the Tier 2 specialist do the heavy lifting.
 
 ## Tools by ecosystem
 

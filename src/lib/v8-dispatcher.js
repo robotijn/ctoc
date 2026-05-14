@@ -43,12 +43,17 @@ const GRADES_PATH = path.join(ROOT, '.ctoc', 'agents', 'dispatch-grades.yaml');
 // Crockford Base32 alphabet (used by ULID — no I, L, O, U)
 const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-// Effort-budget defaults by tier (from tier-definitions.yaml)
+// Effort-budget defaults by tier (from tier-definitions.yaml).
+//
+// v6.9.3: per-agent max_tokens / max_tool_calls were advisory and never
+// runtime-enforced. The dispatcher now ONLY enforces max_subagents (the real
+// invariant that prevents specialists from cascading dispatches). Session-level
+// budget enforcement lives in src/lib/budget.js (v6.9.4+).
 const TIER_BUDGETS = {
-  0: { max_tokens: Number.MAX_SAFE_INTEGER, max_tool_calls: Number.MAX_SAFE_INTEGER, max_subagents: Number.MAX_SAFE_INTEGER },
-  1: { max_tokens: 200000, max_tool_calls: 100, max_subagents: 10 },
-  2: { max_tokens: 50000,  max_tool_calls: 30,  max_subagents: 0  },
-  3: { max_tokens: 4000,   max_tool_calls: 5,   max_subagents: 0  },
+  0: { max_subagents: Number.MAX_SAFE_INTEGER },
+  1: { max_subagents: 10 },
+  2: { max_subagents: 0 },
+  3: { max_subagents: 0 },
 };
 
 /**

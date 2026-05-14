@@ -18,9 +18,11 @@ tiers:
       - cto-chief
     model_default: opus
     effort_budget:
-      max_tokens: unbounded
-      max_tool_calls: unbounded
       max_subagents: unbounded
+    # NOTE (v6.9.3+): Per-agent token / tool-call budgets were advisory and
+    # unenforced. Real budget enforcement happens at the SESSION level via
+    # .ctoc/config/budget.yaml (v6.9.4+). The per-agent budget here keeps
+    # only the load-bearing invariant: max_subagents.
     invariants:
       - "Exactly one agent has role: top-level-coordinator"
       - "Only Tier 0 issues dispatches"
@@ -51,8 +53,6 @@ tiers:
     model_default: opus
     model_optimized_for: opus-4-7
     effort_budget:
-      max_tokens: 200000
-      max_tool_calls: 100
       max_subagents: 10
     required_frontmatter:
       - tier: 1
@@ -90,13 +90,11 @@ tiers:
       - cost: 1
     model_default: opus | sonnet           # category-dependent
     effort_budget:
-      max_tokens: 50000
-      max_tool_calls: 30
       max_subagents: 0                     # leaf agents do not dispatch
     required_frontmatter:
       - tier: 2
       - effort_level: low | medium | high
-      - effort_budget: { max_tokens, max_tool_calls, max_subagents }
+      - effort_budget: { max_subagents }
       - parallel_safe: true | false
       - model_optimized_for: opus-4-7
       - dispatch_protocol: v1
@@ -121,13 +119,11 @@ tiers:
     model_default: haiku
     model_optimized_for: haiku-4-5
     effort_budget:
-      max_tokens: 4000
-      max_tool_calls: 5
       max_subagents: 0
     required_frontmatter:
       - tier: 3
       - effort: low
-      - effort_budget: { max_tokens: 4000, max_tool_calls: 5, max_subagents: 0 }
+      - effort_budget: { max_subagents: 0 }
       - model: haiku
       - model_optimized_for: haiku-4-5
       - parallel_safe: true

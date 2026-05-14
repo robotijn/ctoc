@@ -51,9 +51,7 @@ dispatch:
       - src/auth/__tests__/middleware.test.py
 
   effort_budget:
-    max_tokens: 50000
-    max_tool_calls: 30
-    max_subagents: 0                    # Tier 2 cannot dispatch
+    max_subagents: 0                    # Tier 2 cannot dispatch (enforced)
     deadline_seconds: 300
 
   expected_output:
@@ -73,7 +71,7 @@ dispatch:
 - `target_agent` — `<category>/<name>` path
 - `goal` — one-line statement of intent
 - `plan_ancestry` — full chain of parent plans (NULL fields allowed for early-stage)
-- `effort_budget` — `max_tokens`, `max_tool_calls`, `max_subagents` (0 for Tier 2/3)
+- `effort_budget` — `max_subagents` (0 for Tier 2/3, the only field runtime-enforced as of v6.9.3)
 
 ### Optional fields
 
@@ -223,16 +221,20 @@ Sub-orchestrators MAY NOT recommend a specialist whose isolation test fails. CTO
 
 ## Effort budgets
 
-Hard caps prevent runaway:
+The only runtime-enforced per-agent budget is `max_subagents` — it prevents specialists from cascading dispatches (Tier 2/3 must be 0).
 
-| Tier | max_tokens | max_tool_calls | max_subagents |
-|------|------------|----------------|---------------|
-| 0 (CTO Chief)   | unbounded   | unbounded | unbounded |
-| 1 (sub-orch)    | 200,000     | 100       | 10        |
-| 2 (specialist)  | 50,000      | 30        | 0         |
-| 3 (scout)       | 4,000       | 5         | 0         |
+| Tier | max_subagents |
+|------|---------------|
+| 0 (CTO Chief)   | unbounded |
+| 1 (sub-orch)    | 10        |
+| 2 (specialist)  | 0         |
+| 3 (scout)       | 0         |
 
-When an agent exceeds its budget, it MUST summarize current state and yield. CTO Chief decides whether to re-dispatch with a higher budget (explicit override) or accept the partial result.
+### History (v6.9.3)
+
+`max_tokens` and `max_tool_calls` used to appear in agent frontmatter and dispatch requests, but they were never runtime-enforced — purely advisory. They were dropped in v6.9.3 to remove noise.
+
+The real budget enforcement is at the **session level**, not the per-agent level. See `.ctoc/config/budget.yaml` and `src/lib/budget.js` (introduced v6.9.4) for `max_session_hours`, `max_dispatches`, and `max_iron_loop_iterations`. When a session-level budget is exceeded, the dispatcher halts (or warns, per `halt_action`).
 
 ## Priority and queueing
 

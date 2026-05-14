@@ -122,9 +122,7 @@ when_to_load: [...]       # ≥ 5 triggers
 related_skills: [...]
 effort_level: low | medium | high
 effort_budget:
-  max_tokens: <int>       # default by tier; can override
-  max_tool_calls: <int>
-  max_subagents: 0        # leaf agents do not dispatch
+  max_subagents: 0        # leaf agents do not dispatch (the only runtime-enforced cap)
 model_optimized_for: opus-4-7
 model: opus | sonnet
 parallel_safe: true | false
@@ -153,8 +151,6 @@ output_contract: ./CONTRACT.yaml  # optional schema ref
 tier: 3
 effort: low
 effort_budget:
-  max_tokens: 4000
-  max_tool_calls: 5
   max_subagents: 0
 model: haiku
 model_optimized_for: haiku-4-5
@@ -216,7 +212,7 @@ Every dispatch goes to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml`.
 4. **Audit trail is non-negotiable**. Every dispatch is reproducible, replayable, gradable.
 5. **Workers prove themselves in isolation** before integration. Specialists must pass isolated tests before sub-orchestrators chain them.
 6. **Structured outputs**. YAML/JSON, not prose. Enables automated grading, conflict resolution, and progress tracking.
-7. **Effort budgets prevent runaway**. Every dispatch has hard caps on tokens, tool calls, and subagent depth.
+7. **Effort budgets prevent runaway**. The runtime-enforced cap is `max_subagents` (Tier 2/3 = 0, prevents cascading dispatches). Per-agent token/tool-call caps were noise and dropped in v6.9.3; real session-level budgets (max session hours, max total dispatches, max Iron Loop iterations) live in `.ctoc/config/budget.yaml` (v6.9.4+).
 8. **Confidence is calibrated**. HIGH/MEDIUM/LOW is meaningless without measurement. Agents are scored on precision/recall over time.
 9. **Cite-your-sources by default**. Every finding cites file+line evidence and a category brief source URL. Cuts hallucination 20-40% (per AI quality research).
 10. **Synthesis over enumeration**. The output is a *minimal change list*, not a *complete finding list*. Most systems fail here.

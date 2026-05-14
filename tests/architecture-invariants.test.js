@@ -189,7 +189,8 @@ describe('v8 Architecture — Tier 2 (Specialist skills)', () => {
         assert.match(fm, /confidence_calibration:\s*enabled/, `${rel} missing confidence_calibration`);
         assert.match(fm, /parallel_safe:\s*(true|false)/, `${rel} missing parallel_safe`);
         assert.match(fm, /effort_budget:/, `${rel} missing effort_budget`);
-        assert.match(fm, /max_tokens:\s*\d+/, `${rel} effort_budget.max_tokens missing`);
+        // v6.9.3+: max_tokens/max_tool_calls dropped (unenforced noise).
+        // max_subagents: 0 remains the load-bearing invariant for Tier 2.
         assert.match(fm, /max_subagents:\s*0/, `${rel} Tier 2 must have max_subagents: 0`);
       }
     });

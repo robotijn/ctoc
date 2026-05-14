@@ -60,11 +60,11 @@ definitions:
             type: array
             items: { type: string }
       effort_budget:
+        # v6.9.3+: only max_subagents is runtime-enforced. Session-level
+        # token / tool-call / dispatch budgets live in .ctoc/config/budget.yaml.
         type: object
-        required: [max_tokens, max_tool_calls, max_subagents]
+        required: [max_subagents]
         properties:
-          max_tokens: { type: integer, minimum: 1 }
-          max_tool_calls: { type: integer, minimum: 0 }
           max_subagents: { type: integer, minimum: 0 }
           deadline_seconds: { type: integer, minimum: 1 }
       expected_output:

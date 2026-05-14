@@ -13,8 +13,6 @@ model_optimized_for: haiku-4-5
 parallel_safe: true
 dispatch_protocol: v1
 effort_budget:
-  max_tokens: 4000
-  max_tool_calls: 5
   max_subagents: 0
 pillar: security
 short_circuits: security/secrets-detector

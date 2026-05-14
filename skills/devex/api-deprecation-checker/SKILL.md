@@ -23,8 +23,6 @@ dispatch_protocol: v1
 confidence_calibration: enabled
 parallel_safe: true
 effort_budget:
-  max_tokens: 25000
-  max_tool_calls: 20
   max_subagents: 0
 ---
 
