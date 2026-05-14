@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { getPlanCounts, readPlans, getPlansDir, getAgentStatus, getVisionCounts, getVisionStubs } = require('./state');
 const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs } = require('./sections');
+const { getInboxCounts } = require('./inbox');
 const { validateTransition } = require('./plan-validator');
 const { findProjectRoot } = require('./project-root');
 
@@ -122,6 +123,19 @@ function buildDashboardTable(projectPath) {
     }
     out += '\n';
   }
+
+  // Inbox (A3 — async-overnight surface)
+  const inbox = getInboxCounts(root);
+  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting;
+  out += `INBOX\n`;
+  if (inboxTotal === 0) {
+    out += `  ○ Inbox clear — no async items waiting\n`;
+  } else {
+    out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}\n`;
+    out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review\n`;
+    out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates\n`;
+  }
+  out += '\n';
 
   // Agent status (lock-aware)
   const isAgentActive = agent.active;

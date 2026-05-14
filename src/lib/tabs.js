@@ -1,41 +1,48 @@
 /**
- * Tab System
- * Manages tab definitions and navigation
+ * Tabs (compatibility shim) — re-exports AREAS as TABS so existing callers
+ * (TUI code, src/commands/menu.js) keep working during the A3 transition.
+ *
+ * NEW CODE: import from `./areas` directly. This shim is for backward compat only.
+ * See: /Users/account/Code/ctoc/plans/in-progress/A3-menu-rethink-impl.md (I6 refinement)
  */
 
-const TABS = [
-  { id: 'overview', name: 'Overview' },
-  { id: 'vision', name: 'Vision' },
-  { id: 'functional', name: 'Functional' },
-  { id: 'implementation', name: 'Implementation' },
-  { id: 'review', name: 'Review' },
-  { id: 'todo', name: 'Todo' },
-  { id: 'progress', name: 'Progress' },
-  { id: 'tools', name: 'Tools' }
-];
+const {
+  AREAS,
+  getAreaById,
+  getAreaByIndex,
+  getAreaIndex,
+  nextArea,
+  prevArea,
+} = require('./areas');
+
+// Re-export AREAS as TABS for legacy callers
+const TABS = AREAS;
 
 function getTabNames() {
-  return TABS.map(t => t.name);
+  return AREAS.map(a => a.name);
 }
 
 function getTabById(id) {
-  return TABS.find(t => t.id === id);
+  return getAreaById(id);
 }
 
 function getTabByIndex(index) {
-  return TABS[index];
+  return getAreaByIndex(index);
 }
 
+// I6: getTabIndex resolves old tab ids to area indexes via the shim.
+// Callers like `TABS.findIndex(t => t.id === 'tools')` in src/commands/menu.js
+// continue working because getAreaIndex falls back to TAB_TO_AREA mapping.
 function getTabIndex(id) {
-  return TABS.findIndex(t => t.id === id);
+  return getAreaIndex(id);
 }
 
 function nextTab(currentIndex) {
-  return (currentIndex + 1) % TABS.length;
+  return nextArea(currentIndex);
 }
 
 function prevTab(currentIndex) {
-  return (currentIndex - 1 + TABS.length) % TABS.length;
+  return prevArea(currentIndex);
 }
 
 module.exports = {
@@ -45,5 +52,5 @@ module.exports = {
   getTabByIndex,
   getTabIndex,
   nextTab,
-  prevTab
+  prevTab,
 };

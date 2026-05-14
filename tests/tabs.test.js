@@ -1,5 +1,16 @@
 /**
- * Tab System Tests
+ * Tab System (compatibility shim) Tests
+ *
+ * As of CTOC v7 (A3), tabs.js is a compatibility shim over areas.js. The
+ * 8-tab system has been replaced by 5 top-level areas. This test file
+ * exercises the shim's backward-compatibility guarantees:
+ *
+ *   - TABS exports an array of 5 areas (not 8 tabs)
+ *   - getTabIndex resolves old tab IDs (overview, vision, ..., tools) to
+ *     the correct area index, so legacy lookups continue working.
+ *   - nextTab / prevTab cycle through the 5 areas.
+ *
+ * For the canonical area API, see src/lib/areas.js and tests/areas.test.js.
  */
 
 const assert = require('assert');
@@ -13,213 +24,112 @@ const {
   prevTab
 } = require('../src/lib/tabs');
 
-// Test TABS constant structure
+const AREA_COUNT = 5;
+const AREA_IDS_IN_ORDER = ['pipeline', 'inbox', 'agent', 'library', 'system'];
+const AREA_NAMES_IN_ORDER = ['Pipeline', 'Inbox', 'Agent', 'Library', 'System'];
+
+// Old tab IDs that must continue resolving via the shim.
+const LEGACY_TAB_LOOKUPS = {
+  overview: 'pipeline',
+  vision: 'pipeline',
+  functional: 'pipeline',
+  implementation: 'pipeline',
+  review: 'pipeline',
+  todo: 'pipeline',
+  progress: 'agent',
+  tools: 'system',
+};
+
 function testTabsConstant() {
   assert.ok(Array.isArray(TABS), 'TABS is an array');
-  assert.strictEqual(TABS.length, 8, 'TABS has 8 entries');
-
-  // Verify each tab has required properties
+  assert.strictEqual(TABS.length, AREA_COUNT, 'TABS has 5 areas');
   TABS.forEach((tab, i) => {
-    assert.ok(tab.id, `Tab ${i} has an id`);
-    assert.ok(tab.name, `Tab ${i} has a name`);
-    assert.strictEqual(typeof tab.id, 'string', `Tab ${i} id is a string`);
-    assert.strictEqual(typeof tab.name, 'string', `Tab ${i} name is a string`);
+    assert.ok(tab.id, `Tab ${i} has id`);
+    assert.ok(tab.name, `Tab ${i} has name`);
   });
-
-  // Verify expected tabs exist
-  const expectedIds = ['overview', 'vision', 'functional', 'implementation', 'review', 'todo', 'progress', 'tools'];
   const actualIds = TABS.map(t => t.id);
-  assert.deepStrictEqual(actualIds, expectedIds, 'Tab IDs match expected order');
-
-  console.log('✓ TABS constant structure');
+  assert.deepStrictEqual(actualIds, AREA_IDS_IN_ORDER, 'Tab IDs are the 5 areas in order');
+  console.log('✓ TABS constant structure (v7 areas)');
 }
 
-// Test getTabNames function
 function testGetTabNames() {
   const names = getTabNames();
-
-  assert.ok(Array.isArray(names), 'Returns an array');
-  assert.strictEqual(names.length, 8, 'Returns 8 names');
-
-  const expectedNames = ['Overview', 'Vision', 'Functional', 'Implementation', 'Review', 'Todo', 'Progress', 'Tools'];
-  assert.deepStrictEqual(names, expectedNames, 'Tab names match expected order');
-
-  // Verify all are strings
-  names.forEach((name, i) => {
-    assert.strictEqual(typeof name, 'string', `Name ${i} is a string`);
-  });
-
+  assert.deepStrictEqual(names, AREA_NAMES_IN_ORDER, '5 area names in order');
   console.log('✓ getTabNames()');
 }
 
-// Test getTabById function
 function testGetTabById() {
-  // Test existing tabs
-  const overview = getTabById('overview');
-  assert.ok(overview, 'Found overview tab');
-  assert.strictEqual(overview.id, 'overview', 'Correct id');
-  assert.strictEqual(overview.name, 'Overview', 'Correct name');
-
-  const tools = getTabById('tools');
-  assert.ok(tools, 'Found tools tab');
-  assert.strictEqual(tools.id, 'tools', 'Correct id');
-  assert.strictEqual(tools.name, 'Tools', 'Correct name');
-
-  const implementation = getTabById('implementation');
-  assert.ok(implementation, 'Found implementation tab');
-  assert.strictEqual(implementation.name, 'Implementation', 'Correct name');
-
-  // Test non-existent tab
-  const notFound = getTabById('nonexistent');
-  assert.strictEqual(notFound, undefined, 'Returns undefined for unknown id');
-
-  // Test empty string
-  const empty = getTabById('');
-  assert.strictEqual(empty, undefined, 'Returns undefined for empty string');
-
+  const pipeline = getTabById('pipeline');
+  assert.ok(pipeline && pipeline.id === 'pipeline');
+  const system = getTabById('system');
+  assert.ok(system && system.name === 'System');
+  assert.strictEqual(getTabById('nonexistent'), undefined);
+  assert.strictEqual(getTabById(''), undefined);
   console.log('✓ getTabById()');
 }
 
-// Test getTabByIndex function
 function testGetTabByIndex() {
-  // Test valid indices
-  const first = getTabByIndex(0);
-  assert.ok(first, 'Found first tab');
-  assert.strictEqual(first.id, 'overview', 'First tab is overview');
-
-  const last = getTabByIndex(7);
-  assert.ok(last, 'Found last tab');
-  assert.strictEqual(last.id, 'tools', 'Last tab is tools');
-
-  const middle = getTabByIndex(4);
-  assert.ok(middle, 'Found middle tab');
-  assert.strictEqual(middle.id, 'review', 'Index 4 is review');
-
-  // Test out of bounds
-  const outOfBounds = getTabByIndex(100);
-  assert.strictEqual(outOfBounds, undefined, 'Returns undefined for out of bounds index');
-
-  const negative = getTabByIndex(-1);
-  assert.strictEqual(negative, undefined, 'Returns undefined for negative index');
-
+  assert.strictEqual(getTabByIndex(0).id, 'pipeline');
+  assert.strictEqual(getTabByIndex(AREA_COUNT - 1).id, 'system');
+  assert.strictEqual(getTabByIndex(100), undefined);
+  assert.strictEqual(getTabByIndex(-1), undefined);
   console.log('✓ getTabByIndex()');
 }
 
-// Test getTabIndex function
 function testGetTabIndex() {
-  // Test existing tabs
-  assert.strictEqual(getTabIndex('overview'), 0, 'overview is at index 0');
-  assert.strictEqual(getTabIndex('vision'), 1, 'vision is at index 1');
-  assert.strictEqual(getTabIndex('functional'), 2, 'functional is at index 2');
-  assert.strictEqual(getTabIndex('implementation'), 3, 'implementation is at index 3');
-  assert.strictEqual(getTabIndex('review'), 4, 'review is at index 4');
-  assert.strictEqual(getTabIndex('todo'), 5, 'todo is at index 5');
-  assert.strictEqual(getTabIndex('progress'), 6, 'progress is at index 6');
-  assert.strictEqual(getTabIndex('tools'), 7, 'tools is at index 7');
+  // New area IDs resolve to their canonical index
+  assert.strictEqual(getTabIndex('pipeline'), 0);
+  assert.strictEqual(getTabIndex('system'), 4);
 
-  // Test non-existent tab
-  assert.strictEqual(getTabIndex('nonexistent'), -1, 'Returns -1 for unknown id');
-  assert.strictEqual(getTabIndex(''), -1, 'Returns -1 for empty string');
+  // Legacy tab IDs resolve via the shim (per I6)
+  for (const [oldId, areaId] of Object.entries(LEGACY_TAB_LOOKUPS)) {
+    const expected = AREA_IDS_IN_ORDER.indexOf(areaId);
+    assert.strictEqual(
+      getTabIndex(oldId),
+      expected,
+      `Legacy ${oldId} resolves to area ${areaId} at index ${expected}`
+    );
+  }
 
-  console.log('✓ getTabIndex()');
+  assert.strictEqual(getTabIndex('truly-unknown'), -1);
+  console.log('✓ getTabIndex() with legacy shim');
 }
 
-// Test nextTab function
-function testNextTab() {
-  // Test normal progression
-  assert.strictEqual(nextTab(0), 1, '0 -> 1');
-  assert.strictEqual(nextTab(1), 2, '1 -> 2');
-  assert.strictEqual(nextTab(2), 3, '2 -> 3');
-  assert.strictEqual(nextTab(3), 4, '3 -> 4');
-  assert.strictEqual(nextTab(4), 5, '4 -> 5');
-  assert.strictEqual(nextTab(5), 6, '5 -> 6');
-  assert.strictEqual(nextTab(6), 7, '6 -> 7');
-
-  // Test wrap-around
-  assert.strictEqual(nextTab(7), 0, '7 wraps to 0');
-
-  // Test full cycle
+function testNextPrev() {
+  // Forward cycle
   let current = 0;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < AREA_COUNT; i++) {
     current = nextTab(current);
   }
-  assert.strictEqual(current, 0, 'Full cycle returns to start');
+  assert.strictEqual(current, 0, 'full forward cycle returns to start');
 
-  console.log('✓ nextTab()');
-}
-
-// Test prevTab function
-function testPrevTab() {
-  // Test normal regression
-  assert.strictEqual(prevTab(6), 5, '6 -> 5');
-  assert.strictEqual(prevTab(5), 4, '5 -> 4');
-  assert.strictEqual(prevTab(4), 3, '4 -> 3');
-  assert.strictEqual(prevTab(3), 2, '3 -> 2');
-  assert.strictEqual(prevTab(2), 1, '2 -> 1');
-  assert.strictEqual(prevTab(1), 0, '1 -> 0');
-
-  assert.strictEqual(prevTab(1), 0, '1 -> 0');
-
-  // Test wrap-around
-  assert.strictEqual(prevTab(0), 7, '0 wraps to 7');
-
-  // Test full cycle backwards
-  let current = 0;
-  for (let i = 0; i < 8; i++) {
+  // Backward cycle
+  current = 0;
+  for (let i = 0; i < AREA_COUNT; i++) {
     current = prevTab(current);
   }
-  assert.strictEqual(current, 0, 'Full backwards cycle returns to start');
+  assert.strictEqual(current, 0, 'full backward cycle returns to start');
 
-  console.log('✓ prevTab()');
+  // Wrap-around
+  assert.strictEqual(nextTab(AREA_COUNT - 1), 0);
+  assert.strictEqual(prevTab(0), AREA_COUNT - 1);
+  console.log('✓ nextTab / prevTab cycle through 5 areas');
 }
 
-// Test nextTab and prevTab are inverse operations
-function testNextPrevInverse() {
-  // nextTab followed by prevTab should return to original
-  for (let i = 0; i < 7; i++) {
-    const afterNext = nextTab(i);
-    const backToOriginal = prevTab(afterNext);
-    assert.strictEqual(backToOriginal, i, `nextTab then prevTab from ${i} returns to ${i}`);
-  }
-
-  // prevTab followed by nextTab should return to original
-  for (let i = 0; i < 7; i++) {
-    const afterPrev = prevTab(i);
-    const backToOriginal = nextTab(afterPrev);
-    assert.strictEqual(backToOriginal, i, `prevTab then nextTab from ${i} returns to ${i}`);
-  }
-
-  console.log('✓ nextTab/prevTab inverse operations');
-}
-
-// Test edge cases and boundary conditions
 function testEdgeCases() {
-  // Test that TABS is not modified by getTabNames
-  const originalLength = TABS.length;
-  const names = getTabNames();
-  names.push('ShouldNotAffectTABS');
-  assert.strictEqual(TABS.length, originalLength, 'TABS not affected by modifying getTabNames result');
-
-  // Test getTabById with various falsy values
-  assert.strictEqual(getTabById(null), undefined, 'null returns undefined');
-  assert.strictEqual(getTabById(undefined), undefined, 'undefined returns undefined');
-
-  // Test getTabIndex with case sensitivity
-  assert.strictEqual(getTabIndex('Overview'), -1, 'Case sensitive - uppercase not found');
-  assert.strictEqual(getTabIndex('OVERVIEW'), -1, 'Case sensitive - all caps not found');
-
-  console.log('✓ Edge cases and boundary conditions');
+  assert.strictEqual(getTabById(null), undefined);
+  assert.strictEqual(getTabById(undefined), undefined);
+  // Case sensitivity
+  assert.strictEqual(getTabIndex('Pipeline'), -1, 'case-sensitive: capital P not found');
+  console.log('✓ Edge cases');
 }
 
-// Run all tests
-console.log('\nTab System Tests\n');
+console.log('\nTab System (v7 shim) Tests\n');
 testTabsConstant();
 testGetTabNames();
 testGetTabById();
 testGetTabByIndex();
 testGetTabIndex();
-testNextTab();
-testPrevTab();
-testNextPrevInverse();
+testNextPrev();
 testEdgeCases();
-console.log('\nAll tab tests passed!\n');
+console.log('\nAll tab shim tests passed!\n');

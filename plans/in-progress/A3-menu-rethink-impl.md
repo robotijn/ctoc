@@ -299,3 +299,33 @@ Slugs use `<timestamp>-<6char-random>.md` format (e.g. `1715634000000-a3f9k2.md`
 
 ### I9 — Plans-at-gates cache
 Cache `{plansAtGates: [...], computedAt: ts}` in module-level memo. Invalidate when: (a) cache age >60s, (b) any plan file in plans/* mtime newer than computedAt. `fs.statSync` on each plan dir cheap (~few ms for 50 plans).
+
+
+---
+
+## A3 Phased Execution
+
+### A3.1 — Foundation: areas + inbox + JSON dashboard (v6.2.2 — shipped)
+- [x] src/lib/areas.js — AREAS list + listAreas/getAreaById/getAreaByIndex/getAreaIndex/nextArea/prevArea
+- [x] src/lib/inbox.js — getInboxCounts, listQuestions, listDecisions, listPlansAtGates, createQuestion, createDecision
+- [x] src/lib/tabs.js — compatibility shim re-exporting areas (per I6)
+- [x] menu-screens.js — INBOX block in JSON dashboard
+- [x] .ctoc/inbox/{questions,decisions}/ created with .gitkeep
+- [x] tests/areas.test.js (10 tests) + tests/inbox.test.js (6 tests)
+- [x] tests/tabs.test.js rewritten for shim contract
+- [x] Step 8 TEST, Step 10 IMPLEMENT, Step 14 VERIFY (822 tests, 0 fails)
+
+### A3.2 — TUI areas (follow-up commit)
+- [ ] src/areas/pipeline.js (TUI rendering)
+- [ ] src/areas/inbox.js (drill-in views, accept/kickback actions)
+- [ ] src/areas/agent.js (folds progress tab)
+- [ ] src/areas/library.js (browse agents/skills/commands)
+- [ ] src/areas/system.js (folds tools tab)
+- [ ] src/commands/menu.js — keyboard shortcuts 1-5 + l, s; handleKey routes to area modules
+- [ ] Per I7 (4-option AskUserQuestion limit), Pipeline/Inbox/Agent + More menu
+
+## Decisions Taken Under Ambiguity (A3.1)
+1. **Slug random suffix**: 6 chars from base36. Provides ~2 billion combinations, sufficient for I8's collision protection over the lifetime of any project.
+2. **Plans-at-gates marker**: `approved_by: human` substring match. Same heuristic as src/hooks/human-gate-check.js. Catches both new commits and retroactive markers.
+3. **Inbox dashboard format**: 3-line summary always shown when any item is non-zero. "Inbox clear" when all zero. Avoids visual clutter on empty days.
+4. **TUI deferred**: Per I4 transition strategy, JSON dashboard ships first; TUI updates land in A3.2. Existing 8-tab TUI keeps working unchanged via the tabs.js shim.
