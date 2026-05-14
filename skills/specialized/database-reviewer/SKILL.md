@@ -120,3 +120,15 @@ EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'test@example.com';
 | List orders by date | 500ms | No | Fix |
 | Search products | 120ms | Partial | Review |
 ```
+
+---
+
+## Refinement Loop — critic mode (v6.9.8)
+
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+
+- Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
+- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- Warnings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
+
+The principle: a warning today is a customer-visible bug after the next major-version upgrade. Code that ships green-with-warnings ships with known latent failures.
