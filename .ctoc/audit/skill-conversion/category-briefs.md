@@ -232,6 +232,325 @@ performance-profiler, resilience-checker, translation-checker.
 
 ---
 
+## Category: Infrastructure (5 agents)
+
+Applies to: terraform-validator, kubernetes-checker, docker-security-checker, ci-pipeline-checker, ci-runner-setup.
+
+### Patterns to encode in skill bodies
+
+1. **Shift-left security scanning** — Trivy / Checkov / tfsec run pre-commit and in PR, not nightly. SCA + IaC + container scan are one pipeline.
+2. **Secrets via managed stores only** — HashiCorp Vault, AWS Secrets Manager, Azure Key Vault. JIT read-only access. Auto-rotate DB passwords, API keys, certificates.
+3. **Remote state with locking** — S3 + DynamoDB for Terraform; never local state in shared repos.
+4. **GitOps as deployment standard** — Argo CD / Flux reconcile live state against Git. Container orchestrator state lives in Git.
+5. **Container image build + scan on every commit** — Docker / Kaniko / Buildpacks pipeline → Trivy/Snyk before pushing to registry.
+6. **Tag enforcement at provisioning** — policy-as-code (OPA, Conftest) refuses untagged resources; ≥95% tag compliance is the bar.
+
+### Canonical `when_to_load` triggers
+
+- "terraform validate", "infrastructure check", "IaC scan"
+- "kubernetes audit", "k8s manifest check", "helm chart review"
+- "docker security", "container image scan", "Dockerfile review"
+- "CI pipeline check", "CI runner setup", "ci/cd validation"
+
+### Sources
+- [Top 10 IaC Best Practices 2026 (TekRecruiter)](https://www.tekrecruiter.com/post/top-10-infrastructure-as-code-best-practices-for-scalable-devops-in-2026)
+- [Top IaC Security Tools 2026 (env0)](https://www.env0.com/blog/top-infrastructure-as-code-security-tools)
+- [Terraform in CI/CD (Spacelift)](https://spacelift.io/blog/terraform-in-ci-cd)
+- [Kubernetes IaC Best Practices (Mirantis)](https://www.mirantis.com/blog/kubernetes-infrastructure-as-code-iac-best-practices-and-guide/)
+- [16 Most Useful IaC Tools 2026 (Spacelift)](https://spacelift.io/blog/infrastructure-as-code-tools)
+
+---
+
+## Category: Frontend (3 agents)
+
+Applies to: visual-regression-checker, component-tester, bundle-analyzer.
+
+### Patterns to encode in skill bodies
+
+1. **Visual regression is mainstream in 2026** — not optional. Tools use AI/perceptual diffing, not pixel-by-pixel. Reg-suit, Applitools Eyes 10.22, BackstopJS, Playwright Screenshots.
+2. **Component testing runs in real browsers** — Vitest browser mode + Playwright; jsdom is insufficient for hover, focus, intersection observers, scroll.
+3. **Performance budgets block PRs** — concrete thresholds: LCP < 2.5s, CLS < 0.1, JS bundle < 200kb gzipped. Bundlemon/size-limit gate the budget.
+4. **Test user behavior, not implementation** — React Testing Library standard. Couple tests to what the user sees, not to component internals.
+5. **Shift-left frontend quality** — visual + a11y + bundle checks in CI on every PR, not at QA-time.
+
+### Canonical `when_to_load` triggers
+
+- "visual regression", "screenshot diff", "visual test"
+- "component test", "RTL test", "test the component"
+- "bundle size", "bundle analysis", "performance budget"
+
+### Sources
+- [State of Regression Testing 2026 (Vizproof)](https://vizproof.com/en/blog/the-state-of-regression-testing-in-2026-tools-methods-and-trends)
+- [Modern Frontend Quality Pipeline (alexop.dev)](https://alexop.dev/posts/modern-frontend-quality-pipeline/)
+- [Best Visual Regression Tools 2026 (Bug0)](https://bug0.com/knowledge-base/visual-regression-testing-tools)
+- [Frontend Testing in 2026 (Atina)](https://www.atinatechnology.in/frontend-testing-in-2026/)
+- [Frontend Trends 2026 (Syncfusion)](https://www.syncfusion.com/blogs/post/frontend-development-trends)
+
+---
+
+## Category: Mobile (3 agents)
+
+Applies to: ios-checker, android-checker, react-native-bridge-checker.
+
+### Patterns to encode in skill bodies
+
+1. **Mobile reviews ≠ web reviews** — focus on where the app fails: lifecycle, navigation, lists, animations, native bridge surfaces.
+2. **Secure storage for credentials** — never AsyncStorage for tokens/keys; iOS Keychain via react-native-keychain, Android Keystore. SSL pinning for in-transit data.
+3. **Performance on the worst device** — test on low-end Android and older iOS. Hermes profiler / Flipper for runtime analysis.
+4. **Code splitting + lazy loading** — `React.lazy() + Suspense`, split by routes/features.
+5. **CI/CD is non-negotiable** — automated build, test (Jest/Detox/Appium), upload to stores. Manual = error-prone.
+6. **Evidence of manual testing on both platforms** required when changes touch nav, background return, or lifecycle.
+
+### Canonical `when_to_load` triggers
+
+- "iOS check", "Swift review", "iOS code quality"
+- "Android check", "Kotlin review", "Android code quality"
+- "React Native bridge", "RN performance", "native module check"
+
+### Sources
+- [React Native Best Practices 2026 (ReactNativeCoders)](https://reactnativecoders.com/latest-article/react-native-best-practices/)
+- [RN Code Review 2026 (Kodus)](https://kodus.io/en/react-native-code-review)
+- [Mobile Development Best Practices 2026 (Apponward)](https://apponward.com/blogs/top-frameworks-for-mobile-app-development-in-2026/)
+- [Mobile App Best Practices 2026 (SoftwareCo)](https://www.softwareco.com/mobile-app-development-best-practices-a-practical-guide-for-2026/)
+
+---
+
+## Category: Compliance (3 agents)
+
+Applies to: gdpr-compliance-checker, audit-log-checker, license-scanner.
+
+### Patterns to encode in skill bodies
+
+1. **Continuous compliance > point-in-time audits** — high-risk systems scanned daily, lower-risk monthly. Records of Processing Activities updated continuously.
+2. **Consent + audit logging are dual obligations** — timestamped, immutable, queryable. Every consent grant + revoke must be retrievable.
+3. **License obligations are per-package** — MIT/Apache/BSD = permissive; GPL/AGPL = copyleft (review). Track attributions; commercial scanning enforced at the build gate.
+4. **OSS scanned periodically for vulns** — same SCA tools as security (link to [[dependency-auditor]]) but with license dimension.
+5. **Records of Processing Activities** as a maintained artifact, not a one-time document.
+
+### Canonical `when_to_load` triggers
+
+- "GDPR check", "GDPR compliance", "data protection audit"
+- "audit log review", "audit trail check", "compliance logging"
+- "license scan", "OSS licenses", "license compatibility"
+
+### Sources
+- [GDPR Compliance Guide 2026 (Apptega)](https://www.apptega.com/blog/gdpr-compliance-software)
+- [GDPR Compliance 2026 (Secure Privacy)](https://secureprivacy.ai/blog/gdpr-compliance-2026)
+- [Enterprise License Mgmt 2026 (Soraco)](https://soraco.co/the-2026-enterprise-guide-to-software-license-protection-and-management/)
+- [Open Source Compliance (OpenLogic)](https://www.openlogic.com/blog/open-source-compliance-overview)
+- [Software Compliance (Sonar)](https://www.sonarsource.com/resources/library/software-compliance/)
+
+---
+
+## Category: Data/ML (3 agents)
+
+Applies to: data-quality-checker, ml-model-validator, feature-store-validator.
+
+### Patterns to encode in skill bodies
+
+1. **Six dimensions of data quality** — accuracy, completeness, consistency, timeliness, validity, uniqueness. Every check names which dimension it serves.
+2. **Validate at ingestion, not at consumption** — schema validation (JSON Schema/Pydantic) at the edge of the pipeline.
+3. **Volume + range + format gates** — alert when row counts deviate from baseline; reject malformed records; enforce enum values.
+4. **Quarantine, don't drop** — failed records routed to a quarantine table with the failed check + timestamp + original payload.
+5. **ML-specific quality** — contextual coverage, drift detection, training/serving skew, feature-store consistency.
+6. **Tools**: Great Expectations (declarative), dbt tests (in-pipeline), schema validators (edge), Databricks pipeline expectations (cloud-native).
+
+### Canonical `when_to_load` triggers
+
+- "data quality check", "validate data", "data pipeline quality"
+- "ML model validation", "model validation", "training/serving skew"
+- "feature store check", "feature consistency", "feature drift"
+
+### Sources
+- [Data Quality Framework 2026 (lakeFS)](https://lakefs.io/data-quality/data-quality-framework/)
+- [How to Improve Data Quality 2026 (RudderStack)](https://www.rudderstack.com/blog/how-to-improve-data-quality/)
+- [Data Quality Testing 2026 (OvalEdge)](https://www.ovaledge.com/blog/data-quality-testing-guide)
+- [Data Quality is a Pipeline Problem (Datalakehouse Hub)](https://datalakehousehub.com/blog/2026-02-de-best-practices-03-data-quality-first/)
+- [Survey of ML Data Quality (ACM JDIQ)](https://dl.acm.org/doi/10.1145/3592616)
+
+---
+
+## Category: Versioning (3 agents)
+
+Applies to: backwards-compatibility-checker, feature-flag-auditor, technical-debt-tracker.
+
+### Patterns to encode in skill bodies
+
+1. **SemVer is the standard** — Major.Minor.Patch. Never break in minor or patch. Required for any public API or library.
+2. **Feature flags decouple deploy from release** — code ships dark; toggles release. Staged rollouts (1% → 10% → 50% → 100%).
+3. **Track deprecation usage** — count attempts to use a deprecated feature for ≥1 release; surface users who missed the deprecation notice.
+4. **Tech debt = tracked, not assumed** — every shortcut gets an entry with cost-of-fix estimate. Don't let it rot in comments.
+5. **Microservices versioning** — version the API at the boundary; keep N-1 alive during transition; document the deprecation timeline.
+6. **Feature flag hygiene** — every flag has an owner, an expiry date, and a removal plan. Stale flags are tech debt.
+
+### Canonical `when_to_load` triggers
+
+- "backwards compatibility", "breaking change check", "API version check"
+- "feature flag audit", "flag hygiene", "stale flags"
+- "technical debt", "tech debt tracker", "debt audit"
+
+### Sources
+- [Software Versioning Best Practices 2026 (MoonTech)](https://www.moontechnolabs.com/qanda/software-versioning-best-practices/)
+- [Software Release Versioning (LaunchDarkly)](https://launchdarkly.com/blog/software-release-versioning/)
+- [Microservices Versioning Guide (OpsLevel)](https://www.opslevel.com/resources/the-ultimate-guide-to-microservices-versioning-best-practices)
+- [Semantic Versioning 2.0.0](https://semver.org/)
+- [App Versioning 2026 (UXCam)](https://uxcam.com/blog/app-versioning-best-practices/)
+
+---
+
+## Category: AI Quality (2 agents)
+
+Applies to: hallucination-detector, ai-code-quality-reviewer.
+
+### Patterns to encode in skill bodies
+
+1. **AI code carries 29-45% vulnerability rate** — 2026 data. Treat AI-generated code as untrusted input until reviewed.
+2. **Hallucination patterns to detect** — Happy-Path Hallucination (no null guards), Security Amnesia (raw SQL concat), N+1 Query Signature, Phantom Package (imports of non-existent libs ~20%).
+3. **Multi-technique detection** — combine RAG + RLHF + guardrails (96% reduction in Stanford study). Single technique = leakage.
+4. **Deterministic AST analysis** — 100% precision on semantic errors when structurally grounded; pair with auto-correction (~77% rate).
+5. **AI code = handwritten code review standards** — peer review, integration test, manual QA, security scan. No fast-track.
+6. **Cite-your-sources prompting** — structured prompts ("Before answering, cite sources") reduce hallucination 20-40%.
+
+### Canonical `when_to_load` triggers
+
+- "hallucination check", "detect hallucination", "AI code review"
+- "AI-generated code", "review AI code", "LLM output review"
+- "AI quality check", "AI code audit"
+
+### Sources
+- [LLM Hallucinations in AI Code Review (diffray)](https://diffray.ai/blog/llm-hallucinations-code-review/)
+- [Detecting Hallucinations via AST (arXiv 2601.19106)](https://arxiv.org/html/2601.19106v1)
+- [LLM Hallucination Rates 2026 (ModelsLab)](https://modelslab.com/blog/llm/llm-hallucination-rates-2026)
+- [AI Code Review Checklist 2026 (Dev Journal)](https://earezki.com/ai-news/2026-04-04-ai-code-review-checklist/)
+- [Exploring Hallucinations in LLM Code (arXiv 2404.00971)](https://arxiv.org/abs/2404.00971)
+
+---
+
+## Category: Architecture (2 agents)
+
+Applies to: pattern-detector, dependency-analyzer.
+
+### Patterns to encode in skill bodies
+
+1. **Loose coupling at boundaries** — components interact through defined interfaces; never direct dependencies. Boundary contracts (schemas) for cross-service communication.
+2. **No "best" pattern** — monoliths fast-start; microservices scale specific components; event-driven for real-time. Match pattern to need, not fashion.
+3. **DDD-aligned decomposition** — align technical architecture with business capabilities. Bounded contexts, ubiquitous language.
+4. **Circular dependencies are blockers** — automated detection (madge, deptry, jdeps); refactor required. New cycles = BLOCK.
+5. **Versioned schemas for cross-service events** — never broadcast raw internal types.
+6. **AI integration changes pattern adoption** — Saga via predictive analytics, AI-assisted microservices workflows.
+
+### Canonical `when_to_load` triggers
+
+- "pattern detection", "find design patterns", "architectural patterns"
+- "dependency analysis", "module dependencies", "dependency graph"
+- "circular dependency", "module boundary"
+
+### Sources
+- [Software Design Patterns Guide 2026 (Cymbidium)](https://cymbidium.org/software-design-patterns-guide-2026/)
+- [Top 10 Architecture Patterns 2026 (Tecnovy)](https://tecnovy.com/en/top-10-software-architecture-patterns)
+- [Architecture Patterns Guide 2026 (Index.dev)](https://www.index.dev/blog/software-architecture-patterns-guide)
+- [Software Architecture Principles 2026 (Codewave)](https://codewave.com/insights/software-architecture-principles-practices/)
+
+---
+
+## Category: DevEx (2 agents)
+
+Applies to: onboarding-validator, api-deprecation-checker.
+
+### Patterns to encode in skill bodies
+
+1. **DORA + SPACE + DevEx are the three measurement frames** — combine all three for a complete picture: speed (DORA), holistic (SPACE), engineer experience (DevEx).
+2. **TTFHW (Time To First Hello World) is the onboarding KPI** — bootstrap scripts replace wiki sprawl. Single-command setup is the bar.
+3. **API deprecation = explicit schedule + parallel versions** — never break without ≥1 version of overlap; communicate dates clearly.
+4. **Operational + qualitative metrics combined** — DORA numbers + developer satisfaction surveys. One without the other lies.
+5. **Key DevEx metrics**: environment setup time, CI/CD turnaround, review speed, deployment frequency, lead time, interruption frequency, satisfaction.
+
+### Canonical `when_to_load` triggers
+
+- "onboarding validation", "onboarding check", "new dev setup"
+- "API deprecation", "deprecation check", "breaking change schedule"
+- "DevEx metrics", "developer experience"
+
+### Sources
+- [Developer Experience Complete Guide (kodus)](https://kodus.io/en/the-complete-guide-to-developer-experience-devex/)
+- [DevEx Measurement 2026 (getdx)](https://getdx.com/blog/developer-experience/)
+- [Developer Onboarding Checklist (Cortex)](https://www.cortex.io/post/developer-onboarding-guide)
+- [API Engineering 2026 (Refonte)](https://www.refontelearning.com/blog/api-developer-engineering-in-2026-trends-skills-best-practices)
+
+---
+
+## Category: Cost (1 agent)
+
+Applies to: cloud-cost-analyzer.
+
+### Patterns to encode in skill bodies
+
+1. **Shift-left FinOps**: forecast and model costs before deployment, not after the bill arrives. Infrastructure review includes cost estimates the same way it includes security review.
+2. **Tagging at provisioning, not convention** — policy-as-code refuses untagged resources. ≥95% tag compliance achievable.
+3. **Right-size + reserved + scheduling**: RIs/SPs save 40-72% on stable workloads; right-sizing saves 15-25%; non-prod scheduling saves up to 75%.
+4. **4-phase FinOps lifecycle**: Visibility → Optimization → Forecasting → Continuous Improvement. Not a one-time audit.
+5. **AI workload cost** is the breakout category in 2026 — track separately, attribute to features/teams.
+6. **30-40% waste** is the baseline for un-managed cloud spend. The skill quantifies the gap to that target.
+
+### Canonical `when_to_load` triggers
+
+- "cloud cost", "cost analysis", "AWS cost", "Azure cost", "GCP cost"
+- "FinOps", "cost optimization", "cloud spend"
+- "right-size", "reserved instances", "cost forecast"
+
+### Sources
+- [8 FinOps Best Practices 2026 (nOps)](https://www.nops.io/blog/top-finops-practices-to-effectively-manage-cloud-costs/)
+- [FinOps Cloud Optimization 2026 (Sedai)](https://sedai.io/blog/finops-cloud-optimization-strategies)
+- [2026 FinOps Playbook (LeanOps)](https://leanopstech.com/blog/cloud-cost-optimization-finops-playbook-2026/)
+- [Top FinOps Tools 2026 (Vantage)](https://www.vantage.sh/blog/top-finops-tools-for-cloud-cost-optimization)
+- [FinOps Principles (Flexera)](https://www.flexera.com/blog/finops/finops-principles/)
+
+---
+
+## Category: Orchestrators (sub-orchestrators reporting to CTO Chief)
+
+Applies to the **non-leaf** agents (B1 Phase 2 modernization, not B2 skill conversion):
+iron-loop/{integrator, critic, executor}, pipeline/{writer, critic, tester, qa, publisher},
+planning/{vision-decomposer}, planning reviewers (functional-reviewer, implementation-plan-reviewer),
+implementation/{test-maker, self-reviewer, optimizer, verifier, documenter, implementation-reviewer}.
+
+These stay as agents (not converted to skills) because they orchestrate other agents.
+They need v7 modernization in place.
+
+### Patterns to encode in agent bodies (v7 modernization)
+
+1. **Single top-level**: every orchestrator declares `reports_to: cto-chief` in its frontmatter. CTO Chief is sole top-level. No sibling dispatch — recommend, don't execute peer calls.
+2. **Hierarchical pattern**: higher-level coordinates and plans; lower-level executes. Sub-orchestrators occupy the middle tier.
+3. **Start small, scale validated**: each sub-orchestrator dispatches 1-3 specialist agents at a time, not 10. Validate output before expanding.
+4. **Observability + auditability**: every dispatch decision is logged. Inspectable trail back to CTO Chief.
+5. **Open protocols (MCP + A2A)**: where applicable, prefer standard protocols over bespoke RPC for agent-to-agent communication.
+6. **Test workers in isolation first**: if a specialist can't pass a simple isolated test, it can't pass an integrated one — sub-orchestrators don't paper over broken specialists.
+7. **Reads ancestry**: every orchestrator must read the full plan chain (vision → canvas → functional → implementation → todo) before dispatching. v7 `reads_ancestry: true` frontmatter required.
+8. **No-stub + async-overnight**: same v7 principles apply — make documented choices, continue, let morning review catch errors. Never block.
+
+### Frontmatter fields required for v7 orchestrator modernization
+
+```yaml
+effort: high             # or xhigh for coordinator-level
+reads_ancestry: true
+async_choice_protocol: enabled
+model_optimized_for: opus-4-7
+reports_to: cto-chief    # explicit chain of command
+```
+
+### Body addition required
+
+A "## v7 Operating Principles" section near the top of the body (similar to what vision-advisor/product-owner/implementation-planner already have) that names: pre-todo-is-context-building, no-stub rule, async-overnight, literal interpretation, and the sub-orchestrator chain (this agent → CTO Chief).
+
+### Sources
+- [Multi-Agent Orchestration 2026 (CodeBridge)](https://www.codebridge.tech/articles/mastering-multi-agent-orchestration-coordination-is-the-new-scale-frontier)
+- [Multi-Agent Patterns (MindStudio)](https://www.mindstudio.ai/blog/multi-agent-orchestration-patterns)
+- [Agent Orchestration (MIT Technology Review)](https://www.technologyreview.com/2026/04/21/1135654/agent-orchestration-ai-artificial-intelligence/)
+- [AI Agent Patterns (Microsoft Azure Architecture)](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)
+- [Multi-Agent Frameworks 2026 (Gurusup)](https://gurusup.com/blog/best-multi-agent-frameworks-2026)
+
+---
+
 ## Application Pattern
 
 For each agent being converted (or each skill being modernized):

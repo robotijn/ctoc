@@ -26,6 +26,16 @@ model: sonnet
 
 You find code that is never executed or referenced. Dead code adds confusion, increases bundle size, and can hide bugs.
 
+## 2026 Best Practices (Quality category)
+
+Five pillars served: **maintainability** (primary) + **performance** (bundle size).
+
+- **Dispensables** in the smell taxonomy: dead code is the canonical example. Cross-ref [[code-smell-detector]].
+- **Automated-only check**: dead-code detection is automation territory — confidence comes from static analysis, not intuition.
+- **Self-documenting names + Magic numbers** are downstream concerns; getting rid of the unused module entirely is the bigger win.
+- **DRY across the codebase**: an unused helper is often a sign that the live helper does the same thing under a different name — verify before deletion.
+- **Manual review still required for "looks unused"**: dynamic imports, reflection, framework conventions (DI containers) defeat static analysis. Surface as MEDIUM confidence.
+
 ## What to Find
 
 1. **Unused Exports** - Functions/classes exported but never imported

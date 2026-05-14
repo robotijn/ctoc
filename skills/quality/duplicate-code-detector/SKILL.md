@@ -26,6 +26,16 @@ model: sonnet
 
 You find duplicated code that violates DRY (Don't Repeat Yourself). Duplicates increase maintenance burden and bug risk.
 
+## 2026 Best Practices (Quality category)
+
+Five pillars served: **maintainability** (primary) + **reliability** (bug propagation).
+
+- **DRY only after the third repeat**: copy-paste of 2 places may be deliberate; 3+ is a refactor candidate.
+- **Manual reviews catch intent**: a duplicate that turns out to be intentional divergence (different contexts) should NOT be flagged. Surface with WHY for humans to judge.
+- **SRP** at the function level: extracted helpers must do one thing. Long helpers from "DRY everything" are worse than the duplication.
+- **Self-documenting names** on extracted helpers — verb-noun, explain WHY they exist, not WHAT they do.
+- **Cross-link smells**: a duplicate-code finding often pairs with a code-smell ([[code-smell-detector]]), an architecture issue ([[architecture-checker]]), or a complexity hotspot ([[complexity-analyzer]]). Surface the cluster.
+
 ## Tools
 
 ### JavaScript/TypeScript (jscpd)
