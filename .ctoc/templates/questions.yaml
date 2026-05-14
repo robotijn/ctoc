@@ -1,0 +1,274 @@
+# ===============================================================================
+#  CTOC Question Catalog (v8.3 — persona-aware)
+#  Source of truth for which questions are asked at which phase, by which persona.
+#  See docs/PERSONA_ROUTING.md and src/lib/persona.js for the routing logic.
+#
+#  Each question:
+#    id:               <phase>/<slug>
+#    phase:            vision | canvas | functional | implementation | testing | deployment
+#    category:         vision | canvas | pricing | market | target_users | unit_economics |
+#                      tech_stack | db_schema | ux_flow | accessibility | compliance | etc.
+#    default_phrasing: "What problem does this solve?"
+#    persona_phrasing: {founder: "...", programmer: "..."}   # optional role-specific phrasing
+#    personas:         [founder, pm, ...]                    # who CAN answer
+#    deferred_for:     [programmer, architect]               # who should DEFER, not be asked
+#    defer_to_persona: founder                               # if asked of wrong persona, defer here
+#    required:         true | false
+#    optional:         true | false
+# ===============================================================================
+
+schema_version: 1
+last_reviewed: 2026-05-14
+
+questions:
+
+# ============================================================
+# PHASE: VISION (every persona contributes here, with phrasing variants)
+# ============================================================
+
+  - id: vision/problem
+    phase: vision
+    category: vision
+    default_phrasing: "What problem does this solve?"
+    persona_phrasing:
+      founder: "What pain are your customers feeling that they'd pay to make go away?"
+      pm: "What user pain motivates this feature?"
+      programmer: "What does this code need to do? (one-liner)"
+      architect: "What's the system meant to solve?"
+      designer: "What's the user need driving this?"
+      hobbyist: "What do you want to build?"
+    personas: [founder, technical-founder, pm, programmer, architect, designer, hobbyist, agency]
+    required: true
+
+  - id: vision/success
+    phase: vision
+    category: success_criteria
+    default_phrasing: "What does success look like?"
+    persona_phrasing:
+      founder: "What's your success metric? Revenue target, customer count, retention rate?"
+      pm: "What's the success criterion? Activation, retention, NPS?"
+      programmer: "What does 'shipped' look like? Deployed and tested in prod?"
+      architect: "What does 'complete' look like? SLA met, observability in place?"
+      designer: "What does 'launched' look like? a11y validated, UX tested?"
+      hobbyist: "When are you done?"
+    personas: [founder, technical-founder, pm, programmer, architect, designer, hobbyist, agency]
+    required: true
+
+  - id: vision/scope
+    phase: vision
+    category: vision
+    default_phrasing: "What's IN scope and what's explicitly OUT?"
+    personas: [founder, technical-founder, pm, programmer, architect, designer, agency]
+    required: true
+
+  - id: vision/audience
+    phase: vision
+    category: target_users
+    default_phrasing: "Who is this for? Specific user persona, not 'everyone'."
+    persona_phrasing:
+      founder: "Who's your ideal customer? Specific role/industry/company size."
+      pm: "Which user persona benefits most?"
+      designer: "Whose UX are we optimizing for?"
+    personas: [founder, technical-founder, pm, designer, agency]
+    deferred_for: [programmer, architect, hobbyist]
+    defer_to_persona: founder
+
+# ============================================================
+# PHASE: CANVAS (business model — founder/PM only)
+# ============================================================
+
+  - id: canvas/business-model
+    phase: canvas
+    category: business_model
+    default_phrasing: "What's your business model? (B2C subscription | B2B sales-led | usage-based | one-time | freemium)"
+    personas: [founder, technical-founder]
+    deferred_for: [pm, programmer, architect, designer, hobbyist, agency]
+    defer_to_persona: founder
+
+  - id: canvas/pricing-model
+    phase: canvas
+    category: pricing
+    default_phrasing: "What's your pricing structure? Tiers? Price points? Free tier limits?"
+    persona_phrasing:
+      founder: "Pricing tiers and price points? Free tier? Annual discount? Anchor price?"
+    personas: [founder, technical-founder]
+    deferred_for: [pm, programmer, architect, designer, hobbyist, agency]
+    defer_to_persona: founder
+    required: true   # for SaaS — gates payment integration
+
+  - id: canvas/target-ltv
+    phase: canvas
+    category: unit_economics
+    default_phrasing: "Target customer LTV? (helps decide infra spend per customer)"
+    personas: [founder, technical-founder]
+    deferred_for: [pm, programmer, architect, designer, hobbyist, agency]
+    optional: true
+
+  - id: canvas/cac-payback
+    phase: canvas
+    category: unit_economics
+    default_phrasing: "Target CAC payback period? (months)"
+    personas: [founder, technical-founder]
+    deferred_for: [pm, programmer, architect, designer, hobbyist, agency]
+    optional: true
+
+  - id: canvas/north-star
+    phase: canvas
+    category: success_criteria
+    default_phrasing: "What's your North Star metric — the single number that says it's working?"
+    personas: [founder, technical-founder, pm]
+    deferred_for: [programmer, architect, designer, hobbyist, agency]
+    defer_to_persona: founder
+
+  - id: canvas/competitors
+    phase: canvas
+    category: market
+    default_phrasing: "Who are the 2-3 closest competitors? What do you do differently?"
+    personas: [founder, technical-founder, pm]
+    deferred_for: [programmer, architect, designer, hobbyist, agency]
+    defer_to_persona: founder
+
+  - id: canvas/compliance-scope
+    phase: canvas
+    category: compliance
+    default_phrasing: "Compliance scope? (none | GDPR | SOC2 | HIPAA | PCI)"
+    personas: [founder, technical-founder, architect]
+    deferred_for: [pm, programmer, designer, hobbyist, agency]
+    defer_to_persona: founder
+
+# ============================================================
+# PHASE: FUNCTIONAL (BDD scenarios, acceptance — PM/founder/designer)
+# ============================================================
+
+  - id: functional/acceptance-criteria
+    phase: functional
+    category: acceptance_criteria
+    default_phrasing: "What are the acceptance scenarios (Given/When/Then)?"
+    personas: [founder, technical-founder, pm, designer]
+    deferred_for: [programmer, architect, hobbyist, agency]
+
+  - id: functional/user-flow
+    phase: functional
+    category: ux_flow
+    default_phrasing: "What's the user flow? (steps from entry to value)"
+    personas: [founder, technical-founder, pm, designer]
+    deferred_for: [programmer, architect, hobbyist]
+
+  - id: functional/feature-priority
+    phase: functional
+    category: feature_priority
+    default_phrasing: "Feature priority? (must-have / should-have / nice-to-have)"
+    personas: [founder, technical-founder, pm]
+    deferred_for: [programmer, architect, designer, hobbyist, agency]
+
+  - id: functional/accessibility-target
+    phase: functional
+    category: accessibility
+    default_phrasing: "Accessibility target? (WCAG 2.2 AA is the default for public-facing)"
+    personas: [designer, pm, technical-founder, architect]
+    deferred_for: [founder, programmer, hobbyist, agency]
+    defer_to_persona: designer
+
+# ============================================================
+# PHASE: IMPLEMENTATION (tech stack, db, deploy — programmer/architect)
+# ============================================================
+
+  - id: implementation/tech-stack
+    phase: implementation
+    category: tech_stack
+    default_phrasing: "Tech stack preferences? (or accept defaults)"
+    persona_phrasing:
+      programmer: "Stack? Defaults for SaaS: Next.js 15 + Postgres (Supabase) + Clerk + Stripe + Resend."
+      architect: "Stack constraints? Existing system to integrate with?"
+      technical-founder: "Stack preferences? Or accept the SaaS defaults?"
+    personas: [programmer, architect, technical-founder]
+    deferred_for: [founder, pm, designer, hobbyist, agency]
+    defer_to_persona: programmer
+
+  - id: implementation/db-schema
+    phase: implementation
+    category: db_schema
+    default_phrasing: "Database choices? (Postgres relational by default for SaaS)"
+    personas: [architect, technical-founder, programmer]
+    deferred_for: [founder, pm, designer, hobbyist, agency]
+    defer_to_persona: architect
+
+  - id: implementation/multi-tenancy
+    phase: implementation
+    category: db_schema
+    default_phrasing: "Multi-tenancy model? (single-DB row-level | schema-per-tenant | DB-per-tenant)"
+    persona_phrasing:
+      architect: "Multi-tenancy isolation level? Row-level (RLS) is default; schema-per-tenant for B2B; DB-per for enterprise."
+    personas: [architect, technical-founder]
+    deferred_for: [founder, pm, programmer, designer, hobbyist, agency]
+    defer_to_persona: architect
+
+  - id: implementation/deployment-target
+    phase: implementation
+    category: deployment_target
+    default_phrasing: "Deployment target? (Vercel default for Next.js)"
+    personas: [architect, programmer, technical-founder]
+    deferred_for: [founder, pm, designer, hobbyist, agency]
+    defer_to_persona: programmer
+
+  - id: implementation/auth-provider
+    phase: implementation
+    category: integration_design
+    default_phrasing: "Auth provider? (Clerk default for B2C; WorkOS for B2B SSO)"
+    personas: [programmer, architect, technical-founder]
+    deferred_for: [founder, pm, designer, hobbyist, agency]
+    defer_to_persona: programmer
+
+  - id: implementation/observability-stack
+    phase: implementation
+    category: integration_design
+    default_phrasing: "Observability stack? (defaults: PostHog + Sentry + Plausible)"
+    personas: [programmer, architect, technical-founder]
+    deferred_for: [founder, pm, designer, hobbyist, agency]
+    defer_to_persona: architect
+
+# ============================================================
+# PHASE: TESTING (test strategy — programmer)
+# ============================================================
+
+  - id: testing/strategy
+    phase: testing
+    category: test_framework
+    default_phrasing: "Test strategy? (Trophy default: integration-heavy with thin E2E)"
+    personas: [programmer, technical-founder]
+    deferred_for: [founder, pm, architect, designer, hobbyist, agency]
+    defer_to_persona: programmer
+
+# ============================================================
+# PHASE: DEPLOYMENT (go-live — founder + programmer)
+# ============================================================
+
+  - id: deployment/legal-docs
+    phase: deployment
+    category: compliance
+    default_phrasing: "Privacy Policy and Terms of Service ready? (required before paying customers)"
+    personas: [founder, technical-founder]
+    deferred_for: [pm, programmer, architect, designer, hobbyist, agency]
+    defer_to_persona: founder
+
+  - id: deployment/payment-tested
+    phase: deployment
+    category: compliance
+    default_phrasing: "Tested checkout with a real card? (Stripe test mode is NOT enough for go-live)"
+    personas: [founder, technical-founder, programmer]
+    deferred_for: [pm, architect, designer, hobbyist, agency]
+
+  - id: deployment/email-deliverability
+    phase: deployment
+    category: integration_design
+    default_phrasing: "SPF / DKIM / DMARC configured? (otherwise transactional emails land in spam)"
+    personas: [programmer, architect, technical-founder]
+    deferred_for: [founder, pm, designer, hobbyist, agency]
+    defer_to_persona: programmer
+
+  - id: deployment/error-monitoring
+    phase: deployment
+    category: integration_design
+    default_phrasing: "Error monitoring connected? (Sentry / similar)"
+    personas: [programmer, architect, technical-founder]
+    deferred_for: [founder, pm, designer, hobbyist, agency]

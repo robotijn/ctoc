@@ -1,0 +1,80 @@
+# ===============================================================================
+#  CTOC SaaS Template Index (v8.3)
+#  Opinionated starter templates for autonomous SaaS builds.
+#  Each template has a manifest.yaml describing default tech stack,
+#  required skills, setup steps, and first-week milestones.
+# ===============================================================================
+
+schema_version: 1
+last_reviewed: 2026-05-14
+
+templates:
+
+  - id: saas/b2c-subscription
+    name: "B2C Subscription SaaS"
+    description: "Freemium or paid B2C SaaS with Stripe subscriptions. Default for consumer products."
+    target_personas: [founder, technical-founder]
+    target_project_types: [saas-b2c, startup-product]
+    path: .ctoc/templates/saas/b2c-subscription/
+    status: ready
+
+  # Future templates (sketches — to be built in subsequent passes):
+
+  - id: saas/b2b-sales-led
+    name: "B2B Sales-Led SaaS"
+    description: "B2B with SSO, audit logs, RBAC, contracts. Sales-led GTM."
+    target_personas: [founder, technical-founder]
+    target_project_types: [saas-b2b]
+    status: planned
+    notes: |
+      Differs from b2c-subscription: WorkOS for SSO, organization-scoped data,
+      role-based permissions, audit log table, contract-based billing (not self-serve),
+      compliance docs (SOC2 templates).
+
+  - id: saas/usage-based-api
+    name: "Usage-Based API SaaS"
+    description: "API product with per-request or per-token metering."
+    target_personas: [founder, technical-founder]
+    target_project_types: [api-saas]
+    status: planned
+    notes: |
+      Differs: metered billing (Stripe metered prices), API keys table, rate limiting,
+      usage dashboard, latency SLO.
+
+  - id: app/expo-react-native
+    name: "React Native Mobile App"
+    description: "Cross-platform iOS + Android with Expo + EAS."
+    target_personas: [founder, programmer, technical-founder]
+    target_project_types: [mobile-app]
+    status: planned
+    notes: |
+      Default stack: Expo SDK 52+, Clerk Expo, Supabase, RevenueCat (in-app purchases),
+      Sentry, EAS Build & Submit.
+
+  - id: cli/bun-single-binary
+    name: "CLI Tool (Bun, Single Binary)"
+    description: "CLI tool packaged as a single cross-platform binary."
+    target_personas: [programmer, hobbyist]
+    target_project_types: [cli]
+    status: planned
+
+  - id: oss-lib/typescript
+    name: "OSS TypeScript Library"
+    description: "TypeScript library with proper publish + changesets + CI."
+    target_personas: [programmer]
+    target_project_types: [oss-library]
+    status: planned
+
+# ===============================================================================
+#  How a template is selected
+# ===============================================================================
+#
+#  1. persona-classifier sets the persona (founder | programmer | etc.)
+#  2. vision-advisor extracts the project type from the user's vision
+#  3. stack-chooser (Tier 1) consults this index + the project type
+#  4. CTO Chief presents the matching template(s) and asks user to confirm
+#     (only for founders/technical-founders; programmers see "we'll use $TEMPLATE
+#      defaults unless you override")
+#  5. The template's manifest.yaml dictates the implementation-planner output
+#
+# ===============================================================================

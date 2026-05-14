@@ -26,6 +26,50 @@ Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatc
 
 Scouts (Tier 3) declare `model: haiku` because they run as **subagents** — isolated context, the Haiku model is safe at this layer. The user's terminal session is untouched.
 
+## Persona-aware question routing (v8.3+)
+
+> **Don't ask a programmer about pricing. Don't ask a founder about TypeScript.**
+
+CTOC classifies the user's role at session start and routes every question accordingly. See [`docs/PERSONA_ROUTING.md`](./docs/PERSONA_ROUTING.md).
+
+**Eight personas**, each with explicit `can_answer` / `cannot_answer` categories:
+
+| Role | Decides | Defers (or never sees) |
+|---|---|---|
+| founder | pricing · market · target customer · business model · unit economics · compliance scope | tech stack · db schema · code style |
+| technical-founder | everything | (none) |
+| pm | features · acceptance criteria · UX flow · success metrics | pricing · unit economics · tech stack |
+| programmer | tech stack · code style · test framework | pricing · market · business model |
+| architect | system design · db schema · deployment · integration | pricing · business model · UX flow |
+| designer | UX · IA · a11y · brand · copy tone | tech stack · pricing · db schema |
+| hobbyist | vision · success criteria | pricing · compliance · business model |
+| agency | tech stack · integration | pricing · market (deferred to client/founder) |
+
+Questions outside the current persona scope are **deferred** to `.ctoc/inbox/questions/` with `awaits_persona: <role>`. The right user answers them later (async-overnight). Answers persist in `.ctoc/session/answers.yaml` — never re-asked.
+
+## SaaS template library (v8.3+)
+
+CTOC ships opinionated templates for common project types. `agents/planning/stack-chooser.md` (Tier 1) selects the matching template and presents defaults to qualified personas only.
+
+| Template | Status | Default stack |
+|---|---|---|
+| `saas/b2c-subscription` | ready | Next.js 15 · Supabase · Clerk · Stripe · Resend · PostHog · Sentry · Vercel |
+| `saas/b2b-sales-led` | planned | adds WorkOS SSO · org-scoped data · audit log · SOC2 docs |
+| `saas/usage-based-api` | planned | metered billing · API keys · rate limiting · usage dashboard |
+| `app/expo-react-native` | planned | Expo SDK 52 · Clerk Expo · Supabase · RevenueCat · EAS |
+| `cli/bun-single-binary` | planned | Bun + cross-platform binary |
+| `oss-lib/typescript` | planned | tsup · changesets · GitHub Actions |
+
+SaaS skills under `skills/saas/`:
+- `stripe-subscriptions` — Checkout, webhooks, dunning, proration, idempotency
+- `clerk-auth` — signup, login, email verification, MFA, session
+- `multi-tenancy-row-level` — Postgres RLS, isolation tests
+- `resend-email` — SPF/DKIM/DMARC, React Email, welcome/receipt/dunning
+- `posthog-analytics` — events, funnels, feature flags, A/B tests
+- `legal-scaffold` — Privacy Policy · ToS · Cookie Policy · DPA generators
+
+Production-readiness gate enforced at Gate 3 via `.ctoc/templates/saas/b2c-subscription/production-readiness.yaml` — 20+ checks (domain, HTTPS, auth, billing, email deliverability, RLS, observability, legal docs, support).
+
 **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`) is the only agent with top-level authority. All other agents and skills are dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer, synthesizer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
 
 ```

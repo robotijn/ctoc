@@ -1,0 +1,226 @@
+# ===============================================================================
+#  Production Readiness Checklist — B2C Subscription SaaS
+#  Gate before "ready for paying customers".
+#  CTO Chief enforces at Gate 3 (review → done) for SaaS projects.
+# ===============================================================================
+
+template_id: saas/b2c-subscription
+schema_version: 1
+last_reviewed: 2026-05-14
+
+# Each check has:
+#   id, severity (block | warn | info), owner (persona), validation (how to verify)
+
+checks:
+
+  # ─────────────────────────────────────────────────────────
+  # Domain & HTTPS
+  # ─────────────────────────────────────────────────────────
+  - id: custom_domain
+    severity: block
+    owner: programmer
+    description: "Custom domain configured (not a vercel.app subdomain)"
+    validation: "curl -sI https://<domain> shows HTTP/2 200"
+
+  - id: https_enforced
+    severity: block
+    owner: programmer
+    description: "HTTPS enforced (HTTP redirects to HTTPS)"
+    validation: "curl -sI http://<domain> returns 301 to https"
+
+  # ─────────────────────────────────────────────────────────
+  # Auth
+  # ─────────────────────────────────────────────────────────
+  - id: signup_flow_works
+    severity: block
+    owner: programmer
+    description: "End-to-end signup with email verification works in production"
+    validation: "Manual test from clean browser, verify email arrives, click link, land in app"
+
+  - id: password_reset_works
+    severity: block
+    owner: programmer
+    description: "Forgot password → reset email → new password works"
+    validation: "Manual test in production"
+
+  - id: session_expiry
+    severity: warn
+    owner: programmer
+    description: "Session expires at reasonable interval (default: 7 days)"
+
+  # ─────────────────────────────────────────────────────────
+  # Billing
+  # ─────────────────────────────────────────────────────────
+  - id: real_card_tested
+    severity: block
+    owner: founder
+    description: "Tested checkout with a REAL credit card (not just Stripe test mode)"
+    validation: "Charged $1+ on founder's card, verified subscription created, refunded"
+    rationale: |
+      Stripe test mode is not enough. Real cards have real failure modes
+      (3DS, network errors, fraud rules). Test one before paying customers.
+
+  - id: webhook_signature_verified
+    severity: block
+    owner: programmer
+    description: "Stripe webhook signature verification works in production"
+    validation: "Trigger test webhook from Stripe Dashboard, verify it lands in DB"
+
+  - id: failed_payment_handling
+    severity: block
+    owner: programmer
+    description: "past_due / invoice.payment_failed events handled (dunning email sent)"
+    validation: "Use Stripe test card 4000 0000 0000 0341 (auto-fail on retry)"
+
+  - id: billing_portal_link
+    severity: block
+    owner: programmer
+    description: "Customer Portal accessible from app (self-serve plan changes)"
+    validation: "Log in as test user → click 'Manage billing' → land in Stripe Portal"
+
+  # ─────────────────────────────────────────────────────────
+  # Email deliverability
+  # ─────────────────────────────────────────────────────────
+  - id: spf_dkim_dmarc
+    severity: block
+    owner: programmer
+    description: "SPF + DKIM + DMARC DNS records configured (otherwise mail goes to spam)"
+    validation: "mail-tester.com score ≥ 9/10"
+
+  - id: welcome_email
+    severity: block
+    owner: programmer
+    description: "Welcome email triggers on signup"
+    validation: "Sign up with personal email, verify welcome email arrives"
+
+  - id: receipt_email
+    severity: block
+    owner: programmer
+    description: "Subscription receipt email sent on successful charge"
+    validation: "Complete checkout, verify receipt email arrives"
+
+  # ─────────────────────────────────────────────────────────
+  # Multi-tenancy isolation
+  # ─────────────────────────────────────────────────────────
+  - id: rls_enforced
+    severity: block
+    owner: architect
+    description: "Postgres RLS prevents user A from reading user B's data"
+    validation: "Multi-tenant pen test: log in as A, fetch B's resources, expect 403"
+
+  - id: rls_policies_per_table
+    severity: block
+    owner: architect
+    description: "Every table with user_id has an RLS policy"
+    validation: "psql: SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname='public'"
+
+  # ─────────────────────────────────────────────────────────
+  # Observability
+  # ─────────────────────────────────────────────────────────
+  - id: sentry_connected
+    severity: block
+    owner: programmer
+    description: "Sentry receiving errors from production"
+    validation: "Throw a test error, see it in Sentry dashboard"
+
+  - id: posthog_events
+    severity: block
+    owner: programmer
+    description: "PostHog receiving product events (signup, subscription_started, etc.)"
+    validation: "Sign up, verify event in PostHog Activity"
+
+  - id: uptime_monitoring
+    severity: warn
+    owner: programmer
+    description: "Uptime monitor pinging /api/health every 60s"
+    validation: "Better Uptime or similar shows green"
+
+  - id: status_page
+    severity: warn
+    owner: founder
+    description: "Public status page (optional but recommended for $$$ tiers)"
+
+  # ─────────────────────────────────────────────────────────
+  # Legal / compliance
+  # ─────────────────────────────────────────────────────────
+  - id: privacy_policy
+    severity: block
+    owner: founder
+    description: "Privacy Policy posted and linked from footer + signup"
+    validation: "curl /legal/privacy returns 200"
+    rationale: "Required by GDPR, CCPA. Cannot take EU/CA traffic without it."
+
+  - id: terms_of_service
+    severity: block
+    owner: founder
+    description: "Terms of Service posted and linked from footer + signup"
+    validation: "curl /legal/terms returns 200"
+
+  - id: cookie_consent
+    severity: warn
+    owner: programmer
+    description: "Cookie consent banner shown to EU users (or always)"
+    validation: "Visit from EU IP, verify banner appears before non-essential cookies"
+    rationale: "GDPR requires explicit consent for non-essential cookies"
+
+  - id: dpa_template
+    severity: info
+    owner: founder
+    description: "DPA template ready for B2B-leaning customers who request one"
+
+  # ─────────────────────────────────────────────────────────
+  # Customer support
+  # ─────────────────────────────────────────────────────────
+  - id: support_email
+    severity: block
+    owner: founder
+    description: "support@<domain> email forwards somewhere (or contact form works)"
+    validation: "Send test email to support@<domain>, verify receipt"
+
+  - id: help_docs_index
+    severity: warn
+    owner: founder
+    description: "Basic help docs (at least 3 articles: getting started, billing, cancel)"
+
+  # ─────────────────────────────────────────────────────────
+  # Backups & DR
+  # ─────────────────────────────────────────────────────────
+  - id: db_backups
+    severity: block
+    owner: architect
+    description: "Database backups enabled (Supabase auto-backups OR scheduled pg_dump)"
+    validation: "Check Supabase Dashboard → Settings → Backups OR verify backup cron logs"
+
+  - id: backup_restore_tested
+    severity: warn
+    owner: architect
+    description: "Verified you can restore from a backup (don't wait for incident to find out it's broken)"
+
+  # ─────────────────────────────────────────────────────────
+  # Performance baseline
+  # ─────────────────────────────────────────────────────────
+  - id: lcp_under_2_5s
+    severity: warn
+    owner: programmer
+    description: "Largest Contentful Paint < 2.5s on landing page (mobile, 3G)"
+    validation: "PageSpeed Insights green"
+
+  - id: api_p95_under_500ms
+    severity: warn
+    owner: architect
+    description: "API p95 < 500ms under normal load"
+    validation: "Synthetic load test or production p95 from Vercel Analytics"
+
+# ===============================================================================
+#  How to use this checklist
+# ===============================================================================
+#
+#  1. CTO Chief loads this file when a SaaS plan reaches Gate 3 (review → done).
+#  2. For each check with severity:block, verify per the validation field.
+#  3. Blocks must pass before Gate 3 approval; warns surface in the report but
+#     do not block; info items are notes for follow-up.
+#  4. Owner persona dictates who answers — if owner is 'founder' and only a
+#     programmer is in session, the question is DEFERRED to .ctoc/inbox/.
+#
+#  Slash command (future v8.4):  /ctoc:production-readiness
+#  Runs this checklist and reports.

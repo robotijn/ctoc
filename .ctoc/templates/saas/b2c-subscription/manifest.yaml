@@ -1,0 +1,297 @@
+# ===============================================================================
+#  B2C Subscription SaaS — Manifest
+#  Consumed by stack-chooser (Tier 1) and implementation-planner.
+# ===============================================================================
+
+template_id: saas/b2c-subscription
+display_name: "B2C Subscription SaaS"
+description: "Freemium-or-paid B2C SaaS with self-serve subscription billing."
+schema_version: 1
+last_reviewed: 2026-05-14
+
+target_personas:
+  - founder
+  - technical-founder
+
+target_project_types:
+  - saas-b2c
+  - startup-product
+
+# ===============================================================================
+#  Default tech stack (2026 best practice — see category briefs)
+# ===============================================================================
+
+default_tech_stack:
+  language: TypeScript
+  runtime: Node 22 LTS (or Bun if user prefers)
+  frontend_framework: Next.js 15 (App Router)
+  styling: Tailwind CSS 4 + shadcn/ui
+  api_pattern: tRPC (internal) + Route Handlers (public webhooks)
+
+  auth_provider: Clerk
+  auth_rationale: |
+    Clerk gives email+password, social, MFA, session management, and a hosted
+    UI out of the box. Lower friction than Auth.js for B2C. Alternative for
+    self-hosting: Supabase Auth or Lucia.
+
+  database: Postgres
+  database_host: Supabase (or Neon serverless for cost)
+  orm: Drizzle ORM
+  migration_strategy: drizzle-kit generate + push, run in CI
+
+  payments: Stripe Subscriptions
+  payments_rationale: |
+    Stripe Checkout for self-serve signup, Customer Portal for self-serve
+    plan changes. Webhooks for state sync. Alternative: Paddle for
+    Merchant-of-Record (handles tax in 100+ countries — recommended if
+    selling globally and you don't want to handle tax yourself).
+
+  email_transactional: Resend
+  email_marketing: Loops (or Customer.io for advanced)
+  email_rationale: |
+    Resend has a clean API + React Email components. Domain verification
+    (SPF/DKIM/DMARC) is required before sending — a production-readiness gate.
+
+  analytics_product: PostHog
+  analytics_web: Plausible (privacy-friendly, GDPR-compliant by default)
+  feature_flags: PostHog (same tool)
+  a_b_testing: PostHog
+
+  error_monitoring: Sentry
+  uptime_monitoring: Better Uptime (or Instatus for status page)
+  log_aggregation: Vercel Logs / Axiom
+
+  file_storage: Cloudflare R2 (S3-compatible, no egress fees)
+  cdn: Cloudflare or Vercel Edge
+
+  background_jobs: Inngest
+  bg_jobs_rationale: |
+    Inngest gives you typed event-driven jobs with retries, observability,
+    and durable execution. Alternative: Trigger.dev for similar UX, BullMQ
+    for self-hosted with Redis.
+
+  search: Typesense (self-hosted) or Algolia (managed)
+  rate_limiting: Upstash Redis (sliding-window)
+
+  deployment_target: Vercel
+  deployment_rationale: |
+    Vercel for Next.js is the path of least resistance. Custom domain +
+    HTTPS in minutes. Alternative: Fly.io (Docker-based, single-region or
+    multi-region), Railway (PaaS), Render (PaaS).
+
+  ci_cd: GitHub Actions
+  preview_deployments: Vercel (automatic per-PR)
+
+# ===============================================================================
+#  Required skills (all from skills/saas/)
+# ===============================================================================
+
+required_skills:
+  - saas/stripe-subscriptions
+  - saas/clerk-auth
+  - saas/resend-email
+  - saas/posthog-analytics
+  - saas/multi-tenancy-row-level
+  - saas/legal-scaffold
+
+# ===============================================================================
+#  Standard schema (Drizzle)
+# ===============================================================================
+
+standard_schema:
+  # Minimal SaaS schema. Implementation-planner extends with product-specific
+  # tables; these are baseline.
+  users:
+    columns: [id, clerk_id, email, created_at, deleted_at]
+    indexes: [clerk_id_unique, email_unique]
+
+  subscriptions:
+    columns:
+      - id
+      - user_id (FK users.id)
+      - stripe_customer_id
+      - stripe_subscription_id (unique)
+      - plan_id
+      - status   # active | past_due | canceled | incomplete
+      - current_period_end
+      - cancel_at_period_end
+      - created_at
+      - updated_at
+    indexes: [user_id, stripe_subscription_id_unique]
+
+  webhook_events:
+    columns: [id, stripe_event_id (unique), type, payload, processed_at]
+    note: "Idempotency table. Skip if event_id already processed."
+
+  audit_log:
+    columns: [id, user_id, action, target_type, target_id, metadata, created_at]
+    note: "Recommended even for B2C — helpful for support and compliance."
+
+# ===============================================================================
+#  Setup steps (run BEFORE writing code)
+# ===============================================================================
+
+setup_steps:
+  - step: "Create Vercel project + connect custom domain"
+    estimated_minutes: 15
+    persona: programmer
+  - step: "Provision Supabase database (free tier OK for MVP)"
+    estimated_minutes: 10
+    persona: programmer
+  - step: "Set up Clerk application + configure email/password + social providers"
+    estimated_minutes: 20
+    persona: programmer
+  - step: "Set up Stripe account + create products + create prices for each tier"
+    estimated_minutes: 30
+    persona: founder
+    note: "Founder defines tier names + price points; programmer enters them in Stripe."
+  - step: "Set up Resend domain + verify SPF/DKIM/DMARC DNS records"
+    estimated_minutes: 30
+    persona: programmer
+    blocking_for: deployment
+  - step: "Set up Sentry project + grab DSN"
+    estimated_minutes: 10
+    persona: programmer
+  - step: "Set up PostHog project + grab API key"
+    estimated_minutes: 10
+    persona: programmer
+  - step: "Configure all environment variables in Vercel (production + preview)"
+    estimated_minutes: 15
+    persona: programmer
+    env_vars:
+      - DATABASE_URL
+      - CLERK_SECRET_KEY
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+      - STRIPE_SECRET_KEY
+      - STRIPE_WEBHOOK_SECRET
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+      - RESEND_API_KEY
+      - SENTRY_DSN
+      - NEXT_PUBLIC_POSTHOG_KEY
+
+# ===============================================================================
+#  First-week milestones
+# ===============================================================================
+
+first_week_milestones:
+  day_1:
+    persona: programmer
+    deliverables:
+      - "Repo scaffolded with Next.js 15 + TypeScript + Tailwind"
+      - "Deployed to Vercel with custom domain (HTTPS)"
+      - "CI green on first PR"
+
+  day_2:
+    persona: programmer
+    deliverables:
+      - "Clerk auth working (signup + signin + signout)"
+      - "Postgres connected via Drizzle (initial users table migrated)"
+
+  day_3:
+    persona: programmer
+    deliverables:
+      - "Stripe Checkout working with test card"
+      - "Webhook handler verifies Stripe signature"
+      - "subscriptions table updates on webhook events"
+      - "Idempotency via webhook_events table"
+
+  day_4:
+    persona: programmer
+    deliverables:
+      - "Customer Billing Portal link works (self-serve plan change)"
+      - "Failed-payment (past_due) handling tested"
+
+  day_5:
+    persona: programmer
+    deliverables:
+      - "Resend domain verified — transactional email working"
+      - "Welcome email triggers on signup"
+      - "Sentry capturing errors"
+      - "PostHog events firing (signup, subscription_started)"
+
+  day_6:
+    persona: designer_or_founder
+    deliverables:
+      - "Landing page copy + hero + features + pricing + FAQ"
+      - "OG tags, favicon, brand colors applied"
+      - "Mobile responsive verified"
+
+  day_7:
+    persona: founder
+    deliverables:
+      - "Privacy Policy posted (via legal-scaffold skill)"
+      - "Terms of Service posted"
+      - "Cookie consent banner if EU traffic expected"
+      - "Status page live"
+      - "Support email forwarding set up"
+
+# ===============================================================================
+#  Minimum viable features (what counts as "shippable")
+# ===============================================================================
+
+minimum_viable_features:
+  - id: signup_and_login
+    description: "User can sign up with email, verify email, log in, log out"
+    required: true
+  - id: subscription_purchase
+    description: "User can purchase a subscription via Stripe Checkout"
+    required: true
+  - id: billing_portal_link
+    description: "User can access Stripe Customer Portal to manage subscription"
+    required: true
+  - id: webhook_handler
+    description: "Stripe webhooks update local subscription state"
+    required: true
+  - id: core_value_feature_v1
+    description: "The ACTUAL product feature — what people pay for. Define per project."
+    required: true
+  - id: account_settings
+    description: "User can view/edit profile, see current plan, see usage"
+    required: true
+  - id: support_contact
+    description: "User can email support (mailto: or contact form)"
+    required: true
+
+# ===============================================================================
+#  Estimated effort (MVP to first paying customer)
+# ===============================================================================
+
+estimated_effort:
+  technical_founder: "40-80 hours (1-2 weeks full-time)"
+  founder_with_hired_programmer: "60-120 hours of programmer time + 20-30 founder time"
+  solo_programmer_following_template: "40-60 hours if Clerk/Stripe/Resend accounts are familiar"
+
+# ===============================================================================
+#  Common pitfalls (the things that bite at launch)
+# ===============================================================================
+
+common_pitfalls:
+  - issue: "Stripe webhooks failing because signature verification uses wrong secret"
+    severity: critical
+    detection: "Tests should mock the webhook with the test secret; CI must use STRIPE_WEBHOOK_SECRET env."
+    fix: "stripe.webhooks.constructEvent() with the correct secret per environment"
+
+  - issue: "Email landing in spam because SPF/DKIM/DMARC not set up"
+    severity: high
+    detection: "Send test email to mail-tester.com; aim for 10/10"
+    fix: "Resend's domain verification flow handles this; complete it before launch"
+
+  - issue: "Failed payments (past_due status) not retried — silent churn"
+    severity: high
+    detection: "Test by creating a subscription with a card that fails on retry"
+    fix: "Stripe Smart Retries + dunning emails via Resend"
+
+  - issue: "Row-level security not enforced — user A can read user B's data"
+    severity: critical
+    detection: "Multi-tenant test: log in as user A, request user B's data via API, expect 403"
+    fix: "Postgres RLS policies on every table (see skills/saas/multi-tenancy-row-level)"
+
+  - issue: "EU users see no cookie consent — GDPR violation"
+    severity: high
+    detection: "Visit from EU IP, check for consent banner"
+    fix: "Cookie consent banner (PostHog has a built-in one) gated on geo-detection"
+
+  - issue: "Subscription state out of sync between Stripe and local DB"
+    severity: high
+    detection: "User cancels in Stripe Portal, our DB still shows active"
+    fix: "Webhook handler MUST update local state; reconciliation cron for safety"
