@@ -409,3 +409,165 @@ Audit script produces `.ctoc/audit/skill-conversion/audit-manifest.json`:
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+
+---
+
+## Critic Round 2 Refinements (Discussion fixes)
+
+Applied during the /ctoc:menu discuss step. Each item ties back to a numbered critique point.
+
+### B2-1 — Conversion list enumerated (no more "estimated")
+
+Actual files (read from disk on 2026-05-14):
+
+**Quality reviewers (11):**
+- agents/quality/architecture-checker.md
+- agents/quality/code-reviewer.md
+- agents/quality/code-smell-detector.md
+- agents/quality/complexity-analyzer.md
+- agents/quality/complexity-reducer.md
+- agents/quality/consistency-checker.md
+- agents/quality/dead-code-detector.md
+- agents/quality/duplicate-code-detector.md
+- agents/quality/performance-validator.md
+- agents/quality/quality-gate.md
+- agents/quality/type-checker.md
+
+**Testing (14):**
+- agents/testing/coverage-enforcer.md
+- agents/testing/coverage-mapper.md
+- agents/testing/playwright-qa.md
+- agents/testing/quality-gate-runner.md
+- agents/testing/smart-test-runner.md
+- agents/testing/runners/e2e-test-runner.md
+- agents/testing/runners/integration-test-runner.md
+- agents/testing/runners/mutation-test-runner.md
+- agents/testing/runners/smoke-test-runner.md
+- agents/testing/runners/unit-test-runner.md
+- agents/testing/writers/e2e-test-writer.md
+- agents/testing/writers/integration-test-writer.md
+- agents/testing/writers/property-test-writer.md
+- agents/testing/writers/unit-test-writer.md
+
+**Documentation (2):**
+- agents/documentation/changelog-generator.md
+- agents/documentation/documentation-updater.md
+
+**Security (7):**
+- agents/security/concurrency-checker.md
+- agents/security/dependency-auditor.md
+- agents/security/dependency-checker.md
+- agents/security/input-validation-checker.md
+- agents/security/sast-scanner.md
+- agents/security/secrets-detector.md
+- agents/security/security-scanner.md
+
+**Specialized (11):**
+- agents/specialized/accessibility-checker.md
+- agents/specialized/api-contract-validator.md
+- agents/specialized/configuration-validator.md
+- agents/specialized/database-reviewer.md
+- agents/specialized/error-handler-checker.md
+- agents/specialized/health-check-validator.md
+- agents/specialized/memory-safety-checker.md
+- agents/specialized/observability-checker.md
+- agents/specialized/performance-profiler.md
+- agents/specialized/resilience-checker.md
+- agents/specialized/translation-checker.md
+
+**ACTUAL TOTAL: 45 agents to convert** (was estimated ~39).
+
+### B2-2 — Reduced critic rounds for skills
+
+10-round integrator+critic was inherited from B1's orchestrator pattern. For skills (shorter, simpler, single-purpose) it's overkill.
+
+**Revised**: 3-round critic per converted skill. Reserve 10-round for genuinely complex cases discovered during conversion (e.g., a "leaf" agent that turns out to have orchestration concerns). Estimated load: 45 × 3 = 135 rounds — feasible in a multi-session sweep.
+
+For B2b (skill modernization sweep), no per-skill critic. Audit identifies failing skills; updates are mechanical (add missing frontmatter, normalize triggers). A single round of self-review per category is sufficient.
+
+### B2-3 — FR-4 reworded to clarify resolver role
+
+**Updated FR-4**: `src/lib/agent-resolver.js` is **supplemental tooling** that:
+- Powers Library area listing (knows which agents have been promoted to skills)
+- Provides discovery / cross-link generation
+- **NOT used by Claude's invocation path** — that's filesystem-based via the redirect stub (per ADR-1)
+
+The backward-compat mechanism is ADR-1's redirect stub, not this resolver. The resolver is convenience tooling.
+
+### B2-4 — Redirect-follow validation strategy
+
+Cannot fully automate via Claude Code SDK (would require spawning a sub-Claude — out of scope for v7). **Compromise**:
+
+1. Static test: tests/agent-resolver.test.js verifies redirect-stub structure and target-skill existence (catches broken stubs).
+2. Manual smoke test documented in B2 plan: after each conversion batch, the implementer pastes "review my code" (or equivalent trigger) and verifies the converted skill's body appears in the response. Failure is logged to `.ctoc/audit/skill-conversion/redirect-failures.json`.
+3. If failures > 0: switch the affected agents to **wrapper-fallback** mode (see B2-7 for clarified semantics).
+
+### B2-5 — Skill sweep scope bounded
+
+**Revised**: B2b ships **only the audit manifest** as a v7 deliverable. The actual modernization sweep:
+- Each category (languages, frameworks, tools) gets its own follow-up commit AFTER v7 ships
+- Categories are addressed when their owner has a real need (e.g., updating Python skill when starting a Python feature)
+- No commitment to fix all 360 in v7
+
+This converts B2b from "open-ended sweep" to "produce manifest + opportunistic fixing".
+
+### B2-6 — Auto-load test corpus defined
+
+`tests/skill-loading.test.js` includes a test-prompt corpus at the top of the file:
+
+```js
+const TRIGGER_CORPUS = [
+  { prompt: 'review my code for issues', expects: 'code-reviewer' },
+  { prompt: 'find dead code in this module', expects: 'dead-code-detector' },
+  { prompt: 'run the unit tests', expects: 'unit-test-runner' },
+  { prompt: 'check accessibility', expects: 'accessibility-checker' },
+  { prompt: 'scan for secrets', expects: 'secrets-detector' },
+  // ... 25-50 entries covering each converted skill
+];
+```
+
+NFR-5 acceptance: ≥90% of corpus entries match expected skill via `when_to_load` frontmatter. Test runs each prompt through a simple matcher (`when_to_load` substring match) and counts.
+
+### B2-7 — Wrapper-fallback semantics clarified
+
+If pilot fails (Claude doesn't follow redirect stubs), the fallback agent file has **exactly this content** (no partial business logic):
+
+```markdown
+---
+name: <agent-name>
+type: wrapper
+target_skill: <skill-path>
+---
+
+This agent's logic lives at skills/<skill-path>/SKILL.md.
+Read that file in full, then follow its instructions.
+```
+
+The skill remains the **single source of truth**. The agent file is a one-line indirection — never has business content. This eliminates source-of-truth ambiguity.
+
+### B2-8 — Middle-tier agents explicitly out of scope
+
+Added to Out of Scope:
+- **Middle-tier agents** (`agents/architecture/`, `agents/pipeline/`, `agents/devex/`, `agents/cost/`, `agents/infrastructure/`, `agents/frontend/`, `agents/mobile/`, `agents/data-ml/`, `agents/ai-quality/`, `agents/versioning/`, `agents/compliance/`) are **not** modernized in B2.
+- Defer to a follow-up B3 vision if usage data shows these are leaf-nodes too.
+- v7 ships with: B1 (orchestrators modernized) + B2 (45 leaf-nodes converted to skills) + 30+ agents unchanged.
+
+### B2-9 — NFR-1 test count updated
+
+**Revised NFR-1**: "All existing tests pass (`node --test tests/*.test.js` → `# fail 0`). Current count at B2 start: ~50 test files, ~879 tests. Adding tests in B2: `tests/agent-resolver.test.js`, `tests/skill-loading.test.js`."
+
+### B2-10 — Execution plan steps de-duplicated
+
+The boilerplate Steps 8-16 (from `applyIronLoop()`) overlap with the impl spec's Steps 1-3. **Resolution**:
+- Boilerplate Steps 8-16 are the *checklist* the implementer ticks off.
+- Impl spec Steps 1-10 are the *ordered work items*.
+- Mapping: impl steps 1-3 (write tests) = boilerplate Step 8 TEST. Impl steps 4-9 (convert, audit, modernize, document) = boilerplate Steps 10 IMPLEMENT + Step 15 DOCUMENT. Impl step 10 (run tests) = Step 14 VERIFY.
+
+This is cosmetic; both views coexist in the plan.
+
+---
+
+## Structural Recommendation Status
+
+The B2 → B2a/B2b split was proposed but **not applied** in this round per the user's choice ("Edit B2 inline"). The fixes above tighten B2 as a single plan. If B2 execution surfaces fresh problems with the combined scope, the split can be reconsidered at that point (functional kickback → re-plan).
