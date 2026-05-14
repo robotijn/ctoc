@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-05-14T16:20:27.830Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "B2 — Leaf-Node Agents → Skills + 360-Skill Sweep"
 created: "2026-05-14T00:00:00Z"
 priority: HIGH

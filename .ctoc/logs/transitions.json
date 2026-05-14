@@ -1,0 +1,30 @@
+[
+  {
+    "timestamp": "2026-05-14T16:20:27.828Z",
+    "plan": "B1-orchestrator-agent-modernization.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-05-14T16:20:27.830Z",
+    "plan": "B2-leaf-agents-to-skills-and-skill-sweep.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  }
+]

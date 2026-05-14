@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-05-14T16:20:27.827Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "B1 — Orchestrator Agent Modernization + Protocols"
 created: "2026-05-14T00:00:00Z"
 priority: HIGH
