@@ -114,21 +114,31 @@ async function main() {
   const { checkForUpdatesSync } = require('../lib/version');
   const updateInfo = checkForUpdatesSync();
 
-  // 7. Build context (all output goes to stdout — stderr triggers Claude Code hook errors)
+  // 7. Iron Loop self-check (fast mode — frontmatter-only scans, ~50ms target)
+  let selfCheckSummary = null;
+  try {
+    const { checkAllInvariants, formatCompact } = require('../lib/iron-loop-enforcer');
+    const sc = checkAllInvariants({ root: projectPath, mode: 'fast' });
+    selfCheckSummary = formatCompact(sc);
+  } catch (err) {
+    // Self-check itself must never crash session start
+    selfCheckSummary = `Self-check skipped: ${err.message}`;
+  }
 
   // 8. Output context for Claude (to stdout for hook consumption)
-  const context = generateContext(stack, state, version, updateInfo);
+  const context = generateContext(stack, state, version, updateInfo, selfCheckSummary);
   console.log(context);
 }
 
 /**
  * Generate CTOC context instructions for Claude
  */
-function generateContext(stack, state, version, updateInfo) {
+function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
   const stepName = state?.feature ? STEP_NAMES[state.currentStep] : 'Ready';
   const updateLine = updateInfo?.updateAvailable
     ? `\nUpdate available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion} (run: git pull origin main)`
     : '';
+  const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
 
   return `
 ============================================================
@@ -136,7 +146,7 @@ CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
 ============================================================
 Project: ${path.basename(process.cwd())}
 Stack: ${stack.languages.join('/') || 'unknown'}
-Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}
+Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}${selfCheckLine}
 
 ## Iron Loop (16 Steps) - NON-NEGOTIABLE
 
