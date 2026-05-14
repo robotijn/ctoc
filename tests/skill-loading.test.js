@@ -121,6 +121,70 @@ const TRIGGER_CORPUS = [
   { prompt: 'add hypothesis test for sort function', expects: 'property-test-writer' },
   { prompt: 'write unit tests for the validator', expects: 'unit-test-writer' },
   { prompt: 'tdd red phase for the new feature', expects: 'unit-test-writer' },
+  // Infrastructure
+  { prompt: 'terraform validate the IaC', expects: 'terraform-validator' },
+  { prompt: 'check terraform security with checkov', expects: 'terraform-validator' },
+  { prompt: 'kubernetes audit on the manifests', expects: 'kubernetes-checker' },
+  { prompt: 'k8s manifest check pre-deploy', expects: 'kubernetes-checker' },
+  { prompt: 'docker security review of the image', expects: 'docker-security-checker' },
+  { prompt: 'container image scan for CVEs', expects: 'docker-security-checker' },
+  { prompt: 'CI pipeline check on workflow files', expects: 'ci-pipeline-checker' },
+  { prompt: 'github actions audit for the repo', expects: 'ci-pipeline-checker' },
+  { prompt: 'CI runner setup wizard', expects: 'ci-runner-setup' },
+  { prompt: 'configure github runner self-hosted', expects: 'ci-runner-setup' },
+  // Frontend
+  { prompt: 'visual regression test on the homepage', expects: 'visual-regression-checker' },
+  { prompt: 'screenshot diff for the dashboard', expects: 'visual-regression-checker' },
+  { prompt: 'component test for the Button', expects: 'component-tester' },
+  { prompt: 'RTL test for the Modal', expects: 'component-tester' },
+  { prompt: 'bundle size analysis for the app', expects: 'bundle-analyzer' },
+  { prompt: 'check performance budget on JS bundle', expects: 'bundle-analyzer' },
+  // Mobile
+  { prompt: 'iOS check for the Swift sources', expects: 'ios-checker' },
+  { prompt: 'swiftlint review on Auth module', expects: 'ios-checker' },
+  { prompt: 'Android check for the Kotlin app', expects: 'android-checker' },
+  { prompt: 'ktlint review for the app module', expects: 'android-checker' },
+  { prompt: 'React Native bridge performance review', expects: 'react-native-bridge-checker' },
+  { prompt: 'turbo module migration audit', expects: 'react-native-bridge-checker' },
+  // Compliance
+  { prompt: 'GDPR check on the data handling', expects: 'gdpr-compliance-checker' },
+  { prompt: 'data protection audit for PII flows', expects: 'gdpr-compliance-checker' },
+  { prompt: 'audit log review for compliance', expects: 'audit-log-checker' },
+  { prompt: 'audit trail check on auth events', expects: 'audit-log-checker' },
+  { prompt: 'license scan on dependencies', expects: 'license-scanner' },
+  { prompt: 'OSS licenses compatibility audit', expects: 'license-scanner' },
+  // Data/ML
+  { prompt: 'data quality check on the warehouse', expects: 'data-quality-checker' },
+  { prompt: 'validate data in the ingestion pipeline', expects: 'data-quality-checker' },
+  { prompt: 'ML model validation before serving', expects: 'ml-model-validator' },
+  { prompt: 'model validation for fairness checks', expects: 'ml-model-validator' },
+  { prompt: 'feature store check for online/offline parity', expects: 'feature-store-validator' },
+  { prompt: 'feature consistency audit', expects: 'feature-store-validator' },
+  // Versioning
+  { prompt: 'backwards compatibility audit before release', expects: 'backwards-compatibility-checker' },
+  { prompt: 'breaking change check on the API', expects: 'backwards-compatibility-checker' },
+  { prompt: 'feature flag audit for stale flags', expects: 'feature-flag-auditor' },
+  { prompt: 'flag hygiene check this sprint', expects: 'feature-flag-auditor' },
+  { prompt: 'technical debt audit on the codebase', expects: 'technical-debt-tracker' },
+  { prompt: 'tech debt report by priority', expects: 'technical-debt-tracker' },
+  // AI Quality
+  { prompt: 'hallucination check on AI-generated code', expects: 'hallucination-detector' },
+  { prompt: 'detect hallucination in copilot output', expects: 'hallucination-detector' },
+  { prompt: 'review AI code for quality issues', expects: 'ai-code-quality-reviewer' },
+  { prompt: 'AI code review on the PR', expects: 'ai-code-quality-reviewer' },
+  // Architecture
+  { prompt: 'pattern detection on this codebase', expects: 'pattern-detector' },
+  { prompt: 'architectural patterns audit', expects: 'pattern-detector' },
+  { prompt: 'dependency analysis for circular dependency', expects: 'dependency-analyzer' },
+  { prompt: 'module dependencies report', expects: 'dependency-analyzer' },
+  // DevEx
+  { prompt: 'onboarding validation for new joiners', expects: 'onboarding-validator' },
+  { prompt: 'new dev setup test', expects: 'onboarding-validator' },
+  { prompt: 'API deprecation check on the codebase', expects: 'api-deprecation-checker' },
+  { prompt: 'deprecation check before upgrade', expects: 'api-deprecation-checker' },
+  // Cost
+  { prompt: 'cloud cost analysis on infra', expects: 'cloud-cost-analyzer' },
+  { prompt: 'FinOps review of AWS spend', expects: 'cloud-cost-analyzer' },
 ];
 
 function parseSkillFrontmatter(skillPath) {
