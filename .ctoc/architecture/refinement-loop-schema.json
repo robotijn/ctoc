@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ctoc-refinement-loop-letter-v1",
+  "title": "CTOC Refinement Loop Letter",
+  "description": "JSON schema for the letter CTO Chief sends to test-writer (first) and implementer (second) each round of the refinement loop. Spec: docs/REFINEMENT_LOOP.md",
+  "type": "object",
+  "required": ["letter_id", "round", "phase", "plan", "summary", "issues"],
+  "properties": {
+    "letter_id": {
+      "type": "string",
+      "description": "ULID identifying this letter; same as the dispatch_id in the audit log",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "round": {
+      "type": "integer",
+      "description": "Round number within the current phase (starts at 1)",
+      "minimum": 1
+    },
+    "phase": {
+      "type": "string",
+      "description": "Current phase of the refinement loop",
+      "enum": ["critical", "medium", "low", "final-sweep"]
+    },
+    "plan": {
+      "type": "string",
+      "description": "Plan slug this loop is refining (e.g., 'freelance-invoices-impl')"
+    },
+    "summary": {
+      "type": "string",
+      "description": "2-3 sentence prose framing for human escalation views. Renderer converts to Markdown.",
+      "minLength": 1
+    },
+    "convergence_status": {
+      "type": "object",
+      "properties": {
+        "phase_issues_before": { "type": "integer", "minimum": 0 },
+        "phase_issues_after": { "type": "integer", "minimum": 0 },
+        "total_issues_remaining": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "description": "Issues to address this round. Length bounded by K * N_critics (K=3/5/7 per phase, N=panel size).",
+      "items": { "$ref": "#/$defs/issue" }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "required": [
+        "id",
+        "fingerprint",
+        "severity",
+        "file",
+        "current_behaviour",
+        "expected_behaviour",
+        "observable_test_conditions",
+        "raised_by"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Per-letter unique issue identifier (e.g., 'cr-001')"
+        },
+        "fingerprint": {
+          "type": "string",
+          "description": "Stable identifier across rounds: sha256(critic_id + file + line_range + finding_type)[:12]. Same value across rounds means same issue.",
+          "pattern": "^[a-z0-9-]{8,32}$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "medium", "low"],
+          "description": "Severity classification. Per the warnings-are-bugs principle, all compiler/linter warnings, deprecations, and CVEs of any severity classify as 'critical'."
+        },
+        "file": {
+          "type": "string",
+          "description": "Path to the file containing the issue (relative to project root)"
+        },
+        "line_range": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "minItems": 1,
+          "maxItems": 2,
+          "description": "Line range [start, end]. Single-element array allowed for single-line issues."
+        },
+        "current_behaviour": {
+          "type": "string",
+          "description": "Description of what the code does now (the broken state)",
+          "minLength": 1
+        },
+        "expected_behaviour": {
+          "type": "string",
+          "description": "Description of what the code SHOULD do after the fix (the spec for the test-writer)",
+          "minLength": 1
+        },
+        "observable_test_conditions": {
+          "type": "array",
+          "description": "Given/When/Then style conditions the test must verify. Test-writer asserts these; does NOT see the implementation.",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "forbidden_in_test": {
+          "type": "array",
+          "description": "Things the test-writer must NOT do (e.g., 'don't assert specific exception class names'). Prevents tests pinning implementation details.",
+          "items": { "type": "string" }
+        },
+        "raised_by": {
+          "type": "array",
+          "description": "Critic agent paths that surfaced this finding (e.g., ['security/sast-scanner', 'quality/code-reviewer']). Multiple = corroborated.",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]+/[a-z][a-z0-9-]+$"
+          },
+          "minItems": 1
+        },
+        "related_findings": {
+          "type": "array",
+          "description": "IDs of other findings in the same letter that share a fix (e.g., 'cr-003 — same function flagged for length').",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

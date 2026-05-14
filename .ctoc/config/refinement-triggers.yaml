@@ -1,0 +1,120 @@
+# ===============================================================================
+#  CTOC Refinement Loop — Risk-Surface Triggers
+#  Spec: docs/REFINEMENT_LOOP.md (Decision 7-F)
+#
+#  The refinement loop runs when EITHER condition holds:
+#    1. plan.effort_level ∈ { high, xhigh }
+#    2. plan's `files:` declaration matches any glob below
+#
+#  Risk-surface globs cover: money, access, data integrity, compliance,
+#  HIPAA/PHI, PII handling, and cryptography. The principle: anything where
+#  a silent bug means real-world damage — money lost, data leaked, customer
+#  locked out, compliance violation, patient harmed.
+# ===============================================================================
+
+schema_version: 1
+last_reviewed: 2026-05-14
+
+trigger_loop_when_files_match:
+
+  # ─────────────────────────────────────────────────────────
+  # Money + access
+  # ─────────────────────────────────────────────────────────
+  - "**/auth/**"
+  - "**/billing/**"
+  - "**/payment/**"
+  - "**/payments/**"
+  - "**/webhook/**"
+  - "**/webhooks/**"
+  - "**/stripe/**"
+  - "**/inngest/**"
+  - "**/checkout/**"
+  - "**/subscription/**"
+  - "**/subscriptions/**"
+
+  # ─────────────────────────────────────────────────────────
+  # Data structure + integrity
+  # ─────────────────────────────────────────────────────────
+  - "**/migrations/**"
+  - "**/security/**"
+  - "**/api/public/**"
+  - "**/api/v*/**"          # versioned public APIs
+
+  # ─────────────────────────────────────────────────────────
+  # Compliance
+  # ─────────────────────────────────────────────────────────
+  - "**/legal/**"
+  - "**/gdpr/**"
+  - "**/privacy/**"
+  - "**/compliance/**"
+  - "**/audit/**"
+  - "**/dpa/**"             # Data Processing Agreement endpoints
+
+  # ─────────────────────────────────────────────────────────
+  # HIPAA / PHI surfaces
+  # ─────────────────────────────────────────────────────────
+  - "**/health/**"
+  - "**/medical/**"
+  - "**/phi/**"
+  - "**/patient/**"
+  - "**/patients/**"
+  - "**/clinical/**"
+  - "**/hipaa/**"
+  - "**/ehr/**"             # Electronic Health Records
+  - "**/emr/**"             # Electronic Medical Records
+
+  # ─────────────────────────────────────────────────────────
+  # PII handling
+  # ─────────────────────────────────────────────────────────
+  - "**/personal/**"
+  - "**/profile/**"
+  - "**/profiles/**"
+  - "**/user-data/**"
+  - "**/export/**"          # data-export endpoints — GDPR Article 20 right of portability
+  - "**/pii/**"
+  - "**/dsar/**"            # Data-Subject Access Request endpoints
+  - "**/ccpa/**"            # California Consumer Privacy Act endpoints
+
+  # ─────────────────────────────────────────────────────────
+  # Cryptography + secrets
+  # ─────────────────────────────────────────────────────────
+  - "**/encryption/**"
+  - "**/keys/**"
+  - "**/crypto/**"
+  - "**/jwt/**"
+  - "**/oauth/**"
+  - "**/sso/**"
+  - "**/saml/**"
+  - "**/oidc/**"
+
+  # ─────────────────────────────────────────────────────────
+  # Infrastructure as code (silent misconfig = production incident)
+  # ─────────────────────────────────────────────────────────
+  - "**/terraform/**"
+  - "**/cloudformation/**"
+  - "**/kubernetes/**"
+  - "**/k8s/**"
+  - "**/helm/**"
+  - "**/Dockerfile"
+  - "**/.github/workflows/**"
+
+# ===============================================================================
+#  Escape phrases that bypass the loop entirely
+#  (reuses existing escape-phrase mechanism from src/lib/escape-phrases.js)
+# ===============================================================================
+
+bypass_escape_phrases:
+  - "hotfix"
+  - "trivial fix"
+  - "urgent"
+  - "quick fix"
+  - "trivial change"
+  - "skip refinement"
+
+# ===============================================================================
+#  How to extend
+#
+#  Add a new glob to trigger_loop_when_files_match when a new risk surface
+#  emerges. Don't remove existing globs without explicit reasoning recorded
+#  in the commit message — these were chosen to cover concrete failure modes.
+# ===============================================================================
