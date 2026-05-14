@@ -33,6 +33,22 @@ const TRIGGER_CORPUS = [
   { prompt: 'look for unused code', expects: 'dead-code-detector' },
   { prompt: 'find duplicate code', expects: 'duplicate-code-detector' },
   { prompt: 'check for DRY violations', expects: 'duplicate-code-detector' },
+  { prompt: 'architecture check on this module', expects: 'architecture-checker' },
+  { prompt: 'detect circular dependency in the imports', expects: 'architecture-checker' },
+  { prompt: 'find code smell in this file', expects: 'code-smell-detector' },
+  { prompt: 'this code is bad and messy', expects: 'code-smell-detector' },
+  { prompt: 'cyclomatic complexity audit', expects: 'complexity-analyzer' },
+  { prompt: 'cognitive complexity report', expects: 'complexity-analyzer' },
+  { prompt: 'reduce complexity in this function', expects: 'complexity-reducer' },
+  { prompt: 'refactor this function for readability', expects: 'complexity-reducer' },
+  { prompt: 'consistency check across files', expects: 'consistency-checker' },
+  { prompt: 'naming convention audit', expects: 'consistency-checker' },
+  { prompt: 'performance check on the build', expects: 'performance-validator' },
+  { prompt: 'detect benchmark regression', expects: 'performance-validator' },
+  { prompt: 'run the quality gate', expects: 'quality-gate' },
+  { prompt: 'is the quality gate passing', expects: 'quality-gate' },
+  { prompt: 'run a type check', expects: 'type-checker' },
+  { prompt: 'static type check this project', expects: 'type-checker' },
 ];
 
 function parseSkillFrontmatter(skillPath) {
