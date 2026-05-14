@@ -61,23 +61,36 @@ describe('Menu Screens Tests', () => {
     console.log('# dashboardPipeline returns valid JSON structure');
   });
 
-  test('dashboardPipeline always shows Functional, Implementation, Review, More', () => {
+  test('dashboardPipeline (v7) shows 3 sections + More', () => {
     const result = menuScreens.dashboardPipeline(testDir);
     const labels = result.ask.questions[0].options.map(o => o.label);
 
-    assert.ok(labels.some(l => l.startsWith('Functional')), 'Should have Functional');
-    assert.ok(labels.some(l => l.startsWith('Implementation')), 'Should have Implementation');
-    assert.ok(labels.some(l => l.startsWith('Review')), 'Should have Review');
+    assert.ok(labels.includes('Business'), 'Should have Business section');
+    assert.ok(labels.includes('Implementation'), 'Should have Implementation section');
+    assert.ok(labels.includes('Execution'), 'Should have Execution section');
     assert.ok(labels.some(l => l.includes('More')), 'Should have More');
-    console.log('# dashboardPipeline always shows Functional, Implementation, Review, More');
+    console.log('# dashboardPipeline (v7) shows 3 sections + More');
   });
 
-  test('dashboardPipeline shows counts even when zero', () => {
+  test('dashboardPipeline labels are stable (no counts in label)', () => {
     const result = menuScreens.dashboardPipeline(testDir);
     const labels = result.ask.questions[0].options.map(o => o.label);
 
-    assert.ok(labels.some(l => l.includes('(0)')), 'Should show zero counts');
-    console.log('# dashboardPipeline shows counts even when zero');
+    // v7 stability requirement: labels are pure section names; counts go in description
+    for (const label of ['Business', 'Implementation', 'Execution']) {
+      assert.ok(labels.includes(label), `${label} should be a stable label`);
+      assert.ok(!label.match(/\(\d+\)/), `${label} should not embed a count`);
+    }
+    console.log('# dashboardPipeline labels are stable');
+  });
+
+  test('dashboardPipeline descriptions surface per-stage counts', () => {
+    const result = menuScreens.dashboardPipeline(testDir);
+    const descs = result.ask.questions[0].options.map(o => o.description || '');
+
+    // Counts appear in descriptions, not labels
+    assert.ok(descs.some(d => d.includes('total')), 'descriptions include section totals');
+    console.log('# dashboardPipeline descriptions surface counts');
   });
 
   test('dashboardPipeline actions map to correct commands', () => {
@@ -327,9 +340,10 @@ describe('Menu Screens Tests', () => {
   test('route function dispatches correctly', () => {
     createPlan('functional', 'test-plan');
 
-    // No args -> dashboard
+    // No args -> dashboard (v7: shows section labels)
     const dashboard = menuScreens.route([], testDir);
-    assert.ok(dashboard.ask.questions[0].options.some(o => o.label.startsWith('Functional')));
+    const labels = dashboard.ask.questions[0].options.map(o => o.label);
+    assert.ok(labels.includes('Business'), 'route() returns v7 section labels');
 
     // menu commands -> commands
     const commands = menuScreens.route(['menu', 'commands'], testDir);

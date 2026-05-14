@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { memoize } = require('./cache');
 
 const QUESTIONS_DIR = ['.ctoc', 'inbox', 'questions'];
 const DECISIONS_DIR = ['.ctoc', 'inbox', 'decisions'];
@@ -173,13 +174,13 @@ function listPlansAtGates(root) {
   return out;
 }
 
-function getInboxCounts(root) {
+const getInboxCounts = memoize(function getInboxCountsImpl(root) {
   return {
     questions: listQuestions(root).length,
     decisions: listDecisions(root).length,
     gatesWaiting: listPlansAtGates(root).length,
   };
-}
+}, 'getInboxCounts');
 
 module.exports = {
   getInboxCounts,

@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { readStatus, getStatusIcon } = require('./background');
 const { findProjectRoot } = require('./project-root');
+const { memoize } = require('./cache');
 
 // Get plans directory (always from project root)
 function getPlansDir(projectPath) {
@@ -89,7 +90,7 @@ function timeAgo(date) {
 }
 
 // Get counts for all plan types (flat folder structure)
-function getPlanCounts(projectPath) {
+const getPlanCounts = memoize(function getPlanCountsImpl(projectPath) {
   const root = projectPath || findProjectRoot();
   const plansDir = getPlansDir(root);
 
@@ -102,7 +103,7 @@ function getPlanCounts(projectPath) {
     inProgress: readPlans(path.join(plansDir, 'in-progress')).length,
     done: readPlans(path.join(plansDir, 'done')).length
   };
-}
+}, 'getPlanCounts');
 
 // Get in-progress count from state
 function getInProgressCount(projectPath) {
@@ -339,8 +340,8 @@ function saveSettings(settings, projectPath) {
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
 }
 
-// Get vision counts for dashboard
-function getVisionCounts(projectPath) {
+// Get vision counts for dashboard (memoized)
+const getVisionCounts = memoize(function getVisionCountsImpl(projectPath) {
   const root = projectPath || findProjectRoot();
   const plansDir = getPlansDir(root);
   const visionDir = path.join(plansDir, 'vision');
@@ -375,7 +376,7 @@ function getVisionCounts(projectPath) {
     converted,
     decomposing
   };
-}
+}, 'getVisionCounts');
 
 /**
  * Get vision stubs for a given vision slug.

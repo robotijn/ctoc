@@ -154,37 +154,144 @@ function buildDashboardTable(projectPath) {
 }
 
 /**
- * Dashboard Menu A (Pipeline)
- * Shows: Functional(n), Implementation(n), Review(n), More
+ * Dashboard Menu A (Pipeline) — v7
+ *
+ * Shows the 3 task-aligned sections (Business / Implementation / Execution)
+ * plus More. Labels are STABLE — counts moved to descriptions so the option
+ * labels don't shift as plans move between stages.
+ *
+ * Section selection → `section {name}` drills into the stages within.
  */
 function dashboardPipeline(projectPath) {
   const root = getProjectPath(projectPath);
   const counts = getPlanCounts(root);
+  const visionCounts = getVisionCounts(root);
+
+  const businessTotal = visionCounts.total + (counts.canvas || 0) + counts.functional;
+  const implTotal     = counts.implementation + counts.todo;
+  const execTotal     = counts.inProgress + counts.review + (counts.done || 0);
 
   const text = buildDashboardTable(root) + '\n\n\n';
 
   const options = [
-    { label: `Functional (${counts.functional})`, description: 'Browse functional plans' },
-    { label: `Implementation (${counts.implementation})`, description: 'Browse implementation plans' },
-    { label: `Review (${counts.review})`, description: 'Browse review queue' },
-    { label: 'More ▶', description: 'Vision, agents, sync, and other commands' }
+    {
+      label: 'Business',
+      description: `Vision · Canvas · Functional  (${businessTotal} total — ${visionCounts.total} vision, ${counts.canvas || 0} canvas, ${counts.functional} functional)`
+    },
+    {
+      label: 'Implementation',
+      description: `Implementation · Todo  (${implTotal} total — ${counts.implementation} impl, ${counts.todo} todo)`
+    },
+    {
+      label: 'Execution',
+      description: `In-Progress · Review · Done  (${execTotal} total — ${counts.inProgress} in-progress, ${counts.review} review, ${counts.done || 0} done)`
+    },
+    { label: 'More ▶', description: 'Vision pipeline, start agent, sync plans, system' }
   ];
 
   return {
     text,
     ask: {
       questions: [{
-        question: 'Select a pipeline stage to browse:',
+        question: 'Select a section to drill into:',
         header: 'Pipeline',
         options
       }]
     },
     actions: {
-      [`Functional (${counts.functional})`]: 'browse functional',
-      [`Implementation (${counts.implementation})`]: 'browse implementation',
-      [`Review (${counts.review})`]: 'browse review',
+      'Business': 'section business',
+      'Implementation': 'section implementation',
+      'Execution': 'section execution',
       'More ▶': 'menu commands'
     }
+  };
+}
+
+/**
+ * Section browse — drill-in for the 3 v7 sections.
+ *
+ * @param {string} sectionName - 'business' | 'implementation' | 'execution'
+ * @param {string} [projectPath]
+ */
+function sectionBrowse(sectionName, projectPath) {
+  const root = getProjectPath(projectPath);
+  const counts = getPlanCounts(root);
+  const visionCounts = getVisionCounts(root);
+
+  const SECTION_STAGES = {
+    business:       ['vision', 'canvas', 'functional'],
+    implementation: ['implementation', 'todo'],
+    execution:      ['in-progress', 'review', 'done'],
+  };
+  const SECTION_LABEL = {
+    business: 'Business',
+    implementation: 'Implementation',
+    execution: 'Execution',
+  };
+
+  const stages = SECTION_STAGES[sectionName];
+  if (!stages) {
+    return {
+      text: `Unknown section: ${sectionName}\n\n\n`,
+      ask: {
+        questions: [{
+          question: 'Return to dashboard?',
+          header: 'Error',
+          options: [{ label: 'Back', description: 'Return to dashboard' }],
+        }],
+      },
+      actions: { Back: '' },
+    };
+  }
+
+  function stageCount(stage) {
+    switch (stage) {
+      case 'vision':         return visionCounts.total;
+      case 'canvas':         return counts.canvas || 0;
+      case 'functional':     return counts.functional;
+      case 'implementation': return counts.implementation;
+      case 'todo':           return counts.todo;
+      case 'in-progress':    return counts.inProgress;
+      case 'review':         return counts.review;
+      case 'done':           return counts.done || 0;
+      default:               return 0;
+    }
+  }
+
+  let text = `${SECTION_LABEL[sectionName]} section\n${'─'.repeat(40)}\n\n`;
+  for (const stage of stages) {
+    const n = stageCount(stage);
+    const label = stage.charAt(0).toUpperCase() + stage.slice(1).replace(/-/g, ' ');
+    text += `  ${label.padEnd(14)} ${n}\n`;
+  }
+  text += '\n\n\n';
+
+  // Build options — one per stage in the section, plus Back.
+  const options = stages.map(stage => {
+    const n = stageCount(stage);
+    const label = stage.charAt(0).toUpperCase() + stage.slice(1).replace(/-/g, ' ');
+    return { label, description: `Browse ${label} stage (${n} plans)` };
+  });
+  // AskUserQuestion caps at 4 options. business has 3 stages, exec has 3, impl has 2 — all fit with Back.
+  options.push({ label: '◀ Back', description: 'Return to pipeline view' });
+
+  const actions = {};
+  for (const stage of stages) {
+    const label = stage.charAt(0).toUpperCase() + stage.slice(1).replace(/-/g, ' ');
+    actions[label] = `browse ${stage}`;
+  }
+  actions['◀ Back'] = '';
+
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: `Select a stage in ${SECTION_LABEL[sectionName]}:`,
+        header: SECTION_LABEL[sectionName],
+        options,
+      }],
+    },
+    actions,
   };
 }
 
@@ -672,6 +779,9 @@ function route(args, projectPath) {
 
     case 'browse':
       return stageBrowse(args[1], projectPath);
+
+    case 'section':
+      return sectionBrowse(args[1], projectPath);
 
     case 'plan': {
       const ref = args[1]; // stage/file
