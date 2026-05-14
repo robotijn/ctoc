@@ -13,10 +13,18 @@ CTOC v8 organizes the agent layer into four tiers. See [`docs/AGENT_ARCHITECTURE
 Tier 0  CTO CHIEF (1)              top-level, sole dispatcher
 Tier 1  Sub-orchestrators (16)     incl. NEW synthesizer (cross-pillar)
 Tier 2  Specialist skills (72)     leaf agents → skills, structured outputs
-Tier 3  Scouts (5)                 fast pre-screens, short-circuit deep dispatches
+Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatches
 ```
 
-**Critical rule (v8.1+): no mid-session model switching.** Every dispatched subagent inherits the user's session model. Agents MUST NOT declare a specific `model:` field in frontmatter — switching Opus→Haiku mid-session crashes the CLI (context window mismatch). Scouts are cheap because they do **less work** (4K tokens / 5 tool calls), not because they use a smaller model. Exception: slash commands (e.g., `/ctoc:menu`) run as separate invocations and MAY declare their own model.
+**Model rules (v8.2+)**: Claude Code has three distinct execution contexts, with different model-declaration rules each:
+
+| Context | Model rule | Why |
+|---|---|---|
+| Front process (terminal `claude` session) | Stays on user's chosen model; CTOC never auto-switches | `/model` mid-session preserves context; Opus→Haiku doesn't fit and breaks the session |
+| Slash commands (`/ctoc:menu`) | MAY declare any model in frontmatter | Separate top-level Claude invocation, fresh context |
+| Subagents (Task tool — Tier 2/3 dispatches) | MAY declare any model | Subagent is a fresh Claude instance with isolated 200K context, no inheritance from parent |
+
+Scouts (Tier 3) declare `model: haiku` because they run as **subagents** — isolated context, the Haiku model is safe at this layer. The user's terminal session is untouched.
 
 **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`) is the only agent with top-level authority. All other agents and skills are dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer, synthesizer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
 

@@ -110,7 +110,7 @@ tiers:
 
   tier_3:
     name: scout
-    description: "Lightweight pre-screens. Fast pass/flag decision; short-circuits Tier 2 if pass. Runs on the user's session model (NO mid-session model switch — that crashes the CLI)."
+    description: "Haiku-tier subagent pre-screens. Fast pass/flag decision in isolated 200K context; short-circuits Tier 2 if pass. Safe because Task-tool subagents have their own context independent of the user's terminal session."
     member_count: 5
     members:
       - scouts/syntax-scout
@@ -118,9 +118,8 @@ tiers:
       - scouts/dep-scout
       - scouts/lint-scout
       - scouts/test-scout
-    model_default: inherit            # CRITICAL: inherit session model — never switch
-    inherits_session_model: true
-    model_optimized_for: any
+    model_default: haiku
+    model_optimized_for: haiku-4-5
     effort_budget:
       max_tokens: 4000
       max_tool_calls: 5
@@ -129,36 +128,44 @@ tiers:
       - tier: 3
       - effort: low
       - effort_budget: { max_tokens: 4000, max_tool_calls: 5, max_subagents: 0 }
-      - inherits_session_model: true
-      - model_optimized_for: any
+      - model: haiku
+      - model_optimized_for: haiku-4-5
       - parallel_safe: true
       - dispatch_protocol: v1
-    forbidden_frontmatter:
-      - model: haiku                  # would force a mid-session switch and crash the CLI
-      - model: sonnet
-      - model: opus
     expected_output:
       decision: pass | flag | error
       pillar: <pillar-name>
       reason: <one-line>
       next_specialist: <category/name>     # if flag
     cost_rationale: |
-      Scouts use the SAME model as the rest of the session — they do not switch to Haiku.
-      Cost savings come from doing less work: 4K-token / 5-tool-call dispatch vs 50K / 30
-      for a specialist. A scout is ~10-15x cheaper than the specialist it short-circuits,
-      on the same model. On a clean codebase, 4 of 5 scouts return 'pass', eliminating
+      A Haiku scout subagent is ~10-50x cheaper than the Opus/Sonnet specialist it
+      short-circuits. On a clean codebase, 4 of 5 scouts return 'pass', eliminating
       4 deep dispatches per gate.
-    why_no_model_switch: |
-      Mid-session model switching (e.g., Opus → Haiku) blows up the context window
-      because Haiku's max context is smaller than Opus's. The handover fails and the
-      CLI crashes. CTOC v8.1+ explicitly forbids declaring `model: haiku` (or any
-      specific model) on dispatched subagents. All subagents inherit the user's
-      chosen session model.
+    why_haiku_is_safe_for_subagents: |
+      Scouts are dispatched via the Claude Code Task tool, which spawns a fresh agent
+      instance with its own isolated 200K-token context window. The subagent does NOT
+      inherit the parent's conversation history — only the prompt the parent passes
+      it. So a Haiku subagent never sees the parent's Opus-sized context; it runs
+      independently and returns one summary message back.
+
+      What crashes the CLI is /model switching the FRONT process (the user's terminal
+      session) from Opus → Haiku — because that switch preserves conversation context,
+      and Opus's 1M-context conversation can't fit in Haiku's 200K. That's a separate
+      concern from subagent dispatch and is controlled by the user via /model, not by
+      agent frontmatter.
+
+      Sources:
+        - Anthropic Agent SDK: "during a code review, you can run style-checker,
+          security-scanner, and test-coverage subagents simultaneously" with
+          different models.
+        - Claude Code docs: subagents are "named, isolated Claude instances with
+          their own system prompt, context window, tool access list, and permission
+          mode."
     invariants:
       - "Must return pass | flag | error decision"
-      - "Cannot dispatch other agents"
+      - "Cannot dispatch other agents (max_subagents: 0)"
       - "Latency target ≤ 200ms"
-      - "MUST NOT declare a specific model in frontmatter (inherits session model)"
+      - "MUST declare model: haiku in frontmatter (Task-tool subagent context)"
     enforced_by: tests/architecture-invariants.test.js
 
 # ===============================================================================

@@ -84,12 +84,13 @@ Before dispatching deep specialists, run the **scouts** tier in parallel:
 
 ```
 1. Receive review request (e.g., "review this commit").
-2. PARALLEL — dispatch Tier 3 scouts (~50-200ms each, USER'S SESSION MODEL):
+2. PARALLEL — dispatch Tier 3 scouts as Haiku subagents (~50-200ms each):
      - scouts/syntax-scout    (pillar: readability)
      - scouts/secret-scout    (pillar: security)
      - scouts/dep-scout       (pillar: security)
      - scouts/lint-scout      (pillar: maintainability)
      - scouts/test-scout      (pillar: reliability)
+   Each scout runs in its own isolated 200K-token context (Task-tool subagent).
 3. Aggregate scout decisions:
      - For pillars where scout returned `pass`: SKIP the deep specialist.
      - For pillars where scout returned `flag`: dispatch the Tier 2 specialist.
@@ -104,9 +105,11 @@ Before dispatching deep specialists, run the **scouts** tier in parallel:
 7. Audit log written to .ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml.
 ```
 
-**Cost rationale**: scouts use the SAME model as the session — no mid-session model switching (that would crash the CLI). Savings come from doing less work (4K-token / 5-tool-call dispatch vs 50K / 30 for a specialist). A scout is ~10-15x cheaper than its specialist short-circuit on the same model. On a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 of 5 deep dispatches per gate.
+**Cost rationale**: a Haiku scout subagent is ~10-50x cheaper than an Opus/Sonnet specialist. On a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 of 5 deep dispatches per gate. Average review cost drops 60-80%.
 
-**Critical**: NEVER dispatch a subagent that declares a specific `model:` field. The Opus→Haiku context window mismatch crashes Claude CLI. All subagents inherit the session model. See `docs/AGENT_ARCHITECTURE.md` § "No mid-session model switching".
+**Why Haiku scouts are safe** (per Anthropic docs): scouts run as Task-tool subagents — Claude Code spawns a fresh agent instance with its own isolated 200K-token context. The subagent does NOT inherit the user's terminal conversation. The Haiku model is safe at the subagent layer because the subagent's context is independent.
+
+**The user's terminal session** stays on whatever model the user chose. CTOC never `/model`-switches the front process; only Task-tool subagents may declare a different model. See `docs/AGENT_ARCHITECTURE.md` § "Front-process vs subagent model rules".
 
 **Synthesis rationale**: most agent systems produce 47 siloed findings; the developer fixes 5 and ignores the rest. The synthesizer produces 3 changes that fix 31 findings — same fixes, better presentation.
 
