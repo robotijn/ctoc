@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.9-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.10-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-86-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-360-blue">
@@ -107,7 +107,7 @@ The generated `CLAUDE.md` becomes the single source of truth for how Claude work
 | Security scanning | Built-in (Steps 9, 13) | Manual | Manual | None |
 | Human approval gates | 4 mandatory checkpoints | None | None | None |
 | Quality verification | Automated gate (Step 14) | Manual | Manual | None |
-| Specialist agents | 85 across 19 categories | None | DIY | None |
+| Specialist agents | 86 across 19 categories | None | DIY | None |
 
 ### Example Session
 
@@ -198,6 +198,11 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 - **86 specialist agents** across 19 categories — testing, security, quality, infrastructure, and more
 - **360 expert skills** — 50 languages, 85 web frameworks, 44 AI/ML, 52 data, 15 DevOps, 15 mobile, and more
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
+- **Refinement loop** — Iterative critic → test-writer → implementer cycle that drives findings to zero (warnings included) before Gate 3 — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
+- **Persona-aware question routing** — 8 roles (founder, programmer, architect, PM, designer, …); pricing questions never reach a programmer, code-style questions never reach a founder — see [PERSONA_ROUTING.md](docs/PERSONA_ROUTING.md)
+- **4-tier agent architecture** — CTO Chief (Tier 0) dispatches sub-orchestrators (Tier 1), specialists (Tier 2), and Haiku scouts (Tier 3) for fast pre-screens — see [AGENT_ARCHITECTURE.md](docs/AGENT_ARCHITECTURE.md)
+- **Production-ready SaaS templates** — Opinionated starters with 20+ Gate-3 production-readiness checks: domain, HTTPS, auth, billing, RLS, observability, legal, zero warnings, zero CVEs
+- **Product Loop** — Post-launch DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → LEARN cycle keyed to canonical KPIs — see [PRODUCT_LOOP.md](docs/PRODUCT_LOOP.md)
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
 - **Deployment pipeline** — Configurable dev → staging → production promotion triggered automatically after Gate 3 approval
 - **Smart quality gates** — Background checks that don't block commits, block pushes
@@ -521,7 +526,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.9'
+getVersion()       // → '6.9.10'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -536,13 +541,13 @@ ctoc/
 ├── src/
 │   ├── commands/    8 slash commands
 │   ├── hooks/       10 Claude Code hooks
-│   ├── lib/         71 JS modules
+│   ├── lib/         88 JS modules
 │   ├── tabs/        8 dashboard tabs
 │   ├── scripts/     Build utilities
 │   └── data/        Static data files
-├── agents/          85 agent definitions (19 categories)
+├── agents/          86 agent definitions (19 categories)
 ├── skills/          360 language & framework skills
-├── tests/           40 test files
+├── tests/           66 test files
 ├── .ctoc/           Config, templates, operations
 └── .claude-plugin/  Plugin metadata
 ```
@@ -563,6 +568,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.9** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.10** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
