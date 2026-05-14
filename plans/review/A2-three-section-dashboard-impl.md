@@ -250,3 +250,29 @@ During the period A2 ships but A3 has not landed, the TUI still has 8 tabs while
 
 ### I5 — dashboard-prefs.json corruption fallback
 `loadDashboardPrefs()` wraps JSON.parse in try/catch. On error: log to stderr, return defaults `{collapsed:{business:false,implementation:false,execution:false}}`, do NOT delete the corrupt file (user can inspect). On next successful save, the corrupt file is overwritten.
+
+
+---
+
+## Execution Status — A2 COMPLETE
+
+### Step 8: TEST ✓ — tests/sections.test.js (16 tests)
+### Step 9: PREPARE ✓ — no new deps; pre-flight: all touched files were declared
+### Step 10: IMPLEMENT ✓
+- src/lib/sections.js (SECTIONS, getSectionForStage, getStagesInSection, getSectionLabel, loadDashboardPrefs, saveDashboardPrefs)
+- src/lib/menu-screens.js refactored to render 3-section view in JSON mode (per I4)
+- CLAUDE.md gained 'Pipeline Philosophy' section with all 4 load-bearing principles (per X2)
+- docs/IRON_LOOP.md gained 'Pipeline sections (v7)' section mapping steps to sections
+
+### Step 11: REVIEW ✓ — sections.js is a thin grouping layer; stages remain canonical
+### Step 12: OPTIMIZE ✓ N/A — no performance regression
+### Step 13: SECURE ✓ — prefs JSON parsed with try/catch (I5); no code execution path
+### Step 14: VERIFY ✓ — 795 tests pass, 0 fails
+### Step 15: DOCUMENT ✓ — CLAUDE.md + IRON_LOOP.md updated
+### Step 16: FINAL-REVIEW — Gate 3 pending (commit-cadence implicit approval)
+
+## Decisions Taken Under Ambiguity
+1. **Section render symbols**: ▼ (expanded) / ▶ (collapsed). Unicode chevrons are visually clear; ASCII alternatives less so.
+2. **Per-stage label format**: title-case with spaces (e.g., 'In progress'). Matches existing Vision/Functional capitalization in the prior dashboard.
+3. **I4 split**: JSON mode renders sections; TUI overview.js untouched until A3 lands. Documented in the impl plan's I4 refinement.
+4. **TUI overview.js NOT updated in A2**: Per I4 transition strategy. Will be updated when A3 rewrites the menu structure into 5 areas. Documented in this Decisions section.

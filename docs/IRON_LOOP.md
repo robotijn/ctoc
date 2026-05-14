@@ -22,6 +22,20 @@ Nothing ships without your explicit approval.
 
 ---
 
+## Pipeline sections (v7)
+
+The 16 steps map to 3 task-aligned dashboard sections:
+
+| Section | Stages (in plan files) | Iron Loop steps | Purpose |
+|---|---|---|---|
+| **Business** | vision · canvas · functional | 1–4 (IDEATE, ASSESS, ALIGN, CAPTURE) | WHY + business viability + product requirements |
+| **Implementation** | implementation · todo | 5–7 (PLAN, DESIGN, SPEC) | Technical context, then ready-to-execute |
+| **Execution** | in-progress · review · done | 8–16 (TEST→FINAL-REVIEW) | Doing the work, verifying, shipping |
+
+The boundary at `todo` is load-bearing: everything before it builds context; everything from it executes. See [CLAUDE.md "Pipeline Philosophy"](../CLAUDE.md) for the four load-bearing principles.
+
+---
+
 ## The 16 Steps at a Glance
 
 | Step | Name | One-Liner |

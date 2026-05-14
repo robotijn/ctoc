@@ -5,6 +5,34 @@
 
 ---
 
+## Pipeline Philosophy (v7)
+
+CTOC v7 introduces four load-bearing principles. Every agent, every plan, every change should honor them.
+
+### 1. Pre-todo is context-building. Todo+ is execution.
+
+| Section | Stages | Purpose |
+|---|---|---|
+| **Business** | Vision · Canvas · Functional | WHY + business model + product context |
+| **Implementation** | Implementation · Todo | Technical context + ready-to-execute queue |
+| **Execution** | In-Progress · Review · Done | Doing · verifying · shipped |
+
+By the time work reaches `todo`, every contextual decision is locked. The implementer never guesses. If the implementer would have to guess, upstream context is incomplete — kick back to the appropriate phase.
+
+### 2. No-stub rule.
+
+When an agent (especially the implementer at Step 10) hits ambiguity, it MUST NOT write a stub, a TODO, or a "this needs to be filled in." It MUST make a documented reasonable choice and continue with working code. Document each choice in the plan's `## Decisions Taken Under Ambiguity` section. Wrong choices are caught at review and kicked back; stubs are not caught and rot.
+
+### 3. Async overnight (documented choices + kickback).
+
+The pipeline drains while the user sleeps. Agents do NOT synchronously block on ambiguity — they make a documented choice, continue, and let morning review catch wrong calls. This applies to every step (Steps 1–15), not just the implementer.
+
+### 4. Literal interpretation (Opus 4.7).
+
+Opus 4.7 follows instructions literally. Vague prompts produce silent drift. Every agent prompt must be explicit, declare its `effort` level, name its `# Decisions Taken Under Ambiguity` write target, and mandate reading the full plan ancestry (vision → canvas → functional → implementation) before acting.
+
+---
+
 ## Critical Rules
 
 ### 1. Human Gates (4 Mandatory Approval Points)

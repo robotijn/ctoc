@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getPlanCounts, readPlans, getPlansDir, getAgentStatus, getVisionCounts, getVisionStubs } = require('./state');
+const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs } = require('./sections');
 const { validateTransition } = require('./plan-validator');
 const { findProjectRoot } = require('./project-root');
 
@@ -82,25 +83,45 @@ function buildDashboardTable(projectPath) {
   const visionCounts = getVisionCounts(root);
   const agent = getAgentStatus(root);
   const version = getVersion(root);
+  const prefs = loadDashboardPrefs(root);
 
-  const status = (count, empty, active) => count > 0 ? active : empty;
+  // Per-stage count lookup. Sections.js stages are canonical strings.
+  const stageCount = (stage) => {
+    switch (stage) {
+      case 'vision':       return visionCounts.total;
+      case 'canvas':       return counts.canvas || 0;
+      case 'functional':   return counts.functional;
+      case 'implementation': return counts.implementation;
+      case 'todo':         return counts.todo;
+      case 'in-progress':  return counts.inProgress;
+      case 'review':       return counts.review;
+      case 'done':         return counts.done || 0;
+      default:             return 0;
+    }
+  };
 
   let out = '';
   out += `CTOC v${version}\n`;
   out += `${'─'.repeat(60)}\n\n`;
 
-  out += `┌────────────────┬────────┬─────────────────┐\n`;
-  out += `│ Stage          │ Count  │ Status          │\n`;
-  out += `├────────────────┼────────┼─────────────────┤\n`;
-  out += `│ Vision         │ ${String(visionCounts.total).padEnd(6)}│ ${status(visionCounts.total, 'No visions', visionCounts.exploring + ' exploring').padEnd(16)}│\n`;
-  out += `│ Canvas         │ ${String(counts.canvas || 0).padEnd(6)}│ ${status(counts.canvas, 'No canvases', (counts.canvas || 0) + ' canvases').padEnd(16)}│\n`;
-  out += `│ Functional     │ ${String(counts.functional).padEnd(6)}│ ${status(counts.functional, 'No drafts', counts.functional + ' drafts').padEnd(16)}│\n`;
-  out += `│ Implementation │ ${String(counts.implementation).padEnd(6)}│ ${status(counts.implementation, 'No drafts', counts.implementation + ' drafts').padEnd(16)}│\n`;
-  out += `│ Todo           │ ${String(counts.todo).padEnd(6)}│ ${status(counts.todo, 'Queue empty', counts.todo + ' queued').padEnd(16)}│\n`;
-  out += `│ In Progress    │ ${String(counts.inProgress).padEnd(6)}│ ${status(counts.inProgress, 'None active', counts.inProgress + ' active').padEnd(16)}│\n`;
-  out += `│ Review         │ ${String(counts.review).padEnd(6)}│ ${status(counts.review, 'Queue empty', counts.review + ' pending').padEnd(16)}│\n`;
-  out += `│ Done           │ ${String(counts.done || 0).padEnd(6)}│ ${status(counts.done, 'None yet', (counts.done || 0) + ' completed').padEnd(16)}│\n`;
-  out += `└────────────────┴────────┴─────────────────┘\n\n`;
+  // Render 3 sections (A2 / v7) — Business / Implementation / Execution.
+  // Per I4: JSON mode is sectioned; TUI overview.js still renders the flat
+  // table until A3 lands and the menu is fully restructured.
+  for (const section of Object.keys(SECTIONS)) {
+    const stages = getStagesInSection(section);
+    const sectionTotal = stages.reduce((sum, s) => sum + stageCount(s), 0);
+    const collapsed = prefs.collapsed[section];
+    const chevron = collapsed ? '▶' : '▼';
+    out += `${chevron} ${getSectionLabel(section)} (${sectionTotal})\n`;
+    if (!collapsed) {
+      for (const stage of stages) {
+        const c = stageCount(stage);
+        const label = stage.charAt(0).toUpperCase() + stage.slice(1).replace(/-/g, ' ');
+        out += `    ${label.padEnd(14)} ${c}\n`;
+      }
+    }
+    out += '\n';
+  }
 
   // Agent status (lock-aware)
   const isAgentActive = agent.active;
