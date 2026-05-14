@@ -75,6 +75,7 @@ const REQUIRED_LIBS = [
   'src/lib/escape-phrases.js',
   'src/lib/persona.js',
   'src/lib/v8-dispatcher.js',
+  'src/lib/product-loop.js',     // v8.4+ Product Loop
 ];
 
 // ─────────────────────────────────────────────────────────────────────
@@ -474,6 +475,26 @@ function checkSaasTemplates(root) {
   return null;
 }
 
+function checkProductLoop(root) {
+  const required = [
+    'docs/PRODUCT_LOOP.md',
+    '.ctoc/templates/product-kpis.yaml',
+    'agents/planning/kpi-planner.md',
+    'skills/product/product-reviewer/SKILL.md',
+    'skills/product/experiment-designer/SKILL.md',
+    'src/lib/product-loop.js',
+  ];
+  const missing = required.filter(rel => !fs.existsSync(path.join(root, rel)));
+  if (missing.length > 0) {
+    return {
+      severity: 'warn',
+      message: `Product Loop artifacts missing: ${missing.join(', ')}`,
+      details: { missing },
+    };
+  }
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  Plan statistics (info-only)
 // ─────────────────────────────────────────────────────────────────────
@@ -511,6 +532,7 @@ const CHECKS = [
   { id: 'version-sync',                scope: 'system',       mode: 'fast', fn: checkVersionSync },
   { id: 'persona-system',              scope: 'persona',      mode: 'fast', fn: checkPersonaSystemExists },
   { id: 'saas-templates',              scope: 'saas',         mode: 'fast', fn: checkSaasTemplates },
+  { id: 'product-loop',                scope: 'product',      mode: 'fast', fn: checkProductLoop },
   { id: 'plan-counts',                 scope: 'info',         mode: 'fast', fn: checkPlanCounts },
 ];
 

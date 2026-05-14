@@ -70,6 +70,34 @@ SaaS skills under `skills/saas/`:
 
 Production-readiness gate enforced at Gate 3 via `.ctoc/templates/saas/b2c-subscription/production-readiness.yaml` — 20+ checks (domain, HTTPS, auth, billing, email deliverability, RLS, observability, legal docs, support).
 
+## The Product Loop (v8.4+)
+
+Iron Loop ships features. Product Loop validates them. See [`docs/PRODUCT_LOOP.md`](./docs/PRODUCT_LOOP.md).
+
+```
+DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → LEARN
+  ↑                                                                    │
+  └───────────────────── continuous post-launch ────────────────────────┘
+```
+
+| Step | Owner persona | When |
+|---|---|---|
+| DEFINE | founder + pm | Canvas phase, via `agents/planning/kpi-planner.md` |
+| INSTRUMENT | programmer | Implementation, via `skills/saas/posthog-analytics` |
+| MEASURE | (automated) | Continuous (PostHog + Stripe) |
+| REVIEW | founder + pm | Weekly, via `skills/product/product-reviewer` |
+| HYPOTHESIZE | founder + pm | From review findings |
+| EXPERIMENT | pm + programmer | Via `skills/product/experiment-designer` |
+| LEARN | founder + pm | Post-experiment |
+
+Canonical KPI library at `.ctoc/templates/product-kpis.yaml` — 17 KPIs across acquisition/activation/retention/revenue/churn/satisfaction/engagement. SaaS-b2c launch set: signup_completion, activation_rate, time_to_value, w1_retention, free_to_paid_conversion, monthly_churn, mrr.
+
+Slash commands:
+- `/ctoc:kpi-status` — current values vs targets (color-coded)
+- `/ctoc:product-review` — run weekly product review
+
+Persona-gated: programmers are never asked "what should the activation target be?" — those are founder/pm questions. Founders are never asked "which event ID should we use?" — that's a programmer question.
+
 **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`) is the only agent with top-level authority. All other agents and skills are dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer, synthesizer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
 
 ```

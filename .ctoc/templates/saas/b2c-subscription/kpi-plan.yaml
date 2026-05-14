@@ -1,0 +1,105 @@
+# ===============================================================================
+#  SaaS B2C — Default KPI Plan
+#  Subset of .ctoc/templates/product-kpis.yaml selected for the b2c-subscription template.
+#  Implementation-planner consumes this to wire up event tracking.
+# ===============================================================================
+
+schema_version: 1
+template_id: saas/b2c-subscription
+
+# Minimum KPIs for launch — implementation-planner ensures these are instrumented
+launch_kpis:
+  - signup_completion
+  - activation_rate
+  - time_to_value
+  - w1_retention
+  - free_to_paid_conversion
+  - monthly_churn
+  - mrr
+
+# Add as the product matures (after ~100 users / ~1000 users / paid acquisition)
+post_launch_kpis:
+  after_100_users:
+    - d1_retention
+    - m1_retention
+    - organic_share
+  after_1000_users:
+    - nps
+    - dau_mau_ratio
+    - csat
+  when_paid_acquisition_starts:
+    - cac
+    - cac_payback
+
+# Events to track (consumed by skills/saas/posthog-analytics)
+required_events:
+  - id: signup_started
+    fired_when: "User submits the signup form"
+    properties: [source, referrer]
+
+  - id: signup_completed
+    fired_when: "Email verified successfully"
+    properties: [user_id, source]
+
+  - id: onboarding_step
+    fired_when: "User completes each onboarding step"
+    properties: [step, total_steps]
+
+  - id: activation
+    fired_when: "User performs the activation event (per product)"
+    properties: [user_id, activation_type]
+    note: "Define activation per product. For freelance-invoices SaaS: 'created first invoice'."
+
+  - id: subscription_started
+    fired_when: "Stripe customer.subscription.created webhook"
+    properties: [plan, mrr, billing_cycle]
+    server_side: true
+
+  - id: subscription_updated
+    fired_when: "Stripe customer.subscription.updated webhook"
+    properties: [old_plan, new_plan, mrr_delta]
+    server_side: true
+
+  - id: subscription_canceled
+    fired_when: "Stripe customer.subscription.deleted webhook"
+    properties: [reason, days_active]
+    server_side: true
+
+  - id: payment_failed
+    fired_when: "Stripe invoice.payment_failed webhook"
+    properties: [user_id, retry_count]
+    server_side: true
+
+# Dashboards to create (PostHog Insights)
+required_dashboards:
+  - id: activation_funnel
+    name: "Activation Funnel"
+    chart_type: funnel
+    events: [signup_started, signup_completed, onboarding_step, activation]
+
+  - id: retention_cohorts
+    name: "Retention Cohorts"
+    chart_type: retention
+    cohort_event: signup_completed
+    return_event: any
+
+  - id: mrr_growth
+    name: "MRR Growth"
+    chart_type: line
+    aggregation: sum(subscription_started.mrr) - sum(subscription_canceled.mrr)
+
+  - id: churn_dashboard
+    name: "Churn Reasons"
+    chart_type: bar
+    event: subscription_canceled
+    group_by: reason
+
+# Weekly review template — what the product-reviewer agent fills in
+weekly_review_template:
+  sections:
+    - "KPI snapshot (current vs target, week-over-week delta)"
+    - "Funnel drop-off analysis (where users disappear)"
+    - "Churn analysis (categorized reasons)"
+    - "Top 3 hypotheses for next week's improvement"
+    - "Active experiments status"
+    - "New experiments to launch"

@@ -1,0 +1,243 @@
+# ===============================================================================
+#  CTOC Canonical KPI Library (v8.4 / Product Loop)
+#  See docs/PRODUCT_LOOP.md
+#
+#  Each KPI has:
+#    id, name, category, definition, default_target, formula, event_source,
+#    applicable_to (project types), persona_owner
+# ===============================================================================
+
+schema_version: 1
+last_reviewed: 2026-05-14
+
+kpis:
+
+# ─────────────────────────────────────────────
+# Activation funnel
+# ─────────────────────────────────────────────
+
+  - id: signup_started
+    name: "Signup started rate"
+    category: acquisition
+    definition: "Visitors who begin the signup flow"
+    default_target: "depends on traffic volume"
+    formula: "events('signup_started') / sessions"
+    event_source: "posthog: signup_started"
+    applicable_to: [saas-b2c, saas-b2b, mobile-app]
+    persona_owner: founder
+
+  - id: signup_completion
+    name: "Signup completion rate"
+    category: acquisition
+    definition: "% of started signups that complete (email verified)"
+    default_target: "> 60%"
+    formula: "events('signup_completed') / events('signup_started')"
+    event_source: "posthog: signup_completed"
+    applicable_to: [saas-b2c, saas-b2b, mobile-app]
+    persona_owner: founder
+
+  - id: activation_rate
+    name: "Activation rate"
+    category: activation
+    definition: "% of signups that reach value within 7 days"
+    default_target: "> 30%"
+    formula: "users_activated_within_7d / total_signups"
+    event_source: "posthog: activation (event must be defined per product)"
+    applicable_to: [saas-b2c, saas-b2b, mobile-app]
+    persona_owner: pm
+    notes: "Define 'activation' per product. E.g., 'created first invoice' for invoice SaaS."
+
+  - id: time_to_value
+    name: "Time to value (median)"
+    category: activation
+    definition: "Median seconds from signup_completed → activation"
+    default_target: "< 300s for B2C, < 1800s for B2B"
+    formula: "median(activation_timestamp - signup_completed_timestamp)"
+    event_source: "posthog: derived"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: pm
+
+# ─────────────────────────────────────────────
+# Retention
+# ─────────────────────────────────────────────
+
+  - id: d1_retention
+    name: "Day 1 retention"
+    category: retention
+    definition: "% of new signups returning on day 1"
+    default_target: "> 40% (B2C consumer apps), > 25% (B2B)"
+    formula: "returning_users_d1 / new_signups"
+    event_source: "posthog: session events with user_id"
+    applicable_to: [saas-b2c, saas-b2b, mobile-app]
+    persona_owner: pm
+
+  - id: w1_retention
+    name: "Week 1 retention"
+    category: retention
+    definition: "% returning within 7 days of signup"
+    default_target: "> 25%"
+    formula: "returning_users_w1 / new_signups"
+    event_source: "posthog"
+    applicable_to: [saas-b2c, saas-b2b, mobile-app]
+    persona_owner: pm
+
+  - id: m1_retention
+    name: "Month 1 retention"
+    category: retention
+    definition: "% returning within 30 days of signup"
+    default_target: "> 15% (B2C), > 60% (B2B)"
+    formula: "returning_users_m1 / new_signups"
+    event_source: "posthog"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: pm
+
+# ─────────────────────────────────────────────
+# Revenue
+# ─────────────────────────────────────────────
+
+  - id: free_to_paid_conversion
+    name: "Free → paid conversion rate"
+    category: revenue
+    definition: "% of free users that subscribe within 30 days"
+    default_target: "> 3% (B2C freemium), > 15% (B2B trial-to-paid)"
+    formula: "subscribed_users_within_30d / free_signups"
+    event_source: "stripe: subscription_started + posthog signup attribution"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: founder
+
+  - id: mrr
+    name: "MRR (Monthly Recurring Revenue)"
+    category: revenue
+    definition: "Sum of monthly-equivalent revenue from active subscriptions"
+    default_target: "growing month-over-month"
+    formula: "sum(active_subscriptions.monthly_price)"
+    event_source: "stripe + subscriptions table"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: founder
+
+  - id: arpu
+    name: "ARPU (Average Revenue Per User)"
+    category: revenue
+    definition: "MRR / active paying users"
+    default_target: "depends on target market"
+    formula: "MRR / paying_users"
+    event_source: "derived"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: founder
+
+# ─────────────────────────────────────────────
+# Churn
+# ─────────────────────────────────────────────
+
+  - id: monthly_churn
+    name: "Monthly churn rate"
+    category: churn
+    definition: "% of paying customers who cancel in a month"
+    default_target: "< 5% (B2C), < 1.5% (B2B)"
+    formula: "canceled_in_month / active_at_month_start"
+    event_source: "stripe: customer.subscription.deleted"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: founder
+
+  - id: churn_reason
+    name: "Churn reason distribution"
+    category: churn
+    definition: "Categorized reasons for cancellation"
+    default_target: "(qualitative)"
+    formula: "group by reason from cancel_survey"
+    event_source: "in-app exit survey + Stripe metadata"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: pm
+
+# ─────────────────────────────────────────────
+# Satisfaction
+# ─────────────────────────────────────────────
+
+  - id: nps
+    name: "NPS (Net Promoter Score)"
+    category: satisfaction
+    definition: "% promoters (9-10) − % detractors (0-6)"
+    default_target: "> 30 (good), > 50 (excellent)"
+    formula: "promoters_pct - detractors_pct"
+    event_source: "in-app survey (Userlist, Wootric, etc.)"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: founder
+    notes: "Trigger survey after activation (e.g., 30 days post-signup or 5 sessions)"
+
+  - id: csat
+    name: "CSAT (Customer Satisfaction)"
+    category: satisfaction
+    definition: "% of customers rating their experience ≥ 4/5"
+    default_target: "> 80%"
+    formula: "responses_4_or_5 / total_responses"
+    event_source: "in-app survey or post-support-ticket"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: pm
+
+# ─────────────────────────────────────────────
+# Acquisition mix
+# ─────────────────────────────────────────────
+
+  - id: organic_share
+    name: "Organic signup share"
+    category: acquisition
+    definition: "% of signups from non-paid channels (no utm_source=ads)"
+    default_target: "> 50% (cheaper acquisition = healthier)"
+    formula: "organic_signups / total_signups"
+    event_source: "utm_source captured at signup"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: founder
+
+  - id: cac
+    name: "CAC (Customer Acquisition Cost)"
+    category: acquisition
+    definition: "Total acquisition spend / new paying customers in period"
+    default_target: "payback < 12 months"
+    formula: "acquisition_spend / new_paying_customers"
+    event_source: "manual (ad spend + sales)"
+    applicable_to: [saas-b2c, saas-b2b]
+    persona_owner: founder
+    notes: "Connects to unit-economics-modeler. CAC payback period < 12mo is healthy."
+
+# ─────────────────────────────────────────────
+# Engagement
+# ─────────────────────────────────────────────
+
+  - id: dau
+    name: "DAU (Daily Active Users)"
+    category: engagement
+    definition: "Users with ≥ 1 meaningful event in the day"
+    default_target: "depends on use frequency"
+    formula: "distinct(user_id) where event_in_today"
+    event_source: "posthog"
+    applicable_to: [saas-b2c, mobile-app]
+    persona_owner: pm
+
+  - id: dau_mau_ratio
+    name: "DAU/MAU ratio (stickiness)"
+    category: engagement
+    definition: "How often monthly users come back in any given day"
+    default_target: "> 0.2 (B2C), > 0.5 (daily-use B2B)"
+    formula: "DAU / MAU"
+    event_source: "posthog"
+    applicable_to: [saas-b2c, mobile-app]
+    persona_owner: pm
+
+# ===============================================================================
+#  Composition guidance
+# ===============================================================================
+#
+#  A *minimal* product-loop KPI set for a B2C SaaS at launch:
+#    - signup_completion
+#    - activation_rate
+#    - time_to_value
+#    - w1_retention
+#    - free_to_paid_conversion
+#    - monthly_churn
+#    - mrr
+#
+#  Add these as the product matures:
+#    - d1_retention, m1_retention (after first 100 users)
+#    - nps (after 1000 users)
+#    - cac, cac_payback (when paid acquisition starts)
+#    - dau_mau_ratio (for daily-use products)
