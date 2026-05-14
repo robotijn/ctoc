@@ -315,3 +315,36 @@ Hook resolves `target_file` to absolute path then matches against each plan's `f
 
 ### K4 reference - Escape phrases
 Hook imports `{ matchEscapePhrase }` from `src/lib/escape-phrases.js` (single source of truth, created in this session).
+
+
+---
+
+## Execution Status — C1 COMPLETE
+
+### Step 8: TEST ✓ — tests/enforcement-hook.test.js (11 tests)
+### Step 9: PREPARE ✓ — pre-flight: all touched files are in C1 files: declaration
+### Step 10: IMPLEMENT ✓
+- src/lib/ctoc-project-detector.js (isCtocProject)
+- src/lib/plan-coverage.js (findCoveringPlan with stage priority + specificity)
+- src/lib/enforcement-log.js (append-only JSON log, max 1000 entries)
+- src/hooks/PreToolUse.Edit.js REPLACED (per K7) with C1 plan-coverage logic
+- src/hooks/PreToolUse.Write.js delegates to Edit.js
+- src/hooks/PreToolUse.MultiEdit.js NEW, delegates to Edit.js
+- src/hooks/PreToolUse.NotebookEdit.js NEW, delegates to Edit.js
+- .claude-plugin/hooks.json registers MultiEdit + NotebookEdit hooks
+- CLAUDE.md gains 'Mandatory Pipeline Use' section
+- src/lib/escape-phrases.js (shipped earlier with A1) is the single source
+
+### Step 11: REVIEW ✓ — fails OPEN on hook errors; whitelist preserved
+### Step 12: OPTIMIZE ✓ — process-level caching deferred (not needed yet)
+### Step 13: SECURE ✓ — no shell exec; path traversal blocked by relative resolution
+### Step 14: VERIFY ✓ — 833 tests pass, 0 fails
+### Step 15: DOCUMENT ✓ — CLAUDE.md 'Mandatory Pipeline Use' section
+### Step 16: FINAL-REVIEW — Gate 3 implicit per commit-cadence preference
+
+## Decisions Taken Under Ambiguity (C1)
+1. **Used pure-JS glob (no minimatch dependency)**: minimatch isn't in deps. Wrote globToRegex supporting *, **, ?, literal. Sufficient for v7 plans' file declarations. Adding minimatch would expand deps for marginal benefit.
+2. **Transcript-based escape detection is best-effort**: hook reads stdin JSON for transcript_path; if absent, escape detection degrades to none (block-by-default). Note: this is a follow-up improvement opportunity — when Claude Code provides transcript path reliably, escape phrases work transparently.
+3. **Hook fails OPEN, not closed**: per ADR-3 risk mitigation. A buggy hook should not block the user; better to log + allow.
+4. **VERSION whitelisted**: added to allow release.js to write to it without plan coverage. Otherwise every patch release would need a plan.
+5. **Defer transcript wiring to follow-up**: the hook currently uses crude stdin JSON parsing. A proper integration with Claude Code's hook input schema is a small follow-up (5-10 lines once the schema is locked).

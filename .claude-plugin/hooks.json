@@ -37,6 +37,24 @@
         ]
       },
       {
+        "matcher": "MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/PreToolUse.MultiEdit.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/PreToolUse.NotebookEdit.js\""
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {

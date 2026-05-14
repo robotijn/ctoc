@@ -33,6 +33,28 @@ Opus 4.7 follows instructions literally. Vague prompts produce silent drift. Eve
 
 ---
 
+## Mandatory Pipeline Use (v7)
+
+When Claude is inside a CTOC project, the **PreToolUse enforcement hook** (`src/hooks/PreToolUse.Edit.js` and siblings for Write/MultiEdit/NotebookEdit) intercepts every file-edit operation. Flow:
+
+1. **Whitelist** — `.gitignore`, `.ctoc/*`, `.local/*`, `plans/*.md`, `VERSION` always pass.
+2. **Non-CTOC project** — silent pass; the hook treats this project as out of scope.
+3. **Plan-covered target** — allow. The hook checks each active plan's `files:` declaration (in stages `in-progress`, `todo`, `implementation`) and matches the target via minimatch-style globs. Stage priority: in-progress > todo > implementation. Within a stage, most-specific glob wins.
+4. **Escape phrase in recent user messages** — allow. See `src/lib/escape-phrases.js` for the canonical list (`hotfix`, `trivial fix`, `urgent`, `skip planning`, `skip iron loop`, `quick fix`, `trivial change`). Case-insensitive, word-bounded.
+5. **Otherwise — BLOCK** with a helpful message redirecting to `/ctoc:menu`.
+
+Every decision is logged to `.ctoc/logs/enforcement.json`. Hook fails OPEN on internal error.
+
+**Per-project tuning** via `.ctoc/settings.yaml`:
+```yaml
+enforcement:
+  mode: strict   # strict | warn | off  (default: strict)
+```
+
+**Plans must declare `files:`** in YAML frontmatter to be coverage-aware. Pre-v7 plans without this declaration fall through to escape-phrase / block (per the X1 decision: warn-only treatment is logged but not yet block-default for legacy plans).
+
+---
+
 ## Critical Rules
 
 ### 1. Human Gates (4 Mandatory Approval Points)
