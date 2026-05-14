@@ -1,5 +1,6 @@
 ---
 description: CTOC Dashboard - Your Virtual CTO command center
+model: claude-haiku-4-5
 ---
 
 Run the state machine to get the current screen as JSON:
@@ -53,6 +54,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 
 1. Always show AskUserQuestion after every response
 2. Auto-discuss when creating new plans
-3. Dashboard always shows Functional(n), Implementation(n), Review(n), More -- even when count is 0
+3. Dashboard pipeline shows the 3 v7 sections: Business, Implementation, Execution, More (counts in descriptions, labels are stable)
 4. 3 human gates: functional->implementation, implementation->todo, review->done
 5. Pre-validate before every approve (run `validate` command first)
+6. Menu rendering runs on Haiku (this slash command declares `model: claude-haiku-4-5`); execution commands inherit the user's chosen session model
