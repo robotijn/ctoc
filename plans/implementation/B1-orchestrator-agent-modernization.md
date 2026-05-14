@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-05-14T16:20:27.827Z
 gate_crossed: functional → implementation
----
-
----
 title: "B1 — Orchestrator Agent Modernization + Protocols"
 created: "2026-05-14T00:00:00Z"
 priority: HIGH
@@ -16,6 +13,19 @@ depends_on:
   - A1-canvas-layer
   - A2-three-section-dashboard
   - C1-pretooluse-enforcement-hook
+files:
+  - "agents/_shared/no-stub-rule.md"
+  - "agents/_shared/async-choice-protocol.md"
+  - "agents/_shared/ancestry-read.md"
+  - "agents/_shared/**"
+  - "agents/planning/**"
+  - "agents/iron-loop/**"
+  - "agents/coordinator/cto-chief.md"
+  - "CLAUDE.md"
+  - "docs/IRON_LOOP.md"
+  - "src/lib/init-project.js"
+  - "tests/agent-modernization.test.js"
+  - ".ctoc/audit/agent-modernization/**"
 ---
 
 # Functional Plan: B1 — Orchestrator Agent Modernization + Protocols
@@ -165,3 +175,171 @@ So that I always have full WHY context before executing
 
 ### K2 reference - Step labels must match plan-validator
 All modernized agent prompts must produce plans/sections labeled exactly: TEST, PREPARE, IMPLEMENT, REVIEW, OPTIMIZE, SECURE, VERIFY, DOCUMENT, FINAL-REVIEW. Add to `agents/_shared/ancestry-read.md`: "Use exact step labels. The plan-validator (src/lib/plan-validator.js) rejects plans with non-matching labels."
+
+
+---
+
+## 4. PLAN — Technical Approach
+
+### Solution Overview
+Modernize orchestrator agents in two layers:
+1. **Shared prompt fragments** under `agents/_shared/`: `no-stub-rule.md`, `async-choice-protocol.md`, `ancestry-read.md`. Each is a short reusable snippet that orchestrator prompts can reference.
+2. **Per-agent updates**: each orchestrator gets frontmatter additions (`effort`, `reads_ancestry`, `async_choice_protocol`, `model_optimized_for`) and prompt-body additions referencing the shared fragments. 10-round integrator+critic per agent, diff captured under `.ctoc/audit/agent-modernization/<agent>.diff.md`.
+
+### Technology Choices
+| Component | Technology | Rationale |
+|---|---|---|
+| Shared prompt fragments | Markdown files | Loaded by reference; no exec; trivial to update |
+| Per-agent modernization | Direct file edit | One commit per agent (or per agent-cluster) so each is reviewable |
+| 10-round critic | Manual orchestration via Claude | Mirrors the existing iron-loop integrator pattern |
+| Diff capture | Plain markdown diff files | Human-auditable; not a system requirement, but useful for future review |
+
+### Architecture Decision Records
+
+#### ADR-1: agents/_shared/ for cross-agent prompt fragments
+- **Context**: Multiple agents need the same no-stub / async-choice / ancestry-read instructions
+- **Decision**: New directory `agents/_shared/` with three foundational snippets; each agent imports by reference (string include in prompt)
+- **Consequences**: + Single source of truth per principle. + Update once, all agents benefit. − One indirection (small)
+
+#### ADR-2: Modernization is incremental, not big-bang
+- **Context**: 12 orchestrators × 10 rounds is a lot of work
+- **Decision**: Modernize in batches of 3-4 agents per commit. Each batch is independently reviewable and revertible
+- **Consequences**: + Smaller PRs, lower review burden. + Failures isolated to one batch. − Modernization takes longer (acceptable)
+
+#### ADR-3: Conservative frontmatter (4 new fields, not 10)
+- **Context**: Could add many declared properties (token budgets, retry counts, etc.)
+- **Decision**: Add only `effort`, `reads_ancestry`, `async_choice_protocol`, `model_optimized_for`. Other declarations stay implicit
+- **Consequences**: + Easier to maintain. + Lower cognitive load on contributors. − Some advanced features (task budgets) need adding later if needed
+
+#### ADR-4: 10-round critic is human-orchestrated, not automated
+- **Context**: An automated 10-round loop is possible but expensive
+- **Decision**: Claude (with help from the integrator pattern) runs the 10 rounds per agent on demand, captures diffs to `.ctoc/audit/agent-modernization/`. Not run in CI
+- **Consequences**: + Lower compute cost. + Each pass benefits from fresh context. − Cannot run all 12 agents in one batch; sequential
+
+### Risk Assessment
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| Modernization breaks existing agent behavior | Medium | High | Per-batch tests; revert per batch if regression detected |
+| Shared fragments diverge from cited principles | Low | Medium | Tests in `tests/agent-modernization.test.js` verify each agent imports the right snippet IDs |
+| 10-round critic produces low-quality output | Medium | Medium | Capture diffs to audit/, manual review at end of each batch |
+| init-project.js fails to create agents/_shared/ on existing projects | Medium | Medium | SessionStart hook creates it lazily if missing |
+
+---
+
+## 5. DESIGN — Architecture
+
+### Orchestrator List (12 agents to modernize)
+
+| Agent | Path | Role |
+|---|---|---|
+| vision-advisor | `agents/planning/vision-advisor.md` | Step 1 — IDEATE |
+| vision-decomposer | `agents/planning/vision-decomposer.md` | Step 2 — ASSESS |
+| product-owner | `agents/planning/product-owner.md` | Step 3 — ALIGN |
+| implementation-planner | `agents/planning/implementation-planner.md` | Steps 5-7 |
+| iron-loop-executor | `agents/iron-loop/iron-loop-executor.md` | Drives Steps 8-15 |
+| iron-loop-critic | `agents/iron-loop/iron-loop-critic.md` | Critique loop |
+| iron-loop-integrator | `agents/iron-loop/iron-loop-integrator.md` | Integration loop |
+| cto-chief | `agents/coordinator/cto-chief.md` | Top-level coordinator |
+
+(Additional agents per category may need modernization; final list locked during execution as the audit progresses.)
+
+### Shared Fragment Format
+
+`agents/_shared/no-stub-rule.md`:
+```
+## No-stub rule (v7)
+When you hit ambiguity, make a documented reasonable choice and continue with
+working code. Never write stubs, TODOs, or "to be filled in" markers. Document
+each choice in the plan's `## Decisions Taken Under Ambiguity` section. Wrong
+choices are caught at review and kicked back; stubs are not caught and rot.
+```
+
+`agents/_shared/async-choice-protocol.md`:
+```
+## Async overnight protocol (v7)
+Do not synchronously block on ambiguity. The user is asleep. Make a documented
+choice and continue. Kickback handles wrong calls. Applies to every step
+(Steps 1-15), not just the implementer.
+```
+
+`agents/_shared/ancestry-read.md`:
+```
+## Ancestry read (v7)
+First action: read the full plan ancestry — vision → canvas (if exists) →
+functional → implementation. Use exact step labels (TEST, PREPARE, IMPLEMENT,
+REVIEW, OPTIMIZE, SECURE, VERIFY, DOCUMENT, FINAL-REVIEW). The plan-validator
+rejects non-matching labels.
+```
+
+### Per-Agent Frontmatter Additions
+
+```yaml
+effort: xhigh|high|medium|low      # xhigh for design/migration/review
+reads_ancestry: true               # mandatory for step-N agents N>=5
+async_choice_protocol: enabled
+model_optimized_for: opus-4-7
+```
+
+### init-project.js Updates
+
+Add `agents/_shared/` to the list of CTOC directories created during init (per I13). On existing projects, SessionStart hook detects missing directory and creates it lazily.
+
+---
+
+## 6. SPEC — Technical Specification
+
+### File Changes
+
+| File | Action | Description |
+|---|---|---|
+| `agents/_shared/no-stub-rule.md` | Create | No-stub rule snippet |
+| `agents/_shared/async-choice-protocol.md` | Create | Async-choice protocol snippet |
+| `agents/_shared/ancestry-read.md` | Create | Ancestry-read mandate snippet |
+| `agents/planning/vision-advisor.md` | Modify | Add v7 frontmatter + reference shared fragments |
+| `agents/planning/vision-decomposer.md` | Modify | Same (already partly modernized for canvas in A1) |
+| `agents/planning/product-owner.md` | Modify | Same |
+| `agents/planning/implementation-planner.md` | Modify | Same |
+| `agents/iron-loop/iron-loop-executor.md` | Modify | Same |
+| `agents/iron-loop/iron-loop-critic.md` | Modify | Same |
+| `agents/iron-loop/iron-loop-integrator.md` | Modify | Same |
+| `agents/coordinator/cto-chief.md` | Modify | Same |
+| `src/lib/init-project.js` | Modify | Add `agents/_shared` to CTOC_DIRS |
+| `tests/agent-modernization.test.js` | Create | Tests: each modernized agent declares required frontmatter + includes shared-fragment references |
+| `.ctoc/audit/agent-modernization/*.diff.md` | Create per agent | Captures the 10-round modernization diff |
+
+### Implementation Steps
+
+1. [ ] Create `agents/_shared/` with the 3 foundational snippets
+2. [ ] Update `src/lib/init-project.js` to include `agents/_shared` in CTOC_DIRS
+3. [ ] Write `tests/agent-modernization.test.js` (TDD red — assert frontmatter present for each agent)
+4. [ ] Batch 1: modernize planning agents (vision-advisor, vision-decomposer, product-owner, implementation-planner) — 4 agents
+5. [ ] Batch 2: modernize iron-loop agents (executor, critic, integrator) — 3 agents
+6. [ ] Batch 3: modernize cto-chief — 1 agent
+7. [ ] Per batch: run 10 rounds of integrator+critic, capture diff, run full test suite
+8. [ ] Each batch commits independently (one or more agents per commit)
+
+### Test Plan
+
+| Test Type | Coverage | Files |
+|---|---|---|
+| Unit | Each modernized agent file: frontmatter complete, shared-fragment refs present | tests/agent-modernization.test.js |
+| Integration | Existing planning workflow tests still pass | tests/iron-loop.test.js, tests/pipeline.test.js |
+| Regression | Pre-v7 plans process correctly through modernized agents | tests/plan-validator.test.js |
+
+### Dependencies
+
+- A1 (canvas layer) — vision-decomposer agent already references it
+- A2 (sections) — modernized agents' prompts reference Pipeline Philosophy
+- C1 (enforcement hook) — modernized agents are written knowing the hook is active
+
+### Rollback Plan
+
+- Modernization is per-agent — revert affected agent's commit to restore prior behavior
+- `agents/_shared/` is purely additive; can be deleted without breaking pre-v7 agents
+- init-project.js change is forward-compatible (new directory)
+
+---
+
+## Approval
+
+**Status**: Pending Approval (Gate 2: implementation → todo)

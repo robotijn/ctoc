@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-05-14T16:20:27.830Z
 gate_crossed: functional → implementation
----
-
----
 title: "B2 — Leaf-Node Agents → Skills + 360-Skill Sweep"
 created: "2026-05-14T00:00:00Z"
 priority: HIGH
@@ -17,6 +14,19 @@ depends_on:
   - A2-three-section-dashboard
   - C1-pretooluse-enforcement-hook
   - B1-orchestrator-agent-modernization
+files:
+  - "agents/quality/**"
+  - "agents/testing/**"
+  - "agents/security/**"
+  - "agents/specialized/**"
+  - "agents/documentation/**"
+  - "skills/**"
+  - "src/lib/agent-resolver.js"
+  - "tests/skill-loading.test.js"
+  - "tests/agent-resolver.test.js"
+  - "CLAUDE.md"
+  - ".claude-plugin/marketplace.json"
+  - ".ctoc/audit/skill-conversion/**"
 ---
 
 # Functional Plan: B2 — Leaf-Node Agents → Skills + 360-Skill Sweep
@@ -178,3 +188,166 @@ When Claude invokes the old agent name, it sees the redirect note and follows th
 
 ### Skill loading test must verify auto-load works
 Per FR-8, `tests/skill-loading.test.js` must verify that natural-language prompts containing `when_to_load` triggers cause the skill to load. This may require integration test via Claude Code SDK, or a stub that validates the frontmatter matcher logic.
+
+
+---
+
+## 4. PLAN — Technical Approach
+
+### Solution Overview
+Two coordinated workstreams:
+1. **Leaf-node agent → skill conversion** (conservative, list locked at Gate 1): convert ~30-40 single-job agents to skills under `skills/`. Original agent files become **redirect stubs** pointing to the skill (per I14 — Claude reads markdown, not JS, so the resolver must be filesystem-based).
+2. **360-skill audit + modernization**: every existing skill file in `skills/` audited against a 5-point checklist (frontmatter complete, literal instructions, prompt <4k tokens, trigger conditions explicit, related-skills cross-references). Failing skills updated in batches per category.
+
+### Technology Choices
+| Component | Technology | Rationale |
+|---|---|---|
+| Conversion = redirect agent file | Markdown stub | Filesystem-based; no JS resolver needed; Claude reads agent path, finds redirect, follows to skill |
+| Audit script | Pure Node.js script | One-shot use; output a checklist |
+| Per-skill modernization | Direct file edit | Same pattern as B1 — batched per language/framework category |
+
+### Architecture Decision Records
+
+#### ADR-1: Conversion = filesystem redirect (per I14)
+- **Context**: Claude reads agent files directly; JS resolver wouldn't be invoked
+- **Decision**: After converting `agents/X/Y.md` → `skills/X/Y/SKILL.md`, replace original with stub: `---\nstatus: redirected-to-skill\ntarget_skill: X/Y\n---\nLoad skills/X/Y/SKILL.md instead.`
+- **Consequences**: + No JS dependency. + Easy to undo (delete stub, restore original). + Easy to audit (find redirect files). − Two files per converted agent during the migration period
+
+#### ADR-2: Locked conversion list (Gate 1 boundary)
+- **Context**: Avoid scope creep mid-execution
+- **Decision**: Concrete list below. Adding to it during execution requires a fresh Gate 1 approval
+- **Consequences**: + Bounded scope. − Some agents may be discovered as candidates mid-execution but deferred
+
+#### ADR-3: 360-skill audit produces a manifest before edits start
+- **Context**: Editing 360 files blindly risks regressions
+- **Decision**: First pass = audit only (produce `.ctoc/audit/skill-conversion/audit-manifest.json` listing each skill's pass/fail and missing checks). Second pass = edit only the failing skills
+- **Consequences**: + Surgical edits, fewer breakages. + Audit is independently reviewable. − Two-pass = slower
+
+#### ADR-4: Backward compatibility via redirect stubs, not JS alias
+- **Context**: Pre-v7 plans reference `agents/quality/code-reviewer` etc.
+- **Decision**: Original agent path remains in `agents/` but becomes a redirect stub. Claude opening the old path sees the redirect note and follows to the skill
+- **Consequences**: + Zero breakage for pre-v7 plans. − Redirect stubs add noise to the agents/ tree (acceptable; they're small)
+
+### Risk Assessment
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| Redirect stub format isn't followed by Claude | Medium | High | First convert 2-3 agents, test that Claude's invocation correctly follows the redirect. If not, fall back to keeping the old agent file as a thin wrapper |
+| Skill auto-load triggers don't fire | Medium | High | Per FR-8, test natural-language triggers in `tests/skill-loading.test.js`. May require Claude Code SDK integration |
+| 360-skill sweep produces churn without value | Medium | Medium | Audit-first approach: only edit failing skills |
+| Conversion list grows during execution | Medium | Low | ADR-2: locked at Gate 1; additions require new approval |
+
+---
+
+## 5. DESIGN — Architecture
+
+### Conservative Conversion List (locked at Gate 1)
+
+| Category | Agent path | Count |
+|---|---|---|
+| Quality reviewers | `agents/quality/*.md` (code-reviewer, architecture-checker, complexity-analyzer, dead-code-detector, duplicate-code-detector, etc.) | ~14 |
+| Test writers/runners | `agents/testing/writers/*.md`, `agents/testing/runners/*.md` | ~10 |
+| Documenters | `agents/documentation/changelog-generator.md`, `agents/documentation/documentation-updater.md` | 2 |
+| Security scanners | `agents/security/secrets-detector.md`, `agents/security/dependency-auditor.md`, `agents/security/sast-scanner.md` | 3 |
+| Specialized leaf-nodes | `agents/specialized/*.md` (accessibility-checker, api-contract-validator, etc., as confirmed leaf-only) | ~10 |
+| **TOTAL** | | ~39 |
+
+### Skill Frontmatter Standard
+
+```yaml
+name: <skill-slug>
+description: <one-line — used for auto-load matching by Claude>
+when_to_load:
+  - <trigger condition 1>
+  - <trigger condition 2>
+related_skills:
+  - <other skill name>
+effort_level: xhigh|high|medium|low
+model_optimized_for: opus-4-7
+```
+
+### Redirect Stub Format (original agent location)
+
+```markdown
+---
+name: <agent-name>
+status: redirected-to-skill
+target_skill: <skill-path>
+---
+
+This agent has been promoted to a skill. Load skills/<skill-path>/SKILL.md instead.
+When invoked via the old agent path, follow the skill's instructions.
+```
+
+### Audit Checklist (per skill)
+
+1. Frontmatter has `name`, `description`, `when_to_load`, `related_skills`?
+2. Prompt body uses literal instructions (no vague "consider", "might")?
+3. Total token count < 4k (rough heuristic: file size < 16KB)?
+4. Trigger conditions explicit (`when_to_load` non-empty)?
+5. Related skills cross-referenced (`related_skills` non-empty where applicable)?
+
+Audit script produces `.ctoc/audit/skill-conversion/audit-manifest.json`:
+```json
+{
+  "skills/languages/python.md": { "pass": false, "failing_checks": [1, 4] },
+  "skills/frameworks/react.md": { "pass": true }
+}
+```
+
+---
+
+## 6. SPEC — Technical Specification
+
+### File Changes
+
+| File | Action | Description |
+|---|---|---|
+| `skills/<category>/<name>/SKILL.md` | Create per converted agent (~39 files) | Skill body with v7 frontmatter |
+| `agents/<original>/<name>.md` | Modify per converted agent (~39 files) | Replaced with redirect stub |
+| `src/lib/agent-resolver.js` | Create | Helper: given an agent path, return the skill path if redirected. Used by tooling that lists agents (Library area, etc.). NOT used by Claude's invocation path (which is filesystem-based). |
+| `tests/agent-resolver.test.js` | Create | Tests: resolver returns skill path for redirect stubs; returns original path for un-converted agents |
+| `tests/skill-loading.test.js` | Create | Tests: skills have valid frontmatter; auto-load triggers don't collide; redirect stubs point at existing skills |
+| `.ctoc/audit/skill-conversion/audit-manifest.json` | Generate via script | Audit results, one entry per of 360 skills |
+| `.ctoc/audit/skill-conversion/<skill>.diff.md` | Generate per modernized skill | Diff captured by 10-round critic |
+| `CLAUDE.md` | Modify | New "Skill System" section explaining agent/skill split |
+| `.claude-plugin/marketplace.json` | Modify if needed | Reflect new skill set if marketplace expects an inventory |
+
+### Implementation Steps
+
+1. [ ] Write `tests/agent-resolver.test.js` (TDD red)
+2. [ ] Write `src/lib/agent-resolver.js`
+3. [ ] Write `tests/skill-loading.test.js` (TDD red — schema validation)
+4. [ ] Convert 2-3 quality reviewers as pilot batch; verify Claude follows redirects in practice
+5. [ ] If pilot works: convert remaining 36-37 agents in 4-5 batches (per category)
+6. [ ] If pilot doesn't work: fall back to keeping original agent files as thin wrappers ("This agent delegates to skills/X/Y — read that file and follow its instructions")
+7. [ ] Generate skill audit manifest via script
+8. [ ] Modernize failing skills in batches per category (languages, frameworks, tools)
+9. [ ] Update CLAUDE.md "Skill System" section
+10. [ ] Run full test suite; verify no regressions
+
+### Test Plan
+
+| Test Type | Coverage | Files |
+|---|---|---|
+| Unit | agent-resolver: redirect detection, path resolution | tests/agent-resolver.test.js |
+| Unit | Skill frontmatter validation; redirect-stub structure | tests/skill-loading.test.js |
+| Integration | Pre-v7 plan referencing converted-agent name resolves correctly | tests/skill-loading.test.js |
+| Regression | All 40+ existing tests pass | tests/*.test.js |
+
+### Dependencies
+
+- A1, A2, A3, C1 — shipped; B2 modernized skills assume the v7 structure
+- B1 — orchestrator agents modernized first; B2 leaf-node conversion follows
+- No new external dependencies
+
+### Rollback Plan
+
+- Per-agent conversion is reversible: delete redirect stub, restore original agent file from git history
+- Per-skill modernization is reversible per commit
+- Audit manifest is a generated artifact; no rollback needed (regenerate as needed)
+
+---
+
+## Approval
+
+**Status**: Pending Approval (Gate 2: implementation → todo)
