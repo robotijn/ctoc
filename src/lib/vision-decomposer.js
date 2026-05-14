@@ -12,6 +12,52 @@ const { writeStatus, clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
 
 /**
+ * Get the canvas file path for a given vision slug, if a canvas exists.
+ * Looks for plans/canvas/<slug>.md.
+ *
+ * @param {string} visionSlug - Slug of the parent vision
+ * @param {string} [projectPath] - Project root path
+ * @returns {string|null} Canvas file path, or null if no canvas exists
+ */
+function getCanvasForVision(visionSlug, projectPath) {
+  const root = projectPath || findProjectRoot();
+  const canvasPath = path.join(root, 'plans', 'canvas', `${visionSlug}.md`);
+  return fs.existsSync(canvasPath) ? canvasPath : null;
+}
+
+/**
+ * Parse a canvas file into a structured object.
+ * Returns the canvas type (lean | bmc) and a blocks map keyed by H2 heading.
+ *
+ * @param {string} canvasPath - Path to the canvas file
+ * @returns {{ type: string, blocks: Object<string, string> }}
+ */
+function parseCanvas(canvasPath) {
+  if (!fs.existsSync(canvasPath)) {
+    throw new Error(`Canvas file not found: ${canvasPath}`);
+  }
+
+  const content = fs.readFileSync(canvasPath, 'utf8');
+  const metadata = parseMetadata(content);
+  const type = metadata.canvas_type || 'lean';
+
+  // Strip frontmatter
+  const body = content.replace(/^---\n[\s\S]*?\n---\n/, '');
+
+  // Parse H2 blocks
+  const blocks = {};
+  const blockRegex = /^##\s+(.+?)\n([\s\S]*?)(?=^##\s+|\Z|$(?![\s\S]))/gm;
+  let match;
+  while ((match = blockRegex.exec(body)) !== null) {
+    const heading = match[1].trim();
+    const blockBody = (match[2] || '').trim();
+    blocks[heading] = blockBody;
+  }
+
+  return { type, blocks };
+}
+
+/**
  * Validate vision readiness for decomposition.
  * Checks for required dimensions: problem statement, target audience,
  * success criteria, and scope/what-we're-building.
@@ -333,5 +379,7 @@ module.exports = {
   listStubs,
   removeStub,
   mergeStubs,
-  slugify
+  slugify,
+  getCanvasForVision,
+  parseCanvas
 };

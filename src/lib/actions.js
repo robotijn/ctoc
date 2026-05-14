@@ -613,6 +613,81 @@ function advanceAgent(projectPath) {
 }
 
 /**
+ * Create a canvas file (Lean Canvas or BMC) for a vision.
+ * Writes plans/canvas/<vision-slug>.md from the corresponding template.
+ *
+ * Behavior under ambiguity (no-stub rule):
+ * - If vision file does not exist at plans/vision/<slug>.md OR plans/done/<slug>.md,
+ *   creation proceeds with a warning (canvas can exist before vision is finalized).
+ * - If canvas already exists for this vision, throws unless { overwrite: true }.
+ *
+ * @param {string} visionSlug - Slug of the parent vision (must match /^[a-z0-9][a-z0-9-]*$/)
+ * @param {string} canvasType - 'lean' or 'bmc'
+ * @param {string} [projectPath] - Project root path
+ * @param {{ overwrite?: boolean }} [options] - { overwrite: true } to replace existing canvas
+ * @returns {{ name: string, path: string, warnings: string[] }}
+ */
+function createCanvas(visionSlug, canvasType, projectPath, options = {}) {
+  const root = projectPath || findProjectRoot();
+  const warnings = [];
+
+  if (canvasType !== 'lean' && canvasType !== 'bmc') {
+    throw new Error(`Invalid canvas type '${canvasType}'. Must be 'lean' or 'bmc'.`);
+  }
+
+  if (typeof visionSlug !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(visionSlug)) {
+    throw new Error(`Invalid vision slug '${visionSlug}'. Must match /^[a-z0-9][a-z0-9-]*$/.`);
+  }
+
+  // I1: warn if parent vision not found at expected locations
+  const visionPath = path.join(root, 'plans', 'vision', `${visionSlug}.md`);
+  const doneVisionPath = path.join(root, 'plans', 'done', `${visionSlug}.md`);
+  if (!fs.existsSync(visionPath) && !fs.existsSync(doneVisionPath)) {
+    warnings.push(`No parent vision found at plans/vision/${visionSlug}.md or plans/done/${visionSlug}.md. Canvas will be created as an orphan.`);
+  }
+
+  const templateName = canvasType === 'lean'
+    ? 'lean-canvas.md.template'
+    : 'business-model-canvas.md.template';
+  const templatePath = path.join(root, '.ctoc', 'templates', templateName);
+
+  if (!fs.existsSync(templatePath)) {
+    throw new Error(`Canvas template not found: ${templatePath}`);
+  }
+
+  const canvasDir = path.join(root, 'plans', 'canvas');
+  if (!fs.existsSync(canvasDir)) {
+    fs.mkdirSync(canvasDir, { recursive: true });
+  }
+
+  const filePath = path.join(canvasDir, `${visionSlug}.md`);
+
+  // I2: refuse to silently overwrite existing canvas
+  if (fs.existsSync(filePath) && !options.overwrite) {
+    throw new Error(`Canvas already exists at ${filePath}. Pass { overwrite: true } to replace.`);
+  }
+
+  let template = fs.readFileSync(templatePath, 'utf8');
+
+  const displayName = visionSlug
+    .split('-')
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(' ');
+  template = template
+    .replace(/\{\{NAME\}\}/g, displayName)
+    .replace(/\{\{DATE\}\}/g, new Date().toISOString())
+    .replace(/\{\{VISION_SLUG\}\}/g, visionSlug);
+
+  fs.writeFileSync(filePath, template);
+
+  return {
+    name: visionSlug,
+    path: filePath,
+    warnings
+  };
+}
+
+/**
  * Clean up orphaned in-progress plans (D2).
  * If no lock is active for an in-progress plan, move it to review.
  * Logs cleanup events to .ctoc/logs/cleanup.json (keeps plan files clean).
@@ -679,5 +754,6 @@ module.exports = {
   startAgent,
   stopAgent,
   advanceAgent,
-  cleanupStaleInProgress
+  cleanupStaleInProgress,
+  createCanvas
 };

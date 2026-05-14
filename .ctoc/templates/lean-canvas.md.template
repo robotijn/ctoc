@@ -1,0 +1,46 @@
+---
+title: "Lean Canvas: {{NAME}}"
+created: "{{DATE}}"
+type: canvas
+canvas_type: lean
+parent_vision: "{{VISION_SLUG}}"
+status: draft
+---
+
+# Lean Canvas: {{NAME}}
+
+> A 9-block lean canvas (Ash Maurya). Optional context layer between Vision and Functional.
+> Problem-first — fill in Problem and Customer Segments before Solution. Validates business viability before committing to features.
+
+---
+
+## Problem
+<!-- Top 1-3 problems your customers have today. Be specific. What's broken or missing in their current workflow? -->
+
+## Customer Segments
+<!-- Who has this problem? Early adopters first (the ones who feel it most). What identifies them? -->
+
+## Unique Value Proposition
+<!-- Single, clear, compelling message: why are you different and worth paying attention to? -->
+
+## Solution
+<!-- Top 1-3 features that address the top 1-3 problems. -->
+
+## Channels
+<!-- Path to customers: how do they hear about you, how do you reach them? -->
+
+## Revenue Streams
+<!-- How does this make money? Pricing model, transaction value, lifetime value. -->
+
+## Cost Structure
+<!-- Customer acquisition cost, infrastructure, salaries, fixed vs variable costs. -->
+
+## Key Metrics
+<!-- The 3-5 numbers that tell you whether this is working. -->
+
+## Unfair Advantage
+<!-- Something that can't easily be bought or copied. Network effects, deep domain expertise, exclusive partnerships. -->
+
+---
+
+*Lean Canvas methodology by Ash Maurya. Use this canvas to test problem-solution fit before committing to feature work.*

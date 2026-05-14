@@ -22,6 +22,7 @@ const { findProjectRoot } = require('./project-root');
 
 // Stage to folder mapping
 const STAGE_FOLDERS = {
+  canvas: 'canvas',
   functional: 'functional',
   implementation: 'implementation',
   todo: 'todo',
@@ -92,6 +93,7 @@ function buildDashboardTable(projectPath) {
   out += `│ Stage          │ Count  │ Status          │\n`;
   out += `├────────────────┼────────┼─────────────────┤\n`;
   out += `│ Vision         │ ${String(visionCounts.total).padEnd(6)}│ ${status(visionCounts.total, 'No visions', visionCounts.exploring + ' exploring').padEnd(16)}│\n`;
+  out += `│ Canvas         │ ${String(counts.canvas || 0).padEnd(6)}│ ${status(counts.canvas, 'No canvases', (counts.canvas || 0) + ' canvases').padEnd(16)}│\n`;
   out += `│ Functional     │ ${String(counts.functional).padEnd(6)}│ ${status(counts.functional, 'No drafts', counts.functional + ' drafts').padEnd(16)}│\n`;
   out += `│ Implementation │ ${String(counts.implementation).padEnd(6)}│ ${status(counts.implementation, 'No drafts', counts.implementation + ' drafts').padEnd(16)}│\n`;
   out += `│ Todo           │ ${String(counts.todo).padEnd(6)}│ ${status(counts.todo, 'Queue empty', counts.todo + ' queued').padEnd(16)}│\n`;

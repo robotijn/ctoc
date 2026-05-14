@@ -1,0 +1,46 @@
+---
+title: "Business Model Canvas: {{NAME}}"
+created: "{{DATE}}"
+type: canvas
+canvas_type: bmc
+parent_vision: "{{VISION_SLUG}}"
+status: draft
+---
+
+# Business Model Canvas: {{NAME}}
+
+> A 9-block Business Model Canvas (Osterwalder). Optional context layer between Vision and Functional.
+> Best for established businesses or initiatives where partnership and infrastructure decisions matter. For early-stage problem validation, prefer Lean Canvas.
+
+---
+
+## Key Partners
+<!-- Who are your key partners and suppliers? What key resources do partners provide? What key activities do partners perform? -->
+
+## Key Activities
+<!-- The most important things your value proposition requires you to do. Production, problem solving, platform/network management. -->
+
+## Key Resources
+<!-- The most important assets required to make the business model work. Physical, intellectual, human, financial. -->
+
+## Value Propositions
+<!-- The bundle of products and services that create value for a specific customer segment. What problem are you solving? -->
+
+## Customer Relationships
+<!-- The types of relationships you establish with specific customer segments. Personal assistance, self-service, automated services, communities. -->
+
+## Channels
+<!-- How customer segments are reached and served. Awareness, evaluation, purchase, delivery, after-sales. -->
+
+## Customer Segments
+<!-- The different groups of people or organizations you aim to reach and serve. Mass market, niche, segmented, diversified, multi-sided. -->
+
+## Cost Structure
+<!-- All costs incurred to operate the business model. Cost-driven vs value-driven, fixed vs variable, economies of scale. -->
+
+## Revenue Streams
+<!-- The cash generated from each customer segment. Asset sale, usage fee, subscription, lending/renting/leasing, licensing, brokerage, advertising. -->
+
+---
+
+*Business Model Canvas methodology by Alexander Osterwalder. Use this canvas to design or document the business model behind your initiative.*

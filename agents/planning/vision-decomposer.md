@@ -58,6 +58,33 @@ If validation fails (blocking errors), show errors to user and ask them to compl
 
 ## Process
 
+### Phase 0 (Optional): Read Canvas Context
+
+Before extracting goals, check if a Canvas exists for this vision:
+
+1. Compute the vision slug from the vision filename (strip `.md` extension and any leading stage prefix).
+2. Check `plans/canvas/<vision-slug>.md` (or call `getCanvasForVision(visionSlug)` from `lib/vision-decomposer.js`).
+3. If a canvas exists, call `parseCanvas(canvasPath)` and bind the result `{type, blocks}`.
+
+**If canvas type is `lean`:**
+- The **Problem** block names the top 1-3 problems — these often correspond 1:1 to top-priority goals.
+- The **Customer Segments** block defines the actors (use these in goal output).
+- The **Unique Value Proposition** is the highest-level success criterion.
+- The **Unfair Advantage** is context, not a goal (don't decompose it).
+- The **Key Metrics** block defines success metrics for goals.
+
+**If canvas type is `bmc`:**
+- The **Value Propositions** block names what the system delivers — each distinct value prop is often a separate goal.
+- The **Customer Segments** block defines the actors.
+- The **Key Activities** block lists what the org must do — these become candidate goals if they're customer-facing, candidate non-functional concerns if internal.
+- **Key Partners**, **Key Resources**, **Cost Structure** are context (not goal material).
+
+**If no canvas exists:** proceed with vision-only extraction in Phase 1. This is the backward-compatible path; canvas is optional.
+
+**Output of Phase 0:**
+- Either a parsed canvas object available to Phase 1 (use blocks to inform extraction), or `null` (vision-only path).
+- Do NOT block on missing canvas. Canvas is intentionally optional.
+
 ### Phase 1: Extract Goals (2-4 goals)
 
 Use Impact Mapping to identify distinct business outcomes from the vision document.

@@ -94,6 +94,7 @@ function getPlanCounts(projectPath) {
   const plansDir = getPlansDir(root);
 
   return {
+    canvas: readPlans(path.join(plansDir, 'canvas')).length,
     functional: readPlans(path.join(plansDir, 'functional')).length,
     implementation: readPlans(path.join(plansDir, 'implementation')).length,
     review: readPlans(path.join(plansDir, 'review')).length,
