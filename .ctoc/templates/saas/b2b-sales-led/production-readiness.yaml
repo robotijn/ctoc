@@ -1,0 +1,275 @@
+# ===============================================================================
+#  Production Readiness Checklist — B2B Sales-Led SaaS
+#  Gate before first signed enterprise customer.
+# ===============================================================================
+
+template_id: saas/b2b-sales-led
+schema_version: 1
+last_reviewed: 2026-05-14
+
+checks:
+
+  # ─────────────────────────────────────────────────────────
+  # Domain & TLS
+  # ─────────────────────────────────────────────────────────
+  - id: custom_domain
+    severity: block
+    owner: programmer
+    description: "Custom domain with HTTPS"
+    validation: "curl -sI https://<domain> shows 200"
+
+  - id: tls_a_grade
+    severity: block
+    owner: programmer
+    description: "TLS configuration scores ≥A on Qualys SSL Labs"
+    validation: "https://www.ssllabs.com/ssltest/ — must be A or A+"
+    rationale: "Enterprise customers run security scans; B grade fails procurement."
+
+  # ─────────────────────────────────────────────────────────
+  # SSO + Directory Sync
+  # ─────────────────────────────────────────────────────────
+  - id: workos_authkit_works
+    severity: block
+    owner: programmer
+    description: "AuthKit SSO flow works end-to-end via test SAML provider"
+    validation: "Use WorkOS test SAML IdP; sign in; land in app with org_id set"
+
+  - id: scim_provisioning
+    severity: block
+    owner: programmer
+    description: "SCIM user.created webhook auto-creates user in app"
+    validation: "Add user to WorkOS test directory; verify user appears in DB"
+
+  - id: scim_deprovisioning
+    severity: block
+    owner: programmer
+    description: "SCIM user.deleted webhook removes user from app"
+    validation: "Remove user from WorkOS test directory; verify user soft-deleted in DB"
+    rationale: "Compliance failure if IT removes user from Okta but they retain app access."
+
+  # ─────────────────────────────────────────────────────────
+  # Multi-tenancy isolation
+  # ─────────────────────────────────────────────────────────
+  - id: org_rls_enforced
+    severity: block
+    owner: architect
+    description: "RLS prevents Org A from reading Org B data"
+    validation: "Multi-tenant pen test: sign in as Org A user, request Org B's resources via API, expect 403"
+
+  - id: rls_per_business_table
+    severity: block
+    owner: architect
+    description: "Every business-data table has RLS enabled + policy by organization_id"
+    validation: |
+      SELECT tablename FROM pg_tables
+      WHERE schemaname='public' AND rowsecurity=false
+        AND tablename NOT IN ('users','organizations','webhook_events','audit_log');
+      -- Expected: 0 rows
+
+  # ─────────────────────────────────────────────────────────
+  # RBAC
+  # ─────────────────────────────────────────────────────────
+  - id: rbac_enforced_in_middleware
+    severity: block
+    owner: programmer
+    description: "Every protected endpoint checks role"
+    validation: "Audit: every route handler has `requireRole('admin' | 'member' | ...)`"
+
+  - id: rbac_enforced_at_db
+    severity: block
+    owner: architect
+    description: "RLS policies are role-aware where applicable"
+    validation: "Member role cannot read admin-only tables (e.g., audit_log requires admin)"
+
+  - id: owner_uniqueness
+    severity: block
+    owner: programmer
+    description: "Exactly one owner per organization"
+    validation: "DB constraint: UNIQUE(organization_id) WHERE role='owner'"
+
+  # ─────────────────────────────────────────────────────────
+  # Audit log
+  # ─────────────────────────────────────────────────────────
+  - id: audit_log_table_exists
+    severity: block
+    owner: architect
+    description: "audit_log table exists with full schema"
+
+  - id: audit_log_captures_mutations
+    severity: block
+    owner: programmer
+    description: "Every business-data mutation writes an audit_log entry"
+    validation: "Sample: create an invoice, then SELECT * FROM audit_log WHERE action='invoice.created'"
+
+  - id: audit_log_captures_auth
+    severity: block
+    owner: programmer
+    description: "Sign-in, sign-out, role changes write audit_log entries"
+
+  - id: audit_log_admin_visible
+    severity: block
+    owner: programmer
+    description: "Org admins can view audit log at /org/audit-log"
+
+  # ─────────────────────────────────────────────────────────
+  # Billing (invoice mode)
+  # ─────────────────────────────────────────────────────────
+  - id: invoice_billing_tested
+    severity: block
+    owner: founder
+    description: "Created Stripe Invoice via send_invoice mode; customer paid via ACH/wire"
+    validation: "Test with real customer; verify subscription activates on payment"
+
+  - id: ach_only_for_invoices
+    severity: warn
+    owner: programmer
+    description: "Customer's payment_method_types include us_bank_account / sepa_debit, not just card"
+    rationale: "Enterprise customers pay by ACH/wire, not corporate card."
+
+  - id: stripe_webhook_works
+    severity: block
+    owner: programmer
+    description: "invoice.paid + invoice.payment_failed webhooks update subscription state"
+
+  # ─────────────────────────────────────────────────────────
+  # Email deliverability
+  # ─────────────────────────────────────────────────────────
+  - id: spf_dkim_dmarc
+    severity: block
+    owner: programmer
+    description: "SPF + DKIM + DMARC configured; mail-tester score ≥ 9/10"
+
+  - id: invite_email_works
+    severity: block
+    owner: programmer
+    description: "Admin invites user → user receives email → user joins org"
+
+  # ─────────────────────────────────────────────────────────
+  # Observability
+  # ─────────────────────────────────────────────────────────
+  - id: sentry_with_user_context
+    severity: block
+    owner: programmer
+    description: "Sentry captures errors with user_id AND organization_id context"
+
+  - id: posthog_groups_per_org
+    severity: block
+    owner: programmer
+    description: "PostHog 'group' calls track at organization level"
+    rationale: "Org-level analytics are required for enterprise expansion decisions."
+
+  - id: log_aggregation
+    severity: warn
+    owner: programmer
+    description: "Logs aggregated to Axiom / Datadog / similar"
+    rationale: "Enterprise customers will ask for log access during incidents."
+
+  - id: uptime_monitoring
+    severity: block
+    owner: programmer
+    description: "Public status page + uptime monitor"
+
+  # ─────────────────────────────────────────────────────────
+  # Legal / compliance (B2B-specific)
+  # ─────────────────────────────────────────────────────────
+  - id: privacy_policy
+    severity: block
+    owner: founder
+    description: "Privacy Policy posted, GDPR-compliant"
+
+  - id: terms_of_service
+    severity: block
+    owner: founder
+    description: "Terms of Service posted"
+
+  - id: dpa_template
+    severity: block
+    owner: founder
+    description: "DPA template ready (enterprise customers will request it)"
+    rationale: "EU customers and SOC2-conscious US customers require a signed DPA."
+
+  - id: msa_template
+    severity: block
+    owner: founder
+    description: "Master Services Agreement template ready"
+    rationale: "Enterprise procurement requires an MSA before signing an order form."
+
+  - id: infosec_questionnaire_response
+    severity: warn
+    owner: founder
+    description: "Pre-drafted answers to SIG Lite / VSA questionnaire"
+    rationale: "Saves 10+ hours per enterprise sales cycle."
+
+  - id: subprocessor_list
+    severity: block
+    owner: founder
+    description: "Public subprocessor list at /legal/subprocessors"
+    rationale: "GDPR requires customers be told about subprocessors."
+
+  # ─────────────────────────────────────────────────────────
+  # Backup & DR
+  # ─────────────────────────────────────────────────────────
+  - id: db_backups_enabled
+    severity: block
+    owner: architect
+    description: "Supabase Pro daily backups enabled (or self-rolled equivalent)"
+
+  - id: pitr_enabled
+    severity: warn
+    owner: architect
+    description: "Point-in-time recovery enabled (Supabase Team+)"
+    rationale: "Mid-market customers expect < 1h RPO."
+
+  - id: backup_restore_tested
+    severity: block
+    owner: architect
+    description: "Verified restore from backup completes successfully"
+
+  - id: dr_runbook
+    severity: warn
+    owner: architect
+    description: "Disaster recovery runbook documented (Notion / runbooks/)"
+
+  # ─────────────────────────────────────────────────────────
+  # Performance
+  # ─────────────────────────────────────────────────────────
+  - id: api_p95_under_500ms
+    severity: warn
+    owner: architect
+    description: "API p95 < 500ms under normal load"
+
+  - id: load_tested
+    severity: warn
+    owner: architect
+    description: "Load test simulating 10x current org count passes"
+
+  # ─────────────────────────────────────────────────────────
+  # SOC2 readiness (optional at MVP, expected before enterprise)
+  # ─────────────────────────────────────────────────────────
+  - id: vanta_or_drata_engaged
+    severity: info
+    owner: founder
+    description: "SOC2 readiness vendor engaged (or alternative path)"
+
+  - id: access_review_quarterly
+    severity: info
+    owner: founder
+    description: "Process for quarterly access review (who has admin to what)"
+
+  # ─────────────────────────────────────────────────────────
+  # Customer support
+  # ─────────────────────────────────────────────────────────
+  - id: support_email_dedicated
+    severity: block
+    owner: founder
+    description: "support@yourapp.com with SLA commitment (e.g., 24h response)"
+
+  - id: help_docs
+    severity: warn
+    owner: founder
+    description: "≥ 10 help articles covering onboarding, SSO, billing, admin"
+
+  - id: customer_success_owner
+    severity: warn
+    owner: founder
+    description: "Dedicated CS owner for accounts > $X ARR (founder is fine at MVP)"

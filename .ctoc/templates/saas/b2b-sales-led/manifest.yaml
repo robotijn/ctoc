@@ -1,0 +1,378 @@
+# ===============================================================================
+#  B2B Sales-Led SaaS — Manifest
+#  Consumed by stack-chooser (Tier 1) and implementation-planner.
+# ===============================================================================
+
+template_id: saas/b2b-sales-led
+display_name: "B2B Sales-Led SaaS"
+description: "B2B SaaS with SSO (SAML/OIDC), organization-scoped data, audit log, contract-based billing, RBAC."
+schema_version: 1
+last_reviewed: 2026-05-14
+
+target_personas:
+  - founder
+  - technical-founder
+
+target_project_types:
+  - saas-b2b
+  - enterprise-saas
+
+# ===============================================================================
+#  Default tech stack
+# ===============================================================================
+
+default_tech_stack:
+  language: TypeScript
+  runtime: Node 22 LTS
+  frontend_framework: Next.js 15 (App Router)
+  styling: Tailwind CSS 4 + shadcn/ui
+  api_pattern: tRPC (internal) + Route Handlers (public webhooks)
+
+  auth_provider: WorkOS
+  auth_rationale: |
+    WorkOS is the standard for B2B SSO. SAML + OIDC + AuthKit (hosted UI) +
+    Directory Sync (SCIM) + Audit Log. Built for the IT-admin-procures-it
+    workflow that enterprise customers expect. Alternative for non-SSO
+    customers (smaller orgs): magic-link fallback within WorkOS.
+
+  database: Postgres
+  database_host: Supabase
+  orm: Drizzle ORM
+  migration_strategy: drizzle-kit + versioned migrations in CI
+
+  payments: Stripe (Invoice-based, NOT Checkout)
+  payments_rationale: |
+    B2B sales-led = invoice billing, not self-serve. Use
+    stripe.invoices.create + collection_method: 'send_invoice' for net-30
+    ACH/wire payments. Subscriptions still in Stripe for renewal cadence,
+    but created by ops team after order form signed.
+
+  email_transactional: Resend
+  email_marketing: Customer.io (more enterprise-friendly than Loops)
+
+  analytics_product: PostHog
+  analytics_account_level: PostHog Groups (track at organization level, not user)
+  feature_flags: PostHog
+  a_b_testing: PostHog
+
+  error_monitoring: Sentry
+  uptime_monitoring: Better Uptime
+  log_aggregation: Axiom or Datadog (enterprise customers will ask)
+
+  file_storage: Cloudflare R2 (or AWS S3 — enterprise customers may prefer)
+  cdn: Cloudflare
+
+  background_jobs: Inngest
+  bg_jobs_rationale: |
+    Inngest for: SCIM event handling (user provisioning/deprovisioning),
+    nightly audit log archive, contract renewal reminders, billing
+    finalization, invoice retry, scheduled reports.
+
+  rate_limiting: Upstash Redis (per-organization, not just per-user)
+  contract_signing: DocuSign or PandaDoc (out of template scope, but link)
+
+  deployment_target: Vercel (or AWS/Render if customer requires on-prem)
+  ci_cd: GitHub Actions
+
+# ===============================================================================
+#  Required skills
+# ===============================================================================
+
+required_skills:
+  - saas/workos-sso
+  - saas/multi-tenancy-row-level     # organization-scoped, not user-scoped
+  - saas/stripe-subscriptions        # used in invoice mode
+  - saas/resend-email
+  - saas/posthog-analytics
+  - saas/supabase-data
+  - saas/vercel-deploy
+  - saas/inngest-jobs
+  - saas/sentry-errors
+  - saas/rate-limiting
+  - saas/legal-scaffold              # includes DPA + MSA templates
+  - compliance/audit-log-checker     # SOC2 readiness
+
+# ===============================================================================
+#  Standard schema (organization-scoped)
+# ===============================================================================
+
+standard_schema:
+  organizations:
+    columns:
+      - id
+      - workos_org_id (unique)
+      - name
+      - domain                         # for IdP routing by email domain
+      - plan_id
+      - stripe_customer_id
+      - status                         # active | suspended | trial
+      - trial_ends_at
+      - created_at
+      - deleted_at
+    indexes: [workos_org_id_unique, domain]
+
+  users:
+    columns:
+      - id
+      - workos_user_id (unique)
+      - organization_id (FK organizations.id)
+      - email
+      - role                           # owner | admin | member | billing_only
+      - status                         # active | suspended | invited
+      - created_at
+      - last_login_at
+    indexes: [workos_user_id_unique, organization_id, email]
+
+  # EVERY business-data table has organization_id
+  invoices:
+    columns:
+      - id
+      - organization_id (FK)           # NOT user_id at the top level
+      - created_by_user_id (FK users.id)
+      - amount
+      - status
+      - created_at
+    indexes: [organization_id, created_at]
+
+  audit_log:
+    columns:
+      - id
+      - organization_id (FK)
+      - user_id (FK users.id, nullable for system events)
+      - action                         # 'invoice.created', 'user.invited', etc.
+      - resource_type
+      - resource_id
+      - metadata (jsonb)
+      - ip_address
+      - user_agent
+      - created_at
+    indexes: [organization_id, created_at, action]
+    note: "Customer-facing — show in /org/audit-log to admins. Required for SOC2."
+
+  webhook_events:
+    columns: [id, source, source_event_id (unique), type, payload, processed_at]
+    note: "Idempotency for WorkOS SCIM + Stripe + other webhooks."
+
+# ===============================================================================
+#  RBAC matrix
+# ===============================================================================
+
+rbac:
+  roles:
+    - id: owner
+      description: "Created the org; only one per org"
+      can: ["*"]   # everything
+
+    - id: admin
+      description: "Full access except delete org"
+      can:
+        - "user.invite"
+        - "user.remove"
+        - "user.update_role"
+        - "billing.view"
+        - "billing.update"
+        - "settings.update"
+        - "data.*"
+
+    - id: member
+      description: "Standard user"
+      can:
+        - "data.read.own"
+        - "data.create"
+        - "data.update.own"
+        - "data.delete.own"
+
+    - id: billing_only
+      description: "Can manage billing but not product"
+      can:
+        - "billing.view"
+        - "billing.update"
+
+# ===============================================================================
+#  Setup steps
+# ===============================================================================
+
+setup_steps:
+  - step: "Create Vercel project + custom domain"
+    estimated_minutes: 15
+    persona: programmer
+
+  - step: "Provision Supabase database (Pro plan for backups)"
+    estimated_minutes: 15
+    persona: programmer
+
+  - step: "Set up WorkOS account + AuthKit + grab Client ID + API key"
+    estimated_minutes: 30
+    persona: programmer
+
+  - step: "Configure Stripe account for invoice mode + tax (if applicable)"
+    estimated_minutes: 30
+    persona: founder
+    note: "Founder owns pricing tiers + tax configuration."
+
+  - step: "Set up Resend domain + SPF/DKIM/DMARC"
+    estimated_minutes: 30
+    persona: programmer
+    blocking_for: deployment
+
+  - step: "Set up Sentry + PostHog + Better Uptime + Axiom"
+    estimated_minutes: 30
+    persona: programmer
+
+  - step: "Configure all environment variables in Vercel"
+    estimated_minutes: 20
+    persona: programmer
+    env_vars:
+      - DATABASE_URL
+      - DIRECT_DATABASE_URL
+      - WORKOS_API_KEY
+      - WORKOS_CLIENT_ID
+      - WORKOS_COOKIE_PASSWORD
+      - WORKOS_WEBHOOK_SECRET
+      - STRIPE_SECRET_KEY
+      - STRIPE_WEBHOOK_SECRET
+      - RESEND_API_KEY
+      - SENTRY_DSN
+      - NEXT_PUBLIC_POSTHOG_KEY
+      - UPSTASH_REDIS_REST_URL
+      - UPSTASH_REDIS_REST_TOKEN
+
+  - step: "Generate legal templates (DPA, MSA, ToS, Privacy)"
+    estimated_minutes: 60
+    persona: founder
+    note: "Use saas/legal-scaffold skill; lawyer review required before first signed customer."
+
+  - step: "Engage SOC2 readiness vendor (Vanta / Drata)"
+    estimated_minutes: 480
+    persona: founder
+    note: "Optional at MVP; required before mid-market+ customers ask."
+
+# ===============================================================================
+#  First-week milestones (B2B is slower than B2C)
+# ===============================================================================
+
+first_week_milestones:
+  day_1:
+    persona: programmer
+    deliverables:
+      - "Repo scaffolded, deployed to Vercel with custom domain"
+      - "Postgres connected, organizations + users tables migrated"
+
+  day_2:
+    persona: programmer
+    deliverables:
+      - "WorkOS AuthKit working (test SAML flow)"
+      - "Organization created on first sign-in"
+
+  day_3:
+    persona: programmer
+    deliverables:
+      - "RLS policies on every business-data table (RLS by organization_id)"
+      - "RBAC middleware enforces role-based access"
+      - "Audit log table + middleware capturing every mutation"
+
+  day_4:
+    persona: programmer
+    deliverables:
+      - "SCIM webhook handler: user.created + user.deleted"
+      - "Test by adding/removing a user in WorkOS test directory"
+
+  day_5:
+    persona: programmer
+    deliverables:
+      - "Stripe Invoice creation flow + send_invoice mode tested"
+      - "Customer Portal accessible for billing-only role"
+
+  day_6:
+    persona: programmer + designer
+    deliverables:
+      - "Org settings page (members, roles, billing)"
+      - "Audit log viewer for admins"
+      - "Invite flow (admin invites teammate via email)"
+
+  day_7:
+    persona: founder
+    deliverables:
+      - "DPA + MSA + Privacy + ToS posted at /legal/*"
+      - "InfoSec questionnaire template ready (SIG Lite or similar)"
+
+# ===============================================================================
+#  Minimum viable features
+# ===============================================================================
+
+minimum_viable_features:
+  - id: workos_sso_login
+    description: "SAML/OIDC sign-in via WorkOS AuthKit, organization auto-created"
+    required: true
+
+  - id: org_scoped_data
+    description: "All business data scoped to organization_id; RLS enforces"
+    required: true
+
+  - id: rbac_enforcement
+    description: "owner/admin/member/billing_only roles enforced at middleware + DB"
+    required: true
+
+  - id: scim_directory_sync
+    description: "WorkOS SCIM user.created/user.deleted webhooks provision/deprovision"
+    required: true
+
+  - id: audit_log
+    description: "Audit log captures every sensitive action; viewable by admins"
+    required: true
+
+  - id: invoice_billing
+    description: "Stripe Invoice creation, send_invoice mode, ACH/wire payment"
+    required: true
+
+  - id: core_value_feature_v1
+    description: "The product itself — what customers pay for"
+    required: true
+
+  - id: org_settings
+    description: "Members + Roles + Billing + Audit Log + General settings pages"
+    required: true
+
+# ===============================================================================
+#  Estimated effort
+# ===============================================================================
+
+estimated_effort:
+  technical_founder: "80-160 hours (2-4 weeks full-time)"
+  founder_with_hired_programmer: "120-240 programmer hours + 40-60 founder hours"
+  solo_programmer_familiar: "80-120 hours"
+
+# ===============================================================================
+#  Common pitfalls
+# ===============================================================================
+
+common_pitfalls:
+  - issue: "Forgot organization_id on a new table"
+    severity: critical
+    detection: "CI check: every table with `user_id` must also have `organization_id` (or be in allowlist)"
+    fix: "ALTER TABLE ... ADD COLUMN organization_id; backfill from user → org join"
+
+  - issue: "SCIM deprovisioning silently fails"
+    severity: critical
+    detection: "Inngest function logs; failed deprovisions queue for retry"
+    fix: "user.deleted webhook → soft-delete user in DB; downstream cleanup as jobs"
+
+  - issue: "RBAC check missing on an endpoint"
+    severity: high
+    detection: "Pen test: log in as member, try admin-only endpoint, expect 403"
+    fix: "Centralize role checks in tRPC middleware or route handler wrapper"
+
+  - issue: "Audit log entry skipped on a mutation"
+    severity: high
+    detection: "CI scan: every db.update / db.insert / db.delete on business tables must be inside an audited handler"
+    fix: "Wrap mutations in `withAudit(req, action, ()=>...)`"
+
+  - issue: "Invoice billing accepting credit card by accident"
+    severity: medium
+    detection: "Stripe webhook: charge events should be rare (ACH only)"
+    fix: "On Customer creation, set `payment_method_types: ['us_bank_account', 'sepa_debit']` only"
+
+  - issue: "DPA template not customized per customer"
+    severity: high
+    detection: "Audit each signed DPA for customer-specific terms"
+    fix: "Generate from saas/legal-scaffold with customer fact set"
