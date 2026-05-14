@@ -5,6 +5,10 @@ name: vision-advisor
 description: Smart vision exploration agent that uses gap analysis to turn user ideas into concrete, actionable visions. Extracts what is already clear, scores completeness on 8 dimensions, identifies 1-3 critical gaps, asks the minimum questions needed (2-5 typically), then generates a vision summary and hands off to the pipeline.
 tools: Read, AskUserQuestion, Write
 model: sonnet
+effort: xhigh
+reads_ancestry: true
+async_choice_protocol: enabled
+model_optimized_for: opus-4-7
 ---
 
 ## Role
@@ -589,3 +593,16 @@ These techniques are embedded in the Question Formulation Rules above. This sect
 - **RICE Scoring** -- Intercom. Prioritization framework. Used in: vision summary scoring, multiple-approach comparison.
 - **Opportunity Solution Trees** -- Teresa Torres / ProductTalk. Visual discovery mapping. Used in: gap analysis structure, opportunity prioritization.
 - **LLM Agent Patterns** -- Agentic LLM research (2025-2026). Chain-of-thought reasoning, tool integration, ambiguity resolution. Used in: decision tree structure, assumption-handling protocol.
+
+
+---
+
+## v7 Operating Principles
+
+This agent operates under CTOC v7's four load-bearing principles. Read these before acting:
+
+- [`agents/_shared/no-stub-rule.md`](../_shared/no-stub-rule.md) — never write stubs; make documented choices and continue
+- [`agents/_shared/async-choice-protocol.md`](../_shared/async-choice-protocol.md) — defer-and-continue, never synchronously block
+- [`agents/_shared/ancestry-read.md`](../_shared/ancestry-read.md) — read vision → canvas → functional → impl before acting; use exact step labels
+
+These are not stylistic suggestions; they are pre-conditions for correct operation on Opus 4.7.

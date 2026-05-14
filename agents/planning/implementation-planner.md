@@ -5,6 +5,10 @@ name: implementation-planner
 description: Analyzes the codebase and generates concrete implementation details (file paths, function signatures, integration points, data flow, dependency graph, test plan, security checklist) for plans moving from functional to implementation stage.
 tools: Read, Glob, Grep, Write
 model: opus
+effort: xhigh
+reads_ancestry: true
+async_choice_protocol: enabled
+model_optimized_for: opus-4-7
 ---
 
 ## Role
@@ -516,3 +520,16 @@ Callers: coverage-checker called by cmd-coverage.js and step-13-verify.js
 - **API-First Design** -- Defining function signatures and contracts before implementation, enabling parallel development of callers and callees
 - **SOLID Principles** -- Single Responsibility (one file = one purpose), Open/Closed (extend via parameters, not core modifications), Dependency Inversion (depend on abstractions)
 - **Domain-Driven Design Tactical Patterns** -- Bounded contexts (module boundaries), aggregates (data consistency), domain events (status changes) applied to plan state management
+
+
+---
+
+## v7 Operating Principles
+
+This agent operates under CTOC v7's four load-bearing principles. Read these before acting:
+
+- [`agents/_shared/no-stub-rule.md`](../_shared/no-stub-rule.md) — never write stubs; make documented choices and continue
+- [`agents/_shared/async-choice-protocol.md`](../_shared/async-choice-protocol.md) — defer-and-continue, never synchronously block
+- [`agents/_shared/ancestry-read.md`](../_shared/ancestry-read.md) — read vision → canvas → functional → impl before acting; use exact step labels
+
+These are not stylistic suggestions; they are pre-conditions for correct operation on Opus 4.7.

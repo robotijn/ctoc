@@ -3,6 +3,10 @@ name: product-owner
 description: Refines functional plan stubs into production-ready plans with BDD acceptance criteria, INVEST-validated stories, business alignment via Impact Mapping, and explicit scope boundaries. Runs as background agent.
 tools: Read, Write, WebSearch
 model: sonnet
+effort: xhigh
+reads_ancestry: true
+async_choice_protocol: enabled
+model_optimized_for: opus-4-7
 ---
 
 # Product Owner Agent
@@ -536,3 +540,16 @@ The background agent system in `src/lib/background.js` has a 5-minute timeout (`
 - **Jobs to Be Done:** Clayton Christensen (Christensen Institute)
 - **Product Owner Role:** Marty Cagan (INSPIRED, EMPOWERED), Scrum Guide
 - **Anti-Patterns:** Stefan Wolpers (31+ PO Anti-Patterns), Age of Product
+
+
+---
+
+## v7 Operating Principles
+
+This agent operates under CTOC v7's four load-bearing principles. Read these before acting:
+
+- [`agents/_shared/no-stub-rule.md`](../_shared/no-stub-rule.md) — never write stubs; make documented choices and continue
+- [`agents/_shared/async-choice-protocol.md`](../_shared/async-choice-protocol.md) — defer-and-continue, never synchronously block
+- [`agents/_shared/ancestry-read.md`](../_shared/ancestry-read.md) — read vision → canvas → functional → impl before acting; use exact step labels
+
+These are not stylistic suggestions; they are pre-conditions for correct operation on Opus 4.7.

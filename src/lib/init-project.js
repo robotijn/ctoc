@@ -124,9 +124,11 @@ const FRAMEWORK_TEST_OVERRIDES = {
  */
 const PLAN_DIRS = [
   'plans/vision',
+  'plans/canvas',
   'plans/functional',
   'plans/implementation',
   'plans/todo',
+  'plans/in-progress',
   'plans/review',
   'plans/done'
 ];
@@ -138,10 +140,15 @@ const CTOC_DIRS = [
   '.ctoc',
   '.ctoc/state',
   '.ctoc/logs',
+  '.ctoc/inbox/questions',
+  '.ctoc/inbox/decisions',
+  '.ctoc/audit/agent-modernization',
+  '.ctoc/audit/skill-conversion',
   '.ctoc/learnings/pending',
   '.ctoc/learnings/approved',
   '.ctoc/learnings/applied',
-  '.ctoc/learnings/rejected'
+  '.ctoc/learnings/rejected',
+  'agents/_shared'
 ];
 
 /**
