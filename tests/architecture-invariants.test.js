@@ -208,7 +208,7 @@ describe('v8 Architecture — Tier 3 (Scouts)', () => {
     assert.ok(files.length >= 5, `expected ≥ 5 scouts, got ${files.length}`);
   });
 
-  it('every scout declares tier: 3, model: haiku, parallel_safe: true, reports_to: cto-chief', () => {
+  it('every scout declares tier: 3, inherits_session_model: true, parallel_safe: true, reports_to: cto-chief', () => {
     const scoutsDir = path.join(projectRoot, 'agents', 'scouts');
     const files = fs.readdirSync(scoutsDir)
       .filter(f => f.endsWith('.md'))
@@ -218,11 +218,28 @@ describe('v8 Architecture — Tier 3 (Scouts)', () => {
       const { fm } = readFM(scout);
       const rel = path.relative(projectRoot, scout);
       assert.match(fm, /^tier:\s*3$/m, `${rel} missing tier: 3`);
-      assert.match(fm, /^model:\s*haiku$/m, `${rel} scouts must use model: haiku`);
-      assert.match(fm, /model_optimized_for:\s*haiku-4-5/, `${rel} must be optimized for haiku-4-5`);
+      assert.match(fm, /inherits_session_model:\s*true/, `${rel} scouts MUST inherit session model (mid-session switch crashes CLI)`);
       assert.match(fm, /parallel_safe:\s*true/, `${rel} scouts must be parallel_safe`);
       assert.match(fm, /reports_to:\s*cto-chief/, `${rel} scouts must report to cto-chief`);
       assert.match(fm, /dispatch_protocol:\s*v1/, `${rel} must declare dispatch_protocol: v1`);
+    }
+  });
+
+  it('NO scout declares a specific model: field (mid-session model switch crashes CLI)', () => {
+    const scoutsDir = path.join(projectRoot, 'agents', 'scouts');
+    const files = fs.readdirSync(scoutsDir)
+      .filter(f => f.endsWith('.md'))
+      .map(f => path.join(scoutsDir, f));
+
+    for (const scout of files) {
+      const { fm } = readFM(scout);
+      const rel = path.relative(projectRoot, scout);
+      // Forbid a top-level `model:` field in frontmatter — must inherit session
+      assert.doesNotMatch(
+        fm,
+        /^model:\s*(haiku|sonnet|opus)/m,
+        `${rel} MUST NOT declare model: <name> — scouts inherit session model to avoid Opus↔Haiku context-window crash`
+      );
     }
   });
 

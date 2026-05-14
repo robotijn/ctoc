@@ -110,7 +110,7 @@ tiers:
 
   tier_3:
     name: scout
-    description: "Haiku-tier pre-screens. Fast pass/flag decision; short-circuits Tier 2 if pass."
+    description: "Lightweight pre-screens. Fast pass/flag decision; short-circuits Tier 2 if pass. Runs on the user's session model (NO mid-session model switch — that crashes the CLI)."
     member_count: 5
     members:
       - scouts/syntax-scout
@@ -118,8 +118,9 @@ tiers:
       - scouts/dep-scout
       - scouts/lint-scout
       - scouts/test-scout
-    model_default: haiku
-    model_optimized_for: haiku-4-5
+    model_default: inherit            # CRITICAL: inherit session model — never switch
+    inherits_session_model: true
+    model_optimized_for: any
     effort_budget:
       max_tokens: 4000
       max_tool_calls: 5
@@ -128,22 +129,36 @@ tiers:
       - tier: 3
       - effort: low
       - effort_budget: { max_tokens: 4000, max_tool_calls: 5, max_subagents: 0 }
-      - model: haiku
-      - model_optimized_for: haiku-4-5
+      - inherits_session_model: true
+      - model_optimized_for: any
       - parallel_safe: true
       - dispatch_protocol: v1
+    forbidden_frontmatter:
+      - model: haiku                  # would force a mid-session switch and crash the CLI
+      - model: sonnet
+      - model: opus
     expected_output:
       decision: pass | flag | error
       pillar: <pillar-name>
       reason: <one-line>
       next_specialist: <category/name>     # if flag
     cost_rationale: |
-      A Haiku scout is ~10-50x cheaper than the Opus/Sonnet specialist it short-circuits.
-      On a clean codebase, 4 of 5 scouts return 'pass', eliminating 4 deep dispatches per gate.
+      Scouts use the SAME model as the rest of the session — they do not switch to Haiku.
+      Cost savings come from doing less work: 4K-token / 5-tool-call dispatch vs 50K / 30
+      for a specialist. A scout is ~10-15x cheaper than the specialist it short-circuits,
+      on the same model. On a clean codebase, 4 of 5 scouts return 'pass', eliminating
+      4 deep dispatches per gate.
+    why_no_model_switch: |
+      Mid-session model switching (e.g., Opus → Haiku) blows up the context window
+      because Haiku's max context is smaller than Opus's. The handover fails and the
+      CLI crashes. CTOC v8.1+ explicitly forbids declaring `model: haiku` (or any
+      specific model) on dispatched subagents. All subagents inherit the user's
+      chosen session model.
     invariants:
       - "Must return pass | flag | error decision"
       - "Cannot dispatch other agents"
       - "Latency target ≤ 200ms"
+      - "MUST NOT declare a specific model in frontmatter (inherits session model)"
     enforced_by: tests/architecture-invariants.test.js
 
 # ===============================================================================

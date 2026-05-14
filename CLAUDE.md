@@ -13,8 +13,10 @@ CTOC v8 organizes the agent layer into four tiers. See [`docs/AGENT_ARCHITECTURE
 Tier 0  CTO CHIEF (1)              top-level, sole dispatcher
 Tier 1  Sub-orchestrators (16)     incl. NEW synthesizer (cross-pillar)
 Tier 2  Specialist skills (72)     leaf agents → skills, structured outputs
-Tier 3  Scouts (5, Haiku)          fast pre-screens, short-circuit deep dispatches
+Tier 3  Scouts (5)                 fast pre-screens, short-circuit deep dispatches
 ```
+
+**Critical rule (v8.1+): no mid-session model switching.** Every dispatched subagent inherits the user's session model. Agents MUST NOT declare a specific `model:` field in frontmatter — switching Opus→Haiku mid-session crashes the CLI (context window mismatch). Scouts are cheap because they do **less work** (4K tokens / 5 tool calls), not because they use a smaller model. Exception: slash commands (e.g., `/ctoc:menu`) run as separate invocations and MAY declare their own model.
 
 **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`) is the only agent with top-level authority. All other agents and skills are dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer, synthesizer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
 

@@ -137,7 +137,7 @@ output_contract: ./CONTRACT.yaml  # optional schema ref
 
 ### Tier 3 — Scouts
 
-**Members** (5, all Haiku, all NEW in v8):
+**Members** (5, NEW in v8):
 - `scouts/syntax-scout` — AST/parser-level syntax check (~50ms)
 - `scouts/secret-scout` — pattern-only secret scan (no entropy/verification, ~100ms)
 - `scouts/dep-scout` — known-bad CVE list lookup (~50ms)
@@ -145,6 +145,8 @@ output_contract: ./CONTRACT.yaml  # optional schema ref
 - `scouts/test-scout` — does the test suite currently pass?
 
 **Authority**: pre-screen. Returns one of: `pass`, `flag`, `error`. If `pass`, CTO Chief may skip the corresponding deep specialist. If `flag`, CTO Chief dispatches the Tier 2 specialist.
+
+**Model**: scouts run on the **user's session model** — same model as everything else. They MUST NOT declare a specific `model:` in frontmatter. Mid-session model switching crashes the CLI (Opus → Haiku reduces the context window below what's already loaded). See "No mid-session model switching" below.
 
 **Frontmatter contract**:
 ```yaml
@@ -154,13 +156,29 @@ effort_budget:
   max_tokens: 4000
   max_tool_calls: 5
   max_subagents: 0
-model: haiku
-model_optimized_for: haiku-4-5
+inherits_session_model: true
+model_optimized_for: any
 parallel_safe: true
 dispatch_protocol: v1
 ```
 
-**Cost rationale**: a Haiku scout is ~10-50x cheaper than the Opus/Sonnet specialist it short-circuits. On a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 deep dispatches per gate.
+**Cost rationale**: scouts are ~10-15x cheaper than specialists **on the same model** — they do less work (4K tokens / 5 tool calls vs 50K / 30). Savings come from reduced scope, not from model tier. On a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 deep dispatches per gate.
+
+### No mid-session model switching (v8.1+)
+
+The Claude CLI crashes when a subagent declares a different model from the active session — most notably Opus → Haiku, because Haiku's smaller context window cannot hold what was already loaded under Opus's 1M-context session. The handover fails and the process exits.
+
+CTOC v8.1+ rule: **every dispatched subagent inherits the user's session model**. Agents MUST NOT declare a specific `model:` field in their frontmatter. The `model_optimized_for` field is for documentation only (which model the agent was tuned against).
+
+The cost savings of CTOC v8 come from **work tiering**, not model tiering:
+- Tier 3 (scouts): 4K tokens / 5 tool calls — fast, focused, cheap on any model
+- Tier 2 (specialists): 50K / 30 — deep but still bounded
+- Tier 1 (sub-orchestrators): 200K / 100 — coordinate, but recommend not execute
+- Tier 0 (CTO Chief): unbounded — sole dispatcher
+
+This still produces the architectural benefit (scout-then-specialist is 10-15x cheaper than always-specialist) without the model-switch crash.
+
+The one exception is **slash commands**, which Claude Code launches as separate invocations (not mid-session switches). A slash command MAY declare `model:` in its frontmatter (e.g., `/ctoc:menu` declares `model: claude-haiku-4-5` for fast menu rendering). This is safe because the slash command runs in its own Claude process, not as a subagent of the current session.
 
 ## Dispatch flow
 

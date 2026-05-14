@@ -84,7 +84,7 @@ Before dispatching deep specialists, run the **scouts** tier in parallel:
 
 ```
 1. Receive review request (e.g., "review this commit").
-2. PARALLEL — dispatch Tier 3 scouts (Haiku, ~50-200ms each):
+2. PARALLEL — dispatch Tier 3 scouts (~50-200ms each, USER'S SESSION MODEL):
      - scouts/syntax-scout    (pillar: readability)
      - scouts/secret-scout    (pillar: security)
      - scouts/dep-scout       (pillar: security)
@@ -104,7 +104,9 @@ Before dispatching deep specialists, run the **scouts** tier in parallel:
 7. Audit log written to .ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml.
 ```
 
-**Cost rationale**: on a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 of 5 deep Opus/Sonnet dispatches. Average review cost drops 60-80%.
+**Cost rationale**: scouts use the SAME model as the session — no mid-session model switching (that would crash the CLI). Savings come from doing less work (4K-token / 5-tool-call dispatch vs 50K / 30 for a specialist). A scout is ~10-15x cheaper than its specialist short-circuit on the same model. On a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 of 5 deep dispatches per gate.
+
+**Critical**: NEVER dispatch a subagent that declares a specific `model:` field. The Opus→Haiku context window mismatch crashes Claude CLI. All subagents inherit the session model. See `docs/AGENT_ARCHITECTURE.md` § "No mid-session model switching".
 
 **Synthesis rationale**: most agent systems produce 47 siloed findings; the developer fixes 5 and ignores the rest. The synthesizer produces 3 changes that fix 31 findings — same fixes, better presentation.
 

@@ -4,12 +4,12 @@
 name: secret-scout
 description: Fast pattern-only secret scan. No entropy, no verification — just known-format regexes. Short-circuits the deep secrets-detector when no candidates found.
 tools: Bash, Grep
-model: haiku
 tier: 3
 role: pre-screen
 reports_to: cto-chief
 effort: low
-model_optimized_for: haiku-4-5
+model_optimized_for: any
+inherits_session_model: true
 parallel_safe: true
 dispatch_protocol: v1
 effort_budget:
@@ -22,7 +22,7 @@ short_circuits: security/secrets-detector
 
 ## Role
 
-You are a **scout** — Haiku-tier pre-screen. Pattern-matching only. No entropy analysis (too slow for Haiku tier). No live-key verification (network calls forbidden at this tier).
+You are a **scout** — lightweight pre-screen. Pattern-matching only. No entropy analysis (too slow for Haiku tier). No live-key verification (network calls forbidden at this tier).
 
 Return `pass | flag | error`. CTO Chief uses your decision to decide whether to dispatch the deep [[secrets-detector]] specialist.
 
@@ -73,9 +73,11 @@ else:
 
 ## Why pattern-only
 
-The full [[secrets-detector]] runs pattern + entropy + verification — slow and expensive. A Haiku scout running only pattern-match is:
-- ~100x cheaper than the full scan
-- ~50ms vs 5-30s
+The full [[secrets-detector]] runs pattern + entropy + verification — slow and expensive. The scout runs only pattern-match. It uses the **user's session model** (no mid-session switch — that crashes the CLI).
+
+Savings come from doing **less work**, not from a smaller model:
+- ~10-15x cheaper than the full scan (4K tokens vs 50K)
+- ~100ms vs 5-30s (5 tool calls vs 30)
 - Catches the 95% case (most leaked secrets match known formats)
 
 The 5% (custom keys with no fixed prefix) is handled by Tier 2 entropy analysis when scout flags.

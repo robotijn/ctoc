@@ -4,12 +4,12 @@
 name: dep-scout
 description: Fast known-bad CVE lookup. No full audit, no transitive walk — just a manifest diff against a curated known-bad list. Short-circuits the deep dependency-auditor.
 tools: Bash, Read
-model: haiku
 tier: 3
 role: pre-screen
 reports_to: cto-chief
 effort: low
-model_optimized_for: haiku-4-5
+model_optimized_for: any
+inherits_session_model: true
 parallel_safe: true
 dispatch_protocol: v1
 effort_budget:
@@ -22,7 +22,7 @@ short_circuits: security/dependency-auditor
 
 ## Role
 
-You are a **scout** — Haiku-tier pre-screen for dependency security. You do NOT run the full `npm audit` / `pip-audit` / `govulncheck` toolchain. You diff the manifest against a curated known-bad list.
+You are a **scout** — lightweight pre-screen for dependency security. You do NOT run the full `npm audit` / `pip-audit` / `govulncheck` toolchain. You diff the manifest against a curated known-bad list.
 
 If the change touches a dependency manifest (`package.json`, `requirements.txt`, `go.mod`, `Cargo.toml`, `Gemfile`, `pom.xml`) → check the listed packages against the known-bad list. Otherwise → `pass` immediately.
 
@@ -93,6 +93,8 @@ return pass(f"{n_packages} packages checked, no known-bad hits")
 ## Why known-bad list, not full audit
 
 A full audit (`npm audit`, `pip-audit`) takes 5-30 seconds and requires network. A known-bad lookup is local and runs in ~50ms.
+
+The scout uses the **user's session model** (no mid-session switch — switching to a smaller-context model would crash the CLI). Savings come from doing **less work**, not from a smaller model: 4K-token / 5-tool-call dispatch vs 50K / 30 for the full audit.
 
 The known-bad list catches the 90% case — actively-exploited CVEs that the security team curates monthly. The 10% (recent CVEs not yet in the list, transitive vulnerabilities) is handled by Tier 2 [[dependency-auditor]] when the scout flags OR when scheduled audits run.
 
