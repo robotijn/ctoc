@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────────────────────────────────
+#  CTOC Autonomous Build Budget (v6.9.4+)
+#  Session-level limits actually enforced by the dispatcher.
+#  See src/lib/budget.js and src/commands/budget.md.
+# ─────────────────────────────────────────────────────────────────────
+#
+#  Why this exists:
+#    The CTOC pipeline can drain overnight. Without limits, a runaway
+#    agent loop can rack up massive compute. This file caps the session.
+#
+#  What's enforced:
+#    - max_session_hours       — wall-clock since the session began
+#    - max_dispatches          — total Tier 1/2/3 dispatches issued by CTO Chief
+#    - max_iron_loop_iterations — total Iron Loop step transitions (Steps 1–16)
+#
+#  Checkpoints are advisory notifications BEFORE a hard limit; halt_action
+#  controls what happens when a hard limit is hit:
+#    - ask_user   — throw a BUDGET_EXCEEDED error; caller surfaces to user
+#    - log_only   — warn on stderr, keep going (use during prototyping)
+#    - continue   — same as log_only but quieter
+#
+#  Set enabled: false to disable enforcement entirely.
+
+budget:
+  max_session_hours: 4
+  max_dispatches: 100
+  max_iron_loop_iterations: 50
+
+  checkpoint_at:
+    dispatches: [50, 75]
+    iron_loop_iterations: [25, 40]
+
+  halt_action: ask_user        # ask_user | log_only | continue
+  enabled: true

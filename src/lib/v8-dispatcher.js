@@ -33,6 +33,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const budget = require('./budget');
 
 const ROOT = process.cwd();
 const AUDIT_BASE = path.join(ROOT, '.ctoc', 'audit', 'dispatches');
@@ -151,13 +152,34 @@ function normalizeRequest(opts) {
 /**
  * Begin a dispatch: validate request, write audit entry with request block,
  * return a token used to record the response and finalize.
+ *
+ * Session-level budget check (v6.9.4+):
+ *   Before normalizing, ask budget.enforce() whether we are within the
+ *   session-level limits (.ctoc/config/budget.yaml). On 'ask_user', throws
+ *   BUDGET_EXCEEDED. On 'log_only' or 'continue', warns and proceeds.
+ *   After successful normalization, records the dispatch counter.
  */
 function beginDispatch(opts) {
+  // 1. Session-level pre-flight budget check
+  try {
+    budget.enforce();
+  } catch (err) {
+    if (err && err.code === 'BUDGET_EXCEEDED' && opts && opts.skipBudgetCheck) {
+      // Explicit override (rare — set when user already approved a continuation)
+    } else {
+      throw err;
+    }
+  }
+
   const req = normalizeRequest(opts);
   ensureDir(AUDIT_BASE);
   const auditPath = auditPathForId(req.id);
   const entry = { request: req };
   fs.writeFileSync(auditPath, yamlStringify(entry));
+
+  // 2. Record dispatch in session usage
+  try { budget.recordDispatch(req.target_agent); } catch {}
+
   return { id: req.id, auditPath, request: req };
 }
 

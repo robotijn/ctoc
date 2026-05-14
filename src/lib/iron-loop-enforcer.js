@@ -475,6 +475,18 @@ function checkSaasTemplates(root) {
   return null;
 }
 
+function checkBudgetConfigExists(root) {
+  const p = path.join(root, '.ctoc', 'config', 'budget.yaml');
+  if (!fs.existsSync(p)) {
+    return {
+      severity: 'warn',
+      message: 'Session-level build budget config missing at .ctoc/config/budget.yaml — autonomous runs are unbounded',
+      details: { suggested: 'Copy from .ctoc/config/budget.yaml in the CTOC repo, or run /ctoc:budget to generate.' },
+    };
+  }
+  return null;
+}
+
 function checkProductLoop(root) {
   const required = [
     'docs/PRODUCT_LOOP.md',
@@ -532,6 +544,7 @@ const CHECKS = [
   { id: 'version-sync',                scope: 'system',       mode: 'fast', fn: checkVersionSync },
   { id: 'persona-system',              scope: 'persona',      mode: 'fast', fn: checkPersonaSystemExists },
   { id: 'saas-templates',              scope: 'saas',         mode: 'fast', fn: checkSaasTemplates },
+  { id: 'budget-config-exists',        scope: 'budget',       mode: 'fast', fn: checkBudgetConfigExists },
   { id: 'product-loop',                scope: 'product',      mode: 'fast', fn: checkProductLoop },
   { id: 'plan-counts',                 scope: 'info',         mode: 'fast', fn: checkPlanCounts },
 ];
