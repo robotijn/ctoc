@@ -5,6 +5,18 @@
 
 ---
 
+## Agent Hierarchy (v7)
+
+There is exactly one top-level coordinator agent: **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`). Every other agent and skill is dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
+
+```
+USER (human CTO) → CTO CHIEF (sole top-level) → { sub-orchestrators, specialists, skills }
+```
+
+CTO Chief is the **final approver** before any plan crosses Gate 3 (review → done). It verifies the 14 quality dimensions and the human-approval marker exist before approving. When sub-orchestrator outputs conflict, CTO Chief decides — not majority vote, not first-to-finish.
+
+---
+
 ## Pipeline Philosophy (v7)
 
 CTOC v7 introduces four load-bearing principles. Every agent, every plan, every change should honor them.

@@ -42,9 +42,12 @@ agents:
     path: agents/coordinator/cto-chief.md
     model: opus
     category: coordinator
-    description: Central coordinator, learning aggregator, decision maker
-    steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    role: top-level-coordinator     # v7 — sole top-level agent for CTOC
+    top_level: true                 # registry-level marker (matches frontmatter)
+    description: Top-level coordinator for ALL CTOC work. Sole orchestrator that dispatches every other agent and skill.
+    steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     always_available: true
+    dispatches_everything: true     # routes ALL specialist dispatches
 
   # -----------------------------------------------------------------------------
   #  PLANNING AGENTS (Steps 1-6)
