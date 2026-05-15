@@ -172,7 +172,12 @@ dispatch_rules:
 
   who_can_dispatch:
     tier_0: [tier_1, tier_2, tier_3]      # CTO Chief dispatches everything
-    tier_1: []                            # Sub-orchestrators recommend, do not execute
+    tier_1: [tier_2, tier_3]              # Sub-orchestrators may dispatch their own children
+                                          # (specialists, scouts) to do work — needed for parallel
+                                          # critic fan-out in the refinement loop and Iron Loop
+                                          # step orchestration. They MUST NOT dispatch peer Tier 1
+                                          # agents (no cross-orchestrator cascading). Reconciles
+                                          # the load-bearing `max_subagents: 10` budget on Tier 1.
     tier_2: []                            # Specialists never dispatch
     tier_3: []                            # Scouts never dispatch
 

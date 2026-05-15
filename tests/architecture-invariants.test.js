@@ -163,6 +163,51 @@ describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
       assert.doesNotMatch(c, /role:\s*top-level-coordinator/, `${rel} must NOT be top-level`);
     }
   });
+
+  // v6.9.11: pin the dispatch-graph semantics for Tier 1.
+  // Tier 1 may dispatch its own children (Tier 2 specialists + Tier 3 scouts)
+  // — this is needed for parallel critic fan-out in the refinement loop and
+  // for Iron Loop step orchestration. It MUST NOT dispatch peer Tier 1 agents
+  // (no cross-orchestrator cascading). The matching budget is max_subagents: 10.
+  describe('Dispatch graph — Tier 1 children + peer-dispatch ban', () => {
+    const tierDefsPath = path.join(projectRoot, '.ctoc', 'architecture', 'tier-definitions.yaml');
+    const content = fs.existsSync(tierDefsPath) ? fs.readFileSync(tierDefsPath, 'utf8') : '';
+
+    function extractWhoCanDispatchLine(tier) {
+      // Match e.g. `    tier_1: [tier_2, tier_3]` under the who_can_dispatch block.
+      const block = content.split('who_can_dispatch:')[1] || '';
+      const rx = new RegExp(`^\\s*${tier}:\\s*(\\[[^\\]]*\\]|\\[\\])`, 'm');
+      const m = block.match(rx);
+      return m ? m[1] : null;
+    }
+
+    it('tier_1 in who_can_dispatch lists tier_2 and tier_3', () => {
+      const t1 = extractWhoCanDispatchLine('tier_1');
+      assert.ok(t1, 'tier_1 entry missing from who_can_dispatch');
+      assert.match(t1, /tier_2/, 'tier_1 must dispatch tier_2 (refinement loop fan-out)');
+      assert.match(t1, /tier_3/, 'tier_1 must dispatch tier_3 (scout pre-screens)');
+    });
+
+    it('tier_1 does NOT dispatch peer tier_1 (no cross-orchestrator cascading)', () => {
+      const t1 = extractWhoCanDispatchLine('tier_1');
+      assert.ok(t1, 'tier_1 entry missing from who_can_dispatch');
+      assert.doesNotMatch(t1, /tier_1/, 'tier_1 must NOT dispatch peer tier_1 (cascading ban)');
+    });
+
+    it('tier_1 budget remains max_subagents: 10 (reflects parallel fan-out need)', () => {
+      const block = content.split('tier_1:')[1] || '';
+      const budget = block.split('tier_2:')[0];
+      assert.match(budget, /max_subagents:\s*10/,
+        'tier_1.effort_budget.max_subagents must remain 10 to support refinement-loop critic fan-out');
+    });
+
+    it('tier_2 and tier_3 still cannot dispatch (leaf agents)', () => {
+      const t2 = extractWhoCanDispatchLine('tier_2');
+      const t3 = extractWhoCanDispatchLine('tier_3');
+      assert.equal(t2, '[]', 'tier_2 must not dispatch');
+      assert.equal(t3, '[]', 'tier_3 must not dispatch');
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────
