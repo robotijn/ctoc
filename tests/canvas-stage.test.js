@@ -115,26 +115,31 @@ describe('createCanvas (actions.js)', () => {
     assert.match(result.path, /plans[\\/]canvas[\\/]my-test-vision\.md$/, 'file is at plans/canvas/<slug>.md');
   });
 
-  it('lean canvas file content has correct frontmatter and 9 blocks', () => {
+  it('lean canvas file content has correct frontmatter and 9 canvas blocks + 2 planning blocks (v6.9.12)', () => {
     const { createCanvas } = require('../src/lib/actions');
     const result = createCanvas('vision-x', 'lean', tempDir);
     const content = fs.readFileSync(result.path, 'utf8');
     assert.match(content, /type:\s*canvas/, 'has type: canvas');
     assert.match(content, /canvas_type:\s*lean/, 'has canvas_type: lean');
     assert.match(content, /parent_vision:\s*["']?vision-x["']?/, 'has parent_vision: vision-x');
-    // 9 H2 blocks
+    // 9 canonical Lean Canvas blocks (Maurya) + 2 planning sections (v6.9.12):
+    //   6-Month Pre-Mortem (Gary Klein) and Cash Flow Planning (5 scenarios).
     const h2Count = (content.match(/^##\s+/gm) || []).length;
-    assert.equal(h2Count, 9, 'lean canvas has exactly 9 H2 blocks');
+    assert.equal(h2Count, 11, 'lean canvas has 9 canvas blocks + 6-Month Pre-Mortem + Cash Flow Planning');
+    assert.match(content, /^## 6-Month Pre-Mortem$/m);
+    assert.match(content, /^## Cash Flow Planning — 5 Scenarios/m);
   });
 
-  it('BMC file content has correct frontmatter and 9 blocks', () => {
+  it('BMC file content has correct frontmatter and 9 canvas blocks + 2 planning blocks (v6.9.12)', () => {
     const { createCanvas } = require('../src/lib/actions');
     const result = createCanvas('vision-y', 'bmc', tempDir);
     const content = fs.readFileSync(result.path, 'utf8');
     assert.match(content, /canvas_type:\s*bmc/, 'has canvas_type: bmc');
     assert.match(content, /parent_vision:\s*["']?vision-y["']?/, 'has parent_vision: vision-y');
     const h2Count = (content.match(/^##\s+/gm) || []).length;
-    assert.equal(h2Count, 9, 'BMC has exactly 9 H2 blocks');
+    assert.equal(h2Count, 11, 'BMC has 9 canvas blocks + 6-Month Pre-Mortem + Cash Flow Planning');
+    assert.match(content, /^## 6-Month Pre-Mortem$/m);
+    assert.match(content, /^## Cash Flow Planning — 5 Scenarios/m);
   });
 
   it('rejects invalid canvas type', () => {

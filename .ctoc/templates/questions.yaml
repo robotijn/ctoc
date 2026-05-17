@@ -136,6 +136,36 @@ questions:
     deferred_for: [pm, programmer, designer, hobbyist, agency]
     defer_to_persona: founder
 
+  # ── 6-month pre-mortem (Gary Klein, HBR 2007) ──
+  # Prospective hindsight: imagining failure has ALREADY occurred boosts the
+  # ability to identify failure causes by ~30%. Re-run every 3-4 months.
+  - id: canvas/premortem-6month
+    phase: canvas
+    category: risk
+    default_phrasing: "It is 6 months from now and this initiative has FAILED. List 5+ distinct failure modes (likelihood × impact) and a mitigation each you can start THIS WEEK."
+    persona_phrasing:
+      founder: "Look back from 6 months in the future — the company failed. Why? What 5+ things broke? For each, what would you start this week to prevent it?"
+      pm: "Imagine the launch failed in 6 months. List the top 5+ failure modes (rank by likelihood × impact) and a mitigation you can start now for each."
+    personas: [founder, technical-founder, pm]
+    deferred_for: [programmer, architect, designer, hobbyist, agency]
+    defer_to_persona: founder
+    required: true   # canvas is incomplete without a pre-mortem
+
+  # ── Cash flow planning, 5 scenarios (worst/conservative/base/optimistic/exceptional) ──
+  # 18-month horizon; the three middle scenarios must each be plausible.
+  # Industry signal (Abacum 2025): 3+ scenarios → 1.8× funding outcomes.
+  - id: canvas/cashflow-5scenarios
+    phase: canvas
+    category: unit_economics
+    default_phrasing: "Build a 5-scenario 18-month cash flow: Worst, Conservative, Base, Optimistic, Exceptional. Fill base assumptions (starting cash, fixed/variable burn, MRR, pricing, churn, CAC), MRR per scenario at M3/M6/M9/M12/M15/M18, runway per scenario, and decision triggers."
+    persona_phrasing:
+      founder: "Build a 5-scenario cash flow plan over 18 months — Worst, Conservative, Base, Optimistic, Exceptional. The three middle scenarios must each be plausible (defensible, not aspirational). Stress-test revenue growth, CAC, churn, and time-to-first-payment per scenario. Document runway per scenario and the decision triggers."
+      technical-founder: "Same as founder phrasing — 5-scenario 18-month cash flow with runway + decision triggers."
+    personas: [founder, technical-founder]
+    deferred_for: [pm, programmer, architect, designer, hobbyist, agency]
+    defer_to_persona: founder
+    required: true   # SaaS canvas is incomplete without runway scenarios
+
 # ============================================================
 # PHASE: FUNCTIONAL (BDD scenarios, acceptance — PM/founder/designer)
 # ============================================================
