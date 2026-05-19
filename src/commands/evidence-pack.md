@@ -1,6 +1,5 @@
 ---
 description: Bundle dispatch logs, gate approvals, test runs, threat models, model-risk attestations, and provenance events into a tamper-evident evidence pack for continuous controls monitoring.
-model: claude-haiku-4-5
 ---
 
 # /ctoc:evidence-pack — Continuous Controls Monitoring evidence bundle

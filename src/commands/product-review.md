@@ -1,6 +1,5 @@
 ---
 description: Run a weekly product review — KPI snapshot, funnel drop-offs, hypotheses for improvement.
-model: claude-haiku-4-5
 ---
 
 Run a Product Loop weekly review. The review:

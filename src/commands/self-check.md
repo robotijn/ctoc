@@ -1,6 +1,5 @@
 ---
 description: Run the CTOC Iron Loop self-check — verify architectural + Iron Loop + plan + system invariants.
-model: claude-haiku-4-5
 ---
 
 Run the CTOC self-check and present the report:

@@ -1,6 +1,5 @@
 ---
 description: Start a new vision — ignition flow that routes through vision → canvas → implementation in order, dispatching the planning chain step by step.
-model: claude-haiku-4-5
 ---
 
 # /ctoc:start — Ignition flow for a new vision or feature

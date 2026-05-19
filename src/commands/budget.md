@@ -1,6 +1,5 @@
 ---
 description: Show the autonomous build budget for the current session — wall-clock, dispatches, Iron Loop iterations vs configured limits.
-model: claude-haiku-4-5
 ---
 
 Show the CTOC autonomous build budget status:

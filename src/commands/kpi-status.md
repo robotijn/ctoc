@@ -1,6 +1,5 @@
 ---
 description: Show current KPI status — values vs targets, week-over-week delta, color-coded.
-model: claude-haiku-4-5
 ---
 
 Display the current state of all Product Loop KPIs for this project.

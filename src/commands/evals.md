@@ -1,6 +1,5 @@
 ---
 description: Run the Continuous Tool of Continuous Tools (CTOC) Evaluation-Driven Development (EDD) harness against the current branch and report the verdict.
-model: claude-haiku-4-5
 ---
 
 # /ctoc:evals
