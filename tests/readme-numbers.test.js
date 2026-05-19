@@ -1,5 +1,5 @@
 /**
- * Guard tests for README numeric claims (v6.9.13).
+ * Guard tests for README numeric claims (v6.9.24).
  *
  * Pins every count the README states so the file can't silently drift when
  * agents/skills/commands/tests are added or removed. If a count changes,
@@ -114,16 +114,18 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countAgentCategories(), 22);
   });
 
-  it('skills/: 86 SKILL.md specialist bodies', () => {
-    // v6.9.23 added 5 gap-fill skills (sbom-cra, threat-modeler, ai-governance,
-    // llm-security-tester, incident-responder). Allow growth: pin at >= 86.
+  it('skills/: 91 SKILL.md specialist bodies (v6.9.24+)', () => {
+    // v6.9.15–v6.9.23: improved 86 existing SKILL.md via websearch→update→critique→update.
+    // v6.9.24: added 5 gap-fill skills (sbom-cra-checker, threat-modeler,
+    // ai-governance-checker, llm-security-tester, incident-responder) via v3 critique.
+    // Pin at >= 91 to allow future growth.
     const count = countSpecialistSkillBodies();
-    assert.ok(count >= 86, `expected >= 86 SKILL.md, got ${count}`);
+    assert.ok(count >= 91, `expected >= 91 SKILL.md, got ${count}`);
   });
 
-  it('skills/: total .md count is in v6.9.14+ range (after 38-file orphan cleanup)', () => {
+  it('skills/: total .md count is in v6.9.24+ range (408 → 413 after 5 gap-fill adds)', () => {
     const total = countAllSkillMd();
-    assert.ok(total >= 400 && total <= 430, `expected 400-430 .md files in skills/, got ${total}`);
+    assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
   it('src/lib/: 88 JS modules at top level', () => {
@@ -192,8 +194,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /agents-110-orange/);
   });
 
-  it('badge: skills-408', () => {
-    assert.match(README, /skills-408-blue/);
+  it('badge: skills-413 (v6.9.24+)', () => {
+    assert.match(README, /skills-413-blue/);
   });
 
   it('lead paragraph: 110 agents across 22 categories', () => {
@@ -208,8 +210,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /\*\*110 agents\*\* across 22 categories/);
   });
 
-  it('Key Features: 408 skill files', () => {
-    assert.match(README, /\*\*408 skill files\*\*/);
+  it('Key Features: 413 skill files (v6.9.24+)', () => {
+    assert.match(README, /\*\*413 skill files\*\*/);
   });
 
   it('Key Features: 14 languages auto-detected', () => {
@@ -262,20 +264,20 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /110 agent definitions across 22 categories/);
   });
 
-  it('Project structure: 408 skill files', () => {
-    assert.match(README, /408 skill files/);
+  it('Project structure: 413 skill files (v6.9.24+)', () => {
+    assert.match(README, /413 skill files/);
   });
 
   it('Agents intro: 110 agents across 22 categories', () => {
     assert.match(README, /\*\*110 agents across 22 categories\*\*/);
   });
 
-  it('Skills intro: 408 skill files', () => {
-    assert.match(README, /\*\*408 skill files\*\*/);
+  it('Skills intro: 413 skill files (v6.9.24+)', () => {
+    assert.match(README, /\*\*413 skill files\*\*/);
   });
 
-  it('Skills section names two kinds — Tier-2 (86) and Knowledge (322)', () => {
-    assert.match(README, /Tier-2 specialist skill bodies \(86\)/);
+  it('Skills section names two kinds — Tier-2 (91) and Knowledge (322)', () => {
+    assert.match(README, /Tier-2 specialist skill bodies \(91\)/);
     assert.match(README, /Knowledge skills \(322\)/);
   });
 });

@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.24-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.25-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
-  <img alt="Skills" src="https://img.shields.io/badge/skills-408-blue">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-413-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **110 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), **persona-aware** so pricing questions never reach a programmer and code-style questions never reach a founder, with **4 mandatory human gates**. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **110 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), **persona-aware** so pricing questions never reach a programmer and code-style questions never reach a founder, with **4 mandatory human gates**. The **413-file skill library** (91 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -56,6 +56,66 @@ CTO Chief starts with ideation — agents explore your idea with you, ask clarif
 
 > [!TIP]
 > For autonomous agent workflows, use `claude --dangerously-skip-permissions` to avoid repeated tool-call prompts. This is safe on feature branches where git can revert changes. Add `--continue` to resume a previous session.
+
+---
+
+## Auto-Availability After Install
+
+When you install CTOC from the marketplace, Claude Code auto-discovers every artifact the plugin ships — slash commands, agents, hooks, and skills — per the [Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference). No manual wiring is needed. The 91 Tier-2 specialist `SKILL.md` files then become available through **three routing paths**:
+
+1. **Slash-command pipeline** — `/ctoc` (or any sub-command) dispatches CTO Chief, which dispatches a Tier-1 sub-orchestrator, which dispatches the relevant Tier-2 specialist by name. This is the path used during the Iron Loop and refinement loop.
+2. **`when_to_load` trigger phrases** — each `SKILL.md` declares a list of natural-language triggers in YAML frontmatter (e.g. `"SBOM"`, `"prompt injection"`, `"NIST 800-61"`). When your conversation matches a trigger, Claude Code auto-loads the skill into context with no slash command needed.
+3. **Direct `Skill` tool invocation** — Claude can invoke any skill explicitly via the built-in `Skill` tool (e.g. `Skill(skill_name="ctoc:llm-security-tester")`) based on conversational context.
+
+The auto-discovery is documented behavior of Claude Code's plugin system. Installing CTOC therefore makes the entire 413-file library reachable without configuration — you only pay for what loads, but everything is wired and ready.
+
+---
+
+## Skill Library Quality Bar
+
+Every one of the 91 Tier-2 specialist `SKILL.md` bodies was brought to 2026 best-practices quality through an explicit improvement loop (completed across v6.9.15–v6.9.24). The library is not a grab-bag of LLM-generated stubs — it is engineered.
+
+**The 4-step loop (existing skills, 86 of them):**
+
+```
+websearch (May 2026 sources) → update v1 → critique (subagent) → update v2
+```
+
+**The 6-step loop (5 new gap-fill skills in v6.9.24, per the new-skill memory rule):**
+
+```
+websearch → v1 → critique → v2 → extra critique → v3
+```
+
+The extra critique round catches things like missing SLSA/in-toto provenance flows, omitted CVEs (EchoLeak, MCP tool poisoning), and stale tool-lifecycle dates. The loop is documented in commits `ec94f62..e0ee079`.
+
+**Every SKILL.md ships:**
+
+- YAML frontmatter (`tier: 2`, `dispatch_protocol: v1`, `max_subagents: 0`, declared `when_to_load` triggers, `effort_level`, `model_optimized_for`)
+- A `## 2026 Best Practices` section with **sourced citations** — no invented stats. Quantitative claims trace back to a primary source (OWASP, NIST, ENISA, EC, CNCF, SLSA.dev, Sigstore, ISO, MITRE ATT&CK/ATLAS, vendor docs, peer-reviewed papers).
+- **7-language coverage** (C#, Java, Python, C, C++, JS/TS, SQL) of BAD/SAFE pattern pairs in foundational categories; per-skill rationale where a language is skipped (e.g. SQL skipped in E2E test skills).
+- A `## Tool Integration (2026)` matrix with current CLI commands.
+- A `## Severity` block that reconciles internal triage tiers with the always-`critical` letter contract on the wire (no soft tiers escape the refinement loop).
+- A `## Letter schema (refinement-loop output contract)` so findings are machine-readable.
+- A `## Refinement Loop — critic mode` footer cross-linking `agents/_shared/warnings-are-critical.md`.
+
+**Warnings are bugs.** Every critic emits findings at `severity: critical` on the wire. Compiler/linter/type-checker warnings, deprecation notices, and CVEs at any severity block phase advancement. Time is a vector: today's warning is tomorrow's customer-visible crash.
+
+---
+
+## Gap-Fill Skills (v6.9.24)
+
+Five new Tier-2 specialists were created from a v6.9.22 gap analysis — each fills a hole that 2026 regulation, the OWASP/MITRE landscape, or industry incidents made urgent. All went through the 6-step v3 critique loop above.
+
+| Skill | Why it was added |
+|---|---|
+| [`compliance/sbom-cra-checker`](skills/compliance/sbom-cra-checker/SKILL.md) | EU Cyber Resilience Act reporting goes live **11 Sep 2026** — SBOMs become a legal artifact with 10-year retention and penalties up to €15M / 2.5% turnover. Validates NTIA Minimum Elements, CycloneDX 1.6 / SPDX 2.3+/3.0, signed-SBOM verification, in-toto attestations, SLSA, GUAC, VEX, and ENISA Single Reporting Platform onboarding. |
+| [`security/threat-modeler`](skills/security/threat-modeler/SKILL.md) | Design-time threat decomposition before any code is written — STRIDE, PASTA, LINDDUN(-GO and the new GenAI extension, arXiv 2603.06051), attack trees, automotive TARA, and tagging against **MITRE ATT&CK** + **ATLAS v5.4.0** (16 tactics / 84 techniques / 56 sub-techniques). Tool integration: Threagile, OWASP Threat Dragon, pytm, IriusRisk, Microsoft TMT. |
+| [`compliance/ai-governance-checker`](skills/compliance/ai-governance-checker/SKILL.md) | **EU AI Act high-risk provisions become enforceable 2 Aug 2026.** Classifies systems against EU AI Act risk tiers (Art. 5 prohibited, Annex III high-risk, GPAI Chap V Arts. 51–55 with the 10²⁵ FLOPs systemic-risk threshold), **NIST AI 600-1** (12 GenAI risks), and **ISO/IEC 42001** (38 Annex A controls). Includes Art. 73 incident-reporting windows (2/10/15-day) to the AI Office. |
+| [`ai-quality/llm-security-tester`](skills/ai-quality/llm-security-tester/SKILL.md) | LLM red-team analyst covering **OWASP LLM Top 10 v2 (2025)** all 10 categories, mapped to **MITRE ATLAS v5.4.0** tactics. Covers CVE-2025-53773 (GitHub Copilot RCE, CVSS 9.6), CVE-2025-32711 (EchoLeak), the Cursor IDE chain, persistent memory poisoning, MCP tool poisoning, multi-turn crescendo/TAP jailbreaks, and markdown exfiltration. Tools: Garak, PyRIT, PromptFoo. |
+| [`security/incident-responder`](skills/security/incident-responder/SKILL.md) | **NIST SP 800-61r3 (Apr 2025)** rewritten around CSF 2.0 functions plus the regulatory clocks that now bind: ENISA SRP 24h/72h/14d/1m from 11 Sep 2026, SEC Item 1.05 8-K (4 business days), NIS2, CIRCIA (pending), GDPR 72h. Runbooks per incident class, blameless-postmortem template, on-call wiring for PagerDuty / Opsgenie (EOS Apr 2027) / incident.io / FireHydrant. |
+
+These five take the specialist count from 86 → **91**, and the total skill-library file count from 408 → **413**.
 
 ---
 
@@ -107,10 +167,16 @@ The generated `CLAUDE.md` becomes the single source of truth for how Claude work
 | 6-month pre-mortem + 5-scenario cash flow | Built into canvas | None | None | None |
 | TDD enforcement | Automatic (Step 8) | Manual | Manual | None |
 | Security scanning | Built-in (Steps 9, 13) | Manual | Manual | None |
+| Threat modeling (STRIDE / PASTA / LINDDUN / ATT&CK / ATLAS) | Built-in (`threat-modeler`) | None | None | None |
+| LLM security testing (OWASP LLM Top 10 v2) | Built-in (`llm-security-tester`) | None | None | None |
+| EU CRA + SBOM compliance (11 Sep 2026) | Built-in (`sbom-cra-checker`) | None | None | None |
+| AI governance (EU AI Act / NIST AI RMF / ISO 42001) | Built-in (`ai-governance-checker`) | None | None | None |
+| Incident response (NIST 800-61r3, SEC 8-K, NIS2) | Built-in (`incident-responder`) | None | None | None |
 | Iterative refinement to zero findings | Refinement loop (incl. warnings) | None | None | None |
 | Human approval gates | 4 mandatory checkpoints | None | None | None |
 | Quality verification | Automated gate (Step 14) | Manual | Manual | None |
 | Specialist agents | 110 across 22 categories | None | DIY | None |
+| Specialist skill library (engineered, sourced) | 91 SKILL.md bodies through critique loop | None | None | None |
 | Production-readiness checklist | SaaS templates with 20+ block-severity checks | None | None | None |
 | Post-launch product loop | KPI library + experiment designer | None | None | None |
 
@@ -200,8 +266,8 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 
 - **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
-- **110 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, and more
-- **408 skill files** — 86 Tier-2 specialist skill bodies + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
+- **110 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, and more
+- **413 skill files** — 91 Tier-2 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — Iterative critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) before Gate 3 — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
 - **Persona-aware question routing** — 8 roles (founder, technical-founder, pm, programmer, architect, designer, hobbyist, agency); pricing questions never reach a programmer, code-style questions never reach a founder — see [PERSONA_ROUTING.md](docs/PERSONA_ROUTING.md)
@@ -209,6 +275,7 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 - **6-month pre-mortem + 5-scenario cash flow** — Every canvas (lean or BMC) now carries a Gary-Klein 6-month pre-mortem (≥5 failure modes scored by likelihood × impact with this-week mitigations) and a Worst / Conservative / Base / Optimistic / Exceptional 18-month cash flow with runway-per-scenario and commit-now decision triggers
 - **Warnings are bugs** — Compiler/linter/type-checker warnings, deprecation notices, and CVEs at any severity are classified critical-tier by the refinement loop. Production-readiness gate requires zero warnings across all toolchains and zero open CVEs before Gate 3
 - **Production-ready SaaS templates** — Opinionated starters (B2C subscription, B2B sales-led) with 20+ Gate-3 production-readiness block-severity checks: domain, HTTPS, auth, billing, RLS, observability, legal, zero warnings, zero CVEs
+- **2026-grade compliance & AI safety** — Five gap-fill skills (`sbom-cra-checker`, `threat-modeler`, `ai-governance-checker`, `llm-security-tester`, `incident-responder`) cover EU CRA, EU AI Act, NIST 800-61r3, OWASP LLM Top 10 v2, MITRE ATLAS v5.4.0, and STRIDE/PASTA/LINDDUN
 - **Product Loop** — Post-launch DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → LEARN cycle keyed to 17 canonical KPIs across acquisition/activation/retention/revenue/churn — see [PRODUCT_LOOP.md](docs/PRODUCT_LOOP.md)
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
 - **Deployment pipeline** — Configurable dev → staging → production promotion triggered automatically after Gate 3 approval
@@ -434,36 +501,40 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 
 Agents spawn conditionally based on your project, current Iron Loop step, and active persona. Scouts (Tier 3) pre-screen and short-circuit deep dispatches when clean.
 
+> Note: not every Tier-2 specialist `SKILL.md` has a paired top-level agent file. Several skills (e.g. `sbom-cra-checker`, `threat-modeler`, `ai-governance-checker`, `llm-security-tester`, `incident-responder`) are dispatched directly through the skill auto-load mechanism — see "Auto-Availability After Install" above.
+
 ---
 
 ## Skills
 
-**408 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
+**413 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
 
 There are two kinds of skills:
 
-1. **Tier-2 specialist skill bodies (86)** — the actual expert agents that run during Iron Loop and refinement-loop steps. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
+1. **Tier-2 specialist skill bodies (91)** — the actual expert agents that run during Iron Loop and refinement-loop steps. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
 2. **Knowledge skills (322)** — language refs, framework refs, and per-language quality configs. Read by agents (or loaded by code paths like `src/lib/quality-config.js` and `src/lib/skill-loader.js`) to inform their work.
 
-> **v6.9.14**: 38 unreachable reference files were deleted from `skills/` after a usage audit confirmed they had zero code or agent references. The remaining 408 files are all either actively dispatched (the 86 SKILL.md bodies) or loaded by an explicit code path (the 322 reference files).
+> **v6.9.14**: 38 unreachable reference files were deleted from `skills/` after a usage audit confirmed they had zero code or agent references.
+> **v6.9.15–v6.9.23**: all 86 existing `SKILL.md` bodies were rewritten through a websearch → update → critique → update loop (May 2026 sources, 7-language coverage, sourced citations only).
+> **v6.9.24**: 5 new gap-fill specialists were added via a 6-step v3 critique loop (see "Gap-Fill Skills" above). Net library: 408 → **413** files; 86 → **91** specialists.
 
 <details>
-<summary><strong>Specialist skill bodies (Tier 2) — 86 across 19 categories</strong></summary>
+<summary><strong>Specialist skill bodies (Tier 2) — 91 across 17 categories</strong></summary>
 
 | Category | # | Skill bodies |
 |----------|---|--------------|
 | [SaaS](skills/saas/) | 12 | clerk-auth · stripe-subscriptions · workos-sso · multi-tenancy-row-level · resend-email · posthog-analytics · sentry-errors · supabase-data · inngest-jobs · rate-limiting · vercel-deploy · legal-scaffold |
 | [Quality](skills/quality/) | 11 | architecture-checker · code-reviewer · complexity-analyzer · complexity-reducer · code-smell-detector · consistency-checker · dead-code-detector · duplicate-code-detector · performance-validator · quality-gate · type-checker |
 | [Specialized](skills/specialized/) | 11 | accessibility-checker · api-contract-validator · configuration-validator · database-reviewer · error-handler-checker · health-check-validator · memory-safety-checker · observability-checker · performance-profiler · resilience-checker · translation-checker |
-| [Security](skills/security/) | 7 | security-scanner · sast-scanner · secrets-detector · input-validation-checker · concurrency-checker · dependency-checker · dependency-auditor |
+| [Security](skills/security/) | 9 | security-scanner · sast-scanner · secrets-detector · input-validation-checker · concurrency-checker · dependency-checker · dependency-auditor · **threat-modeler** *(new, v6.9.24)* · **incident-responder** *(new, v6.9.24)* |
 | [Testing](skills/testing/) | 14 (5+4+5) | playwright-qa · coverage-enforcer · coverage-mapper · smart-test-runner · quality-gate-runner · 4 writers · 5 runners |
 | [Infrastructure](skills/infrastructure/) | 5 | terraform-validator · kubernetes-checker · docker-security-checker · ci-pipeline-checker · ci-runner-setup |
-| [Compliance](skills/compliance/) | 3 | audit-log-checker · gdpr-compliance-checker · license-scanner |
+| [Compliance](skills/compliance/) | 5 | audit-log-checker · gdpr-compliance-checker · license-scanner · **sbom-cra-checker** *(new, v6.9.24)* · **ai-governance-checker** *(new, v6.9.24)* |
+| [AI Quality](skills/ai-quality/) | 3 | ai-code-quality-reviewer · hallucination-detector · **llm-security-tester** *(new, v6.9.24)* |
 | [Data/ML](skills/data-ml/) | 3 | data-quality-checker · feature-store-validator · ml-model-validator |
 | [Frontend](skills/frontend/) | 3 | bundle-analyzer · component-tester · visual-regression-checker |
 | [Mobile](skills/mobile/) | 3 | android-checker · ios-checker · react-native-bridge-checker |
 | [Versioning](skills/versioning/) | 3 | backwards-compatibility-checker · feature-flag-auditor · technical-debt-tracker |
-| [AI Quality](skills/ai-quality/) | 2 | ai-code-quality-reviewer · hallucination-detector |
 | [Architecture](skills/architecture/) | 2 | pattern-detector · dependency-analyzer |
 | [DevEx](skills/devex/) | 2 | api-deprecation-checker · onboarding-validator |
 | [Documentation](skills/documentation/) | 2 | changelog-generator · documentation-updater |
@@ -473,7 +544,7 @@ There are two kinds of skills:
 </details>
 
 <details>
-<summary><strong>Knowledge skills — 360 reference files</strong></summary>
+<summary><strong>Knowledge skills — 322 reference files</strong></summary>
 
 | Type | # | Examples |
 |------|---|----------|
@@ -484,7 +555,6 @@ There are two kinds of skills:
 | [DevOps frameworks](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Helm](skills/frameworks/devops/helm.md), [Ansible](skills/frameworks/devops/ansible.md), [Pulumi](skills/frameworks/devops/pulumi.md) |
 | [Mobile frameworks](skills/frameworks/mobile/) | 15 | [React Native](skills/frameworks/mobile/react-native.md), [Flutter](skills/frameworks/mobile/flutter.md), [SwiftUI](skills/frameworks/mobile/swiftui.md), [Jetpack Compose](skills/frameworks/mobile/jetpack-compose.md) |
 | [Quality configs](skills/quality-configs/) | 61 | Per-language lint, format, and test configs |
-| [Architecture patterns](skills/architecture/) | 2 SKILL.md | `pattern-detector` · `dependency-analyzer` (the standalone pattern refs were removed in v6.9.14) |
 
 </details>
 
@@ -713,7 +783,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.24'
+getVersion()       // → '6.9.25'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -738,9 +808,11 @@ ctoc/
 ├── agents/          110 agent definitions across 22 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
 │                     async-choice-protocol, no-stub-rule, warnings-are-critical)
-├── skills/          408 skill files: 86 Tier-2 specialist bodies (SKILL.md)
+├── skills/          413 skill files: 91 Tier-2 specialist bodies (SKILL.md)
 │                    + 322 reference files (50 langs, 211 frameworks,
-│                    61 quality configs). 38 unreachable refs removed in v6.9.14.
+│                    61 quality configs). 38 unreachable refs removed in v6.9.14;
+│                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
+│                    5 gap-fill SKILL.md added in v6.9.24 via the v3 critique loop.
 ├── tests/           68 test files (1521+ passing assertions)
 ├── .ctoc/           Config, templates, operations, audit, loop journals
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
@@ -767,6 +839,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.24** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.25** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

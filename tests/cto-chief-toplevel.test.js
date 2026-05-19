@@ -45,7 +45,7 @@ describe('CTO Chief — sole top-level coordinator', () => {
   it('cto-chief body contains the Top-Level Authority section', () => {
     const { body } = readFM(CTO_CHIEF_PATH);
     assert.match(body, /##\s+Top-Level Authority/, 'body must include "## Top-Level Authority" section');
-    assert.match(body, /Sole Coordinator/i, 'body must claim sole-coordinator role');
+    assert.match(body, /Sole( Technical)? Coordinator/i, 'body must claim sole-coordinator role (technical scope optional)');
   });
 
   it('operations registry marks cto-chief with role: top-level-coordinator', () => {
