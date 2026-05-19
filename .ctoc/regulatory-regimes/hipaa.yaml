@@ -1,0 +1,31 @@
+name: hipaa
+display_name: "Health Insurance Portability and Accountability Act"
+description: "Applicable to United States covered entities and business associates handling protected health information."
+authoritative_sources:
+  - title: "HIPAA Business Associate Agreement 2026 — HIPAA Journal"
+    url: "https://www.hipaajournal.com/hipaa-business-associate-agreement/"
+  - title: "HIPAA breach notification requirements 2026 — HIPAA Journal"
+    url: "https://www.hipaajournal.com/hipaa-breach-notification-requirements/"
+effective_date: "1996-08-21"
+applies_to: "United States health-care providers, health plans, health-care clearinghouses, and any business associate processing protected health information"
+required_controls:
+  - audit_hash_chain
+  - retention_schedule
+  - legal_hold
+  - dsar_handler
+  - four_eyes_gate3
+  - irac_compliance_output
+  - clm_obligations_tracker
+  - spoliation_safe_delete
+  - business_continuity_plan
+retention:
+  dispatches: 2190
+  security_incident: 2190
+  gdpr_dsar_log: 2190
+  contract_artifacts: 2190
+notes: |
+  Six-year retention for documentation. Breach notification within sixty days of
+  discovery. Business Associate Agreement is mandatory before any sub-processor
+  receives protected health information. Privacy Rule and Security Rule require
+  technical safeguards (access control, audit controls, integrity controls,
+  transmission security).

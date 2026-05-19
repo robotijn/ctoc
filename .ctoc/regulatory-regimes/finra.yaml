@@ -1,0 +1,26 @@
+name: finra
+display_name: "Financial Industry Regulatory Authority broker-dealer rules"
+description: "Applicable to United States broker-dealers. Rule 4511 records retention; Rule 4530 reportable events."
+authoritative_sources:
+  - title: "FINRA Rule 4511 audit trail alternative — Smarsh"
+    url: "https://www.smarsh.com/regulations/finra-rule-4511/"
+effective_date: "2011-12-05"
+applies_to: "United States broker-dealers registered with the Securities and Exchange Commission and FINRA"
+required_controls:
+  - audit_hash_chain
+  - retention_schedule
+  - four_eyes_gate3
+  - spoliation_safe_delete
+  - legal_hold
+  - precision_time_protocol
+  - data_lineage
+retention:
+  dispatches: 2555
+  security_incident: 2555
+  contract_artifacts: 2190
+  tax_relevant: 2555
+notes: |
+  Rule 4511 mandates six-year retention for general books and records, three years
+  in an accessible location. The 2023 audit-trail alternative permits non-write-once
+  storage only if every change is tracked and the original reconstructible — this
+  drives the cryptographic hash-chain requirement.

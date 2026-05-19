@@ -1,0 +1,107 @@
+# ===============================================================================
+#  Corrective and Preventive Action (CAPA) entry — template
+#
+#  Copy this file to .ctoc/capa/<id>.yaml when filing a new CAPA. The <id>
+#  is a Crockford Base32 ULID; generate one with src/lib/refinement-loop.js
+#  generateUlid() or any standard ULID generator.
+#
+#  Schema reference: .ctoc/capa/_README.md
+#  Standard reference: ISO 9001:2015 Clause 10.2 Nonconformity and corrective action
+#  Sources:
+#    - isoTracker — https://www.isotracker.com/blog/capa-requirements-in-iso-90012015/
+#    - ComplianceQuest — https://www.compliancequest.com/bloglet/capa-iso-9001/
+# ===============================================================================
+
+# Unique CAPA identifier (Crockford Base32 ULID).
+id: 01JXXXXXXXXXXXXXXXXXXXXXXX
+
+# Slug of the plan where the defect originated, or the plan whose work-product
+# the defect was found in. Matches the filename under plans/<stage>/<slug>.md.
+plan_id: ""
+
+# One-sentence description of the defect, written in customer-impact terms.
+# Bad:   "Bug in webhook handler."
+# Good:  "Webhook handler accepted unsigned requests, allowing a remote
+#        attacker to trigger a refund without authentication."
+defect_description: ""
+
+# When the defect was discovered (ISO 8601, UTC).
+discovered_at: ""
+
+# How the defect surfaced. Allowed values:
+#   gate-3-review       — caught at the Gate 3 human review
+#   incident            — post-shipping production incident
+#   refinement-loop     — refinement loop detected implementer-wall or oscillation
+#   andon               — Andon hook fired on a quality metric breach
+#   step-11             — self-reviewer at Step 11 flagged a regression-class defect
+#   customer-report     — external report (bug bounty, customer email, support ticket)
+discovered_via: ""
+
+# Severity. Drives whether a full 8D report is required.
+#   low      — cosmetic, single-user impact, documented workaround
+#   medium   — feature-level functional defect, no data loss
+#   high     — data corruption, security exposure, multi-user impact (8D required)
+#   critical — outage, regulatory breach, money lost (8D + incident escalation)
+severity: medium
+
+# Five-Why chain. Each entry is one "why" answered. The fifth answer should
+# point at a *system* (process, gate, agent prompt, template, test policy),
+# not a person. If the fifth answer is "human error" or "we forgot", the
+# chain is too shallow — keep asking why.
+#
+# Reference: American Society for Quality —
+#   https://asq.org/quality-resources/root-cause-analysis
+five_why:
+  - "Why did the defect ship?"
+  - "Why?"
+  - "Why?"
+  - "Why?"
+  - "Why?"
+
+# The system-level root cause identified by the five-why chain. One sentence.
+root_cause: ""
+
+# The fix to the symptom. What you did to the specific defect, the specific
+# plan, the specific test, the specific code path. Bounded scope.
+corrective_action: ""
+
+# The fix to the system that produced the defect. Examples:
+#   - Updated agent prompt at agents/<path>/<name>.md
+#   - Added new critic to refinement-loop CORE_CRITICS
+#   - Added new entry to plan template
+#   - Tightened threshold in .ctoc/config/andon-thresholds.yaml
+#   - New regression test pinned in tests/<file>.test.js
+# Preventive action MUST be at the system level. If it's "be more careful
+# next time", reject and re-write.
+preventive_action: ""
+
+# When the effectiveness check is scheduled (ISO 8601 date). Typically the
+# next weekly review, or 30 days from preventive_action application.
+verification_date: ""
+
+# How effectiveness will be measured. Must be objective and reproducible.
+# Bad:   "Check that the bug doesn't come back."
+# Good:  "Run 30 plans through Iron Loop with the new critic enabled.
+#        Confirm zero malformed-input defects in escape-rate control chart.
+#        Confirm Cpk of refinement loop convergence remains above 1.0."
+effectiveness_check: ""
+
+# null until verification_date arrives; true when effectiveness_check passes;
+# false on relapse (re-opens the CAPA with a fresh five-why).
+effective: null
+
+# Timestamp (ISO 8601) when the CAPA was formally closed. Only set when
+# effective: true. A CAPA cannot be closed with effective: null or false.
+closed_at: null
+
+# Optional: link to the full Ford Global 8D Problem Solving report for
+# severity high or critical. Path relative to project root.
+eight_d_report: null
+
+# Optional: list of additional CAPA IDs related to this one (e.g. when the
+# same root cause was found by multiple discovery channels in the same week).
+related_capa_ids: []
+
+# Optional: list of plan slugs the preventive action modified. Helps future
+# investigators trace which plans were affected by which CAPA.
+modified_plans: []

@@ -1,0 +1,29 @@
+name: sox-itgc
+display_name: "Sarbanes-Oxley Section 404 Information Technology General Controls"
+description: "Applicable to United States public companies. Internal control over financial reporting. Audited annually by an independent public accounting firm."
+authoritative_sources:
+  - title: "Best practices for automating SOX ITGC evidence in 2026 — Screenata"
+    url: "https://screenata.com/resources/blog/best-practices-for-automating-sox-itgc-evidence-in-2026-from-access-controls-to-continuous-monitoring"
+effective_date: "2002-07-30"
+applies_to: "United States Securities and Exchange Commission registered public companies and their auditors"
+required_controls:
+  - audit_hash_chain
+  - retention_schedule
+  - four_eyes_gate3
+  - continuous_controls_monitoring
+  - spec_code_reconciliation
+  - capa_register
+  - lessons_learned_closure
+  - process_capability_index
+  - third_party_risk_register
+retention:
+  dispatches: 2555
+  security_incident: 2555
+  contract_artifacts: 2555
+  tax_relevant: 2555
+notes: |
+  Sarbanes-Oxley Section 404 requires that internal controls over financial reporting
+  be tested annually. Information Technology General Controls cover change management,
+  logical access, computer operations, and program development. Continuous controls
+  monitoring is the 2026 expectation — nightly evidence collection rather than annual
+  audit-time scrambling.

@@ -1,0 +1,27 @@
+name: nydfs-500
+display_name: "23 New York Codes Rules and Regulations Part 500 (NYDFS Cybersecurity)"
+description: "Applicable to entities regulated by the New York State Department of Financial Services. Amended November 2023; new requirements in force since December 1 2023."
+authoritative_sources:
+  - title: "NYDFS new requirements in force — Epstein Becker Green"
+    url: "https://www.workforcebulletin.com/nydfs-cybersecurity-crackdown-new-requirements-now-in-force-are-you-compliant"
+  - title: "NYDFS second amendment finalized — WilmerHale"
+    url: "https://www.wilmerhale.com/en/insights/blogs/wilmerhale-privacy-and-cybersecurity-law/20231128-nydfs-finalizes-amendments-to-cybersecurity-regulations"
+effective_date: "2023-12-01"
+applies_to: "Covered entities regulated by the New York State Department of Financial Services (banks, insurance companies, money transmitters, mortgage originators)"
+required_controls:
+  - audit_hash_chain
+  - retention_schedule
+  - nydfs_dora_incident_class
+  - third_party_risk_register
+  - business_continuity_plan
+  - continuous_controls_monitoring
+  - four_eyes_gate3
+  - capa_register
+retention:
+  dispatches: 1825
+  security_incident: 2555
+notes: |
+  Section 500.17 requires notification of a cybersecurity event within 72 hours.
+  Class A companies subject to enhanced controls (penetration testing, automated
+  blocking, password vaulting, expanded encryption). Chief Information Security
+  Officer certification.

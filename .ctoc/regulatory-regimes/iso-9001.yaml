@@ -1,0 +1,30 @@
+name: iso-9001
+display_name: "ISO 9001:2015 Quality Management Systems"
+description: "International standard for quality management systems. Applicable to any organization seeking systematic quality improvement."
+authoritative_sources:
+  - title: "ISO 9001:2015 CAPA requirements — isoTracker"
+    url: "https://www.isotracker.com/blog/capa-requirements-in-iso-90012015/"
+  - title: "CAPA Requirements in ISO 9001 — ComplianceQuest"
+    url: "https://www.compliancequest.com/bloglet/capa-iso-9001/"
+effective_date: "2015-09-15"
+applies_to: "Any organization, of any size, in any sector, seeking to demonstrate ability to consistently provide products or services that meet customer and regulatory requirements"
+required_controls:
+  - capa_register
+  - eight_d_incident_template
+  - lessons_learned_closure
+  - process_fmea_loop
+  - defects_per_million
+  - process_capability_index
+  - control_chart_variance
+  - kaizen_backlog
+  - audit_hash_chain
+  - retention_schedule
+  - continuous_controls_monitoring
+retention:
+  dispatches: 1095
+  contract_artifacts: 1825
+notes: |
+  Plan-Do-Check-Act cycle is the central improvement loop. Corrective and Preventive
+  Action register required for every nonconformity, with root cause, action,
+  verification, and effectiveness check. Management review at defined intervals.
+  Internal audits.

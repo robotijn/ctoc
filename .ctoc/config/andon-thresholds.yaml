@@ -1,0 +1,89 @@
+# ===============================================================================
+#  CTOC Andon Cord Halt — quality-metric thresholds
+#
+#  When any metric below crosses its alert threshold, the Andon hook at
+#  src/hooks/andon-halt.js halts further dispatches until a Corrective and
+#  Preventive Action register entry closes the loop, or until a manual
+#  override is written to .ctoc/andon-override.yaml.
+#
+#  The hook is ONLY active when the `andon_cord_halt` control is enabled
+#  by an active regulatory regime profile (e.g. iso-9001, iso-26262-asil-d,
+#  dora). With no profile, this file is dormant.
+#
+#  Each threshold cites the source standard it is drawn from. We do not
+#  invent numbers.
+# ===============================================================================
+
+schema_version: 1
+last_reviewed: 2026-05-19
+
+# -------------------------------------------------------------------------------
+# Escape rate — fraction of completed plans that produced a Corrective and
+# Preventive Action register entry within 30 days of Gate 3 approval.
+#
+# 5 percent (0.05) is the alert threshold. Above this rate, the pipeline is
+# producing too many escaping defects and must halt until the root cause is
+# understood.
+#
+# Source: Capers Jones, *Software Quality in 2020: Overview of Best and Worst
+# Practices*. Jones reports that average commercial software ships with a
+# defect-escape rate of 6 to 7 percent; "best-in-class" practice is below 5
+# percent. 5 percent is therefore the upper bound for a stable Iron Loop.
+# Reference: https://www.namcook.com/articles/Software%20Quality%20in%202020.pdf
+# -------------------------------------------------------------------------------
+escape_rate:
+  alert_above: 0.05
+  window_days: 30
+  source: "Capers Jones, Software Quality in 2020"
+  source_url: "https://www.namcook.com/articles/Software%20Quality%20in%202020.pdf"
+
+# -------------------------------------------------------------------------------
+# Process Capability Index (Cpk) — applied to refinement-loop convergence.
+#
+# Cpk below 1.0 means the process is operating outside its 3-sigma capability
+# limits. This is the textbook minimum for a "capable" process in Six Sigma
+# manufacturing. Below 1.0, the loop is producing too much variance to be
+# considered controlled.
+#
+# Source: Montgomery, *Introduction to Statistical Quality Control*, 7th ed.,
+# Wiley, 2013. Standard threshold for "minimally capable" is Cpk >= 1.0;
+# "capable" is Cpk >= 1.33; "highly capable" is Cpk >= 1.67.
+# Reference: https://en.wikipedia.org/wiki/Process_capability_index
+# -------------------------------------------------------------------------------
+cpk:
+  alert_below: 1.0
+  window_days: 30
+  source: "Montgomery, Introduction to Statistical Quality Control, 7th ed."
+  source_url: "https://en.wikipedia.org/wiki/Process_capability_index"
+
+# -------------------------------------------------------------------------------
+# Flaky tests — count of tests that failed on retry (not on first attempt)
+# in the trailing window.
+#
+# A flaky test is a quality leak: it pollutes every downstream gate's signal.
+# CTOC follows the warnings-are-bugs principle from CLAUDE.md — a flaky test
+# is a deferred crash. Zero is the only acceptable count.
+#
+# Source: Google Testing Blog, *Flaky Tests at Google and How We Mitigate Them*,
+# 2016. Google's published policy is to quarantine flaky tests immediately and
+# treat them as bugs, not noise.
+# Reference: https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
+# -------------------------------------------------------------------------------
+flaky_tests:
+  alert_above: 0
+  window_days: 30
+  source: "Google Testing Blog, Flaky Tests at Google, 2016"
+  source_url: "https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html"
+
+# ===============================================================================
+# How to tune
+#
+# These defaults are calibrated for a stable mature pipeline. New projects
+# may see false halts in the first thirty plans (before the control chart has
+# enough data). In that case, raise the thresholds temporarily and tighten
+# them as data accumulates — but record each loosening in the CAPA register
+# with effectiveness verification scheduled for thirty days later.
+#
+# Never raise a threshold to silence a halt without a CAPA. That is the
+# manufacturing equivalent of taping over the Andon lamp.
+# ===============================================================================

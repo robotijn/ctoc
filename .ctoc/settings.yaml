@@ -10,6 +10,44 @@
 timezone: "UTC"
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Regulatory Regime Profiles (v6.9.27 — multi-industry critique response)
+#  Opt-in profiles that activate industry-grade controls (audit hash-chaining,
+#  four-eyes principle, traceability matrix, retention schedule, hardware-in-
+#  the-loop testing, incident-reporting clocks, etc.).
+#
+#  Default profile is `none` — CTOC stays lean. List one or more regimes
+#  per project; controls are union-merged (any regime requiring a control
+#  activates it).
+#
+#  Per-profile catalog at: .ctoc/regulatory-regimes/<profile>.yaml
+#  Library: src/lib/regulatory-regime.js
+#  Documentation: docs/REGULATORY_REGIMES.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+regulatory_regime:
+  # Profiles to activate. Default empty list = `none` (lean, opt-in nothing).
+  # Available profiles (stack multiple if the project is multi-regime):
+  #   - pci-dss-v4        (payment card industry, mandatory March 2025)
+  #   - sox-itgc          (Sarbanes-Oxley Section 404 IT general controls)
+  #   - dora              (EU Digital Operational Resilience Act, applicable Jan 2025)
+  #   - finra             (Financial Industry Regulatory Authority broker-dealer)
+  #   - hipaa             (Health Insurance Portability and Accountability Act)
+  #   - iso-26262-asil-d  (automotive functional safety highest level)
+  #   - do-178c-level-a   (airborne software, catastrophic-failure-condition level)
+  #   - iec-62304-class-c (medical device software, life-threatening class)
+  #   - iec-61508-sil-3   (industrial functional safety integrity level 3)
+  #   - eu-cra            (EU Cyber Resilience Act, effective 11 Sep 2026)
+  #   - eu-ai-act-high-risk (EU Artificial Intelligence Act Annex III high-risk systems)
+  #   - iso-9001          (Quality management systems)
+  #   - nydfs-500         (New York Department of Financial Services 23 NYCRR 500)
+  #   - mifid-ii          (Markets in Financial Instruments Directive II, sub-100-microsecond clock)
+  active_profiles: []
+
+  # Override individual controls regardless of profile (use sparingly).
+  # Setting a control to `true` activates it; `false` forces it off.
+  overrides: {}
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Operations Configuration (NEW in v1.4.0)
 # ─────────────────────────────────────────────────────────────────────────────
 

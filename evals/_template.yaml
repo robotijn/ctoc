@@ -1,0 +1,96 @@
+# Evaluation case template — Continuous Tool of Continuous Tools (CTOC) v8.5+
+#
+# Copy this file to:
+#   evals/skills/<category>/<skill-name>/cases/<case-name>.yaml
+#
+# Fill in every required field. Run locally:
+#   node src/scripts/run-evals.js --only=<category>/<skill-name>
+#
+# A maintainer reviews every pull request. See evals/_README.md for the bar.
+
+# ──────────────────────────────────────────────────────────────────────────
+# REQUIRED FIELDS
+# ──────────────────────────────────────────────────────────────────────────
+
+# Stable identifier. Lowercase, hyphen-separated. Must be unique across all
+# cases. Do not change after merge — other systems may reference the id.
+id: <skill>-<aspect-tested>
+
+# Skill path under skills/. The harness uses this to locate the skill file.
+skill: <category>/<skill-name>
+
+# One-sentence purpose. What regression does this case catch?
+description: |
+  One sentence explaining what this case proves.
+
+# The prompt or invocation that triggers the skill. Multi-line scalar.
+# Write a realistic user request, not a contrived edge case.
+input: |
+  A realistic prompt that a user would send to the skill. Multiple lines
+  are fine. The prompt should be self-contained — the comparator agent
+  receives only what is in this field.
+
+# The reference answer or pattern. Multi-line scalar. The comparator agent
+# uses this to judge the candidate output. Cite the source.
+expected_output: |
+  The expected answer. Cite the source document that justifies this
+  reference (Open Web Application Security Project (OWASP), MITRE
+  Adversarial Threat Landscape for Artificial-Intelligence Systems (MITRE
+  ATLAS), Stripe documentation, Request For Comments (RFC), peer-reviewed
+  paper).
+
+# Finding identifiers that MUST appear in the output. Empty list is allowed,
+# but prefer explicit identifiers over freeform expected_output when the
+# skill emits structured finding identifiers.
+expected_findings:
+  - <finding_identifier_1>
+  - <finding_identifier_2>
+
+# Strings that MUST NOT appear in the output. The harness fails the case if
+# any of these substrings is found.
+must_not_contain:
+  - "anti-pattern phrase 1"
+  - "anti-pattern phrase 2"
+
+# Severity if the case fails. Controls the weight in the aggregate pass rate.
+#   critical (weight 4.0) — data loss, security breach, compliance violation
+#   high     (weight 2.0) — silent quality regression a user is unlikely to notice
+#   medium   (weight 1.0) — detectable on inspection but inconvenient
+#   low      (weight 0.5) — cosmetic or stylistic
+severity_when_fails: medium
+
+# Your GitHub handle (preferred) or "(maintainer)". Recorded for attribution.
+contributed_by: "@your-handle"
+
+# CTOC version that added this case. Read from the VERSION file at the time
+# of contribution. Used to track when coverage was introduced.
+added_in_version: "8.5.0"
+
+# Date the case was last replayed and confirmed correct. International
+# Organization for Standardization 8601 (ISO 8601), for example "2026-05-19".
+# Bump this date when you edit the case.
+last_verified: "2026-05-19"
+
+# ──────────────────────────────────────────────────────────────────────────
+# OPTIONAL FIELDS
+# ──────────────────────────────────────────────────────────────────────────
+
+# Free-form tags for filtering. Useful for running a subset of cases via
+# --tag=<name>.
+tags:
+  - example-tag
+  - another-tag
+
+# Citations supporting the expected output. Plain-text references.
+references:
+  - "Source one — title and date"
+  - "Source two — title and date"
+
+# Per-case timeout in milliseconds. Default 60000. Increase only when the
+# skill is known to be slow on this input.
+timeout_ms: 60000
+
+# When true, the case is allowed to fail once per run before counting as a
+# failure. Temporary measure while a known-flaky cause is fixed. Flaky cases
+# should not stay flaky indefinitely.
+flaky: false

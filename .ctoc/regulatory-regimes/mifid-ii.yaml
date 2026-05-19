@@ -1,0 +1,26 @@
+name: mifid-ii
+display_name: "Markets in Financial Instruments Directive II"
+description: "Applicable to investment firms operating in European Union markets. Regulatory Technical Standard 25 sets clock synchronization requirements."
+authoritative_sources:
+  - title: "MiFID II RTS 25 clock synchronisation — Red Hat"
+    url: "https://www.redhat.com/en/blog/mifid-ii-rts-25-and-time-synchronisation-red-hat-enterprise-linux-and-red-hat-virtualization"
+  - title: "MiFID II RTS 25 best practices — Pico/Corvil"
+    url: "https://www.pico.net/assets/resources/documents/ebook-mifid-ii-clock-synchronization-rts-25.pdf"
+effective_date: "2018-01-03"
+applies_to: "Investment firms, regulated markets, and operators of multilateral or organized trading facilities in the European Union"
+required_controls:
+  - precision_time_protocol
+  - audit_hash_chain
+  - retention_schedule
+  - data_lineage
+  - spec_code_reconciliation
+  - third_party_risk_register
+retention:
+  dispatches: 1825
+  security_incident: 2555
+notes: |
+  Regulatory Technical Standard 25 requires maximum clock divergence of one hundred
+  microseconds from Coordinated Universal Time for participants in markets where
+  high-frequency algorithmic trading occurs. Network Time Protocol is insufficient;
+  Precision Time Protocol (IEEE 1588) is required. Transaction reporting under
+  Article 26 demands full reconciliation between firm records and trade repositories.

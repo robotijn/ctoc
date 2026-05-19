@@ -1,0 +1,29 @@
+name: pci-dss-v4
+display_name: "Payment Card Industry Data Security Standard version 4"
+description: "Applicable to any merchant or service provider processing cardholder data. Future-dated requirements became mandatory March 31 2025."
+authoritative_sources:
+  - title: "PCI Security Standards Council — DSS v4 future-dated requirements"
+    url: "https://blog.pcisecuritystandards.org/now-is-the-time-for-organizations-to-adopt-the-future-dated-requirements-of-pci-dss-v4-x"
+effective_date: "2025-03-31"
+applies_to: "Merchants and service providers handling primary account number data"
+required_controls:
+  - audit_hash_chain
+  - retention_schedule
+  - four_eyes_gate3
+  - tool_qualification
+  - third_party_risk_register
+  - process_fmea_loop
+  - continuous_controls_monitoring
+  - control_chart_variance
+  - defects_per_million
+  - nydfs_dora_incident_class
+retention:
+  dispatches: 365
+  security_incident: 2555
+  tax_relevant: 2555
+notes: |
+  Requirement 6.2.4 mandates threat modeling for bespoke software since March 2025
+  (already covered by CTOC Step 6.5). Requirement 6.5.4 enforces segregation of
+  duties between development and production environments (four-eyes Gate 3).
+  Requirement 10 covers logging and audit retention; minimum one year, three months
+  immediately accessible.

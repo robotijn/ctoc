@@ -1,0 +1,36 @@
+name: dora
+display_name: "Digital Operational Resilience Act (European Union)"
+description: "Applicable to European Union financial entities and their information and communication technology third-party providers. Applicable since January 17 2025."
+authoritative_sources:
+  - title: "Digital Operational Resilience Act final text"
+    url: "https://www.digital-operational-resilience-act.com/DORA_Articles.html"
+  - title: "DORA Threat-Led Penetration Testing requirements — DeepStrike"
+    url: "https://deepstrike.io/blog/dora-penetration-testing-tlpt-requirements"
+  - title: "Critical Third-Party Provider designations November 2025 — Morgan Lewis"
+    url: "https://www.morganlewis.com/blogs/sourcingatmorganlewis/2025/11/dora-eu-regulators-announce-list-of-critical-ict-third-party-providers"
+effective_date: "2025-01-17"
+applies_to: "European Union banks, investment firms, insurers, payment institutions, crypto-asset service providers, and their critical information and communication technology third parties"
+required_controls:
+  - audit_hash_chain
+  - retention_schedule
+  - third_party_risk_register
+  - business_continuity_plan
+  - nydfs_dora_incident_class
+  - cra_incident_clocks
+  - model_risk_file
+  - continuous_controls_monitoring
+  - process_capability_index
+  - capa_register
+  - eight_d_incident_template
+retention:
+  dispatches: 1825
+  security_incident: 2555
+  contract_artifacts: 1825
+notes: |
+  Article 11 requires information and communication technology business continuity
+  policies with documented recovery time objective and recovery point objective per
+  pipeline phase. Article 19 requires classified incident notification on 24-hour
+  early-warning and 72-hour final-report clocks. Article 28 requires a register of
+  contractual arrangements with each information and communication technology third
+  party. Threat-Led Penetration Testing every three years for systemically important
+  firms.

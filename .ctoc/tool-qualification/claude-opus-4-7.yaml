@@ -1,0 +1,83 @@
+# Tool Qualification Record — Anthropic Claude Opus 4.7
+# Required when the regulatory regime includes any of:
+#   iso-26262-asil-d, do-178c-level-a, iec-62304-class-c, iec-61508-sil-3
+
+tool_name: Anthropic Claude Opus 4.7
+tool_version: claude-opus-4-7
+vendor: Anthropic, Public Benefit Corporation
+license: proprietary (commercial terms via Anthropic)
+
+tool_impact:
+  level: TI2
+  rationale: |
+    The language model generates code and configuration that lands in the
+    project's safety-related artifacts. It can introduce defects directly
+    (incorrect logic, missing edge cases, invented application-programming-interface
+    surface). Tool Impact level 2 by definition.
+
+tool_error_detection:
+  level: TD2
+  rationale: |
+    Defects in language-model output are detected by downstream pipeline
+    stages: Step 11 REVIEW, Step 13 SECURE, Step 14 VERIFY, the synthesizer,
+    and the human gates. This is medium confidence — strong but not high,
+    because some classes of subtle semantic defects can slip through
+    automated review when the model's confident-sounding output is
+    incorrect (hallucinated facts, plausible but wrong specification
+    interpretation). [unverified hallucination rate for this specific model]
+
+tool_confidence_level: TCL2
+# TI2 + TD2 -> TCL2 per ISO 26262-8 §11 Table 4.
+
+intended_use: |
+  Generation of source code, tests, documentation, plans, and structured
+  decision artifacts inside the CTOC Iron Loop. Used at Steps 1 through 16
+  by the cto-chief and sub-orchestrators.
+
+restrictions: |
+  - Outputs must pass through Step 13 SECURE (security scanners), Step 14
+    VERIFY (full quality gate), Step 11 REVIEW (independent code review),
+    AND the synthesizer's minimal-change-list integration before any human
+    sees them as "ready to ship."
+  - For ISO 26262 ASIL D, DO-178C Level A, IEC 62304 Class C, or IEC 61508
+    SIL 3 projects, the additional `independent_verification_validation`
+    control must be active (separate IV&V chief re-runs Steps 11, 13, 14
+    in an isolated context).
+  - Model-risk file at `.ctoc/model-risk/claude-opus-4-7.yaml` must be
+    current (re-validated quarterly or whenever the model version updates).
+  - The language model must NOT be used for the four-eyes Gate 3 approval
+    when the `four_eyes_gate3` control is active — that approval requires
+    a distinct human identity.
+
+qualification_evidence:
+  evidence_type: validation-in-actual-use
+  evidence_artifacts:
+    - .ctoc/model-risk/claude-opus-4-7.yaml
+    - .ctoc/audit/dispatches/ (every dispatch records model + outcome)
+    - Anthropic public benchmarks (cite specific URL when validated)
+
+known_issues:
+  - id: hallucination-application-programming-interface
+    description: |
+      The model can invent application-programming-interface methods or
+      signatures that do not exist in the actual library, particularly for
+      less popular libraries. Manifests as runtime AttributeError or import
+      failure.
+    workaround: |
+      The `ai-quality/hallucination-detector` Tier 2 skill cross-checks
+      generated symbols against installed libraries before Step 14 VERIFY.
+  - id: confidence-without-source
+    description: |
+      The model can output confident statements about facts, dates, version
+      numbers, or regulatory text without citing a source. The user (a
+      30-year AI professor) has identified this as a recurring failure mode.
+    workaround: |
+      All factual claims must cite a source URL. The `recommend-highest-quality`
+      and `user_role_and_collaboration` memory rules in the user's session
+      memory enforce this at the prompt level.
+
+owner: <project-owner-identity>
+last_validated: 2026-05-19
+expiration: 2026-08-19
+# Re-validate quarterly. Earlier re-validation required if Anthropic ships
+# a new Claude Opus version that the project upgrades to.

@@ -1,0 +1,128 @@
+# Basic STRIDE coverage case for skills/security/threat-modeler.
+#
+# Catches regressions where the skill drops one or more STRIDE legs — most
+# commonly Repudiation and Tampering, which are silently omitted by some
+# upstream model upgrades.
+
+id: threat-modeler-basic-stride
+skill: security/threat-modeler
+
+description: |
+  Confirms the skill emits all six Spoofing-Tampering-Repudiation-
+  Information disclosure-Denial of service-Elevation of privilege (STRIDE)
+  categories for a system with a clear Spoofing-Tampering threat path, and
+  recommends at least one concrete mitigation per category.
+
+input: |
+  Threat-model the following system.
+
+  A small public web application accepts user-submitted product reviews.
+  The architecture is:
+
+    - A single-page front end served from a content-delivery network.
+    - A representational-state-transfer (REST) Application Programming
+      Interface (API) gateway accepting unauthenticated POST requests on
+      /reviews and authenticated POST requests on /admin/reviews.
+    - A relational database storing reviews. The application server
+      writes directly with a shared service account that has full table
+      privileges.
+    - No audit log. No rate-limiting. No web application firewall.
+    - The /admin/reviews endpoint authenticates with a static API token
+      stored in an environment variable and reused across deployments.
+
+  Produce a Spoofing-Tampering-Repudiation-Information disclosure-Denial
+  of service-Elevation of privilege (STRIDE) decomposition. For each of
+  the six categories, identify the most material threat and recommend
+  one concrete mitigation. Cite the Open Web Application Security Project
+  (OWASP) threat-modeling cheat sheet.
+
+expected_output: |
+  A STRIDE table with all six rows present:
+
+    Spoofing            — Static admin API token is shared and reused,
+                          allowing an attacker who exfiltrates it once
+                          to impersonate the admin indefinitely.
+                          Mitigation: rotate to short-lived per-deployment
+                          tokens, ideally signed-JSON-Web-Tokens (JWTs)
+                          with audience and expiry claims.
+
+    Tampering           — Unauthenticated POST /reviews allows arbitrary
+                          modification of review content with no integrity
+                          check. The shared service account has full
+                          table privileges, so a compromised application
+                          tier can rewrite history.
+                          Mitigation: server-side input validation, write
+                          via a least-privilege role that cannot UPDATE
+                          or DELETE existing rows.
+
+    Repudiation         — No audit log. Neither the application nor the
+                          database records who wrote which row at which
+                          time. A malicious user can post abuse and the
+                          operator cannot prove it.
+                          Mitigation: append-only audit table with
+                          per-write user, timestamp, and source IP;
+                          ideally a write-ahead log.
+
+    Information disclosure — Reviews may contain personally identifiable
+                          information (PII). With no rate-limiting and
+                          no authentication on /reviews, scraping the
+                          full corpus is trivial.
+                          Mitigation: rate-limit by IP and session;
+                          consider authentication for read of full lists.
+
+    Denial of service   — No rate-limiting, no web application firewall.
+                          A single attacker can saturate the API gateway
+                          with low-cost POST requests.
+                          Mitigation: deploy a web application firewall;
+                          add per-IP and global rate limits at the API
+                          gateway.
+
+    Elevation of privilege — The shared service account has full table
+                          privileges. A bug in the application tier
+                          (Structured Query Language (SQL) injection,
+                          insecure deserialization) lets an attacker
+                          execute arbitrary writes.
+                          Mitigation: split into per-endpoint roles with
+                          INSERT-only on /reviews and SELECT on read
+                          paths; revoke UPDATE/DELETE from the application
+                          role.
+
+  Source: OWASP threat-modeling cheat sheet, current revision.
+
+expected_findings:
+  - stride_spoofing_present
+  - stride_tampering_present
+  - stride_repudiation_present
+  - stride_information_disclosure_present
+  - stride_denial_of_service_present
+  - stride_elevation_of_privilege_present
+  - mitigation_per_category_present
+
+must_not_contain:
+  - "Repudiation: Not applicable"
+  - "no audit log needed"
+  - "STRIDE does not apply"
+  - "skip Spoofing"
+  - "TODO"
+  - "stub"
+
+severity_when_fails: critical
+
+contributed_by: "(maintainer)"
+
+added_in_version: "8.5.0"
+
+last_verified: "2026-05-19"
+
+tags:
+  - stride
+  - owasp
+  - baseline
+
+references:
+  - "OWASP Threat Modeling Cheat Sheet (cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html), 2024 revision"
+  - "Shostack, Adam. Threat Modeling: Designing for Security. Wiley, 2014."
+
+timeout_ms: 90000
+
+flaky: false

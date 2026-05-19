@@ -1,0 +1,33 @@
+name: eu-ai-act-high-risk
+display_name: "European Union Artificial Intelligence Act high-risk systems (Annex III)"
+description: "Applicable to artificial intelligence systems listed in Annex III. High-risk obligations effective August 2 2026."
+authoritative_sources:
+  - title: "EU Artificial Intelligence Act Article 50 transparency"
+    url: "https://artificialintelligenceact.eu/article/50/"
+  - title: "EU Artificial Intelligence Act Article 5 prohibitions"
+    url: "https://artificialintelligenceact.eu/article/5/"
+effective_date: "2026-08-02"
+applies_to: "Providers and deployers of artificial intelligence systems classified as high-risk under Annex III (critical infrastructure, education, employment, essential services, law enforcement, migration, justice)"
+required_controls:
+  - ai_provenance_stamp
+  - model_risk_file
+  - irac_compliance_output
+  - audit_hash_chain
+  - retention_schedule
+  - third_party_risk_register
+  - capa_register
+  - eight_d_incident_template
+  - data_lineage
+  - process_fmea_loop
+  - graceful_degradation_matrix
+retention:
+  dispatches: 3650
+  model_risk: 3650
+  security_incident: 3650
+notes: |
+  Article 5 prohibitions effective February 2 2025. High-risk obligations effective
+  August 2 2026. Article 50 transparency requires machine-readable provenance for
+  synthetic content and human disclosure for chatbots, deepfakes, emotion recognition,
+  and biometric categorisation systems. Penalty tiers up to thirty-five million euros
+  or seven percent of worldwide annual turnover for prohibited practices; up to fifteen
+  million euros or three percent for other obligations.

@@ -1,0 +1,49 @@
+# Tool Qualification Record Template
+# Copy to <tool-name>.yaml and fill in.
+# Required when `tool_qualification` control is active.
+
+tool_name: <human-readable name>
+tool_version: <semantic version>
+vendor: <vendor name or "open-source" or "in-house">
+license: <SPDX identifier>
+
+# International Organization for Standardization 26262 section 8 clause 11 classification.
+tool_impact:
+  level: TI1 | TI2
+  rationale: |
+    Why this level? TI1 if the tool cannot inject a defect (e.g., a read-only static
+    analyzer); TI2 if it can (e.g., a code generator, compiler, transformer).
+
+tool_error_detection:
+  level: TD1 | TD2 | TD3
+  rationale: |
+    TD1 = high confidence the tool's errors will be detected (e.g., the tool's
+    output is checked by a separate verification step); TD2 = medium; TD3 = low.
+
+tool_confidence_level: TCL1 | TCL2 | TCL3
+# Per the ISO 26262 table:
+#   TI1 + any TD     -> TCL1
+#   TI2 + TD1        -> TCL1
+#   TI2 + TD2        -> TCL2
+#   TI2 + TD3        -> TCL3
+
+intended_use: |
+  Plain description of what this tool does in the CTOC pipeline.
+
+restrictions: |
+  Conditions of correct use. Inputs out of these conditions invalidate qualification.
+
+qualification_evidence:
+  # For TCL2 / TCL3 only: evidence the tool produces correct results within scope.
+  evidence_type: validation-in-actual-use | tool-development-process | manual | none-required
+  evidence_artifacts:
+    - <path or URL to evidence>
+
+known_issues:
+  - id: <issue id>
+    description: <what>
+    workaround: <mitigation>
+
+owner: <identity of the person responsible for this tool's qualification>
+last_validated: <ISO 8601 date>
+expiration: <ISO 8601 date, when the qualification must be re-evaluated>

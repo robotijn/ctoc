@@ -1,0 +1,234 @@
+# Third-party register — Digital Operational Resilience Act Article 28
+#
+# CTOC v6.9.27 — Cluster 3 (Risk Analysis Before Build). Activated by the
+# `third_party_risk_register` control, which is required by the active
+# regulatory regime profiles `dora` (Digital Operational Resilience Act,
+# applicable since January 17 2025) and `eu-ai-act-high-risk`
+# (European Union Artificial Intelligence Act Annex III, high-risk
+# obligations effective August 2 2026).
+#
+# Article 28 of Regulation (European Union) 2022/2554 (Digital Operational
+# Resilience Act) requires every in-scope financial entity to maintain a
+# register of contractual arrangements with every information-and-
+# communication-technology third-party provider. The European
+# Supervisory Authorities published the final implementing technical
+# standards on the register's content in Commission Implementing
+# Regulation (European Union) 2024/2956 (October 29 2024). The
+# `dora` profile in CTOC inherits this requirement.
+#
+# Schema for each entry:
+#   provider                — legal name of the third-party provider
+#   provider_homepage       — canonical public website
+#   service                 — the service consumed from this provider
+#   relationship            — direct contract | sub-processor of <other>
+#   criticality             — low | medium | high | critical
+#                              "critical" maps to Digital Operational
+#                              Resilience Act Article 28 paragraph 2
+#                              ("services supporting critical or
+#                              important functions").
+#   substitutability        — easy | moderate | hard | locked-in
+#                              "locked-in" maps to the substitutability
+#                              concern in Digital Operational Resilience
+#                              Act Article 28 paragraph 8.
+#   exit_plan               — reference to the documented exit plan
+#                              required by Article 28 paragraph 8.
+#   data_categories         — list of data categories processed by the
+#                              provider.
+#   data_residency          — declared region(s) where the data is held.
+#   contract_url            — link to the terms-of-service / data-
+#                              processing-addendum / master-services-
+#                              agreement under which the service is
+#                              consumed.
+#   compliance_attestations — list of independent attestations published
+#                              by the provider (System and Organization
+#                              Controls 2 Type II, International
+#                              Organization for Standardization 27001,
+#                              and similar).
+#   last_reviewed           — calendar date of the last review.
+#   review_due              — calendar date the next review is due.
+#                              Default cadence: annually OR on any
+#                              change to the service, contract, or
+#                              criticality classification.
+#   source                  — citation that justifies the entry's facts
+#                              (do not invent values; CLAUDE.md mandates
+#                              citation).
+
+providers:
+
+  - provider: Anthropic, PBC
+    provider_homepage: https://www.anthropic.com
+    service: |
+      Application Programming Interface access to the Claude language-
+      model family (default model in this project is
+      `claude-opus-4-7`). Used by CTOC's Tier 0 coordinator
+      (CTO Chief) and the Iron Loop refinement loop.
+    relationship: direct contract
+    criticality: critical
+    substitutability: hard
+    substitutability_rationale: |
+      Other large-language-model providers (Open Artificial Intelligence
+      and Google DeepMind among them) offer functionally similar
+      capabilities, but prompt engineering, tool-use semantics, and the
+      structured-output schema differ. Migration is feasible but
+      requires re-validating every agent and every skill against the
+      replacement model. The model-risk file at
+      .ctoc/model-risk/claude-opus-4-7.yaml records the limitations
+      that any successor must also be checked against.
+    exit_plan: docs/EXIT_PLANS/anthropic.md    # [unverified — to be authored]
+    data_categories:
+      - source code in the project repository (uploaded as context)
+      - plan files (vision through done)
+      - user prompts typed into the terminal session
+    data_residency: |
+      United States by default; the Anthropic Data Processing Addendum
+      governs cross-border transfers under the Standard Contractual
+      Clauses where the user is in the European Economic Area.
+    contract_url: https://www.anthropic.com/legal/commercial-terms
+    compliance_attestations:
+      - "System and Organization Controls 2 Type II (per https://trust.anthropic.com/)"
+      - "International Organization for Standardization 27001 (per https://trust.anthropic.com/)"
+      - "European Union General Data Protection Regulation Standard Contractual Clauses available in the Data Processing Addendum"
+    last_reviewed: 2026-05-19
+    review_due: 2027-05-19
+    source: https://www.anthropic.com/legal/commercial-terms
+
+  - provider: Anthropic, PBC
+    provider_homepage: https://claude.ai/download
+    service: |
+      Claude Code — the official command-line interface that hosts the
+      CTOC plugin. Distributed by Anthropic and updated through the
+      same channel. CTOC runs as a Claude Code plugin and therefore
+      depends on this runtime.
+    relationship: direct contract (same Anthropic agreement as the API service above)
+    criticality: critical
+    substitutability: locked-in
+    substitutability_rationale: |
+      The plugin format, the hook system, the slash-command surface,
+      and the subagent dispatch protocol are all Claude Code specific.
+      No drop-in alternative exists as of writing. Migration would
+      require re-implementing the harness layer.
+    exit_plan: docs/EXIT_PLANS/claude-code.md  # [unverified — to be authored]
+    data_categories:
+      - source code in the project repository
+      - the user's local file system within the project working directory
+    data_residency: local to the user's machine; the runtime forwards
+      prompts and tool calls to the Anthropic Application Programming
+      Interface under the same agreement listed above.
+    contract_url: https://www.anthropic.com/legal/commercial-terms
+    compliance_attestations:
+      - "Inherits the Anthropic attestations listed above"
+    last_reviewed: 2026-05-19
+    review_due: 2027-05-19
+    source: https://www.anthropic.com/legal/commercial-terms
+
+  - provider: GitHub, Inc. (a Microsoft Corporation subsidiary)
+    provider_homepage: https://github.com
+    service: |
+      Source-code hosting and the marketplace channel via which CTOC is
+      distributed (`https://github.com/robotijn/ctoc`). The plugin.json
+      at .claude-plugin/plugin.json and the marketplace.json at
+      .claude-plugin/marketplace.json declare GitHub as the canonical
+      distribution surface; the CLAUDE.md "Marketplace Only" rule
+      mandates that CTOC is always installed from this marketplace.
+    relationship: direct contract (free or paid GitHub plan, per the user's account)
+    criticality: high
+    substitutability: moderate
+    substitutability_rationale: |
+      The repository is a standard Git repository and is mirrorable to
+      GitLab, Bitbucket, or self-hosted Gitea. The marketplace surface
+      is GitHub-specific; migration would require an additional
+      marketplace plumbing change in Claude Code.
+    exit_plan: docs/EXIT_PLANS/github.md       # [unverified — to be authored]
+    data_categories:
+      - public source code of the CTOC project
+      - public issue tracker content
+      - the CTOC plugin and marketplace metadata
+    data_residency: |
+      United States by default; GitHub Enterprise Cloud regional
+      tenancy is available but not used for the CTOC public
+      distribution.
+    contract_url: https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+    compliance_attestations:
+      - "System and Organization Controls 1 Type II, System and Organization Controls 2 Type II (per https://github.com/security)"
+      - "International Organization for Standardization 27001, 27017, 27018 (per https://github.com/security)"
+      - "Federal Risk and Authorization Management Program Tailored — Moderate"
+    last_reviewed: 2026-05-19
+    review_due: 2027-05-19
+    source: https://github.com/security
+
+  - provider: OpenJS Foundation (Node.js Project)
+    provider_homepage: https://nodejs.org
+    service: |
+      Node.js — the runtime that executes CTOC's hooks
+      (src/hooks/*.js), library modules (src/lib/*.js), and tests
+      (`node --test tests/*.test.js` per CLAUDE.md). CTOC declares no
+      runtime version pin in plugin.json as of writing; the project's
+      effective requirement is the Node.js version distributed with
+      Claude Code.
+    relationship: open-source dependency
+    criticality: critical
+    substitutability: hard
+    substitutability_rationale: |
+      Bun and Deno offer partial Node.js compatibility, but CTOC uses
+      several Node.js standard-library modules (`node --test` test
+      runner, `fs.promises`, `path.join`, `os.homedir`) that have
+      runtime-specific behaviour. Migration is feasible but is not a
+      drop-in swap.
+    exit_plan: docs/EXIT_PLANS/nodejs.md       # [unverified — to be authored]
+    data_categories:
+      - none directly; Node.js is a runtime, not a data processor
+    data_residency: not applicable (executes locally on the user's machine)
+    contract_url: https://nodejs.org/about/governance/    # OpenJS Foundation governance, no commercial contract
+    compliance_attestations:
+      - "OpenJS Foundation governance (an open-source-software project under the Linux Foundation)"
+      - "Long-Term Support cadence published at https://nodejs.org/en/about/previous-releases"
+    last_reviewed: 2026-05-19
+    review_due: 2027-05-19
+    source: https://nodejs.org/en/about/previous-releases
+
+  - provider: npm, Inc. (a GitHub subsidiary, in turn a Microsoft Corporation subsidiary)
+    provider_homepage: https://www.npmjs.com
+    service: |
+      Node Package Manager registry. CTOC's runtime dependency surface
+      is intentionally minimal (the source tree contains src/lib/yaml-
+      lite.js to avoid a YAML dependency, and the regulatory-regime
+      module ships its own shallow YAML parser at
+      src/lib/regulatory-regime.js to the same end), but tooling and
+      tests may transitively pull packages from this registry.
+    relationship: indirect dependency (consumed via the Node.js
+      ecosystem); no direct commercial contract.
+    criticality: medium
+    substitutability: moderate
+    substitutability_rationale: |
+      Alternative registries (jsr.io, GitHub Packages, Verdaccio
+      private registry) exist and are interchangeable for most
+      packages. The migration cost is low when the dependency surface
+      is small.
+    exit_plan: docs/EXIT_PLANS/npm.md          # [unverified — to be authored]
+    data_categories:
+      - public package metadata
+    data_residency: |
+      United States by default; the registry has no published
+      regionalisation.
+    contract_url: https://docs.npmjs.com/policies/terms
+    compliance_attestations:
+      - "Inherits GitHub-published attestations as a GitHub subsidiary; see https://github.com/security"
+    last_reviewed: 2026-05-19
+    review_due: 2027-05-19
+    source: https://docs.npmjs.com/policies/terms
+
+# Review cadence:
+#   Per Digital Operational Resilience Act Article 28 paragraph 3, the
+#   register is maintained on an ongoing basis and reviewed at least
+#   annually. CTOC additionally re-reviews any entry on any of the
+#   following events:
+#     - a change to the contractual arrangement,
+#     - a change to the provider's compliance posture,
+#     - a change to the substitutability classification,
+#     - a published incident affecting the provider (per the provider_incidents
+#       field of the matching .ctoc/model-risk/<model>.yaml when applicable),
+#     - or a change to the criticality of the function the provider supports.
+#
+# When the `dora` profile is active, the next review date is also
+# tracked under the `capa_register` control so it surfaces in the
+# session-start banner.

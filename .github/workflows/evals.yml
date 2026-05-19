@@ -1,0 +1,133 @@
+name: Evaluation Harness
+
+# Continuous Tool of Continuous Tools (CTOC) Evaluation-Driven Development
+# (EDD) harness. Spec: docs/EVALUATION_HARNESS.md
+#
+# Runs on every pull request that touches a skill, agent, or eval case. Loads
+# and validates every case file, then dispatches the comparator agent and
+# fails the build when the weighted pass rate falls below the threshold.
+#
+# Required repository secret:
+#   ANTHROPIC_API_KEY  Used by src/lib/comparator-agent.js to call the judge
+#                      and the candidate Large Language Model (LLM). When the
+#                      secret is absent, the harness runs in load-only mode
+#                      and validates the case schema without dispatching the
+#                      comparator. That keeps fork-based pull requests
+#                      submitted by community contributors usable: schema
+#                      regressions are caught even when the secret is
+#                      unavailable to the workflow.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - 'agents/**'
+      - 'evals/**'
+      - 'src/lib/eval-harness.js'
+      - 'src/lib/comparator-agent.js'
+      - 'src/scripts/run-evals.js'
+      - '.github/workflows/evals.yml'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Restrict to a single skill path (for example: security/threat-modeler)'
+        required: false
+        default: ''
+      threshold:
+        description: 'Weighted pass-rate threshold'
+        required: false
+        default: '0.95'
+
+jobs:
+  evals:
+    name: Run evaluation harness
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Detect harness presence
+        id: detect
+        run: |
+          if [ -f src/scripts/run-evals.js ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::src/scripts/run-evals.js is missing; skipping the evals step."
+          fi
+
+      - name: Resolve threshold
+        id: threshold
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          if [ -n "${{ github.event.inputs.threshold }}" ]; then
+            echo "value=${{ github.event.inputs.threshold }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=0.95" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve only-filter
+        id: only
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          if [ -n "${{ github.event.inputs.only }}" ]; then
+            echo "flag=--only=${{ github.event.inputs.only }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate eval-case schemas (load-only, no Application Programming Interface (API) key required)
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          echo "Running load-only validation on every eval case..."
+          node src/scripts/run-evals.js --load-only ${{ steps.only.outputs.flag }}
+
+      - name: Run comparator (skipped if ANTHROPIC_API_KEY is absent)
+        if: steps.detect.outputs.present == 'true' && env.ANTHROPIC_API_KEY != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "Running comparator with threshold ${{ steps.threshold.outputs.value }}"
+          node src/scripts/run-evals.js \
+            --no-load-only \
+            --fail-on-regression \
+            --threshold=${{ steps.threshold.outputs.value }} \
+            --baseline=origin/main \
+            --candidate=HEAD \
+            ${{ steps.only.outputs.flag }}
+
+      - name: Note when comparator was skipped
+        if: steps.detect.outputs.present == 'true' && env.ANTHROPIC_API_KEY == ''
+        run: |
+          echo "::notice::ANTHROPIC_API_KEY secret is not available in this run."
+          echo "::notice::Only the case-schema validation step ran; the comparator was skipped."
+          echo "::notice::Set the ANTHROPIC_API_KEY repository secret to enable comparator runs."
+
+      - name: Append summary
+        if: always() && steps.detect.outputs.present == 'true'
+        run: |
+          echo "## Evaluation Harness — Node ${{ matrix.node-version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- threshold: ${{ steps.threshold.outputs.value }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- only:      ${{ github.event.inputs.only || '(all)' }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "- comparator: ran" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- comparator: skipped (no ANTHROPIC_API_KEY secret)" >> "$GITHUB_STEP_SUMMARY"
+          fi

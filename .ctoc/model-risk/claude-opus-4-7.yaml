@@ -1,0 +1,171 @@
+# Model-risk file — Claude Opus 4.7 (one million-token context)
+#
+# Generated as the concrete companion to .ctoc/model-risk/_template.yaml
+# for the model CTOC currently uses by default in this project.
+# Unverified values are marked with [unverified] per CLAUDE.md
+# ("no invented numbers; cite sources"). They are NOT filled in with
+# estimates; the user fills them in when the underlying citation is
+# available.
+
+model_id: anthropic-claude-opus-4-7
+model_display_name: "Claude Opus 4.7 (one million-token context)"
+
+provider:
+  name: Anthropic
+  homepage: https://www.anthropic.com
+  contractual_relationship: direct API customer
+  # The Anthropic Data Processing Addendum is published as part of the
+  # Commercial Terms. Replace with the exact contract reference when the
+  # Digital Operational Resilience Act third-party register at
+  # .ctoc/registers/third-party.yaml is finalised.
+  data_processing_addendum_url: https://www.anthropic.com/legal/commercial-terms
+
+model_version: claude-opus-4-7
+# The training-data cutoff is the date publicly identified in the system
+# context for this conversation. Replace with the provider-published
+# value when Anthropic publishes a specific calendar date in the model
+# release notes.
+training_data_cutoff: 2026-01-31    # [unverified] — system context states "January 2026"; exact day not published
+release_date: "[unverified]"        # Anthropic has not published an exact release calendar date as of writing
+deprecation_date: "[unverified]"    # No deprecation announced as of writing
+
+capabilities:
+  # The one-million-token context variant is identified by the model
+  # name in the system context for this session. Anthropic publishes the
+  # canonical context-window numbers in the model documentation; verify
+  # the exact figure at the next model-risk review and replace [unverified]
+  # if the documentation has changed.
+  context_window_tokens: 1000000    # [unverified — verify against https://docs.anthropic.com/en/docs/about-claude/models]
+  max_output_tokens: "[unverified]" # Anthropic-published value varies by tier; not invented here
+  modalities: [text, vision, code]  # documented capabilities per the Anthropic Application Programming Interface
+  tool_use_supported: true
+  structured_output_supported: true
+  fine_tune_available: false        # Anthropic does not offer fine-tuning of Opus as of writing
+
+intended_use:
+  primary: |
+    Claude Opus 4.7 is the default reasoning model for CTOC's Tier 0
+    (CTO Chief), Tier 1 sub-orchestrators that declare `effort_level:
+    high`, and the Iron Loop refinement-loop integrator and critics. It
+    is dispatched for planning, design review, refinement, and final
+    review. It is NOT the default for routine dashboard rendering
+    (Haiku 4.5 handles that per v6.4.1) or for fast pre-screens (Tier 3
+    scouts use Haiku).
+  permitted_inputs:
+    - source code in the project repository
+    - plan files (vision / functional / implementation / todo / review / done)
+    - publicly-available documentation and standards excerpts under fair-use
+    - the user's spoken or typed instructions to CTOC
+  forbidden_inputs:
+    - personal data of European Union residents without an Anthropic Data Processing Addendum on file
+    - special-category personal data per General Data Protection Regulation Article 9
+    - credentials, secrets, signed cryptographic material, or production database dumps
+    - safety-critical control outputs (Claude is advisory; humans approve gates)
+
+known_limitations:
+  - id: ML-001
+    category: hallucination
+    description: |
+      Even with strong reasoning, Claude Opus 4.7 can produce confident
+      assertions about facts that post-date its training-data cutoff,
+      about specific numeric values, and about identifier strings that
+      resemble but differ from real ones (Application Programming
+      Interface method names, library identifiers, regulation article
+      numbers).
+    mitigation: |
+      CLAUDE.md rule "no invented numbers; cite sources" is enforced
+      across CTOC. The CTOC user is documented as an artificial-
+      intelligence expert who will find drift; this is a deliberate
+      detection layer.
+  - id: ML-002
+    category: instruction-following-drift
+    description: |
+      Long-context conversations may drift from earlier system
+      instructions when the user input is ambiguous.
+    mitigation: |
+      Critical constraints (human gate rules, marketplace rule, cross-
+      platform rules) are re-stated in CLAUDE.md and are referenced at
+      the top of every system prompt produced by Iron Loop dispatch
+      records.
+  - id: ML-003
+    category: prompt-injection-direct
+    description: |
+      User-supplied prompts can include instructions that conflict with
+      the agent's system prompt; the model may follow the user
+      instruction rather than the system instruction.
+    mitigation: |
+      The threat-modeler skill enumerates the prompt-injection threats
+      per MITRE ATLAS technique AML.T0051 with explicit ATLAS-version
+      pinning (atlas_version: v5.4.0 as of writing). Structured outputs
+      bound the response shape.
+  - id: ML-004
+    category: prompt-injection-indirect
+    description: |
+      Documents retrieved via WebFetch or read via Read can include
+      hidden instructions; the model may treat them as authoritative.
+    mitigation: |
+      Retrieved content is provenance-tagged. The CTOC pipeline forbids
+      the model from acting on retrieved instructions without an
+      explicit human authorisation gate at the relevant Iron Loop step.
+  - id: ML-005
+    category: agentic-tool-use-overreach
+    description: |
+      Tool-use capability lets the model invoke side-effectful tools
+      (Bash, Write, Edit). The risk is incorrect tool invocation,
+      particularly destructive shell commands.
+    mitigation: |
+      The pre-tool-use enforcement hooks at src/hooks/PreToolUse.Bash.js
+      and siblings intercept destructive operations. The escape-phrase
+      catalogue at src/lib/escape-phrases.js is the only path that
+      bypasses planning enforcement.
+
+prompt_injection_test_summary:
+  # CTOC does not yet ship a project-specific prompt-injection regression
+  # pack. The placeholder below blocks Gate 3 until the user supplies
+  # one when the model_risk_file control is active.
+  test_suite: "[unverified] — to be populated when the project ships a regression suite"
+  test_suite_url: "[unverified]"
+  last_run_date: "[unverified]"
+  pass_rate_pct: "[unverified]"
+  notes: |
+    A first prompt-injection test pack should exercise (1) direct
+    instruction conflicts in user input, (2) indirect injection via
+    documents read by WebFetch, (3) tool-use authorisation bypass
+    attempts, and (4) cross-conversation memory injection.
+
+output_variance_benchmark:
+  benchmark_suite: "[unverified] — to be populated"
+  last_run_date: "[unverified]"
+  variance_metric: "proportion of outputs that differ across two runs of an identical prompt at temperature=0"
+  threshold: "[unverified]"
+  observed: "[unverified]"
+
+owner: tijn.vanderzant@gmail.com    # from MEMORY.md userEmail
+challenger_reviewer: "[unverified] — required for financial-services profile, not currently active in this project"
+last_validated_date: 2026-05-19     # creation date of this file
+expiration_date: 2027-05-19         # last_validated_date + 365 days
+escalation_path: |
+  When expiration_date is reached, the Iron Loop session-start banner
+  surfaces the expiry and the model_risk_file control blocks Gate 3
+  until the file is re-validated. Re-validation requires re-running the
+  prompt-injection test pack and the output-variance benchmark, and
+  refreshing the limitations catalogue against the latest MITRE ATLAS
+  release.
+
+provider_incidents:
+  # Populate as Anthropic-published incidents arise. Source the entries
+  # from https://status.anthropic.com and from Anthropic's published
+  # post-mortems.
+  []
+
+references:
+  - title: "Federal Reserve Supervisory Letter 11-7 — Guidance on Model Risk Management"
+    url: "https://www.federalreserve.gov/supervisionreg/srletters/sr1107.htm"
+  - title: "Anthropic Claude model documentation"
+    url: "https://docs.anthropic.com/en/docs/about-claude/models"
+  - title: "Anthropic commercial terms (including the Data Processing Addendum)"
+    url: "https://www.anthropic.com/legal/commercial-terms"
+  - title: "MITRE ATLAS — Adversarial Threat Landscape for Artificial-Intelligence Systems"
+    url: "https://atlas.mitre.org/"
+  - title: "National Institute of Standards and Technology Artificial Intelligence Risk Management Framework version 1.0"
+    url: "https://www.nist.gov/itl/ai-risk-management-framework"

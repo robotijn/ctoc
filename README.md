@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.26-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.27-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
-  <img alt="Skills" src="https://img.shields.io/badge/skills-413-blue">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **109 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **413-file skill library** (91 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **110 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **421-file skill library** (99 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -61,7 +61,7 @@ CTO Chief starts with ideation — agents explore your idea with you, ask clarif
 
 ## Auto-Availability After Install
 
-When you install CTOC from the marketplace, Claude Code auto-discovers every artifact the plugin ships — slash commands, agents, hooks, and skills — per the [Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference). No manual wiring is needed. The 91 Tier-2 specialist `SKILL.md` files then become available through **three routing paths**:
+When you install CTOC from the marketplace, Claude Code auto-discovers every artifact the plugin ships — slash commands, agents, hooks, and skills — per the [Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference). No manual wiring is needed. The 99 Tier-2 specialist `SKILL.md` files then become available through **three routing paths**:
 
 1. **Slash-command pipeline** — `/ctoc` (or any sub-command) dispatches CTO Chief, which dispatches a Tier-1 sub-orchestrator, which dispatches the relevant Tier-2 specialist by name. This is the path used during the Iron Loop and refinement loop.
 2. **`when_to_load` trigger phrases** — each `SKILL.md` declares a list of natural-language triggers in YAML frontmatter (e.g. `"SBOM"`, `"prompt injection"`, `"NIST 800-61"`). When your conversation matches a trigger, Claude Code auto-loads the skill into context with no slash command needed.
@@ -73,7 +73,7 @@ The auto-discovery is documented behavior of Claude Code's plugin system. Instal
 
 ## Skill Library Quality Bar
 
-Every one of the 91 Tier-2 specialist `SKILL.md` bodies was brought to 2026 best-practices quality through an explicit improvement loop (completed across v6.9.15–v6.9.24). The library is not a grab-bag of LLM-generated stubs — it is engineered.
+Every one of the 99 Tier-2 specialist `SKILL.md` bodies was brought to 2026 best-practices quality through an explicit improvement loop (completed across v6.9.15–v6.9.24). The library is not a grab-bag of LLM-generated stubs — it is engineered.
 
 **The 4-step loop (existing skills, 86 of them):**
 
@@ -176,7 +176,7 @@ The generated `CLAUDE.md` becomes the single source of truth for how Claude work
 | Human approval gates | 4 mandatory checkpoints | None | None | None |
 | Quality verification | Automated gate (Step 14) | Manual | Manual | None |
 | Specialist agents | 110 across 22 categories | None | DIY | None |
-| Specialist skill library (engineered, sourced) | 91 SKILL.md bodies through critique loop | None | None | None |
+| Specialist skill library (engineered, sourced) | 99 SKILL.md bodies through critique loop | None | None | None |
 | Production-readiness checklist | SaaS templates with 20+ block-severity checks | None | None | None |
 | Post-launch product loop | KPI library + experiment designer | None | None | None |
 
@@ -266,8 +266,8 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 
 - **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
-- **109 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, and more
-- **413 skill files** — 91 Tier-2 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
+- **110 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, and more
+- **421 skill files** — 99 Tier-2 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — Iterative critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) before Gate 3 — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
 - **4-tier agent architecture** — CTO Chief (Tier 0, sole dispatcher) → 16 sub-orchestrators (Tier 1) → specialists (Tier 2) → 5 Haiku scouts (Tier 3) for fast pre-screens — see [AGENT_ARCHITECTURE.md](docs/AGENT_ARCHITECTURE.md)
@@ -447,7 +447,7 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 
 ## Agents
 
-**109 agents across 22 categories** — [browse all →](agents/)
+**110 agents across 22 categories** — [browse all →](agents/)
 
 <details>
 <summary><strong>Full agent list</strong></summary>
@@ -487,11 +487,11 @@ Agents spawn conditionally based on your project and current Iron Loop step. Sco
 
 ## Skills
 
-**413 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
+**421 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
 
 There are two kinds of skills:
 
-1. **Tier-2 specialist skill bodies (91)** — the actual expert agents that run during Iron Loop and refinement-loop steps. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
+1. **Tier-2 specialist skill bodies (99)** — the actual expert agents that run during Iron Loop and refinement-loop steps. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
 2. **Knowledge skills (322)** — language refs, framework refs, and per-language quality configs. Read by agents (or loaded by code paths like `src/lib/quality-config.js` and `src/lib/skill-loader.js`) to inform their work.
 
 > **v6.9.14**: 38 unreachable reference files were deleted from `skills/` after a usage audit confirmed they had zero code or agent references.
@@ -763,7 +763,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.26'
+getVersion()       // → '6.9.27'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -778,9 +778,9 @@ ctoc/
 │                    PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md,
 │                    CONTRIBUTING.md, CODE_OF_CONDUCT.md
 ├── src/
-│   ├── commands/    11 slash commands (13 files: .md spec + .js impl where needed)
-│   ├── hooks/       12 Claude Code hooks (session, pre/post tool use, pre-push)
-│   ├── lib/         87 JS modules (state, planning, quality, refinement loop, dispatcher)
+│   ├── commands/    13 slash commands (.md spec + .js impl where needed)
+│   ├── hooks/       13 Claude Code hooks (session, pre/post tool use, andon-halt)
+│   ├── lib/         105 JS modules (planning, quality, refinement, dispatcher, regulatory-regime, audit-chain, retention, legal-hold, traceability, lineage, eval-harness, comparator)
 │   ├── tabs/        8 dashboard tabs
 │   ├── areas/       5 dashboard areas (pipeline, library, system, agent, inbox)
 │   ├── scripts/     11 build/release utilities
@@ -788,7 +788,7 @@ ctoc/
 ├── agents/          110 agent definitions across 22 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
 │                     async-choice-protocol, no-stub-rule, warnings-are-critical)
-├── skills/          413 skill files: 91 Tier-2 specialist bodies (SKILL.md)
+├── skills/          421 skill files: 99 Tier-2 specialist bodies (SKILL.md)
 │                    + 322 reference files (50 langs, 211 frameworks,
 │                    61 quality configs). 38 unreachable refs removed in v6.9.14;
 │                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
@@ -819,6 +819,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.26** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.27** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

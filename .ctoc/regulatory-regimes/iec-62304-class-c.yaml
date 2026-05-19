@@ -1,0 +1,35 @@
+name: iec-62304-class-c
+display_name: "IEC 62304 Class C medical device software"
+description: "Software whose failure could result in death or serious injury. Mandatory for life-supporting and life-sustaining medical devices."
+authoritative_sources:
+  - title: "IEC 62304 Edition 2 changes — IntuitionLabs"
+    url: "https://intuitionlabs.ai/articles/iec-62304-edition-2-medical-software-changes"
+  - title: "Medical device software development 2026 — Attract Group"
+    url: "https://attractgroup.com/blog/medical-device-software-development-in-2026-regulatory-and-technical-overview/"
+effective_date: "2026-06-01"
+applies_to: "Medical device software whose failure could result in death or serious injury"
+required_controls:
+  - fmeda_design
+  - fault_tree_analysis
+  - requirements_traceability_matrix
+  - independent_verification_validation
+  - config_baseline
+  - tool_qualification
+  - defect_density_target
+  - audit_hash_chain
+  - retention_schedule
+  - capa_register
+  - eight_d_incident_template
+  - graceful_degradation_matrix
+  - process_fmea_loop
+  - irac_compliance_output
+retention:
+  dispatches: 3650
+  baselines: 5475
+  security_incident: 3650
+notes: |
+  Class C is the highest software safety class. Edition 2 (effective mid-to-late 2026)
+  emphasizes risk-based traceability and rejects spreadsheet-based compliance theater.
+  Document the entire software lifecycle: planning, requirements, architecture,
+  detailed design, implementation, integration, system testing, release. Maintain
+  records of failure modes, identified risks, and mitigations.

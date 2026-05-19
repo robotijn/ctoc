@@ -1,0 +1,37 @@
+name: iso-26262-asil-d
+display_name: "ISO 26262 Automotive Safety Integrity Level D"
+description: "Highest level of automotive functional safety. Applicable to road vehicles where a malfunction would cause severe, unmanageable, life-threatening hazards."
+authoritative_sources:
+  - title: "AUTOSAR ISO 26262 guide"
+    url: "https://autosar.io/en/insights/iso26262-guide"
+  - title: "Achieving Functional Safety Automotive ISO 26262 ASIL — Parasoft"
+    url: "https://alm.parasoft.com/hubfs/whitepaper-Achieving-Functional-Safety-Automotive-ISO-26262-ASIL.pdf"
+effective_date: "2018-12-01"
+applies_to: "Automotive electrical and electronic systems where uncontrolled hazard could cause fatality"
+required_controls:
+  - fmeda_design
+  - fault_tree_analysis
+  - process_fmea_loop
+  - requirements_traceability_matrix
+  - hil_test_ladder
+  - wcet_budget
+  - independent_verification_validation
+  - config_baseline
+  - tool_qualification
+  - defect_density_target
+  - graceful_degradation_matrix
+  - audit_hash_chain
+  - retention_schedule
+  - capa_register
+  - eight_d_incident_template
+retention:
+  dispatches: 3650
+  baselines: 5475
+  security_incident: 3650
+notes: |
+  ASIL D is the most stringent automotive safety integrity level. Single-Point Fault
+  Metric must exceed 99 percent. Latent Fault Metric must exceed 90 percent.
+  Probabilistic Metric for Hardware Failures must be below 10 to the minus 8 per hour.
+  Tool Confidence Level classification required for every tool that can inject or
+  miss a defect. Independent Verification and Validation by a separately reporting
+  team.

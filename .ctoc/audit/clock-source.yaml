@@ -1,0 +1,77 @@
+# Clock Source Posture
+#
+# Declarative record of this project's time-source posture. The CTOC
+# time-source library (src/lib/time-source.js) reads this file when
+# evaluating compliance against an observed probe of the local clock.
+#
+# Schema:
+#   profile:                          best-effort | ntp | ptp
+#   max_tolerated_drift_microseconds: integer; the upper bound on
+#                                     wall-clock divergence from
+#                                     Coordinated Universal Time that
+#                                     this project tolerates.
+#   verification_command:             one-line shell command the operator
+#                                     can run to check actual drift. The
+#                                     command is informational only; the
+#                                     library does not execute it.
+#   last_verified:                    ISO 8601 timestamp of the most
+#                                     recent operator verification.
+#   notes:                            free-form rationale for the chosen
+#                                     posture.
+#
+# Profile semantics
+# -----------------
+# best-effort
+#   The project does not require synchronised wall-clock time. Dispatch
+#   records still carry a time-source field for forensic completeness,
+#   but no compliance check is enforced. This is the default for
+#   non-regulated projects.
+#
+# ntp
+#   The project requires Network Time Protocol synchronisation. The
+#   library expects the local chronyd (or equivalent) to be active and
+#   the last-known drift to be below max_tolerated_drift_microseconds.
+#   Suitable for finance, e-commerce, and general operational logging
+#   where sub-millisecond drift is acceptable.
+#
+# ptp
+#   The project requires IEEE 1588 Precision Time Protocol. Required by
+#   the Markets in Financial Instruments Directive II Regulatory
+#   Technical Standard 25 for participants in markets where
+#   high-frequency algorithmic trading occurs (maximum divergence of
+#   one hundred microseconds from Coordinated Universal Time).
+#
+# References
+# ----------
+#   - Markets in Financial Instruments Directive II Regulatory Technical
+#     Standard 25, Red Hat reference:
+#     https://www.redhat.com/en/blog/mifid-ii-rts-25-and-time-synchronisation-red-hat-enterprise-linux-and-red-hat-virtualization
+#   - Pico / Corvil MiFID II clock synchronisation ebook:
+#     https://www.pico.net/assets/resources/documents/ebook-mifid-ii-clock-synchronization-rts-25.pdf
+#   - Linux PTP project (ptp4l):
+#     https://linuxptp.sourceforge.net/
+
+profile: best-effort
+max_tolerated_drift_microseconds: 100000
+verification_command: chronyc tracking
+last_verified: 2026-05-19T00:00:00Z
+notes: |
+  CTOC is itself a developer-tooling project, not a regulated trading or
+  safety system. The default posture is best-effort. Projects that adopt
+  a Markets in Financial Instruments Directive II profile via
+  .ctoc/settings.yaml (active_profiles: [mifid-ii]) must overwrite this
+  file with profile: ptp and a tolerance of at most 100 microseconds
+  (the Regulatory Technical Standard 25 bound).
+
+  To raise the posture for a downstream project:
+    1. Set profile to ntp or ptp as required by the regulatory regime.
+    2. Set max_tolerated_drift_microseconds to the regulator's bound.
+    3. Confirm chronyd (or the platform equivalent) reports a healthy
+       reference identifier matching the chosen profile. On Linux:
+         chronyc tracking | grep -E "Reference ID|Last offset"
+       The reference identifier should be a PHC* entry when profile is
+       ptp. Last offset should be below the tolerance, in absolute terms.
+    4. Update last_verified to the date of the check.
+
+  The time-source library never edits this file. Updates are an explicit
+  operator action recorded in the regular audit log.

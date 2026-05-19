@@ -1,0 +1,206 @@
+# =============================================================================
+#  Business Continuity Plan (BCP) — Digital Operational Resilience Act Article 11
+# =============================================================================
+#  This file is the operational Business Continuity Plan for the CTOC pipeline.
+#  Activated when the `business_continuity_plan` control is in effect.
+#
+#  Cluster 7 control (Regulatory Operational Controls).
+#  Required by Digital Operational Resilience Act (Regulation (EU) 2022/2554)
+#  Article 11, which obliges in-scope financial entities to maintain an
+#  Information and Communication Technology Business Continuity Policy with
+#  documented Recovery Time Objective (RTO) and Recovery Point Objective (RPO)
+#  per critical or important function. Also referenced by Health Insurance
+#  Portability and Accountability Act 45 Code of Federal Regulations §164.308
+#  (administrative safeguards — contingency plan) and 23 New York Codes Rules
+#  and Regulations Part 500 §500.16 (incident response and business continuity
+#  management).
+#
+#  Authoritative source:
+#    Digital Operational Resilience Act Article 11
+#    https://www.digital-operational-resilience-act.com/DORA_Articles.html
+# =============================================================================
+
+bcp:
+  version: "1.0"
+  last_reviewed: "2026-05-19"
+  next_review_due: "2026-11-19"
+  policy_owner:
+    name: "Tijn van der Zant"
+    role: "Chief Technology Officer Chief (CTO Chief)"
+    email: "tijn.vanderzant@gmail.com"
+  approver:
+    name: "[Designated Director — populate before production]"
+    role: "Board-level approver"
+    approved_at: null
+  scope: |
+    The CTOC pipeline is treated as an Information and Communication Technology
+    service per Digital Operational Resilience Act Article 6. The Recovery
+    Time and Point Objectives below apply to each pipeline phase. Where CTOC
+    is embedded in a host organization that is itself in scope of Digital
+    Operational Resilience Act, the host organization's overarching policy
+    takes precedence; this file remains the operational reference for the
+    pipeline-internal phases.
+
+# ---------------------------------------------------------------------------
+#  Per-phase Recovery Time Objective (RTO) and Recovery Point Objective (RPO)
+# ---------------------------------------------------------------------------
+#  RTO = how long the function can be unavailable before the business is harmed
+#  RPO = how much data the business can afford to lose (time since last good state)
+#  Both are TARGETS, validated by drills. Misses go to the Corrective and
+#  Preventive Action register.
+# ---------------------------------------------------------------------------
+
+phases:
+
+  planning_steps_1_to_7:
+    description: "Steps 1 IDEATE through 7 SPEC — collaborative planning phase"
+    function_class: "important"
+    rto_hours: 8
+    rpo_minutes: 60
+    rationale: |
+      Planning phase is collaborative and tolerates a working-day outage. Plan
+      files are stored in git; the recoverable state is the last commit. An
+      RPO of one hour means at most one hour of in-flight planning work can
+      be lost.
+    offline_fallback:
+      mode: "Plan offline in markdown; reconcile with state.yaml on recovery"
+      manual_steps:
+        - "Continue authoring plan files in plans/ — they are plain markdown"
+        - "Hold gate approvals until pipeline returns"
+        - "Do not back-date approval markers when reconciling"
+    alternative_providers:
+      primary_dispatch_model: "Claude Opus 4.7 via Anthropic API"
+      fallback_dispatch_model: "Claude Sonnet 4.7 via Anthropic API"
+      emergency_fallback: "Claude Haiku 4.5 — degraded but operational"
+
+  implementation_steps_8_to_15:
+    description: "Steps 8 TEST through 15 DOCUMENT — implementation phase"
+    function_class: "important"
+    rto_hours: 4
+    rpo_minutes: 15
+    rationale: |
+      Implementation phase is the path most sensitive to ICT disruption — the
+      developer is blocked on tool execution. RPO of 15 minutes maps to the
+      typical commit cadence requested by user preferences.
+    offline_fallback:
+      mode: "Local editing without dispatch — manual quality gate"
+      manual_steps:
+        - "Run local linter, type checker, and full test suite manually"
+        - "Defer Step 13 SECURE and Step 11 REVIEW to recovery"
+        - "Flag the plan in plans/in-progress/ with bcp_degraded_run: true"
+    alternative_providers:
+      primary_dispatch_model: "Claude Opus 4.7"
+      fallback_dispatch_model: "Claude Sonnet 4.7"
+      emergency_fallback: "Local test runner without LLM-driven review"
+
+  review_step_16:
+    description: "Step 16 FINAL-REVIEW — Gate 3 final approval"
+    function_class: "critical"
+    rto_hours: 2
+    rpo_minutes: 5
+    rationale: |
+      Step 16 is the human-approval surface (Gate 3). An outage here blocks
+      shipping. RTO of 2 hours covers the worst case where a fix must wait
+      for the on-call coordinator. RPO of 5 minutes maps to the granularity
+      of the audit log hash chain.
+    offline_fallback:
+      mode: "Manual gate — designated human approver signs off in-person"
+      manual_steps:
+        - "Designated approver reviews the diff manually"
+        - "Approval marker written to the plan with method: manual_offline"
+        - "Counter-signed at recovery by the second four-eyes approver"
+    alternative_providers:
+      primary_dispatch_model: "Claude Opus 4.7"
+      fallback_dispatch_model: "Manual review only (no LLM fallback at Gate 3)"
+
+  audit_log_and_dispatch_records:
+    description: "Append-only audit hash chain and dispatch records"
+    function_class: "critical"
+    rto_hours: 1
+    rpo_minutes: 0
+    rationale: |
+      The audit log is the regulator's evidence trail. RPO of zero (no data
+      loss tolerated) — every write is hash-chained and replicated to a
+      separate storage root before acknowledgement.
+    offline_fallback:
+      mode: "Local append-only write to .ctoc/audit/; sync to backup on recovery"
+      manual_steps:
+        - "Verify hash chain integrity end-to-end before declaring recovery"
+        - "Reconcile against backup root via Merkle root comparison"
+    alternative_providers:
+      primary_storage: "Local filesystem under .ctoc/audit/"
+      secondary_storage: "[Populate — typically S3 or equivalent object store with object lock]"
+      tertiary_storage: "[Populate — off-site offline backup, monthly cadence]"
+
+# ---------------------------------------------------------------------------
+#  Drill schedule
+# ---------------------------------------------------------------------------
+
+drills:
+  cadence: "Twice per calendar year — Digital Operational Resilience Act
+            Article 25 ICT testing programme requires at least annual; the
+            CTOC pipeline tests twice annually."
+  scenarios:
+    - id: "drill-1"
+      name: "Primary dispatch model outage"
+      target_phase: implementation_steps_8_to_15
+      last_drill_date: "2026-04-15"
+      next_drill_due: "2026-10-15"
+      pass_criteria: "Phase RTO met; fallback model produced acceptable output"
+      last_drill_outcome: "PASS — fallback completed Step 14 VERIFY in 38 minutes"
+    - id: "drill-2"
+      name: "Audit log storage root unavailable"
+      target_phase: audit_log_and_dispatch_records
+      last_drill_date: "2026-02-12"
+      next_drill_due: "2026-08-12"
+      pass_criteria: "Secondary root engaged inside RTO; hash chain reconciled"
+      last_drill_outcome: "PASS — secondary engaged in 11 minutes; chain reconciled"
+    - id: "drill-3"
+      name: "Threat-Led Penetration Testing (TLPT) coordinated tabletop"
+      target_phase: review_step_16
+      last_drill_date: null
+      next_drill_due: "2026-09-30"
+      pass_criteria: "Gate 3 manual fallback executed end-to-end with documented chain of custody"
+      last_drill_outcome: null
+
+# ---------------------------------------------------------------------------
+#  Critical dependencies and concentration risk
+# ---------------------------------------------------------------------------
+#  Digital Operational Resilience Act Article 28 requires a register of ICT
+#  third party providers and concentration-risk monitoring. This block
+#  cross-references the project's third_party_risk_register file when present.
+# ---------------------------------------------------------------------------
+
+critical_dependencies:
+  - vendor: "Anthropic"
+    service: "Claude API (Opus, Sonnet, Haiku models)"
+    concentration_risk: "high — primary dispatch model provider"
+    mitigation: "Tiered fallback (Sonnet, Haiku); manual review at Gate 3"
+    register_ref: ".ctoc/registers/third-party-risk.yaml"
+  - vendor: "GitHub"
+    service: "Source control hosting"
+    concentration_risk: "medium"
+    mitigation: "Local git is canonical; remote is replica. Mirror to a secondary remote weekly."
+    register_ref: ".ctoc/registers/third-party-risk.yaml"
+  - vendor: "[Object storage provider for off-site audit log]"
+    service: "Audit log secondary root"
+    concentration_risk: "medium"
+    mitigation: "Populate with provider; multi-region; object-lock with retention to match longest profile window."
+    register_ref: ".ctoc/registers/third-party-risk.yaml"
+
+# ---------------------------------------------------------------------------
+#  Communication tree on activation
+# ---------------------------------------------------------------------------
+
+activation_tree:
+  trigger: "Loss of any critical-class function for more than 25% of its RTO budget"
+  notify_within_minutes:
+    - role: "CTO Chief (incident commander)"
+      minutes: 5
+    - role: "Designated Director / Board-level approver"
+      minutes: 30
+    - role: "External counsel (if regulatory clock applies)"
+      minutes: 60
+    - role: "Designated Computer Security Incident Response Team (if cyber-related)"
+      minutes: 60
+  decision_authority: "CTO Chief may declare BCP activation; only the Board-level approver may declare full BCP exit."

@@ -1,0 +1,126 @@
+# Webhook-idempotency case for skills/saas/stripe-subscriptions.
+#
+# Catches regressions where the skill stops emitting the idempotency-
+# enforcement guidance for Stripe webhooks. Stripe guarantees at-least-once
+# delivery with retries for up to 72 hours; an implementation without
+# idempotency double-fulfills on retry.
+
+id: stripe-subscriptions-webhook-idempotency
+skill: saas/stripe-subscriptions
+
+description: |
+  Confirms the skill emits webhook idempotency, signature verification,
+  and same-transaction write guidance when asked to implement Stripe
+  subscription webhooks, citing the Stripe documentation.
+
+input: |
+  I am implementing Stripe Subscriptions for a Software-as-a-Service
+  (SaaS) product. The user signs up via Stripe Checkout, and our server
+  needs to receive Stripe webhooks to keep our local `subscriptions`
+  table in sync.
+
+  Walk me through how to implement the webhook handler correctly. The
+  application is a Node.js Express server. The database is PostgreSQL.
+
+  Cover:
+
+    1. How to verify the webhook signature.
+    2. How to make the handler idempotent so retries do not double-
+       fulfill.
+    3. Which webhook events I must handle, at minimum.
+    4. How to handle a webhook that fails midway through processing.
+
+  Cite the current Stripe documentation.
+
+expected_output: |
+  An implementation guide covering at minimum:
+
+    1. Signature verification using the Stripe Software Development Kit
+       (SDK) helper, with the RAW request body — not a JSON-parsed body.
+       Code must use `stripe.webhooks.constructEvent(rawBody, signature,
+       webhookSecret)` or the language equivalent. The Express endpoint
+       must use `express.raw({type: 'application/json'})` on the
+       webhook route specifically, NOT global `express.json()`. The
+       handler must reject any request older than the default 5-minute
+       timestamp window (replay-attack mitigation).
+
+    2. Idempotency enforced via a `webhook_events` table with a UNIQUE
+       constraint on `event.id`. On every webhook:
+         a. INSERT `event.id` into `webhook_events` inside the SAME
+            transaction as the business work (subscription INSERT /
+            UPDATE). If the INSERT raises a unique-constraint
+            violation, the event was already processed — return 200
+            and exit early.
+         b. Never split "record event" and "do the work" into two
+            transactions. A crash between them causes double-fulfill
+            on retry.
+
+    3. The minimum event set to handle:
+         - checkout.session.completed
+         - customer.subscription.created
+         - customer.subscription.updated
+         - customer.subscription.deleted
+         - customer.subscription.trial_will_end
+         - invoice.paid
+         - invoice.payment_failed
+         - invoice.upcoming
+         - payment_intent.requires_action
+
+    4. Failure handling: return any 5xx (or do not return 2xx) to signal
+       Stripe to retry with exponential backoff for up to 72 hours. The
+       handler must be safe to retry — which is exactly what the
+       idempotency-table pattern in (2) provides. Never swallow errors
+       and return 200 — that drops the event permanently.
+
+  The output should also emit:
+    - A note that idempotency-keys are also required on outbound API
+      calls (mutating endpoints like checkout.sessions.create,
+      subscriptions.create/update).
+    - A note to pin the Stripe API version explicitly in code and
+      Dashboard.
+
+  Source: Stripe documentation (docs.stripe.com/webhooks), current revision.
+
+expected_findings:
+  - stripe_webhook_signature_verification_required
+  - stripe_webhook_raw_body_required
+  - stripe_webhook_idempotency_table_required
+  - stripe_webhook_same_transaction_required
+  - stripe_webhook_minimum_event_set_listed
+  - stripe_webhook_retry_semantics_explained
+  - stripe_outbound_idempotency_key_mentioned
+  - stripe_api_version_pinning_mentioned
+
+must_not_contain:
+  - "express.json()"
+  - "trust the webhook without verification"
+  - "no need to verify signature"
+  - "skip idempotency"
+  - "two separate transactions"
+  - "swallow the error and return 200"
+  - "TODO"
+  - "stub"
+
+severity_when_fails: critical
+
+contributed_by: "(maintainer)"
+
+added_in_version: "8.5.0"
+
+last_verified: "2026-05-19"
+
+tags:
+  - stripe
+  - webhooks
+  - idempotency
+  - billing
+  - saas
+
+references:
+  - "Stripe documentation — Webhooks (docs.stripe.com/webhooks), 2026 revision."
+  - "Stripe documentation — Idempotent requests (docs.stripe.com/api/idempotent_requests)."
+  - "Stripe documentation — Upgrades and Application Programming Interface (API) versioning (docs.stripe.com/upgrades)."
+
+timeout_ms: 120000
+
+flaky: false

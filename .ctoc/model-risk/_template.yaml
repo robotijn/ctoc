@@ -1,0 +1,173 @@
+# Per-language-model risk file (template)
+#
+# CTOC v6.9.27 — Cluster 3 (Risk Analysis Before Build). Activated by the
+# `model_risk_file` control, which is required by the active regulatory
+# regime profile `dora` (Digital Operational Resilience Act, applicable
+# since January 17 2025) and `eu-ai-act-high-risk` (European Union
+# Artificial Intelligence Act Annex III, high-risk obligations
+# effective August 2 2026).
+#
+# Lineage: the model-risk discipline derives from the Federal Reserve
+# Supervisory Letter 11-7, "Guidance on Model Risk Management"
+# (https://www.federalreserve.gov/supervisionreg/srletters/sr1107.htm),
+# issued April 4 2011 jointly by the Federal Reserve System and the
+# Office of the Comptroller of the Currency. Supervisory Letter 11-7
+# was originally aimed at financial-institution quantitative models
+# (credit, market, operational risk). The same discipline is now
+# generally accepted as the right framing for any model that influences
+# a consequential decision, including large-language-models. The 2024
+# Office of the Comptroller of the Currency Bulletin 2024-29 reaffirms
+# the principles explicitly for artificial-intelligence models, and the
+# European Banking Authority's 2024 guidelines on the use of artificial
+# intelligence in financial services adopt the same vocabulary. See
+# also the National Institute of Standards and Technology Artificial
+# Intelligence Risk Management Framework 1.0 (January 2023) at
+# https://www.nist.gov/itl/ai-risk-management-framework which structures
+# the same lifecycle in non-financial terms.
+#
+# Copy this file to .ctoc/model-risk/<model-id-slug>.yaml for each
+# language model the project uses. Re-validate annually OR after any
+# model upgrade (Claude 4.5 → 4.6 → 4.7, GPT-N to GPT-(N+1), and so on).
+# An expired or missing model-risk file blocks Gate 3 advancement when
+# the `model_risk_file` control is active.
+
+# Stable identifier. Use the canonical model ID as published by the
+# provider (e.g., claude-opus-4-7, gpt-4-turbo-2024-04-09).
+model_id: <provider>-<model-name>-<version>
+
+# Human-readable display name used in dashboards and audit exports.
+model_display_name: <e.g., Claude Opus 4.7 (one million-token context)>
+
+# Provider organisation. The third-party-risk register at
+# .ctoc/registers/third-party.yaml MUST also have an entry for this
+# provider when the `third_party_risk_register` control is active.
+provider:
+  name: <e.g., Anthropic>
+  homepage: <https://...>
+  contractual_relationship: <direct API customer | aggregator | reseller>
+  data_processing_addendum_url: <url, when applicable>
+
+# Version metadata.
+model_version: <release tag from the provider>
+training_data_cutoff: <YYYY-MM-DD, as published by the provider>
+release_date: <YYYY-MM-DD, as published by the provider>
+deprecation_date: <YYYY-MM-DD, when announced; otherwise unverified>
+
+# Technical capability summary. Only record values published by the
+# provider. Mark any value the provider does NOT publish with
+# `[unverified]` and a citation note explaining the gap; do not estimate.
+capabilities:
+  context_window_tokens: <integer, as published>
+  max_output_tokens: <integer, as published>
+  modalities: [text, vision, audio, code]    # list those the provider documents
+  tool_use_supported: true | false
+  structured_output_supported: true | false
+  fine_tune_available: true | false
+
+# Intended use within this project — explicit scope statement. A model
+# used outside its declared intended use is one of the canonical model-
+# risk failure modes (Supervisory Letter 11-7 Section IV).
+intended_use:
+  primary: <one-paragraph description of what this model is used for here>
+  permitted_inputs: <list of input categories, e.g., source code, plans, public documentation>
+  forbidden_inputs:
+    - personal data of European Union residents without the Data Processing Addendum
+    - special-category personal data per General Data Protection Regulation Article 9
+    - credentials, secrets, or signed cryptographic material
+    - safety-critical control outputs (this model is advisory only)
+
+# Known limitations and failure modes. The Supervisory Letter 11-7
+# vocabulary uses "model risk" for the residual risk after limitations
+# are documented. This block is the discipline's load-bearing element.
+known_limitations:
+  - id: ML-001
+    category: hallucination
+    description: |
+      The model can produce confident-sounding text that is factually
+      incorrect, particularly for events after the training-data cutoff,
+      for numbers that are not citation-anchored, and for names or
+      organisations that resemble but differ from real entities.
+    mitigation: |
+      Require citations for every factual claim; reject outputs that
+      include numeric values without a `[verified]` marker or a source
+      URL. The CLAUDE.md rule "no invented numbers; cite sources" makes
+      this enforceable in the CTOC pipeline.
+  - id: ML-002
+    category: instruction-following-drift
+    description: |
+      Long-context conversations can drift from earlier system
+      instructions when the user input is ambiguous.
+    mitigation: |
+      Re-state critical constraints in every prompt; do not rely on
+      multi-turn memory for safety-relevant constraints.
+  - id: ML-003
+    category: prompt-injection-direct
+    description: |
+      User-supplied prompts can include instructions that conflict with
+      the agent's system prompt. The model may follow the user
+      instruction rather than the system instruction.
+    mitigation: |
+      Treat user-supplied input as untrusted data, not as authority.
+      Apply structured-output schemas to bound the model's response.
+      Reference MITRE ATLAS technique AML.T0051 (Large-Language-Model
+      Prompt Injection) for the canonical attack catalogue.
+  - id: ML-004
+    category: prompt-injection-indirect
+    description: |
+      Web pages or documents read by the agent can contain hidden
+      instructions that the model may execute when the content is
+      retrieved into context.
+    mitigation: |
+      Tag retrieved content with provenance and treat it as data, not
+      as instructions; do not allow the model to act on retrieved
+      content without a separate authorisation gate. MITRE ATLAS
+      sub-technique under AML.T0051.
+
+# Independent evaluation evidence. The Supervisory Letter 11-7 calls
+# this "model validation" and requires it to be independent of model
+# development (Section V). For language models, the customer is the
+# validator; the provider's published benchmarks are inputs, not
+# substitutes.
+prompt_injection_test_summary:
+  test_suite: <e.g., the project's prompt-injection test pack, or a public benchmark>
+  test_suite_url: <when public>
+  last_run_date: <YYYY-MM-DD>
+  pass_rate_pct: <number 0..100, with citation>
+  notes: |
+    <free-form explanation of which categories pass and which fail>
+
+output_variance_benchmark:
+  benchmark_suite: <e.g., the project's regression suite for outputs>
+  last_run_date: <YYYY-MM-DD>
+  variance_metric: <e.g., proportion of outputs that differ across two runs of the same prompt>
+  threshold: <project-specific threshold>
+  observed: <observed value, with citation>
+
+# Governance fields per Supervisory Letter 11-7 Section IV.A
+# (model development, implementation, and use).
+owner: <name or team; the human accountable for the model in this project>
+challenger_reviewer: <name or team; required for the financial-services profile>
+last_validated_date: <YYYY-MM-DD>
+expiration_date: <YYYY-MM-DD; typically last_validated_date + 365 days>
+escalation_path: |
+  <how the user is notified when the expiration date is reached, and how
+  the model-risk file is re-validated>
+
+# Optional: provider-side incidents that affected this model.
+provider_incidents:
+  - date: <YYYY-MM-DD>
+    severity: <provider-published severity tier>
+    summary: <one-line>
+    url: <provider status-page or post-mortem>
+
+# Sources used to populate this file. CLAUDE.md mandates citations for
+# every factual claim; mark any unverifiable value with `[unverified]`.
+references:
+  - title: "Federal Reserve Supervisory Letter 11-7 — Guidance on Model Risk Management"
+    url: "https://www.federalreserve.gov/supervisionreg/srletters/sr1107.htm"
+  - title: "Office of the Comptroller of the Currency Bulletin 2011-12 — companion to Supervisory Letter 11-7"
+    url: "https://www.occ.gov/news-issuances/bulletins/2011/bulletin-2011-12.html"
+  - title: "National Institute of Standards and Technology Artificial Intelligence Risk Management Framework version 1.0"
+    url: "https://www.nist.gov/itl/ai-risk-management-framework"
+  - title: "MITRE ATLAS — Adversarial Threat Landscape for Artificial-Intelligence Systems"
+    url: "https://atlas.mitre.org/"

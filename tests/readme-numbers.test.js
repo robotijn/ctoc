@@ -106,38 +106,38 @@ function countQualityConfigs() {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('Ground truth — project counts (sanity checks)', () => {
-  it('agents/: 109 .md files (excluding _shared/, after persona-classifier removal)', () => {
-    assert.equal(countAgentMdFiles(), 109);
+  it('agents/: 110 .md files (excluding _shared/, ivv-chief added in v6.9.27)', () => {
+    assert.equal(countAgentMdFiles(), 110);
   });
 
   it('agents/: 22 categories', () => {
     assert.equal(countAgentCategories(), 22);
   });
 
-  it('skills/: 91 SKILL.md specialist bodies (v6.9.24+)', () => {
+  it('skills/: 99 SKILL.md specialist bodies (v6.9.27 added 8 cross-industry-critique skills)', () => {
     // v6.9.15–v6.9.23: improved 86 existing SKILL.md via websearch→update→critique→update.
     // v6.9.24: added 5 gap-fill skills (sbom-cra-checker, threat-modeler,
     // ai-governance-checker, llm-security-tester, incident-responder) via v3 critique.
     // Pin at >= 91 to allow future growth.
     const count = countSpecialistSkillBodies();
-    assert.ok(count >= 91, `expected >= 91 SKILL.md, got ${count}`);
+    assert.ok(count >= 99, `expected >= 99 SKILL.md, got ${count}`);
   });
 
-  it('skills/: total .md count is in v6.9.24+ range (408 → 413 after 5 gap-fill adds)', () => {
+  it('skills/: total .md count is in v6.9.27+ range (413 → 421 after 8 cross-industry-critique skill adds)', () => {
     const total = countAllSkillMd();
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 87 JS modules at top level (after persona.js removal)', () => {
-    assert.equal(countTopLevelJs('src/lib'), 87);
+  it('src/lib/: 105 JS modules at top level (v6.9.27 added 18 cross-industry-critique libraries)', () => {
+    assert.equal(countTopLevelJs('src/lib'), 105);
   });
 
-  it('src/commands/: 11 slash command specs (.md files)', () => {
-    assert.equal(countSlashCommandSpecs(), 11);
+  it('src/commands/: 13 slash command specs (.md files)', () => {
+    assert.equal(countSlashCommandSpecs(), 13);
   });
 
-  it('src/hooks/: 12 hook files', () => {
-    assert.equal(countTopLevelFiles('src/hooks'), 12);
+  it('src/hooks/: 13 hook files (andon-halt added v6.9.27)', () => {
+    assert.equal(countTopLevelFiles('src/hooks'), 13);
   });
 
   it('src/tabs/: 8 dashboard tab files', () => {
@@ -148,8 +148,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(countTestFiles() >= 65, `expected >=65 test files, got ${countTestFiles()}`);
   });
 
-  it('docs/: 7 docs files (after PERSONA_ROUTING.md removal)', () => {
-    assert.equal(countDocsFiles(), 7);
+  it('docs/: 14 docs files (v6.9.27 added 7 cross-industry-critique docs)', () => {
+    assert.equal(countDocsFiles(), 14);
   });
 
   it('scouts (Tier 3): 5 Haiku scout agents', () => {
@@ -195,23 +195,23 @@ describe('README — explicit numeric claims match reality', () => {
   });
 
   it('badge: skills-413 (v6.9.24+)', () => {
-    assert.match(README, /skills-413-blue/);
+    assert.match(README, /skills-421-blue/);
   });
 
-  it('lead paragraph: 109 agents across 22 categories', () => {
-    assert.match(README, /\*\*109 agents\*\* across \*\*22 categories\*\*/);
+  it('lead paragraph: 110 agents across 22 categories', () => {
+    assert.match(README, /\*\*110 agents\*\* across \*\*22 categories\*\*/);
   });
 
   it('Compare table: 110 across 22 categories', () => {
     assert.match(README, /110 across 22 categories/);
   });
 
-  it('Key Features: 109 agents across 22 categories', () => {
-    assert.match(README, /\*\*109 agents\*\* across 22 categories/);
+  it('Key Features: 110 agents across 22 categories', () => {
+    assert.match(README, /\*\*110 agents\*\* across 22 categories/);
   });
 
-  it('Key Features: 413 skill files (v6.9.24+)', () => {
-    assert.match(README, /\*\*413 skill files\*\*/);
+  it('Key Features: 421 skill files (v6.9.24+)', () => {
+    assert.match(README, /\*\*421 skill files\*\*/);
   });
 
   it('Key Features: 14 languages auto-detected', () => {
@@ -243,35 +243,35 @@ describe('README — explicit numeric claims match reality', () => {
   });
 
   it('Project structure: 11 slash commands', () => {
-    assert.match(README, /11 slash commands/);
+    assert.match(README, /13 slash commands/);
   });
 
   it('Project structure: 12 Claude Code hooks', () => {
-    assert.match(README, /12 Claude Code hooks/);
+    assert.match(README, /13 Claude Code hooks/);
   });
 
-  it('Project structure: 87 JS modules in src/lib', () => {
-    assert.match(README, /87 JS modules/);
+  it('Project structure: 105 JS modules in src/lib', () => {
+    assert.match(README, /105 JS modules/);
   });
 
   it('Project structure: 110 agent definitions across 22 categories', () => {
     assert.match(README, /110 agent definitions across 22 categories/);
   });
 
-  it('Project structure: 413 skill files (v6.9.24+)', () => {
-    assert.match(README, /413 skill files/);
+  it('Project structure: 421 skill files (v6.9.24+)', () => {
+    assert.match(README, /421 skill files/);
   });
 
-  it('Agents intro: 109 agents across 22 categories', () => {
-    assert.match(README, /\*\*109 agents across 22 categories\*\*/);
+  it('Agents intro: 110 agents across 22 categories', () => {
+    assert.match(README, /\*\*110 agents across 22 categories\*\*/);
   });
 
-  it('Skills intro: 413 skill files (v6.9.24+)', () => {
-    assert.match(README, /\*\*413 skill files\*\*/);
+  it('Skills intro: 421 skill files (v6.9.24+)', () => {
+    assert.match(README, /\*\*421 skill files\*\*/);
   });
 
-  it('Skills section names two kinds — Tier-2 (91) and Knowledge (322)', () => {
-    assert.match(README, /Tier-2 specialist skill bodies \(91\)/);
+  it('Skills section names two kinds — Tier-2 (99) and Knowledge (322)', () => {
+    assert.match(README, /Tier-2 specialist skill bodies \(99\)/);
     assert.match(README, /Knowledge skills \(322\)/);
   });
 });

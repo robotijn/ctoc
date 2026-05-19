@@ -1,0 +1,31 @@
+name: eu-cra
+display_name: "European Union Cyber Resilience Act"
+description: "Applicable to products with digital elements placed on the European Union market. Effective September 11 2026."
+authoritative_sources:
+  - title: "EU Cyber Resilience Act 2026 milestones — Hogan Lovells"
+    url: "https://www.hoganlovells.com/en/publications/eu-cyber-resilience-act-getting-ready-for-cra-compliance-in-2026"
+  - title: "Cyber Resilience Act — European Commission"
+    url: "https://digital-strategy.ec.europa.eu/en/policies/cyber-resilience-act"
+effective_date: "2026-09-11"
+applies_to: "Manufacturers, importers, and distributors of products with digital elements sold in the European Union"
+required_controls:
+  - audit_hash_chain
+  - retention_schedule
+  - cra_incident_clocks
+  - third_party_risk_register
+  - tool_qualification
+  - config_baseline
+  - ai_provenance_stamp
+  - process_fmea_loop
+  - capa_register
+  - eight_d_incident_template
+  - business_continuity_plan
+retention:
+  dispatches: 3650
+  baselines: 3650
+  security_incident: 3650
+notes: |
+  Article 14 requires three statutory clocks for actively exploited vulnerabilities:
+  early warning within twenty-four hours, full notification within seventy-two hours,
+  final report within fourteen days. Conformity assessment required for products with
+  digital elements. Software Bill of Materials maintained throughout lifecycle.

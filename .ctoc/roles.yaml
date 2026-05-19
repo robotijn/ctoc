@@ -1,0 +1,69 @@
+# Project Role Declarations
+#
+# Declares the principals (humans and machine identities) that can author,
+# review, and approve work in this project. Used by:
+#   - src/lib/four-eyes.js          — Gate 3 four-eyes enforcement
+#   - src/lib/privilege-posture.js  — work-product disclosure banners
+#   - src/hooks/human-gate-check.js — gate-violation detection
+#
+# Schema (each entry under roles:):
+#   - name: string           Unique stable identifier; appears in plan markers
+#                            such as `approved_by_author_review: <name>`.
+#     identity: string       Human-readable name, email, or service principal.
+#                            For humans, prefer the email used in commits so
+#                            audit trails match version-control history.
+#     can_author: bool       May write or edit plans and source files. Author
+#                            authority does NOT imply approval authority.
+#     can_review: bool       May sign the author-side review marker
+#                            (`approved_by_author_review:`). One role can hold
+#                            this and `can_author`; the marker just records
+#                            who signed the author-side review pass.
+#     can_approve: bool      May sign the independent approval marker
+#                            (`approved_by_independent:`). The four-eyes
+#                            library requires that the identity carrying this
+#                            marker differs from the identity that carried
+#                            `approved_by_author_review`.
+#
+# Defaults below are the minimum-viable set for a solo human developer plus
+# an AI authoring assistant. Add additional principals (peer reviewer,
+# Independent Verification and Validation Chief identity, compliance officer)
+# as the project grows.
+#
+# Cross-references:
+#   - Four-eyes principle: International Organization for Standardization
+#     27001:2022 Annex A control 5.3 (segregation of duties); Sarbanes-Oxley
+#     Section 404 Information Technology General Controls; Payment Card
+#     Industry Data Security Standard version 4 Requirement 6.5.4.
+
+roles:
+  - name: human
+    identity: "primary-developer@example.com"
+    can_author: true
+    can_review: true
+    can_approve: true
+
+  - name: ai-author
+    identity: "claude-code-assistant"
+    can_author: true
+    can_review: false
+    can_approve: false
+
+  # Example additional roles (uncomment and edit as the project grows):
+  #
+  # - name: peer-reviewer
+  #   identity: "second-developer@example.com"
+  #   can_author: true
+  #   can_review: true
+  #   can_approve: true
+  #
+  # - name: ivv-chief
+  #   identity: "iv-and-v-team@example.com"
+  #   can_author: false
+  #   can_review: false
+  #   can_approve: true     # Independent Verification and Validation sign-off
+  #
+  # - name: compliance-officer
+  #   identity: "compliance@example.com"
+  #   can_author: false
+  #   can_review: true
+  #   can_approve: true     # required when sox-itgc or pci-dss-v4 is active
