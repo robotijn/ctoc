@@ -51,9 +51,15 @@ const TIER_1_AGENTS = [
   'agents/planning/vision-decomposer.md',
   'agents/planning/product-owner.md',
   'agents/planning/implementation-planner.md',
-  'agents/coordinator/persona-classifier.md',     // v8.3+
-  'agents/planning/stack-chooser.md',             // v8.3+
-  'agents/planning/unit-economics-modeler.md',    // v8.3+
+  'agents/planning/stack-chooser.md',
+];
+
+// Product Loop agents — dispatched OUTSIDE the CTO Chief technical chain.
+// They are Tier 1 sub-orchestrators but report to the user (founder or product manager),
+// not to the CTO Chief. Listed here for awareness; excluded from the tier-1-reports-to check.
+const PRODUCT_LOOP_AGENTS = [
+  'agents/planning/kpi-planner.md',
+  'agents/planning/unit-economics-modeler.md',
 ];
 
 const REQUIRED_HOOKS = [
@@ -73,7 +79,6 @@ const REQUIRED_LIBS = [
   'src/lib/iron-loop.js',
   'src/lib/plan-validator.js',
   'src/lib/escape-phrases.js',
-  'src/lib/persona.js',
   'src/lib/v8-dispatcher.js',
   'src/lib/product-loop.js',     // v8.4+ Product Loop
 ];
@@ -432,28 +437,6 @@ function checkVersionSync(root) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  Persona system integrity
-// ─────────────────────────────────────────────────────────────────────
-
-function checkPersonaSystemExists(root) {
-  const required = [
-    'src/lib/persona.js',
-    '.ctoc/templates/questions.yaml',
-    'agents/coordinator/persona-classifier.md',
-    'docs/PERSONA_ROUTING.md',
-  ];
-  const missing = required.filter(rel => !fs.existsSync(path.join(root, rel)));
-  if (missing.length > 0) {
-    return {
-      severity: 'block',
-      message: `Persona system files missing: ${missing.join(', ')}`,
-      details: { missing },
-    };
-  }
-  return null;
-}
-
-// ─────────────────────────────────────────────────────────────────────
 //  SaaS template integrity
 // ─────────────────────────────────────────────────────────────────────
 
@@ -542,7 +525,6 @@ const CHECKS = [
   { id: 'required-libs',               scope: 'system',       mode: 'fast', fn: checkRequiredLibs },
   { id: 'hooks-json-registration',     scope: 'system',       mode: 'fast', fn: checkHooksJsonRegistration },
   { id: 'version-sync',                scope: 'system',       mode: 'fast', fn: checkVersionSync },
-  { id: 'persona-system',              scope: 'persona',      mode: 'fast', fn: checkPersonaSystemExists },
   { id: 'saas-templates',              scope: 'saas',         mode: 'fast', fn: checkSaasTemplates },
   { id: 'budget-config-exists',        scope: 'budget',       mode: 'fast', fn: checkBudgetConfigExists },
   { id: 'product-loop',                scope: 'product',      mode: 'fast', fn: checkProductLoop },

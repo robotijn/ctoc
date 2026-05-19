@@ -9,10 +9,6 @@ description: "B2B SaaS with SSO (SAML/OIDC), organization-scoped data, audit log
 schema_version: 1
 last_reviewed: 2026-05-14
 
-target_personas:
-  - founder
-  - technical-founder
-
 target_project_types:
   - saas-b2b
   - enterprise-saas
@@ -195,33 +191,26 @@ rbac:
 setup_steps:
   - step: "Create Vercel project + custom domain"
     estimated_minutes: 15
-    persona: programmer
 
   - step: "Provision Supabase database (Pro plan for backups)"
     estimated_minutes: 15
-    persona: programmer
 
   - step: "Set up WorkOS account + AuthKit + grab Client ID + API key"
     estimated_minutes: 30
-    persona: programmer
 
   - step: "Configure Stripe account for invoice mode + tax (if applicable)"
     estimated_minutes: 30
-    persona: founder
     note: "Founder owns pricing tiers + tax configuration."
 
   - step: "Set up Resend domain + SPF/DKIM/DMARC"
     estimated_minutes: 30
-    persona: programmer
     blocking_for: deployment
 
   - step: "Set up Sentry + PostHog + Better Uptime + Axiom"
     estimated_minutes: 30
-    persona: programmer
 
   - step: "Configure all environment variables in Vercel"
     estimated_minutes: 20
-    persona: programmer
     env_vars:
       - DATABASE_URL
       - DIRECT_DATABASE_URL
@@ -239,12 +228,10 @@ setup_steps:
 
   - step: "Generate legal templates (DPA, MSA, ToS, Privacy)"
     estimated_minutes: 60
-    persona: founder
     note: "Use saas/legal-scaffold skill; lawyer review required before first signed customer."
 
   - step: "Engage SOC2 readiness vendor (Vanta / Drata)"
     estimated_minutes: 480
-    persona: founder
     note: "Optional at MVP; required before mid-market+ customers ask."
 
 # ===============================================================================
@@ -253,45 +240,38 @@ setup_steps:
 
 first_week_milestones:
   day_1:
-    persona: programmer
     deliverables:
       - "Repo scaffolded, deployed to Vercel with custom domain"
       - "Postgres connected, organizations + users tables migrated"
 
   day_2:
-    persona: programmer
     deliverables:
       - "WorkOS AuthKit working (test SAML flow)"
       - "Organization created on first sign-in"
 
   day_3:
-    persona: programmer
     deliverables:
       - "RLS policies on every business-data table (RLS by organization_id)"
       - "RBAC middleware enforces role-based access"
       - "Audit log table + middleware capturing every mutation"
 
   day_4:
-    persona: programmer
     deliverables:
       - "SCIM webhook handler: user.created + user.deleted"
       - "Test by adding/removing a user in WorkOS test directory"
 
   day_5:
-    persona: programmer
     deliverables:
       - "Stripe Invoice creation flow + send_invoice mode tested"
       - "Customer Portal accessible for billing-only role"
 
   day_6:
-    persona: programmer + designer
     deliverables:
       - "Org settings page (members, roles, billing)"
       - "Audit log viewer for admins"
       - "Invite flow (admin invites teammate via email)"
 
   day_7:
-    persona: founder
     deliverables:
       - "DPA + MSA + Privacy + ToS posted at /legal/*"
       - "InfoSec questionnaire template ready (SIG Lite or similar)"

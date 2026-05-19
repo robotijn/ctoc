@@ -13,7 +13,6 @@ templates:
   - id: saas/b2c-subscription
     name: "B2C Subscription SaaS"
     description: "Freemium or paid B2C SaaS with Stripe subscriptions. Default for consumer products."
-    target_personas: [founder, technical-founder]
     target_project_types: [saas-b2c, startup-product]
     path: .ctoc/templates/saas/b2c-subscription/
     status: ready
@@ -22,46 +21,41 @@ templates:
 
   - id: saas/b2b-sales-led
     name: "B2B Sales-Led SaaS"
-    description: "B2B with SSO, audit logs, RBAC, contracts. Sales-led GTM."
-    target_personas: [founder, technical-founder]
+    description: "B2B with single-sign-on, audit logs, role-based access control, contracts. Sales-led go-to-market."
     target_project_types: [saas-b2b]
     status: planned
     notes: |
-      Differs from b2c-subscription: WorkOS for SSO, organization-scoped data,
+      Differs from b2c-subscription: WorkOS for single-sign-on, organization-scoped data,
       role-based permissions, audit log table, contract-based billing (not self-serve),
-      compliance docs (SOC2 templates).
+      compliance docs (System and Organization Controls 2 templates).
 
   - id: saas/usage-based-api
     name: "Usage-Based API SaaS"
-    description: "API product with per-request or per-token metering."
-    target_personas: [founder, technical-founder]
+    description: "Application-programming-interface product with per-request or per-token metering."
     target_project_types: [api-saas]
     status: planned
     notes: |
-      Differs: metered billing (Stripe metered prices), API keys table, rate limiting,
-      usage dashboard, latency SLO.
+      Differs: metered billing (Stripe metered prices), application-programming-interface
+      keys table, rate limiting, usage dashboard, latency service-level objective.
 
   - id: app/expo-react-native
     name: "React Native Mobile App"
-    description: "Cross-platform iOS + Android with Expo + EAS."
-    target_personas: [founder, programmer, technical-founder]
+    description: "Cross-platform iOS plus Android with Expo and Expo Application Services."
     target_project_types: [mobile-app]
     status: planned
     notes: |
-      Default stack: Expo SDK 52+, Clerk Expo, Supabase, RevenueCat (in-app purchases),
-      Sentry, EAS Build & Submit.
+      Default stack: Expo software-development-kit 52+, Clerk Expo, Supabase, RevenueCat
+      (in-app purchases), Sentry, Expo Application Services Build and Submit.
 
   - id: cli/bun-single-binary
-    name: "CLI Tool (Bun, Single Binary)"
-    description: "CLI tool packaged as a single cross-platform binary."
-    target_personas: [programmer, hobbyist]
+    name: "Command-Line Tool (Bun, Single Binary)"
+    description: "Command-line tool packaged as a single cross-platform binary."
     target_project_types: [cli]
     status: planned
 
   - id: oss-lib/typescript
-    name: "OSS TypeScript Library"
-    description: "TypeScript library with proper publish + changesets + CI."
-    target_personas: [programmer]
+    name: "Open-Source TypeScript Library"
+    description: "TypeScript library with proper publish plus changesets plus continuous integration."
     target_project_types: [oss-library]
     status: planned
 
@@ -69,12 +63,9 @@ templates:
 #  How a template is selected
 # ===============================================================================
 #
-#  1. persona-classifier sets the persona (founder | programmer | etc.)
-#  2. vision-advisor extracts the project type from the user's vision
-#  3. stack-chooser (Tier 1) consults this index + the project type
-#  4. CTO Chief presents the matching template(s) and asks user to confirm
-#     (only for founders/technical-founders; programmers see "we'll use $TEMPLATE
-#      defaults unless you override")
-#  5. The template's manifest.yaml dictates the implementation-planner output
+#  1. vision-advisor extracts the project type from the user's vision
+#  2. stack-chooser (Tier 1) consults this index plus the project type
+#  3. CTO Chief presents the matching template and asks the user to confirm
+#  4. The template's manifest.yaml dictates the implementation-planner output
 #
 # ===============================================================================

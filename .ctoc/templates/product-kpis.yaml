@@ -24,7 +24,6 @@ kpis:
     formula: "events('signup_started') / sessions"
     event_source: "posthog: signup_started"
     applicable_to: [saas-b2c, saas-b2b, mobile-app]
-    persona_owner: founder
 
   - id: signup_completion
     name: "Signup completion rate"
@@ -34,7 +33,6 @@ kpis:
     formula: "events('signup_completed') / events('signup_started')"
     event_source: "posthog: signup_completed"
     applicable_to: [saas-b2c, saas-b2b, mobile-app]
-    persona_owner: founder
 
   - id: activation_rate
     name: "Activation rate"
@@ -44,7 +42,6 @@ kpis:
     formula: "users_activated_within_7d / total_signups"
     event_source: "posthog: activation (event must be defined per product)"
     applicable_to: [saas-b2c, saas-b2b, mobile-app]
-    persona_owner: pm
     notes: "Define 'activation' per product. E.g., 'created first invoice' for invoice SaaS."
 
   - id: time_to_value
@@ -55,7 +52,6 @@ kpis:
     formula: "median(activation_timestamp - signup_completed_timestamp)"
     event_source: "posthog: derived"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: pm
 
 # ─────────────────────────────────────────────
 # Retention
@@ -69,7 +65,6 @@ kpis:
     formula: "returning_users_d1 / new_signups"
     event_source: "posthog: session events with user_id"
     applicable_to: [saas-b2c, saas-b2b, mobile-app]
-    persona_owner: pm
 
   - id: w1_retention
     name: "Week 1 retention"
@@ -79,7 +74,6 @@ kpis:
     formula: "returning_users_w1 / new_signups"
     event_source: "posthog"
     applicable_to: [saas-b2c, saas-b2b, mobile-app]
-    persona_owner: pm
 
   - id: m1_retention
     name: "Month 1 retention"
@@ -89,7 +83,6 @@ kpis:
     formula: "returning_users_m1 / new_signups"
     event_source: "posthog"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: pm
 
 # ─────────────────────────────────────────────
 # Revenue
@@ -103,7 +96,6 @@ kpis:
     formula: "subscribed_users_within_30d / free_signups"
     event_source: "stripe: subscription_started + posthog signup attribution"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: founder
 
   - id: mrr
     name: "MRR (Monthly Recurring Revenue)"
@@ -113,7 +105,6 @@ kpis:
     formula: "sum(active_subscriptions.monthly_price)"
     event_source: "stripe + subscriptions table"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: founder
 
   - id: arpu
     name: "ARPU (Average Revenue Per User)"
@@ -123,7 +114,6 @@ kpis:
     formula: "MRR / paying_users"
     event_source: "derived"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: founder
 
 # ─────────────────────────────────────────────
 # Churn
@@ -137,7 +127,6 @@ kpis:
     formula: "canceled_in_month / active_at_month_start"
     event_source: "stripe: customer.subscription.deleted"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: founder
 
   - id: churn_reason
     name: "Churn reason distribution"
@@ -147,7 +136,6 @@ kpis:
     formula: "group by reason from cancel_survey"
     event_source: "in-app exit survey + Stripe metadata"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: pm
 
 # ─────────────────────────────────────────────
 # Satisfaction
@@ -161,7 +149,6 @@ kpis:
     formula: "promoters_pct - detractors_pct"
     event_source: "in-app survey (Userlist, Wootric, etc.)"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: founder
     notes: "Trigger survey after activation (e.g., 30 days post-signup or 5 sessions)"
 
   - id: csat
@@ -172,7 +159,6 @@ kpis:
     formula: "responses_4_or_5 / total_responses"
     event_source: "in-app survey or post-support-ticket"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: pm
 
 # ─────────────────────────────────────────────
 # Acquisition mix
@@ -186,7 +172,6 @@ kpis:
     formula: "organic_signups / total_signups"
     event_source: "utm_source captured at signup"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: founder
 
   - id: cac
     name: "CAC (Customer Acquisition Cost)"
@@ -196,7 +181,6 @@ kpis:
     formula: "acquisition_spend / new_paying_customers"
     event_source: "manual (ad spend + sales)"
     applicable_to: [saas-b2c, saas-b2b]
-    persona_owner: founder
     notes: "Connects to unit-economics-modeler. CAC payback period < 12mo is healthy."
 
 # ─────────────────────────────────────────────
@@ -211,7 +195,6 @@ kpis:
     formula: "distinct(user_id) where event_in_today"
     event_source: "posthog"
     applicable_to: [saas-b2c, mobile-app]
-    persona_owner: pm
 
   - id: dau_mau_ratio
     name: "DAU/MAU ratio (stickiness)"
@@ -221,7 +204,6 @@ kpis:
     formula: "DAU / MAU"
     event_source: "posthog"
     applicable_to: [saas-b2c, mobile-app]
-    persona_owner: pm
 
 # ===============================================================================
 #  Composition guidance

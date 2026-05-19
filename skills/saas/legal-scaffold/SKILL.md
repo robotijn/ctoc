@@ -79,7 +79,7 @@ The legal surface for a SaaS in 2026 is wider than it was even in 2024. Quebec L
 
 **Lawyer review is still required.** Generated drafts are a starting point; jurisdictional clauses (limitation of liability, arbitration, age gate, special-category data) require a licensed attorney in the relevant jurisdiction.
 
-## Input fact set (collected from founder persona)
+## Input fact set (collected from the founder)
 
 ```yaml
 project:
@@ -448,7 +448,7 @@ The `production-readiness.yaml` for `saas/b2c-subscription` includes:
 - `legal/ai_disclosure: severity: block` (if `uses_ai: true`)
 - `legal/accessibility_statement: severity: warn` (cross-link [[accessibility-checker]])
 
-This skill generates the drafts; the founder persona reviews + posts them; production-readiness verifies they're live at `/legal/*` with current effective-date frontmatter.
+This skill generates the drafts; the founder reviews and posts them; production-readiness verifies they're live at `/legal/*` with current effective-date frontmatter.
 
 ## Critical pitfalls (audit categories)
 

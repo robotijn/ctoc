@@ -14,29 +14,24 @@ dispatch_protocol: v1
 tier: 1
 ---
 
-## Step 0: Persona + Template selection (v8.3+ — runs FIRST)
+## Step 0: Template selection
 
-> Tech-stack questions are **programmer/architect decisions**. NEVER ask a founder which ORM to use.
+Before producing the implementation blueprint:
 
-Before producing the implementation blueprint, execute:
-
-1. **Read persona**: `.ctoc/session/persona.yaml`. Read the parent functional plan for the project type (`saas-b2c`, `saas-b2b`, `mobile-app`, `cli`, `oss-library`, `internal-tool`).
+1. **Read project type** from the parent functional plan (`saas-b2c`, `saas-b2b`, `mobile-app`, `cli`, `oss-library`, `internal-tool`).
 
 2. **Dispatch stack-chooser** (`agents/planning/stack-chooser.md`):
-   - This agent is persona-aware. For `founder` / `pm` / `designer` / `hobbyist`, it silently accepts the matching template's default stack (e.g., `saas/b2c-subscription` template). Tech-stack questions defer to `programmer` via the inbox.
-   - For `programmer` / `architect` / `technical-founder`, it presents defaults + allows component overrides.
-   - The output is a `tech_stack:` block written into the implementation plan's frontmatter.
+   - The stack-chooser selects the appropriate template defaults and writes a `tech_stack:` block into the implementation plan's frontmatter.
 
 3. **Consume the selected template**:
    - If the project type matches a template in `.ctoc/templates/saas/index.yaml` (or `app/*`, `cli/*`, `oss-lib/*`), read the template's `manifest.yaml`.
    - The manifest provides: default tech stack, required SaaS skills, standard schema, setup steps, first-week milestones, common pitfalls.
    - Use the manifest as the base; only fill in product-specific details (entities, business logic, custom routes).
 
-4. **Wire Product Loop instrumentation** (v8.4+):
-   - Read `plans/canvas/<slug>-kpis.yaml` (written by kpi-planner during the canvas phase).
-   - For each required event in `required_events:`, plan the wiring point in the impl plan (which file, which function, what payload).
-   - For each `required_dashboards:` entry, add a one-line item to the impl plan noting it must be created in PostHog post-deploy.
-   - Reference the `skills/saas/posthog-analytics` skill for instrumentation patterns.
+4. **Wire Product Loop instrumentation** (when the Product Loop is dispatched externally — see [`docs/PRODUCT_LOOP.md`](../../docs/PRODUCT_LOOP.md)):
+   - If `plans/canvas/<slug>-kpis.yaml` exists (the founder or product manager defined launch key-performance-indicators outside this technical chain), use it to plan the wiring point in the impl plan (which file, which function, what payload) for each required event.
+   - For each required dashboard entry, add a one-line item noting it must be created post-deploy.
+   - Reference the `skills/saas/posthog-analytics` skill for instrumentation patterns. The CTO Chief implements the wiring; the key-performance-indicator selection is outside scope.
 
 5. **Production-readiness reference**:
    - If template is `saas/b2c-subscription`, include `.ctoc/templates/saas/b2c-subscription/production-readiness.yaml` as the Gate 3 checklist.

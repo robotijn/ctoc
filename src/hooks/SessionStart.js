@@ -125,34 +125,20 @@ async function main() {
     selfCheckSummary = `Self-check skipped: ${err.message}`;
   }
 
-  // 7b. Persona context (v8.3+) — if classified, surface it
-  let personaSummary = null;
-  try {
-    const { loadPersona } = require('../lib/persona');
-    const persona = loadPersona();
-    if (persona && persona.primary) {
-      const sec = (persona.secondary && persona.secondary.length > 0) ? ` (+${persona.secondary.join(', ')})` : '';
-      personaSummary = `Persona: ${persona.primary}${sec} · confidence: ${persona.confidence || 'unknown'}`;
-    }
-  } catch {
-    // persona file may not exist on first session — that's fine
-  }
-
   // 8. Output context for Claude (to stdout for hook consumption)
-  const context = generateContext(stack, state, version, updateInfo, selfCheckSummary, personaSummary);
+  const context = generateContext(stack, state, version, updateInfo, selfCheckSummary);
   console.log(context);
 }
 
 /**
  * Generate CTOC context instructions for Claude
  */
-function generateContext(stack, state, version, updateInfo, selfCheckSummary, personaSummary) {
+function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
   const stepName = state?.feature ? STEP_NAMES[state.currentStep] : 'Ready';
   const updateLine = updateInfo?.updateAvailable
     ? `\nUpdate available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion} (run: git pull origin main)`
     : '';
   const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
-  const personaLine = personaSummary ? `\n${personaSummary}` : '';
 
   return `
 ============================================================
@@ -160,7 +146,7 @@ CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
 ============================================================
 Project: ${path.basename(process.cwd())}
 Stack: ${stack.languages.join('/') || 'unknown'}
-Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}${personaLine}${selfCheckLine}
+Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}${selfCheckLine}
 
 ## Iron Loop (16 Steps) - NON-NEGOTIABLE
 

@@ -26,7 +26,7 @@
 ```
 1. Run /ctoc:menu and start a new vision with project type "saas-b2c"
 2. CTO Chief consults this template
-3. Vision-advisor + product-owner ask founder-facing questions (per persona routing)
+3. Vision-advisor + product-owner walk through the step-scoped questions
 4. Implementation-planner generates the impl plan against this template's stack
 5. Iron Loop builds it
 6. Production-readiness gate blocks ship until the checklist passes
@@ -58,11 +58,11 @@ The template's `production-readiness.yaml` lists every one of these as a gate.
 
 ## Customizations the user can override
 
-When a `technical-founder` or `programmer` accepts this template, they can override:
-- Auth provider (Clerk → Supabase Auth, Auth.js, Lucia)
-- Payments provider (Stripe → Paddle for MoR / tax handling)
+When the user accepts this template, they can override:
+- Authentication provider (Clerk → Supabase Auth, Auth.js, Lucia)
+- Payments provider (Stripe → Paddle for merchant-of-record tax handling)
 - Database (Postgres-Supabase → Postgres-Neon, PlanetScale)
-- Email (Resend → Postmark, SendGrid)
+- Email provider (Resend → Postmark, SendGrid)
 - Analytics (PostHog → Mixpanel, Amplitude)
 
-When a `founder` (non-technical) accepts this template, overrides are deferred to a `programmer` persona via the deferral queue.
+If the user does not specify overrides, the template defaults apply.

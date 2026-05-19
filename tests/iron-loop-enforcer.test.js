@@ -138,14 +138,6 @@ nope`);
     assert.equal(f.severity, 'critical');
   });
 
-  it('flags missing persona system as block', () => {
-    const root = makeMinimalProject();
-    const result = checkAllInvariants({ root, mode: 'fast', scopes: ['persona'] });
-    const f = result.findings.find(x => x.id === 'persona-system');
-    assert.ok(f, 'expected persona-system finding');
-    assert.equal(f.severity, 'block');
-  });
-
   it('flags plan in done/ without approved_by marker as block', () => {
     const root = makeMinimalProject();
     fs.writeFileSync(path.join(root, 'plans/done/x.md'), '---\nfiles: ["*"]\n---\nbody');
@@ -200,9 +192,8 @@ describe('iron-loop-enforcer — constants', () => {
 
   it('TIER_1_AGENTS lists all expected sub-orchestrators', () => {
     assert.ok(TIER_1_AGENTS.includes('agents/coordinator/synthesizer.md'));
-    assert.ok(TIER_1_AGENTS.includes('agents/coordinator/persona-classifier.md'));
     assert.ok(TIER_1_AGENTS.includes('agents/planning/stack-chooser.md'));
-    assert.ok(TIER_1_AGENTS.includes('agents/planning/unit-economics-modeler.md'));
+    assert.ok(TIER_1_AGENTS.includes('agents/planning/stack-chooser.md'));
   });
 
   it('REQUIRED_HOOKS lists all PreToolUse + SessionStart + human-gate-check', () => {

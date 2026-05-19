@@ -113,11 +113,7 @@ describe('SaaS skills v8 conformance', () => {
   });
 });
 
-describe('Persona-aware planning agents exist', () => {
-  it('agents/coordinator/persona-classifier.md exists', () => {
-    assert.ok(exists(path.join(projectRoot, 'agents/coordinator/persona-classifier.md')));
-  });
-
+describe('Planning sub-orchestrators exist', () => {
   it('agents/planning/stack-chooser.md exists', () => {
     assert.ok(exists(path.join(projectRoot, 'agents/planning/stack-chooser.md')));
   });
@@ -126,54 +122,15 @@ describe('Persona-aware planning agents exist', () => {
     assert.ok(exists(path.join(projectRoot, 'agents/planning/unit-economics-modeler.md')));
   });
 
-  it('persona-classifier declares tier: 1 + reports_to: cto-chief', () => {
-    const c = read(path.join(projectRoot, 'agents/coordinator/persona-classifier.md'));
-    assert.match(c, /^tier:\s*1$/m);
-    assert.match(c, /reports_to:\s*cto-chief/);
-  });
-
   it('stack-chooser declares tier: 1 + reports_to: cto-chief', () => {
     const c = read(path.join(projectRoot, 'agents/planning/stack-chooser.md'));
     assert.match(c, /^tier:\s*1$/m);
     assert.match(c, /reports_to:\s*cto-chief/);
   });
 
-  it('unit-economics-modeler declares persona_gates', () => {
+  it('unit-economics-modeler declares tier: 1 and reports outside the CTO Chief chain', () => {
     const c = read(path.join(projectRoot, 'agents/planning/unit-economics-modeler.md'));
-    assert.match(c, /persona_gates:/);
-    assert.match(c, /- founder/);
-  });
-});
-
-describe('Question catalog (.ctoc/templates/questions.yaml)', () => {
-  const catalogPath = path.join(projectRoot, '.ctoc/templates/questions.yaml');
-
-  it('exists', () => {
-    assert.ok(exists(catalogPath));
-  });
-
-  it('has questions for each phase', () => {
-    const c = read(catalogPath);
-    for (const phase of ['vision', 'canvas', 'functional', 'implementation', 'deployment']) {
-      assert.match(c, new RegExp(`phase: ${phase}`), `no questions for phase: ${phase}`);
-    }
-  });
-
-  it('canvas pricing-model is gated for founder personas only', () => {
-    const c = read(catalogPath);
-    const pricingBlock = c.match(/^\s+- id: canvas\/pricing-model[\s\S]+?(?=^\s+- id:)/m);
-    assert.ok(pricingBlock, 'canvas/pricing-model question must exist');
-    const block = pricingBlock[0];
-    assert.match(block, /personas:[\s\S]*founder/, 'founder must be in personas');
-    assert.match(block, /deferred_for:[\s\S]*programmer/, 'programmer must be in deferred_for');
-  });
-
-  it('implementation tech-stack is gated for programmer personas only', () => {
-    const c = read(catalogPath);
-    const stackBlock = c.match(/^\s+- id: implementation\/tech-stack[\s\S]+?(?=^\s+- id:)/m);
-    assert.ok(stackBlock, 'implementation/tech-stack question must exist');
-    const block = stackBlock[0];
-    assert.match(block, /personas:[\s\S]*programmer/, 'programmer must be in personas');
-    assert.match(block, /deferred_for:[\s\S]*founder/, 'founder must be in deferred_for');
+    assert.match(c, /^tier:\s*1$/m);
+    assert.match(c, /reports_to:\s*user/);
   });
 });

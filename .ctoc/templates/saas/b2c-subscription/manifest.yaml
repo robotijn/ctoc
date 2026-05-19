@@ -9,10 +9,6 @@ description: "Freemium-or-paid B2C SaaS with self-serve subscription billing."
 schema_version: 1
 last_reviewed: 2026-05-14
 
-target_personas:
-  - founder
-  - technical-founder
-
 target_project_types:
   - saas-b2c
   - startup-product
@@ -134,30 +130,22 @@ standard_schema:
 setup_steps:
   - step: "Create Vercel project + connect custom domain"
     estimated_minutes: 15
-    persona: programmer
   - step: "Provision Supabase database (free tier OK for MVP)"
     estimated_minutes: 10
-    persona: programmer
   - step: "Set up Clerk application + configure email/password + social providers"
     estimated_minutes: 20
-    persona: programmer
   - step: "Set up Stripe account + create products + create prices for each tier"
     estimated_minutes: 30
-    persona: founder
     note: "Founder defines tier names + price points; programmer enters them in Stripe."
   - step: "Set up Resend domain + verify SPF/DKIM/DMARC DNS records"
     estimated_minutes: 30
-    persona: programmer
     blocking_for: deployment
   - step: "Set up Sentry project + grab DSN"
     estimated_minutes: 10
-    persona: programmer
   - step: "Set up PostHog project + grab API key"
     estimated_minutes: 10
-    persona: programmer
   - step: "Configure all environment variables in Vercel (production + preview)"
     estimated_minutes: 15
-    persona: programmer
     env_vars:
       - DATABASE_URL
       - CLERK_SECRET_KEY
@@ -175,20 +163,17 @@ setup_steps:
 
 first_week_milestones:
   day_1:
-    persona: programmer
     deliverables:
       - "Repo scaffolded with Next.js 15 + TypeScript + Tailwind"
       - "Deployed to Vercel with custom domain (HTTPS)"
       - "CI green on first PR"
 
   day_2:
-    persona: programmer
     deliverables:
       - "Clerk auth working (signup + signin + signout)"
       - "Postgres connected via Drizzle (initial users table migrated)"
 
   day_3:
-    persona: programmer
     deliverables:
       - "Stripe Checkout working with test card"
       - "Webhook handler verifies Stripe signature"
@@ -196,13 +181,11 @@ first_week_milestones:
       - "Idempotency via webhook_events table"
 
   day_4:
-    persona: programmer
     deliverables:
       - "Customer Billing Portal link works (self-serve plan change)"
       - "Failed-payment (past_due) handling tested"
 
   day_5:
-    persona: programmer
     deliverables:
       - "Resend domain verified — transactional email working"
       - "Welcome email triggers on signup"
@@ -210,14 +193,12 @@ first_week_milestones:
       - "PostHog events firing (signup, subscription_started)"
 
   day_6:
-    persona: designer_or_founder
     deliverables:
       - "Landing page copy + hero + features + pricing + FAQ"
       - "OG tags, favicon, brand colors applied"
       - "Mobile responsive verified"
 
   day_7:
-    persona: founder
     deliverables:
       - "Privacy Policy posted (via legal-scaffold skill)"
       - "Terms of Service posted"

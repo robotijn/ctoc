@@ -1,120 +1,77 @@
 ---
-description: Start a new vision — persona-aware ignition flow. Classifies user role, then routes through vision → canvas → impl with the right questions at the right time.
+description: Start a new vision — ignition flow that routes through vision → canvas → implementation in order, dispatching the planning chain step by step.
 model: claude-haiku-4-5
 ---
 
-# /ctoc:start — the v8.3+ ignition flow
+# /ctoc:start — Ignition flow for a new vision or feature
 
-This is the canonical entry point for "I want to build something new". It activates the full v8.3+ persona-aware planning chain:
+This is the canonical entry point for "I want to build something new". It dispatches the planning chain in order:
 
 ```
-1. persona-classifier (if no persona yet)
-   ↓
-2. vision-advisor (persona-filtered questions)
+1. vision-advisor (vision questions — at most 5)
    ↓ Gate 0
-3. product-owner OR skip-to-impl (per persona)
-   - founder/pm/technical-founder → product-owner + kpi-planner
-   - programmer/architect → skip canvas; tech-stack questions only
-   - hobbyist → minimal flow, defaults everything
+2. product-owner (Steps 2 ASSESS through 4 CAPTURE — functional plan)
    ↓ Gate 1
-4. implementation-planner + stack-chooser
+3. implementation-planner + stack-chooser (Steps 5 PLAN through 7 SPEC — technical plan)
    ↓ Gate 2
-5. Iron Loop (Steps 7-15)
+4. Iron Loop Steps 8 TEST through 16 FINAL-REVIEW
    ↓ Gate 3
-6. Product Loop (DEFINE happened at canvas; INSTRUMENT at impl; REVIEW post-ship)
+5. Product Loop (dispatched outside the CTO Chief technical chain by the founder or product manager)
 ```
 
 ## Steps for Claude to execute
 
-### Step 1: Check existing persona
+### Step 1: Dispatch vision-advisor
 
-```
-1. Read('.ctoc/session/persona.yaml')
-   - If exists AND classified within 30 days → use it; skip to Step 2
-   - If exists but > 30 days old → re-confirm with user via /ctoc:persona
-   - If missing → continue to Step 1a
-```
+Pass the user's initial message. The vision-advisor:
 
-### Step 1a: Classify persona (if not set)
+- Asks at most five questions to fill in problem, audience, success, and scope.
+- Writes the vision file under `plans/vision/`.
+- Returns control to the CTO Chief for Gate 0.
 
-Dispatch the persona-classifier agent. The user's intent message tells us most of what we need:
+### Step 2: User approves vision (Gate 0)
 
-- "I want to build a SaaS for X" → founder
-- "Refactor the auth module" → programmer
-- "Design the system for X" → architect
-- "Side project for fun" → hobbyist
+The CTO Chief presents the vision summary. User approves to continue.
 
-If signals are weak, persona-classifier asks ONE clarifying question.
+### Step 3: Functional planning (Steps 2 ASSESS through 4 CAPTURE)
 
-### Step 2: Run vision-advisor with persona context
+Dispatch product-owner to refine the vision into a functional plan with behaviour-driven-development acceptance criteria. Output lands in `plans/functional/`.
 
-Pass the persona file path + the user's initial message. The vision-advisor:
-- Loads the question catalog
-- Filters questions by persona (founder gets audience/pricing-relevant; programmer gets minimal)
-- Asks at most 5 questions
-- Writes the vision file
-- Marks the vision frontmatter with `primary_persona`, `canvas_required`, `kpi_loop_required`
+### Step 4: User approves functional plan (Gate 1)
 
-### Step 3: User approves vision (Gate 0)
+### Step 5: Technical planning (Steps 5 PLAN through 7 SPEC)
 
-CTO Chief presents the vision summary. User says approve.
+Dispatch implementation-planner. It in turn dispatches stack-chooser to lock the tech stack from the matching template. Output lands in `plans/implementation/`.
 
-### Step 4: Branch by persona
+If the founder or product manager has previously dispatched the Product Loop's kpi-planner outside this chain and a `plans/canvas/<slug>-kpis.yaml` exists, the implementation-planner reads it and plans instrumentation work for Step 10. The CTO Chief implements the wiring; the key-performance-indicator selection itself is outside scope.
 
-```
-if persona is founder/pm/technical-founder:
-  → product-owner runs canvas-phase questions (pricing, business model, target customer)
-  → kpi-planner runs DEFINE step (picks launch KPIs from canonical library)
-  → user approves at Gate 1
+### Step 6: User approves technical plan (Gate 2)
 
-if persona is programmer/architect:
-  → SKIP canvas. The canvas-required questions are deferred to .ctoc/inbox/ for the founder
-  → go directly to implementation-planner with template defaults
+### Step 7: Iron Loop execution (Steps 8 through 16)
 
-if persona is hobbyist:
-  → Minimal pipeline. Accept all template defaults. No KPI loop.
-```
+The Iron Loop runs end to end. The CTO Chief dispatches each step's specialists per the named-skill map in `agents/coordinator/cto-chief.md`.
 
-### Step 5: implementation-planner with stack-chooser
+### Step 8: User approves the final result (Gate 3)
 
-The implementation-planner:
-- Dispatches stack-chooser to lock the tech stack (per persona — defaults silently for non-tech, presents options for tech)
-- Loads the template's manifest (e.g., `.ctoc/templates/saas/b2c-subscription/manifest.yaml`)
-- Wires Product Loop instrumentation from the kpi-plan.yaml
-- Adds the production-readiness checklist as the Gate 3 reference
+After Gate 3, the Product Loop (dispatched outside this technical chain) takes over for validation. `/ctoc:kpi-status` and `/ctoc:product-review` are the relevant commands.
 
-### Step 6: Gate 2 → Iron Loop
-
-User approves the impl plan at Gate 2. Iron Loop Steps 7-15 run.
-
-### Step 7: Gate 3 → Product Loop kicks in
-
-After shipping:
-- Production-readiness checklist gates the release
-- `/ctoc:kpi-status` shows current state
-- Weekly `/ctoc:product-review` runs (or is scheduled by the user)
-
-## Slash-command behavior
+## Slash-command behaviour
 
 When the user invokes `/ctoc:start`:
 
-1. Acknowledge briefly ("Starting persona-aware planning flow…")
-2. Run Step 1 (check persona)
-3. Run Step 2 (dispatch vision-advisor)
-4. Let the vision-advisor's question flow play out
-5. After vision is written, return control to CTO Chief for Gate 0 approval
-
-Never skip Step 1. Never ask a programmer about pricing. Never ask a founder about TypeScript.
+1. Acknowledge briefly ("Starting ignition flow…").
+2. Dispatch vision-advisor with the user's initial message.
+3. Let the vision-advisor's question flow play out.
+4. After the vision file is written, return control to the CTO Chief for Gate 0.
 
 ## Output format
 
-After the flow completes a phase, end with a menu:
+After each phase completes, end with a menu:
 
 ```
-Vision approved. Persona: <role>. Next:
-[1] Continue to canvas (founder/pm) (Recommended if persona is founder/pm)
-[2] Skip to implementation (programmer/architect) (Recommended for technical persona)
-[3] Pause and revise the vision
+Vision approved. Next:
+[1] Continue to functional plan (Recommended)
+[2] Pause and revise the vision
 [0] Back to dashboard
 ```
 
@@ -122,10 +79,8 @@ Vision approved. Persona: <role>. Next:
 
 | | /ctoc:menu | /ctoc:start |
 |---|---|---|
-| Entry point | Dashboard (existing flow, all features) | New vision (v8.3+ persona-aware) |
-| Persona-aware | No | Yes |
-| KPI Loop wired | No (manual) | Yes (auto-dispatches kpi-planner) |
+| Entry point | Dashboard (existing flow, all features) | New vision or feature |
 | Template selection | Manual | Auto (via stack-chooser) |
 | Best for | Returning users, dashboard browsing | New project ignition |
 
-Both are valid entry points. `/ctoc:start` is the **persona-aware ignition flow** for greenfield projects.
+Both are valid entry points. `/ctoc:start` is the linear ignition flow for greenfield projects.

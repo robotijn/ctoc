@@ -31,7 +31,7 @@ function readFile(p, fallback = '') { return fs.existsSync(p) ? fs.readFileSync(
 /**
  * Load the canonical KPI library.
  * Returns an array of KPI entries (each: { id, name, category, definition, default_target,
- * formula, event_source, applicable_to, persona_owner, notes }).
+ * formula, event_source, applicable_to, notes }).
  */
 function loadCanonicalKPIs() {
   const content = readFile(CANONICAL_KPI_PATH);
@@ -60,7 +60,6 @@ function loadCanonicalKPIs() {
       formula: get('formula'),
       event_source: get('event_source'),
       applicable_to: getList('applicable_to'),
-      persona_owner: get('persona_owner'),
       notes: get('notes'),
     });
   }
@@ -68,14 +67,13 @@ function loadCanonicalKPIs() {
 }
 
 /**
- * Filter canonical KPIs by project type + persona.
+ * Filter canonical KPIs by project type.
  * @returns {Array} applicable KPIs
  */
-function getApplicableKPIs({ projectType, personas }) {
+function getApplicableKPIs({ projectType }) {
   const canonical = loadCanonicalKPIs();
   return canonical.filter(k => {
     if (projectType && k.applicable_to && k.applicable_to.length > 0 && !k.applicable_to.includes(projectType)) return false;
-    if (personas && personas.length > 0 && k.persona_owner && !personas.includes(k.persona_owner)) return false;
     return true;
   });
 }
@@ -119,7 +117,6 @@ function renderKPIPlan(plan) {
   const now = new Date().toISOString();
   let yaml = `schema_version: 1\nproject: ${plan.project || 'unknown'}\ncreated_at: ${now}\ncreated_by: kpi-planner\n`;
   if (plan.template_id) yaml += `template_id: ${plan.template_id}\n`;
-  if (plan.persona) yaml += `persona: ${plan.persona}\n`;
   if (plan.activation_event) yaml += `activation_event: ${plan.activation_event}\n`;
   yaml += `\nlaunch_kpis:\n`;
   for (const k of plan.launch_kpis || []) {

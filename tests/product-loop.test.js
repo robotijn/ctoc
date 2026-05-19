@@ -109,7 +109,6 @@ describe('Product Loop — project KPI plan I/O', () => {
     saveProjectKPIPlan('my-saas', {
       project: 'my-saas',
       template_id: 'saas/b2c-subscription',
-      persona: 'founder',
       activation_event: 'created_first_invoice',
       launch_kpis: [
         { id: 'activation_rate', target: '> 30%', rationale: 'canonical default' },
@@ -121,7 +120,7 @@ describe('Product Loop — project KPI plan I/O', () => {
     assert.ok(loaded);
     assert.match(loaded.raw, /activation_rate/);
     assert.match(loaded.raw, /created_first_invoice/);
-    assert.match(loaded.raw, /founder/);
+    assert.match(loaded.raw, /saas\/b2c-subscription/);
   });
 });
 
@@ -195,13 +194,12 @@ describe('Product Loop — review scheduling', () => {
 });
 
 describe('Product Loop — agent + skill conformance', () => {
-  it('kpi-planner exists at tier:1 with persona_gates including founder', () => {
+  it('kpi-planner exists at tier:1 reporting outside the CTO Chief chain (Product Loop, not Iron Loop)', () => {
     const p = path.join(projectRoot, 'agents/planning/kpi-planner.md');
     assert.ok(fs.existsSync(p), 'kpi-planner.md must exist');
     const content = fs.readFileSync(p, 'utf8');
     assert.match(content, /^tier:\s*1$/m);
-    assert.match(content, /reports_to:\s*cto-chief/);
-    assert.match(content, /persona_gates:[\s\S]*founder/);
+    assert.match(content, /reports_to:\s*user/);
   });
 
   it('product-reviewer skill exists at tier:2', () => {

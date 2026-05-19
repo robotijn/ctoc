@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.25-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.26-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-413-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **110 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), **persona-aware** so pricing questions never reach a programmer and code-style questions never reach a founder, with **4 mandatory human gates**. The **413-file skill library** (91 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **109 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **413-file skill library** (91 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -135,7 +135,7 @@ This runs an interactive setup that:
 4. **Creates `plans/` directory structure** — `vision/`, `functional/`, `implementation/`, `todo/`, `review/`, `done/`
 5. **Initializes Iron Loop state** in `.ctoc/state/`
 
-The generated `CLAUDE.md` becomes the single source of truth for how Claude works in your project — CTO persona, planning pipeline, test commands, and quality standards.
+The generated `CLAUDE.md` becomes the single source of truth for how Claude works in your project — agent personality, planning pipeline, test commands, and quality standards.
 
 > [!TIP]
 > You don't need to run `ctoc init` manually. If you just start talking to Claude with CTO Chief installed, it will guide you. `ctoc init` is useful when you want to pre-configure a project or customize the generated `CLAUDE.md`.
@@ -266,11 +266,10 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 
 - **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
-- **110 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, and more
+- **109 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, and more
 - **413 skill files** — 91 Tier-2 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — Iterative critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) before Gate 3 — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
-- **Persona-aware question routing** — 8 roles (founder, technical-founder, pm, programmer, architect, designer, hobbyist, agency); pricing questions never reach a programmer, code-style questions never reach a founder — see [PERSONA_ROUTING.md](docs/PERSONA_ROUTING.md)
 - **4-tier agent architecture** — CTO Chief (Tier 0, sole dispatcher) → 16 sub-orchestrators (Tier 1) → specialists (Tier 2) → 5 Haiku scouts (Tier 3) for fast pre-screens — see [AGENT_ARCHITECTURE.md](docs/AGENT_ARCHITECTURE.md)
 - **6-month pre-mortem + 5-scenario cash flow** — Every canvas (lean or BMC) now carries a Gary-Klein 6-month pre-mortem (≥5 failure modes scored by likelihood × impact with this-week mitigations) and a Worst / Conservative / Base / Optimistic / Exceptional 18-month cash flow with runway-per-scenario and commit-now decision triggers
 - **Warnings are bugs** — Compiler/linter/type-checker warnings, deprecation notices, and CVEs at any severity are classified critical-tier by the refinement loop. Production-readiness gate requires zero warnings across all toolchains and zero open CVEs before Gate 3
@@ -367,25 +366,6 @@ Triggered on `effort: high` plans OR when a risk-surface glob matches (auth, bil
 
 ---
 
-## Persona-Aware Question Routing
-
-Don't ask a programmer about pricing. Don't ask a founder about TypeScript.
-
-CTO Chief classifies the user's role at session start and routes every question accordingly. Questions outside scope are deferred to `.ctoc/inbox/questions/` with `awaits_persona: <role>` — the right person answers them later, async. Answers persist; no one is asked twice. See [`PERSONA_ROUTING.md`](docs/PERSONA_ROUTING.md).
-
-| Role | Decides | Defers (or never sees) |
-|------|---------|-----------------------|
-| **founder** | pricing · market · target customer · business model · unit economics · compliance scope | tech stack · db schema · code style |
-| **technical-founder** | everything | (none) |
-| **pm** | features · acceptance criteria · UX flow · success metrics | pricing · unit economics · tech stack |
-| **programmer** | tech stack · code style · test framework | pricing · market · business model |
-| **architect** | system design · db schema · deployment · integration | pricing · business model · UX flow |
-| **designer** | UX · IA · a11y · brand · copy tone | tech stack · pricing · db schema |
-| **hobbyist** | vision · success criteria | pricing · compliance · business model |
-| **agency** | tech stack · integration | pricing · market (deferred to client/founder) |
-
----
-
 ## The Canvas — 6-Month Pre-Mortem + 5-Scenario Cash Flow
 
 Both Lean Canvas (Maurya) and Business Model Canvas (Osterwalder) carry two extra planning sections by default — surfacing 6-month failure modes and runway scenarios up-front so the business plan is interrogated before any feature work begins.
@@ -403,7 +383,7 @@ Both Lean Canvas (Maurya) and Business Model Canvas (Osterwalder) carry two extr
 
 Includes base-case assumption anchors, per-month MRR table at M3/M6/M9/M12/M15/M18, runway per scenario, and **commit-now decision triggers** (e.g., "if actuals track Worst for 2 consecutive months: switch operating plan to Worst"). Industry signal: startups with 3+ scenarios secure 1.8× the funding (Abacum 2025).
 
-Both sections are persona-gated to founder / technical-founder / PM via `.ctoc/templates/questions.yaml`.
+Both sections are owned by the founder or product manager. The CTO Chief technical chain does not produce them; it consumes them when planning instrumentation work.
 
 ---
 
@@ -417,7 +397,7 @@ DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → 
   └───────────────── continuous post-launch ───────────────────────────┘
 ```
 
-| Step | Owner persona | Cadence |
+| Step | Owner | Cadence |
 |------|---------------|---------|
 | DEFINE | founder + pm | Canvas phase — via `kpi-planner` |
 | INSTRUMENT | programmer | Implementation — via `skills/saas/posthog-analytics` |
@@ -435,7 +415,7 @@ Slash commands: `/ctoc:kpi-status` (current values vs. targets, color-coded) and
 
 ## SaaS Production-Readiness Templates
 
-CTOC ships opinionated templates for common project types. `agents/planning/stack-chooser.md` (Tier 1) selects the matching template and presents defaults to qualified personas only.
+CTOC ships opinionated templates for common project types. `agents/planning/stack-chooser.md` (Tier 1) selects the matching template and presents defaults to the user.
 
 | Template | Status | Default stack |
 |----------|--------|---------------|
@@ -467,7 +447,7 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 
 ## Agents
 
-**110 agents across 22 categories** — [browse all →](agents/)
+**109 agents across 22 categories** — [browse all →](agents/)
 
 <details>
 <summary><strong>Full agent list</strong></summary>
@@ -484,7 +464,7 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 | [Pipeline](agents/pipeline/) | 5 | [agent-writer](agents/pipeline/agent-writer.md), [agent-critic](agents/pipeline/agent-critic.md), [agent-tester](agents/pipeline/agent-tester.md), [agent-qa](agents/pipeline/agent-qa.md), [agent-publisher](agents/pipeline/agent-publisher.md) |
 | [Scouts (Tier 3, Haiku)](agents/scouts/) | 5 | [syntax-scout](agents/scouts/syntax-scout.md), [lint-scout](agents/scouts/lint-scout.md), [test-scout](agents/scouts/test-scout.md), [dep-scout](agents/scouts/dep-scout.md), [secret-scout](agents/scouts/secret-scout.md) |
 | [Compliance](agents/compliance/) | 3 | [gdpr-compliance-checker](agents/compliance/gdpr-compliance-checker.md), [audit-log-checker](agents/compliance/audit-log-checker.md), [license-scanner](agents/compliance/license-scanner.md) |
-| [Coordinator](agents/coordinator/) | 3 | [cto-chief](agents/coordinator/cto-chief.md) (Tier 0), [synthesizer](agents/coordinator/synthesizer.md), [persona-classifier](agents/coordinator/persona-classifier.md) |
+| [Coordinator](agents/coordinator/) | 2 | [cto-chief](agents/coordinator/cto-chief.md) (Tier 0), [synthesizer](agents/coordinator/synthesizer.md) |
 | [Data/ML](agents/data-ml/) | 3 | [data-quality-checker](agents/data-ml/data-quality-checker.md), [ml-model-validator](agents/data-ml/ml-model-validator.md), [feature-store-validator](agents/data-ml/feature-store-validator.md) |
 | [Frontend](agents/frontend/) | 3 | [bundle-analyzer](agents/frontend/bundle-analyzer.md), [component-tester](agents/frontend/component-tester.md), [visual-regression-checker](agents/frontend/visual-regression-checker.md) |
 | [Iron Loop](agents/iron-loop/) | 3 | [integrator](agents/iron-loop/iron-loop-integrator.md), [critic](agents/iron-loop/iron-loop-critic.md), [executor](agents/iron-loop/iron-loop-executor.md) |
@@ -499,7 +479,7 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 
 </details>
 
-Agents spawn conditionally based on your project, current Iron Loop step, and active persona. Scouts (Tier 3) pre-screen and short-circuit deep dispatches when clean.
+Agents spawn conditionally based on your project and current Iron Loop step. Scouts (Tier 3) pre-screen and short-circuit deep dispatches when clean.
 
 > Note: not every Tier-2 specialist `SKILL.md` has a paired top-level agent file. Several skills (e.g. `sbom-cra-checker`, `threat-modeler`, `ai-governance-checker`, `llm-security-tester`, `incident-responder`) are dispatched directly through the skill auto-load mechanism — see "Auto-Availability After Install" above.
 
@@ -783,7 +763,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.25'
+getVersion()       // → '6.9.26'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -794,13 +774,13 @@ Files synced by `release()`: `VERSION` (source of truth), `.claude-plugin/market
 **Project structure:**
 ```
 ctoc/
-├── docs/            8 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
-│                    PERSONA_ROUTING.md, PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md,
+├── docs/            7 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
+│                    PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md,
 │                    CONTRIBUTING.md, CODE_OF_CONDUCT.md
 ├── src/
 │   ├── commands/    11 slash commands (13 files: .md spec + .js impl where needed)
 │   ├── hooks/       12 Claude Code hooks (session, pre/post tool use, pre-push)
-│   ├── lib/         88 JS modules (state, planning, quality, refinement loop, dispatcher)
+│   ├── lib/         87 JS modules (state, planning, quality, refinement loop, dispatcher)
 │   ├── tabs/        8 dashboard tabs
 │   ├── areas/       5 dashboard areas (pipeline, library, system, agent, inbox)
 │   ├── scripts/     11 build/release utilities
@@ -839,6 +819,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.25** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.26** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

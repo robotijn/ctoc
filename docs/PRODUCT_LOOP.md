@@ -26,15 +26,15 @@ DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → 
   └─────────────────────── continuous cycle ──────────────────────────┘
 ```
 
-| Step | Owner persona | What happens | Cadence |
+| Step | Owner | What happens | Cadence |
 |------|---|---|---|
-| **DEFINE** | founder + pm | Pick KPIs from the canonical library; set targets | Once at canvas phase, revise quarterly |
-| **INSTRUMENT** | programmer | Wire up event tracking, dashboards | Once at implementation phase |
-| **MEASURE** | (automated) | PostHog/Plausible captures events; dashboards update | Continuous |
-| **REVIEW** | founder + pm | Weekly synthesis: what's working, what's not | Weekly |
-| **HYPOTHESIZE** | founder + pm | "If we do X, KPI Y will improve by Z" | At each review |
-| **EXPERIMENT** | pm + programmer | A/B test the hypothesis (PostHog feature flags) | 1-4 weeks per experiment |
-| **LEARN** | founder + pm | Did it work? Roll out winners; kill losers; document | End of experiment |
+| **DEFINE** | founder + product manager (external to CTO Chief) | Pick key-performance-indicators from the canonical library; set targets | Once at canvas phase, revise quarterly |
+| **INSTRUMENT** | implementer (CTO Chief Step 10) | Wire up event tracking, dashboards | Once at implementation phase |
+| **MEASURE** | (automated) | PostHog or Plausible captures events; dashboards update | Continuous |
+| **REVIEW** | founder + product manager (external to CTO Chief) | Weekly synthesis: what's working, what's not | Weekly |
+| **HYPOTHESIZE** | founder + product manager (external to CTO Chief) | "If we do X, key-performance-indicator Y will improve by Z" | At each review |
+| **EXPERIMENT** | product manager + implementer | A/B test the hypothesis (PostHog feature flags) | 1-4 weeks per experiment |
+| **LEARN** | founder + product manager (external to CTO Chief) | Did it work? Roll out winners; kill losers; document | End of experiment |
 
 ## Canonical KPIs (SaaS B2C)
 
@@ -85,21 +85,11 @@ The **experiment-designer agent** (Tier 2):
 3. Outputs a PostHog feature flag configuration
 4. After experiment ends, computes statistical significance + recommends roll-out
 
-## Persona routing for Product Loop
+## Role boundary
 
-Following the v8.3 routing rules:
+The Product Loop is dispatched **outside the CTO Chief technical chain**. The CTO Chief (`agents/coordinator/cto-chief.md`) is technical only — it owns the Iron Loop (ship code) but does not pick key-performance-indicator targets or own product validation. The Product Loop is owned by the founder and product manager, who dispatch `agents/planning/kpi-planner.md`, `skills/product/product-reviewer`, and `skills/product/experiment-designer` directly outside the technical chain.
 
-| Persona | DEFINE | INSTRUMENT | REVIEW | HYPOTHESIZE | EXPERIMENT-design | EXPERIMENT-implement |
-|---|---|---|---|---|---|---|
-| founder | ✓ | (defers to programmer) | ✓ | ✓ | (defers to pm) | (defers to programmer) |
-| pm | ✓ | (defers to programmer) | ✓ | ✓ | ✓ | (defers to programmer) |
-| technical-founder | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| programmer | (defers to founder/pm) | ✓ | (defers to founder/pm) | (defers to founder/pm) | (defers to pm) | ✓ |
-| architect | (defers to founder/pm) | ✓ | (defers to founder/pm) | (defers to founder/pm) | (defers to pm) | ✓ |
-| designer | (sees UX KPIs only) | ✗ | (sees UX KPIs only) | (UX hypotheses only) | (UX experiments) | ✗ |
-| hobbyist | (skips entirely) | (skips) | (skips) | (skips) | (skips) | (skips) |
-
-A programmer is NEVER asked "should we lower the activation target?" — that's a founder/pm question. A founder is NEVER asked "which event ID should we use?" — that's a programmer question.
+The handoff between the two loops is the file `plans/canvas/<slug>-kpis.yaml`. The Product Loop produces it; the CTO Chief reads it at Iron Loop Step 10 to plan instrumentation wiring.
 
 ## Slash commands
 
@@ -112,8 +102,8 @@ A programmer is NEVER asked "should we lower the activation target?" — that's 
 ## When Product Loop is skipped
 
 - `oss-library` / `cli` projects — no users, no funnel
-- `internal-tool` — no product KPIs in the consumer sense (may track adoption)
-- `hobbyist` persona — over-engineering for a side project
+- `internal-tool` — no product key-performance-indicators in the consumer sense (may track adoption)
+- Side projects and learning projects — skip; over-engineering for non-commercial work
 - Pre-launch — only DEFINE + INSTRUMENT run; the loop fully kicks in after first paying customer
 
 ## File layout
@@ -138,7 +128,7 @@ src/commands/kpi-status.md                     ← /ctoc:kpi-status
 ## Test invariants
 
 `tests/product-loop.test.js`:
-- kpi-planner exists at tier:1, persona_gates includes founder
+- kpi-planner exists at tier:1 and reports outside the CTO Chief chain (Product Loop, not Iron Loop)
 - product-reviewer skill has tier:2 + v8 frontmatter
 - experiment-designer skill has tier:2 + v8 frontmatter
 - product-kpis.yaml canonical library is well-formed

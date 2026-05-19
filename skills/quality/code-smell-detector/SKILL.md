@@ -106,7 +106,7 @@ Per Van Oort et al. (2022) "Code Smells for Machine Learning Applications" and M
 ### 2026 additions — LLM prompt / agent smells
 
 - **God Prompt**: one mega-system-prompt covering all tasks (review PR, summarize, classify, translate) — bloats context, blurs role. Refactor: per-task prompts.
-- **Generic Role**: "You are a helpful assistant" — under-specified persona produces under-specified output.
+- **Generic Role**: "You are a helpful assistant" — under-specified role produces under-specified output.
 - **Missing Unknown-Path**: no instruction for what to do when the model doesn't know — the model defaults to confabulation. Add: "If you do not know, output `UNKNOWN` and stop."
 - **Hallucination Feedback Loop**: model output piped directly into the next call without an evaluator/guardrail step — errors compound across turns.
 - **Untyped Tool Output**: LLM tool/function returns free-form prose instead of a JSON schema — caller can't parse.

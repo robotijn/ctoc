@@ -26,30 +26,15 @@ Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatc
 
 Scouts (Tier 3) declare `model: haiku` because they run as **subagents** — isolated context, the Haiku model is safe at this layer. The user's terminal session is untouched.
 
-## Persona-aware question routing (v8.3+)
+## Step-driven question routing
 
-> **Don't ask a programmer about pricing. Don't ask a founder about TypeScript.**
+Questions are asked based on which Iron Loop step the user is currently in, not based on who the user is. Every user goes through the same steps and answers (or accepts defaults for) the same step-scoped questions. There is no persona system; the pipeline is technical only.
 
-CTOC classifies the user's role at session start and routes every question accordingly. See [`docs/PERSONA_ROUTING.md`](./docs/PERSONA_ROUTING.md).
+Business questions (pricing, market, unit economics, key-performance-indicator targets) are OUT OF SCOPE for the CTO Chief technical chain — see the Product Loop in [`docs/PRODUCT_LOOP.md`](./docs/PRODUCT_LOOP.md). They are dispatched outside this chain by the founder or product manager.
 
-**Eight personas**, each with explicit `can_answer` / `cannot_answer` categories:
+## SaaS template library
 
-| Role | Decides | Defers (or never sees) |
-|---|---|---|
-| founder | pricing · market · target customer · business model · unit economics · compliance scope | tech stack · db schema · code style |
-| technical-founder | everything | (none) |
-| pm | features · acceptance criteria · UX flow · success metrics | pricing · unit economics · tech stack |
-| programmer | tech stack · code style · test framework | pricing · market · business model |
-| architect | system design · db schema · deployment · integration | pricing · business model · UX flow |
-| designer | UX · IA · a11y · brand · copy tone | tech stack · pricing · db schema |
-| hobbyist | vision · success criteria | pricing · compliance · business model |
-| agency | tech stack · integration | pricing · market (deferred to client/founder) |
-
-Questions outside the current persona scope are **deferred** to `.ctoc/inbox/questions/` with `awaits_persona: <role>`. The right user answers them later (async-overnight). Answers persist in `.ctoc/session/answers.yaml` — never re-asked.
-
-## SaaS template library (v8.3+)
-
-CTOC ships opinionated templates for common project types. `agents/planning/stack-chooser.md` (Tier 1) selects the matching template and presents defaults to qualified personas only.
+CTOC ships opinionated templates for common project types. `agents/planning/stack-chooser.md` (Tier 1) selects the matching template and presents defaults to the user.
 
 | Template | Status | Default stack |
 |---|---|---|
@@ -80,10 +65,10 @@ DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → 
   └───────────────────── continuous post-launch ────────────────────────┘
 ```
 
-| Step | Owner persona | When |
+| Step | Owner | When |
 |---|---|---|
-| DEFINE | founder + pm | Canvas phase, via `agents/planning/kpi-planner.md` |
-| INSTRUMENT | programmer | Implementation, via `skills/saas/posthog-analytics` |
+| DEFINE | founder + product manager (external to CTO Chief) | Canvas phase, via `agents/planning/kpi-planner.md` |
+| INSTRUMENT | implementer (inside Iron Loop Step 10) | Implementation, via `skills/saas/posthog-analytics` |
 | MEASURE | (automated) | Continuous (PostHog + Stripe) |
 | REVIEW | founder + pm | Weekly, via `skills/product/product-reviewer` |
 | HYPOTHESIZE | founder + pm | From review findings |
@@ -96,7 +81,7 @@ Slash commands:
 - `/ctoc:kpi-status` — current values vs targets (color-coded)
 - `/ctoc:product-review` — run weekly product review
 
-Persona-gated: programmers are never asked "what should the activation target be?" — those are founder/pm questions. Founders are never asked "which event ID should we use?" — that's a programmer question.
+The Product Loop is dispatched outside the CTO Chief technical chain — the founder or product manager owns it. The CTO Chief implements the technical wiring (instrumentation, dashboards, feature-flag plumbing) inside Iron Loop Step 10 only.
 
 **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`) is the only agent with top-level authority. All other agents and skills are dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer, synthesizer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
 

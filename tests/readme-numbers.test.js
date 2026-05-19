@@ -106,8 +106,8 @@ function countQualityConfigs() {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('Ground truth — project counts (sanity checks)', () => {
-  it('agents/: 110 .md files (excluding _shared/)', () => {
-    assert.equal(countAgentMdFiles(), 110);
+  it('agents/: 109 .md files (excluding _shared/, after persona-classifier removal)', () => {
+    assert.equal(countAgentMdFiles(), 109);
   });
 
   it('agents/: 22 categories', () => {
@@ -128,8 +128,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 88 JS modules at top level', () => {
-    assert.equal(countTopLevelJs('src/lib'), 88);
+  it('src/lib/: 87 JS modules at top level (after persona.js removal)', () => {
+    assert.equal(countTopLevelJs('src/lib'), 87);
   });
 
   it('src/commands/: 11 slash command specs (.md files)', () => {
@@ -144,12 +144,12 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countTopLevelJs('src/tabs'), 8);
   });
 
-  it('tests/: >=67 test files (grows with the project)', () => {
-    assert.ok(countTestFiles() >= 67, `expected >=67 test files, got ${countTestFiles()}`);
+  it('tests/: >=65 test files (grows with the project)', () => {
+    assert.ok(countTestFiles() >= 65, `expected >=65 test files, got ${countTestFiles()}`);
   });
 
-  it('docs/: 8 docs files (one per major subsystem)', () => {
-    assert.equal(countDocsFiles(), 8);
+  it('docs/: 7 docs files (after PERSONA_ROUTING.md removal)', () => {
+    assert.equal(countDocsFiles(), 7);
   });
 
   it('scouts (Tier 3): 5 Haiku scout agents', () => {
@@ -198,16 +198,16 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /skills-413-blue/);
   });
 
-  it('lead paragraph: 110 agents across 22 categories', () => {
-    assert.match(README, /\*\*110 agents\*\* across \*\*22 categories\*\*/);
+  it('lead paragraph: 109 agents across 22 categories', () => {
+    assert.match(README, /\*\*109 agents\*\* across \*\*22 categories\*\*/);
   });
 
   it('Compare table: 110 across 22 categories', () => {
     assert.match(README, /110 across 22 categories/);
   });
 
-  it('Key Features: 110 agents across 22 categories', () => {
-    assert.match(README, /\*\*110 agents\*\* across 22 categories/);
+  it('Key Features: 109 agents across 22 categories', () => {
+    assert.match(README, /\*\*109 agents\*\* across 22 categories/);
   });
 
   it('Key Features: 413 skill files (v6.9.24+)', () => {
@@ -224,12 +224,6 @@ describe('README — explicit numeric claims match reality', () => {
 
   it('Tier table: 5 Haiku scouts in Tier 3', () => {
     assert.match(README, /5 Haiku scouts/);
-  });
-
-  it('Persona table: 8 roles enumerated', () => {
-    for (const role of ['founder', 'technical-founder', 'pm', 'programmer', 'architect', 'designer', 'hobbyist', 'agency']) {
-      assert.match(README, new RegExp(`\\*\\*${role}\\*\\*`), `persona '${role}' missing from README persona table`);
-    }
   });
 
   it('Refinement loop: K-budget phases listed (critical/medium/low/final)', () => {
@@ -256,8 +250,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /12 Claude Code hooks/);
   });
 
-  it('Project structure: 88 JS modules in src/lib', () => {
-    assert.match(README, /88 JS modules/);
+  it('Project structure: 87 JS modules in src/lib', () => {
+    assert.match(README, /87 JS modules/);
   });
 
   it('Project structure: 110 agent definitions across 22 categories', () => {
@@ -268,8 +262,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /413 skill files/);
   });
 
-  it('Agents intro: 110 agents across 22 categories', () => {
-    assert.match(README, /\*\*110 agents across 22 categories\*\*/);
+  it('Agents intro: 109 agents across 22 categories', () => {
+    assert.match(README, /\*\*109 agents across 22 categories\*\*/);
   });
 
   it('Skills intro: 413 skill files (v6.9.24+)', () => {
@@ -290,7 +284,6 @@ describe('README — every major subsystem is documented', () => {
   const REQUIRED_SECTIONS = [
     /^## The 4-Tier Agent Architecture$/m,
     /^## The Refinement Loop$/m,
-    /^## Persona-Aware Question Routing$/m,
     /^## The Canvas — 6-Month Pre-Mortem \+ 5-Scenario Cash Flow$/m,
     /^## The Product Loop$/m,
     /^## SaaS Production-Readiness Templates$/m,
