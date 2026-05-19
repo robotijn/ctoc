@@ -6,10 +6,10 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.13-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.14-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
-  <img alt="Skills" src="https://img.shields.io/badge/skills-446-blue">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-408-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
@@ -201,7 +201,7 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 - **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
 - **110 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, and more
-- **446 skill files** — 86 Tier-2 specialist skill bodies + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs + meta skills
+- **408 skill files** — 86 Tier-2 specialist skill bodies + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — Iterative critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) before Gate 3 — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
 - **Persona-aware question routing** — 8 roles (founder, technical-founder, pm, programmer, architect, designer, hobbyist, agency); pricing questions never reach a programmer, code-style questions never reach a founder — see [PERSONA_ROUTING.md](docs/PERSONA_ROUTING.md)
@@ -438,12 +438,14 @@ Agents spawn conditionally based on your project, current Iron Loop step, and ac
 
 ## Skills
 
-**446 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
+**408 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
 
 There are two kinds of skills:
 
 1. **Tier-2 specialist skill bodies (86)** — the actual expert agents that run during Iron Loop and refinement-loop steps. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
-2. **Knowledge skills (360)** — language refs, framework refs, per-language quality configs, security overviews, and architecture pattern catalogs. Read by agents to inform their work.
+2. **Knowledge skills (322)** — language refs, framework refs, and per-language quality configs. Read by agents (or loaded by code paths like `src/lib/quality-config.js` and `src/lib/skill-loader.js`) to inform their work.
+
+> **v6.9.14**: 38 unreachable reference files were deleted from `skills/` after a usage audit confirmed they had zero code or agent references. The remaining 408 files are all either actively dispatched (the 86 SKILL.md bodies) or loaded by an explicit code path (the 322 reference files).
 
 <details>
 <summary><strong>Specialist skill bodies (Tier 2) — 86 across 19 categories</strong></summary>
@@ -482,11 +484,7 @@ There are two kinds of skills:
 | [DevOps frameworks](skills/frameworks/devops/) | 15 | [Docker](skills/frameworks/devops/docker.md), [Kubernetes](skills/frameworks/devops/kubernetes.md), [Helm](skills/frameworks/devops/helm.md), [Ansible](skills/frameworks/devops/ansible.md), [Pulumi](skills/frameworks/devops/pulumi.md) |
 | [Mobile frameworks](skills/frameworks/mobile/) | 15 | [React Native](skills/frameworks/mobile/react-native.md), [Flutter](skills/frameworks/mobile/flutter.md), [SwiftUI](skills/frameworks/mobile/swiftui.md), [Jetpack Compose](skills/frameworks/mobile/jetpack-compose.md) |
 | [Quality configs](skills/quality-configs/) | 61 | Per-language lint, format, and test configs |
-| [Testing patterns](skills/testing/) | misc | Playwright per-framework, coverage tools (istanbul · simplecov · jacoco · go-cover · llvm-cov), test pyramid, coverage enforcement |
-| [Security patterns](skills/security/) | misc | OWASP Top 10, secrets detection, SAST overview, dependency scanning, quality gates |
-| [Architecture patterns](skills/architecture/) | 7 + 2 | layered · hexagonal · MVC · vertical slices · dependency rules · pattern detection |
-| [Complexity](skills/complexity/) | 3 | metrics · limits · refactoring patterns |
-| Core meta | 6 | [CTO Persona](skills/cto-persona.md), [Iron Loop](skills/iron-loop.md), [Quality Standards](skills/quality-standards.md), [Enforcement](skills/enforcement.md), [Modes](skills/modes.md), [Upgrade Paths](skills/upgrade-paths.md) |
+| [Architecture patterns](skills/architecture/) | 2 SKILL.md | `pattern-detector` · `dependency-analyzer` (the standalone pattern refs were removed in v6.9.14) |
 
 </details>
 
@@ -715,7 +713,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.13'
+getVersion()       // → '6.9.14'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -740,10 +738,10 @@ ctoc/
 ├── agents/          110 agent definitions across 22 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
 │                     async-choice-protocol, no-stub-rule, warnings-are-critical)
-├── skills/          446 skill files: 86 Tier-2 specialist bodies (SKILL.md)
-│                    + 360 knowledge skills (50 langs, 211 frameworks,
-│                    61 quality configs, plus testing/security/architecture refs)
-├── tests/           67 test files (1472 passing assertions as of v6.9.12)
+├── skills/          408 skill files: 86 Tier-2 specialist bodies (SKILL.md)
+│                    + 322 reference files (50 langs, 211 frameworks,
+│                    61 quality configs). 38 unreachable refs removed in v6.9.14.
+├── tests/           68 test files (1521+ passing assertions)
 ├── .ctoc/           Config, templates, operations, audit, loop journals
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
@@ -769,6 +767,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.13** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.14** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

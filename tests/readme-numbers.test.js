@@ -118,9 +118,9 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countSpecialistSkillBodies(), 86);
   });
 
-  it('skills/: total .md count is non-trivial and in expected range', () => {
+  it('skills/: total .md count is in v6.9.14+ range (after 38-file orphan cleanup)', () => {
     const total = countAllSkillMd();
-    assert.ok(total >= 440 && total <= 500, `expected 440-500 .md files in skills/, got ${total}`);
+    assert.ok(total >= 400 && total <= 430, `expected 400-430 .md files in skills/, got ${total}`);
   });
 
   it('src/lib/: 88 JS modules at top level', () => {
@@ -189,8 +189,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /agents-110-orange/);
   });
 
-  it('badge: skills-446', () => {
-    assert.match(README, /skills-446-blue/);
+  it('badge: skills-408', () => {
+    assert.match(README, /skills-408-blue/);
   });
 
   it('lead paragraph: 110 agents across 22 categories', () => {
@@ -205,8 +205,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /\*\*110 agents\*\* across 22 categories/);
   });
 
-  it('Key Features: 446 skill files', () => {
-    assert.match(README, /\*\*446 skill files\*\*/);
+  it('Key Features: 408 skill files', () => {
+    assert.match(README, /\*\*408 skill files\*\*/);
   });
 
   it('Key Features: 14 languages auto-detected', () => {
@@ -259,21 +259,21 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /110 agent definitions across 22 categories/);
   });
 
-  it('Project structure: 446 skill files', () => {
-    assert.match(README, /446 skill files/);
+  it('Project structure: 408 skill files', () => {
+    assert.match(README, /408 skill files/);
   });
 
   it('Agents intro: 110 agents across 22 categories', () => {
     assert.match(README, /\*\*110 agents across 22 categories\*\*/);
   });
 
-  it('Skills intro: 446 skill files', () => {
-    assert.match(README, /\*\*446 skill files\*\*/);
+  it('Skills intro: 408 skill files', () => {
+    assert.match(README, /\*\*408 skill files\*\*/);
   });
 
-  it('Skills section names two kinds — Tier-2 (86) and Knowledge (360)', () => {
+  it('Skills section names two kinds — Tier-2 (86) and Knowledge (322)', () => {
     assert.match(README, /Tier-2 specialist skill bodies \(86\)/);
-    assert.match(README, /Knowledge skills \(360\)/);
+    assert.match(README, /Knowledge skills \(322\)/);
   });
 });
 
