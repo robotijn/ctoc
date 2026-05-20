@@ -270,7 +270,10 @@ function sectionBrowse(sectionName, projectPath) {
   const options = stages.map(stage => {
     const n = stageCount(stage);
     const label = stage.charAt(0).toUpperCase() + stage.slice(1).replace(/-/g, ' ');
-    return { label, description: `Browse ${label} stage (${n} plans)` };
+    const description = stage === 'vision'
+      ? `Enter Vision Mode — create, edit, or decompose visions (${n} active)`
+      : `Browse ${label} stage (${n} plans)`;
+    return { label, description };
   });
   // AskUserQuestion caps at 4 options. business has 3 stages, exec has 3, impl has 2 — all fit with Back.
   options.push({ label: '◀ Back', description: 'Return to pipeline view' });
@@ -278,7 +281,10 @@ function sectionBrowse(sectionName, projectPath) {
   const actions = {};
   for (const stage of stages) {
     const label = stage.charAt(0).toUpperCase() + stage.slice(1).replace(/-/g, ' ');
-    actions[label] = `browse ${stage}`;
+    // Vision is not a plan-file stage — it is a separate pipeline handled by
+    // Vision Mode (create / edit / decompose). `browse vision` has no
+    // STAGE_FOLDERS entry and dead-ends on "Unknown stage". Route to Vision Mode.
+    actions[label] = stage === 'vision' ? 'claude:vision' : `browse ${stage}`;
   }
   actions['◀ Back'] = '';
 
@@ -344,6 +350,35 @@ function dashboardCommands(projectPath) {
 function stageBrowse(stage, projectPath) {
   const root = getProjectPath(projectPath);
   const plansDir = getPlansDir(root);
+
+  // Vision is not a plan-file stage — it is a separate pipeline (explore →
+  // decompose → stubs) handled by Vision Mode. `browse vision` has no
+  // STAGE_FOLDERS entry; rather than dead-end on "Unknown stage: vision",
+  // point the user at Vision Mode, where visions are created, edited, and
+  // decomposed into functional plans.
+  if (stage === 'vision') {
+    const visionCounts = getVisionCounts(root);
+    return {
+      text: `[vision] (${visionCounts.total} active)\n${'─'.repeat(40)}\n\n`
+        + '  Visions are created, edited, and decomposed in Vision Mode —\n'
+        + '  they are not browsed as plan files.\n\n\n',
+      ask: {
+        questions: [{
+          question: 'Open Vision Mode?',
+          header: 'Vision',
+          options: [
+            { label: 'Enter Vision Mode', description: 'Create, edit, or decompose a vision' },
+            { label: '◀ Back', description: 'Return to pipeline view' },
+          ],
+        }],
+      },
+      actions: {
+        'Enter Vision Mode': 'claude:vision',
+        '◀ Back': '',
+      },
+    };
+  }
+
   const folder = STAGE_FOLDERS[stage];
 
   if (!folder) {
@@ -833,6 +868,7 @@ module.exports = {
   // Screen renderers
   dashboardPipeline,
   dashboardCommands,
+  sectionBrowse,
   stageBrowse,
   visionStubsBrowse,
   planActions,

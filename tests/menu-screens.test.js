@@ -171,6 +171,43 @@ describe('Menu Screens Tests', () => {
     console.log('# stageBrowse with unknown stage shows error');
   });
 
+  test('stageBrowse(vision) redirects to Vision Mode — never dead-ends', () => {
+    const result = menuScreens.stageBrowse('vision', testDir);
+
+    // Regression: 'browse vision' used to fall through STAGE_FOLDERS and
+    // dead-end on "Unknown stage: vision", stranding the user.
+    assert.ok(!result.text.includes('Unknown stage'),
+      'browse vision must NOT dead-end — vision is handled by Vision Mode');
+    assert.strictEqual(result.actions['Enter Vision Mode'], 'claude:vision',
+      'stageBrowse(vision) must offer entry to Vision Mode');
+    console.log('# stageBrowse(vision) redirects to Vision Mode');
+  });
+
+  test('sectionBrowse(business) routes Vision to Vision Mode, not browse', () => {
+    const result = menuScreens.sectionBrowse('business', testDir);
+
+    // Regression: Business → Vision used to map to `browse vision`, which
+    // dead-ended. It must enter Vision Mode so the user can create a vision.
+    assert.strictEqual(result.actions['Vision'], 'claude:vision',
+      'Business → Vision must enter Vision Mode (create/edit/decompose)');
+    // Canvas and Functional remain real plan-file stage browses.
+    assert.strictEqual(result.actions['Canvas'], 'browse canvas',
+      'Business → Canvas still browses the canvas plan stage');
+    assert.strictEqual(result.actions['Functional'], 'browse functional',
+      'Business → Functional still browses the functional plan stage');
+    console.log('# sectionBrowse(business) routes Vision to Vision Mode');
+  });
+
+  test('route("browse vision") reaches Vision Mode', () => {
+    const result = menuScreens.route(['browse', 'vision'], testDir);
+
+    assert.ok(!result.text.includes('Unknown stage'),
+      'route browse vision must not produce Unknown stage');
+    assert.strictEqual(result.actions['Enter Vision Mode'], 'claude:vision',
+      'route browse vision must route to Vision Mode');
+    console.log('# route browse vision reaches Vision Mode');
+  });
+
   test('planActions returns valid JSON with View, Discuss, Approve, More', () => {
     createPlan('functional', 'my-plan');
 
