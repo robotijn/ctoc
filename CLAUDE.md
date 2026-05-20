@@ -21,7 +21,7 @@ Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatc
 | Context | Model rule | Why |
 |---|---|---|
 | Front process (terminal `claude` session) | Stays on user's chosen model; CTOC never auto-switches | `/model` mid-session preserves context; Opus→Haiku doesn't fit and breaks the session |
-| Slash commands (`/ctoc:menu`, `/ctoc:start`, etc.) | **MUST NOT declare `model:` in frontmatter** | A slash command's `model:` switches the live session, not a fresh process; pinning Haiku triggers autocompact + crash |
+| Slash commands (`/ctoc:menu`, `/ctoc:push`, `/ctoc:update`) | **MUST NOT declare `model:` in frontmatter** | A slash command's `model:` switches the live session, not a fresh process; pinning Haiku triggers autocompact + crash |
 | Subagents (Task tool — Tier 2/3 dispatches) | MAY declare any model | Subagent is a genuinely fresh Claude instance with isolated 200K context, no inheritance from parent |
 
 Scouts (Tier 3) declare `model: haiku` because they run as **subagents** — isolated context, the Haiku model is safe at this layer. The user's terminal session is untouched. Slash commands are NOT subagents: they run inside the user's session and must never pin a model. Enforced by `tests/slash-command-no-model-pin.test.js`.
@@ -77,9 +77,7 @@ DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → 
 
 Canonical KPI library at `.ctoc/templates/product-kpis.yaml` — 17 KPIs across acquisition/activation/retention/revenue/churn/satisfaction/engagement. SaaS-b2c launch set: signup_completion, activation_rate, time_to_value, w1_retention, free_to_paid_conversion, monthly_churn, mrr.
 
-Slash commands:
-- `/ctoc:kpi-status` — current values vs targets (color-coded)
-- `/ctoc:product-review` — run weekly product review
+KPI status and the weekly product review run inside the Product Loop and are reached through the menu — CTOC ships only three slash commands (`menu`, `push`, `update`).
 
 The Product Loop is dispatched outside the CTO Chief technical chain — the founder or product manager owns it. The CTO Chief implements the technical wiring (instrumentation, dashboards, feature-flag plumbing) inside Iron Loop Step 10 only.
 
@@ -225,7 +223,7 @@ ctoc/
   VERSION                Source of truth for version
   docs/                  IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
   src/                   Source code directory
-    commands/            8 slash commands
+    commands/            3 slash commands (menu, push, update)
     hooks/               10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
     lib/                 72 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
@@ -376,7 +374,7 @@ All code MUST run on Windows, macOS, and Linux. Use:
 
 ## Project Init Procedure
 
-When initializing a new project with CTOC (`ctoc init`):
+Initialization is automatic. There is no init command — when `/ctoc:menu` runs in a project that has no `.ctoc/` directory, `src/commands/menu.js` calls `initProject()` before rendering the dashboard. The procedure (`src/lib/init-project.js`):
 
 1. **Detect**: Scan for languages, frameworks, tools (via `src/lib/stack-detector.js`)
 2. **Generate**: Create tailored `CLAUDE.md` from `.ctoc/templates/CLAUDE.md.template`

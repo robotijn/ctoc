@@ -132,8 +132,11 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countTopLevelJs('src/lib'), 105);
   });
 
-  it('src/commands/: 13 slash command specs (.md files)', () => {
-    assert.equal(countSlashCommandSpecs(), 13);
+  it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {
+    // v6.9.32: trimmed the slash-command surface to three. Everything else —
+    // vision, planning, quality, review, agent runs, init — goes through the
+    // menu. init is auto-triggered by opening the menu.
+    assert.equal(countSlashCommandSpecs(), 3);
   });
 
   it('src/hooks/: 13 hook files (andon-halt added v6.9.27)', () => {
@@ -242,8 +245,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /saas\/b2b-sales-led.*ready/i);
   });
 
-  it('Project structure: 11 slash commands', () => {
-    assert.match(README, /13 slash commands/);
+  it('Project structure: 3 slash commands', () => {
+    assert.match(README, /3 slash commands/);
   });
 
   it('Project structure: 12 Claude Code hooks', () => {

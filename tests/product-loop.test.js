@@ -230,16 +230,18 @@ describe('Product Loop — agent + skill conformance', () => {
   });
 });
 
-describe('Product Loop — docs + commands', () => {
+describe('Product Loop — docs + command surface', () => {
   it('docs/PRODUCT_LOOP.md exists', () => {
     assert.ok(fs.existsSync(path.join(projectRoot, 'docs/PRODUCT_LOOP.md')));
   });
 
-  it('src/commands/product-review.md exists', () => {
-    assert.ok(fs.existsSync(path.join(projectRoot, 'src/commands/product-review.md')));
-  });
-
-  it('src/commands/kpi-status.md exists', () => {
-    assert.ok(fs.existsSync(path.join(projectRoot, 'src/commands/kpi-status.md')));
+  it('Product Loop slash commands are removed — workflow goes through the menu (v6.9.32)', () => {
+    // v6.9.32: the slash-command surface is menu, push, update only.
+    // kpi-status and product-review were removed; the Product Loop is
+    // dispatched outside the slash-command surface (see docs/PRODUCT_LOOP.md).
+    assert.ok(!fs.existsSync(path.join(projectRoot, 'src/commands/product-review.md')),
+      'product-review slash command must be removed');
+    assert.ok(!fs.existsSync(path.join(projectRoot, 'src/commands/kpi-status.md')),
+      'kpi-status slash command must be removed');
   });
 });

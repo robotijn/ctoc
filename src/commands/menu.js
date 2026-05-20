@@ -233,8 +233,28 @@ function handleResize() {
   render();
 }
 
+// Auto-initialize CTOC for this project if it has not been set up yet.
+// Opening the menu is the signal that the user wants CTOC in this project,
+// so initialization happens automatically — there is no separate init
+// command. The marker is a `.ctoc/` directory; initProject() is idempotent
+// and skips any file that already exists. Fails open so the menu never
+// blocks on an initialization problem.
+function ensureInitialized(projectPath) {
+  const root = projectPath || process.cwd();
+  if (fs.existsSync(path.join(root, '.ctoc'))) return false;
+  try {
+    const { initProject } = require('../lib/init-project');
+    initProject(root);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Main entry point
 function main() {
+  const justInitialized = ensureInitialized(app.projectPath);
+
   // Check for non-interactive JSON mode (subcommands passed as args)
   // Usage: node menu.js [browse functional | plan stage/file | validate stage/file | menu commands]
   const cliArgs = process.argv.slice(2);
@@ -260,14 +280,22 @@ function main() {
     });
     setupKeyboard(handleKey);
     app.navStack.push('Overview');
+    if (justInitialized) app.message = 'CTOC initialized for this project';
     render();
   } else {
     // Non-interactive with no args: JSON dashboard output for Claude
     const { route } = require('../lib/menu-screens');
     const result = route([], app.projectPath);
+    if (justInitialized) {
+      result.text = 'CTOC initialized for this project (automatic — no init command needed).\n\n' + result.text;
+    }
     console.log(JSON.stringify(result, null, 2));
   }
 }
 
-// Run
-main();
+// Run as a script; stay importable (without side effects) for tests.
+if (require.main === module) {
+  main();
+}
+
+module.exports = { ensureInitialized };

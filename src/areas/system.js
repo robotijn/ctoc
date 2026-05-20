@@ -36,7 +36,7 @@ function render(app) {
   if (fs.existsSync(settingsPath)) {
     out += `    ${c.dim}${settingsPath}${c.reset}\n`;
   } else {
-    out += `    ${c.dim}Not configured (run /ctoc init)${c.reset}\n`;
+    out += `    ${c.dim}Not configured (.ctoc/settings.yaml missing)${c.reset}\n`;
   }
 
   out += '\n' + line() + '\n';

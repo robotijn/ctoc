@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.31-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.32-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -409,7 +409,7 @@ DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → 
 
 Canonical KPI library at `.ctoc/templates/product-kpis.yaml` — **17 KPIs** across acquisition / activation / retention / revenue / churn / satisfaction / engagement. SaaS-b2c launch set: signup_completion, activation_rate, time_to_value, w1_retention, free_to_paid_conversion, monthly_churn, mrr.
 
-Slash commands: `/ctoc:kpi-status` (current values vs. targets, color-coded) and `/ctoc:product-review` (run weekly product review).
+KPI status and the weekly product review are reached through the `/ctoc:menu` dashboard — CTOC ships only three slash commands (`menu`, `push`, `update`).
 
 ---
 
@@ -679,19 +679,13 @@ Priority: security > correctness > performance > cleverness.
 
 **Slash commands** (typed in Claude Code):
 
+CTOC ships exactly three slash commands. Everything else — vision, planning, quality, review, agent runs, initialization — goes through the menu.
+
 | Command | Description |
 |---------|-------------|
-| `/ctoc` (alias for `/ctoc:menu`) | Interactive dashboard with 8 tabs (rendered on Haiku for speed) |
-| `/ctoc:start` | Greenfield project start — guided ideation through to first plan |
-| `/ctoc:vision` | Vision pipeline — explore and decompose ideas into plans |
-| `/ctoc:quality` | Run quality checks on changed files |
+| `/ctoc` (alias for `/ctoc:menu`) | Interactive dashboard. Auto-initializes the project on first run (no init command needed). |
 | `/ctoc:push` | Quality checks + push |
-| `/ctoc:init` | Initialize a project with CTOC methodology |
 | `/ctoc:update` | Update to latest version (workaround for plugin-cache bug) |
-| `/ctoc:kpi-status` | Product Loop — current KPI values vs targets (color-coded) |
-| `/ctoc:product-review` | Product Loop — run a weekly product review |
-| `/ctoc:budget` | Session-level budget status and overrides |
-| `/ctoc:self-check` | Architectural self-check — validates Tier invariants, dispatcher rules |
 
 **Conversational commands** (said to Claude):
 
@@ -763,7 +757,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.31'
+getVersion()       // → '6.9.32'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -778,7 +772,7 @@ ctoc/
 │                    PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md,
 │                    CONTRIBUTING.md, CODE_OF_CONDUCT.md
 ├── src/
-│   ├── commands/    13 slash commands (.md spec + .js impl where needed)
+│   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       13 Claude Code hooks (session, pre/post tool use, andon-halt)
 │   ├── lib/         105 JS modules (planning, quality, refinement, dispatcher, regulatory-regime, audit-chain, retention, legal-hold, traceability, lineage, eval-harness, comparator)
 │   ├── tabs/        8 dashboard tabs
@@ -819,6 +813,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.31** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.32** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
