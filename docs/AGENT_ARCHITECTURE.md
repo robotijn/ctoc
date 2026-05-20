@@ -160,22 +160,23 @@ dispatch_protocol: v1
 
 **Cost rationale**: a Haiku scout subagent is ~10-50x cheaper than the Opus/Sonnet specialist it short-circuits. On a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 deep dispatches per gate.
 
-### Front-process vs subagent model rules
+### Front-process vs subagent model rules (corrected v6.9.29)
 
-Sources confirm two separate execution contexts in Claude Code:
+Claude Code has two execution contexts that matter for model declarations. An earlier version of this document claimed a slash command was "a separate top-level invocation with no session context to preserve" and could therefore declare any model. **That was wrong and it caused crashes.** A slash command's `model:` frontmatter switches the *live session's* model. When `/ctoc:menu` pinned `model: claude-haiku-4-5`, invoking it switched the running session to Haiku; if the session conversation was larger than Haiku's context window, autocompact triggered and the session crashed. The v6.9.29 fix removed the `model:` line from every slash command.
 
 | Context | What it is | Model declarations |
 |---|---|---|
 | **Front process** | The user's terminal Claude session — the live conversation | **MUST stay on user's chosen model.** `/model` switching mid-session preserves conversation context, but if that context is larger than the new model's window, the session breaks. Do not auto-switch. |
-| **Subagent** (Task tool) | A fresh Claude instance spawned by the Task tool — own isolated 200K context, no inheritance of parent's conversation, returns one summary message back | **MAY declare any model.** Anthropic docs explicitly recommend this for review pipelines: *"during a code review, you can run style-checker, security-scanner, and test-coverage subagents simultaneously"* with different models. |
-| **Slash command** | A separate top-level Claude invocation (e.g., `/ctoc:menu`) — different process from the session | **MAY declare any model.** No session context to preserve. `/ctoc:menu` declares `model: claude-haiku-4-5` for fast rendering. |
+| **Subagent** (Task tool) | A genuinely fresh Claude instance spawned by the Task tool — own isolated 200K context, no inheritance of parent's conversation, returns one summary message back | **MAY declare any model.** Anthropic docs explicitly recommend this for review pipelines: *"during a code review, you can run style-checker, security-scanner, and test-coverage subagents simultaneously"* with different models. |
+| **Slash command** | Runs **inside the user's session**, not a separate process — its `model:` frontmatter switches the live session | **MUST NOT declare `model:`.** Pinning a model (especially Haiku) switches the live session and can force autocompact and a crash. |
 
-The rule for CTOC v8.x:
-- Agent frontmatter `model:` declarations are **valid for subagents** (Tier 2 specialists, Tier 3 scouts, Tier 1 sub-orchestrators dispatched via Task tool)
+The rule for CTOC v6.9.29+:
+- Agent frontmatter `model:` declarations are **valid only for subagents** (Tier 2 specialists, Tier 3 scouts, Tier 1 sub-orchestrators dispatched via the Task tool)
+- Slash command frontmatter must **never** contain a `model:` key
 - The **front process** (the live `claude` terminal session) is controlled by the user via `/model` or session-start args
 - No code path in CTOC should programmatically `/model`-switch the front process
 
-This combination preserves both safety (front process untouched) and cost benefit (Haiku scouts deliver 10-50x savings on the Tier 3 dispatches).
+This preserves both safety (front process untouched, no slash-command-induced model switch) and cost benefit (Haiku scouts deliver 10-50x savings on the Tier 3 subagent dispatches, where the isolated context makes Haiku genuinely safe).
 
 ## Dispatch flow
 

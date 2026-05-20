@@ -16,15 +16,15 @@ Tier 2  Specialist skills (72)     leaf agents → skills, structured outputs
 Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatches
 ```
 
-**Model rules (v8.2+)**: Claude Code has three distinct execution contexts, with different model-declaration rules each:
+**Model rules (v6.9.29+, corrected)**: Claude Code has two execution contexts that matter for model declarations. The earlier v8.2 guidance — that slash commands run in a "fresh, separate context" and may safely pin any model — was **wrong in practice and caused crashes**. A slash command's `model:` frontmatter switches the **live session**; when it switched to Haiku, the session conversation no longer fit Haiku's smaller context window, forcing autocompact and crashing the session.
 
 | Context | Model rule | Why |
 |---|---|---|
 | Front process (terminal `claude` session) | Stays on user's chosen model; CTOC never auto-switches | `/model` mid-session preserves context; Opus→Haiku doesn't fit and breaks the session |
-| Slash commands (`/ctoc:menu`) | MAY declare any model in frontmatter | Separate top-level Claude invocation, fresh context |
-| Subagents (Task tool — Tier 2/3 dispatches) | MAY declare any model | Subagent is a fresh Claude instance with isolated 200K context, no inheritance from parent |
+| Slash commands (`/ctoc:menu`, `/ctoc:start`, etc.) | **MUST NOT declare `model:` in frontmatter** | A slash command's `model:` switches the live session, not a fresh process; pinning Haiku triggers autocompact + crash |
+| Subagents (Task tool — Tier 2/3 dispatches) | MAY declare any model | Subagent is a genuinely fresh Claude instance with isolated 200K context, no inheritance from parent |
 
-Scouts (Tier 3) declare `model: haiku` because they run as **subagents** — isolated context, the Haiku model is safe at this layer. The user's terminal session is untouched.
+Scouts (Tier 3) declare `model: haiku` because they run as **subagents** — isolated context, the Haiku model is safe at this layer. The user's terminal session is untouched. Slash commands are NOT subagents: they run inside the user's session and must never pin a model. Enforced by `tests/slash-command-no-model-pin.test.js`.
 
 ## Step-driven question routing
 
