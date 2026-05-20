@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.33-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.34-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -67,13 +67,13 @@ When you install CTOC from the marketplace, Claude Code auto-discovers every art
 2. **`when_to_load` trigger phrases** — each `SKILL.md` declares a list of natural-language triggers in YAML frontmatter (e.g. `"SBOM"`, `"prompt injection"`, `"NIST 800-61"`). When your conversation matches a trigger, Claude Code auto-loads the skill into context with no slash command needed.
 3. **Direct `Skill` tool invocation** — Claude can invoke any skill explicitly via the built-in `Skill` tool (e.g. `Skill(skill_name="ctoc:llm-security-tester")`) based on conversational context.
 
-The auto-discovery is documented behavior of Claude Code's plugin system. Installing CTOC therefore makes the entire 413-file library reachable without configuration — you only pay for what loads, but everything is wired and ready.
+The auto-discovery is documented behavior of Claude Code's plugin system. Installing CTOC therefore makes the entire 421-file library reachable without configuration — you only pay for what loads, but everything is wired and ready.
 
 ---
 
 ## Skill Library Quality Bar
 
-Every one of the 99 Tier-2 specialist `SKILL.md` bodies was brought to 2026 best-practices quality through an explicit improvement loop (completed across v6.9.15–v6.9.24). The library is not a grab-bag of LLM-generated stubs — it is engineered.
+Every one of the 99 Tier-2 specialist `SKILL.md` bodies was brought to 2026 best-practices quality through an explicit improvement loop (v6.9.15–v6.9.27). The library is not a grab-bag of LLM-generated stubs — it is engineered.
 
 **The 4-step loop (existing skills, 86 of them):**
 
@@ -121,24 +121,14 @@ These five take the specialist count from 86 → **91**, and the total skill-lib
 
 ## Project Init
 
-To set up CTO Chief methodology on an existing project:
-
-```
-ctoc init
-```
-
-This runs an interactive setup that:
+Initialization is automatic. The first time you open the dashboard (`/ctoc`) in a project that has not been set up, CTO Chief initializes it before rendering — there is no init command to run. Setup:
 
 1. **Detects your stack** — scans for languages (14), frameworks (20+), and tools (linters, test runners, bundlers)
 2. **Generates a tailored `CLAUDE.md`** — project-specific instructions including detected tools, quality commands, and Iron Loop steps
 3. **Configures `.ctoc/settings.yaml`** — quality gates, enforcement mode, and agent settings tuned to your stack
-4. **Creates `plans/` directory structure** — `vision/`, `functional/`, `implementation/`, `todo/`, `review/`, `done/`
-5. **Initializes Iron Loop state** in `.ctoc/state/`
+4. **Creates the `plans/` directory structure** and initializes Iron Loop state in `.ctoc/state/`
 
-The generated `CLAUDE.md` becomes the single source of truth for how Claude works in your project — agent personality, planning pipeline, test commands, and quality standards.
-
-> [!TIP]
-> You don't need to run `ctoc init` manually. If you just start talking to Claude with CTO Chief installed, it will guide you. `ctoc init` is useful when you want to pre-configure a project or customize the generated `CLAUDE.md`.
+The generated `CLAUDE.md` becomes the single source of truth for how Claude works in your project — agent personality, planning pipeline, test commands, and quality standards. Initialization is idempotent: it skips any file that already exists, so opening the dashboard never overwrites your work.
 
 ---
 
@@ -163,7 +153,7 @@ The generated `CLAUDE.md` becomes the single source of truth for how Claude work
 |--|-----------|-------------|----------------|----------------|
 | Ideation with product owner | AI explores your idea before planning | None | None | None |
 | Planning before coding | 6-step plan with adversarial review | Manual rules file | None | None |
-| Persona-aware question routing | 8 roles; founder ≠ programmer ≠ designer | None | None | None |
+| Step-driven question routing | Questions scoped to your current Iron Loop step | None | None | None |
 | 6-month pre-mortem + 5-scenario cash flow | Built into canvas | None | None | None |
 | TDD enforcement | Automatic (Step 8) | Manual | Manual | None |
 | Security scanning | Built-in (Steps 9, 13) | Manual | Manual | None |
@@ -464,7 +454,7 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 | [Pipeline](agents/pipeline/) | 5 | [agent-writer](agents/pipeline/agent-writer.md), [agent-critic](agents/pipeline/agent-critic.md), [agent-tester](agents/pipeline/agent-tester.md), [agent-qa](agents/pipeline/agent-qa.md), [agent-publisher](agents/pipeline/agent-publisher.md) |
 | [Scouts (Tier 3, Haiku)](agents/scouts/) | 5 | [syntax-scout](agents/scouts/syntax-scout.md), [lint-scout](agents/scouts/lint-scout.md), [test-scout](agents/scouts/test-scout.md), [dep-scout](agents/scouts/dep-scout.md), [secret-scout](agents/scouts/secret-scout.md) |
 | [Compliance](agents/compliance/) | 3 | [gdpr-compliance-checker](agents/compliance/gdpr-compliance-checker.md), [audit-log-checker](agents/compliance/audit-log-checker.md), [license-scanner](agents/compliance/license-scanner.md) |
-| [Coordinator](agents/coordinator/) | 2 | [cto-chief](agents/coordinator/cto-chief.md) (Tier 0), [synthesizer](agents/coordinator/synthesizer.md) |
+| [Coordinator](agents/coordinator/) | 3 | [cto-chief](agents/coordinator/cto-chief.md) (Tier 0), [ivv-chief](agents/coordinator/ivv-chief.md), [synthesizer](agents/coordinator/synthesizer.md) |
 | [Data/ML](agents/data-ml/) | 3 | [data-quality-checker](agents/data-ml/data-quality-checker.md), [ml-model-validator](agents/data-ml/ml-model-validator.md), [feature-store-validator](agents/data-ml/feature-store-validator.md) |
 | [Frontend](agents/frontend/) | 3 | [bundle-analyzer](agents/frontend/bundle-analyzer.md), [component-tester](agents/frontend/component-tester.md), [visual-regression-checker](agents/frontend/visual-regression-checker.md) |
 | [Iron Loop](agents/iron-loop/) | 3 | [integrator](agents/iron-loop/iron-loop-integrator.md), [critic](agents/iron-loop/iron-loop-critic.md), [executor](agents/iron-loop/iron-loop-executor.md) |
@@ -497,16 +487,17 @@ There are two kinds of skills:
 > **v6.9.14**: 38 unreachable reference files were deleted from `skills/` after a usage audit confirmed they had zero code or agent references.
 > **v6.9.15–v6.9.23**: all 86 existing `SKILL.md` bodies were rewritten through a websearch → update → critique → update loop (May 2026 sources, 7-language coverage, sourced citations only).
 > **v6.9.24**: 5 new gap-fill specialists were added via a 6-step v3 critique loop (see "Gap-Fill Skills" above). Net library: 408 → **413** files; 86 → **91** specialists.
+> **v6.9.27**: 8 cross-industry-critique specialists added — new `legal`, `realtime`, and `safety` categories plus `security/cra-incident-clocks`. Net library: 413 → **421** files; 91 → **99** specialists.
 
 <details>
-<summary><strong>Specialist skill bodies (Tier 2) — 91 across 17 categories</strong></summary>
+<summary><strong>Specialist skill bodies (Tier 2) — 99 across 20 categories</strong></summary>
 
 | Category | # | Skill bodies |
 |----------|---|--------------|
 | [SaaS](skills/saas/) | 12 | clerk-auth · stripe-subscriptions · workos-sso · multi-tenancy-row-level · resend-email · posthog-analytics · sentry-errors · supabase-data · inngest-jobs · rate-limiting · vercel-deploy · legal-scaffold |
 | [Quality](skills/quality/) | 11 | architecture-checker · code-reviewer · complexity-analyzer · complexity-reducer · code-smell-detector · consistency-checker · dead-code-detector · duplicate-code-detector · performance-validator · quality-gate · type-checker |
 | [Specialized](skills/specialized/) | 11 | accessibility-checker · api-contract-validator · configuration-validator · database-reviewer · error-handler-checker · health-check-validator · memory-safety-checker · observability-checker · performance-profiler · resilience-checker · translation-checker |
-| [Security](skills/security/) | 9 | security-scanner · sast-scanner · secrets-detector · input-validation-checker · concurrency-checker · dependency-checker · dependency-auditor · **threat-modeler** *(new, v6.9.24)* · **incident-responder** *(new, v6.9.24)* |
+| [Security](skills/security/) | 10 | security-scanner · sast-scanner · secrets-detector · input-validation-checker · concurrency-checker · dependency-checker · dependency-auditor · **threat-modeler** *(new, v6.9.24)* · **incident-responder** *(new, v6.9.24)* · **cra-incident-clocks** *(new, v6.9.27)* |
 | [Testing](skills/testing/) | 14 (5+4+5) | playwright-qa · coverage-enforcer · coverage-mapper · smart-test-runner · quality-gate-runner · 4 writers · 5 runners |
 | [Infrastructure](skills/infrastructure/) | 5 | terraform-validator · kubernetes-checker · docker-security-checker · ci-pipeline-checker · ci-runner-setup |
 | [Compliance](skills/compliance/) | 5 | audit-log-checker · gdpr-compliance-checker · license-scanner · **sbom-cra-checker** *(new, v6.9.24)* · **ai-governance-checker** *(new, v6.9.24)* |
@@ -519,6 +510,9 @@ There are two kinds of skills:
 | [DevEx](skills/devex/) | 2 | api-deprecation-checker · onboarding-validator |
 | [Documentation](skills/documentation/) | 2 | changelog-generator · documentation-updater |
 | [Product](skills/product/) | 2 | product-reviewer · experiment-designer |
+| [Safety](skills/safety/) | 3 | **fault-tree-builder · fmeda-analyzer · redundancy-pattern-picker** *(new category, v6.9.27)* |
+| [Legal](skills/legal/) | 2 | **clm-obligations · dsar-handler** *(new category, v6.9.27)* |
+| [Realtime](skills/realtime/) | 2 | **hil-harness · wcet-budget** *(new category, v6.9.27)* |
 | [Cost](skills/cost/) | 1 | cloud-cost-analyzer |
 
 </details>
@@ -544,18 +538,15 @@ Stack detected automatically from your project files. Skills load on-demand — 
 
 ## Interactive Dashboard
 
-The `/ctoc` command opens an interactive dashboard with 8 tabs:
+The `/ctoc` command opens an interactive dashboard with 5 areas:
 
-| Tab | Purpose |
-|-----|---------|
-| Pipeline | Plan counts per stage, navigate to any stage |
-| Vision | Start here — dump ideas, explore, decompose into plans |
-| Functional | Product owner refines ideas into BDD specs |
-| Implementation | Technical approach and architecture |
-| Review | Review completed implementations |
-| Todo | FIFO queue for agent work |
-| Progress | In-progress and finished items |
-| Tools | Release, Doctor, Update, Settings |
+| Area | Purpose |
+|------|---------|
+| Pipeline | The plan pipeline — Business, Implementation, and Execution sections; drill into any stage |
+| Inbox | Morning questions, decisions awaiting review, and plans waiting at a human gate |
+| Agent | Background agent status — start, stop, and monitor the todo-queue runner |
+| Library | Browse the agent and skill library |
+| System | Doctor, update, settings, and logs |
 
 **Plan pipeline** (directories under `plans/`):
 ```
@@ -569,7 +560,7 @@ vision → functional → implementation → todo → [in-progress] → review �
 2. Implementation → Todo *(approve how to build it)*
 3. Review → Done *(approve the result)*
 
-Navigate with numbers: `[1]` `[2]` `[3]`... `[0]` for back. Or just talk naturally.
+Navigate with numbers `[1]`–`[5]` to switch areas, `[0]` for back. Or just talk naturally.
 
 ---
 
@@ -582,7 +573,7 @@ CTO Chief blocks premature actions with hooks:
 | Edit/Write code | Planning complete (Step 8+) | "skip planning", "skip iron loop", "quick fix", "trivial fix", "trivial change", "hotfix", "urgent" |
 | Git commit | Documentation complete (Step 15+) | "hotfix", "urgent" |
 
-Config and CTOC files are **whitelisted** and never blocked: `.ctoc/**`, `.local/**`, `plans/*.md`, `.gitignore`, `.gitattributes`.
+Config and CTOC files are **whitelisted** and never blocked: `.ctoc/**`, `.local/**`, `plans/*.md`, `.gitignore`, `.gitattributes`, `VERSION`.
 
 ---
 
@@ -757,7 +748,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.33'
+getVersion()       // → '6.9.34'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -768,16 +759,18 @@ Files synced by `release()`: `VERSION` (source of truth), `.claude-plugin/market
 **Project structure:**
 ```
 ctoc/
-├── docs/            7 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
-│                    PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md,
+├── docs/            14 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
+│                    PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md, EVALUATION_HARNESS.md,
+│                    INDEPENDENCE.md, REGULATORY_OPS.md, REALTIME.md, PROCESS_FMEA.md,
+│                    CRITICAL_CONTROL_POINTS.md, CONTINUOUS_IMPROVEMENT.md,
 │                    CONTRIBUTING.md, CODE_OF_CONDUCT.md
 ├── src/
 │   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       13 Claude Code hooks (session, pre/post tool use, andon-halt)
 │   ├── lib/         105 JS modules (planning, quality, refinement, dispatcher, regulatory-regime, audit-chain, retention, legal-hold, traceability, lineage, eval-harness, comparator)
-│   ├── tabs/        8 dashboard tabs
-│   ├── areas/       5 dashboard areas (pipeline, library, system, agent, inbox)
-│   ├── scripts/     11 build/release utilities
+│   ├── areas/       5 dashboard areas (pipeline, inbox, agent, library, system)
+│   ├── tabs/        8 legacy tab modules (superseded by areas/, kept for drill-in flows)
+│   ├── scripts/     13 build/release utilities
 │   └── data/        Static data files
 ├── agents/          110 agent definitions across 22 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
@@ -786,8 +779,9 @@ ctoc/
 │                    + 322 reference files (50 langs, 211 frameworks,
 │                    61 quality configs). 38 unreachable refs removed in v6.9.14;
 │                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
-│                    5 gap-fill SKILL.md added in v6.9.24 via the v3 critique loop.
-├── tests/           68 test files (1521+ passing assertions)
+│                    5 gap-fill SKILL.md added in v6.9.24; 8 cross-industry
+│                    SKILL.md added in v6.9.27.
+├── tests/           68 test files (1470 passing tests)
 ├── .ctoc/           Config, templates, operations, audit, loop journals
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
@@ -813,6 +807,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.33** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.34** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
