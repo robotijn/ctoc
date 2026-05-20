@@ -34,7 +34,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 | Action | What to do |
 |--------|-----------|
 | `claude:view-edit {ref}` | Display the plan file, then help the user edit it (View and Edit are one action) |
-| `claude:discuss` | Critique the plan, then show discussion menu |
+| `claude:discuss` | Critique the plan to find gaps and weak assumptions. Ask the user about each gap **one question at a time** using the decision-matrix format — Read `${CLAUDE_PLUGIN_ROOT}/.ctoc/ask-me-questions.md` and follow it exactly (Unicode-box matrix with Option / Pros / Cons / Recommendation columns, then AskUserQuestion). Then show the discussion menu. |
 | `claude:edit` | Help user edit the plan (used by the discussion menu's Apply edits) |
 | `claude:approve {ref}` | Run approvePlan(), show result, return to stage list |
 | `claude:create-plan {stage}` | Create new plan in stage, enter discussion |
@@ -52,7 +52,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 ### Rules
 
 1. Always show AskUserQuestion after every response
-2. Auto-discuss when creating new plans
+2. Auto-discuss when creating new plans — ask every discussion question via the `.ctoc/ask-me-questions.md` matrix format: one question per turn, the Unicode-box matrix first, then AskUserQuestion
 3. Dashboard pipeline shows the 3 v7 sections: Business, Implementation, Execution, More (counts in descriptions, labels are stable)
 4. 3 human gates: functional->implementation, implementation->todo, review->done
 5. Pre-validate before every approve (run `validate` command first)

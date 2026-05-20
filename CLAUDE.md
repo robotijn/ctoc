@@ -306,17 +306,22 @@ ctoc/
 ## Menu System Rules
 
 1. **Numbered menus after every CTOC response** — `[1][2][3]...[0]`, where `[0]` is always back/cancel
-2. **Discussion mode when creating plans** — critique, find gaps, question assumptions before showing menu
+2. **Discussion mode when creating plans** — critique, find gaps, question assumptions before showing menu. Ask every question using the decision-matrix format in [`.ctoc/ask-me-questions.md`](./.ctoc/ask-me-questions.md): one question per turn, matrix first.
 3. **Recommended option first** with `(Recommended)` label
 4. **Auto-generate implementation details** when plans move to implementation stage
-5. **Every gap gets a question with pros/cons** — never just list gaps. Use `+`/`-` for pros/cons (not emojis)
+5. **Every gap gets its own matrix question** — never just list gaps, and never ask more than one at a time. For each gap, render the [`.ctoc/ask-me-questions.md`](./.ctoc/ask-me-questions.md) decision matrix — a real Unicode box-drawing table (`│` separators), columns `Option` · `Pros` · `Cons` · `Recommendation` — then ask the single question via AskUserQuestion. The `Recommendation` cell names the highest-quality option and why. A pipe-character pseudo-table is not acceptable; it must be a real box-drawing matrix.
 
 ```
-Gap: Settings location unclear
-  [1] Global (~/.ctoc/) (Recommended)
-      + One config for all projects   - Can't vary per project
-  [2] Per-project (.ctoc/)
-      + Settings travel with repo     - Must configure every project
+### Question 1 — Where should CTOC settings live?
+
+┌──────────────────────┬───────────────────────────────┬───────────────────────────────┬────────────────────────────────────┐
+│ Option               │ Pros                          │ Cons                          │ Recommendation                     │
+├──────────────────────┼───────────────────────────────┼───────────────────────────────┼────────────────────────────────────┤
+│ Global (~/.ctoc/)    │ One config for all projects.  │ Cannot vary per project.      │                                    │
+├──────────────────────┼───────────────────────────────┼───────────────────────────────┼────────────────────────────────────┤
+│ Per-project (.ctoc/) │ Settings live with the repo.  │ Must set up every project.    │ Recommended — config versions      │
+│                      │                               │                               │ with the code it governs.          │
+└──────────────────────┴───────────────────────────────┴───────────────────────────────┴────────────────────────────────────┘
 ```
 
 ---
