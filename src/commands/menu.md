@@ -33,9 +33,9 @@ The command outputs JSON: `{ text, ask, actions }`.
 
 | Action | What to do |
 |--------|-----------|
-| `claude:view {ref}` | Read and display the plan file |
+| `claude:view-edit {ref}` | Display the plan file, then help the user edit it (View and Edit are one action) |
 | `claude:discuss` | Critique the plan, then show discussion menu |
-| `claude:edit` | Help user edit the plan |
+| `claude:edit` | Help user edit the plan (used by the discussion menu's Apply edits) |
 | `claude:approve {ref}` | Run approvePlan(), show result, return to stage list |
 | `claude:create-plan {stage}` | Create new plan in stage, enter discussion |
 | `claude:delete {ref}` | Delete plan file, return to stage list |

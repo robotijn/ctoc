@@ -539,23 +539,26 @@ function planActions(stage, file, projectPath) {
     }
   }
 
-  text += '\n\n\n';
+  text += '\n  Type "more" for delete and other actions.\n\n\n';
 
   const nextStage = NEXT_STAGE[stage];
   const approveLabel = nextStage ? `Approve → ${nextStage}` : 'Approve';
 
+  // Every plan menu carries the same four verbs: Create, View/Edit, Discuss,
+  // Approve. View and Edit are one action — opening a plan shows it and lets
+  // you edit it in the same step.
   const options = [
-    { label: 'View', description: 'Show full plan contents' },
+    { label: 'Create new', description: `Create a new ${stage} plan` },
+    { label: 'View/Edit', description: 'Show the plan, then edit it' },
     { label: 'Discuss', description: 'Critique and refine the plan' },
-    { label: approveLabel, description: `Validate and move to ${nextStage || 'next stage'}` },
-    { label: 'More ▶', description: 'Edit, delete, and other actions' }
+    { label: approveLabel, description: `Validate and move to ${nextStage || 'next stage'}` }
   ];
 
   const actions = {
-    'View': `claude:view ${stage}/${file}`,
+    'Create new': `claude:create-plan ${stage}`,
+    'View/Edit': `claude:view-edit ${stage}/${file}`,
     'Discuss': 'claude:discuss',
-    [approveLabel]: `validate ${stage}/${file}`,
-    'More ▶': `plan ${stage}/${file} more`
+    [approveLabel]: `validate ${stage}/${file}`
   };
 
   return {
@@ -595,15 +598,15 @@ function planActionsMore(stage, file, projectPath) {
 
   text += '\n\n\n';
 
+  // Edit merged into the main menu's View/Edit action; this secondary screen
+  // now carries only Delete plus navigation. Reached by typing "more".
   const options = [
-    { label: 'Edit', description: 'Modify plan contents' },
     { label: 'Delete', description: 'Remove this plan permanently' },
     { label: 'Back to list', description: `Return to ${stage} plan list` },
     { label: '◀ Actions', description: 'Return to main action menu' }
   ];
 
   const actions = {
-    'Edit': 'claude:edit',
     'Delete': `claude:delete ${stage}/${file}`,
     'Back to list': `browse ${stage}`,
     '◀ Actions': `plan ${stage}/${file}`
@@ -646,15 +649,17 @@ function reviewActions(stage, file, projectPath) {
 
   text += '\n\n\n';
 
+  // Review is the human gate: inspect, then approve or kick back. The four
+  // slots are View/Edit plus the three gate transitions.
   const options = [
-    { label: 'View', description: 'Show full plan contents' },
+    { label: 'View/Edit', description: 'Show the plan, then edit it' },
     { label: 'Approve → Done', description: 'Validate and mark as complete' },
     { label: 'Feedback → Functional', description: 'Send back to functional for requirements rework' },
     { label: 'Rework → Implementation', description: 'Send back to implementation for technical rework' }
   ];
 
   const actions = {
-    'View': `claude:view review/${file}`,
+    'View/Edit': `claude:view-edit review/${file}`,
     'Approve → Done': `validate review/${file}`,
     'Feedback → Functional': `claude:reject review/${file} functional`,
     'Rework → Implementation': `claude:reject review/${file} implementation`

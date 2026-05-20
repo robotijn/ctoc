@@ -208,17 +208,20 @@ describe('Menu Screens Tests', () => {
     console.log('# route browse vision reaches Vision Mode');
   });
 
-  test('planActions returns valid JSON with View, Discuss, Approve, More', () => {
+  test('planActions returns Create new, View/Edit, Discuss, Approve', () => {
     createPlan('functional', 'my-plan');
 
     const result = menuScreens.planActions('functional', 'my-plan.md', testDir);
     const labels = result.ask.questions[0].options.map(o => o.label);
 
-    assert.ok(labels.includes('View'), 'Should have View');
+    assert.ok(labels.includes('Create new'), 'Should have Create new');
+    assert.ok(labels.includes('View/Edit'), 'Should have View/Edit (See and Edit merged)');
     assert.ok(labels.includes('Discuss'), 'Should have Discuss');
     assert.ok(labels.some(l => l.startsWith('Approve')), 'Should have Approve');
-    assert.ok(labels.some(l => l.includes('More')), 'Should have More');
-    console.log('# planActions returns valid JSON with View, Discuss, Approve, More');
+    assert.ok(!labels.includes('View'), 'View is merged into View/Edit, not a separate option');
+    assert.ok(result.actions['View/Edit'].startsWith('claude:view-edit'),
+      'View/Edit maps to the merged claude:view-edit action');
+    console.log('# planActions returns Create new, View/Edit, Discuss, Approve');
   });
 
   test('planActions Approve includes next stage', () => {
@@ -243,30 +246,31 @@ describe('Menu Screens Tests', () => {
     console.log('# planActions Approve maps to validate command');
   });
 
-  test('planActionsMore returns Edit, Delete, Back to list, Actions', () => {
+  test('planActionsMore returns Delete, Back to list, Actions (Edit merged away)', () => {
     createPlan('functional', 'my-plan');
 
     const result = menuScreens.planActionsMore('functional', 'my-plan.md', testDir);
     const labels = result.ask.questions[0].options.map(o => o.label);
 
-    assert.ok(labels.includes('Edit'), 'Should have Edit');
+    assert.ok(!labels.includes('Edit'), 'Edit is merged into the main menu View/Edit action');
     assert.ok(labels.includes('Delete'), 'Should have Delete');
     assert.ok(labels.includes('Back to list'), 'Should have Back to list');
     assert.ok(labels.some(l => l.includes('Actions')), 'Should have Actions back');
-    console.log('# planActionsMore returns Edit, Delete, Back to list, Actions');
+    console.log('# planActionsMore returns Delete, Back to list, Actions');
   });
 
-  test('reviewActions returns View, Approve, Feedback, Rework', () => {
+  test('reviewActions returns View/Edit, Approve, Feedback, Rework', () => {
     createPlan('review', 'reviewed-plan');
 
     const result = menuScreens.reviewActions('review', 'reviewed-plan.md', testDir);
     const labels = result.ask.questions[0].options.map(o => o.label);
 
-    assert.ok(labels.includes('View'), 'Should have View');
+    assert.ok(labels.includes('View/Edit'), 'Should have View/Edit (See and Edit merged)');
+    assert.ok(!labels.includes('View'), 'View is merged into View/Edit, not a separate option');
     assert.ok(labels.some(l => l.includes('Approve')), 'Should have Approve');
     assert.ok(labels.some(l => l.includes('Feedback')), 'Should have Feedback');
     assert.ok(labels.some(l => l.includes('Rework')), 'Should have Rework');
-    console.log('# reviewActions returns View, Approve, Feedback, Rework');
+    console.log('# reviewActions returns View/Edit, Approve, Feedback, Rework');
   });
 
   test('reviewActions maps to correct claude actions', () => {
@@ -392,11 +396,11 @@ describe('Menu Screens Tests', () => {
 
     // plan stage/file -> plan actions
     const plan = menuScreens.route(['plan', 'functional/test-plan.md'], testDir);
-    assert.ok(plan.ask.questions[0].options.some(o => o.label === 'View'));
+    assert.ok(plan.ask.questions[0].options.some(o => o.label === 'View/Edit'));
 
     // plan stage/file more -> more actions
     const more = menuScreens.route(['plan', 'functional/test-plan.md', 'more'], testDir);
-    assert.ok(more.ask.questions[0].options.some(o => o.label === 'Edit'));
+    assert.ok(more.ask.questions[0].options.some(o => o.label === 'Delete'));
 
     // validate stage/file -> validation
     const validate = menuScreens.route(['validate', 'functional/test-plan.md'], testDir);
@@ -414,15 +418,18 @@ describe('Menu Screens Tests', () => {
     console.log('# toggle menus work: Pipeline <-> Commands');
   });
 
-  test('toggle menus work: Actions <-> More', () => {
+  test('planActionsMore returns to the main plan actions menu', () => {
     createPlan('functional', 'plan-a');
 
+    // planActions no longer has a "More ▶" button — its four slots are
+    // Create new, View/Edit, Discuss, Approve. planActionsMore is reached by
+    // typing "more" and routes back to the main actions menu.
     const actions = menuScreens.planActions('functional', 'plan-a.md', testDir);
-    assert.ok(actions.actions['More ▶'].includes('more'), 'Actions More goes to more menu');
+    assert.ok(!('More ▶' in actions.actions), 'planActions has no More ▶ button');
 
     const more = menuScreens.planActionsMore('functional', 'plan-a.md', testDir);
-    assert.ok(more.actions['◀ Actions'].includes('plan'), 'More Actions goes back to actions');
-    console.log('# toggle menus work: Actions <-> More');
+    assert.ok(more.actions['◀ Actions'].includes('plan'), 'More returns to the actions menu');
+    console.log('# planActionsMore returns to the main plan actions menu');
   });
 });
 
