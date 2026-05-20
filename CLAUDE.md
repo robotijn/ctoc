@@ -39,7 +39,7 @@ CTOC ships opinionated templates for common project types. `agents/planning/stac
 | Template | Status | Default stack |
 |---|---|---|
 | `saas/b2c-subscription` | ready | Next.js 15 · Supabase · Clerk · Stripe · Resend · PostHog · Sentry · Vercel |
-| `saas/b2b-sales-led` | planned | adds WorkOS SSO · org-scoped data · audit log · SOC2 docs |
+| `saas/b2b-sales-led` | ready | adds WorkOS SSO · org-scoped data · audit log · MSA/DPA templates · SOC2 docs |
 | `saas/usage-based-api` | planned | metered billing · API keys · rate limiting · usage dashboard |
 | `app/expo-react-native` | planned | Expo SDK 52 · Clerk Expo · Supabase · RevenueCat · EAS |
 | `cli/bun-single-binary` | planned | Bun + cross-platform binary |
@@ -139,7 +139,7 @@ Every decision is logged to `.ctoc/logs/enforcement.json`. Hook fails OPEN on in
 **Per-project tuning** via `.ctoc/settings.yaml`:
 ```yaml
 enforcement:
-  mode: strict   # strict | warn | off  (default: strict)
+  mode: strict   # strict | soft | off  (default: strict)
 ```
 
 **Plans must declare `files:`** in YAML frontmatter to be coverage-aware. Pre-v7 plans without this declaration fall through to escape-phrase / block (per the X1 decision: warn-only treatment is logged but not yet block-default for legacy plans).

@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.34-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.35-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -116,6 +116,19 @@ Five new Tier-2 specialists were created from a v6.9.22 gap analysis — each fi
 | [`security/incident-responder`](skills/security/incident-responder/SKILL.md) | **NIST SP 800-61r3 (Apr 2025)** rewritten around CSF 2.0 functions plus the regulatory clocks that now bind: ENISA SRP 24h/72h/14d/1m from 11 Sep 2026, SEC Item 1.05 8-K (4 business days), NIS2, CIRCIA (pending), GDPR 72h. Runbooks per incident class, blameless-postmortem template, on-call wiring for PagerDuty / Opsgenie (EOS Apr 2027) / incident.io / FireHydrant. |
 
 These five take the specialist count from 86 → **91**, and the total skill-library file count from 408 → **413**.
+
+---
+
+## Cross-Industry Skills (v6.9.27)
+
+A cross-industry critique — pulling best practice from safety-critical, real-time, legal, and regulated-finance engineering, not just SaaS — added 8 specialists across three new categories plus security:
+
+- **Safety** — `fault-tree-builder` (top-down Fault Tree analysis), `fmeda-analyzer` (failure modes + diagnostic coverage), `redundancy-pattern-picker` (lockstep / N-version / voting / standby selection)
+- **Realtime** — `hil-harness` (Model-/Software-/Processor-/Hardware-in-the-Loop test ladder), `wcet-budget` (worst-case execution time bounds)
+- **Legal** — `clm-obligations` (contract obligation tracking), `dsar-handler` (GDPR data-subject-access-request flow)
+- **Security** — `cra-incident-clocks` (EU Cyber Resilience Act 24h / 72h / 14d incident clocks)
+
+The same pass added a regulatory-regime profile framework and an evaluation-driven-development harness — see [`REGULATORY_OPS.md`](docs/REGULATORY_OPS.md) and [`EVALUATION_HARNESS.md`](docs/EVALUATION_HARNESS.md).
 
 ---
 
@@ -748,7 +761,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.34'
+getVersion()       // → '6.9.35'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -807,6 +820,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.34** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.35** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
