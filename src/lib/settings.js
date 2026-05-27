@@ -13,7 +13,8 @@ const SETTINGS_TABS = [
   { id: 'learning', name: 'Learning' },
   { id: 'git', name: 'Git' },
   { id: 'privacy', name: 'Privacy' },
-  { id: 'deployment', name: 'Deployment' }
+  { id: 'deployment', name: 'Deployment' },
+  { id: 'retry', name: 'Retry' }
 ];
 
 const SETTINGS_SCHEMA = {
@@ -83,6 +84,12 @@ const SETTINGS_SCHEMA = {
       { key: 'productionEnabled', label: 'Production environment', type: 'toggle', default: false },
       { key: 'productionApproval', label: 'Production approval', type: 'select', options: ['auto', 'manual'], default: 'manual' },
       { key: 'autoRollback', label: 'Auto-rollback on failure', type: 'toggle', default: true }
+    ]
+  },
+  retry: {
+    label: 'Retry Settings',
+    settings: [
+      { key: 'overloadIntervalSeconds', label: 'API overload retry interval (seconds)', type: 'number', default: 600 }
     ]
   }
 };

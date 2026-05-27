@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { parseMetadata } = require('./state');
 const { refineLoop, appendDeferredQuestions } = require('./iron-loop');
-const { writeStatus, clearStatus } = require('./background');
+const { writeStatus, clearStatus, readStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
 const { validateForReview, validateTransition, formatValidationResult } = require('./plan-validator');
 const { logTransition } = require('./transition-log');
@@ -495,11 +495,45 @@ function startAgent(projectPath) {
   // 2. Clear any leftover stop flag
   clearStop(root);
 
-  // 3. Clean up stale in-progress plans (D2)
+  // 3. Clean up stale in-progress plans (skips overload-retry / overload-partial)
   const cleanedUp = cleanupStaleInProgress(root);
 
-  // 4. Get next plan from todo queue
+  // 4. Check for an overload-retry plan that is ready to resume.
+  //    These stay in in-progress across agent restarts — do not pick a new todo plan.
   const plansDir = getPlansDir(root);
+  const inProgressPlans = readPlans(path.join(plansDir, 'in-progress'));
+  const retryPlan = inProgressPlans.find(p => p.bgStatus === 'overload-retry');
+  if (retryPlan) {
+    // Clear overload-retry status so the executor resumes normally
+    clearStatus(retryPlan.path);
+    updateLockPlan(root, retryPlan.name);
+    setAgentStatus(root, {
+      active: true,
+      plan: retryPlan.name,
+      step: 8,
+      phase: 'TEST',
+      task: 'Resuming after API overload'
+    });
+    return {
+      started: true,
+      resumed: true,
+      plan: { name: retryPlan.name, path: retryPlan.path },
+      cleanedUp,
+      remainingTodo: readPlans(path.join(plansDir, 'todo')).length
+    };
+  }
+
+  // 5. Block if an overload-partial plan is in-progress — requires human gate.
+  const partialPlan = inProgressPlans.find(p => p.bgStatus === 'overload-partial');
+  if (partialPlan) {
+    releaseLock(root);
+    return {
+      started: false,
+      error: `Plan "${partialPlan.name}" has a partial write from an API overload. Review the in-progress plan and clear the .status file before restarting the agent.`
+    };
+  }
+
+  // 6. Get next plan from todo queue
   const todoPlans = readPlans(path.join(plansDir, 'todo'));
 
   if (todoPlans.length === 0) {
@@ -511,16 +545,16 @@ function startAgent(projectPath) {
     };
   }
 
-  // 5. Pick oldest plan (FIFO — already sorted by readPlans)
+  // 7. Pick oldest plan (FIFO — already sorted by readPlans)
   const nextPlan = todoPlans[0];
 
-  // 6. Update lock with actual plan name
+  // 8. Update lock with actual plan name
   updateLockPlan(root, nextPlan.name);
 
-  // 7. Move plan to in-progress
+  // 9. Move plan to in-progress
   const newPath = startExecution(nextPlan.path, root);
 
-  // 8. Update agent status for dashboard display
+  // 10. Update agent status for dashboard display
   setAgentStatus(root, {
     active: true,
     plan: nextPlan.name,
@@ -704,6 +738,13 @@ function cleanupStaleInProgress(projectPath) {
   const cleanedUp = [];
 
   for (const plan of plans) {
+    // Skip plans in overload states — they need special handling, not cleanup.
+    // overload-retry: executor will resume; overload-partial: human gate required.
+    const planStatus = readStatus(plan.path);
+    if (planStatus.status === 'overload-retry' || planStatus.status === 'overload-partial') {
+      continue;
+    }
+
     // Log cleanup event to .ctoc/logs/cleanup.json
     const logDir = path.join(root, '.ctoc', 'logs');
     fs.mkdirSync(logDir, { recursive: true });

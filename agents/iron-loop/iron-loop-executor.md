@@ -237,6 +237,46 @@ if [ -f "plans/.stop-after-current" ]; then
 fi
 ```
 
+## API Overload (529) Handling
+
+When the Anthropic API returns HTTP 529 (overloaded), your response depends on whether
+any tool writes have been made **in the current step**:
+
+### Pre-write overload — no writes made yet in the current step
+
+1. Write `status: "overload-retry"` to the plan's `.status` file:
+   ```json
+   {
+     "agent": "iron-loop-executor",
+     "status": "overload-retry",
+     "message": "API overloaded (529) — no writes made, safe to retry",
+     "retry_at": "<ISO timestamp: now + overloadIntervalSeconds from .ctoc/settings.json, default 600s>"
+   }
+   ```
+2. If `ScheduleWakeup` is available in your context, call it with the same interval.
+3. Exit cleanly. The dashboard will display `⏳ retry in Xm — <plan>`. The operator
+   can restart the agent via the menu when ready.
+
+### Mid-write overload — at least one file was written in the current step
+
+1. Write `status: "overload-partial"` to the plan's `.status` file:
+   ```json
+   {
+     "agent": "iron-loop-executor",
+     "status": "overload-partial",
+     "message": "API overloaded (529) after partial writes — human review required before resuming"
+   }
+   ```
+2. Exit cleanly. The dashboard will display `⚠ partial write — review: <plan>`.
+3. **Do NOT auto-retry.** A human must inspect what was written and decide whether
+   to continue or roll back before restarting the agent.
+
+### Tracking writes within a step
+
+Before making any tool write in a step, note the last completed checkpoint (the most
+recent `[x]` checkbox). If a 529 occurs before you write anything, use `overload-retry`.
+If a 529 occurs after at least one write in the current step, use `overload-partial`.
+
 ## Error Handling
 
 If a step fails:

@@ -20,8 +20,9 @@ function getStatusPath(planPath) {
  * @param {string} planPath - Path to the plan file
  * @param {Object} status - Status object
  * @param {string} status.agent - Agent type (research-assistant, implementation-planner, etc.)
- * @param {string} status.status - Current status (working, complete, needs-input, timeout)
+ * @param {string} status.status - Current status (working, complete, needs-input, timeout, overload-retry, overload-partial)
  * @param {string} [status.message] - Optional status message
+ * @param {string} [status.retry_at] - ISO timestamp for next retry (overload-retry only)
  */
 function writeStatus(planPath, status) {
   const statusPath = getStatusPath(planPath);
@@ -34,6 +35,10 @@ function writeStatus(planPath, status) {
     updatedAt: new Date().toISOString()
   };
 
+  if (status.retry_at) {
+    statusObj.retry_at = status.retry_at;
+  }
+
   fs.writeFileSync(statusPath, JSON.stringify(statusObj, null, 2));
   return statusObj;
 }
@@ -41,7 +46,7 @@ function writeStatus(planPath, status) {
 /**
  * Read background agent status
  * @param {string} planPath - Path to the plan file
- * @returns {Object} Status object with status field (none, working, complete, needs-input, timeout)
+ * @returns {Object} Status object with status field (none, working, complete, needs-input, timeout, overload-retry, overload-partial)
  */
 function readStatus(planPath) {
   const statusPath = getStatusPath(planPath);
@@ -87,6 +92,10 @@ function getStatusIcon(status) {
       return '⚠';  // Background agent needs input
     case 'timeout':
       return '✗';  // Timed out
+    case 'overload-retry':
+      return '⏳';  // API overload — scheduled retry
+    case 'overload-partial':
+      return '⚠';  // API overload mid-write — human review needed
     default:
       return '○';
   }
@@ -153,6 +162,38 @@ function markTimeout(planPath) {
 }
 
 /**
+ * Mark plan as overload-retry: API returned 529 before any writes in the current step.
+ * Safe to auto-retry after the configured interval.
+ * @param {string} planPath - Path to the plan file
+ * @param {string} retryAt - ISO timestamp when the retry should occur
+ */
+function markOverloadRetry(planPath, retryAt) {
+  const current = readStatus(planPath);
+  writeStatus(planPath, {
+    agent: current.agent || 'iron-loop-executor',
+    status: 'overload-retry',
+    started: current.started,
+    message: 'API overloaded (529) — no writes made, safe to retry',
+    retry_at: retryAt
+  });
+}
+
+/**
+ * Mark plan as overload-partial: API returned 529 after partial writes in the current step.
+ * Requires human review before resuming to avoid duplicate or inconsistent state.
+ * @param {string} planPath - Path to the plan file
+ */
+function markOverloadPartial(planPath) {
+  const current = readStatus(planPath);
+  writeStatus(planPath, {
+    agent: current.agent || 'iron-loop-executor',
+    status: 'overload-partial',
+    started: current.started,
+    message: 'API overloaded (529) after partial writes — human review required before resuming'
+  });
+}
+
+/**
  * Get all status files in a directory
  * @param {string} dirPath - Directory to scan
  * @returns {Array} Array of {planPath, status} objects
@@ -206,6 +247,8 @@ module.exports = {
   markComplete,
   markNeedsInput,
   markTimeout,
+  markOverloadRetry,
+  markOverloadPartial,
   getAllStatuses,
   cleanupStale
 };

@@ -19,6 +19,7 @@ const path = require('path');
 const { getPlanCounts, readPlans, getPlansDir, getAgentStatus, getVisionCounts, getVisionStubs } = require('./state');
 const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs } = require('./sections');
 const { getInboxCounts } = require('./inbox');
+const { getNotesCount } = require('./notes');
 const { validateTransition } = require('./plan-validator');
 const { findProjectRoot } = require('./project-root');
 
@@ -124,7 +125,7 @@ function buildDashboardTable(projectPath) {
     out += '\n';
   }
 
-  // Inbox (A3 — async-overnight surface)
+  // Inbox (A3 — async-overnight surface, agent → user)
   const inbox = getInboxCounts(root);
   const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting;
   out += `INBOX\n`;
@@ -137,6 +138,17 @@ function buildDashboardTable(projectPath) {
   }
   out += '\n';
 
+  // Notes (user → Claude, via NOTES.md at project root). Distinct from
+  // INBOX above which is the agent → user direction.
+  const notesCount = getNotesCount(root);
+  out += `NOTES\n`;
+  if (notesCount === 0) {
+    out += `  ○ No notes pending in NOTES.md\n`;
+  } else {
+    out += `  ⊙ ${notesCount} note${notesCount === 1 ? '' : 's'} pending in NOTES.md\n`;
+  }
+  out += '\n';
+
   // Agent status (lock-aware)
   const isAgentActive = agent.active;
   out += `AGENT\n`;
@@ -146,6 +158,17 @@ function buildDashboardTable(projectPath) {
     out += '\n';
   } else if (agent.stale) {
     out += `  ⚠ Stale lock: ${agent.stalePlan || 'unknown'} (process died)\n`;
+  } else if (agent.overloadRetry) {
+    const retryLabel = agent.retryAt
+      ? (() => {
+          const diffMs = new Date(agent.retryAt).getTime() - Date.now();
+          const diffMin = Math.ceil(diffMs / 60000);
+          return diffMin > 0 ? `retry in ${diffMin}m` : 'ready to retry';
+        })()
+      : 'retry pending';
+    out += `  ⏳ ${retryLabel} — ${agent.plan}\n`;
+  } else if (agent.overloadPartial) {
+    out += `  ⚠ partial write — review: ${agent.plan}\n`;
   } else {
     out += `  ○ Idle\n`;
   }

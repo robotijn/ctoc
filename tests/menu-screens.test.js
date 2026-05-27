@@ -101,6 +101,26 @@ describe('Menu Screens Tests', () => {
     console.log('# dashboardPipeline actions map to correct commands');
   });
 
+  test('dashboardPipeline shows NOTES section — clear when no NOTES.md', () => {
+    const result = menuScreens.dashboardPipeline(testDir);
+    assert.match(result.text, /NOTES\n/, 'should render a NOTES section header');
+    assert.match(result.text, /No notes pending|Notes clear/, 'should show empty-state message');
+    console.log('# dashboardPipeline NOTES section — empty');
+  });
+
+  test('dashboardPipeline shows NOTES count when NOTES.md has bullets', () => {
+    fs.writeFileSync(path.join(testDir, 'NOTES.md'),
+      '# Notes\n\n- 2026-05-27 21:01 — idea one\n- 2026-05-27 21:02 — idea two\n');
+    // Re-require to pick up filesystem change (menu-screens caches nothing here).
+    delete require.cache[require.resolve('../src/lib/menu-screens.js')];
+    delete require.cache[require.resolve('../src/lib/notes.js')];
+    const ms = require('../src/lib/menu-screens.js');
+    const result = ms.dashboardPipeline(testDir);
+    assert.match(result.text, /NOTES\n/);
+    assert.match(result.text, /2 note/, 'should mention the count');
+    console.log('# dashboardPipeline NOTES section — counted');
+  });
+
   test('dashboardCommands returns valid JSON structure', () => {
     const result = menuScreens.dashboardCommands(testDir);
 
