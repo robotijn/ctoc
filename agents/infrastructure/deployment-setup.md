@@ -462,12 +462,12 @@ Do you want to integrate feature flags with deployments?
 
 ## Configuration Output
 
-Write the deployment config to `.ctoc/settings.yaml` under the `deployment:` section. Validate all fields before saving.
+Write the deployment config to `.ctoc/settings.json` under the `deployment` key — this is the file `src/lib/deployment.js` actually reads (the documented, executed config home). Validate all fields before saving. Always include `dry_run`: leave it `true` (simulate — build commands, execute nothing) unless the user explicitly confirms they want real pushes/POSTs/ssh, then set `dry_run: false`. Example shape: `{ "deployment": { "enabled": true, "dry_run": true, "remote": "origin", "environments": [...], "approval": {...}, "notifications": {...}, "rollback": {...} } }`.
 
 ## Security Considerations
 
 **Secrets & credentials:**
-- NEVER store secrets (tokens, passwords) in settings.yaml
+- NEVER store secrets (tokens, passwords) in settings.json
 - Webhook authentication tokens should use environment variables: `$DEPLOY_TOKEN`
 - SSH keys should reference paths, never inline private keys
 - Use a secrets vault (HashiCorp Vault, AWS Secrets Manager, etc.) — never env files in repos

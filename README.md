@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.40-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.41-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -654,31 +654,34 @@ Gate 3 approved → development → staging → production
                   ssh
 ```
 
-**Configurable per environment** — choose a deployment strategy (git-branch, git-tag, webhook, script, docker, ssh), set approval mode (auto or manual), and enable auto-rollback on failure. Any environment can be skipped.
+Each strategy is **really executed** — `git-branch` pushes the approved commit to the environment branch, `git-tag` creates and pushes a tag, `webhook` POSTs the deployment payload, `script` runs your deploy script (with `DEPLOY_ENV`/`DEPLOY_COMMIT` exported), `docker` builds and optionally pushes the image, and `ssh` runs your remote command.
 
-**Setup** — run the `deployment-setup` agent for an interactive walkthrough, or configure directly in `.ctoc/settings.yaml`:
+**Safe by default (`dry_run`).** Deployment ships with `dry_run: true`: every strategy builds and returns its real command but performs **nothing**. Enabling the pipeline can never fire a destructive push/POST/ssh by accident. Set `dry_run: false` only when you want it to actually deploy.
 
-```yaml
-deployment:
-  enabled: true
-  environments:
-    - name: staging
-      enabled: true
-      strategy: git-branch
-      branch: deploy/staging
-    - name: production
-      enabled: true
-      strategy: git-branch
-      branch: deploy/production
-  approval:
-    staging: auto
-    production: manual    # pause and ask before production
-  rollback:
-    auto_rollback: true
-    keep_history: 10
+**Configurable per environment** — choose a strategy (git-branch, git-tag, webhook, script, docker, ssh), set approval mode (auto or manual), and enable auto-rollback on failure. Any environment can be skipped. On failure the pipeline stops, auto-rolls-back if configured, and fires failure notifications.
+
+**Setup** — run the `deployment-setup` agent for an interactive walkthrough, or configure the `deployment` block directly in `.ctoc/settings.json`:
+
+```json
+{
+  "deployment": {
+    "enabled": true,
+    "dry_run": false,
+    "remote": "origin",
+    "environments": [
+      { "name": "staging", "enabled": true, "strategy": "git-branch", "branch": "deploy/staging" },
+      { "name": "production", "enabled": true, "strategy": "git-branch", "branch": "deploy/production" }
+    ],
+    "approval": { "staging": "auto", "production": "manual" },
+    "notifications": { "on_success": [], "on_failure": ["https://hooks.example.com/deploy"] },
+    "rollback": { "auto_rollback": true, "keep_history": 10 }
+  }
+}
 ```
 
-**Status tracking** — deployment history and latest status are stored in `.ctoc/deployments/`. Each entry records environment, status (success/failed/rolled-back), timestamp, commit, and plan name.
+`production: manual` pauses the pipeline before production and waits for approval. `dry_run: false` is what turns simulation into real deployment.
+
+**Status tracking** — deployment history and latest status are stored in `.ctoc/deployments/` (`history.json`, `latest.json`). Each entry records environment, status (success/failed/rolled-back/awaiting-approval), whether it was a dry run, timestamp, commit, and plan name.
 
 ---
 
@@ -787,7 +790,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.40'
+getVersion()       // → '6.9.41'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -846,6 +849,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.40** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.41** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

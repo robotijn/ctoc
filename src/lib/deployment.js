@@ -2,6 +2,12 @@
  * Deployment Pipeline
  * Promotes code through dev -> staging -> production after Gate 3 approval.
  * Strategies: git-branch, git-tag, webhook, script, docker, ssh
+ *
+ * Execution is REAL but safe-by-default: every strategy runs under `dry_run`
+ * (build the command, return it, perform nothing) unless `.ctoc/settings.json`
+ * sets `deployment.dry_run: false`. Only then does the pipeline actually push,
+ * POST, build, or ssh. This is why enabling deployment cannot fire a destructive
+ * operation by accident — see DEFAULT_CONFIG.dry_run.
  */
 
 const fs = require('fs');
@@ -11,6 +17,13 @@ const { execSync } = require('child_process');
 // Default deployment configuration
 const DEFAULT_CONFIG = {
   enabled: false,
+  // SAFE BY DEFAULT: dry_run simulates every strategy (builds the real command,
+  // returns it, but does NOT push/POST/ssh/docker/exec). Set `dry_run: false`
+  // in .ctoc/settings.json to let the pipeline actually execute. This is why
+  // enabling deployment never fires a destructive operation by accident.
+  dry_run: true,
+  // Git remote used by the git-branch / git-tag strategies.
+  remote: 'origin',
   environments: [
     { name: 'development', enabled: false, strategy: 'git-branch', branch: 'deploy/development' },
     { name: 'staging', enabled: false, strategy: 'git-branch', branch: 'deploy/staging' },
@@ -103,6 +116,10 @@ async function runDeploymentPipeline(planPath, projectPath) {
   // Build deployment context
   const context = buildDeploymentContext(planPath, projectPath, config);
 
+  // Real execution happens only when dry_run is explicitly false.
+  const opts = { dryRun: config.dry_run !== false, cwd: projectPath };
+  context.dryRun = opts.dryRun;
+
   const results = [];
   let pipelineFailed = false;
 
@@ -120,7 +137,11 @@ async function runDeploymentPipeline(planPath, projectPath) {
       break;
     }
 
-    const envResult = await deployToEnvironment(env, context);
+    const envResult = await deployToEnvironment(
+      { remote: config.remote, ...env },
+      context,
+      opts
+    );
     results.push(envResult);
 
     if (envResult.status === 'failed') {
@@ -142,7 +163,7 @@ async function runDeploymentPipeline(planPath, projectPath) {
         environment: env.name,
         error: envResult.error,
         context
-      });
+      }, opts);
     }
   }
 
@@ -162,7 +183,7 @@ async function runDeploymentPipeline(planPath, projectPath) {
       event: 'deployment_success',
       environments: results,
       context
-    });
+    }, opts);
   }
 
   return context;
@@ -199,15 +220,17 @@ function buildDeploymentContext(planPath, projectPath, config) {
  * @param {object} context - Deployment context
  * @returns {object} Result with name, status, duration, error
  */
-async function deployToEnvironment(env, context) {
+async function deployToEnvironment(env, context, opts = {}) {
   const start = Date.now();
 
   try {
-    await executeStrategy(env.strategy, env, context);
+    const detail = await executeStrategy(env.strategy, env, context, opts);
     return {
       name: env.name,
       status: 'success',
-      duration: Date.now() - start
+      duration: Date.now() - start,
+      dryRun: detail && typeof detail === 'object' ? detail.dryRun : undefined,
+      detail
     };
   } catch (err) {
     return {
@@ -226,94 +249,172 @@ async function deployToEnvironment(env, context) {
  * @param {object} config - Environment configuration
  * @param {object} context - Deployment context
  */
-async function executeStrategy(strategy, config, context) {
+async function executeStrategy(strategy, config, context, opts = {}) {
   switch (strategy) {
     case 'git-branch':
-      return executeGitBranch(config, context);
+      return executeGitBranch(config, context, opts);
     case 'git-tag':
-      return executeGitTag(config, context);
+      return executeGitTag(config, context, opts);
     case 'webhook':
-      return executeWebhook(config, context);
+      return executeWebhook(config, context, opts);
     case 'script':
-      return executeScript(config, context);
+      return executeScript(config, context, opts);
     case 'docker':
-      return executeDocker(config, context);
+      return executeDocker(config, context, opts);
     case 'ssh':
-      return executeSsh(config, context);
+      return executeSsh(config, context, opts);
     default:
       throw new Error(`Unknown deployment strategy: ${strategy}`);
   }
 }
 
-/**
- * git-branch strategy: push to environment-specific branch
- */
-function executeGitBranch(config, context) {
-  const targetBranch = config.branch || `deploy/${config.name}`;
-  // In a real deployment this would push to the target branch
-  // For safety, we log the intent rather than executing destructive git operations
-  return { strategy: 'git-branch', branch: targetBranch, commit: context.commit };
+// Whether a strategy should actually run. Real execution requires opts.dryRun
+// to be EXPLICITLY false; undefined (e.g. a bare 2-arg call) means simulate.
+function isLive(opts) {
+  return Boolean(opts && opts.dryRun === false);
+}
+
+// Minimal dependency-free JSON POST for the webhook strategy. Resolves to the
+// HTTP status code; rejects on transport error or invalid URL.
+function httpPostJson(url, body) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      reject(new Error(`Invalid webhook URL: ${url}`));
+      return;
+    }
+    const mod = parsed.protocol === 'http:' ? require('http') : require('https');
+    const data = JSON.stringify(body);
+    const req = mod.request(parsed, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, (res) => {
+      res.resume(); // drain so the socket frees
+      res.on('end', () => resolve(res.statusCode));
+    });
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
+}
+
+// Run a shell command in the project directory, returning trimmed stdout.
+// Shared by the git/script/docker/ssh strategies when running live.
+function run(command, opts) {
+  return execSync(command, {
+    cwd: (opts && opts.cwd) || process.cwd(),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  }).trim();
 }
 
 /**
- * git-tag strategy: create version tag with environment suffix
+ * git-branch strategy: push the current commit to an environment branch.
+ * Live: `git push <remote> HEAD:refs/heads/<branch>`.
  */
-function executeGitTag(config, context) {
+function executeGitBranch(config, context, opts = {}) {
+  const remote = config.remote || 'origin';
+  const targetBranch = config.branch || `deploy/${config.name}`;
+  const command = `git push ${remote} HEAD:refs/heads/${targetBranch}`;
+  const intent = { strategy: 'git-branch', branch: targetBranch, remote, commit: context.commit, command, dryRun: !isLive(opts) };
+  if (!isLive(opts)) return intent;
+  return { ...intent, executed: true, output: run(command, opts) };
+}
+
+/**
+ * git-tag strategy: create an environment-suffixed tag and push it.
+ * Live: `git tag <tag> && git push <remote> <tag>`.
+ */
+function executeGitTag(config, context, opts = {}) {
+  const remote = config.remote || 'origin';
   const tag = config.tagPattern
     ? config.tagPattern.replace('{env}', config.name).replace('{commit}', context.commit)
     : `${context.commit}-${config.name}`;
-  return { strategy: 'git-tag', tag, commit: context.commit };
+  const command = `git tag ${tag} && git push ${remote} ${tag}`;
+  const intent = { strategy: 'git-tag', tag, remote, commit: context.commit, command, dryRun: !isLive(opts) };
+  if (!isLive(opts)) return intent;
+  return { ...intent, executed: true, output: run(command, opts) };
 }
 
 /**
- * webhook strategy: POST deployment payload to a URL
+ * webhook strategy: POST the deployment payload to a URL.
+ * Live: real JSON POST; a >=400 status fails the environment.
  */
-async function executeWebhook(config, context) {
+async function executeWebhook(config, context, opts = {}) {
   if (!config.url) {
     throw new Error(`Webhook URL not configured for ${config.name}`);
   }
-  // In production this would make an HTTP POST
-  // We return the payload that would be sent
-  return {
-    strategy: 'webhook',
-    url: config.url,
-    payload: {
-      environment: config.name,
-      commit: context.commit,
-      branch: context.branch,
-      plan: context.plan,
-      timestamp: context.timestamp
-    }
+  const payload = {
+    environment: config.name,
+    commit: context.commit,
+    branch: context.branch,
+    plan: context.plan,
+    timestamp: context.timestamp
   };
+  const intent = { strategy: 'webhook', url: config.url, payload, dryRun: !isLive(opts) };
+  if (!isLive(opts)) return intent;
+  const httpStatus = await httpPostJson(config.url, payload);
+  if (httpStatus >= 400) {
+    throw new Error(`Webhook for ${config.name} returned HTTP ${httpStatus}`);
+  }
+  return { ...intent, executed: true, httpStatus };
 }
 
 /**
- * script strategy: run a custom script
+ * script strategy: run a custom deploy script.
+ * Live: executes `config.script` in the project dir with DEPLOY_ENV/DEPLOY_COMMIT
+ * exported. Cross-platform: the script string is run through the platform shell.
  */
-function executeScript(config, context) {
+function executeScript(config, context, opts = {}) {
   if (!config.script) {
     throw new Error(`Script path not configured for ${config.name}`);
   }
-  // In production this would execute the script
-  return { strategy: 'script', script: config.script, environment: config.name };
+  const intent = { strategy: 'script', script: config.script, environment: config.name, command: config.script, dryRun: !isLive(opts) };
+  if (!isLive(opts)) return intent;
+  const output = execSync(config.script, {
+    cwd: opts.cwd || process.cwd(),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, DEPLOY_ENV: config.name, DEPLOY_COMMIT: context.commit || '' }
+  }).trim();
+  return { ...intent, executed: true, output };
 }
 
 /**
- * docker strategy: build and tag image
+ * docker strategy: build (and optionally push) a tagged image.
+ * Live: `docker build -t <image>:<tag> <context>` then optional `docker push`.
  */
-function executeDocker(config, context) {
+function executeDocker(config, context, opts = {}) {
+  const image = config.image || 'app';
   const tag = config.imageTag || `${config.name}-${context.commit}`;
-  return { strategy: 'docker', image: config.image || 'app', tag };
+  const ref = `${image}:${tag}`;
+  const buildContext = config.context || '.';
+  const command = `docker build -t ${ref} ${buildContext}`;
+  const intent = { strategy: 'docker', image, tag, command, dryRun: !isLive(opts) };
+  if (!isLive(opts)) return intent;
+  let output = run(command, opts);
+  if (config.push) {
+    output += '\n' + run(`docker push ${ref}`, opts);
+  }
+  return { ...intent, executed: true, output };
 }
 
 /**
- * ssh strategy: execute commands on remote server
+ * ssh strategy: run a remote deploy command over ssh.
+ * Live: `ssh <user>@<host> "<command>"`.
  */
-function executeSsh(config, context) {
+function executeSsh(config, context, opts = {}) {
   if (!config.host) {
     throw new Error(`SSH host not configured for ${config.name}`);
   }
-  return { strategy: 'ssh', host: config.host, user: config.user || 'deploy' };
+  const user = config.user || 'deploy';
+  const remoteCmd = config.command || `echo deployed ${context.commit || ''}`.trim();
+  const command = `ssh ${user}@${config.host} ${JSON.stringify(remoteCmd)}`;
+  const intent = { strategy: 'ssh', host: config.host, user, command, dryRun: !isLive(opts) };
+  if (!isLive(opts)) return intent;
+  return { ...intent, executed: true, output: run(command, opts) };
 }
 
 /**
@@ -417,19 +518,22 @@ function writeLatestStatus(entry, projectPath) {
 }
 
 /**
- * Send notifications via webhooks
+ * Send notifications via webhooks. Real POSTs only when live (dry_run false);
+ * a notification failure never breaks the pipeline.
+ *
+ * @param {string[]} urls - Notification webhook URLs
+ * @param {object} payload - JSON body to POST
+ * @param {object} [opts] - { dryRun } — when dryRun, no network call is made
  */
-async function sendNotifications(urls, payload) {
+async function sendNotifications(urls, payload, opts = {}) {
   if (!urls || urls.length === 0) return;
+  if (!isLive(opts)) return; // simulate: no network in dry-run
 
-  // In production this would POST to each URL
-  // For now we just log the intent
   for (const url of urls) {
     try {
-      // Would use fetch/http.request here
-      // Intentionally a no-op for safety
+      await httpPostJson(url, payload);
     } catch {
-      // Notification failures should not break the pipeline
+      // Notification failures should not break the pipeline.
     }
   }
 }
@@ -442,6 +546,8 @@ module.exports = {
   buildDeploymentContext,
   deployToEnvironment,
   executeStrategy,
+  isLive,
+  httpPostJson,
   rollback,
   getDeploymentHistory,
   logDeployment,
