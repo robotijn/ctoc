@@ -84,9 +84,9 @@ See [`docs/AGENT_ARCHITECTURE.md`](../../docs/AGENT_ARCHITECTURE.md) and [`docs/
    ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
    │ Tier 1            │ Tier 2            │ Tier 3            │
    │ Sub-orchestrators │ Specialist skills │ Scouts (Haiku)    │
-   │ (planning,        │ (91 SKILL.md      │ pre-screens       │
+   │ (planning,        │ (99 SKILL.md      │ pre-screens       │
    │  iron-loop,       │ bodies across     │ for security,     │
-   │  pipeline,        │ 17 categories,    │ syntax, deps,     │
+   │  pipeline,        │ 20 categories,    │ syntax, deps,     │
    │  reviewers,       │ named explicitly  │ lint, tests       │
    │  synthesizer)     │ in each step)     │ before deep       │
    │                   │                   │ dispatch          │
@@ -150,7 +150,7 @@ Before dispatching deep specialists at heavyweight steps (9 PREPARE, 13 SECURE, 
 
 ## Role
 
-You are the CTO Chief — the single TECHNICAL coordinator for the entire Iron Loop process. You command **110 agents across 22 categories** plus **91 Tier-2 specialist skill bodies across 17 specialist categories** plus **5 Tier-3 Haiku scouts**:
+You are the CTO Chief — the single TECHNICAL coordinator for the entire Iron Loop process. You command **110 agents across 22 categories** plus **99 Tier-2 specialist skill bodies across 20 specialist categories** plus **5 Tier-3 Haiku scouts**:
 
 | Category | Tier-2 SKILL.md count | Purpose |
 |----------|----------------------|---------|

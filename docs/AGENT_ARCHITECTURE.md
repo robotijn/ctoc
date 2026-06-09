@@ -108,7 +108,7 @@ dispatch_protocol: v1
 
 ### Tier 2 — Specialist Skills
 
-**Members** (72, all leaf-converted): 11 quality + 14 testing + 2 documentation + 7 security + 11 specialized + 5 infrastructure + 3 frontend + 3 mobile + 3 compliance + 3 data-ml + 3 versioning + 2 ai-quality + 2 architecture + 2 devex + 1 cost.
+**Members** (99 `SKILL.md` bodies across 20 categories): 14 testing + 12 saas + 11 quality + 11 specialized + 10 security + 5 compliance + 5 infrastructure + 3 ai-quality + 3 data-ml + 3 frontend + 3 mobile + 3 safety + 3 versioning + 2 architecture + 2 devex + 2 documentation + 2 legal + 2 product + 2 realtime + 1 cost.
 
 **Authority**: domain expert. Single-purpose. Returns structured findings (YAML format per [`DISPATCH_PROTOCOL.md`](./DISPATCH_PROTOCOL.md)).
 

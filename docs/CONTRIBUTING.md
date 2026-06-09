@@ -21,7 +21,7 @@ Have an idea? Open an issue with:
 
 ### Suggest Skill Improvements
 
-CTOC has 261 skills that need continuous updates. Help keep them current:
+CTOC ships 421 skill files that need continuous updates. Help keep them current:
 
 **Quick way (recommended):**
 ```bash

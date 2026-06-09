@@ -71,22 +71,27 @@ tiers:
   tier_2:
     name: specialist
     description: "Domain experts. Single-purpose. Structured findings output."
-    member_count: 72
+    member_count: 99
     member_categories:
-      - quality: 11
       - testing: 14
-      - documentation: 2
-      - security: 7
+      - saas: 12
+      - quality: 11
       - specialized: 11
+      - security: 10
+      - compliance: 5
       - infrastructure: 5
+      - ai-quality: 3
+      - data-ml: 3
       - frontend: 3
       - mobile: 3
-      - compliance: 3
-      - data-ml: 3
+      - safety: 3
       - versioning: 3
-      - ai-quality: 2
       - architecture: 2
       - devex: 2
+      - documentation: 2
+      - legal: 2
+      - product: 2
+      - realtime: 2
       - cost: 1
     model_default: opus | sonnet           # category-dependent
     effort_budget:

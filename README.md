@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.38-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.39-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -331,7 +331,7 @@ CTO Chief is the only top-level dispatcher. All other agents are dispatched by C
 |------|------|------:|-------|--------------|
 | **Tier 0** | Top-level coordinator | 1 | Opus | CTO Chief — sole dispatcher, owns the audit trail, approves all gate crossings |
 | **Tier 1** | Sub-orchestrators | 16 | Opus | Planning (7) · Iron Loop (3) · Pipeline (5) · Synthesizer (1) — recommend dispatches and orchestrate Tier 2/3 fan-out |
-| **Tier 2** | Specialists | 72+ | Opus / Sonnet | Domain experts — single-purpose, structured findings output, cannot dispatch other agents |
+| **Tier 2** | Specialists | 99 | Opus / Sonnet | Domain experts — single-purpose, structured findings output, cannot dispatch other agents |
 | **Tier 3** | Scouts | 5 | Haiku 4.5 | Fast pass/flag pre-screens in isolated 200K context: syntax · lint · test · dep · secret. Short-circuit Tier 2 when clean. ~10–50× cheaper than the specialists they replace on the happy path. |
 
 Cross-pillar conflicts (security vs. performance, etc.) are resolved by the **synthesizer** using a fixed priority: Security > Correctness > Maintainability > Performance > Readability > Consistency. Every dispatch is logged to `.ctoc/audit/dispatches/YYYY-MM-DD/<id>.yaml` per the [Dispatch Protocol](docs/DISPATCH_PROTOCOL.md).
@@ -761,7 +761,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.38'
+getVersion()       // → '6.9.39'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -820,6 +820,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.38** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.39** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

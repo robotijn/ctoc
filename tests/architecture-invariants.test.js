@@ -215,11 +215,12 @@ describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('v8 Architecture — Tier 2 (Specialist skills)', () => {
-  // Migrated categories (all 15 specialist categories — all 72 leaf-skills are v8)
+  // All 20 specialist categories — all 99 leaf-skills are v8.
   const MIGRATED = [
     'quality', 'testing', 'documentation', 'security', 'specialized',
     'infrastructure', 'frontend', 'mobile', 'compliance', 'data-ml',
     'versioning', 'ai-quality', 'architecture', 'devex', 'cost',
+    'saas', 'safety', 'legal', 'realtime', 'product',
   ];
 
   for (const category of MIGRATED) {
@@ -329,6 +330,7 @@ describe('v8 Architecture — Dispatch authority', () => {
       'quality', 'testing', 'documentation', 'security', 'specialized',
       'infrastructure', 'frontend', 'mobile', 'compliance', 'data-ml',
       'versioning', 'ai-quality', 'architecture', 'devex', 'cost',
+      'saas', 'safety', 'legal', 'realtime', 'product',
     ];
     for (const category of MIGRATED) {
       const skills = walkSkillFiles(path.join(projectRoot, 'skills', category));

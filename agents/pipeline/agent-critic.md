@@ -685,7 +685,7 @@ If this critic is evaluated by itself, the expected scores are:
 |-----------|---------------|---------------|
 | SPECIFICITY | 9 | Calibration anchors at every level, deduction rules explicit, but some edge cases in scoring remain |
 | COMPLETENESS | 9 | 8 dimensions cover the space thoroughly, but novel agent types may reveal gaps |
-| BOUNDARIES | 9 | Anti-scope is explicit, pipeline integration documented, but not cross-validated against all 86 agents |
+| BOUNDARIES | 9 | Anti-scope is explicit, pipeline integration documented, but not cross-validated against all 110 agents |
 | ACTIONABILITY | 9 | Fixes in the output format are structured, but the critic's own fixes to itself are meta and harder to verify |
 | INTEGRATION | 10 | Output format explicitly matches agent-writer input, escalation rules match CTO Chief protocol |
 | ROBUSTNESS | 9 | Adversarial tests defined, anti-gaming protocol present, but new gaming vectors may emerge |
