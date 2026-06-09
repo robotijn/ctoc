@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.37-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.38-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -112,7 +112,7 @@ Five new Tier-2 specialists were created from a v6.9.22 gap analysis — each fi
 | [`compliance/sbom-cra-checker`](skills/compliance/sbom-cra-checker/SKILL.md) | EU Cyber Resilience Act reporting goes live **11 Sep 2026** — SBOMs become a legal artifact with 10-year retention and penalties up to €15M / 2.5% turnover. Validates NTIA Minimum Elements, CycloneDX 1.6 / SPDX 2.3+/3.0, signed-SBOM verification, in-toto attestations, SLSA, GUAC, VEX, and ENISA Single Reporting Platform onboarding. |
 | [`security/threat-modeler`](skills/security/threat-modeler/SKILL.md) | Design-time threat decomposition before any code is written — STRIDE, PASTA, LINDDUN(-GO and the new GenAI extension, arXiv 2603.06051), attack trees, automotive TARA, and tagging against **MITRE ATT&CK** + **ATLAS v5.4.0** (16 tactics / 84 techniques / 56 sub-techniques). Tool integration: Threagile, OWASP Threat Dragon, pytm, IriusRisk, Microsoft TMT. |
 | [`compliance/ai-governance-checker`](skills/compliance/ai-governance-checker/SKILL.md) | **EU AI Act high-risk provisions become enforceable 2 Aug 2026.** Classifies systems against EU AI Act risk tiers (Art. 5 prohibited, Annex III high-risk, GPAI Chap V Arts. 51–55 with the 10²⁵ FLOPs systemic-risk threshold), **NIST AI 600-1** (12 GenAI risks), and **ISO/IEC 42001** (38 Annex A controls). Includes Art. 73 incident-reporting windows (2/10/15-day) to the AI Office. |
-| [`ai-quality/llm-security-tester`](skills/ai-quality/llm-security-tester/SKILL.md) | LLM red-team analyst covering **OWASP LLM Top 10 v2 (2025)** all 10 categories, mapped to **MITRE ATLAS v5.4.0** tactics. Covers CVE-2025-53773 (GitHub Copilot RCE, CVSS 9.6), CVE-2025-32711 (EchoLeak), the Cursor IDE chain, persistent memory poisoning, MCP tool poisoning, multi-turn crescendo/TAP jailbreaks, and markdown exfiltration. Tools: Garak, PyRIT, PromptFoo. |
+| [`ai-quality/llm-security-tester`](skills/ai-quality/llm-security-tester/SKILL.md) | LLM red-team analyst covering **OWASP LLM Top 10 v2 (2025)** all 10 categories, mapped to **MITRE ATLAS v5.4.0** tactics. Covers CVE-2025-53773 (GitHub Copilot RCE, CVSS 7.8 High), CVE-2025-32711 (EchoLeak), the Cursor IDE chain, persistent memory poisoning, MCP tool poisoning, multi-turn crescendo/TAP jailbreaks, and markdown exfiltration. Tools: Garak, PyRIT, PromptFoo. |
 | [`security/incident-responder`](skills/security/incident-responder/SKILL.md) | **NIST SP 800-61r3 (Apr 2025)** rewritten around CSF 2.0 functions plus the regulatory clocks that now bind: ENISA SRP 24h/72h/14d/1m from 11 Sep 2026, SEC Item 1.05 8-K (4 business days), NIS2, CIRCIA (pending), GDPR 72h. Runbooks per incident class, blameless-postmortem template, on-call wiring for PagerDuty / Opsgenie (EOS Apr 2027) / incident.io / FireHydrant. |
 
 These five take the specialist count from 86 → **91**, and the total skill-library file count from 408 → **413**.
@@ -384,7 +384,7 @@ Both Lean Canvas (Maurya) and Business Model Canvas (Osterwalder) carry two extr
 | Monthly churn | 2.0× | 1.3× | 1.0× | 0.8× | 0.6× |
 | Time-to-first-pay | +60d | +30d | normal | −15d | −30d |
 
-Includes base-case assumption anchors, per-month MRR table at M3/M6/M9/M12/M15/M18, runway per scenario, and **commit-now decision triggers** (e.g., "if actuals track Worst for 2 consecutive months: switch operating plan to Worst"). Industry signal: startups with 3+ scenarios secure 1.8× the funding (Abacum 2025).
+Includes base-case assumption anchors, per-month MRR table at M3/M6/M9/M12/M15/M18, runway per scenario, and **commit-now decision triggers** (e.g., "if actuals track Worst for 2 consecutive months: switch operating plan to Worst").
 
 Both sections are owned by the founder or product manager. The CTO Chief technical chain does not produce them; it consumes them when planning instrumentation work.
 
@@ -761,7 +761,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.37'
+getVersion()       // → '6.9.38'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -820,6 +820,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.37** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.38** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

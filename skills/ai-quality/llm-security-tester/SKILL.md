@@ -482,7 +482,7 @@ def agent_loop(user_input, user_id):
 
 | ID | Year | Surface | Shape | Lesson |
 |---|---|---|---|---|
-| CVE-2025-53773 | 2025 | GitHub Copilot agent mode (Visual Studio) | Prompt-injection-via-workspace-files flips a settings.json "YOLO mode" toggle; subsequent tool calls run without confirmation → RCE. CVSS 9.6 per Microsoft / Wiz. | Never let model output write to an agent-configuration file. Confirmation toggles are a privileged surface. |
+| CVE-2025-53773 | 2025 | GitHub Copilot agent mode (Visual Studio) | Prompt-injection-via-workspace-files flips a settings.json "YOLO mode" toggle; subsequent tool calls run without confirmation → RCE. CVSS 7.8 (High, AV:L) per Microsoft / Wiz / NVD. | Never let model output write to an agent-configuration file. Confirmation toggles are a privileged surface. |
 | CVE-2025-32711 ("EchoLeak") | 2025 | Microsoft 365 Copilot | Indirect prompt injection via inbound email; agent exfiltrates user mail + files through markdown-image fetches to attacker URL. | Block external image fetches from rendered model output. Treat retrieved mail as untrusted content with delimiter + system instruction. |
 | Cursor IDE chain | 2025 | Cursor IDE agent | Workspace-file prompt injection causes the agent to add and run unreviewed shell commands. | Same shape as CVE-2025-53773 — pin agent settings; require human approval for shell-exec. |
 | MCPTox-class | 2025–2026 | Any MCP-enabled agent | A malicious MCP server publishes a tool whose `description` field encodes hidden instructions the model reads. | Audit MCP tool descriptions; pin server versions; restrict which tools each server may register. |

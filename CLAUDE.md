@@ -12,7 +12,7 @@ CTOC v8 organizes the agent layer into four tiers. See [`docs/AGENT_ARCHITECTURE
 ```
 Tier 0  CTO CHIEF (1)              top-level, sole dispatcher
 Tier 1  Sub-orchestrators (16)     incl. NEW synthesizer (cross-pillar)
-Tier 2  Specialist skills (72)     leaf agents → skills, structured outputs
+Tier 2  Specialist skills (99)     leaf agents → skills, structured outputs
 Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatches
 ```
 
@@ -182,7 +182,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ## Test & Verify
 
 ```bash
-node --test tests/*.test.js          # Run all 40 test files (cross-platform)
+node --test tests/*.test.js          # Run all 68 test files (cross-platform)
 node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
@@ -224,14 +224,14 @@ ctoc/
   docs/                  IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
-    hooks/               10 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-    lib/                 72 JS modules (state, quality, security, planning, UI, analysis)
+    hooks/               13 Claude Code hooks (session start, pre-tool-use, post-tool-use)
+    lib/                 105 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)
     data/                Static data files
-  agents/                86 agent definitions across 19 categories
-  skills/                360 language & framework skill files
-  tests/                 40 test files
+  agents/                110 agent definitions across 22 categories
+  skills/                421 skill files (99 Tier-2 specialist bodies + 322 reference)
+  tests/                 68 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

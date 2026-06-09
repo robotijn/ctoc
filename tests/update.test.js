@@ -140,15 +140,21 @@ test('Error message mentions GitHub', () => {
     'Should not have vague "Check network connection" without mentioning GitHub');
 });
 
-// Test: update.md tries both path patterns
-test('update.md tries both old and new cache paths', () => {
+// Test: update.md locates update.js in both old and new cache layouts
+test('update.md finds update.js in both old and new cache layouts', () => {
   const updateMd = path.join(__dirname, '..', 'src', 'commands', 'update.md');
   const content = fs.readFileSync(updateMd, 'utf8');
 
-  assert(content.includes('*/src/commands/update.js'),
-    'Should try new path (src/commands/)');
-  assert(content.includes('*/commands/update.js'),
-    'Should try old path (commands/)');
+  // v6.9.37 replaced the zsh-fragile `ls -d <glob> <glob>` with a single
+  // `find ... -path '*commands/update.js'`. That one pattern matches BOTH the
+  // new layout (src/commands/update.js) and the legacy layout (commands/update.js),
+  // because `*` spans the optional `src/` segment.
+  assert(content.includes("find ~/.claude/plugins/cache/robotijn/ctoc"),
+    'Should use find over the plugin cache dir (zsh-safe; no unmatched-glob abort)');
+  assert(content.includes("-path '*commands/update.js'"),
+    "Should match update.js via -path '*commands/update.js' (covers src/commands/ and legacy commands/)");
+  assert(!content.includes('ls -d '),
+    'Should not use `ls -d <glob>` — zsh aborts on an unmatched glob before any fallback runs');
 });
 
 // Test: update.md does not suppress errors
