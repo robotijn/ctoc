@@ -142,6 +142,8 @@ enforcement:
   mode: strict   # strict | soft | off  (default: strict)
 ```
 
+**Runtime environment** — `general.environment` in `.ctoc/settings.json` (`ask | dev | staging | prod`) selects a CTOC behavior profile via `src/lib/settings.js` (`ENVIRONMENT_PROFILES`). Resolution is `explicit user setting > environment profile > schema default`; `ask` (default) applies no profile and makes the menu prompt the user on first open. Profiles tune enforcement strictness, auto-push, default model, and log verbosity — they NEVER weaken a human gate (no profile may set `requireReviewGate: false` or `enforcementMode: off`; enforced by `tests/environment-mode.test.js`).
+
 **Plans must declare `files:`** in YAML frontmatter to be coverage-aware. Pre-v7 plans without this declaration fall through to escape-phrase / block (per the X1 decision: warn-only treatment is logged but not yet block-default for legacy plans).
 
 ---

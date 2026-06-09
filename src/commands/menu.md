@@ -48,6 +48,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 | `claude:start-agent` | Call startAgent(). If started: implement the plan sequentially (Steps 7-15). After each plan completes (moved to review), call advanceAgent() to get next plan or stop. |
 | `claude:stop-agent` | Call stopAgent(). Shows confirmation message. Agent will finish current plan then stop. |
 | `claude:sync` | Run fullPlansSync(), show result |
+| `claude:set-environment {env}` | Persist the chosen CTOC environment: run `node -e "require('${CLAUDE_PLUGIN_ROOT}/src/lib/settings').setSetting('general','environment','{env}')"`, confirm the choice to the user, then re-open the dashboard (`node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"`). |
 
 ### Rules
 
@@ -58,5 +59,6 @@ The command outputs JSON: `{ text, ask, actions }`.
 5. Pre-validate before every approve (run `validate` command first)
 6. Menu rendering and all CTOC slash commands inherit the user's chosen session model; no model pin is set in command frontmatter (removed in v6.9.28 to avoid forced context compaction in long sessions)
 7. The menu auto-initializes CTOC on first run: if the project has no `.ctoc/` directory, `menu.js` runs `initProject()` before rendering (creates `.ctoc/`, `plans/`, `CLAUDE.md` if absent). There is no separate init command — opening the menu is the trigger.
+8. First-run environment prompt: when the CTOC environment is unset (`general.environment: ask`), `menu.js` emits the environment question **before** the dashboard. Present its `ask` to the user; on their choice run the `claude:set-environment {env}` action. The environment (dev/staging/prod) only tunes CTOC's own behavior — it never weakens the four human gates.
 
 CTOC ships exactly three slash commands: `menu`, `push`, `update`. Every other workflow — vision, planning, quality, review, agent runs — goes through the menu.

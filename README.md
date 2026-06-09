@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.39-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.40-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -145,6 +145,31 @@ The generated `CLAUDE.md` becomes the single source of truth for how Claude work
 
 ---
 
+## Environments — dev / staging / prod
+
+CTOC runs in a chosen **environment** that tunes its *own* behavior — how strictly it enforces planning, whether it auto-pushes, the default model, and log verbosity. This is separate from deploying your app; it changes how the plugin itself operates.
+
+The first time you open the dashboard, CTOC **asks you which environment to use**. You can change it anytime in **System → Settings** (`general.environment` in `.ctoc/settings.json`).
+
+| Environment | Enforcement | Auto-push | Notable |
+|-------------|-------------|-----------|---------|
+| `dev` | soft (warn, never block) | off | Fast local iteration; auto-sync off; cost estimates shown |
+| `staging` | strict | off (manual push) | Rehearse production; auto-move to review |
+| `prod` | strict | on (after gates) | Locked down; top model; minimal noise |
+| `ask` *(default)* | — | — | No profile applied; CTOC prompts you to choose |
+
+**Resolution order** — any value you set explicitly always wins:
+
+```
+explicit user setting  >  environment profile  >  per-setting default
+```
+
+So choosing `dev` softens enforcement *unless* you've set `enforcementMode` yourself, in which case your value stands. `ask` applies nothing, so an un-chosen project behaves exactly as it did before.
+
+**The four human gates are mandatory in every environment.** No profile can disable the review gate or turn enforcement `off` — enforced by `tests/environment-mode.test.js`. The environment tunes strictness and operational knobs; it never lets unreviewed code through a gate.
+
+---
+
 ## Why CTO Chief?
 
 **Without CTO Chief** — AI writes code immediately, skips tests, ignores security. You spend hours debugging, refactoring, and adding missing error handling.
@@ -279,6 +304,7 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 - **Production-ready SaaS templates** — Opinionated starters (B2C subscription, B2B sales-led) with 20+ Gate-3 production-readiness block-severity checks: domain, HTTPS, auth, billing, RLS, observability, legal, zero warnings, zero CVEs
 - **2026-grade compliance & AI safety** — Five gap-fill skills (`sbom-cra-checker`, `threat-modeler`, `ai-governance-checker`, `llm-security-tester`, `incident-responder`) cover EU CRA, EU AI Act, NIST 800-61r3, OWASP LLM Top 10 v2, MITRE ATLAS v5.4.0, and STRIDE/PASTA/LINDDUN
 - **Product Loop** — Post-launch DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → LEARN cycle keyed to 17 canonical KPIs across acquisition/activation/retention/revenue/churn — see [PRODUCT_LOOP.md](docs/PRODUCT_LOOP.md)
+- **Runtime environments (dev / staging / prod)** — A single `environment` setting tunes CTOC's own behavior (enforcement strictness, auto-push, default model, log verbosity). CTOC asks you to pick one on first run; explicit settings always override the profile, and no environment ever weakens the four human gates — see [Environments](#environments--dev--staging--prod)
 - **Interactive dashboard** — Numbered menus, plan pipeline, progress tracking
 - **Deployment pipeline** — Configurable dev → staging → production promotion triggered automatically after Gate 3 approval
 - **Smart quality gates** — Background checks that don't block commits, block pushes
@@ -559,7 +585,7 @@ The `/ctoc` command opens an interactive dashboard with 5 areas:
 | Inbox | Morning questions, decisions awaiting review, and plans waiting at a human gate |
 | Agent | Background agent status — start, stop, and monitor the todo-queue runner |
 | Library | Browse the agent and skill library |
-| System | Doctor, update, settings, and logs |
+| System | Doctor, update, settings (including the dev/staging/prod environment), and logs |
 
 **Plan pipeline** (directories under `plans/`):
 ```
@@ -761,7 +787,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.39'
+getVersion()       // → '6.9.40'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -820,6 +846,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.39** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.40** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

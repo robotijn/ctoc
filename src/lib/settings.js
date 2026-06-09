@@ -20,6 +20,10 @@ const SETTINGS_SCHEMA = {
   general: {
     label: 'General Settings',
     settings: [
+      // `environment` selects a CTOC runtime behavior profile (see ENVIRONMENT_PROFILES).
+      // Default 'ask' applies NO profile (identical to per-setting defaults) and signals
+      // the plugin to prompt the user to choose dev/staging/prod on first use.
+      { key: 'environment', label: 'CTOC environment', type: 'select', options: ['ask', 'dev', 'staging', 'prod'], default: 'ask' },
       { key: 'timezone', label: 'Timezone', type: 'string', default: 'UTC' },
       { key: 'syncInterval', label: 'Auto-sync interval (minutes)', type: 'number', default: 5 },
       { key: 'syncEnabled', label: 'Auto-sync enabled', type: 'toggle', default: true },
@@ -87,31 +91,100 @@ const SETTINGS_SCHEMA = {
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  CTOC Runtime Environment Profiles
+//
+//  `general.environment` (ask | dev | staging | prod) selects a behavior profile
+//  for CTOC ITSELF — not a deployment target for the user's app. A profile is a
+//  sparse set of overrides keyed by <category>.<key>; any key it does not name
+//  falls through to the per-setting schema default.
+//
+//  Resolution order (highest wins):  explicit user setting  >  env profile  >  schema default
+//
+//  SAFETY INVARIANT (enforced by tests/environment-mode.test.js):
+//  No profile may weaken a human gate. `workflow.requireReviewGate` is never set
+//  to false and `workflow.enforcementMode` is never set to 'off' by any profile —
+//  the four human gates are mandatory in every environment (see CLAUDE.md).
+//  'ask' is intentionally empty: it changes nothing and tells the menu to prompt.
+// ─────────────────────────────────────────────────────────────────────────────
+const ENVIRONMENT_PROFILES = {
+  // Not chosen yet — apply nothing, prompt the user.
+  ask: {},
+
+  // Fast local iteration. Edits warn instead of block; never auto-push; cost shown.
+  dev: {
+    workflow: { enforcementMode: 'soft' },
+    git: { commitAndPush: false, autoSync: false },
+    privacy: { showCostEstimates: true }
+  },
+
+  // Rehearse production. Strict enforcement, but push stays manual.
+  staging: {
+    workflow: { enforcementMode: 'strict', autoMoveToReview: true },
+    git: { commitAndPush: false }
+  },
+
+  // Locked down. Strict enforcement, auto-push after gates, minimal noise, top model.
+  prod: {
+    workflow: { enforcementMode: 'strict' },
+    git: { commitAndPush: true },
+    agents: { defaultModel: 'opus' },
+    privacy: { showCostEstimates: false }
+  }
+};
+
 // Settings file path
 function getSettingsPath(projectPath = process.cwd()) {
   return path.join(projectPath, '.ctoc', 'settings.json');
 }
 
-// Load settings (with defaults)
-function loadSettings(projectPath = process.cwd()) {
+// Read the raw settings file (no defaults merged). Returns {} if absent/invalid.
+function readRawSettings(projectPath = process.cwd()) {
   const settingsPath = getSettingsPath(projectPath);
-  let settings = {};
-
-  // Load from file if exists
-  if (fs.existsSync(settingsPath)) {
-    try {
-      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    } catch (e) {
-      // Invalid JSON, use defaults
-    }
+  if (!fs.existsSync(settingsPath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    return {};
   }
+}
 
-  // Merge with defaults
+// The active CTOC environment ('ask' | 'dev' | 'staging' | 'prod').
+// Reads the raw file so it never depends on the merge it drives.
+function getEnvironment(projectPath = process.cwd()) {
+  const env = readRawSettings(projectPath).general?.environment;
+  return env && env in ENVIRONMENT_PROFILES ? env : 'ask';
+}
+
+// Sparse override map for an environment (safe to mutate by caller — it's fresh).
+function getEnvironmentProfile(env) {
+  const profile = ENVIRONMENT_PROFILES[env] || {};
+  const out = {};
+  for (const [cat, vals] of Object.entries(profile)) out[cat] = { ...vals };
+  return out;
+}
+
+// True when the user has not yet chosen an environment — the plugin should ask.
+function needsEnvironmentPrompt(projectPath = process.cwd()) {
+  return getEnvironment(projectPath) === 'ask';
+}
+
+// Load settings, resolving each value as: explicit user setting > environment
+// profile > schema default. The environment is read from the raw file; 'ask'
+// (the default) contributes an empty profile, so behavior is unchanged until the
+// user opts into dev/staging/prod.
+function loadSettings(projectPath = process.cwd()) {
+  const settings = readRawSettings(projectPath);
+  const profile = ENVIRONMENT_PROFILES[getEnvironment(projectPath)] || {};
+
   const merged = {};
   for (const [category, schema] of Object.entries(SETTINGS_SCHEMA)) {
     merged[category] = {};
     for (const setting of schema.settings) {
-      merged[category][setting.key] = settings[category]?.[setting.key] ?? setting.default;
+      merged[category][setting.key] =
+        settings[category]?.[setting.key] ??
+        profile[category]?.[setting.key] ??
+        setting.default;
     }
   }
 
@@ -170,6 +243,7 @@ function getSettingsTabs() {
 module.exports = {
   SETTINGS_TABS,
   SETTINGS_SCHEMA,
+  ENVIRONMENT_PROFILES,
   loadSettings,
   saveSettings,
   getSetting,
@@ -177,5 +251,9 @@ module.exports = {
   getCategorySettings,
   toggleSetting,
   getCategorySchema,
-  getSettingsTabs
+  getSettingsTabs,
+  readRawSettings,
+  getEnvironment,
+  getEnvironmentProfile,
+  needsEnvironmentPrompt
 };

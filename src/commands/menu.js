@@ -12,6 +12,42 @@ const { TABS, getTabNames, nextTab, prevTab } = require('../lib/tabs');
 const { NavStack } = require('../lib/state');
 const { startAutoSync, stopAutoSync } = require('../lib/sync');
 const { findProjectRoot } = require('../lib/project-root');
+const { needsEnvironmentPrompt } = require('../lib/settings');
+
+// First-run prompt: CTOC asks the user which runtime environment to operate in.
+// Returned in the menu's {text, ask, actions} protocol so the menu itself asks.
+function environmentPromptResult() {
+  return {
+    text:
+      'CTOC can run in a chosen environment that tunes its own behavior — how\n' +
+      'strictly it enforces planning, whether it auto-pushes, default model, and\n' +
+      'log verbosity. The four human gates stay mandatory in every environment.\n' +
+      '\n' +
+      '  • Development — soft enforcement (warn, never block), never auto-push\n' +
+      '  • Staging     — strict enforcement, push stays manual\n' +
+      '  • Production  — strict enforcement, auto-push after gates\n' +
+      '\n' +
+      'Pick one to continue (you can change it later in System → Settings).\n\n\n',
+    ask: {
+      questions: [{
+        question: 'Which environment should CTOC run in for this project?',
+        header: 'Environment',
+        options: [
+          { label: 'Development', description: 'Soft enforcement, never auto-push — fast local iteration' },
+          { label: 'Staging', description: 'Strict enforcement, manual push — rehearse production' },
+          { label: 'Production', description: 'Strict enforcement, auto-push after gates — locked down' },
+          { label: 'Decide later', description: 'Keep defaults; ask again next time' }
+        ]
+      }]
+    },
+    actions: {
+      'Development': 'claude:set-environment dev',
+      'Staging': 'claude:set-environment staging',
+      'Production': 'claude:set-environment prod',
+      'Decide later': ''
+    }
+  };
+}
 
 // Read version from VERSION file
 let VERSION;
@@ -283,7 +319,17 @@ function main() {
     if (justInitialized) app.message = 'CTOC initialized for this project';
     render();
   } else {
-    // Non-interactive with no args: JSON dashboard output for Claude
+    // Non-interactive with no args: JSON dashboard output for Claude.
+    // On first run (environment not yet chosen) the plugin asks the user to
+    // pick one before showing the dashboard.
+    if (needsEnvironmentPrompt(app.projectPath)) {
+      const prompt = environmentPromptResult();
+      if (justInitialized) {
+        prompt.text = 'CTOC initialized for this project (automatic — no init command needed).\n\n' + prompt.text;
+      }
+      console.log(JSON.stringify(prompt, null, 2));
+      return;
+    }
     const { route } = require('../lib/menu-screens');
     const result = route([], app.projectPath);
     if (justInitialized) {
