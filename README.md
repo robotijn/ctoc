@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.41-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.42-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -641,17 +641,19 @@ git commit → background agent runs: lint, typecheck, tests, security
 
 ## Deployment Pipeline
 
-After Gate 3 approval (review → done), CTO Chief can automatically promote your code through environments:
+After Gate 3 approval (review → done), CTO Chief can promote the approved commit to your deploy targets. You work in **dev/local** — that is the *source*, never a target you deploy to. The only deploy targets are **staging** and **production**, and which promotion happens depends on what you enable and what passes review:
 
 ```
-Gate 3 approved → development → staging → production
-                      │            │           │
-                  git-branch   git-branch   git-branch
-                  git-tag      webhook      script
-                  webhook      script       docker
-                  script       docker       ssh
-                  docker       ssh
-                  ssh
+                         ┌──────────────► staging ──(review)──┐
+work (dev/local) ────────┤                                    ▼
+ Gate-3 approved commit  └──────────────────────────────► production
+                                       (direct)
+
+  • staging only      → work → staging
+  • production only   → work → production           (direct)
+  • staging + prod    → work → staging → (review) → production
+
+Target strategies: git-branch · git-tag · webhook · script · docker · ssh
 ```
 
 Each strategy is **really executed** — `git-branch` pushes the approved commit to the environment branch, `git-tag` creates and pushes a tag, `webhook` POSTs the deployment payload, `script` runs your deploy script (with `DEPLOY_ENV`/`DEPLOY_COMMIT` exported), `docker` builds and optionally pushes the image, and `ssh` runs your remote command.
@@ -790,7 +792,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.41'
+getVersion()       // → '6.9.42'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -849,6 +851,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.41** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.42** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

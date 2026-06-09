@@ -24,8 +24,13 @@ const DEFAULT_CONFIG = {
   dry_run: true,
   // Git remote used by the git-branch / git-tag strategies.
   remote: 'origin',
+  // Deploy TARGETS only. Development/local is where you work — the source of the
+  // approved commit — never a target you "deploy to". The promotion path falls
+  // out of which targets are enabled plus the approval gate:
+  //   • staging enabled only            → work → staging
+  //   • production enabled only         → work → production (direct)
+  //   • both, production: manual        → work → staging → (review) → production
   environments: [
-    { name: 'development', enabled: false, strategy: 'git-branch', branch: 'deploy/development' },
     { name: 'staging', enabled: false, strategy: 'git-branch', branch: 'deploy/staging' },
     { name: 'production', enabled: false, strategy: 'git-branch', branch: 'deploy/production' }
   ],

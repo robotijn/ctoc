@@ -45,40 +45,37 @@ You help users configure their deployment pipeline (dev -> staging -> production
                  DEPLOYMENT PIPELINE SETUP
 ===============================================================
 
-Which environments does your project use?
+You work in dev/local — that is the SOURCE of every deploy, never a target.
+Which deploy TARGETS should the approved commit be promoted to?
 
-[1] Development only
-    [+] Simplest setup
-    [+] Good for solo projects
-    [-] No staging validation before production
-
-[2] Development + Production (Recommended)
-    [+] Most common setup
-    [+] Direct path from dev to prod
-    [+] Minimal configuration
-    [-] No staging safety net
-
-[3] Development + Staging + Production
-    [+] Full pipeline with staging validation
-    [+] Catch issues before production
-    [+] Industry standard for teams
-    [-] More configuration required
+[1] Staging + Production (Recommended)
+    Path: work -> staging -> (review) -> production
+    [+] Staging validation before production
+    [+] Production stays manual-approval by default (the review gate)
     [-] Slower path to production
 
-[4] Development + QA + Staging + Production
-    [+] Dedicated QA environment for testers
-    [+] Staging mirrors production exactly
-    [-] Four environments to maintain
-    [-] Longer promotion pipeline
+[2] Production only
+    Path: work -> production (direct)
+    [+] Simplest, fastest path to prod
+    [+] Good for solo projects / low-risk changes
+    [-] No staging safety net before production
 
-[5] Custom selection
-    [+] Full flexibility
-    [+] Add custom environment names
+[3] Staging only
+    Path: work -> staging
+    [+] A shared preview/QA target with no production yet
+    [-] No production target configured
+
+[4] Custom selection
+    [+] Full flexibility; add custom target names (e.g. qa, canary)
     [-] Requires more setup time
 
 [0] Skip — configure later
 ===============================================================
 ```
+
+There is no "development" deploy target: dev/local is where the code is built.
+The three real promotions — work→staging, staging→production, and work→production
+(direct) — are just which targets you enable above plus the production approval gate.
 
 **Environment parity guidelines:**
 - Staging MUST mirror production (same OS, runtime versions, resource limits)
@@ -350,16 +347,16 @@ After collecting all options, show a summary:
             DEPLOYMENT PIPELINE SUMMARY
 ===============================================================
 
-Environments:
-  [OK] Development  -> git-branch (deploy/development)
+Source: dev/local (the approved Gate-3 commit)
+Deploy targets:
   [OK] Staging      -> git-branch (deploy/staging)
   [OK] Production   -> git-branch (deploy/production)
 
-Pipeline: development -> staging -> production
+Pipeline: work (dev/local) -> staging -> production
 
 Approval:
-  Staging:    auto (deploys after development succeeds)
-  Production: manual (pauses for user approval)
+  Staging:    auto (deploys the approved commit)
+  Production: manual (pauses for user approval — the review gate)
 
 Failure handling:
   Auto-rollback: enabled
@@ -575,5 +572,5 @@ Fast pipelines increase deployment frequency and developer satisfaction:
 - **Parallel test execution** — split test suites across multiple agents/containers; run unit tests on every commit, integration/e2e tests on merge
 - **Artifact compression** — compress build artifacts to reduce transfer time between pipeline stages
 - **Ephemeral runners with warm caches** — pre-bake runner images with common dependencies
-- **Skip unchanged environments** — if only staging config changed, do not redeploy development
+- **Skip unchanged targets** — if only the staging config changed, do not redeploy production
 - **Measure pipeline duration** — set a target (e.g., < 10 min for full pipeline) and alert when it degrades

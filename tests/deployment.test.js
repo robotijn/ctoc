@@ -53,10 +53,10 @@ function createPlanFile(name) {
 function testDefaultConfig() {
   assert.strictEqual(DEFAULT_CONFIG.enabled, false, 'Default config is disabled');
   assert.ok(Array.isArray(DEFAULT_CONFIG.environments), 'Has environments array');
-  assert.strictEqual(DEFAULT_CONFIG.environments.length, 3, 'Has 3 default environments');
-  assert.strictEqual(DEFAULT_CONFIG.environments[0].name, 'development', 'First env is development');
-  assert.strictEqual(DEFAULT_CONFIG.environments[1].name, 'staging', 'Second env is staging');
-  assert.strictEqual(DEFAULT_CONFIG.environments[2].name, 'production', 'Third env is production');
+  // Targets only — dev/local is the source, not a deploy target.
+  assert.strictEqual(DEFAULT_CONFIG.environments.length, 2, 'Has 2 default deploy targets');
+  assert.strictEqual(DEFAULT_CONFIG.environments[0].name, 'staging', 'First target is staging');
+  assert.strictEqual(DEFAULT_CONFIG.environments[1].name, 'production', 'Second target is production');
   assert.strictEqual(DEFAULT_CONFIG.approval.production, 'manual', 'Production approval defaults to manual');
   assert.strictEqual(DEFAULT_CONFIG.approval.staging, 'auto', 'Staging approval defaults to auto');
   assert.strictEqual(DEFAULT_CONFIG.rollback.auto_rollback, true, 'Auto-rollback defaults to true');
@@ -70,7 +70,7 @@ function testGetDeploymentConfigDefaults() {
   setup();
   const config = getDeploymentConfig(testDir);
   assert.strictEqual(config.enabled, false, 'Disabled by default');
-  assert.strictEqual(config.environments.length, 3, 'Has 3 environments');
+  assert.strictEqual(config.environments.length, 2, 'Has 2 deploy targets');
   assert.strictEqual(config.rollback.auto_rollback, true, 'Auto-rollback on');
   cleanup();
   console.log('# getDeploymentConfig() defaults');
@@ -101,7 +101,7 @@ function testGetDeploymentConfigMissing() {
   // No settings.json at all
   const config = getDeploymentConfig(testDir);
   assert.strictEqual(config.enabled, false, 'Falls back to defaults when no file');
-  assert.strictEqual(config.environments.length, 3, 'Default environments');
+  assert.strictEqual(config.environments.length, 2, 'Default deploy targets');
   cleanup();
   console.log('# getDeploymentConfig() missing file');
 }
