@@ -1,6 +1,20 @@
 /**
  * Settings Management
- * Centralized settings with categories and persistence
+ * Centralized settings with categories and persistence.
+ *
+ * CONFIG SOURCES — CTOC deliberately uses two files (see docs/CONFIG_SOURCES.md):
+ *   • .ctoc/settings.json  — this module's menu-driven store: runtime environment
+ *     (general.environment), agents, workflow, learning, git, privacy, and the
+ *     deployment engine block (read by src/lib/deployment.js). Rich/nested, JSON.
+ *   • .ctoc/settings.yaml  — read directly by the safety-critical PreToolUse hooks
+ *     and library code (enforcement.mode, regulatory_regime, operations). Kept
+ *     flat + dependency-free so hooks parse it fast without a YAML library.
+ * Edit enforcement in settings.yaml; edit everything this module owns in settings.json.
+ *
+ * Deployment is NOT configured through this schema — it has no flat-toggle UI
+ * (toggles cannot express strategy/branch/approval). Configure it via the
+ * deployment-setup agent, which writes the nested `deployment` block to
+ * settings.json that src/lib/deployment.js reads.
  */
 
 const fs = require('fs');
@@ -12,8 +26,7 @@ const SETTINGS_TABS = [
   { id: 'workflow', name: 'Workflow' },
   { id: 'learning', name: 'Learning' },
   { id: 'git', name: 'Git' },
-  { id: 'privacy', name: 'Privacy' },
-  { id: 'deployment', name: 'Deployment' }
+  { id: 'privacy', name: 'Privacy' }
 ];
 
 const SETTINGS_SCHEMA = {
@@ -77,18 +90,11 @@ const SETTINGS_SCHEMA = {
       { key: 'redactSecrets', label: 'Redact secrets in logs', type: 'toggle', default: true },
       { key: 'showCostEstimates', label: 'Show cost estimates', type: 'toggle', default: true }
     ]
-  },
-  deployment: {
-    label: 'Deployment Settings',
-    settings: [
-      { key: 'enabled', label: 'Deployment pipeline enabled', type: 'toggle', default: false },
-      { key: 'developmentEnabled', label: 'Development environment', type: 'toggle', default: false },
-      { key: 'stagingEnabled', label: 'Staging environment', type: 'toggle', default: false },
-      { key: 'productionEnabled', label: 'Production environment', type: 'toggle', default: false },
-      { key: 'productionApproval', label: 'Production approval', type: 'select', options: ['auto', 'manual'], default: 'manual' },
-      { key: 'autoRollback', label: 'Auto-rollback on failure', type: 'toggle', default: true }
-    ]
   }
+  // NOTE: no `deployment` category here. Deployment is configured via the
+  // deployment-setup agent into the nested `deployment` block of settings.json
+  // (read by src/lib/deployment.js) — flat toggles cannot express strategy,
+  // branch, or per-environment approval, so a partial UI would mislead.
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

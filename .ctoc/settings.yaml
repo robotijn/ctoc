@@ -1,6 +1,12 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CTOC Settings v1.4.0
 #  Project-level configuration for CTOC
+#
+#  This YAML file is read by the safety-critical PreToolUse hooks and library
+#  code (enforcement.mode, regulatory_regime, operations) — kept flat and
+#  dependency-free so hooks parse it without a YAML library. The menu-driven
+#  store (runtime environment, agents, workflow, git, privacy, deployment) lives
+#  in .ctoc/settings.json. See docs/CONFIG_SOURCES.md for what goes where.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ─────────────────────────────────────────────────────────────────────────────

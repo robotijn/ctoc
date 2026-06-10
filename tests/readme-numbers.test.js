@@ -151,8 +151,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(countTestFiles() >= 65, `expected >=65 test files, got ${countTestFiles()}`);
   });
 
-  it('docs/: 14 docs files (v6.9.27 added 7 cross-industry-critique docs)', () => {
-    assert.equal(countDocsFiles(), 14);
+  it('docs/: 15 docs files (v6.9.43 added CONFIG_SOURCES.md)', () => {
+    assert.equal(countDocsFiles(), 15);
   });
 
   it('scouts (Tier 3): 5 Haiku scout agents', () => {
