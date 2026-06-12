@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.43-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.44-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -149,7 +149,7 @@ The generated `CLAUDE.md` becomes the single source of truth for how Claude work
 
 CTOC runs in a chosen **environment** that tunes its *own* behavior — how strictly it enforces planning, whether it auto-pushes, the default model, and log verbosity. This is separate from deploying your app; it changes how the plugin itself operates.
 
-The first time you open the dashboard, CTOC **asks you which environment to use**. You can change it anytime in **System → Settings** (`general.environment` in `.ctoc/settings.json`).
+Until you choose one, the dashboard **asks you which environment to use** — as an extra question alongside the normal plan overview, never replacing it. You can change it anytime in **System → Settings** (`general.environment` in `.ctoc/settings.json`).
 
 | Environment | Enforcement | Auto-push | Notable |
 |-------------|-------------|-----------|---------|
@@ -792,7 +792,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.43'
+getVersion()       // → '6.9.44'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -825,7 +825,7 @@ ctoc/
 │                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
 │                    5 gap-fill SKILL.md added in v6.9.24; 8 cross-industry
 │                    SKILL.md added in v6.9.27.
-├── tests/           70 test files (1500 passing tests)
+├── tests/           71 test files (1504 passing tests)
 ├── .ctoc/           Config, templates, operations, audit, loop journals
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
@@ -851,6 +851,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.43** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.44** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

@@ -184,7 +184,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ## Test & Verify
 
 ```bash
-node --test tests/*.test.js          # Run all 70 test files (cross-platform)
+node --test tests/*.test.js          # Run all 71 test files (cross-platform)
 node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
@@ -233,7 +233,7 @@ ctoc/
     data/                Static data files
   agents/                110 agent definitions across 22 categories
   skills/                421 skill files (99 Tier-2 specialist bodies + 322 reference)
-  tests/                 70 test files
+  tests/                 71 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
