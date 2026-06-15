@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-06-15T09:45:22.722Z
+gate_crossed: review → done
+---
+
+---
 title: "C1 — PreToolUse Pipeline Enforcement Hook — Implementation"
 created: "2026-05-14T00:00:00Z"
 priority: HIGH

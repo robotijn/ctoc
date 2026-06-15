@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-06-15T09:45:22.725Z
+gate_crossed: review → done
+---
+
+---
 title: "Vision Pipeline: Vision-to-Functional Decomposition"
 created: "2026-02-08T17:00:00Z"
 priority: MEDIUM
