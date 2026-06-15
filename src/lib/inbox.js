@@ -6,7 +6,8 @@
  *   - decisions/   documented choices the implementer took under ambiguity
  *
  * Plus a derived view:
- *   - plansAtGates  plans currently awaiting human approval at any gate (X3)
+ *   - plansAtGates  plans currently AWAITING a human approval decision at a
+ *                   gate — i.e. sitting in a gate SOURCE stage (X3)
  *
  * Inbox is READ-ONLY at its surface — writes come from upstream agents
  * (vision-decomposer creates questions, implementer creates decisions).
@@ -20,7 +21,18 @@ const { memoize } = require('./cache');
 const QUESTIONS_DIR = ['.ctoc', 'inbox', 'questions'];
 const DECISIONS_DIR = ['.ctoc', 'inbox', 'decisions'];
 
-const HUMAN_GATE_STAGES = ['implementation', 'todo', 'done'];
+// Gate SOURCE stages: a plan sitting in one of these stages is AWAITING the
+// human's approval decision to cross the named gate. Destination stages
+// (implementation/todo/done) are where APPROVED plans land — a plan there has
+// already crossed its gate, so it is not "waiting" and is not counted.
+//   functional      → Gate 1 (functional → implementation)
+//   implementation  → Gate 2 (implementation → todo)
+//   review          → Gate 3 (review → done)
+const HUMAN_GATE_SOURCE_STAGES = Object.freeze({
+  functional: 1,
+  implementation: 2,
+  review: 3,
+});
 
 function getQuestionsDir(root) { return path.join(root, ...QUESTIONS_DIR); }
 function getDecisionsDir(root) { return path.join(root, ...DECISIONS_DIR); }
@@ -145,9 +157,20 @@ function listDecisions(root) {
 }
 
 /**
- * X3: list plans currently at any human gate (1, 2, or 3).
- * A plan is "at a gate" if it has an `approved_by: human` marker AND sits in
- * a gate destination stage.
+ * X3: list plans currently AWAITING a human approval decision at a gate.
+ *
+ * A plan is "at a gate" when it sits in a gate SOURCE stage — the human must
+ * approve it for the plan to advance across that gate (see
+ * HUMAN_GATE_SOURCE_STAGES). Plans in destination stages (implementation/todo/
+ * done) are NOT counted: once a plan carries its approval marker and has landed
+ * in a destination, it has crossed the gate rather than waiting at one. That
+ * inversion was the prior bug — it reported every shipped `done/` plan as
+ * "at a gate", so the count tracked the Done total instead of the work the
+ * human still owes a decision on.
+ *
+ * The approval marker is deliberately not consulted here: a marker reflects the
+ * PREVIOUS gate a plan crossed to reach its current stage, not the next gate it
+ * awaits, so it carries no signal about pending approval.
  *
  * @param {string} root
  * @returns {Array<{plan: string, stage: string, gate: number}>}
@@ -157,18 +180,12 @@ function listPlansAtGates(root) {
   const plansDir = path.join(root, 'plans');
   if (!fs.existsSync(plansDir)) return out;
 
-  for (const stage of HUMAN_GATE_STAGES) {
+  for (const [stage, gate] of Object.entries(HUMAN_GATE_SOURCE_STAGES)) {
     const stageDir = path.join(plansDir, stage);
     if (!fs.existsSync(stageDir)) continue;
     const files = fs.readdirSync(stageDir).filter(f => f.endsWith('.md') && f !== '.gitkeep');
     for (const f of files) {
-      const filePath = path.join(stageDir, f);
-      let content;
-      try { content = fs.readFileSync(filePath, 'utf8'); } catch { continue; }
-      if (content.includes('approved_by: human')) {
-        const gate = stage === 'implementation' ? 1 : stage === 'todo' ? 2 : 3;
-        out.push({ plan: f.replace(/\.md$/, ''), stage, gate });
-      }
+      out.push({ plan: f.replace(/\.md$/, ''), stage, gate });
     }
   }
   return out;

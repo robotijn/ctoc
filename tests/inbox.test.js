@@ -120,22 +120,85 @@ describe('createDecision + listDecisions', () => {
   });
 });
 
-describe('listPlansAtGates (X3 — all gates by default)', () => {
+describe('listPlansAtGates (X3 — plans AWAITING approval at a gate source)', () => {
   let root;
   beforeEach(() => { root = tempProject(); });
   afterEach(() => { cleanup(root); });
 
-  it('reports plans in stages with frontmatter dogfood_retro or approved_by', () => {
-    // X3 default = all gates shown. Plan with approval marker counts as 'at gate'.
-    const planContent = `---\ntitle: "Test"\napproved_by: human\ngate_crossed: implementation → todo\n---\n# Test\n`;
-    fs.writeFileSync(path.join(root, 'plans', 'todo', 'test-plan.md'), planContent);
-    const plans = listPlansAtGates(root);
-    assert.ok(plans.length >= 0, 'returns an array');
-  });
+  const PLAN = (title) => `---\ntitle: "${title}"\n---\n# ${title}\n`;
+  const APPROVED_PLAN = (title, crossed) =>
+    `---\ntitle: "${title}"\napproved_by: human\ngate_crossed: "${crossed}"\n---\n# ${title}\n`;
 
-  it('returns array of {plan, stage, gate} entries', () => {
+  it('returns an array of {plan, stage, gate} entries', () => {
     const plans = listPlansAtGates(root);
     assert.ok(Array.isArray(plans));
+  });
+
+  it('counts a functional plan as awaiting Gate 1', () => {
+    fs.writeFileSync(path.join(root, 'plans', 'functional', 'f1.md'), PLAN('F1'));
+    const plans = listPlansAtGates(root);
+    assert.equal(plans.length, 1);
+    assert.deepEqual(plans[0], { plan: 'f1', stage: 'functional', gate: 1 });
+  });
+
+  it('counts an implementation plan as awaiting Gate 2', () => {
+    fs.writeFileSync(path.join(root, 'plans', 'implementation', 'i1.md'), PLAN('I1'));
+    const plans = listPlansAtGates(root);
+    assert.equal(plans.length, 1);
+    assert.equal(plans[0].stage, 'implementation');
+    assert.equal(plans[0].gate, 2);
+  });
+
+  it('counts a review plan as awaiting Gate 3', () => {
+    fs.writeFileSync(path.join(root, 'plans', 'review', 'r1.md'), PLAN('R1'));
+    const plans = listPlansAtGates(root);
+    assert.equal(plans.length, 1);
+    assert.equal(plans[0].stage, 'review');
+    assert.equal(plans[0].gate, 3);
+  });
+
+  it('does NOT count a shipped done/ plan (regression: prior bug counted these)', () => {
+    // The exact failure we fixed: an approved plan that already crossed Gate 3
+    // and landed in done/ must not be reported as "at a gate".
+    fs.writeFileSync(
+      path.join(root, 'plans', 'done', 'shipped.md'),
+      APPROVED_PLAN('Shipped', 'review → done'),
+    );
+    const plans = listPlansAtGates(root);
+    assert.equal(plans.length, 0, 'done/ plans have crossed their gate, not waiting at one');
+    assert.equal(getInboxCounts(root).gatesWaiting, 0);
+  });
+
+  it('does NOT count a todo/ plan (past Gate 2, queued for execution)', () => {
+    fs.writeFileSync(
+      path.join(root, 'plans', 'todo', 't1.md'),
+      APPROVED_PLAN('T1', 'implementation → todo'),
+    );
+    assert.equal(listPlansAtGates(root).length, 0);
+  });
+
+  it('does NOT count an in-progress/ plan (mid-execution, no pending gate)', () => {
+    fs.writeFileSync(path.join(root, 'plans', 'in-progress', 'p1.md'), PLAN('P1'));
+    assert.equal(listPlansAtGates(root).length, 0);
+  });
+
+  it('sums across all three source stages', () => {
+    fs.writeFileSync(path.join(root, 'plans', 'functional', 'f1.md'), PLAN('F1'));
+    fs.writeFileSync(path.join(root, 'plans', 'implementation', 'i1.md'), PLAN('I1'));
+    fs.writeFileSync(path.join(root, 'plans', 'review', 'r1.md'), PLAN('R1'));
+    // noise that must be ignored
+    fs.writeFileSync(path.join(root, 'plans', 'done', 'd1.md'), APPROVED_PLAN('D1', 'review → done'));
+    fs.writeFileSync(path.join(root, 'plans', 'todo', 't1.md'), PLAN('T1'));
+    const plans = listPlansAtGates(root);
+    assert.equal(plans.length, 3);
+    assert.deepEqual(plans.map(p => p.gate).sort(), [1, 2, 3]);
+    assert.equal(getInboxCounts(root).gatesWaiting, 3);
+  });
+
+  it('ignores .gitkeep and non-markdown files', () => {
+    fs.writeFileSync(path.join(root, 'plans', 'review', '.gitkeep'), '');
+    fs.writeFileSync(path.join(root, 'plans', 'review', 'notes.txt'), 'not a plan');
+    assert.equal(listPlansAtGates(root).length, 0);
   });
 });
 
