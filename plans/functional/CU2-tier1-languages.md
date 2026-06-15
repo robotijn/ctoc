@@ -8,7 +8,7 @@ program: ctoc-corpus-quality
 order: 2
 depends_on: [CU1-tier0-quick-wins]
 status: refined
-acceptance_criteria_count: 12
+acceptance_criteria_count: 13
 risk_level: LOW
 files:
   - skills/languages/python.md
@@ -42,12 +42,13 @@ than filed-and-forgotten stubs.
 
 ### Current State
 
-Each of the 9 files contains the CTOC 5-section template:
-1. Overview (1-2 sentences)
-2. Common Pitfalls (typically 2-3 bullet points, generic)
-3. Best Practices (2-3 bullet points, generic)
-4. Testing Conventions (1-2 bullet points)
-5. References (0-2 links, often stale)
+Each of the 9 files contains the CTOC 5-section template (confirmed by the
+2026-06-15 audit, floor defined as <=5 `##` sections):
+1. Installation / Critical Corrections (1-2 paragraphs or bullet list)
+2. Current Tooling (1-2 bullets or table, generic)
+3. Common Mistakes (2-5 bullets, often shallow)
+4. Correct Patterns (code snippet, no security or version context)
+5. Version Gotchas / References (1-3 bullets, often undated)
 
 Confirmed line counts from the 2026-06-15 audit: python 48, javascript 49,
 typescript 50, go 53, java 53, rust 57. C# (~50), C (~50), C++ (~50) are in the
@@ -95,34 +96,49 @@ language-specific knowledge rather than template boilerplate.
 
 ### Success Metrics
 
-- Each guide contains at minimum 6 substantive sections beyond the base 5.
-- Every version-specific or security claim carries a source reference with a
-  retrieval or publication date.
+- Each guide contains more than 5 distinct `##` sections with substantive depth.
+- Every required section names at least one technology-specific identifier
+  (a version number such as "Python 3.12", a CWE identifier such as "CWE-416",
+  or a concrete API/function name such as "asyncio.gather") — generic bullets
+  without a concrete identifier are a failing criterion.
+- Every version-specific or security claim carries an inline dated source from
+  2025-01-01 or later (URL, document title + section, or advisory reference with
+  retrieval date). Claims without a dated source fail the reviewer gate.
 - CVE-class or well-known vulnerability classes are named for languages with
   established classes (C/C++ memory safety, Java/.NET deserialization, etc.).
 - `node --test tests/*.test.js` stays green (frontmatter and skills.json indexing
   are not broken by the content additions).
 - `.ctoc/skills.json` trigger mappings for these languages remain valid after edits.
 
+### Audit-Ledger Scoping
+
+In-scope files are defined by diffing the checked-in audit ledger at
+`.ctoc/audit/corpus-audit-2026-06-15.json` against already-upgraded files.
+The floor criterion is <=5 `##` sections (not line count). A completeness check
+passes when every in-scope file appears in either the upgraded list or a recorded
+skipped list in the audit artifact — no file may be silently omitted.
+
 ### Stakeholders
 
 - Claude Code (automated consumer): benefits directly from richer guide content
   at edit time.
 - Human reviewer (gate approval): spot-checks depth and source quality.
-- Implementation Planner (downstream on CU3/CU4): uses CU2 output as the depth
-  standard for framework and long-tail upgrades.
+- Implementation Planner (downstream on CU3/CU4a/CU4b/CU4c): uses CU2 output as
+  the depth standard for framework and long-tail upgrades.
 
 ### Constraints
 
 - **Language set is fixed**: exactly the 9 enumerated above. The "..." in the
-  vision is not an open invitation; remaining thin languages are CU4 (Tier 2).
+  vision is not an open invitation; remaining thin languages are CU4c (Tier 2).
 - **Single-language exemption**: these guides are not subject to the 7-language
   BAD/SAFE cross-coverage rule (explicit vision carve-out); depth-within-language
-  is the bar.
+  is the bar. The implementer must not add cross-language BAD/SAFE examples to
+  these files.
 - **No-churn rule**: if a section within any thin file already has audited-SOLID
   content, extend rather than rewrite. No healthy sentence is deleted.
 - **Source recency**: WebSearch authoritative sources before asserting
-  version-specific facts; stamp each claim with retrieval date.
+  version-specific facts; stamp each claim with retrieval date no earlier than
+  2025-01-01 so staleness is visible to reviewers.
 - **No new files**: all work is edits to the 9 existing files.
 - **Parallel-safe**: the 9 files are independent; they can be implemented
   concurrently without merge conflict (different files).
@@ -147,32 +163,40 @@ with pointers" — in my code review output.
 
 **As a** human reviewer approving a CU2 implementation,
 **I want** each of the 9 guides to have a clearly visible source citation for every
-version-specific or security claim, with a retrieval date no older than the
-implementation date,
-**so that** I can verify the claims are authoritative and track when they were
-last confirmed.
+version-specific or security claim, with a retrieval date of 2025-01-01 or later,
+**so that** I can verify the claims are authoritative and reject any claim that
+lacks a concrete dated source.
 
 ### Acceptance Criteria
 
+**Objective depth gate (applies to every scenario below):** A reviewer rejects
+any guide section that does not name at least one technology-specific identifier
+(version number, CWE identifier, or concrete API/function name), and rejects any
+version-specific or security claim that does not carry an inline dated source from
+2025-01-01 or later. "Not padding" is not a sufficient criterion; the identifiers
+and dated sources are the checkable gate.
+
 - [ ] **Scenario: each guide exceeds the 5-section floor with substantive depth**
-  Given all 9 language guides currently sit at the 5-section template floor
+  Given all 9 language guides currently sit at <=5 `##` sections (template floor)
   When each guide is upgraded
-  Then each file contains at minimum the following distinct sections:
+  Then each file contains more than 5 distinct `##` sections including at minimum:
   Overview, Concurrency / Async Footguns, Error Handling Idioms, Security and
   Dependency Gotchas (including relevant CVE classes), Testing Conventions,
   Performance Traps, Version-Specific Gotchas, and References
-  And each section contains substantive, non-generic content specific to that
-  language
+  And each section names at least one technology-specific identifier — a version
+  number, a CWE identifier, or a concrete API/function name
+  And no section consists only of generic bullets without a concrete identifier
 
 - [ ] **Scenario: python.md covers GIL, asyncio, and 3.12+ specifics**
   Given python.md is ~48 lines with no concurrency or async content
   When upgraded
   Then the guide addresses: GIL implications for CPU-bound threading, asyncio
-  footguns (missing await, task cancellation, exception swallowing in gather),
-  Python 3.12+ changes (removed deprecated APIs, new type system features),
-  dependency security (PyPI supply-chain, pinning with hashes), and testing
-  conventions (pytest idioms, fixture scoping)
-  And every claim about Python 3.12+ behavior carries a source and retrieval date
+  footguns (missing await, task cancellation, exception swallowing in
+  asyncio.gather), Python 3.12+ changes (removed deprecated APIs, new type
+  system features), dependency security (PyPI supply-chain, pinning with hashes),
+  and testing conventions (pytest idioms, fixture scoping)
+  And every claim about Python 3.12+ behavior carries a source URL or document
+  reference with a retrieval date of 2025-01-01 or later
 
 - [ ] **Scenario: javascript.md and typescript.md cover async, type, and ecosystem pitfalls**
   Given javascript.md (~49 lines) and typescript.md (~50 lines) are at template floor
@@ -183,38 +207,40 @@ last confirmed.
   And typescript.md addresses: strict mode trade-offs, `any` escape hatch risks,
   module resolution edge cases (ESM vs CJS), declaration file pitfalls, and
   TypeScript 5.x-specific changes
-  And both files carry dated sources for version-specific claims
+  And both files name specific version numbers (Node.js LTS version, TypeScript 5.x
+  release) and carry dated sources for version-specific claims
 
 - [ ] **Scenario: go.md covers goroutine leaks, error wrapping, and module gotchas**
   Given go.md is ~53 lines with generic content
   When upgraded
   Then go.md addresses: goroutine leak patterns (unbuffered channels, missing
-  cancel propagation), `errors.As`/`errors.Is` wrapping idioms vs sentinel error
+  cancel propagation), errors.As/errors.Is wrapping idioms vs sentinel error
   anti-patterns, context propagation requirements, Go module dependency pinning
   risks, and performance traps (interface boxing, map pre-allocation)
-  And version-specific content is dated and sourced (Go 1.21+/1.22+ changes
-  as applicable at implementation time)
+  And version-specific content names the applicable Go version (e.g. Go 1.21,
+  Go 1.22) and is dated with a source from 2025-01-01 or later
 
 - [ ] **Scenario: java.md covers deserialization, virtual threads, and module system**
   Given java.md is ~53 lines
   When upgraded
-  Then java.md addresses: Java deserialization vulnerability class (CWE-502,
-  well-known CVE pattern), virtual threads (Java 21 Project Loom) pitfalls,
-  Java Platform Module System (JPMS) encapsulation errors, checked vs unchecked
-  exception design, dependency security (Maven/Gradle lockfiles), and
-  Java 21+ language feature gotchas (records, sealed classes, pattern matching)
-  And the deserialization CVE class entry references an authoritative source
-  (e.g. OWASP, CWE, or a specific advisory) with a retrieval date
+  Then java.md addresses: Java deserialization vulnerability class (CWE-502),
+  virtual threads (Java 21 Project Loom) pitfalls, Java Platform Module System
+  (JPMS) encapsulation errors, checked vs unchecked exception design, dependency
+  security (Maven/Gradle lockfiles), and Java 21+ language feature gotchas
+  (records, sealed classes, pattern matching)
+  And the deserialization entry names CWE-502 and references CWE.mitre.org or
+  OWASP with a retrieval date of 2025-01-01 or later
 
 - [ ] **Scenario: rust.md covers ownership, async, and unsafe footguns**
   Given rust.md is ~57 lines
   When upgraded
   Then rust.md addresses: lifetime elision edge cases, async trait object
-  limitations, `unsafe` block invariant documentation requirements, `Send`/`Sync`
-  implementation pitfalls, Rust edition migration (2021/2024 differences),
+  limitations, `unsafe` block invariant documentation requirements, Send/Sync
+  implementation pitfalls, Rust edition migration (2021/2024 edition differences),
   dependency security (`cargo audit`), and performance traps (unnecessary
   heap allocation via Box, String vs &str misuse)
-  And async-specific content covers tokio-specific pitfalls where applicable
+  And async-specific content names the tokio version applicable at implementation
+  time and carries a dated source
 
 - [ ] **Scenario: csharp.md covers nullable, async, and .NET 9 specifics**
   Given csharp.md is at template floor
@@ -224,17 +250,20 @@ last confirmed.
   performance APIs (Span<T>, Memory<T> common misuse), deserialization risks
   (System.Text.Json vs Newtonsoft divergence), dependency security (NuGet
   audit), and C# 12/13 feature gotchas
-  And all .NET 9-specific claims carry a source and retrieval date
+  And all .NET 9-specific claims name "NET 9" or a specific C# version number and
+  carry a source with retrieval date of 2025-01-01 or later
 
 - [ ] **Scenario: c.md covers memory-safety CVE classes with mitigations**
   Given c.md is at template floor
   When upgraded
-  Then c.md addresses: the primary C memory-safety CVE classes (buffer overflow
-  CWE-121/122, use-after-free CWE-416, format string CWE-134, integer overflow
-  CWE-190), C17 standard additions vs C99/C11 footguns, sanitizer recommendations
-  (AddressSanitizer, UBSan invocation), safe alternatives for dangerous functions
-  (strncpy traps, snprintf over sprintf), and static analysis tool guidance
-  And each CWE reference links to the CWE entry or an authoritative source
+  Then c.md addresses: the primary C memory-safety CVE classes naming the CWE
+  identifiers (buffer overflow CWE-121/CWE-122, use-after-free CWE-416, format
+  string CWE-134, integer overflow CWE-190), C17 standard additions vs C99/C11
+  footguns, sanitizer recommendations (AddressSanitizer, UBSan invocation flags),
+  safe alternatives for dangerous functions (strncpy traps, snprintf over sprintf),
+  and static analysis tool guidance
+  And each CWE reference links to CWE.mitre.org or an authoritative source with
+  a retrieval date of 2025-01-01 or later
 
 - [ ] **Scenario: cpp.md covers modern C++20/23 idioms and memory safety**
   Given cpp.md is at template floor
@@ -245,16 +274,18 @@ last confirmed.
   smart pointer misuse (shared_ptr cycles, dangling references), iterator
   invalidation rules, and security implications of undefined behavior in
   security-sensitive code paths
-  And C++20/23-specific claims carry a dated source
+  And C++20/23-specific claims name the applicable standard version ("C++20",
+  "C++23") and carry a dated source from 2025-01-01 or later
 
 - [ ] **Scenario: all version-specific and security claims carry dated sources**
   Given the audit confirmed all guides lack sourced claims
   When any version-specific or security claim is added to any of the 9 guides
   Then the claim includes either an inline source reference (URL or document
-  title + section) with a retrieval or publication date no earlier than
-  2025-01-01, or a References section entry that the claim text links to
-  And claims using the form "as of [version]" or "since [version]" are paired
-  with the release date of that version
+  title + section) with a retrieval or publication date of 2025-01-01 or later,
+  or a References section entry that the claim text links to
+  And a reviewer can reject any claim that lacks a concrete technology-specific
+  identifier (version number, CWE ID, or API/function name) in the same sentence
+  or paragraph
 
 - [ ] **Scenario: CVE classes are named for languages with established classes**
   Given C, C++, Java, and .NET have well-documented CVE/CWE classes
@@ -273,6 +304,15 @@ last confirmed.
   required by the skills.json trigger mapping (no key renames, no removal of
   indexed fields)
 
+- [ ] **Scenario: audit-ledger completeness check passes**
+  Given the audit ledger at `.ctoc/audit/corpus-audit-2026-06-15.json` defines
+  the in-scope file list (files with <=5 `##` sections, not line count)
+  When the implementer processes all 9 language files
+  Then every file appears in the audit artifact as either UPGRADED or
+  SOLID-SKIPPED with a rationale — no file is silently omitted
+  And the completeness check can be run by diffing the in-scope list against
+  the union of (upgraded list + skipped list) and confirming the diff is empty
+
 - [ ] **Scenario: no file outside the 9 enumerated guides is modified**
   Given the no-churn rule
   When the implementer reviews all touched files
@@ -287,19 +327,22 @@ last confirmed.
 - Content upgrades to the 9 files in `skills/languages/`: python.md, javascript.md,
   typescript.md, go.md, java.md, rust.md, csharp.md, c.md, cpp.md.
 - Adding sections for: concurrency/async footguns, error-handling idioms, security
-  and dependency gotchas (with CVE/CWE classes where applicable), testing
+  and dependency gotchas (with CVE/CWE identifiers where applicable), testing
   conventions, performance traps, version-specific gotchas, and dated references.
 - WebSearch before asserting version-specific facts; stamping each claim with a
-  retrieval date.
+  retrieval date of 2025-01-01 or later.
 - Extending any existing solid content within these files (no overwriting).
+- Updating the audit artifact with per-file verdicts (UPGRADED / SOLID-SKIPPED).
 
 ### Out of Scope
 
-- Any language guide not in the 9-file list — remaining thin languages are CU4.
+- Any language guide not in the 9-file list — remaining thin languages are CU4c.
 - The 7-language BAD/SAFE cross-coverage rule — single-language guides are
-  explicitly exempt per the vision and locked decisions.
+  explicitly exempt per the vision and locked decisions; the implementer must not
+  add cross-language examples to these files.
 - Framework reference guides — those are CU3.
-- Quality-config files — those are CU4.
+- Quality-config files — those are CU4b.
+- Non-mainstream language guides — those are CU4c.
 - SKILL.md files in other categories — not in scope for CU2.
 - Changes to `src/`, `tests/`, `agents/`, hooks, or gate logic.
 - Rewriting any section confirmed solid by the 2026-06-15 audit (no-churn rule).
@@ -324,18 +367,18 @@ last confirmed.
   - Impact: MEDIUM (wrong version claim is worse than no claim — gives false
     confidence)
   - Mitigation: WebSearch each language's current release notes before asserting
-    version-specific behavior; stamp with retrieval date so staleness is visible
-    to reviewers.
+    version-specific behavior; stamp with retrieval date of 2025-01-01 or later
+    so staleness is visible to reviewers.
 
 ### Business Risks
 
-- **Depth without accuracy**: Padding with generic content to "exceed the 5-section
-  floor" by line count rather than substance would defeat the purpose.
-  - Likelihood: LOW (acceptance criteria explicitly require non-generic content)
-  - Impact: MEDIUM (a longer but still-useless guide wastes review time)
-  - Mitigation: Each section must reference a language-specific detail (version,
-    CVE class, function name, or API) — generic bullets are a failing criterion
-    in the self-check.
+- **Depth without specificity**: Padding with generic content to exceed the
+  5-section floor without naming concrete identifiers would defeat the purpose.
+  - Likelihood: LOW (the objective depth gate explicitly requires identifiers)
+  - Impact: MEDIUM (a longer but still-vague guide wastes review time)
+  - Mitigation: The reviewer gate rejects any section lacking a version number,
+    CWE identifier, or concrete API/function name — this is a binary check,
+    not a judgment call.
 
 ### Dependency Risks
 
@@ -350,8 +393,8 @@ last confirmed.
 ## Priority
 
 **Priority: HIGH** (Score: 7/9)
-- Dependency: MEDIUM (2) — CU3 (frameworks) can run in parallel with CU2; CU4
-  depends on CU2 setting the depth standard; no stub depends solely on CU2.
+- Dependency: MEDIUM (2) — CU3 (frameworks) can run in parallel with CU2; CU4a/b/c
+  depend on CU2 setting the depth standard; no stub depends solely on CU2.
 - Business Impact: HIGH (3) — highest-traffic trigger-loaded guides; every Claude
   edit to the most common source languages benefits immediately.
 - Technical Risk: MEDIUM (2) — content additions are low-complexity; the main
@@ -361,12 +404,21 @@ last confirmed.
 
 - **Language set boundary** — exactly the 9 the vision enumerates
   (python, js, ts, go, java, rust, c#, c, c++). The "..." in the vision is not
-  treated as an open invitation; remaining thin languages are Tier 2 (CU4).
+  treated as an open invitation; remaining thin languages are Tier 2 (CU4c).
 - **Cross-language example rule** — single-language reference guides are exempt
   from the 7-language BAD/SAFE coverage standard (explicit vision carve-out);
-  depth-within-language is the bar instead.
+  depth-within-language is the bar instead. Implementer must not add cross-language
+  BAD/SAFE examples to these files.
+- **Objective depth bar** — "not padding" replaced with a grep-checkable rule:
+  every required section must name at least one technology-specific identifier
+  (version number, CWE identifier, or concrete API/function name), AND every
+  version-specific or security claim must carry an inline dated source from
+  2025-01-01 or later. A reviewer rejects against this criterion.
+- **Floor criterion** — <=5 `##` sections (not line count); consistent with the
+  audit ledger definition used across all CU plans.
 - **Existing partial content** — if a guide already has audited-SOLID content in
   a section, extend rather than rewrite (no-churn rule applies even within a
   thin file's solid sections).
 - **Source recency** — cite the most recent authoritative source available at
-  implementation time; stamp each with retrieval date so staleness is visible.
+  implementation time; stamp each with retrieval date of 2025-01-01 or later so
+  staleness is visible.

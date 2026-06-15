@@ -1,5 +1,5 @@
 ---
-title: "EC1 — compliance.mode setting + ride-along gate question"
+title: "EC1 — Regulatory-regime compliance gating + ride-along profile activation"
 created: "2026-06-15T00:00:00Z"
 priority: HIGH
 type: feature
@@ -8,35 +8,38 @@ program: ctoc-eu-compliance
 order: 1
 depends_on: []
 files:
-  - src/lib/settings.js
+  - src/lib/regulatory-regime.js
+  - src/lib/compliance-regime.js
   - src/commands/menu.js
-  - .ctoc/settings.json
   - .ctoc/settings.yaml
+  - .ctoc/regulatory-regimes/gdpr.yaml
   - tests/compliance-mode.test.js
 status: refined
-acceptance_criteria_count: 9
+acceptance_criteria_count: 10
 risk_level: MEDIUM
 ---
 
-# EC1 — compliance.mode setting + ride-along gate question
+# EC1 — Regulatory-regime compliance gating + ride-along profile activation
 
 ## 1. ASSESS
 
 ### Business Context
 
-CTOC has no per-project notion of which EU regulatory regimes apply. Every project is treated identically — the existing `gdpr-compliance-checker` and `ai-governance-checker` skills run (or do not run) regardless of whether the project is an internal tool, a consumer SaaS, or a high-risk AI system. The vision's Problem #4 names this gap explicitly. A purely internal tool, a consumer SaaS, and a high-risk AI system have wildly different obligations; conflating them produces noise for projects that have no EU exposure and silence for projects that need full GDPR + EU AI Act coverage.
+CTOC already ships a regulatory-regime profile system (`src/lib/regulatory-regime.js`) with `loadActiveProfiles`, `effectiveControls`, `isControlEnabled`, `regimeSummary`, and `listAvailableProfiles`. Profiles are declared in `.ctoc/settings.yaml` under `regulatory_regime.active_profiles` and resolved from YAML files under `.ctoc/regulatory-regimes/`. The `eu-ai-act-high-risk` profile exists. No GDPR profile exists.
 
-`compliance.mode` is the foundation every downstream EC slice depends on. EC2 and EC3 gate on it before running. EC5 reads it to decide which agent(s) to dispatch. Without it, every downstream slice is ungated.
+The earlier design invented a `compliance.mode` flat setting with its own schema entry, its own resolver API, and a mirror write to `settings.yaml`. That design creates a second source of truth alongside the existing regime system and must be replaced.
+
+The correct design: `shouldRunGdpr()` and `shouldRunEuAiAct()` are derived directly from `regulatory_regime.active_profiles` via `loadActiveProfiles(projectRoot)`. A `gdpr` profile YAML is added as a first-class regime alongside `eu-ai-act-high-risk`. The ride-along question activates the relevant profile(s) by adding them to `active_profiles` in `settings.yaml`. There is no `compliance.mode` key and no `settings.json` mirror.
+
+This is the single source of truth: `regulatory_regime.active_profiles` in `.ctoc/settings.yaml`.
 
 ### Current State
 
-`src/lib/settings.js` models settings under `SETTINGS_SCHEMA` with tabs: `general`, `agents`, `workflow`, `learning`, `git`, `privacy`. The `general.environment` key is the canonical precedent: it uses an explicit-user-setting > default resolution rule, is asked as a non-blocking ride-along question on first dashboard open, and is never re-prompted once set. `.ctoc/settings.json` is the canonical JSON store; `.ctoc/settings.yaml` carries flat mirrors (`enforcement.mode`, `regulatory_regime`) that hook/library code reads without a YAML parser.
-
-There is no `compliance.mode` key anywhere in the schema today.
+`src/lib/regulatory-regime.js` exports `loadActiveProfiles(projectRoot)` returning `{ profiles: string[], overrides: {} }`. `.ctoc/settings.yaml` has `regulatory_regime.active_profiles: []` as the default. `.ctoc/regulatory-regimes/eu-ai-act-high-risk.yaml` exists. No `gdpr.yaml` profile exists. The menu has no ride-along question for EU compliance profiles.
 
 ### Impact
 
-Without this slice, no compliance agent can gate correctly. The two downstream agents (EC2, EC3) would either run on every project (noise, wrong) or never run (useless). This is the single prerequisite for the entire EU compliance program; its priority is HIGH and it blocks EC2, EC3, and EC5.
+Without this slice, no compliance agent can gate correctly. EC2 and EC3 call `shouldRunGdpr()` / `shouldRunEuAiAct()` — these functions do not exist until EC1 ships them, derived from the regime system. Default (empty `active_profiles`) correctly maps to all-false, preserving backward compatibility.
 
 ---
 
@@ -44,38 +47,33 @@ Without this slice, no compliance agent can gate correctly. The two downstream a
 
 ### Business Goals
 
-**Goal:** Provide each project with a declared EU regulatory scope so CTOC compliance work is accurate (not over-broad for non-EU projects, not silent for EU projects).
+**Goal:** Per-project EU compliance scoping via the existing regulatory-regime system, so compliance agents gate on a single, auditable source of truth.
 
-**Job to Be Done:** When I am setting up a CTOC project for a client whose data-processing obligations I know, I want to declare the applicable EU regime once, so that CTOC scopes all compliance checks to it rather than running all-or-nothing.
+**Job to Be Done:** When I am setting up a CTOC project for a client whose data-processing obligations I know, I want to activate the relevant EU regime profile once, so that CTOC scopes all compliance checks to it rather than running all-or-nothing.
 
 **Impact Map:**
-- **Goal:** Per-project compliance scope — only the opted-in regime's agents run.
+- **Goal:** Per-project compliance scope — only the opted-in regime's agents run — derived from `regulatory_regime.active_profiles`.
 - **Actor:** Project owner / CTO Chief configuring a new or existing CTOC project.
-- **Impact:** Non-EU / internal-only projects gain a silent, zero-noise baseline (`none`). EU-scoped projects get the correct agent(s) running without having to remember to invoke them manually.
-- **Deliverable:** `compliance.mode` setting in schema + ride-along prompt + resolver API (`getComplianceMode()`, `shouldRunGdpr()`, `shouldRunAiAct()`).
+- **Impact:** Non-EU / internal-only projects keep an empty `active_profiles` (zero noise). EU-scoped projects activate a named profile (gdpr, eu-ai-act-high-risk, or both) via the ride-along question, and the resolver API returns correct booleans.
+- **Deliverable:** `gdpr.yaml` profile + `src/lib/compliance-regime.js` resolver module + ride-along prompt in `menu.js` that writes to `active_profiles`.
 
 ### Success Metrics
 
-1. `compliance.mode` is present in `SETTINGS_SCHEMA` with valid values `gdpr | eu-ai-act | both | none` and default `none`.
-2. First dashboard open with no stored value prompts once, non-blocking (dashboard renders regardless of answer).
-3. Once set, never re-prompted; resolution is explicit user setting > default.
-4. `getComplianceMode()` returns the resolved value; `shouldRunGdpr()` / `shouldRunAiAct()` return correct booleans for all four values.
-5. `compliance.mode` cannot weaken any human gate (Gate 0–3).
-6. Setting persists in `.ctoc/settings.json` (canonical) and is mirrored to `.ctoc/settings.yaml` as `compliance_mode` flat key.
-
-### Stakeholders
-
-- **Project owner** — wants the prompt to be unobtrusive, asked once.
-- **EC2/EC3/EC5 implementers** — consume the resolver API; they must not re-implement the resolution logic.
-- **Security maintainer** — needs a test asserting gate logic is untouched.
+1. `shouldRunGdpr()` returns `true` when `gdpr` appears in `active_profiles`; `false` otherwise.
+2. `shouldRunEuAiAct()` returns `true` when `eu-ai-act-high-risk` appears in `active_profiles`; `false` otherwise.
+3. First dashboard open with neither profile active prompts once, non-blocking.
+4. Once a profile is activated, never re-prompted.
+5. `shouldRunGdpr()` / `shouldRunEuAiAct()` cannot weaken any human gate (Gate 0–3).
+6. Default (empty `active_profiles`) returns `false` for both — backward-compatible for all existing projects.
+7. The gate-invariant test from EC6 passes after this slice ships.
 
 ### Constraints
 
-- Must mirror the `general.environment` ride-along pattern exactly — no new modal, no dashboard-blocking question.
-- Default `none` is non-negotiable: backward-compatible for all existing projects.
-- Resolution rule: explicit user setting > default. No environment-profile override (a regulatory regime is a legal fact, not a behavior profile).
-- The setting must never weaken a human gate — enforced the same way `tests/environment-mode.test.js` enforces it for environment profiles.
-- Cross-platform: `path.join`, `fs.promises`, no bash entry points.
+- **One source of truth.** `regulatory_regime.active_profiles` in `.ctoc/settings.yaml` is canonical. No `compliance.mode` key. No `settings.json` mirror. No shadow copy. `loadActiveProfiles()` is the only reader.
+- **No new modal, no dashboard-blocking.** Ride-along question mirrors the `general.environment` mechanism.
+- **Default is empty active_profiles.** Backward-compatible — existing projects keep all-quiet behavior.
+- **Resolution rule.** `shouldRunGdpr()` = `profiles.includes('gdpr')`. `shouldRunEuAiAct()` = `profiles.includes('eu-ai-act-high-risk')`. No env-profile override.
+- **Cross-platform.** `path.join`, `fs.promises`, no bash entry points.
 
 ---
 
@@ -84,79 +82,79 @@ Without this slice, no compliance agent can gate correctly. The two downstream a
 ### User Stories
 
 **As a** project owner configuring a CTOC project,
-**I want** a `compliance.mode` setting with values `gdpr | eu-ai-act | both | none` (default `none`),
-**so that** non-EU / internal-only projects are unaffected by compliance agents and EU projects opt in explicitly.
-
-**As a** project owner on first dashboard open,
-**I want** the compliance regime question asked once as a non-blocking ride-along (identical to the runtime-environment question),
-**so that** the dashboard always renders immediately and I am not repeatedly prompted.
+**I want** a ride-along question that activates the `gdpr` and/or `eu-ai-act-high-risk` profile in `regulatory_regime.active_profiles`,
+**so that** non-EU / internal-only projects are unaffected and EU projects opt in explicitly via the existing regime system.
 
 **As a** downstream agent author (EC2/EC3/EC5),
-**I want** a resolver function `getComplianceMode()` returning `gdpr | eu-ai-act | both | none` and helpers `shouldRunGdpr()` / `shouldRunAiAct()`,
-**so that** every consumer gates consistently from a single source of truth.
+**I want** `shouldRunGdpr()` and `shouldRunEuAiAct()` from `src/lib/compliance-regime.js` derived directly from `loadActiveProfiles()`,
+**so that** every consumer gates consistently from one source of truth with no shadow config.
 
 **As a** security maintainer,
-**I want** a test asserting that `compliance.mode` cannot alter gate transitions, enforcement mode, or `requireReviewGate`,
+**I want** a test asserting that activating compliance profiles cannot alter gate transitions, enforcement mode, or `requireReviewGate`,
 **so that** Gate 0–3 safety is provably intact after this change.
 
 ### BDD Scenarios
 
-- [ ] **Scenario: Default value when setting is absent**
-  Given a project with no `compliance.mode` stored in `.ctoc/settings.json`
-  When `getComplianceMode()` is called
-  Then it returns `"none"`
-  And `shouldRunGdpr()` returns `false`
-  And `shouldRunAiAct()` returns `false`
-
-- [ ] **Scenario: Ride-along prompt on first dashboard open**
-  Given a project with no `compliance.mode` stored
-  When the dashboard renders for the first time
-  Then a non-blocking compliance-regime question is displayed (dashboard is fully rendered before and after the question)
-  And the question offers options: `none`, `gdpr`, `eu-ai-act`, `both`
-
-- [ ] **Scenario: No re-prompt after mode is set**
-  Given `compliance.mode` is stored as `gdpr` in `.ctoc/settings.json`
-  When the dashboard renders on any subsequent open
-  Then no compliance-regime prompt appears
-  And `getComplianceMode()` returns `"gdpr"`
-
-- [ ] **Scenario: Resolver truth table — gdpr**
-  Given `compliance.mode` is `"gdpr"`
-  When `shouldRunGdpr()` and `shouldRunAiAct()` are called
-  Then `shouldRunGdpr()` returns `true`
-  And `shouldRunAiAct()` returns `false`
-
-- [ ] **Scenario: Resolver truth table — eu-ai-act**
-  Given `compliance.mode` is `"eu-ai-act"`
-  When `shouldRunGdpr()` and `shouldRunAiAct()` are called
-  Then `shouldRunGdpr()` returns `false`
-  And `shouldRunAiAct()` returns `true`
-
-- [ ] **Scenario: Resolver truth table — both**
-  Given `compliance.mode` is `"both"`
-  When `shouldRunGdpr()` and `shouldRunAiAct()` are called
-  Then `shouldRunGdpr()` returns `true`
-  And `shouldRunAiAct()` returns `true`
-
-- [ ] **Scenario: Setting persists to JSON and mirrors to YAML**
-  Given the user selects `"both"` in the ride-along prompt
-  When the choice is saved
-  Then `.ctoc/settings.json` contains `compliance.mode: "both"` (or `general.complianceMode: "both"` per schema tab placement)
-  And `.ctoc/settings.yaml` contains `compliance_mode: "both"` as a flat key
-  And re-reading the setting from either file returns `"both"`
-
-- [ ] **Scenario: Invalid stored value falls back to default**
-  Given `.ctoc/settings.json` contains `compliance.mode: "unknown-value"`
-  When `getComplianceMode()` is called
-  Then it returns `"none"` (safe default)
+- [ ] **Scenario: Default value — empty active_profiles means both functions return false**
+  Given a project with `regulatory_regime.active_profiles: []` in `.ctoc/settings.yaml`
+  When `shouldRunGdpr(projectRoot)` and `shouldRunEuAiAct(projectRoot)` are called
+  Then both return `false`
   And no exception is thrown
 
-- [ ] **Scenario: Gate invariant — compliance.mode cannot weaken gates**
-  Given `compliance.mode` is set to any value including `"both"`
+- [ ] **Scenario: gdpr profile active — shouldRunGdpr returns true**
+  Given `regulatory_regime.active_profiles` contains `gdpr`
+  When `shouldRunGdpr(projectRoot)` is called
+  Then it returns `true`
+  And `shouldRunEuAiAct(projectRoot)` returns `false`
+
+- [ ] **Scenario: eu-ai-act-high-risk profile active — shouldRunEuAiAct returns true**
+  Given `regulatory_regime.active_profiles` contains `eu-ai-act-high-risk`
+  When `shouldRunEuAiAct(projectRoot)` is called
+  Then it returns `true`
+  And `shouldRunGdpr(projectRoot)` returns `false`
+
+- [ ] **Scenario: Both profiles active — both functions return true**
+  Given `regulatory_regime.active_profiles` contains both `gdpr` and `eu-ai-act-high-risk`
+  When both resolver functions are called
+  Then `shouldRunGdpr(projectRoot)` returns `true`
+  And `shouldRunEuAiAct(projectRoot)` returns `true`
+
+- [ ] **Scenario: Ride-along prompt on first dashboard open**
+  Given a project with `regulatory_regime.active_profiles: []`
+  When the dashboard renders for the first time
+  Then a non-blocking compliance-regime question is displayed (dashboard renders before and after)
+  And the question offers: `none`, `gdpr`, `eu-ai-act`, `both`
+  And selecting an option writes the relevant profile name(s) to `regulatory_regime.active_profiles` in `.ctoc/settings.yaml`
+
+- [ ] **Scenario: No re-prompt after profile is activated**
+  Given `regulatory_regime.active_profiles` contains `gdpr`
+  When the dashboard renders on any subsequent open
+  Then no compliance-regime prompt appears
+
+- [ ] **Scenario: gdpr.yaml profile file is valid and loadable**
+  Given `.ctoc/regulatory-regimes/gdpr.yaml` exists
+  When `loadProfile(projectRoot, 'gdpr')` is called
+  Then it returns an object with `name: "gdpr"`, `display_name`, `description`, `applies_to`, and `required_controls`
+  And `listAvailableProfiles(projectRoot)` includes `"gdpr"` in its returned array
+
+- [ ] **Scenario: Missing settings.yaml — no crash, both return false**
+  Given a project with no `.ctoc/settings.yaml` file
+  When `shouldRunGdpr(projectRoot)` is called
+  Then it returns `false` without throwing
+  And `shouldRunEuAiAct(projectRoot)` returns `false` without throwing
+
+- [ ] **Scenario: Unknown profile name in active_profiles — graceful degradation**
+  Given `regulatory_regime.active_profiles` contains `["unknown-regime"]`
+  When `shouldRunGdpr(projectRoot)` and `shouldRunEuAiAct(projectRoot)` are called
+  Then both return `false` (unknown profile does not activate either function)
+  And no exception is thrown (the existing regime system's loadProfile returns null for unknown profiles)
+
+- [ ] **Scenario: Gate invariant — activating compliance profiles cannot weaken gates**
+  Given `regulatory_regime.active_profiles` contains both `gdpr` and `eu-ai-act-high-risk`
   When gate transition logic in `src/hooks/human-gate-check.js` is evaluated
   Then `requireReviewGate` is unchanged
   And the gate count remains exactly 4 (Gate 0–3)
-  And `enforcementMode` is unaffected by the compliance setting
+  And `enforcementMode` is unaffected by the compliance profile settings
 
 ---
 
@@ -164,13 +162,10 @@ Without this slice, no compliance agent can gate correctly. The two downstream a
 
 ### In Scope
 
-- `compliance.mode` key added to `SETTINGS_SCHEMA` under the existing `general` tab (one setting; no new tab until EC2–EC6 introduce more compliance toggles).
-- Valid values: `gdpr | eu-ai-act | both | none`; default `none`.
-- Ride-along prompt in `src/commands/menu.js` mirroring the `general.environment` mechanism: asked once, non-blocking, never re-prompts.
-- Persistence to `.ctoc/settings.json` (canonical JSON store).
-- Mirror to `.ctoc/settings.yaml` as flat key `compliance_mode` (derived, JSON is canonical).
-- Resolver API exported from `src/lib/settings.js`: `getComplianceMode()`, `shouldRunGdpr()`, `shouldRunAiAct()`.
-- Unit test (`tests/compliance-mode.test.js`): full truth table for resolver, persistence round-trip, ride-along-no-re-prompt, invalid-value fallback, gate-invariant assertion.
+- `.ctoc/regulatory-regimes/gdpr.yaml` — new regime profile file for GDPR (Regulation (EU) 2016/679); modeled after `eu-ai-act-high-risk.yaml`; declares `name: gdpr`, `display_name`, `description`, `applies_to`, `authoritative_sources`, and `required_controls` (DSAR-relevant controls: `dsar_handler`, `retention_schedule`, `audit_hash_chain`).
+- `src/lib/compliance-regime.js` — new module exporting `shouldRunGdpr(projectRoot)` and `shouldRunEuAiAct(projectRoot)`, both delegating to `loadActiveProfiles()` from `src/lib/regulatory-regime.js`. No schema, no JSON store, no mirror write.
+- Ride-along prompt in `src/commands/menu.js`: asked once when `active_profiles` is empty, non-blocking, offers `none` / `gdpr` / `eu-ai-act` / `both`; writes the selected profile(s) to `regulatory_regime.active_profiles` in `.ctoc/settings.yaml`.
+- Unit test (`tests/compliance-mode.test.js`): full truth table for resolver functions, ride-along-no-re-prompt, missing-settings graceful degradation, unknown-profile graceful degradation, gate-invariant assertion.
 
 ### Out of Scope
 
@@ -178,9 +173,10 @@ Without this slice, no compliance agent can gate correctly. The two downstream a
 - EU AI Act agent implementation (EC3).
 - Recommendation layer / web search (EC4).
 - Iron Loop dispatch wiring (EC5).
-- A dedicated "Compliance" settings tab — deferred until there are ≥3 compliance-specific settings.
-- Any UI beyond the single ride-along question (a full compliance settings screen is a future enhancement).
-- Per-environment override of `compliance.mode` — regulatory regime is a legal fact, not a profile toggle; environment profiles (`dev/staging/prod`) do not override it.
+- Any `compliance.mode` key in any settings file — this design is replaced entirely by regime profiles.
+- Any `settings.json` mirror write — the canonical store is `settings.yaml` for regime data.
+- A dedicated "Compliance" tab in the dashboard.
+- Per-environment override of compliance profiles — regulatory regime is a legal fact, not a behavior profile.
 
 ---
 
@@ -188,22 +184,22 @@ Without this slice, no compliance agent can gate correctly. The two downstream a
 
 ### Technical Risks
 
-- **Schema migration for existing projects:** Projects that have `.ctoc/settings.json` without `compliance.mode` must receive `none` transparently on first read, with no crash or prompt loop.
-  - Likelihood: MEDIUM (common scenario — all existing projects lack the key)
-  - Impact: MEDIUM (broken dashboard on upgrade for existing projects)
-  - Mitigation: Implement getComplianceMode() with an explicit `?? 'none'` fallback and add a migration test fixture using a pre-existing settings.json without the key.
+- **YAML write to settings.yaml from the ride-along prompt:** The ride-along prompt must write to `.ctoc/settings.yaml`, which is the safety-critical flat store read by hooks. A malformed write could break hook parsing.
+  - Likelihood: LOW (the write is additive — appending to a list or updating `active_profiles`)
+  - Impact: HIGH (broken `settings.yaml` breaks hook enforcement)
+  - Mitigation: Write the update by reading the full file, modifying only the `active_profiles` line using a targeted string replacement (not a full YAML re-serialization), and verifying the file round-trips correctly in a post-write assertion. Add a test for the round-trip. Log write failure to `.ctoc/logs/enforcement.json`.
 
-- **YAML mirror drift:** If `settings.json` is updated but `settings.yaml` mirror write fails (e.g. file locked), hook/library code reads a stale value.
-  - Likelihood: LOW (file locking is rare; both files live in `.ctoc/`)
-  - Impact: HIGH (hook reads wrong mode, compliance agents run or don't run incorrectly)
-  - Mitigation: Wrap the YAML mirror write in a try-catch that logs to `.ctoc/logs/enforcement.json` and alerts the user; treat write failure as a WARNING-level finding (not silent).
+- **loadActiveProfiles path resolution:** `src/lib/regulatory-regime.js` reads from a relative path `'.ctoc/settings.yaml'`. The resolver functions must pass the correct `projectRoot` — callers that pass the wrong root silently return `false` rather than throwing.
+  - Likelihood: LOW (the existing system uses `projectRoot` consistently)
+  - Impact: MEDIUM (agents silently skip compliance checks thinking mode is none)
+  - Mitigation: Document the `projectRoot` parameter requirement explicitly in the `compliance-regime.js` JSDoc. Add a test that passes an explicitly wrong root and asserts the graceful false return, not a crash.
 
 ### Business Risks
 
-- **User confusion about which regime applies:** A project owner may not know whether their project is subject to GDPR, the EU AI Act, both, or neither.
-  - Likelihood: MEDIUM (EU compliance scope requires legal knowledge)
-  - Impact: LOW (choosing `none` is safe-by-default; they can update later)
-  - Mitigation: Include a one-line hint per option in the ride-along prompt (e.g. "`gdpr` — processes EU personal data; `eu-ai-act` — deploys AI systems in the EU market") so the choice is informed without requiring legal counsel at prompt time.
+- **User confusion about which profile to activate:** A project owner may not know whether their project is subject to GDPR, the EU AI Act, both, or neither.
+  - Likelihood: MEDIUM
+  - Impact: LOW (empty profiles is safe-by-default; they can update `settings.yaml` later)
+  - Mitigation: Include a one-line hint per option in the ride-along prompt (`gdpr` — processes EU personal data under Regulation (EU) 2016/679; `eu-ai-act` — deploys AI systems in the EU market under Regulation (EU) 2024/1689).
 
 ### Dependency Risks
 
@@ -217,15 +213,16 @@ Without this slice, no compliance agent can gate correctly. The two downstream a
 ## Priority
 
 **Priority: HIGH** (Score: 8/9)
-- Dependency: HIGH (3) — EC2, EC3, EC5, and EC6 all depend on this slice; nothing else in the program ships correctly without it.
-- Business Impact: HIGH (3) — enables the entire per-project compliance scoping vision; default `none` makes it backward-compatible for all existing projects.
-- Technical Risk: MEDIUM (2) — well-understood pattern (mirrors `general.environment`); main risk is schema migration for existing projects, which is straightforward to handle.
+- Dependency: HIGH (3) — EC2, EC3, EC5, and EC6 all call `shouldRunGdpr()` / `shouldRunEuAiAct()`; nothing else in the program ships correctly without it.
+- Business Impact: HIGH (3) — enables the entire per-project compliance scoping vision; empty `active_profiles` makes it backward-compatible for all existing projects.
+- Technical Risk: MEDIUM (2) — well-understood pattern (regime system already exists); main risk is the `settings.yaml` write, which is mitigated by targeted string replacement + round-trip test.
 
 ---
 
 ## Decisions Taken Under Ambiguity
 
-- **Where the setting lives.** Vision says "a new project setting — `compliance.mode`". `src/lib/settings.js` notes safety-critical hooks read `regulatory_regime` from the flat `.ctoc/settings.yaml`, while the menu-driven store is `.ctoc/settings.json`. Decision: store the menu-facing `compliance.mode` in `settings.json` (consistent with `general.environment`), and ALSO mirror it to the flat `compliance_mode` key in `settings.yaml` so non-YAML-library hook/library code can read it fast. The JSON value is canonical; the YAML mirror is derived. Rationale: keeps the two documented config sources coherent and avoids a YAML parser in hook paths.
-- **New `compliance` tab vs. `general` key.** Decision: add the key under the existing `general` tab (one setting, no need for a tab yet). Revisit if EC2–EC6 introduce more compliance toggles.
-- **Default value.** Decision: `none`, per vision ("default for non-EU/internal-only projects"). Backward-compatible — existing projects keep all-quiet behavior.
-- **Resolution rule.** Decision: explicit user setting > default (mirrors `general.environment`); no environment-profile override for this key, because a regulatory regime is a legal fact about the project, not a behavior profile.
+- **No `compliance.mode` key.** The adversarial review identified that inventing a `compliance.mode` setting alongside the existing `regulatory_regime.active_profiles` creates two sources of truth and a mirror-drift risk. Decision: remove `compliance.mode` entirely. The resolver functions are derived from `loadActiveProfiles()`. The ride-along question writes directly to `active_profiles`. One source of truth.
+- **New `src/lib/compliance-regime.js` module, not adding to `settings.js`.** Decision: add a thin compliance-specific module that wraps `loadActiveProfiles()` and exports `shouldRunGdpr()` and `shouldRunEuAiAct()`. This keeps the regulatory-regime system unchanged and adds a clear, testable API layer for compliance agents.
+- **Profile name for GDPR.** Decision: `gdpr` (plain, matches the convention of `eu-ai-act-high-risk`). The ride-along maps user-visible option `gdpr` → profile name `gdpr`; option `eu-ai-act` → profile name `eu-ai-act-high-risk` (the existing profile).
+- **`gdpr.yaml` required_controls.** Decision: include `dsar_handler`, `retention_schedule`, `audit_hash_chain` — the three controls most directly mandated by GDPR's operational obligations (DSAR workflow, data retention schedules, immutable audit trail for Art. 17/20/33 fulfilment). Additional GDPR controls can be added in a future profile revision as the skill matures.
+- **Default.** Empty `active_profiles` maps to `false` for both resolver functions. Backward-compatible for all existing projects. No migration needed.
