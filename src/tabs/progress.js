@@ -3,7 +3,6 @@
  * In-progress and finished items
  */
 
-const path = require('path');
 const { c, line, renderActionMenu, renderFooter } = require('../lib/tui');
 const { getAgentStatus, getFinishedItems, getSettings } = require('../lib/state');
 

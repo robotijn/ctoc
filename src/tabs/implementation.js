@@ -4,10 +4,9 @@
  */
 
 const path = require('path');
-const { c, line, renderList, renderActionMenu, renderFooter } = require('../lib/tui');
+const { c, renderList, renderActionMenu, renderFooter } = require('../lib/tui');
 const { readPlans, getPlansDir } = require('../lib/state');
-const { approvePlan, renamePlan, deletePlan } = require('../lib/actions');
-const { readStatus, getStatusIcon } = require('../lib/background');
+const { approvePlan } = require('../lib/actions');
 
 const ACTIONS = [
   { key: '1', label: 'View' },
@@ -112,11 +111,12 @@ function executeAction(actionKey, app) {
     case '2': // Plan
       app.mode = 'edit';
       return true;
-    case '3': // Approve → Iron Loop → Todo
-      const result = approvePlan(app.selectedPlan.path, app.projectPath);
+    case '3': { // Approve → Iron Loop → Todo
+      approvePlan(app.selectedPlan.path, app.projectPath);
       app.mode = 'list';
       app.message = `✓ ${app.selectedPlan.name} → Iron Loop applied → todo queue`;
       return true;
+    }
     case '4': // Rename
       app.mode = 'rename';
       app.inputValue = app.selectedPlan.name;

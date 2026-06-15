@@ -28,7 +28,7 @@ const { AutoFixer, RISK_LEVELS } = require('../lib/auto-fixer');
  * @param {boolean} options.fix - Apply fixes
  * @param {boolean} options.dryRun - Dry run for fixes
  * @param {string} options.riskLevel - Max risk level for fixes
- * @returns {Object} Command result
+ * @returns {Promise<Object>} Command result
  */
 async function execute(options) {
   const {
@@ -73,7 +73,7 @@ async function execute(options) {
  * Full detection and analysis
  * @param {string} projectRoot - Project root
  * @param {Object} options - Options
- * @returns {Object} Full analysis
+ * @returns {Promise<Object>} Full analysis
  */
 async function detectFull(projectRoot, options = {}) {
   const analyzer = new ProjectAnalyzer(projectRoot);
@@ -104,7 +104,7 @@ async function detectFull(projectRoot, options = {}) {
  * Quality score detection only
  * @param {string} projectRoot - Project root
  * @param {Object} options - Options
- * @returns {Object} Quality analysis
+ * @returns {Promise<Object>} Quality analysis
  */
 async function detectQuality(projectRoot, options = {}) {
   const analyzer = new ProjectAnalyzer(projectRoot);
@@ -135,7 +135,7 @@ async function detectQuality(projectRoot, options = {}) {
  * Mode suggestion only
  * @param {string} projectRoot - Project root
  * @param {Object} options - Options
- * @returns {Object} Mode suggestion
+ * @returns {Promise<Object>} Mode suggestion
  */
 async function detectMode(projectRoot, options = {}) {
   const analyzer = new ProjectAnalyzer(projectRoot);
@@ -164,7 +164,7 @@ async function detectMode(projectRoot, options = {}) {
  * Upgrade roadmap generation
  * @param {string} projectRoot - Project root
  * @param {Object} options - Options
- * @returns {Object} Upgrade plan
+ * @returns {Promise<Object>} Upgrade plan
  */
 async function detectUpgrade(projectRoot, options = {}) {
   const analyzer = new ProjectAnalyzer(projectRoot);
@@ -199,7 +199,7 @@ async function detectUpgrade(projectRoot, options = {}) {
  * Auto-fix detection and application
  * @param {string} projectRoot - Project root
  * @param {Object} options - Options
- * @returns {Object} Fix results
+ * @returns {Promise<Object>} Fix results
  */
 async function detectFix(projectRoot, options = {}) {
   const fixer = new AutoFixer(projectRoot);

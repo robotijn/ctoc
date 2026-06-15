@@ -105,7 +105,7 @@ function testFrameworkPatternsStructure() {
   assert.ok(frameworks.length >= 15, 'At least 15 frameworks defined');
 
   for (const [framework, config] of Object.entries(FRAMEWORK_PATTERNS)) {
-    assert.ok(config.hasOwnProperty('language'), `${framework} has language property`);
+    assert.ok(Object.prototype.hasOwnProperty.call(config, 'language'), `${framework} has language property`);
     assert.ok(config.files || config.deps, `${framework} has files or deps`);
   }
   console.log('# FRAMEWORK_PATTERNS - structure validation');
@@ -416,12 +416,12 @@ function testDetectStackStructure() {
 
   const stack = detectStack(tempDir);
 
-  assert.ok(stack.hasOwnProperty('project'), 'Has project property');
-  assert.ok(stack.hasOwnProperty('languages'), 'Has languages property');
-  assert.ok(stack.hasOwnProperty('frameworks'), 'Has frameworks property');
-  assert.ok(stack.hasOwnProperty('primary'), 'Has primary property');
-  assert.ok(stack.primary.hasOwnProperty('language'), 'Has primary.language');
-  assert.ok(stack.primary.hasOwnProperty('framework'), 'Has primary.framework');
+  assert.ok(Object.prototype.hasOwnProperty.call(stack, 'project'), 'Has project property');
+  assert.ok(Object.prototype.hasOwnProperty.call(stack, 'languages'), 'Has languages property');
+  assert.ok(Object.prototype.hasOwnProperty.call(stack, 'frameworks'), 'Has frameworks property');
+  assert.ok(Object.prototype.hasOwnProperty.call(stack, 'primary'), 'Has primary property');
+  assert.ok(Object.prototype.hasOwnProperty.call(stack.primary, 'language'), 'Has primary.language');
+  assert.ok(Object.prototype.hasOwnProperty.call(stack.primary, 'framework'), 'Has primary.framework');
 
   cleanupTempDir();
   console.log('# detectStack - return structure');
@@ -474,7 +474,7 @@ function testDetectStackDefaultsToCurrentDir() {
   // We can't easily test process.cwd() behavior without changing dir
   const stack = detectStack();
 
-  assert.ok(stack.hasOwnProperty('project'), 'Works with no arguments');
+  assert.ok(Object.prototype.hasOwnProperty.call(stack, 'project'), 'Works with no arguments');
   assert.ok(stack.project, 'Project is set to some path');
 
   console.log('# detectStack - defaults to current directory');

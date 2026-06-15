@@ -5,8 +5,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { c, line, renderList, renderActionMenu, renderFooter } = require('../lib/tui');
-const { readPlans, getPlansDir, timeAgo } = require('../lib/state');
+const { c, renderActionMenu, renderFooter } = require('../lib/tui');
+const { getPlansDir, timeAgo } = require('../lib/state');
 
 const ACTIONS = [
   { key: '1', label: 'Continue' },

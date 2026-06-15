@@ -116,7 +116,7 @@ function saveSettings(settings) {
     try {
       const content = fs.readFileSync(settingsPath, 'utf8');
       existing = parseSimpleYaml(content);
-    } catch {}
+    } catch { /* ignore: best-effort, non-fatal */ }
   }
 
   // Merge CI settings

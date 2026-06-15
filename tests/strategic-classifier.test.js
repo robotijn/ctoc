@@ -4,7 +4,7 @@
  */
 
 const assert = require('assert');
-const { test, describe, beforeEach, afterEach } = require('node:test');
+const { test, describe, beforeEach } = require('node:test');
 
 // Module will be loaded after it's created
 let strategicClassifier;

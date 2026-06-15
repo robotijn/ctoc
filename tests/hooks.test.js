@@ -5,19 +5,15 @@
  * Run with: node --test tests/hooks.test.js
  */
 
-const { describe, it, beforeEach, afterEach, mock } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
-const fs = require('fs');
-const os = require('os');
 
 // ============================================================================
 // SHARED TEST FIXTURES
 // ============================================================================
 
 const TEST_PROJECT_PATH = '/home/tijn/ctoc-build/ctoc-public';
-const CTOC_HOME = path.join(os.homedir(), '.ctoc');
-const STATE_DIR = path.join(CTOC_HOME, 'state');
 
 /**
  * Create a mock state object for testing
@@ -406,7 +402,7 @@ describe('PreToolUse.Edit/Write - Whitelist Logic', () => {
 
 describe('SessionStart - Stack Detection', () => {
   // Import real stack detector
-  const { detectStack, detectLanguages, detectFrameworks, LANGUAGE_PATTERNS } = require('../src/lib/stack-detector');
+  const { detectStack, detectLanguages, LANGUAGE_PATTERNS } = require('../src/lib/stack-detector');
 
   describe('Language Detection Logic', () => {
     it('returns array for any directory', () => {
@@ -968,7 +964,6 @@ describe('Integration Scenarios', () => {
         feature: 'new-feature',
         currentStep: 3
       });
-      const filePath = 'src/index.js';
 
       // Check whitelist
       const isWhitelisted = false; // src/index.js is not whitelisted
@@ -978,10 +973,6 @@ describe('Integration Scenarios', () => {
     });
 
     it('should allow Edit on .ctoc files at step 3', () => {
-      const state = createMockState({
-        feature: 'new-feature',
-        currentStep: 3
-      });
       const filePath = '.ctoc/settings.yaml';
 
       // Check whitelist

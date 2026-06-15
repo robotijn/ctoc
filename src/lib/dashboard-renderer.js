@@ -10,8 +10,7 @@
  * - Sparkline history charts
  */
 
-const { getWidth, c } = require('./tui');
-const { GRADES } = require('./quality-scorer');
+const { getWidth } = require('./tui');
 
 /**
  * ANSI color codes for dashboard
@@ -423,9 +422,6 @@ class DashboardRenderer {
    */
   renderFooter() {
     const width = this.options.width;
-    const timestamp = new Date(this.data.timestamp).toLocaleString();
-    const footer = `Generated: ${timestamp}`;
-    const padding = Math.floor((width - 4 - footer.length) / 2);
 
     const lines = [];
     lines.push(this.color('cyan', box.bottomLeft + box.horizontal.repeat(width - 2) + box.bottomRight));

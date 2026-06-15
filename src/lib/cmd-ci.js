@@ -15,12 +15,10 @@
  * @module commands/ci
  */
 
-const path = require('path');
 const {
   runLocalCI,
   runQuickCheck,
   runFullCheck,
-  willCIPass,
   getChecks,
   runCheckType,
   CI_STATUS
@@ -30,17 +28,9 @@ const { parseCIConfig, CHECK_TYPES } = require('../lib/ci-parser');
 // Runner modules
 const {
   formatDecisionMenu,
-  formatPublicRepoWarning,
   getRepoInfo,
-  isRepoPublic,
-  getLatestRunnerVersion,
-  downloadRunner,
-  configureRunner,
-  installService,
   getServiceStatus,
-  uninstallRunner,
-  formatSuccess,
-  hasTTY
+  uninstallRunner
 } = require('../lib/runner-setup');
 
 const {
@@ -52,7 +42,6 @@ const {
 const {
   getRunnerPreference,
   setRunnerPreference,
-  markSelfHostedConfigured,
   hasAskedPreference
 } = require('../lib/runner-settings');
 

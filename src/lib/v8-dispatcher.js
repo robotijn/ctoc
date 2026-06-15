@@ -178,7 +178,7 @@ function beginDispatch(opts) {
   fs.writeFileSync(auditPath, yamlStringify(entry));
 
   // 2. Record dispatch in session usage
-  try { budget.recordDispatch(req.target_agent); } catch {}
+  try { budget.recordDispatch(req.target_agent); } catch { /* ignore: best-effort, non-fatal */ }
 
   return { id: req.id, auditPath, request: req };
 }

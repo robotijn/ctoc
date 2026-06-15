@@ -82,7 +82,7 @@ if (!fs.existsSync(planPath)) {
 }
 
 try {
-  const newPath = movePlan(planPath, destination, root);
+  movePlan(planPath, destination, root);
   console.log(`Moved ${ref} -> ${destination}/`);
 } catch (err) {
   console.error(`Failed to move plan: ${err.message}`);

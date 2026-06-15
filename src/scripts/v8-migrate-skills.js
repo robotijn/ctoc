@@ -118,7 +118,6 @@ function migrate(skillPath) {
   }
 
   // Insert v8 fields before the closing --- of frontmatter
-  const fmEnd = '\n---';
   const newFm = fm.raw + v8Block;
   const newContent = content.replace(/^---\n[\s\S]*?\n---/, `---\n${newFm}\n---`);
 

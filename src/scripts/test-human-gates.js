@@ -17,7 +17,7 @@ function ensureDir(dir) {
 }
 
 function cleanup(filePath) {
-  try { fs.unlinkSync(filePath); } catch {}
+  try { fs.unlinkSync(filePath); } catch { /* ignore: best-effort, non-fatal */ }
 }
 
 function test(name, fn) {

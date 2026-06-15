@@ -698,7 +698,6 @@ class UpgradePlanner {
   defineMilestones() {
     const milestones = [];
     const targetCoverage = this.toMode === 'strictest' ? 90 : 80;
-    const currentCoverage = this.analysis.currentQuality?.scores?.actualCoverage || 0;
 
     milestones.push({
       name: 'Foundation Complete',

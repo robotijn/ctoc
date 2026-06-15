@@ -12,8 +12,8 @@
 const fs = require('fs');
 const path = require('path');
 const { SASTRunner, SEVERITY: SAST_SEVERITY } = require('../lib/sast-runner');
-const { DependencyAuditor, SEVERITY: DEP_SEVERITY } = require('../lib/dependency-auditor');
-const { SecretsScanner, SECRET_TYPES } = require('../lib/secrets-scanner');
+const { DependencyAuditor } = require('../lib/dependency-auditor');
+const { SecretsScanner } = require('../lib/secrets-scanner');
 const { QualityGate, GATE_STATUS } = require('../lib/quality-gate');
 
 /**
@@ -28,7 +28,7 @@ const { QualityGate, GATE_STATUS } = require('../lib/quality-gate');
  * @param {string} options.format - Report format (text, json, markdown)
  * @param {boolean} options.auto - Auto-fix where possible
  * @param {string} options.projectRoot - Project root directory
- * @returns {Object} Command result
+ * @returns {Promise<Object>} Command result
  */
 async function execute(options) {
   const {
@@ -68,7 +68,7 @@ async function execute(options) {
  * Run comprehensive security scan
  * @param {string} projectRoot - Project root path
  * @param {Object} options - Scan options
- * @returns {Object} Scan results
+ * @returns {Promise<Object>} Scan results
  */
 async function runSecurityScan(projectRoot, options) {
   const { sast, deps, secrets, all } = options;
@@ -188,7 +188,7 @@ async function runSecurityScan(projectRoot, options) {
  * Generate security report in specified format
  * @param {string} projectRoot - Project root path
  * @param {string} format - Output format
- * @returns {Object} Report result
+ * @returns {Promise<Object>} Report result
  */
 async function generateSecurityReport(projectRoot, format) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'latest-scan.json');
@@ -362,7 +362,7 @@ function generateMarkdownReport(results) {
  * Check security gate thresholds
  * @param {string} projectRoot - Project root path
  * @param {string} mode - Quality mode
- * @returns {Object} Gate result
+ * @returns {Promise<Object>} Gate result
  */
 async function checkSecurityGate(projectRoot, mode) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'latest-scan.json');
@@ -445,7 +445,7 @@ async function checkSecurityGate(projectRoot, mode) {
  * Suggest fixes for security issues
  * @param {string} projectRoot - Project root path
  * @param {boolean} auto - Auto-fix where possible
- * @returns {Object} Fix suggestions
+ * @returns {Promise<Object>} Fix suggestions
  */
 async function suggestFixes(projectRoot, auto) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'latest-scan.json');

@@ -298,7 +298,10 @@ class StagedFiles {
       if (!safeFileExists(fullPath, this.repoRoot)) return false;
 
       try {
-        const content = fs.readFileSync(fullPath, 'utf8', { length: 100 });
+        // readFileSync takes no length option; the previous { length: 100 }
+        // third argument was silently ignored by Node and is removed here.
+        // Behavior is otherwise unchanged: detect a shell shebang.
+        const content = fs.readFileSync(fullPath, 'utf8');
         return content.startsWith('#!') && content.includes('sh');
       } catch {
         return false;

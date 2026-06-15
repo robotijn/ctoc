@@ -21,15 +21,6 @@ function readFM(filePath) {
   return { fm: m ? m[1] : '', body: content };
 }
 
-function hasField(fm, name) {
-  return new RegExp(`^${name}:\\s`, 'm').test(fm);
-}
-
-function getField(fm, name) {
-  const m = fm.match(new RegExp(`^${name}:\\s*(.+)$`, 'm'));
-  return m ? m[1].trim() : null;
-}
-
 function walkSkillFiles(dir, opts = {}) {
   const out = [];
   const { excludeCategories = new Set() } = opts;

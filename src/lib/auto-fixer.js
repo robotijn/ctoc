@@ -27,7 +27,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync, spawnSync } = require('child_process');
+const { execSync } = require('child_process');
 
 /**
  * Risk levels for fixes
@@ -172,7 +172,6 @@ const AVAILABLE_FIXES = {
       return pkg && (!pkg.scripts?.test || pkg.scripts.test.includes('no test specified'));
     },
     fixer: async (project, options) => {
-      const pkg = readPackageJson(project);
       const testFramework = detectTestFramework(project);
       const testCommand = testFramework === 'vitest' ? 'vitest' :
                          testFramework === 'jest' ? 'jest' :
@@ -348,7 +347,7 @@ class AutoFixer {
   detectAvailableFixes() {
     const available = [];
 
-    for (const [key, fix] of Object.entries(AVAILABLE_FIXES)) {
+    for (const [_key, fix] of Object.entries(AVAILABLE_FIXES)) {
       try {
         if (fix.detector(this.projectPath)) {
           available.push({
@@ -372,7 +371,7 @@ class AutoFixer {
    * @param {Object} options - Fix options
    * @param {boolean} options.dryRun - If true, don't make changes
    * @param {boolean} options.createCheckpoint - If true, create git checkpoint
-   * @returns {Object} Fix results
+   * @returns {Promise<Object>} Fix results
    */
   async runSafeFixes(options = {}) {
     const safeFixes = this.detectAvailableFixes()
@@ -385,7 +384,7 @@ class AutoFixer {
    * Run all auto-fixes up to a risk level
    * @param {string} maxRisk - Maximum risk level to include
    * @param {Object} options - Fix options
-   * @returns {Object} Fix results
+   * @returns {Promise<Object>} Fix results
    */
   async runFixesUpToRisk(maxRisk, options = {}) {
     const riskOrder = [RISK_LEVELS.safe, RISK_LEVELS.low, RISK_LEVELS.medium, RISK_LEVELS.high];
@@ -401,7 +400,7 @@ class AutoFixer {
    * Run specific fixes
    * @param {Array} fixIds - Fix IDs to run
    * @param {Object} options - Fix options
-   * @returns {Object} Fix results
+   * @returns {Promise<Object>} Fix results
    */
   async runFixes(fixIds, options = {}) {
     const { dryRun = false, createCheckpoint = true } = options;
@@ -609,7 +608,7 @@ function readPackageJson(projectPath) {
     if (fs.existsSync(pkgPath)) {
       return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
     }
-  } catch (e) {}
+  } catch (e) { /* ignore: malformed or unreadable package.json, treat as absent */ }
   return null;
 }
 

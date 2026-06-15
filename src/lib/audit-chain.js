@@ -32,7 +32,6 @@ const path = require('path');
 const crypto = require('crypto');
 
 const AUDIT_ROOT = '.ctoc/audit';
-const DISPATCHES_DIR = path.join(AUDIT_ROOT, 'dispatches');
 const CHAIN_HEAD_PATH = path.join(AUDIT_ROOT, 'chain-head.yaml');
 const CHAIN_LOG_PATH = path.join(AUDIT_ROOT, 'chain.jsonl');
 const GENESIS_HASH = '0'.repeat(64);

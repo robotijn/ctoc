@@ -53,12 +53,6 @@ const ALWAYS_ALLOWED = [
   /^\s*echo\s+[^>]+$/
 ];
 
-/**
- * Git commit pattern (kept for reference / simple single-segment cases).
- * NOTE: the anchored form alone is bypassable (see isCommitCommand below).
- */
-const GIT_COMMIT_PATTERN = /^\s*git\s+(commit|push)/;
-
 // git global flags that take a separate argument (so the next token is the
 // flag's value, not the subcommand). Used to find the real subcommand.
 const GIT_VALUE_FLAGS = new Set(['-c', '-C', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--super-prefix']);

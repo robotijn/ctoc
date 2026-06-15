@@ -5,7 +5,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { signState, verifyState, hashPath, CTOC_HOME } = require('./crypto');
 
 const STATE_DIR = path.join(CTOC_HOME, 'state');

@@ -16,7 +16,7 @@
  * Cross-platform: all paths via path.join; process.execPath spawns Node.
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -72,7 +72,7 @@ function makeProject({ ctoc = true, strict = true } = {}) {
 }
 
 function cleanup(dir) {
-  if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+  if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ } }
 }
 
 /**

@@ -2,7 +2,7 @@
  * Tests for src/lib/budget.js — session-level build budget enforcement.
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -36,7 +36,7 @@ function setupTempProject(yamlOverride) {
 function teardownTempProject() {
   delete process.env.CTOC_SESSION_ID;
   process.chdir(originalCwd);
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore: best-effort temp cleanup, non-fatal */ }
 }
 
 describe('budget — loadBudget', () => {

@@ -24,7 +24,7 @@ function tempProject() {
   fs.mkdirSync(path.join(dir, 'skills', 'quality', 'code-reviewer'), { recursive: true });
   return dir;
 }
-function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ } }
 
 function writeRedirectStub(root, agentPath, targetSkill) {
   const full = path.join(root, 'agents', agentPath);

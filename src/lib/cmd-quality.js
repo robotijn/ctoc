@@ -15,7 +15,7 @@ const path = require('path');
 const { QualityConfig, MODES, LANGUAGES } = require('../lib/quality-config');
 const { CoverageChecker } = require('../lib/coverage-checker');
 const { ArchitectureDetector } = require('../lib/architecture-detector');
-const { QualityScorer, GRADES, WEIGHTS } = require('../lib/quality-scorer');
+const { QualityScorer } = require('../lib/quality-scorer');
 const { QualityReporter, FORMATS } = require('../lib/quality-reporter');
 const { DashboardRenderer } = require('../lib/dashboard-renderer');
 const qualityState = require('../lib/quality-state');
@@ -29,7 +29,7 @@ const qualityState = require('../lib/quality-state');
  * @param {string} options.format - Report format (json, html, md)
  * @param {string} options.output - Output file path
  * @param {string} options.projectRoot - Project root directory
- * @returns {Object} Command result
+ * @returns {Promise<Object>} Command result
  */
 async function execute(options) {
   const {
@@ -75,7 +75,7 @@ async function execute(options) {
  * @param {QualityConfig} config - Quality config instance
  * @param {string} mode - Quality mode
  * @param {string} lang - Target language (optional, auto-detected if not provided)
- * @returns {Object} Initialization result
+ * @returns {Promise<Object>} Initialization result
  */
 async function initQuality(config, mode, lang) {
   // Validate mode
@@ -139,7 +139,7 @@ async function initQuality(config, mode, lang) {
  * @param {QualityConfig} config - Quality config instance
  * @param {string} mode - Quality mode
  * @param {string} projectRoot - Project root path
- * @returns {Object} Quality check result
+ * @returns {Promise<Object>} Quality check result
  */
 async function runQualityCheck(config, mode, projectRoot) {
   const languages = config.detectLanguages();
@@ -217,7 +217,7 @@ async function runQualityCheck(config, mode, projectRoot) {
  * Show interactive quality dashboard
  * @param {string} projectRoot - Project root path
  * @param {string} mode - Quality mode
- * @returns {Object} Dashboard result
+ * @returns {Promise<Object>} Dashboard result
  */
 async function showDashboard(projectRoot, mode) {
   const scorer = new QualityScorer(projectRoot, { mode });
@@ -245,7 +245,7 @@ async function showDashboard(projectRoot, mode) {
  * @param {string} mode - Quality mode
  * @param {string} format - Output format
  * @param {string} output - Output file path (optional)
- * @returns {Object} Report result
+ * @returns {Promise<Object>} Report result
  */
 async function generateReport(projectRoot, mode, format, output) {
   // Validate format
@@ -305,7 +305,7 @@ async function generateReport(projectRoot, mode, format, output) {
 /**
  * Show quality score trend over time
  * @param {string} projectRoot - Project root path
- * @returns {Object} Trend result
+ * @returns {Promise<Object>} Trend result
  */
 async function showTrend(projectRoot) {
   const scorer = new QualityScorer(projectRoot);
@@ -505,60 +505,6 @@ function generateCheckMessage(checks, scoreData, compactSummary) {
     for (const rec of scoreData.recommendations.slice(0, 3)) {
       lines.push(`  [${rec.priority}] ${rec.category}: ${rec.message}`);
     }
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Generate legacy dashboard message (for backward compatibility)
- * @param {Object} metrics - Quality metrics
- * @returns {string} Formatted message
- * @deprecated Use showDashboard instead
- */
-function generateDashboardMessage(metrics) {
-  const lines = [];
-  lines.push('Quality Dashboard');
-  lines.push('=================');
-  lines.push('');
-  lines.push(`Overall Score: ${metrics.score}/100`);
-  lines.push('');
-
-  // Score bar
-  const filled = Math.round(metrics.score / 5);
-  const empty = 20 - filled;
-  const bar = '[' + '='.repeat(filled) + '-'.repeat(empty) + ']';
-  lines.push(bar);
-  lines.push('');
-
-  // Languages
-  lines.push(`Languages: ${metrics.languages.join(', ') || 'none detected'}`);
-  lines.push('');
-
-  // Coverage
-  if (metrics.coverage) {
-    lines.push('Coverage:');
-    lines.push(`  Lines: ${metrics.coverage.coverage?.lines || 0}%`);
-    lines.push(`  Branches: ${metrics.coverage.coverage?.branches || 0}%`);
-    lines.push(`  Functions: ${metrics.coverage.coverage?.functions || 0}%`);
-    lines.push(`  Status: ${metrics.coverage.pass ? 'PASS' : 'FAIL'}`);
-  } else {
-    lines.push('Coverage: No coverage report found');
-  }
-  lines.push('');
-
-  // Architecture
-  lines.push(`Architecture: ${metrics.architecture.pattern}`);
-  lines.push(`  Violations: ${metrics.architecture.violations}`);
-  lines.push(`  Circular deps: ${metrics.architecture.cycles}`);
-  lines.push('');
-
-  // Suggestions
-  if (metrics.architecture.suggestions.length > 0) {
-    lines.push('Suggestions:');
-    metrics.architecture.suggestions.forEach(s => {
-      lines.push(`  - ${s.message}`);
-    });
   }
 
   return lines.join('\n');

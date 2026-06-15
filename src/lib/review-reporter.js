@@ -3,8 +3,6 @@
  * Generates combined review reports from Code Reviewer and CTO Chief
  */
 
-const { resolveDisagreement } = require('./consensus-resolver.js');
-
 // Verdict constants
 const VERDICT = {
   APPROVE: 'APPROVE',

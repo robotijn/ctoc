@@ -10,7 +10,7 @@
  * - SpotBugs with FindSecBugs (Java)
  */
 
-const { execSync, spawnSync } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -180,7 +180,7 @@ class SASTRunner {
 
   /**
    * Run SAST scan on the project
-   * @returns {Object} Scan results
+   * @returns {Promise<Object>} Scan results
    */
   async run() {
     const startTime = Date.now();

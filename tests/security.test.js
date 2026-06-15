@@ -3,7 +3,7 @@
  * Tests for SAST runner, dependency auditor, secrets scanner, and quality gate
  */
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it, after } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');

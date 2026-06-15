@@ -3,8 +3,7 @@
  */
 
 const assert = require('assert');
-const path = require('path');
-const { test, mock, describe, beforeEach, afterEach } = require('node:test');
+const { test, describe, beforeEach, afterEach } = require('node:test');
 
 // We need to mock modules before requiring sync.js
 // Using Node.js test runner's mocking capabilities
@@ -13,7 +12,6 @@ describe('Sync Manager Tests', () => {
   let syncModule;
   let mockExecSync;
   let mockGetSetting;
-  let mockFs;
   let execSyncCalls;
   let settingsStore;
   let fileSystem;
@@ -148,9 +146,7 @@ describe('Sync Manager Tests', () => {
     const childProcess = require('child_process');
     const originalExecSync = childProcess.execSync;
 
-    let callCount = 0;
     childProcess.execSync = (cmd, opts) => {
-      callCount++;
       if (cmd.includes('git status --porcelain')) {
         return 'M plans/test-plan.md';
       }
@@ -633,6 +629,7 @@ const syncModuleFresh = (() => {
 })();
 
 describe('Event-Triggered Sync Tests', () => {
+  let syncModule;
   let mockExecSync;
   let mockGetSetting;
   let execSyncCalls;
@@ -763,7 +760,7 @@ describe('Event-Triggered Sync Tests', () => {
       delete require.cache[require.resolve('../src/lib/sync.js')];
       syncModule = require('../src/lib/sync.js');
 
-      const result = syncModule.checkRemoteChanges('/test/project');
+      syncModule.checkRemoteChanges('/test/project');
 
       // Verify fetch was called
       const fetchCall = execSyncCalls.find(c => c.cmd.includes('git fetch'));

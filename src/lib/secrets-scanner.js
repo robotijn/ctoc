@@ -172,7 +172,7 @@ const SECRET_PATTERNS = [
   // Generic Secrets
   {
     type: 'GENERIC_SECRET',
-    pattern: /(?:secret|api[_-]?key|token|auth)\s*[:=]\s*['"]([A-Za-z0-9_\-]{20,})['"](?!\s*\.env|\s*process)/gi,
+    pattern: /(?:secret|api[_-]?key|token|auth)\s*[:=]\s*['"]([A-Za-z0-9_-]{20,})['"](?!\s*\.env|\s*process)/gi,
     description: 'Generic Secret/API Key'
   }
 ];
@@ -476,7 +476,7 @@ class SecretsScanner {
     const findings = [];
 
     // Pattern for potential secrets in assignments
-    const assignmentPattern = /(?:secret|key|token|password|credential|auth)['"]?\s*[:=]\s*['"]([A-Za-z0-9+/=_\-]{20,})['"](?!\s*\+)/gi;
+    const assignmentPattern = /(?:secret|key|token|password|credential|auth)['"]?\s*[:=]\s*['"]([A-Za-z0-9+/=_-]{20,})['"](?!\s*\+)/gi;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -529,7 +529,7 @@ class SecretsScanner {
 
   /**
    * Run the secrets scan
-   * @returns {Object} Scan results
+   * @returns {Promise<Object>} Scan results
    */
   async run() {
     const startTime = Date.now();
@@ -564,7 +564,7 @@ class SecretsScanner {
 
   /**
    * Run scan using external tools (TruffleHog, detect-secrets)
-   * @returns {Object} Scan results
+   * @returns {Promise<Object>} Scan results
    */
   async runWithExternalTools() {
     const results = await this.run();
@@ -618,7 +618,7 @@ class SecretsScanner {
 
   /**
    * Run TruffleHog scanner
-   * @returns {Array} TruffleHog findings
+   * @returns {Promise<Array>} TruffleHog findings
    */
   async runTruffleHog() {
     const findings = [];
@@ -660,7 +660,7 @@ class SecretsScanner {
 
   /**
    * Run detect-secrets scanner
-   * @returns {Array} detect-secrets findings
+   * @returns {Promise<Array>} detect-secrets findings
    */
   async runDetectSecrets() {
     const findings = [];

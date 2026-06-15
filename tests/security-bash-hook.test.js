@@ -50,10 +50,6 @@ const REPO = path.resolve(__dirname, '..');
 const HOOK = path.join(REPO, 'src', 'hooks', 'PreToolUse.Bash.js');
 const stateManager = require(path.join(REPO, 'src', 'lib', 'state-manager'));
 
-// Step thresholds (mirrors the hook constants; asserted via behavior below).
-const MINIMUM_STEP_FOR_WRITE = 8;
-const MINIMUM_STEP_FOR_COMMIT = 15;
-
 // --- hermetic project + signed-state harness -------------------------------
 
 let project;

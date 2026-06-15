@@ -105,7 +105,7 @@ function renderPaginationControls(paginationState, options = {}) {
 
 // Render a list with selection
 function renderList(items, selectedIndex, options = {}) {
-  const { showNumbers = true, prefix = '', emptyMessage = 'No items.', page = 0, pageSize = 9, showStatus = true } = options;
+  const { showNumbers = true, prefix: _prefix = '', emptyMessage = 'No items.', page = 0, pageSize = 9, showStatus = true } = options;
 
   if (items.length === 0) {
     return `${c.dim}${emptyMessage}${c.reset}\n`;
@@ -165,11 +165,9 @@ function renderActionMenu(title, actions, selectedIndex = 0) {
   output += `${c.bold}${title}${c.reset}\n`;
   output += line() + '\n\n';
 
-  let hasDanger = false;
   actions.forEach((action, i) => {
     if (action.separator) {
       output += line() + '\n';
-      hasDanger = true;
       return;
     }
 

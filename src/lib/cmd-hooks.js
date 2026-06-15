@@ -25,7 +25,6 @@
 const fs = require('fs');
 const path = require('path');
 const { HooksInstaller, SYSTEMS, HOOK_TYPES } = require('../lib/hooks-installer');
-const { StagedFiles } = require('../lib/staged-files');
 const { detectStack } = require('../lib/stack-detector');
 
 // ==============================================================================

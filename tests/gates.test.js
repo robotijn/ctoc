@@ -80,7 +80,6 @@ Version: ${changes.version}`;
 
 // Test destructive summary formatting
 function testDestructiveSummaryFormat() {
-  const action = 'Delete all files';
   const target = '/home/user/project';
 
   const summary = `This will affect: ${target}`;
@@ -166,12 +165,6 @@ function testChoiceParsingInvalid() {
 
 // Test choice parsing - boundary conditions
 function testChoiceParsingBoundary() {
-  const choices = [
-    { label: 'First' },
-    { label: 'Second' },
-    { label: 'Third' }
-  ];
-
   // Test first option
   let answer = '1';
   let choice = parseInt(answer, 10) - 1;

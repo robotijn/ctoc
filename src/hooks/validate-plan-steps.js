@@ -16,7 +16,6 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 
 /**
  * Canonical step labels - these are MANDATORY and must NOT be changed.

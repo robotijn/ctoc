@@ -149,7 +149,7 @@ RATIONALE: {detailed reasoning}`;
  * @returns {Promise<ExplorationResult>}
  */
 async function deepExplore(params) {
-  const { question, options, skipLLM = false, context = {} } = params;
+  const { question, options, skipLLM = false, context: _context = {} } = params;
 
   // If skipping LLM (for testing), return mock data
   if (skipLLM) {
@@ -170,8 +170,7 @@ async function deepExplore(params) {
   }
 
   // In real implementation, would call LLM here
-  // Generate the prompt for potential LLM call
-  const prompt = generateExplorationPrompt(question, options, context);
+  // (generateExplorationPrompt is exported for callers that wire up an LLM)
 
   // For now, return structured mock response
   const analyzedOptions = options.map((opt, i) => ({

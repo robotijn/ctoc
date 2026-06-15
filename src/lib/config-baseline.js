@@ -91,7 +91,7 @@ function writeBaseline(projectRoot, opts = {}) {
   let packageJson = null;
   const pkgPath = path.join(projectRoot, 'package.json');
   if (fs.existsSync(pkgPath)) {
-    try { packageJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); } catch {}
+    try { packageJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); } catch { /* ignore: best-effort, non-fatal */ }
   }
   const dependencies = packageJson && packageJson.dependencies ? packageJson.dependencies : {};
   const devDependencies = packageJson && packageJson.devDependencies ? packageJson.devDependencies : {};

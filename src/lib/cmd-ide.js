@@ -18,7 +18,6 @@ const {
   mergeConfigs,
   IDE_TYPES,
   getTemplatesForIDE,
-  getTemplatesDir,
 } = require('../lib/ide-config');
 
 // Colors for terminal output

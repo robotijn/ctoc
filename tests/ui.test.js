@@ -2,7 +2,7 @@
  * Unit tests for CTOC UI Library
  */
 
-const { describe, it, beforeEach, mock } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
 // Mock state-manager before requiring ui

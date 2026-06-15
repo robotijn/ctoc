@@ -4,10 +4,9 @@
  */
 
 const path = require('path');
-const { c, line, renderList, renderActionMenu, renderConfirm, renderFooter } = require('../lib/tui');
+const { c, renderList, renderActionMenu, renderConfirm, renderFooter } = require('../lib/tui');
 const { readPlans, getPlansDir } = require('../lib/state');
-const { approvePlan, renamePlan, deletePlan, assignDirectly, initResearchAgent } = require('../lib/actions');
-const { readStatus, getStatusIcon } = require('../lib/background');
+const { approvePlan, assignDirectly } = require('../lib/actions');
 
 const ACTIONS = [
   { key: '1', label: 'View' },
@@ -158,7 +157,7 @@ function executeAction(actionKey, app) {
     case '2': // Plan
       app.mode = 'edit';
       return true;
-    case '3': // Approve
+    case '3': { // Approve
       const result = approvePlan(app.selectedPlan.path, app.projectPath);
       app.mode = 'list';
       if (result.backgroundAgent) {
@@ -167,6 +166,7 @@ function executeAction(actionKey, app) {
         app.message = `✓ ${app.selectedPlan.name} moved to implementation drafts`;
       }
       return true;
+    }
     case '4': // Rename
       app.mode = 'rename';
       app.inputValue = app.selectedPlan.name;

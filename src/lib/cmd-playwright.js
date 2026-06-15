@@ -11,8 +11,8 @@
  */
 
 const path = require('path');
-const { PlaywrightScaffolder, setupPlaywright } = require('../lib/playwright-scaffolder');
-const { FrameworkDetector, detectFramework } = require('../lib/framework-detector');
+const { PlaywrightScaffolder } = require('../lib/playwright-scaffolder');
+const { FrameworkDetector } = require('../lib/framework-detector');
 
 /**
  * Execute playwright command
@@ -24,7 +24,7 @@ const { FrameworkDetector, detectFramework } = require('../lib/framework-detecto
  * @param {boolean} options.ui - Run with Playwright UI
  * @param {string} options.url - URL for codegen
  * @param {string} options.projectRoot - Project root directory
- * @returns {Object} Command result
+ * @returns {Promise<Object>} Command result
  */
 async function execute(options) {
   const {
@@ -65,7 +65,7 @@ async function execute(options) {
  * Initialize Playwright in the project
  * @param {string} projectRoot - Project root path
  * @param {Object} options - Init options
- * @returns {Object} Init result
+ * @returns {Promise<Object>} Init result
  */
 async function initPlaywright(projectRoot, options = {}) {
   try {
@@ -102,7 +102,7 @@ async function initPlaywright(projectRoot, options = {}) {
  * Run Playwright tests
  * @param {string} projectRoot - Project root path
  * @param {Object} options - Run options
- * @returns {Object} Run result
+ * @returns {Promise<Object>} Run result
  */
 async function runTests(projectRoot, options = {}) {
   const { headed, ui } = options;
@@ -126,7 +126,7 @@ async function runTests(projectRoot, options = {}) {
 /**
  * Show Playwright test report
  * @param {string} projectRoot - Project root path
- * @returns {Object} Report result
+ * @returns {Promise<Object>} Report result
  */
 async function showReport(projectRoot) {
   const command = 'npx playwright show-report';
@@ -142,7 +142,7 @@ async function showReport(projectRoot) {
  * Run Playwright codegen for recording tests
  * @param {string} projectRoot - Project root path
  * @param {string} url - Target URL
- * @returns {Object} Codegen result
+ * @returns {Promise<Object>} Codegen result
  */
 async function runCodegen(projectRoot, url) {
   // Detect framework to get default URL
@@ -163,7 +163,7 @@ async function runCodegen(projectRoot, url) {
 /**
  * Detect web framework in the project
  * @param {string} projectRoot - Project root path
- * @returns {Object} Detection result
+ * @returns {Promise<Object>} Detection result
  */
 async function detectWebFramework(projectRoot) {
   const detector = new FrameworkDetector(projectRoot);

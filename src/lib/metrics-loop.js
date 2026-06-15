@@ -350,7 +350,7 @@ function processCapabilityIndex(projectRoot, windowDays = 90, usl = CPK_USL_DEFA
     if (!isWithinWindow(startedAt, windowDays)) continue;
 
     // Count rounds by counting occurrences of "  - round:"
-    const matches = content.match(/^  - round:/gm) || [];
+    const matches = content.match(/^ {2}- round:/gm) || [];
     if (matches.length > 0) roundCounts.push(matches.length);
   }
 
@@ -425,7 +425,7 @@ function controlChart(projectRoot, metric = 'rounds', windowDays = 90) {
       if (!content) continue;
       const startedAt = getYamlField(content, 'started_at');
       if (!isWithinWindow(startedAt, windowDays)) continue;
-      const matches = content.match(/^  - round:/gm) || [];
+      const matches = content.match(/^ {2}- round:/gm) || [];
       points.push({ label: planSlug, timestamp: startedAt, value: matches.length });
     }
   } else if (metric === 'tokens') {

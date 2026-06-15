@@ -152,7 +152,7 @@ function detectTestFramework(projectPath) {
       if (scripts.test) {
         return { name: 'npm test', command: 'npm test' };
       }
-    } catch (e) {}
+    } catch (e) { /* ignore: malformed package.json falls through to other detectors */ }
   }
 
   // Check for Python
@@ -188,7 +188,7 @@ async function runTests(projectPath = process.cwd(), options = {}) {
     command = null,
     timeout = DEFAULT_TIMEOUT,
     coverage = false,
-    verbose = false
+    verbose: _verbose = false
   } = options;
 
   // Detect or use provided command
@@ -340,16 +340,6 @@ async function runSingleTest(testFile, options = {}) {
  * @returns {Object} Test presence info
  */
 function checkTestsExist(projectPath = process.cwd()) {
-  const testPatterns = [
-    '**/*.test.js',
-    '**/*.spec.js',
-    '**/*.test.ts',
-    '**/*.spec.ts',
-    '**/test_*.py',
-    '**/*_test.py',
-    '**/*_test.go'
-  ];
-
   const testDirs = ['test', 'tests', '__tests__', 'spec'];
 
   let hasTests = false;

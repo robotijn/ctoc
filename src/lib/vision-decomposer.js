@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { parseMetadata, readPlans, getPlansDir } = require('./state');
 const { movePlan } = require('./actions');
-const { writeStatus, clearStatus } = require('./background');
+const { clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
 
 /**
@@ -46,7 +46,7 @@ function parseCanvas(canvasPath) {
 
   // Parse H2 blocks
   const blocks = {};
-  const blockRegex = /^##\s+(.+?)\n([\s\S]*?)(?=^##\s+|\Z|$(?![\s\S]))/gm;
+  const blockRegex = /^##\s+(.+?)\n([\s\S]*?)(?=^##\s+|Z|$(?![\s\S]))/gm;
   let match;
   while ((match = blockRegex.exec(body)) !== null) {
     const heading = match[1].trim();

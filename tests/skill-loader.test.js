@@ -6,7 +6,6 @@
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 
 // Import the module under test
 const skillLoader = require('../src/lib/skill-loader');

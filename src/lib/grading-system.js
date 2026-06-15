@@ -31,9 +31,6 @@ const simpleYaml = {
 function getGradesFile() {
   return path.join(process.env.HOME || '/tmp', '.ctoc/agents/grades.yaml');
 }
-function getCapabilityIndexFile() {
-  return path.join(process.env.HOME || '/tmp', '.ctoc/agents/capability-index.yaml');
-}
 // Keep GRADES_FILE for export compatibility
 const GRADES_FILE = getGradesFile();
 
@@ -344,7 +341,7 @@ async function generateSummary() {
   let totalScore = 0;
   let scoredAgents = 0;
 
-  for (const [name, data] of agents) {
+  for (const [_name, data] of agents) {
     // Count by status
     if (summary.byStatus[data.status] !== undefined) {
       summary.byStatus[data.status]++;

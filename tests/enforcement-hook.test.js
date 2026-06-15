@@ -32,7 +32,7 @@ function tempProject({ withCtoc = true, withMarker = true } = {}) {
   }
   return dir;
 }
-function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore: best-effort temp cleanup */ } }
 
 describe('ctoc-project-detector', () => {
   const { isCtocProject } = require('../src/lib/ctoc-project-detector');

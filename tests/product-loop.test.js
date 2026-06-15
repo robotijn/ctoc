@@ -101,7 +101,7 @@ describe('Product Loop — project KPI plan I/O', () => {
 
   afterEach(() => {
     process.chdir(originalCwd);
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ }
   });
 
   it('saveProjectKPIPlan + loadProjectKPIPlan round-trip', () => {
@@ -136,7 +136,7 @@ describe('Product Loop — review + experiment storage', () => {
 
   afterEach(() => {
     process.chdir(originalCwd);
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ }
   });
 
   it('saveReview writes to .ctoc/product-loop/reviews/', () => {
@@ -173,7 +173,7 @@ describe('Product Loop — review scheduling', () => {
 
   afterEach(() => {
     process.chdir(originalCwd);
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ }
   });
 
   it('nextReviewDue returns null if no plan exists', () => {

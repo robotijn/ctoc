@@ -23,7 +23,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync, spawnSync } = require('child_process');
+const { execSync } = require('child_process');
 
 // ==============================================================================
 // CONSTANTS
@@ -70,20 +70,6 @@ function runCommand(cmd, options = {}) {
   } catch (error) {
     return { success: false, error: error.message, output: error.stdout };
   }
-}
-
-/**
- * Safely resolve path (prevent symlink attacks)
- */
-function safePath(targetPath, basePath) {
-  const resolved = path.resolve(targetPath);
-  const base = path.resolve(basePath);
-
-  if (!resolved.startsWith(base)) {
-    throw new Error(`Path traversal attempt detected: ${targetPath}`);
-  }
-
-  return resolved;
 }
 
 /**

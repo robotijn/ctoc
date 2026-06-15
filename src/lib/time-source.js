@@ -50,7 +50,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { execSync } = require('child_process');
 
 const KNOWN_SOURCES = ['system', 'ntp', 'ptp', 'unknown'];

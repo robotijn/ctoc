@@ -30,10 +30,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // Import related modules
-const { detectLanguages, detectFrameworks, detectStack } = require('./stack-detector');
+const { detectLanguages, detectStack } = require('./stack-detector');
 const { ArchitectureDetector } = require('./architecture-detector');
 const { CoverageChecker } = require('./coverage-checker');
-const { QualityConfig, LINTER_CONFIGS } = require('./quality-config');
 
 /**
  * Patterns to exclude from analysis (generated/vendor code)
@@ -756,7 +755,7 @@ class ProjectAnalyzer {
         try {
           const content = fs.readFileSync(filePath, 'utf8');
           totalLines += content.split('\n').length;
-        } catch (e) {}
+        } catch (e) { /* ignore: best-effort, non-fatal */ }
 
         // Categorize
         if (basename.includes('.test.') || basename.includes('.spec.') ||
@@ -900,7 +899,7 @@ class ProjectAnalyzer {
           const stat = fs.statSync(lockPath);
           const ageMs = Date.now() - stat.mtimeMs;
           return Math.floor(ageMs / (1000 * 60 * 60 * 24));
-        } catch (e) {}
+        } catch (e) { /* ignore: best-effort, non-fatal */ }
       }
     }
 
@@ -1254,7 +1253,7 @@ class ProjectAnalyzer {
       if (fs.existsSync(pkgPath)) {
         return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
       }
-    } catch (e) {}
+    } catch (e) { /* ignore: best-effort, non-fatal */ }
     return null;
   }
 
@@ -1278,7 +1277,7 @@ class ProjectAnalyzer {
       if (fs.existsSync(filePath)) {
         return fs.readFileSync(filePath, 'utf8');
       }
-    } catch (e) {}
+    } catch (e) { /* ignore: best-effort, non-fatal */ }
     return '';
   }
 

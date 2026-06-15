@@ -22,7 +22,6 @@ const simpleYaml = {
       // Simple key: value parsing
       const result = {};
       const lines = cleaned.split('\n');
-      let currentKey = null;
       for (const line of lines) {
         const match = line.match(/^(\w+):\s*(.*)$/);
         if (match) {
@@ -257,7 +256,7 @@ async function improveAgent(agentPath, options = {}) {
  * @returns {Promise<Object>} Critique result
  */
 async function runAgentCritic(params) {
-  const { target, round, selfCritique = false, question = null, previousCritiques = [] } = params;
+  const { target, round, selfCritique = false, question: _question = null, previousCritiques: _previousCritiques = [] } = params;
 
   // In a real implementation, this would invoke the agent-critic agent
   // For now, return a mock structure that matches the expected format
@@ -285,7 +284,7 @@ async function runAgentCritic(params) {
  * @returns {Promise<string>} Improved agent content
  */
 async function runAgentWriter(params) {
-  const { original, critique = null, failures = null } = params;
+  const { original, critique: _critique = null, failures: _failures = null } = params;
 
   // In a real implementation, this would invoke the agent-writer agent
   // For now, return the original with placeholder improvements
@@ -299,7 +298,7 @@ async function runAgentWriter(params) {
  * @returns {Promise<Object>} Test results
  */
 async function runAgentTester(params) {
-  const { agent, agentPath } = params;
+  const { agent: _agent, agentPath: _agentPath } = params;
 
   // In a real implementation, this would invoke the agent-tester agent
   return {
@@ -318,7 +317,7 @@ async function runAgentTester(params) {
  * @returns {Promise<Object>} QA report
  */
 async function runAgentQA(params) {
-  const { agent, scoreHistory } = params;
+  const { agent: _agent, scoreHistory: _scoreHistory } = params;
 
   // In a real implementation, this would invoke the agent-qa agent
   return {
@@ -546,7 +545,7 @@ async function batchProcess(agentPaths, options = {}) {
 async function getGrades() {
   try {
     const content = await fs.readFile(GRADES_FILE, 'utf8');
-    return yaml.load(content) || {};
+    return simpleYaml.load(content) || {};
   } catch (e) {
     return {};
   }

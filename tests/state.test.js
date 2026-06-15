@@ -3,7 +3,6 @@
  */
 
 const assert = require('assert');
-const path = require('path');
 
 // Test FIFO queue ordering
 function testFifoOrdering() {

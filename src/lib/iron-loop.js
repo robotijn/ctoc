@@ -4,7 +4,6 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 
 /**
  * Marker for Iron Loop execution steps section.

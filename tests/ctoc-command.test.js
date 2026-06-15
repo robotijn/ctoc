@@ -4,7 +4,7 @@
  */
 
 const assert = require('assert');
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
+const { test, describe, beforeEach, afterEach } = require('node:test');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');

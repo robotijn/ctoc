@@ -5,35 +5,9 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
 
 // Import the module under test
 const version = require('../src/lib/version');
-
-// Create a temporary directory for test files
-const TEST_DIR = path.join(os.tmpdir(), `ctoc-version-test-${Date.now()}`);
-const TEST_VERSION_FILE = path.join(TEST_DIR, 'VERSION');
-const TEST_MARKETPLACE_FILE = path.join(TEST_DIR, '.claude-plugin', 'marketplace.json');
-const TEST_PLUGIN_FILE = path.join(TEST_DIR, 'ctoc-plugin', '.claude-plugin', 'plugin.json');
-const TEST_README_FILE = path.join(TEST_DIR, 'README.md');
-
-// Setup test directory
-function setupTestDir() {
-  if (!fs.existsSync(TEST_DIR)) {
-    fs.mkdirSync(TEST_DIR, { recursive: true });
-  }
-  fs.mkdirSync(path.join(TEST_DIR, '.claude-plugin'), { recursive: true });
-  fs.mkdirSync(path.join(TEST_DIR, 'ctoc-plugin', '.claude-plugin'), { recursive: true });
-}
-
-// Cleanup test directory
-function cleanupTestDir() {
-  if (fs.existsSync(TEST_DIR)) {
-    fs.rmSync(TEST_DIR, { recursive: true, force: true });
-  }
-}
 
 // =============================================================================
 // parseVersion Tests

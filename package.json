@@ -1,0 +1,24 @@
+{
+  "name": "ctoc",
+  "version": "6.9.49",
+  "description": "Your Virtual CTO — AI agents and expert skills with quality gates. A Claude Code plugin.",
+  "license": "Apache-2.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.36.0",
+    "eslint-plugin-n": "^17.23.1",
+    "eslint-plugin-security": "^3.0.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -8,11 +8,8 @@ const path = require('path');
 const { c, line, renderTabs, renderFooter } = require('../lib/tui');
 const {
   SETTINGS_TABS,
-  SETTINGS_SCHEMA,
   loadSettings,
-  saveSettings,
   toggleSetting,
-  setSetting,
   getCategorySchema
 } = require('../lib/settings');
 const { getLastSync, manualSync } = require('../lib/sync');

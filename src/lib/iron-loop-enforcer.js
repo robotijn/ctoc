@@ -54,14 +54,6 @@ const TIER_1_AGENTS = [
   'agents/planning/stack-chooser.md',
 ];
 
-// Product Loop agents — dispatched OUTSIDE the CTO Chief technical chain.
-// They are Tier 1 sub-orchestrators but report to the user (founder or product manager),
-// not to the CTO Chief. Listed here for awareness; excluded from the tier-1-reports-to check.
-const PRODUCT_LOOP_AGENTS = [
-  'agents/planning/kpi-planner.md',
-  'agents/planning/unit-economics-modeler.md',
-];
-
 const REQUIRED_HOOKS = [
   'src/hooks/SessionStart.js',
   'src/hooks/PreToolUse.Edit.js',
@@ -276,7 +268,7 @@ function checkActivePlanStepLabels(root) {
     for (const planPath of listPlans(root, stage)) {
       const content = fs.readFileSync(planPath, 'utf8');
       // Plans declare steps via "## Step N: LABEL" or "step: <num>" — scan both
-      const stepHeadings = [...content.matchAll(/^##\s+Step\s+(\d+)[:\.\s]+([A-Z][A-Z-]+)/gm)];
+      const stepHeadings = [...content.matchAll(/^##\s+Step\s+(\d+)[:.\s]+([A-Z][A-Z-]+)/gm)];
       for (const m of stepHeadings) {
         const stepNum = parseInt(m[1], 10);
         const label = m[2].trim();
@@ -417,14 +409,14 @@ function checkVersionSync(root) {
     try {
       const j = JSON.parse(fs.readFileSync(pluginJson, 'utf8'));
       if (j.version && j.version !== version) mismatches.push({ file: 'plugin.json', got: j.version, expected: version });
-    } catch {}
+    } catch { /* ignore: unreadable/invalid plugin.json is reported by other checks */ }
   }
   if (fs.existsSync(marketplaceJson)) {
     try {
       const j = JSON.parse(fs.readFileSync(marketplaceJson, 'utf8'));
       const v = j?.plugins?.[0]?.version;
       if (v && v !== version) mismatches.push({ file: 'marketplace.json', got: v, expected: version });
-    } catch {}
+    } catch { /* ignore: unreadable/invalid marketplace.json is reported by other checks */ }
   }
   if (mismatches.length > 0) {
     return {

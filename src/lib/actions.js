@@ -9,7 +9,7 @@ const { parseMetadata } = require('./state');
 const { refineLoop, appendDeferredQuestions } = require('./iron-loop');
 const { writeStatus, clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
-const { validateForReview, validateTransition, formatValidationResult } = require('./plan-validator');
+const { validateForReview } = require('./plan-validator');
 const { logTransition } = require('./transition-log');
 
 /**
@@ -572,7 +572,7 @@ function stopAgent(projectPath) {
  */
 function advanceAgent(projectPath) {
   const root = projectPath || findProjectRoot();
-  const { isStopRequested, releaseLock, updateLockPlan, clearStop } = require('./agent-lock');
+  const { isStopRequested, releaseLock, updateLockPlan } = require('./agent-lock');
   const { readPlans, getPlansDir, clearAgentStatus, setAgentStatus } = require('./state');
 
   // 1. Check stop flag

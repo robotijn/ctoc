@@ -10,48 +10,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// Simple YAML parser for CI configs (basic key-value and array support)
-function parseYamlLike(content) {
-  try {
-    // Remove comments
-    const lines = content.split('\n').filter(line => !line.trim().startsWith('#'));
-    const result = {};
-    let currentKey = null;
-    let currentIndent = 0;
-    const stack = [result];
-
-    for (let line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      const indent = line.search(/\S/);
-      const keyMatch = trimmed.match(/^(\w[\w-]*):\s*(.*)?$/);
-      const arrayMatch = trimmed.match(/^-\s+(.*)$/);
-
-      if (keyMatch) {
-        const [, key, value] = keyMatch;
-        const current = stack[stack.length - 1];
-
-        if (value) {
-          current[key] = value.replace(/^['"]|['"]$/g, '');
-        } else {
-          current[key] = {};
-        }
-        currentKey = key;
-      } else if (arrayMatch && currentKey) {
-        const current = stack[stack.length - 1];
-        if (!Array.isArray(current[currentKey])) {
-          current[currentKey] = [];
-        }
-        current[currentKey].push(arrayMatch[1]);
-      }
-    }
-    return result;
-  } catch (e) {
-    return {};
-  }
-}
-
 // CI system definitions
 const CI_SYSTEMS = {
   github: {
@@ -436,7 +394,7 @@ function detectDefaultContainer(projectPath) {
         const version = engines.match(/\d+/)?.[0] || '20';
         return `node:${version}-alpine`;
       }
-    } catch (e) {}
+    } catch (e) { /* ignore: best-effort, non-fatal */ }
     return 'node:20-alpine';
   }
 
@@ -488,7 +446,7 @@ function getDefaultChecks(projectPath) {
       if (scripts.build) {
         checks.push({ name: 'Build', command: 'npm run build', type: CHECK_TYPES.BUILD });
       }
-    } catch (e) {}
+    } catch (e) { /* ignore: best-effort, non-fatal */ }
   }
 
   // If no checks found, add common defaults

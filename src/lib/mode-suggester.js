@@ -25,8 +25,6 @@
  * B10: Added confidence scoring to all suggestions
  */
 
-const { ProjectAnalyzer, DOMAIN_KEYWORDS } = require('./project-analyzer');
-
 /**
  * Scoring weights for mode suggestion
  * @type {Object}

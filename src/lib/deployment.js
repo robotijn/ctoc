@@ -104,7 +104,7 @@ function mergeConfig(defaults, overrides) {
  *
  * @param {string} planPath - Path to the approved plan file
  * @param {string} projectPath - Project root directory
- * @returns {object} Pipeline result with per-environment status
+ * @returns {Promise<object>} Pipeline result with per-environment status
  */
 async function runDeploymentPipeline(planPath, projectPath) {
   const config = getDeploymentConfig(projectPath);
@@ -223,7 +223,7 @@ function buildDeploymentContext(planPath, projectPath, config) {
  *
  * @param {object} env - Environment config (name, strategy, ...)
  * @param {object} context - Deployment context
- * @returns {object} Result with name, status, duration, error
+ * @returns {Promise<object>} Result with name, status, duration, error
  */
 async function deployToEnvironment(env, context, opts = {}) {
   const start = Date.now();
@@ -515,7 +515,7 @@ function executeSsh(config, context, opts = {}) {
  *
  * @param {string} environment - Environment name to rollback
  * @param {string} projectPath - Project root directory
- * @returns {object} Rollback result
+ * @returns {Promise<object>} Rollback result
  */
 async function rollback(environment, projectPath) {
   const history = getDeploymentHistory(projectPath);

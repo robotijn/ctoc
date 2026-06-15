@@ -3,7 +3,7 @@
  * Tests for lib/state-manager.js
  */
 
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
+const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
@@ -90,17 +90,6 @@ function saveTestStateDirectly(state) {
   const signedState = signState(state);
   fs.writeFileSync(statePath, JSON.stringify(signedState, null, 2));
   return signedState;
-}
-
-/**
- * Loads state directly from file (for test verification)
- */
-function loadTestStateDirectly() {
-  const statePath = getTestStatePath();
-  if (!fs.existsSync(statePath)) {
-    return null;
-  }
-  return JSON.parse(fs.readFileSync(statePath, 'utf8'));
 }
 
 // =============================================================================

@@ -14,39 +14,6 @@ const path = require('path');
 const { FrameworkDetector } = require('./framework-detector');
 
 /**
- * Template loader for Playwright files
- * @param {string} templateName - Template file name
- * @returns {string} Template content
- */
-function loadTemplate(templateName) {
-  const templateDir = path.join(__dirname, '..', '..', '.ctoc', 'templates', 'testing');
-  const templatePath = path.join(templateDir, templateName);
-
-  if (fs.existsSync(templatePath)) {
-    return fs.readFileSync(templatePath, 'utf8');
-  }
-
-  // Fallback to inline templates if file not found
-  return getInlineTemplate(templateName);
-}
-
-/**
- * Get inline template content (fallback)
- * @param {string} templateName - Template name
- * @returns {string} Template content
- */
-function getInlineTemplate(templateName) {
-  const templates = {
-    'playwright.config.ts.template': getBasePlaywrightConfig(),
-    'example.spec.ts.template': getExampleSpec(),
-    'BasePage.ts.template': getBasePage(),
-    'playwright.yml.template': getGitHubWorkflow()
-  };
-
-  return templates[templateName] || '';
-}
-
-/**
  * Playwright Scaffolder class
  * Sets up Playwright testing infrastructure
  */
@@ -70,7 +37,7 @@ class PlaywrightScaffolder {
 
   /**
    * Initialize Playwright in the project
-   * @returns {Object} Result with created files and commands
+   * @returns {Promise<Object>} Result with created files and commands
    */
   async init() {
     const createdFiles = [];
@@ -546,85 +513,6 @@ jobs:
 async function setupPlaywright(projectRoot, options = {}) {
   const scaffolder = new PlaywrightScaffolder(projectRoot, options);
   return await scaffolder.init();
-}
-
-// Base config template for fallback
-function getBasePlaywrightConfig() {
-  return `import { defineConfig, devices } from '@playwright/test';
-
-export default defineConfig({
-  testDir: './e2e',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
-  use: {
-    trace: 'on-first-retry',
-  },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-  ],
-});
-`;
-}
-
-function getExampleSpec() {
-  return `import { test, expect } from '@playwright/test';
-
-test('has title', async ({ page }) => {
-  await page.goto('/');
-  await expect(page).toHaveTitle(/.+/);
-});
-`;
-}
-
-function getBasePage() {
-  return `import { Page, Locator, expect } from '@playwright/test';
-
-export abstract class BasePage {
-  protected readonly page: Page;
-  abstract readonly url: string;
-  abstract readonly loadedIndicator: Locator;
-
-  constructor(page: Page) {
-    this.page = page;
-  }
-
-  async navigate(): Promise<void> {
-    await this.page.goto(this.url);
-    await this.waitForPageLoad();
-  }
-
-  async waitForPageLoad(): Promise<void> {
-    await expect(this.loadedIndicator).toBeVisible({ timeout: 10000 });
-  }
-}
-`;
-}
-
-function getGitHubWorkflow() {
-  return `name: Playwright Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: npx playwright install --with-deps
-      - run: npx playwright test
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-`;
 }
 
 module.exports = {

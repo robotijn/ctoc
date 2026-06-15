@@ -8,6 +8,9 @@ mcp/node_modules/
 # Quality state cache (local-only, per-developer)
 .ctoc/quality-state/
 
+# Enforcement hook runtime log (local-only)
+.ctoc/logs/
+
 # OS files
 .DS_Store
 Thumbs.db

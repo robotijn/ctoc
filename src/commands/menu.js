@@ -4,7 +4,6 @@
  * Main entry point for /ctoc command
  */
 
-const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
 const { c, clear, line, renderTabs, renderTabIndicator, setupKeyboard, cleanup, renderBreadcrumb } = require('../lib/tui');
@@ -64,6 +63,7 @@ const systemArea = require('../areas/system');
 // Legacy tab modules retained so functional/review/etc. drill-in flows that
 // reference `functionalTab.renderActions`, `reviewTab.renderRejectInput`
 // continue to work during A3.2 transition.
+const overviewTab = require('../tabs/overview');
 const functionalTab = require('../tabs/functional');
 const reviewTab = require('../tabs/review');
 const toolsTab = require('../tabs/tools');

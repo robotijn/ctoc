@@ -192,7 +192,7 @@ function validateAcceptanceCriteria(content) {
   const result = { errors: [], warnings: [], checklist: {} };
 
   // Find acceptance criteria section
-  const criteriaSection = content.match(/(?:acceptance criteria|definition of done|requirements)[:\s]*\n([\s\S]*?)(?=\n##|\n---|\Z)/i);
+  const criteriaSection = content.match(/(?:acceptance criteria|definition of done|requirements)[:\s]*\n([\s\S]*?)(?=\n##|\n---|Z)/i);
 
   if (!criteriaSection) {
     result.warnings.push('No explicit acceptance criteria section found');
@@ -576,7 +576,6 @@ function validateForExecution(planPath, projectPath) {
  */
 function validateForQueue(planPath, projectPath) {
   const content = fs.readFileSync(planPath, 'utf8');
-  const metadata = parseMetadata(content);
 
   const result = {
     valid: true,

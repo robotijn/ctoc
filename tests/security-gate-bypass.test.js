@@ -90,7 +90,7 @@ function makeProject() {
 }
 
 function cleanup(dir) {
-  if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+  if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore: best-effort temp cleanup */ } }
 }
 
 /** Write a plan file into plans/<stage>/<name>. Returns absolute path. */

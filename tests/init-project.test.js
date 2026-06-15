@@ -263,7 +263,7 @@ describe('init-project', () => {
     });
 
     it('creates settings.yaml', () => {
-      const result = initProject(tempDir);
+      initProject(tempDir);
 
       const settingsPath = path.join(tempDir, '.ctoc', 'settings.yaml');
       assert.ok(fs.existsSync(settingsPath));
@@ -274,7 +274,7 @@ describe('init-project', () => {
     });
 
     it('creates iron-loop state', () => {
-      const result = initProject(tempDir);
+      initProject(tempDir);
 
       const statePath = path.join(tempDir, '.ctoc', 'state', 'iron-loop.yaml');
       assert.ok(fs.existsSync(statePath));
@@ -303,7 +303,7 @@ describe('init-project', () => {
       fs.mkdirSync(path.join(tempDir, '.ctoc'), { recursive: true });
       fs.writeFileSync(path.join(tempDir, '.ctoc', 'settings.yaml'), 'old: true');
 
-      const result = initProject(tempDir, { force: true });
+      initProject(tempDir, { force: true });
 
       const content = fs.readFileSync(path.join(tempDir, '.ctoc', 'settings.yaml'), 'utf8');
       assert.ok(content.includes('enforcement:'));

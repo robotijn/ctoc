@@ -15,10 +15,6 @@ const os = require('os');
 
 // Modules under test
 const {
-  bootstrapAgentCritic,
-  improveAgent,
-  saveGrade,
-  getGrades,
   PERFECT_SCORE,
   ACCEPTANCE_THRESHOLD,
   MAX_ROUNDS
@@ -28,8 +24,7 @@ const {
   PipelineOrchestrator,
   PipelineContext,
   STAGES,
-  createOrchestrator,
-  runSingleAgent
+  createOrchestrator
 } = require('../src/lib/pipeline-orchestrator');
 
 const {
@@ -39,16 +34,11 @@ const {
   getScoreMeaning,
   loadGrades,
   updateGrade,
-  getAgentsByStatus,
   analyzeProgression,
   generateSummary,
-  STATUS,
-  DIMENSION_WEIGHTS
+  STATUS
 } = require('../src/lib/grading-system');
 
-// Test fixtures
-const FIXTURE_DIR = path.join(os.tmpdir(), 'ctoc-pipeline-test');
-const GRADES_FILE = path.join(FIXTURE_DIR, 'grades.yaml');
 
 describe('Grading System', () => {
   describe('calculateOverallScore', () => {
@@ -294,8 +284,6 @@ describe('Integration Tests', () => {
 
   describe('Grade Persistence', () => {
     it('should save and load grades correctly', async () => {
-      const gradesFile = path.join(tempDir, 'grades.yaml');
-
       // Mock the GRADES_FILE path
       const originalEnv = process.env.HOME;
       process.env.HOME = tempDir;

@@ -14,7 +14,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
 // Quality commands per language
 const QUALITY_COMMANDS = {

@@ -12,21 +12,7 @@ const { loadState, createState, saveState, STEP_NAMES, isInterruptedSession, for
 const { detectStack } = require('../lib/stack-detector');
 const { getVersion } = require('../lib/version');
 const { findProjectRoot: findRoot } = require('../lib/project-root');
-
-/**
- * Get the plugin root directory (where .claude-plugin folder is)
- */
-function getPluginRoot() {
-  // hooks/SessionStart.js -> go up one level to plugin root
-  let dir = __dirname;
-  for (let i = 0; i < 5; i++) {
-    if (fs.existsSync(path.join(dir, '.claude-plugin'))) {
-      return dir;
-    }
-    dir = path.dirname(dir);
-  }
-  return path.join(__dirname, '..', '..');
-}
+const { writeToTerminal } = require('../lib/ui');
 
 /**
  * Find project root by looking for .git, .ctoc, or plans directory

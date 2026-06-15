@@ -233,13 +233,13 @@ function parseJournalYaml(content, planSlug) {
     else if (line.startsWith('started_at:')) journal.started_at = line.split(':').slice(1).join(':').trim();
     else if (line.startsWith('phase:') && !inRounds) journal.phase = line.split(':')[1].trim();
     else if (line.startsWith('rounds:')) inRounds = true;
-    else if (inRounds && /^  - round:/.test(line)) {
+    else if (inRounds && /^ {2}- round:/.test(line)) {
       flush();
       currentRound = { round: parseInt(line.match(/round:\s*(\d+)/)[1], 10) };
       currentListField = null;
     } else if (inRounds && currentRound) {
       // 4-space-indented field
-      const fieldMatch = line.match(/^    ([a-z_]+):\s*(.*)$/);
+      const fieldMatch = line.match(/^ {4}([a-z_]+):\s*(.*)$/);
       if (fieldMatch) {
         const [, key, val] = fieldMatch;
         if (val === '') {
@@ -254,7 +254,7 @@ function parseJournalYaml(content, planSlug) {
           currentListField = null;
         }
       } else if (currentListField) {
-        const itemMatch = line.match(/^      - (.+)$/);
+        const itemMatch = line.match(/^ {6}- (.+)$/);
         if (itemMatch) {
           const item = itemMatch[1];
           if (item.includes(':')) {
@@ -566,7 +566,6 @@ function writeLetter(planSlug, letter, root = findProjectRoot()) {
 // ─────────────────────────────────────────────────────────────────────
 
 function phaseConverged(roundFindings, phase) {
-  const K = K_PER_PHASE[phase];
   for (const critic of Object.keys(roundFindings)) {
     const findings = (roundFindings[critic] || []).filter(f => f.severity === effectivePhaseSeverity(phase, f.severity));
     if (phase === 'final-sweep') {

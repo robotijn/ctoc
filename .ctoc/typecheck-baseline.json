@@ -1,0 +1,7 @@
+{
+  "comment": "Baseline count of `tsc --noEmit` (checkJs) errors. The typecheck enforcement test (tests/typecheck.test.js) asserts the current error count is <= this number. This is a RATCHET: it may only ever be lowered, never raised. New code must not introduce typecheck errors above the baseline; reducing the baseline by adding JSDoc annotations is encouraged. NEVER raise this number to make a failing build pass — fix the code or annotate instead.",
+  "maxErrors": 89,
+  "establishedAt": "2026-06-15",
+  "establishedAtVersion": "6.9.49",
+  "notes": "All 89 remaining errors are TypeScript checkJs inference artifacts on un-annotated plain JS (e.g. object shapes inferred from first use, Date-string arithmetic, block-scoped duplicate-const false positives). They are not runtime bugs. Two genuine bugs surfaced by checkJs were fixed when the baseline was set: a broken require('./security') in cmd-audit.js and an invalid 3rd argument to fs.readFileSync in staged-files.js. The path to lowering this number is adding JSDoc @typedef/@param/@returns annotations."
+}

@@ -454,7 +454,7 @@ class QualityConfig {
       haskell: 'cabal update && cabal install hlint ormolu',
       lua: 'luarocks install luacheck',
       r: 'Rscript -e "install.packages(c(\'lintr\', \'styler\', \'testthat\'))"',
-      julia: 'julia -e "using Pkg; Pkg.add([\"JuliaFormatter\"])"'
+      julia: 'julia -e "using Pkg; Pkg.add([\\"JuliaFormatter\\"])"'
     };
 
     return commands[language] || `# Install ${language} quality tools`;
@@ -464,10 +464,11 @@ class QualityConfig {
    * Apply quality configuration to project (create config files)
    * @param {string} language - Target language
    * @param {string} mode - Quality mode
-   * @returns {Object} Applied configuration details
+   * @returns {Promise<Object>} Applied configuration details
    */
   async applyConfig(language, mode = 'strict') {
-    const config = this.getConfig(language, mode);
+    // Validate language/mode (throws on invalid input)
+    this.getConfig(language, mode);
     const applied = {
       language,
       mode,
@@ -505,11 +506,6 @@ class QualityConfig {
    */
   parseConfigFromSkill(skillContent) {
     const configs = {};
-    // Match code blocks with filename comments
-    const codeBlockRegex = /```(?:javascript|json|toml|yaml|xml|ini|sh)?\n([\s\S]*?)```/g;
-    const filenameRegex = /##\s+.*?`([^`]+)`/g;
-
-    let match;
     let lastFilename = null;
 
     // Look for section headers with filenames

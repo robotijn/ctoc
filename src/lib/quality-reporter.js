@@ -5,7 +5,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { GRADES } = require('./quality-scorer');
 
 /**
  * Report format types

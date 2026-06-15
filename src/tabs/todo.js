@@ -4,10 +4,9 @@
  */
 
 const path = require('path');
-const { c, line, renderList, renderActionMenu, renderFooter } = require('../lib/tui');
+const { c, renderList, renderActionMenu, renderFooter } = require('../lib/tui');
 const { readPlans, getPlansDir } = require('../lib/state');
 const { moveUpInQueue, moveDownInQueue, removeFromQueue } = require('../lib/actions');
-const { readStatus, getStatusIcon } = require('../lib/background');
 
 const ACTIONS = [
   { key: '1', label: 'View' },

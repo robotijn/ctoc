@@ -307,7 +307,7 @@ describe('Menu Screens Tests', () => {
   });
 
   test('validateScreen returns validation results', () => {
-    const planPath = createPlan('functional', 'valid-plan',
+    createPlan('functional', 'valid-plan',
       '# Valid Plan\n\n## Problem Statement\nTest.\n\n## Success Criteria\nTest.\n\n## Scope\nTest.\n');
 
     const result = menuScreens.validateScreen('functional', 'valid-plan.md', testDir);
@@ -322,7 +322,7 @@ describe('Menu Screens Tests', () => {
 
   test('validateScreen shows fix option on validation failure', () => {
     // Plan missing problem statement
-    const planPath = createPlan('functional', 'bad-plan', '# Just a Title\n\nNo proper structure.\n');
+    createPlan('functional', 'bad-plan', '# Just a Title\n\nNo proper structure.\n');
 
     const result = menuScreens.validateScreen('functional', 'bad-plan.md', testDir);
     const labels = result.ask.questions[0].options.map(o => o.label);

@@ -325,7 +325,6 @@ function sectionBrowse(sectionName, projectPath) {
 function dashboardCommands(projectPath) {
   const root = getProjectPath(projectPath);
   const visionCounts = getVisionCounts(root);
-  const counts = getPlanCounts(root);
   const agent = getAgentStatus(root);
   const isAgentActive = agent.active;
 
@@ -754,7 +753,6 @@ function validateScreen(stage, file, projectPath) {
     };
   }
   const planPath = path.join(plansDir, folder, file);
-  const planName = file.replace('.md', '');
   const nextStage = NEXT_STAGE[stage];
 
   // Run validation
@@ -781,8 +779,6 @@ function validateScreen(stage, file, projectPath) {
   }
 
   text += '\n\n\n';
-
-  const issueCount = validationResult.errors.length + validationResult.warnings.length;
 
   let question;
   if (validationResult.valid) {

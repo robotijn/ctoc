@@ -26,7 +26,6 @@ const {
   runCommand,
   detectTestFramework,
   parseTestCounts,
-  checkTestsExist,
   TEST_STATUS,
   DEFAULT_TIMEOUT
 } = require('../src/lib/test-runner');
@@ -34,7 +33,6 @@ const {
 const {
   runLocalCI,
   getChecks,
-  willCIPass,
   CI_STATUS
 } = require('../src/lib/local-ci');
 
@@ -229,7 +227,7 @@ describe('Integration Tests', () => {
   afterEach(async () => {
     try {
       await fs.rm(tempDir, { recursive: true });
-    } catch (e) {}
+    } catch { /* ignore: best-effort, non-fatal */ }
   });
 
   describe('detectCISystem', () => {

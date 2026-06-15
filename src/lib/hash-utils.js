@@ -222,7 +222,6 @@ function verifyFileIntegrity(filePath, expectedHash) {
  */
 function hashDirectory(dirPath, options = {}) {
   const {
-    include = ['**/*'],
     exclude = ['node_modules', '.git', 'dist', 'build', 'coverage'],
     maxDepth = 10
   } = options;

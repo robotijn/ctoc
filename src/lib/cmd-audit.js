@@ -21,7 +21,7 @@ const path = require('path');
  * @param {string} options.format - Report format
  * @param {string} options.mode - Quality mode
  * @param {string} options.projectRoot - Project root directory
- * @returns {Object} Command result
+ * @returns {Promise<Object>} Command result
  */
 async function execute(options) {
   const {
@@ -58,7 +58,7 @@ async function execute(options) {
  * Audit project dependencies for vulnerabilities
  * @param {string} projectRoot - Project root path
  * @param {Object} options - Audit options
- * @returns {Object} Audit results
+ * @returns {Promise<Object>} Audit results
  */
 async function auditDependencies(projectRoot, options = {}) {
   const { fix = false } = options;
@@ -167,11 +167,11 @@ async function auditDependencies(projectRoot, options = {}) {
 /**
  * Run full audit (dependencies + security scan)
  * @param {string} projectRoot - Project root path
- * @returns {Object} Full audit results
+ * @returns {Promise<Object>} Full audit results
  */
 async function auditAll(projectRoot) {
-  // Import security command
-  const { runSecurityScan } = require('./security');
+  // Import security command (runSecurityScan lives in cmd-security.js)
+  const { runSecurityScan } = require('./cmd-security');
   return await runSecurityScan(projectRoot, { all: true });
 }
 
@@ -179,7 +179,7 @@ async function auditAll(projectRoot) {
  * Generate audit report
  * @param {string} projectRoot - Project root path
  * @param {string} format - Output format
- * @returns {Object} Report result
+ * @returns {Promise<Object>} Report result
  */
 async function generateReport(projectRoot, format) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'dependency-audit.json');
@@ -294,7 +294,7 @@ function generateTextReport(results) {
  * Check audit against quality gate
  * @param {string} projectRoot - Project root path
  * @param {string} mode - Quality mode
- * @returns {Object} Gate result
+ * @returns {Promise<Object>} Gate result
  */
 async function checkGate(projectRoot, mode) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'dependency-audit.json');

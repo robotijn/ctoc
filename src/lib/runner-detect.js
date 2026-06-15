@@ -242,7 +242,7 @@ function checkExistingRunner(runnerPath = path.join(os.homedir(), 'actions-runne
   if (configured) {
     try {
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    } catch {}
+    } catch { /* ignore: best-effort, non-fatal */ }
   }
 
   return {

@@ -15,7 +15,7 @@
  * - Pull-rebase-push on remote conflict
  */
 
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -69,23 +69,12 @@ function runCommand(cmd, options = {}) {
 }
 
 /**
- * Get current git HEAD
- */
-function getGitHead() {
-  try {
-    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Run lint check
  */
 async function runLint(tools) {
   console.log('\n  Running lint...');
 
-  for (const [lang, langTools] of Object.entries(tools)) {
+  for (const [_lang, langTools] of Object.entries(tools)) {
     if (!langTools.lint) continue;
 
     const result = runCommand(langTools.lint, { allowFail: true, silent: true });
@@ -109,7 +98,7 @@ async function runLint(tools) {
 async function runTypecheck(tools) {
   console.log('\n  Running type check...');
 
-  for (const [lang, langTools] of Object.entries(tools)) {
+  for (const [_lang, langTools] of Object.entries(tools)) {
     if (!langTools.typecheck) continue;
 
     const result = runCommand(langTools.typecheck, { allowFail: true, silent: true });
@@ -136,7 +125,7 @@ function runSpecificTests(tools, testFiles) {
   let totalPassed = 0;
   let totalFailed = 0;
 
-  for (const [lang, langTools] of Object.entries(tools)) {
+  for (const [_lang, langTools] of Object.entries(tools)) {
     if (!langTools.test) continue;
 
     let cmd;

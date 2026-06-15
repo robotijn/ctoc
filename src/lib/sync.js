@@ -71,8 +71,6 @@ function stopAutoSync() {
 // Sync plans to git
 function syncPlans(projectPath = process.cwd()) {
   try {
-    const plansDir = path.join(projectPath, 'plans');
-
     // Check for changes in plans directory
     const status = execSync('git status --porcelain plans/', {
       cwd: projectPath,

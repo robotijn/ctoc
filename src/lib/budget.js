@@ -279,7 +279,7 @@ function checkBudget(root, sessionId) {
 
 function resetSession(root, sessionId) {
   const p = getUsagePath(root, sessionId);
-  try { fs.unlinkSync(p); } catch {}
+  try { fs.unlinkSync(p); } catch { /* ignore: best-effort, non-fatal */ }
   return true;
 }
 

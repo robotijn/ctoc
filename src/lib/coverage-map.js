@@ -11,7 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { hashFile, findChangedFiles } = require('./hash-utils');
+const { hashFile } = require('./hash-utils');
 const { atomicWrite, safeRead, getStateDir } = require('./quality-state');
 
 // Lazily resolve coverage map path (getStateDir uses findProjectRoot)
@@ -473,7 +473,7 @@ if (require.main === module) {
   const command = args[0];
 
   switch (command) {
-    case 'stats':
+    case 'stats': {
       const stats = getStatistics();
       console.log('\nCoverage Map Statistics\n');
       console.log(`Source files: ${stats.sourceFiles}`);
@@ -484,8 +484,9 @@ if (require.main === module) {
       console.log(`Framework: ${stats.framework || 'unknown'}`);
       console.log(`Last rebuilt: ${stats.lastRebuilt || 'never'}`);
       break;
+    }
 
-    case 'check':
+    case 'check': {
       const rebuild = needsRebuild();
       if (rebuild.needed) {
         console.log(`Rebuild needed: ${rebuild.reason}`);
@@ -494,13 +495,14 @@ if (require.main === module) {
         console.log('Coverage map is up to date');
       }
       break;
+    }
 
     case 'clear':
       clearCoverageMap();
       console.log('Coverage map cleared');
       break;
 
-    case 'tests':
+    case 'tests': {
       if (args.length < 2) {
         console.log('Usage: coverage-map.js tests <source-file>');
         process.exit(1);
@@ -518,6 +520,7 @@ if (require.main === module) {
         }
       }
       break;
+    }
 
     default:
       console.log('Coverage Map CLI');

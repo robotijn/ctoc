@@ -29,7 +29,7 @@ const {
 function tempProject() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-sections-'));
 }
-function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore: best-effort temp cleanup, non-fatal */ } }
 
 describe('SECTIONS map', () => {
   it('has exactly 3 sections', () => {

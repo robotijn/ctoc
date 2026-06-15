@@ -105,20 +105,6 @@ const getPlanCounts = memoize(function getPlanCountsImpl(projectPath) {
   };
 }, 'getPlanCounts');
 
-// Get in-progress count from state
-function getInProgressCount(projectPath) {
-  const root = projectPath || findProjectRoot();
-  const stateFile = path.join(root, '.ctoc', 'state', 'progress.json');
-  if (!fs.existsSync(stateFile)) return 0;
-
-  try {
-    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-    return state.inProgress ? 1 : 0;
-  } catch {
-    return 0;
-  }
-}
-
 // Get agent status (lock-file aware)
 // The lock file is authoritative for liveness; agent.json is supplementary detail.
 function getAgentStatus(projectPath) {

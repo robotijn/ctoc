@@ -23,7 +23,7 @@ const { CoverageChecker, THRESHOLDS } = require('../lib/coverage-checker');
  * @param {number} options.threshold - Custom threshold
  * @param {number} options.below - Show files below this threshold
  * @param {string} options.projectRoot - Project root directory
- * @returns {Object} Command result
+ * @returns {Promise<Object>} Command result
  */
 async function execute(options) {
   const {
@@ -63,7 +63,7 @@ async function execute(options) {
  * Check coverage against thresholds
  * @param {string} projectRoot - Project root path
  * @param {string} mode - Quality mode
- * @returns {Object} Check result
+ * @returns {Promise<Object>} Check result
  */
 async function checkCoverage(projectRoot, mode) {
   const reportPath = findCoverageReport(projectRoot);
@@ -118,7 +118,7 @@ async function checkCoverage(projectRoot, mode) {
  * @param {string} projectRoot - Project root path
  * @param {string} mode - Quality mode
  * @param {string} format - Output format (text, json, markdown)
- * @returns {Object} Report result
+ * @returns {Promise<Object>} Report result
  */
 async function generateReport(projectRoot, mode, format) {
   const reportPath = findCoverageReport(projectRoot);
@@ -179,7 +179,7 @@ async function generateReport(projectRoot, mode, format) {
  * @param {string} projectRoot - Project root path
  * @param {string} mode - Quality mode
  * @param {number} customThreshold - Optional custom threshold
- * @returns {Object} Enforcement result
+ * @returns {Promise<Object>} Enforcement result
  */
 async function enforceCoverage(projectRoot, mode, customThreshold) {
   const result = await checkCoverage(projectRoot, mode);
@@ -241,7 +241,7 @@ async function enforceCoverage(projectRoot, mode, customThreshold) {
 /**
  * Show coverage trend over time
  * @param {string} projectRoot - Project root path
- * @returns {Object} Trend result
+ * @returns {Promise<Object>} Trend result
  */
 async function showTrend(projectRoot) {
   const historyPath = path.join(projectRoot, '.ctoc', 'coverage-history.json');
@@ -342,7 +342,7 @@ async function showTrend(projectRoot) {
  * @param {string} projectRoot - Project root path
  * @param {string} mode - Quality mode
  * @param {number} below - Show files below this threshold
- * @returns {Object} Files coverage result
+ * @returns {Promise<Object>} Files coverage result
  */
 async function showFilesCoverage(projectRoot, mode, below) {
   const reportPath = findCoverageReport(projectRoot);

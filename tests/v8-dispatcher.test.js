@@ -10,7 +10,7 @@
  *   - Grade tracking math
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -36,7 +36,7 @@ function setupTempProject() {
 
 function teardownTempProject() {
   process.chdir(originalCwd);
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore: best-effort temp cleanup */ }
 }
 
 describe('v8-dispatcher — ULID generation', () => {

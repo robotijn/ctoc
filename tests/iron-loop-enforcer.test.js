@@ -9,7 +9,7 @@
  *   - Format functions produce parseable output
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -84,7 +84,7 @@ describe('iron-loop-enforcer — violation detection', () => {
 
   afterEach(() => {
     if (tmpRoot) {
-      try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* ignore: best-effort temp cleanup, non-fatal */ }
       tmpRoot = null;
     }
   });

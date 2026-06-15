@@ -204,13 +204,6 @@ class QualityScorer {
       source: null
     };
 
-    // Try to find lint results
-    const lintPaths = [
-      { path: '.eslintcache', format: 'eslint-cache' },
-      { path: 'lint-results.json', format: 'json' },
-      { path: '.ruff_cache', format: 'ruff' }
-    ];
-
     // For now, estimate based on file existence of lint config
     const lintConfigs = [
       'eslint.config.js', '.eslintrc.js', '.eslintrc.json', '.eslintrc.yml',

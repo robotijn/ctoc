@@ -103,7 +103,7 @@ function detectProjectType(projectPath) {
       if (deps['@nestjs/core']) result.frameworks.push('NestJS');
 
       return result;
-    } catch (e) {}
+    } catch (e) { /* ignore: malformed or unreadable package.json, fall through to other detectors */ }
   }
 
   // Check for Python

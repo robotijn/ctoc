@@ -7,12 +7,11 @@
  * @module lib/runner-setup
  */
 
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const https = require('https');
-const { runAllChecks, formatPrerequisites } = require('./runner-detect');
 
 /**
  * Runner preferences

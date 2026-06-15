@@ -146,17 +146,6 @@ function testIronLoopMarkerConstant() {
 
 // Test integrate() returns valid markdown with Steps 8-16
 function testIntegrateReturnsValidMarkdown() {
-  // Mock integrate function behavior
-  const planContent = `# Test Plan
-
-## Problem Statement
-Need to implement feature X.
-
-## Requirements
-- Requirement 1
-- Requirement 2
-`;
-
   // Expected output format - canonical step labels
   const expectedSections = [
     '## Execution Plan (Steps 8-16)',

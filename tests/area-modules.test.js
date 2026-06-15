@@ -25,7 +25,7 @@ function tempProject() {
   fs.mkdirSync(path.join(dir, 'src', 'commands'), { recursive: true });
   return dir;
 }
-function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ } }
 
 describe('area module contracts', () => {
   for (const name of AREA_MODULES) {

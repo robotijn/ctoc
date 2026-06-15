@@ -24,7 +24,6 @@
 
 'use strict';
 
-const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
 
@@ -221,11 +220,11 @@ function validateCase(caseObj) {
   }
 
   // Field-specific checks (only if the field is present)
-  if (typeof caseObj.id === 'string' && !/^[a-z0-9][a-z0-9\-]*$/.test(caseObj.id)) {
+  if (typeof caseObj.id === 'string' && !/^[a-z0-9][a-z0-9-]*$/.test(caseObj.id)) {
     errors.push('id must be lowercase, hyphen-separated, starting with letter or digit');
   }
 
-  if (typeof caseObj.skill === 'string' && !/^[a-z0-9][a-z0-9\-]*(\/[a-z0-9][a-z0-9\-]*)+$/.test(caseObj.skill)) {
+  if (typeof caseObj.skill === 'string' && !/^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)+$/.test(caseObj.skill)) {
     errors.push('skill must be a path like "category/skill-name"');
   }
 

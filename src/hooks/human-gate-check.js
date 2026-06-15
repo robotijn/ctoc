@@ -34,7 +34,7 @@ function loadViolations() {
     if (fs.existsSync(VIOLATIONS_FILE)) {
       return JSON.parse(fs.readFileSync(VIOLATIONS_FILE, 'utf8'));
     }
-  } catch {}
+  } catch { /* ignore: best-effort, non-fatal */ }
   return [];
 }
 
@@ -146,7 +146,7 @@ function main() {
         });
 
         // Revert to previous stage
-        const newPath = revertPlan(v);
+        revertPlan(v);
         console.error(`  Action: REVERTED to ${v.revertTo}/`);
         console.error('');
       }

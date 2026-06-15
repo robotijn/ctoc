@@ -20,7 +20,7 @@ function loadViolations() {
     if (fs.existsSync(VIOLATIONS_FILE)) {
       return JSON.parse(fs.readFileSync(VIOLATIONS_FILE, 'utf8'));
     }
-  } catch {}
+  } catch { /* ignore: best-effort, non-fatal */ }
   return [];
 }
 
@@ -44,7 +44,7 @@ function getLastAck() {
     if (fs.existsSync(ACK_FILE)) {
       return JSON.parse(fs.readFileSync(ACK_FILE, 'utf8'));
     }
-  } catch {}
+  } catch { /* ignore: best-effort, non-fatal */ }
   return { acknowledgedAt: null };
 }
 

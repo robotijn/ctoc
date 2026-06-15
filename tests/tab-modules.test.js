@@ -8,7 +8,7 @@
  * DRY: Shared fixtures for app state, grouped by operation type
  */
 
-const { test, describe, mock, beforeEach, afterEach } = require('node:test');
+const { test, describe } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 
@@ -88,9 +88,6 @@ function createMockKey(name, overrides = {}) {
 // ============================================================================
 // MODULE MOCKS
 // ============================================================================
-
-// Store original module cache
-const originalModules = {};
 
 // Mock state module
 function mockState(mocks = {}) {

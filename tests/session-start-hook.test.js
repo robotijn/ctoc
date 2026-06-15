@@ -16,7 +16,7 @@ const HOOK_PATH = path.join(__dirname, '..', 'src', 'hooks', 'SessionStart.js');
 
 function runHook(env = {}) {
   return new Promise((resolve, reject) => {
-    const child = execFile('node', [HOOK_PATH], {
+    execFile('node', [HOOK_PATH], {
       cwd: path.join(__dirname, '..'),
       env: { ...process.env, ...env },
       timeout: 15000
@@ -44,7 +44,7 @@ describe('SessionStart hook', () => {
   });
 
   it('should include version banner on stdout (not stderr)', async () => {
-    const { stdout, stderr } = await runHook();
+    const { stderr } = await runHook();
     // Version info should be on stdout or nowhere, never stderr
     assert.ok(!stderr.includes('ctoc v'), 'Version banner leaked to stderr');
   });

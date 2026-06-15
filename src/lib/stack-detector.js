@@ -140,7 +140,7 @@ function detectLanguages(projectPath) {
             found = true;
             break;
           }
-        } catch (e) {}
+        } catch (e) { /* ignore: unreadable dir means no match for this pattern */ }
       } else {
         if (fs.existsSync(path.join(projectPath, file))) {
           found = true;

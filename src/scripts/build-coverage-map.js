@@ -25,8 +25,6 @@ const { execSync } = require('child_process');
 // Import from lib (relative path for scripts)
 const libPath = path.join(__dirname, '..', 'lib');
 const {
-  loadCoverageMap,
-  saveCoverageMap,
   clearCoverageMap,
   mergeCoverageData
 } = require(path.join(libPath, 'coverage-map'));
@@ -304,7 +302,7 @@ function findCoverageFile(framework, projectPath = process.cwd()) {
 function detectFramework(projectPath = process.cwd()) {
   const tools = detectTools(projectPath);
 
-  for (const [lang, langTools] of Object.entries(tools.tools)) {
+  for (const [_lang, langTools] of Object.entries(tools.tools)) {
     if (langTools.testFramework) {
       return langTools.testFramework.toLowerCase();
     }
@@ -320,22 +318,6 @@ function detectFramework(projectPath = process.cwd()) {
   }
 
   return 'unknown';
-}
-
-/**
- * Extract test -> file mapping from test results
- * Parses test output to find which tests executed which files
- * @param {string} testOutput - Test runner output
- * @param {string} framework - Test framework
- * @returns {Object} Test to files mapping
- */
-function extractTestMapping(testOutput, framework) {
-  const mapping = {};
-
-  // This is framework-specific and often requires --verbose or special reporters
-  // For now, return empty - this should be enhanced per framework
-
-  return mapping;
 }
 
 /**
@@ -415,7 +397,7 @@ async function buildCoverageMap(options = {}) {
       case 'lcov':
         coverageData = parseLcovCoverage(coverageFile);
         break;
-      default:
+      default: {
         // Try to auto-detect from file content
         const content = fs.readFileSync(coverageFile, 'utf8');
         if (content.startsWith('mode:')) {
@@ -425,6 +407,7 @@ async function buildCoverageMap(options = {}) {
         } else {
           coverageData = parseJestCoverage(coverageFile);
         }
+      }
     }
   } catch (err) {
     return {
@@ -433,8 +416,8 @@ async function buildCoverageMap(options = {}) {
     };
   }
 
-  // Merge into coverage map
-  const map = mergeCoverageData(coverageData, framework);
+  // Merge into coverage map (writes the map to disk as a side effect)
+  mergeCoverageData(coverageData, framework);
 
   const fileCount = Object.keys(coverageData).length;
   console.log(`\nProcessed ${fileCount} source files`);

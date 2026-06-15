@@ -29,7 +29,7 @@ function tempProject() {
   }
   return dir;
 }
-function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+function cleanup(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ } }
 
 describe('inbox counts and listing', () => {
   let root;

@@ -190,7 +190,7 @@ class DependencyAuditor {
 
   /**
    * Run dependency audit on the project
-   * @returns {Object} Audit results
+   * @returns {Promise<Object>} Audit results
    */
   async run() {
     const startTime = Date.now();

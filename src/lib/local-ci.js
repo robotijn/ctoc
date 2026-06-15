@@ -7,9 +7,6 @@
  * @module lib/local-ci
  */
 
-const { execSync, spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
 const { parseCIConfig, CHECK_TYPES } = require('./ci-parser');
 const { runCommand, TEST_STATUS, DEFAULT_TIMEOUT } = require('./test-runner');
 
