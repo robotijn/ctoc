@@ -501,10 +501,13 @@ node "${agentHookPath}" 2>/dev/null &
     return { installed: true, appended: true };
   }
 
-  // Create new hook script
+  // Create new hook script. EVERY generated content line must carry a CTOC
+  // marker ("CTOC" or "post-commit.js"), because uninstallPostCommitHook
+  // identifies removable lines by that marker — an untagged line would be
+  // treated as foreign and leave a dangling hook file behind.
   const hookContent = `#!/bin/sh
 # CTOC post-commit hook - triggers background quality agent
-# This hook is NON-BLOCKING - commit always succeeds instantly.
+# CTOC hook is NON-BLOCKING - commit always succeeds instantly.
 node "${agentHookPath}" 2>/dev/null &
 `;
 
