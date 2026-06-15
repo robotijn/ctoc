@@ -63,7 +63,17 @@ if (HUMAN_GATES[sourceStage] === destination) {
 }
 
 const root = findProjectRoot();
+const plansRoot = path.resolve(root, 'plans');
 const planPath = path.join(root, 'plans', ref);
+
+// Confine the source to the plans/ tree. The file part of `ref` is unvalidated,
+// so a ref like "functional/../../outside.md" would otherwise resolve outside
+// plans/ and let move-plan.js rename an arbitrary file into the pipeline.
+const resolvedPlanPath = path.resolve(planPath);
+if (resolvedPlanPath !== plansRoot && !resolvedPlanPath.startsWith(plansRoot + path.sep)) {
+  console.error(`Refusing reference that escapes the plans/ directory: ${ref}`);
+  process.exit(1);
+}
 
 // Check source file exists
 if (!fs.existsSync(planPath)) {

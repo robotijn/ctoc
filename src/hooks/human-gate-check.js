@@ -56,7 +56,22 @@ function logViolation(entry) {
 function hasApprovalMarker(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    return content.includes('approved_by: human');
+    // Approval MUST come from the YAML frontmatter block, never from arbitrary
+    // body text. A substring search (the old behaviour) let any plan forge a
+    // gate crossing by writing "approved_by: human" in a code fence, prose, or
+    // a commented-out / rejected line — and rejected a genuine approval whose
+    // value had non-canonical spacing. Parse the frontmatter and require an
+    // `approved_by` key whose value trims to exactly "human".
+    const fm = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!fm) return false;
+    for (const line of fm[1].split(/\r?\n/)) {
+      const m = line.match(/^\s*approved_by\s*:\s*(.+?)\s*$/);
+      if (m) {
+        const value = m[1].replace(/^["']|["']$/g, '').trim();
+        if (value === 'human') return true;
+      }
+    }
+    return false;
   } catch {
     return false;
   }

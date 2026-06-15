@@ -33,6 +33,23 @@ const STAGE_FOLDERS = {
   done: 'done'
 };
 
+/**
+ * A plan reference's file part is always a bare filename inside a stage folder.
+ * Anything with a path separator, a ".." segment, an absolute path, or a NUL
+ * byte is a directory-traversal attempt and must be refused before the path is
+ * joined or read (e.g. "functional/../../etc/passwd").
+ */
+function isUnsafePlanFile(file) {
+  return typeof file !== 'string'
+    || file === ''
+    || file.includes('/')
+    || file.includes('\\')
+    || file.includes('\0')
+    || file.split(/[\\/]/).includes('..')
+    || file.includes('..')
+    || path.isAbsolute(file);
+}
+
 // Stage flow: what stage comes next after approval
 const NEXT_STAGE = {
   functional: 'implementation',
@@ -725,6 +742,17 @@ function validateScreen(stage, file, projectPath) {
   const root = getProjectPath(projectPath);
   const plansDir = getPlansDir(root);
   const folder = STAGE_FOLDERS[stage];
+  // Confine to a single plan file inside plans/<folder>/. A plan reference is
+  // always a bare filename; anything containing path separators or ".." is a
+  // traversal attempt (e.g. "functional/../../etc/passwd") and must not be
+  // resolved or read.
+  if (!folder || isUnsafePlanFile(file)) {
+    return {
+      text: `Invalid plan reference: ${stage}/${file}\n${'─'.repeat(40)}\n\n  Refusing a reference that escapes the plans/ directory.\n\n\n`,
+      ask: { questions: [{ question: 'Invalid reference.', header: 'Error', options: [{ label: '◀ Back', description: 'Return to dashboard' }] }] },
+      actions: { '◀ Back': '' },
+    };
+  }
   const planPath = path.join(plansDir, folder, file);
   const planName = file.replace('.md', '');
   const nextStage = NEXT_STAGE[stage];

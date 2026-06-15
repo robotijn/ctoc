@@ -39,7 +39,20 @@ const WHITELIST = [
 
 function isWhitelisted(filePath) {
   if (!filePath) return false;
-  const norm = filePath.replace(/^\.\//, '').replace(/^\//, '');
+  // Claude Code passes ABSOLUTE file paths; relativize against the project root
+  // so the anchored patterns (^plans/.*\.md$, ^VERSION$, ^\.ctoc/) match. Without
+  // this, every whitelisted file was wrongly blocked in production.
+  let norm = filePath;
+  if (path.isAbsolute(norm)) {
+    norm = path.relative(process.cwd(), norm);
+  }
+  norm = norm.replace(/\\/g, '/').replace(/^\.\//, '');
+  // Reject any path that escapes the project root via traversal — otherwise a
+  // crafted target like ".ctoc/../src/lib/x.js" or "plans/../../outside.md"
+  // would match a whitelist prefix yet resolve to an arbitrary file.
+  if (norm === '' || norm === '..' || norm.startsWith('../') || norm.includes('/../')) return false;
+  norm = path.posix.normalize(norm);
+  if (norm.startsWith('../')) return false;
   for (const pattern of WHITELIST) {
     if (typeof pattern === 'string') {
       if (norm === pattern || path.basename(norm) === pattern) return true;
