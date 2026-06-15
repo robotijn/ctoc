@@ -108,13 +108,20 @@ function parseYAMLShallow(content) {
     }
     const parent = stack[stack.length - 1].obj;
 
-    // List item under current parent
+    // List item. When a `key:` introduced a block list, the active stack frame's
+    // obj IS that array, so push straight into it. The old code looked up
+    // parent[lastKey] on the array frame — always undefined — so it silently
+    // dropped EVERY block-list item, which meant every shipped regime profile
+    // (hipaa.yaml, etc.) parsed required_controls to [] and activated zero
+    // controls in production.
     const listMatch = stripped.match(/^[ \t]*-\s*(.*)$/);
     if (listMatch) {
       const value = listMatch[1].trim();
-      const parentKey = stack[stack.length - 1].lastKey;
-      if (parentKey && Array.isArray(parent[parentKey])) {
-        parent[parentKey].push(coerce(value));
+      const top = stack[stack.length - 1];
+      if (Array.isArray(top.obj)) {
+        top.obj.push(coerce(value));
+      } else if (top.lastKey && Array.isArray(top.obj[top.lastKey])) {
+        top.obj[top.lastKey].push(coerce(value));
       }
       continue;
     }
