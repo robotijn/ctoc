@@ -54,9 +54,14 @@ const ALWAYS_ALLOWED = [
 ];
 
 /**
- * Git commit pattern
+ * Git commit pattern (kept for reference / simple single-segment cases).
+ * NOTE: the anchored form alone is bypassable (see isCommitCommand below).
  */
 const GIT_COMMIT_PATTERN = /^\s*git\s+(commit|push)/;
+
+// git global flags that take a separate argument (so the next token is the
+// flag's value, not the subcommand). Used to find the real subcommand.
+const GIT_VALUE_FLAGS = new Set(['-c', '-C', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--super-prefix']);
 
 /**
  * Check if command is a write command
@@ -89,10 +94,32 @@ function isWriteCommand(command) {
 }
 
 /**
- * Check if command is a git commit
+ * Check if a command invokes `git commit` or `git push` anywhere — including
+ * when chained (`a; git commit`, `a && git push`, `a | git push`), substituted
+ * (`$(git commit)`, backticks), or prefixed with global flags
+ * (`git -c k=v commit`, `git -C . push`). The old `^\s*git\s+(commit|push)`
+ * anchor only matched git as the very first token and missed all of these.
  */
 function isCommitCommand(command) {
-  return GIT_COMMIT_PATTERN.test(command);
+  if (!command) return false;
+  // Split into candidate sub-commands across chaining / substitution boundaries.
+  const segments = String(command).split(/[\n;]|&&|\|\||\||\$\(|`|\(/);
+  for (const seg of segments) {
+    const tokens = seg.trim().split(/\s+/).filter(Boolean);
+    const gi = tokens.indexOf('git');
+    if (gi === -1) continue;
+    // Walk tokens after `git`, skipping global flags and their arguments, to
+    // find the real subcommand.
+    let i = gi + 1;
+    while (i < tokens.length) {
+      const t = tokens[i];
+      if (GIT_VALUE_FLAGS.has(t)) { i += 2; continue; } // flag + its value
+      if (t.startsWith('-')) { i += 1; continue; }      // other global flag (incl. --foo=bar)
+      if (t === 'commit' || t === 'push') return true;  // the subcommand
+      break;                                            // some other subcommand (e.g. log)
+    }
+  }
+  return false;
 }
 
 /**

@@ -68,7 +68,10 @@ describe('Deployment execution — script strategy (live)', () => {
     );
     const res = await executeStrategy(
       'script',
-      { name: 'production', script: 'node deploy.js' },
+      // Secure contract (v6.9.49): the script strategy runs a confined project
+      // FILE via execFile (no shell), interpreter chosen by extension — not an
+      // arbitrary inline command. So config.script is the file path itself.
+      { name: 'production', script: 'deploy.js' },
       { commit: 'c0ffee' },
       { dryRun: false, cwd: dir }
     );
@@ -125,7 +128,9 @@ describe('Deployment execution — webhook strategy (live, localhost)', () => {
     const url = `http://127.0.0.1:${server.address().port}/deploy`;
     try {
       const res = await deployToEnvironment(
-        { name: 'staging', strategy: 'webhook', url },
+        // allow_internal_webhooks opts THIS test's localhost server past the new
+        // SSRF guard, which default-denies loopback/private/link-local targets.
+        { name: 'staging', strategy: 'webhook', url, allow_internal_webhooks: true },
         { commit: 'abc', branch: 'main', plan: 'p.md', timestamp: 't' },
         { dryRun: false }
       );
@@ -144,7 +149,7 @@ describe('Deployment execution — webhook strategy (live, localhost)', () => {
     const url = `http://127.0.0.1:${server.address().port}/deploy`;
     try {
       const res = await deployToEnvironment(
-        { name: 'staging', strategy: 'webhook', url },
+        { name: 'staging', strategy: 'webhook', url, allow_internal_webhooks: true },
         { commit: 'abc' },
         { dryRun: false }
       );
@@ -166,7 +171,7 @@ describe('Deployment execution — full pipeline (live script via config)', () =
       deployment: {
         enabled: true,
         dry_run: false,
-        environments: [{ name: 'staging', enabled: true, strategy: 'script', script: 'node run.js' }],
+        environments: [{ name: 'staging', enabled: true, strategy: 'script', script: 'run.js' }],
         approval: { staging: 'auto', production: 'auto' }
       }
     }));

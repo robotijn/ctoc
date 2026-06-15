@@ -63,7 +63,10 @@ function validatePlanStepLabels(planPath) {
   // Check each canonical label
   for (const [num, label] of Object.entries(CANONICAL_LABELS)) {
     const escapedLabel = label.replace('-', '[-\\s]');
-    const stepPattern = new RegExp(`Step\\s*${num}[:\\s]+${escapedLabel}`, 'i');
+    // Trailing (?![\w-]) is REQUIRED: without it "TEST" matches inside the known-
+    // wrong label "TESTING" (and "REVIEW" inside "REVIEWS"), so a wrong label
+    // would silently pass the step-label gate.
+    const stepPattern = new RegExp(`Step\\s*${num}[:\\s]+${escapedLabel}(?![\\w-])`, 'i');
 
     if (!stepPattern.test(content)) {
       // Check if there's a wrong label at this position

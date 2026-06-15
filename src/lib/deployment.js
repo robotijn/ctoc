@@ -12,7 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 // Default deployment configuration
 const DEFAULT_CONFIG = {
@@ -281,15 +281,9 @@ function isLive(opts) {
 
 // Minimal dependency-free JSON POST for the webhook strategy. Resolves to the
 // HTTP status code; rejects on transport error or invalid URL.
-function httpPostJson(url, body) {
+async function httpPostJson(url, body, opts = {}) {
+  const parsed = await assertSafeWebhookUrl(url, opts.allowInternal === true);
   return new Promise((resolve, reject) => {
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch {
-      reject(new Error(`Invalid webhook URL: ${url}`));
-      return;
-    }
     const mod = parsed.protocol === 'http:' ? require('http') : require('https');
     const data = JSON.stringify(body);
     const req = mod.request(parsed, {
@@ -305,14 +299,74 @@ function httpPostJson(url, body) {
   });
 }
 
-// Run a shell command in the project directory, returning trimmed stdout.
-// Shared by the git/script/docker/ssh strategies when running live.
-function run(command, opts) {
-  return execSync(command, {
+// Reject any deployment config value that could break out of a single argument.
+// We now execute via execFileSync (no shell), but validating here gives clear
+// errors and blocks option/argument injection (e.g. a value starting with "-").
+const SHELL_META = /[;&|`$(){}<>\\\n\r'"\s]/;
+function assertSafeArg(value, label) {
+  const s = String(value == null ? '' : value);
+  if (s === '' || SHELL_META.test(s) || s.startsWith('-')) {
+    throw new Error(`Unsafe ${label} for deployment: ${JSON.stringify(value)}`);
+  }
+  return s;
+}
+
+// Mask secret-looking values so tokens/keys never surface in returned intents.
+function maskSecrets(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/(--?(?:token|secret|key|password|pass|credential|api[-_]?key)[=: ]+)(\S+)/gi, '$1***');
+}
+
+// Run a program WITHOUT a shell so config-derived arguments cannot inject
+// commands (OWASP/Snyk: prefer execFile + argument array over exec).
+function runFile(file, args, opts) {
+  return execFileSync(file, args, {
     cwd: (opts && opts.cwd) || process.cwd(),
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe']
   }).trim();
+}
+
+// SSRF guard: a webhook must be http(s) and must not resolve to a loopback,
+// private (RFC1918), link-local (incl. the 169.254.169.254 cloud-metadata IP),
+// or unspecified address. Override with deployment.allow_internal_webhooks: true.
+function isBlockedAddress(ip) {
+  const a = String(ip).replace(/^::ffff:/i, '');
+  if (a === '0.0.0.0' || a === '::' || a === '::1') return true;
+  if (/^127\./.test(a)) return true;
+  if (/^10\./.test(a)) return true;
+  if (/^192\.168\./.test(a)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(a)) return true;
+  if (/^169\.254\./.test(a)) return true;
+  if (/^f[cd][0-9a-f]{2}:/i.test(a)) return true; // IPv6 unique-local
+  if (/^fe80:/i.test(a)) return true;             // IPv6 link-local
+  return false;
+}
+async function assertSafeWebhookUrl(url, allowInternal) {
+  let parsed;
+  try { parsed = new URL(url); } catch { throw new Error(`Invalid webhook URL: ${url}`); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Webhook URL must use http or https: ${url}`);
+  }
+  if (allowInternal) return parsed;
+  const host = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+    throw new Error(`Webhook blocked: internal host ${host} (set deployment.allow_internal_webhooks: true to override)`);
+  }
+  const net = require('net');
+  let addrs;
+  if (net.isIP(host)) {
+    addrs = [host];
+  } else {
+    try { addrs = (await require('dns').promises.lookup(host, { all: true })).map((r) => r.address); }
+    catch { throw new Error(`Webhook host did not resolve: ${host}`); }
+  }
+  for (const a of addrs) {
+    if (isBlockedAddress(a)) {
+      throw new Error(`Webhook blocked: ${host} resolves to non-public address ${a} (set deployment.allow_internal_webhooks: true to override)`);
+    }
+  }
+  return parsed;
 }
 
 /**
@@ -322,10 +376,12 @@ function run(command, opts) {
 function executeGitBranch(config, context, opts = {}) {
   const remote = config.remote || 'origin';
   const targetBranch = config.branch || `deploy/${config.name}`;
-  const command = `git push ${remote} HEAD:refs/heads/${targetBranch}`;
+  const command = maskSecrets(`git push ${remote} HEAD:refs/heads/${targetBranch}`);
   const intent = { strategy: 'git-branch', branch: targetBranch, remote, commit: context.commit, command, dryRun: !isLive(opts) };
   if (!isLive(opts)) return intent;
-  return { ...intent, executed: true, output: run(command, opts) };
+  const safeRemote = assertSafeArg(remote, 'git remote');
+  const safeBranch = assertSafeArg(targetBranch, 'git branch');
+  return { ...intent, executed: true, output: runFile('git', ['push', safeRemote, `HEAD:refs/heads/${safeBranch}`], opts) };
 }
 
 /**
@@ -337,10 +393,14 @@ function executeGitTag(config, context, opts = {}) {
   const tag = config.tagPattern
     ? config.tagPattern.replace('{env}', config.name).replace('{commit}', context.commit)
     : `${context.commit}-${config.name}`;
-  const command = `git tag ${tag} && git push ${remote} ${tag}`;
+  const command = maskSecrets(`git tag ${tag} && git push ${remote} ${tag}`);
   const intent = { strategy: 'git-tag', tag, remote, commit: context.commit, command, dryRun: !isLive(opts) };
   if (!isLive(opts)) return intent;
-  return { ...intent, executed: true, output: run(command, opts) };
+  const safeRemote = assertSafeArg(remote, 'git remote');
+  const safeTag = assertSafeArg(tag, 'git tag');
+  runFile('git', ['tag', safeTag], opts);
+  const output = runFile('git', ['push', safeRemote, safeTag], opts);
+  return { ...intent, executed: true, output };
 }
 
 /**
@@ -360,7 +420,7 @@ async function executeWebhook(config, context, opts = {}) {
   };
   const intent = { strategy: 'webhook', url: config.url, payload, dryRun: !isLive(opts) };
   if (!isLive(opts)) return intent;
-  const httpStatus = await httpPostJson(config.url, payload);
+  const httpStatus = await httpPostJson(config.url, payload, { allowInternal: config.allow_internal_webhooks === true });
   if (httpStatus >= 400) {
     throw new Error(`Webhook for ${config.name} returned HTTP ${httpStatus}`);
   }
@@ -376,12 +436,32 @@ function executeScript(config, context, opts = {}) {
   if (!config.script) {
     throw new Error(`Script path not configured for ${config.name}`);
   }
-  const intent = { strategy: 'script', script: config.script, environment: config.name, command: config.script, dryRun: !isLive(opts) };
+  const cwd = opts.cwd || process.cwd();
+  const intent = { strategy: 'script', script: maskSecrets(config.script), environment: config.name, command: maskSecrets(config.script), dryRun: !isLive(opts) };
   if (!isLive(opts)) return intent;
-  const output = execSync(config.script, {
-    cwd: opts.cwd || process.cwd(),
+  // Run a deploy SCRIPT FILE confined to the project — never an arbitrary inline
+  // shell string. execFileSync (no shell) means config cannot inject commands.
+  const projectRoot = path.resolve(cwd);
+  const scriptPath = path.resolve(cwd, config.script);
+  if (scriptPath !== projectRoot && !scriptPath.startsWith(projectRoot + path.sep)) {
+    throw new Error(`Deploy script must live inside the project: ${config.script}`);
+  }
+  if (!fs.existsSync(scriptPath) || !fs.statSync(scriptPath).isFile()) {
+    throw new Error(`Deploy script not found: ${config.script}`);
+  }
+  // Pick the interpreter by extension and pass the script as a single argument
+  // (no shell), so it stays usable cross-platform without ever shelling out.
+  const ext = path.extname(scriptPath).toLowerCase();
+  let file = scriptPath;
+  let args = [];
+  if (ext === '.js' || ext === '.cjs' || ext === '.mjs') { file = process.execPath; args = [scriptPath]; }
+  else if (ext === '.sh' || ext === '.bash') { file = 'sh'; args = [scriptPath]; }
+  else if (ext === '.py') { file = 'python3'; args = [scriptPath]; }
+  const output = execFileSync(file, args, {
+    cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
     env: { ...process.env, DEPLOY_ENV: config.name, DEPLOY_COMMIT: context.commit || '' }
   }).trim();
   return { ...intent, executed: true, output };
@@ -396,12 +476,16 @@ function executeDocker(config, context, opts = {}) {
   const tag = config.imageTag || `${config.name}-${context.commit}`;
   const ref = `${image}:${tag}`;
   const buildContext = config.context || '.';
-  const command = `docker build -t ${ref} ${buildContext}`;
+  const command = maskSecrets(`docker build -t ${ref} ${buildContext}`);
   const intent = { strategy: 'docker', image, tag, command, dryRun: !isLive(opts) };
   if (!isLive(opts)) return intent;
-  let output = run(command, opts);
+  const safeImage = assertSafeArg(image, 'docker image');
+  const safeTag = assertSafeArg(tag, 'docker tag');
+  const safeRef = `${safeImage}:${safeTag}`;
+  const safeContext = assertSafeArg(buildContext, 'docker build context');
+  let output = runFile('docker', ['build', '-t', safeRef, safeContext], opts);
   if (config.push) {
-    output += '\n' + run(`docker push ${ref}`, opts);
+    output += '\n' + runFile('docker', ['push', safeRef], opts);
   }
   return { ...intent, executed: true, output };
 }
@@ -416,10 +500,14 @@ function executeSsh(config, context, opts = {}) {
   }
   const user = config.user || 'deploy';
   const remoteCmd = config.command || `echo deployed ${context.commit || ''}`.trim();
-  const command = `ssh ${user}@${config.host} ${JSON.stringify(remoteCmd)}`;
+  const command = maskSecrets(`ssh ${user}@${config.host} ${JSON.stringify(remoteCmd)}`);
   const intent = { strategy: 'ssh', host: config.host, user, command, dryRun: !isLive(opts) };
   if (!isLive(opts)) return intent;
-  return { ...intent, executed: true, output: run(command, opts) };
+  const safeUser = assertSafeArg(user, 'ssh user');
+  const safeHost = assertSafeArg(config.host, 'ssh host');
+  // remoteCmd is passed as a SINGLE argument; with execFileSync there is no
+  // local shell, so it executes only on the remote host (operator's own command).
+  return { ...intent, executed: true, output: runFile('ssh', [`${safeUser}@${safeHost}`, remoteCmd], opts) };
 }
 
 /**
