@@ -1,0 +1,47 @@
+{
+  "general": {
+    "environment": "dev",
+    "timezone": "UTC",
+    "syncInterval": 5,
+    "syncEnabled": true,
+    "keyboardLayout": "latin"
+  },
+  "agents": {
+    "defaultModel": "opus",
+    "maxParallelAgents": 1,
+    "autoPick": true,
+    "timeout": 60,
+    "tokenBudget": 50000
+  },
+  "workflow": {
+    "enforcementMode": "strict",
+    "requireReviewGate": true,
+    "autoMoveToReview": true,
+    "escapePhrases": [
+      "skip planning",
+      "quick fix",
+      "trivial fix",
+      "hotfix"
+    ]
+  },
+  "learning": {
+    "crossAgentLearning": true,
+    "learningMode": "cto_gated",
+    "autoPublish": true,
+    "critiqueLoops": 5
+  },
+  "git": {
+    "coAuthor": "Claude Opus 4.5 <noreply@anthropic.com>",
+    "autoSync": true,
+    "forceWithLease": true,
+    "commitAndPush": true
+  },
+  "privacy": {
+    "cachingEnabled": true,
+    "structureTtl": "24h",
+    "insightsTtl": "1h",
+    "gitignoreCache": true,
+    "redactSecrets": true,
+    "showCostEstimates": true
+  }
+}

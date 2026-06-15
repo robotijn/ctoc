@@ -1,6 +1,9 @@
 ---
 title: "C1 — PreToolUse Pipeline Enforcement Hook"
 created: "2026-05-14T00:00:00Z"
+approved_by: human
+approved_at: "2026-06-15T00:00:00Z"
+gate_crossed: "functional → done (shipped in v6.3.0; archived 2026-06-15)"
 priority: HIGH
 type: feature
 parent_vision: ctoc-v7-mandatory-pipeline-enforcement

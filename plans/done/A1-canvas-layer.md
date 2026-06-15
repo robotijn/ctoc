@@ -1,6 +1,9 @@
 ---
 title: "A1 — Canvas Layer (Lean Canvas + BMC)"
 created: "2026-05-14T00:00:00Z"
+approved_by: human
+approved_at: "2026-06-15T00:00:00Z"
+gate_crossed: "functional → done (shipped in v6.2.0; archived 2026-06-15)"
 priority: HIGH
 type: feature
 parent_vision: ctoc-v7-business-first-architecture
