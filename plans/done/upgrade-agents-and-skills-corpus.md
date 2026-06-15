@@ -3,9 +3,12 @@ title: "Upgrade the Agent & Skill Corpus — fill the thin reference library, fi
 created: "2026-06-15T00:00:00Z"
 priority: HIGH
 type: vision
-status: draft
+status: decomposed
 program: ctoc-corpus-quality
 order: 1
+approved_by: human
+approved_at: "2026-06-15T00:00:00Z"
+gate_crossed: "vision → done (decomposed 2026-06-15)"
 ---
 
 # Upgrade the Agent & Skill Corpus

@@ -3,9 +3,12 @@ title: "Automated Stale-Plan Detection & Human-Gated Cleanup"
 created: "2026-06-15T00:00:00Z"
 priority: MEDIUM
 type: vision
-status: draft
+status: decomposed
 program: ctoc-pipeline-hygiene
 order: 1
+approved_by: human
+approved_at: "2026-06-15T00:00:00Z"
+gate_crossed: "vision → done (decomposed 2026-06-15)"
 ---
 
 # Automated Stale-Plan Detection & Human-Gated Cleanup
