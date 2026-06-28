@@ -433,3 +433,16 @@ Add `agents/_shared/` to the list of CTOC directories created during init (per I
 2. **10-round integrator+critic per agent DEFERRED**: Phase 1 is the foundation (snippets + init + 3 agents). The 10-round critic is high-cost; running it on 12 agents in one session is unrealistic. Phase 2 commits run the critic per-agent and capture diffs.
 3. **Shared snippet refs use markdown links not include directives**: agents are read by Claude as plain markdown; there's no include mechanism. The reader resolves the link semantically.
 4. **agents/_shared/ added at top of CTOC_DIRS but NOT inside agents-prefixed namespace**: still in agents/ tree but isolated by underscore prefix. Distinguishes from real agent files.
+
+
+---
+
+## Archived 2026-06-28 — reconciliation (bookkeeping, not a Gate-3 crossing)
+
+Deliverables verified present in the repository on 2026-06-28; this plan file was
+simply never moved out of `in-progress/` after the work shipped on 2026-05-14.
+
+- Phase 1 (commit f5b29bc, v6.3.3): `agents/_shared/{no-stub-rule,async-choice-protocol,ancestry-read}.md`, `src/lib/init-project.js` CTOC_DIRS, and vision-advisor / product-owner / implementation-planner modernized — present.
+- Phase 2 (since shipped): cto-chief, iron-loop-{executor,critic,integrator}, vision-decomposer all carry the v7 fields (`effort`, `reads_ancestry`, `async_choice_protocol`, `model_optimized_for`) — present.
+
+Moved `in-progress → done` via `movePlan` (not `approvePlan`). Program superseded by the v8 four-tier architecture.

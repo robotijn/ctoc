@@ -571,3 +571,16 @@ This is cosmetic; both views coexist in the plan.
 ## Structural Recommendation Status
 
 The B2 → B2a/B2b split was proposed but **not applied** in this round per the user's choice ("Edit B2 inline"). The fixes above tighten B2 as a single plan. If B2 execution surfaces fresh problems with the combined scope, the split can be reconsidered at that point (functional kickback → re-plan).
+
+
+---
+
+## Archived 2026-06-28 — reconciliation (bookkeeping, not a Gate-3 crossing)
+
+Deliverables verified present in the repository on 2026-06-28; never moved out of
+`in-progress/` after the work shipped on 2026-05-14 (pilot commit e7e4b62, v6.4.0).
+
+- Sampled leaf agents (quality/code-reviewer, security/sast-scanner, testing/runners/unit-test-runner, specialized/accessibility-checker, documentation/changelog-generator) all exist as `skills/<...>/SKILL.md` with `type: wrapper` + `target_skill:` backward-compat stubs at the old `agents/` path.
+- The agents→skills split (B2's goal) is realized repo-wide under the v8 four-tier architecture (99 Tier-2 specialist skills).
+
+Moved `in-progress → done` via `movePlan` (not `approvePlan`). The 360-skill audit sweep was descoped to opportunistic per-category fixing (decision B2-5); nothing outstanding.
