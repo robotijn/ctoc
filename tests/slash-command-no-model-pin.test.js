@@ -44,4 +44,13 @@ describe('Slash commands — no model pin (v6.9.29 crash-prevention invariant)',
       );
     });
   }
+
+  it('menu.md declares effort: low (fast, minimal-reasoning menu)', () => {
+    const fm = frontmatterOf(fs.readFileSync(path.join(COMMANDS_DIR, 'menu.md'), 'utf8'));
+    assert.match(
+      fm,
+      /^effort:\s*low\b/m,
+      'menu.md must declare effort: low so the menu renders with minimal reasoning (it is a deterministic script). effort overrides session effort for that turn only and reverts after — unlike model:, it never switches the session model. See CLAUDE.md model rules.'
+    );
+  });
 });

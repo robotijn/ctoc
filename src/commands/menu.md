@@ -1,5 +1,6 @@
 ---
 description: CTOC Dashboard - Your Virtual CTO command center
+effort: low
 ---
 
 Run the state machine to get the current screen as JSON:
