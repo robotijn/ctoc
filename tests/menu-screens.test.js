@@ -126,42 +126,57 @@ describe('Menu Screens Tests', () => {
     assert.ok(result.text, 'Should have text');
     assert.ok(result.text.includes('[functional]'), 'Should show stage name');
     assert.ok(result.text.includes('0 items'), 'Should show 0 items');
-    assert.ok(result.actions['Create new'], 'Should have Create new action');
-    assert.ok('Back' in result.actions, 'Should have Back action key');
-    // Back maps to '' (re-run dashboard), which is falsy but intentional
-    assert.strictEqual(result.actions['Back'], '', 'Back should map to empty string (dashboard)');
+    assert.strictEqual(result.inputMode, 'plan-select', 'browse is free-text plan-select');
+    assert.strictEqual(result.actions['n'], 'claude:create-plan functional', "'n' creates a new plan");
+    assert.ok('b' in result.actions, "Should have 'b' back action key");
+    // 'b' maps to '' (re-run dashboard), which is falsy but intentional
+    assert.strictEqual(result.actions['b'], '', "'b' should map to empty string (dashboard)");
     console.log('# stageBrowse with empty stage returns valid JSON');
   });
 
-  test('stageBrowse with 1-3 plans shows plan buttons', () => {
+  test('stageBrowse with 1-3 plans numbers each plan (numbers open plans)', () => {
     createPlan('functional', 'plan-a');
     createPlan('functional', 'plan-b');
 
     const result = menuScreens.stageBrowse('functional', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
 
-    assert.ok(labels.includes('plan-a'), 'Should have plan-a as button');
-    assert.ok(labels.includes('plan-b'), 'Should have plan-b as button');
-    assert.ok(result.actions['plan-a'], 'plan-a should have action');
-    assert.ok(result.actions['plan-b'], 'plan-b should have action');
-    console.log('# stageBrowse with 1-3 plans shows plan buttons');
+    assert.strictEqual(result.inputMode, 'plan-select');
+    assert.match(result.actions['1'], /^plan functional\/plan-[ab]\.md$/, 'number 1 opens a plan');
+    assert.match(result.actions['2'], /^plan functional\/plan-[ab]\.md$/, 'number 2 opens a plan');
+    const mapped = [result.actions['1'], result.actions['2']].sort();
+    assert.deepStrictEqual(mapped, ['plan functional/plan-a.md', 'plan functional/plan-b.md'],
+      'numbers 1-2 map bijectively to the two plans');
+    console.log('# stageBrowse with 1-3 plans numbers each plan');
   });
 
-  test('stageBrowse with 4+ plans shows numbered list', () => {
+  test('stageBrowse with 4+ plans: numbers map ONLY to plans', () => {
     createPlan('functional', 'plan-a');
     createPlan('functional', 'plan-b');
     createPlan('functional', 'plan-c');
     createPlan('functional', 'plan-d');
 
     const result = menuScreens.stageBrowse('functional', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
 
-    // 4+ plans: plan names should NOT be buttons
-    assert.ok(!labels.includes('plan-a'), 'plan-a should NOT be a button with 4+ plans');
-    // But should have number actions
     assert.ok(result.actions['1'], 'Should have number 1 action');
     assert.ok(result.actions['4'], 'Should have number 4 action');
-    console.log('# stageBrowse with 4+ plans shows numbered list');
+    // EVERY numeric action key opens a plan — never a meta-action (the bug).
+    for (const [key, val] of Object.entries(result.actions)) {
+      if (/^\d+$/.test(key)) {
+        assert.match(val, /^plan functional\/.+\.md$/, `numeric key ${key} must open a plan, got '${val}'`);
+      }
+    }
+    console.log('# stageBrowse with 4+ plans: numbers map only to plans');
+  });
+
+  test('stageBrowse: every plan including the 25th is reachable by number', () => {
+    for (let i = 1; i <= 25; i++) createPlan('functional', `p${String(i).padStart(2, '0')}`);
+
+    const result = menuScreens.stageBrowse('functional', testDir);
+
+    assert.ok(result.actions['25'], 'plan 25 must be reachable by its number (multi-digit)');
+    assert.match(result.actions['25'], /^plan functional\/.+\.md$/);
+    assert.notStrictEqual(result.actions['1'], '', "number 1 must open a plan, not 'back'");
+    console.log('# stageBrowse: plan 25 reachable; numbers never meta-actions');
   });
 
   test('stageBrowse with unknown stage shows error', () => {
@@ -353,28 +368,36 @@ describe('Menu Screens Tests', () => {
   test('all screens have actions mapping for every option', () => {
     createPlan('functional', 'plan-a');
 
-    const screens = [
+    // AskUserQuestion-driven screens: every option label maps to an action.
+    const askScreens = [
       menuScreens.dashboardPipeline(testDir),
       menuScreens.dashboardCommands(testDir),
-      menuScreens.stageBrowse('functional', testDir),
       menuScreens.planActions('functional', 'plan-a.md', testDir),
       menuScreens.planActionsMore('functional', 'plan-a.md', testDir),
       menuScreens.discussMenu('functional', 'plan-a.md', testDir)
     ];
 
-    screens.forEach((screen, i) => {
+    askScreens.forEach((screen, i) => {
       const options = screen.ask.questions[0].options;
       options.forEach(opt => {
         const hasAction = opt.label in screen.actions;
         // Allow "Other" options that don't map to actions
         if (!hasAction && opt.label !== 'Other') {
-          // Check if it's a plan name that maps via plan name
-          const hasAnyAction = Object.keys(screen.actions).some(k => k === opt.label);
-          assert.ok(hasAnyAction || opt.label in screen.actions,
+          assert.ok(opt.label in screen.actions,
             `Screen ${i}: option "${opt.label}" has no action mapping`);
         }
       });
     });
+
+    // Free-text plan-select screens (browse) carry no AskUserQuestion: every
+    // action key must be a plan number or a navigation word (n/new/b/back).
+    const browse = menuScreens.stageBrowse('functional', testDir);
+    assert.strictEqual(browse.inputMode, 'plan-select');
+    assert.ok(!('ask' in browse), 'plan-select screens carry no AskUserQuestion');
+    for (const key of Object.keys(browse.actions)) {
+      assert.ok(/^\d+$/.test(key) || ['n', 'new', 'b', 'back'].includes(key),
+        `browse action key "${key}" must be a number or a nav word`);
+    }
     console.log('# all screens have actions mapping for every option');
   });
 

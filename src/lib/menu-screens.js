@@ -427,45 +427,34 @@ function stageBrowse(stage, projectPath) {
     text += '\n';
   }
 
-  text += '\n\n\n';
+  // Numbers are reserved EXCLUSIVELY for opening a plan — any count, multi-digit.
+  // Meta-actions are WORDS ('n' new, 'b' back), so a number can never select
+  // navigation by accident and every plan (including the 25th) is reachable by
+  // typing its number. (Fixes the AskUserQuestion-numbering collision where the
+  // first option grabbed "1" and >9 plans were unreachable.)
+  text += plans.length > 0
+    ? `\n  Reply with a plan number (1-${plans.length}) to open it · n = new ${stage} plan · b = back\n\n\n`
+    : `\n  Reply:  n = new ${stage} plan · b = back\n\n\n`;
 
-  // Build options
-  const options = [];
   const actions = {};
-
-  if (plans.length <= 3) {
-    // Each plan is a button
-    plans.forEach((plan, i) => {
-      const label = plan.name;
-      options.push({ label, description: `View and manage this plan` });
-      actions[label] = `plan ${stage}/${plan.name}.md`;
-    });
-  }
-
-  // Always show Create new and Back
-  options.push({ label: 'Create new', description: `Create a new ${stage} plan` });
-  options.push({ label: 'Back', description: 'Return to dashboard' });
-  actions['Create new'] = `claude:create-plan ${stage}`;
-  actions['Back'] = '';
-
-  // For 4+ plans, plan selection is handled via "Other" in AskUserQuestion
-  if (plans.length > 3) {
-    plans.forEach((plan, i) => {
-      actions[`${i + 1}`] = `plan ${stage}/${plan.name}.md`;
-    });
-  }
+  plans.forEach((plan, i) => {
+    actions[`${i + 1}`] = `plan ${stage}/${plan.name}.md`;
+  });
+  // Word-keyed navigation — NEVER numeric.
+  actions['n'] = `claude:create-plan ${stage}`;
+  actions['new'] = `claude:create-plan ${stage}`;
+  actions['b'] = '';
+  actions['back'] = '';
 
   return {
     text,
-    ask: {
-      questions: [{
-        question: plans.length > 3
-          ? `Type a number (1-${plans.length}) to select a plan, or choose an action:`
-          : 'Select a plan or action:',
-        header: stage,
-        options
-      }]
-    },
+    // inputMode tells the driver: do NOT render a numbered AskUserQuestion for a
+    // plan list. Show the list and take a free-text reply — a number opens that
+    // plan via actions[number]; 'n'/'b' are the only non-plan shortcuts (words).
+    inputMode: 'plan-select',
+    prompt: plans.length > 0
+      ? `Reply with a plan number (1-${plans.length}) to open it, or 'n' for a new plan, 'b' for back.`
+      : `No plans in ${stage}. Reply 'n' to create one, or 'b' for back.`,
     actions
   };
 }

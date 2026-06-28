@@ -204,16 +204,22 @@ describe('e2e: menu state machine via real process', () => {
       assert.match(json.text, new RegExp(`\\[${i}\\] `), `numbered item [${i}] rendered`);
     }
 
-    // With ≤3 plans each plan is its own button; every plan maps to a `plan
-    // functional/<file>.md` action keyed by its name (order-independent, so no
-    // reliance on birthtime-tie FIFO ordering).
-    for (const name of ['alpha', 'beta', 'gamma']) {
-      assert.equal(json.actions[name], `plan functional/${name}.md`,
-        `"${name}" button routes to its plan action`);
+    assert.equal(json.inputMode, 'plan-select', 'browse is free-text plan-select');
+
+    // Numbers 1..3 map bijectively to the three plans; nothing else is numeric.
+    const mapped = [];
+    for (let i = 1; i <= 3; i++) {
+      assert.match(json.actions[String(i)], /^plan functional\/[a-z]+\.md$/, `key ${i} opens a plan`);
+      mapped.push(json.actions[String(i)]);
     }
-    // Navigation affordances present.
-    assert.ok('Create new' in json.actions, 'Create new offered');
-    assert.equal(json.actions['Back'], '', 'Back returns to dashboard');
+    assert.deepEqual(mapped.slice().sort(),
+      ['alpha', 'beta', 'gamma'].map(n => `plan functional/${n}.md`).sort(),
+      'numbers 1..3 map bijectively to the three plans');
+
+    // Navigation is word-keyed, never numeric.
+    assert.equal(json.actions['n'], 'claude:create-plan functional', "'n' = new plan");
+    assert.equal(json.actions['b'], '', "'b' = back to dashboard");
+    assert.ok(!('Create new' in json.actions), 'no label-keyed Create new (words only)');
   });
 
   it('4b. "browse functional" with 4+ plans uses numbered-key actions', () => {
@@ -228,6 +234,7 @@ describe('e2e: menu state machine via real process', () => {
     // their relative order is readPlans' FIFO concern (birthtime ties make it
     // filesystem-dependent), so we assert the mapping covers every file exactly
     // once rather than pinning a specific order.
+    assert.equal(json.inputMode, 'plan-select', 'browse is free-text plan-select');
     const mapped = [];
     for (let i = 1; i <= 5; i++) {
       const action = json.actions[String(i)];
@@ -238,6 +245,13 @@ describe('e2e: menu state machine via real process', () => {
     const expected = names.map(n => `plan functional/${n}.md`).sort();
     assert.deepEqual(mapped.slice().sort(), expected,
       'number keys 1..5 map bijectively onto the five plan files');
+
+    // No numeric key is ever a navigation shortcut; nav is word-keyed.
+    for (const [key, val] of Object.entries(json.actions)) {
+      if (/^\d+$/.test(key)) assert.match(val, /^plan functional\//, `numeric ${key} opens a plan`);
+    }
+    assert.equal(json.actions['n'], 'claude:create-plan functional', "'n' = new plan");
+    assert.equal(json.actions['b'], '', "'b' = back");
   });
 
   it('5. "validate functional/<file>.md" returns a pre-transition validation result', () => {

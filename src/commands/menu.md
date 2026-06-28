@@ -13,8 +13,9 @@ node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"
 The command outputs JSON: `{ text, ask, actions }`.
 
 - **text**: Display this text to the user (always ends with `\n\n\n`)
-- **ask**: Pass directly to AskUserQuestion tool
-- **actions**: Maps each option label to the next command or `claude:` action
+- **ask**: Pass directly to AskUserQuestion tool — EXCEPT when the screen sets `inputMode: "plan-select"` (plan lists). Then do NOT call AskUserQuestion.
+- **inputMode**: when `"plan-select"`, show the plan list and take a FREE-TEXT reply — a number opens that plan, `n`/`b` navigate (see Rule 1).
+- **actions**: Maps each reply (a plan number, or a word like `n`/`b`/an option label) to the next command or `claude:` action
 
 ### Navigation Commands
 
@@ -53,7 +54,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 
 ### Rules
 
-1. Always show AskUserQuestion after every response
+1. **Numbers are reserved EXCLUSIVELY for opening a plan.** A number must NEVER be a shortcut for navigation or any other action, on any screen. On a plan list (`inputMode: "plan-select"`) do NOT call AskUserQuestion — render the list and accept a FREE-TEXT reply: a number of any length (e.g. `25`) opens that plan via `actions[number]`; `n`/`new` and `b`/`back` are the only non-plan shortcuts (words, never numbers). On other screens, present the options and accept the option's word/label (case-insensitive) — AskUserQuestion may be used there, but a number must never map to a non-plan action.
 2. Auto-discuss when creating new plans — ask every discussion question via the `.ctoc/ask-me-questions.md` matrix format: one question per turn, the Unicode-box matrix first, then AskUserQuestion
 3. Dashboard pipeline shows the 3 v7 sections: Business, Implementation, Execution, More (counts in descriptions, labels are stable)
 4. 3 human gates: functional->implementation, implementation->todo, review->done
@@ -61,5 +62,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 6. Menu rendering and all CTOC slash commands inherit the user's chosen session model; no model pin is set in command frontmatter (removed in v6.9.28 to avoid forced context compaction in long sessions)
 7. The menu auto-initializes CTOC on first run: if the project has no `.ctoc/` directory, `menu.js` runs `initProject()` before rendering (creates `.ctoc/`, `plans/`, `CLAUDE.md` if absent). There is no separate init command — opening the menu is the trigger.
 8. Environment question rides along, never gates: when the CTOC environment is unset (`general.environment: ask`), `menu.js` renders the **normal dashboard** (plan overview across all phases) and attaches the environment question as a **second** question in `ask`. Present both questions in one AskUserQuestion call. Handle the answers in this order: if the environment answer is Development/Staging/Production, run `claude:set-environment {env}` first; then follow the pipeline-section action. "Decide later" persists nothing. The dashboard must NEVER be replaced by the environment question. The environment (dev/staging/prod) only tunes CTOC's own behavior — it never weakens the four human gates.
+
+9. **Reasoning depth, not model switching.** Menu turns use MINIMAL reasoning — the menu is a deterministic script; run it and show the output immediately, with no deliberation before the menu. Plan review, gate, and quality steps dispatch subagents at HIGH/MAX effort (deep thinking, isolated context). Modulate reasoning *effort*, never the session *model* — switching the model mid-session breaks context (see CLAUDE.md).
 
 CTOC ships exactly three slash commands: `menu`, `push`, `update`. Every other workflow — vision, planning, quality, review, agent runs — goes through the menu.
