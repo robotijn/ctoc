@@ -4,10 +4,11 @@ created: "2026-06-28T00:00:00Z"
 type: feature
 status: functional
 priority: HIGH
+parent_vision: "done/local-semantic-plan-index.md"
 program: ctoc-onboarding
 order: 1
 depends_on: []
-acceptance_criteria_count: 9
+acceptance_criteria_count: 11
 risk_level: MEDIUM
 files:
   - ".ctoc/templates/CLAUDE.md.template"
@@ -37,8 +38,8 @@ CTOC in anger. Concretely, the template is **factually wrong** today:
   `functional/approved/`, `in_progress/`) instead of the real
   `plans/{vision,canvas,functional,implementation,todo,in-progress,review,done}`.
 - Lists `ctoc`, `ctoc plan new`, `ctoc plan approve` CLI commands — CTOC ships
-  exactly three slash commands (`menu`, `push`, `update`); everything else is the
-  menu.
+  exactly three slash commands (`/ctoc:menu`, `/ctoc:push`, `/ctoc:update`);
+  everything else is the menu.
 - Shows only Gates 1/2/3 — Gate 0 (vision → functional) is missing.
 
 Wrong onboarding instructions are bugs (today's warning is tomorrow's crash):
@@ -94,11 +95,14 @@ CLAUDE.md or tracking what changed between CTOC versions.
 - [ ] **Scenario: New project init produces accurate CLAUDE.md**
   Given a new project directory containing no CLAUDE.md
   When `initProject()` runs (non-dry-run)
-  Then the generated CLAUDE.md contains "16" in the Iron Loop section label,
+  Then the generated CLAUDE.md contains the substring "16 steps" or "16-step"
+  in the Iron Loop section (the assertion must match that compound token — not
+  the bare digit "16", which also matches "2016" or pixel sizes),
   the step labels "8:TEST", "10:IMPLEMENT", and "14:VERIFY", all four gate
   labels including "Gate 0", the plan directory list
   `plans/{vision,canvas,functional,implementation,todo,in-progress,review,done}`,
-  and the three slash command names `menu`, `push`, `update`
+  and the three slash command tokens `/ctoc:menu`, `/ctoc:push`, `/ctoc:update`
+  (not bare "menu"/"push"/"update", which appear in ordinary prose)
   And the managed lessons block is present between its version markers
 
 - [ ] **Scenario: Drift strings absent from generated CLAUDE.md**
@@ -110,11 +114,15 @@ CLAUDE.md or tracking what changed between CTOC versions.
 
 - [ ] **Scenario: `ensureLessonsBlock` is idempotent on a current block**
   Given a CLAUDE.md already containing `<!-- CTOC:LESSONS v1 START -->` through
-  `<!-- CTOC:LESSONS v1 END -->` (current version)
+  `<!-- CTOC:LESSONS v1 END -->` with the exact canonical block body (current
+  version and content hash match)
   When `ensureLessonsBlock(claudeMdPath, ctocRoot)` is called a second time
   Then the function returns `false` (no change made)
   And the file content is byte-for-byte identical to before the call
   And the file contains exactly one start marker and exactly one end marker
+  And the no-change decision is keyed on a content hash of the canonical block
+  body (not just the version string): if the block body were altered while
+  keeping v1 markers, the next call returns `true` and replaces the block
 
 - [ ] **Scenario: User prose preserved byte-for-byte around managed block**
   Given a CLAUDE.md with user-authored prose before the managed block start
@@ -138,14 +146,19 @@ CLAUDE.md or tracking what changed between CTOC versions.
   And the surrounding user prose is unchanged
 
 - [ ] **Scenario: SessionStart injects block for existing project on first run**
-  Given an existing CTOC project whose CLAUDE.md is present but contains no
-  managed lessons block
-  When `SessionStart.js` `main()` completes
-  Then CLAUDE.md contains exactly one managed lessons block between its markers
+  Given an existing CTOC project directory with a stub `.ctoc/state` file,
+  a CLAUDE.md that contains no managed lessons block, and the canonical
+  `operating-lessons.md` source present at its resolved path
+  When `SessionStart.js` `main()` runs to completion against that project
+  directory (invoked as the real module, not stubbed)
+  Then the on-disk CLAUDE.md contains exactly one `<!-- CTOC:LESSONS v1 START -->`
+  marker, exactly one `<!-- CTOC:LESSONS v1 END -->` marker, and the canonical
+  lesson content between them
+  And no additional start or end markers are present anywhere in the file
 
 - [ ] **Scenario: SessionStart is a no-op on second run**
   Given an existing CTOC project whose CLAUDE.md already contains the current
-  managed lessons block
+  managed lessons block (version and content hash both match)
   When `SessionStart.js` `main()` runs again
   Then CLAUDE.md is byte-for-byte unchanged after the second run
 
@@ -154,16 +167,44 @@ CLAUDE.md or tracking what changed between CTOC versions.
   resolved path
   When `ensureLessonsBlock(claudeMdPath, ctocRoot)` is called
   Then the function returns `false` without modifying `claudeMdPath`
-  And a warning is written to stderr (not a thrown exception)
+  And a warning message is written to stderr — the test captures stderr output
+  and asserts it is non-empty and references the missing file path
+  (a silent return-false with no stderr output FAILS this scenario — no-silent-
+  failure rule)
   And `SessionStart.js` continues to completion without aborting
 
-- [ ] **Scenario: All file paths are cross-platform**
-  Given the module `src/lib/claude-md-lessons.js` is loaded on macOS, Linux,
-  or Windows
-  When paths to `operating-lessons.md` and `claudeMdPath` are resolved
-  Then every path is constructed via `path.join()` or `path.resolve()` with no
-  hardcoded `/` or `\` directory separators in string literals
+- [ ] **Scenario: All file paths and atomic write are cross-platform**
+  Given a test environment where `process.platform` is set to `'win32'`
+  and `path.sep` is set to `'\\'`
+  When `ensureLessonsBlock(claudeMdPath, ctocRoot)` resolves all internal
+  paths (to `operating-lessons.md` and to the temp write target)
+  Then every resolved path string uses the `'\\'` separator (no hardcoded `/`
+  appears in any generated path string)
+  And a spy on `fs.renameSync` confirms it is called exactly once with arguments
+  `(tempPath, claudeMdPath)`, verifying the atomic temp-then-rename write
+  pattern (no direct `writeFileSync` to the target path)
   And no child processes or shell commands are spawned to read or write files
+
+- [ ] **Scenario: CRLF line endings do not produce duplicate markers**
+  Given a CLAUDE.md fixture whose line endings are `\r\n` (CRLF) throughout
+  and which already contains `<!-- CTOC:LESSONS v1 START -->` through
+  `<!-- CTOC:LESSONS v1 END -->` with the canonical block body (CRLF-encoded)
+  When `ensureLessonsBlock(claudeMdPath, ctocRoot)` is called
+  Then the function returns `false` (no change — current version, hash matches)
+  And the file contains exactly one start marker and exactly one end marker
+  And no duplicate markers appear anywhere in the file
+  And the original CRLF line endings are preserved in the written output
+
+- [ ] **Scenario: Markers embedded in fenced code blocks are ignored**
+  Given a CLAUDE.md that contains a fenced code block (triple-backtick
+  delimiters) whose inner text includes the literal strings
+  `<!-- CTOC:LESSONS v1 START -->` and `<!-- CTOC:LESSONS v1 END -->` as
+  documentation examples, but has no real managed block outside the code fence
+  When `ensureLessonsBlock(claudeMdPath, ctocRoot)` is called
+  Then the injector identifies the file as having no real managed block
+  And inserts exactly one managed block at the end of the file (outside
+  the fenced code section)
+  And the fenced code block content is preserved byte-for-byte
 
 ---
 
@@ -171,12 +212,12 @@ CLAUDE.md or tracking what changed between CTOC versions.
 
 | Requirement | Criterion |
 |-------------|-----------|
-| Cross-platform | `path.join`/`path.resolve` only; `fs` synchronous API; no shell invocation; passes on macOS, Linux, Windows |
-| Idempotency | Running `ensureLessonsBlock` N times on the same file with the same version produces the same result as running it once |
+| Cross-platform | `path.join`/`path.resolve` only; `fs` synchronous API; no shell invocation; verified behaviorally by mocking `process.platform` and `path.sep` in the test suite |
+| Idempotency | Running `ensureLessonsBlock` N times is idempotent: keyed on a SHA-256 content hash of the canonical block body (not just the version string), so in-marker drift is also corrected; result of N calls equals result of one call |
 | Content preservation | Bytes outside the managed block markers are never altered; verified by byte-for-byte diff in tests |
-| Atomicity | Write uses a temp file + `fs.renameSync` (atomic on same filesystem) to prevent partial-write corruption |
-| Performance | `ensureLessonsBlock` completes in < 20ms measured in the test suite; SessionStart total < 100ms |
-| Fail-open | Any error inside `ensureLessonsBlock` (missing file, I/O error, regex failure) catches, logs to stderr, and returns `false`; it never throws to the caller |
+| Atomicity | Write uses a temp file + `fs.renameSync` (atomic on same filesystem) to prevent partial-write corruption; verified by spy on `fs.renameSync` in the test |
+| Performance | Steady-state no-op path reads two files and exits without writing; no hard millisecond CI thresholds (inherently flaky); performance is validated by design (minimal synchronous I/O) rather than by timing assertions |
+| Fail-open | Any error inside `ensureLessonsBlock` (missing file, I/O error, regex failure) catches, logs to stderr (assertably non-empty), and returns `false`; it never throws to the caller |
 | No global mutation | Never touches `~/.claude/CLAUDE.md` or any file outside the target project directory |
 
 ---
@@ -188,17 +229,31 @@ CLAUDE.md or tracking what changed between CTOC versions.
 - Correct `.ctoc/templates/CLAUDE.md.template`: 16 steps (Step 8 TEST, Step 10
   IMPLEMENT, Step 14 VERIFY), 4 gates (Gate 0 through Gate 3), real plan dirs
   (`plans/{vision,canvas,functional,implementation,todo,in-progress,review,done}`),
-  3 slash commands (`menu`, `push`, `update`), removal of all `ctoc plan ...` CLI
-  references and `functional/draft`/`in_progress` directory references.
+  3 slash commands (`/ctoc:menu`, `/ctoc:push`, `/ctoc:update`), removal of all
+  `ctoc plan ...` CLI references and `functional/draft`/`in_progress` directory
+  references.
 - New `.ctoc/templates/operating-lessons.md`: canonical versioned source for the
   12 generalized operating lessons; version marker embedded in file.
 - New `src/lib/claude-md-lessons.js`: exports `ensureLessonsBlock(claudeMdPath,
-  ctocRoot)` with idempotent marker-delimited injection logic.
+  ctocRoot)` with idempotent marker-delimited injection logic keyed on content
+  hash; CRLF-normalizing reader; fenced-code-block-aware marker search; atomic
+  write via temp file + `fs.renameSync`.
 - Wire `ensureLessonsBlock` into `initProject()` (called after the CLAUDE.md
   write/skip decision so both new and existing projects receive the block).
 - Wire `ensureLessonsBlock` into `SessionStart.js` `main()` (after step 5,
   directory ensure; before step 6, update check), wrapped in try/catch.
-- Test file `tests/claude-md-lessons.test.js` covering all 9 acceptance scenarios.
+- Add `plans/canvas` to `SessionStart.js`'s `directories` list (currently absent
+  from lines 76–90) to match the corrected template's directory listing;
+  `initProject()`'s `PLAN_DIRS` constant already includes it and is not changed.
+- Resolve the `generateContext` triplication: `SessionStart.js`'s `generateContext`
+  hardcodes the 16-step banner inline — a third copy alongside the corrected
+  template and `operating-lessons.md`. In Scope: add a cross-reference comment in
+  `generateContext` citing the canonical source, and add a test assertion that the
+  step labels in the banner match those in `operating-lessons.md`. `generateContext`
+  is NOT restructured to do runtime file I/O (would add latency to every session
+  start); the three copies are kept intentionally separate but sync-guarded by a
+  test.
+- Test file `tests/claude-md-lessons.test.js` covering all 11 acceptance scenarios.
 
 ### Out of Scope
 
@@ -210,8 +265,9 @@ CLAUDE.md or tracking what changed between CTOC versions.
 - Auto-migration of incorrect CLAUDE.md content other than the managed block (e.g.,
   rewriting the human's custom sections — out of scope forever).
 - Any UI or dashboard surface for managing lessons (future phase if needed).
-- `plans/canvas` directory creation in `initProject()` — it already appears in
-  `PLAN_DIRS` at line 124; this plan does not add or change that constant.
+- `plans/canvas` constant in `initProject()`'s `PLAN_DIRS` — already correct at
+  line 126; this plan does not touch it. Only `SessionStart.js`'s separate
+  `directories` list is updated (see In Scope).
 
 ---
 
@@ -222,15 +278,17 @@ project convention).
 
 | Test | Scenario covered | Method |
 |------|-----------------|--------|
-| `init_writes_16_step_iron_loop` | AC1 | Render template to temp dir; grep output for "16", "8:TEST", "10:IMPLEMENT", "14:VERIFY", "Gate 0" |
+| `init_writes_16_step_iron_loop` | AC1 | Render template to temp dir; assert presence of "16 steps" or "16-step" (compound token), "8:TEST", "10:IMPLEMENT", "14:VERIFY", "Gate 0", "/ctoc:menu", "/ctoc:push", "/ctoc:update" |
 | `init_no_drift_strings` | AC2 | Render template to temp dir; assert each drift string absent |
-| `ensure_lessons_idempotent` | AC3 | Call `ensureLessonsBlock` twice; compare file after each call; assert returns false on second call |
+| `ensure_lessons_idempotent` | AC3 | Call `ensureLessonsBlock` twice with matching content hash; compare file after each call; assert returns false on second call |
 | `ensure_lessons_preserves_prose` | AC4 | Construct fixture with user text above/below markers; run; compare non-block content byte-for-byte |
 | `ensure_lessons_upgrades_old_version` | AC5 | Fixture with v0 block; call with v1; assert v1 markers present, v0 absent, return value true |
-| `session_start_injects_block` | AC6 | Spy/stub `ensureLessonsBlock`; verify it is called from `main()` when block absent |
-| `session_start_noop_on_second_run` | AC7 | Call injector twice on same fixture; assert file unchanged on second call |
-| `ensure_lessons_fails_open_missing_source` | AC8 | Delete/mock operating-lessons.md; call; assert returns false, no throw, no file mutation |
-| `ensure_lessons_uses_path_join` | AC9 | Inspect module source for hardcoded path separators (static analysis); mock path module to confirm calls |
+| `session_start_injects_block` | AC6 | Run real `SessionStart.main()` against a temp project dir with stub state; assert on-disk CLAUDE.md contains exactly one START marker, one END marker, and the canonical lesson body between them |
+| `session_start_noop_on_second_run` | AC7 | Call injector twice on same fixture (current version + hash match); assert file unchanged on second call |
+| `ensure_lessons_fails_open_missing_source` | AC8 | Delete/rename operating-lessons.md; capture stderr; call; assert returns false, stderr non-empty referencing the missing path, no file mutation |
+| `ensure_lessons_cross_platform_atomic` | AC9 | Mock `process.platform='win32'` and `path.sep='\\'`; spy `fs.renameSync`; call `ensureLessonsBlock`; assert all paths use `\\`, renameSync called with `(tempPath, target)`, no child processes spawned |
+| `ensure_lessons_idempotent_crlf` | AC10 | Load CRLF fixture with current-version markers and canonical body; call `ensureLessonsBlock`; assert returns false, exactly one start marker, one end marker, CRLF endings preserved |
+| `ensure_lessons_ignores_fenced_markers` | AC11 | Load fixture with fenced code block containing literal marker text but no real managed block; assert injector inserts one managed block, fenced content preserved |
 
 **Falsifiable drift-string assertions** (must all be absent from rendered template output):
 
@@ -252,16 +310,16 @@ project convention).
 **Presence assertions** (must all appear in rendered template output):
 
 ```
-"16"              (in Iron Loop header)
-"Step 8"          (TEST step)
-"Step 10"         (IMPLEMENT step)
-"Step 14"         (VERIFY step)
-"Gate 0"          (vision → functional)
-"menu"            (slash command)
-"push"            (slash command)
-"update"          (slash command)
-"plans/in-progress"  (correct hyphenated form)
-"plans/canvas"    (missing from old template)
+"16 steps" or "16-step"  (compound token — not bare "16", which matches "2016"/sizes)
+"Step 8"                  (TEST step)
+"Step 10"                 (IMPLEMENT step)
+"Step 14"                 (VERIFY step)
+"Gate 0"                  (vision → functional)
+"/ctoc:menu"              (slash command — not bare "menu", which appears in prose)
+"/ctoc:push"              (slash command — not bare "push")
+"/ctoc:update"            (slash command — not bare "update")
+"plans/in-progress"       (correct hyphenated form)
+"plans/canvas"            (missing from old template)
 ```
 
 ---
@@ -316,16 +374,26 @@ commands, marketplace-only install.)
   - Impact: HIGH — partial CLAUDE.md is invisible damage; developer may not notice
   - Mitigation: Write final content to `path.join(os.tmpdir(), uuid + '.claude.md')`
     then `fs.renameSync(tmp, target)` — atomic on same-volume filesystems (macOS,
-    Linux, Windows NTFS)
+    Linux, Windows NTFS); verified by spy on `fs.renameSync` in AC9
 
 - **CRLF line endings (Windows) break marker regex matching.**
   - Likelihood: MEDIUM — Windows developers editing CLAUDE.md in VS Code default
     to CRLF; the start marker `<!-- CTOC:LESSONS vN START -->` spans a full line
-    and regex using `\n` will not match `\r\n`
+    and a regex using `\n` will not match `\r\n`
   - Impact: HIGH — injector incorrectly treats a CRLF-encoded current block as
     absent and inserts a duplicate
   - Mitigation: Normalize `\r\n` → `\n` on read into memory; detect and restore
-    original EOL style (CRLF or LF) when writing back; test with CRLF fixture
+    original EOL style (CRLF or LF) when writing back; verified by AC10
+    (CRLF fixture asserts no duplicate markers and returns false on second call)
+
+- **Markers inside fenced code blocks matched by naive regex.**
+  - Likelihood: MEDIUM — this plan file itself embeds the literal markers as
+    documentation; any project using operating-lessons.md as a reference will
+    reproduce this pattern
+  - Impact: MEDIUM — injector finds a false start marker inside a code fence and
+    treats an absent block as present (no-op) or corrupts the splice
+  - Mitigation: Strip fenced code block regions before searching for markers;
+    verified by AC11
 
 ### Business Risks
 
@@ -344,13 +412,13 @@ commands, marketplace-only install.)
 - **SessionStart.js performance regression from added I/O.**
   - Likelihood: MEDIUM — `ensureLessonsBlock` adds two synchronous file reads
     (CLAUDE.md + operating-lessons.md) and a conditional write to every session
-    start; SessionStart already targets < 100ms total
-  - Impact: MEDIUM — perceived session start slowness; if > 100ms developers may
-    disable the hook
-  - Mitigation: Benchmark `ensureLessonsBlock` isolated in the test suite; assert
-    it completes in < 20ms on a warm filesystem; use `fs.readFileSync` (sync,
-    avoids event-loop overhead); the no-op path (current block already present)
-    reads two files and exits — fastest path is the steady-state path
+    start; SessionStart already has a sub-100ms target
+  - Impact: MEDIUM — perceived session start slowness; if perceptible developers
+    may disable the hook
+  - Mitigation: Keep `ensureLessonsBlock` to pure synchronous fs I/O (no async,
+    no shell); the no-op path (current block present, hash matches) reads two
+    files and exits — the steady-state path is also the fastest path; no timing
+    assertions in CI (flaky); validate by design
 
 ---
 
@@ -372,8 +440,9 @@ commands, marketplace-only install.)
 ## Dependencies
 
 None. This plan has no upstream plan dependencies. `src/lib/claude-md-lessons.js`
-is a new module with no imports beyond Node built-ins (`fs`, `path`, `os`). It
-does not depend on state-manager, stack-detector, or any other CTOC library.
+is a new module with no imports beyond Node built-ins (`fs`, `path`, `os`,
+`crypto`). It does not depend on state-manager, stack-detector, or any other
+CTOC library.
 
 ---
 
@@ -389,8 +458,9 @@ does not depend on state-manager, stack-detector, or any other CTOC library.
   propagate to every downstream project; the problem exists at program start
   for every new CTOC user and every existing project.
 - Technical Risk: MEDIUM (2) — file read/write with marker-based injection is
-  well-understood; the main complexity is CRLF normalization and atomic write,
-  both solvable with standard Node built-ins and documented mitigations.
+  well-understood; the main complexity is CRLF normalization, fenced-code-block
+  stripping, content-hash keying, and atomic write, all solvable with standard
+  Node built-ins and documented mitigations.
 
 ---
 
@@ -403,8 +473,29 @@ does not depend on state-manager, stack-detector, or any other CTOC library.
 - **Single canonical source.** Lessons live once in
   `.ctoc/templates/operating-lessons.md`; the template embeds the block at
   build/init time and the injector reads it at runtime, so they can never diverge.
-- **Version marker drives upgrades.** A block version (`vN`) lets SessionStart
-  upgrade silently; bumping it is how future lessons propagate to every project.
+- **Content hash rather than version marker for idempotency.** A user who edits
+  inside the current-version markers would silently drift from canonical if we
+  keyed only on the version string. Decision: compute SHA-256 of the canonical
+  block body at call time; if the existing block's content hash differs from the
+  canonical hash, treat as out of date and replace. The `crypto` built-in is added
+  to the module's imports for this purpose.
+- **Version marker still drives cross-version upgrades.** The content-hash check
+  applies within the same version (v1 → v1 drift). A version bump (v0 → v1)
+  triggers replacement unconditionally, without needing a hash comparison.
+- **generateContext intentionally separate, sync-guarded by test.** Three copies of
+  the 16-step progression exist: `generateContext` in `SessionStart.js` (compact
+  machine-readable banner), the CLAUDE.md template (human prose), and
+  `operating-lessons.md` (canonical lesson source). Merging them would require
+  runtime file I/O in `generateContext`, adding latency to every session start.
+  Decision: keep the three copies separate; add a cross-reference comment in
+  `generateContext` naming the canonical source; add a test in
+  `claude-md-lessons.test.js` that asserts the step labels in the banner string
+  match those extracted from `operating-lessons.md`, so a future edit to one
+  immediately fails the other.
+- **Fenced-code-block stripping via line-state parser, not regex look-behind.**
+  A naive regex could be foiled by nested backticks or language-tagged fences.
+  Decision: scan the file line-by-line tracking open/closed fence state before
+  building the marker search range; this is O(n) and free of regex complexity.
 - **Generalized content.** All person- and repo-specific phrasing is stripped so
   the block is correct in any project.
 - **Lessons source resolved via `__dirname`, not project root.** `operating-lessons.md`
@@ -418,6 +509,8 @@ does not depend on state-manager, stack-detector, or any other CTOC library.
   synchronous throughout its setup steps (loadState, saveState, mkdirSync). Using
   `readFileSync`/`writeFileSync` is consistent with the existing hook pattern and
   avoids introducing async complexity into a path that is not currently async.
-- **`plans/canvas` confirmed in scope.** `PLAN_DIRS` in `init-project.js` line 124
-  includes `plans/canvas`; the corrected template must list it. The old template
-  omitted it entirely.
+- **`plans/canvas` confirmed in scope for SessionStart.** `PLAN_DIRS` in
+  `init-project.js` line 126 includes `plans/canvas`; the corrected template
+  must list it; and `SessionStart.js`'s `directories` list (lines 76–90) currently
+  omits it — that omission is a bug this plan fixes. The `initProject()` constant
+  is not touched.
