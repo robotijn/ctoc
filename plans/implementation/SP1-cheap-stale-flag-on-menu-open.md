@@ -17,7 +17,7 @@ files:
   - src/lib/stale-detector.js
   - tests/stale-detector-cheap.test.js
 status: refined
-acceptance_criteria_count: 8
+acceptance_criteria_count: 7
 risk_level: LOW
 ---
 
@@ -27,7 +27,7 @@ risk_level: LOW
 
 ### Business Context
 
-Plans rot in their stage after their work ships and nobody notices. On 2026-06-15 four `functional/` and ten `review/` plans were misreported as live backlog for approximately 31 days — every dashboard open counted them as work-in-flight when they had already shipped in v6.1.x–v6.3.x. The current `getInboxCounts()` in `src/lib/inbox.js` surfaces questions, decisions, and plans-at-gates, but has no concept of "has this plan's work already shipped?" It is blind to inactivity, missing declared files, and the marker-in-source-stage anomaly (`approved_by: human` present while the plan still sits in a gate source directory).
+Plans rot in their stage after their work ships and nobody notices. On 2026-06-15 four `functional/` and ten `review/` plans were misreported as live backlog for approximately 31 days — every dashboard open counted them as work-in-flight when they had already shipped in v6.1.x–v6.3.x. The current `getInboxCounts()` in `src/lib/inbox.js` surfaces questions, decisions, and plans-at-gates, but has no concept of "has this plan's work already shipped?" It is blind to inactivity and to missing declared files — the two cheap, filesystem-only signals this slice adds. (An earlier draft also proposed a `marker-in-source-stage` signal, but the `approved_by` marker carries zero discriminating power at the gate-source stages — see §2 Signal Scope — so it is not used.)
 
 ### Current State
 
@@ -47,24 +47,49 @@ Phantom backlog erodes the dashboard's credibility as a single source of truth. 
 
 ### Signal Scope — Actionable vs. Advisory
 
-The `marker-in-source-stage` actionable signal fires for **REVIEW STAGE ONLY** — `approved_by: human` found in a plan file sitting in `plans/review/`. This is the terminal gate source, so a marker there is unambiguous evidence the Gate 3 crossing was never executed.
+The cheap pass emits exactly two signals:
 
-Implementation-stage plans (`plans/implementation/`) legitimately carry a Gate-1 approval marker (`approved_by: human` stamped when the plan crossed Gate 1). That marker does NOT indicate staleness at the implementation stage — it is the expected state for a plan that has legitimately advanced. A healthy `implementation/` plan with a Gate-1 marker MUST NOT be returned as an actionable candidate.
+- **`missing-files` (actionable, ALL three gate-source stages).** One or more paths
+  in the plan's declared `files:` no longer exist on disk. A candidate is
+  `actionable` if and only if its `signals` contains `missing-files`.
+- **`advisory:age` (advisory-only, ALL three stages).** The plan file's mtime is
+  older than the 14-day threshold. Advisory never makes a candidate actionable on
+  its own (the HYBRID "age never acts alone" rule).
 
-Plans in `plans/functional/` similarly carry a Gate-0 marker after crossing vision review. These are also not flagged by the `marker-in-source-stage` signal.
+**No marker-based signal.** An earlier draft proposed a `marker-in-source-stage`
+signal (`approved_by: human` found in a gate-source stage). It has been **dropped
+entirely** from the cheap pass, because the marker carries **zero discriminating
+power**, verified against `src/lib/actions.js`:
 
-Shipped-but-stranded plans in `functional/` or `implementation/` may be caught by the `missing-files` signal (their declared files were removed when the work shipped without the plan being advanced), or by the git-evidence check that runs on SP3 drill-in — not by the marker signal.
+- `HUMAN_GATES` (lines 63-67) stamps `approved_by: human` (`addApprovalMarker`,
+  lines 70-72) on exactly three crossings: `functional → implementation`,
+  `implementation → todo`, `review → done`. **Every** plan that reaches
+  `plans/review/` got there by crossing Gate 2 (`implementation → todo`), so
+  `approved_by: human` is the **normal, expected pending-Gate-3 state of every
+  review plan** — present on stranded and freshly-arrived plans alike. It cannot
+  distinguish the two.
+- `plans/functional/` plans carry **no** marker at all: `HUMAN_GATES` has **no**
+  `vision → functional` entry, so the vision → functional transition stamps
+  nothing. (Corrects the earlier prose that claimed a "Gate-0 marker.")
+- `plans/implementation/` plans carry the Gate-1 marker (`functional →
+  implementation`) by design — its presence is normal, not evidence of staleness.
+
+Because the marker is present-by-design at review and absent-by-design at
+functional, it is useless as a cheap staleness signal. **Review-stage stranding is
+established by SP3's git-evidence** (the declared files were committed/shipped AND
+the plan never advanced past `review/`) — not by the cheap pass. Shipped-but-stranded
+plans at any stage are caught cheaply by `missing-files` (their declared files were
+removed when the work shipped) and confirmed by SP3.
 
 ### Success Metrics
 
 - **M1:** `scanCheapCandidates(root, { nowMs })` completes without invoking `child_process`, `execSync`, `spawnSync`, or any git binary — asserted by a spy/module-boundary test that fails loudly if the boundary is violated. The `nowMs` parameter (defaults to `Date.now()`) makes the age threshold deterministically testable without mtime manipulation.
-- **M2:** A plan file in `plans/review/` that contains `approved_by: human` in its YAML frontmatter is always returned as an ACTIONABLE-eligible candidate with signal `marker-in-source-stage`.
-- **M3:** A healthy `plans/implementation/` plan that contains `approved_by: human` (normal Gate-1 marker) and has all declared `files:` present is NOT returned as a candidate.
-- **M4:** A plan whose declared `files:` array lists one or more paths that no longer exist on disk is returned with a `missing-files` signal and is ACTIONABLE-eligible.
-- **M5:** A plan that is only old (`nowMs - mtime > 14 days`, no other signals) is returned with only an `advisory:age` signal and is NOT marked actionable.
-- **M6:** A plan that is fresh, has valid markers for its stage, and has all declared files present yields an empty signals array and is not included as a candidate.
-- **M7:** Both YAML `files:` syntaxes are parsed correctly: block-list syntax (`- path/to/file.js` on successive indented lines) and inline-array syntax (`files: [path/to/a.js, path/to/b.js]`). A test exists for each syntax. The `missing-files` signal must not silently fail on inline arrays.
-- **M8:** All path construction in the module uses `path.join()` — no string concatenation — so the module is cross-platform on Windows, macOS, and Linux.
+- **M2:** The cheap pass flags NOTHING on `approved_by`/marker grounds. A healthy plan — all declared `files:` present and modified within the age threshold — is NOT returned as a candidate, regardless of whether it carries an `approved_by: human` marker and regardless of which frontmatter block that marker lives in, in ANY of the three gate-source stages. (Regression guard for the F1 fix: the dropped `marker-in-source-stage` signal must never reappear.)
+- **M3:** A plan whose declared `files:` array lists one or more paths that no longer exist on disk is returned with a `missing-files` signal and is ACTIONABLE-eligible (`actionable === true`).
+- **M4:** A plan that is only old (`nowMs - mtime > 14 days`, no other signals) is returned with only an `advisory:age` signal and is NOT marked actionable.
+- **M5:** A plan that is fresh and has all declared files present yields an empty signals array and is not included as a candidate.
+- **M6:** Both YAML `files:` syntaxes are parsed correctly: block-list syntax (`- path/to/file.js` on successive indented lines) and inline-array syntax (`files: [path/to/a.js, path/to/b.js]`). A test exists for each syntax. The `missing-files` signal must not silently fail on inline arrays.
+- **M7:** All path construction in the module uses `path.join()` — no string concatenation — so the module is cross-platform on Windows, macOS, and Linux.
 
 ### Stakeholders
 
@@ -94,65 +119,77 @@ Shipped-but-stranded plans in `functional/` or `implementation/` may be caught b
 
 ### BDD Scenarios
 
-- [ ] **Scenario: Marker-in-source-stage fires only for review-stage plans**
-  Given a plan file in `plans/review/` that contains `approved_by: human` in its YAML frontmatter
-  When `scanCheapCandidates(root)` runs
-  Then the plan is included in `candidates` with a `marker-in-source-stage` signal
-  And its `actionable` field is `true`
-  And the returned `count` is at least 1
-
-- [ ] **Scenario: Healthy implementation-stage plan with Gate-1 marker is NOT flagged**
-  Given a plan file in `plans/implementation/` that contains `approved_by: human` in its YAML frontmatter (normal Gate-1 marker)
-  And all files listed in its `files:` frontmatter exist on disk
-  When `scanCheapCandidates(root)` runs
-  Then the plan is NOT included in `candidates`
-  And the returned `count` does not increase due to this plan
-
-- [ ] **Scenario: Plan with missing declared files is flagged actionable**
+- [ ] **Scenario 1: Plan with missing declared files is flagged actionable**
   Given a plan file in `plans/functional/` whose frontmatter `files:` array lists `src/lib/nonexistent.js`
   And that file does not exist on disk
   When `scanCheapCandidates(root)` runs
   Then the plan is included in `candidates` with a `missing-files` signal
   And its `actionable` field is `true`
 
-- [ ] **Scenario: Age-only plan is advisory, never actionable**
-  Given a plan file in `plans/implementation/` that has no `approved_by: human` marker
+- [ ] **Scenario 2: A plan is never flagged on `approved_by`/marker grounds (F1 regression guard)**
+  Given a fresh plan file that contains `approved_by: human` in its frontmatter
   And all files listed in its `files:` frontmatter exist on disk
+  When `scanCheapCandidates(root)` runs — for the same fixture written in EACH of `plans/functional/`, `plans/implementation/`, and `plans/review/`
+  Then the plan is NOT included in `candidates`
+  And no candidate anywhere carries a marker-based signal (the signal does not exist)
+
+- [ ] **Scenario 3: Age-only plan is advisory, never actionable**
+  Given a plan file in `plans/implementation/` whose declared `files:` all exist on disk
   When `scanCheapCandidates(root, { nowMs: mtime + 15 * 24 * 3600 * 1000 + 1 })` runs (simulating 15 days elapsed)
   Then the plan is included in `candidates` with only an `advisory:age` signal
   And its `actionable` field is `false`
 
-- [ ] **Scenario: Healthy fresh plan yields no signals**
+- [ ] **Scenario 4: Healthy fresh plan yields no signals**
   Given a plan file in `plans/functional/` modified within the last 14 days (nowMs within threshold)
-  And the plan has no `approved_by: human` marker
   And all its declared `files:` exist on disk
   When `scanCheapCandidates(root)` runs
   Then the plan is NOT included in `candidates`
 
-- [ ] **Scenario: No git binary invoked during cheap scan**
+- [ ] **Scenario 5: No git binary invoked during cheap scan**
   Given a `plans/` directory with multiple plan files across stages
   When `scanCheapCandidates(root)` runs with a spy on `child_process.exec`, `execSync`, and `spawnSync`
   Then none of those spy methods are called
   And the function returns a valid `{candidates, count}` object
 
-- [ ] **Scenario: Block-list YAML files: syntax parsed correctly**
+- [ ] **Scenario 6: Block-list YAML files: syntax parsed correctly**
   Given a plan file whose frontmatter declares `files:` as a YAML block list (each entry on its own `  - path` line)
   And one of the listed files does not exist on disk
   When `scanCheapCandidates(root)` runs
   Then the plan is included in `candidates` with a `missing-files` signal
   And the signal fires — the block-list syntax is not silently ignored
 
-- [ ] **Scenario: Inline-array YAML files: syntax parsed correctly**
+- [ ] **Scenario 7: Inline-array YAML files: syntax parsed correctly**
   Given a plan file whose frontmatter declares `files: [src/lib/a.js, src/lib/b.js]` on a single line
   And `src/lib/b.js` does not exist on disk
   When `scanCheapCandidates(root)` runs
   Then the plan is included in `candidates` with a `missing-files` signal
   And the signal fires — the inline-array syntax is not silently ignored
 
+- [ ] **Scenario 8: `files:` in the second frontmatter block is still found (multi-block extraction)**
+  Given an approved plan whose FIRST `---…---` block is the prepended approval marker (no `files:` key)
+  And whose SECOND `---…---` block is the metadata block carrying `files:` with one missing entry
+  When `scanCheapCandidates(root)` runs
+  Then the plan is included in `candidates` with a `missing-files` signal
+  And the signal fires — `extractFrontmatterRegion` combined both blocks so `files:` was not missed
+
+- [ ] **Scenario 9: `approved_by` merged into the metadata block does not hide `files:` (F3)**
+  Given a plan whose single metadata block contains BOTH `approved_by: human` (merged in, as in `plans/done/A1-canvas-layer-impl.md:26-28`) AND `files:` with one missing entry
+  When `scanCheapCandidates(root)` runs
+  Then the plan is included in `candidates` with a `missing-files` signal
+  And no marker-based signal is emitted
+
+- [ ] **Scenario 10: A per-file IO fault mid-scan is skipped, not thrown (F2)**
+  Given a `plans/` tree with several plan files, one of which becomes unreadable or vanishes between directory listing and read
+  When `scanCheapCandidates(root)` runs
+  Then the scan SKIPS the unreadable/vanished file and continues
+  And returns a valid `{candidates, count}` object without throwing
+  And a sibling plan with a `missing-files` signal is still flagged (the scan continued past the skip)
+  And misuse (`root` not a non-empty string, or non-finite `nowMs`) still throws `TypeError`
+
 ### In Scope
 
 - New module `src/lib/stale-detector.js` exporting `scanCheapCandidates(root, { nowMs } = {})`
-- Cheap signal detection: `marker-in-source-stage` (review stage only), `missing-files` (all gate source stages), `advisory:age` (all gate source stages, advisory-only)
+- Cheap signal detection: `missing-files` (actionable, all gate source stages), `advisory:age` (advisory-only, all gate source stages)
 - Return shape: `{ candidates: Array<{plan, stage, signals, actionable}>, count: number }`
 - YAML `files:` parser supporting both block-list (`- item`) and inline-array (`[a, b, c]`) syntax
 - Unit test file `tests/stale-detector-cheap.test.js` with fixtures in `os.tmpdir()` sandbox; injectable `nowMs` for age scenarios
@@ -166,7 +203,7 @@ Shipped-but-stranded plans in `functional/` or `implementation/` may be caught b
 - Any cleanup execution (SP4)
 - Modifying `inbox.js` — SP2 does that
 - Modifying any hook, gate logic, or vision file
-- `functional/` and `implementation/` `marker-in-source-stage` signal — those stages carry prior-gate markers by design; the marker signal is review-stage only
+- Any `approved_by`/marker-based signal in the cheap pass — the marker carries zero discriminating power (every `review/` plan carries it from the Gate-2 `implementation → todo` crossing; `functional/` plans carry none). Review-stage stranding is established by SP3 git-evidence, not the cheap pass
 
 ## Risks
 
@@ -175,7 +212,7 @@ Shipped-but-stranded plans in `functional/` or `implementation/` may be caught b
 - **Risk:** Existing `parseFrontmatter` in `inbox.js` is scalar-only (simple `key: value` regex, confirmed by reading lines 123-137 of `src/lib/inbox.js`). It silently yields an empty string for block-list `files:` syntax and does not parse inline-array syntax at all. SP1 must implement its own sequence-aware parser for the `files:` key.
   - Likelihood: HIGH (confirmed by code review — the existing parser cannot handle either YAML list syntax)
   - Impact: HIGH (missing-files signal never fires if the list is not parsed as an array)
-  - Mitigation: Implement a `parseFilesField(frontmatterText)` helper in `stale-detector.js` that handles both block-list and inline-array syntaxes. Cover both syntaxes with a dedicated test per syntax (M7). Do not reuse the scalar parser from `inbox.js`.
+  - Mitigation: Implement a `parseFilesField(frontmatterText)` helper in `stale-detector.js` that handles both block-list and inline-array syntaxes. Cover both syntaxes with a dedicated test per syntax (M6). Do not reuse the scalar parser from `inbox.js`.
 
 - **Risk:** `git checkout` rewrites file mtimes to the checkout timestamp, not the original commit time. An old plan checked out fresh will appear young; a long-running session where the plan was last written days ago may appear old even if the content is unchanged.
   - Likelihood: HIGH (inherent to how git manages the working tree)
@@ -217,27 +254,28 @@ The module is organized in four bands so SP3 can append `verifyStaleCandidate`
 and `classifyStaleCandidate` below SP1's exports without touching SP1 code:
 
 1. JSDoc typedefs (`StaleCandidate`, `CheapScanResult`) + constants.
-2. Frontmatter helpers — `extractFrontmatterRegion`, `parseFrontmatter` (scalar),
-   `parseFilesField` (sequence-aware).
-3. Signal detectors — pure helpers for each of the three signals.
+2. Frontmatter helpers — `extractFrontmatterRegion` (multi-block) and
+   `parseFilesField` (sequence-aware). No scalar `approved_by` parser — the cheap
+   pass reads no marker (F1).
+3. Signal detectors — pure helpers for each of the two signals.
 4. Public `scanCheapCandidates` orchestrator + `module.exports`.
 
-### 5.2 The critical integration subtlety — two-block frontmatter
+### 5.2 The critical integration subtlety — `files:` is not always in the first block
 
 Confirmed by reading real approved plans (`plans/done/A1-canvas-layer-impl.md`,
 the SP1 target itself): an approved plan has the approval marker **prepended as a
 separate leading `---…---` block** (the `addApprovalMarker` pattern in
-`actions.js`), so the file begins:
+`actions.js:70-72`), so the file begins:
 
 ```
 ---
-approved_by: human          ← BLOCK 1 (prepended at gate crossing)
+approved_by: human          ← BLOCK 1 (prepended at gate crossing — NO files: here)
 approved_at: …
 gate_crossed: …
 ---
 
 ---
-title: …                    ← BLOCK 2 (original plan metadata)
+title: …                    ← BLOCK 2 (original plan metadata — files: lives HERE)
 files:
   - src/lib/stale-detector.js
 status: refined
@@ -245,27 +283,42 @@ status: refined
 ```
 
 `inbox.js`'s `parseFrontmatter` (lines 123–137) matches **only the first**
-`---…---` block with `/^---\n([\s\S]*?)\n---/`. On an approved plan that block
-contains `approved_by` but **not** `files:` — so reusing it would (a) miss
-`files:` entirely and never fire `missing-files`, and (b) is also scalar-only and
-cannot parse either YAML list syntax. This is the load-bearing reason SP1
-implements its own parser rather than importing `inbox.js`'s.
+`---…---` block with `/^---\n([\s\S]*?)\n---/`. On an approved plan that first
+block contains the marker but **not** `files:` — so reusing it would (a) miss
+`files:` entirely and never fire `missing-files` on approved plans, and (b) is
+also scalar-only and cannot parse either YAML list syntax. This is the load-bearing
+reason SP1 keeps its own multi-block extractor rather than importing `inbox.js`'s.
+
+> **Note (F1):** SP1 no longer reads `approved_by` at all (the marker signal was
+> dropped — §2). The SOLE remaining reason `extractFrontmatterRegion` exists is
+> `files:` placement: because `files:` lives in the metadata block, which on an
+> approved plan is the SECOND block, the cheap pass must combine blocks or it will
+> be blind to `missing-files` on every approved plan. That is sufficient on its own
+> to keep the multi-block extractor.
 
 **Design response:** `extractFrontmatterRegion(content)` collects **every**
 consecutive leading `---…---` block (skipping blank lines between blocks) and
-concatenates their bodies into one combined frontmatter string. Both
-`approved_by` detection and `parseFilesField` operate on that combined string, so
-they see keys regardless of which leading block they live in. `A1-canvas-layer-impl.md`
-even repeats `approved_by: human` in both blocks — the combined-region approach
-handles that idempotently (presence is presence).
+concatenates their bodies into one combined frontmatter string. `parseFilesField`
+operates on that combined string, so it finds `files:` regardless of which leading
+block it lives in. The real shapes this must survive (both present in
+`A1-canvas-layer-impl.md`):
+
+- **Prepended marker block** — marker in BLOCK 1, `files:` in BLOCK 2 (lines 1-5 vs
+  15-25 of `A1-canvas-layer-impl.md`).
+- **Merged marker** — `approved_by` / `gate_crossed` merged INTO the metadata block
+  alongside `files:` (lines 26-28 of `A1-canvas-layer-impl.md`).
+
+In both shapes `extractFrontmatterRegion` yields a combined region containing
+`files:`, so `parseFilesField` finds it and `missing-files` can fire. (A plan that
+repeats `approved_by` across blocks is irrelevant now — no marker is read.)
 
 ### 5.3 Dependency graph
 
 ```
 node:fs ─┐
 node:path┤──▶ src/lib/stale-detector.js  (NEW, leaf — no project deps, no child_process)
-                  │ exports: scanCheapCandidates, parseFilesField,
-                  │          parseFrontmatter, GATE_SOURCE_STAGES, AGE_THRESHOLD_MS
+                  │ exports: scanCheapCandidates, extractFrontmatterRegion,
+                  │          parseFilesField, GATE_SOURCE_STAGES, AGE_THRESHOLD_MS
                   │
                   ├─ tested-by ▶ tests/stale-detector-cheap.test.js  (NEW)
                   ├─ consumed-by ▶ src/lib/inbox.js                  (SP2 — not this plan)
@@ -282,18 +335,17 @@ module is never imported by a hook or command in this slice.
 /**
  * @typedef {('functional'|'implementation'|'review')} GateSourceStage
  *
- * @typedef {('marker-in-source-stage'|'missing-files'|'advisory:age')} StaleSignal
+ * @typedef {('missing-files'|'advisory:age')} StaleSignal
  *
  * @typedef {Object} StaleCandidate
  * @property {string}        plan        Plan slug = filename without `.md`
  *                                         (matches inbox.js listPlansAtGates).
  * @property {GateSourceStage} stage     The gate SOURCE stage it was found in.
  * @property {StaleSignal[]}  signals    Non-empty, deduped, canonical order:
- *                                         actionable first (marker-in-source-stage,
- *                                         missing-files), advisory last (advisory:age).
- * @property {boolean}        actionable true iff signals contains an actionable
- *                                         signal (marker-in-source-stage OR
- *                                         missing-files). advisory:age alone ⇒ false.
+ *                                         actionable (missing-files) first,
+ *                                         advisory (advisory:age) last.
+ * @property {boolean}        actionable true iff signals contains missing-files.
+ *                                         advisory:age alone ⇒ false.
  *
  * @typedef {Object} CheapScanResult
  * @property {StaleCandidate[]} candidates  Plans (in gate source stages) that
@@ -308,6 +360,9 @@ module is never imported by a hook or command in this slice.
  * Filesystem-ONLY scan of plans/functional, plans/implementation, plans/review.
  * NEVER invokes git or any subprocess. mtime age is advisory & best-effort only
  * (git checkout rewrites mtimes); age never makes a candidate actionable alone.
+ * Per-file IO faults (a plan file that vanishes or becomes unreadable mid-scan)
+ * are skipped — the offending plan is omitted and the scan continues; the function
+ * never throws on a structural or IO irregularity. Only misuse throws (see @throws).
  *
  * @param {string} root  Project root (directory containing `plans/`).
  * @param {{ nowMs?: number }} [options]  nowMs defaults to Date.now(); inject a
@@ -330,22 +385,27 @@ For each `.md` file (excluding `.gitkeep`) in each of the three gate source
 stages, build `signals` by pushing in this fixed evaluation order (which yields
 the canonical order automatically):
 
-1. **`marker-in-source-stage` (actionable, REVIEW STAGE ONLY).**
-   `if (stage === 'review' && parseFrontmatter(region).approved_by === 'human')`.
-   Functional and implementation plans legitimately carry prior-gate markers
-   (Gate-0 / Gate-1) — the marker signal must NOT fire for them (M3). Match is on
-   value `human` (case-insensitive, after unquote/trim).
-2. **`missing-files` (actionable, ALL three stages).**
-   `declared = parseFilesField(region)`. If `declared.length > 0` and **any**
-   declared path is absent on disk, fire. Empty/absent `files:` ⇒ never fires.
-3. **`advisory:age` (ADVISORY only, ALL three stages).**
+1. **`missing-files` (actionable, ALL three stages).**
+   `declared = parseFilesField(extractFrontmatterRegion(content))`. If
+   `declared.length > 0` and **any** declared path is absent on disk, fire.
+   Empty/absent `files:` ⇒ never fires. The cheap pass reads **no** `approved_by`
+   marker (dropped in F1 — the marker has zero discriminating power; see §2).
+2. **`advisory:age` (ADVISORY only, ALL three stages).**
    `if (nowMs - statSync(file).mtimeMs > AGE_THRESHOLD_MS)` where
    `AGE_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000`.
 
 After building `signals`: if `signals.length === 0`, the plan is **not** a
-candidate (M6). Otherwise push
-`{ plan, stage, signals, actionable: signals.includes('marker-in-source-stage') || signals.includes('missing-files') }`.
+candidate (M5). Otherwise push
+`{ plan, stage, signals, actionable: signals.includes('missing-files') }`.
 Finally `count = candidates.length`.
+
+**Per-file IO containment (F2):** the per-file `readFileSync` (frontmatter) and
+`statSync` (mtime) are each wrapped in a narrow `try/catch` scoped to that single
+file, so a plan file that vanishes or becomes unreadable between `readdirSync` and
+the read is **skipped** (omitted from `candidates`) and the scan continues. One bad
+file never throws out of the scan. This is the IO-level counterpart of the
+structural graceful-degradation rules (§6.1); it does NOT mask misuse — a bad
+`root` or non-finite `nowMs` still throws `TypeError` before any per-file work.
 
 **Determinism:** iterate stages in fixed gate order `[functional, implementation,
 review]`; within a stage sort `readdirSync` results ascending (readdir order is
@@ -365,10 +425,16 @@ Handles both YAML syntaxes plus defensible edge cases:
     as a one-element list (`files: src/lib/x.js`); strip quotes. (Documented
     tolerance; real plans use the two list forms.)
   - **Block-list** — `rest` empty: walk subsequent lines; each line matching
-    `/^[ \t]*-[ \t]*(.+?)[ \t]*$/` is an item (strip quotes, drop empties). Stop
+    `/^[ \t]*-[ \t]*(.+?)[ \t]*$/` is an item. From each captured item, first
+    strip a trailing YAML line comment — a `#` preceded by whitespace through end
+    of line (e.g. `  - src/lib/x.js  # note` ⇒ `src/lib/x.js`) — then trim, strip
+    surrounding quotes, and drop empties. A `#` **not** preceded by whitespace is
+    preserved as part of the path (so a hypothetical `a#b.js` is kept intact). Stop
     at the first line that is **not** a dash-item line (a new key such as
     `status:` or a blank line) — block sequences in plan frontmatter are
-    contiguous.
+    contiguous. (F5: this makes `files:` robust to commented entries instead of
+    treating the comment text as part of the filename and spuriously firing
+    `missing-files`.)
 - Each returned path is checked for existence cross-platform by splitting on
   `/[\\/]+/` and rejoining under `root` with `path.join(root, ...parts)`, so a
   POSIX-authored `src/lib/x.js` resolves on Windows. Leading separators are
@@ -376,7 +442,7 @@ Handles both YAML syntaxes plus defensible edge cases:
 
 ### 5.7 Cross-platform & security notes
 
-- **Cross-platform (M8):** `require('path')`; every path via `path.join(...)`;
+- **Cross-platform (M7):** `require('path')`; every path via `path.join(...)`;
   no string concatenation of separators; declared-file splitting on `/[\\/]+/`;
   tests use `os.tmpdir()`. No bash, no `execSync` for path work, no `~`.
 - **Security:** the module is read-only — it `existsSync`/`statSync`/
@@ -407,13 +473,15 @@ hot-path. Leaf module; no project deps; no subprocess.
 **Functions (with signatures):**
 - `extractFrontmatterRegion(content: string) → string` — concatenate every
   consecutive leading `---…---` block body (§5.2 algorithm). No throw on a
-  missing/unterminated block — returns `''`.
-- `parseFrontmatter(region: string) → Object<string,string>` — scalar `key: value`
-  map over the combined region (own implementation; unquotes values). Used to read
-  `approved_by`. NOT reused from inbox.js.
-- `parseFilesField(region: string) → string[]` — §5.6.
+  missing/unterminated block — returns `''`. Load-bearing: `files:` lives in the
+  metadata block, which is NOT always the first `---…---` block (on an approved
+  plan the first block is the prepended marker block), so multi-block extraction
+  is required for `missing-files` to fire on approved plans.
+- `parseFilesField(region: string) → string[]` — §5.6. No scalar `approved_by`
+  parser exists in the module — the cheap pass reads no marker (F1).
 - `scanCheapCandidates(root: string, { nowMs = Date.now() } = {}) → CheapScanResult`
-  — §5.5 orchestrator; validates inputs and throws `TypeError` on misuse.
+  — §5.5 orchestrator; validates inputs and throws `TypeError` on misuse; skips and
+  continues past per-file IO faults (F2).
 
 **Graceful-degradation rules (explicit guards, NOT swallowing try/catch):**
 - `root` missing/empty or non-string → `throw new TypeError(...)` (fail loud on misuse).
@@ -421,16 +489,25 @@ hot-path. Leaf module; no project deps; no subprocess.
 - `plans/` dir absent → return `{ candidates: [], count: 0 }`.
 - A stage dir absent → skip that stage.
 - A plan with no frontmatter / no `files:` / empty list → `declared = []` (no
-  `missing-files`); marker absent ⇒ no marker signal; age still computed. Never
-  throws on structural irregularity.
-- True IO faults (file vanishes between `readdir` and `read`) are **not** wrapped
-  here — SP1 stays fail-loud; hot-path containment is SP2's concern when it wraps
-  `scanCheapCandidates` inside the memoized `getInboxCounts`. (Documented under
-  Decisions.)
+  `missing-files`); age still computed. Never throws on structural irregularity.
+- **Per-file IO fault containment (F2):** each per-file `readFileSync` (frontmatter)
+  and `statSync` (mtime) is wrapped in a narrow `try/catch` scoped to that single
+  file. If a plan file vanishes between `readdirSync` and the read, or is unreadable
+  (permissions, a path that is now a directory, etc.), that one plan is **skipped**
+  (omitted from `candidates`) and the scan continues — one bad file never throws out
+  of the scan, so a single corrupt plan can never break the menu hot-path. This is
+  the IO-level counterpart of the structural guards above and is consistent with the
+  graceful-on-structure stance. It is **not** a blanket swallow: the `try` wraps only
+  the two per-file syscalls, contains no control-flow that could hide a logic bug, and
+  does NOT catch misuse (bad `root`/`nowMs` throw before any per-file work). Earlier
+  this was wrongly deferred to SP2; SP1 now owns it (see Decisions).
 
-**Exports:** `module.exports = { scanCheapCandidates, parseFilesField, parseFrontmatter, GATE_SOURCE_STAGES, AGE_THRESHOLD_MS };`
-(`parseFilesField`/`parseFrontmatter` exported so SP5 can validate fixtures with
-the real code path; constants exported so SP3 reuses them without re-declaring.)
+**Exports:** `module.exports = { scanCheapCandidates, extractFrontmatterRegion, parseFilesField, GATE_SOURCE_STAGES, AGE_THRESHOLD_MS };`
+(`extractFrontmatterRegion`/`parseFilesField` exported so SP5 can validate fixtures
+through the real code path — compose as `parseFilesField(extractFrontmatterRegion(content))`;
+constants exported so SP3 reuses them without re-declaring. `parseFrontmatter` is
+gone — the cheap pass no longer reads any scalar marker, so a scalar parser would be
+dead code, F1.)
 
 ### 6.2 File: `tests/stale-detector-cheap.test.js` — **CREATE**
 
@@ -439,8 +516,13 @@ the real code path; constants exported so SP3 reuses them without re-declaring.)
 
 **Sandbox harness (fail-loud, hermetic, cross-platform):**
 - `makeSandbox()` → `path.join(os.tmpdir(), 'ctoc-sp1-' + process.pid + '-' + Date.now() + '-' + Math.random().toString(36).slice(2))`; `fs.mkdirSync(..., { recursive: true })`.
-- `writePlan(sandbox, stage, slug, { approved=false, filesSyntax='block'|'inline'|'none', files=[], twoBlock=approved })` — writes `plans/<stage>/<slug>.md`. When `approved`, prepend a separate `---\napproved_by: human\napproved_at: …\ngate_crossed: …\n---\n` block then the main metadata block (replicates the real `addApprovalMarker` two-block shape — exercises §5.2).
+- `writePlan(sandbox, stage, slug, { markerStyle='none', filesSyntax='block'|'inline'|'none', files=[], comment=false })` — writes `plans/<stage>/<slug>.md`. `markerStyle` reproduces the real-world frontmatter shapes (verified against `plans/done/A1-canvas-layer-impl.md`):
+  - `'none'` — single metadata block only, no `approved_by`.
+  - `'prepended'` — a separate leading `---\napproved_by: human\napproved_at: …\ngate_crossed: … → …\n---\n` block, then the metadata block carrying `files:` (the `addApprovalMarker` two-block shape — exercises §5.2 / Scenario 8).
+  - `'merged'` — a single metadata block containing BOTH `files:` and `approved_by: human` merged in (the A1:26-28 shape — exercises Scenario 9 / F3).
+  When `comment=true` and `filesSyntax==='block'`, one block-list entry is written with a trailing `  # note` to exercise the F5 comment-stripping branch.
 - `touchTarget(sandbox, relPath)` — `mkdir -p` + write an empty file at `path.join(sandbox, ...relPath.split('/'))` so declared files "exist".
+- `breakPlanFile(sandbox, stage, slug)` — for the F2 IO-fault test: after `writePlan`, delete the plan file and create a directory at the same path, so `readFileSync` throws `EISDIR`. This is a portable, cross-platform way to force a per-file read fault without relying on chmod semantics (which differ across OSes and are a no-op for root). The test asserts the scan returns a valid `{candidates, count}`, does not throw, and omits the broken slug while still flagging a sibling `missing-files` plan.
 - `afterEach` → `fs.rmSync(sandbox, { recursive: true, force: true })`.
 
 **Every test asserts concretely and fails loudly** — no empty catches, no
@@ -452,25 +534,26 @@ not by swallowing an error.
 
 | AC / BDD | Implementation element | Test case in `stale-detector-cheap.test.js` |
 |---|---|---|
-| **M1 / Scenario 6** — no git/subprocess | module imports no `child_process`; pure fs | (a) **behavioral spy:** monkeypatch `child_process.{exec,execSync,spawn,spawnSync,execFile,execFileSync}` to throw, `delete require.cache` for the module, require fresh, run scan over a multi-stage fixture, assert valid `{candidates,count}` and **no spy fired**; restore in teardown. (b) **static:** read the source, assert no `require('child_process')` and no `execSync/spawnSync/exec(/spawn(` token. |
-| **M2 / Scenario 1** — review + `approved_by: human` ⇒ actionable | `marker-in-source-stage` detector, review-only | review plan w/ two-block approval marker + files present ⇒ candidate has `signals.includes('marker-in-source-stage')`, `actionable === true`, `count >= 1`. |
-| **M3 / Scenario 2** — healthy impl + Gate-1 marker NOT flagged | review-only guard on marker; files-present ⇒ no missing | implementation plan w/ `approved_by: human` + all files present + fresh ⇒ slug absent from `candidates`; `count === 0`; no `marker-in-source-stage` emitted. |
-| **M4 / Scenario 3** — missing declared files ⇒ actionable | `missing-files` detector | functional plan `files: [src/lib/nonexistent.js]`, file not created ⇒ candidate `signals.includes('missing-files')`, `actionable === true`. |
-| **M5 / Scenario 4** — age-only advisory, never actionable | `advisory:age` via `nowMs` seam | implementation plan, no marker, files present; call with `{ nowMs: mtimeMs + 15*24*3600*1000 + 1 }` ⇒ candidate `signals` **deep-equals** `['advisory:age']`, `actionable === false`. |
-| **M6 / Scenario 5** — fresh healthy ⇒ no candidate | zero-signal plans omitted | functional plan, no marker, files present, `nowMs` within 14d of mtime ⇒ slug absent from `candidates`. |
-| **M7 / Scenario 7** — block-list parsed | `parseFilesField` block branch | block-list `files:` with one missing entry ⇒ `missing-files` fires (not silently ignored). + direct `parseFilesField` unit test. |
-| **M7 / Scenario 8** — inline-array parsed | `parseFilesField` inline branch | `files: [src/lib/a.js, src/lib/b.js]`, only `a.js` created ⇒ `missing-files` fires. + direct `parseFilesField` unit test. |
-| **M8** — cross-platform `path.join` | `path.join` throughout; declared-path split `/[\\/]+/` | static: source uses `require('path')` + `path.join`, contains no `'/plans'`/`+ '/'` concat; behavioral coverage is implicit (all sandbox tests run on the host OS). |
+| **M1 / Scenario 5** — no git/subprocess | module imports no `child_process`; pure fs | (a) **behavioral spy:** monkeypatch `child_process.{exec,execSync,spawn,spawnSync,execFile,execFileSync}` to throw, `delete require.cache` for the module, require fresh, run scan over a multi-stage fixture, assert valid `{candidates,count}` and **no spy fired**; restore in teardown. (b) **static:** read the source, assert no `require('child_process')` and no `execSync/spawnSync/exec(/spawn(` token. |
+| **M2 / Scenario 2** — nothing flagged on marker grounds (F1 guard) | no marker detector exists; `signals ∈ {missing-files, advisory:age}` only | fresh plan carrying `approved_by: human` + all files present, written in EACH stage (`functional/`, `implementation/`, `review/`) ⇒ slug absent from `candidates`; assert no candidate's `signals` contains any marker token; **static:** assert the source contains no `'marker-in-source-stage'` and no `approved_by` token. |
+| **M3 / Scenarios 1, 6, 7** — missing declared files ⇒ actionable | `missing-files` detector + `parseFilesField` | functional plan `files: [src/lib/nonexistent.js]`, file not created ⇒ candidate `signals.includes('missing-files')`, `actionable === true`. |
+| **M4 / Scenario 3** — age-only advisory, never actionable | `advisory:age` via `nowMs` seam | implementation plan, files present; call with `{ nowMs: mtimeMs + 15*24*3600*1000 + 1 }` ⇒ candidate `signals` **deep-equals** `['advisory:age']`, `actionable === false`. |
+| **M5 / Scenario 4** — fresh healthy ⇒ no candidate | zero-signal plans omitted | functional plan, files present, `nowMs` within 14d of mtime ⇒ slug absent from `candidates`. |
+| **M6 / Scenarios 6, 7** — block-list & inline parsed | `parseFilesField` block + inline branches | block-list `files:` with one missing entry ⇒ `missing-files` fires; `files: [a.js, b.js]` with only `a.js` present ⇒ `missing-files` fires. + direct `parseFilesField` unit test per syntax. |
+| **M7** — cross-platform `path.join` | `path.join` throughout; declared-path split `/[\\/]+/` | static: source uses `require('path')` + `path.join`, contains no `'/plans'`/`+ '/'` concat; behavioral coverage is implicit (all sandbox tests run on the host OS). |
+| **Scenario 8** — `files:` in 2nd block found | `extractFrontmatterRegion` multi-block | approved plan w/ **prepended** marker block AND metadata-block block-list `files:` with a missing entry ⇒ `signals.includes('missing-files')` (proves §5.2 combined-region parsing). |
+| **Scenario 9** — merged-block `approved_by` (F3) | `extractFrontmatterRegion` + `parseFilesField` | plan w/ a single metadata block containing BOTH `approved_by: human` (merged, A1:26-28 shape) AND `files:` w/ a missing entry ⇒ `missing-files` fires; assert NO marker signal emitted. |
+| **Scenario 10** — per-file IO fault skipped (F2) | per-file `try/catch` around `readFileSync`/`statSync` | multi-plan fixture; `breakPlanFile` replaces one plan file with a directory (forces `EISDIR` on read) ⇒ scan returns valid `{candidates,count}`, does NOT throw, broken slug absent, and a sibling `missing-files` plan is still flagged (proves continue-after-skip). |
 
-**Additional regression/edge tests (beyond the 8 ACs):**
-- Two-block frontmatter integration: review plan w/ **prepended** approval block AND block-list `files:` with a missing entry ⇒ signals contain BOTH `marker-in-source-stage` AND `missing-files` (proves §5.2 combined-region parsing).
-- Combined signals & ordering: review plan approved + missing-files + old ⇒ `signals` deep-equals `['marker-in-source-stage','missing-files','advisory:age']`, `actionable === true`.
+**Additional regression/edge tests (beyond the numbered ACs):**
+- Combined signals & ordering: a plan with missing-files AND old mtime ⇒ `signals` deep-equals `['missing-files','advisory:age']`, `actionable === true`.
 - `count === candidates.length` invariant on a mixed fixture.
 - `plans/` absent ⇒ `{ candidates: [], count: 0 }`; one stage dir absent ⇒ no throw; `.gitkeep` ignored.
 - `files: []` and absent `files:` ⇒ no `missing-files` signal.
-- `parseFilesField` direct units: block, inline, `[]`, quoted entries (`- "a.js"`, `['a.js']`), scalar single value, absent key ⇒ `[]`.
-- Input validation: `scanCheapCandidates(null)` and `scanCheapCandidates('')` throw `TypeError`; `scanCheapCandidates(sandbox, { nowMs: 'x' })` throws `TypeError`.
+- `parseFilesField` direct units: block, inline, `[]`, quoted entries (`- "a.js"`, `['a.js']`), scalar single value, **trailing block-list comment** (`- a.js  # note` ⇒ `a.js`), `#` not preceded by whitespace preserved as part of the path, absent key ⇒ `[]`.
+- Input validation: `scanCheapCandidates(null)` and `scanCheapCandidates('')` throw `TypeError`; `scanCheapCandidates(sandbox, { nowMs: 'x' })` throws `TypeError`; misuse throws even when a per-file fault also exists (validation precedes per-file work).
 - Malformed/empty frontmatter plan ⇒ graceful (age-only or no candidate), never throws.
+- **F1 negative guard:** no fixture in any stage is ever flagged solely because it carries `approved_by: human`; the only ways into `candidates` are `missing-files` and `advisory:age`.
 
 **Coverage target:** ≥ 80% line & branch on `stale-detector.js`; every signal
 branch, both `parseFilesField` syntaxes, both throw paths exercised.
@@ -479,8 +562,9 @@ branch, both `parseFilesField` syntaxes, both throw paths exercised.
 
 1. `tests/stale-detector-cheap.test.js` — write failing tests first (Iron Loop Step 8 TEST).
 2. `src/lib/stale-detector.js` — constants → `extractFrontmatterRegion` →
-   `parseFrontmatter` → `parseFilesField` → signal detectors → `scanCheapCandidates`
-   → exports, until the suite is green (Step 10 IMPLEMENT).
+   `parseFilesField` → signal detectors (`missing-files`, `advisory:age`) →
+   `scanCheapCandidates` (with per-file IO containment) → exports, until the suite
+   is green (Step 10 IMPLEMENT).
 
 ## Decisions Taken Under Ambiguity
 
@@ -488,21 +572,57 @@ branch, both `parseFilesField` syntaxes, both throw paths exercised.
 - **"Inactivity" source:** plan-file mtime (single `fs.stat` per file), not per-step timestamps — keeps the cheap pass truly cheap. Mtime is advisory only due to git-checkout rewrite behavior (documented in JSDoc).
 - **Module placement:** new `src/lib/stale-detector.js`, not an extension of `inbox.js`. `inbox.js` is extended in SP2 only. Keeps SP1 independently testable.
 - **YAML `files:` parsing:** implement a `parseFilesField()` helper inside `stale-detector.js` that handles both block-list (`  - path`) and inline-array (`[a, b, c]`) syntaxes. Two tests, one per syntax. Do not reuse the scalar-only parser from `inbox.js` which silently fails on both list forms.
-- **`marker-in-source-stage` scope:** review stage only. Implementation and functional plans carry prior-gate markers by design — flagging them as stale on that basis alone would produce constant false positives. Shipped-but-stranded plans at earlier stages are identified by the `missing-files` signal or by SP3 git-evidence.
+- **`marker-in-source-stage` DROPPED entirely (F1, Gate-2 kickback decision — human chose option (a) DROP):** the cheap pass emits no `approved_by`/marker-based signal at all. Rationale, verified against `src/lib/actions.js`: `HUMAN_GATES = { functional→implementation, implementation→todo, review→done }` (lines 63-67) and `addApprovalMarker` (lines 70-72) stamp `approved_by: human` on each of those three crossings only. Therefore (a) **every** plan in `plans/review/` carries `approved_by: human` from crossing Gate 2 (`implementation → todo`) — it is the NORMAL pending-Gate-3 state, present on stranded and freshly-arrived review plans alike, so the marker has **zero discriminating power** at review; and (b) `plans/functional/` plans carry **no** marker (there is no `vision → functional` entry in `HUMAN_GATES`). The marker is thus present-by-design where we'd want to flag and absent-by-design elsewhere — useless as a cheap signal. Real-world confirmation of the marker's normal presence: `plans/done/A1-canvas-layer-impl.md:26-28` carries `approved_by: human` / `gate_crossed: implementation → todo` merged into its metadata block as the ordinary record of a crossed gate. **Review-stage stranding is established by SP3's git-evidence** (declared files committed/shipped AND the plan never advanced past `review/`), not by the cheap pass. The human explicitly rejected demotion and `gate_crossed` discrimination in favour of dropping the signal.
+- **`approved_by` parse dropped; `extractFrontmatterRegion` KEPT (F1 follow-through):** with no marker signal, the scalar `parseFrontmatter` helper that read `approved_by` would be dead code, so it is removed from the module and from the exports. `extractFrontmatterRegion` is **kept and remains load-bearing**: `files:` lives in the metadata block, which is NOT always the first `---…---` block — on an approved plan the first block is the prepended marker block (no `files:`). Reading only the first block (as `inbox.js`'s `parseFrontmatter` does, lines 123-137) would miss `files:` and `missing-files` would never fire on approved plans. Multi-block extraction is therefore still required for `missing-files`.
+- **Per-file IO-fault containment owned by SP1 (F2, Gate-2 kickback decision):** an earlier draft deferred IO-fault containment to SP2 ("SP1 stays fail-loud"). That was wrong — a single unreadable/vanished plan file would throw out of the entire cheap scan and break the menu hot-path on every open. SP1 now wraps each per-file `readFileSync`/`statSync` in a narrow `try/catch` scoped to that one file: the offending plan is skipped and the scan continues, returning a valid `{candidates, count}`. This is consistent with the graceful-on-structure stance and does NOT weaken fail-loud-on-misuse — a bad `root` or non-finite `nowMs` still throws `TypeError` before any per-file work begins. The catch wraps only the two syscalls and hides no logic-bug control flow.
+- **Trailing block-list comment handling (F5):** `parseFilesField` strips a trailing YAML line comment from each block-list entry — a `#` preceded by whitespace through end of line (`  - src/lib/x.js  # note` ⇒ `src/lib/x.js`). A `#` not preceded by whitespace is preserved as part of the path. This makes the parser robust to commented `files:` entries rather than treating the comment text as part of the filename (which would spuriously fire `missing-files`). Covered by a direct `parseFilesField` unit test.
 - **`nowMs` injection:** `scanCheapCandidates(root, { nowMs } = {})` where `nowMs` defaults to `Date.now()`. Required testability seam for SP5; eliminates dependency on `fs.utimesSync` for age scenarios in tests.
 
 ### Decisions taken during technical planning (Steps 5–6)
 
-- **Combined multi-block frontmatter region (the load-bearing parser decision):** approved plans carry the approval marker in a *separate prepended* `---…---` block (the `addApprovalMarker` pattern; confirmed in `plans/done/A1-canvas-layer-impl.md`, which even repeats `approved_by: human` in both blocks, and in the SP1 target's own header). `inbox.js`'s `parseFrontmatter` reads only the first block, so on an approved plan it would find `approved_by` but miss `files:` (a second-block key) — `missing-files` would never fire on approved plans. SP1 therefore implements `extractFrontmatterRegion()` to concatenate **all** consecutive leading `---…---` blocks and runs both `approved_by` detection and `parseFilesField` over the combined string. This is a second, independent reason (beyond scalar-vs-sequence parsing) that the inbox parser cannot be reused.
+- **Combined multi-block frontmatter region (the load-bearing parser decision):** approved plans carry the approval marker in a *separate prepended* `---…---` block (the `addApprovalMarker` pattern; confirmed in `plans/done/A1-canvas-layer-impl.md:1-5` and in the SP1 target's own header), OR merged into the metadata block (also shown in `A1-canvas-layer-impl.md:26-28`). Either way, `files:` is a **metadata-block** key, and on a prepended-marker plan that block is the SECOND `---…---` block. `inbox.js`'s `parseFrontmatter` reads only the FIRST block (lines 123-137), so on an approved plan it would miss `files:` entirely — `missing-files` would never fire on approved plans. SP1 therefore implements `extractFrontmatterRegion()` to concatenate **all** consecutive leading `---…---` blocks and runs `parseFilesField` over the combined string. After F1 dropped the `approved_by` reader, this is the SOLE remaining consumer of multi-block extraction — and it is independently sufficient to justify keeping it: without it, `missing-files` is blind to every approved plan. It also explains why `inbox.js`'s scalar, first-block-only parser cannot be reused.
 - **Own `GATE_SOURCE_STAGES` constant, not an import:** `inbox.js` does not export `HUMAN_GATE_SOURCE_STAGES`, and editing `inbox.js` is out of scope (SP2 owns it). SP1 declares its own frozen `['functional','implementation','review']`. Minor duplication is accepted to keep SP1 an independent leaf and avoid an out-of-scope edit.
 - **Candidate shape frozen to exactly four keys** — `{plan, stage, signals, actionable}`. No `path`, no parsed-`files`, no `mtime` added. SP2 asserts the shape and SP5 deep-checks it; SP3 reconstructs the file path from `{plan, stage}` and re-parses `files:` itself. `plan` is the slug (filename without `.md`), matching `inbox.js` `listPlansAtGates`.
 - **`count = candidates.length`** (total candidates, including advisory-only ones) — consistent with SP2's "N possibly-stale plans" label, which is deliberately inclusive of advisory candidates. A zero-signal plan is never a candidate, so it never contributes to `count`.
-- **Signal canonical order** `['marker-in-source-stage','missing-files','advisory:age']` — produced naturally by the fixed evaluation order; actionable signals first, advisory last. Tests assert membership for most cases and deep-equality for the single-signal and combined-signal cases.
-- **`actionable` rule:** `true` iff `signals` contains `marker-in-source-stage` or `missing-files`. `advisory:age` alone ⇒ `actionable: false`. This is the code-level enforcement of the HYBRID "age never acts alone" principle.
-- **`approved_by` match value:** the marker fires only when the parsed value equals `human` (case-insensitive, unquoted/trimmed), matching the canonical gate marker — not on mere presence of the key.
+- **Signal canonical order** `['missing-files','advisory:age']` — produced naturally by the fixed evaluation order; the actionable signal first, advisory last. Tests assert membership for most cases and deep-equality for the single-signal and combined (`missing-files` + `advisory:age`) cases.
+- **`actionable` rule:** `true` iff `signals` contains `missing-files` (the only actionable signal after F1). `advisory:age` alone ⇒ `actionable: false`. This is the code-level enforcement of the HYBRID "age never acts alone" principle.
+- **No `approved_by` value matching:** removed with the marker signal (F1). The module reads no marker value at all; there is no `human`-equality check anywhere in the cheap pass.
 - **Determinism:** stages iterated in fixed gate order; `readdirSync` results sorted ascending within each stage (readdir order is platform-dependent) so candidate ordering is stable across platforms and runs.
 - **`parseFilesField` edge tolerances:** empty inline array `files: []` ⇒ `[]`; absent `files:` ⇒ `[]` (so `missing-files` cannot fire on a plan that declares none); block-list collection stops at the first non-dash line (frontmatter sequences are contiguous); a bare scalar `files: x` is tolerated as a one-element list; surrounding quotes are stripped. Declared paths are split on `/[\\/]+/` and rejoined under `root` via `path.join` so POSIX-authored paths resolve on Windows; leading separators are dropped (paths are repo-root-relative).
-- **Fail-loud on misuse, graceful on structure:** misuse (`root` not a non-empty string; non-finite `nowMs`) throws `TypeError`. Structural irregularity (missing `plans/`, missing stage dir, missing/empty/malformed frontmatter) is handled by explicit guards returning empty/zero — never a swallowing `try/catch`. True IO faults (a file vanishing mid-scan) are intentionally **not** caught in SP1; hot-path containment belongs to SP2 when it wraps `scanCheapCandidates` inside the memoized `getInboxCounts`. This keeps SP1 honest and avoids masking real bugs.
-- **Exports widened for downstream reuse without contract risk:** `parseFilesField` and `parseFrontmatter` are exported (SP5 validates fixtures through the real code path per its risk-mitigation note), and `GATE_SOURCE_STAGES` + `AGE_THRESHOLD_MS` are exported so SP3 reuses them without re-declaring magic numbers. `scanCheapCandidates` remains the sole primary entry point.
+- **Fail-loud on misuse, graceful on structure AND on per-file IO faults:** misuse (`root` not a non-empty string; non-finite `nowMs`) throws `TypeError` before any per-file work. Structural irregularity (missing `plans/`, missing stage dir, missing/empty/malformed frontmatter) is handled by explicit guards returning empty/zero — never a swallowing `try/catch`. Per-file IO faults (a plan file vanishing or becoming unreadable mid-scan) are caught with a narrow per-file `try/catch` scoped to the single `readFileSync`/`statSync` (F2): the offending plan is skipped and the scan continues. This was previously — wrongly — deferred to SP2; deferring it meant one corrupt plan file could throw out of the whole cheap scan and break the menu hot-path. SP1 now owns containment so the cheap pass is self-contained, while still avoiding masking real logic bugs (the catch wraps only the two syscalls, never control flow).
+- **Exports widened for downstream reuse without contract risk:** `extractFrontmatterRegion` and `parseFilesField` are exported (SP5 validates fixtures through the real code path — `parseFilesField(extractFrontmatterRegion(content))` — per its risk-mitigation note), and `GATE_SOURCE_STAGES` + `AGE_THRESHOLD_MS` are exported so SP3 reuses them without re-declaring magic numbers. `parseFrontmatter` is NOT exported (it no longer exists — F1 removed the only `approved_by` reader). `scanCheapCandidates` remains the sole primary entry point.
 - **M1 asserted two ways:** a behavioral spy (monkeypatch `child_process` methods to throw, require the module fresh, assert none fired) as the durable regression guard SP3/SP5 depend on, plus a static source assertion (no `child_process` require, no subprocess tokens) as defense-in-depth. Both must pass.
 - **In-flight SP1 self-reference is by-design, not special-cased:** when run against the live tree, SP1's own implementation plan declares `src/lib/stale-detector.js`, which does not exist until this plan ships — so a live scan would emit `missing-files` for SP1 itself. That is correct cheap-signal behavior; the HYBRID gate means SP3 git-evidence (no commit yet ⇒ `inconclusive`) prevents any action. Adding a self-exclusion would violate the locked cheap-only contract, so none is added. Tests use hermetic `os.tmpdir()` fixtures and are unaffected.
+- **Acceptance-criteria recomposition (F1 / F2):** the old `marker-in-source-stage` success metric (former M2) is removed and the remaining metrics renumbered, so `acceptance_criteria_count` drops 8 → 7. The new behavioral guarantees from this kickback are captured as BDD scenarios + tests + Decisions rather than as numbered success metrics: F1's "never flagged on marker grounds" folds into the reframed M2 regression guard; F2's per-file IO containment is Scenario 10 + a §6.1 rule + this decision; F3's merged-block shape is Scenario 9; F5's comment handling is a `parseFilesField` edge test.
+
+## Required downstream changes (from F1)
+
+> A note for the FUTURE planning of SP2, SP3 and SP5 — this is NOT an edit to those plans.
+> The cheap pass no longer emits `marker-in-source-stage`; the `StaleSignal` union is
+> now `('missing-files'|'advisory:age')`. Downstream plans must align when they are
+> planned:
+
+- **SP2 (`getInboxCounts` stale stream — the immediate consumer):** SP2 extends
+  `getInboxCounts()` with `scanCheapCandidates()` output, but its current BDD
+  scenarios/examples still reference the dropped signal — `SP2:86`
+  (`signals: ['marker-in-source-stage'], actionable: true`) and `SP2:105`
+  ("one actionable (marker-in-source-stage)"). When SP2 is implementation-planned,
+  replace those with `missing-files` / `advisory:age`; the cheap pass emits no
+  marker signal, so any SP2 example asserting one would encode a state that can
+  never occur.
+- **SP3 (`classifyStaleCandidate` / in-process verify layer):** must NOT consume or
+  branch on a `marker-in-source-stage` signal — it will never be present in a
+  candidate's `signals`. Review-stage stranding must be established by **git-evidence**
+  (the declared files were committed/shipped AND the plan never advanced past
+  `review/`), not by any `approved_by` marker. SP3's "approved-but-stranded"
+  classification must therefore derive from git history + stage, never from the marker.
+- **SP5 (regression suite):** the positive invariant must NOT assert that any plan is
+  flagged on `marker-in-source-stage` (or any `approved_by`-based) grounds. SP5's
+  positive cases assert `missing-files` (cheap) and SP3 git-evidence (verify); its
+  negative invariant must include the F1 regression guard — a fresh plan carrying
+  `approved_by: human` (in any frontmatter block, in any stage) with all declared
+  files present is NOT a candidate.
+- **`StaleSignal` contract:** any downstream typedef, switch, or assertion referencing
+  the signal union must use `('missing-files'|'advisory:age')`. SP3 may ADD new
+  verify-layer signals (e.g. a `shipped` signal), but the `marker-in-source-stage`
+  member must never be reintroduced into the cheap pass.
