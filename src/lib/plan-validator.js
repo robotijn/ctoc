@@ -385,8 +385,17 @@ function validateFunctionalToImpl(planPath, projectPath) {
     checklist: {}
   };
 
-  // Must have problem statement
-  const hasProblem = /problem\s*statement/i.test(content) || /## Problem/i.test(content);
+  // Must have a problem statement. Accept either the explicit "Problem Statement"
+  // heading OR CTOC's canonical Iron-Loop Step-2 section ("## N. ASSESS —
+  // Problem Understanding", with Business Context / Current State / Impact),
+  // which is what the product-owner and vision-decomposer agents emit. Matching
+  // only the literal "problem statement" string false-failed every plan written
+  // in the canonical ASSESS format (v6.9.61).
+  const hasProblem =
+    /problem\s*statement/i.test(content) ||
+    /problem\s+understanding/i.test(content) ||
+    /^#+\s.*\bASSESS\b/im.test(content) ||
+    /## Problem/i.test(content);
   result.checklist.problemStatement = hasProblem;
   if (!hasProblem) {
     result.errors.push('Missing problem statement');

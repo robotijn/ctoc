@@ -52,6 +52,22 @@ describe('Plan Validator Tests', () => {
     console.log('# functional->implementation: passes with problem, criteria, scope');
   });
 
+  test('functional->implementation: accepts canonical Iron-Loop "## ASSESS" problem section (v6.9.61)', () => {
+    // CTOC's product-owner / vision-decomposer agents emit the problem as
+    // "## 1. ASSESS — Problem Understanding" (Business Context / Current State /
+    // Impact), NOT the literal "Problem Statement" heading. The validator must
+    // recognize it, or every canonically-formatted plan false-fails Gate 1.
+    const planPath = createPlan('functional', 'assess-format',
+      '# Stale Flag\n\n## 1. ASSESS — Problem Understanding\n\n### Business Context\nPlans rot after their work ships.\n\n### Impact\nPhantom backlog erodes dashboard trust.\n\n## 3. CAPTURE — Acceptance Criteria\nScan completes without git.\n\n### In Scope\nCheap signal detection.\n');
+
+    const result = validator.validateTransition(planPath, 'functional', 'implementation', testDir);
+
+    assert.strictEqual(result.checklist.problemStatement, true, 'ASSESS section must satisfy the problem-statement check');
+    assert.ok(!result.errors.some(e => /problem/i.test(e)), 'Should NOT report a missing problem statement');
+    assert.strictEqual(result.valid, true, 'Canonical ASSESS-format plan should pass functional->implementation');
+    console.log('# functional->implementation: accepts canonical Iron-Loop "## ASSESS" problem section');
+  });
+
   test('functional->implementation: fails without problem statement', () => {
     const planPath = createPlan('functional', 'no-problem',
       '# No Problem\n\n## Success Criteria\nLogin works.\n\n## Scope\nOnly login.\n');
