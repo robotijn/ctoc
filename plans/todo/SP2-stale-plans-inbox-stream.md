@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-06-30T12:18:02.766Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-06-30T11:41:19.938Z
 gate_crossed: functional → implementation
@@ -597,3 +604,57 @@ SP2 does NOT touch either item here — it edits only the four files in its own 
 - **Read-only verification via an `fs.writeFileSync` spy (F5 — scoped to the candidate-render path):** Scenario 5 asserts the candidate-render path performs no writes by counting `fs.writeFileSync` calls (rewired in `beforeEach`, restored in `afterEach`). The spy is scoped to the candidate-render functions — `inboxStalePlansDrillIn(root)` and `route(['inbox','stale'], root)` — measured as a `wroteCount` DELTA, rather than asserting `0` across the whole dashboard render. Rationale (F5, adversarial review): `buildDashboardTable()` and `dashboardPipeline()` also call `getPlanCounts()`/`getAgentStatus()`, which can legitimately write during stale-LOCK cleanup (an unrelated subsystem), so a whole-render `0` assertion would be a false guard that could fail for reasons unrelated to SP2. The SP2 contributions inside `buildDashboardTable`/`dashboardPipeline` are read-only by construction (a mocked-count read + string concatenation) and ship no write call. `movePlan`/`createQuestion`/`createDecision` all funnel through `fs.writeFileSync`, so the scoped spy still covers them on the candidate-render path it guards.
 
 - **Memoize busting in tests:** because `getInboxCounts` is memoized (5 s TTL, keyed by root), tests use a UNIQUE `mkdtempSync` root per test AND call `cache.invalidate('getInboxCounts')` in `beforeEach`/`afterEach`. Unique roots make cross-test bleed impossible; `invalidate` is the explicit belt-and-suspenders. Node's per-file process isolation (`node --test tests/*.test.js`) prevents the `scanCheapCandidates` rewire from leaking to other test files; the `afterEach` restore prevents leaks within this file.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
