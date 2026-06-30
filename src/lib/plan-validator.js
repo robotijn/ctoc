@@ -109,16 +109,31 @@ function validateStepsComplete(content, planPath, projectPath) {
     { num: 16, name: 'FINAL-REVIEW', required: true }
   ];
 
+  // Scope step-state detection to the "## Execution Plan" section and parse each
+  // step's BLOCK. Scanning the whole plan body with single-line regexes
+  // false-matched prose mentions of "Step N" (common in meta-plans that document
+  // the Iron Loop itself) and could not recognize the integrator's multi-line
+  // format ("### Step N: LABEL" followed by "- [x]" checkbox lines) (v6.9.86).
+  const blocks = extractStepBlocks(content);
+
   for (const step of requiredSteps) {
-    const stepPattern = new RegExp(`Step\\s*${step.num}[:\\s]*${step.name}`, 'i');
-    const hasStep = stepPattern.test(content);
+    const block = blocks[String(step.num)];
+    const hasStep = block != null;
+    let isCompleted = false;
+    let isSkipped = false;
 
-    // Check for completion markers
-    const completedPattern = new RegExp(`Step\\s*${step.num}.*(?:COMPLETE|DONE|✓|\\[x\\])`, 'i');
-    const skippedPattern = new RegExp(`Step\\s*${step.num}.*(?:SKIP|N\\/A|NOT APPLICABLE)`, 'i');
-
-    const isCompleted = completedPattern.test(content);
-    const isSkipped = skippedPattern.test(content);
+    if (block) {
+      const hasUnchecked = /-\s*\[ \]/.test(block);
+      const hasChecked = /-\s*\[x\]/i.test(block);
+      const hasWord = /\b(?:COMPLETE|COMPLETED|DONE)\b/i.test(block) || /✓/.test(block);
+      // Complete iff there is positive evidence (a ticked box or a completion
+      // word) AND no remaining unchecked box in the block.
+      isCompleted = (hasChecked || hasWord) && !hasUnchecked;
+      // Skipped only on an EXPLICIT, un-completed skip marker — not the words
+      // "n/a"/"skipped" appearing inside completed checkbox prose (e.g.
+      // "- [x] 0 skipped, 0 flaky tests" or "(n/a — Node built-ins only)").
+      isSkipped = !isCompleted && (/\bSKIPPED\b/i.test(block) || /\bNOT APPLICABLE\b/i.test(block) || /\[\s*N\/A\s*\]/i.test(block));
+    }
 
     result.checklist[`step_${step.num}`] = {
       name: step.name,
@@ -141,15 +156,49 @@ function validateStepsComplete(content, planPath, projectPath) {
 }
 
 /**
+ * Extract the "## Execution Plan" region and split it into per-step blocks keyed
+ * by step number. A block runs from one "### Step N" heading to the next.
+ * Returns {} if no execution section is present (legacy plans without one).
+ */
+function extractStepBlocks(content) {
+  const execMatch = content.match(/^##\s+Execution Plan[\s\S]*$/m);
+  // Region = from the Execution Plan heading up to the next top-level "## " heading.
+  const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : '';
+  if (!region) return {};
+
+  const blocks = {};
+  const headingRe = /^#{2,4}\s*Step\s*(\d+)\b[^\n]*$/gim;
+  const heads = [];
+  let m;
+  while ((m = headingRe.exec(region)) !== null) {
+    heads.push({ num: m[1], index: m.index });
+  }
+  for (let i = 0; i < heads.length; i++) {
+    const start = heads[i].index;
+    const end = i + 1 < heads.length ? heads[i + 1].index : region.length;
+    blocks[heads[i].num] = region.slice(start, end);
+  }
+  return blocks;
+}
+
+/**
  * Check that skipped/blocked steps have proper escalation
  */
 function validateEscalations(content, metadata) {
   const result = { errors: [], warnings: [], checklist: {} };
 
+  // Only treat a step as escalation-requiring if it is marked SKIPPED/BLOCKED/
+  // DEFERRED inside the "## Execution Plan" section. Scanning the whole plan body
+  // false-matched prose (e.g. a meta-plan documenting "Step 13 VERIFY" drift or
+  // a "0 skipped" line) as an unapproved skip (v6.9.86). Fall back to the whole
+  // body only when there is no execution section (legacy plans).
+  const execMatch = content.match(/^##\s+Execution Plan[\s\S]*$/m);
+  const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : content;
+
   // Look for SKIPPED/BLOCKED without approval
   for (const status of ESCALATION_STATUSES) {
     const pattern = new RegExp(`(Step\\s*\\d+[^\\n]*${status})`, 'gi');
-    const matches = content.match(pattern) || [];
+    const matches = region.match(pattern) || [];
 
     for (const match of matches) {
       const stepMatch = match.match(/Step\s*(\d+)/i);
@@ -157,7 +206,7 @@ function validateEscalations(content, metadata) {
 
       // Check if there's an approval/justification nearby
       const approvalPattern = new RegExp(`Step\\s*${stepNum}[^\\n]*${status}[^\\n]*(?:APPROVED|JUSTIFIED|REASON:|ESCALATED)`, 'i');
-      const hasApproval = approvalPattern.test(content);
+      const hasApproval = approvalPattern.test(region);
 
       result.checklist[`escalation_${stepNum}_${status}`] = {
         step: stepNum,
@@ -191,8 +240,14 @@ function validateEscalations(content, metadata) {
 function validateAcceptanceCriteria(content) {
   const result = { errors: [], warnings: [], checklist: {} };
 
-  // Find acceptance criteria section
-  const criteriaSection = content.match(/(?:acceptance criteria|definition of done|requirements)[:\s]*\n([\s\S]*?)(?=\n##|\n---|Z)/i);
+  // Find the acceptance criteria section. Prefer the canonical "## [N.] CAPTURE
+  // — Acceptance Criteria" / "## Acceptance Criteria" heading so we count the
+  // real criteria, not an incidental "acceptance criteria"/"requirements" prose
+  // mention elsewhere. Terminate at the next "## " heading, a "---" rule, or EOF
+  // (the previous "Z" sentinel was a typo and never matched) (v6.9.86).
+  const criteriaSection =
+    content.match(/^##\s+[^\n]*Acceptance Criteria[^\n]*\n([\s\S]*?)(?=\n##\s|\n---\s*\n|$(?![\r\n]))/im) ||
+    content.match(/(?:acceptance criteria|definition of done|requirements)[:\s]*\n([\s\S]*?)(?=\n##\s|\n---\s*\n|$)/i);
 
   if (!criteriaSection) {
     result.warnings.push('No explicit acceptance criteria section found');
@@ -232,11 +287,21 @@ function validateAcceptanceCriteria(content) {
 function validateNoContradictions(content, projectPath) {
   const result = { errors: [], warnings: [], checklist: {} };
 
-  // Pattern 1: File referenced as "created" but doesn't exist
-  const createdFilePattern = /(?:created?|added?|new file)[:\s]*[`"]?([^\s`"]+\.[a-z]+)[`"]?/gi;
+  // Strip fenced code blocks before scanning. Code snippets in ``` / ~~~ fences
+  // (e.g. `lines.push('CLAUDE.md')`, `Hash('sha256').update(body).digest`) are
+  // NOT file-creation claims; scanning them produced false "claimed as created"
+  // errors that blocked otherwise-complete plans at review (v6.9.86).
+  const scanContent = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '');
+
+  // Pattern 1: File referenced as "created" but doesn't exist. The filename
+  // capture excludes quotes, parens and commas so code expressions (which
+  // contain them) are not mistaken for paths.
+  const createdFilePattern = /(?:created?|added?|new file)[:\s]*[`"]?([^\s`"'(),]+\.[a-z0-9]+)[`"]?/gi;
   let match;
 
-  while ((match = createdFilePattern.exec(content)) !== null) {
+  while ((match = createdFilePattern.exec(scanContent)) !== null) {
     const filePath = match[1];
     const fullPath = path.isAbsolute(filePath)
       ? filePath
@@ -256,7 +321,7 @@ function validateNoContradictions(content, projectPath) {
   // Pattern 2: Script referenced but doesn't exist
   const scriptPattern = /(?:run|execute|script)[:\s]*[`"]?([^\s`"]+\.(?:sh|js|py|ts))[`"]?/gi;
 
-  while ((match = scriptPattern.exec(content)) !== null) {
+  while ((match = scriptPattern.exec(scanContent)) !== null) {
     const scriptPath = match[1];
     const fullPath = path.isAbsolute(scriptPath)
       ? scriptPath
@@ -281,7 +346,7 @@ function validateNoContradictions(content, projectPath) {
   // Pattern 3: "SKIPPED" but implementation exists
   const skippedStepPattern = /Step\s*(\d+)[^\\n]*SKIP/gi;
 
-  while ((match = skippedStepPattern.exec(content)) !== null) {
+  while ((match = skippedStepPattern.exec(scanContent)) !== null) {
     const stepNum = match[1];
 
     // Check if there are actually files for this step
@@ -773,6 +838,7 @@ module.exports = {
   validateFunctionalToImpl,
   validateVisionForDecomposition,
   validateReviewToDone,
+  validateNoContradictions,
   validateTransition,
   validateStepLabels,
   formatValidationResult,

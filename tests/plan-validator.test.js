@@ -39,6 +39,46 @@ describe('Plan Validator Tests', () => {
     return filePath;
   }
 
+  // === contradiction parser (file-claim) — v6.9.86 ===
+
+  test('validateNoContradictions: ignores code inside fenced blocks (v6.9.86 false-positive)', () => {
+    // Code snippets in ``` fences (e.g. lines.push('CLAUDE.md'), Hash('sha256')
+    // .update(body).digest) are NOT file-creation claims. Before v6.9.86 the
+    // loose regex matched them as "files claimed as created" and blocked
+    // otherwise-complete plans at review.
+    const content = [
+      '# Plan',
+      '## DESIGN',
+      'We create the module.',
+      '```js',
+      "lines.push('CLAUDE.md');",
+      "const h = Hash('sha256').update(bodyLF, 'utf8').digest('hex');",
+      '```',
+    ].join('\n');
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      !result.errors.some(e => /claimed as created/i.test(e)),
+      `fenced code must not produce file-claim errors, got: ${JSON.stringify(result.errors)}`
+    );
+    console.log('# validateNoContradictions: ignores fenced code');
+  });
+
+  test('validateNoContradictions: still flags a real nonexistent created-file claim', () => {
+    // The fix must not blind the check: an inline claim of a created file that
+    // does not exist must still error (no fences involved).
+    const content = '# Plan\n\nCreated `src/lib/definitely-missing-xyz.js` for the feature.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /definitely-missing-xyz\.js/.test(e)),
+      `real nonexistent created-file claim must still be flagged, got: ${JSON.stringify(result.errors)}`
+    );
+    console.log('# validateNoContradictions: still flags real missing created file');
+  });
+
   // === functional -> implementation ===
 
   test('functional->implementation: passes with problem, criteria, scope', () => {
