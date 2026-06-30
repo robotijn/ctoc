@@ -22,6 +22,13 @@ const { getInboxCounts, listStaleCandidates } = require('./inbox');
 const { validateTransition } = require('./plan-validator');
 const { findProjectRoot } = require('./project-root');
 
+// Security (S1): strip C0 (0x00-0x1F) and C1 (0x7F-0x9F) control chars before
+// rendering any attacker-influenceable string (e.g. a plan slug derived from a
+// filename). An ESC / CR / BS / newline embedded in a slug could otherwise spoof
+// or forge menu rows (ANSI clear-screen, cursor moves, mid-row line breaks).
+// Defined once at module scope so any future slug renderer reuses one sanitizer.
+const stripCtl = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+
 // Stage to folder mapping
 const STAGE_FOLDERS = {
   canvas: 'canvas',
@@ -350,6 +357,11 @@ function inboxStalePlansDrillIn(projectPath) {
   const root = getProjectPath(projectPath);
   const candidates = listStaleCandidates(root); // cold path; one fresh scan
 
+  // S4: cap the cold-path list so a huge candidate set can't flood the screen
+  // (matches the areas/inbox.js convention). Render at most the first MAX rows;
+  // surplus is summarized on one trailing "… and N more" line.
+  const MAX_ROWS = 20;
+
   let text = `Inbox ▸ Possibly-stale plans (${candidates.length})\n`;
   text += `${'─'.repeat(40)}\n\n`;
   if (candidates.length === 0) {
@@ -357,9 +369,17 @@ function inboxStalePlansDrillIn(projectPath) {
   } else {
     // Bullet rows, NOT "1." — numbers are reserved for opening a plan (Rule 1/9).
     // This screen opens nothing, so it shows no numbers and exposes no numeric key.
-    for (const cand of candidates) {
+    // S1: every attacker-influenceable field (slug, stage, each signal) is passed
+    // through stripCtl so a hostile filename cannot inject ANSI/control chars.
+    for (const cand of candidates.slice(0, MAX_ROWS)) {
       const label = cand.actionable ? 'actionable' : 'advisory';
-      text += `  • ${cand.plan}  [${cand.stage}]  signals: ${cand.signals.join(', ')}  — ${label}\n`;
+      const plan = stripCtl(cand.plan);
+      const stage = stripCtl(cand.stage);
+      const signals = (cand.signals || []).map(stripCtl).join(', ');
+      text += `  • ${plan}  [${stage}]  signals: ${signals}  — ${label}\n`;
+    }
+    if (candidates.length > MAX_ROWS) {
+      text += `  … and ${candidates.length - MAX_ROWS} more\n`;
     }
     text += '\n  Verify with SP3 verification (coming soon) before any cleanup.\n';
   }

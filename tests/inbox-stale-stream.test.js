@@ -31,7 +31,10 @@ const {
 } = require('../src/lib/menu-screens');
 
 const realScan = staleDetector.scanCheapCandidates; // capture once
-let root, calls, realWrite, wroteCount;
+// S3: spy the full set of mutating fs calls (not just writeFileSync) so a
+// render path that appends/renames/removes/mkdirs is caught too.
+const MUTATING_FS = ['writeFileSync', 'appendFileSync', 'rmSync', 'renameSync', 'unlinkSync', 'mkdirSync'];
+let root, calls, wroteCount, mutations, realFs;
 
 function tempProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-sp2-')); // cross-platform sandbox
@@ -52,21 +55,29 @@ function mockScan(result) {
 }
 
 beforeEach(() => {
-  root = tempProject();
+  root = tempProject(); // mkdir during setup happens BEFORE spies install ⇒ uncounted
   calls = [];
   invalidate('getInboxCounts'); // bust memoize before each test
-  // read-only spy: count real writes during render paths
+  // read-only spies (S3): count ALL mutating fs calls during render paths.
+  // mutations = aggregate across the full set; wroteCount kept for the existing
+  // writeFileSync-scoped assertions.
   wroteCount = 0;
-  realWrite = fs.writeFileSync;
-  fs.writeFileSync = (...a) => {
-    wroteCount++;
-    return realWrite(...a);
-  };
+  mutations = 0;
+  realFs = {};
+  for (const fn of MUTATING_FS) {
+    const orig = fs[fn];
+    realFs[fn] = orig;
+    fs[fn] = (...a) => {
+      mutations++;
+      if (fn === 'writeFileSync') wroteCount++;
+      return orig.apply(fs, a);
+    };
+  }
 });
 
 afterEach(() => {
   staleDetector.scanCheapCandidates = realScan; // restore boundary
-  fs.writeFileSync = realWrite; // restore spy
+  for (const fn of MUTATING_FS) fs[fn] = realFs[fn]; // restore all spies
   invalidate('getInboxCounts');
   try {
     fs.rmSync(root, { recursive: true, force: true });
@@ -198,6 +209,63 @@ describe('SP2 — inboxStalePlansDrillIn (M4 / Scenario 4)', () => {
   });
 });
 
+describe('SP2 — drill-in hardening (S1 control-char strip, S4 list cap)', () => {
+  it('S1: strips ANSI/control chars from a hostile plan slug (no ESC, no mid-row newline)', () => {
+    mockScan({
+      candidates: [
+        { plan: 'evil\x1b[2Jboom\ninjected', stage: 'func\x1btional', signals: ['miss\ning-files'], actionable: true },
+        { plan: 'ok', stage: 'review', signals: ['advisory:age'], actionable: false },
+      ],
+      count: 2,
+    });
+    const screen = inboxStalePlansDrillIn(root);
+    const t = screen.text;
+    // No raw ESC anywhere
+    assert.ok(!t.includes('\x1b'), 'rendered text must contain no ESC byte');
+    // The sanitized slug content survives, the control bytes are gone
+    assert.ok(t.includes('evil[2Jboominjected') || t.includes('evilboominjected') || /evil.*boom.*injected/.test(t.replace(/\n/g, '')), 'slug text survives minus control chars');
+    // Each candidate is exactly ONE row: the hostile newline must not split a row.
+    // Count bullet rows — must equal candidate count (2), not more.
+    const bulletRows = t.split('\n').filter((l) => l.trimStart().startsWith('•'));
+    assert.equal(bulletRows.length, 2, 'hostile \\n must not forge an extra row');
+    // No control bytes (C0/C1) survive in the body at all.
+    assert.ok(!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(t), 'no C0/C1 control bytes in rendered text');
+  });
+
+  it('S4: caps the cold-path list at 20 rows and summarizes the rest', () => {
+    const N = 27;
+    const candidates = Array.from({ length: N }, (_, i) => ({
+      plan: `p${i}`, stage: 'functional', signals: ['missing-files'], actionable: true,
+    }));
+    mockScan({ candidates, count: N });
+    const screen = inboxStalePlansDrillIn(root);
+    const bulletRows = screen.text.split('\n').filter((l) => l.trimStart().startsWith('•'));
+    assert.equal(bulletRows.length, 20, 'at most 20 candidate rows render');
+    assert.ok(screen.text.includes(`… and ${N - 20} more`), 'surplus summarized on one line');
+    // The header still reports the TRUE total, not the capped count.
+    assert.ok(screen.text.includes(`Possibly-stale plans (${N})`), 'header shows true total');
+  });
+
+  it('S4: no "… and N more" line when count is at or below the cap', () => {
+    const candidates = Array.from({ length: 20 }, (_, i) => ({
+      plan: `p${i}`, stage: 'functional', signals: ['advisory:age'], actionable: false,
+    }));
+    mockScan({ candidates, count: 20 });
+    const screen = inboxStalePlansDrillIn(root);
+    assert.ok(!/… and \d+ more/.test(screen.text), 'no overflow line at exactly the cap');
+  });
+});
+
+describe('SP2 — memoization single-scan (L3)', () => {
+  it('scans exactly once per 5s memoize window (two getInboxCounts calls, no invalidate between)', () => {
+    mockScan({ candidates: [], count: 4 });
+    const before = calls.length;
+    getInboxCounts(root); // first call computes ⇒ one scan
+    getInboxCounts(root); // second call within window ⇒ cache hit, NO scan
+    assert.equal(calls.length - before, 1, 'scanCheapCandidates runs exactly once per memoize window');
+  });
+});
+
 describe('SP2 — route dispatch (M5)', () => {
   it('route(["inbox","stale"]) dispatches to the drill-in (reachable, no slash command)', () => {
     mockScan({
@@ -225,9 +293,15 @@ describe('SP2 — read-only candidate-render path (Scenario 5, F5-scoped delta)'
       count: 1,
     });
     const before = wroteCount;
+    const beforeMut = mutations;
     inboxStalePlansDrillIn(root);
     route(['inbox', 'stale'], root);
-    assert.equal(wroteCount - before, 0, 'candidate-render path must be read-only');
+    assert.equal(wroteCount - before, 0, 'candidate-render path must be read-only (writes)');
+    assert.equal(
+      mutations - beforeMut,
+      0,
+      'no mutating fs call (write/append/rm/rename/unlink/mkdir) across drill-in + route(inbox stale)'
+    );
   });
 });
 
@@ -272,20 +346,20 @@ describe('SP2 — pluralization edge (count === 1)', () => {
 });
 
 describe('SP2 — doc-contract: menu.md stale-first precedence rule (F1 reachability guard)', () => {
-  it('menu.md documents the stale-first precedence rule, co-located in one rule', () => {
+  it('menu.md documents the stale-first precedence rule, anchored in Rule 10 itself', () => {
     const mdPath = path.join(__dirname, '..', 'src', 'commands', 'menu.md');
     const md = fs.readFileSync(mdPath, 'utf8');
-    assert.match(md, /Stale plans/, 'menu.md must name the Stale plans ride-along question');
-    assert.match(md, /inbox stale/, 'menu.md must name the inbox stale route');
-    assert.match(md, /precedence|takes precedence|wins/i, 'menu.md must state precedence semantics');
-    // Co-location: a ±700-char window around the precedence keyword must ALSO
-    // contain both "Stale plans" and "inbox stale" — proving these belong to ONE
-    // rule, not three scattered mentions that could each survive a regression.
-    const m = /precedence|takes precedence|wins/i.exec(md);
-    const window = md.slice(Math.max(0, m.index - 700), m.index + 700);
-    assert.ok(
-      /Stale plans/.test(window) && /inbox stale/.test(window),
-      'the stale-first precedence rule must mention "Stale plans" and "inbox stale" together'
-    );
+    // H1: anchor on Rule 10's own heading, not the first /precedence/ match. The
+    // env action-entry clause at :53 independently contains "Stale plans",
+    // "inbox stale", and "precedence" and matches FIRST, so a ±window around the
+    // first keyword false-greens even with Rule 10 deleted. Slicing from Rule
+    // 10's index guarantees the env clause (lower index) cannot satisfy this.
+    const rule10 = /^10\.\s+\*\*Stale-plans question rides along, navigates with precedence/m;
+    assert.match(md, rule10, 'menu.md must contain Rule 10 with its precedence heading');
+    const m = rule10.exec(md);
+    const body = md.slice(m.index, m.index + 1200); // Rule 10 body only — env clause at :53 cannot satisfy this
+    assert.ok(/inbox stale/.test(body),       'Rule 10 must name the inbox stale route');
+    assert.ok(/takes precedence/i.test(body), 'Rule 10 must state precedence semantics');
+    assert.ok(/View stale plans/.test(body),  'Rule 10 must name the View stale plans option');
   });
 });
