@@ -715,6 +715,48 @@ commit as the `stale-detector.js` source change (Risk R3); verify locally with
      `files:` declaration; the edit is the minimal two-assertion update required
      to keep the suite green and is flagged here for morning review.
 
+- **Pre-Gate-3 review KICKBACK fixes (5; real code, each locked by a regression
+  test). Locked contract preserved** (execFileSync no-shell + `--` pathspecs;
+  `scanCheapCandidates` subprocess-free; `verifyStaleCandidate` sole git site,
+  never hot-path; signals missing-files/advisory:age; menu discipline; read-only;
+  degrade-never-throw):
+  1. **MED (Surface 5, fix-first) — empty-slug `.md` filename crashed the whole
+     menu.** A `plans/<stage>/.md` file → slug `''` → empty-slug candidate →
+     `verifyStaleCandidate` misuse `TypeError` → uncaught through
+     `inboxVerifyProposals`/route → menu abort. A filename is a DATA fault and
+     must degrade, not throw. Fixed in BOTH layers (defense-in-depth): (a)
+     `scanCheapCandidates` skips `file === '.md' || slug.length === 0` before it
+     can become a candidate; (b) `inboxVerifyProposals` wraps each candidate's
+     verify+classify in try/catch, degrading a throwing row to an `inconclusive`
+     proposal `{plan: stripCtl(cand.plan||'(unknown)'), proposedAction:null,
+     evidence:['verification error — skipped']}` and continuing. Tests #15, #16.
+  2. **MED (Surface 4) — uncapped verification fan-out before the display cap.**
+     `inboxVerifyProposals` verified ALL candidates (each ≥1 git spawn +1/file,
+     serial, 5s timeout) BEFORE the 20-row slice → N×M = minutes of feedback-less
+     grinding. Fixed: cap the WORK first — `candidates.slice(0, MAX_ROWS)` is
+     verified; the "… and N more" line is driven by the TRUE total
+     (`candidates.length - toVerify.length` + any render truncation) so the count
+     stays honest. Test #17 (verify call-count ≤ MAX_ROWS).
+  3. **LOW (Surface 3 latent) — commit subject not stripped at capture.** The
+     `%B`-derived `subject` stored in evidence was unsanitized (safe today, ANSI
+     trap if SP4 renders it). Fixed: a local `stripCtlChars` (C0/C1 strip, pure
+     string op, no new import) is applied AT CAPTURE in `verifyStaleCandidate` so
+     the invariant holds regardless of any future renderer. Test #18.
+  4. **LOW (code-review) — `classifyStaleCandidate` malformed-evidence guard.**
+     The pure classifier now default-guards: `if (!evidence || !evidence.gitAvailable)
+     return inconclusive`, and reads `(evidence.slugMatchCommits || []).length`, so
+     a missing/partial evidence object degrades instead of throwing. Test #19.
+  5. **INFO (code-review) — empty drill-in actions assertion.** Locks
+     `inboxStalePlansDrillIn` with 0 candidates ⇒ `actions === {'◀ Back':''}`,
+     exactly one option (no `Verify`). Test #20.
+
+  Verification after fixes: `tests/stale-classifier.test.js` 23 pass / 0 fail / 0
+  skipped; `tests/stale-detector-cheap.test.js` 57 pass (static subprocess-free
+  guard + empty-slug skip both green); full suite `node --test tests/*.test.js`
+  2495 pass / **# fail 0** / 0 skipped. Coverage: `stale-detector.js` 97.42% line
+  / 100% funcs; `inboxVerifyProposals` changed path fully covered bar the now-
+  redundant in-render truncation branch (kept defensively).
+
 ### 6.6 Acceptance-Criteria → Implementation → Test Matrix
 
 Every success metric (M1–M8; M8 is the verify-reachability metric) maps to an
@@ -791,8 +833,8 @@ implementation element AND ≥1 test.
 
 ### Step 14: VERIFY
 - [x] Run lint + type check — tsc back to baseline 89 (0 new errors in my files); eslint 0 errors
-- [x] Run ALL tests (TDD Green) — full suite 2486 pass / 0 fail
-- [x] Check coverage >= 80% — stale-detector.js 95.06% line / 100% funcs; inboxVerifyProposals fully covered
+- [x] Run ALL tests (TDD Green) — full suite 2495 pass / 0 fail (post review-kickback: +5 fixes, +5 tests)
+- [x] Check coverage >= 80% — stale-detector.js 97.42% line / 100% funcs; inboxVerifyProposals changed path fully covered
 - [x] 0 skipped, 0 flaky tests — 0 skipped
 
 ### Step 15: DOCUMENT

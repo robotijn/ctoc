@@ -500,3 +500,164 @@ describe('no side effects across verify+classify+render', () => {
     assert.equal(mutated, false, 'verify+classify+render must not write/move/delete');
   });
 });
+
+// A complete, well-formed gitAvailable:true evidence object ⇒ classifier returns
+// 'inconclusive' (no shipping evidence). Reused by the fan-out and per-row tests.
+const inconclusiveEvidence = () => ({
+  gitAvailable: true,
+  error: null,
+  approvedBy: null,
+  declaredFiles: [],
+  allFilesExist: true,
+  anyFileMissing: false,
+  stageEntryEpoch: null,
+  filesLastModifiedEpoch: null,
+  filesModifiedAfterEntry: false,
+  slugMatchCommits: [],
+  slugMatchAfterEntry: false,
+  explicitlyRejected: false,
+});
+
+// ---------------------------------------------------------------------------
+// 15 — FIX 1a: empty-slug `.md` filename is never a cheap-scan candidate
+// ---------------------------------------------------------------------------
+
+describe('scanCheapCandidates — empty-slug filename skipped', () => {
+  it('a plans/functional/.md file produces NO empty-slug candidate and does not throw', () => {
+    const sb = makeSandbox();
+    writeStalePlan(sb, 'functional', 'p-real'); // a genuine candidate to keep alongside
+    // A literal `.md` filename ⇒ slug = '' ⇒ would crash verify if it became a candidate.
+    fs.writeFileSync(path.join(sb, 'plans', 'functional', '.md'), '---\nfiles: [src/lib/gone.js]\n---\n');
+    let res;
+    assert.doesNotThrow(() => { res = staleDetector.scanCheapCandidates(sb); });
+    assert.ok(res.candidates.every((c) => c.plan.length > 0), 'no empty-slug candidate');
+    assert.ok(!res.candidates.some((c) => c.plan === ''), 'plan:"" must never appear');
+    // The real plan is still detected — the skip is surgical, not over-broad.
+    assert.ok(res.candidates.some((c) => c.plan === 'p-real'), 'real candidate still found');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 16 — FIX 1b: a throwing candidate degrades its ROW, never crashes the screen
+// ---------------------------------------------------------------------------
+
+describe('inboxVerifyProposals — per-row verify failure degrades, does not crash', () => {
+  it('verify throwing on one candidate ⇒ valid screen, that row inconclusive, siblings render', () => {
+    const sb = makeSandbox();
+    writeStalePlan(sb, 'functional', 'p-aaa');
+    writeStalePlan(sb, 'functional', 'p-bbb');
+    const orig = staleDetector.verifyStaleCandidate;
+    let n = 0;
+    staleDetector.verifyStaleCandidate = () => {
+      n++;
+      if (n === 1) throw new TypeError('boom'); // first candidate throws
+      return inconclusiveEvidence();
+    };
+    let screen;
+    try {
+      assert.doesNotThrow(() => { screen = menuScreens.inboxVerifyProposals(sb); });
+    } finally {
+      staleDetector.verifyStaleCandidate = orig;
+    }
+    assert.ok(typeof screen.text === 'string' && screen.text.length > 0, 'valid screen returned');
+    assert.ok(screen.text.includes('verification error'), 'degraded row shows verification error');
+    // Both rows render — the crash on row 1 did not suppress row 2 (sorted: p-aaa, p-bbb).
+    assert.ok(screen.text.includes('p-aaa'), 'errored row still rendered with its slug');
+    assert.ok(screen.text.includes('p-bbb'), 'sibling row still rendered');
+    assert.equal(screen.actions['◀ Back'], 'inbox stale');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 17 — FIX 2: verification fan-out is capped at MAX_ROWS BEFORE the display slice
+// ---------------------------------------------------------------------------
+
+describe('inboxVerifyProposals — fan-out capped before verifying', () => {
+  it('25 candidates ⇒ verifyStaleCandidate invoked at most 20 times; 20 rows + true "… and 5 more"', () => {
+    const sb = makeSandbox();
+    const MAX_ROWS = 20;
+    for (let i = 0; i < 25; i++) writeStalePlan(sb, 'functional', 'p' + String(i).padStart(2, '0'));
+    const orig = staleDetector.verifyStaleCandidate;
+    let calls = 0;
+    staleDetector.verifyStaleCandidate = () => { calls++; return inconclusiveEvidence(); };
+    let screen;
+    try {
+      screen = menuScreens.inboxVerifyProposals(sb);
+    } finally {
+      staleDetector.verifyStaleCandidate = orig;
+    }
+    assert.ok(calls <= MAX_ROWS, 'verify must not run more than MAX_ROWS times, got ' + calls);
+    assert.equal(calls, MAX_ROWS, 'verify runs exactly MAX_ROWS times (sliced before fan-out)');
+    const rows = screen.text.split('\n').filter((l) => l.trim().startsWith('•')).length;
+    assert.equal(rows, MAX_ROWS, 'exactly MAX_ROWS rows rendered');
+    assert.ok(screen.text.includes('… and 5 more'), 'true remaining (25-20=5) reflected honestly');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 18 — FIX 3: commit subject is C0/C1-stripped AT CAPTURE in verifyStaleCandidate
+// ---------------------------------------------------------------------------
+
+describe('verifyStaleCandidate — commit subject stripped of control chars at capture', () => {
+  it('a hostile commit subject (ESC sequence) is sanitized in slugMatchCommits[].subject', () => {
+    const sb = makeSandbox();
+    writeStalePlan(sb, 'functional', 'p-ctl');
+    const cand = baseCandidate('p-ctl');
+    const spy = spyChildProcess({
+      execFileSync: (_file, args) => {
+        const a = args.join(' ');
+        if (a.includes('rev-parse')) return '';
+        // slug-history scan: one record whose subject embeds an ESC color sequence.
+        if (a.includes('%x1f')) return '1700000000\x1fabc1234\x1fship p-ctl \x1b[31mEVIL\x1b[0m\x1e';
+        return '1700000000'; // %ct epoch queries
+      },
+    });
+    let evidence;
+    try {
+      evidence = verifyStaleCandidate(cand, sb);
+    } finally {
+      spy.restore();
+    }
+    assert.equal(evidence.slugMatchCommits.length, 1, 'slug matched the commit');
+    const subject = evidence.slugMatchCommits[0].subject;
+    assert.ok(!/[\x00-\x1f\x7f-\x9f]/.test(subject), 'subject must carry NO control chars: ' + JSON.stringify(subject));
+    assert.ok(subject.includes('ship p-ctl'), 'visible text preserved');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 19 — FIX 4: classifyStaleCandidate default-guards malformed/partial evidence
+// ---------------------------------------------------------------------------
+
+describe('classifyStaleCandidate — malformed evidence degrades, never throws', () => {
+  it('undefined evidence ⇒ inconclusive, null action, no throw', () => {
+    const cand = baseCandidate('p-undef');
+    let p;
+    assert.doesNotThrow(() => { p = classifyStaleCandidate(cand, undefined); });
+    assert.equal(p.category, 'inconclusive');
+    assert.equal(p.proposedAction, null);
+    assert.equal(p.plan, 'p-undef');
+  });
+
+  it('partial evidence {gitAvailable:true} (no slugMatchCommits) ⇒ inconclusive, no throw', () => {
+    const cand = baseCandidate('p-partial');
+    let p;
+    assert.doesNotThrow(() => { p = classifyStaleCandidate(cand, { gitAvailable: true }); });
+    assert.equal(p.category, 'inconclusive');
+    assert.equal(p.proposedAction, null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 20 — FIX 5: empty drill-in exposes ONLY Back (no Verify)
+// ---------------------------------------------------------------------------
+
+describe('inboxStalePlansDrillIn — empty candidate set actions', () => {
+  it('0 candidates ⇒ actions deepEqual {"◀ Back":""} and exactly one option', () => {
+    const sb = makeSandbox(); // no plans ⇒ zero candidates
+    const screen = menuScreens.inboxStalePlansDrillIn(sb);
+    assert.deepEqual(screen.actions, { '◀ Back': '' });
+    assert.equal(screen.ask.questions[0].options.length, 1);
+    assert.equal(screen.ask.questions[0].options[0].label, '◀ Back');
+  });
+});

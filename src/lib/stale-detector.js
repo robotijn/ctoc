@@ -140,6 +140,21 @@ function stripQuotes(s) {
 }
 
 /**
+ * Strip C0/C1 control characters (incl. ESC) from a string. Local twin of
+ * menu-screens.js `stripCtl`, kept here so the ANSI-injection invariant holds at
+ * the point of CAPTURE, not just at render: any commit-message-derived string
+ * stored in evidence (e.g. the slug-match commit subject) is sanitized BEFORE it
+ * leaves this module, so a hostile commit subject can never carry escape
+ * sequences into a future renderer (SP4) regardless of that renderer's own
+ * hygiene. Pure string op — no import.
+ * @param {string} s
+ * @returns {string}
+ */
+function stripCtlChars(s) {
+  return String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+}
+
+/**
  * Parse a single block-list item value, resolving the ordering hazard between
  * quote-stripping and comment-stripping.
  *
@@ -442,7 +457,9 @@ function verifyStaleCandidate(candidate, root, opts = {}) {
       slugMatchCommits.push({
         shortHash: r.shortHash,
         dateISO: new Date(r.ct * 1000).toISOString().slice(0, 10),
-        subject: (r.message.split(/\r?\n/)[0] || '').trim(),
+        // Invariant: subject is stripped of C0/C1 control chars AT CAPTURE so a
+        // hostile commit subject cannot inject ANSI/escape sequences downstream.
+        subject: stripCtlChars((r.message.split(/\r?\n/)[0] || '').trim()),
       });
       if (stageEntryEpoch != null && r.ct > stageEntryEpoch) slugMatchAfterEntry = true;
     }
@@ -510,18 +527,23 @@ function buildEvidenceLines(evidence) {
 function classifyStaleCandidate(candidate, evidence) {
   const plan = candidate.plan;
 
-  // 0. Git unavailable ⇒ inconclusive (degraded signal).
-  if (!evidence.gitAvailable) {
+  // 0. Missing / git-unavailable evidence ⇒ inconclusive (degraded signal).
+  // Default-guard a missing or partial evidence object: a `undefined` evidence or
+  // one lacking gitAvailable degrades to inconclusive instead of throwing on a
+  // property read. This keeps the pure classifier total over malformed input.
+  if (!evidence || !evidence.gitAvailable) {
     return {
       plan,
       category: 'inconclusive',
       proposedAction: null,
-      evidence: ['git unavailable — cannot verify (' + (evidence.error || '') + ')'],
+      evidence: ['git unavailable — cannot verify (' + ((evidence && evidence.error) || '') + ')'],
     };
   }
 
+  const slugMatchCount = (evidence.slugMatchCommits || []).length;
+
   // 1. DEAD-ON-ARRIVAL — files gone, nothing shipped, never approved.
-  if (evidence.anyFileMissing && evidence.slugMatchCommits.length === 0 && !evidence.approvedBy) {
+  if (evidence.anyFileMissing && slugMatchCount === 0 && !evidence.approvedBy) {
     return {
       plan,
       category: 'dead-on-arrival',
@@ -606,6 +628,13 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
     for (const file of entries) {
       const filePath = path.join(stageDir, file);
       const slug = file.slice(0, -3); // strip '.md'
+
+      // Empty-slug skip (data fault, defense-in-depth layer A): a filename like
+      // `.md` yields an empty slug. An empty-slug candidate would later make
+      // verifyStaleCandidate throw its misuse TypeError, crashing the cold-path
+      // verify screen. A filename is DATA, never misuse, so it must never become a
+      // candidate. (The verify screen wraps verify per-row as layer B.)
+      if (file === '.md' || slug.length === 0) continue;
 
       // Per-file IO containment (F2): each per-file syscall is wrapped in a narrow
       // try/catch scoped to this single file. A vanished/unreadable plan is skipped

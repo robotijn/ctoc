@@ -426,13 +426,34 @@ function inboxVerifyProposals(projectPath) {
   const root = getProjectPath(projectPath);
   const candidates = listStaleCandidates(root); // cold path; one fresh scan
   const slugHistoryCache = {}; // shared across all candidates (single git log read)
-  const proposals = candidates.map((cand) => {
-    const evidence = staleDetector.verifyStaleCandidate(cand, root, { slugHistoryCache });
-    return staleDetector.classifyStaleCandidate(cand, evidence);
+  const MAX_ROWS = 20; // matches inboxStalePlansDrillIn S4 cap
+
+  // Fan-out cap (S4): cap the WORK before doing it. Each verify is ≥1 git spawn
+  // (+1 per declared file, serial, 5s timeout each); verifying ALL candidates
+  // before the display slice lets N plans × M files grind for minutes with no
+  // feedback. Slice to the display cap FIRST, verify only those. The "… and N
+  // more" line below is driven by the TRUE total (candidates.length) so the count
+  // stays honest ("showing 20 of N").
+  const toVerify = candidates.slice(0, MAX_ROWS);
+  const proposals = toVerify.map((cand) => {
+    // Per-row degrade (defense-in-depth layer B): one malformed candidate must
+    // never crash the whole screen. If verify/classify throws (e.g. a candidate
+    // that slipped past the cheap-scan guard with an empty plan slug), degrade
+    // THAT row to an inconclusive proposal and keep rendering the siblings.
+    try {
+      const evidence = staleDetector.verifyStaleCandidate(cand, root, { slugHistoryCache });
+      return staleDetector.classifyStaleCandidate(cand, evidence);
+    } catch {
+      return {
+        plan: stripCtl((cand && cand.plan) || '(unknown)'),
+        category: 'inconclusive',
+        proposedAction: null,
+        evidence: ['verification error — skipped'],
+      };
+    }
   });
 
   const ORDER = ['shipped-but-early', 'approved-but-stranded', 'dead-on-arrival', 'inconclusive'];
-  const MAX_ROWS = 20; // matches inboxStalePlansDrillIn S4 cap
 
   let text = `Inbox ▸ Verified proposals (${proposals.length})\n`;
   text += `${'─'.repeat(40)}\n`;
@@ -460,8 +481,14 @@ function inboxVerifyProposals(projectPath) {
         rows++;
       }
     }
-    if (truncated > 0) {
-      text += `  … and ${truncated} more\n`;
+    // True remaining = un-verified surplus (candidates beyond the fan-out cap)
+    // plus any rows truncated during grouped rendering. With the pre-verify slice,
+    // truncated is normally 0 and overflow carries the count; summing both keeps
+    // the line correct regardless.
+    const overflow = candidates.length - toVerify.length;
+    const remaining = overflow + truncated;
+    if (remaining > 0) {
+      text += `  … and ${remaining} more\n`;
     }
   }
   text += '\n\n\n';
