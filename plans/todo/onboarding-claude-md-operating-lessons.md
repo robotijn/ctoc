@@ -689,6 +689,34 @@ CTOC library.
   before). This is a test seam only; no `model:` frontmatter is involved, and
   `SessionStart.js` is already in this plan's `files:` list.
 
+- **SessionStart self-repo guard (surfaced at execution Step 10/14).** §6.5 Change 2
+  is wired exactly as specified, with ONE added safety guard: step 5b skips injection
+  when `path.resolve(projectPath) === path.resolve(__dirname, '..', '..')` — i.e. when
+  the hook is running against CTOC's OWN source repo. Rationale: (1) CTOC's own
+  hand-maintained `CLAUDE.md` must never be auto-edited by its own dev hook (a tool
+  must not silently rewrite its source-of-truth onboarding file); (2) `tests/session-start-hook.test.js`
+  spawns `node SessionStart.js` with `cwd = repo root`, so without the guard step 5b
+  would append the block to the real repo `CLAUDE.md` and dirty the tree on every test
+  run. In a consumer project the hook runs from the installed plugin, so the plugin
+  root (`__dirname/../..`) differs from `projectPath` and injection proceeds normally
+  (verified by AC6/AC7 against a temp project). No AC is affected; the repo `CLAUDE.md`
+  is provably untouched by the suite.
+
+- **init fills-on-create / refreshes-existing, but does NOT first-inject a blockless
+  pre-existing `CLAUDE.md` (refines §6.4).** §6.4's data-flow note ("appends if a
+  pre-existing project's CLAUDE.md has no block") conflicts with the frozen
+  `tests/init-project.test.js` assertion that an existing user `CLAUDE.md` is preserved
+  byte-for-byte without `--force` (and that test file is outside this plan's editable
+  `files:` set). Reconciliation: at init, `ensureLessonsBlock` runs only when the
+  `CLAUDE.md` was just created from the template (placeholder fill — AC1) OR already
+  contains a managed block (refresh). A pre-existing user `CLAUDE.md` with no block is
+  left untouched at init; its first injection is owned by `SessionStart` on next session
+  open — which is the documented every-open trigger for existing projects (Decision A).
+  All three triggers remain (init for new, SessionStart for existing/every-open, update
+  for explicit); no acceptance criterion is affected (AC1/AC2 cover new-init; AC6 covers
+  existing-via-SessionStart; AC12 covers update). This is the more conservative behavior
+  — init never silently rewrites a developer's hand-authored CLAUDE.md.
+
 ---
 
 ## Implementation Details
@@ -1475,50 +1503,50 @@ Every AC maps to a concrete implementation element AND ≥ 1 test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (`tests/claude-md-lessons.test.js`, 12 ACs + sync-guard + error paths)
+- [x] Test error conditions (missing source, malformed markers, EXDEV, non-EXDEV rename, fail-open)
+- [x] Run tests - expect RED (failing) — confirmed MODULE_NOT_FOUND before implementation
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none — Node built-ins only)
+- [x] Check prerequisites (node v24; node:test runner)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (n/a — module + template files)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (operating-lessons.md, claude-md-lessons.js, template C1–C8 + placeholder, init/SessionStart/update wiring, README + readme-numbers bump)
+- [x] Add error handling (single outer try/catch, fail-open, stderr on every error exit)
+- [x] Wire up integration points (init 3b, SessionStart 5b + guard, update refreshLocalLessons x2)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together (full suite green)
+- [x] Check error handling completeness (no silent failures; stderr asserted)
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (steady-state no-op = 2 reads + early return, no write)
+- [x] Optimize critical paths (session-start hot path off the stdout path; no async)
+- [x] Simplify complex code (O(n) fence parser; uniform ManagedBlock shape)
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal — callers pass project-scoped paths)
+- [x] Sanitize outputs (markers/notice are fixed constants)
+- [x] No secrets in code (no network, no credentials)
+- [x] Safe file operations (atomic temp-then-rename; never touches ~/.claude)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (ESLint 0 errors; tsc baseline unchanged — new file type-clean)
+- [x] Run ALL tests (TDD Green) — full suite 2516 pass / 0 fail
+- [x] Check coverage >= 80% (claude-md-lessons.js: 99.28% line, 84.48% branch, 100% funcs)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (README src/lib count + parenthetical)
+- [x] Add JSDoc comments to new functions (all exports + ManagedBlock typedef)
+- [x] Update CHANGELOG if needed (n/a — version bump handled at release)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed (repo CLAUDE.md provably untouched by suite)
+- [x] Ready for human review (plan left in todo/ per execution brief; no stage change)

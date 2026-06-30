@@ -16,6 +16,21 @@ const MARKETPLACE_DIR = path.join(PLUGINS_DIR, 'marketplaces', 'robotijn');
 const CACHE_DIR = path.join(PLUGINS_DIR, 'cache', 'robotijn', 'ctoc');
 const INSTALLED_FILE = path.join(PLUGINS_DIR, 'installed_plugins.json');
 
+/**
+ * Refresh the local project's CTOC-managed operating-lessons block. Fail-open:
+ * a lessons-injection failure is logged to stderr and NEVER aborts the version update.
+ */
+function refreshLocalLessons() {
+  try {
+    const { ensureLessonsBlock } = require('../lib/claude-md-lessons');
+    const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
+    const ctocRoot = path.resolve(__dirname, '..', '..');
+    ensureLessonsBlock(claudeMdPath, ctocRoot);
+  } catch (err) {
+    console.error('[CTOC] Lessons block refresh skipped:', err.message);
+  }
+}
+
 function run(cmd, opts = {}) {
   try {
     return execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...opts }).trim();
@@ -98,6 +113,7 @@ function update() {
   if (currentVersion === newVersion) {
     console.log('\n' + '─'.repeat(40));
     console.log(`✓ Already up to date (v${newVersion})`);
+    refreshLocalLessons();          // (a) refresh even when version unchanged
     return;
   }
 
@@ -173,9 +189,16 @@ function update() {
     console.log('   No old versions to remove');
   }
 
+  // 7b. Refresh local CLAUDE.md operating-lessons block after a successful upgrade.
+  refreshLocalLessons();            // (b) refresh after version change
+
   console.log('\n' + '─'.repeat(40));
   console.log(`✓ Updated to CTOC v${newVersion}`);
   console.log('\nRestart Claude Code for changes to take effect.');
 }
 
-update();
+if (require.main === module) {
+  update();
+}
+
+module.exports = { update, refreshLocalLessons, getCurrentVersion, getLatestVersion };

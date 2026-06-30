@@ -76,6 +76,7 @@ async function main() {
   const directories = [
     // Plans workflow (matches init-project.js PLAN_DIRS)
     'plans/vision',
+    'plans/canvas',          // PLAN_DIRS already has it; SessionStart was missing it
     'plans/functional',
     'plans/implementation',
     'plans/todo',
@@ -93,6 +94,23 @@ async function main() {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+  }
+
+  // 5b. Ensure CTOC-managed operating-lessons block in CLAUDE.md (fail-open).
+  //     MUST NOT throw, block, or perceptibly slow session start. Double-guarded:
+  //     ensureLessonsBlock itself never throws; this try/catch is a belt-and-braces backstop.
+  //     Self-repo guard: never auto-edit CTOC's OWN hand-maintained CLAUDE.md (the dev repo).
+  //     In a consumer project the hook runs from the installed plugin, so ctocRoot (the plugin
+  //     root) differs from projectPath and injection proceeds normally.
+  try {
+    const ctocRoot = path.resolve(__dirname, '..', '..');
+    if (path.resolve(projectPath) !== ctocRoot) {
+      const { ensureLessonsBlock } = require('../lib/claude-md-lessons');
+      const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
+      ensureLessonsBlock(claudeMdPath, ctocRoot);
+    }
+  } catch (err) {
+    console.error('[CTOC] Lessons block injection skipped:', err.message);
   }
 
   // 6. Check for updates (sync cache check only — no stderr output in hooks)
@@ -126,6 +144,11 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
     : '';
   const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
 
+  // NOTE: This 16-step banner is the compact, machine-readable copy. The CANONICAL
+  // operating-lessons + methodology reference live in .ctoc/templates/operating-lessons.md.
+  // Kept as a separate inline copy on purpose (no runtime file I/O on the hot session-start
+  // path); the generateContext<->operating-lessons.md step labels are sync-guarded by
+  // tests/claude-md-lessons.test.js (any divergence fails that test).
   return `
 ============================================================
 CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
@@ -168,7 +191,11 @@ This is cryptographically enforced. There are no escape phrases.
 `;
 }
 
-main().catch(err => {
-  console.error('[CTOC] Session start error:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('[CTOC] Session start error:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { main, generateContext };

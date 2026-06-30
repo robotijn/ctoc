@@ -597,6 +597,28 @@ function initProject(projectDir, options = {}) {
     skipped.push('CLAUDE.md (already exists, use --force to overwrite)');
   }
 
+  // 3b. Ensure CTOC-managed operating-lessons block.
+  //     Single canonical source: .ctoc/templates/operating-lessons.md (resolved via __dirname).
+  //     init fills the template placeholder on a freshly-written CLAUDE.md, and refreshes an
+  //     existing managed block if one is present. It does NOT append a block to a pre-existing
+  //     user CLAUDE.md that has none — that first-injection is owned by SessionStart on next
+  //     session open, so init never silently rewrites a user's hand-authored CLAUDE.md.
+  if (!dryRun) {
+    try {
+      const { ensureLessonsBlock, START_MARKER } = require('./claude-md-lessons');
+      const ctocRoot = path.resolve(__dirname, '..', '..');   // same base as templatePath
+      const wasCreated = created.includes('CLAUDE.md');
+      const hasBlock = fs.existsSync(claudeMdPath) &&
+        fs.readFileSync(claudeMdPath, 'utf8').includes(START_MARKER);
+      if ((wasCreated || hasBlock) && ensureLessonsBlock(claudeMdPath, ctocRoot)) {
+        created.push('CLAUDE.md (operating-lessons block)');
+      }
+    } catch (err) {
+      // Fail-open: a lessons failure must never break project init.
+      skipped.push('CLAUDE.md operating-lessons block (' + err.message + ')');
+    }
+  }
+
   // 4. Generate IRON_LOOP.md
   const ironLoopPath = path.join(projectDir, 'IRON_LOOP.md');
   if (!fs.existsSync(ironLoopPath) || force) {

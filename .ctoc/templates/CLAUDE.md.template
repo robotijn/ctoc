@@ -36,27 +36,31 @@ Red lines (never compromise): no code without tests on critical paths, no secret
 
 ---
 
-## Iron Loop (15 Steps)
+## Iron Loop (16 Steps)
 
-Every feature follows 15 steps. This is non-negotiable. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
+Every feature follows 16 steps. This is non-negotiable. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
 
 ```
-Phase 1: FUNCTIONAL PLANNING (Steps 1-3)     [Product Owner]
+Phase 0: IDEATION (Step 1)                       [vision-advisor, product-owner]
+  IDEATE
+  Human Gate 0: User approves vision (vision → functional)
+
+Phase 1: FUNCTIONAL PLANNING (Steps 2-4)         [product-owner, functional-reviewer]
   ASSESS -> ALIGN -> CAPTURE
-  Human Gate 1: User approves functional plan
+  Human Gate 1: User approves functional plan (functional → implementation)
 
-Phase 2: IMPLEMENTATION PLANNING (Steps 4-6)  [Technical]
+Phase 2: IMPLEMENTATION PLANNING (Steps 5-7)     [implementation-planner]
   PLAN -> DESIGN -> SPEC
-  Human Gate 2: User approves technical approach
+  Human Gate 2: User approves technical approach (implementation → todo)
 
-Phase 3: IMPLEMENTATION (Steps 7-15)          [Autonomous]
+Phase 3: IMPLEMENTATION (Steps 8-16)             [Autonomous]
   TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUMENT -> FINAL-REVIEW
-  Human Gate 3: User approves commit/push
+  Human Gate 3: User approves commit/push (review → done)
 ```
 
-**Step 7 is TDD** -- write tests FIRST, not "identify coverage".
-**Step 9 is ONE step** -- multiple files are sub-items, not separate IMPLEMENT steps.
-**Step 13 VERIFY is the quality gate** -- lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky.
+**Step 8 is TEST (TDD)** -- write tests FIRST, not "identify coverage".
+**Step 10 is ONE step (IMPLEMENT)** -- multiple files are sub-items, not separate IMPLEMENT steps.
+**Step 14 VERIFY is the quality gate** -- lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky.
 
 ### Escape Hatches
 
@@ -64,28 +68,36 @@ User can bypass planning for trivial changes by saying: "skip planning", "quick 
 
 ---
 
+<!-- CTOC:LESSONS v1 START -->
+<!-- Content between these markers is CTOC-managed. Do not edit manually. -->
+<!-- CTOC:LESSONS v1 END -->
+
+---
+
 ## Plan Management
 
-Plans live in `plans/` at the project root (git-tracked):
+Plans live in `plans/` at the project root (git-tracked). The real directories are
+`plans/{vision,canvas,functional,implementation,todo,in-progress,review,done}`:
 
 ```
 plans/
-  functional/draft/       New feature ideas
-  functional/approved/    Business-approved features
-  implementation/draft/   Technical design in progress
-  implementation/approved/ Technical design approved
-  todo/                   Ready for execution (Iron Loop injected)
-  in_progress/            Currently being worked on
-  review/                 Awaiting review
-  done/                   Completed
+  vision/          Raw ideas / vision drafts (Gate 0)
+  canvas/          Business-model / lean canvas context
+  functional/      Business-approved features (Gate 1)
+  implementation/  Technical design + blueprint (Gate 2)
+  todo/            Ready for execution (Iron Loop injected)
+  in-progress/     Currently being worked on
+  review/          Awaiting human review (Gate 3)
+  done/            Shipped
 ```
+
+CTOC ships exactly three slash commands; everything else is reached through the menu:
 
 | Command | Action |
 |---------|--------|
-| `ctoc` | Show status |
-| `ctoc plan new "title"` | Create functional plan |
-| `ctoc plan status` | Show plan dashboard |
-| `ctoc plan approve <id>` | Approve a plan |
+| /ctoc:menu | Dashboard — create/approve/advance plans, releases, all features |
+| /ctoc:push | Run quality checks and push (when auto-push is disabled) |
+| /ctoc:update | Update CTOC to the latest version + refresh this file's lessons block |
 
 ---
 

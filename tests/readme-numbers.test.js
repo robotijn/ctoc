@@ -128,8 +128,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 106 JS modules at top level (v6.9.65 added stale-detector for SP1)', () => {
-    assert.equal(countTopLevelJs('src/lib'), 106);
+  it('src/lib/: 107 JS modules at top level (claude-md-lessons added for onboarding)', () => {
+    assert.equal(countTopLevelJs('src/lib'), 107);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {
@@ -253,8 +253,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /13 Claude Code hooks/);
   });
 
-  it('Project structure: 106 JS modules in src/lib', () => {
-    assert.match(README, /106 JS modules/);
+  it('Project structure: 107 JS modules in src/lib', () => {
+    assert.match(README, /107 JS modules/);
   });
 
   it('Project structure: 110 agent definitions across 22 categories', () => {
