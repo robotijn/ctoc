@@ -633,3 +633,169 @@ describe('T13 — error paths throw descriptively', () => {
     assert.equal(planMutations(spy.calls).length, 0, 'unknown action mutates nothing');
   });
 });
+
+// ===========================================================================
+// T14 (D9 broaden) — a PURE-DOA stale set surfaces 'Clean up ▸' AND the DOA plan
+// is reachable + actionable through the cleanup tree (revert by default; delete
+// only via the explicitlyRejected override). The reachability regression guard.
+// ===========================================================================
+
+describe('T14 (D9) — pure-DOA set surfaces Clean up ▸ and is fully reachable + actionable', () => {
+  it('entry surfaces on a DOA-only set; plan reachable; revert default; delete only via explicit-reject override', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'implementation', 'baz', { files: ['src/gone.js'] }); // the ONLY candidate ⇒ pure-DOA set
+    const restore = stubClassify('dead-on-arrival', { explicitlyRejected: false });
+    try {
+      // (1) the read-only verify screen surfaces 'Clean up ▸' even for a pure-DOA set (was the D9 bug: hidden).
+      const verify = menuScreens.inboxVerifyProposals(sb);
+      assert.equal(verify.actions['Clean up ▸'], 'inbox cleanup', 'pure-DOA set still surfaces Clean up ▸ (D9)');
+      ALL_ACTION_KEYS_NONDIGIT(verify);
+
+      // (2) the DOA plan is reachable through the cleanup nav tree.
+      const review = menuScreens.route(['inbox', 'cleanup'], sb);
+      assert.equal(review.actions['Review individually ▸'], 'inbox cleanup plan');
+      const pick = menuScreens.route(['inbox', 'cleanup', 'plan'], sb);
+      assert.equal(pick.actions['baz'], 'inbox cleanup plan baz', 'DOA plan listed for individual review');
+      const plan = menuScreens.route(['inbox', 'cleanup', 'plan', 'baz'], sb);
+
+      // (3) default action is the reversible revert — NEVER delete.
+      assert.equal(plan.actions['Approve'], 'claude:cleanup-exec plan baz revert', 'DOA default = revert');
+      ALL_ACTION_KEYS_NONDIGIT(plan);
+
+      // (4) override WITHOUT explicitlyRejected offers NO delete affordance.
+      const ov = menuScreens.route(['inbox', 'cleanup', 'override', 'baz'], sb);
+      assert.ok(!('Delete permanently' in ov.actions), 'no delete affordance without explicitlyRejected');
+      assert.equal(ov.actions['Archive to done instead'], 'claude:cleanup-exec plan baz archive-to-done');
+      ALL_ACTION_KEYS_NONDIGIT(ov);
+    } finally {
+      restore();
+    }
+
+    // (5) delete is reachable ONLY via the explicitlyRejected override surface.
+    const restore2 = stubClassify('dead-on-arrival', { explicitlyRejected: true });
+    try {
+      const ov2 = menuScreens.route(['inbox', 'cleanup', 'override', 'baz'], sb);
+      assert.equal(ov2.actions['Delete permanently'], 'claude:cleanup-exec plan baz delete',
+        'delete reachable only through the explicitlyRejected override');
+      ALL_ACTION_KEYS_NONDIGIT(ov2);
+    } finally {
+      restore2();
+    }
+
+    // (6) executing the default action actually reverts (reversible) — not delete.
+    const moveSpy = makeSpy();
+    const r = cleanup.executeCleanup({ plan: 'baz', proposedAction: 'revert' }, sb, { movePlan: moveSpy.fn });
+    assert.equal(r.to, 'functional', 'DOA revert lands implementation→functional');
+    assert.equal(moveSpy.calls.length, 1, 'revert used the mover; no unlink/delete');
+  });
+});
+
+// ===========================================================================
+// T15 (F1) — archive refuses to overwrite an existing plans/done/<slug>.md
+// ===========================================================================
+
+describe('T15 (F1) — archive refuses to overwrite a real shipped done/<slug>.md', () => {
+  it('done/foo.md already exists ⇒ archivePlan throws, source NOT moved, existing done file unchanged', () => {
+    const sb = makeSandbox();
+    const src = writePlan(sb, 'functional', 'foo', { files: ['src/missing.js'] });
+    const srcBefore = fs.readFileSync(src, 'utf8');
+    const doneDir = path.join(sb, 'plans', 'done');
+    fs.mkdirSync(doneDir, { recursive: true });
+    const donePath = path.join(doneDir, 'foo.md');
+    const shipped = '---\napproved_by: human\n---\n# the REAL shipped foo\n';
+    fs.writeFileSync(donePath, shipped);
+
+    assert.throws(
+      () => cleanup.archivePlan(src, sb),
+      /already exists \(would overwrite shipped work\)/i,
+      'must refuse to overwrite a real shipped plan'
+    );
+    assert.ok(fs.existsSync(src), 'source plan NOT moved');
+    assert.equal(fs.readFileSync(src, 'utf8'), srcBefore, 'source plan NOT mutated (no stamp written)');
+    assert.equal(fs.readFileSync(donePath, 'utf8'), shipped, 'existing shipped done file unchanged');
+  });
+});
+
+// ===========================================================================
+// T16 (F2) — a corrupt cleanup log is preserved aside, NEVER silently wiped
+// ===========================================================================
+
+describe('T16 (F2) — corrupt cleanup log preserved aside, not discarded', () => {
+  it('append over a corrupt log renames it to .corrupt-<ts> and starts a fresh valid log', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'functional', 'foo', { files: ['src/missing.js'] });
+    const logDir = path.join(sb, '.ctoc', 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    const logPath = path.join(logDir, 'stale-cleanup.json');
+    const corruptContent = '{ this is NOT valid json ';
+    fs.writeFileSync(logPath, corruptContent);
+
+    // a real archive triggers an append into the corrupt log.
+    cleanup.executeCleanup({ plan: 'foo', proposedAction: 'archive-to-done' }, sb);
+
+    const aside = fs.readdirSync(logDir).filter((f) => f.startsWith('stale-cleanup.json.corrupt-'));
+    assert.equal(aside.length, 1, 'corrupt log preserved aside exactly once');
+    assert.equal(
+      fs.readFileSync(path.join(logDir, aside[0]), 'utf8'),
+      corruptContent,
+      'corrupt history preserved verbatim (not wiped)'
+    );
+    const fresh = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+    assert.ok(Array.isArray(fresh) && fresh.length >= 1, 'a fresh valid log was started with the new entry');
+  });
+});
+
+// ===========================================================================
+// T17 (security) — same slug stale in two stages ⇒ fail-closed ambiguous-skip
+// ===========================================================================
+
+describe('T17 (security) — slug collision across stages ⇒ executeCleanup fails closed', () => {
+  it('two same-slug candidates in different stages ⇒ ambiguous-skip no-op, no fs mutation', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'functional', 'dup', { files: ['src/a.js'] });
+    writePlan(sb, 'implementation', 'dup', { files: ['src/b.js'] });
+    const injScan = () => [
+      { plan: 'dup', stage: 'functional' },
+      { plan: 'dup', stage: 'implementation' },
+    ];
+    const spy = spyFs();
+    let r;
+    try {
+      r = cleanup.executeCleanup(
+        { plan: 'dup', proposedAction: 'archive-to-done' },
+        sb,
+        { listStaleCandidates: injScan }
+      );
+    } finally {
+      spy.restore();
+    }
+    assert.equal(r.action, 'ambiguous-skip');
+    assert.equal(r.skipped, true);
+    assert.equal(planMutations(spy.calls).length, 0, 'no plan-file mutation on an ambiguous slug');
+    assert.ok(fs.existsSync(path.join(sb, 'plans', 'functional', 'dup.md')), 'functional copy untouched');
+    assert.ok(fs.existsSync(path.join(sb, 'plans', 'implementation', 'dup.md')), 'implementation copy untouched');
+  });
+});
+
+// ===========================================================================
+// T18 (security) — archive re-asserts a regular-file source (symlink-swap window)
+// ===========================================================================
+
+describe('T18 (security) — archive refuses a non-regular-file source', () => {
+  it('a directory at the plan path ⇒ archivePlan throws, no write-through', () => {
+    const sb = makeSandbox();
+    const stageDir = path.join(sb, 'plans', 'functional');
+    fs.mkdirSync(path.join(stageDir, 'foo.md'), { recursive: true }); // a DIRECTORY where the plan file would be
+    const planPath = path.join(stageDir, 'foo.md');
+    const spy = spyFs();
+    try {
+      assert.throws(() => cleanup.archivePlan(planPath, sb), /not a regular file/i);
+    } finally {
+      spy.restore();
+    }
+    const writeThrough = spy.calls.filter(
+      (c) => c.op === 'writeFileSync' && endsWithPlan(c.path, 'functional', 'foo')
+    );
+    assert.equal(writeThrough.length, 0, 'no write-through to a non-regular-file path');
+  });
+});

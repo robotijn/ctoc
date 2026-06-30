@@ -410,19 +410,38 @@ describe("menu — 'Verify' routes to inbox verify", () => {
 // ---------------------------------------------------------------------------
 
 describe('menu — inboxVerifyProposals render', () => {
-  it('route([inbox,verify]) ⇒ {text,ask,actions}; Back→inbox stale; one option; no digit', () => {
+  // D9 (SP4 broaden): an actionable DOA proposal (p-render: declared file missing,
+  // no slug commits, not approved ⇒ dead-on-arrival/revert) now surfaces the
+  // 'Clean up ▸' entry, so the read-only verify screen renders TWO options
+  // (Clean up ▸ + Back). Render stays strictly read-only — it must mutate no plan
+  // file (the entry is navigation, not execution).
+  it('route([inbox,verify]) with an actionable DOA ⇒ Clean up ▸ + Back; read-only; no digit', () => {
     const sb = makeSandbox();
-    writeStalePlan(sb, 'functional', 'p-render');
+    writeStalePlan(sb, 'functional', 'p-render'); // DOA: missing declared file
     const spy = spyChildProcess({ execFileSync: () => '1700000000' });
+    // Read-only render guard: any plan-file write/rename/rm flips this.
+    const origWrite = fs.writeFileSync;
+    const origRename = fs.renameSync;
+    const origRm = fs.rmSync;
+    let mutated = false;
+    fs.writeFileSync = () => { mutated = true; };
+    fs.renameSync = () => { mutated = true; };
+    fs.rmSync = () => { mutated = true; };
     let screen;
     try {
       screen = menuScreens.route(['inbox', 'verify'], sb);
     } finally {
+      fs.writeFileSync = origWrite;
+      fs.renameSync = origRename;
+      fs.rmSync = origRm;
       spy.restore();
     }
+    assert.equal(mutated, false, 'verify render must perform NO plan-file mutation (read-only)');
     assert.ok(typeof screen.text === 'string' && screen.text.length > 0);
+    // Both options present now that DOA surfaces the cleanup entry (D9).
+    assert.equal(screen.ask.questions[0].options.length, 2, 'Clean up ▸ + Back');
+    assert.equal(screen.actions['Clean up ▸'], 'inbox cleanup', 'DOA is actionable ⇒ Clean up ▸ entry');
     assert.equal(screen.actions['◀ Back'], 'inbox stale');
-    assert.equal(screen.ask.questions[0].options.length, 1);
     for (const k of Object.keys(screen.actions)) {
       assert.ok(!/^\d/.test(k), 'no action key may be a digit: ' + k);
     }

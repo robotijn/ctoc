@@ -42,13 +42,11 @@ const CLEANUP_CATEGORY_TABLE = Object.freeze({
 });
 // Every category the cleanup screens act on (DOA included).
 const ACTIONABLE_CLEANUP = Object.keys(CLEANUP_CATEGORY_TABLE);
-// Forward-to-done categories: these gate the 'Clean up ▸' ENTRY on
-// inboxVerifyProposals. DOA (a backward, reversible revert + an unmarked,
-// anomalous plan per D7) does not by itself surface the entry — this preserves
-// the SP3 read-only proposals contract (a DOA-only set renders a single Back
-// option). DOA items remain fully handled INSIDE the cleanup screens once the
-// entry is reached (see _buildCleanupItems / inboxCleanupReview).
-const FORWARD_CLEANUP = ['shipped-but-early', 'approved-but-stranded'];
+// D9: the 'Clean up ▸' ENTRY gate on inboxVerifyProposals is gated on
+// ACTIONABLE_CLEANUP (shipped-but-early ∪ approved-but-stranded ∪
+// dead-on-arrival) — ANY actionable proposal surfaces the cleanup entry. (The
+// former FORWARD_CLEANUP subset, which excluded DOA, left a pure-DOA set with no
+// reachable cleanup; removed.)
 const CLEANUP_ORDER = ['shipped-but-early', 'approved-but-stranded', 'dead-on-arrival'];
 const CLEANUP_MAX_ROWS = 20;
 
@@ -512,13 +510,17 @@ function inboxVerifyProposals(projectPath) {
   }
   text += '\n\n\n';
 
-  // SP4: surface the 'Clean up ▸' entry only when there is a FORWARD-to-done
-  // actionable proposal (shipped-but-early / approved-but-stranded). Label-only
-  // navigation — no digit maps to any cleanup action.
-  const hasForwardActionable = proposals.some((p) => FORWARD_CLEANUP.includes(p.category));
+  // SP4 (D9 broaden): surface the 'Clean up ▸' entry whenever there is ANY
+  // actionable proposal — shipped-but-early, approved-but-stranded, OR
+  // dead-on-arrival. Previously this gate excluded DOA, leaving a pure-DOA stale
+  // set with NO reachable cleanup entry (dead-on-arrival by the human). The DOA
+  // batch action remains revert and its delete remains override-only inside the
+  // cleanup tree — only the ENTRY gate broadens here. Label-only navigation — no
+  // digit maps to any cleanup action.
+  const hasActionable = proposals.some((p) => ACTIONABLE_CLEANUP.includes(p.category));
   const options = [];
   const actions = {};
-  if (hasForwardActionable) {
+  if (hasActionable) {
     options.push({ label: 'Clean up ▸', description: 'Review & execute cleanup' });
     actions['Clean up ▸'] = 'inbox cleanup';
   }

@@ -66,23 +66,53 @@ function _stampMarker(content, reason) {
  * Best-effort append to the cleanup log. A logging failure is swallowed — it
  * NEVER aborts a move that already happened (the rename/unlink is the source of
  * truth; the log is advisory). Mirrors actions.cleanupStaleInProgress.
+ *
+ * Integrity hardening (F2 + security):
+ *   - A corrupt/unparseable existing log is NOT silently wiped. It is renamed
+ *     aside to `stale-cleanup.json.corrupt-<now>` so audit history is preserved
+ *     for forensics, then a fresh log starts from this entry. If the
+ *     preservation rename itself fails, we degrade to stderr and skip the append
+ *     rather than destroy the corrupt file.
+ *   - The write is atomic: serialize to a sibling temp file, then renameSync over
+ *     the target, so a crash mid-write can never leave a half-written log.
+ *
  * @param {string} root
  * @param {object} entry { plan, from, to, action, reason, at }
+ * @param {number} [now] timestamp for the corrupt-aside filename (Date.now() default)
  */
-function _appendLog(root, entry) {
+function _appendLog(root, entry, now = Date.now()) {
   try {
     const dir = path.join(root, ...CLEANUP_LOG.slice(0, -1));
     fs.mkdirSync(dir, { recursive: true });
     const logPath = path.join(root, ...CLEANUP_LOG);
     let arr = [];
-    try {
-      const parsed = JSON.parse(fs.readFileSync(logPath, 'utf8'));
-      if (Array.isArray(parsed)) arr = parsed;
-    } catch {
-      arr = [];
+    if (fs.existsSync(logPath)) {
+      let parsed;
+      let corrupt = false;
+      try {
+        parsed = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+      } catch {
+        corrupt = true;
+      }
+      if (corrupt || !Array.isArray(parsed)) {
+        // Preserve the corrupt file aside — never silently discard history.
+        const asidePath = logPath + '.corrupt-' + now;
+        try {
+          fs.renameSync(logPath, asidePath);
+          arr = [];
+        } catch (e) {
+          // Could not preserve it; do NOT overwrite/wipe it. Skip the append.
+          try { process.stderr.write('stale-cleanup: corrupt log, preserve failed: ' + e.message + '\n'); } catch { /* ignore */ }
+          return;
+        }
+      } else {
+        arr = parsed;
+      }
     }
     arr.push(entry);
-    fs.writeFileSync(logPath, JSON.stringify(arr, null, 2));
+    const tmpPath = logPath + '.tmp-' + now + '-' + process.pid;
+    fs.writeFileSync(tmpPath, JSON.stringify(arr, null, 2));
+    fs.renameSync(tmpPath, logPath); // atomic publish
   } catch {
     // best-effort: never abort a completed move because logging failed
   }
@@ -111,14 +141,28 @@ function _stampAndArchive(planPath, root, action) {
   if (!fs.existsSync(planPath)) {
     throw new Error('stale-cleanup: plan not found: ' + planPath);
   }
+  // Security (TOCTOU): re-assert the source is a REGULAR file at mutation time.
+  // Closes the window where a scan-time plain file is swapped for a symlink (or a
+  // directory) before we write through it.
+  const srcStat = fs.lstatSync(planPath);
+  if (!srcStat.isFile()) {
+    throw new Error('stale-cleanup: refusing to archive ' + planPath + ': not a regular file');
+  }
+  const slug = path.basename(planPath, '.md');
+  const doneDir = path.join(root, 'plans', 'done');
+  const dest = path.join(doneDir, path.basename(planPath));
+  // F1: never overwrite a real shipped plan that already occupies done/<slug>.md.
+  if (fs.existsSync(dest)) {
+    throw new Error(
+      'refusing to archive ' + slug + ': plans/done/' + slug + '.md already exists (would overwrite shipped work)'
+    );
+  }
   const iso = new Date().toISOString();
   const from = _stageFromPath(planPath);
   const content = fs.readFileSync(planPath, 'utf8');
   const stamped = _stampMarker(content, 'stale-reconciliation ' + iso);
   fs.writeFileSync(planPath, stamped); // WRITE strictly BEFORE rename (M5)
-  const doneDir = path.join(root, 'plans', 'done');
   fs.mkdirSync(doneDir, { recursive: true });
-  const dest = path.join(doneDir, path.basename(planPath));
   fs.renameSync(planPath, dest);
   _appendLog(root, {
     plan: path.basename(planPath, '.md'),
@@ -226,7 +270,23 @@ function deletePlan(planPath, { explicitlyRejected = false } = {}) {
 function executeCleanup(proposal, root, deps = {}) {
   const scanFn = deps.listStaleCandidates || listStaleCandidates;
   const scan = scanFn(root);
-  const cand = Array.isArray(scan) ? scan.find((c) => c && c.plan === proposal.plan) : null;
+  const matches = Array.isArray(scan) ? scan.filter((c) => c && c.plan === proposal.plan) : [];
+  // Security (slug collision across gate-source stages): if the SAME slug is
+  // stale in more than one stage, do NOT guess which one the human meant — fail
+  // closed with a no-op (no fs op, no throw) rather than silently acting on the
+  // first match.
+  if (matches.length > 1) {
+    _appendLog(root, {
+      plan: proposal.plan,
+      from: null,
+      to: null,
+      action: 'ambiguous-skip',
+      reason: 'slug-collision-across-stages',
+      at: new Date().toISOString(),
+    });
+    return { plan: proposal.plan, action: 'ambiguous-skip', skipped: true };
+  }
+  const cand = matches.length === 1 ? matches[0] : null;
   if (!cand) {
     // slug no longer stale (already cleaned / moved) — fail closed, no fs op.
     _appendLog(root, {
