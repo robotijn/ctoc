@@ -8,8 +8,10 @@
  *
  * ALL fixtures live under os.tmpdir(). The injector is NEVER run against the
  * real repo CLAUDE.md, and the real .ctoc/templates/operating-lessons.md is
- * only ever read (and, in two isolated error-path tests, temporarily renamed
- * and synchronously restored in a finally block).
+ * ONLY ever read — NEVER renamed, moved, or mutated. Missing-source error paths
+ * are exercised by copying the module into a temp dir that genuinely lacks the
+ * source (see loadModuleWithoutSource), so parallel suites never race on the
+ * live repo file.
  */
 
 const { describe, it } = require('node:test');
@@ -32,6 +34,29 @@ function mkTmpProject(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-lessons-'));
   if (t) t.after(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* ignore cleanup error */ } });
   return dir;
+}
+
+/**
+ * Load a FRESH copy of the injector from a temp directory that has NO
+ * `.ctoc/templates/operating-lessons.md` anywhere up its tree. This busts the
+ * module's __dirname-relative PRIMARY source resolution without touching the
+ * live repo source — the only honest way to drive the missing-source path under
+ * parallel `node --test` without a cross-process rename race.
+ *
+ * @returns {{ mod: object, root: string, expectedPrimary: string }}
+ */
+function loadModuleWithoutSource(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-nosrc-'));
+  if (t) t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch (_) { /* ignore */ } });
+  // Nest as src/lib so the module's `../../` resolution stays inside this temp
+  // tree (root/.ctoc/...), which deliberately does not exist.
+  const modDir = path.join(root, 'src', 'lib');
+  fs.mkdirSync(modDir, { recursive: true });
+  const code = fs.readFileSync(require.resolve('../src/lib/claude-md-lessons'), 'utf8');
+  const modPath = path.join(modDir, 'claude-md-lessons.js');
+  fs.writeFileSync(modPath, code, 'utf8');
+  const expectedPrimary = path.join(root, '.ctoc', 'templates', 'operating-lessons.md');
+  return { mod: require(modPath), root, expectedPrimary };
 }
 
 function canonicalBlock() {
@@ -268,20 +293,19 @@ describe('ensureLessonsBlock — fail-open error paths', () => {
     const seed = '# Project\n\nuntouched\n';
     fs.writeFileSync(target, seed);
 
+    // Copied module with NO source up its tree → primary misses; empty fallback
+    // root → fallback misses too. The live repo source is never touched.
+    const { mod, expectedPrimary } = loadModuleWithoutSource(t);
     const emptyRoot = mkTmpProject(t); // fallback dir without operating-lessons.md
-    const backup = SOURCE_PATH + '.test-bak';
 
-    fs.renameSync(SOURCE_PATH, backup); // primary now absent
-    try {
-      const { stderr, result } = captureStderr(() => lessons.ensureLessonsBlock(target, emptyRoot));
-      assert.equal(result, false, 'fails open with false');
-      assert.ok(stderr.length > 0, 'stderr must be non-empty (no silent failure)');
-      assert.ok(stderr.includes('operating-lessons.md'), 'stderr names the missing file');
-      assert.ok(stderr.includes(SOURCE_PATH), 'stderr names the primary resolved path');
-      assert.equal(fs.readFileSync(target, 'utf8'), seed, 'target left unchanged');
-    } finally {
-      fs.renameSync(backup, SOURCE_PATH); // always restore the repo source
-    }
+    const { stderr, result } = captureStderr(() => mod.ensureLessonsBlock(target, emptyRoot));
+    assert.equal(result, false, 'fails open with false');
+    assert.ok(stderr.length > 0, 'stderr must be non-empty (no silent failure)');
+    assert.ok(stderr.includes('operating-lessons.md'), 'stderr names the missing file');
+    assert.ok(stderr.includes(expectedPrimary), 'stderr names the primary resolved path');
+    // The real repo source is never the resolved primary here — proves no rename.
+    assert.ok(!stderr.includes(SOURCE_PATH), 'live repo source path is not involved');
+    assert.equal(fs.readFileSync(target, 'utf8'), seed, 'target left unchanged');
   });
 
   it('fails open when the canonical source lacks well-formed markers', (t) => {
@@ -289,22 +313,18 @@ describe('ensureLessonsBlock — fail-open error paths', () => {
     const target = path.join(dir, 'CLAUDE.md');
     fs.writeFileSync(target, '# Project\n\nuntouched\n');
 
-    // Build a fallback ctocRoot whose operating-lessons.md has NO markers.
+    // Copied module (primary misses) + a fallback ctocRoot whose
+    // operating-lessons.md exists but has NO markers. No live-repo rename.
+    const { mod } = loadModuleWithoutSource(t);
     const fakeRoot = mkTmpProject(t);
     const fakeSrcDir = path.join(fakeRoot, '.ctoc', 'templates');
     fs.mkdirSync(fakeSrcDir, { recursive: true });
     fs.writeFileSync(path.join(fakeSrcDir, 'operating-lessons.md'), '# no markers here\n');
 
-    const backup = SOURCE_PATH + '.test-bak';
-    fs.renameSync(SOURCE_PATH, backup);
-    try {
-      const { stderr, result } = captureStderr(() => lessons.ensureLessonsBlock(target, fakeRoot));
-      assert.equal(result, false);
-      assert.ok(stderr.length > 0, 'stderr non-empty');
-      assert.ok(stderr.includes('marker'), 'stderr explains the missing markers');
-    } finally {
-      fs.renameSync(backup, SOURCE_PATH);
-    }
+    const { stderr, result } = captureStderr(() => mod.ensureLessonsBlock(target, fakeRoot));
+    assert.equal(result, false);
+    assert.ok(stderr.length > 0, 'stderr non-empty');
+    assert.ok(stderr.includes('marker'), 'stderr explains the missing markers');
   });
 
   it('fails open (does not splice) on a malformed managed block', (t) => {
@@ -577,14 +597,117 @@ describe('resolveLessonsSource', () => {
   });
 
   it('returns null when neither primary nor fallback exists', (t) => {
-    const backup = SOURCE_PATH + '.test-bak';
+    // Copied module with no source up its tree + an empty fallback root.
+    // The live repo source is never renamed.
+    const { mod } = loadModuleWithoutSource(t);
     const emptyRoot = mkTmpProject(t);
-    fs.renameSync(SOURCE_PATH, backup);
-    try {
-      assert.equal(lessons.resolveLessonsSource(emptyRoot), null);
-    } finally {
-      fs.renameSync(backup, SOURCE_PATH);
-    }
+    assert.equal(mod.resolveLessonsSource(emptyRoot), null);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Pre-Gate-3 hardening — phantom fence, mixed EOL, non-Error throw, wx, size cap
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('ensureLessonsBlock — pre-Gate-3 hardening', () => {
+  it('finds the real block beneath an UNTERMINATED code fence (no duplicate append)', (t) => {
+    const dir = mkTmpProject(t);
+    const target = path.join(dir, 'CLAUDE.md');
+    // An unclosed ``` fence in user prose ABOVE a real, current managed block.
+    const content = [
+      '# Project',
+      '',
+      'A snippet I forgot to close:',
+      '',
+      '```js',
+      'const x = 1;',
+      '',
+      canonicalBlock(),
+      '',
+      'trailing prose'
+    ].join('\n');
+    fs.writeFileSync(target, content);
+
+    // The existing current block is FOUND (re-scan recovers it) -> idempotent no-op.
+    const changed = lessons.ensureLessonsBlock(target, REPO_ROOT);
+    assert.equal(changed, false, 'current block found beneath unterminated fence -> no-op');
+
+    const out = fs.readFileSync(target, 'utf8');
+    assert.equal(countOccurrences(out, START_MARKER), 1, 'no duplicate block appended');
+    assert.equal(countOccurrences(out, END_MARKER), 1);
+    assert.equal(out, content, 'file byte-for-byte unchanged');
+
+    // And a second call is still a stable no-op (no churn).
+    assert.equal(lessons.ensureLessonsBlock(target, REPO_ROOT), false);
+    assert.equal(fs.readFileSync(target, 'utf8'), content);
+  });
+
+  it('preserves every byte OUTSIDE the block on a mixed-EOL file', (t) => {
+    const dir = mkTmpProject(t);
+    const target = path.join(dir, 'CLAUDE.md');
+    // Deliberately mixed: LF-only and CRLF lines in the user prose.
+    const before = 'First\nSecond\r\nThird\n';   // First→Second is LF; Second→Third is CRLF
+    const after = 'After1\r\nAfter2\n';           // CRLF then LF
+    const content = before + V0_BLOCK + '\n' + after;
+    fs.writeFileSync(target, content, 'utf8');
+
+    const changed = lessons.ensureLessonsBlock(target, REPO_ROOT);
+    assert.equal(changed, true, 'v0 -> v1 upgrade performed');
+
+    const out = fs.readFileSync(target, 'utf8');
+
+    // Region BEFORE the block is byte-for-byte identical (mixed EOL intact).
+    const outBefore = out.slice(0, out.indexOf(START_MARKER));
+    assert.equal(outBefore, before, 'prose before block preserved byte-for-byte');
+
+    // Region AFTER the block ends with the original mixed-EOL trailing prose.
+    assert.ok(out.endsWith(after), 'prose after block preserved byte-for-byte');
+
+    // The old (buggy) restoreEol globally re-CRLF'd the whole file; assert the
+    // originally-LF boundary was NOT upgraded to CRLF.
+    assert.ok(out.includes('First\nSecond\r\nThird\n'), 'LF/CRLF mix outside block intact');
+    assert.ok(!out.includes('First\r\n'), 'an originally-LF line was not re-encoded to CRLF');
+  });
+
+  it('catch handler tolerates a non-Error (null) throw without re-throwing', (t) => {
+    const dir = mkTmpProject(t);
+    const target = path.join(dir, 'CLAUDE.md');
+    fs.writeFileSync(target, '# Project\n');
+    // Force a thrown non-Error from inside the try body.
+    t.mock.method(fs, 'readFileSync', () => { throw null; });
+    let result;
+    const { stderr } = captureStderr(() => {
+      assert.doesNotThrow(() => { result = lessons.ensureLessonsBlock(target, REPO_ROOT); });
+    });
+    assert.equal(result, false, 'fails open');
+    assert.ok(stderr.length > 0, 'stderr non-empty even for a null throw');
+  });
+
+  it('writes the atomic temp file with the exclusive (wx) flag', (t) => {
+    const dir = mkTmpProject(t);
+    const target = path.join(dir, 'CLAUDE.md');
+    fs.writeFileSync(target, '# Prose\n\nno block\n'); // seed before installing the spy
+    let sawWx = false;
+    const realWrite = fs.writeFileSync.bind(fs);
+    t.mock.method(fs, 'writeFileSync', (p, data, opts) => {
+      if (opts && typeof opts === 'object' && opts.flag === 'wx') sawWx = true;
+      return realWrite(p, data, opts);
+    });
+    const changed = lessons.ensureLessonsBlock(target, REPO_ROOT);
+    assert.equal(changed, true, 'block appended');
+    assert.ok(sawWx, 'temp file opened O_EXCL (flag: wx) — fail-closed against symlink/pre-existing');
+  });
+
+  it('skips and fails open on a CLAUDE.md larger than the size cap', (t) => {
+    const dir = mkTmpProject(t);
+    const target = path.join(dir, 'CLAUDE.md');
+    const big = 'x'.repeat(2 * 1024 * 1024 + 1024); // > 2 MiB
+    fs.writeFileSync(target, big, 'utf8');
+
+    const { stderr, result } = captureStderr(() => lessons.ensureLessonsBlock(target, REPO_ROOT));
+    assert.equal(result, false, 'oversized file -> fail-open false');
+    assert.ok(stderr.length > 0, 'stderr non-empty (no silent skip)');
+    assert.equal(fs.readFileSync(target, 'utf8'), big, 'oversized file left untouched (no write)');
   });
 });
 
