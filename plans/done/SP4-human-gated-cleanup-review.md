@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-06-30T21:54:04.355Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-06-30T20:27:38.653Z
@@ -121,7 +127,7 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
 
 ### BDD Scenarios
 
-- [ ] **Scenario: Grouped review screen offers category-batch and individual approval paths**
+- [x] **Scenario: Grouped review screen offers category-batch and individual approval paths**
   Given SP3 produced 3 proposals: one `shipped-but-early`, one `approved-but-stranded`, one `dead-on-arrival`
   When the `inbox cleanup` screen (`inboxCleanupReview`) renders
   Then each proposal is listed with its plan name, category, proposed action, and evidence summary
@@ -131,7 +137,7 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
   And selecting `'Review individually ▸'` navigates to a per-plan screen with `'Approve'` / `'Override ▸'` / `'Skip'` / `'◀ Back'`
   And no digit maps to any cleanup action at any screen in this flow
 
-- [ ] **Scenario: Approving shipped-but-early stamps markers before move and does not call approvePlan**
+- [x] **Scenario: Approving shipped-but-early stamps markers before move and does not call approvePlan**
   Given a `shipped-but-early` proposal for `plans/functional/foo-plan.md`
   And a spy on `approvePlan` from `src/lib/actions.js`
   When the user approves the proposal
@@ -140,7 +146,7 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
   And the moved file's YAML frontmatter contains `gate_crossed` with value containing `'stale-reconciliation'`
   And the `approvePlan` spy was NOT called
 
-- [ ] **Scenario: Approving approved-but-stranded uses reconciliation path, not approvePlan**
+- [x] **Scenario: Approving approved-but-stranded uses reconciliation path, not approvePlan**
   Given an `approved-but-stranded` proposal for `plans/review/bar-plan.md`
   And a spy on `approvePlan` from `src/lib/actions.js`
   And a spy on `movePlan` from `src/lib/actions.js`
@@ -149,19 +155,19 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
   And the `approvePlan` spy was NOT called
   And the `movePlan` spy was NOT called directly
 
-- [ ] **Scenario: No action executes without explicit approve**
+- [x] **Scenario: No action executes without explicit approve**
   Given 2 proposals are rendered in the grouped review
   When the user views the proposals but does not select approve for either
   Then no plan file is moved, stamped, or deleted
   And the proposals remain visible (no auto-execution after a timeout or render event)
 
-- [ ] **Scenario: dead-on-arrival default is revert, not delete**
+- [x] **Scenario: dead-on-arrival default is revert, not delete**
   Given a `dead-on-arrival` proposal where `evidence.explicitlyRejected` is false or absent
   When `executeCleanup(proposal, root)` is called with the default proposed action
   Then the plan is moved back one stage (reverted), NOT deleted
   And no `fs.unlinkSync` or `fs.rmSync` call is made
 
-- [ ] **Scenario: delete requires explicitlyRejected evidence and explicit user override**
+- [x] **Scenario: delete requires explicitlyRejected evidence and explicit user override**
   Given a `dead-on-arrival` proposal where `evidence.explicitlyRejected` is true
   And the user selects "delete" as an override action
   And the user confirms the second confirmation prompt
@@ -169,13 +175,13 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
   Then the plan file is deleted
   And the action is logged with `reason: 'stale-delete'`
 
-- [ ] **Scenario: Moved plan carries markers that satisfy gate auto-revert hook**
+- [x] **Scenario: Moved plan carries markers that satisfy gate auto-revert hook**
   Given a `shipped-but-early` plan approved and moved to `done/`
   When `src/hooks/human-gate-check.js` evaluates the moved plan
   Then the plan is NOT reverted (it carries `approved_by: human` + `gate_crossed` as the hook expects)
   And the markers were written to the file BEFORE `fs.renameSync` was called (order asserted via spy sequence)
 
-- [ ] **Scenario: executeCleanup accepts injectable deps for spy-based gate-safety testing**
+- [x] **Scenario: executeCleanup accepts injectable deps for spy-based gate-safety testing**
   Given `executeCleanup(proposal, root, { approvePlan: spyFn, movePlan: spyFn2, listStaleCandidates: spyFn3 })` is called
   When the cleanup runs
   Then the injected `movePlan` (revert) and `listStaleCandidates` (stage re-derivation) overrides are used instead of the real implementations
