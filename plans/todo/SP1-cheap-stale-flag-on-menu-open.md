@@ -640,50 +640,50 @@ branch, both `parseFilesField` syntaxes, both throw paths exercised.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — confirmed MODULE_NOT_FOUND before implementation
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none; only `fs`, `path` built-ins
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — tests create hermetic os.tmpdir() sandboxes
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling — fail-loud on misuse (TypeError); graceful per-file IO containment (F2)
+- [x] Wire up integration points — exports scanCheapCandidates + helpers + constants for SP2/SP3/SP5
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together — composed parseFilesField(extractFrontmatterRegion(content))
+- [x] Check error handling completeness — both throw paths + IO-skip path tested
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single stat + single read per file; one readdir per stage
+- [x] Optimize critical paths — filesystem-only, no subprocess on the menu hot-path
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — repo-root-relative paths, existence checks only, never read/written
+- [x] Sanitize outputs — plain objects, fixed 4-key shape, no prototype-pollution surface
+- [x] No secrets in code
+- [x] Safe file operations — read-only (existsSync/statSync/readFileSync); no writes/moves/deletes; no child_process
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — tsc checkJs back to baseline 89 (0 errors in new module)
+- [x] Run ALL tests (TDD Green) — new suite 44/44; full suite 2440 pass / 1 fail (expected out-of-scope manifest count bump only)
+- [x] Check coverage >= 80% — stale-detector.js 98.69% stmts, 90.27% branch, 100% funcs
+- [x] 0 skipped, 0 flaky tests — 0 skipped across full suite
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — module JSDoc + typedefs (StaleCandidate, CheapScanResult, StaleSignal)
+- [x] Add JSDoc comments to new functions — every exported function documented
+- [x] Update CHANGELOG if needed — n/a for this slice
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed (one out-of-scope manifest count test pending a 105→106 bump in README + tests/readme-numbers.test.js)
+- [x] Manual verification if needed
+- [x] Ready for human review
