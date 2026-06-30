@@ -13,6 +13,7 @@ const {
   parseFilesField,
   GATE_SOURCE_STAGES,
   AGE_THRESHOLD_MS,
+  MAX_PLAN_BYTES,
 } = require('../src/lib/stale-detector.js');
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,20 @@ function touchTarget(sandbox, relPath) {
   fs.writeFileSync(full, '');
 }
 
+// Paths created OUTSIDE a sandbox (e.g. traversal-target fixtures) that must be
+// cleaned up explicitly in afterEach since they live above the sandbox root.
+const extraCleanup = [];
+
+// Write a plan file with RAW, byte-exact content (no normalization) so tests can
+// inject CRLF line endings or oversized bodies deterministically.
+function writeRawPlan(sandbox, stage, slug, content) {
+  const stageDir = path.join(sandbox, 'plans', stage);
+  fs.mkdirSync(stageDir, { recursive: true });
+  const filePath = path.join(stageDir, slug + '.md');
+  fs.writeFileSync(filePath, content);
+  return filePath;
+}
+
 // For the F2 IO-fault test: replace the plan file with a directory at the same
 // path so readFileSync throws EISDIR — portable across OSes (no chmod reliance).
 function breakPlanFile(sandbox, stage, slug) {
@@ -120,6 +135,10 @@ afterEach(() => {
   while (sandboxes.length) {
     const dir = sandboxes.pop();
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+  while (extraCleanup.length) {
+    const p = extraCleanup.pop();
+    fs.rmSync(p, { recursive: true, force: true });
   }
 });
 
@@ -575,5 +594,221 @@ describe('exported contract surface', () => {
   });
   it('AGE_THRESHOLD_MS is 14 days in ms', () => {
     assert.equal(AGE_THRESHOLD_MS, 14 * 24 * 60 * 60 * 1000);
+  });
+  it('MAX_PLAN_BYTES is 1 MiB', () => {
+    assert.equal(MAX_PLAN_BYTES, 1 << 20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FIX 1 — CRLF line endings must not break files: parsing (Windows checkout)
+// ---------------------------------------------------------------------------
+
+describe('FIX 1 / CRLF — Windows line endings do not break files: parsing', () => {
+  it('(a) block-list files: under CRLF with a missing entry fires missing-files', () => {
+    const region = 'title: x\r\nfiles:\r\n  - src/lib/a.js\r\n  - src/lib/b.js\r\nstatus: y\r\n';
+    assert.deepEqual(parseFilesField(region), ['src/lib/a.js', 'src/lib/b.js']);
+  });
+
+  it('(b) inline-array files: under CRLF parses without a trailing \\r', () => {
+    const region = 'files: [src/lib/a.js, src/lib/b.js]\r\n';
+    assert.deepEqual(parseFilesField(region), ['src/lib/a.js', 'src/lib/b.js']);
+  });
+
+  it('extractFrontmatterRegion handles CRLF block delimiters', () => {
+    const content = '---\r\ntitle: x\r\nfiles:\r\n  - a.js\r\n---\r\n\r\n# body\r\n';
+    const region = extractFrontmatterRegion(content);
+    assert.deepEqual(parseFilesField(region), ['a.js']);
+  });
+
+  it('(c) full scan over a CRLF plan with a missing declared file flags it actionable', () => {
+    const sb = makeSandbox();
+    const content =
+      '---\r\n' +
+      'title: "p-crlf"\r\n' +
+      'files:\r\n' +
+      '  - src/lib/crlf-missing.js\r\n' +
+      'status: refined\r\n' +
+      '---\r\n\r\n' +
+      '# p-crlf\r\n';
+    writeRawPlan(sb, 'review', 'p-crlf', content);
+    const res = scanCheapCandidates(sb);
+    const cand = findCandidate(res, 'p-crlf');
+    assert.ok(cand, 'CRLF plan with a missing declared file must be a candidate');
+    assert.ok(cand.signals.includes('missing-files'), 'missing-files must fire under CRLF');
+    assert.equal(cand.actionable, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FIX 2 — oversized plan files are size-gated (stat before read on hot path)
+// ---------------------------------------------------------------------------
+
+describe('FIX 2 / size-gate — plan files larger than MAX_PLAN_BYTES are skipped', () => {
+  it('an oversized plan is not a candidate; a normal sibling still scans', () => {
+    const sb = makeSandbox();
+    // Oversized plan: valid frontmatter declaring a missing file, then a huge body.
+    // If it were read it WOULD be a missing-files candidate; it must be skipped.
+    const head =
+      '---\n' +
+      'title: "p-huge"\n' +
+      'files: [src/lib/huge-missing.js]\n' +
+      'status: refined\n' +
+      '---\n\n';
+    const filler = 'x'.repeat(MAX_PLAN_BYTES + 1);
+    writeRawPlan(sb, 'functional', 'p-huge', head + filler + '\n');
+    // Normal sibling with a missing file — must still be flagged.
+    writePlan(sb, 'functional', 'p-normal', {
+      filesSyntax: 'inline',
+      files: ['src/lib/normal-missing.js'],
+    });
+    let res;
+    assert.doesNotThrow(() => {
+      res = scanCheapCandidates(sb);
+    });
+    assert.equal(findCandidate(res, 'p-huge'), undefined, 'oversized plan must be skipped');
+    const normal = findCandidate(res, 'p-normal');
+    assert.ok(normal, 'normal sibling must still be flagged');
+    assert.ok(normal.signals.includes('missing-files'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FIX 3 — `..` traversal segments are neutralized (repo-root-relative only)
+// ---------------------------------------------------------------------------
+
+describe('FIX 3 / traversal — leading ../ segments cannot resolve outside root', () => {
+  it('a declared ../ path is treated repo-root-relative; the plan is flagged missing-files', () => {
+    const sb = makeSandbox();
+    // Create a REAL file OUTSIDE the sandbox root. Without `..` filtering,
+    // path.join(root, '..', name) would resolve to it and missing-files would NOT fire.
+    const outsideName = 'sp1-outside-' + process.pid + '-' + Date.now() + '.js';
+    const outsidePath = path.join(path.dirname(sb), outsideName);
+    fs.writeFileSync(outsidePath, '// real file outside root\n');
+    extraCleanup.push(outsidePath);
+
+    writePlan(sb, 'functional', 'p-traverse', {
+      filesSyntax: 'inline',
+      files: ['../' + outsideName],
+    });
+    const res = scanCheapCandidates(sb);
+    const cand = findCandidate(res, 'p-traverse');
+    assert.ok(cand, 'traversal path must NOT resolve to the outside file ⇒ candidate');
+    assert.ok(
+      cand.signals.includes('missing-files'),
+      'the `..` segment must be filtered so the path is missing under root'
+    );
+    assert.equal(cand.actionable, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FIX 4 — symlinks are not followed (lstat + isFile guard)
+// ---------------------------------------------------------------------------
+
+describe('FIX 4 / symlink — a plan path that is a symlink outside root is skipped', () => {
+  it('symlinked plan file is not read and not a candidate; sibling still scans', () => {
+    const sb = makeSandbox();
+    // Sibling regular plan with a missing file — proves the scan continues.
+    writePlan(sb, 'review', 'sib', { filesSyntax: 'inline', files: ['src/lib/sib-missing.js'] });
+
+    // Target lives OUTSIDE root and, if followed, WOULD be a missing-files candidate.
+    const targetName = 'sp1-symtarget-' + process.pid + '-' + Date.now() + '.md';
+    const targetPath = path.join(path.dirname(sb), targetName);
+    fs.writeFileSync(
+      targetPath,
+      '---\ntitle: "sym"\nfiles: [src/lib/sym-missing.js]\nstatus: refined\n---\n\n# sym\n'
+    );
+    extraCleanup.push(targetPath);
+
+    const linkPath = path.join(sb, 'plans', 'review', 'sym.md');
+    let symlinkOk = true;
+    try {
+      fs.symlinkSync(targetPath, linkPath);
+    } catch (e) {
+      if (e.code === 'EPERM' || e.code === 'ENOSYS' || e.code === 'EACCES') {
+        symlinkOk = false;
+      } else {
+        throw e;
+      }
+    }
+
+    const res = scanCheapCandidates(sb);
+    // Sibling must always be flagged regardless of symlink support.
+    const sib = findCandidate(res, 'sib');
+    assert.ok(sib, 'sibling missing-files plan must be flagged');
+    assert.ok(sib.signals.includes('missing-files'));
+
+    if (symlinkOk) {
+      assert.equal(
+        findCandidate(res, 'sym'),
+        undefined,
+        'a symlinked plan file must be skipped (lstat + isFile guard), not followed'
+      );
+    } else {
+      // Cross-platform fallback (Windows without symlink privilege): symlink
+      // creation was unavailable, so the symlink-specific assertion is skipped
+      // here. The isFile() guard that also subsumes symlinks is proven by the
+      // directory case in the next test (a non-regular plan path is skipped).
+      assert.ok(true, 'symlink unsupported on this host; isFile guard covered by directory case');
+    }
+  });
+
+  it('fallback: a non-regular (directory) plan path is skipped via the isFile guard', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'functional', 'willbreak', {
+      filesSyntax: 'inline',
+      files: ['src/lib/x.js'],
+    });
+    writePlan(sb, 'functional', 'ok-sib', {
+      filesSyntax: 'inline',
+      files: ['src/lib/ok-missing.js'],
+    });
+    breakPlanFile(sb, 'functional', 'willbreak'); // replace file with a directory
+    let res;
+    assert.doesNotThrow(() => {
+      res = scanCheapCandidates(sb);
+    });
+    assert.equal(findCandidate(res, 'willbreak'), undefined, 'directory plan path skipped');
+    assert.ok(findCandidate(res, 'ok-sib'), 'sibling still scans after the skip');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FIX 5 — quoted block-list path containing a whitespace-preceded # is intact
+// ---------------------------------------------------------------------------
+
+describe('FIX 5 / quoted-#  — quoted block-list path with an internal # is not truncated', () => {
+  it('  - "src/weird #name.js"  parses to the full quoted path', () => {
+    const region = 'files:\n  - "src/weird #name.js"\n';
+    assert.deepEqual(parseFilesField(region), ['src/weird #name.js']);
+  });
+
+  it("single-quoted block-list path with internal # is intact", () => {
+    const region = "files:\n  - 'src/odd #2.js'\n";
+    assert.deepEqual(parseFilesField(region), ['src/odd #2.js']);
+  });
+
+  it('quoted block-list path FOLLOWED by a real comment still strips the comment', () => {
+    const region = 'files:\n  - "src/q.js"  # note\n';
+    assert.deepEqual(parseFilesField(region), ['src/q.js']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FIX 6 — candidate 4-key shape asserted directly (guards SP2/SP5 lock)
+// ---------------------------------------------------------------------------
+
+describe('FIX 6 / shape — a real candidate has exactly the 4 locked keys', () => {
+  it('keys are exactly [actionable, plan, signals, stage] (no path/mtime leak)', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'review', 'p-shape', {
+      filesSyntax: 'inline',
+      files: ['src/lib/shape-missing.js'],
+    });
+    const res = scanCheapCandidates(sb);
+    const cand = findCandidate(res, 'p-shape');
+    assert.ok(cand, 'candidate must exist');
+    assert.deepEqual(Object.keys(cand).sort(), ['actionable', 'plan', 'signals', 'stage']);
   });
 });

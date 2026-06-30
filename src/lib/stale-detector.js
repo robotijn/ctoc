@@ -50,6 +50,14 @@ const path = require('path');
 const AGE_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
+ * Upper bound on a plan file we will read into memory on the menu hot path.
+ * 1 MiB is generous for a markdown plan (the largest real plans are tens of KiB).
+ * Any larger file is size-gated out BEFORE the read so a pathological or
+ * accidental huge file cannot stall the hot path or balloon memory.
+ */
+const MAX_PLAN_BYTES = 1 << 20; // 1 MiB
+
+/**
  * The three gate-SOURCE stages scanned by the cheap pass, in fixed gate order.
  * SP1's own frozen copy — inbox.js does not export its equivalent, and editing
  * inbox.js is out of scope (SP2 owns it).
@@ -77,7 +85,10 @@ const GATE_SOURCE_STAGES = Object.freeze(['functional', 'implementation', 'revie
  */
 function extractFrontmatterRegion(content) {
   if (typeof content !== 'string' || content.length === 0) return '';
-  const lines = content.split('\n');
+  // Split on CRLF or LF so a Windows checkout (CRLF) does not leave a trailing
+  // `\r` on every line — which would defeat the `---`/`files:`/dash regexes and
+  // silently suppress `missing-files`.
+  const lines = content.split(/\r?\n/);
   const bodies = [];
   let i = 0;
   // Skip leading blank lines before the first block.
@@ -129,6 +140,33 @@ function stripQuotes(s) {
 }
 
 /**
+ * Parse a single block-list item value, resolving the ordering hazard between
+ * quote-stripping and comment-stripping.
+ *
+ * A QUOTED value is taken literally between its matching quotes, so a
+ * whitespace-preceded `#` INSIDE the quotes (`"src/weird #name.js"`) is part of
+ * the path and is NOT treated as a comment — while a real trailing comment AFTER
+ * the closing quote (`"src/q.js"  # note`) is still discarded. An UNQUOTED value
+ * has any trailing ` #…` comment stripped (F5); a `#` not preceded by whitespace
+ * (`a#b.js`) is preserved.
+ *
+ * This makes block-list parsing consistent with the inline-array form, which
+ * never comment-strips a quoted entry.
+ * @param {string} raw The captured dash-item text.
+ * @returns {string}
+ */
+function parseListItem(raw) {
+  const t = raw.trim();
+  const q = t[0];
+  if (q === '"' || q === "'") {
+    const end = t.indexOf(q, 1);
+    if (end > 0) return t.slice(1, end); // literal between quotes; ignore any trailing comment
+    // Unterminated quote — fall through to the unquoted path.
+  }
+  return stripQuotes(stripTrailingComment(t).trim());
+}
+
+/**
  * Sequence-aware parser for the `files:` frontmatter key. Handles both YAML
  * syntaxes plus defensible edge cases. Returns the declared file paths.
  *
@@ -145,7 +183,9 @@ function stripQuotes(s) {
  */
 function parseFilesField(region) {
   if (typeof region !== 'string' || region.length === 0) return [];
-  const lines = region.split('\n');
+  // CRLF-safe split (see extractFrontmatterRegion): a trailing `\r` would break
+  // the `files:` and dash-item regexes on a Windows checkout.
+  const lines = region.split(/\r?\n/);
   let idx = -1;
   let rest = '';
   for (let k = 0; k < lines.length; k++) {
@@ -179,7 +219,7 @@ function parseFilesField(region) {
   for (let k = idx + 1; k < lines.length; k++) {
     const dash = lines[k].match(/^[ \t]*-[ \t]*(.+?)[ \t]*$/);
     if (!dash) break; // stop at first non-dash line (new key or blank)
-    const v = stripQuotes(stripTrailingComment(dash[1]).trim());
+    const v = parseListItem(dash[1]);
     if (v.length > 0) out.push(v);
   }
   return out;
@@ -194,7 +234,12 @@ function parseFilesField(region) {
  * @returns {boolean} true if the path exists under root.
  */
 function declaredFileExists(root, declared) {
-  const parts = declared.split(/[\\/]+/).filter((p) => p.length > 0);
+  // Drop empty/leading-separator segments AND `.`/`..` so a declared path can
+  // never climb above `root` (e.g. `files: ['../../etc/passwd']` is neutralized
+  // to a repo-root-relative `etc/passwd`). Declared paths are developer-authored
+  // and used for existence checks only, but filtering keeps the "under root"
+  // guarantee literal rather than incidental.
+  const parts = declared.split(/[\\/]+/).filter((p) => p.length > 0 && p !== '.' && p !== '..');
   if (parts.length === 0) return true; // nothing meaningful to check
   return fs.existsSync(path.join(root, ...parts));
 }
@@ -258,24 +303,34 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
       const filePath = path.join(stageDir, file);
       const slug = file.slice(0, -3); // strip '.md'
 
-      // Per-file IO containment (F2): the two per-file syscalls are each wrapped
-      // in a narrow try/catch scoped to this single file. A vanished/unreadable
-      // plan is skipped and the scan continues. This never masks misuse (which
-      // already threw above) and wraps no control-flow that could hide a bug.
+      // Per-file IO containment (F2): each per-file syscall is wrapped in a narrow
+      // try/catch scoped to this single file. A vanished/unreadable plan is skipped
+      // and the scan continues. This never masks misuse (which already threw above)
+      // and wraps no control-flow that could hide a bug.
+
+      // STAT FIRST (lstat — do NOT follow symlinks). lstat lets us (a) skip any
+      // non-regular file — a directory or a SYMLINK — so the scan only ever reads
+      // real files UNDER root (a symlink could point outside root); this cleanly
+      // subsumes the old EISDIR directory-skip. And (b) size-gate before reading,
+      // so an oversized file is never pulled into memory on the hot path. The same
+      // stat supplies the advisory mtime, so no second stat is needed.
+      let st;
+      try {
+        st = fs.lstatSync(filePath);
+      } catch {
+        continue; // file vanished between readdir and stat — skip
+      }
+      if (!st.isFile()) continue; // directory or symlink — skip (reads stay under root)
+      if (st.size > MAX_PLAN_BYTES) continue; // oversized — skip before read
+
       let content;
       try {
         content = fs.readFileSync(filePath, 'utf8');
       } catch {
-        continue; // file vanished or unreadable (e.g. EISDIR) — skip
+        continue; // file vanished or became unreadable mid-scan — skip
       }
 
-      let mtimeMs;
-      try {
-        mtimeMs = fs.statSync(filePath).mtimeMs;
-      } catch {
-        continue; // stat fault — skip this file
-      }
-
+      const mtimeMs = st.mtimeMs;
       const declared = parseFilesField(extractFrontmatterRegion(content));
 
       /** @type {StaleSignal[]} */
@@ -303,4 +358,5 @@ module.exports = {
   parseFilesField,
   GATE_SOURCE_STAGES,
   AGE_THRESHOLD_MS,
+  MAX_PLAN_BYTES,
 };

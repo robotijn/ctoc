@@ -452,13 +452,36 @@ Handles both YAML syntaxes plus defensible edge cases:
 - **Cross-platform (M7):** `require('path')`; every path via `path.join(...)`;
   no string concatenation of separators; declared-file splitting on `/[\\/]+/`;
   tests use `os.tmpdir()`. No bash, no `execSync` for path work, no `~`.
-- **Security:** the module is read-only — it `existsSync`/`statSync`/
-  `readFileSync`s files under `root` and never writes, moves, or deletes. Declared
-  paths come from developer-authored plan frontmatter (not external input) and are
-  used only for existence checks under `root`, so path-traversal risk is nil (no
-  read/write follows the join). No secrets, no `exec`, no untrusted object merge
-  (results are plain objects/arrays with a fixed key set ⇒ no prototype-pollution
-  surface).
+- **Line-ending normalization (Windows checkout):** both `extractFrontmatterRegion`
+  and `parseFilesField` split on `/\r?\n/`, not `'\n'`. A CRLF checkout would
+  otherwise leave a trailing `\r` on every line, defeating the `---`, `files:`, and
+  dash-item regexes and silently suppressing `missing-files`. (Corrects the earlier
+  omission — the original `'\n'` split was a latent Windows bug.)
+- **Plan-file size gate (hot-path safety):** `scanCheapCandidates` size-gates each
+  plan against `MAX_PLAN_BYTES = 1 << 20` (1 MiB — generous for markdown plans)
+  using the `lstat` result BEFORE reading. An oversized file is skipped, never
+  pulled into memory on the menu hot path. The stat now precedes the read (was:
+  read-then-stat), and the single `lstat` mtime is reused for the age signal — one
+  stat, one read per file.
+- **Security:**
+  - The module is read-only — `existsSync`/`lstatSync`/`readFileSync` under `root`
+    only; never writes, moves, or deletes.
+  - **Path traversal is neutralized**, not merely "nil by provenance":
+    `declaredFileExists` filters out `.` and `..` (as well as empty/leading-separator)
+    segments before `path.join(root, ...parts)`, so a declared `../../etc/passwd`
+    collapses to a repo-root-relative `etc/passwd` and can never resolve above
+    `root`. (Corrects the earlier claim that "path-traversal risk is nil" because no
+    external input — declared paths ARE attacker-influenceable via a crafted plan,
+    so the `.`/`..` filter is the actual mitigation.)
+  - **"Reads files under root" is enforced via `lstat` + `isFile()`:** the per-file
+    stat uses `fs.lstatSync` (does NOT follow symlinks) and the scan skips any
+    non-regular entry (`if (!st.isFile()) continue;`). A symlinked plan file —
+    which could point at a target OUTSIDE `root` — is therefore never read; this
+    also cleanly subsumes the old EISDIR directory-skip. (Corrects the earlier
+    `statSync`/`readFileSync` path, which followed symlinks and could read outside
+    `root`.)
+  - No secrets, no `exec`, no untrusted object merge (results are plain
+    objects/arrays with a fixed key set ⇒ no prototype-pollution surface).
 
 ## 6. DESIGN — File-by-File Implementation Blueprint (Iron Loop Step 6)
 
@@ -562,8 +585,23 @@ not by swallowing an error.
 - Malformed/empty frontmatter plan ⇒ graceful (age-only or no candidate), never throws.
 - **F1 negative guard:** no fixture in any stage is ever flagged solely because it carries `approved_by: human`; the only ways into `candidates` are `missing-files` and `advisory:age`.
 
+**Pre-Gate-3 review-kickback scenarios (addendum — code + security findings):**
+Each of the following was added with a locking regression test that FAILED before
+the fix and PASSES after (TDD red→green); all live in `stale-detector-cheap.test.js`.
+
+| Finding | Severity | Fix | Locking test(s) |
+|---|---|---|---|
+| **CRLF line endings break `files:` parsing** — `content.split('\n')` / `region.split('\n')` leave a trailing `\r`, defeating the `---`/`files:`/dash regexes on a Windows checkout ⇒ `missing-files` never fires | HIGH | split on `/\r?\n/` at BOTH sites | `FIX 1 / CRLF`: (a) block-list CRLF region, (b) inline-array CRLF region, (c) `extractFrontmatterRegion` CRLF delimiters, (d) full `scanCheapCandidates` over a CRLF plan with a missing declared file ⇒ candidate, actionable |
+| **Unbounded `readFileSync` on the hot path** — whole file read before any stat | MEDIUM | `lstat` FIRST; size-gate against `MAX_PLAN_BYTES = 1<<20` before read; reuse stat mtime (removed redundant 2nd stat) | `FIX 2 / size-gate`: oversized plan skipped (not a candidate), normal sibling still scans; + `MAX_PLAN_BYTES is 1 MiB` export check |
+| **`..` traversal segments not filtered** — declared `../../x` climbs above `root` | LOW | `declaredFileExists` filters `p !== '.' && p !== '..'` | `FIX 3 / traversal`: real file created OUTSIDE root, declared via `../` ⇒ does NOT resolve outside ⇒ plan flagged `missing-files`, actionable |
+| **Symlink following breaks "reads under root"** — `statSync`/`readFileSync` follow links | LOW–MED | per-file `lstatSync` + `if (!st.isFile()) continue;` (skips symlinks AND directories) | `FIX 4 / symlink`: symlinked plan file → target outside root is skipped (not a candidate), sibling still scans; cross-platform fallback asserts the `isFile()` guard via the directory case when `symlinkSync` throws EPERM/ENOSYS/EACCES |
+| **Quoted block-list path with whitespace-preceded `#` truncated** — `stripTrailingComment` ran before `stripQuotes` (inline form was already correct → inconsistency) | LOW | new `parseListItem`: take literal text between matching quotes (no comment-strip inside quotes); strip a real trailing comment AFTER the closing quote; unquoted values still comment-stripped | `FIX 5 / quoted-#`: `- "src/weird #name.js"` ⇒ `src/weird #name.js`; single-quoted internal `#` intact; quoted-then-comment still strips the comment |
+| **Candidate 4-key shape not asserted directly** — risk of a `path`/`mtime` key leaking into the SP2/SP5-locked shape | LOW | n/a (test-only guard) | `FIX 6 / shape`: `Object.keys(cand).sort()` deep-equals `['actionable','plan','signals','stage']` on a real candidate |
+
 **Coverage target:** ≥ 80% line & branch on `stale-detector.js`; every signal
-branch, both `parseFilesField` syntaxes, both throw paths exercised.
+branch, both `parseFilesField` syntaxes, both throw paths exercised. Post-kickback
+measured coverage: **98.34% line / 89.87% branch / 100% funcs** (57 tests in
+`stale-detector-cheap.test.js`, up from 44).
 
 ### 6.4 Implementation order (dependency-respecting; executor does TDD-red first)
 
@@ -584,6 +622,7 @@ branch, both `parseFilesField` syntaxes, both throw paths exercised.
 - **Per-file IO-fault containment owned by SP1 (F2, Gate-2 kickback decision):** an earlier draft deferred IO-fault containment to SP2 ("SP1 stays fail-loud"). That was wrong — a single unreadable/vanished plan file would throw out of the entire cheap scan and break the menu hot-path on every open. SP1 now wraps each per-file `readFileSync`/`statSync` in a narrow `try/catch` scoped to that one file: the offending plan is skipped and the scan continues, returning a valid `{candidates, count}`. This is consistent with the graceful-on-structure stance and does NOT weaken fail-loud-on-misuse — a bad `root` or non-finite `nowMs` still throws `TypeError` before any per-file work begins. The catch wraps only the two syscalls and hides no logic-bug control flow.
 - **Trailing block-list comment handling (F5):** `parseFilesField` strips a trailing YAML line comment from each block-list entry — a `#` preceded by whitespace through end of line (`  - src/lib/x.js  # note` ⇒ `src/lib/x.js`). A `#` not preceded by whitespace is preserved as part of the path. This makes the parser robust to commented `files:` entries rather than treating the comment text as part of the filename (which would spuriously fire `missing-files`). Covered by a direct `parseFilesField` unit test.
 - **`nowMs` injection:** `scanCheapCandidates(root, { nowMs } = {})` where `nowMs` defaults to `Date.now()`. Required testability seam for SP5; eliminates dependency on `fs.utimesSync` for age scenarios in tests.
+- **Pre-Gate-3 review kickback applied (CRLF · size-gate · traversal · symlink · quoted-`#` · shape):** a code + security review before Gate 3 found six issues, each now fixed with a locking regression test (TDD red→green; see §6.3 addendum table). (1) **CRLF (HIGH):** both `extractFrontmatterRegion` and `parseFilesField` now split on `/\r?\n/` so a Windows/CRLF checkout no longer leaves a trailing `\r` that silently suppressed `missing-files`. (2) **Size-gate (MED):** `scanCheapCandidates` now `lstat`s each plan FIRST and skips any file `> MAX_PLAN_BYTES = 1<<20` (1 MiB) before reading; the single `lstat` mtime is reused for the age signal (the redundant second `statSync` is removed) — one stat + at most one read per file. (3) **Traversal (LOW):** `declaredFileExists` now filters `.`/`..` segments so a declared `../…` path is collapsed to repo-root-relative and can never resolve above `root`; this corrects the earlier "traversal risk is nil" claim — declared paths ARE plan-author-influenceable, so the `.`/`..` filter is the actual mitigation. (4) **Symlink (LOW–MED):** the per-file stat is now `lstatSync` (does not follow symlinks) with `if (!st.isFile()) continue;`, so a symlinked plan file pointing outside `root` is never read; this also subsumes the prior EISDIR directory-skip. (5) **Quoted-`#` (LOW):** new `parseListItem` strips surrounding quotes before (and instead of) comment-stripping for quoted block-list entries, so `- "src/weird #name.js"` is no longer truncated — matching the inline-array form's behavior. (6) **Shape guard (LOW):** a direct `Object.keys(cand).sort()` assertion locks the candidate to exactly `{actionable, plan, signals, stage}` so a future `path`/`mtime` key leak fails loudly. `MAX_PLAN_BYTES` is now exported alongside the existing constants. No numbered success metric was added, so `acceptance_criteria_count` stays 7; these are recorded as the §6.3 addendum scenarios + this decision. Module coverage after the fixes: 98.34% line / 89.87% branch / 100% funcs; module suite 44 → 57 tests, full suite `# fail 0`, 0 skipped.
 
 ### Decisions taken during technical planning (Steps 5–6)
 
