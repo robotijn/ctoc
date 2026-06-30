@@ -16,6 +16,7 @@ depends_on: [SP1-cheap-stale-flag-on-menu-open]
 files:
   - src/lib/inbox.js
   - src/lib/menu-screens.js
+  - src/commands/menu.md
   - tests/inbox-stale-stream.test.js
 status: refined
 acceptance_criteria_count: 6
@@ -53,16 +54,16 @@ Without a visible count the user never knows stale candidates exist. The dashboa
 ### Business Goals
 
 1. Extend `getInboxCounts()` to include `staleCandidates: N` derived from SP1's `scanCheapCandidates()`, using the same memoization pattern so the hot-path cost is at most one extra scan per 5-second cache window.
-2. Render the `staleCandidates` count in the INBOX block of `buildDashboardTable()` in `src/lib/menu-screens.js`, conditionally showing a line "N possibly-stale plans" when the count is non-zero, hidden when zero (consistent with current zero-count hiding for other streams).
+2. Render the `staleCandidates` count in the INBOX block of `buildDashboardTable()` in `src/lib/menu-screens.js`, conditionally showing a line "N possibly-stale plans" when the count is non-zero, hidden when zero. NOTE: the hiding-at-zero is an INTENTIONAL design choice SPECIFIC to the possibly-stale line — it is NOT mirroring the sibling streams. In `buildDashboardTable`, the `questions`/`decisions`/`gatesWaiting` lines always print (including their `0` values) whenever `inboxTotal > 0`; only the possibly-stale line hides at `0`, because the cheap, unverified stale signal should not occupy a permanent zero-row that implies a standing chore before SP3 verification has run.
 3. Provide a drill-in screen produced by a new `inboxStalePlansDrillIn()` function in `src/lib/menu-screens.js`, reachable via a ride-along second question attached to `dashboardPipeline()`'s `ask.questions` ONLY when `staleCandidates > 0`. That second question (header `'Stale plans'`, prompt `'N possibly-stale plans detected — view them?'`) presents exactly two options: `'View stale plans'` and `'Not now'`. In `actions`, `'View stale plans'` maps to route `inbox stale`; `'Not now'` maps to `''` (no-op). The first (pipeline-section) question keeps its four options (Business / Implementation / Execution / More ▶) unchanged. Navigation to the drill-in is always by label text, never by number (menu discipline Rule 1 and Rule 9).
 4. Keep the Inbox surface READ-ONLY at this layer — no writes, no moves, no gate crossings.
 
 ### Success Metrics
 
 - **M1:** `getInboxCounts(root)` returns an object containing `staleCandidates: N` for some integer N >= 0; existing keys (`questions`, `decisions`, `gatesWaiting`) are unchanged in value and type.
-- **M2:** When `staleCandidates > 0`, `buildDashboardTable()` renders a line "N possibly-stale plans" in the INBOX block; `dashboardPipeline()` attaches a ride-along second question to `ask.questions` with header `'Stale plans'`, prompt `'N possibly-stale plans detected — view them?'`, and options `['View stale plans', 'Not now']`; `'View stale plans'` maps via `actions` to route `inbox stale`; `'Not now'` maps to `''`. No numeric key in `actions` on any screen maps to a stale-plans route (menu discipline: numbers open plans, never navigation targets).
-- **M3:** When `staleCandidates === 0`, no "possibly-stale" line appears in the INBOX block and no ride-along stale question is attached to `dashboardPipeline()`'s `ask.questions`.
-- **M4:** The `inboxStalePlansDrillIn()` screen lists each candidate's plan slug, stage, signals array, and advisory/actionable label; it performs no file operation. A `◀ Back` option returns the user to the dashboard pipeline view.
+- **M2:** When `staleCandidates > 0`, `buildDashboardTable()` renders a line "N possibly-stale plans" in the INBOX block; `dashboardPipeline()` attaches a ride-along second question to `ask.questions` with header `'Stale plans'`, prompt `'N possibly-stale plans detected — view them?'`, and options `['View stale plans', 'Not now']`; `'View stale plans'` maps via `actions` to route `inbox stale`; `'Not now'` maps to `''`. No numeric key in `actions` on any screen maps to a stale-plans route (menu discipline: numbers open plans, never navigation targets). **The drill-in is genuinely reachable end-to-end:** the menu driver doc (`src/commands/menu.md`) carries an explicit stale-first precedence rule (new Rule 10, §6.3) so that when the user picks `'View stale plans'` the driver navigates to `inbox stale` instead of silently following the always-present pipeline-section answer. Without that rule the count would render but the human could never reach the drill-in — the F1 reachability bug ("green but does nothing the human sees").
+- **M3:** When `staleCandidates === 0`, no "possibly-stale" line appears in the INBOX block and no ride-along stale question is attached to `dashboardPipeline()`'s `ask.questions`. (The line's absence at `0` is an intentional design choice specific to the possibly-stale line — it does NOT mirror the sibling `questions`/`decisions`/`gatesWaiting` lines, which DO print their zero values whenever `inboxTotal > 0`.)
+- **M4:** The `inboxStalePlansDrillIn()` screen lists each candidate's plan slug, stage, signals array, and advisory/actionable label; it performs no file operation. A `◀ Back` option returns the user to the dashboard pipeline view. The screen is genuinely reachable: `route('inbox stale')` dispatches to it AND the `menu.md` Rule 10 precedence guarantees the `'View stale plans'` answer actually triggers that route (end-to-end reachability, not a wired-but-dead screen).
 - **M5:** No new slash command is introduced; the stale stream lives entirely within the `menu-screens.js` JSON path, reachable through the existing menu navigation.
 - **M6:** SP1 is a hard dependency that is already shipped. SP2 does NOT stub `stale-detector.js`. Unit tests for SP2 mock `scanCheapCandidates` at the module boundary (injected or mocked) but do not ship a placeholder stub that returns empty results.
 
@@ -146,8 +147,9 @@ Without a visible count the user never knows stale candidates exist. The dashboa
 - Update `dashboardPipeline()` in `src/lib/menu-screens.js` to conditionally attach a ride-along second question to `ask.questions` (when `staleCandidates > 0`) with header `'Stale plans'`, prompt `'N possibly-stale plans detected — view them?'`, options `['View stale plans', 'Not now']`; `'View stale plans'` mapped to route `inbox stale` in `actions`, `'Not now'` mapped to `''`
 - New `inboxStalePlansDrillIn(projectPath)` screen function in `src/lib/menu-screens.js`, modeled on `stageBrowse`, returning `{text, ask, actions}`: candidates listed as text lines with slug/stage/signals/label; `◀ Back` as the only selectable option; "Verify (SP3)" as affordance text only
 - New route `inbox stale` → `inboxStalePlansDrillIn()` added to `route()` in `src/lib/menu-screens.js`
+- Edit `src/commands/menu.md` to add a new numbered driver Rule (Rule 10, sibling to Rule 8 / Rule 9): the stale-first navigation precedence rule that makes `'View stale plans'` → `inbox stale` take precedence over the always-present pipeline-section answer for the turn (`'Not now'` → `''` falls through). This is the F1 fix — without it the count renders but the drill-in is unreachable. Exact wording in §6.3.
 - Zero-count hiding: no stale line in INBOX block and no ride-along stale question in `dashboardPipeline` when `staleCandidates === 0`
-- Unit test `tests/inbox-stale-stream.test.js` with mocked `scanCheapCandidates`; SP1 module must exist (no stub)
+- Unit test `tests/inbox-stale-stream.test.js` with mocked `scanCheapCandidates`; SP1 module must exist (no stub). Includes a doc-contract test asserting `src/commands/menu.md` contains the stale-first precedence rule — the only guard against the dead-navigation silently regressing, since the rule is driver prose, not executable code.
 
 ### Out of Scope
 
@@ -224,13 +226,14 @@ stale-detector.js  (SHIPPED, frozen — NOT in files:)
    tests/inbox-stale-stream.test.js  (CREATE)
 ```
 
-No cycles. Dependency direction stays inward (`menu-screens → inbox → stale-detector`). `menu-screens.js` gains NO new dependency on `stale-detector.js` — the stale dependency is localized in `inbox.js` (the inbox surface module), and `menu-screens.js` reaches candidates only through `inbox.listStaleCandidates`.
+No cycles. Dependency direction stays inward (`menu-screens → inbox → stale-detector`). `menu-screens.js` gains NO new dependency on `stale-detector.js` — the stale dependency is localized in `inbox.js` (the inbox surface module), and `menu-screens.js` reaches candidates only through `inbox.listStaleCandidates`. `src/commands/menu.md` is a fourth touched file but it is driver DOCUMENTATION (the stale-first precedence Rule 10), not a code module — it sits outside the require graph and introduces no cycle.
 
 ### 5.3 Implementation order (dependency order; TDD test-first is Step 8, not here)
 
-1. `src/lib/inbox.js` — namespace-import `stale-detector`, add `staleCandidates` to memoized counts, add `listStaleCandidates()`, export it. (No dependency on the other two changes.)
+1. `src/lib/inbox.js` — namespace-import `stale-detector`, add `staleCandidates` to memoized counts, add `listStaleCandidates()`, export it. (No dependency on the other changes.)
 2. `src/lib/menu-screens.js` — import `listStaleCandidates`; extend `buildDashboardTable` + `dashboardPipeline`; add `inboxStalePlansDrillIn`; add `route` case; export the new screen. (Depends on step 1.)
-3. `tests/inbox-stale-stream.test.js` — exercises both via the rewired boundary. (Depends on steps 1–2.)
+3. `src/commands/menu.md` — add the stale-first precedence driver Rule (Rule 10, sibling to Rule 8/Rule 9). Independent of the code, but it is what makes the `actions` contract from step 2 actually reachable (F1 fix).
+4. `tests/inbox-stale-stream.test.js` — exercises the code via the rewired boundary AND asserts the menu.md doc-contract rule. (Depends on steps 1–3.)
 
 ### 5.4 Per-file change list (summary; signatures in §6)
 
@@ -238,9 +241,10 @@ No cycles. Dependency direction stays inward (`menu-screens → inbox → stale-
 |---|---|---|
 | `src/lib/inbox.js` | MODIFY | (a) `const staleDetector = require('./stale-detector');` (namespace, late-bound). (b) `getInboxCountsImpl` returns extra key `staleCandidates: staleDetector.scanCheapCandidates(root).count`. (c) new `listStaleCandidates(root)` → `staleDetector.scanCheapCandidates(root).candidates`. (d) export `listStaleCandidates`. |
 | `src/lib/menu-screens.js` | MODIFY | (a) import `listStaleCandidates` from `./inbox`. (b) `buildDashboardTable`: conditional "N possibly-stale plans" line + fold into `inboxTotal`. (c) `dashboardPipeline`: read `getInboxCounts(root).staleCandidates`; when `>0` push ride-along Stale question + actions. (d) new `inboxStalePlansDrillIn(projectPath)`. (e) `route`: `case 'inbox'` → `inboxStalePlansDrillIn`. (f) export `inboxStalePlansDrillIn`. |
-| `tests/inbox-stale-stream.test.js` | CREATE | Boundary-mock `scanCheapCandidates`; assert behavior of (b)–(e) above. |
+| `src/commands/menu.md` | MODIFY | Add driver Rule 10 (stale-first navigation precedence), sibling to Rule 8/Rule 9. Makes `'View stale plans'` → `inbox stale` win over the pipeline-section answer for the turn; `'Not now'` falls through. F1 fix — exact wording in §6.3. |
+| `tests/inbox-stale-stream.test.js` | CREATE | Boundary-mock `scanCheapCandidates`; assert behavior of (b)–(e) above; assert the menu.md doc-contract (stale-first precedence rule present). |
 
-Out of scope and untouched: `src/areas/inbox.js`, `src/commands/menu.js`, `src/commands/menu.md`, `src/tabs/overview.js`, `src/lib/stale-detector.js`. No new files beyond the one test file. No new slash command.
+Out of scope and untouched: `src/areas/inbox.js`, `src/commands/menu.js`, `src/tabs/overview.js`, `src/lib/stale-detector.js`. `src/commands/menu.md` IS now in scope (Option-A reachability fix — it owns the stale-first precedence Rule 10; this adds a driver rule, NOT a new slash command). No new files beyond the one test file.
 
 ---
 
@@ -407,23 +411,29 @@ Two-word command `inbox stale` (per the existing Decision) leaves room for futur
 
 **Exports (modify lines 885–905)** — add `inboxStalePlansDrillIn` to the renderer block.
 
-### 6.3 Slash-command driver handling (mirrors the env ride-along)
+### 6.3 `src/commands/menu.md` — stale-first precedence Rule (OWNED; F1 fix)
 
-This is a PROTOCOL the menu driver (the model executing `/ctoc:menu` per `menu.md`) follows; it is not unit-testable code (the driver is the model reading the JSON). The SP2 code contract is the `actions` map; a correct driver acts on it as follows.
+The menu has NO answer-consuming driver code: answer→navigation is the model executing `/ctoc:menu` while following `src/commands/menu.md`. Rule 8 already handles the environment ride-along (resolve the env side-effect, then follow the pipeline answer). SP2's ride-along Stale question returns a COMPETING navigation (`'View stale plans'` → `inbox stale`); with no precedence rule the driver routes to the always-present pipeline-section answer and silently drops the stale navigation — the count renders but the human can NEVER reach `inboxStalePlansDrillIn` (F1, CRITICAL — "green but does nothing the human sees"). Option A makes SP2 own the fix end-to-end by adding a new numbered driver Rule. This is why `src/commands/menu.md` is in this plan's `files:`.
 
-Sequence for the no-args dashboard:
+**Exact edit — add Rule 10 to `src/commands/menu.md`**, immediately after Rule 9 (the reasoning-depth rule) and before the trailing "CTOC ships exactly three slash commands" line. Do NOT renumber Rules 1–9. Match the existing Rule voice (cf. Rule 8). Insert verbatim:
+
+> 10. **Stale-plans question rides along, navigates with precedence:** when `dashboardPipeline()` attaches a second **'Stale plans'** question (only when `staleCandidates > 0`), present it in the same AskUserQuestion call as the Pipeline question (and the Environment question if Rule 8 is also active). Resolve the answers in this order: first apply any environment side-effect (Rule 8 — `claude:set-environment {env}`); then, if the **Stale plans** answer maps via `actions` to `inbox stale` (the `'View stale plans'` option), navigate there — **it takes precedence over the pipeline-section answer for this turn** (the pipeline section is one keystroke away on return). If the answer is `'Not now'` (→ `''`) or the Stale plans question was absent, fall through to the pipeline-section answer (`section {x}` / `menu commands`). Precedence is explicit because the Pipeline question is always first and always non-empty, so a naive "first non-empty action wins" would never reach the stale drill-in. Numbers still open plans only (Rule 1) — the stale route is reached only by the label `'View stale plans'`, never a digit.
+
+**Driver protocol this rule encodes** (sequence for the no-args dashboard):
 1. `menu.js main()` → `route([], root)` → `dashboardPipeline(root)` returns `ask.questions = [Pipeline]` or `[Pipeline, Stale plans]` (when `staleCandidates > 0`), with merged `actions`.
 2. `menu.js main()` then, iff `needsEnvironmentPrompt(root)`, calls `attachEnvironmentQuestion(result)` → pushes `Environment` (3rd question) + merges its actions (`src/commands/menu.js:323–325`).
 3. Final `ask.questions` order: `[Pipeline, Stale plans?, Environment?]`. All presented in ONE AskUserQuestion call. One answer comes back per question.
-4. The driver resolves the answers in this order (a direct generalization of `menu.md` Rule 8):
+4. The driver resolves the answers per Rule 10 (a direct generalization of Rule 8):
    - **Side-effects first.** If an Environment answer is present and maps to `claude:set-environment {env}`, run it (persist). `claude:env-decide-later` ⇒ no-op. (Existing Rule 8 behavior, unchanged.)
    - **Navigation, stale-first precedence.** Look up the Stale answer's action: if it is non-empty (`'inbox stale'`, from `'View stale plans'`) → navigate there (`route(['inbox','stale'])` → `inboxStalePlansDrillIn`). If it is `''` (`'Not now'`) or the Stale question was absent → fall through to the Pipeline answer's action (`section {x}` / `menu commands`).
 
 **Why precedence is an explicit rule, not inferable from order:** the Pipeline question is always first and always non-empty, so a naive "first non-empty action wins" would never reach the stale drill-in. The user picking `'View stale plans'` is an explicit request that must win for this turn (the pipeline section is one keystroke away on return). The `''` value of `'Not now'` is the existing "no-op / fall through" sentinel used everywhere in the codebase (`◀ Back`, `◀ Pipeline`, etc.), so the fall-through half needs no new semantics.
 
+**Second `menu.md` edit — close the pre-existing env action-table seam (Gate-2 LOW finding):** the `claude:set-environment {env}` action entry in `src/commands/menu.md` (currently ~line 53) ends "…then continue with the user's pipeline-section choice (or re-open the dashboard if none)." That sentence predates Rule 10 and names only the pipeline branch. Append a clause so a careful model does not mis-resolve when a Stale answer is also present: after "pipeline-section choice", add "— **or, when a 'Stale plans' answer maps to `inbox stale`, navigate there first per Rule 10 (stale-first precedence)**". This keeps the env action entry and Rule 10 in agreement; the side-effect (env persist) still runs first, only the post-persist navigation target defers to Rule 10. No behavior change beyond making the existing entry consistent with the new rule.
+
 **Composition with env (≤4 questions):** Pipeline(4 opts) + Stale plans(2 opts) + Environment(4 opts) = 3 questions, each ≤4 options — within the AskUserQuestion ceiling pinned by `tests/menu-environment.test.js:66–72`. Side-effect (env persist) and navigation (stale vs pipeline) are orthogonal, so all three compose without conflict.
 
-**Scope note (honest, no routing-around):** the natural home for this precedence sentence is a `menu.md` protocol note (a sibling of Rule 8). `src/commands/menu.md` is NOT in this plan's `files:`, so SP2 does not edit it. See Decisions for the recommended out-of-scope follow-up. The SP2 code is complete and correct on its own; the JSON `actions` contract is self-describing for a driver that already honors Rule 8 plus this one precedence rule.
+**Guarding the rule (it is prose, not code):** Rule 10 is driver prose the model follows; no executable code path enforces it. The ONLY automated guard against the dead-navigation silently regressing is the doc-contract test (§6.4) asserting the rule's presence in `menu.md`. That test is what lets F1 be caught by the suite.
 
 ### 6.4 Test strategy — `tests/inbox-stale-stream.test.js`
 
@@ -483,9 +493,27 @@ Each test calls `mockScan({...})` with a distinct root (unique `mkdtempSync`) so
 - M3 / Scenario 2 — `mockScan({candidates:[],count:0})`; `buildDashboardTable(root)` text does NOT include `'possibly-stale'`; `dashboardPipeline(root).ask.questions.length === 1`; `!('View stale plans' in actions)`.
 - M4 / Scenario 4 — `mockScan` two candidates: `{plan:'alpha',stage:'functional',signals:['missing-files'],actionable:true}` and `{plan:'beta',stage:'review',signals:['advisory:age'],actionable:false}`; `inboxStalePlansDrillIn(root).text` includes `alpha`, `functional`, `missing-files`, `actionable` AND `beta`, `review`, `advisory:age`, `advisory`; `actions` deep-equals `{ '◀ Back': '' }`; assert `wroteCount === 0` across the render (read-only).
 - M5 — `route(['inbox','stale'], root)` returns the same shape as `inboxStalePlansDrillIn(root)` (header `'Stale plans'`, `◀ Back` only) ⇒ reachable through the menu router, no slash command added. Also `route(['inbox','bogus'], root)` falls back to the dashboard (header `'Pipeline'`).
-- Scenario 5 (read-only across full navigation) — with candidates present, call `buildDashboardTable(root)`, `dashboardPipeline(root)`, `route(['inbox','stale'], root)` in sequence; assert `wroteCount === 0` after all three (no `createQuestion`/`createDecision`/`movePlan`/`writeFileSync` on the render path).
+- Scenario 5 (read-only across the candidate-render path) — **F5 scoping:** the write-spy is scoped to the candidate-render functions, NOT the whole dashboard render. `buildDashboardTable()` and `dashboardPipeline()` also call `getPlanCounts()`/`getAgentStatus()`, which can legitimately write during stale-LOCK cleanup (an unrelated subsystem); asserting `0` writes across them would be a false guard that could fail for reasons unrelated to SP2. Instead, with candidates present, snapshot `wroteCount`, then call `inboxStalePlansDrillIn(root)` and `route(['inbox','stale'], root)` (the pure candidate-render path — `getProjectPath` + `listStaleCandidates` → mocked scan, no plan-counts/agent-status), and assert the DELTA is `0`. The SP2 contributions inside `buildDashboardTable`/`dashboardPipeline` are read-only by construction (a mocked-count read + string concatenation) and ship no `createQuestion`/`createDecision`/`movePlan`/`writeFileSync` call. `movePlan`/`createQuestion`/`createDecision` all funnel through `fs.writeFileSync`, so the scoped spy still covers them on the candidate-render path it guards.
 - Scenario 6 (menu discipline, both screens) — for `dashboardPipeline(root)` (stale>0) and `inboxStalePlansDrillIn(root)`: `Object.keys(actions).filter(k => /^\d+$/.test(k))` is empty; the only key whose value === `'inbox stale'` is `'View stale plans'` (dashboard) and the drill-in has no `'inbox stale'`-valued key.
 - Pluralization edge — `mockScan(count:1)` ⇒ buildDashboardTable includes `'1 possibly-stale plan'` (singular, no trailing `s`) and the ride-along prompt reads `1 possibly-stale plan detected — view them?`.
+- **Doc-contract (F1 reachability guard)** — read the REAL `src/commands/menu.md` (no mock) and assert the stale-first precedence Rule is present AND co-located in one rule. This is the only automated guard against the dead-navigation (F1) silently regressing, because the rule is driver prose, not executable code:
+  ```js
+  it('menu.md documents the stale-first precedence rule (F1 reachability guard)', () => {
+    const mdPath = path.join(__dirname, '..', 'src', 'commands', 'menu.md');
+    const md = fs.readFileSync(mdPath, 'utf8');
+    assert.match(md, /Stale plans/, 'menu.md must name the Stale plans ride-along question');
+    assert.match(md, /inbox stale/, 'menu.md must name the inbox stale route');
+    assert.match(md, /precedence|takes precedence|wins/i, 'menu.md must state precedence semantics');
+    // Co-location: a ±700-char window around the precedence keyword must ALSO contain
+    // both "Stale plans" and "inbox stale" — proving these belong to ONE rule, not
+    // three scattered mentions that could each survive a regression independently.
+    const m = /precedence|takes precedence|wins/i.exec(md);
+    const window = md.slice(Math.max(0, m.index - 700), m.index + 700);
+    assert.ok(/Stale plans/.test(window) && /inbox stale/.test(window),
+      'the stale-first precedence rule must mention "Stale plans" and "inbox stale" together');
+  });
+  ```
+  Fails loud if Rule 10 is deleted, reworded away from the precedence semantics, or decoupled from the route name. (No `scanCheapCandidates` mock involved — this assertion is independent of the boundary seam.)
 
 All assertions read concrete return values (count integer, exact substrings, exact action mappings, `wroteCount`), never structure-only truthiness — they fail loud if behavior drifts. No test depends on another's state (unique root + restore + invalidate). `os.tmpdir()` + `path.join` keep sandboxes cross-platform.
 
@@ -505,6 +533,7 @@ All assertions read concrete return values (count integer, exact substrings, exa
 | Scenario 4 | drill-in content + labels + `◀ Back` + no write | M4 test |
 | Scenario 5 | read-only render path | Scenario 5 test (`wroteCount===0`) |
 | Scenario 6 | no digit-only `actions` key on either screen; only `'View stale plans'` routes to `inbox stale` | Scenario 6 test |
+| F1 / reachability (drill-in reachable end-to-end) | `menu.md` Rule 10 stale-first precedence (§6.3) so `'View stale plans'` beats the always-present pipeline answer; backed by `route('inbox stale')` dispatch | Doc-contract test (menu.md contains the precedence rule) + M5 route test |
 
 ### 6.6 Cross-platform & contract conformance
 
@@ -512,11 +541,20 @@ All assertions read concrete return values (count integer, exact substrings, exa
 - New screens honor the menu return contract `{ text, ask, actions }`; `text` ends with `\n\n\n` (matches `tests/menu-screens.test.js:58`). No `inputMode` on the drill-in (it opens no plan).
 - Additive `staleCandidates` key preserves all existing `getInboxCounts` consumers (`menu-screens.buildDashboardTable`, `src/areas/inbox.js`) and existing tests (`tests/inbox.test.js`, `tests/menu-environment.test.js`, `tests/menu-screens.test.js`) — their temp projects have no stale candidates (fresh mtime, no plans), so the real `scanCheapCandidates` returns `count:0`: no stale line, no ride-along, question counts unchanged. No regression.
 
+## Required downstream changes (SP3)
+
+SP2 deliberately leaves two items for SP3 to fix WHEN SP3 IS PLANNED (they are SP3's scope, not SP2's — flagged here only as a breadcrumb so they are not lost). The adversarial Gate-2 review raised them as F2/F3 against SP3:
+
+- **SP3 must add `src/lib/menu-screens.js` to its own `files:`** to wire the drill-in "Verify" action onto SP2's `inboxStalePlansDrillIn()` screen. SP2 ships "Verify with SP3 verification" as affordance TEXT only; SP3 turns it into a wired action and therefore must hold write access to `menu-screens.js`.
+- **SP3 must purge `marker-in-source-stage`** — that signal does not exist in the cheap pass (SP1 emits only `missing-files` | `advisory:age`); SP3 still references the dead `marker-in-source-stage` and must drop every reference to it.
+
+SP2 does NOT touch either item here — it edits only the four files in its own `files:`.
+
 ## Decisions Taken Under Ambiguity
 
 - **Stream key name:** `staleCandidates` (count key) / "possibly-stale plans" (UI label). "Possibly" communicates that cheap detection is unverified, setting correct expectations before SP3 verification runs.
 
-- **Empty-state hiding:** when count is 0 the stream line is omitted from `buildDashboardTable` INBOX block and no ride-along stale question is attached to `dashboardPipeline`, consistent with how zero-count streams already behave (`questions` and `decisions` lines are omitted when zero in `src/areas/inbox.js`).
+- **Empty-state hiding (intentional, line-specific — NOT sibling-consistency):** when count is 0 the possibly-stale line is omitted from the `buildDashboardTable` INBOX block and no ride-along stale question is attached to `dashboardPipeline`. This hiding is an INTENTIONAL design choice SPECIFIC to the possibly-stale line, NOT a mirror of the sibling streams. In `buildDashboardTable` the `questions`/`decisions`/`gatesWaiting` lines all print (including their `0` values) whenever `inboxTotal > 0` — they do NOT hide at zero. The possibly-stale line hides at `0` on purpose: the cheap, unverified stale signal should not occupy a permanent zero-row implying a standing chore before SP3 verification has even run. (The earlier rationale citing `src/areas/inbox.js`'s zero-omission was a different code path and is withdrawn — the relevant surface here is `buildDashboardTable`, where the siblings do not hide.)
 
 - **Option-A rework (human decision, 2026-06-30):** the stale-plans count and drill-in live in the slash-command JSON path (`menu-screens.js`) and NOT in the TTY Enter-key model. The original SP2 design placed the view-mode state machine and key handler in `src/areas/inbox.js` activating on Enter. That design addressed the TTY path (`src/commands/menu.js` → `setupKeyboard` → `src/areas/*`), which is not what the user reaches via `/ctoc:menu`. Under Option A: (1) the count renders in `buildDashboardTable` INBOX block; (2) `dashboardPipeline` conditionally attaches a ride-along second question to `ask.questions` when `staleCandidates > 0`, following the env-prompt precedent (Rule 8); (3) a new `inboxStalePlansDrillIn()` screen in `menu-screens.js` handles the drill-in. `src/areas/inbox.js` is OUT OF SCOPE and is not in `files:`.
 
@@ -552,10 +590,10 @@ All assertions read concrete return values (count integer, exact substrings, exa
 
 - **`inboxTotal` includes `staleCandidates` so "Inbox clear" stays truthful:** `buildDashboardTable` folds `stale` into `inboxTotal`. If the only async signal is stale candidates, the block must NOT print "Inbox clear". The stale line itself remains guarded by `if (stale > 0)` so M3's zero-hiding holds independently of the other three streams.
 
-- **Stale-first navigation precedence is an explicit driver rule (menu.md is OUT OF SCOPE — recommended follow-up):** when the user answers both the Pipeline question and the ride-along Stale question, `'View stale plans'` (→ `inbox stale`) takes precedence over the pipeline-section navigation for that turn; `'Not now'` (→ `''`) falls through to the pipeline answer. This precedence cannot be derived from question order (Pipeline is first and always non-empty), so it is a genuine new driver semantic. The natural home for documenting it is a `menu.md` protocol note (a sibling of Rule 8), but `src/commands/menu.md` is NOT in this plan's `files:`. SP2 therefore does NOT edit it. The SP2 code contract (the `actions` JSON) is complete and correct on its own; a driver already honoring Rule 8 plus this one precedence rule handles it. RECOMMENDATION for Gate 2 / the integrator: either (a) the human expands `files:` to add `src/commands/menu.md` and a one-line Rule, or (b) fold the menu.md note into SP3 (which owns the verify hand-off and will touch this surface anyway). Do not silently edit menu.md outside `files:` — that would trip enforcement and route around scope.
+- **Stale-first navigation precedence is an explicit driver rule — OWNED by SP2 (Option A, human decision 2026-06-30):** when the user answers both the Pipeline question and the ride-along Stale question, `'View stale plans'` (→ `inbox stale`) takes precedence over the pipeline-section navigation for that turn; `'Not now'` (→ `''`) falls through to the pipeline answer. This precedence cannot be derived from question order (Pipeline is first and always non-empty), so it is a genuine new driver semantic — and because the menu has no answer-consuming driver code (the model follows `menu.md`), the only place it can live is `menu.md` itself. The adversarial Gate-2 review found (F1, CRITICAL) that without this rule the count renders but the human can NEVER reach `inboxStalePlansDrillIn` — "green but does nothing the human sees." The human chose Option A: **SP2 owns the fix end-to-end.** `src/commands/menu.md` is therefore IN this plan's `files:`, and SP2 adds the precedence rule as a new numbered driver Rule (Rule 10, sibling to Rule 8 / Rule 9 — exact wording in §6.3). Because the rule is driver prose, not executable code, SP2 also ships a doc-contract test (§6.4) asserting the rule's presence in `menu.md` — the only automated guard against the dead-navigation silently regressing. This SUPERSEDES the previous recommendation to defer the menu.md edit to SP3; the reachability fix is no longer an out-of-scope follow-up but an owned SP2 deliverable.
 
 - **Driver protocol is not unit-tested (correctly):** the driver is the model reading the JSON, not code SP2 ships. Tests assert the JSON contract only — `ask.questions` shape, option labels, `actions` mappings, absence of numeric keys, `wroteCount === 0`. The stale-first precedence is design prose, deliberately outside the unit-test surface.
 
-- **Read-only verification via an `fs.writeFileSync` spy:** Scenario 5 asserts the render path performs no writes by counting `fs.writeFileSync` calls (rewired in `beforeEach`, restored in `afterEach`) and asserting `0` across `buildDashboardTable` + `dashboardPipeline` + the drill-in. This is a behavioral guard against any future regression that introduces a write on the hot/cold render path; `movePlan`/`createQuestion`/`createDecision` all funnel through `fs.writeFileSync`, so the single spy covers them.
+- **Read-only verification via an `fs.writeFileSync` spy (F5 — scoped to the candidate-render path):** Scenario 5 asserts the candidate-render path performs no writes by counting `fs.writeFileSync` calls (rewired in `beforeEach`, restored in `afterEach`). The spy is scoped to the candidate-render functions — `inboxStalePlansDrillIn(root)` and `route(['inbox','stale'], root)` — measured as a `wroteCount` DELTA, rather than asserting `0` across the whole dashboard render. Rationale (F5, adversarial review): `buildDashboardTable()` and `dashboardPipeline()` also call `getPlanCounts()`/`getAgentStatus()`, which can legitimately write during stale-LOCK cleanup (an unrelated subsystem), so a whole-render `0` assertion would be a false guard that could fail for reasons unrelated to SP2. The SP2 contributions inside `buildDashboardTable`/`dashboardPipeline` are read-only by construction (a mocked-count read + string concatenation) and ship no write call. `movePlan`/`createQuestion`/`createDecision` all funnel through `fs.writeFileSync`, so the scoped spy still covers them on the candidate-render path it guards.
 
 - **Memoize busting in tests:** because `getInboxCounts` is memoized (5 s TTL, keyed by root), tests use a UNIQUE `mkdtempSync` root per test AND call `cache.invalidate('getInboxCounts')` in `beforeEach`/`afterEach`. Unique roots make cross-test bleed impossible; `invalidate` is the explicit belt-and-suspenders. Node's per-file process isolation (`node --test tests/*.test.js`) prevents the `scanCheapCandidates` rewire from leaking to other test files; the `afterEach` restore prevents leaks within this file.
