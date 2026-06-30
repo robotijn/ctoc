@@ -256,6 +256,310 @@ function hasMissingFiles(root, declared) {
 }
 
 /**
+ * @typedef {Object} StaleEvidence
+ * @property {boolean}  gitAvailable          false ⇒ git binary missing / not a repo / probe failed ⇒ classifier ⇒ inconclusive.
+ * @property {?string}  error                 execFile error message when gitAvailable is false, else null.
+ * @property {?string}  approvedBy            value of approved_by re-read from frontmatter (e.g. 'human'), else null.
+ * @property {string[]} declaredFiles         files: parsed from the plan (POSIX-authored).
+ * @property {boolean}  allFilesExist         every declared file exists under root (verify-confirmed; [] ⇒ true).
+ * @property {boolean}  anyFileMissing        at least one declared file is absent under root.
+ * @property {?number}  stageEntryEpoch       %ct of the OLDEST commit touching plans/<stage>/<slug>.md (current path), else null.
+ * @property {?number}  filesLastModifiedEpoch MAX %ct across declared files' last-modifying commits, else null.
+ * @property {boolean}  filesModifiedAfterEntry  filesLastModifiedEpoch > stageEntryEpoch (false if either null).
+ * @property {Array<{shortHash:string, dateISO:string, subject:string}>} slugMatchCommits  commits whose message matches \bslug\b.
+ * @property {boolean}  slugMatchAfterEntry   ≥1 slugMatch commit with %ct > stageEntryEpoch.
+ * @property {boolean}  explicitlyRejected    positive death evidence; SP3 default false.
+ *
+ * @typedef {Object} StaleProposal
+ * @property {string}  plan  candidate.plan (slug).
+ * @property {('shipped-but-early'|'approved-but-stranded'|'dead-on-arrival'|'inconclusive')} category
+ * @property {('archive-to-done'|'advance-via-reconciliation'|'revert'|'delete'|null)} proposedAction
+ * @property {string[]} evidence  human-readable evidence lines derived from StaleEvidence.
+ */
+
+/**
+ * Explicit-trigger git verification of a single cheap candidate. The ONLY
+ * function in this module that may invoke a subprocess — and it is invoked ONLY
+ * from the cold-path menu screen `inboxVerifyProposals`, never on the hot path.
+ *
+ * Degrades, never throws, on data faults: an unreadable plan ⇒ empty content;
+ * git binary missing / not-a-repo / timeout ⇒ `gitAvailable:false`; a per-path
+ * query failure ⇒ that datum is null. Only argument MISUSE throws (TypeError),
+ * consistent with `scanCheapCandidates`.
+ *
+ * Subprocess is spawned via `execFileSync('git', [argv])` — NEVER a shell string;
+ * no slug/path/message is interpolated into a command, so shell metacharacters
+ * cannot inject. The `\bslug\b` (case-insensitive) match is applied in JS to git
+ * stdout. Date comparisons use `%ct` (UNIX epoch integer).
+ *
+ * @param {{plan: string, stage: string, signals?: string[], actionable?: boolean}} candidate
+ *        one item from scanCheapCandidates().candidates (StaleCandidate; typed
+ *        structurally so the cheap-scan return widening stays assignable).
+ * @param {string} root project root (directory containing plans/).
+ * @param {{ slugHistoryCache?: {records?: Array<{ct:number, shortHash:string, message:string}>} }} [opts]
+ *        when supplied, the full-history slug scan (`git log -n 2000`) is run at
+ *        most once and shared across candidates via this cache object.
+ * @returns {StaleEvidence}
+ * @throws {TypeError} on misuse only.
+ */
+function verifyStaleCandidate(candidate, root, opts = {}) {
+  if (
+    !candidate ||
+    typeof candidate !== 'object' ||
+    typeof candidate.plan !== 'string' ||
+    candidate.plan.length === 0 ||
+    typeof candidate.stage !== 'string' ||
+    candidate.stage.length === 0
+  ) {
+    throw new TypeError('verifyStaleCandidate: candidate must have non-empty string plan and stage');
+  }
+  if (typeof root !== 'string' || root.length === 0) {
+    throw new TypeError('verifyStaleCandidate: root must be a non-empty string');
+  }
+
+  // Lazy require co-located with the sole subprocess user. Module load stays
+  // side-effect-free and subprocess-free.
+  const cp = require('child_process');
+  const runGit = (args) =>
+    cp
+      .execFileSync('git', args, {
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 5000,
+        maxBuffer: 16 * 1024 * 1024,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'], // ignore git stderr
+      })
+      .trim();
+
+  // 2. Re-read the plan file (verify-only; the cheap scan does NOT read approved_by).
+  const planFsPath = path.join(root, 'plans', candidate.stage, candidate.plan + '.md');
+  let content = '';
+  try {
+    content = fs.readFileSync(planFsPath, 'utf8');
+  } catch {
+    content = ''; // degrade; do not throw
+  }
+  const region = extractFrontmatterRegion(content);
+  const declaredFiles = parseFilesField(region);
+  const approvedMatch = region.match(/^approved_by:[ \t]*(.+?)[ \t]*$/m);
+  const approvedBy = approvedMatch ? stripQuotes(approvedMatch[1].trim()) || null : null;
+
+  // 3. File-tree truth (reuse the internal existence check).
+  const allFilesExist = declaredFiles.every((f) => declaredFileExists(root, f));
+  const anyFileMissing = declaredFiles.some((f) => !declaredFileExists(root, f));
+
+  const degraded = (error) => ({
+    gitAvailable: false,
+    error,
+    approvedBy,
+    declaredFiles,
+    allFilesExist,
+    anyFileMissing,
+    stageEntryEpoch: null,
+    filesLastModifiedEpoch: null,
+    filesModifiedAfterEntry: false,
+    slugMatchCommits: [],
+    slugMatchAfterEntry: false,
+    explicitlyRejected: false,
+  });
+
+  // 4. Git availability probe (Risk R2). Any throw ⇒ degraded evidence, never rethrow.
+  try {
+    runGit(['rev-parse', '--is-inside-work-tree']);
+  } catch (e) {
+    return degraded(e && e.message ? e.message : String(e));
+  }
+
+  // 5. Stage-entry epoch = OLDEST (last) commit TOUCHING the plan at its current
+  // path (no --follow). POSIX forward slashes for the git pathspec.
+  let stageEntryEpoch = null;
+  try {
+    const planPosix = ['plans', candidate.stage, candidate.plan + '.md'].join('/');
+    const out = runGit(['log', '--format=%ct', '--', planPosix]);
+    const lines = out.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length > 0) {
+      const n = Number(lines[lines.length - 1].trim());
+      stageEntryEpoch = Number.isFinite(n) ? n : null;
+    }
+  } catch {
+    stageEntryEpoch = null;
+  }
+
+  // 6. Files last-modified epoch = MAX %ct across declared files' last commits.
+  let filesLastModifiedEpoch = null;
+  for (const f of declaredFiles) {
+    const decl = f.replace(/\\/g, '/');
+    try {
+      const out = runGit(['log', '-1', '--format=%ct', '--', decl]);
+      const trimmed = out.trim();
+      const n = Number(trimmed);
+      if (trimmed.length > 0 && Number.isFinite(n)) {
+        if (filesLastModifiedEpoch === null || n > filesLastModifiedEpoch) filesLastModifiedEpoch = n;
+      }
+    } catch {
+      // per-path failure ⇒ skip this datum
+    }
+  }
+  const filesModifiedAfterEntry =
+    filesLastModifiedEpoch != null && stageEntryEpoch != null && filesLastModifiedEpoch > stageEntryEpoch;
+
+  // 7. Slug-match commits. The full-history read is hoisted to ONE shared scan
+  // across all candidates via opts.slugHistoryCache (cleanup #4): the git call
+  // still lives ONLY inside this function (sole git site), but the cache
+  // short-circuits repeated reads within one inboxVerifyProposals pass.
+  let records;
+  const cache = opts && opts.slugHistoryCache;
+  if (cache && Array.isArray(cache.records)) {
+    records = cache.records;
+  } else {
+    records = [];
+    try {
+      // \x1f unit-separator between fields, \x1e record-terminator; capped at -n 2000.
+      const raw = runGit(['log', '--format=%ct%x1f%h%x1f%B%x1e', '-n', '2000']);
+      for (const rec of raw.split('\x1e')) {
+        if (!rec.trim()) continue;
+        const i1 = rec.indexOf('\x1f');
+        const i2 = rec.indexOf('\x1f', i1 + 1);
+        if (i1 === -1 || i2 === -1) continue;
+        const ct = Number(rec.slice(0, i1).trim());
+        const shortHash = rec.slice(i1 + 1, i2).trim();
+        const message = rec.slice(i2 + 1);
+        records.push({ ct, shortHash, message });
+      }
+    } catch {
+      records = [];
+    }
+    if (cache) cache.records = records;
+  }
+
+  const re = new RegExp('\\b' + candidate.plan.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+  const slugMatchCommits = [];
+  let slugMatchAfterEntry = false;
+  for (const r of records) {
+    if (!Number.isFinite(r.ct)) continue;
+    if (re.test(r.message)) {
+      slugMatchCommits.push({
+        shortHash: r.shortHash,
+        dateISO: new Date(r.ct * 1000).toISOString().slice(0, 10),
+        subject: (r.message.split(/\r?\n/)[0] || '').trim(),
+      });
+      if (stageEntryEpoch != null && r.ct > stageEntryEpoch) slugMatchAfterEntry = true;
+    }
+  }
+
+  return {
+    gitAvailable: true,
+    error: null,
+    approvedBy,
+    declaredFiles,
+    allFilesExist,
+    anyFileMissing,
+    stageEntryEpoch,
+    filesLastModifiedEpoch,
+    filesModifiedAfterEntry,
+    slugMatchCommits,
+    slugMatchAfterEntry,
+    explicitlyRejected: false,
+  };
+}
+
+/**
+ * Build human-readable evidence lines from a StaleEvidence object. Pure string
+ * formatting — no I/O, no mutation.
+ * @param {StaleEvidence} evidence
+ * @returns {string[]}
+ */
+function buildEvidenceLines(evidence) {
+  const lines = [];
+  if (evidence.approvedBy) lines.push('approved_by: ' + evidence.approvedBy);
+  if (evidence.slugMatchCommits && evidence.slugMatchCommits.length > 0) {
+    const c = evidence.slugMatchCommits[0];
+    lines.push(
+      'slug matched in ' +
+        c.shortHash +
+        ' (' +
+        c.dateISO +
+        ')' +
+        (evidence.slugMatchAfterEntry ? ', after stage entry' : '')
+    );
+  }
+  const n = evidence.declaredFiles ? evidence.declaredFiles.length : 0;
+  if (n > 0) {
+    if (evidence.anyFileMissing) {
+      lines.push('at least one of ' + n + ' declared file(s) missing');
+    } else if (evidence.allFilesExist) {
+      lines.push(
+        'all ' + n + ' declared files present' +
+          (evidence.filesModifiedAfterEntry ? '; last change after stage entry' : '')
+      );
+    }
+  }
+  if (lines.length === 0) lines.push('age-only signal; no shipping evidence');
+  return lines;
+}
+
+/**
+ * Pure, deterministic classifier mapping verified evidence to a category and a
+ * proposed action. No git, no fs, no I/O, no mutation of inputs. First match wins.
+ *
+ * @param {{plan: string, stage?: string, signals?: string[], actionable?: boolean}} candidate
+ * @param {StaleEvidence} evidence
+ * @returns {StaleProposal} exactly { plan, category, proposedAction, evidence }.
+ */
+function classifyStaleCandidate(candidate, evidence) {
+  const plan = candidate.plan;
+
+  // 0. Git unavailable ⇒ inconclusive (degraded signal).
+  if (!evidence.gitAvailable) {
+    return {
+      plan,
+      category: 'inconclusive',
+      proposedAction: null,
+      evidence: ['git unavailable — cannot verify (' + (evidence.error || '') + ')'],
+    };
+  }
+
+  // 1. DEAD-ON-ARRIVAL — files gone, nothing shipped, never approved.
+  if (evidence.anyFileMissing && evidence.slugMatchCommits.length === 0 && !evidence.approvedBy) {
+    return {
+      plan,
+      category: 'dead-on-arrival',
+      proposedAction: evidence.explicitlyRejected === true ? 'delete' : 'revert',
+      evidence: buildEvidenceLines(evidence),
+    };
+  }
+
+  // 2. APPROVED-BUT-STRANDED — carries approval AND work continued after entry.
+  if (evidence.approvedBy && evidence.filesModifiedAfterEntry) {
+    return {
+      plan,
+      category: 'approved-but-stranded',
+      proposedAction: 'advance-via-reconciliation',
+      evidence: buildEvidenceLines(evidence),
+    };
+  }
+
+  // 3. SHIPPED-BUT-EARLY — slug-match AND files modified after entry, all present.
+  if (evidence.slugMatchAfterEntry && evidence.filesModifiedAfterEntry && evidence.allFilesExist) {
+    return {
+      plan,
+      category: 'shipped-but-early',
+      proposedAction: 'archive-to-done',
+      evidence: buildEvidenceLines(evidence),
+    };
+  }
+
+  // 4. INCONCLUSIVE — everything else (incl. age-only, thin/partial evidence).
+  return {
+    plan,
+    category: 'inconclusive',
+    proposedAction: null,
+    evidence: buildEvidenceLines(evidence),
+  };
+}
+
+/**
  * Cheap, filesystem-only scan of plans/functional, plans/implementation,
  * plans/review for stale-plan candidates. NEVER invokes git or any subprocess.
  *
@@ -354,6 +658,8 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
 
 module.exports = {
   scanCheapCandidates,
+  verifyStaleCandidate,
+  classifyStaleCandidate,
   extractFrontmatterRegion,
   parseFilesField,
   GATE_SOURCE_STAGES,

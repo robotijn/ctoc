@@ -25,6 +25,7 @@ files:
   - src/lib/menu-screens.js
   - tests/stale-classifier.test.js
   - tests/stale-detector-cheap.test.js
+  - tests/inbox-stale-stream.test.js
 status: refined
 acceptance_criteria_count: 8
 risk_level: MEDIUM
@@ -65,7 +66,7 @@ Without verification, any cleanup proposal is untrustworthy. Users need evidence
 - **M3:** `approved-but-stranded` maps to `proposedAction: 'advance-via-reconciliation'` — uses the dedicated reconciliation path in SP4's `stale-cleanup.js`, NOT `approvePlan()` (which would re-fire the deployment pipeline and pollute the Gate-3 audit trail).
 - **M4:** `dead-on-arrival` default proposed action is `'revert'` (reversible) unless the caller supplies explicit positive death evidence (an `explicitlyRejected` flag in the evidence object). `'delete'` is only proposed when that flag is true. Never auto-execute either.
 - **M5:** A candidate with age signal only and no git/file evidence is classified `inconclusive` with `proposedAction: null` and is NOT proposed for any action.
-- **M6:** `verifyStaleCandidate(candidate, root)` invokes git via `child_process.execSync` and is isolated to `stale-detector.js`. It returns the evidence object consumed by `classifyStaleCandidate`. It is never called from the menu hot-path.
+- **M6:** `verifyStaleCandidate(candidate, root)` invokes git via `child_process.execFileSync` and is isolated to `stale-detector.js`. It returns the evidence object consumed by `classifyStaleCandidate`. It is never called from the menu hot-path.
 - **M7:** The verifier and classifier produce a structured proposals array (`Array<{plan, category, proposedAction, evidence}>`); neither function performs any file write, plan move, or gate crossing.
 - **M8:** Selecting `'Verify'` in `inboxStalePlansDrillIn` routes to `inbox verify`, which calls `inboxVerifyProposals(projectPath)`. That screen calls `verifyStaleCandidate` and `classifyStaleCandidate` per candidate and renders proposals grouped by category in a read-only screen with `'◀ Back'` as the only selectable option (routes to `inbox stale`). No digit in `actions` maps to the `inbox verify` route (menu discipline Rule 1).
 
@@ -78,8 +79,8 @@ Without verification, any cleanup proposal is untrustworthy. Users need evidence
 ### Constraints
 
 - `classifyStaleCandidate(candidate, evidence)` is a pure function — no side effects, no git calls, no filesystem access. All evidence is passed in by the caller.
-- `verifyStaleCandidate(candidate, root)` may call git via `child_process.execSync` — this is the ONLY function in `stale-detector.js` that may invoke a subprocess, and it is only called when the user explicitly selects `'Verify'` in the drill-in, routing through `inboxVerifyProposals`.
-- `scanCheapCandidates` must remain subprocess-free even though `stale-detector.js` now contains `verifyStaleCandidate` which uses `child_process.execSync`. SP1's shipped behavioral spy (no subprocess DURING `scanCheapCandidates`) is the primary behavioral guard and is unchanged. The FILE-LEVEL static assertion in `tests/stale-detector-cheap.test.js` (Scenario 5) is NARROWED to scope the subprocess-free guarantee to the `scanCheapCandidates` function body only — see Decision C and Risk R3.
+- `verifyStaleCandidate(candidate, root)` may call git via `child_process.execFileSync` — this is the ONLY function in `stale-detector.js` that may invoke a subprocess, and it is only called when the user explicitly selects `'Verify'` in the drill-in, routing through `inboxVerifyProposals`.
+- `scanCheapCandidates` must remain subprocess-free even though `stale-detector.js` now contains `verifyStaleCandidate` which uses `child_process.execFileSync`. SP1's shipped behavioral spy (no subprocess DURING `scanCheapCandidates`) is the primary behavioral guard and is unchanged. The FILE-LEVEL static assertion in `tests/stale-detector-cheap.test.js` (Scenario 5) is NARROWED to scope the subprocess-free guarantee to the `scanCheapCandidates` function body only — see Decision C and Risk R3.
 - No agent file, no operations-registry entry, no scout registration. SP3's `stale-detector.js` additions are entirely in-process.
 - Verification output is proposals only — no execution of any kind. Gate hooks must not be modified.
 - `dead-on-arrival` default is `'revert'` (reversible-first). `'delete'` requires `evidence.explicitlyRejected === true`.
@@ -151,7 +152,7 @@ Without verification, any cleanup proposal is untrustworthy. Users need evidence
 - [ ] **Scenario: verifyStaleCandidate is never called on menu hot-path**
   Given the menu is opened and `scanCheapCandidates` runs
   When the Inbox renders the stale count
-  Then `verifyStaleCandidate` is NOT called (asserted by spy on `child_process.execSync`)
+  Then `verifyStaleCandidate` is NOT called (asserted by spy on `child_process.execFileSync`)
   And `verifyStaleCandidate` is ONLY called when the user explicitly selects `'Verify'` in the drill-in, which routes `['inbox', 'verify']` through `route()` to `inboxVerifyProposals(projectPath)`
 
 - [ ] **Scenario: Selecting 'Verify' in drill-in routes to `inbox verify` and renders proposals**
@@ -165,7 +166,7 @@ Without verification, any cleanup proposal is untrustworthy. Users need evidence
 
 ### In Scope
 
-- `verifyStaleCandidate(candidate, root)` added to `src/lib/stale-detector.js` — shells to git via `child_process.execSync`; re-reads the plan file to detect `approved_by` frontmatter; returns an evidence object with git findings, file-tree results, and any `approved_by` value found
+- `verifyStaleCandidate(candidate, root)` added to `src/lib/stale-detector.js` — shells to git via `child_process.execFileSync`; re-reads the plan file to detect `approved_by` frontmatter; returns an evidence object with git findings, file-tree results, and any `approved_by` value found
 - `classifyStaleCandidate(candidate, evidence)` added to `src/lib/stale-detector.js` — pure function, no git calls, no fs access
 - Four categories: `shipped-but-early`, `approved-but-stranded`, `dead-on-arrival`, `inconclusive`
 - `approved-but-stranded` proposed action: `'advance-via-reconciliation'` (not `approvePlan()`)
@@ -194,10 +195,10 @@ Without verification, any cleanup proposal is untrustworthy. Users need evidence
   - Impact: MEDIUM (false positives cause the verifier to classify a plan as shipped when it is not, leading to incorrect archive proposals)
   - Mitigation: Require the slug to appear as a word-bounded token in the commit message (regex `\bslug\b`, case-insensitive) and also require the plan's stage-entry date to predate the matching commit — both conditions must be true for `shipped-but-early`.
 
-- **Risk:** `child_process.execSync` in `verifyStaleCandidate` throws if the git binary is not on PATH, producing an unhandled exception that crashes the menu process.
+- **Risk:** `child_process.execFileSync` in `verifyStaleCandidate` throws if the git binary is not on PATH, producing an unhandled exception that crashes the menu process.
   - Likelihood: LOW (git is present in all CTOC development environments)
   - Impact: HIGH (crash in the menu process is the worst user experience)
-  - Mitigation: Wrap every `execSync` call in a try/catch; on failure return `{ gitAvailable: false, error: e.message }`. The classifier treats `gitAvailable: false` as `inconclusive` — degraded signal, no crash.
+  - Mitigation: Wrap every `execFileSync` call in a try/catch; on failure return `{ gitAvailable: false, error: e.message }`. The classifier treats `gitAvailable: false` as `inconclusive` — degraded signal, no crash.
 
 ### Business Risks
 
@@ -213,8 +214,8 @@ Without verification, any cleanup proposal is untrustworthy. Users need evidence
   - Impact: MEDIUM (SP4 tests would fail at integration time)
   - Mitigation: Export a JSDoc typedef for `StaleProposal` from `stale-detector.js` and reference it in `stale-cleanup.js` (SP4) via `@param {import('./stale-detector').StaleProposal[]}`.
 
-- **Risk R3:** SP3 adds `require('child_process')` and `execSync` to `stale-detector.js`. SP1's FILE-LEVEL static test in `tests/stale-detector-cheap.test.js` (Scenario 5) currently asserts the WHOLE source has no such tokens — it WILL fail when SP3 lands unless the assertion is narrowed in the same commit.
-  - Likelihood: HIGH (the assertion is exact string-match on the full source; any `execSync` in the file triggers it)
+- **Risk R3:** SP3 adds `require('child_process')` and `execFileSync` to `stale-detector.js`. SP1's FILE-LEVEL static test in `tests/stale-detector-cheap.test.js` (Scenario 5) currently asserts the WHOLE source has no such tokens — it WILL fail when SP3 lands unless the assertion is narrowed in the same commit.
+  - Likelihood: HIGH (the assertion is exact string-match on the full source; any `execFileSync` in the file triggers it)
   - Impact: HIGH (CI breaks on every post-SP3 test run until fixed)
   - Mitigation: Narrow the static assertion atomically with the `stale-detector.js` source change (see Decision C); ship both files in one commit; verify locally with `node --test tests/stale-detector-cheap.test.js` before committing.
 
@@ -223,19 +224,19 @@ Without verification, any cleanup proposal is untrustworthy. Users need evidence
 **Priority: MEDIUM** (Score: 6/9)
 - Dependency: MEDIUM (2) — depends on SP2; SP4 depends on this; serial chain
 - Business Impact: MEDIUM (2) — produces the evidence-backed proposals that make cleanup trustworthy
-- Technical Risk: MEDIUM (2) — git-match heuristic has fragility risks; `execSync` error handling is a real edge case
+- Technical Risk: MEDIUM (2) — git-match heuristic has fragility risks; `execFileSync` error handling is a real edge case
 
 ## Decisions Taken Under Ambiguity
 
-- **No subagent scout:** The menu is a plain Node.js process with no subagent dispatch capability. The previous design assumed a Tier-3 Haiku scout; that assumption was wrong. Verification runs in-process via `child_process.execSync` in `verifyStaleCandidate`. No agent file, no operations-registry entry.
+- **No subagent scout:** The menu is a plain Node.js process with no subagent dispatch capability. The previous design assumed a Tier-3 Haiku scout; that assumption was wrong. Verification runs in-process via `child_process.execFileSync` in `verifyStaleCandidate`. No agent file, no operations-registry entry.
 - **`approved-but-stranded` proposed action:** `'advance-via-reconciliation'` (not `'advance-via-approvePlan'`). Using `approvePlan()` re-fires the deployment pipeline and logs a fresh live Gate-3 crossing, polluting the audit trail for months-old work. SP4's dedicated reconciliation path handles this correctly.
 - **`dead-on-arrival` default:** `'revert'` (reversible-first). `'delete'` is only proposed when `evidence.explicitlyRejected === true`. Reversible-first principle: never auto-propose irreversible destruction without positive death evidence.
 - **Git-match heuristic:** commit message references plan slug as a word-bounded token AND plan's declared `files:` exist and were last modified by a commit dated after the plan's stage-entry date. Both conditions together are required for `shipped-but-early`; either alone is insufficient.
-- **`execSync` error handling:** try/catch wrapper around every git shell call; on failure return `{ gitAvailable: false, error: e.message }`. Classifier treats `gitAvailable: false` as `inconclusive` — degraded signal, no crash.
+- **`execFileSync` error handling:** try/catch wrapper around every git call; on failure return `{ gitAvailable: false, error: e.message }`. Classifier treats `gitAvailable: false` as `inconclusive` — degraded signal, no crash.
 - **`inconclusive` is a valid output category, not an error:** a candidate that cannot be proven stale through evidence is left alone and not proposed for action.
 - **Files list:** Removed `agents/scouts/stale-plan-scout.md` and `.ctoc/operations-registry.yaml` from prior design (scout design superseded). SP3 touches `src/lib/stale-detector.js`, `src/lib/menu-screens.js`, `tests/stale-classifier.test.js`, and `tests/stale-detector-cheap.test.js`.
 - **Decision F2 — SP3 owns verify wiring end-to-end (Option A chosen):** SP3 promotes `'Verify'` from a text-only affordance in `inboxStalePlansDrillIn` to a real selectable label mapped to `'inbox verify'` in `actions`. `route()` handles `args = ['inbox', 'verify']` by calling new `inboxVerifyProposals(projectPath)`. That screen: calls `listStaleCandidates(root)`, runs `verifyStaleCandidate` + `classifyStaleCandidate` per candidate, renders proposals grouped by category header (read-only, max 20 rows matching the S4 convention already used by `inboxStalePlansDrillIn`), `'◀ Back'` is the only option and routes to `'inbox stale'`. `inboxVerifyProposals` is the ONLY call site for `verifyStaleCandidate` in the codebase — it is never called from the hot-path (satisfies M6). No digit maps to `inbox verify` (menu discipline Rule 1). AskUserQuestion cap satisfied: `inboxStalePlansDrillIn` has exactly 2 options (`'Verify'` + `'◀ Back'`); `inboxVerifyProposals` has 1 option (`'◀ Back'`).
-- **Decision C — narrowing the SP1 static assertion:** SP3 adds `require('child_process')` and `execSync` to `stale-detector.js` (inside `verifyStaleCandidate`). SP1's Scenario 5 static test in `tests/stale-detector-cheap.test.js` (lines ~280-289) currently asserts the WHOLE module source contains no subprocess tokens — it will fail once SP3 lands. The fix: rewrite that static `it(...)` to (a) locate the `scanCheapCandidates` function via `src.indexOf('function scanCheapCandidates(')`, (b) locate the exports boundary via `src.indexOf('\nmodule.exports')`, (c) extract `fnBody = src.slice(fnStart, exportsStart)`, (d) assert all subprocess-free tokens against `fnBody` only. If either marker is absent (renamed function, etc.), `fnBody` falls back to the full source so any regression still fails loudly. Since `verifyStaleCandidate` is defined above `scanCheapCandidates` in the file, it falls outside the extracted slice and its `execSync` does not trigger the narrowed assertions. The `it` description changes from `'static: source imports no child_process and uses no subprocess token'` to `'static: scanCheapCandidates function body is subprocess-free'`. The behavioral spy (no subprocess DURING `scanCheapCandidates` — lines ~251-278) is unchanged and remains the primary behavioral guard. Ship this test change atomically with the `stale-detector.js` source change (Risk R3).
+- **Decision C — narrowing the SP1 static assertion:** SP3 adds `require('child_process')` and `execFileSync` to `stale-detector.js` (inside `verifyStaleCandidate`). SP1's Scenario 5 static test in `tests/stale-detector-cheap.test.js` (lines ~280-289) currently asserts the WHOLE module source contains no subprocess tokens — it will fail once SP3 lands. The fix: rewrite that static `it(...)` to (a) locate the `scanCheapCandidates` function via `src.indexOf('function scanCheapCandidates(')`, (b) locate the exports boundary via `src.indexOf('\nmodule.exports')`, (c) extract `fnBody = src.slice(fnStart, exportsStart)`, (d) assert all subprocess-free tokens against `fnBody` only. If either marker is absent (renamed function, etc.), `fnBody` falls back to the full source so any regression still fails loudly. Since `verifyStaleCandidate` is defined above `scanCheapCandidates` in the file, it falls outside the extracted slice and its `execFileSync` does not trigger the narrowed assertions. The `it` description changes from `'static: source imports no child_process and uses no subprocess token'` to `'static: scanCheapCandidates function body is subprocess-free'`. The behavioral spy (no subprocess DURING `scanCheapCandidates` — lines ~251-278) is unchanged and remains the primary behavioral guard. Ship this test change atomically with the `stale-detector.js` source change (Risk R3).
 
 ## 5. PLAN — Implementation Context (Iron Loop Step 5)
 
@@ -567,7 +568,7 @@ case 'inbox':
 `require('../src/lib/stale-detector.js')` and `require('../src/lib/menu-screens.js')`.
 Covers ALL SP3 behaviour except the narrowed cheap-scan static guard (§6.4).
 Uses a sandbox helper (mirror `stale-detector-cheap.test.js`’s `makeSandbox` +
-`afterEach` cleanup) and an `execFileSync`/`execSync` spy on the `child_process`
+`afterEach` cleanup) and an `execFileSync`/`execFileSync` spy on the `child_process`
 singleton (replace + restore in try/finally).
 
 | # | `describe` / `it` | Asserts |
@@ -582,7 +583,7 @@ singleton (replace + restore in try/finally).
 | 8 | classifier — purity / no side effects | spy fs.writeFileSync + all `cp` methods; run classify ⇒ none fired; input objects unmutated (M7) |
 | 9 | verify — git IS invoked on verify | spy `cp.execFileSync` returns canned stdout; `verifyStaleCandidate(cand, sandbox)` ⇒ execFileSync called ≥1; returns object with `gitAvailable:true` and the documented keys (M6) |
 | 10 | verify — gitAvailable:false on missing git | spy `cp.execFileSync` throws `Object.assign(new Error('ENOENT'),{code:'ENOENT'})` ⇒ evidence.gitAvailable === false, no throw (Risk R2) |
-| 11 | verify — NOT called during scan; ONLY via menu | spy `cp.execFileSync`/`execSync`; call `listStaleCandidates`/`scanCheapCandidates` ⇒ 0 git calls; then `route(['inbox','verify'], sandbox)` ⇒ ≥1 git call (M6, M8) |
+| 11 | verify — NOT called during scan; ONLY via menu | spy `cp.execFileSync`/`execFileSync`; call `listStaleCandidates`/`scanCheapCandidates` ⇒ 0 git calls; then `route(['inbox','verify'], sandbox)` ⇒ ≥1 git call (M6, M8) |
 | 12 | menu — 'Verify' routes to `inbox verify` | `inboxStalePlansDrillIn(sandbox)` with ≥1 candidate ⇒ `actions['Verify'] === 'inbox verify'`; NO key in `actions` is a digit (`/^\d/` test) (M8) |
 | 13 | menu — inboxVerifyProposals renders grouped, Back→inbox stale | spy execFileSync (canned) ; `route(['inbox','verify'], sandbox)` ⇒ `{text,ask,actions}`; `actions['◀ Back'] === 'inbox stale'`; only 1 option; no digit key; text non-empty (M8) |
 | 14 | no-side-effects across verify+classify+render | spy fs.writeFileSync/renameSync/rmSync (assert NOT called) while allowing read-only `cp.execFileSync`; run `route(['inbox','verify'], sandbox)` ⇒ no write/move/delete; no gate file touched (M7) |
@@ -682,6 +683,38 @@ commit as the `stale-detector.js` source change (Risk R3); verify locally with
   list offers only `◀ Back` (verifying nothing is pointless); a non-empty list
   offers `Verify` + `◀ Back` (2 options, within the AskUserQuestion 4-cap).
 
+- **Residual risk — `dead-on-arrival` can mis-catch a renamed-but-shipped plan.**
+  A plan that DID ship but whose declared `files:` were later renamed (so the
+  declared paths no longer exist), with no plan-slug mention in any commit message
+  and no `approved_by` marker, satisfies the `dead-on-arrival` predicate
+  (`anyFileMissing && slugMatchCommits.length === 0 && !approvedBy`) and would be
+  proposed for cleanup. ACCEPTED mitigation: the proposed action defaults to
+  `revert` (fully reversible — no irreversible `delete` without
+  `explicitlyRejected === true`, which nothing emits today), AND the SP4 human
+  gate is the final arbiter — no proposal is ever auto-executed. A wrong
+  `dead-on-arrival` proposal therefore costs at most one human skip, never data
+  loss. This is the deliberate reversible-first posture, not a defect.
+
+- **Two SP1/SP2 test reconciliations forced atomically by the SP3 surface change
+  (Decisions Taken Under Ambiguity, implementer at Step 10):** the plan's `files:`
+  list and §6.4 named only the cheap-test static-guard narrowing, but the SP3
+  source changes break two further sibling assertions that lock the *old* surface
+  — exactly the Decision-C class of "prior-subplan test must update when the new
+  subplan lands":
+  1. `tests/stale-detector-cheap.test.js` Scenario 2's `approved_by` static
+     assertion checked the WHOLE module source for the literal `approved_by`.
+     SP3's `verifyStaleCandidate` legitimately re-reads `approved_by:` frontmatter
+     (above the slice), so that assertion is NARROWED to the `scanCheapCandidates`
+     body — preserving the true F1 invariant ("the *cheap pass* reads no marker")
+     while permitting the verifier's read. (§6.4 claimed this guard was "outside
+     the slice"; it was actually full-source — the inconsistency is resolved here.)
+  2. `tests/inbox-stale-stream.test.js` (SP2) had two assertions locking the
+     drill-in `actions` to exactly `{ '◀ Back': '' }`. Decision F2-A promotes
+     `'Verify'` to a real label, so both assertions are updated to
+     `{ Verify: 'inbox verify', '◀ Back': '' }`. This file was NOT in SP3's
+     `files:` declaration; the edit is the minimal two-assertion update required
+     to keep the suite green and is flagged here for morning review.
+
 ### 6.6 Acceptance-Criteria → Implementation → Test Matrix
 
 Every success metric (M1–M8; M8 is the verify-reachability metric) maps to an
@@ -725,50 +758,50 @@ implementation element AND ≥1 test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (tests/stale-classifier.test.js, 16 tests)
+- [x] Test error conditions (gitAvailable:false, ENOENT, misuse TypeErrors)
+- [x] Run tests - expect RED (failing) — confirmed 13 fail / 1 pass before implement
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (Node built-ins fs/path/child_process only)
+- [x] Check prerequisites — SP1/SP2 surface verified present
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (verify+classify above scanCheapCandidates; menu wiring)
+- [x] Add error handling (degrade-never-throw; gitAvailable:false; per-path try/catch)
+- [x] Wire up integration points (route inbox verify; inboxVerifyProposals sole call site; shared slugHistoryCache)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together (route → inboxVerifyProposals → verify → classify)
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single shared git-log read across candidates (cleanup #4)
+- [x] Optimize critical paths — hot path untouched, subprocess-free
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — declaredFileExists pins under root; planPosix from frozen stage + slug
+- [x] Sanitize outputs — stripCtl on every rendered field
+- [x] No secrets in code
+- [x] Safe file operations — execFileSync no-shell, regex-escaped slug, read-only
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — tsc back to baseline 89 (0 new errors in my files); eslint 0 errors
+- [x] Run ALL tests (TDD Green) — full suite 2486 pass / 0 fail
+- [x] Check coverage >= 80% — stale-detector.js 95.06% line / 100% funcs; inboxVerifyProposals fully covered
+- [x] 0 skipped, 0 flaky tests — 0 skipped
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — plan execSync→execFileSync reconciliation + residual-risk note
+- [x] Add JSDoc comments to new functions (StaleEvidence/StaleProposal typedefs + full JSDoc)
+- [x] Update CHANGELOG if needed — n/a
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review (plan remains in todo/ per executor instruction — no gate crossed)

@@ -198,10 +198,22 @@ describe('Scenario 2 / M2 — F1 marker regression guard', () => {
     }
   });
 
-  it('static: source contains no marker token and no approved_by token', () => {
+  it('static: cheap pass reads no marker — no marker token anywhere; no approved_by in scanCheapCandidates body', () => {
+    // The dropped marker signal must NEVER reappear anywhere in the module.
     const src = fs.readFileSync(MODULE_PATH, 'utf8');
     assert.ok(!src.includes('marker-in-source-stage'), 'dropped signal must not reappear');
-    assert.ok(!src.includes('approved_by'), 'cheap pass must read no approved_by marker');
+    // F1: the CHEAP pass reads no approved_by marker. SP3 adds a legitimate
+    // approved_by re-read inside verifyStaleCandidate (ABOVE scanCheapCandidates),
+    // so the "reads no marker" guarantee is scoped to the scanCheapCandidates body
+    // — the same narrowing forced on the subprocess guard (Decision C). Fall back
+    // to full source if either marker is absent so a rename still fails loudly.
+    const fnStart = src.indexOf('function scanCheapCandidates(');
+    const exportsStart = src.indexOf('\nmodule.exports');
+    const fnBody =
+      fnStart !== -1 && exportsStart !== -1 && exportsStart > fnStart
+        ? src.slice(fnStart, exportsStart)
+        : src;
+    assert.ok(!fnBody.includes('approved_by'), 'cheap pass must read no approved_by marker');
   });
 });
 
@@ -277,15 +289,27 @@ describe('Scenario 5 / M1 — no subprocess invoked', () => {
     assert.equal(typeof res.count, 'number');
   });
 
-  it('static: source imports no child_process and uses no subprocess token', () => {
+  it('static: scanCheapCandidates function body is subprocess-free', () => {
+    // SP3 adds verifyStaleCandidate (which uses child_process.execFileSync) to
+    // this module, ABOVE scanCheapCandidates. The subprocess-free guarantee is
+    // therefore scoped to the scanCheapCandidates function body only. If either
+    // marker is absent (function renamed / exports moved), fall back to the FULL
+    // source so any regression still fails LOUDLY rather than silently passing.
     const src = fs.readFileSync(MODULE_PATH, 'utf8');
-    assert.ok(!src.includes("require('child_process')"), 'must not require child_process');
-    assert.ok(!src.includes('require("child_process")'), 'must not require child_process');
-    assert.ok(!src.includes('execSync'), 'no execSync');
-    assert.ok(!src.includes('spawnSync'), 'no spawnSync');
-    assert.ok(!src.includes('execFile'), 'no execFile');
-    assert.ok(!/\bexec\s*\(/.test(src), 'no exec( call');
-    assert.ok(!/\bspawn\s*\(/.test(src), 'no spawn( call');
+    const fnStart = src.indexOf('function scanCheapCandidates(');
+    const exportsStart = src.indexOf('\nmodule.exports');
+    const fnBody =
+      fnStart !== -1 && exportsStart !== -1 && exportsStart > fnStart
+        ? src.slice(fnStart, exportsStart)
+        : src;
+    assert.ok(!fnBody.includes("require('child_process')"), 'scan must not require child_process');
+    assert.ok(!fnBody.includes('require("child_process")'), 'scan must not require child_process');
+    assert.ok(!fnBody.includes('execSync'), 'no execSync in scan body');
+    assert.ok(!fnBody.includes('execFileSync'), 'no execFileSync in scan body');
+    assert.ok(!fnBody.includes('spawnSync'), 'no spawnSync in scan body');
+    assert.ok(!fnBody.includes('execFile'), 'no execFile in scan body');
+    assert.ok(!/\bexec\s*\(/.test(fnBody), 'no exec( call in scan body');
+    assert.ok(!/\bspawn\s*\(/.test(fnBody), 'no spawn( call in scan body');
   });
 });
 

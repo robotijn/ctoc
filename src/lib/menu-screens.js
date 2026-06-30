@@ -19,6 +19,10 @@ const path = require('path');
 const { getPlanCounts, readPlans, getPlansDir, getAgentStatus, getVisionCounts, getVisionStubs } = require('./state');
 const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs } = require('./sections');
 const { getInboxCounts, listStaleCandidates } = require('./inbox');
+// Namespace import (not destructured) preserves the spy seam: a test can rewire
+// staleDetector.verifyStaleCandidate / classifyStaleCandidate at the require
+// boundary. inboxVerifyProposals is the SOLE call site of verifyStaleCandidate.
+const staleDetector = require('./stale-detector');
 const { validateTransition } = require('./plan-validator');
 const { findProjectRoot } = require('./project-root');
 
@@ -381,9 +385,20 @@ function inboxStalePlansDrillIn(projectPath) {
     if (candidates.length > MAX_ROWS) {
       text += `  … and ${candidates.length - MAX_ROWS} more\n`;
     }
-    text += '\n  Verify with SP3 verification (coming soon) before any cleanup.\n';
+    text += '\n  Select "Verify" to run git-backed verification (read-only).\n';
   }
   text += '\n\n\n';
+
+  // 'Verify' is a real selectable LABEL (never a digit — Rule 1), offered only
+  // when there is something to verify. An empty list shows just '◀ Back'.
+  const hasCandidates = candidates.length > 0;
+  const options = hasCandidates
+    ? [
+        { label: 'Verify', description: 'Run git-backed verification (read-only) and view proposals' },
+        { label: '◀ Back', description: 'Return to dashboard' },
+      ]
+    : [{ label: '◀ Back', description: 'Return to dashboard' }];
+  const actions = hasCandidates ? { Verify: 'inbox verify', '◀ Back': '' } : { '◀ Back': '' };
 
   return {
     text,
@@ -391,10 +406,76 @@ function inboxStalePlansDrillIn(projectPath) {
       questions: [{
         question: 'Possibly-stale plans (read-only).',
         header: 'Stale plans',
-        options: [{ label: '◀ Back', description: 'Return to dashboard' }],
+        options,
       }],
     },
-    actions: { '◀ Back': '' },
+    actions,
+  };
+}
+
+/**
+ * Inbox ▸ Verified proposals — cold-path, read-only screen. The SOLE call site of
+ * verifyStaleCandidate (never the hot path). Runs git-backed verification + the
+ * pure classifier per candidate and renders proposals grouped by category. The
+ * full-history slug scan is hoisted to ONE shared read via slugHistoryCache.
+ * No write, no plan move, no gate crossing — proposals are display-only (SP4
+ * executes).
+ * @param {string} projectPath
+ */
+function inboxVerifyProposals(projectPath) {
+  const root = getProjectPath(projectPath);
+  const candidates = listStaleCandidates(root); // cold path; one fresh scan
+  const slugHistoryCache = {}; // shared across all candidates (single git log read)
+  const proposals = candidates.map((cand) => {
+    const evidence = staleDetector.verifyStaleCandidate(cand, root, { slugHistoryCache });
+    return staleDetector.classifyStaleCandidate(cand, evidence);
+  });
+
+  const ORDER = ['shipped-but-early', 'approved-but-stranded', 'dead-on-arrival', 'inconclusive'];
+  const MAX_ROWS = 20; // matches inboxStalePlansDrillIn S4 cap
+
+  let text = `Inbox ▸ Verified proposals (${proposals.length})\n`;
+  text += `${'─'.repeat(40)}\n`;
+  if (proposals.length === 0) {
+    text += '\n  No proposals.\n';
+  } else {
+    let rows = 0;
+    let truncated = 0;
+    for (const cat of ORDER) {
+      const group = proposals.filter((p) => p.category === cat);
+      if (group.length === 0) continue;
+      if (rows < MAX_ROWS) {
+        text += `\n${stripCtl(cat)} (${group.length})\n`;
+      }
+      for (const p of group) {
+        if (rows >= MAX_ROWS) {
+          truncated++;
+          continue;
+        }
+        // Every attacker-influenceable field passes through stripCtl.
+        const plan = stripCtl(p.plan);
+        const action = stripCtl(p.proposedAction || 'none');
+        const ev = (p.evidence || []).map(stripCtl).join('; ');
+        text += `  • ${plan} → ${action}  (${ev})\n`;
+        rows++;
+      }
+    }
+    if (truncated > 0) {
+      text += `  … and ${truncated} more\n`;
+    }
+  }
+  text += '\n\n\n';
+
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: 'Verified proposals (read-only).',
+        header: 'Stale plans',
+        options: [{ label: '◀ Back', description: 'Return to the stale list' }],
+      }],
+    },
+    actions: { '◀ Back': 'inbox stale' },
   };
 }
 
@@ -917,6 +998,7 @@ function route(args, projectPath) {
       return sectionBrowse(args[1], projectPath);
 
     case 'inbox':
+      if (args[1] === 'verify') return inboxVerifyProposals(projectPath);
       if (args[1] === 'stale') return inboxStalePlansDrillIn(projectPath);
       return dashboardPipeline(projectPath); // unknown inbox subcommand → safe default
 
@@ -972,6 +1054,7 @@ module.exports = {
   dashboardCommands,
   sectionBrowse,
   inboxStalePlansDrillIn,
+  inboxVerifyProposals,
   stageBrowse,
   visionStubsBrowse,
   planActions,

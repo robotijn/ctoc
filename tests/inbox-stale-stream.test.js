@@ -177,7 +177,7 @@ describe('SP2 — zero-count hiding (M3 / Scenario 2)', () => {
 });
 
 describe('SP2 — inboxStalePlansDrillIn (M4 / Scenario 4)', () => {
-  it('lists candidates with slug/stage/signals + actionable|advisory label, ◀ Back only, no writes', () => {
+  it('lists candidates with slug/stage/signals + actionable|advisory label, Verify+Back, no writes', () => {
     mockScan({
       candidates: [
         { plan: 'alpha', stage: 'functional', signals: ['missing-files'], actionable: true },
@@ -196,7 +196,10 @@ describe('SP2 — inboxStalePlansDrillIn (M4 / Scenario 4)', () => {
     assert.ok(t.includes('review'));
     assert.ok(t.includes('advisory:age'));
     assert.ok(t.includes('advisory'));
-    assert.deepEqual(screen.actions, { '◀ Back': '' });
+    // SP3 (Decision F2-A) promotes 'Verify' from a text-only "coming soon"
+    // affordance to a real selectable label routing to 'inbox verify' whenever
+    // candidates exist. 'Verify' is a LABEL, never a digit (Rule 1).
+    assert.deepEqual(screen.actions, { Verify: 'inbox verify', '◀ Back': '' });
     assert.equal(wroteCount - before, 0, 'drill-in render must perform no writes');
   });
 
@@ -274,7 +277,8 @@ describe('SP2 — route dispatch (M5)', () => {
     });
     const screen = route(['inbox', 'stale'], root);
     assert.equal(screen.ask.questions[0].header, 'Stale plans');
-    assert.deepEqual(screen.actions, { '◀ Back': '' });
+    // SP3 (Decision F2-A): drill-in with ≥1 candidate now offers Verify + Back.
+    assert.deepEqual(screen.actions, { Verify: 'inbox verify', '◀ Back': '' });
   });
 
   it('route(["inbox","bogus"]) falls back to the dashboard pipeline', () => {
