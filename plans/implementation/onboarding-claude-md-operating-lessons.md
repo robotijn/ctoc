@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-06-30T18:07:12.714Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "Onboarding — Corrected CLAUDE.md + Injected Operating Lessons (init + existing projects)"
 created: "2026-06-28T00:00:00Z"
 type: feature
@@ -8,7 +14,7 @@ parent_vision: "done/local-semantic-plan-index.md"
 program: ctoc-onboarding
 order: 1
 depends_on: []
-acceptance_criteria_count: 11
+acceptance_criteria_count: 12
 risk_level: MEDIUM
 files:
   - ".ctoc/templates/CLAUDE.md.template"
@@ -16,6 +22,7 @@ files:
   - "src/lib/claude-md-lessons.js"
   - "src/lib/init-project.js"
   - "src/hooks/SessionStart.js"
+  - "src/commands/update.js"
   - "tests/claude-md-lessons.test.js"
 ---
 
@@ -47,7 +54,9 @@ they mislead the human and the agent in every downstream project. Separately,
 `init-project.js` writes CLAUDE.md only when absent (confirmed at line ~575), so
 existing projects never receive corrections or new lessons. `SessionStart.js` does
 not currently call any lessons injector — no mechanism exists to propagate lessons
-to already-initialized projects.
+to already-initialized projects. And no on-demand path exists: a developer who
+runs `/ctoc:update` to get the latest CTOC version receives updated plugin code
+but no refreshed local CLAUDE.md managed block.
 
 ---
 
@@ -69,8 +78,8 @@ contradictions between what CLAUDE.md says and what CTOC actually does.
   step labels, gate count, plan directory names, slash commands, and operating
   lessons — without manually editing CLAUDE.md or reading release notes.
 - **Deliverable:** A corrected template, a canonical lessons source, an idempotent
-  injector module (`ensureLessonsBlock`), and wiring of that module into both
-  `initProject()` and `SessionStart.js`.
+  injector module (`ensureLessonsBlock`), and wiring of that module into
+  `initProject()`, `SessionStart.js`, and `src/commands/update.js`.
 
 ---
 
@@ -206,6 +215,23 @@ CLAUDE.md or tracking what changed between CTOC versions.
   the fenced code section)
   And the fenced code block content is preserved byte-for-byte
 
+- [ ] **Scenario: /ctoc:update refreshes the local CLAUDE.md managed block**
+  Given a project directory whose CLAUDE.md has a stale or absent managed
+  lessons block (either no markers at all, or a v0 block, or a v1 block with
+  a content hash that does not match the canonical canonical source)
+  When the `/ctoc:update` code path runs — specifically, the
+  `ensureLessonsBlock` injection added to `src/commands/update.js` is invoked
+  against a temp project directory (the real `update.js` lessons-injection path,
+  not a stub; the version-fetch network calls are stubbed to avoid network I/O
+  in the test)
+  Then the local CLAUDE.md contains exactly one `<!-- CTOC:LESSONS v1 START -->`
+  marker and exactly one `<!-- CTOC:LESSONS v1 END -->` marker
+  And the canonical lesson content appears between those markers
+  And a second invocation of the same injection path leaves the file
+  byte-for-byte unchanged (no-op: current version and content hash already match)
+  And no exception propagates to the caller — a lessons-injection failure is
+  caught and logged to stderr without aborting the update function
+
 ---
 
 ## Non-Functional Requirements
@@ -242,6 +268,19 @@ CLAUDE.md or tracking what changed between CTOC versions.
   write/skip decision so both new and existing projects receive the block).
 - Wire `ensureLessonsBlock` into `SessionStart.js` `main()` (after step 5,
   directory ensure; before step 6, update check), wrapped in try/catch.
+- Wire `ensureLessonsBlock(claudeMdPath, ctocRoot)` into `src/commands/update.js`
+  so running `/ctoc:update` refreshes or injects the managed lessons block in the
+  current project's local CLAUDE.md, in addition to the command's existing
+  version-sync behavior. The injection runs at both terminal points of the
+  `update()` function: (a) immediately before the early-return in the
+  "already up to date" branch, and (b) after step 7 (clean old versions) and
+  before the final success console.log, so the block is refreshed whether or not
+  a version change occurred. `claudeMdPath` is `path.join(process.cwd(), 'CLAUDE.md')`;
+  `ctocRoot` is `path.resolve(__dirname, '..', '..')`. The call is wrapped in
+  try/catch: a lessons-injection failure is caught, logged to stderr, and never
+  aborts the version update. `src/commands/update.md` is NOT modified — it is a
+  pass-through bash invoker with `disable-model-invocation: true`; the injection
+  behavior is fully contained in `update.js`.
 - Add `plans/canvas` to `SessionStart.js`'s `directories` list (currently absent
   from lines 76–90) to match the corrected template's directory listing;
   `initProject()`'s `PLAN_DIRS` constant already includes it and is not changed.
@@ -253,7 +292,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   is NOT restructured to do runtime file I/O (would add latency to every session
   start); the three copies are kept intentionally separate but sync-guarded by a
   test.
-- Test file `tests/claude-md-lessons.test.js` covering all 11 acceptance scenarios.
+- Test file `tests/claude-md-lessons.test.js` covering all 12 acceptance scenarios.
 
 ### Out of Scope
 
@@ -268,6 +307,9 @@ CLAUDE.md or tracking what changed between CTOC versions.
 - `plans/canvas` constant in `initProject()`'s `PLAN_DIRS` — already correct at
   line 126; this plan does not touch it. Only `SessionStart.js`'s separate
   `directories` list is updated (see In Scope).
+- `src/commands/update.md` — already correctly passes through to `update.js` via
+  bash with `disable-model-invocation: true`; no content change required; no
+  `model:` frontmatter to add (guarded by `tests/slash-command-no-model-pin.test.js`).
 
 ---
 
@@ -289,6 +331,7 @@ project convention).
 | `ensure_lessons_cross_platform_atomic` | AC9 | Mock `process.platform='win32'` and `path.sep='\\'`; spy `fs.renameSync`; call `ensureLessonsBlock`; assert all paths use `\\`, renameSync called with `(tempPath, target)`, no child processes spawned |
 | `ensure_lessons_idempotent_crlf` | AC10 | Load CRLF fixture with current-version markers and canonical body; call `ensureLessonsBlock`; assert returns false, exactly one start marker, one end marker, CRLF endings preserved |
 | `ensure_lessons_ignores_fenced_markers` | AC11 | Load fixture with fenced code block containing literal marker text but no real managed block; assert injector inserts one managed block, fenced content preserved |
+| `update_injects_lessons_block` | AC12 | Invoke the real `update.js` lessons-injection path against a temp project dir (stub network calls that fetch from GitHub and update the plugin registry; call only the `ensureLessonsBlock` portion of `update()` directly to isolate the injection logic); assert CLAUDE.md gains exactly one START marker and one END marker with canonical content between them; invoke a second time and assert the file is byte-for-byte unchanged (no-op on current block) |
 
 **Falsifiable drift-string assertions** (must all be absent from rendered template output):
 
@@ -465,6 +508,37 @@ CTOC library.
 ---
 
 ## Decisions Taken Under Ambiguity
+
+- **Three refresh triggers: init + SessionStart auto + /ctoc:update explicit
+  (Option A — human decision).**
+  The human selected Option A: the lessons block is refreshed by three independent
+  triggers — `initProject()` at project creation, `SessionStart.js` at every
+  session open (automatic), and `/ctoc:update` on explicit demand. Rationale:
+  `/ctoc:update` matches the developer's mental model of "run update to get the
+  latest everything"; riding the injection on the existing command satisfies
+  discoverability without introducing a fourth slash command (CTOC ships exactly
+  three). The "already up to date" case (version unchanged) still refreshes the
+  block: a developer who runs `/ctoc:update` expects their environment to be
+  current regardless of whether the plugin version changed.
+  **Documented choice — WHERE in update.js the injection runs:** The call to
+  `ensureLessonsBlock(claudeMdPath, ctocRoot)` is placed at both terminal points
+  of the `update()` function in `src/commands/update.js`:
+  (a) Immediately before the early-return in the "already up to date" branch
+  (currently lines ~99–102), so the block is refreshed even when the plugin
+  version has not changed.
+  (b) After step 7 (clean old versions), before the final
+  `console.log('✓ Updated to CTOC ...')`, so the block is also refreshed after
+  a successful version upgrade.
+  In both cases: `claudeMdPath = path.join(process.cwd(), 'CLAUDE.md')` (the
+  project directory from which the user invoked `/ctoc:update`);
+  `ctocRoot = path.resolve(__dirname, '..', '..')` (the installed plugin root,
+  consistent with the `__dirname`-relative resolution used in `initProject.js`
+  and `claude-md-lessons.js`). Both call sites are wrapped in try/catch: a
+  lessons-injection failure is caught, logged to stderr, and never surfaces as a
+  version-update failure. `src/commands/update.md` is NOT modified — it already
+  invokes `update.js` via bash with `disable-model-invocation: true`; it carries
+  no `model:` frontmatter (preserved: the slash-command-no-model-pin test guards
+  this); the injection behavior is fully self-contained in `update.js`.
 
 - **Managed-block, not overwrite.** The injector edits only between markers so a
   project's own CLAUDE.md content is never clobbered — the safe way for a tool to
