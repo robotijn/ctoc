@@ -110,7 +110,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
 
 ## Acceptance Criteria
 
-- [ ] **Scenario: New project init produces accurate CLAUDE.md**
+- [x] **Scenario: New project init produces accurate CLAUDE.md**
   Given a new project directory containing no CLAUDE.md
   When `initProject()` runs (non-dry-run)
   Then the generated CLAUDE.md contains the substring "16 steps" or "16-step"
@@ -123,14 +123,14 @@ CLAUDE.md or tracking what changed between CTOC versions.
   (not bare "menu"/"push"/"update", which appear in ordinary prose)
   And the managed lessons block is present between its version markers
 
-- [ ] **Scenario: Drift strings absent from generated CLAUDE.md**
+- [x] **Scenario: Drift strings absent from generated CLAUDE.md**
   Given a freshly initialized project's CLAUDE.md produced by the corrected template
   When its full text is scanned
   Then none of the following strings appear: "15 Steps", "functional/draft",
   "functional/approved", "in_progress/", "ctoc plan new", "ctoc plan approve",
   "Step 7 is TDD", "Step 9 is ONE step", "Step 13 VERIFY"
 
-- [ ] **Scenario: `ensureLessonsBlock` is idempotent on a current block**
+- [x] **Scenario: `ensureLessonsBlock` is idempotent on a current block**
   Given a CLAUDE.md already containing `<!-- CTOC:LESSONS v1 START -->` through
   `<!-- CTOC:LESSONS v1 END -->` with the exact canonical block body (current
   version and content hash match)
@@ -142,7 +142,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   body (not just the version string): if the block body were altered while
   keeping v1 markers, the next call returns `true` and replaces the block
 
-- [ ] **Scenario: User prose preserved byte-for-byte around managed block**
+- [x] **Scenario: User prose preserved byte-for-byte around managed block**
   Given a CLAUDE.md with user-authored prose before the managed block start
   marker and additional user-authored prose after the managed block end marker
   When `ensureLessonsBlock` runs (whether inserting for the first time or
@@ -150,7 +150,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   Then the content before the start marker is byte-for-byte unchanged
   And the content after the end marker is byte-for-byte unchanged
 
-- [ ] **Scenario: Version upgrade replaces old block in place**
+- [x] **Scenario: Version upgrade replaces old block in place**
   Given a CLAUDE.md containing an older block bounded by
   `<!-- CTOC:LESSONS v0 START -->` and `<!-- CTOC:LESSONS v0 END -->`
   with user prose outside those markers
@@ -163,7 +163,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   And no duplicate start or end markers exist
   And the surrounding user prose is unchanged
 
-- [ ] **Scenario: SessionStart injects block for existing project on first run**
+- [x] **Scenario: SessionStart injects block for existing project on first run**
   Given an existing CTOC project directory with a stub `.ctoc/state` file,
   a CLAUDE.md that contains no managed lessons block, and the canonical
   `operating-lessons.md` source present at its resolved path
@@ -174,13 +174,13 @@ CLAUDE.md or tracking what changed between CTOC versions.
   lesson content between them
   And no additional start or end markers are present anywhere in the file
 
-- [ ] **Scenario: SessionStart is a no-op on second run**
+- [x] **Scenario: SessionStart is a no-op on second run**
   Given an existing CTOC project whose CLAUDE.md already contains the current
   managed lessons block (version and content hash both match)
   When `SessionStart.js` `main()` runs again
   Then CLAUDE.md is byte-for-byte unchanged after the second run
 
-- [ ] **Scenario: `ensureLessonsBlock` fails open when lessons source is missing**
+- [x] **Scenario: `ensureLessonsBlock` fails open when lessons source is missing**
   Given the canonical lessons file `operating-lessons.md` does not exist at the
   resolved path
   When `ensureLessonsBlock(claudeMdPath, ctocRoot)` is called
@@ -191,7 +191,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   failure rule)
   And `SessionStart.js` continues to completion without aborting
 
-- [ ] **Scenario: All file paths and atomic write are cross-platform**
+- [x] **Scenario: All file paths and atomic write are cross-platform**
   Given a test environment where `process.platform` is set to `'win32'`
   and `path.sep` is set to `'\\'`
   When `ensureLessonsBlock(claudeMdPath, ctocRoot)` resolves all internal
@@ -203,7 +203,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   pattern (no direct `writeFileSync` to the target path)
   And no child processes or shell commands are spawned to read or write files
 
-- [ ] **Scenario: CRLF line endings do not produce duplicate markers**
+- [x] **Scenario: CRLF line endings do not produce duplicate markers**
   Given a CLAUDE.md fixture whose line endings are `\r\n` (CRLF) throughout
   and which already contains `<!-- CTOC:LESSONS v1 START -->` through
   `<!-- CTOC:LESSONS v1 END -->` with the canonical block body (CRLF-encoded)
@@ -213,7 +213,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   And no duplicate markers appear anywhere in the file
   And the original CRLF line endings are preserved in the written output
 
-- [ ] **Scenario: Markers embedded in fenced code blocks are ignored**
+- [x] **Scenario: Markers embedded in fenced code blocks are ignored**
   Given a CLAUDE.md that contains a fenced code block (triple-backtick
   delimiters) whose inner text includes the literal strings
   `<!-- CTOC:LESSONS v1 START -->` and `<!-- CTOC:LESSONS v1 END -->` as
@@ -224,7 +224,7 @@ CLAUDE.md or tracking what changed between CTOC versions.
   the fenced code section)
   And the fenced code block content is preserved byte-for-byte
 
-- [ ] **Scenario: /ctoc:update refreshes the local CLAUDE.md managed block**
+- [x] **Scenario: /ctoc:update refreshes the local CLAUDE.md managed block**
   Given a project directory whose CLAUDE.md has a stale or absent managed
   lessons block (either no markers at all, or a v0 block, or a v1 block with
   a content hash that does not match the canonical canonical source)
