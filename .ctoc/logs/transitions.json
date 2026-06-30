@@ -222,5 +222,47 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-06-30T20:25:22.899Z",
+    "plan": "onboarding-claude-md-operating-lessons.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-06-30T20:27:38.657Z",
+    "plan": "SP4-human-gated-cleanup-review.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-06-30T21:54:04.357Z",
+    "plan": "SP4-human-gated-cleanup-review.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
