@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-06-30T13:58:36.647Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-06-30T12:18:02.766Z
