@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
-    "version": "6.9.91"
+    "version": "6.9.92"
   },
   "plugins": [
     {
       "name": "ctoc",
       "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
-      "version": "6.9.91",
+      "version": "6.9.92",
       "author": {
         "name": "robotijn"
       },
