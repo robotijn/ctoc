@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-06-30T20:27:38.653Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-06-30T18:35:52.980Z
 gate_crossed: functional → implementation
@@ -17,6 +24,8 @@ files:
   - src/lib/stale-cleanup.js
   - src/lib/menu-screens.js
   - tests/stale-cleanup-human-gate.test.js
+  - README.md
+  - tests/readme-numbers.test.js
 status: refined
 acceptance_criteria_count: 8
 risk_level: HIGH
@@ -80,7 +89,7 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
 - **M5:** Marker stamping occurs BEFORE `fs.renameSync()` in all archive/reconciliation paths so the gate auto-revert hook in `src/hooks/human-gate-check.js` does NOT revert the move.
 - **M6:** `dead-on-arrival` default action is `revert`. `delete` requires explicit human override AND `evidence.explicitlyRejected === true`. A test asserts the default proposal for a DOA plan without `explicitlyRejected` is `revert`, not `delete`.
 - **M7:** The override flow (`inboxCleanupPlanOverride`) allows the user to select a different action from the allowed set for that plan's category (e.g. `revert` instead of `archive-to-done`) or to skip the plan entirely (it remains in place and re-surfaces on the next scan).
-- **M8:** `executeCleanup(proposal, root, deps)` accepts an optional `deps` parameter containing injectable `{ approvePlan, movePlan }` overrides — the testability seam required by SP5 to spy on gate-safety invariants without CommonJS module-cache tricks.
+- **M8:** `executeCleanup(proposal, root, deps)` accepts an optional `deps` parameter containing injectable `{ approvePlan, movePlan, listStaleCandidates }` overrides — the testability seam required by SP5 to spy on gate-safety invariants (and to drive deterministic stage re-derivation) without CommonJS module-cache tricks.
 
 ### Stakeholders
 
@@ -166,9 +175,10 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
   And the markers were written to the file BEFORE `fs.renameSync` was called (order asserted via spy sequence)
 
 - [ ] **Scenario: executeCleanup accepts injectable deps for spy-based gate-safety testing**
-  Given `executeCleanup(proposal, root, { approvePlan: spyFn, movePlan: spyFn2 })` is called
+  Given `executeCleanup(proposal, root, { approvePlan: spyFn, movePlan: spyFn2, listStaleCandidates: spyFn3 })` is called
   When the cleanup runs
-  Then the injected `spyFn` and `spyFn2` are used instead of the real implementations
+  Then the injected `movePlan` (revert) and `listStaleCandidates` (stage re-derivation) overrides are used instead of the real implementations
+  And `approvePlan` is never called (structurally — it is not imported)
   And SP5 can assert gate-safety invariants without fighting CommonJS module caching
 
 ### In Scope
@@ -178,7 +188,7 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
   - `reconcilePlan(planPath, root)` — same as archive but for `approved-but-stranded`; does NOT call `approvePlan()`
   - `revertPlan(planPath, root)` — move back one stage; no marker stamping
   - `deletePlan(planPath)` — only callable when `evidence.explicitlyRejected === true`
-  - `executeCleanup(proposal, root, deps)` — dispatcher with injectable `deps` for testability
+  - `executeCleanup(proposal, root, deps)` — dispatcher that RE-DERIVES the plan's current stage via `listStaleCandidates(root)` (matching `candidate.plan === slug`; fail-closed no-op if absent), then routes to the right primitive; injectable `deps` (`{ approvePlan, movePlan, listStaleCandidates }`) for SP5 testability
 - Grouped review surface in `src/lib/menu-screens.js` as new screen functions, extending SP3's `inboxVerifyProposals` with a `'Clean up ▸'` label option (→ `inbox cleanup`) when actionable proposals exist:
   - `inboxCleanupReview` — entry screen (route `inbox cleanup`); lists proposals grouped by category; offers `'Approve a category ▸'` / `'Review individually ▸'` / `'◀ Back'`
   - `inboxCleanupCategoryPick` — category selection screen (route `inbox cleanup category`); one option per actionable category, ≤4 options incl. `'◀ Back'`
@@ -257,14 +267,14 @@ Only available when `evidence.explicitlyRejected === true` AND the user selects 
 
 ### Implementation-stage decisions (Steps 5–6, resolved by the implementation planner)
 
-- **D1 — Proposal augmentation (`stage` + `explicitlyRejected`), classifier output unchanged:** `classifyStaleCandidate` returns the locked 4-key proposal `{ plan, category, proposedAction, evidence: string[] }` (asserted by SP3's `classifier — proposal shape` test, which must keep passing). It carries neither the source `stage` nor a boolean `explicitlyRejected` (the latter lives on the `StaleEvidence` object, NOT on `proposal.evidence`, which is `string[]`). SP4's menu layer therefore builds an **augmented cleanup item** by pairing each proposal with (a) its cheap-scan candidate — for `stage` — and (b) its `StaleEvidence` — for `explicitlyRejected`. `executeCleanup` consumes this item, reading `proposal.stage`, `proposal.plan`, the effective action (`proposal.action` override ?? `proposal.proposedAction`), and `proposal.explicitlyRejected`. SP3's classifier contract is not modified.
-- **D2 — `deps` seam semantics (gate-safety as a structural guarantee):** `stale-cleanup.js` deliberately does NOT import `approvePlan` from `actions.js` at all — so the module is *structurally incapable* of crossing a live Gate 3 or firing the deployment pipeline (the strongest possible form of M2/M3). It imports ONLY `movePlan` from `actions.js`, used as the default mover for the `revert` path. `executeCleanup(proposal, root, deps = {})`: the `revert` branch routes through `deps.movePlan ?? movePlan` (the seam's live half — SP5 injects a spy and asserts it IS called for a revert); the `archive`/`reconcile` branches are fully self-contained (own marker-stamp + `fs.renameSync`) and never touch the injected functions (SP5 asserts the `movePlan` spy has 0 calls for archive/reconcile). `deps.approvePlan` is part of the documented seam contract for SP5's negative assertion but is never referenced by any code path — its 0-call guarantee is enforced structurally by the absent import. This is intentional negative space; the Step-11/critic reviewer must NOT "fix" the unused contract field.
+- **D1 — Stage is RE-DERIVED at exec time via the scanner; classifier output unchanged; the exec string carries only `{slug, action}`:** `classifyStaleCandidate` returns the locked 4-key proposal `{ plan, category, proposedAction, evidence: string[] }` (asserted by SP3's `classifier — proposal shape` test, which must keep passing) — it carries NO `stage` and NO `explicitlyRejected`. SP3's classifier contract is not modified. The earlier design tried to thread `stage` through an "augmented cleanup item" built in the menu layer, but the execution trigger is a `claude:cleanup-exec plan <slug> <action>` STRING (D5) that carries NO stage — so the augmented item never reached `executeCleanup`, which then built `path.join(root,'plans',proposal.stage,…)` = `plans/undefined/<slug>.md` and ENOENT-no-op'd at the only human entry point (the F1/F2 CRITICAL bug). **Resolution (human decision, Option a): `executeCleanup` re-derives the plan's CURRENT stage itself** by calling `listStaleCandidates(root)` (or `deps.listStaleCandidates`) and matching `candidate.plan === proposal.plan`, then reading `candidate.stage`. This is authoritative and robust to render→exec drift (if the plan moved between render and exec, the CURRENT stage wins). If no candidate matches the slug (already cleaned / no longer stale) → FAIL CLOSED: log a `noop` and return without mutating anything (idempotent). `explicitlyRejected` is NOT re-derived from the scan (the cheap candidate has no such field, and SP3's classifier defaults it false) — it is set ONLY by the explicit override-delete path: the override screen renders `'Delete permanently'` solely when `item.explicitlyRejected === true`, and the executor maps that single action to a proposal carrying `explicitlyRejected:true`. The menu layer still builds display items (category/evidence/explicitlyRejected-for-override-gating) for the screens, but the EXEC path threads only the slug + action through the `claude:` string; stage and the rejection flag are re-derived/re-supplied at exec, never trusted from a render-time snapshot. `executeCleanup` consumes `{ plan, proposedAction, action?:override, explicitlyRejected? }` and reads the effective action (`proposal.action` override ?? `proposal.proposedAction`).
+- **D2 — `deps` seam semantics (gate-safety as a structural guarantee):** `stale-cleanup.js` imports from `actions.js` ONLY `movePlan` (the default mover for `revert`) — it deliberately does NOT import `approvePlan` at all, so the module is *structurally incapable* of crossing a live Gate 3 or firing the deployment pipeline (the strongest possible form of M2/M3). It additionally imports `listStaleCandidates` from `inbox.js` for stage re-derivation (D1); this does NOT weaken the guarantee because `inbox.js` exports no `approvePlan` (its exports are `getInboxCounts, listQuestions, listDecisions, listPlansAtGates, listStaleCandidates, createQuestion, createDecision`) — `approvePlan` is absent from every binding `stale-cleanup.js` holds. No require cycle is introduced: `inbox.js` requires only `./cache` and `./stale-detector` (namespace), neither re-enters `stale-cleanup`, and `actions.js` never imports `inbox` (verified against shipped code). `executeCleanup(proposal, root, deps = {})`: stage re-derivation routes through `deps.listStaleCandidates ?? listStaleCandidates`; the `revert` branch routes through `deps.movePlan ?? movePlan` (the seam's live half — SP5 injects a spy and asserts it IS called for a revert); the `archive`/`reconcile` branches are fully self-contained (own marker-stamp + `fs.renameSync`) and never touch the injected mover (SP5 asserts the `movePlan` spy has 0 calls for archive/reconcile). `deps.approvePlan` is part of the documented seam contract for SP5's negative assertion but is never referenced by any code path — its 0-call guarantee is enforced structurally by the absent import. This is intentional negative space; the Step-11/critic reviewer must NOT "fix" the unused contract field.
 - **D3 — `revertPlan(planPath, root, deps = {})` is a documented superset of the In-Scope `revertPlan(planPath, root)`:** the optional trailing `deps` (default `{}`) carries `deps.movePlan` so the move-seam is exercised end-to-end; the 2-arg form still works standalone (falls back to the imported `movePlan`). `archivePlan`/`reconcilePlan` keep their exact In-Scope signatures.
 - **D4 — `deletePlan(planPath, { explicitlyRejected = false } = {})` safety guard:** a documented superset of the In-Scope `deletePlan(planPath)`. The primitive itself THROWS unless `explicitlyRejected === true`, independent of the dispatcher guard (belt-and-suspenders: deletion is irreversible, so it is refused by construction at two layers).
 - **D5 — Execution is a `claude:cleanup-exec …` action, never a render side effect:** every `menu-screens.js` render function is pure — it produces option labels and action STRINGS and performs NO file mutation (the structural form of M4). The actual `executeCleanup` call fires only when the human selects the explicit `'Confirm: …'` (batch) or `'Approve'` (per-plan) label, which maps to a `claude:cleanup-exec …` string that Claude acts on — mirroring the existing `claude:approve` / `claude:reject` convention emitted by `menu-screens.js`. No dispatcher/command file outside SP4's three scoped files is added or modified; the plan's `files:` is authoritative.
 - **D6 — `gate_crossed` unquoted, identical block shape to `addApprovalMarker`:** the stamp is a separate leading block `---\napproved_by: human\napproved_at: <ISO>\ngate_crossed: stale-reconciliation <ISO>\n---\n\n` prepended to the original content (two-block frontmatter). Value is unquoted, matching the proven `approved_at:` pattern (ISO colons are not `": "`-delimited, so the scalar parses cleanly). The first block satisfies `human-gate-check.hasApprovalMarker`; `extractFrontmatterRegion` still finds `files:` in the second block.
 - **D7 — review-stage dead-on-arrival revert edge:** `revert` maps `review → implementation`, which is a hook-watched destination. An unmarked DOA plan landing in `implementation/` may be further reverted `implementation → functional` by the gate hook on the next tool call. Accepted as-is: still strictly backward, reversible, no data loss; a review-stage DOA (no `approved_by`) is itself anomalous because a normal review plan carries the Gate-2 marker. Not specially handled (handling it would require touching the hook, which is out of scope).
-- **D8 — stateless re-derivation across screens:** each cleanup screen re-derives candidates/proposals from disk + git on render (no cross-screen session state), matching SP2/SP3. Category membership and `explicitlyRejected` are recomputed at confirm/override time. Bounded by the 20-row cap; cold-path only. A plan already moved by a prior approval is simply absent from the next scan (idempotency).
+- **D8 — stateless re-derivation everywhere (screens AND `executeCleanup`):** each cleanup screen re-derives candidates/proposals from disk + git on render (no cross-screen session state), matching SP2/SP3. Category membership and `explicitlyRejected` are recomputed at confirm/override time. Crucially, `executeCleanup` ALSO re-derives — it does not trust any value baked into the `claude:cleanup-exec` string beyond the slug + action: it calls `listStaleCandidates(root)` at exec time and reads the matched candidate's CURRENT `stage` (D1). Because every proposal originates from `listStaleCandidates`, the slug IS a member of that scan at render time; the cheap scan is the single source of truth for stage, so render→exec drift cannot produce a wrong path. Bounded by the 20-row cap; cold-path only. A plan already moved by a prior approval is simply absent from the next scan, so `executeCleanup` fail-closes to a no-op (idempotency) rather than throwing on a missing `plans/<stage>/<slug>.md`.
 
 ## 5. PLAN — Technical Architecture
 
@@ -283,6 +293,10 @@ stale-cleanup.js (NEW)
    ├─ require('fs'), require('path')                      [Node built-ins]
    ├─ require('./actions').movePlan                       [revert default mover ONLY]
    │      └─ NOTE: approvePlan is DELIBERATELY NOT imported (structural gate-safety)
+   ├─ require('./inbox').listStaleCandidates              [stage RE-DERIVATION at exec time — D1/D8]
+   │      └─ NOTE: inbox exports {getInboxCounts, listQuestions, listDecisions, listPlansAtGates,
+   │               listStaleCandidates, createQuestion, createDecision} — NO approvePlan, so this
+   │               import does NOT make approvePlan reachable.
    ├─ writes  → .ctoc/logs/stale-cleanup.json             [append-only log]
    └─ mutates → plans/<stage>/<slug>.md  (stamp+rename / rename / unlink)
 
@@ -298,7 +312,11 @@ tests/stale-cleanup-human-gate.test.js (NEW)
    ├─ require('../src/lib/menu-screens')       [reachability/render purity]
    └─ require('../src/lib/actions')            [spy reference for negative assertions]
 
-NO cycle. NO edge stale-cleanup.js → human-gate-check.js. NO edge stale-cleanup.js → approvePlan.
+NO cycle: stale-cleanup → {actions, inbox}; inbox → {cache, stale-detector}; stale-detector → (no
+  local requires); actions → (never inbox / stale-detector / stale-cleanup). No path returns to
+  stale-cleanup, so adding require('./inbox') introduces no require cycle (verified against shipped code).
+NO edge stale-cleanup.js → human-gate-check.js. NO edge stale-cleanup.js → approvePlan (movePlan is the
+  ONLY binding pulled from actions; inbox exports no approvePlan — approvePlan stays unreachable).
 NO edge menu-screens.js → stale-cleanup.js (the claude: convention keeps render pure).
 ```
 
@@ -316,31 +334,40 @@ NO edge menu-screens.js → stale-cleanup.js (the claude: convention keeps rende
 | `inboxVerifyProposals` → `inbox cleanup` | menu nav | Add `'Clean up ▸'` option (label only) when ≥1 *actionable* proposal exists (category ∈ {shipped-but-early, approved-but-stranded, dead-on-arrival}); maps to `'inbox cleanup'`. `inconclusive`-only proposal sets show no Clean-up option. |
 | `route(['inbox','cleanup', …])` | menu dispatch | New subtree (see §6.2). Each leaf returns `{ text, ask, actions }`. |
 | `'Confirm: …'` / `'Approve'` labels | menu → Claude | Map to `claude:cleanup-exec category <category>` / `claude:cleanup-exec plan <slug> <action>`. Claude invokes `executeCleanup`. |
-| `executeCleanup` → `stale-detector` | read | Re-derives stage (cheap scan) and, for delete, `explicitlyRejected` (verify) — D8. |
+| `executeCleanup` → `inbox.listStaleCandidates` | read | Re-derives the plan's CURRENT `stage` at exec time by matching `candidate.plan === slug` (authoritative; robust to render→exec drift). Slug absent from the live scan ⇒ fail-closed no-op (idempotent). Via `deps.listStaleCandidates ?? listStaleCandidates`. `explicitlyRejected` is NOT re-derived here — it rides the explicit override-delete action only (D1). |
 | `executeCleanup` → `actions.movePlan` | move (revert only) | Via `deps.movePlan ?? movePlan`; archive/reconcile bypass it. |
 | `stale-cleanup.js` → `human-gate-check.js` | implicit | Produces moves the unmodified hook accepts (stamp-before-rename). |
 
 ### Data Flow (per category)
 
 ```
+stage RE-DERIVATION (first step of EVERY executeCleanup call, before any branch — D1/D8):
+  scan = (deps.listStaleCandidates ?? listStaleCandidates)(root)   [the SAME cheap scan that produced
+                                                                   the proposals — slug is a member by construction]
+  cand = scan.find(c => c.plan === proposal.plan)
+  if (!cand) → FAIL CLOSED: appendLog({ plan, action:'noop', reason:'not-currently-stale', at:<ISO> });
+              return { plan, action:'noop', skipped:true }   [NO fs mutation — idempotent: already cleaned]
+  stage = cand.stage                                          [CURRENT on-disk stage — authoritative]
+  sourcePath = path.join(root,'plans',stage,proposal.plan + '.md')
+
 shipped-but-early / approved-but-stranded (forward → done):
-  read plans/<stage>/<slug>.md
+  read sourcePath
    → _stampMarker(content, 'stale-reconciliation <ISO>')   [prepend ---…--- block, IN MEMORY]
    → fs.writeFileSync(sourcePath, stamped)                 [WRITE-BEFORE-RENAME]
    → fs.renameSync(sourcePath, plans/done/<slug>.md)       [hook now accepts: approved_by:human present]
-   → appendLog({ plan, from:<stage>, to:'done', action, reason:'stale-reconciliation', at:<ISO> })
+   → appendLog({ plan, from:stage, to:'done', action, reason:'stale-reconciliation', at:<ISO> })
 
 dead-on-arrival (default revert, backward, NO marker):
-  priorStage = REVERT_MAP[<stage>]
+  priorStage = REVERT_MAP[stage]
    → (deps.movePlan ?? movePlan)(sourcePath, priorStage, root)   [plain rename, no stamp]
    → appendLog({ …, to:priorStage, action:'revert', reason:'stale-revert', at:<ISO> })
 
 dead-on-arrival (delete, override only, irreversible):
-  guard: proposal.explicitlyRejected === true       (else REFUSE)
+  guard: proposal.explicitlyRejected === true       (else REFUSE — set ONLY by the override-delete path, D1)
    → deletePlan(sourcePath, { explicitlyRejected:true })   [guard again → fs.unlinkSync]
    → appendLog({ …, to:null, action:'delete', reason:'stale-delete', at:<ISO> })
 
-inconclusive / null action: no-op (nothing executes).
+inconclusive / null action, or slug unmatched in the live scan: no-op (nothing executes).
 ```
 
 ## 6. DESIGN — Implementation Blueprint
@@ -360,6 +387,11 @@ const path = require('path');
 // movePlan ONLY — approvePlan is deliberately NOT imported (D2: structural gate-safety;
 // the module is physically unable to fire a live Gate-3 crossing / deployment pipeline).
 const { movePlan } = require('./actions');
+// listStaleCandidates ONLY — used to RE-DERIVE a plan's current stage at exec time (D1/D8).
+// inbox.js exports no approvePlan, so this import does NOT widen the gate-safety surface.
+// No require cycle: inbox → {cache, stale-detector}; neither re-enters stale-cleanup; actions
+// never imports inbox (verified against shipped code).
+const { listStaleCandidates } = require('./inbox');
 
 // Backward revert map (inverse of the forward gate flow). Only the three
 // gate-source stages the detector scans are valid inputs.
@@ -424,10 +456,19 @@ deletePlan(planPath: string, { explicitlyRejected = false } = {}) → { …, act
   _appendLog(root?, …)  // root derived from planPath via path; see note below.
 
 executeCleanup(proposal, root, deps = {}) → result object
-  proposal (augmented cleanup item, D1):
-    { plan:string, stage:'functional'|'implementation'|'review',
-      category, proposedAction, action?:string /*override*/, explicitlyRejected?:boolean }
-  planPath = path.join(root, 'plans', proposal.stage, proposal.plan + '.md')
+  proposal (cleanup descriptor — NO stage field; stage is re-derived here, D1):
+    { plan:string /*slug*/, category?, proposedAction, action?:string /*override*/,
+      explicitlyRejected?:boolean /*set ONLY by the override-delete path*/ }
+  // ── stage RE-DERIVATION (D1/D8) — runs before any branch ──────────────────────────────────────
+  const scan = (deps.listStaleCandidates || listStaleCandidates)(root);   ← seam (SP5-injectable)
+  const cand = scan.find(c => c.plan === proposal.plan);
+  if (!cand) {                                  // slug no longer stale (already cleaned / moved)
+    _appendLog(root, { plan:proposal.plan, action:'noop', reason:'not-currently-stale', at:ISO });
+    return { plan:proposal.plan, action:'noop', skipped:true };   ← FAIL CLOSED: no fs op, no throw
+  }
+  const stage    = cand.stage;                  // CURRENT on-disk stage — authoritative
+  const planPath = path.join(root, 'plans', stage, proposal.plan + '.md');
+  // ─────────────────────────────────────────────────────────────────────────────────────────────
   effective = proposal.action || proposal.proposedAction
   switch (effective):
     'archive-to-done'            → archivePlan(planPath, root)
@@ -438,6 +479,10 @@ executeCleanup(proposal, root, deps = {}) → result object
     default / null               → return { plan, action:'none', skipped:true } (no fs op)
   NOTE: deps.approvePlan is accepted by the documented seam contract (D2) and is NEVER referenced in
   any branch above — gate-safety is structural (no import + no call site). SP5 asserts 0 calls.
+  Why re-derivation is total: every proposal originates from listStaleCandidates(root), so its slug IS a
+  member of that scan at render time; re-running the scan at exec time finds it again UNLESS the plan was
+  already cleaned — the one case the fail-closed no-op exists for (idempotency). stage is NEVER read from
+  the action string or a render-time snapshot (that was the F1/F2 'plans/undefined/<slug>.md' bug).
 ```
 
 > `deletePlan` takes only `planPath` per its core In-Scope contract; `root` for its log entry is derived from `planPath` (`path.resolve(planPath, '..','..','..')` = project root, since plans live at `<root>/plans/<stage>/<slug>.md`). If that derivation is undesirable, the dispatcher passes `root` to a thin internal `_deleteAndLog(planPath, root)` while `deletePlan(planPath, opts)` remains the guarded public primitive. Implementer chooses; both keep the guard and the `unlink-only-when-explicitlyRejected` invariant.
@@ -482,6 +527,10 @@ _buildCleanupItems(root) → { items, candidates }
                    catch { push inconclusive degraded row (no stage-dependent action) }
   - ACTIONABLE categories = shipped-but-early | approved-but-stranded | dead-on-arrival
   - Pure read (verify spawns git but writes nothing). Reused by every cleanup screen (D8 re-derivation).
+  - NOTE: `item.stage` is for DISPLAY/ordering and category grouping only. It is NEVER serialized into a
+    `claude:cleanup-exec` string — the exec strings carry only the slug + action; `executeCleanup`
+    re-derives stage from its OWN `listStaleCandidates(root)` call at exec time (D1/D8). This deliberate
+    decoupling is the F1/F2 fix: no stage value ever crosses the menu→executor boundary.
 ```
 
 #### Category → action/verb table (single source of truth in this file)
@@ -519,7 +568,7 @@ inboxCleanupCategoryPick(projectPath)    route: inbox cleanup category
   - '◀ Back' → 'inbox cleanup'. Labels only; NO digit. NO execution.
 
 inboxCleanupCategoryConfirm(category, projectPath)   route: inbox cleanup confirm <category>
-  - Re-derive items; group = items of <category>; N = group.length.
+  - Re-derive items via _buildCleanupItems(root); group = items of <category>; N = group.length.
   - text shows the count + category + the plan names that WILL be acted on (stripCtl), so the
     human sees the batch before confirming (Business-risk mitigation).
   - options:
@@ -527,6 +576,20 @@ inboxCleanupCategoryConfirm(category, projectPath)   route: inbox cleanup confir
       '◀ Back'                              → 'inbox cleanup category'
   - The CONFIRM label is the ONLY place a batch executes, and only on explicit selection (M1/M4).
     Rendering this screen performs NO fs op. NO digit key.
+
+Batch exec enumeration (how 'claude:cleanup-exec category <category>' resolves to per-plan moves):
+  - The category exec string carries ONLY <category> — NO slugs, NO stages (same decoupling as the
+    per-plan string, D1). When the executor (Claude) acts on it, it RE-DERIVES the member set from scratch:
+      1. items = _buildCleanupItems(root).items            (fresh scan+verify+classify — D8)
+      2. members = items.filter(i => i.category === <category> && <category> is ACTIONABLE)
+      3. for each m in members:
+           executeCleanup({ plan: m.plan, proposedAction: <category→action> }, root)
+         — the per-member proposal carries NO stage; executeCleanup re-derives EACH member's CURRENT
+           stage via its own listStaleCandidates(root) call (D1). Members already cleaned between render
+           and exec are absent from the scan ⇒ that member fail-closes to a no-op (idempotent, no throw).
+  - <category→action> uses the single-source category table above (shipped-but-early→archive-to-done,
+    approved-but-stranded→advance-via-reconciliation, dead-on-arrival→revert). 'delete' is NEVER a batch
+    action — deletion is reachable only via the per-plan override path gated on explicitlyRejected (M6).
 
 inboxCleanupPlanReview(slug, projectPath)   route: inbox cleanup plan <slug>
   - If <slug> absent (the 'Review individually ▸' landing with no slug): render a label-only
@@ -548,7 +611,15 @@ inboxCleanupPlanOverride(slug, projectPath)   route: inbox cleanup override <slu
                           'claude:cleanup-exec plan <slug> delete' }   (else NO delete option — M6)
   - Always include '◀ Back' → 'inbox cleanup plan <slug>'. ≤4 options; labels only; NO digit.
   - The 'Delete permanently' label, when offered, is the SECOND confirmation surface; selecting it is
-    the explicit human override. (executeCleanup re-guards on explicitlyRejected — belt & suspenders.)
+    the explicit human override.
+  - explicitlyRejected threading (D1): the 'Delete permanently' string is the ONLY exec string that
+    implies deletion, and it is emitted ONLY on this screen, ONLY when item.explicitlyRejected === true.
+    The executor therefore maps the `delete` action (uniquely produced by this override path) to a
+    proposal carrying `explicitlyRejected: true`. EVERY other exec string stays `{slug, action}` and
+    yields a proposal WITHOUT explicitlyRejected (falsy) — so `delete` requested through any non-override
+    path is refused by executeCleanup's guard. Three fail-closed layers: (1) the screen hides delete
+    unless explicitlyRejected; (2) the executor sets the flag only for this path; (3) executeCleanup AND
+    deletePlan both throw unless explicitlyRejected===true (D4) — belt, suspenders, and a second belt.
 ```
 
 #### `route()` extension (inside the existing `case 'inbox':`)
@@ -590,35 +661,50 @@ spyFs()                  → wraps fs.writeFileSync / fs.renameSync / fs.unlinkS
                            { calls, restore }. BROADENED beyond SP3 (which spied write+rename) to
                            also watch unlink+rm for the no-side-effects / no-delete assertions.
 makeSpy()                → tiny call-recording fn { fn, calls } (or node:test mock.fn) for deps.
+parseCleanupExec(str)    → mirrors EXACTLY how the executor maps a 'claude:cleanup-exec …' action string
+                           to an executeCleanup proposal (the production contract under test):
+                             'claude:cleanup-exec plan <slug> <action>'
+                                → { plan:<slug>, proposedAction:<action> }            (NO stage)
+                             'claude:cleanup-exec plan <slug> delete'  (override path only)
+                                → { plan:<slug>, proposedAction:'delete', explicitlyRejected:true }
+                             'claude:cleanup-exec category <category>'
+                                → { kind:'category', category:<category> }
+                           Tokenized on single spaces. This is the SAME mapping Claude applies, so the
+                           F3 tests assert the END-TO-END string→proposal→executeCleanup path and cannot
+                           pass by hand-injecting stage.
 ```
 
 #### Test cases (→ acceptance criteria)
 
 ```
-T1 (M2) shipped-but-early approve → stamp-before-move, lands in done/, no approvePlan
-  setup: writePlan(sb,'functional','foo',{files:['src/x.js']});  (file content present)
+T1 (M2 + re-derivation) shipped-but-early approve via executeCleanup → re-derives stage, stamp-before-move, no approvePlan
+  setup: writePlan(sb,'functional','foo',{files:['src/missing-x.js']});  (declared file ABSENT so the
+         cheap scan lists foo as a candidate at stage 'functional' — the scan, not the proposal, supplies stage)
   spy = spyFs(); approveSpy = makeSpy(); moveSpy = makeSpy();
-  proposal = { plan:'foo', stage:'functional', category:'shipped-but-early',
-               proposedAction:'archive-to-done', explicitlyRejected:false };
+  proposal = { plan:'foo', proposedAction:'archive-to-done' };   ← NO stage field (re-derivation MUST fill it)
   executeCleanup(proposal, sb, { approvePlan:approveSpy.fn, movePlan:moveSpy.fn });
   asserts:
-    • a writeFileSync to plans/functional/foo.md occurred whose content includes
-      'approved_by: human' AND 'stale-reconciliation'   (marker stamped)
+    • a writeFileSync to plans/functional/foo.md occurred (PROVES stage re-derived to 'functional', not
+      'undefined') whose content includes 'approved_by: human' AND 'stale-reconciliation'   (marker stamped)
     • that writeFileSync index < the renameSync index    (WRITE-BEFORE-RENAME — M5 ordering)
     • renameSync target = plans/done/foo.md
     • final file plans/done/foo.md exists; its content matches /^---[\s\S]*approved_by:\s*human/
       AND contains 'gate_crossed: stale-reconciliation'
     • approveSpy.calls.length === 0   (M2: approvePlan NOT called)
+  This case FAILS if executeCleanup assumes proposal.stage: with no stage it would target
+  plans/undefined/foo.md → ENOENT/no-op → the done/foo.md assertion fails. (Directly pins F1/F2.)
 
-T2 (M3) approved-but-stranded approve → reconciliation, no approvePlan, no actions.movePlan
-  setup: writePlan(sb,'review','bar',{files:['src/y.js'], approved:true});
-  proposal = { plan:'bar', stage:'review', category:'approved-but-stranded',
-               proposedAction:'advance-via-reconciliation', explicitlyRejected:false };
+T2 (M3 + re-derivation) approved-but-stranded approve → reconciliation, re-derives stage, no approvePlan, no actions.movePlan
+  setup: writePlan(sb,'review','bar',{files:['src/missing-y.js'], approved:true});  (declared file ABSENT
+         so the cheap scan lists bar at stage 'review'; stage comes from the scan, not the proposal)
+  approveSpy = makeSpy(); moveSpy = makeSpy(); spy = spyFs();
+  proposal = { plan:'bar', proposedAction:'advance-via-reconciliation' };   ← NO stage field
   executeCleanup(proposal, sb, { approvePlan:approveSpy.fn, movePlan:moveSpy.fn });
   asserts:
-    • plans/done/bar.md exists; content contains 'gate_crossed: stale-reconciliation' + 'approved_by: human'
+    • plans/done/bar.md exists (PROVES stage re-derived to 'review'); content contains
+      'gate_crossed: stale-reconciliation' + 'approved_by: human'
     • approveSpy.calls.length === 0   AND   moveSpy.calls.length === 0   (M3: neither called)
-    • a writeFileSync-before-renameSync pair targeted bar.md (reconciliation path, self-contained)
+    • a writeFileSync-before-renameSync pair targeted plans/review/bar.md (reconciliation path, self-contained)
 
 T3 (M5) marker-before-rename ordering (explicit sequence)
   Reuses the spyFs `calls` array from a shipped-but-early run; asserts
@@ -636,27 +722,38 @@ T4 (M4) NO action executes on render (menu purity)
           plan files === 0   (rendering never mutates — only git reads allowed).
   (Verification git reads are permitted; only fs mutations are asserted absent.)
 
-T5 (M6) dead-on-arrival DEFAULT is revert; NO unlink/rm
-  setup: writePlan(sb,'implementation','baz',{files:['src/gone.js']}) (declared file absent → DOA-ish);
-  proposal = { plan:'baz', stage:'implementation', category:'dead-on-arrival',
-               proposedAction:'revert', explicitlyRejected:false };
+T5 (M6 + re-derivation) dead-on-arrival DEFAULT is revert; re-derives stage; NO unlink/rm
+  setup: writePlan(sb,'implementation','baz',{files:['src/gone.js']}) (declared file absent → cheap scan
+         lists baz at stage 'implementation');
+  proposal = { plan:'baz', proposedAction:'revert' };   ← NO stage field (re-derivation supplies 'implementation')
   spy = spyFs(); moveSpy = makeSpy();
   executeCleanup(proposal, sb, { movePlan: moveSpy.fn });
   asserts:
-    • moveSpy.calls.length === 1 and called with (planPath, 'functional', sb)  (review-map: impl→functional)
+    • moveSpy.calls.length === 1 and called with (plans/implementation/baz.md, 'functional', sb)
+      (PROVES stage re-derived to 'implementation'; REVERT_MAP: implementation→functional)
     • spy.calls has NO unlinkSync and NO rmSync   (M6: revert never deletes)
 
 T6 (M6) delete ONLY when explicitlyRejected===true
-  (a) explicitlyRejected false/absent + action 'delete' → executeCleanup THROWS; file still on disk;
-      no unlinkSync recorded.
-  (b) explicitlyRejected:true + action 'delete' → file removed; spyFs records exactly one unlinkSync
-      on plans/<stage>/<slug>.md; (log reason 'stale-delete' present in stale-cleanup.json).
-  Also: deletePlan(planPath) with no opts / explicitlyRejected:false THROWS directly (primitive guard, D4).
+  setup (both cases): writePlan(sb,'implementation','del',{files:['src/gone.js']}) so the cheap scan lists
+         'del' at stage 'implementation' — re-derivation succeeds, so the delete GUARD (not the slug-absent
+         no-op) is what's exercised.
+  (a) proposal { plan:'del', proposedAction:'delete' } (explicitlyRejected absent/false)
+      → executeCleanup THROWS ('delete blocked: not explicitlyRejected'); file still on disk;
+        spyFs records NO unlinkSync.   (assert.throws)
+  (b) proposal { plan:'del', proposedAction:'delete', explicitlyRejected:true }
+      → file removed; spyFs records exactly one unlinkSync on plans/implementation/del.md;
+        log reason 'stale-delete' present in stale-cleanup.json.
+  Also (primitive guard, D4): deletePlan(planPath) with no opts / { explicitlyRejected:false } THROWS
+  directly — independent of the dispatcher (belt-and-suspenders). (assert.throws)
 
-T7 (M8) executeCleanup deps injection is honored
-  • revert proposal + { movePlan: moveSpy.fn } → moveSpy IS used (calls.length===1)  (seam live)
-  • archive proposal + { movePlan: moveSpy.fn, approvePlan: approveSpy.fn } → both spies 0 calls
-    (archive bypasses the seam — structural gate-safety)
+T7 (M8) executeCleanup deps injection is honored (all three seams: listStaleCandidates, movePlan, approvePlan)
+  • listStaleCandidates seam: injScan = () => [{ plan:'inj', stage:'implementation' }];
+    executeCleanup({ plan:'inj', proposedAction:'revert' }, sb, { listStaleCandidates: injScan, movePlan: moveSpy.fn })
+    → moveSpy called once with (path.join(sb,'plans','implementation','inj.md'), 'functional', sb)
+      — PROVES stage was re-derived from the INJECTED scan (no file on disk needed; the mover is a spy).
+  • revert proposal (seeded on disk) + { movePlan: moveSpy.fn } → moveSpy IS used (calls.length===1)  (seam live)
+  • archive proposal (seeded) + { movePlan: moveSpy.fn, approvePlan: approveSpy.fn } → both spies 0 calls
+    (archive bypasses the move seam; approvePlan never referenced — structural gate-safety)
 
 T8 (M1/menu reachability) Clean up ▸ → inbox cleanup → … → claude:cleanup-exec; NO digit anywhere
   • Build a sandbox whose verify yields ≥1 actionable proposal (declare a missing file so the cheap
@@ -687,10 +784,39 @@ T9 (M7 / M6 override) override surfaces delete ONLY when explicitlyRejected
     'claude:cleanup-exec plan baz delete'.
   • shipped-but-early override offers 'Revert instead' → 'claude:cleanup-exec plan <slug> revert'.
 
-T10 (idempotency / log) second executeCleanup on an already-moved plan
-  • after T1's archive, the source path no longer exists → re-running executeCleanup on the same
-    proposal THROWS (missing file) rather than silently corrupting; stale-cleanup.json has the single
-    archive entry. (Confirms moves are not double-counted.)
+T10 (idempotency / fail-closed) second executeCleanup on an already-moved plan
+  • after an archive run, foo is in done/ and ABSENT from listStaleCandidates(sb) (done/ is not scanned).
+    Re-running executeCleanup({plan:'foo', proposedAction:'archive-to-done'}, sb) → re-derivation finds
+    NO candidate → FAIL-CLOSED no-op: returns { plan:'foo', action:'noop', skipped:true }, does NOT throw,
+    and spyFs records NO second writeFileSync/renameSync/unlinkSync/rmSync. stale-cleanup.json holds the
+    single original archive entry (plus optionally one 'noop' entry) — the move is not double-counted.
+  (Changed from the prior 'THROWS on missing file' design: with exec-time stage re-derivation an
+   already-cleaned slug is simply absent from the scan, so the idempotent path is a no-op, not an error.)
+
+T11 (F3 — production exec-path: string carries NO stage, executeCleanup re-derives it)
+  Drives the REAL trigger string end-to-end (not a hand-built proposal):
+  (a) archive: writePlan(sb,'functional','foo',{files:['src/missing.js']});
+      p = parseCleanupExec('claude:cleanup-exec plan foo archive-to-done');  → { plan:'foo', proposedAction:'archive-to-done' }
+      assert: p.stage === undefined   (the string carries no stage — contract pinned)
+      executeCleanup(p, sb);
+      assert: plans/done/foo.md exists with 'approved_by: human' + 'gate_crossed: stale-reconciliation';
+              plans/functional/foo.md gone   (stage re-derived to 'functional' from the live scan)
+  (b) revert: writePlan(sb,'implementation','baz',{files:['src/gone.js']}); moveSpy = makeSpy();
+      p = parseCleanupExec('claude:cleanup-exec plan baz revert');           → { plan:'baz', proposedAction:'revert' }
+      executeCleanup(p, sb, { movePlan: moveSpy.fn });
+      assert: moveSpy called once with (plans/implementation/baz.md, 'functional', sb)  (impl→functional, re-derived)
+  Both sub-cases FAIL if stage is assumed instead of re-derived (no stage in p ⇒ plans/undefined/<slug>.md).
+
+T12 (F3 — negative: slug not in the current scan → fail-closed no-op, no throw, no fs mutation)
+  spy = spyFs();
+  p = parseCleanupExec('claude:cleanup-exec plan ghost archive-to-done');    (ghost is NOT seeded on disk)
+  const r = executeCleanup(p, sb);                                           (does NOT throw)
+  asserts:
+    • r.skipped === true && r.action === 'noop'
+    • spy.calls has ZERO writeFileSync / renameSync / unlinkSync / rmSync to any plan file
+    • no plan file created/moved/removed anywhere under plans/
+  Pins the idempotent / already-cleaned path: a stale exec request for a plan that is no longer stale
+  is a safe no-op, never a crash and never a spurious mutation.
 ```
 
 #### Spy seam notes
@@ -698,34 +824,97 @@ T10 (idempotency / log) second executeCleanup on an already-moved plan
 - `staleDetector` is imported as a NAMESPACE in `menu-screens.js` (line 25), so a test rewires
   `staleDetector.classifyStaleCandidate` / `verifyStaleCandidate` to drive deterministic categories
   WITHOUT real git — the documented SP3 seam. Restore in `afterEach`.
-- `executeCleanup` deps injection (`{ approvePlan, movePlan }`) is the SP5 seam and is the ONLY
-  mechanism these tests use to assert non-calls — no `require.cache` surgery on `actions.js`.
-- All assertions FAIL LOUD: each has ≥1 meaningful assert; no empty catch; error paths (T6a, T10)
-  assert a throw via `assert.throws`.
+- `executeCleanup` deps injection (`{ approvePlan, movePlan, listStaleCandidates }`) is the SP5 seam and is
+  the ONLY mechanism these tests use to assert non-calls / drive deterministic stage re-derivation — no
+  `require.cache` surgery on `actions.js` or `inbox.js`.
+- For the production-path tests (T11/T12) stage re-derivation runs against the REAL on-disk scan
+  (`listStaleCandidates` over a seeded sandbox), proving the string→executeCleanup contract WITHOUT
+  injecting stage. `parseCleanupExec` is the canonical string→proposal mapping the executor applies.
+- All assertions FAIL LOUD: each has ≥1 meaningful assert; no empty catch; error paths (T6a, primitive
+  guard) assert a throw via `assert.throws`; the idempotent path (T10, T12) asserts a no-op result +
+  zero fs mutations (NOT a throw).
 
 ### 6.4 Acceptance-criteria mapping (M1–M8 → implementation element → test)
 
 | AC | Implementation element | Test |
 |---|---|---|
 | **M1** grouped review surface; 3-option entry; category-pick → confirm; per-plan Approve/Override/Skip/Back; no digit any screen | `inboxCleanupReview`, `inboxCleanupCategoryPick`, `inboxCleanupCategoryConfirm`, `inboxCleanupPlanReview`, `inboxCleanupPlanOverride` + `route()` subtree (§6.2) | T8 (reachability + digit-free), T4 (render purity) |
-| **M2** shipped-but-early → stamp-before-move to `done/`; `approved_by:human` + `gate_crossed` contains `stale-reconciliation`; `approvePlan` NOT called | `archivePlan` (self-contained `_stampAndArchive`); `approvePlan` not imported (§6.1, D2) | T1, T3 |
-| **M3** approved-but-stranded → same reconciliation; `approvePlan` AND `actions.movePlan` NOT called | `reconcilePlan` (self-contained; no `movePlan`) | T2, T7 |
+| **M2** shipped-but-early → stamp-before-move to `done/`; `approved_by:human` + `gate_crossed` contains `stale-reconciliation`; `approvePlan` NOT called | `archivePlan` (self-contained `_stampAndArchive`); `approvePlan` not imported (§6.1, D2); `executeCleanup` re-derives stage (§6.1, D1) | T1, T3, T11 |
+| **M3** approved-but-stranded → same reconciliation; `approvePlan` AND `actions.movePlan` NOT called | `reconcilePlan` (self-contained; no `movePlan`); `executeCleanup` re-derives stage (§6.1, D1) | T2, T7 |
 | **M4** nothing executes without explicit approve (render ≠ execute) | Pure render fns emit `claude:cleanup-exec` strings only (D5) | T4 |
 | **M5** marker stamped BEFORE `fs.renameSync` (gate-hook window) | `archivePlan`/`reconcilePlan` write-then-rename order (§6.1 steps 3→4) | T1 (index ordering), T3 (named) |
 | **M6** DOA default `revert`; `delete` requires `explicitlyRejected===true` + explicit override; never auto-delete | `executeCleanup` switch default = proposedAction `revert`; dispatcher + `deletePlan` double guard (D4); override screen hides delete unless `explicitlyRejected` | T5, T6, T9 |
 | **M7** override picks an alternative action or skips (plan re-surfaces) | `inboxCleanupPlanOverride` allowed-action set; `Skip` → `inbox cleanup` (no state change) | T9 |
-| **M8** `executeCleanup(proposal, root, deps={})` honors injectable `{approvePlan, movePlan}` | `deps.movePlan ?? movePlan` (revert); `approvePlan` contract-only/never called (D2) | T7 |
+| **M8** `executeCleanup(proposal, root, deps={})` honors injectable `{approvePlan, movePlan, listStaleCandidates}` | `deps.movePlan ?? movePlan` (revert); `deps.listStaleCandidates ?? listStaleCandidates` (stage re-derivation); `approvePlan` contract-only/never called (D2) | T7 |
 
-Every AC maps to ≥1 implementation element AND ≥1 test. No orphan AC.
+Every AC maps to ≥1 implementation element AND ≥1 test. No orphan AC. The Gate-2 KICKBACK findings are
+covered explicitly: F1/F2 (stage not threaded → `plans/undefined/<slug>.md`) by exec-time re-derivation
+(§6.1 executeCleanup, D1/D8) pinned by T1/T2/T5/T11; F3 (no end-to-end exec-path coverage) by the
+production-path tests T11 (positive, string→re-derive→move) and T12 (negative, absent slug → fail-closed no-op).
 
 ### 6.5 Security & gate-safety note
 
 This is the highest-risk slice in the chain — it stamps gate markers, moves plan files between gate stages, and can delete. The invariants below are load-bearing and each is pinned by a test:
 
 1. **No auto-cross.** Execution fires ONLY on an explicit human `Confirm`/`Approve` selection routed through a `claude:cleanup-exec …` action. Render functions are pure (no fs mutation) — M4/T4. There is no timer, no render-time execution, no "approve all" blanket path.
-2. **Reconciliation ≠ `approvePlan`.** `stale-cleanup.js` does not import `approvePlan` (D2) → it is structurally incapable of firing the deployment pipeline or logging a live Gate-3 crossing. M2/M3/T1/T2/T7.
+2. **Reconciliation ≠ `approvePlan`.** `stale-cleanup.js` imports `movePlan` from `actions.js` and `listStaleCandidates` from `inbox.js` — but NOT `approvePlan` (D2). `inbox.js` exports no `approvePlan`, so neither import puts `approvePlan` in reach → the module is structurally incapable of firing the deployment pipeline or logging a live Gate-3 crossing. M2/M3/T1/T2/T7.
 3. **Stamp-before-rename.** Markers are written to the source file BEFORE `fs.renameSync`, closing the gate-hook auto-revert window. Identical ordering to `actions.approvePlan` (lines 97–107). M5/T1/T3.
 4. **`hooks/` and `actions.js` untouched.** SP4 modifies only the three `files:` targets. The moved file satisfies the *unmodified* `human-gate-check.hasApprovalMarker` because the prepended block (first `---…---`) carries `approved_by: human` (D6).
 5. **No delete without `explicitlyRejected`.** Deletion is refused by construction at two layers (dispatcher guard + `deletePlan` primitive guard, D4); the override screen does not even render a delete affordance unless `explicitlyRejected === true`. M6/T6/T9. Revert (the DOA default) performs no `unlink`/`rm` — T5.
 6. **Input hardening.** Cleanup screens pass every plan-derived field through `stripCtl` before rendering (ANSI/control-char injection from a hostile filename or commit subject — the latter already sanitized at capture by SP3). Route `<slug>`/`<category>` are validated; `executeCleanup` re-joins paths under `root/plans/<stage>/` via `path.join`, so a slug cannot traverse out of the plans tree. No subprocess/shell is spawned in `stale-cleanup.js` — nothing to inject.
 7. **Best-effort logging, never data-losing.** A `stale-cleanup.json` write failure is swallowed and never aborts a move that already happened; the move itself (rename/unlink) is the source of truth, the log is advisory.
+8. **Stage re-derived at exec, fail-closed on absence.** `executeCleanup` never trusts a stage from the `claude:` action string or a render-time snapshot — it re-derives the CURRENT stage from `listStaleCandidates(root)` at exec time (D1/D8). This is the only way the move path is correct under render→exec drift, and the fix for the F1/F2 `plans/undefined/<slug>.md` bug that no-op'd the feature at its only human entry point. A slug absent from the live scan (already cleaned) yields a no-op — never a wrong-path move, never a throw. Adding `require('./inbox')` introduces no require cycle (inbox → {cache, stale-detector}; neither re-enters stale-cleanup; actions never imports inbox) and no new gate-safety surface (inbox exports no `approvePlan`). M-coverage: T1/T2/T5/T7/T11/T12.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
