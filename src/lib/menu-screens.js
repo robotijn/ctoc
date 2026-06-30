@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { getPlanCounts, readPlans, getPlansDir, getAgentStatus, getVisionCounts, getVisionStubs } = require('./state');
 const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs } = require('./sections');
-const { getInboxCounts } = require('./inbox');
+const { getInboxCounts, listStaleCandidates } = require('./inbox');
 const { validateTransition } = require('./plan-validator');
 const { findProjectRoot } = require('./project-root');
 
@@ -141,9 +141,10 @@ function buildDashboardTable(projectPath) {
     out += '\n';
   }
 
-  // Inbox (A3 — async-overnight surface)
+  // Inbox (A3 — async-overnight surface; SP2 adds the possibly-stale stream)
   const inbox = getInboxCounts(root);
-  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting;
+  const stale = inbox.staleCandidates || 0;
+  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale;
   out += `INBOX\n`;
   if (inboxTotal === 0) {
     out += `  ○ Inbox clear — no async items waiting\n`;
@@ -151,6 +152,11 @@ function buildDashboardTable(projectPath) {
     out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}\n`;
     out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review\n`;
     out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates\n`;
+    // SP2: conditional — present iff > 0 (M2), absent when 0 (M3). "possibly-stale"
+    // (not "stale") sets correct expectations: cheap detection is unverified (SP3).
+    if (stale > 0) {
+      out += `  ⊙ ${stale} possibly-stale plan${stale === 1 ? '' : 's'}\n`;
+    }
   }
   out += '\n';
 
@@ -206,22 +212,37 @@ function dashboardPipeline(projectPath) {
     { label: 'More ▶', description: 'Vision pipeline, start agent, sync plans, system' }
   ];
 
-  return {
-    text,
-    ask: {
-      questions: [{
-        question: 'Select a section to drill into:',
-        header: 'Pipeline',
-        options
-      }]
-    },
-    actions: {
-      'Business': 'section business',
-      'Implementation': 'section implementation',
-      'Execution': 'section execution',
-      'More ▶': 'menu commands'
-    }
+  // SP2: cheap stale count (memoized → cache hit after buildDashboardTable above).
+  const stale = (getInboxCounts(root).staleCandidates) || 0;
+
+  const questions = [{
+    question: 'Select a section to drill into:',
+    header: 'Pipeline',
+    options
+  }];
+  const actions = {
+    'Business': 'section business',
+    'Implementation': 'section implementation',
+    'Execution': 'section execution',
+    'More ▶': 'menu commands'
   };
+
+  // SP2 ride-along: a SECOND question, only when there is something to show (M3).
+  // Navigation is by label only — NEVER a digit (menu discipline Rule 1/9).
+  if (stale > 0) {
+    questions.push({
+      question: `${stale} possibly-stale plan${stale === 1 ? '' : 's'} detected — view them?`,
+      header: 'Stale plans',
+      options: [
+        { label: 'View stale plans', description: `Inspect the ${stale} possibly-stale plan${stale === 1 ? '' : 's'} (read-only)` },
+        { label: 'Not now', description: 'Dismiss for this menu turn' },
+      ],
+    });
+    actions['View stale plans'] = 'inbox stale'; // label key only — NEVER a digit
+    actions['Not now'] = '';                      // no-op (driver falls through to pipeline answer)
+  }
+
+  return { text, ask: { questions }, actions };
 }
 
 /**
@@ -315,6 +336,45 @@ function sectionBrowse(sectionName, projectPath) {
       }],
     },
     actions,
+  };
+}
+
+/**
+ * SP2 drill-in: read-only list of possibly-stale candidates. No file op, no plan
+ * move, no inputMode. The only selectable option is ◀ Back. "Verify (SP3)" is
+ * affordance TEXT only — SP3 wires the verification.
+ * @param {string} [projectPath]
+ * @returns {{text:string, ask:Object, actions:Object}}
+ */
+function inboxStalePlansDrillIn(projectPath) {
+  const root = getProjectPath(projectPath);
+  const candidates = listStaleCandidates(root); // cold path; one fresh scan
+
+  let text = `Inbox ▸ Possibly-stale plans (${candidates.length})\n`;
+  text += `${'─'.repeat(40)}\n\n`;
+  if (candidates.length === 0) {
+    text += '  No possibly-stale plans.\n';
+  } else {
+    // Bullet rows, NOT "1." — numbers are reserved for opening a plan (Rule 1/9).
+    // This screen opens nothing, so it shows no numbers and exposes no numeric key.
+    for (const cand of candidates) {
+      const label = cand.actionable ? 'actionable' : 'advisory';
+      text += `  • ${cand.plan}  [${cand.stage}]  signals: ${cand.signals.join(', ')}  — ${label}\n`;
+    }
+    text += '\n  Verify with SP3 verification (coming soon) before any cleanup.\n';
+  }
+  text += '\n\n\n';
+
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: 'Possibly-stale plans (read-only).',
+        header: 'Stale plans',
+        options: [{ label: '◀ Back', description: 'Return to dashboard' }],
+      }],
+    },
+    actions: { '◀ Back': '' },
   };
 }
 
@@ -836,6 +896,10 @@ function route(args, projectPath) {
     case 'section':
       return sectionBrowse(args[1], projectPath);
 
+    case 'inbox':
+      if (args[1] === 'stale') return inboxStalePlansDrillIn(projectPath);
+      return dashboardPipeline(projectPath); // unknown inbox subcommand → safe default
+
     case 'plan': {
       const ref = args[1]; // stage/file
       if (!ref) {
@@ -887,6 +951,7 @@ module.exports = {
   dashboardPipeline,
   dashboardCommands,
   sectionBrowse,
+  inboxStalePlansDrillIn,
   stageBrowse,
   visionStubsBrowse,
   planActions,

@@ -18,6 +18,15 @@ const fs = require('fs');
 const path = require('path');
 const { memoize } = require('./cache');
 
+// SP1 cheap stale-plan scan. Imported as a NAMESPACE (not destructured) so the
+// call site is late-bound: SP2 tests rewire staleDetector.scanCheapCandidates on
+// the live module object at the require boundary. A destructured import would
+// capture the function reference at load time and defeat that seam.
+// Contract (frozen in SP1): scanCheapCandidates(root, { nowMs }?) =>
+//   { candidates: Array<{plan:string, stage:'functional'|'implementation'|'review',
+//     signals:Array<'missing-files'|'advisory:age'>, actionable:boolean}>, count:number }
+const staleDetector = require('./stale-detector');
+
 const QUESTIONS_DIR = ['.ctoc', 'inbox', 'questions'];
 const DECISIONS_DIR = ['.ctoc', 'inbox', 'decisions'];
 
@@ -191,11 +200,24 @@ function listPlansAtGates(root) {
   return out;
 }
 
+/**
+ * SP2: the full possibly-stale candidate list for the drill-in screen (cold path).
+ * NOT memoized — the drill-in is reached only by explicit navigation, so a single
+ * fresh scan there is acceptable; the hot dashboard path uses getInboxCounts.count.
+ * @param {string} root
+ * @returns {Array<{plan:string, stage:string, signals:string[], actionable:boolean}>}
+ */
+function listStaleCandidates(root) {
+  return staleDetector.scanCheapCandidates(root).candidates;
+}
+
 const getInboxCounts = memoize(function getInboxCountsImpl(root) {
   return {
     questions: listQuestions(root).length,
     decisions: listDecisions(root).length,
     gatesWaiting: listPlansAtGates(root).length,
+    // SP2: cheap stale count. One scan per memoize window (5 s TTL) ⇒ Goal 1.
+    staleCandidates: staleDetector.scanCheapCandidates(root).count,
   };
 }, 'getInboxCounts');
 
@@ -204,6 +226,7 @@ module.exports = {
   listQuestions,
   listDecisions,
   listPlansAtGates,
+  listStaleCandidates,
   createQuestion,
   createDecision,
 };

@@ -611,50 +611,50 @@ SP2 does NOT touch either item here — it edits only the four files in its own 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 14 tests, 4 pass / 10 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (Node built-in test runner)
+- [x] Check prerequisites — SP1 stale-detector.js shipped & live; cache.invalidate seam present
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — temp sandboxes via os.tmpdir/mkdtempSync
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling — unknown `inbox` subcommand falls back to dashboard
+- [x] Wire up integration points — route case, ride-along question, menu.md Rule 10
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together — full suite green
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — count via memoized getInboxCounts (cache hit), drill-in single cold scan
+- [x] Optimize critical paths — no second hot-path scan
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — only passes root to hardened scanCheapCandidates
+- [x] Sanitize outputs — read-only string concatenation
+- [x] No secrets in code
+- [x] Safe file operations — render/drill-in path is read-only (write-spy delta === 0)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green) — 2468 pass / 0 fail
+- [x] Check coverage >= 80% — all SP2-changed lines exercised, both branches each
+- [x] 0 skipped, 0 flaky tests — 0 skipped
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — menu.md Rule 10 + env action-entry clause
+- [x] Add JSDoc comments to new functions — listStaleCandidates, inboxStalePlansDrillIn; scanCheapCandidates shape pinned in inbox.js import comment
+- [x] Update CHANGELOG if needed — n/a (no CHANGELOG entry required for this slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
