@@ -33,6 +33,25 @@ const { findProjectRoot } = require('./project-root');
 // Defined once at module scope so any future slug renderer reuses one sanitizer.
 const stripCtl = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
+// SP4 cleanup: single source of truth mapping a category to its execution action
+// and human-facing verb. Mirrors the stale-cleanup.js dispatcher action names.
+const CLEANUP_CATEGORY_TABLE = Object.freeze({
+  'shipped-but-early': { action: 'archive-to-done', verb: 'archive' },
+  'approved-but-stranded': { action: 'advance-via-reconciliation', verb: 'reconcile' },
+  'dead-on-arrival': { action: 'revert', verb: 'revert' },
+});
+// Every category the cleanup screens act on (DOA included).
+const ACTIONABLE_CLEANUP = Object.keys(CLEANUP_CATEGORY_TABLE);
+// Forward-to-done categories: these gate the 'Clean up ▸' ENTRY on
+// inboxVerifyProposals. DOA (a backward, reversible revert + an unmarked,
+// anomalous plan per D7) does not by itself surface the entry — this preserves
+// the SP3 read-only proposals contract (a DOA-only set renders a single Back
+// option). DOA items remain fully handled INSIDE the cleanup screens once the
+// entry is reached (see _buildCleanupItems / inboxCleanupReview).
+const FORWARD_CLEANUP = ['shipped-but-early', 'approved-but-stranded'];
+const CLEANUP_ORDER = ['shipped-but-early', 'approved-but-stranded', 'dead-on-arrival'];
+const CLEANUP_MAX_ROWS = 20;
+
 // Stage to folder mapping
 const STAGE_FOLDERS = {
   canvas: 'canvas',
@@ -493,17 +512,281 @@ function inboxVerifyProposals(projectPath) {
   }
   text += '\n\n\n';
 
+  // SP4: surface the 'Clean up ▸' entry only when there is a FORWARD-to-done
+  // actionable proposal (shipped-but-early / approved-but-stranded). Label-only
+  // navigation — no digit maps to any cleanup action.
+  const hasForwardActionable = proposals.some((p) => FORWARD_CLEANUP.includes(p.category));
+  const options = [];
+  const actions = {};
+  if (hasForwardActionable) {
+    options.push({ label: 'Clean up ▸', description: 'Review & execute cleanup' });
+    actions['Clean up ▸'] = 'inbox cleanup';
+  }
+  options.push({ label: '◀ Back', description: 'Return to the stale list' });
+  actions['◀ Back'] = 'inbox stale';
+
   return {
     text,
     ask: {
       questions: [{
         question: 'Verified proposals (read-only).',
         header: 'Stale plans',
-        options: [{ label: '◀ Back', description: 'Return to the stale list' }],
+        options,
       }],
     },
-    actions: { '◀ Back': 'inbox stale' },
+    actions,
   };
+}
+
+// ===========================================================================
+// SP4 — Human-gated grouped cleanup review & execution (screens, all PURE).
+// Every render function below emits option labels and action STRINGS and
+// performs NO filesystem mutation. Execution happens only when the human selects
+// an explicit 'Confirm: …' / 'Approve' / 'Delete permanently' label, which maps
+// to a `claude:cleanup-exec …` string that the executor (Claude) acts on by
+// calling stale-cleanup.executeCleanup. The exec strings carry only slug+action
+// (or a category) — NEVER a stage; executeCleanup re-derives stage at exec time.
+// ===========================================================================
+
+/**
+ * Build cleanup display items by re-deriving candidates from disk + git on every
+ * render (no cross-screen session state — D8). Reused by every cleanup screen.
+ * `item.stage` is for DISPLAY/grouping only; it is NEVER serialized into a
+ * `claude:cleanup-exec` string (the F1/F2 decoupling — executeCleanup re-derives
+ * stage from its own scan).
+ * @param {string} root
+ * @returns {{ items: Array<object>, candidates: Array<object> }}
+ */
+function _buildCleanupItems(root) {
+  const candidates = listStaleCandidates(root); // cheap scan; carries .stage
+  const slugHistoryCache = {};
+  const toVerify = candidates.slice(0, CLEANUP_MAX_ROWS); // fan-out cap, mirrors SP3
+  const items = [];
+  for (const cand of toVerify) {
+    try {
+      const ev = staleDetector.verifyStaleCandidate(cand, root, { slugHistoryCache });
+      const p = staleDetector.classifyStaleCandidate(cand, ev);
+      items.push({
+        plan: p.plan,
+        stage: cand.stage,
+        category: p.category,
+        proposedAction: p.proposedAction,
+        evidence: p.evidence,
+        explicitlyRejected: !!(ev && ev.explicitlyRejected === true),
+      });
+    } catch {
+      items.push({
+        plan: (cand && cand.plan) || '(unknown)',
+        stage: cand && cand.stage,
+        category: 'inconclusive',
+        proposedAction: null,
+        evidence: ['verification error — skipped'],
+        explicitlyRejected: false,
+      });
+    }
+  }
+  return { items, candidates };
+}
+
+function _cleanupScreen(text, question, options, actions) {
+  return { text, ask: { questions: [{ question, header: 'Clean up', options }] }, actions };
+}
+
+/**
+ * inboxCleanupReview — entry screen (route `inbox cleanup`). Lists actionable
+ * proposals grouped by category; offers Approve-a-category / Review-individually
+ * / Back. NO execution here (render only).
+ */
+function inboxCleanupReview(projectPath) {
+  const root = getProjectPath(projectPath);
+  const { items } = _buildCleanupItems(root);
+  const actionable = items.filter((i) => ACTIONABLE_CLEANUP.includes(i.category));
+
+  let text = `Inbox ▸ Clean up (${actionable.length})\n${'─'.repeat(40)}\n`;
+  if (actionable.length === 0) {
+    text += '\n  No actionable proposals.\n';
+  } else {
+    let rows = 0;
+    let truncated = 0;
+    for (const cat of CLEANUP_ORDER) {
+      const group = actionable.filter((i) => i.category === cat);
+      if (group.length === 0) continue;
+      if (rows < CLEANUP_MAX_ROWS) text += `\n${stripCtl(cat)} (${group.length})\n`;
+      for (const it of group) {
+        if (rows >= CLEANUP_MAX_ROWS) {
+          truncated++;
+          continue;
+        }
+        const verb = (CLEANUP_CATEGORY_TABLE[it.category] || {}).verb || 'review';
+        const ev = (it.evidence || []).map(stripCtl).join('; ');
+        text += `  • ${stripCtl(it.plan)} → ${verb}  (${ev})\n`;
+        rows++;
+      }
+    }
+    if (truncated > 0) text += `  … and ${truncated} more\n`;
+  }
+  text += '\n\n\n';
+
+  const options = [];
+  const actions = {};
+  if (actionable.length > 0) {
+    options.push({ label: 'Approve a category ▸', description: 'Batch-approve one category (with a confirm)' });
+    actions['Approve a category ▸'] = 'inbox cleanup category';
+    options.push({ label: 'Review individually ▸', description: 'Approve or override one plan at a time' });
+    actions['Review individually ▸'] = 'inbox cleanup plan';
+  }
+  options.push({ label: '◀ Back', description: 'Return to verified proposals' });
+  actions['◀ Back'] = 'inbox verify';
+
+  return _cleanupScreen(text, 'Review & execute cleanup (human-gated).', options, actions);
+}
+
+/**
+ * inboxCleanupCategoryPick — route `inbox cleanup category`. One option per
+ * actionable category present (≤3 + Back). NO execution.
+ */
+function inboxCleanupCategoryPick(projectPath) {
+  const root = getProjectPath(projectPath);
+  const { items } = _buildCleanupItems(root);
+  const present = CLEANUP_ORDER.filter((cat) => items.some((i) => i.category === cat));
+
+  let text = `Inbox ▸ Clean up ▸ Approve a category\n${'─'.repeat(40)}\n`;
+  const options = [];
+  const actions = {};
+  for (const cat of present) {
+    const n = items.filter((i) => i.category === cat).length;
+    const label = `${stripCtl(cat)} (${n}) ▸`;
+    const verb = (CLEANUP_CATEGORY_TABLE[cat] || {}).verb || 'process';
+    text += `  • ${stripCtl(cat)} (${n})\n`;
+    options.push({ label, description: `Confirm then ${verb} ${n} plan(s)` });
+    actions[label] = `inbox cleanup confirm ${cat}`;
+  }
+  text += '\n\n\n';
+  options.push({ label: '◀ Back', description: 'Return to cleanup review' });
+  actions['◀ Back'] = 'inbox cleanup';
+
+  return _cleanupScreen(text, 'Pick a category to batch-approve.', options, actions);
+}
+
+/**
+ * inboxCleanupCategoryConfirm — route `inbox cleanup confirm <category>`. Shows
+ * the count + category + member plan names BEFORE any execution. The 'Confirm: …'
+ * label is the ONLY place a batch executes, and only on explicit selection.
+ */
+function inboxCleanupCategoryConfirm(category, projectPath) {
+  if (!ACTIONABLE_CLEANUP.includes(category)) {
+    return inboxCleanupReview(projectPath); // invalid category → safe default
+  }
+  const root = getProjectPath(projectPath);
+  const { items } = _buildCleanupItems(root);
+  const group = items.filter((i) => i.category === category);
+  const n = group.length;
+  const verb = (CLEANUP_CATEGORY_TABLE[category] || {}).verb || 'process';
+
+  let text = `Inbox ▸ Clean up ▸ Confirm\n${'─'.repeat(40)}\n`;
+  text += `\n  ${verb} ${n} ${stripCtl(category)} plan(s):\n`;
+  for (const it of group.slice(0, CLEANUP_MAX_ROWS)) text += `  • ${stripCtl(it.plan)}\n`;
+  text += '\n\n\n';
+
+  const confirmLabel = `Confirm: ${verb} ${n} ${category} plans`;
+  const options = [
+    { label: confirmLabel, description: 'Execute this batch now' },
+    { label: '◀ Back', description: 'Return to the category picker' },
+  ];
+  const actions = {
+    [confirmLabel]: `claude:cleanup-exec category ${category}`,
+    '◀ Back': 'inbox cleanup category',
+  };
+  return _cleanupScreen(text, 'Confirm the batch before it executes.', options, actions);
+}
+
+/**
+ * inboxCleanupPlanReview — route `inbox cleanup plan <slug>|undefined`. With no
+ * slug: a label-only pick list of actionable plans. With a slug: the per-plan
+ * Approve / Override ▸ / Skip / Back screen.
+ */
+function inboxCleanupPlanReview(slug, projectPath) {
+  const root = getProjectPath(projectPath);
+  const { items } = _buildCleanupItems(root);
+  const actionable = items.filter((i) => ACTIONABLE_CLEANUP.includes(i.category));
+
+  if (!slug) {
+    let text = `Inbox ▸ Clean up ▸ Review individually\n${'─'.repeat(40)}\n`;
+    const options = [];
+    const actions = {};
+    for (const it of actionable.slice(0, CLEANUP_MAX_ROWS)) {
+      const label = stripCtl(it.plan);
+      text += `  • ${label} (${stripCtl(it.category)})\n`;
+      options.push({ label, description: `Review ${stripCtl(it.category)}` });
+      actions[label] = `inbox cleanup plan ${it.plan}`;
+    }
+    text += '\n\n\n';
+    options.push({ label: '◀ Back', description: 'Return to cleanup review' });
+    actions['◀ Back'] = 'inbox cleanup';
+    return _cleanupScreen(text, 'Pick a plan to review.', options, actions);
+  }
+
+  const item = actionable.find((i) => i.plan === slug);
+  if (!item) {
+    return inboxCleanupReview(projectPath); // unknown / no-longer-actionable slug → safe default
+  }
+  const verb = (CLEANUP_CATEGORY_TABLE[item.category] || {}).verb || 'review';
+  const action = (CLEANUP_CATEGORY_TABLE[item.category] || {}).action;
+  const ev = (item.evidence || []).map(stripCtl).join('; ');
+
+  let text = `Inbox ▸ Clean up ▸ ${stripCtl(slug)}\n${'─'.repeat(40)}\n`;
+  text += `\n  plan: ${stripCtl(item.plan)}\n  category: ${stripCtl(item.category)}\n  proposed: ${verb}\n  evidence: ${ev}\n`;
+  text += '\n\n\n';
+
+  const options = [
+    { label: 'Approve', description: `Execute: ${verb}` },
+    { label: 'Override ▸', description: 'Choose a different action' },
+    { label: 'Skip', description: 'Leave in place; re-surfaces on the next scan' },
+    { label: '◀ Back', description: 'Return to cleanup review' },
+  ];
+  const actions = {
+    Approve: `claude:cleanup-exec plan ${item.plan} ${action}`,
+    'Override ▸': `inbox cleanup override ${item.plan}`,
+    Skip: 'inbox cleanup',
+    '◀ Back': 'inbox cleanup',
+  };
+  return _cleanupScreen(text, 'Approve, override, or skip this plan.', options, actions);
+}
+
+/**
+ * inboxCleanupPlanOverride — route `inbox cleanup override <slug>`. Lists the
+ * allowed alternative actions for the plan's category. 'Delete permanently' is
+ * offered ONLY for a DOA item with explicitlyRejected === true (the second
+ * confirmation surface for an irreversible delete).
+ */
+function inboxCleanupPlanOverride(slug, projectPath) {
+  const root = getProjectPath(projectPath);
+  const { items } = _buildCleanupItems(root);
+  const actionable = items.filter((i) => ACTIONABLE_CLEANUP.includes(i.category));
+  const item = slug ? actionable.find((i) => i.plan === slug) : null;
+  if (!item) {
+    return inboxCleanupReview(projectPath); // unknown slug → safe default
+  }
+
+  let text = `Inbox ▸ Clean up ▸ Override ${stripCtl(slug)}\n${'─'.repeat(40)}\n\n`;
+  text += '  Choose an alternative action.\n\n\n';
+  const options = [];
+  const actions = {};
+  if (item.category === 'dead-on-arrival') {
+    options.push({ label: 'Archive to done instead', description: 'Reconcile forward to done/' });
+    actions['Archive to done instead'] = `claude:cleanup-exec plan ${item.plan} archive-to-done`;
+    if (item.explicitlyRejected === true) {
+      options.push({ label: 'Delete permanently', description: 'Irreversible — explicitly rejected' });
+      actions['Delete permanently'] = `claude:cleanup-exec plan ${item.plan} delete`;
+    }
+  } else {
+    options.push({ label: 'Revert instead', description: 'Move back one stage (reversible)' });
+    actions['Revert instead'] = `claude:cleanup-exec plan ${item.plan} revert`;
+  }
+  options.push({ label: '◀ Back', description: 'Return to plan review' });
+  actions['◀ Back'] = `inbox cleanup plan ${item.plan}`;
+
+  return _cleanupScreen(text, 'Pick an alternative action.', options, actions);
 }
 
 /**
@@ -1027,6 +1310,13 @@ function route(args, projectPath) {
     case 'inbox':
       if (args[1] === 'verify') return inboxVerifyProposals(projectPath);
       if (args[1] === 'stale') return inboxStalePlansDrillIn(projectPath);
+      if (args[1] === 'cleanup') {
+        if (args[2] === 'category') return inboxCleanupCategoryPick(projectPath);
+        if (args[2] === 'confirm') return inboxCleanupCategoryConfirm(args[3], projectPath); // <category>
+        if (args[2] === 'plan') return inboxCleanupPlanReview(args[3], projectPath); // <slug>|undefined
+        if (args[2] === 'override') return inboxCleanupPlanOverride(args[3], projectPath); // <slug>
+        return inboxCleanupReview(projectPath); // bare 'inbox cleanup'
+      }
       return dashboardPipeline(projectPath); // unknown inbox subcommand → safe default
 
     case 'plan': {
@@ -1082,6 +1372,12 @@ module.exports = {
   sectionBrowse,
   inboxStalePlansDrillIn,
   inboxVerifyProposals,
+  inboxCleanupReview,
+  inboxCleanupCategoryPick,
+  inboxCleanupCategoryConfirm,
+  inboxCleanupPlanReview,
+  inboxCleanupPlanOverride,
+  _buildCleanupItems,
   stageBrowse,
   visionStubsBrowse,
   planActions,

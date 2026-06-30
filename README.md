@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.89-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.90-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -792,7 +792,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.89'
+getVersion()       // → '6.9.90'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -811,7 +811,7 @@ ctoc/
 ├── src/
 │   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       13 Claude Code hooks (session, pre/post tool use, andon-halt)
-│   ├── lib/         107 JS modules (planning, quality, refinement, dispatcher, regulatory-regime, audit-chain, retention, legal-hold, traceability, lineage, eval-harness, comparator, stale-detector, claude-md-lessons)
+│   ├── lib/         108 JS modules (planning, quality, refinement, dispatcher, regulatory-regime, audit-chain, retention, legal-hold, traceability, lineage, eval-harness, comparator, stale-detector, stale-cleanup, claude-md-lessons)
 │   ├── areas/       5 dashboard areas (pipeline, inbox, agent, library, system)
 │   ├── tabs/        8 legacy tab modules (superseded by areas/, kept for drill-in flows)
 │   ├── scripts/     13 build/release utilities
@@ -851,6 +851,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.89** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.90** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
