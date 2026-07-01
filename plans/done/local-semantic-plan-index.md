@@ -47,6 +47,22 @@ conflict/dependency detection**. Embeddings are produced on local hardware,
 within a five-second-per-plan budget, and every create/move/edit/rename/delete on
 the `.md` files is mirrored into the store.
 
+> ### Architecture pivot (2026-07-01, human-directed) — storage HOW only
+> The store is **no longer `node:sqlite` + FTS5 + `sqlite-vec`**. It is a
+> **pure-JavaScript in-memory store backed by a single JSON file**
+> (`.ctoc/index/plan-index.json`) with **brute-force cosine** search. The WHY, the
+> vision, and the four capabilities below are **unchanged** — only the storage
+> mechanism changes. Rationale (established with the CTO): CTOC's corpus is ~1,720
+> units (60 plans, ~1.6 MB) — two orders of magnitude below the ~10k–100k crossover
+> where an approximate-nearest-neighbour index beats brute force. Brute-force cosine
+> over 1,720 × 384-dim vectors is sub-millisecond and the whole index is ~2.6 MB, so
+> a native vector database is premature optimisation. Pure-JS is right-sized,
+> **cross-platform for free** (CLAUDE.md non-negotiable), and eliminates the native
+> binary blocker (per-platform vendoring, musl/glibc ABI, `node:sqlite` experimental
+> status). RRF fusion (below) is index-agnostic, so retrieval quality is unchanged.
+> The stack bullets below are updated to reflect this; the capability and
+> success-criteria sections are untouched.
+
 ### Decisions locked during ideation (2026-06-28, via /ask-me-questions)
 
 - **Scope — FULL CROSS-CORRELATION SUITE.** Semantic search + related-plans
@@ -60,11 +76,19 @@ the `.md` files is mirrored into the store.
   retrieval (FTS5/BM25) via Reciprocal Rank Fusion so exact tokens are never
   missed. Structured frontmatter (`files:`, `parent_vision`, step labels) stays
   queryable metadata, never buried in an embedding.
-- **Store — `node:sqlite` + FTS5 + sqlite-vec.** One transactional file holds
-  classical BM25 and exact vector KNN. SQLite is in Node core; the only artifact
-  is a small per-platform `vec0` extension binary. Proven working on the target
-  hardware (Node 24, SQLite 3.51.2, sqlite-vec v0.1.9, `{ allowExtension: true }`).
-  It literally is a local vector database and makes CRUD mirroring atomic.
+- **Store — PURE-JS IN-MEMORY + SINGLE JSON FILE (pivoted 2026-07-01).** A
+  pure-JavaScript store keyed by `(planPath, sectionId)`, persisted to one JSON file
+  at `.ctoc/index/plan-index.json` (embeddings base64-encoded, byte-exact), with
+  **brute-force cosine** nearest-neighbour search. Zero native dependencies, zero
+  install, cross-platform for free. Atomic writes (temp-file + rename via
+  `src/lib/safe-fs.js`) make persistence crash-safe; a concurrency lock with
+  reload-under-lock + stale-steal keeps the menu + `PostToolUse` hook +
+  reconciliation sweep from clobbering or hanging. The dense half is this
+  brute-force cosine index; the lexical (BM25) half is a pure-JS inverted index built
+  on top in a later slice — both fused by RRF (below).
+  *(Superseded design: `node:sqlite` + FTS5 + `sqlite-vec` `vec0` — abandoned as
+  premature optimisation and a cross-platform binary-vendoring cost at this corpus
+  scale.)*
 - **Engine — OLLAMA-FIRST, IN-PROCESS FALLBACK, FIRST-RUN CALIBRATION.** Probe
   the hardware; use Ollama with acceleration when present (best quality), fall
   back to an in-process engine (ONNX / WebAssembly) when absent. A first-run
@@ -80,20 +104,22 @@ the `.md` files is mirrored into the store.
 
 ## Decisions Taken Under Ambiguity (no-stub rule — to confirm at Gate 0)
 
-- **Cache location & lifecycle:** `.ctoc/index/plans.db`, git-ignored and
-  rebuildable; the `vec0` table dimension is per-machine (set by the calibrated
-  model) and never committed. Whitelisted by the enforcement hook (`.ctoc/*`).
+- **Cache location & lifecycle:** `.ctoc/index/plan-index.json`, git-ignored and
+  rebuildable; the embedding dimension is per-machine (inferred from the calibrated
+  model's first vector) and never committed. Whitelisted by the enforcement hook
+  (`.ctoc/*`).
 - **Fusion:** Reciprocal Rank Fusion, k = 60; cosine distance for dense KNN.
 - **Plan-summary text:** deterministic extraction (title + frontmatter intent +
   section headings) — no LLM summarization call, for determinism and speed.
 - **Calibration target:** model selected so measured p95 ≤ ~3 s per plan, holding
   margin under the 5 s ceiling; embedding runs asynchronously so the menu never
   blocks.
-- **Distribution:** vendor the `vec0` binary for the major platforms
-  (`darwin-arm64/x64`, `linux-x64/arm64`, `win-x64`); embedding model arrives via
-  Ollama pull or lazy download to `~/.ctoc` cache. This is CTOC's first runtime
-  dependency — isolated entirely behind the index module so the rest of CTOC
-  stays dependency-free.
+- **Distribution:** the store has **no native binary and no runtime dependency** —
+  it is pure JavaScript on Node built-ins, so it ships and runs cross-platform with
+  nothing to vendor or install (the pivot's central win). The only runtime dependency
+  in the whole vision is the *embedding engine* (PI2), which arrives via Ollama pull
+  or a lazy download to the `~/.ctoc` cache and is isolated entirely behind the index
+  module so the rest of CTOC stays dependency-free.
 - **Duplicate-guard threshold:** tunable in `.ctoc/settings.yaml`; warns, never
   blocks.
 

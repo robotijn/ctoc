@@ -5,8 +5,9 @@ gate_crossed: functional → implementation
 ---
 
 ---
-title: "PI1 — Index Store, Schema & sqlite-vec Bootstrap"
+title: "PI1 — Pure-JS Plan-Index Store (In-Memory + JSON Persistence)"
 created: "2026-06-28T00:00:00Z"
+updated: "2026-07-01T00:00:00Z"
 type: feature
 status: implementation
 priority: HIGH
@@ -14,987 +15,833 @@ parent_vision: "done/local-semantic-plan-index.md"
 program: ctoc-planning-intelligence
 order: 1
 depends_on: []
-acceptance_criteria_count: 18
-risk_level: HIGH
+acceptance_criteria_count: 20
+risk_level: MEDIUM
 files:
-  - "src/lib/plan-index/db.js"
-  - "src/lib/plan-index/schema.js"
-  - "src/lib/plan-index/vec0-loader.js"
+  - "src/lib/plan-index/store.js"
   - "src/lib/plan-index/index.js"
-  - "src/lib/plan-index/binaries/**"
-  - "src/scripts/vendor-vec0.js"
   - "src/lib/settings.js"
   - ".gitignore"
   - "tests/plan-index-store.test.js"
 gate: "Pending Approval (Gate 2: implementation → todo)"
 ---
 
-# PI1 — Index Store, Schema & sqlite-vec Bootstrap
+# PI1 — Pure-JS Plan-Index Store (In-Memory + JSON Persistence)
+
+> **Architecture pivot (human-directed, 2026-07-01).** This slice was previously
+> "Index Store, Schema & sqlite-vec Bootstrap" — `node:sqlite` + FTS5 + the
+> `sqlite-vec` (`vec0`) native extension. That design is abandoned in favour of a
+> **pure-JavaScript in-memory store backed by a single JSON file**, with brute-force
+> cosine search. Rationale (established with the CTO): CTOC's corpus is ~1,720 units
+> (60 plans, ~1.6 MB of `.md`) — two orders of magnitude below the ~10k–100k
+> crossover where an approximate-nearest-neighbour (ANN) index beats brute force.
+> Brute-force cosine over 1,720 × 384-dim vectors is sub-millisecond; the whole
+> index is ~2.6 MB. A native vector database is premature optimisation. Pure-JS is
+> right-sized, cross-platform **for free** (CLAUDE.md non-negotiable), and deletes
+> the native-binary blocker (vendoring, per-platform resolution, musl/glibc ABI,
+> `node:sqlite` experimental status). **Everything below is the pure-JS design.**
 
 ## Problem Statement
 
-CTOC has no persistent store capable of holding both a lexical (BM25/FTS5) and a
-dense-vector representation of plans. Without a transactional, rebuildable local
-SQLite database with the `sqlite-vec` extension loaded and a well-defined schema,
-none of the four cross-correlation capabilities — semantic search, related-plans
-surfacing, duplicate guard, conflict detection — can exist. This is the
-zero-dependency foundation every other PI slice builds on. Every other PI calls
+CTOC has no persistent store capable of holding a dense-vector representation of
+plans alongside their queryable metadata. Without a rebuildable local store that
+maps `(planPath, sectionId)` → embedding + metadata and answers a nearest-neighbour
+query, none of the four cross-correlation capabilities — semantic search,
+related-plans surfacing, duplicate guard, conflict detection — can exist. This is
+the zero-dependency foundation every other PI slice builds on. Every other PI calls
 this slice's primitives; nothing in this slice depends on any other PI.
+
+The store must be **cross-platform with zero native dependencies** (no compiled
+binaries, no per-platform resolution), **fail-open** (a corrupt or absent index
+never crashes the live menu — it rebuilds), and **safe under concurrent access**
+(the menu, the `PostToolUse` hook, and the reconciliation sweep can all touch the
+index at once without lost updates or hangs).
 
 ## Business Alignment
 
-**Job to Be Done:** When CTOC needs to store or retrieve a plan's lexical and
-vector representations, I want a transactional local database with a stable CRUD
-API, so I can rely on all four cross-correlation capabilities working correctly
-against a consistent, rebuildable store.
+**Job to Be Done:** When CTOC needs to store or retrieve a plan's vector and
+metadata, I want an in-memory store with a stable CRUD + search API persisted to a
+single JSON file, so I can rely on all four cross-correlation capabilities working
+correctly against a consistent, rebuildable store — on macOS, Linux, and Windows,
+with nothing to install.
 
 **Impact Map:**
-- **Goal:** Establish the storage foundation for hybrid BM25 + vector retrieval over all plans (vision success criteria 1–5, 7)
-- **Actor:** CTOC pipeline components (agents, scripts, hooks) and by extension the CTO/developer using CTOC
-- **Impact:** Every plan write operation can be mirrored into a consistent, queryable store; the index is rebuildable from plans at any time on any machine
-- **Deliverable:** A working SQLite database at `.ctoc/index/plans.db` with FTS5 + vec0 schema (cosine distance, kind-separable), committed-vendored platform binaries, and `upsertUnit` / `getUnit` / `deleteUnit` / `moveUnit` / `getFilesForPlan` CRUD primitives
+- **Goal:** Establish the storage + retrieval foundation for the semantic layer
+  (vision success criteria 1–5, 7), right-sized to CTOC's actual corpus.
+- **Actor:** CTOC pipeline components (agents, scripts, hooks) and, by extension,
+  the CTO/developer using CTOC.
+- **Impact:** Every plan write is mirrored into a consistent, queryable in-memory
+  store persisted to `.ctoc/index/plan-index.json`; the index is rebuildable from
+  the `.md` plans at any time on any machine with **zero** setup.
+- **Deliverable:** `src/lib/plan-index/store.js` — a pure-JS store with
+  `openStore` / `upsertUnit` / `getUnit` / `deleteUnit` / `moveUnit` /
+  `getFilesForPlan` / `search` / `save`, atomic JSON persistence via
+  `src/lib/safe-fs.js`, and a designed-out concurrency model.
 
 ## User Stories
 
-**As a** CTOC pipeline component (PI2, PI3), **I want** a parameterized
-`initVectorTable(dimension)` and `upsertUnit` / `getUnit` / `deleteUnit` API,
-**so that** PI2 can set the per-machine vector dimension and PI3 can mirror plan
-changes atomically without knowing how the store is implemented.
+**As a** CTOC pipeline component (PI2, PI3, PI4), **I want** `upsertUnit` /
+`getUnit` / `deleteUnit` / `moveUnit` / `search(queryEmbedding, k, opts)`, **so
+that** PI3 can mirror plan changes atomically and PI4 can run nearest-neighbour
+retrieval, without either knowing how the store is implemented.
 
-**As a** CTOC developer or CI runner, **I want** the store to open and initialize
-with no network access, using only committed-vendored binaries, **so that** the
-index works in offline and air-gapped environments from first run.
+**As a** CTOC developer or CI runner, **I want** the store to open and operate with
+**no native binary, no network, and no install step**, **so that** the index works
+identically in offline, air-gapped, containerised (incl. Alpine/musl), and CI
+environments from first run — the cross-platform guarantee is structural, not
+vendored.
+
+**As a** CTO watching the live menu, **I want** a corrupt or half-written index to
+silently rebuild rather than crash, and concurrent writes from the hook + sweep to
+never clobber each other or hang the menu, **so that** the intelligence layer is
+invisible when healthy and self-heals when not.
 
 ## Acceptance Criteria
 
-- [ ] **Scenario: DB opens and vec0 loads**
-  Given `.ctoc/index/` does not exist on disk
-  When `openStore(dbPath)` is called
-  Then `.ctoc/index/plans.db` is created, `SELECT vec_version()` returns a
-  non-empty string, and `PRAGMA compile_options` confirms FTS5 is compiled in
+- [ ] **AC1 — Scenario: openStore on an absent file yields an empty, usable store**
+  Given `.ctoc/index/plan-index.json` does not exist on disk
+  When `openStore(jsonPath)` is called
+  Then a usable store is returned, `search(anyQuery, 5)` returns `[]`, no file is
+  written to disk until `save()` is called, and nothing throws
 
-- [ ] **Scenario: Store opens in WAL mode with a non-zero busy timeout**
-  Given `openStore(dbPath)` has just returned a store
-  When `PRAGMA journal_mode` and `PRAGMA busy_timeout` are queried on `store.db`
-  Then `journal_mode` returns `wal` and `busy_timeout` returns `5000`, so the
-  multi-process sync path (menu + PostToolUse hook + reconciliation sweep all
-  touching `plans.db`) does not deadlock on `SQLITE_BUSY`; the WAL side-files
-  (`plans.db-wal`, `plans.db-shm`) are covered by the existing `.ctoc/index/`
-  gitignore entry
+- [ ] **AC2 — Scenario: openStore loads a persisted index losslessly**
+  Given a valid `plan-index.json` with N units previously written by `save()`
+  When `openStore(jsonPath)` is called
+  Then `getUnit(planPath, sectionId)` returns each unit with every metadata field
+  intact and its `embedding` as a `Float32Array` whose bytes equal the persisted
+  bytes (`Buffer.compare === 0`)
 
-- [ ] **Scenario: Parameterized vector table creation with cosine metric**
-  Given the store is open and no vec0 virtual table exists
-  When `initVectorTable(384)` is called
-  Then a vec0 virtual table is created accepting 384-float vectors with cosine
-  distance metric; `SELECT sql FROM sqlite_master WHERE name = 'vec_plans'`
-  contains `distance_metric=cosine` and `float[384]` (the vec0 dimension is
-  exposed via `sqlite_master.sql`, not `PRAGMA table_info`; see Decision D10)
+- [ ] **AC3 — Scenario: corrupt/invalid index file → fail-open rebuild (never throws)**
+  Given `plan-index.json` contains malformed JSON, or valid JSON of the wrong shape
+  (missing `units`, wrong `version`, non-array `units`)
+  When `openStore(jsonPath)` is called
+  Then an empty, usable store is returned, a `warn` is appended to
+  `.ctoc/logs/plan-index.json`, and nothing is thrown into the caller (the menu
+  never crashes on a poisoned cache; the index is a rebuildable cache)
 
-- [ ] **Scenario: Dimension mismatch triggers a full tri-table reset**
-  Given a vec0 table already exists at dimension 384 with at least one stored unit
-  When `initVectorTable(512)` is called
-  Then the `vec_plans`, `fts_plans`, and `units` tables are all cleared and
-  `vec_plans` is recreated at dimension 512; no silent mismatch, no thrown error,
-  a warning is logged to `.ctoc/logs/`, and the pre-existing unit is absent from
-  all three tables (no orphaned metadata; `getUnit` returns null)
+- [ ] **AC4 — Scenario: upsertUnit + getUnit round-trip (embedding byte-for-byte)**
+  Given the store is open
+  When `upsertUnit({ planPath, sectionId, kind: 'section', text, embedding:
+  Float32Array(384), files, parentVision, stepLabel, contentHash })` is called
+  Then `getUnit(planPath, sectionId)` returns an object with all fields matching the
+  input — including `contentHash`, `files` (as an array), `parentVision`, `kind` —
+  and the `embedding` as a `Float32Array` equal float-for-float to the input
+  (Float32 precision preserved; no lossy conversion)
 
-- [ ] **Scenario: upsertUnit + getUnit round-trip including vector**
-  Given the store is initialized at dimension 384
-  When `upsertUnit({ path, sectionId, kind: 'plan', text, vector: Float32Array(384),
-  files, parentVision, stepLabel, contentHash })` is called
-  Then `getUnit(path, sectionId)` returns an object with all fields matching the
-  input including `contentHash`, `files` (as array), `parentVision`, `kind`, and
-  the `vector` deserialized as a `Float32Array` whose byte values match the input
-  float-by-float (Float32 precision — no lossy conversion)
+- [ ] **AC5 — Scenario: upsertUnit is an idempotent replace keyed on (planPath, sectionId)**
+  Given a unit already exists at `(p, s)`
+  When `upsertUnit` is called again with the same `(p, s)` and new text/embedding
+  Then the stored unit is replaced (not duplicated), the total unit count is
+  unchanged, and `getUnit(p, s)` returns the new values
 
-- [ ] **Scenario: Forced mid-write leaves no partial row**
-  Given a unit already exists in the store
-  When a write transaction is interrupted mid-execution (simulated via throwing
-  inside the transaction callback)
-  Then `getUnit` returns the original pre-write unit unchanged; no partial row is
-  present in any table
+- [ ] **AC6 — Scenario: getUnit on a miss returns null and never throws**
+  Given `(p, s)` is not present
+  When `getUnit(p, s)` is called
+  Then it returns `null` (never throws, never returns a partial object)
 
-- [ ] **Scenario: deleteUnit removes from FTS5 and vec0 (raw count assertion)**
-  Given a unit exists in the FTS5, vec0, and metadata tables with a known rowid
-  When `deleteUnit(path, sectionId)` is called
-  Then `getUnit(path, sectionId)` returns null,
-  `SELECT COUNT(*) FROM fts_plans WHERE plan_path = ? AND section_id = ?` returns 0,
-  and `SELECT COUNT(*) FROM vec_plans WHERE rowid = <unit rowid>` returns 0
+- [ ] **AC7 — Scenario: deleteUnit removes a unit; absent delete is a no-op**
+  Given a unit exists at `(p, s)`
+  When `deleteUnit(p, s)` is called
+  Then it returns `true`, `getUnit(p, s)` returns `null`; and a subsequent
+  `deleteUnit(p, s)` returns `false` without throwing
 
-- [ ] **Scenario: Binary selection — supported platform**
-  Given the runtime is one of: darwin-arm64, darwin-x64, linux-x64, linux-arm64,
-  win32-x64
-  When `loadVec0Extension(db)` is called
-  Then `fs.existsSync(resolved)` is true (committed binary present), the extension
-  loads without throwing, and `SELECT vec_version()` returns a string matching
-  the pattern `^\d+\.\d+\.\d+$`
+- [ ] **AC8 — Scenario: moveUnit re-paths a plan's units without re-embedding**
+  Given units exist for `plans/todo/x.md` (a plan-level unit and ≥1 section unit),
+  each with a stored `embedding` and `contentHash`
+  When `moveUnit('plans/todo/x.md', 'plans/in-progress/x.md')` is called
+  Then every matching unit's `planPath` becomes `plans/in-progress/x.md`, the
+  `embedding` and `contentHash` of each are unchanged byte-for-byte (no re-embed),
+  the return value is the count of re-pathed units, `getUnit('plans/todo/x.md', …)`
+  returns `null`, and moving a non-existent `fromPath` returns `0`
 
-- [ ] **Scenario: Binary selection — unsupported platform throws clearly**
-  Given the runtime is an unsupported platform/arch (e.g., win32-arm64)
-  When `loadVec0Extension(db)` is called
-  Then it throws an `Error` whose `.message` contains the current
-  `process.platform`, `process.arch`, and the list of supported combinations
-
-- [ ] **Scenario: Binary selection — supported platform but binary not vendored**
-  Given the runtime is a supported platform/arch but the resolved binary file is
-  absent (e.g., a fresh checkout before the maintainer ran `vendor-vec0.js`)
-  When `loadVec0Extension(db)` is called
-  Then it throws an `Error` whose `.message` contains the resolved absolute path
-  of the missing binary and points at the maintainer `vendor-vec0.js` step — a
-  distinct, actionable error separate from the unsupported-platform case
-
-- [ ] **Scenario: Binary selection — incompatible binary (e.g. musl libc)**
-  Given the runtime key is supported and the binary file exists, but the native
-  library fails to load (e.g. the glibc-linked `.so` on an Alpine/musl host, or
-  any raw `dlopen` failure)
-  When `loadVec0Extension(db)` is called
-  Then the raw loader error is caught and re-thrown as an `Error` whose `.message`
-  names `process.platform`, `process.arch`, the libc flavor when detectable, and
-  directs the caller to PI0's degrade path (rebuild-from-plans / no-index); the
-  process never surfaces a bare, unhelpful `dlopen` error
-
-- [ ] **Scenario: Rebuildable cache**
-  Given a populated database
-  When `.ctoc/index/plans.db` is deleted and `openStore(dbPath)` is called again
-  Then a fresh, empty schema is created with identical table names, column names,
-  FTS5 configuration, and vec0 configuration (including cosine metric) as the original
-
-- [ ] **Scenario: Metadata columns are queryable, not embedded**
-  Given a unit upserted with `files: ['src/lib/auth.js']` and
-  `parentVision: 'vision/ci.md'`
-  When a raw `SELECT` is run on the metadata table filtering `WHERE parent_vision
-  = 'vision/ci.md'`
-  Then the row is returned with `files` as a JSON column, not buried inside a
-  vector
-
-- [ ] **Scenario: vendor-vec0.js is not a runtime dependency**
-  Given the runtime binary is present in
-  `src/lib/plan-index/binaries/<platform>-<arch>/`
-  When `openStore` initializes
-  Then `src/scripts/vendor-vec0.js` is never imported or required, and no network
-  call is made
-
-- [ ] **Scenario: Cosine distance metric ranks by angle, not magnitude**
-  Given the store is initialized at dimension 3
-  And three units upserted:
-    - unit A with vector `[10, 1, 0]` (large magnitude, high cosine similarity to `[1, 0, 0]`)
-    - unit B with vector `[0.1, 0.995, 0]` (small magnitude, low cosine similarity to `[1, 0, 0]`)
-  When a KNN query for k=2 is executed against `vec_plans` with query vector `[1, 0, 0]`
-  Then unit A ranks above unit B (cosine sim A ≈ 0.995 > cosine sim B ≈ 0.100);
-  if L2 distance were used the ranking would be reversed (L2 distance A ≈ 9.06 > L2 distance B ≈ 1.34),
-  confirming the metric is cosine, not L2
-
-- [ ] **Scenario: kind column separates plan-level and section-level vectors**
-  Given units upserted for the same plan path:
-    - one with `kind: 'plan'` (plan-level summary vector)
-    - one with `kind: 'section'` (section-level vector)
-  When raw SELECT queries filter the metadata table
-  Then `SELECT COUNT(*) FROM units WHERE plan_path = ? AND kind = 'plan'` returns 1
-  And `SELECT COUNT(*) FROM units WHERE plan_path = ? AND kind = 'section'` returns 1
-  And `upsertUnit` with an invalid kind value (e.g., `'unknown'`) throws or is
-  rejected by a CHECK constraint
-
-- [ ] **Scenario: getFilesForPlan returns a plan's declared files by slug**
+- [ ] **AC9 — Scenario: getFilesForPlan returns a plan's declared files**
   Given a plan-level unit upserted for `pi6-conflict.md` with
   `files: ['src/lib/a.js', 'src/lib/b/**']`
   When `getFilesForPlan('pi6-conflict.md')` is called
-  Then it returns `['src/lib/a.js', 'src/lib/b/**']`; for a plan with no `files:`
-  it returns `[]` and never throws; the lookup is keyed on plan path/slug, not section
+  Then it returns `['src/lib/a.js', 'src/lib/b/**']`; for a plan with no plan-level
+  unit (or empty `files`) it returns `[]` and never throws; the lookup is keyed on
+  plan path/slug, not section
 
-- [ ] **Scenario: moveUnit re-paths a unit without re-embedding**
-  Given a unit exists at `plans/todo/x.md` with a stored vector and contentHash
-  When `moveUnit('plans/todo/x.md', 'plans/in-progress/x.md')` is called
-  Then `plan_path` updates in the metadata, FTS5, and vec0 tables; the stored
-  `vector` and `contentHash` are unchanged (no re-embed); and
-  `getUnit('plans/in-progress/x.md', ...)` returns the same vector byte-for-byte
+- [ ] **AC10 — Scenario: kind separates plan-level and section-level units; bad kind rejected**
+  Given units upserted for the same plan path — one `kind: 'plan'` (sentinel
+  `sectionId: '__plan__'`) and one `kind: 'section'`
+  When they are stored and queried
+  Then both coexist and are individually retrievable, and `upsertUnit` with an
+  invalid `kind` (e.g. `'unknown'`) throws a clear `Error` before any state changes
+
+- [ ] **AC11 — Scenario: search ranks by cosine angle, not magnitude**
+  Given the store holds unit A with embedding `[10, 1, 0]` and unit B with embedding
+  `[0.1, 0.995, 0]` (dimension 3)
+  When `search([1, 0, 0], 2)` is called
+  Then unit A ranks above unit B (cosine sim A ≈ 0.995 > B ≈ 0.100); if Euclidean
+  (L2) distance were used the order would reverse (L2 A ≈ 9.06 > B ≈ 1.34) —
+  confirming the metric is cosine, not L2
+
+- [ ] **AC12 — Scenario: search honours k and opts (kind filter, self-exclusion)**
+  Given a store with mixed `kind: 'plan'` and `kind: 'section'` units across several
+  plans
+  When `search(q, k, { kind: 'section' })` is called
+  Then at most `k` results return, sorted descending by cosine similarity, and every
+  result has `kind === 'section'`; and `search(q, k, { excludePlanPath: 'p.md' })`
+  returns no unit whose `planPath === 'p.md'`
+
+- [ ] **AC13 — Scenario: search validates query dimension**
+  Given the store's dimension is 384
+  When `search(Float32Array(512), 5)` is called
+  Then it throws a clear `Error` naming the expected dimension (384) and the received
+  dimension (512) — a wrong-dimension query is a caller bug, surfaced loudly
+
+- [ ] **AC14 — Scenario: dimension is inferred from the first embedding**
+  Given a freshly opened, empty store (`store.dimension === null`)
+  When the first `upsertUnit` with a `Float32Array(384)` embedding is applied
+  Then `store.dimension === 384` thereafter and persists across `save()`/`openStore`
+
+- [ ] **AC15 — Scenario: dimension mismatch on upsert → full reset + warn (no throw)**
+  Given a store at dimension 384 holding ≥1 unit
+  When `upsertUnit` is called with a `Float32Array(512)` embedding (the calibrated
+  model changed)
+  Then all pre-existing units are cleared, `store.dimension` becomes 512, the new
+  unit is present, a `warn` is appended to `.ctoc/logs/plan-index.json`, and nothing
+  is thrown — the index is a rebuildable cache; PI3 reconciliation re-populates it.
+  Post-reset consistency is asserted: exactly one unit remains and it is the new one
+
+- [ ] **AC16 — Scenario: save() persists the canonical shape and round-trips through disk**
+  Given a store with several units
+  When `save()` is called
+  Then `plan-index.json` exists containing `{ version, dimension, units: [...] }`
+  where each unit's `embedding` is a **base64 string** (not a JSON number array), no
+  `*.tmp-*` sidecar file lingers in the directory, and a fresh `openStore` of that
+  file yields units equal (metadata + embedding bytes) to the pre-save store
+
+- [ ] **AC17 — Scenario: atomic write leaves the prior file intact on failure**
+  Given a valid `plan-index.json` exists on disk
+  When a `save()` fails after serialization but before the rename completes
+  (simulated by making the temp write throw)
+  Then the original `plan-index.json` is unchanged byte-for-byte (temp-file + rename
+  guarantees no torn/partial index is ever observed)
+
+- [ ] **AC18 — Scenario: concurrency — reload-under-lock prevents lost updates (clobber)**
+  Given store handle A is open in memory holding unit X, and a *separate* writer
+  appends unit Y directly to `plan-index.json`
+  When handle A performs `upsertUnit(Z)` (a locked read-modify-write that reloads
+  the file under the lock before mutating)
+  Then the persisted file contains X, Y, **and** Z — Y is not clobbered by A's stale
+  in-memory snapshot. This is the "green tests but the human's menu clobbers the
+  index" failure, designed out and asserted
+
+- [ ] **AC19 — Scenario: concurrency — a stale lock is stolen (writes never hang)**
+  Given a lock file `plan-index.json.lock` exists with an mtime older than the stale
+  threshold (e.g. 10 s)
+  When a write acquires the lock
+  Then the stale lock is stolen and the write completes within the acquire timeout —
+  a crashed lock-holder never hangs the live menu. This is the "green tests but the
+  human's menu hangs" failure, designed out and asserted
+
+- [ ] **AC20 — Scenario: concurrency — writes are serialized; reads are lock-free**
+  Given a write holds the exclusive lock for its read-modify-write section
+  When a second write attempts to acquire the lock while it is held (fresh, not
+  stale)
+  Then the second write waits (bounded retry/backoff) and succeeds only after the
+  first releases — no interleaving; and a concurrent `getUnit`/`search` (read) does
+  **not** take the lock and returns from the in-memory snapshot without blocking
 
 ## Scope
 
 ### In Scope
-- Open/create SQLite at `.ctoc/index/plans.db` via `node:sqlite`
-  `new DatabaseSync(path, { allowExtension: true })` then `enableLoadExtension(true)`
-- Resolve and load the vendored `sqlite-vec` binary from
-  `src/lib/plan-index/binaries/<platform>-<arch>/vec.{dylib,so,dll}` — committed
-  to the repo, no runtime download, no network call. **The file is named
-  `vec.{ext}` (not `vec0.{ext}`)** so SQLite's filename-derived extension entry
-  point resolves to `sqlite3_vec_init` (the symbol sqlite-vec actually exports);
-  see §6.4 and Decision D9
-- FTS5 virtual table for BM25 lexical search over plan/section text
-- `vec0` virtual table with **caller-supplied dimension** via `initVectorTable(dim)`;
-  declared with `distance_metric=cosine` at creation time; deferred until PI2 calls
-  it — PI1 never depends on PI2
-- `kind` column (`TEXT NOT NULL`, values `'plan'` | `'section'`, enforced via
-  `CHECK (kind IN ('plan', 'section'))`) in the `units` metadata table, enabling
-  PI4/PI6 to filter coarse vs. precise vectors via JOIN
-- Metadata/units table: `plan_path`, `section_id`, `kind`, `files` (JSON text
-  column), `parent_vision`, `step_label`, `content_hash` — all queryable columns,
-  never embedded in a vector
-- CRUD primitives: `upsertUnit`, `getUnit`, `deleteUnit`, `moveUnit` (re-path a
-  unit across the metadata, FTS5, and vec0 tables WITHOUT re-embedding — for pure
-  stage moves; used by PI3), and `getFilesForPlan(slug)` (return a plan's declared
-  `files:` globs as an array, `[]` if none; used by PI6) — all wrapped in
-  explicit transactions
-- `src/lib/plan-index/index.js` barrel that exports the public API
-- `.gitignore` entry for `.ctoc/index/` (DB is git-ignored; binaries under
-  `src/lib/plan-index/binaries/` are committed)
-- `src/scripts/vendor-vec0.js` — maintainer-only binary refresh tool; fetches,
-  checksum-verifies, and writes the per-platform binaries as `vec.<ext>` (see
-  D9); a networked, out-of-band, human-run action (F8); **never imported at runtime**
-- Register `plan_index` block in `SETTINGS_SCHEMA` in `src/lib/settings.js`
-  (keys: `engine_preference`, `ollama_base_url`, `duplicate_threshold` — stubs
-  for PI2/PI5/PI6; PI1 reads no settings itself at runtime)
-- `tests/plan-index-store.test.js` — covers all 20 test scenarios (ST-01…ST-20)
+- `src/lib/plan-index/store.js` — the pure-JS store: an in-memory model keyed by
+  `(planPath, sectionId)` plus the CRUD + `search` + `save` API.
+- In-memory model: a `Map<compositeKey, unitRecord>` (source of truth for CRUD) whose
+  values carry the metadata, the raw `embedding` (`Float32Array`, lossless), and a
+  derived, in-memory-only `_norm` (precomputed L2 norm) for fast cosine. `search`
+  iterates `map.values()` — O(N·dim) brute force, right-sized (see Decision D2).
+- Single-file JSON persistence at `.ctoc/index/plan-index.json`, shape
+  `{ version, dimension, units: [...] }`; embeddings stored as **base64 of the
+  `Float32Array` buffer** (compact + byte-exact — Decision D3).
+- Atomic writes via `src/lib/safe-fs.js` only: serialize → `safeFs.writeFileSync` to
+  a temp sibling → `safeFs.renameSync` over the target (Decision D4). **No raw `fs`.**
+- Fail-open `openStore`: absent file → empty store; corrupt/wrong-shape file → warn
+  + empty store; never throws into the caller (Decision D5).
+- Concurrency model: exclusive lock file (`plan-index.json.lock`) guarding every
+  read-modify-write, with reload-under-lock, bounded acquire retry, and stale-lock
+  steal; reads are lock-free against the in-memory snapshot (Decision D6). A
+  `withBatch(fn)` write path takes the lock once for reconciliation's many upserts.
+- Cosine similarity implemented once (`dot` / `norm`), zero-vector-guarded; query
+  dimension validated at `search`.
+- `kind` field (`'plan' | 'section'`) validated at `upsertUnit`; plan-level units use
+  the reserved `sectionId: '__plan__'` sentinel so `(planPath, sectionId)` is always
+  a non-null composite key and `getFilesForPlan` can address the plan-level row.
+- `src/lib/plan-index/index.js` — barrel exporting the public API (the only entry
+  point other CTOC code imports).
+- `.gitignore` entry for `.ctoc/index/` (the JSON index is a git-ignored, rebuildable
+  cache).
+- Forward-declared `plan_index` block in `SETTINGS_SCHEMA` in `src/lib/settings.js`
+  (keys `engine_preference`, `ollama_base_url` for PI2; `duplicate_threshold` for
+  PI5/PI6) — PI1 reads **no** settings at runtime; these are additive stubs so
+  downstream slices are not stranded (Decision D8).
+- `tests/plan-index-store.test.js` — covers all 20 acceptance criteria with tmp-dir
+  JSON fixtures, `node:test`, **zero native binaries and zero network in CI**.
 
 ### Out of Scope
-- Producing vectors (PI2)
-- Deciding what or when to re-embed (PI3)
-- Any query, ranking, or Reciprocal Rank Fusion (PI4)
-- Duplicate guard thresholds or conflict detection (PI5–PI6)
-- UI or menu surfacing of any kind
-- Runtime download of vec0 binaries — zero network at runtime; vendor-vec0.js is
-  a maintainer tool only
-- Automatic schema migration across schema versions (current policy: drop and
-  recreate; DB is a rebuildable cache)
-- Node version pinning or capability gate (PI0's responsibility)
+- Producing embeddings / choosing or calibrating the model (PI2).
+- Deciding what or when to re-embed; the reconciliation sweep + hot-path triggers
+  (PI3) — this slice only exposes the primitives (incl. `withBatch`) PI3 drives.
+- Lexical BM25 retrieval and Reciprocal Rank Fusion (PI4) — PI4 builds ranking
+  *on top of* this store's brute-force cosine; RRF is index-agnostic, so ranking
+  quality is identical to the abandoned FTS5 + sqlite-vec + RRF plan.
+- Duplicate-guard thresholds / conflict detection (PI5–PI6).
+- UI or menu surfacing of any kind.
+- Any native binary, compiled extension, per-platform resolution, or `node:sqlite`
+  (deleted by the pivot).
+- An approximate-nearest-neighbour (ANN) index — premature at CTOC's scale; the
+  brute-force scan is the deliberate, documented choice (Decision D2).
 
 ## Test Plan
 
-Framework: Node `--test` (matches the rest of the CTOC test suite).
-All tests run without network access. No Ollama or external service required.
+Framework: Node `--test` (matches the rest of the CTOC suite). **All tests run with
+zero network and zero native binaries.** Temp indexes use
+`fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-idx-'))` and are cleaned up. Every ST
+below is a distinct `test()` with a meaningful assertion (no empty catches, no
+assertionless passes, no mocked-away core logic — the store and its file I/O are
+exercised for real).
 
-| Test ID | Description                                    | Key Assertion                                                              |
-|---------|------------------------------------------------|----------------------------------------------------------------------------|
-| ST-01   | openStore creates DB and loads vec0            | `SELECT vec_version()` returns string matching `^\d+\.\d+\.\d+$`          |
-| ST-02   | initVectorTable(384) creates vec0 with cosine  | `sqlite_master.sql` contains `distance_metric=cosine` and `float[384]` (dim via sqlite_master, not table_info) |
-| ST-03   | Dimension mismatch → FULL tri-table reset      | New table reflects dim 512; no error thrown; warning logged; pre-existing unit gone from units + fts_plans + vec_plans |
-| ST-04   | upsertUnit + getUnit full round-trip           | All fields equal including kind; vector byte-for-byte Float32 match        |
-| ST-05   | Forced mid-write: no partial row               | getUnit pre-state unchanged after interrupted tx                           |
-| ST-06   | deleteUnit removes from FTS5 and vec0          | getUnit null; `SELECT COUNT(*)` = 0 on fts_plans AND vec_plans             |
-| ST-07   | Binary: darwin-arm64 load + version            | existsSync true; loads without throw; vec_version() matches `^\d+\.\d+\.\d+$` |
-| ST-08   | Binary: linux-x64 load + version              | existsSync true; loads without throw; vec_version() matches `^\d+\.\d+\.\d+$` |
-| ST-09   | Binary: win32-x64 load + version              | existsSync true; loads without throw; vec_version() matches `^\d+\.\d+\.\d+$` |
-| ST-10   | Unsupported platform throws descriptive error  | error.message contains platform + arch + supported list                    |
-| ST-11   | Delete DB + re-init → same empty schema        | Table names, column names, cosine metric match reference set               |
-| ST-12   | Metadata queryable by parent_vision            | SELECT WHERE parent_vision = '...' returns row                             |
-| ST-13   | vendor-vec0.js not in import graph at runtime  | Module cache has no entry for vendor-vec0.js path                          |
-| ST-14   | Cosine metric: angle-based ranking             | Unit A ([10,1,0]) ranks above B ([0.1,0.995,0]) for query [1,0,0]         |
-| ST-15   | kind column: plan vs section separability      | COUNT(*) WHERE kind='plan' = 1; WHERE kind='section' = 1; bad kind throws  |
-| ST-16   | getFilesForPlan returns globs, [] if none      | Returns declared `files:` globs; missing → []; never throws                |
-| ST-17   | moveUnit re-paths without re-embed              | plan_path updated in all tables; vector + contentHash unchanged            |
-| ST-18   | Supported platform, binary not vendored, throws| existsSync false at resolved path → error names resolved absolute path + `vendor-vec0.js` step |
-| ST-19   | Incompatible binary (dlopen/musl) throws       | loadExtension throws → re-thrown error names platform + arch + libc + degrade path; no bare dlopen |
-| ST-20   | openStore sets WAL + busy_timeout              | `PRAGMA journal_mode` = wal; `PRAGMA busy_timeout` = 5000                  |
+| Test ID | Maps AC | Description | Key assertion |
+|---------|---------|-------------|---------------|
+| ST-01 | AC1  | openStore on absent file | usable store; `search` → `[]`; no file created pre-`save`; no throw |
+| ST-02 | AC2  | openStore loads persisted units | every field intact; `Buffer.compare(inBytes, outBytes) === 0` |
+| ST-03 | AC3  | corrupt/invalid file → fail-open | garbage & wrong-shape both → empty store + `warn` logged; no throw |
+| ST-04 | AC4  | upsert + getUnit round-trip | all fields incl. `kind`/`contentHash`/`files`(array); embedding float-for-float equal |
+| ST-05 | AC5  | idempotent replace on (p,s) | count unchanged after re-upsert; new values returned |
+| ST-06 | AC6  | getUnit miss → null | returns `null`; never throws |
+| ST-07 | AC7  | deleteUnit + no-op delete | first → `true`, `getUnit`→`null`; second → `false`, no throw |
+| ST-08 | AC8  | moveUnit re-paths w/o re-embed | all units re-pathed; embedding+contentHash byte-for-byte unchanged; count returned; missing from→0 |
+| ST-09 | AC9  | getFilesForPlan | returns declared globs; no plan-level row → `[]`; never throws |
+| ST-10 | AC10 | kind separability + bad kind | plan+section coexist & retrievable; `kind:'unknown'` throws before mutation |
+| ST-11 | AC11 | cosine ranks by angle not magnitude | A`[10,1,0]` ranks above B`[0.1,0.995,0]` for query `[1,0,0]`; L2 would reverse |
+| ST-12 | AC12 | search k + kind filter + exclude | ≤k, sorted desc; all `kind:'section'`; excluded planPath absent |
+| ST-13 | AC13 | search query-dimension validation | wrong-dim query throws; message names expected(384) + got(512) |
+| ST-14 | AC14 | dimension inferred from first upsert | `dimension` null→384; persists across save/open |
+| ST-15 | AC15 | dimension mismatch → full reset + warn | prior units gone; `dimension`=512; exactly the new unit remains; `warn` logged; no throw |
+| ST-16 | AC16 | save shape + disk round-trip | file has `{version,dimension,units}`; embedding is base64 string; no `*.tmp-*` left; reopen equal |
+| ST-17 | AC17 | atomic write, prior file intact | injected temp-write failure → original file byte-for-byte unchanged |
+| ST-18 | AC18 | reload-under-lock prevents clobber | external append (Y) survives handle-A `upsert(Z)`; file has X+Y+Z |
+| ST-19 | AC19 | stale lock stolen (no hang) | backdated `.lock` mtime → acquire steals it; write completes within timeout |
+| ST-20 | AC20 | writes serialized, reads lock-free | held lock blocks a fresh 2nd acquire until release; `getUnit`/`search` never block |
 
 ## Risks
 
 ### Technical Risks
-- **sqlite-vec binary ABI compatibility**: The vendored binary is proven on
-  Node 24 / SQLite 3.51.2 / sqlite-vec v0.1.9. Future Node upgrades that bundle a
-  different SQLite version may break the extension ABI.
-  - Likelihood: MEDIUM
-  - Impact: HIGH (store completely non-functional)
-  - Mitigation: Record the exact version triple (Node+SQLite+sqlite-vec) in a
-    comment in `vec0-loader.js`; CI smoke test calls `SELECT vec_version()` on
-    every run to detect ABI breakage immediately; Node version pinning is
-    PI0's capability gate — do not add `.nvmrc` or `package.json engines` here
+- **Concurrency correctness (the primary residual risk).** Menu + `PostToolUse` hook
+  + reconciliation sweep can all write the single JSON file. A naive last-writer-wins
+  loses updates ("clobber"); a naive lock that a crashed process holds hangs the menu.
+  - Likelihood: HIGH that concurrent writes occur; MEDIUM that a naive design would
+    corrupt/lose data.
+  - Impact: MEDIUM (a rebuildable cache — reconciliation self-heals — but a live
+    clobber/hang is a bad human experience).
+  - Mitigation: exclusive-lock + reload-under-lock + stale-steal + lock-free reads +
+    atomic temp/rename (Decision D6); made a tested acceptance criterion
+    (AC18/AC19/AC20) precisely so "green tests but the menu hangs/clobbers" is
+    designed out, not discovered in production.
 
-- **Extension entry-point derivation (F1)**: `node:sqlite`
-  `DatabaseSync.loadExtension(path)` is single-arg — no explicit entry-point
-  parameter — so SQLite derives the C symbol from the filename. sqlite-vec exports
-  `sqlite3_vec_init`, which only resolves if the file is named `vec.<ext>` (a
-  `vec0.<ext>` name derives the non-existent `sqlite3_vec0_init` and fails).
-  - Likelihood: HIGH if mis-named (certainty of failure), otherwise N/A
-  - Impact: HIGH (extension never loads → store non-functional — a slice-killer)
-  - Mitigation: vendor the binary as `vec.<ext>` (D9); the **mandatory Step 8
-    pre-IMPLEMENT spike** proves `loadExtension(vec0Path)` + `SELECT vec_version()`
-    on the dev machine before any store code is written; see `## Blocking Prerequisites`
+- **Brute-force scan cost at growth.** `search` is O(N·dim). At N ≈ 1,720 today the
+  scan is sub-millisecond; the design is right-sized, not future-proofed to millions.
+  - Likelihood: LOW (corpus grows slowly).
+  - Impact: LOW until ~50k units, then noticeable.
+  - Mitigation: documented O(N·dim) with headroom to ~50k (Decision D2); the drop-in
+    optimisation (a packed contiguous `Float32Array` + pre-normalised vectors, or an
+    ANN index) is noted as a future option gated on a real measurement, never adopted
+    speculatively.
 
-- **musl / Alpine libc incompatibility (F2)**: sqlite-vec ships glibc-linked `.so`
-  binaries; on a musl host `existsSync` passes but `dlopen` throws a raw, unhelpful
-  error.
-  - Likelihood: MEDIUM (Alpine is common in CI/containers)
-  - Impact: MEDIUM (Linux-musl only; degradable)
-  - Mitigation: `loadVec0Extension` wraps the load in try/catch and re-throws an
-    actionable error naming platform/arch/libc + PI0's degrade path (rebuild-from-plans
-    / no-index); musl is documented known-unsupported (D11); a musl-linked build is a
-    future maintainer TODO, not a PI1 blocker; tested by ST-19
+- **Embedding precision on persistence.** Storing float32 as JSON numbers risks
+  verbosity and reliance on float round-trip subtleties.
+  - Likelihood: LOW with the chosen encoding.
+  - Impact: MEDIUM (a silently lossy embedding degrades ranking).
+  - Mitigation: base64 of the raw `Float32Array` buffer is byte-exact and ~half the
+    size of a number array (Decision D3); AC4/AC16 assert byte-for-byte equality
+    through memory and through disk.
 
-- **Windows DLL load path**: `enableLoadExtension` on Windows may require the
-  DLL's directory to be on PATH, or an absolute path must be passed.
-  - Likelihood: MEDIUM
-  - Impact: MEDIUM (Windows-only; fixable post-discovery)
-  - Mitigation: Always pass the `path.resolve`-resolved absolute path to
-    `loadExtension`; add a win32-platform test in CI
-
-- **FTS5 + vec0 concurrent virtual table writes**: Both use SQLite's virtual
-  table mechanism; edge cases with concurrent writes against two virtual tables
-  in the same transaction may surface.
-  - Likelihood: LOW
-  - Impact: MEDIUM
-  - Mitigation: All writes wrap both FTS5 and vec0 upserts in a single explicit
-    `BEGIN`/`COMMIT`; tested by ST-05
-
-### Business Risks
-- **Vendored binaries increase repo size**: 5 platform binaries at approximately
-  200–400 KB each adds roughly 1.5–2 MB to the repository.
-  - Likelihood: HIGH (certainty — this is a known trade-off)
-  - Impact: LOW (accepted cost for the offline-first, zero-runtime-network guarantee)
-  - Mitigation: Document the size trade-off in the vision; confirm binary sizes
-    during the vendor-vec0.js maintenance run; consider Git LFS if size grows
-    beyond 5 MB across future binary updates
+- **Cross-platform file semantics.** Atomic replace and locking must behave on
+  macOS, Linux, and Windows.
+  - Likelihood: LOW.
+  - Impact: MEDIUM (Windows rename-over-existing and lock steal).
+  - Mitigation: temp file is created in the **same directory** (same volume) as the
+    target so `renameSync` is atomic on all three OSes; all paths via `path.join`;
+    all I/O via `safe-fs`; exclusive create via `writeFileSync(lockPath, …, { flag:
+    'wx' })` is atomic cross-platform.
 
 ### Dependency Risks
-- **PI2 and PI3 are blocked until PI1 ships**: PI1 is the critical-path
-  deliverable; no other PI slice can run integration tests against a real store.
-  - Likelihood: HIGH (structural)
-  - Impact: HIGH (all other PI slices are gated on this)
-  - Mitigation: Ship PI1 in its own Iron Loop cycle first; PI1 has no upstream
-    dependencies and can begin immediately
+- **PI2/PI3/PI4 are gated on PI1.** PI1 is the critical-path foundation; no other PI
+  can integration-test against a real store until it ships.
+  - Likelihood: HIGH (structural).
+  - Impact: MEDIUM (down from HIGH — the pivot removes the native-binary blocker, so
+    PI1 can be built and shipped immediately with no maintainer/vendoring step).
+  - Mitigation: PI1 has no upstream dependency and, post-pivot, no out-of-band
+    prerequisite; it can begin at once.
 
 ## Rollback
 
-1. Delete `.ctoc/index/plans.db` (git-ignored; no committed data loss).
-2. Revert `src/lib/plan-index/` and `tests/plan-index-store.test.js` to the
-   prior commit.
-3. Revert the `plan_index` block addition to `src/lib/settings.js`.
+1. Delete `.ctoc/index/plan-index.json` (git-ignored; no committed data loss).
+2. Revert `src/lib/plan-index/` and `tests/plan-index-store.test.js` to the prior
+   commit.
+3. Revert the additive `plan_index` block in `src/lib/settings.js` and the
+   `.gitignore` line.
 4. The rest of CTOC is unaffected — all plan-index paths are behind the
    `src/lib/plan-index/index.js` barrel; no existing CTOC code imports them yet.
 
 ## Dependencies
 
-- **Node 24** — `node:sqlite` built-in with `allowExtension` + `enableLoadExtension` support.
-- **sqlite-vec v0.1.9 vendored binaries** — committed under `src/lib/plan-index/binaries/`.
-- No npm packages required for PI1.
-- PI2 calls `initVectorTable(dimension)` on this store after calibration.
-- PI3 calls `upsertUnit` / `deleteUnit` / `getUnit` via the PI1 barrel.
-- PI0 owns capability gate (feature-detect node:sqlite/vec0/FTS5) and composition
-  root; PI1 is constructed and initialized by PI0, not self-bootstrapped.
+- **`src/lib/safe-fs.js`** (LH1, landed) — the mandated filesystem choke point; all
+  store I/O routes through it (`readFileSync`, `writeFileSync`, `renameSync`,
+  `existsSync`, `statSync`, `unlinkSync`, `mkdirSync`).
+- **Node built-ins only** — no npm packages, no native modules, no `node:sqlite`.
+- PI0 constructs the store at the composition root (post-pivot this is trivial — the
+  pure-JS store is *always available*, so PI0's native-capability probe is deleted;
+  PI0 simply calls `openStore`).
+- PI2 produces embeddings and drives the per-machine dimension by upserting vectors
+  of that dimension (the store infers/locks it — Decision D7).
+- PI3 mirrors plan changes via `upsertUnit`/`deleteUnit`/`moveUnit`/`withBatch`.
+- PI4 runs `search` and fuses it with BM25 via RRF.
 
-## Blocking Prerequisites (gate IMPLEMENT — Step 10)
+## Cross-Plan Impact (flagged for later alignment — NOT rewritten here)
 
-Step 10 (IMPLEMENT) MUST NOT begin until BOTH of these are satisfied. They are hard
-gates, not soft warnings:
+The pivot changes downstream functional stubs. These are noted so the alignment is
+not lost; each is re-planned in its own slice, not here:
 
-1. **Native `vec0` binaries are vendored (maintainer action, F8).** A human
-   maintainer has run `node src/scripts/vendor-vec0.js` once — a networked,
-   out-of-band action — to fetch, SHA256-verify, and commit the five per-platform
-   sqlite-vec v0.1.9 loadable extensions under
-   `src/lib/plan-index/binaries/<platform>-<arch>/vec.<ext>`. No automated Iron-Loop
-   agent fetches or commits these; if they are absent the loop stalls and surfaces the
-   blocker to the human — it does not route around it or write a stub.
-2. **The Step 8 load spike passes (F1).** On the dev machine, single-arg
-   `db.loadExtension(vec0Path)` loads and `SELECT vec_version()` returns a version
-   string. **STATUS: PASSED on darwin-arm64 (see Spike Results below).** Remaining
-   before IMPLEMENT: the maintainer vendors the other four platform binaries and the
-   spike is re-confirmed per platform in CI.
-
-Ordering: maintainer vendors binaries → Step 8 spike proves the load → Step 8 tests
-are authored → Steps 9–10 implement.
-
-### Step-8 Spike Results (empirical — darwin-arm64, Node 24.14.1, sqlite-vec 0.1.9, 2026-07-01)
-
-Ran the F1 spike against the real sqlite-vec loadable extension. Findings supersede
-the pre-spike theory in §6.4 / D9:
-
-- **loadExtension works single-arg with the DEFAULT `vec0.<ext>` filename.** The
-  critic's theory — that `vec0.dylib` derives entry point `sqlite3_vec0_init` and
-  fails — is **empirically false**: `db.loadExtension(resolve('vec0.dylib'))`
-  (single-arg) loaded cleanly, `SELECT vec_version()` returned `v0.1.9`, and a
-  `CREATE VIRTUAL TABLE … USING vec0(embedding float[3])` + knn round-trip succeeded
-  (query `[1,0,0]` → rowid 1, distance 0). **⇒ D9's rename to `vec.<ext>` is NOT
-  required.** Recommendation: vendor the binaries under their shipped name
-  (`vec0.<ext>`); keep the rename only as a documented per-platform *fallback* if
-  some platform's entry-point derivation ever fails the spike. Simpler vendoring.
-- **D13 (NEW, critical implementer contract) — rowid MUST be bound as `BigInt`.**
-  vec0's implicit `rowid` primary key rejects a JS `number` bound by `node:sqlite`
-  (it binds as REAL): `INSERT INTO t(rowid, embedding) VALUES (1, ?)` throws
-  `"Only integers are allowed for primary key values"`, whereas `(1n, ?)` (BigInt)
-  succeeds. `upsertUnit` (§7.3) and `moveUnit` (§7.6) MUST bind rowid as BigInt
-  (coerce with `BigInt(rowid)` at the store boundary). A Step-8 test MUST assert an
-  insert with a numeric rowid is handled (coerced) and one binding raw REAL fails —
-  otherwise every write silently fails at runtime (a no-stub-rule gotcha).
-- **2-arg `loadExtension(path, entry)` did not throw** on this build (the extra arg
-  was tolerated), but the single-arg form is the contract; do not rely on the 2-arg
-  form.
-- Embeddings bind as `Uint8Array` over a `Float32Array` buffer; `enableLoadExtension(false)`
-  after load works (keep the security re-disable in §6.4).
+- **PI0 (bootstrap) — simplifies.** The pure-JS store is always available, so PI0's
+  native-capability probe (`node:sqlite` present? `vec0` loads? FTS5 compiled?) and
+  its "degrade to no-index" branch are **deleted**. PI0 becomes: create `.ctoc/index/`,
+  call `openStore`, hold the handle. (Fail-open now lives inside `openStore` itself.)
+- **PI2 (embeddings) — unaffected.** Still Ollama-first / in-process fallback /
+  first-run calibration; it hands `Float32Array` embeddings to `upsertUnit`.
+- **PI3 (reconciliation) — retargeted, same shape.** Content-hash diff sweep +
+  hot-path triggers now drive the JSON store's `upsertUnit`/`deleteUnit`/`moveUnit`
+  and use `withBatch` for the sweep (one lock acquire for many writes).
+- **PI4 (semantic search) — retargeted, same ranking.** BM25 + Reciprocal Rank
+  Fusion build on this store's brute-force cosine top-k. RRF is index-agnostic, so
+  retrieval quality is identical to the abandoned FTS5 + sqlite-vec + RRF design.
 
 ## Decisions Taken Under Ambiguity
 
-- **Dimension ownership**: The vec0 table dimension is parameterized and set by
-  the caller (PI2 after calibration), keeping PI1 free of any PI2 dependency
-  while honoring the locked per-machine-dimension decision.
-- **Binary distribution**: Committed-vendored under
-  `src/lib/plan-index/binaries/<platform>-<arch>/`; resolved at runtime via
-  `process.platform` + `process.arch`; zero network calls at runtime.
-  `vendor-vec0.js` is a maintainer refresh tool — never imported at runtime.
-- **Distance metric**: `distance_metric=cosine` is declared at `initVectorTable`
-  creation time. PI2 does NOT need to L2-normalize vectors before insert. This
-  is the correct metric for sentence embedding similarity (insensitive to
-  embedding magnitude, measures directional similarity).
-- **kind column vs. two vec0 tables**: A single `kind` column in the `units`
-  metadata table (with a CHECK constraint) was chosen over two separate vec0
-  virtual tables. Simpler schema; filtering is done by JOIN on the KNN result
-  rowids (PI4/PI6 pattern). The vec0 table holds all vectors uniformly indexed
-  by rowid.
-- **Dimension mismatch policy**: On `initVectorTable` called with a different
-  dimension than the existing table, the vec0 table is dropped and recreated.
-  This is acceptable because the DB is a rebuildable cache; a logged warning is
-  emitted so the event is visible.
-- **plan_index namespace in settings.js SETTINGS_SCHEMA**: PI1 adds the
-  `plan_index` block to `SETTINGS_SCHEMA` in `src/lib/settings.js` so that PI2
-  and PI5/PI6 can read their settings via `getSetting`/`setSetting` from
-  `settings.json`. PI1 does NOT write to `.ctoc/settings.yaml` — the settings
-  API is the correct runtime interface (see CONFIG SOURCES note in settings.js).
-- **Schema migration**: Formal migration tooling is out of scope; current policy
-  is drop-and-recreate, which is safe because the DB is a self-healing cache and
-  can always be rebuilt from the `.md` plans.
+- **D1 — Pure-JS in-memory store + single JSON file (the pivot).** Chosen over
+  `node:sqlite` + FTS5 + `sqlite-vec`. At ~1,720 units, brute-force cosine is
+  sub-millisecond and the index is ~2.6 MB; a native ANN store is premature
+  optimisation and imposes a cross-platform binary-vendoring cost that CLAUDE.md's
+  zero-native-dependency stance forbids taking on speculatively. Pure-JS is
+  right-sized and cross-platform for free.
+- **D2 — Map + per-unit `Float32Array`, brute-force scan.** The in-memory model is a
+  `Map<"planPath sectionId", unitRecord>`; `search` iterates `map.values()`
+  computing cosine — O(N·dim) ≈ 1,720 × 384 ≈ 6.6 × 10⁵ multiply-adds per query,
+  microseconds. Generous headroom to ~50k units before it matters. A packed
+  contiguous vector array (better cache locality) and/or an ANN index are documented
+  **future** options, adopted only on a measured need — not now (no premature
+  optimisation).
+- **D3 — Embeddings persisted as base64 of the `Float32Array` buffer.** A JSON number
+  array bloats (~3–5 KB per 384-dim vector vs ~2 KB base64) and relies on the
+  float64→string→float64→float32 round-trip being exact. Base64 of the raw
+  little-endian buffer is unconditionally byte-exact **and** compact. In memory the
+  raw `Float32Array` is kept (lossless round-trip, AC4); a derived `_norm` (L2 norm)
+  is cached in memory for fast cosine and is **not** persisted (recomputed cheaply on
+  load — no drift).
+- **D4 — Atomic writes via safe-fs temp + rename.** `save()` writes the serialized
+  JSON to `plan-index.json.tmp-<pid>-<ts>` (same directory → same volume) via
+  `safeFs.writeFileSync`, then `safeFs.renameSync` over the target. `rename` is
+  atomic on macOS/Linux/Windows, so a reader never observes a torn/partial index and
+  a crash mid-write leaves the prior file intact (AC17). On any failure before the
+  rename, the temp file is unlinked in a `catch`.
+- **D5 — Fail-open `openStore`.** Absent file → empty store. Present but unparseable,
+  or valid JSON of the wrong shape (`version` mismatch, missing/non-array `units`, a
+  unit missing required fields) → log a `warn` to `.ctoc/logs/plan-index.json` and
+  start empty. `openStore` **never throws** into the menu; the `.md` plans are the
+  source of truth and PI3 rebuilds the cache (AC3). This replaces the abandoned
+  native "capability gate / degrade" path — fail-open is now intrinsic to the store.
+- **D6 — Concurrency: exclusive lock + reload-under-lock + stale-steal; lock-free
+  reads.** The single-JSON-file requirement forces serialising the read-modify-write
+  to prevent lost updates. Every mutating op (`upsertUnit`/`deleteUnit`/`moveUnit`/
+  `save`/`withBatch`) acquires `plan-index.json.lock` via
+  `safeFs.writeFileSync(lockPath, payload, { flag: 'wx' })` (atomic exclusive create),
+  **reloads the file from disk under the lock** (so concurrent external writes are
+  merged, not clobbered — AC18), applies the mutation, atomically saves, then unlinks
+  the lock. Acquire uses a bounded retry with short backoff; a lock whose mtime
+  exceeds a stale threshold (default 10 s) is **stolen** (unlinked + re-acquired) so a
+  crashed holder never hangs the menu (AC19). Reads (`getUnit`/`search`) take **no**
+  lock — they serve the in-memory snapshot and tolerate being at most one write stale
+  (the vision explicitly permits reader staleness), so the live menu never blocks on a
+  writer (AC20). Alternatives weighed and rejected: *sole-writer daemon* (CTOC has no
+  daemon; writes originate from independent hook/menu processes); *per-plan shard
+  files* (contradicts the single-file requirement and complicates `search`);
+  *lock-free optimistic mtime CAS* (has a TOCTOU window between check and rename that
+  the exclusive-create lock closes). The exclusive-create lock is the correct atomic
+  primitive at this scale and is directly testable.
+- **D7 — Dimension is inferred and store-owned.** `store.dimension` is `null` until
+  the first embedding is upserted, then locked to that length (PI2's calibrated model
+  determines it — PI1 never picks a dimension). A later upsert whose embedding
+  dimension differs signals the model changed: the store performs a **full reset**
+  (clear all units, adopt the new dimension, log a `warn`, do **not** throw) because
+  every stored vector is now incomparable and the index is a rebuildable cache (AC15).
+  A `search` query of the wrong dimension is a *caller bug*, not a model change, so it
+  **throws** a clear error (AC13) — reset vs throw is deliberately asymmetric.
+- **D8 — Forward-declared `plan_index` settings block retained.** PI2/PI5/PI6 still
+  need `engine_preference`, `ollama_base_url`, `duplicate_threshold`; these are
+  additive `SETTINGS_SCHEMA` entries only (each with `key`/`label`/`type`/`default`;
+  the `select` default is within `options`) so the existing settings suite is not
+  regressed. PI1 reads none of them at runtime. No new settings tab (UI is out of
+  scope; the tab-count invariant holds).
+- **D9 — `plan_path` is an opaque, verbatim key; normalization is PI3/PI6's job.**
+  AC9 passes a bare slug (`pi6-conflict.md`) while other scenarios use full paths
+  (`plans/todo/x.md`). PI1 keys on the exact string supplied at upsert and does **no**
+  normalization; the barrel JSDoc states this verbatim ("planPath is an opaque key;
+  callers must normalize consistently"). Consistent normalization is carried forward
+  as a **required PI3 (sync/upsert) and PI6 (conflict / getFilesForPlan) acceptance
+  criterion** so the contract is not lost — a deliberate, scoped deferral.
+- **D10 — `kind` validated in code (no schema layer).** With no SQL there is no CHECK
+  constraint; `upsertUnit` validates `kind ∈ {'plan','section'}` and throws before
+  mutating state (AC10). Plan-level units carry the reserved `sectionId: '__plan__'`
+  sentinel so the composite key is always non-null and `getFilesForPlan` addresses the
+  plan-level row unambiguously.
 
 ---
 
 # Implementation Details
 
 > Generated by implementation-planner (Iron Loop Steps 5 PLAN → 6 DESIGN → 7 SPEC)
-> for Gate 2 review. Grounded against the live repo: Node `v24.14.1`,
-> `node:sqlite` `DatabaseSync` (SQLite `3.51.2`, FTS5 compiled in, `enableLoadExtension`
-> + `loadExtension` present), the `src/lib/settings.js` `SETTINGS_SCHEMA`/`getSetting`
-> contract, the `src/lib/enforcement-log.js` append-only JSON log pattern, and the
-> prevailing `node:test` (`describe`/`test`/`assert`) suite idiom.
+> for Gate 2 review. Grounded against the live repo: Node built-ins only,
+> `src/lib/safe-fs.js` (LH1, the mandated fs choke point), the `src/lib/settings.js`
+> `SETTINGS_SCHEMA`/`getSetting` contract, the `src/lib/enforcement-log.js`
+> append-only JSON log pattern, and the prevailing `node:test`
+> (`describe`/`test`/`assert`) suite idiom. **Zero native dependencies.**
 
 ## Step 5 — PLAN (Technical Approach)
 
 ### Module layout (`src/lib/plan-index/`)
 
-Four source modules behind one barrel, layered so dependencies flow inward
-(`index` → `db` → {`schema`, `vec0-loader`}); `schema` and `vec0-loader` are
-leaves with no intra-package imports of each other.
+Two source modules behind one barrel; dependencies flow inward (`index` → `store`).
+No native loader, no schema module, no binaries directory — all deleted by the pivot.
 
 | File | Responsibility | Imports (intra-pkg) | Exports |
 |------|----------------|---------------------|---------|
-| `vec0-loader.js` | Platform/arch → binary path; load the `vec0` extension; supported-platform policy. **No SQL/schema knowledge.** | none | `SUPPORTED_PLATFORMS`, `resolveVec0BinaryPath(platform, arch)`, `loadVec0Extension(db)` |
-| `schema.js` | DDL constants; create base schema (`units`, `fts_plans`); create/recreate the parameterized `vec_plans`; dimension-mismatch policy + warning log. **No extension loading.** | none | `BASE_DDL`, `initSchema(db)`, `initVectorTable(db, dimension, logDir)`, `readVecDimension(db)` |
-| `db.js` | `openStore` composition; the six CRUD/query primitives bound to a store handle; transaction helper; Float32 ⇄ BLOB (de)serialization. | `./schema`, `./vec0-loader` | `openStore(dbPath)` |
-| `index.js` | Public barrel — the only entry point other CTOC code imports. | `./db`, `./vec0-loader` | `openStore`, `loadVec0Extension`, `resolveVec0BinaryPath`, `SUPPORTED_PLATFORMS` |
-| `binaries/<platform>-<arch>/vec.{dylib,so,dll}` | Committed-vendored sqlite-vec v0.1.9 loadable extensions (5 platforms), named `vec.{ext}` so SQLite derives the `sqlite3_vec_init` entry point (§6.4/D9). Not source; produced by the maintainer tool. | — | — |
-
-`src/scripts/vendor-vec0.js` is a **maintainer-only** tool (fetch + SHA256-verify +
-write the five binaries). It is never on the runtime import graph (asserted by ST-13).
+| `store.js` | The pure-JS store: in-memory `Map` model; CRUD (`upsertUnit`/`getUnit`/`deleteUnit`/`moveUnit`/`getFilesForPlan`); `search` (brute-force cosine); `save`/`withBatch`; JSON (de)serialization incl. base64 embeddings; fail-open load; concurrency (lock/reload/steal); cosine + norm; dimension policy; warn-logger. | none (uses `safe-fs`, `path`, `os`) | `openStore(jsonPath, opts?)` |
+| `index.js` | Public barrel — the only entry point other CTOC code imports. | `./store` | `openStore` |
 
 ### Public API surface (object-store shape)
 
-`openStore(dbPath)` returns a **`PlanIndexStore` handle** whose methods are the six
-remaining primitives; `loadVec0Extension(db)` is a standalone module function (the
-scenarios call it directly with a `db`, and PI0's capability gate reuses it). This
-object shape is chosen over a module-level singleton so tests and PI4 can hold
-multiple independent stores and so each method closes over its own `db` + derived
-`logDir`. The seven named primitives map as:
+`openStore(jsonPath, opts?)` returns a **`PlanIndexStore` handle** whose methods are
+the primitives. The object shape (not a module singleton) lets tests and PI4 hold
+multiple independent stores, and lets each method close over its own `jsonPath`,
+in-memory `Map`, `logDir`, and lock path.
 
 ```
-openStore(dbPath)                         → db.js            (factory)
-store.initVectorTable(dimension)          → schema.initVectorTable(db, dim, logDir)
-store.upsertUnit(unit)                    → db.js
-store.getUnit(planPath, sectionId)        → db.js
-store.deleteUnit(planPath, sectionId)     → db.js
-store.moveUnit(fromPath, toPath)          → db.js
-store.getFilesForPlan(planPath)           → db.js
-loadVec0Extension(db)                     → vec0-loader.js   (also called by openStore)
+openStore(jsonPath, opts?)                     → store.js (factory; fail-open load)
+store.upsertUnit(unit)                         → locked RMW; returns the stored unit
+store.getUnit(planPath, sectionId)             → lock-free; Unit | null
+store.deleteUnit(planPath, sectionId)          → locked RMW; boolean
+store.moveUnit(fromPath, toPath)               → locked RMW; count re-pathed
+store.getFilesForPlan(planPath)                → lock-free; string[]
+store.search(queryEmbedding, k, opts?)         → lock-free; ranked [{...unit, score}]
+store.save()                                    → locked atomic persist
+store.withBatch(fn)                             → one lock acquire; fn mutates; one save
+store.dimension                                 → number | null (read-only view)
+store.size                                       → unit count (read-only view)
 ```
-`store.db` is exposed read-only as the escape hatch for raw SELECT/KNN (PI4 and the
-tests run `SELECT … FROM vec_plans MATCH …` / `SELECT COUNT(*) …` directly).
-**All mutations go through the primitives** so the transactional tri-table invariant
-(units + fts_plans + vec_plans share one rowid) is never bypassed.
 
-### How PI0 constructs and gates this slice (PI1 does NOT self-bootstrap)
+`opts` (all optional, with documented defaults): `staleLockMs` (default 10000),
+`acquireTimeoutMs` (default 5000), `acquireBackoffMs` (default 25), `version`
+(default 1). `search` `opts`: `kind`, `excludePlanPath`, `minScore`.
 
-PI1 is a passive library. The composition + gating sequence lives in **PI0**:
-
-1. PI0 feature-detects the capability (`node:sqlite` present; `PRAGMA compile_options`
-   shows `ENABLE_FTS5`; `loadVec0Extension` + `SELECT vec_version()` succeed). If any
-   probe fails, PI0 degrades CTOC to "rebuild-from-plans / no index" — **PI1 owns no
-   gate and throws no capability decision.**
-2. PI0 calls `openStore(dbPath)` once and holds the store in the composition root.
-3. After calibration (PI2) determines the per-machine dimension, **PI2 calls
-   `store.initVectorTable(dim)`** on the store PI0 holds. PI1 never picks a dimension.
-4. PI3 calls `upsertUnit`/`deleteUnit`/`moveUnit`/`getUnit` through the barrel.
-   PI4/PI6 use `store.db` for KNN and `getFilesForPlan` + the `kind` column.
-
-### settings.js registration (`plan_index` block)
-
-Add one category to `SETTINGS_SCHEMA` in `src/lib/settings.js` so PI2/PI5/PI6 can
-read their config via the existing `getSetting`/`setSetting` API backed by
-`settings.json` (the nested, menu-driven store — **never** `settings.yaml`, per the
-CONFIG SOURCES note). PI1 itself reads **no** settings at runtime; these are
-forward-declared keys. No new tab is added (UI surfacing is explicitly out of
-scope, and the settings tests only assert that the six existing tabs are present —
-a schema-only category is safe). Exact block in Step 7 §7.8.
+**All mutations go through the locked RMW helper** so the reload-under-lock invariant
+(no lost updates) is never bypassed; reads never lock.
 
 ### Change classification & dependency posture
 
-New feature, full-depth. **No upstream PI dependency** (foundation). Touch-set is
-five new files under `src/lib/plan-index/`, one new maintainer script, one
-new test file, plus two additive edits (`settings.js` schema block, `.gitignore`
-line). No existing CTOC module imports plan-index yet, so blast radius is contained
-behind the barrel (matches the plan's Rollback section).
+New feature, full-depth, **no upstream PI dependency** (foundation). Touch-set is two
+new files under `src/lib/plan-index/`, one new test file, and two additive edits
+(`settings.js` schema block, `.gitignore` line). No existing CTOC module imports
+plan-index yet, so blast radius is contained behind the barrel (matches Rollback).
+Post-pivot there is **no maintainer/vendoring/out-of-band step** — a clean, fully
+in-loop build.
 
-## Step 6 — DESIGN (Schema, Data Flow, Binary Resolution)
+## Step 6 — DESIGN (Data Model, Persistence, Concurrency, Ranking)
 
-### 6.1 Schema DDL
+### 6.1 In-memory model
 
-Base schema is created by `openStore` (`initSchema`); `vec_plans` is **deferred** to
-`initVectorTable(dim)` (PI2 owns the dimension). All three tables share a single
-integer **rowid** — the canonical `units` table mints it, `fts_plans` and `vec_plans`
-are inserted with that explicit rowid, so KNN results JOIN straight back by rowid.
+```
+key(planPath, sectionId)  = `${planPath} ${sectionId}`   // NUL: not valid in paths/ids
+units: Map<string, UnitRecord>
 
-```sql
--- units: canonical metadata + the rowid↔unit mapping (ordinary table)
-CREATE TABLE IF NOT EXISTS units (
-  rowid         INTEGER PRIMARY KEY,            -- shared with fts_plans + vec_plans
-  plan_path     TEXT    NOT NULL,
-  section_id    TEXT    NOT NULL,               -- '__plan__' sentinel for kind='plan'
-  kind          TEXT    NOT NULL CHECK (kind IN ('plan','section')),
-  files         TEXT    NOT NULL DEFAULT '[]',  -- JSON array of declared file globs
-  parent_vision TEXT,
-  step_label    TEXT,
-  content_hash  TEXT    NOT NULL,
-  UNIQUE (plan_path, section_id)
-);
-CREATE INDEX IF NOT EXISTS idx_units_plan_path ON units(plan_path);
-CREATE INDEX IF NOT EXISTS idx_units_kind      ON units(kind);
-CREATE INDEX IF NOT EXISTS idx_units_parent    ON units(parent_vision);
+UnitRecord = {
+  planPath:     string,
+  sectionId:    string,        // '__plan__' sentinel for kind === 'plan'
+  kind:         'plan' | 'section',
+  text:         string,
+  files:        string[],      // declared file globs (plan-level meaningful; [] otherwise)
+  parentVision: string | null,
+  stepLabel:    string | null,
+  contentHash:  string,
+  embedding:    Float32Array,  // raw, lossless
+  _norm:        number         // derived L2 norm, in-memory only, NOT persisted
+}
 
--- fts_plans: BM25 lexical half (FTS5 virtual table). plan_path/section_id are
--- UNINDEXED filter columns (required by ST-06's COUNT(*) WHERE plan_path=? AND
--- section_id=?). Tokenizer left at unicode61 default — identifier/path tokenizer
--- tuning (tokenchars) is a PI4 retrieval-quality concern, not a storage concern.
-CREATE VIRTUAL TABLE IF NOT EXISTS fts_plans USING fts5(
-  text,
-  plan_path  UNINDEXED,
-  section_id UNINDEXED,
-  tokenize = 'unicode61'
-);
-
--- vec_plans: dense half (vec0). Created ONLY by initVectorTable(dim). Vector keyed
--- by rowid; cosine declared at creation. <DIM> is an integer-validated interpolation
--- (never a user string → no SQL injection vector).
-CREATE VIRTUAL TABLE vec_plans USING vec0(
-  embedding float[<DIM>] distance_metric=cosine
-);
+dimension: number | null       // inferred from first embedding (D7)
 ```
 
-**rowid ↔ unit mapping.** `units` is the source of truth for identity. New unit:
-`INSERT INTO units(...)` → `lastInsertRowid` → insert `fts_plans`/`vec_plans` with
-that explicit rowid. Existing `(plan_path, section_id)`: reuse its rowid and
-delete-then-reinsert the FTS5 and vec0 rows (idempotent in-place replace; rowid
-stays stable so `moveUnit` and any external rowid references survive). PI4 pattern:
-`SELECT rowid, distance FROM vec_plans WHERE embedding MATCH ? AND k = ?` then
-`JOIN units ON units.rowid = vec_plans.rowid` to filter `kind` and read metadata.
+### 6.2 Persistence format (`.ctoc/index/plan-index.json`)
 
-**Why a single `kind` column, not two vec0 tables** (re-affirming the plan): all
-vectors live in one rowid-indexed `vec_plans`; coarse (`kind='plan'`) vs precise
-(`kind='section'`) separation is a metadata JOIN, not a second virtual table.
-Plan-level units carry the reserved `section_id='__plan__'` sentinel so
-`(plan_path, section_id)` is always a non-null composite key and `getFilesForPlan`
-can address the plan-level row unambiguously.
-
-### 6.2 Transaction boundaries
-
-Every mutating primitive wraps its **entire** multi-table write (units + fts_plans
-+ vec_plans) in one explicit transaction via a non-re-entrant helper:
-
-```js
-function withTransaction(db, fn) {
-  db.exec('BEGIN');
-  try { const r = fn(); db.exec('COMMIT'); return r; }
-  catch (err) { try { db.exec('ROLLBACK'); } catch { /* already aborted */ } throw err; }
+```jsonc
+{
+  "version": 1,
+  "dimension": 384,
+  "units": [
+    {
+      "planPath": "plans/todo/x.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "text": "…",
+      "files": ["src/lib/a.js", "src/lib/b/**"],
+      "parentVision": "vision/ci.md",
+      "stepLabel": null,
+      "contentHash": "sha256:…",
+      "embedding": "<base64 of the Float32Array little-endian buffer>"
+    }
+  ]
 }
 ```
 
-This is the ST-05 guarantee: a failure mid-write (e.g. a wrong-dimension vector
-rejected by vec0 after `units`/`fts_plans` rows were already written) rolls the
-whole transaction back, leaving the prior unit byte-for-byte intact. `BEGIN`/
-`ROLLBACK` semantics were verified live against `DatabaseSync.exec`. The helper is
-**not** re-entrant — each public primitive owns exactly one transaction and never
-calls another mutating primitive.
+Serialize: `Buffer.from(f32.buffer, f32.byteOffset, f32.byteLength).toString('base64')`.
+Deserialize: `const b = Buffer.from(str, 'base64'); new Float32Array(b.buffer.slice(
+b.byteOffset, b.byteOffset + b.byteLength))` — a **copy** so the result never aliases
+Node's shared Buffer pool (memory-safety + the byte-for-byte equality of AC2/AC4/AC16).
+`_norm` is recomputed on load, not read from JSON.
 
-### 6.3 Data flow (upsert is the representative hot write)
-
-```
-upsertUnit(unit)
-  → validate: kind ∈ {plan,section}; vector is Float32Array(dim); files is array
-  → blob = vectorToBlob(vector)                 // zero-copy view of the Float32 bytes
-  → withTransaction(db, () => {
-       rowid = existing(plan_path, section_id)?.rowid
-       if (rowid) UPDATE units…WHERE rowid=?     // reuse rowid (stable)
-       else        rowid = INSERT units… .lastInsertRowid
-       DELETE fts_plans WHERE rowid=?; INSERT fts_plans(rowid,text,plan_path,section_id)
-       DELETE vec_plans WHERE rowid=?; INSERT vec_plans(rowid, embedding=blob)  // vec0 enforces dim
-     })
-
-getUnit(p,s)  → SELECT u.*, f.text, v.embedding
-                FROM units u JOIN fts_plans f ON f.rowid=u.rowid
-                             JOIN vec_plans v ON v.rowid=u.rowid
-                WHERE u.plan_path=? AND u.section_id=?
-              → { planPath, sectionId, kind, text, files=JSON.parse, parentVision,
-                  stepLabel, contentHash, vector=blobToVector(embedding) }  // or null
-```
-
-`vectorToBlob` binds `Buffer.from(f32.buffer, f32.byteOffset, f32.byteLength)`
-(node:sqlite binds a Buffer as a BLOB; sqlite-vec accepts packed little-endian
-float32 as `float[N]`). `blobToVector` **copies** the returned bytes
-(`new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset+buf.byteLength))`)
-so the result never aliases Node's shared Buffer pool — this is both the memory-safety
-guard and what makes the ST-04/ST-17 byte-for-byte equality (`Buffer.compare`) hold.
-
-### 6.4 Per-platform binary resolution (`vec0-loader.js`)
+### 6.3 Fail-open load (`openStore`)
 
 ```
-platform = process.platform            // 'darwin' | 'linux' | 'win32'
-arch     = process.arch                // 'arm64'  | 'x64'
-key      = `${platform}-${arch}`
-SUPPORTED_PLATFORMS = ['darwin-arm64','darwin-x64','linux-x64','linux-arm64','win32-x64']
-ext      = { darwin:'dylib', linux:'so', win32:'dll' }[platform]
-resolved = path.resolve(__dirname, 'binaries', key, `vec.${ext}`)    // absolute
+1. logDir = path.resolve(path.dirname(jsonPath), '..', 'logs')   // …/.ctoc/logs
+2. if !safeFs.existsSync(jsonPath) → empty store (units=Map, dimension=null); return
+3. try:
+     raw   = safeFs.readFileSync(jsonPath, 'utf8')
+     data  = JSON.parse(raw)
+     validate: data && data.version === version && Array.isArray(data.units)
+     for each u in data.units: validate required fields + decode embedding;
+       dimension = dimension ?? u.embedding.length;
+       if u.embedding.length !== dimension → treat file as inconsistent (fail-open)
+     populate the Map (compute _norm)
+   catch (err):
+     warnLog('index_load_failed', { message: err.message })
+     reset to an empty store (units cleared, dimension=null)   // rebuildable cache
+4. never throw
 ```
 
-**Entry-point contract (F1 — load-bearing).** `node:sqlite`
-`DatabaseSync.loadExtension(path)` is **single-argument**: it takes the path only
-and has **no** parameter for an explicit C entry-point symbol (passing a 2nd arg
-throws `TypeError`). SQLite therefore derives the entry point from the *filename*:
-for a file `<name>.<ext>` it tries `sqlite3_extension_init` first (which sqlite-vec
-does not export) then `sqlite3_<name>_init`. sqlite-vec's exported symbol is
-`sqlite3_vec_init`, so the vendored file **must be named `vec.<ext>`** (→ derives
-`sqlite3_vec_init`). A file named `vec0.<ext>` would derive the non-existent
-`sqlite3_vec0_init` and auto-load fails. The maintainer script writes the binaries
-under the `vec.<ext>` name for exactly this reason. The filename→symbol derivation
-is confirmed empirically by the Step 8 spike (see `## Blocking Prerequisites`)
-before any store code is written; see Decision D9.
+### 6.4 Concurrency: locked read-modify-write (the AC18/19/20 core)
 
-`loadVec0Extension(db)`:
-1. If `key ∉ SUPPORTED_PLATFORMS` → throw `Error` whose message names
-   `process.platform`, `process.arch`, and the supported list (ST-10).
-2. If supported but `!fs.existsSync(resolved)` → throw `Error` naming the resolved
-   absolute path AND the `vendor-vec0.js` maintainer step (binary not vendored —
-   distinct, actionable maintainer error; ST-18).
-3. `db.enableLoadExtension(true)`; then **single-arg** `db.loadExtension(resolved)`
-   wrapped in `try/catch`. On throw (F2 — e.g. a glibc-linked `.so` on a musl/Alpine
-   host where `existsSync` passed but `dlopen` fails, or any raw loader error),
-   re-throw an `Error` whose message names `process.platform`, `process.arch`, the
-   detected libc flavor (see below), the resolved path, and directs the caller to
-   PI0's degrade path (rebuild-from-plans / no-index). Never let a bare `dlopen`
-   string escape unwrapped. `finally → db.enableLoadExtension(false)` (re-disable
-   after the single load: defense-in-depth). **No 2-arg `loadExtension` retry** —
-   the API does not accept one; correctness comes from the filename above (ST-19).
-4. Verify with `SELECT vec_version()`; if it throws or returns empty, treat it as a
-   load failure per step 3.
+```
+acquireLock():
+  deadline = now + acquireTimeoutMs
+  loop:
+    try safeFs.writeFileSync(lockPath, `${process.pid}:${Date.now()}`, { flag: 'wx' })
+        → acquired; return                       // 'wx' = atomic exclusive create
+    catch EEXIST:
+        if safeFs.existsSync(lockPath) &&
+           (Date.now() - safeFs.statSync(lockPath).mtimeMs) > staleLockMs:
+             try safeFs.unlinkSync(lockPath)      // steal the stale lock (AC19)
+             continue
+        if now > deadline: throw Error('plan-index: lock acquire timeout')  // bounded, never infinite
+        sleep(acquireBackoffMs); continue
 
-**libc detection (best-effort).** On `linux`, derive the flavor for the error
-message from `process.report.getReport().header.glibcVersionRuntime` (present ⇒
-glibc; absent ⇒ likely musl) — best-effort only, never a hard gate. **musl is
-known-unsupported**: sqlite-vec ships glibc-linked `.so` binaries and CTOC vendors
-those; a musl build is an out-of-scope future maintainer TODO (Decision D11), so on
-musl the store degrades to PI0's no-index path with the clear error above rather
-than crashing.
+releaseLock(): try safeFs.unlinkSync(lockPath) catch { /* already gone (stolen) */ }
 
-**Windows DLL note** (carried from the Risks section): always pass the
-`path.resolve`-d **absolute** path to `loadExtension` — `win32` extension loading is
-sensitive to relative paths / PATH. The absolute-path policy above covers all three
-OSes uniformly; `path.join`/`path.resolve` keep separators correct cross-platform.
+withLock(fn):
+  acquireLock()
+  try { reloadFromDisk(); const r = fn(); atomicSave(); return r }   // reload-under-lock (AC18)
+  finally { releaseLock() }
+```
 
-### 6.5 Dimension-mismatch policy + warning log (ST-03)
+- `reloadFromDisk()` = the §6.3 load applied to the *current* file, replacing the
+  in-memory `Map` — so a concurrent external write is merged before this process
+  mutates, and its own mutation lands on top. This is what makes X + Y + Z all
+  survive (AC18).
+- `atomicSave()` = §6.2 serialize → temp write → rename (D4); temp unlinked on failure
+  (AC17).
+- `upsertUnit`/`deleteUnit`/`moveUnit` are `withLock(() => …)`. `save()` is
+  `withLock(() => {})` (reload+save is a no-op merge + persist). `withBatch(fn)` is
+  `withLock(fn)` where `fn` performs many in-memory mutations, then the single
+  `atomicSave` at the end (PI3's sweep — one acquire for the whole pass).
+- Reads (`getUnit`/`getFilesForPlan`/`search`) **do not** call `withLock`; they read
+  the in-memory `Map` directly (AC20, lock-free reads).
 
-`initVectorTable(db, dimension, logDir)`:
-- `readVecDimension(db)` parses the existing `float[(\d+)]` out of
-  `SELECT sql FROM sqlite_master WHERE name='vec_plans'` (the DDL is exactly what we
-  wrote, so the regex is reliable); returns `null` if the table is absent.
-- absent → `CREATE VIRTUAL TABLE vec_plans … float[dimension] … cosine`.
-- same dimension → no-op (idempotent; this is what makes ST-11 rebuild reproducible).
-- different dimension → **FULL tri-table reset** (F4). A dimension change means every
-  stored vector is now invalid, so recreating `vec_plans` alone would leave orphaned
-  `units` + `fts_plans` rows whose vectors are gone — and `getUnit`'s tri-table INNER
-  JOIN would then return `null` for metadata that still exists (silent inconsistency).
-  Instead, in one transaction: `DROP TABLE vec_plans`, `DELETE FROM fts_plans`,
-  `DELETE FROM units`, then recreate `vec_plans` at the new dimension. This is safe
-  because the DB is a rebuildable cache (the `.md` plans are the source of truth) and
-  PI3's reconciliation sweep re-populates all three tables on its next pass. A `warn`
-  entry is appended to `.ctoc/logs/plan-index.json`; **no throw**. The logger mirrors
-  `src/lib/enforcement-log.js`: create the log dir if missing, append
-  `{ timestamp, level:'warn', event:'vec_table_dimension_change', from_dimension,
-  to_dimension, rows_cleared, message }`, rotate at a max-entries cap. (Alternative
-  considered — keep metadata and force an immediate re-embed sweep — rejected for PI1:
-  re-embedding is PI2/PI3's job and PI1 must not depend on them; see Decision D12.)
+`sleep` is a small synchronous busy-wait bounded by `acquireBackoffMs`
+(`Atomics.wait` on a throwaway `Int32Array`, cross-platform, no dependency), keeping
+the store's API synchronous like the rest of CTOC's fs-bound code.
 
-`logDir` is derived once in `openStore` from `dbPath`:
-`path.resolve(path.dirname(dbPath), '..', 'logs')` (from `…/.ctoc/index/` up to
-`…/.ctoc/logs/`) and closed over by the store's `initVectorTable`.
+### 6.5 Ranking: brute-force cosine top-k (`search`)
+
+```
+search(q, k, opts = {}):
+  if !(q instanceof Float32Array) → throw TypeError
+  if dimension !== null && q.length !== dimension →
+     throw Error(`plan-index: query dimension ${q.length} != store dimension ${dimension}`)   // AC13
+  qNorm = norm(q); if qNorm === 0 → return []                        // zero query → no ranking
+  results = []
+  for u of units.values():
+    if opts.kind && u.kind !== opts.kind → continue                 // AC12
+    if opts.excludePlanPath && u.planPath === opts.excludePlanPath → continue
+    score = u._norm === 0 ? 0 : dot(q, u.embedding) / (qNorm * u._norm)   // cosine, guarded
+    if opts.minScore != null && score < opts.minScore → continue
+    results.push({ ...unitView(u), score })
+  results.sort((a, b) => b.score - a.score)
+  return results.slice(0, k)                                          // top-k, ≤ k
+```
+
+`dot`/`norm` are simple loops (no dependency). Complexity O(N·dim + N log N);
+at N ≈ 1,720 this is microseconds (Decision D2). `unitView` returns a shallow copy
+with a fresh `Float32Array` embedding (never leaks the internal record).
+
+### 6.6 Dimension policy (`upsertUnit`, D7/AC14/AC15)
+
+```
+on upsertUnit(unit):
+  validate kind, embedding (Float32Array), files (array default []), contentHash
+  if dimension === null → dimension = unit.embedding.length            // infer (AC14)
+  else if unit.embedding.length !== dimension →                        // model changed
+     units.clear(); dimension = unit.embedding.length                  // FULL reset (AC15)
+     warnLog('dimension_reset', { from, to: dimension, cleared: <n> })
+  store/replace the unit keyed on (planPath, sectionId); compute _norm  // idempotent (AC5)
+```
+
+### 6.7 Warn logger (mirrors `src/lib/enforcement-log.js`)
+
+Append `{ timestamp, level: 'warn', event, ...detail }` to
+`.ctoc/logs/plan-index.json` via `safeFs` (create `logDir` if missing; cap entries
+with rotation). Used by fail-open load (`index_load_failed`) and dimension reset
+(`dimension_reset`). `.ctoc/logs/` is already git-ignored — no new ignore rule.
 
 ## Step 7 — SPEC (Function Signatures & Behavior)
 
 > Step 7 also runs the implementation-plan-reviewer then the integrator+critic
 > (10 rounds) at Gate 2 prep; the contract below is the input to that pass.
 
-### 7.1 `openStore(dbPath: string) → PlanIndexStore`
-- `fs.mkdirSync(path.dirname(dbPath), { recursive: true })`; `db = new
-  DatabaseSync(dbPath, { allowExtension: true })`; **immediately** run
-  `db.exec('PRAGMA journal_mode=WAL')` and `db.exec('PRAGMA busy_timeout=5000')`
-  (F3 — the vision's sync is multi-trigger, multi-process: menu + PostToolUse hook
-  + reconciliation sweep all open `plans.db`; the default rollback journal + zero
-  busy-timeout would surface `SQLITE_BUSY` and hang the live menu. WAL lets readers
-  and one writer proceed concurrently; the 5 s busy-timeout absorbs brief writer
-  contention). Then `loadVec0Extension(db)`; `initSchema(db)` (creates `units` +
-  `fts_plans`; **not** `vec_plans`).
-- The WAL side-files `plans.db-wal` / `plans.db-shm` live alongside `plans.db` under
-  `.ctoc/index/` and are covered by the existing `.ctoc/index/` gitignore entry (no
-  extra ignore rule needed).
-- Returns `{ db, initVectorTable, upsertUnit, getUnit, deleteUnit, moveUnit,
-  getFilesForPlan, close }` with `logDir` captured in the closure.
-- Throws: propagates `loadVec0Extension` errors (unsupported platform / missing
-  binary / incompatible binary). Idempotent re-open on an existing DB reuses the
-  schema unchanged (WAL mode persists on the file; re-applying the PRAGMAs is a
-  cheap no-op).
-- Covers ST-01 (vec_version non-empty; FTS5 in `PRAGMA compile_options`), ST-20
-  (WAL + busy_timeout), ST-11.
+### 7.1 `openStore(jsonPath: string, opts?: OpenOpts) → PlanIndexStore`
+- `safeFs.mkdirSync(path.dirname(jsonPath), { recursive: true })`; derive `logDir`
+  and `lockPath = jsonPath + '.lock'`; run the §6.3 fail-open load. Returns a handle
+  exposing the §"Public API surface" methods and the read-only `dimension`/`size`
+  views. **Never throws on a bad/absent file** (AC1/AC2/AC3).
 
-### 7.2 `store.initVectorTable(dimension: number) → void`
-- Validates `dimension` is a positive integer (else `TypeError`). Applies the §6.5
-  absent / same / different policy. Cosine declared at creation.
-- Covers ST-02 (`sqlite_master.sql` contains `distance_metric=cosine` and
-  `float[384]` — dimension verified via `sqlite_master.sql`, not `PRAGMA table_info`;
-  see D10), ST-03.
+### 7.2 `store.upsertUnit(unit) → StoredUnit`
+`unit = { planPath, sectionId, kind, text, embedding, files?, parentVision?, stepLabel?, contentHash }`
+- Pre-validate (throw clear `Error` before any mutation): `kind ∈ {'plan','section'}`
+  (AC10); `embedding instanceof Float32Array` and non-empty; `files` an array
+  (default `[]`); `contentHash` a non-empty string; `planPath`/`sectionId` non-empty
+  strings. Applies §6.6 dimension policy. Locked RMW (reload-under-lock → mutate →
+  atomic save). Idempotent replace keyed on `(planPath, sectionId)` (AC5). Returns the
+  stored unit view. Covers AC4, AC5, AC10, AC14, AC15.
 
-### 7.3 `store.upsertUnit(unit) → number` (returns rowid)
-`unit = { planPath, sectionId, kind, text, vector, files, parentVision, stepLabel, contentHash }`
-- Pre-validate: `kind ∈ {'plan','section'}` (throw clear `Error` on violation — the
-  `CHECK` constraint is the second line of defense); `vector instanceof Float32Array`
-  with `length === table dimension` (throw before binding for a clear message; vec0
-  also rejects); `files` is an array (default `[]`); `contentHash` non-empty string.
-- Throws `Error('vector table not initialized — call initVectorTable(dimension) first')`
-  if `vec_plans` is absent.
-- Idempotent replace keyed on `(planPath, sectionId)`; rowid preserved across replace.
-- Covers ST-04 (full round-trip incl. byte-for-byte vector), ST-15 (bad kind throws).
+### 7.3 `store.getUnit(planPath, sectionId) → StoredUnit | null`
+- Lock-free `Map` lookup; returns a fresh-copy view (embedding as a new
+  `Float32Array`, `files` a copied array) or `null` on a miss (never throws). Covers
+  AC2, AC4, AC6.
 
-### 7.4 `store.getUnit(planPath: string, sectionId: string) → Unit | null`
-- Tri-table JOIN by rowid (§6.3). Returns the full object with `vector` as a fresh
-  `Float32Array`, `files` parsed from JSON, or `null` when absent (never throws on
-  a miss).
-- Covers ST-04, and the post-conditions of ST-05/ST-06/ST-17.
+### 7.4 `store.deleteUnit(planPath, sectionId) → boolean`
+- Locked RMW; deletes the `(planPath, sectionId)` entry. Returns `true` if present,
+  `false` if not (never throws on a miss). Covers AC7.
 
-### 7.5 `store.deleteUnit(planPath: string, sectionId: string) → boolean`
-- In one transaction: resolve rowid; `DELETE FROM units / fts_plans / vec_plans
-  WHERE rowid=?`. Returns `true` if a row was deleted, `false` if none matched
-  (never throws on a miss).
-- Covers ST-06 (`getUnit`→null; `COUNT(*)`=0 on `fts_plans` AND `vec_plans`).
+### 7.5 `store.moveUnit(fromPath, toPath) → number`
+- Locked RMW; re-paths **every** unit whose `planPath === fromPath` (plan-level +
+  all sections) to `toPath`, re-keying the `Map`. `embedding`, `_norm`, `contentHash`,
+  and all other fields are preserved unchanged (no re-embed — the load-bearing
+  guarantee). Returns the count re-pathed; `0` if `fromPath` matched nothing. Covers
+  AC8.
 
-### 7.6 `store.moveUnit(fromPath: string, toPath: string) → number` (units re-pathed)
-- Re-paths **every** unit (plan-level + all sections) whose `plan_path = fromPath`,
-  in one transaction: `UPDATE units SET plan_path=toPath`; for each affected rowid
-  `UPDATE fts_plans SET plan_path=toPath WHERE rowid=?`. **`vec_plans` is untouched**
-  — the vector is keyed by the unchanged rowid, so it is preserved byte-for-byte and
-  no re-embedding occurs (the load-bearing guarantee). `content_hash` is not modified.
-- Returns the count of re-pathed units; `0` if `fromPath` matched nothing.
-- Covers ST-17. **See Decision D1** for the deliberate reading of "plan_path updates
-  in … vec0" — this is the one item a human reviewer should confirm.
+### 7.6 `store.getFilesForPlan(planPath) → string[]`
+- Lock-free: look up `(planPath, '__plan__')`; return a copy of its `files`, or `[]`
+  if there is no plan-level unit or `files` is empty. **Never throws.** Keyed on plan
+  path/slug (D9 opaque-key contract stated verbatim in the barrel JSDoc). Covers AC9.
 
-### 7.7 `store.getFilesForPlan(planPath: string) → string[]`
-- `SELECT files FROM units WHERE plan_path=? AND kind='plan' LIMIT 1` → `JSON.parse`
-  → array. Returns `[]` when there is no plan-level row or `files` is empty; **never
-  throws**. Keyed on plan path/slug, not section.
-- **Opaque-key contract (F6):** `plan_path` is an **opaque exact-match key** — PI1
-  does no normalization; a lookup succeeds only if the caller passes the identical
-  string used at `upsertUnit`. The barrel JSDoc must state this verbatim ("plan_path
-  is an opaque key; callers must normalize consistently"). Consistent normalization
-  is carried forward as a **required PI3 (sync/upsert) and PI6 (conflict /
-  getFilesForPlan) acceptance criterion** — flagged here so it is not lost when those
-  slices are planned; see Decision D5.
-- Covers ST-16.
+### 7.7 `store.search(queryEmbedding, k, opts?) → Array<StoredUnit & { score: number }>`
+- Per §6.5: validate `queryEmbedding` type and dimension (throw on mismatch — AC13),
+  brute-force cosine, filter by `opts.kind`/`opts.excludePlanPath`/`opts.minScore`,
+  sort descending, return ≤ `k`. Lock-free. Covers AC11, AC12, AC13.
 
-### 7.8 `loadVec0Extension(db) → string` (returns vec_version) + `settings.js` block
-`loadVec0Extension` per §6.4 — covers ST-07/08/09 (supported), ST-10 (unsupported
-platform), ST-18 (supported platform but binary not vendored), ST-19 (incompatible
-binary / musl `dlopen` failure), and ST-13 (no `vendor-vec0.js` in the require
-cache). Add to `SETTINGS_SCHEMA`:
+### 7.8 `store.save() → void`, `store.withBatch(fn) → any`
+- `save()` = locked reload-merge + atomic persist (§6.2/§6.4). `withBatch(fn)` takes
+  the lock once, reloads, runs `fn` (which performs many mutations against the store),
+  then atomically saves once — PI3's sweep path. Covers AC16, AC17 (and the
+  concurrency ACs via the shared `withLock`).
 
+### 7.9 `settings.js` block + `.gitignore`
+Add to `SETTINGS_SCHEMA` (additive, forward-declared — D8):
 ```js
 plan_index: {
   label: 'Plan Index Settings',
   settings: [
-    { key: 'engine_preference',  label: 'Embedding engine preference', type: 'select',
-      options: ['auto', 'ollama', 'in-process'], default: 'auto' },     // PI2
-    { key: 'ollama_base_url',    label: 'Ollama base URL',             type: 'string',
-      default: 'http://localhost:11434' },                              // PI2
-    { key: 'duplicate_threshold',label: 'Duplicate-guard threshold',   type: 'number',
-      default: 0.85 }                                                   // PI5/PI6
+    { key: 'engine_preference',   label: 'Embedding engine preference', type: 'select',
+      options: ['auto', 'ollama', 'in-process'], default: 'auto' },      // PI2
+    { key: 'ollama_base_url',     label: 'Ollama base URL',             type: 'string',
+      default: 'http://localhost:11434' },                               // PI2
+    { key: 'duplicate_threshold', label: 'Duplicate-guard threshold',   type: 'number',
+      default: 0.85 }                                                    // PI5/PI6
   ]
 }
 ```
-Satisfies the settings-suite invariants (every setting has `key`/`label`/`type`/
-`default`; the `select` default is in `options`). `.gitignore`: append `.ctoc/index/`
-(the DB is a git-ignored cache; `.ctoc/logs/` is already ignored; binaries under
-`src/lib/plan-index/binaries/` stay committed).
+`.gitignore`: append `.ctoc/index/` (the JSON index is a git-ignored, rebuildable
+cache). Covers the settings-suite invariants (each setting has
+`key`/`label`/`type`/`default`; the `select` default is within `options`).
 
-## Acceptance Criteria → Test Mapping (`tests/plan-index-store.test.js`)
+## Execution Plan (Steps 8–16, Iron Loop)
 
-18 acceptance criteria expand to **20 tests** (the single "supported platform"
-criterion fans out to ST-07/08/09, one per OS; three new error/concurrency branches
-add ST-18/19/20). All run with **zero network**, under `node:test`. Tests that need a
-temp DB use `fs.mkdtempSync(os.tmpdir(), …)` and clean up. Every ST below is a
-distinct `test()` with a meaningful assertion (no empty catches, no assertionless
-passes).
+### Step 8: TEST (test-maker)
+- [ ] Write `tests/plan-index-store.test.js` (TDD red) — all 20 ST cases from the
+  Test Plan, `node:test` idiom, temp indexes via `mkdtempSync`, **zero network, zero
+  native binaries**. Tests fail until `store.js` is implemented in Step 10.
+- [ ] Concurrency tests (ST-18/19/20) are single-process but exercise the real
+  lock/reload/steal mechanism: ST-18 seeds the file, opens handle A, appends Y to the
+  file directly (simulating another process), then asserts A's `upsert(Z)` preserves
+  X+Y+Z; ST-19 backdates the `.lock` mtime and asserts a steal; ST-20 asserts a held
+  lock blocks a second acquire until release while a read returns immediately.
 
-| ST | Primitive(s) | Key assertion |
-|----|-------------|---------------|
-| ST-01 | openStore | `vec_version()` matches `^\d+\.\d+\.\d+$`; `PRAGMA compile_options` includes `ENABLE_FTS5` |
-| ST-02 | initVectorTable | `sqlite_master.sql` for `vec_plans` contains `distance_metric=cosine` and `float[384]` |
-| ST-03 | initVectorTable | after `initVectorTable(512)` over an existing dim-384 table holding a unit: new sql shows `float[512]`; no throw; a `warn` row appended to `.ctoc/logs/plan-index.json`; **the pre-existing unit is gone from `units`, `fts_plans`, AND `vec_plans` (full reset — no orphaned metadata; `getUnit` returns null, not a JOIN miss)** |
-| ST-04 | upsertUnit+getUnit | every field equals input incl. `kind`/`contentHash`/`files`(array)/`parentVision`; `Buffer.compare(inBytes, outBytes) === 0` |
-| ST-05 | upsertUnit (tx) | upsert with a wrong-dimension vector throws and `getUnit` still returns the original unit byte-for-byte (rollback proven via real failure, not a mock) |
-| ST-06 | deleteUnit | `getUnit`→null; `COUNT(*) FROM fts_plans WHERE plan_path=? AND section_id=?`=0; `COUNT(*) FROM vec_plans WHERE rowid=?`=0 |
-| ST-07 | loadVec0Extension | `existsSync(resolveVec0BinaryPath('darwin','arm64'))`; if current runtime → load + `vec_version()` regex |
-| ST-08 | loadVec0Extension | `existsSync(resolveVec0BinaryPath('linux','x64'))`; if current runtime → load + `vec_version()` regex |
-| ST-09 | loadVec0Extension | `existsSync(resolveVec0BinaryPath('win32','x64'))`; if current runtime → load + `vec_version()` regex |
-| ST-10 | loadVec0Extension | unsupported key (e.g. `win32-arm64`) → `Error.message` contains platform + arch + supported list |
-| ST-11 | openStore+initVectorTable | delete DB + re-init same sequence → identical DDL strings for `units`, `fts_plans`, `vec_plans` (names, columns, cosine, dim) |
-| ST-12 | upsertUnit | `SELECT … FROM units WHERE parent_vision='vision/ci.md'` returns the row; `files` is a JSON column, not in a vector |
-| ST-13 | barrel import | after `require('…/plan-index')` + `openStore`, no `require.cache` key ends with `vendor-vec0.js`; no network performed |
-| ST-14 | upsertUnit + raw KNN | for query `[1,0,0]`, A`[10,1,0]` ranks above B`[0.1,0.995,0]` (cosine dist A≈0.005 < B≈0.900; under L2 the order reverses — proves cosine) |
-| ST-15 | upsertUnit | one `kind='plan'` + one `kind='section'` for same plan → each `COUNT(*)`=1; `kind='unknown'` throws |
-| ST-16 | getFilesForPlan | returns `['src/lib/a.js','src/lib/b/**']`; a plan with no `files:` → `[]`; never throws |
-| ST-17 | moveUnit+getUnit | `plan_path` updated in `units` + `fts_plans`; `vec_plans` row intact at same rowid; `getUnit(toPath)` vector + `contentHash` unchanged (`Buffer.compare === 0`) |
-| ST-18 | loadVec0Extension | supported key but binary file absent (temp `binaries/` dir with no file, or `resolveVec0BinaryPath` pointed at an empty dir) → `Error.message` contains the resolved absolute path and points at the `vendor-vec0.js` maintainer step |
-| ST-19 | loadVec0Extension | supported key, file present, but `loadExtension` throws (drive the branch by placing a non-library file at the resolved path so `existsSync` passes but `dlopen` fails) → caught + re-thrown `Error.message` names platform + arch + libc flavor + degrade path; assert no bare `dlopen` string leaks |
-| ST-20 | openStore | after `openStore`, `PRAGMA journal_mode` returns `wal` and `PRAGMA busy_timeout` returns `5000` |
+### Step 9: PREPARE (quality-checker)
+- [ ] Create `src/lib/plan-index/`. **No binary vendoring, no maintainer step, no
+  spike** — the pivot deletes all of it. This is a fully in-loop build.
 
-## Steps 8–16 — Execution Checklist (Iron Loop)
+### Step 10: IMPLEMENT (implementer)
+- [ ] Build `src/lib/plan-index/store.js` (in-memory Map model; CRUD; `search`;
+  `save`/`withBatch`; base64 (de)serialization; fail-open load; lock/reload/steal;
+  cosine + norm; dimension policy; warn-logger).
+- [ ] Build `src/lib/plan-index/index.js` (barrel exporting `openStore`).
+- [ ] Add the `plan_index` block to `src/lib/settings.js`; append `.ctoc/index/` to
+  `.gitignore`.
+- [ ] One IMPLEMENT step, sub-items per file. No stubs — any residual ambiguity
+  resolved as a documented choice recorded in `## Decisions Taken Under Ambiguity`.
 
-- [ ] **Step 8 — TEST** (test-maker). **First sub-item is a mandatory pre-IMPLEMENT
-  spike (F1) — no store code is written until it passes:** on the dev machine, load the
-  vendored binary with the **single-arg** `db.loadExtension(vec0Path)` and run
-  `SELECT vec_version()`; prove both succeed. If the load fails, resolve the
-  entry-point/arity problem *before proceeding* — confirm the file is named `vec.<ext>`
-  so SQLite derives `sqlite3_vec_init` (§6.4 / D9), and confirm `loadExtension` rejects
-  a 2nd argument. Record the confirmed filename→symbol behavior in `vec0-loader.js`.
-  This spike is gated on the binaries already being vendored (see `## Blocking
-  Prerequisites`). **Then** write `tests/plan-index-store.test.js` (TDD red) — all 20 ST
-  cases from the mapping above, `node:test` idiom, temp DBs via `mkdtempSync`, zero
-  network. Tests fail until Steps 9–10 land code + binaries. Empirically confirm the
-  remaining binary-dependent facts and adjust assertions to the real binary (not stubs):
-  the dimension is exposed via `sqlite_master.sql` (not `PRAGMA table_info`; D10), and
-  `SELECT embedding FROM vec_plans WHERE rowid=?` returns the raw float32 BLOB.
-- [ ] **Step 9 — PREPARE** (quality-checker): create `src/lib/plan-index/`.
-  **Binary vendoring is a human-maintainer, out-of-band, networked action performed
-  BEFORE the Step 8 spike/tests can pass — NOT something an automated Iron-Loop agent
-  fetches or commits (F8).** The maintainer runs `node src/scripts/vendor-vec0.js` once
-  to fetch + SHA256-verify + commit the 5 platform binaries under
-  `binaries/<platform>-<arch>/` **named `vec.<ext>`** (one-time, networked,
-  maintainer-only — never CI/runtime). Record the version triple (Node 24 / SQLite
-  3.51.2 / sqlite-vec 0.1.9) in a `vec0-loader.js` header comment. Ordering: maintainer
-  vendors binaries → Step 8 spike proves the load → Step 8 tests authored → Steps 9–10
-  implement. See `## Blocking Prerequisites`.
-- [ ] **Step 10 — IMPLEMENT** (implementer): build `vec0-loader.js`, `schema.js`,
-  `db.js`, `index.js`, `src/scripts/vendor-vec0.js`; add the `plan_index` block to
-  `src/lib/settings.js`; append `.ctoc/index/` to `.gitignore`. One IMPLEMENT step,
-  sub-items per file. No stubs — any residual ambiguity resolved as a documented
-  choice here and recorded below.
-- [ ] **Step 11 — REVIEW** (self-reviewer): dependency direction (`index`→`db`→leaves,
-  no cycles); single-responsibility per module; rowid invariant; transaction wrapping
-  on every mutation; null/empty/throw contracts match §7.
-- [ ] **Step 12 — OPTIMIZE** (optimizer): prepared statements reused (no per-call
-  re-prepare on the hot upsert/get paths); confirm the three `units` indexes serve
-  the lookups; zero-copy bind / single-copy read on vectors.
-- [ ] **Step 13 — SECURE** (security-scanner): no SQL injection (dimension is
-  integer-validated before interpolation; everything else parameterized); absolute
-  binary path + re-disable `enableLoadExtension(false)` after load; SHA256 pin in
-  `vendor-vec0.js`; `blobToVector` copies out of the Buffer pool (no memory aliasing);
-  no secrets; error messages leak no sensitive paths beyond the intended binary path.
-- [ ] **Step 14 — VERIFY** (verifier): `node --test tests/*.test.js` → `# fail 0`,
-  all 20 ST green, **0 skipped, 0 flaky**; lint + `tsc` checkJs clean (no new warnings —
-  warnings are treated as bugs); coverage ≥ 80% on `src/lib/plan-index/**`; confirm
+### Step 11: REVIEW (self-reviewer)
+- [ ] Dependency direction (`index` → `store`, no cycles); single responsibility; the
+  reload-under-lock invariant on every mutation; lock-free reads; null/empty/throw
+  contracts match §7; all fs via `safe-fs` (no raw `fs` path calls).
+
+### Step 12: OPTIMIZE (optimizer)
+- [ ] Cache `_norm` at upsert/load (no per-search recompute of stored norms);
+  single-copy embedding read/write (no aliasing of the Buffer pool); confirm the
+  brute-force scan allocates no per-iteration garbage on the hot path. Do **not** add
+  an ANN index (premature — Decision D2).
+
+### Step 13: SECURE (security-scanner)
+- [ ] All file I/O via `safe-fs`; temp file in the same directory as the target; lock
+  via atomic `wx` create; embedding decode copies out of the Buffer pool; base64
+  decode length-checked against `dimension`; no secrets; fail-open never leaks a stack
+  trace to the menu; no path traversal (paths derived from the caller-supplied
+  `jsonPath` only).
+
+### Step 14: VERIFY (verifier)
+- [ ] Run automated checks: `node --test tests/*.test.js` → `# fail 0`, all 20 ST
+  green, **0 skipped, 0 flaky**; run lint + `tsc --checkJs` clean (no new warnings —
+  warnings are bugs); coverage ≥ 80% on `src/lib/plan-index/**`; confirm
   `settings.test.js` and `environment-mode.test.js` still pass (the additive
   `plan_index` block must not regress them).
-- [ ] **Step 15 — DOCUMENT** (documenter): JSDoc on the seven primitives + the barrel;
-  a `src/lib/plan-index/README` note on the rebuildable-cache contract, the version
-  triple, and the maintainer `vendor-vec0.js` workflow.
-- [ ] **Step 16 — FINAL-REVIEW** (implementation-reviewer → CTO Chief): 14 quality
-  dimensions; verify Gate 2 marker present; confirm PI2/PI3/PI4/PI6 contracts
-  (`initVectorTable`, CRUD, `store.db` KNN, `getFilesForPlan` + `kind`) are met.
-  Gate 3 is the human's.
 
-## Decisions Taken Under Ambiguity — Implementation Planning (2026-06-28)
+### Step 15: DOCUMENT (documenter)
+- [ ] JSDoc on `openStore` + every primitive (incl. the D9 opaque-key contract and
+  the fail-open/concurrency guarantees); a `src/lib/plan-index/README` note on the
+  rebuildable-cache contract, the JSON shape + base64 encoding, and the concurrency
+  model.
 
-- **D1 — `moveUnit` and the "vec0" re-path (the one to confirm at Gate 2).** ST-17
-  literally says "`plan_path` updates in the metadata, FTS5, **and vec0** tables."
-  The chosen design keeps `plan_path` **out of** `vec_plans` (it lives canonically in
-  `units`, denormalized into `fts_plans` only because ST-06 filters on it). vec0 holds
-  the vector keyed by rowid alone, so `moveUnit` leaves vec0 untouched and the vector
-  is preserved byte-for-byte by construction. Rationale: a single source of truth for
-  `plan_path` avoids the tri-write drift the vision explicitly warns against, and it
-  does not depend on unverified vec0 metadata-column UPDATE semantics in v0.1.9.
-  ST-17's "vec0" clause is satisfied as "the vec row for the unit's rowid is intact
-  with identical bytes after the re-path." **Fallback if the reviewer wants `plan_path`
-  physically in vec0:** declare `vec_plans` with a `plan_path` metadata column and make
-  `moveUnit` delete+reinsert the vec row reusing the stored bytes (still no re-embed) —
-  a localized change to `schema.js` + `db.js`.
-- **D2 — Object-store API over a module singleton.** `openStore` returns a handle whose
-  methods are the primitives (plus read-only `store.db`). Enables multiple independent
-  stores (tests, PI4) and per-store `logDir` capture; avoids hidden global state.
-- **D3 — Plan-level `section_id` sentinel.** Plan-level units use `section_id='__plan__'`
-  so `(plan_path, section_id)` is always a non-null composite key and `getFilesForPlan`
-  can address the plan row. (`NULL` would break SQL `UNIQUE`/equality.)
-- **D4 — FTS5 tokenizer = `unicode61` default.** Identifier/path tokenizer tuning
-  (`tokenchars`) is deferred to PI4 (retrieval quality / RRF), which is out of PI1's
-  storage-foundation scope. The fixed DDL keeps ST-11 rebuild reproducible.
-- **D5 — `plan_path` is an opaque, verbatim key; normalization is PI3/PI6's job (F6).**
-  ST-16 passes a bare slug (`pi6-conflict.md`) while other scenarios use full paths
-  (`plans/todo/x.md`). PI1 keys on the exact `plan_path` string supplied at upsert and
-  does no normalization; the barrel JSDoc states this verbatim ("plan_path is an opaque
-  key; callers must normalize consistently"). Consistent normalization is carried
-  forward as a **required acceptance criterion for PI3 (sync/upsert) and PI6 (conflict
-  detection / getFilesForPlan)** so the contract is not lost — the deferral is
-  deliberate and scoped, not an omission.
-- **D6 — Node experimental-SQLite warning is left in place.** `require('node:sqlite')`
-  emits a one-line `ExperimentalWarning` to stderr (observed live on Node 24.14.1).
-  This is Node's informational banner for a built-in feature, not a deprecation, our
-  bug, or a CVE — globally muting process warnings from a library is worse than the
-  banner, so it is not suppressed in code. It does not fail `node --test`
-  (`# fail 0`). The Node-version guarantee that keeps the experimental API stable is
-  **PI0's** capability gate, not PI1's. (Run the suite with `--no-warnings` if a fully
-  silent log is wanted — a harness choice, not a code change.)
-- **D7 — ST-05 uses a real failure trigger.** Rollback is exercised by a genuine
-  wrong-dimension vector rejected by vec0 mid-transaction (after `units`/`fts_plans`
-  writes), not by monkey-patching the transaction — testing behavior, not a mock.
-- **D8 — Cross-platform binary tests are runtime-conditional.** ST-07/08/09 always
-  assert the committed binary file exists for each platform, and additionally load +
-  version-check only the binary matching the current `process.platform`/`arch` (you
-  cannot `dlopen` a foreign-arch `.so`/`.dll`). This keeps the suite green on any one
-  OS while still guarding that all five binaries are vendored.
-- **D9 — sqlite-vec binary is vendored as `vec.<ext>`, not `vec0.<ext>` (F1).**
-  `node:sqlite` `DatabaseSync.loadExtension(path)` is single-argument (no explicit
-  entry-point parameter; a 2nd arg throws `TypeError`), so SQLite must derive the C
-  entry point from the filename. sqlite-vec exports `sqlite3_vec_init`; SQLite derives
-  `sqlite3_<name>_init` from `<name>.<ext>`, so the file is named `vec.<ext>` (derives
-  `sqlite3_vec_init`). A `vec0.<ext>` name would derive the non-existent
-  `sqlite3_vec0_init` and fail. The Step 8 spike confirms this empirically on the dev
-  machine before any store code is written; if a platform derives differently, the
-  filename is adjusted there and the finding recorded in `vec0-loader.js`. The prior
-  2-arg `loadExtension(resolved, 'sqlite3_vec_init')` retry is removed — the API does
-  not support it.
-- **D10 — vec0 dimension is verified via `sqlite_master.sql`, not `PRAGMA table_info`
-  (F7).** vec0 is a virtual table; `PRAGMA table_info(vec_plans)` does not reliably
-  expose the declared `float[N]` dimension, whereas `SELECT sql FROM sqlite_master
-  WHERE name='vec_plans'` returns the exact `CREATE VIRTUAL TABLE … float[N] …` DDL.
-  All dimension assertions (the AC, ST-02, ST-11) read the dimension from
-  `sqlite_master.sql`. Step 8 confirms empirically whether `table_info` also happens to
-  expose it; the AC does not depend on that.
-- **D11 — musl/Alpine is known-unsupported for now (F2).** sqlite-vec ships
-  glibc-linked `.so` binaries; on a musl host `existsSync` passes but `dlopen` throws.
-  `loadVec0Extension` catches this and re-throws an actionable error (platform, arch,
-  detected libc, degrade path), so CTOC degrades to PI0's no-index / rebuild-from-plans
-  path rather than crashing. A dedicated musl-linked vec0 build is an out-of-scope
-  future maintainer TODO; PI1 does not attempt it.
-- **D12 — dimension change performs a FULL tri-table reset, not a vec-only recreate
-  (F4).** A different-dimension `initVectorTable` invalidates every stored vector, so
-  PI1 clears `units` + `fts_plans` + `vec_plans` together (one transaction) rather than
-  dropping `vec_plans` alone and orphaning metadata (which would make `getUnit`'s INNER
-  JOIN silently return null). This is safe because the DB is a rebuildable cache and
-  PI3's reconciliation re-populates it. The alternative (keep metadata, force an
-  immediate re-embed) was rejected: re-embedding is PI2/PI3's responsibility and PI1
-  must carry no dependency on them.
+### Step 16: FINAL-REVIEW (implementation-reviewer → CTO Chief)
+- [ ] 14 quality dimensions; verify the Gate 2 marker is present; confirm the
+  PI2/PI3/PI4 contracts (`upsertUnit` dimension inference, CRUD, `search`,
+  `withBatch`, `getFilesForPlan`) are met and that the slice is buildable with **zero
+  native/binary prerequisites**. Gate 3 is the human's.
