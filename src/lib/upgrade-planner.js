@@ -25,7 +25,7 @@
  * B10: Added explicit success criteria with verification commands
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -192,7 +192,7 @@ class UpgradePlanner {
     }
 
     // Add editorconfig
-    const hasEditorConfig = fs.existsSync(path.join(a.project, '.editorconfig'));
+    const hasEditorConfig = safeFs.existsSync(path.join(a.project, '.editorconfig'));
     if (!hasEditorConfig) {
       wins.push({
         action: 'Add .editorconfig',
@@ -226,8 +226,8 @@ class UpgradePlanner {
     }
 
     // Pre-commit hooks
-    const hasPreCommit = fs.existsSync(path.join(a.project, '.husky')) ||
-                        fs.existsSync(path.join(a.project, '.pre-commit-config.yaml'));
+    const hasPreCommit = safeFs.existsSync(path.join(a.project, '.husky')) ||
+                        safeFs.existsSync(path.join(a.project, '.pre-commit-config.yaml'));
     if (!hasPreCommit && a.lintingSetup?.hasLinter) {
       wins.push({
         action: 'Set up pre-commit hooks',

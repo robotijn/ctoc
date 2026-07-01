@@ -4,7 +4,7 @@
  * Main entry point for /ctoc command
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { c, clear, line, renderTabs, renderTabIndicator, setupKeyboard, cleanup, renderBreadcrumb } = require('../lib/tui');
 const { TABS, getTabNames, nextTab, prevTab } = require('../lib/tabs');
@@ -46,7 +46,7 @@ function attachEnvironmentQuestion(result) {
 // Read version from VERSION file
 let VERSION;
 try {
-  VERSION = fs.readFileSync(path.join(__dirname, '..', '..', 'VERSION'), 'utf8').trim();
+  VERSION = safeFs.readFileSync(path.join(__dirname, '..', '..', 'VERSION'), 'utf8').trim();
 } catch {
   VERSION = '?.?.?';
 }
@@ -272,7 +272,7 @@ function handleResize() {
 // blocks on an initialization problem.
 function ensureInitialized(projectPath) {
   const root = projectPath || process.cwd();
-  if (fs.existsSync(path.join(root, '.ctoc'))) return false;
+  if (safeFs.existsSync(path.join(root, '.ctoc'))) return false;
   try {
     const { initProject } = require('../lib/init-project');
     initProject(root);

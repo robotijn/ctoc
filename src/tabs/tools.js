@@ -3,7 +3,7 @@
  * Doctor, Update, Settings (with sub-tabs)
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { c, line, renderTabs, renderFooter } = require('../lib/tui');
 const {
@@ -104,14 +104,14 @@ function forceUpdate() {
   let cleared = [];
 
   // Clear cache directory
-  if (fs.existsSync(cacheDir)) {
-    fs.rmSync(cacheDir, { recursive: true, force: true });
+  if (safeFs.existsSync(cacheDir)) {
+    safeFs.rmSync(cacheDir, { recursive: true, force: true });
     cleared.push('cache');
   }
 
   // Clear marketplace directory
-  if (fs.existsSync(marketDir)) {
-    fs.rmSync(marketDir, { recursive: true, force: true });
+  if (safeFs.existsSync(marketDir)) {
+    safeFs.rmSync(marketDir, { recursive: true, force: true });
     cleared.push('marketplace');
   }
 
@@ -165,28 +165,28 @@ function runHealthChecks(projectPath) {
   const pluginPath = path.join(__dirname, '..', '..');
   checks.push({
     label: 'Plugin installed correctly',
-    pass: fs.existsSync(pluginPath)
+    pass: safeFs.existsSync(pluginPath)
   });
 
   // Hooks configured
   const hooksPath = path.join(pluginPath, '.claude-plugin', 'hooks.json');
   checks.push({
     label: 'Hooks configured',
-    pass: fs.existsSync(hooksPath)
+    pass: safeFs.existsSync(hooksPath)
   });
 
   // Settings file
   const settingsPath = path.join(projectPath, '.ctoc', 'settings.json');
   checks.push({
     label: 'Settings file exists',
-    pass: fs.existsSync(settingsPath)
+    pass: safeFs.existsSync(settingsPath)
   });
 
   // Plans directory
   const plansDir = path.join(projectPath, 'plans');
   checks.push({
     label: 'Plans directory exists',
-    pass: fs.existsSync(plansDir)
+    pass: safeFs.existsSync(plansDir)
   });
 
   // Node version
@@ -203,7 +203,7 @@ function runHealthChecks(projectPath) {
 function getVersion() {
   try {
     const versionFile = path.join(__dirname, '..', '..', 'VERSION');
-    return fs.readFileSync(versionFile, 'utf8').trim();
+    return safeFs.readFileSync(versionFile, 'utf8').trim();
   } catch {
     return '0.0.0';
   }

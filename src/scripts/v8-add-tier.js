@@ -10,7 +10,7 @@
  *   - After title:  # Title\n\n---\n... ---\n
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 
 const root = process.cwd();
@@ -54,13 +54,13 @@ function addTierField(content, tier) {
 
 function processFile(relPath, tier) {
   const abs = path.join(root, relPath);
-  if (!fs.existsSync(abs)) return { path: relPath, status: 'missing' };
+  if (!safeFs.existsSync(abs)) return { path: relPath, status: 'missing' };
 
-  const content = fs.readFileSync(abs, 'utf8');
+  const content = safeFs.readFileSync(abs, 'utf8');
   const result = addTierField(content, tier);
   if (!result.changed) return { path: relPath, status: result.reason };
 
-  if (!dryRun) fs.writeFileSync(abs, result.content);
+  if (!dryRun) safeFs.writeFileSync(abs, result.content);
   return { path: relPath, status: 'tier-added', tier };
 }
 

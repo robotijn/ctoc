@@ -4,12 +4,12 @@
  * Doctor, update, settings, logs. Folds the legacy `tools` tab.
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { c, line, renderFooter } = require('../lib/tui');
 
 function fileSize(filePath) {
-  try { return fs.statSync(filePath).size; } catch { return 0; }
+  try { return safeFs.statSync(filePath).size; } catch { return 0; }
 }
 
 function render(app) {
@@ -33,7 +33,7 @@ function render(app) {
 
   out += `  ${c.bold}Settings${c.reset}\n`;
   const settingsPath = path.join(root, '.ctoc', 'settings.yaml');
-  if (fs.existsSync(settingsPath)) {
+  if (safeFs.existsSync(settingsPath)) {
     out += `    ${c.dim}${settingsPath}${c.reset}\n`;
   } else {
     out += `    ${c.dim}Not configured (.ctoc/settings.yaml missing)${c.reset}\n`;

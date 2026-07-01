@@ -33,9 +33,9 @@
  *     https://www.lean.org/lexicon-terms/andon/
  */
 
-const fs = require('fs');
 const path = require('path');
 
+const safeFs = require('../lib/safe-fs');
 const { findProjectRoot } = require('../lib/project-root');
 
 // Lazy-load deps that may not exist in older installs (fail OPEN).
@@ -83,10 +83,10 @@ function readYamlFlat(content) {
  */
 function readThresholds(projectRoot) {
   const p = path.join(projectRoot, THRESHOLDS_PATH);
-  if (!fs.existsSync(p)) return {};
+  if (!safeFs.existsSync(p)) return {};
   let content;
   try {
-    content = fs.readFileSync(p, 'utf8');
+    content = safeFs.readFileSync(p, 'utf8');
   } catch (_e) {
     return {};
   }
@@ -131,10 +131,10 @@ function parseScalar(v) {
 
 function readOverride(projectRoot) {
   const p = path.join(projectRoot, OVERRIDE_PATH);
-  if (!fs.existsSync(p)) return null;
+  if (!safeFs.existsSync(p)) return null;
   let content;
   try {
-    content = fs.readFileSync(p, 'utf8');
+    content = safeFs.readFileSync(p, 'utf8');
   } catch (_e) {
     return null;
   }
@@ -151,7 +151,7 @@ function readOverride(projectRoot) {
 function logOverride(projectRoot, override, breaches) {
   const logDir = path.dirname(path.join(projectRoot, OVERRIDE_LOG_PATH));
   try {
-    fs.mkdirSync(logDir, { recursive: true });
+    safeFs.mkdirSync(logDir, { recursive: true });
     const entry = {
       timestamp: new Date().toISOString(),
       reason: override.reason,
@@ -161,18 +161,18 @@ function logOverride(projectRoot, override, breaches) {
     };
     let arr = [];
     const fullPath = path.join(projectRoot, OVERRIDE_LOG_PATH);
-    if (fs.existsSync(fullPath)) {
-      try { arr = JSON.parse(fs.readFileSync(fullPath, 'utf8')); } catch (_e) { arr = []; }
+    if (safeFs.existsSync(fullPath)) {
+      try { arr = JSON.parse(safeFs.readFileSync(fullPath, 'utf8')); } catch (_e) { arr = []; }
     }
     arr.push(entry);
-    fs.writeFileSync(fullPath, JSON.stringify(arr, null, 2));
+    safeFs.writeFileSync(fullPath, JSON.stringify(arr, null, 2));
   } catch (_e) { /* logging failures must not crash */ }
 }
 
 function logHalt(projectRoot, breaches, toolName) {
   const logDir = path.dirname(path.join(projectRoot, HALT_LOG_PATH));
   try {
-    fs.mkdirSync(logDir, { recursive: true });
+    safeFs.mkdirSync(logDir, { recursive: true });
     const entry = {
       timestamp: new Date().toISOString(),
       tool: toolName || null,
@@ -180,11 +180,11 @@ function logHalt(projectRoot, breaches, toolName) {
     };
     let arr = [];
     const fullPath = path.join(projectRoot, HALT_LOG_PATH);
-    if (fs.existsSync(fullPath)) {
-      try { arr = JSON.parse(fs.readFileSync(fullPath, 'utf8')); } catch (_e) { arr = []; }
+    if (safeFs.existsSync(fullPath)) {
+      try { arr = JSON.parse(safeFs.readFileSync(fullPath, 'utf8')); } catch (_e) { arr = []; }
     }
     arr.push(entry);
-    fs.writeFileSync(fullPath, JSON.stringify(arr, null, 2));
+    safeFs.writeFileSync(fullPath, JSON.stringify(arr, null, 2));
   } catch (_e) { /* logging failures must not crash */ }
 }
 

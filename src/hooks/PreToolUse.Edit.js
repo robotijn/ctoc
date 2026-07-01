@@ -18,6 +18,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 
 function safeRequire(modulePath) {
   try { return require(modulePath); } catch { return null; }
@@ -89,7 +90,7 @@ function getTargetFile(stdinJson) {
 function readTranscript(stdinJson) {
   // Claude Code hook protocol passes transcript_path in stdin JSON
   if (!stdinJson || !stdinJson.transcript_path) return null;
-  try { return fs.readFileSync(stdinJson.transcript_path, 'utf8'); } catch { return null; }
+  try { return safeFs.readFileSync(stdinJson.transcript_path, 'utf8'); } catch { return null; }
 }
 
 function findEscapeInTranscript(transcript) {

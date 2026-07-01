@@ -4,7 +4,7 @@
  * Handles version bumping, syncing, and update checking
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const https = require('https');
 const { CTOC_HOME } = require('./crypto');
@@ -25,7 +25,7 @@ function getPluginRoot() {
   // Go up to find VERSION file
   let dir = __dirname;
   for (let i = 0; i < 5; i++) {
-    if (fs.existsSync(path.join(dir, 'VERSION'))) {
+    if (safeFs.existsSync(path.join(dir, 'VERSION'))) {
       return dir;
     }
     dir = path.dirname(dir);
@@ -40,10 +40,10 @@ function getPluginRoot() {
  */
 function getVersion() {
   const versionFile = path.join(getPluginRoot(), 'VERSION');
-  if (!fs.existsSync(versionFile)) {
+  if (!safeFs.existsSync(versionFile)) {
     return '0.0.0';
   }
-  return fs.readFileSync(versionFile, 'utf8').trim();
+  return safeFs.readFileSync(versionFile, 'utf8').trim();
 }
 
 /**
@@ -110,7 +110,7 @@ function bump(version, type = 'patch') {
  */
 function setVersion(version) {
   const versionFile = path.join(getPluginRoot(), 'VERSION');
-  fs.writeFileSync(versionFile, version + '\n');
+  safeFs.writeFileSync(versionFile, version + '\n');
 }
 
 /**
@@ -121,12 +121,12 @@ function syncToMarketplace() {
   const root = getPluginRoot();
   const marketplaceFile = path.join(root, '.claude-plugin', 'marketplace.json');
 
-  if (!fs.existsSync(marketplaceFile)) {
+  if (!safeFs.existsSync(marketplaceFile)) {
     return { success: false, error: 'marketplace.json not found' };
   }
 
   const version = getVersion();
-  const marketplace = JSON.parse(fs.readFileSync(marketplaceFile, 'utf8'));
+  const marketplace = JSON.parse(safeFs.readFileSync(marketplaceFile, 'utf8'));
 
   // Update both locations
   if (marketplace.metadata) {
@@ -136,7 +136,7 @@ function syncToMarketplace() {
     marketplace.plugins[0].version = version;
   }
 
-  fs.writeFileSync(marketplaceFile, JSON.stringify(marketplace, null, 2) + '\n');
+  safeFs.writeFileSync(marketplaceFile, JSON.stringify(marketplace, null, 2) + '\n');
 
   return { success: true, version };
 }
@@ -148,15 +148,15 @@ function syncToPluginJson() {
   const root = getPluginRoot();
   const pluginFile = path.join(root, 'ctoc-plugin', '.claude-plugin', 'plugin.json');
 
-  if (!fs.existsSync(pluginFile)) {
+  if (!safeFs.existsSync(pluginFile)) {
     return { success: false, error: 'plugin.json not found' };
   }
 
   const version = getVersion();
-  const plugin = JSON.parse(fs.readFileSync(pluginFile, 'utf8'));
+  const plugin = JSON.parse(safeFs.readFileSync(pluginFile, 'utf8'));
   plugin.version = version;
 
-  fs.writeFileSync(pluginFile, JSON.stringify(plugin, null, 2) + '\n');
+  safeFs.writeFileSync(pluginFile, JSON.stringify(plugin, null, 2) + '\n');
 
   return { success: true, version };
 }
@@ -169,12 +169,12 @@ function syncToReadme() {
   const root = getPluginRoot();
   const readmeFile = path.join(root, 'README.md');
 
-  if (!fs.existsSync(readmeFile)) {
+  if (!safeFs.existsSync(readmeFile)) {
     return { success: false, error: 'README.md not found' };
   }
 
   const version = getVersion();
-  let content = fs.readFileSync(readmeFile, 'utf8');
+  let content = safeFs.readFileSync(readmeFile, 'utf8');
 
   // Match pattern: **X.Y.Z** — (at start of line in ## Version section)
   content = content.replace(
@@ -182,7 +182,7 @@ function syncToReadme() {
     `**${version}** — `
   );
 
-  fs.writeFileSync(readmeFile, content);
+  safeFs.writeFileSync(readmeFile, content);
 
   return { success: true, version };
 }
@@ -256,12 +256,12 @@ function fetchLatestVersion() {
  * @returns {{latestVersion: string, checkedAt: number}|null}
  */
 function loadUpdateCache() {
-  if (!fs.existsSync(UPDATE_CACHE_FILE)) {
+  if (!safeFs.existsSync(UPDATE_CACHE_FILE)) {
     return null;
   }
 
   try {
-    const cache = JSON.parse(fs.readFileSync(UPDATE_CACHE_FILE, 'utf8'));
+    const cache = JSON.parse(safeFs.readFileSync(UPDATE_CACHE_FILE, 'utf8'));
     const age = Date.now() - cache.checkedAt;
 
     if (age < CACHE_TTL_MS) {
@@ -284,11 +284,11 @@ function saveUpdateCache(latestVersion) {
   };
 
   // Ensure CTOC_HOME exists
-  if (!fs.existsSync(CTOC_HOME)) {
-    fs.mkdirSync(CTOC_HOME, { recursive: true });
+  if (!safeFs.existsSync(CTOC_HOME)) {
+    safeFs.mkdirSync(CTOC_HOME, { recursive: true });
   }
 
-  fs.writeFileSync(UPDATE_CACHE_FILE, JSON.stringify(cache, null, 2));
+  safeFs.writeFileSync(UPDATE_CACHE_FILE, JSON.stringify(cache, null, 2));
 }
 
 /**

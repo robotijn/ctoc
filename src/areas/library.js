@@ -4,14 +4,14 @@
  * Browse agents, skills, and slash commands. Filterable by category.
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { c, line, renderFooter } = require('../lib/tui');
 
 function countFiles(dir, ext = '.md') {
-  if (!fs.existsSync(dir)) return 0;
+  if (!safeFs.existsSync(dir)) return 0;
   let total = 0;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.')) continue;
     const p = path.join(dir, entry.name);
     if (entry.isDirectory()) total += countFiles(p, ext);
@@ -21,8 +21,8 @@ function countFiles(dir, ext = '.md') {
 }
 
 function listCategories(dir) {
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir, { withFileTypes: true })
+  if (!safeFs.existsSync(dir)) return [];
+  return safeFs.readdirSync(dir, { withFileTypes: true })
     .filter(e => e.isDirectory() && !e.name.startsWith('.'))
     .map(e => ({ name: e.name, count: countFiles(path.join(dir, e.name)) }))
     .sort((a, b) => b.count - a.count);
@@ -50,8 +50,8 @@ function render(app) {
   out += '\n';
 
   out += `  ${c.bold}Commands${c.reset}  ${c.cyan}${countFiles(commandsDir, '.js')}${c.reset}\n`;
-  if (fs.existsSync(commandsDir)) {
-    for (const f of fs.readdirSync(commandsDir).filter(f => f.endsWith('.js')).slice(0, 8)) {
+  if (safeFs.existsSync(commandsDir)) {
+    for (const f of safeFs.readdirSync(commandsDir).filter(f => f.endsWith('.js')).slice(0, 8)) {
       out += `    ${c.dim}${f}${c.reset}\n`;
     }
   }

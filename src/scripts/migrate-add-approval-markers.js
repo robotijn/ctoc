@@ -4,7 +4,7 @@
  * Run once after implementing human gates
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 
 const PLANS_DIR = path.join(process.cwd(), 'plans');
@@ -17,7 +17,7 @@ const GATE_DESTINATIONS = {
 };
 
 function addMarker(filePath, fromStage, toStage) {
-  let content = fs.readFileSync(filePath, 'utf8');
+  let content = safeFs.readFileSync(filePath, 'utf8');
 
   if (content.includes('approved_by: human')) {
     console.log(`  SKIP: ${path.basename(filePath)} (already has marker)`);
@@ -27,7 +27,7 @@ function addMarker(filePath, fromStage, toStage) {
   const marker = `---\napproved_by: human\napproved_at: ${new Date().toISOString()}\ngate_crossed: ${fromStage} → ${toStage}\nnote: Retroactively added during human gates migration\n---\n\n`;
 
   content = marker + content;
-  fs.writeFileSync(filePath, content);
+  safeFs.writeFileSync(filePath, content);
   console.log(`  ADDED: ${path.basename(filePath)}`);
   return true;
 }
@@ -35,12 +35,12 @@ function addMarker(filePath, fromStage, toStage) {
 function migrateFolder(folderName, fromStage) {
   const folderPath = path.join(PLANS_DIR, folderName);
 
-  if (!fs.existsSync(folderPath)) {
+  if (!safeFs.existsSync(folderPath)) {
     console.log(`  ${folderName}/: folder not found, skipping`);
     return 0;
   }
 
-  const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.md'));
+  const files = safeFs.readdirSync(folderPath).filter(f => f.endsWith('.md'));
 
   if (files.length === 0) {
     console.log(`  ${folderName}/: no plans found`);

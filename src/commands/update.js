@@ -6,7 +6,7 @@
  * Issues: #21995, #16866, #14061
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -45,20 +45,20 @@ function getCurrentVersion() {
   const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
   if (pluginRoot) {
     const versionFile = path.join(pluginRoot, 'VERSION');
-    if (fs.existsSync(versionFile)) {
-      return fs.readFileSync(versionFile, 'utf8').trim();
+    if (safeFs.existsSync(versionFile)) {
+      return safeFs.readFileSync(versionFile, 'utf8').trim();
     }
   }
   // Derive from script location (e.g., .../ctoc/6.1.22/commands/update.js)
   const scriptDir = path.resolve(__dirname, '..', '..');
   const versionFile = path.join(scriptDir, 'VERSION');
-  if (fs.existsSync(versionFile)) {
-    return fs.readFileSync(versionFile, 'utf8').trim();
+  if (safeFs.existsSync(versionFile)) {
+    return safeFs.readFileSync(versionFile, 'utf8').trim();
   }
   // Last resort: read from cache directory names
-  if (fs.existsSync(CACHE_DIR)) {
-    const versions = fs.readdirSync(CACHE_DIR).filter(d =>
-      fs.statSync(path.join(CACHE_DIR, d)).isDirectory()
+  if (safeFs.existsSync(CACHE_DIR)) {
+    const versions = safeFs.readdirSync(CACHE_DIR).filter(d =>
+      safeFs.statSync(path.join(CACHE_DIR, d)).isDirectory()
     );
     if (versions.length === 1) return versions[0];
   }
@@ -67,8 +67,8 @@ function getCurrentVersion() {
 
 function getLatestVersion() {
   const versionFile = path.join(MARKETPLACE_DIR, 'VERSION');
-  if (fs.existsSync(versionFile)) {
-    return fs.readFileSync(versionFile, 'utf8').trim();
+  if (safeFs.existsSync(versionFile)) {
+    return safeFs.readFileSync(versionFile, 'utf8').trim();
   }
   return null;
 }
@@ -83,13 +83,13 @@ function update() {
   // 1. Clone or fetch latest from GitHub
   console.log('\n1. Fetching latest from GitHub...');
   try {
-    const hasGit = fs.existsSync(path.join(MARKETPLACE_DIR, '.git'));
+    const hasGit = safeFs.existsSync(path.join(MARKETPLACE_DIR, '.git'));
     if (!hasGit) {
       // No .git dir — clone fresh (handles missing dir, broken state, cleared cache)
-      if (fs.existsSync(MARKETPLACE_DIR)) {
-        fs.rmSync(MARKETPLACE_DIR, { recursive: true });
+      if (safeFs.existsSync(MARKETPLACE_DIR)) {
+        safeFs.rmSync(MARKETPLACE_DIR, { recursive: true });
       }
-      fs.mkdirSync(MARKETPLACE_DIR, { recursive: true });
+      safeFs.mkdirSync(MARKETPLACE_DIR, { recursive: true });
       run(`git clone https://github.com/robotijn/ctoc.git "${MARKETPLACE_DIR}"`);
       console.log('   Cloned fresh from GitHub');
     } else {
@@ -127,18 +127,18 @@ function update() {
   console.log('\n2. Installing to cache...');
 
   // Remove old version dir if exists
-  if (fs.existsSync(cacheVersionDir)) {
-    fs.rmSync(cacheVersionDir, { recursive: true });
+  if (safeFs.existsSync(cacheVersionDir)) {
+    safeFs.rmSync(cacheVersionDir, { recursive: true });
   }
-  fs.mkdirSync(cacheVersionDir, { recursive: true });
+  safeFs.mkdirSync(cacheVersionDir, { recursive: true });
 
   // Copy files (exclude .git)
-  const files = fs.readdirSync(MARKETPLACE_DIR);
+  const files = safeFs.readdirSync(MARKETPLACE_DIR);
   for (const file of files) {
     if (file === '.git') continue;
     const src = path.join(MARKETPLACE_DIR, file);
     const dst = path.join(cacheVersionDir, file);
-    fs.cpSync(src, dst, { recursive: true });
+    safeFs.cpSync(src, dst, { recursive: true });
   }
   console.log(`   Installed to: ${cacheVersionDir}`);
 
@@ -147,9 +147,9 @@ function update() {
 
   // Preserve existing plugins, only update ctoc
   let installed = { version: 2, plugins: {} };
-  if (fs.existsSync(INSTALLED_FILE)) {
+  if (safeFs.existsSync(INSTALLED_FILE)) {
     try {
-      installed = JSON.parse(fs.readFileSync(INSTALLED_FILE, 'utf8'));
+      installed = JSON.parse(safeFs.readFileSync(INSTALLED_FILE, 'utf8'));
     } catch (e) {
       // Use default if file is corrupted
     }
@@ -170,15 +170,15 @@ function update() {
     }
   ];
 
-  fs.writeFileSync(INSTALLED_FILE, JSON.stringify(installed, null, 2));
+  safeFs.writeFileSync(INSTALLED_FILE, JSON.stringify(installed, null, 2));
   console.log('   Registry updated');
 
   // 7. Clean old versions
   console.log('\n4. Cleaning old versions...');
   try {
-    const versions = fs.readdirSync(CACHE_DIR).filter(v => v !== newVersion);
+    const versions = safeFs.readdirSync(CACHE_DIR).filter(v => v !== newVersion);
     for (const v of versions) {
-      fs.rmSync(path.join(CACHE_DIR, v), { recursive: true });
+      safeFs.rmSync(path.join(CACHE_DIR, v), { recursive: true });
       console.log(`   Removed: ${v}`);
     }
     if (versions.length === 0) {

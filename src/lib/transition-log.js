@@ -4,7 +4,7 @@
  * Logs every transition to .ctoc/logs/transitions.json
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { findProjectRoot } = require('./project-root');
 
@@ -24,11 +24,11 @@ function getLogPath(projectPath) {
  */
 function ensureLogFile(logPath) {
   const dir = path.dirname(logPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) {
+    safeFs.mkdirSync(dir, { recursive: true });
   }
-  if (!fs.existsSync(logPath)) {
-    fs.writeFileSync(logPath, '[]');
+  if (!safeFs.existsSync(logPath)) {
+    safeFs.writeFileSync(logPath, '[]');
   }
 }
 
@@ -39,11 +39,11 @@ function ensureLogFile(logPath) {
  */
 function readLog(projectPath) {
   const logPath = getLogPath(projectPath);
-  if (!fs.existsSync(logPath)) {
+  if (!safeFs.existsSync(logPath)) {
     return [];
   }
   try {
-    const content = fs.readFileSync(logPath, 'utf8');
+    const content = safeFs.readFileSync(logPath, 'utf8');
     return JSON.parse(content);
   } catch {
     return [];
@@ -81,7 +81,7 @@ function logTransition(entry, projectPath) {
   };
 
   entries.push(logEntry);
-  fs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
+  safeFs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
 
   return logEntry;
 }

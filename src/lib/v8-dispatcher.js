@@ -30,7 +30,7 @@
  * it wraps the call to produce an audit trail and enforce the protocol.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 const budget = require('./budget');
@@ -77,7 +77,7 @@ function generateUlid(now = Date.now()) {
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 function isoNow() {
@@ -175,7 +175,7 @@ function beginDispatch(opts) {
   ensureDir(AUDIT_BASE);
   const auditPath = auditPathForId(req.id);
   const entry = { request: req };
-  fs.writeFileSync(auditPath, yamlStringify(entry));
+  safeFs.writeFileSync(auditPath, yamlStringify(entry));
 
   // 2. Record dispatch in session usage
   try { budget.recordDispatch(req.target_agent); } catch { /* ignore: best-effort, non-fatal */ }
@@ -209,7 +209,7 @@ function recordResponse(token, response) {
 
   const existing = parseYamlFile(token.auditPath);
   existing.response = fullResponse;
-  fs.writeFileSync(token.auditPath, yamlStringify(existing));
+  safeFs.writeFileSync(token.auditPath, yamlStringify(existing));
   return fullResponse;
 }
 
@@ -225,7 +225,7 @@ function finalizeDispatch(token, outcome) {
     graded_at: outcome.gradedAt || null,
     grade: outcome.grade || null,
   };
-  fs.writeFileSync(token.auditPath, yamlStringify(existing));
+  safeFs.writeFileSync(token.auditPath, yamlStringify(existing));
   return existing;
 }
 
@@ -280,9 +280,9 @@ function parseYamlFile(filePath) {
   // Minimal parser sufficient for round-tripping our own writes.
   // Falls back to returning {} on error — audit log is append-with-replace,
   // not read-heavy.
-  if (!fs.existsSync(filePath)) return {};
+  if (!safeFs.existsSync(filePath)) return {};
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = safeFs.readFileSync(filePath, 'utf8');
     return parseYaml(content);
   } catch {
     return {};
@@ -347,13 +347,13 @@ function parseYamlValue(raw) {
 // ─────────────────────────────────────────────────────────────────────
 
 function loadGrades() {
-  if (!fs.existsSync(GRADES_PATH)) return {};
+  if (!safeFs.existsSync(GRADES_PATH)) return {};
   return parseYamlFile(GRADES_PATH);
 }
 
 function saveGrades(grades) {
   ensureDir(path.dirname(GRADES_PATH));
-  fs.writeFileSync(GRADES_PATH, yamlStringify(grades));
+  safeFs.writeFileSync(GRADES_PATH, yamlStringify(grades));
 }
 
 /**

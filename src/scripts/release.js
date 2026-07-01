@@ -10,7 +10,7 @@
  *   - Documentation files with version references
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -54,7 +54,7 @@ const VERSION_UPDATES = [
 ];
 
 function getVersion() {
-  const version = fs.readFileSync(VERSION_FILE, 'utf8').trim();
+  const version = safeFs.readFileSync(VERSION_FILE, 'utf8').trim();
   if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
     throw new Error(`Invalid version format in ${VERSION_FILE}: "${version}" (expected X.Y.Z)`);
   }
@@ -67,12 +67,12 @@ function updateJsonVersionFiles(version) {
   for (const config of JSON_VERSION_FILES) {
     const filePath = path.join(ROOT, config.file);
 
-    if (!fs.existsSync(filePath)) {
+    if (!safeFs.existsSync(filePath)) {
       console.log(`  Skip: ${config.file} (not found)`);
       continue;
     }
 
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = safeFs.readFileSync(filePath, 'utf8');
     let json;
     try {
       json = JSON.parse(content);
@@ -104,7 +104,7 @@ function updateJsonVersionFiles(version) {
     }
 
     if (changed) {
-      fs.writeFileSync(filePath, JSON.stringify(json, null, 2) + '\n');
+      safeFs.writeFileSync(filePath, JSON.stringify(json, null, 2) + '\n');
       updated.push(config.file);
       console.log(`  Updated: ${config.file}`);
     }
@@ -119,18 +119,18 @@ function updateVersionInFiles(version) {
   for (const update of VERSION_UPDATES) {
     const filePath = path.join(ROOT, update.file);
 
-    if (!fs.existsSync(filePath)) {
+    if (!safeFs.existsSync(filePath)) {
       console.log(`  Skip: ${update.file} (not found)`);
       continue;
     }
 
-    let content = fs.readFileSync(filePath, 'utf8');
+    let content = safeFs.readFileSync(filePath, 'utf8');
     const original = content;
 
     content = content.replace(update.pattern, update.replacement(version));
 
     if (content !== original) {
-      fs.writeFileSync(filePath, content);
+      safeFs.writeFileSync(filePath, content);
       updated.push(update.file);
       console.log(`  Updated: ${update.file}`);
     }

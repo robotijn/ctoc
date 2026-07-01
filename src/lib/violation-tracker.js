@@ -2,7 +2,7 @@
  * Violation Tracker - Tracks gate violations with status
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const LOG_DIR = path.join(process.cwd(), '.ctoc', 'logs');
@@ -10,15 +10,15 @@ const VIOLATIONS_FILE = path.join(LOG_DIR, 'gate-violations.json');
 const ACK_FILE = path.join(LOG_DIR, 'last-ack.json');
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) {
+    safeFs.mkdirSync(dir, { recursive: true });
   }
 }
 
 function loadViolations() {
   try {
-    if (fs.existsSync(VIOLATIONS_FILE)) {
-      return JSON.parse(fs.readFileSync(VIOLATIONS_FILE, 'utf8'));
+    if (safeFs.existsSync(VIOLATIONS_FILE)) {
+      return JSON.parse(safeFs.readFileSync(VIOLATIONS_FILE, 'utf8'));
     }
   } catch { /* ignore: best-effort, non-fatal */ }
   return [];
@@ -26,7 +26,7 @@ function loadViolations() {
 
 function saveViolations(violations) {
   ensureDir(LOG_DIR);
-  fs.writeFileSync(VIOLATIONS_FILE, JSON.stringify(violations, null, 2));
+  safeFs.writeFileSync(VIOLATIONS_FILE, JSON.stringify(violations, null, 2));
 }
 
 function logViolation(violation) {
@@ -41,8 +41,8 @@ function logViolation(violation) {
 
 function getLastAck() {
   try {
-    if (fs.existsSync(ACK_FILE)) {
-      return JSON.parse(fs.readFileSync(ACK_FILE, 'utf8'));
+    if (safeFs.existsSync(ACK_FILE)) {
+      return JSON.parse(safeFs.readFileSync(ACK_FILE, 'utf8'));
     }
   } catch { /* ignore: best-effort, non-fatal */ }
   return { acknowledgedAt: null };
@@ -50,7 +50,7 @@ function getLastAck() {
 
 function acknowledge() {
   ensureDir(LOG_DIR);
-  fs.writeFileSync(ACK_FILE, JSON.stringify({
+  safeFs.writeFileSync(ACK_FILE, JSON.stringify({
     acknowledgedAt: new Date().toISOString()
   }));
 }

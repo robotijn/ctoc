@@ -15,7 +15,7 @@
  * - 1: Validation failed (blocking)
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 
 /**
  * Canonical step labels - these are MANDATORY and must NOT be changed.
@@ -51,11 +51,11 @@ const WRONG_LABEL_MAP = {
  * @returns {Object} Validation result with valid flag, errors, and warnings
  */
 function validatePlanStepLabels(planPath) {
-  if (!fs.existsSync(planPath)) {
+  if (!safeFs.existsSync(planPath)) {
     return { valid: false, errors: [`Plan file not found: ${planPath}`], warnings: [] };
   }
 
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
   const errors = [];
   const warnings = [];
 
@@ -120,11 +120,11 @@ function validatePlanStepLabels(planPath) {
  * @returns {Object} Result with fixed flag, changes made, and any remaining errors
  */
 function autoFixStepLabels(planPath) {
-  if (!fs.existsSync(planPath)) {
+  if (!safeFs.existsSync(planPath)) {
     return { fixed: false, changes: [], errors: [`Plan file not found: ${planPath}`] };
   }
 
-  let content = fs.readFileSync(planPath, 'utf8');
+  let content = safeFs.readFileSync(planPath, 'utf8');
   const changes = [];
 
   // Fix QUALITY -> PREPARE at Step 9
@@ -163,7 +163,7 @@ function autoFixStepLabels(planPath) {
   }
 
   if (changes.length > 0) {
-    fs.writeFileSync(planPath, content);
+    safeFs.writeFileSync(planPath, content);
   }
 
   // Re-validate after fixes

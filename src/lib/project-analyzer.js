@@ -25,7 +25,7 @@
  * B10: Added minimal project handling with sensible defaults
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -255,7 +255,7 @@ class ProjectAnalyzer {
     };
 
     const hasConfig = configFiles[language] &&
-      fs.existsSync(path.join(this.projectPath, configFiles[language]));
+      safeFs.existsSync(path.join(this.projectPath, configFiles[language]));
 
     if (hasConfig && fileCount > 10) return 'high';
     if (hasConfig || fileCount > 5) return 'medium';
@@ -389,7 +389,7 @@ class ProjectAnalyzer {
 
     // Find test directories
     const testDirs = testPatterns.directories.filter(dir =>
-      fs.existsSync(path.join(this.projectPath, dir))
+      safeFs.existsSync(path.join(this.projectPath, dir))
     );
 
     // Count test files
@@ -437,7 +437,7 @@ class ProjectAnalyzer {
 
     for (const [framework, files] of Object.entries(frameworks)) {
       for (const file of files) {
-        if (fs.existsSync(path.join(this.projectPath, file))) {
+        if (safeFs.existsSync(path.join(this.projectPath, file))) {
           // For pytest, verify pytest is in dependencies
           if (framework === 'pytest' && file === 'pyproject.toml') {
             const content = this.readFileSafe(path.join(this.projectPath, file));
@@ -504,7 +504,7 @@ class ProjectAnalyzer {
     for (const [linter, files] of Object.entries(linterConfigs)) {
       for (const file of files) {
         const filePath = path.join(this.projectPath, file);
-        if (fs.existsSync(filePath)) {
+        if (safeFs.existsSync(filePath)) {
           foundLinters.push(linter);
           configs[linter] = file;
 
@@ -575,7 +575,7 @@ class ProjectAnalyzer {
     const foundTools = [];
     for (const [tool, files] of Object.entries(securityTools)) {
       for (const file of files) {
-        if (fs.existsSync(path.join(this.projectPath, file))) {
+        if (safeFs.existsSync(path.join(this.projectPath, file))) {
           foundTools.push(tool);
           break;
         }
@@ -586,8 +586,8 @@ class ProjectAnalyzer {
     const hasSecurityInCI = this.checkCIForSecurity();
 
     // Check for secrets management
-    const hasSecretsConfig = fs.existsSync(path.join(this.projectPath, '.env.example')) ||
-      fs.existsSync(path.join(this.projectPath, '.env.template'));
+    const hasSecretsConfig = safeFs.existsSync(path.join(this.projectPath, '.env.example')) ||
+      safeFs.existsSync(path.join(this.projectPath, '.env.template'));
 
     // Check .gitignore for secret files
     const gitignore = this.readFileSafe(path.join(this.projectPath, '.gitignore'));
@@ -619,10 +619,10 @@ class ProjectAnalyzer {
 
     for (const ciPath of ciPaths) {
       const fullPath = path.join(this.projectPath, ciPath);
-      if (fs.existsSync(fullPath)) {
-        if (fs.statSync(fullPath).isDirectory()) {
+      if (safeFs.existsSync(fullPath)) {
+        if (safeFs.statSync(fullPath).isDirectory()) {
           // Check GitHub Actions workflows
-          const files = fs.readdirSync(fullPath);
+          const files = safeFs.readdirSync(fullPath);
           for (const file of files) {
             const content = this.readFileSafe(path.join(fullPath, file));
             if (content.includes('security') || content.includes('snyk') ||
@@ -694,13 +694,13 @@ class ProjectAnalyzer {
    */
   detectMonorepo() {
     const indicators = {
-      lerna: fs.existsSync(path.join(this.projectPath, 'lerna.json')),
-      nx: fs.existsSync(path.join(this.projectPath, 'nx.json')),
-      turborepo: fs.existsSync(path.join(this.projectPath, 'turbo.json')),
-      pnpmWorkspace: fs.existsSync(path.join(this.projectPath, 'pnpm-workspace.yaml')),
+      lerna: safeFs.existsSync(path.join(this.projectPath, 'lerna.json')),
+      nx: safeFs.existsSync(path.join(this.projectPath, 'nx.json')),
+      turborepo: safeFs.existsSync(path.join(this.projectPath, 'turbo.json')),
+      pnpmWorkspace: safeFs.existsSync(path.join(this.projectPath, 'pnpm-workspace.yaml')),
       yarnWorkspaces: this.hasYarnWorkspaces(),
       npmWorkspaces: this.hasNpmWorkspaces(),
-      packagesDir: fs.existsSync(path.join(this.projectPath, 'packages'))
+      packagesDir: safeFs.existsSync(path.join(this.projectPath, 'packages'))
     };
 
     const isMonorepo = Object.values(indicators).some(v => v);
@@ -753,7 +753,7 @@ class ProjectAnalyzer {
       if (sourceExtensions.includes(ext)) {
         // Count lines
         try {
-          const content = fs.readFileSync(filePath, 'utf8');
+          const content = safeFs.readFileSync(filePath, 'utf8');
           totalLines += content.split('\n').length;
         } catch (e) { /* ignore: best-effort, non-fatal */ }
 
@@ -894,9 +894,9 @@ class ProjectAnalyzer {
 
     for (const lockfile of lockfiles) {
       const lockPath = path.join(this.projectPath, lockfile);
-      if (fs.existsSync(lockPath)) {
+      if (safeFs.existsSync(lockPath)) {
         try {
-          const stat = fs.statSync(lockPath);
+          const stat = safeFs.statSync(lockPath);
           const ageMs = Date.now() - stat.mtimeMs;
           return Math.floor(ageMs / (1000 * 60 * 60 * 24));
         } catch (e) { /* ignore: best-effort, non-fatal */ }
@@ -1073,7 +1073,7 @@ class ProjectAnalyzer {
     ];
 
     for (const indicator of testIndicators) {
-      if (fs.existsSync(path.join(this.projectPath, indicator))) {
+      if (safeFs.existsSync(path.join(this.projectPath, indicator))) {
         return true;
       }
     }
@@ -1093,7 +1093,7 @@ class ProjectAnalyzer {
     ];
 
     for (const config of linterConfigs) {
-      if (fs.existsSync(path.join(this.projectPath, config))) {
+      if (safeFs.existsSync(path.join(this.projectPath, config))) {
         return true;
       }
     }
@@ -1116,7 +1116,7 @@ class ProjectAnalyzer {
     ];
 
     for (const config of formatterConfigs) {
-      if (fs.existsSync(path.join(this.projectPath, config))) {
+      if (safeFs.existsSync(path.join(this.projectPath, config))) {
         return true;
       }
     }
@@ -1130,17 +1130,17 @@ class ProjectAnalyzer {
    */
   hasTypeCheckerSetup() {
     // TypeScript
-    if (fs.existsSync(path.join(this.projectPath, 'tsconfig.json'))) {
+    if (safeFs.existsSync(path.join(this.projectPath, 'tsconfig.json'))) {
       return true;
     }
 
     // Python mypy
     const pyproject = this.readFileSafe(path.join(this.projectPath, 'pyproject.toml'));
     if (pyproject.includes('[tool.mypy]')) return true;
-    if (fs.existsSync(path.join(this.projectPath, 'mypy.ini'))) return true;
+    if (safeFs.existsSync(path.join(this.projectPath, 'mypy.ini'))) return true;
 
     // Python type hints in py.typed
-    if (fs.existsSync(path.join(this.projectPath, 'py.typed'))) return true;
+    if (safeFs.existsSync(path.join(this.projectPath, 'py.typed'))) return true;
 
     return false;
   }
@@ -1161,7 +1161,7 @@ class ProjectAnalyzer {
     ];
 
     for (const indicator of ciIndicators) {
-      if (fs.existsSync(path.join(this.projectPath, indicator))) {
+      if (safeFs.existsSync(path.join(this.projectPath, indicator))) {
         return true;
       }
     }
@@ -1182,7 +1182,7 @@ class ProjectAnalyzer {
     ];
 
     for (const indicator of securityIndicators) {
-      if (fs.existsSync(path.join(this.projectPath, indicator))) {
+      if (safeFs.existsSync(path.join(this.projectPath, indicator))) {
         return true;
       }
     }
@@ -1204,7 +1204,7 @@ class ProjectAnalyzer {
 
     for (const indicator of docIndicators) {
       const fullPath = path.join(this.projectPath, indicator);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         // For README, check it has content
         if (indicator === 'README.md') {
           const content = this.readFileSafe(fullPath);
@@ -1235,7 +1235,7 @@ class ProjectAnalyzer {
 
     for (const loc of coverageLocations) {
       const fullPath = path.join(this.projectPath, loc.path);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         return { path: fullPath, format: loc.format };
       }
     }
@@ -1250,8 +1250,8 @@ class ProjectAnalyzer {
   readPackageJson() {
     const pkgPath = path.join(this.projectPath, 'package.json');
     try {
-      if (fs.existsSync(pkgPath)) {
-        return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      if (safeFs.existsSync(pkgPath)) {
+        return JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
       }
     } catch (e) { /* ignore: best-effort, non-fatal */ }
     return null;
@@ -1274,8 +1274,8 @@ class ProjectAnalyzer {
    */
   readFileSafe(filePath) {
     try {
-      if (fs.existsSync(filePath)) {
-        return fs.readFileSync(filePath, 'utf8');
+      if (safeFs.existsSync(filePath)) {
+        return safeFs.readFileSync(filePath, 'utf8');
       }
     } catch (e) { /* ignore: best-effort, non-fatal */ }
     return '';
@@ -1288,7 +1288,7 @@ class ProjectAnalyzer {
    */
   walkFiles(dir, callback) {
     try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      const entries = safeFs.readdirSync(dir, { withFileTypes: true });
 
       for (const entry of entries) {
         // Skip excluded directories

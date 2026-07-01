@@ -3,7 +3,7 @@
  * Manage vision documents - interactive exploration before formal planning
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { c, renderActionMenu, renderFooter } = require('../lib/tui');
 const { getPlansDir, timeAgo } = require('../lib/state');
@@ -178,16 +178,16 @@ function executeAction(actionKey, app) {
  * Parses metadata to show progress and status
  */
 function readVisions(visionDir) {
-  if (!fs.existsSync(visionDir)) {
+  if (!safeFs.existsSync(visionDir)) {
     return [];
   }
 
-  const files = fs.readdirSync(visionDir)
+  const files = safeFs.readdirSync(visionDir)
     .filter(f => f.endsWith('.md') && f !== '.gitkeep')
     .map(f => {
       const filePath = path.join(visionDir, f);
-      const stat = fs.statSync(filePath);
-      const content = fs.readFileSync(filePath, 'utf8');
+      const stat = safeFs.statSync(filePath);
+      const content = safeFs.readFileSync(filePath, 'utf8');
       const metadata = parseVisionMetadata(content);
 
       return {
@@ -267,8 +267,8 @@ function createVision(title, projectPath) {
   const visionDir = path.join(getPlansDir(projectPath), 'vision');
 
   // Ensure directory exists
-  if (!fs.existsSync(visionDir)) {
-    fs.mkdirSync(visionDir, { recursive: true });
+  if (!safeFs.existsSync(visionDir)) {
+    safeFs.mkdirSync(visionDir, { recursive: true });
   }
 
   // Generate slug from title
@@ -330,7 +330,7 @@ function createVision(title, projectPath) {
 ## Discussion History
 `;
 
-  fs.writeFileSync(filePath, content);
+  safeFs.writeFileSync(filePath, content);
 
   return {
     path: filePath,
@@ -343,9 +343,9 @@ function createVision(title, projectPath) {
  * Save vision progress after a question is answered
  */
 function saveVisionProgress(visionPath, section, answer) {
-  if (!fs.existsSync(visionPath)) return;
+  if (!safeFs.existsSync(visionPath)) return;
 
-  let content = fs.readFileSync(visionPath, 'utf8');
+  let content = safeFs.readFileSync(visionPath, 'utf8');
   const now = new Date().toISOString();
 
   // Update the section with the answer
@@ -383,16 +383,16 @@ function saveVisionProgress(visionPath, section, answer) {
     `## Discussion History\n${historyEntry}`
   );
 
-  fs.writeFileSync(visionPath, content);
+  safeFs.writeFileSync(visionPath, content);
 }
 
 /**
  * Convert vision to functional plan
  */
 function convertToFunctional(visionPath, projectPath) {
-  if (!fs.existsSync(visionPath)) return null;
+  if (!safeFs.existsSync(visionPath)) return null;
 
-  const content = fs.readFileSync(visionPath, 'utf8');
+  const content = safeFs.readFileSync(visionPath, 'utf8');
   const metadata = parseVisionMetadata(content);
 
   // Extract all completed sections
@@ -409,8 +409,8 @@ function convertToFunctional(visionPath, projectPath) {
     .replace(/^-|-$/g, '');
 
   const functionalDir = path.join(getPlansDir(projectPath), 'functional');
-  if (!fs.existsSync(functionalDir)) {
-    fs.mkdirSync(functionalDir, { recursive: true });
+  if (!safeFs.existsSync(functionalDir)) {
+    safeFs.mkdirSync(functionalDir, { recursive: true });
   }
 
   const functionalPath = path.join(functionalDir, `${slug}.md`);
@@ -464,10 +464,10 @@ ${sections['Assumptions'] || 'None documented'}
 *Converted from vision document on ${now}*
 `;
 
-  fs.writeFileSync(functionalPath, functionalContent);
+  safeFs.writeFileSync(functionalPath, functionalContent);
 
   // Update vision status
-  let visionContent = fs.readFileSync(visionPath, 'utf8');
+  let visionContent = safeFs.readFileSync(visionPath, 'utf8');
   visionContent = visionContent.replace(
     /- Status: .+$/m,
     '- Status: converted'
@@ -479,7 +479,7 @@ Converted to: plans/functional/${slug}.md
 Converted at: ${now}
 `;
 
-  fs.writeFileSync(visionPath, visionContent);
+  safeFs.writeFileSync(visionPath, visionContent);
 
   return {
     functionalPath,

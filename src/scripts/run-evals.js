@@ -35,7 +35,7 @@
 'use strict';
 
 const path = require('path');
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 
 const harness = require('../lib/eval-harness');
 
@@ -111,7 +111,7 @@ function showHelp() {
 function findProjectRoot(startDir) {
   let dir = startDir;
   for (let i = 0; i < 32; i++) {
-    if (fs.existsSync(path.join(dir, 'VERSION')) || fs.existsSync(path.join(dir, '.git'))) {
+    if (safeFs.existsSync(path.join(dir, 'VERSION')) || safeFs.existsSync(path.join(dir, '.git'))) {
       return dir;
     }
     const parent = path.dirname(dir);

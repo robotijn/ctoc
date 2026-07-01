@@ -9,7 +9,7 @@
 
 const { spawn, execSync } = require('child_process');
 const path = require('path');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 
 /**
  * Default timeout for tests (5 minutes)
@@ -128,9 +128,9 @@ function runCommand(command, options = {}) {
 function detectTestFramework(projectPath) {
   const packageJson = path.join(projectPath, 'package.json');
 
-  if (fs.existsSync(packageJson)) {
+  if (safeFs.existsSync(packageJson)) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(packageJson, 'utf8'));
+      const pkg = JSON.parse(safeFs.readFileSync(packageJson, 'utf8'));
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
       const scripts = pkg.scripts || {};
 
@@ -158,19 +158,19 @@ function detectTestFramework(projectPath) {
   // Check for Python
   const pytestIni = path.join(projectPath, 'pytest.ini');
   const pyprojectToml = path.join(projectPath, 'pyproject.toml');
-  if (fs.existsSync(pytestIni) || fs.existsSync(pyprojectToml)) {
+  if (safeFs.existsSync(pytestIni) || safeFs.existsSync(pyprojectToml)) {
     return { name: 'Pytest', command: 'python -m pytest' };
   }
 
   // Check for Go
   const goMod = path.join(projectPath, 'go.mod');
-  if (fs.existsSync(goMod)) {
+  if (safeFs.existsSync(goMod)) {
     return { name: 'Go Test', command: 'go test ./...' };
   }
 
   // Check for Rust
   const cargoToml = path.join(projectPath, 'Cargo.toml');
-  if (fs.existsSync(cargoToml)) {
+  if (safeFs.existsSync(cargoToml)) {
     return { name: 'Cargo Test', command: 'cargo test' };
   }
 
@@ -348,7 +348,7 @@ function checkTestsExist(projectPath = process.cwd()) {
   // Check for test directories
   for (const dir of testDirs) {
     const testDir = path.join(projectPath, dir);
-    if (fs.existsSync(testDir) && fs.statSync(testDir).isDirectory()) {
+    if (safeFs.existsSync(testDir) && safeFs.statSync(testDir).isDirectory()) {
       hasTests = true;
       break;
     }
@@ -363,7 +363,7 @@ function checkTestsExist(projectPath = process.cwd()) {
 
   for (const file of checkFiles) {
     const fullPath = path.join(projectPath, file);
-    if (fs.existsSync(fullPath)) {
+    if (safeFs.existsSync(fullPath)) {
       hasTests = true;
       testFiles.push(file);
     }

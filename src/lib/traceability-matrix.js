@@ -21,7 +21,7 @@
  *     https://intuitionlabs.ai/articles/iec-62304-edition-2-medical-software-changes
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const MATRIX_PATH = '.ctoc/traceability/matrix.yaml';
@@ -45,8 +45,8 @@ const MATRIX_PATH = '.ctoc/traceability/matrix.yaml';
  */
 function load(projectRoot) {
   const p = path.join(projectRoot, MATRIX_PATH);
-  if (!fs.existsSync(p)) return { requirements: [], generated_at: null };
-  const content = fs.readFileSync(p, 'utf8');
+  if (!safeFs.existsSync(p)) return { requirements: [], generated_at: null };
+  const content = safeFs.readFileSync(p, 'utf8');
   return parseMatrix(content);
 }
 
@@ -55,7 +55,7 @@ function load(projectRoot) {
  */
 function save(projectRoot, matrix) {
   const dir = path.join(projectRoot, '.ctoc', 'traceability');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
   const lines = [
     `# Requirements Traceability Matrix`,
     `# Bidirectional links from high-level requirement to low-level requirement to source code to tests.`,
@@ -82,7 +82,7 @@ function save(projectRoot, matrix) {
     lines.push(`    last_updated: ${req.last_updated || new Date().toISOString()}`);
     lines.push('');
   }
-  fs.writeFileSync(path.join(projectRoot, MATRIX_PATH), lines.join('\n'));
+  safeFs.writeFileSync(path.join(projectRoot, MATRIX_PATH), lines.join('\n'));
 }
 
 /**
@@ -121,7 +121,7 @@ function findDanglingReferences(projectRoot) {
   for (const req of matrix.requirements) {
     for (const f of req.satisfied_by_files || []) {
       const absPath = path.join(projectRoot, f);
-      if (!fs.existsSync(absPath)) {
+      if (!safeFs.existsSync(absPath)) {
         dangling.push({ requirement_id: req.id, kind: 'missing_file', value: f });
       }
     }

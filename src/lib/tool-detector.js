@@ -9,7 +9,7 @@
  * 4. Prompt user if still unknown
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -90,14 +90,14 @@ function detectLanguages(projectPath = process.cwd()) {
 
       if (pattern) {
         // Glob pattern
-        const files = fs.readdirSync(projectPath);
+        const files = safeFs.readdirSync(projectPath);
         if (files.some(f => pattern.test(f))) {
           detected.push(lang);
           break;
         }
       } else {
         // Exact file
-        if (fs.existsSync(path.join(projectPath, marker))) {
+        if (safeFs.existsSync(path.join(projectPath, marker))) {
           detected.push(lang);
           break;
         }
@@ -113,10 +113,10 @@ function detectLanguages(projectPath = process.cwd()) {
  */
 function detectJsTestFramework(projectPath = process.cwd()) {
   const pkgPath = path.join(projectPath, 'package.json');
-  if (!fs.existsSync(pkgPath)) return null;
+  if (!safeFs.existsSync(pkgPath)) return null;
 
   try {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const pkg = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
     const deps = {
       ...pkg.dependencies,
       ...pkg.devDependencies
@@ -150,18 +150,18 @@ function detectJsTestFramework(projectPath = process.cwd()) {
  */
 function detectPythonTestFramework(projectPath = process.cwd()) {
   const pyprojectPath = path.join(projectPath, 'pyproject.toml');
-  if (!fs.existsSync(pyprojectPath)) {
+  if (!safeFs.existsSync(pyprojectPath)) {
     // Check for pytest.ini or setup.cfg
-    if (fs.existsSync(path.join(projectPath, 'pytest.ini'))) return 'pytest';
-    if (fs.existsSync(path.join(projectPath, 'setup.cfg'))) {
-      const cfg = fs.readFileSync(path.join(projectPath, 'setup.cfg'), 'utf8');
+    if (safeFs.existsSync(path.join(projectPath, 'pytest.ini'))) return 'pytest';
+    if (safeFs.existsSync(path.join(projectPath, 'setup.cfg'))) {
+      const cfg = safeFs.readFileSync(path.join(projectPath, 'setup.cfg'), 'utf8');
       if (cfg.includes('[tool:pytest]')) return 'pytest';
     }
     return null;
   }
 
   try {
-    const content = fs.readFileSync(pyprojectPath, 'utf8');
+    const content = safeFs.readFileSync(pyprojectPath, 'utf8');
     if (content.includes('[tool.pytest')) return 'pytest';
     if (content.includes('pytest')) return 'pytest';
     if (content.includes('[tool.unittest')) return 'unittest';
@@ -225,11 +225,11 @@ function getInstallCommand(tool, language) {
  */
 function readUserConfig(projectPath = process.cwd()) {
   const configPath = path.join(projectPath, '.ctoc', 'quality-config.yaml');
-  if (!fs.existsSync(configPath)) return null;
+  if (!safeFs.existsSync(configPath)) return null;
 
   try {
     // Simple YAML parsing for key sections
-    const content = fs.readFileSync(configPath, 'utf8');
+    const content = safeFs.readFileSync(configPath, 'utf8');
     // For now, return raw content - full YAML parsing would need a library
     return { raw: content, path: configPath };
   } catch {

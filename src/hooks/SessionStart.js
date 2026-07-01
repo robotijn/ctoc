@@ -5,7 +5,8 @@
  */
 
 const path = require('path');
-const fs = require('fs');
+
+const safeFs = require('../lib/safe-fs');
 
 // Note: For Claude Code plugins, hooks are loaded relative to the plugin root
 const { loadState, createState, saveState, STEP_NAMES, isInterruptedSession, formatTimeSince } = require('../lib/state-manager');
@@ -91,8 +92,8 @@ async function main() {
 
   for (const subdir of directories) {
     const dir = path.join(projectPath, subdir);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (!safeFs.existsSync(dir)) {
+      safeFs.mkdirSync(dir, { recursive: true });
     }
   }
 

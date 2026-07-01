@@ -11,7 +11,7 @@
  */
 
 const { execSync } = require('child_process');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { getSetting } = require('./settings');
 
@@ -124,18 +124,17 @@ function moveToReviewAfterPush(planPath, projectPath = process.cwd()) {
     return { moved: false, reason: 'auto-move disabled' };
   }
 
-  const fs = require('fs');
   const plansDir = path.join(projectPath, 'plans');
   const reviewDir = path.join(plansDir, 'review');
 
-  if (!fs.existsSync(reviewDir)) {
-    fs.mkdirSync(reviewDir, { recursive: true });
+  if (!safeFs.existsSync(reviewDir)) {
+    safeFs.mkdirSync(reviewDir, { recursive: true });
   }
 
   const fileName = path.basename(planPath);
   const newPath = path.join(reviewDir, fileName);
 
-  fs.renameSync(planPath, newPath);
+  safeFs.renameSync(planPath, newPath);
 
   return { moved: true, newPath };
 }
@@ -175,8 +174,8 @@ function getLastSyncPath(projectPath = process.cwd()) {
 function getLastSyncTimestamp(projectPath = process.cwd()) {
   const lastSyncPath = getLastSyncPath(projectPath);
   try {
-    if (fs.existsSync(lastSyncPath)) {
-      const content = fs.readFileSync(lastSyncPath, 'utf8').trim();
+    if (safeFs.existsSync(lastSyncPath)) {
+      const content = safeFs.readFileSync(lastSyncPath, 'utf8').trim();
       return parseInt(content, 10);
     }
   } catch (e) {
@@ -191,10 +190,10 @@ function saveLastSyncTimestamp(projectPath = process.cwd()) {
   const ctocDir = path.dirname(lastSyncPath);
 
   try {
-    if (!fs.existsSync(ctocDir)) {
-      fs.mkdirSync(ctocDir, { recursive: true });
+    if (!safeFs.existsSync(ctocDir)) {
+      safeFs.mkdirSync(ctocDir, { recursive: true });
     }
-    fs.writeFileSync(lastSyncPath, Date.now().toString());
+    safeFs.writeFileSync(lastSyncPath, Date.now().toString());
   } catch (e) {
     // Ignore write errors
   }

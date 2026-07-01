@@ -17,7 +17,7 @@
  * Run-and-summarize: node src/scripts/strip-unenforced-budgets.js --dry-run
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -26,8 +26,8 @@ const DRY_RUN = process.argv.includes('--dry-run');
 function listFiles(dir, predicate) {
   const out = [];
   function walk(d) {
-    if (!fs.existsSync(d)) return;
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+    if (!safeFs.existsSync(d)) return;
+    for (const entry of safeFs.readdirSync(d, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
       const full = path.join(d, entry.name);
       if (entry.isDirectory()) walk(full);
@@ -74,11 +74,11 @@ function main() {
   const changedFiles = [];
 
   for (const file of targets) {
-    const content = fs.readFileSync(file, 'utf8');
+    const content = safeFs.readFileSync(file, 'utf8');
     const { changed, content: newContent } = stripFromFrontmatter(content);
     if (changed) {
       changedFiles.push(path.relative(ROOT, file));
-      if (!DRY_RUN) fs.writeFileSync(file, newContent);
+      if (!DRY_RUN) safeFs.writeFileSync(file, newContent);
       changedCount++;
     } else {
       unchangedCount++;

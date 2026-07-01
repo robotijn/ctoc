@@ -15,7 +15,7 @@
  */
 
 const path = require('path');
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const { movePlan } = require('../lib/actions');
 const { findProjectRoot } = require('../lib/project-root');
 
@@ -76,7 +76,7 @@ if (resolvedPlanPath !== plansRoot && !resolvedPlanPath.startsWith(plansRoot + p
 }
 
 // Check source file exists
-if (!fs.existsSync(planPath)) {
+if (!safeFs.existsSync(planPath)) {
   console.error(`Plan file not found: ${planPath}`);
   process.exit(1);
 }

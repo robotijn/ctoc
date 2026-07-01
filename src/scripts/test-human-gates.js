@@ -3,7 +3,7 @@
  * Test Human Gates - Verifies the hook works correctly
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -11,13 +11,13 @@ const PLANS_DIR = path.join(process.cwd(), 'plans');
 const TEST_PLAN = 'test-gate-violation.md';
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) {
+    safeFs.mkdirSync(dir, { recursive: true });
   }
 }
 
 function cleanup(filePath) {
-  try { fs.unlinkSync(filePath); } catch { /* ignore: best-effort, non-fatal */ }
+  try { safeFs.unlinkSync(filePath); } catch { /* ignore: best-effort, non-fatal */ }
 }
 
 function test(name, fn) {
@@ -51,11 +51,11 @@ function main() {
     cleanup(donePath);
     cleanup(reviewPath);
 
-    fs.writeFileSync(donePath, '# Test Plan\nNo approval marker');
+    safeFs.writeFileSync(donePath, '# Test Plan\nNo approval marker');
     execSync('node hooks/human-gate-check.js', { stdio: 'pipe' });
 
-    if (fs.existsSync(donePath)) throw new Error('Plan not removed from done/');
-    if (!fs.existsSync(reviewPath)) throw new Error('Plan not in review/');
+    if (safeFs.existsSync(donePath)) throw new Error('Plan not removed from done/');
+    if (!safeFs.existsSync(reviewPath)) throw new Error('Plan not in review/');
 
     cleanup(reviewPath);
   })) passed++; else failed++;
@@ -66,10 +66,10 @@ function main() {
 
     cleanup(donePath);
 
-    fs.writeFileSync(donePath, '---\napproved_by: human\n---\n# Test Plan');
+    safeFs.writeFileSync(donePath, '---\napproved_by: human\n---\n# Test Plan');
     execSync('node hooks/human-gate-check.js', { stdio: 'pipe' });
 
-    if (!fs.existsSync(donePath)) throw new Error('Plan incorrectly removed');
+    if (!safeFs.existsSync(donePath)) throw new Error('Plan incorrectly removed');
 
     cleanup(donePath);
   })) passed++; else failed++;
@@ -82,11 +82,11 @@ function main() {
     cleanup(todoPath);
     cleanup(implPath);
 
-    fs.writeFileSync(todoPath, '# Test Plan\nNo approval marker');
+    safeFs.writeFileSync(todoPath, '# Test Plan\nNo approval marker');
     execSync('node hooks/human-gate-check.js', { stdio: 'pipe' });
 
-    if (fs.existsSync(todoPath)) throw new Error('Plan not removed from todo/');
-    if (!fs.existsSync(implPath)) throw new Error('Plan not in implementation/');
+    if (safeFs.existsSync(todoPath)) throw new Error('Plan not removed from todo/');
+    if (!safeFs.existsSync(implPath)) throw new Error('Plan not in implementation/');
 
     cleanup(implPath);
   })) passed++; else failed++;
@@ -99,11 +99,11 @@ function main() {
     cleanup(implPath);
     cleanup(funcPath);
 
-    fs.writeFileSync(implPath, '# Test Plan\nNo approval marker');
+    safeFs.writeFileSync(implPath, '# Test Plan\nNo approval marker');
     execSync('node hooks/human-gate-check.js', { stdio: 'pipe' });
 
-    if (fs.existsSync(implPath)) throw new Error('Plan not removed from implementation/');
-    if (!fs.existsSync(funcPath)) throw new Error('Plan not in functional/');
+    if (safeFs.existsSync(implPath)) throw new Error('Plan not removed from implementation/');
+    if (!safeFs.existsSync(funcPath)) throw new Error('Plan not in functional/');
 
     cleanup(funcPath);
   })) passed++; else failed++;

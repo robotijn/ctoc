@@ -9,8 +9,9 @@
  *   review → done
  */
 
-const fs = require('fs');
 const path = require('path');
+
+const safeFs = require('../lib/safe-fs');
 
 const PLANS_DIR = path.join(process.cwd(), 'plans');
 const LOG_DIR = path.join(process.cwd(), '.ctoc', 'logs');
@@ -24,15 +25,15 @@ const HUMAN_GATES = {
 };
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) {
+    safeFs.mkdirSync(dir, { recursive: true });
   }
 }
 
 function loadViolations() {
   try {
-    if (fs.existsSync(VIOLATIONS_FILE)) {
-      return JSON.parse(fs.readFileSync(VIOLATIONS_FILE, 'utf8'));
+    if (safeFs.existsSync(VIOLATIONS_FILE)) {
+      return JSON.parse(safeFs.readFileSync(VIOLATIONS_FILE, 'utf8'));
     }
   } catch { /* ignore: best-effort, non-fatal */ }
   return [];
@@ -40,7 +41,7 @@ function loadViolations() {
 
 function saveViolations(violations) {
   ensureDir(LOG_DIR);
-  fs.writeFileSync(VIOLATIONS_FILE, JSON.stringify(violations, null, 2));
+  safeFs.writeFileSync(VIOLATIONS_FILE, JSON.stringify(violations, null, 2));
 }
 
 function logViolation(entry) {
@@ -55,7 +56,7 @@ function logViolation(entry) {
 
 function hasApprovalMarker(filePath) {
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = safeFs.readFileSync(filePath, 'utf8');
     // Approval MUST come from the YAML frontmatter block, never from arbitrary
     // body text. A substring search (the old behaviour) let any plan forge a
     // gate crossing by writing "approved_by: human" in a code fence, prose, or
@@ -79,10 +80,10 @@ function hasApprovalMarker(filePath) {
 
 function checkFolder(folderName) {
   const folderPath = path.join(PLANS_DIR, folderName);
-  if (!fs.existsSync(folderPath)) return [];
+  if (!safeFs.existsSync(folderPath)) return [];
 
   const violations = [];
-  const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.md'));
+  const files = safeFs.readdirSync(folderPath).filter(f => f.endsWith('.md'));
 
   for (const file of files) {
     const filePath = path.join(folderPath, file);
@@ -104,14 +105,14 @@ function revertPlan(violation) {
   const destPath = path.join(destDir, path.basename(violation.path));
 
   // Read content and add violation note
-  let content = fs.readFileSync(violation.path, 'utf8');
+  let content = safeFs.readFileSync(violation.path, 'utf8');
   const note = `\n\n---\n**⚠️ HUMAN GATE VIOLATION**\nThis plan was moved to ${violation.folder}/ without human approval.\nAutomatically reverted to ${violation.revertTo}/ at ${new Date().toISOString()}\n---\n`;
   content += note;
 
   // Move file
   ensureDir(destDir);
-  fs.writeFileSync(destPath, content);
-  fs.unlinkSync(violation.path);
+  safeFs.writeFileSync(destPath, content);
+  safeFs.unlinkSync(violation.path);
 
   return destPath;
 }

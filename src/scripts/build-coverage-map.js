@@ -18,7 +18,7 @@
  * @module scripts/build-coverage-map
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -65,7 +65,7 @@ const COVERAGE_LOCATIONS = {
  * @returns {Object} Parsed coverage data
  */
 function parseJestCoverage(coveragePath) {
-  const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+  const coverage = JSON.parse(safeFs.readFileSync(coveragePath, 'utf8'));
   const result = {};
 
   for (const [filePath, data] of Object.entries(coverage)) {
@@ -108,7 +108,7 @@ function parseNycCoverage(coveragePath) {
  * @returns {Object} Parsed coverage data
  */
 function parsePytestCoverage(coveragePath) {
-  const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+  const coverage = JSON.parse(safeFs.readFileSync(coveragePath, 'utf8'));
   const result = {};
 
   // pytest-cov format varies, handle both formats
@@ -147,7 +147,7 @@ function parsePytestCoverage(coveragePath) {
  * @returns {Object} Parsed coverage data
  */
 function parseGoCoverage(coveragePath) {
-  const content = fs.readFileSync(coveragePath, 'utf8');
+  const content = safeFs.readFileSync(coveragePath, 'utf8');
   const result = {};
 
   // Go coverage format: mode: set/count/atomic followed by lines like:
@@ -199,7 +199,7 @@ function parseGoCoverage(coveragePath) {
  * @returns {Object} Parsed coverage data
  */
 function parseLcovCoverage(coveragePath) {
-  const content = fs.readFileSync(coveragePath, 'utf8');
+  const content = safeFs.readFileSync(coveragePath, 'utf8');
   const result = {};
   let currentFile = null;
 
@@ -286,7 +286,7 @@ function findCoverageFile(framework, projectPath = process.cwd()) {
 
   for (const location of locations) {
     const fullPath = path.join(projectPath, location);
-    if (fs.existsSync(fullPath)) {
+    if (safeFs.existsSync(fullPath)) {
       return fullPath;
     }
   }
@@ -311,7 +311,7 @@ function detectFramework(projectPath = process.cwd()) {
   // Fallback: check for coverage files
   for (const [framework, locations] of Object.entries(COVERAGE_LOCATIONS)) {
     for (const location of locations) {
-      if (fs.existsSync(path.join(projectPath, location))) {
+      if (safeFs.existsSync(path.join(projectPath, location))) {
         return framework;
       }
     }
@@ -399,7 +399,7 @@ async function buildCoverageMap(options = {}) {
         break;
       default: {
         // Try to auto-detect from file content
-        const content = fs.readFileSync(coverageFile, 'utf8');
+        const content = safeFs.readFileSync(coverageFile, 'utf8');
         if (content.startsWith('mode:')) {
           coverageData = parseGoCoverage(coverageFile);
         } else if (content.startsWith('TN:') || content.startsWith('SF:')) {

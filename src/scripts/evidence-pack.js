@@ -18,7 +18,7 @@
  *     https://screenata.com/resources/blog/best-practices-for-automating-sox-itgc-evidence-in-2026-from-access-controls-to-continuous-monitoring
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
@@ -48,13 +48,13 @@ function collectInputs(since, until) {
 
   // 1. Dispatches in the window.
   const dispatchesRoot = path.join(ROOT, '.ctoc', 'audit', 'dispatches');
-  if (fs.existsSync(dispatchesRoot)) {
-    for (const dateDir of fs.readdirSync(dispatchesRoot)) {
+  if (safeFs.existsSync(dispatchesRoot)) {
+    for (const dateDir of safeFs.readdirSync(dispatchesRoot)) {
       const dirPath = path.join(dispatchesRoot, dateDir);
-      const dirStat = fs.statSync(dirPath);
+      const dirStat = safeFs.statSync(dirPath);
       if (!dirStat.isDirectory()) continue;
       if (dirStat.mtimeMs < sinceMs || dirStat.mtimeMs > untilMs) continue;
-      for (const f of fs.readdirSync(dirPath)) {
+      for (const f of safeFs.readdirSync(dirPath)) {
         inputs.push(path.join(dirPath, f));
       }
     }
@@ -62,18 +62,18 @@ function collectInputs(since, until) {
 
   // 2. Chain log slice.
   const chainPath = path.join(ROOT, '.ctoc', 'audit', 'chain.jsonl');
-  if (fs.existsSync(chainPath)) inputs.push(chainPath);
+  if (safeFs.existsSync(chainPath)) inputs.push(chainPath);
 
   // 3. Gate approvals — every plan with approval markers.
   const plansDirs = ['vision', 'functional', 'implementation', 'todo', 'review', 'done'];
   for (const stage of plansDirs) {
     const dir = path.join(ROOT, 'plans', stage);
-    if (!fs.existsSync(dir)) continue;
-    for (const f of fs.readdirSync(dir)) {
+    if (!safeFs.existsSync(dir)) continue;
+    for (const f of safeFs.readdirSync(dir)) {
       const full = path.join(dir, f);
-      const stat = fs.statSync(full);
+      const stat = safeFs.statSync(full);
       if (stat.mtimeMs >= sinceMs && stat.mtimeMs <= untilMs && f.endsWith('.md')) {
-        const content = fs.readFileSync(full, 'utf8');
+        const content = safeFs.readFileSync(full, 'utf8');
         if (/approved_by/.test(content)) inputs.push(full);
       }
     }
@@ -89,14 +89,14 @@ function collectInputs(since, until) {
 
   // 6. Provenance events.
   const provPath = path.join(ROOT, '.ctoc', 'ai-provenance.jsonl');
-  if (fs.existsSync(provPath)) inputs.push(provPath);
+  if (safeFs.existsSync(provPath)) inputs.push(provPath);
 
   // 7. Configuration baselines (latest version's manifest).
   const baselinesRoot = path.join(ROOT, '.ctoc', 'baselines');
-  if (fs.existsSync(baselinesRoot)) {
-    for (const ver of fs.readdirSync(baselinesRoot)) {
+  if (safeFs.existsSync(baselinesRoot)) {
+    for (const ver of safeFs.readdirSync(baselinesRoot)) {
       const mPath = path.join(baselinesRoot, ver, 'manifest.yaml');
-      if (fs.existsSync(mPath)) inputs.push(mPath);
+      if (safeFs.existsSync(mPath)) inputs.push(mPath);
     }
   }
 
@@ -108,30 +108,30 @@ function collectInputs(since, until) {
 }
 
 function collectAllInWindow(dir, sinceMs, untilMs, out) {
-  if (!fs.existsSync(dir)) return;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  if (!safeFs.existsSync(dir)) return;
+  for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       collectAllInWindow(full, sinceMs, untilMs, out);
     } else if (entry.isFile()) {
-      const stat = fs.statSync(full);
+      const stat = safeFs.statSync(full);
       if (stat.mtimeMs >= sinceMs && stat.mtimeMs <= untilMs) out.push(full);
     }
   }
 }
 
 function hashFile(p) {
-  return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+  return crypto.createHash('sha256').update(safeFs.readFileSync(p)).digest('hex');
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 function readChainHead() {
   const headPath = path.join(ROOT, '.ctoc', 'audit', 'chain-head.yaml');
-  if (!fs.existsSync(headPath)) return null;
-  const content = fs.readFileSync(headPath, 'utf8');
+  if (!safeFs.existsSync(headPath)) return null;
+  const content = safeFs.readFileSync(headPath, 'utf8');
   const m = content.match(/^hash:\s+(\S+)$/m);
   return m ? m[1] : null;
 }
@@ -164,7 +164,7 @@ function main() {
     artifacts: inputs.map(p => ({
       path: path.relative(ROOT, p),
       sha256: hashFile(p),
-      size_bytes: fs.statSync(p).size,
+      size_bytes: safeFs.statSync(p).size,
     })),
   };
 
@@ -175,21 +175,21 @@ function main() {
   // Write manifest first so it can be hashed into itself? No — manifest hash
   // lives in `chain_head_at_pack_time`. Pack then write.
   const manifestYaml = yamlify(manifest);
-  fs.writeFileSync(manifestPath, manifestYaml);
+  safeFs.writeFileSync(manifestPath, manifestYaml);
 
   try {
     if (inputs.length > 0) {
       const relInputs = inputs.map(p => path.relative(ROOT, p));
       const listFile = path.join(EVIDENCE_DIR, `.pack-${args.since}.list`);
-      fs.writeFileSync(listFile, relInputs.join('\n'));
+      safeFs.writeFileSync(listFile, relInputs.join('\n'));
       execSync(`tar -czf "${tarPath}" -T "${listFile}"`, { cwd: ROOT, stdio: 'inherit' });
-      fs.unlinkSync(listFile);
+      safeFs.unlinkSync(listFile);
     }
   } catch (e) {
     console.error(`tar failed (${e.message}); writing JSON bundle instead.`);
     const bundle = {};
-    for (const p of inputs) bundle[path.relative(ROOT, p)] = fs.readFileSync(p, 'utf8');
-    fs.writeFileSync(tarPath.replace(/\.tar\.gz$/, '.json'), JSON.stringify(bundle, null, 2));
+    for (const p of inputs) bundle[path.relative(ROOT, p)] = safeFs.readFileSync(p, 'utf8');
+    safeFs.writeFileSync(tarPath.replace(/\.tar\.gz$/, '.json'), JSON.stringify(bundle, null, 2));
   }
 
   console.log(`Manifest: ${path.relative(ROOT, manifestPath)}`);

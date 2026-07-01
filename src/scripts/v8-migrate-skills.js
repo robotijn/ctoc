@@ -16,7 +16,7 @@
  *   node src/scripts/v8-migrate-skills.js [--dry-run]
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 
 const root = process.cwd();
@@ -44,8 +44,8 @@ const PARALLEL_UNSAFE_KEYWORDS = [
 function findSkillFiles(dir) {
   const out = [];
   function walk(d, depth = 0, topCategory = null) {
-    if (!fs.existsSync(d)) return;
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+    if (!safeFs.existsSync(d)) return;
+    for (const entry of safeFs.readdirSync(d, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
       const full = path.join(d, entry.name);
       if (entry.isDirectory()) {
@@ -106,7 +106,7 @@ effort_budget:
 }
 
 function migrate(skillPath) {
-  const content = fs.readFileSync(skillPath, 'utf8');
+  const content = safeFs.readFileSync(skillPath, 'utf8');
   const fm = parseFrontmatter(content);
   if (!fm) {
     return { path: skillPath, status: 'no-frontmatter' };
@@ -122,7 +122,7 @@ function migrate(skillPath) {
   const newContent = content.replace(/^---\n[\s\S]*?\n---/, `---\n${newFm}\n---`);
 
   if (!dryRun) {
-    fs.writeFileSync(skillPath, newContent);
+    safeFs.writeFileSync(skillPath, newContent);
   }
   return { path: skillPath, status: 'migrated' };
 }

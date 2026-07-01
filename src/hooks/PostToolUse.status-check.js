@@ -6,8 +6,9 @@
  * Runs after every tool use but exits fast (<10ms) when nothing is pending.
  */
 
-const fs = require('fs');
 const path = require('path');
+
+const safeFs = require('../lib/safe-fs');
 
 const PLANS_DIR = path.join(process.cwd(), 'plans');
 
@@ -28,14 +29,14 @@ function findPendingAgents() {
 
   for (const stage of AGENT_STAGES) {
     const stageDir = path.join(PLANS_DIR, stage);
-    if (!fs.existsSync(stageDir)) continue;
+    if (!safeFs.existsSync(stageDir)) continue;
 
-    const files = fs.readdirSync(stageDir).filter(f => f.endsWith('.md.status'));
+    const files = safeFs.readdirSync(stageDir).filter(f => f.endsWith('.md.status'));
 
     for (const statusFile of files) {
       try {
         const statusPath = path.join(stageDir, statusFile);
-        const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
+        const status = JSON.parse(safeFs.readFileSync(statusPath, 'utf8'));
 
         if (status.status === 'working') {
           // Check if stale (> 5 minutes = probably abandoned)
@@ -47,7 +48,7 @@ function findPendingAgents() {
             status.status = 'timeout';
             status.message = 'Agent timed out (no response after 5 minutes)';
             status.updatedAt = new Date().toISOString();
-            fs.writeFileSync(statusPath, JSON.stringify(status, null, 2));
+            safeFs.writeFileSync(statusPath, JSON.stringify(status, null, 2));
             continue;
           }
 
@@ -79,10 +80,10 @@ function findPendingAgents() {
  */
 function checkQualityState() {
   const statusPath = path.join(process.cwd(), '.ctoc', 'quality-state', 'status.json');
-  if (!fs.existsSync(statusPath)) return;
+  if (!safeFs.existsSync(statusPath)) return;
 
   try {
-    const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
+    const status = JSON.parse(safeFs.readFileSync(statusPath, 'utf8'));
 
     if (status.overallStatus === 'fail') {
       console.log('\n[QUALITY GATE FAILED] Background quality checks detected failures.');

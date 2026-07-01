@@ -4,7 +4,7 @@
  * creating functional plan stubs, and managing the vision lifecycle.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { parseMetadata, readPlans, getPlansDir } = require('./state');
 const { movePlan } = require('./actions');
@@ -22,7 +22,7 @@ const { findProjectRoot } = require('./project-root');
 function getCanvasForVision(visionSlug, projectPath) {
   const root = projectPath || findProjectRoot();
   const canvasPath = path.join(root, 'plans', 'canvas', `${visionSlug}.md`);
-  return fs.existsSync(canvasPath) ? canvasPath : null;
+  return safeFs.existsSync(canvasPath) ? canvasPath : null;
 }
 
 /**
@@ -33,11 +33,11 @@ function getCanvasForVision(visionSlug, projectPath) {
  * @returns {{ type: string, blocks: Object<string, string> }}
  */
 function parseCanvas(canvasPath) {
-  if (!fs.existsSync(canvasPath)) {
+  if (!safeFs.existsSync(canvasPath)) {
     throw new Error(`Canvas file not found: ${canvasPath}`);
   }
 
-  const content = fs.readFileSync(canvasPath, 'utf8');
+  const content = safeFs.readFileSync(canvasPath, 'utf8');
   const metadata = parseMetadata(content);
   const type = metadata.canvas_type || 'lean';
 
@@ -68,13 +68,13 @@ function parseCanvas(canvasPath) {
 function validateVisionReadiness(visionPath) {
   const result = { ready: true, errors: [], warnings: [] };
 
-  if (!fs.existsSync(visionPath)) {
+  if (!safeFs.existsSync(visionPath)) {
     result.ready = false;
     result.errors.push('Vision file does not exist');
     return result;
   }
 
-  const content = fs.readFileSync(visionPath, 'utf8');
+  const content = safeFs.readFileSync(visionPath, 'utf8');
 
   // Check for problem statement
   const hasProblem = /problem|the problem/i.test(content);
@@ -144,8 +144,8 @@ function createStub(visionSlug, goal, visionPath, projectPath) {
   const plansDir = getPlansDir(root);
   const functionalDir = path.join(plansDir, 'functional');
 
-  if (!fs.existsSync(functionalDir)) {
-    fs.mkdirSync(functionalDir, { recursive: true });
+  if (!safeFs.existsSync(functionalDir)) {
+    safeFs.mkdirSync(functionalDir, { recursive: true });
   }
 
   const goalSlug = slugify(goal.title);
@@ -182,7 +182,7 @@ To be refined during Product Owner review.
 - [ ] Dependencies identified and documented
 `;
 
-  fs.writeFileSync(filePath, content);
+  safeFs.writeFileSync(filePath, content);
 
   return {
     name: fileName.replace('.md', ''),
@@ -226,7 +226,7 @@ function decomposeVision(visionPath, goals, projectPath) {
 function completeVision(visionPath, projectPath) {
   const root = projectPath || findProjectRoot();
 
-  let content = fs.readFileSync(visionPath, 'utf8');
+  let content = safeFs.readFileSync(visionPath, 'utf8');
   const metadata = parseMetadata(content);
 
   // Add type: vision and status: decomposed to frontmatter
@@ -244,7 +244,7 @@ function completeVision(visionPath, projectPath) {
     content = `---\ntype: vision\nstatus: decomposed\ndecomposed_at: "${timestamp}"\n---\n\n${content}`;
   }
 
-  fs.writeFileSync(visionPath, content);
+  safeFs.writeFileSync(visionPath, content);
 
   // Move to done/
   const newPath = movePlan(visionPath, 'done', root);
@@ -295,8 +295,8 @@ function listStubs(visionSlug, projectPath) {
  * @param {string} stubPath - Path to the stub file
  */
 function removeStub(stubPath) {
-  if (fs.existsSync(stubPath)) {
-    fs.unlinkSync(stubPath);
+  if (safeFs.existsSync(stubPath)) {
+    safeFs.unlinkSync(stubPath);
   }
   clearStatus(stubPath);
 }
@@ -316,8 +316,8 @@ function mergeStubs(stubPaths, mergedName, projectPath) {
 
   // Read all stubs
   const stubs = stubPaths.map(p => ({
-    content: fs.readFileSync(p, 'utf8'),
-    metadata: parseMetadata(fs.readFileSync(p, 'utf8'))
+    content: safeFs.readFileSync(p, 'utf8'),
+    metadata: parseMetadata(safeFs.readFileSync(p, 'utf8'))
   }));
 
   // Collect parent_vision from first stub
@@ -360,7 +360,7 @@ Merged from ${stubPaths.length} stubs. To be refined during Product Owner review
 ${criteria.join('\n')}
 `;
 
-  fs.writeFileSync(filePath, content);
+  safeFs.writeFileSync(filePath, content);
 
   // Remove originals
   stubPaths.forEach(p => removeStub(p));

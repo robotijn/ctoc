@@ -4,7 +4,7 @@
  * Batch script to add exploration protocol section to interactive agents
  */
 
-const fs = require('fs');
+const safeFs = require('../lib/safe-fs');
 const path = require('path');
 
 // Patterns that indicate user interaction
@@ -156,7 +156,7 @@ function processAgent(filePath, options = {}) {
   // Read content
   let content;
   try {
-    content = mockContent !== undefined ? mockContent : fs.readFileSync(filePath, 'utf8');
+    content = mockContent !== undefined ? mockContent : safeFs.readFileSync(filePath, 'utf8');
   } catch (error) {
     return {
       file: filePath,
@@ -196,7 +196,7 @@ function processAgent(filePath, options = {}) {
   // Write if not dry run
   if (!dryRun && mockContent === undefined) {
     try {
-      fs.writeFileSync(filePath, newContent);
+      safeFs.writeFileSync(filePath, newContent);
     } catch (error) {
       return {
         file: filePath,
@@ -225,7 +225,7 @@ function findAgentFiles(dir) {
   const files = [];
 
   try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const entries = safeFs.readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);

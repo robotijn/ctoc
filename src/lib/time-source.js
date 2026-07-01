@@ -48,7 +48,7 @@
 
 'use strict';
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -156,7 +156,7 @@ function looksLikePtpBacked(fields, chronyConf) {
  */
 function safeReadFile(filePath) {
   try {
-    return fs.readFileSync(filePath, 'utf8');
+    return safeFs.readFileSync(filePath, 'utf8');
   } catch (_e) {
     return null;
   }
