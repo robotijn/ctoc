@@ -31,13 +31,13 @@
  *   err.details === { exceeded: [...], usage, config }
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 function findProjectRoot(start = process.cwd()) {
   let dir = start;
   for (let i = 0; i < 12; i++) {
-    if (fs.existsSync(path.join(dir, '.ctoc')) || fs.existsSync(path.join(dir, '.claude-plugin'))) {
+    if (safeFs.existsSync(path.join(dir, '.ctoc')) || safeFs.existsSync(path.join(dir, '.claude-plugin'))) {
       return dir;
     }
     const parent = path.dirname(dir);
@@ -143,17 +143,17 @@ function stringifyYaml(obj, indent = 0) {
 }
 
 function readYamlFile(p) {
-  if (!fs.existsSync(p)) return null;
+  if (!safeFs.existsSync(p)) return null;
   try {
-    return parseYaml(fs.readFileSync(p, 'utf8'));
+    return parseYaml(safeFs.readFileSync(p, 'utf8'));
   } catch {
     return null;
   }
 }
 
 function writeYamlFile(p, obj) {
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, stringifyYaml(obj) + '\n');
+  safeFs.mkdirSync(path.dirname(p), { recursive: true });
+  safeFs.writeFileSync(p, stringifyYaml(obj) + '\n');
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ function checkBudget(root, sessionId) {
 
 function resetSession(root, sessionId) {
   const p = getUsagePath(root, sessionId);
-  try { fs.unlinkSync(p); } catch { /* ignore: best-effort, non-fatal */ }
+  try { safeFs.unlinkSync(p); } catch { /* ignore: best-effort, non-fatal */ }
   return true;
 }
 

@@ -14,7 +14,7 @@
  * Per A3 impl plan ADRs 2-3.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { memoize } = require('./cache');
 
@@ -47,7 +47,7 @@ function getQuestionsDir(root) { return path.join(root, ...QUESTIONS_DIR); }
 function getDecisionsDir(root) { return path.join(root, ...DECISIONS_DIR); }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 /**
@@ -87,7 +87,7 @@ ${opts.question || ''}
 
 ${opts.context || ''}
 `;
-  fs.writeFileSync(filePath, content);
+  safeFs.writeFileSync(filePath, content);
   return { id, path: filePath };
 }
 
@@ -125,7 +125,7 @@ ${opts.choice || ''}
 
 ${opts.rationale || ''}
 `;
-  fs.writeFileSync(filePath, content);
+  safeFs.writeFileSync(filePath, content);
   return { id, path: filePath };
 }
 
@@ -146,12 +146,12 @@ function parseFrontmatter(content) {
 }
 
 function listItemsInDir(dir, statusFilter) {
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir)
+  if (!safeFs.existsSync(dir)) return [];
+  return safeFs.readdirSync(dir)
     .filter(f => f.endsWith('.md') && f !== '.gitkeep')
     .map(f => {
       const filePath = path.join(dir, f);
-      const meta = parseFrontmatter(fs.readFileSync(filePath, 'utf8'));
+      const meta = parseFrontmatter(safeFs.readFileSync(filePath, 'utf8'));
       return { ...meta, path: filePath };
     })
     .filter(item => !statusFilter || item.status === statusFilter);
@@ -187,12 +187,12 @@ function listDecisions(root) {
 function listPlansAtGates(root) {
   const out = [];
   const plansDir = path.join(root, 'plans');
-  if (!fs.existsSync(plansDir)) return out;
+  if (!safeFs.existsSync(plansDir)) return out;
 
   for (const [stage, gate] of Object.entries(HUMAN_GATE_SOURCE_STAGES)) {
     const stageDir = path.join(plansDir, stage);
-    if (!fs.existsSync(stageDir)) continue;
-    const files = fs.readdirSync(stageDir).filter(f => f.endsWith('.md') && f !== '.gitkeep');
+    if (!safeFs.existsSync(stageDir)) continue;
+    const files = safeFs.readdirSync(stageDir).filter(f => f.endsWith('.md') && f !== '.gitkeep');
     for (const f of files) {
       out.push({ plan: f.replace(/\.md$/, ''), stage, gate });
     }

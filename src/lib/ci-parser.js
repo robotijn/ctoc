@@ -7,7 +7,7 @@
  * @module lib/ci-parser
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 // CI system definitions
@@ -16,9 +16,9 @@ const CI_SYSTEMS = {
     name: 'GitHub Actions',
     detect: (projectPath) => {
       const workflowDir = path.join(projectPath, '.github', 'workflows');
-      if (!fs.existsSync(workflowDir)) return null;
+      if (!safeFs.existsSync(workflowDir)) return null;
 
-      const files = fs.readdirSync(workflowDir)
+      const files = safeFs.readdirSync(workflowDir)
         .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
 
       if (files.length === 0) return null;
@@ -29,21 +29,21 @@ const CI_SYSTEMS = {
     name: 'GitLab CI',
     detect: (projectPath) => {
       const configPath = path.join(projectPath, '.gitlab-ci.yml');
-      return fs.existsSync(configPath) ? configPath : null;
+      return safeFs.existsSync(configPath) ? configPath : null;
     }
   },
   jenkins: {
     name: 'Jenkins',
     detect: (projectPath) => {
       const configPath = path.join(projectPath, 'Jenkinsfile');
-      return fs.existsSync(configPath) ? configPath : null;
+      return safeFs.existsSync(configPath) ? configPath : null;
     }
   },
   circleci: {
     name: 'CircleCI',
     detect: (projectPath) => {
       const configPath = path.join(projectPath, '.circleci', 'config.yml');
-      return fs.existsSync(configPath) ? configPath : null;
+      return safeFs.existsSync(configPath) ? configPath : null;
     }
   }
 };
@@ -178,7 +178,7 @@ function detectCISystem(projectPath) {
  * @returns {Object} Parsed CI config
  */
 function parseGitHubActions(workflowPath, projectPath) {
-  const content = fs.readFileSync(workflowPath, 'utf8');
+  const content = safeFs.readFileSync(workflowPath, 'utf8');
   const checks = [];
   let container = null;
   let nodeVersion = null;
@@ -252,7 +252,7 @@ function parseGitHubActions(workflowPath, projectPath) {
  * @returns {Object} Parsed CI config
  */
 function parseGitLabCI(configPath, projectPath) {
-  const content = fs.readFileSync(configPath, 'utf8');
+  const content = safeFs.readFileSync(configPath, 'utf8');
   const checks = [];
   let container = null;
 
@@ -297,7 +297,7 @@ function parseGitLabCI(configPath, projectPath) {
  * @returns {Object} Parsed CI config
  */
 function parseJenkinsfile(configPath, projectPath) {
-  const content = fs.readFileSync(configPath, 'utf8');
+  const content = safeFs.readFileSync(configPath, 'utf8');
   const checks = [];
   let container = null;
 
@@ -337,7 +337,7 @@ function parseJenkinsfile(configPath, projectPath) {
  * @returns {Object} Parsed CI config
  */
 function parseCircleCI(configPath, projectPath) {
-  const content = fs.readFileSync(configPath, 'utf8');
+  const content = safeFs.readFileSync(configPath, 'utf8');
   const checks = [];
   let container = null;
 
@@ -386,9 +386,9 @@ function parseCircleCI(configPath, projectPath) {
 function detectDefaultContainer(projectPath) {
   // Check for Node.js
   const packageJson = path.join(projectPath, 'package.json');
-  if (fs.existsSync(packageJson)) {
+  if (safeFs.existsSync(packageJson)) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(packageJson, 'utf8'));
+      const pkg = JSON.parse(safeFs.readFileSync(packageJson, 'utf8'));
       const engines = pkg.engines?.node;
       if (engines) {
         const version = engines.match(/\d+/)?.[0] || '20';
@@ -401,19 +401,19 @@ function detectDefaultContainer(projectPath) {
   // Check for Python
   const requirementsTxt = path.join(projectPath, 'requirements.txt');
   const pyprojectToml = path.join(projectPath, 'pyproject.toml');
-  if (fs.existsSync(requirementsTxt) || fs.existsSync(pyprojectToml)) {
+  if (safeFs.existsSync(requirementsTxt) || safeFs.existsSync(pyprojectToml)) {
     return 'python:3.11-slim';
   }
 
   // Check for Go
   const goMod = path.join(projectPath, 'go.mod');
-  if (fs.existsSync(goMod)) {
+  if (safeFs.existsSync(goMod)) {
     return 'golang:1.22-alpine';
   }
 
   // Check for Rust
   const cargoToml = path.join(projectPath, 'Cargo.toml');
-  if (fs.existsSync(cargoToml)) {
+  if (safeFs.existsSync(cargoToml)) {
     return 'rust:1.75-alpine';
   }
 
@@ -429,9 +429,9 @@ function getDefaultChecks(projectPath) {
   const checks = [];
   const packageJson = path.join(projectPath, 'package.json');
 
-  if (fs.existsSync(packageJson)) {
+  if (safeFs.existsSync(packageJson)) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(packageJson, 'utf8'));
+      const pkg = JSON.parse(safeFs.readFileSync(packageJson, 'utf8'));
       const scripts = pkg.scripts || {};
 
       if (scripts.lint) {

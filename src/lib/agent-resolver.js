@@ -15,7 +15,7 @@
  * It is **NOT** invoked by Claude's normal agent loading path.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const REDIRECT_MARKER_RE = /^type:\s*wrapper$/m;
@@ -28,9 +28,9 @@ const TARGET_SKILL_RE = /^target_skill:\s*(.+?)\s*$/m;
  * @returns {boolean}
  */
 function isRedirectStub(agentPath) {
-  if (!fs.existsSync(agentPath)) return false;
+  if (!safeFs.existsSync(agentPath)) return false;
   let content;
-  try { content = fs.readFileSync(agentPath, 'utf8'); } catch { return false; }
+  try { content = safeFs.readFileSync(agentPath, 'utf8'); } catch { return false; }
   const fm = content.match(/^---\n([\s\S]*?)\n---/);
   if (!fm) return false;
   return REDIRECT_MARKER_RE.test(fm[1]) && TARGET_SKILL_RE.test(fm[1]);
@@ -47,18 +47,18 @@ function isRedirectStub(agentPath) {
  */
 function resolveAgent(relAgentPath, root) {
   const absAgent = path.join(root, relAgentPath);
-  if (!fs.existsSync(absAgent)) {
+  if (!safeFs.existsSync(absAgent)) {
     return { kind: 'not-found', path: absAgent };
   }
   if (!isRedirectStub(absAgent)) {
     return { kind: 'original', path: absAgent };
   }
-  const content = fs.readFileSync(absAgent, 'utf8');
+  const content = safeFs.readFileSync(absAgent, 'utf8');
   const fm = content.match(/^---\n([\s\S]*?)\n---/);
   const targetMatch = fm[1].match(TARGET_SKILL_RE);
   const targetSkill = targetMatch[1].trim();
   const skillPath = path.join(root, 'skills', targetSkill, 'SKILL.md');
-  if (!fs.existsSync(skillPath)) {
+  if (!safeFs.existsSync(skillPath)) {
     return { kind: 'broken-redirect', path: skillPath, targetSkill };
   }
   return { kind: 'redirected', path: skillPath, targetSkill };
@@ -73,17 +73,17 @@ function resolveAgent(relAgentPath, root) {
 function listConvertedAgents(root) {
   const out = [];
   const agentsDir = path.join(root, 'agents');
-  if (!fs.existsSync(agentsDir)) return out;
+  if (!safeFs.existsSync(agentsDir)) return out;
 
   function walk(dir) {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         walk(full);
       } else if (entry.name.endsWith('.md')) {
         if (isRedirectStub(full)) {
-          const content = fs.readFileSync(full, 'utf8');
+          const content = safeFs.readFileSync(full, 'utf8');
           const m = content.match(TARGET_SKILL_RE);
           out.push({
             agentPath: path.relative(root, full),

@@ -3,7 +3,7 @@
  * Status tracking for background agents working on plans
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -34,7 +34,7 @@ function writeStatus(planPath, status) {
     updatedAt: new Date().toISOString()
   };
 
-  fs.writeFileSync(statusPath, JSON.stringify(statusObj, null, 2));
+  safeFs.writeFileSync(statusPath, JSON.stringify(statusObj, null, 2));
   return statusObj;
 }
 
@@ -46,12 +46,12 @@ function writeStatus(planPath, status) {
 function readStatus(planPath) {
   const statusPath = getStatusPath(planPath);
 
-  if (!fs.existsSync(statusPath)) {
+  if (!safeFs.existsSync(statusPath)) {
     return { status: 'none' };
   }
 
   try {
-    const content = fs.readFileSync(statusPath, 'utf8');
+    const content = safeFs.readFileSync(statusPath, 'utf8');
     return JSON.parse(content);
   } catch {
     return { status: 'none' };
@@ -65,8 +65,8 @@ function readStatus(planPath) {
 function clearStatus(planPath) {
   const statusPath = getStatusPath(planPath);
 
-  if (fs.existsSync(statusPath)) {
-    fs.unlinkSync(statusPath);
+  if (safeFs.existsSync(statusPath)) {
+    safeFs.unlinkSync(statusPath);
   }
 }
 
@@ -158,11 +158,11 @@ function markTimeout(planPath) {
  * @returns {Array} Array of {planPath, status} objects
  */
 function getAllStatuses(dirPath) {
-  if (!fs.existsSync(dirPath)) {
+  if (!safeFs.existsSync(dirPath)) {
     return [];
   }
 
-  const files = fs.readdirSync(dirPath)
+  const files = safeFs.readdirSync(dirPath)
     .filter(f => f.endsWith('.md'))
     .map(f => {
       const planPath = path.join(dirPath, f);

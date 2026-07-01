@@ -25,7 +25,7 @@
  *   info     = informational (plan counts)
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const CANONICAL_STEPS = [
@@ -82,7 +82,7 @@ const REQUIRED_LIBS = [
 function findProjectRoot(start = process.cwd()) {
   let dir = start;
   for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, '.claude-plugin')) || fs.existsSync(path.join(dir, '.ctoc'))) {
+    if (safeFs.existsSync(path.join(dir, '.claude-plugin')) || safeFs.existsSync(path.join(dir, '.ctoc'))) {
       return dir;
     }
     const parent = path.dirname(dir);
@@ -93,8 +93,8 @@ function findProjectRoot(start = process.cwd()) {
 }
 
 function readFM(filePath) {
-  if (!fs.existsSync(filePath)) return { fm: '', body: '', missing: true };
-  const content = fs.readFileSync(filePath, 'utf8');
+  if (!safeFs.existsSync(filePath)) return { fm: '', body: '', missing: true };
+  const content = safeFs.readFileSync(filePath, 'utf8');
   const m = content.match(/^---\n([\s\S]*?)\n---/m) ||
             content.match(/\n---\n([\s\S]*?)\n---/);
   return { fm: m ? m[1] : '', body: content };
@@ -103,8 +103,8 @@ function readFM(filePath) {
 function listAgents(root) {
   const out = [];
   function walk(d) {
-    if (!fs.existsSync(d)) return;
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+    if (!safeFs.existsSync(d)) return;
+    for (const entry of safeFs.readdirSync(d, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
       const full = path.join(d, entry.name);
       if (entry.isDirectory()) walk(full);
@@ -118,8 +118,8 @@ function listAgents(root) {
 function listSkills(root) {
   const out = [];
   function walk(d) {
-    if (!fs.existsSync(d)) return;
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+    if (!safeFs.existsSync(d)) return;
+    for (const entry of safeFs.readdirSync(d, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
       const full = path.join(d, entry.name);
       if (entry.isDirectory()) walk(full);
@@ -132,8 +132,8 @@ function listSkills(root) {
 
 function listPlans(root, stage) {
   const dir = path.join(root, 'plans', stage);
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter(f => f.endsWith('.md') && f !== '.gitkeep').map(f => path.join(dir, f));
+  if (!safeFs.existsSync(dir)) return [];
+  return safeFs.readdirSync(dir).filter(f => f.endsWith('.md') && f !== '.gitkeep').map(f => path.join(dir, f));
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ function listPlans(root, stage) {
 
 function checkCtoChiefTopLevel(root) {
   const p = path.join(root, 'agents/coordinator/cto-chief.md');
-  if (!fs.existsSync(p)) {
+  if (!safeFs.existsSync(p)) {
     return { severity: 'critical', message: 'CTO Chief agent file missing at agents/coordinator/cto-chief.md' };
   }
   const { fm } = readFM(p);
@@ -159,7 +159,7 @@ function checkOnlyOneTopLevel(root) {
   const offenders = [];
   for (const a of listAgents(root)) {
     if (a.endsWith('/cto-chief.md')) continue;
-    const content = fs.readFileSync(a, 'utf8');
+    const content = safeFs.readFileSync(a, 'utf8');
     if (/role:\s*top-level-coordinator/.test(content)) {
       offenders.push(path.relative(root, a));
     }
@@ -176,7 +176,7 @@ function checkOnlyOneTopLevel(root) {
 
 function checkSynthesizerExists(root) {
   const p = path.join(root, 'agents/coordinator/synthesizer.md');
-  if (!fs.existsSync(p)) {
+  if (!safeFs.existsSync(p)) {
     return { severity: 'critical', message: 'Synthesizer (cross-pillar Tier 1) missing at agents/coordinator/synthesizer.md' };
   }
   const { fm } = readFM(p);
@@ -193,7 +193,7 @@ function checkTier1ReportsTo(root) {
   const missing = [];
   for (const rel of TIER_1_AGENTS) {
     const p = path.join(root, rel);
-    if (!fs.existsSync(p)) {
+    if (!safeFs.existsSync(p)) {
       missing.push({ agent: rel, issue: 'file missing' });
       continue;
     }
@@ -233,10 +233,10 @@ function checkTier2NoSubagent(root) {
 
 function checkTier3Scouts(root) {
   const scoutsDir = path.join(root, 'agents/scouts');
-  if (!fs.existsSync(scoutsDir)) {
+  if (!safeFs.existsSync(scoutsDir)) {
     return { severity: 'critical', message: 'agents/scouts/ directory missing' };
   }
-  const files = fs.readdirSync(scoutsDir).filter(f => f.endsWith('.md'));
+  const files = safeFs.readdirSync(scoutsDir).filter(f => f.endsWith('.md'));
   if (files.length < 5) {
     return { severity: 'warn', message: `Expected ≥5 scouts, found ${files.length}` };
   }
@@ -266,7 +266,7 @@ function checkActivePlanStepLabels(root) {
   const offenders = [];
   for (const stage of ['todo', 'implementation', 'review']) {
     for (const planPath of listPlans(root, stage)) {
-      const content = fs.readFileSync(planPath, 'utf8');
+      const content = safeFs.readFileSync(planPath, 'utf8');
       // Plans declare steps via "## Step N: LABEL" or "step: <num>" — scan both
       const stepHeadings = [...content.matchAll(/^##\s+Step\s+(\d+)[:.\s]+([A-Z][A-Z-]+)/gm)];
       for (const m of stepHeadings) {
@@ -294,7 +294,7 @@ function checkGateDestinationsApproved(root) {
   const offenders = [];
   for (const stage of GATE_DESTINATIONS) {
     for (const planPath of listPlans(root, stage)) {
-      const content = fs.readFileSync(planPath, 'utf8');
+      const content = safeFs.readFileSync(planPath, 'utf8');
       if (!content.includes('approved_by: human') && !content.includes('approved_by_human: true')) {
         offenders.push({ plan: path.relative(root, planPath), stage });
       }
@@ -314,7 +314,7 @@ function checkStalePlans(root, days = 7) {
   const stale = [];
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   for (const planPath of listPlans(root, 'in-progress')) {
-    const stat = fs.statSync(planPath);
+    const stat = safeFs.statSync(planPath);
     if (stat.mtimeMs < cutoff) {
       stale.push({ plan: path.relative(root, planPath), age_days: Math.floor((Date.now() - stat.mtimeMs) / (24 * 60 * 60 * 1000)) });
     }
@@ -354,7 +354,7 @@ function checkPlansHaveFilesDeclaration(root) {
 // ─────────────────────────────────────────────────────────────────────
 
 function checkRequiredHooks(root) {
-  const missing = REQUIRED_HOOKS.filter(rel => !fs.existsSync(path.join(root, rel)));
+  const missing = REQUIRED_HOOKS.filter(rel => !safeFs.existsSync(path.join(root, rel)));
   if (missing.length > 0) {
     return {
       severity: 'critical',
@@ -366,7 +366,7 @@ function checkRequiredHooks(root) {
 }
 
 function checkRequiredLibs(root) {
-  const missing = REQUIRED_LIBS.filter(rel => !fs.existsSync(path.join(root, rel)));
+  const missing = REQUIRED_LIBS.filter(rel => !safeFs.existsSync(path.join(root, rel)));
   if (missing.length > 0) {
     return {
       severity: 'critical',
@@ -379,10 +379,10 @@ function checkRequiredLibs(root) {
 
 function checkHooksJsonRegistration(root) {
   const hooksJson = path.join(root, '.claude-plugin/hooks.json');
-  if (!fs.existsSync(hooksJson)) {
+  if (!safeFs.existsSync(hooksJson)) {
     return { severity: 'critical', message: '.claude-plugin/hooks.json missing — no hooks registered' };
   }
-  const content = fs.readFileSync(hooksJson, 'utf8');
+  const content = safeFs.readFileSync(hooksJson, 'utf8');
   const required = ['SessionStart', 'PreToolUse', 'PreToolUse.Edit.js', 'human-gate-check.js'];
   const missing = required.filter(s => !content.includes(s));
   if (missing.length > 0) {
@@ -397,23 +397,23 @@ function checkHooksJsonRegistration(root) {
 
 function checkVersionSync(root) {
   const versionPath = path.join(root, 'VERSION');
-  if (!fs.existsSync(versionPath)) {
+  if (!safeFs.existsSync(versionPath)) {
     return { severity: 'critical', message: 'VERSION file missing' };
   }
-  const version = fs.readFileSync(versionPath, 'utf8').trim();
+  const version = safeFs.readFileSync(versionPath, 'utf8').trim();
   const pluginJson = path.join(root, '.claude-plugin/plugin.json');
   const marketplaceJson = path.join(root, '.claude-plugin/marketplace.json');
   const mismatches = [];
 
-  if (fs.existsSync(pluginJson)) {
+  if (safeFs.existsSync(pluginJson)) {
     try {
-      const j = JSON.parse(fs.readFileSync(pluginJson, 'utf8'));
+      const j = JSON.parse(safeFs.readFileSync(pluginJson, 'utf8'));
       if (j.version && j.version !== version) mismatches.push({ file: 'plugin.json', got: j.version, expected: version });
     } catch { /* ignore: unreadable/invalid plugin.json is reported by other checks */ }
   }
-  if (fs.existsSync(marketplaceJson)) {
+  if (safeFs.existsSync(marketplaceJson)) {
     try {
-      const j = JSON.parse(fs.readFileSync(marketplaceJson, 'utf8'));
+      const j = JSON.parse(safeFs.readFileSync(marketplaceJson, 'utf8'));
       const v = j?.plugins?.[0]?.version;
       if (v && v !== version) mismatches.push({ file: 'marketplace.json', got: v, expected: version });
     } catch { /* ignore: unreadable/invalid marketplace.json is reported by other checks */ }
@@ -434,12 +434,12 @@ function checkVersionSync(root) {
 
 function checkSaasTemplates(root) {
   const indexPath = path.join(root, '.ctoc/templates/saas/index.yaml');
-  if (!fs.existsSync(indexPath)) {
+  if (!safeFs.existsSync(indexPath)) {
     return { severity: 'warn', message: 'SaaS template index missing — autonomous SaaS build degraded' };
   }
   const b2c = path.join(root, '.ctoc/templates/saas/b2c-subscription');
   const required = ['README.md', 'manifest.yaml', 'production-readiness.yaml'];
-  const missing = required.filter(f => !fs.existsSync(path.join(b2c, f)));
+  const missing = required.filter(f => !safeFs.existsSync(path.join(b2c, f)));
   if (missing.length > 0) {
     return {
       severity: 'warn',
@@ -452,7 +452,7 @@ function checkSaasTemplates(root) {
 
 function checkBudgetConfigExists(root) {
   const p = path.join(root, '.ctoc', 'config', 'budget.yaml');
-  if (!fs.existsSync(p)) {
+  if (!safeFs.existsSync(p)) {
     return {
       severity: 'warn',
       message: 'Session-level build budget config missing at .ctoc/config/budget.yaml — autonomous runs are unbounded',
@@ -471,7 +471,7 @@ function checkProductLoop(root) {
     'skills/product/experiment-designer/SKILL.md',
     'src/lib/product-loop.js',
   ];
-  const missing = required.filter(rel => !fs.existsSync(path.join(root, rel)));
+  const missing = required.filter(rel => !safeFs.existsSync(path.join(root, rel)));
   if (missing.length > 0) {
     return {
       severity: 'warn',

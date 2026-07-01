@@ -3,7 +3,7 @@
  * Handles IDE configuration generation, detection, and merging
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ function getTemplatesDir() {
   ];
 
   for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
+    if (safeFs.existsSync(p)) {
       return p;
     }
   }
@@ -69,12 +69,12 @@ function getTemplatesForIDE(ideType) {
   const templatesDir = getTemplatesDir();
   const ideDir = path.join(templatesDir, ideType);
 
-  if (!fs.existsSync(ideDir)) {
+  if (!safeFs.existsSync(ideDir)) {
     return [];
   }
 
   const templates = [];
-  const files = fs.readdirSync(ideDir);
+  const files = safeFs.readdirSync(ideDir);
 
   files.forEach(file => {
     if (file.endsWith('.template')) {
@@ -128,16 +128,16 @@ function detectIDE(projectPath) {
 
   // Check for existing configurations in project
   if (projectPath) {
-    if (fs.existsSync(path.join(projectPath, '.cursor'))) {
+    if (safeFs.existsSync(path.join(projectPath, '.cursor'))) {
       return { type: 'cursor', name: 'Cursor (detected from config)' };
     }
-    if (fs.existsSync(path.join(projectPath, '.vscode'))) {
+    if (safeFs.existsSync(path.join(projectPath, '.vscode'))) {
       return { type: 'vscode', name: 'VS Code (detected from config)' };
     }
-    if (fs.existsSync(path.join(projectPath, '.idea'))) {
+    if (safeFs.existsSync(path.join(projectPath, '.idea'))) {
       return { type: 'jetbrains', name: 'JetBrains (detected from config)' };
     }
-    if (fs.existsSync(path.join(projectPath, 'coc-settings.json'))) {
+    if (safeFs.existsSync(path.join(projectPath, 'coc-settings.json'))) {
       return { type: 'vim', name: 'Vim/CoC (detected from config)' };
     }
   }
@@ -153,11 +153,11 @@ function detectIDE(projectPath) {
  * Read and process a template file
  */
 function readTemplate(templatePath) {
-  if (!fs.existsSync(templatePath)) {
+  if (!safeFs.existsSync(templatePath)) {
     throw new Error(`Template not found: ${templatePath}`);
   }
 
-  let content = fs.readFileSync(templatePath, 'utf8');
+  let content = safeFs.readFileSync(templatePath, 'utf8');
 
   // Process template variables (if any)
   // {{PROJECT_NAME}}, {{YEAR}}, etc.

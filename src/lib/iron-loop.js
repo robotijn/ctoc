@@ -3,7 +3,7 @@
  * Orchestrates the Integrator + Critic refinement loop for plan execution steps.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 
 /**
  * Marker for Iron Loop execution steps section.
@@ -17,10 +17,10 @@ const IRON_LOOP_MARKER = '## Execution Steps (Iron Loop 8-16)';
  * @returns {boolean} True if plan contains Iron Loop steps marker
  */
 function hasIronLoopSteps(planPath) {
-  if (!fs.existsSync(planPath)) {
+  if (!safeFs.existsSync(planPath)) {
     return false;
   }
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
   return content.includes(IRON_LOOP_MARKER);
 }
 
@@ -111,11 +111,11 @@ ${IRON_LOOP_MARKER}
  * @returns {string} Markdown string with Steps 8-16
  */
 function integrate(planPath) {
-  if (!fs.existsSync(planPath)) {
+  if (!safeFs.existsSync(planPath)) {
     throw new Error(`Plan file not found: ${planPath}`);
   }
 
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
 
   // Extract requirements and proposed solution sections
   const requirementsMatch = content.match(/## Requirements\n([\s\S]*?)(?=##|$)/);
@@ -264,11 +264,11 @@ function extractActionItems(text) {
  * @returns {Object} Critique result with scores and feedback
  */
 function critique(planPath) {
-  if (!fs.existsSync(planPath)) {
+  if (!safeFs.existsSync(planPath)) {
     throw new Error(`Plan file not found: ${planPath}`);
   }
 
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
 
   // Check for execution plan section
   const hasExecutionPlan = content.includes('## Execution Plan (Steps 8-16)');
@@ -501,11 +501,11 @@ function scoreSecurity(execPlan) {
  * @returns {Object} Result with status, rounds, and optionally deferredQuestions
  */
 function refineLoop(planPath, maxRounds = 10) {
-  if (!fs.existsSync(planPath)) {
+  if (!safeFs.existsSync(planPath)) {
     throw new Error(`Plan file not found: ${planPath}`);
   }
 
-  let content = fs.readFileSync(planPath, 'utf8');
+  let content = safeFs.readFileSync(planPath, 'utf8');
   let rounds = 0;
   let lastCritique = null;
 
@@ -518,7 +518,7 @@ function refineLoop(planPath, maxRounds = 10) {
     // Append to plan if not already present
     if (!content.includes('## Execution Plan (Steps 8-16)')) {
       content += executionPlan;
-      fs.writeFileSync(planPath, content);
+      safeFs.writeFileSync(planPath, content);
     }
 
     // Critique the plan
@@ -572,7 +572,7 @@ function refineLoop(planPath, maxRounds = 10) {
 function appendDeferredQuestions(planPath, deferredQuestions) {
   if (!deferredQuestions || deferredQuestions.length === 0) return;
 
-  let content = fs.readFileSync(planPath, 'utf8');
+  let content = safeFs.readFileSync(planPath, 'utf8');
 
   const questionsSection = `
 
@@ -582,7 +582,7 @@ ${deferredQuestions.map(q => `- **${q.dimension}**: ${q.feedback}`).join('\n')}
 `;
 
   content += questionsSection;
-  fs.writeFileSync(planPath, content);
+  safeFs.writeFileSync(planPath, content);
 }
 
 module.exports = {

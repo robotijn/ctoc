@@ -10,8 +10,8 @@
  *   ctoc quality trend
  */
 
-const fs = require('fs');
 const path = require('path');
+const safeFs = require('./safe-fs');
 const { QualityConfig, MODES, LANGUAGES } = require('../lib/quality-config');
 const { CoverageChecker } = require('../lib/coverage-checker');
 const { ArchitectureDetector } = require('../lib/architecture-detector');
@@ -278,10 +278,10 @@ async function generateReport(projectRoot, mode, format, output) {
   // Save to file if output path specified
   if (output) {
     const outputDir = path.dirname(output);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
+    if (!safeFs.existsSync(outputDir)) {
+      safeFs.mkdirSync(outputDir, { recursive: true });
     }
-    fs.writeFileSync(output, report);
+    safeFs.writeFileSync(output, report);
 
     return {
       success: true,
@@ -391,7 +391,7 @@ function checkCoverageReport(projectRoot, mode) {
 
   for (const { path: relativePath, format } of coverageLocations) {
     const fullPath = path.join(projectRoot, relativePath);
-    if (fs.existsSync(fullPath)) {
+    if (safeFs.existsSync(fullPath)) {
       try {
         const checker = new CoverageChecker(mode);
         const coverage = checker.parseCoverage(format, fullPath);

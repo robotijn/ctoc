@@ -6,7 +6,7 @@
  * silent-passthrough, hook-broken.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const MAX_ENTRIES = 1000;
@@ -20,12 +20,12 @@ const MAX_ENTRIES = 1000;
  */
 function logEnforcement(entry, root) {
   const logDir = path.join(root, '.ctoc', 'logs');
-  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true });
 
   const logPath = path.join(logDir, 'enforcement.json');
   let log = [];
-  if (fs.existsSync(logPath)) {
-    try { log = JSON.parse(fs.readFileSync(logPath, 'utf8')); } catch { log = []; }
+  if (safeFs.existsSync(logPath)) {
+    try { log = JSON.parse(safeFs.readFileSync(logPath, 'utf8')); } catch { log = []; }
   }
   if (!Array.isArray(log)) log = [];
 
@@ -35,7 +35,7 @@ function logEnforcement(entry, root) {
   });
   if (log.length > MAX_ENTRIES) log = log.slice(-MAX_ENTRIES);
 
-  fs.writeFileSync(logPath, JSON.stringify(log, null, 2));
+  safeFs.writeFileSync(logPath, JSON.stringify(log, null, 2));
 }
 
 module.exports = { logEnforcement };

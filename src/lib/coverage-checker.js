@@ -10,8 +10,8 @@
  * - Python coverage.py
  */
 
-const fs = require('fs');
 const path = require('path');
+const safeFs = require('./safe-fs');
 
 /**
  * Coverage thresholds per mode
@@ -60,7 +60,7 @@ class CoverageChecker {
    * @throws {Error} If format is unknown or file not found
    */
   parseCoverage(format, reportPath) {
-    if (!fs.existsSync(reportPath)) {
+    if (!safeFs.existsSync(reportPath)) {
       throw new Error(`Coverage report not found: ${reportPath}`);
     }
 
@@ -87,7 +87,7 @@ class CoverageChecker {
    * @returns {Object} Normalized coverage
    */
   parseIstanbul(reportPath) {
-    const content = fs.readFileSync(reportPath, 'utf8');
+    const content = safeFs.readFileSync(reportPath, 'utf8');
     const data = JSON.parse(content);
 
     // Istanbul summary format
@@ -143,7 +143,7 @@ class CoverageChecker {
    * @returns {Object} Normalized coverage
    */
   parseCoveragePy(reportPath) {
-    const content = fs.readFileSync(reportPath, 'utf8');
+    const content = safeFs.readFileSync(reportPath, 'utf8');
     const data = JSON.parse(content);
 
     if (data.totals) {
@@ -164,7 +164,7 @@ class CoverageChecker {
    * @returns {Object} Normalized coverage
    */
   parseJacoco(reportPath) {
-    const content = fs.readFileSync(reportPath, 'utf8');
+    const content = safeFs.readFileSync(reportPath, 'utf8');
 
     // Simple XML parsing for JaCoCo counters
     const parseCounter = (type) => {
@@ -193,7 +193,7 @@ class CoverageChecker {
    * @returns {Object} Normalized coverage
    */
   parseLcov(reportPath) {
-    const content = fs.readFileSync(reportPath, 'utf8');
+    const content = safeFs.readFileSync(reportPath, 'utf8');
     const lines = content.split('\n');
 
     let totalLines = 0, coveredLines = 0;
@@ -230,7 +230,7 @@ class CoverageChecker {
    * @returns {Object} Normalized coverage
    */
   parseCobertura(reportPath) {
-    const content = fs.readFileSync(reportPath, 'utf8');
+    const content = safeFs.readFileSync(reportPath, 'utf8');
 
     // Extract line-rate and branch-rate from root coverage element
     const lineRateMatch = content.match(/line-rate="([0-9.]+)"/);
@@ -253,7 +253,7 @@ class CoverageChecker {
    * @returns {Object} Normalized coverage
    */
   parseGoCoverage(reportPath) {
-    const content = fs.readFileSync(reportPath, 'utf8');
+    const content = safeFs.readFileSync(reportPath, 'utf8');
     const lines = content.split('\n').slice(1); // Skip mode line
 
     let totalStatements = 0;
@@ -382,7 +382,7 @@ class CoverageChecker {
     if (ext === '.xml') {
       // Read first few lines to detect format
       try {
-        const content = fs.readFileSync(reportPath, 'utf8');
+        const content = safeFs.readFileSync(reportPath, 'utf8');
         if (content.includes('<!DOCTYPE coverage')) {
           return 'cobertura';
         }
@@ -396,7 +396,7 @@ class CoverageChecker {
     }
     if (ext === '.json') {
       try {
-        const content = fs.readFileSync(reportPath, 'utf8');
+        const content = safeFs.readFileSync(reportPath, 'utf8');
         const data = JSON.parse(content);
         if (data.total || data.s) {
           return 'istanbul';

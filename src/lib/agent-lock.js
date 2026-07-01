@@ -5,7 +5,7 @@
  * Stop file: .ctoc/agent.stop
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -19,7 +19,7 @@ const STOP_FILE = 'agent.stop';
  */
 function getLockPath(projectPath) {
   const dir = path.join(projectPath, '.ctoc');
-  fs.mkdirSync(dir, { recursive: true });
+  safeFs.mkdirSync(dir, { recursive: true });
   return path.join(dir, LOCK_FILE);
 }
 
@@ -60,10 +60,10 @@ function isPidAlive(pid) {
  */
 function readLock(projectPath) {
   const lockPath = getLockPath(projectPath);
-  if (!fs.existsSync(lockPath)) return null;
+  if (!safeFs.existsSync(lockPath)) return null;
 
   try {
-    return JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    return JSON.parse(safeFs.readFileSync(lockPath, 'utf8'));
   } catch {
     return null;
   }
@@ -88,7 +88,7 @@ function acquireLock(projectPath, planName) {
       };
     }
     // Stale lock - remove it
-    try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
+    try { safeFs.unlinkSync(lockPath); } catch { /* ignore */ }
   }
 
   const agentId = crypto.randomUUID();
@@ -99,7 +99,7 @@ function acquireLock(projectPath, planName) {
     startedAt: new Date().toISOString()
   };
 
-  fs.writeFileSync(lockPath, JSON.stringify(lockData, null, 2));
+  safeFs.writeFileSync(lockPath, JSON.stringify(lockData, null, 2));
   return { acquired: true, agentId };
 }
 
@@ -111,8 +111,8 @@ function releaseLock(projectPath) {
   const lockPath = getLockPath(projectPath);
   const stopPath = getStopPath(projectPath);
 
-  try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
-  try { fs.unlinkSync(stopPath); } catch { /* ignore */ }
+  try { safeFs.unlinkSync(lockPath); } catch { /* ignore */ }
+  try { safeFs.unlinkSync(stopPath); } catch { /* ignore */ }
 }
 
 /**
@@ -126,7 +126,7 @@ function updateLockPlan(projectPath, planName) {
   if (!lock) return;
 
   lock.plan = planName;
-  fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2));
+  safeFs.writeFileSync(lockPath, JSON.stringify(lock, null, 2));
 }
 
 /**
@@ -155,8 +155,8 @@ function isLocked(projectPath) {
 function requestStop(projectPath) {
   const stopPath = getStopPath(projectPath);
   const dir = path.dirname(stopPath);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(stopPath, '');
+  safeFs.mkdirSync(dir, { recursive: true });
+  safeFs.writeFileSync(stopPath, '');
 }
 
 /**
@@ -165,7 +165,7 @@ function requestStop(projectPath) {
  * @returns {boolean}
  */
 function isStopRequested(projectPath) {
-  return fs.existsSync(getStopPath(projectPath));
+  return safeFs.existsSync(getStopPath(projectPath));
 }
 
 /**
@@ -174,7 +174,7 @@ function isStopRequested(projectPath) {
  */
 function clearStop(projectPath) {
   const stopPath = getStopPath(projectPath);
-  try { fs.unlinkSync(stopPath); } catch { /* ignore */ }
+  try { safeFs.unlinkSync(stopPath); } catch { /* ignore */ }
 }
 
 module.exports = {

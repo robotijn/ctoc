@@ -12,7 +12,7 @@
  * entry mentioning `program: ctoc-*`.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const CTOC_MARKER_RE = /^#\s*CTOC Project Instructions/m;
@@ -33,17 +33,17 @@ function isCtocProject(root) {
   let isCtocRepo = false;
 
   try {
-    if (!fs.existsSync(dotCtocPath) || !fs.existsSync(claudeMdPath)) {
+    if (!safeFs.existsSync(dotCtocPath) || !safeFs.existsSync(claudeMdPath)) {
       return { isCtoc: false, isCtocRepo: false };
     }
-    const claudeMd = fs.readFileSync(claudeMdPath, 'utf8');
+    const claudeMd = safeFs.readFileSync(claudeMdPath, 'utf8');
     isCtoc = CTOC_MARKER_RE.test(claudeMd) || CTOC_PROGRAM_RE.test(claudeMd);
 
     // Check if this is the ctoc plugin source itself
     const pkgPath = path.join(root, 'package.json');
-    if (fs.existsSync(pkgPath)) {
+    if (safeFs.existsSync(pkgPath)) {
       try {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        const pkg = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
         if (pkg.name === 'ctoc') isCtocRepo = true;
       } catch { /* ignore */ }
     }

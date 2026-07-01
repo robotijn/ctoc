@@ -10,7 +10,7 @@
  * operation by accident — see DEFAULT_CONFIG.dry_run.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync, execFileSync } = require('child_process');
 
@@ -59,9 +59,9 @@ function getDeploymentConfig(projectPath) {
   const settingsPath = path.join(projectPath, '.ctoc', 'settings.json');
   let config = {};
 
-  if (fs.existsSync(settingsPath)) {
+  if (safeFs.existsSync(settingsPath)) {
     try {
-      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      const settings = JSON.parse(safeFs.readFileSync(settingsPath, 'utf8'));
       config = settings.deployment || {};
     } catch {
       // Invalid JSON, use defaults
@@ -446,7 +446,7 @@ function executeScript(config, context, opts = {}) {
   if (scriptPath !== projectRoot && !scriptPath.startsWith(projectRoot + path.sep)) {
     throw new Error(`Deploy script must live inside the project: ${config.script}`);
   }
-  if (!fs.existsSync(scriptPath) || !fs.statSync(scriptPath).isFile()) {
+  if (!safeFs.existsSync(scriptPath) || !safeFs.statSync(scriptPath).isFile()) {
     throw new Error(`Deploy script not found: ${config.script}`);
   }
   // Pick the interpreter by extension and pass the script as a single argument
@@ -554,12 +554,12 @@ async function rollback(environment, projectPath) {
 function getDeploymentHistory(projectPath) {
   const historyPath = path.join(projectPath, '.ctoc', 'deployments', 'history.json');
 
-  if (!fs.existsSync(historyPath)) {
+  if (!safeFs.existsSync(historyPath)) {
     return [];
   }
 
   try {
-    return JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+    return JSON.parse(safeFs.readFileSync(historyPath, 'utf8'));
   } catch {
     return [];
   }
@@ -573,14 +573,14 @@ function getDeploymentHistory(projectPath) {
  */
 function logDeployment(entry, projectPath) {
   const deploymentsDir = path.join(projectPath, '.ctoc', 'deployments');
-  fs.mkdirSync(deploymentsDir, { recursive: true });
+  safeFs.mkdirSync(deploymentsDir, { recursive: true });
 
   const historyPath = path.join(deploymentsDir, 'history.json');
   let history = [];
 
-  if (fs.existsSync(historyPath)) {
+  if (safeFs.existsSync(historyPath)) {
     try {
-      history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+      history = JSON.parse(safeFs.readFileSync(historyPath, 'utf8'));
     } catch {
       history = [];
     }
@@ -596,7 +596,7 @@ function logDeployment(entry, projectPath) {
     history = history.slice(0, keepHistory);
   }
 
-  fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
+  safeFs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
 }
 
 /**
@@ -604,10 +604,10 @@ function logDeployment(entry, projectPath) {
  */
 function writeLatestStatus(entry, projectPath) {
   const deploymentsDir = path.join(projectPath, '.ctoc', 'deployments');
-  fs.mkdirSync(deploymentsDir, { recursive: true });
+  safeFs.mkdirSync(deploymentsDir, { recursive: true });
 
   const latestPath = path.join(deploymentsDir, 'latest.json');
-  fs.writeFileSync(latestPath, JSON.stringify(entry, null, 2));
+  safeFs.writeFileSync(latestPath, JSON.stringify(entry, null, 2));
 }
 
 /**

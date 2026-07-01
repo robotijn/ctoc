@@ -12,7 +12,7 @@
  * Cross-platform: Works on Windows, macOS, and Linux.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 // Quality commands per language
@@ -158,18 +158,18 @@ const CTOC_DIRS = [
 function detectProjectName(projectDir) {
   // Try package.json first
   const pkgPath = path.join(projectDir, 'package.json');
-  if (fs.existsSync(pkgPath)) {
+  if (safeFs.existsSync(pkgPath)) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      const pkg = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
       if (pkg.name) return pkg.name;
     } catch { /* ignore parse errors */ }
   }
 
   // Try pyproject.toml
   const pyprojectPath = path.join(projectDir, 'pyproject.toml');
-  if (fs.existsSync(pyprojectPath)) {
+  if (safeFs.existsSync(pyprojectPath)) {
     try {
-      const content = fs.readFileSync(pyprojectPath, 'utf8');
+      const content = safeFs.readFileSync(pyprojectPath, 'utf8');
       const nameMatch = content.match(/^name\s*=\s*"(.+?)"/m);
       if (nameMatch) return nameMatch[1];
     } catch { /* ignore */ }
@@ -177,9 +177,9 @@ function detectProjectName(projectDir) {
 
   // Try Cargo.toml
   const cargoPath = path.join(projectDir, 'Cargo.toml');
-  if (fs.existsSync(cargoPath)) {
+  if (safeFs.existsSync(cargoPath)) {
     try {
-      const content = fs.readFileSync(cargoPath, 'utf8');
+      const content = safeFs.readFileSync(cargoPath, 'utf8');
       const nameMatch = content.match(/^name\s*=\s*"(.+?)"/m);
       if (nameMatch) return nameMatch[1];
     } catch { /* ignore */ }
@@ -187,9 +187,9 @@ function detectProjectName(projectDir) {
 
   // Try go.mod
   const goModPath = path.join(projectDir, 'go.mod');
-  if (fs.existsSync(goModPath)) {
+  if (safeFs.existsSync(goModPath)) {
     try {
-      const content = fs.readFileSync(goModPath, 'utf8');
+      const content = safeFs.readFileSync(goModPath, 'utf8');
       const moduleMatch = content.match(/^module\s+(\S+)/m);
       if (moduleMatch) {
         const parts = moduleMatch[1].split('/');
@@ -231,7 +231,7 @@ function detectLanguages(projectDir) {
         // Glob-style marker - check for files matching pattern
         try {
           const ext = marker.replace('*', '');
-          const files = fs.readdirSync(projectDir);
+          const files = safeFs.readdirSync(projectDir);
           if (files.some(f => f.endsWith(ext))) {
             if (!detected.includes(lang)) detected.push(lang);
             break;
@@ -239,7 +239,7 @@ function detectLanguages(projectDir) {
         } catch { /* ignore */ }
       } else {
         const markerPath = path.join(projectDir, marker);
-        if (fs.existsSync(markerPath)) {
+        if (safeFs.existsSync(markerPath)) {
           if (!detected.includes(lang)) detected.push(lang);
           break;
         }
@@ -267,9 +267,9 @@ function detectFrameworks(projectDir, languages) {
   // Check package.json for JS/TS frameworks
   if (languages.includes('javascript') || languages.includes('typescript')) {
     const pkgPath = path.join(projectDir, 'package.json');
-    if (fs.existsSync(pkgPath)) {
+    if (safeFs.existsSync(pkgPath)) {
       try {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        const pkg = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
         const allDeps = {
           ...(pkg.dependencies || {}),
           ...(pkg.devDependencies || {})
@@ -305,9 +305,9 @@ function detectFrameworks(projectDir, languages) {
     const reqFiles = ['requirements.txt', 'pyproject.toml', 'Pipfile'];
     for (const reqFile of reqFiles) {
       const reqPath = path.join(projectDir, reqFile);
-      if (fs.existsSync(reqPath)) {
+      if (safeFs.existsSync(reqPath)) {
         try {
-          const content = fs.readFileSync(reqPath, 'utf8');
+          const content = safeFs.readFileSync(reqPath, 'utf8');
           const PY_FRAMEWORKS = {
             django: 'django',
             fastapi: 'fastapi',
@@ -329,9 +329,9 @@ function detectFrameworks(projectDir, languages) {
   // Check Go frameworks via go.mod
   if (languages.includes('go')) {
     const goModPath = path.join(projectDir, 'go.mod');
-    if (fs.existsSync(goModPath)) {
+    if (safeFs.existsSync(goModPath)) {
       try {
-        const content = fs.readFileSync(goModPath, 'utf8');
+        const content = safeFs.readFileSync(goModPath, 'utf8');
         const GO_FRAMEWORKS = {
           'gin-gonic/gin': 'gin',
           'labstack/echo': 'echo',
@@ -348,9 +348,9 @@ function detectFrameworks(projectDir, languages) {
   // Check Rust frameworks via Cargo.toml
   if (languages.includes('rust')) {
     const cargoPath = path.join(projectDir, 'Cargo.toml');
-    if (fs.existsSync(cargoPath)) {
+    if (safeFs.existsSync(cargoPath)) {
       try {
-        const content = fs.readFileSync(cargoPath, 'utf8');
+        const content = safeFs.readFileSync(cargoPath, 'utf8');
         const RUST_FRAMEWORKS = {
           actix: 'actix',
           axum: 'axum',
@@ -367,9 +367,9 @@ function detectFrameworks(projectDir, languages) {
   // Check Ruby frameworks
   if (languages.includes('ruby')) {
     const gemfilePath = path.join(projectDir, 'Gemfile');
-    if (fs.existsSync(gemfilePath)) {
+    if (safeFs.existsSync(gemfilePath)) {
       try {
-        const content = fs.readFileSync(gemfilePath, 'utf8');
+        const content = safeFs.readFileSync(gemfilePath, 'utf8');
         if (content.includes("'rails'") || content.includes('"rails"')) detected.push('rails');
         if (content.includes("'sinatra'") || content.includes('"sinatra"')) detected.push('sinatra');
         if (content.includes("'hanami'") || content.includes('"hanami"')) detected.push('hanami');
@@ -382,9 +382,9 @@ function detectFrameworks(projectDir, languages) {
     const buildFiles = ['pom.xml', 'build.gradle', 'build.gradle.kts'];
     for (const buildFile of buildFiles) {
       const buildPath = path.join(projectDir, buildFile);
-      if (fs.existsSync(buildPath)) {
+      if (safeFs.existsSync(buildPath)) {
         try {
-          const content = fs.readFileSync(buildPath, 'utf8');
+          const content = safeFs.readFileSync(buildPath, 'utf8');
           if (content.includes('spring')) detected.push('spring');
           if (content.includes('quarkus')) detected.push('quarkus');
           if (content.includes('micronaut')) detected.push('micronaut');
@@ -434,7 +434,7 @@ function generateProjectStructure(projectDir) {
   const lines = [];
 
   try {
-    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    const entries = safeFs.readdirSync(projectDir, { withFileTypes: true });
     const sorted = entries
       .filter(e => !e.name.startsWith('.') || ['.env.example', '.gitignore'].includes(e.name))
       .filter(e => !IGNORE_DIRS.has(e.name))
@@ -469,8 +469,8 @@ function generateProjectStructure(projectDir) {
  * @param {string} dirPath - Directory path to create
  */
 function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+  if (!safeFs.existsSync(dirPath)) {
+    safeFs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
@@ -481,7 +481,7 @@ function ensureDir(dirPath) {
  * @returns {string} Generated content
  */
 function renderTemplate(templatePath, vars) {
-  let content = fs.readFileSync(templatePath, 'utf8');
+  let content = safeFs.readFileSync(templatePath, 'utf8');
 
   for (const [key, value] of Object.entries(vars)) {
     content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
@@ -572,8 +572,8 @@ function initProject(projectDir, options = {}) {
 
   // 3. Generate CLAUDE.md
   const claudeMdPath = path.join(projectDir, 'CLAUDE.md');
-  if (!fs.existsSync(claudeMdPath) || force) {
-    if (fs.existsSync(templatePath)) {
+  if (!safeFs.existsSync(claudeMdPath) || force) {
+    if (safeFs.existsSync(templatePath)) {
       const content = renderTemplate(templatePath, {
         PROJECT_NAME: projectName,
         DETECTED_LANGUAGES: languages.join(', ') || 'Not detected',
@@ -587,7 +587,7 @@ function initProject(projectDir, options = {}) {
       });
 
       if (!dryRun) {
-        fs.writeFileSync(claudeMdPath, content, 'utf8');
+        safeFs.writeFileSync(claudeMdPath, content, 'utf8');
       }
       created.push('CLAUDE.md');
     } else {
@@ -608,8 +608,8 @@ function initProject(projectDir, options = {}) {
       const { ensureLessonsBlock, START_MARKER } = require('./claude-md-lessons');
       const ctocRoot = path.resolve(__dirname, '..', '..');   // same base as templatePath
       const wasCreated = created.includes('CLAUDE.md');
-      const hasBlock = fs.existsSync(claudeMdPath) &&
-        fs.readFileSync(claudeMdPath, 'utf8').includes(START_MARKER);
+      const hasBlock = safeFs.existsSync(claudeMdPath) &&
+        safeFs.readFileSync(claudeMdPath, 'utf8').includes(START_MARKER);
       if ((wasCreated || hasBlock) && ensureLessonsBlock(claudeMdPath, ctocRoot)) {
         created.push('CLAUDE.md (operating-lessons block)');
       }
@@ -621,11 +621,11 @@ function initProject(projectDir, options = {}) {
 
   // 4. Generate IRON_LOOP.md
   const ironLoopPath = path.join(projectDir, 'IRON_LOOP.md');
-  if (!fs.existsSync(ironLoopPath) || force) {
-    if (fs.existsSync(ironLoopTemplatePath)) {
-      const content = fs.readFileSync(ironLoopTemplatePath, 'utf8');
+  if (!safeFs.existsSync(ironLoopPath) || force) {
+    if (safeFs.existsSync(ironLoopTemplatePath)) {
+      const content = safeFs.readFileSync(ironLoopTemplatePath, 'utf8');
       if (!dryRun) {
-        fs.writeFileSync(ironLoopPath, content, 'utf8');
+        safeFs.writeFileSync(ironLoopPath, content, 'utf8');
       }
       created.push('IRON_LOOP.md');
     }
@@ -637,7 +637,7 @@ function initProject(projectDir, options = {}) {
   const allDirs = [...PLAN_DIRS, ...CTOC_DIRS];
   for (const dir of allDirs) {
     const dirPath = path.join(projectDir, dir);
-    if (!fs.existsSync(dirPath)) {
+    if (!safeFs.existsSync(dirPath)) {
       if (!dryRun) {
         ensureDir(dirPath);
       }
@@ -647,11 +647,11 @@ function initProject(projectDir, options = {}) {
 
   // 6. Generate .ctoc/settings.yaml
   const settingsPath = path.join(projectDir, '.ctoc', 'settings.yaml');
-  if (!fs.existsSync(settingsPath) || force) {
+  if (!safeFs.existsSync(settingsPath) || force) {
     const settingsContent = generateSettings(languages, frameworks);
     if (!dryRun) {
       ensureDir(path.dirname(settingsPath));
-      fs.writeFileSync(settingsPath, settingsContent, 'utf8');
+      safeFs.writeFileSync(settingsPath, settingsContent, 'utf8');
     }
     created.push('.ctoc/settings.yaml');
   } else {
@@ -660,11 +660,11 @@ function initProject(projectDir, options = {}) {
 
   // 7. Generate .ctoc/state/iron-loop.yaml
   const statePath = path.join(projectDir, '.ctoc', 'state', 'iron-loop.yaml');
-  if (!fs.existsSync(statePath) || force) {
+  if (!safeFs.existsSync(statePath) || force) {
     const stateContent = generateInitialState();
     if (!dryRun) {
       ensureDir(path.dirname(statePath));
-      fs.writeFileSync(statePath, stateContent, 'utf8');
+      safeFs.writeFileSync(statePath, stateContent, 'utf8');
     }
     created.push('.ctoc/state/iron-loop.yaml');
   } else {
@@ -673,12 +673,12 @@ function initProject(projectDir, options = {}) {
 
   // 8. Add .ctoc/logs/ to .gitignore if not already there
   const gitignorePath = path.join(projectDir, '.gitignore');
-  if (fs.existsSync(gitignorePath)) {
-    const gitignore = fs.readFileSync(gitignorePath, 'utf8');
+  if (safeFs.existsSync(gitignorePath)) {
+    const gitignore = safeFs.readFileSync(gitignorePath, 'utf8');
     if (!gitignore.includes('.ctoc/logs/') || !gitignore.includes('.ctoc/state/')) {
       if (!dryRun) {
         const additions = '\n# CTOC\n.ctoc/logs/\n.ctoc/state/\n';
-        fs.appendFileSync(gitignorePath, additions, 'utf8');
+        safeFs.appendFileSync(gitignorePath, additions, 'utf8');
       }
       created.push('.gitignore (updated with CTOC entries)');
     }

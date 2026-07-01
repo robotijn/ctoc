@@ -168,7 +168,26 @@ const promises = {
   copyFile: async (src, dest, mode) => { validatePath(src, 'promises.copyFile'); validatePath(dest, 'promises.copyFile'); return fs.promises.copyFile(src, dest, mode); }
 };
 
-module.exports = {
+// The cast gives every export Node fs's own type (all overloads intact), so
+// call sites type-check under `tsc --checkJs` exactly as if they called fs
+// directly — e.g. readFileSync(p, 'utf8') still narrows to string, not
+// string|Buffer. Without this, the explicit-arity wrappers collapse fs's
+// overloads and every migrated call site regresses the typecheck baseline.
+module.exports = /** @type {(
+  Pick<typeof import('fs'),
+    'existsSync' | 'readFileSync' | 'writeFileSync' | 'appendFileSync' |
+    'mkdirSync' | 'readdirSync' | 'statSync' | 'lstatSync' |
+    'unlinkSync' | 'rmSync' | 'realpathSync' | 'readlinkSync' |
+    'chmodSync' | 'utimesSync' | 'openSync' |
+    'renameSync' | 'copyFileSync' | 'cpSync'>
+  & {
+    promises: Pick<typeof import('fs').promises,
+      'readFile' | 'writeFile' | 'appendFile' | 'mkdir' | 'readdir' |
+      'stat' | 'lstat' | 'unlink' | 'rm' | 'realpath' | 'readlink' |
+      'chmod' | 'rename' | 'copyFile'>,
+    validatePath: (p: unknown, method: string) => void
+  }
+)} */ ({
   existsSync, readFileSync, writeFileSync, appendFileSync,
   mkdirSync, readdirSync, statSync, lstatSync,
   unlinkSync, rmSync, realpathSync, readlinkSync,
@@ -177,4 +196,4 @@ module.exports = {
   promises,
   // Exposed for callers/tests that want the validation primitive directly.
   validatePath
-};
+});

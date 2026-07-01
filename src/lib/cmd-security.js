@@ -9,8 +9,8 @@
  *   ctoc security fix [--auto]
  */
 
-const fs = require('fs');
 const path = require('path');
+const safeFs = require('./safe-fs');
 const { SASTRunner, SEVERITY: SAST_SEVERITY } = require('../lib/sast-runner');
 const { DependencyAuditor } = require('../lib/dependency-auditor');
 const { SecretsScanner } = require('../lib/secrets-scanner');
@@ -169,10 +169,10 @@ async function runSecurityScan(projectRoot, options) {
 
   // Save results
   const resultsDir = path.join(projectRoot, '.ctoc', 'security');
-  if (!fs.existsSync(resultsDir)) {
-    fs.mkdirSync(resultsDir, { recursive: true });
+  if (!safeFs.existsSync(resultsDir)) {
+    safeFs.mkdirSync(resultsDir, { recursive: true });
   }
-  fs.writeFileSync(
+  safeFs.writeFileSync(
     path.join(resultsDir, 'latest-scan.json'),
     JSON.stringify(results, null, 2)
   );
@@ -193,14 +193,14 @@ async function runSecurityScan(projectRoot, options) {
 async function generateSecurityReport(projectRoot, format) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'latest-scan.json');
 
-  if (!fs.existsSync(resultsPath)) {
+  if (!safeFs.existsSync(resultsPath)) {
     return {
       success: false,
       error: 'No security scan results found. Run "ctoc security scan" first.'
     };
   }
 
-  const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+  const results = JSON.parse(safeFs.readFileSync(resultsPath, 'utf8'));
 
   let report;
   switch (format) {
@@ -367,12 +367,12 @@ function generateMarkdownReport(results) {
 async function checkSecurityGate(projectRoot, mode) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'latest-scan.json');
 
-  if (!fs.existsSync(resultsPath)) {
+  if (!safeFs.existsSync(resultsPath)) {
     // Run scan first
     await runSecurityScan(projectRoot, { all: true });
   }
 
-  const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+  const results = JSON.parse(safeFs.readFileSync(resultsPath, 'utf8'));
 
   // Prepare security metrics for quality gate
   const securityMetrics = {
@@ -450,14 +450,14 @@ async function checkSecurityGate(projectRoot, mode) {
 async function suggestFixes(projectRoot, auto) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'latest-scan.json');
 
-  if (!fs.existsSync(resultsPath)) {
+  if (!safeFs.existsSync(resultsPath)) {
     return {
       success: false,
       error: 'No security scan results found. Run "ctoc security scan" first.'
     };
   }
 
-  const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+  const results = JSON.parse(safeFs.readFileSync(resultsPath, 'utf8'));
   const suggestions = [];
   const autoFixable = [];
 

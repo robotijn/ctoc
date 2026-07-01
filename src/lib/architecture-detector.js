@@ -9,7 +9,7 @@
  * - MVC pattern
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -110,7 +110,7 @@ class ArchitectureDetector {
 
     return searchPaths.some(p => {
       try {
-        return fs.existsSync(p) && fs.statSync(p).isDirectory();
+        return safeFs.existsSync(p) && safeFs.statSync(p).isDirectory();
       } catch (e) {
         return false;
       }
@@ -179,7 +179,7 @@ class ArchitectureDetector {
     const searchDirs = ['src', 'app', 'lib', '.'];
     for (const dir of searchDirs) {
       const fullPath = path.join(this.projectRoot, dir);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         this.walkDirectory(fullPath, extensions, files);
       }
     }
@@ -195,7 +195,7 @@ class ArchitectureDetector {
    */
   walkDirectory(dir, extensions, files) {
     try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      const entries = safeFs.readdirSync(dir, { withFileTypes: true });
 
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
@@ -227,7 +227,7 @@ class ArchitectureDetector {
     const imports = [];
 
     try {
-      const content = fs.readFileSync(filePath, 'utf8');
+      const content = safeFs.readFileSync(filePath, 'utf8');
       const lines = content.split('\n');
       const relativePath = path.relative(this.projectRoot, filePath);
 
@@ -412,7 +412,7 @@ class ArchitectureDetector {
       for (const ext of extensions) {
         const withExt = resolved + ext;
         const relativePath = path.relative(this.projectRoot, withExt);
-        if (fs.existsSync(withExt)) {
+        if (safeFs.existsSync(withExt)) {
           return relativePath;
         }
       }

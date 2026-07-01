@@ -11,7 +11,7 @@
  * - React (CRA, Vite)
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -135,8 +135,8 @@ class FrameworkDetector {
   loadPackageJson() {
     const packagePath = path.join(this.projectRoot, 'package.json');
     try {
-      if (fs.existsSync(packagePath)) {
-        const content = fs.readFileSync(packagePath, 'utf8');
+      if (safeFs.existsSync(packagePath)) {
+        const content = safeFs.readFileSync(packagePath, 'utf8');
         return JSON.parse(content);
       }
     } catch (e) {
@@ -151,7 +151,7 @@ class FrameworkDetector {
    * @returns {boolean} True if file exists
    */
   fileExists(filename) {
-    return fs.existsSync(path.join(this.projectRoot, filename));
+    return safeFs.existsSync(path.join(this.projectRoot, filename));
   }
 
   /**
@@ -286,9 +286,9 @@ class FrameworkDetector {
 
     for (const location of monorepoLocations) {
       const locationPath = path.join(this.projectRoot, location);
-      if (fs.existsSync(locationPath) && fs.statSync(locationPath).isDirectory()) {
+      if (safeFs.existsSync(locationPath) && safeFs.statSync(locationPath).isDirectory()) {
         try {
-          const entries = fs.readdirSync(locationPath, { withFileTypes: true });
+          const entries = safeFs.readdirSync(locationPath, { withFileTypes: true });
           for (const entry of entries) {
             if (entry.isDirectory()) {
               const subPath = path.join(location, entry.name);

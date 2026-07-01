@@ -9,8 +9,8 @@
  * @module lib/coverage-map
  */
 
-const fs = require('fs');
 const path = require('path');
+const safeFs = require('./safe-fs');
 const { hashFile } = require('./hash-utils');
 const { atomicWrite, safeRead, getStateDir } = require('./quality-state');
 
@@ -292,14 +292,14 @@ function findTestsByHeuristic(sourceFile) {
     for (const pattern of testPatterns) {
       // Check in test directory at same level
       const sameLevel = path.join(sourceDir, dir, pattern);
-      if (fs.existsSync(sameLevel)) {
+      if (safeFs.existsSync(sameLevel)) {
         tests.push(sameLevel);
       }
 
       // Check in project root test directory
       if (projectRoot) {
         const rootLevel = path.join(projectRoot, dir, pattern);
-        if (fs.existsSync(rootLevel)) {
+        if (safeFs.existsSync(rootLevel)) {
           tests.push(rootLevel);
         }
       }
@@ -309,7 +309,7 @@ function findTestsByHeuristic(sourceFile) {
   // Check for co-located tests
   for (const pattern of testPatterns) {
     const colocated = path.join(sourceDir, pattern);
-    if (fs.existsSync(colocated)) {
+    if (safeFs.existsSync(colocated)) {
       tests.push(colocated);
     }
   }
@@ -328,7 +328,7 @@ function findProjectRoot(startDir) {
 
   while (dir !== path.dirname(dir)) {
     for (const marker of markers) {
-      if (fs.existsSync(path.join(dir, marker))) {
+      if (safeFs.existsSync(path.join(dir, marker))) {
         return dir;
       }
     }

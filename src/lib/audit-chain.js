@@ -27,7 +27,7 @@
  * regulatory regime (see src/lib/regulatory-regime.js).
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -61,10 +61,10 @@ function stableStringify(obj) {
  */
 function getChainHead(projectRoot) {
   const headPath = path.join(projectRoot, CHAIN_HEAD_PATH);
-  if (!fs.existsSync(headPath)) {
+  if (!safeFs.existsSync(headPath)) {
     return { hash: GENESIS_HASH, sequence: 0, updated_at: null };
   }
-  const content = fs.readFileSync(headPath, 'utf8');
+  const content = safeFs.readFileSync(headPath, 'utf8');
   const hashMatch = content.match(/^hash:\s+(\S+)$/m);
   const seqMatch = content.match(/^sequence:\s+(\d+)$/m);
   const tsMatch = content.match(/^updated_at:\s+(\S+)$/m);
@@ -104,11 +104,11 @@ function appendDispatch(projectRoot, dispatch) {
 
   // Append to the chain log (newline-delimited JSON, never rewritten)
   const logPath = path.join(projectRoot, CHAIN_LOG_PATH);
-  fs.appendFileSync(logPath, JSON.stringify(chainEntry) + '\n');
+  safeFs.appendFileSync(logPath, JSON.stringify(chainEntry) + '\n');
 
   // Update the chain head
   const headPath = path.join(projectRoot, CHAIN_HEAD_PATH);
-  fs.writeFileSync(headPath,
+  safeFs.writeFileSync(headPath,
     `hash: ${chainEntry.chain_hash}\nsequence: ${chainEntry.sequence}\nupdated_at: ${chainEntry.timestamp}\nlast_dispatch_id: ${chainEntry.dispatch_id}\n`);
 
   return chainEntry;
@@ -122,10 +122,10 @@ function appendDispatch(projectRoot, dispatch) {
  */
 function verifyChain(projectRoot) {
   const logPath = path.join(projectRoot, CHAIN_LOG_PATH);
-  if (!fs.existsSync(logPath)) {
+  if (!safeFs.existsSync(logPath)) {
     return { ok: true, count: 0, note: 'no chain entries yet' };
   }
-  const lines = fs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean);
+  const lines = safeFs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean);
   let previousChainHash = GENESIS_HASH;
   let count = 0;
 
@@ -185,10 +185,10 @@ function verifyChain(projectRoot) {
  * not been altered.
  */
 function verifyDispatch(projectRoot, dispatchPath, expectedHash) {
-  if (!fs.existsSync(dispatchPath)) {
+  if (!safeFs.existsSync(dispatchPath)) {
     return { ok: false, reason: 'dispatch file missing' };
   }
-  const content = fs.readFileSync(dispatchPath, 'utf8');
+  const content = safeFs.readFileSync(dispatchPath, 'utf8');
   // Parse the dispatch as a JS object via the minimal YAML parser used elsewhere.
   // For now we hash the canonical text content; recommended caller stores the
   // exact hash that was hashed at append time.
@@ -201,7 +201,7 @@ function verifyDispatch(projectRoot, dispatchPath, expectedHash) {
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 module.exports = {

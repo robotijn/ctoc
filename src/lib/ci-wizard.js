@@ -7,7 +7,7 @@
  * @module lib/ci-wizard
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const readline = require('readline');
 
@@ -70,15 +70,15 @@ function detectProjectType(projectPath) {
 
   // Check for Node.js/TypeScript
   const packageJson = path.join(projectPath, 'package.json');
-  if (fs.existsSync(packageJson)) {
+  if (safeFs.existsSync(packageJson)) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(packageJson, 'utf8'));
+      const pkg = JSON.parse(safeFs.readFileSync(packageJson, 'utf8'));
       result.name = pkg.name || 'Node.js Project';
 
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
       // Detect TypeScript
-      if (deps.typescript || fs.existsSync(path.join(projectPath, 'tsconfig.json'))) {
+      if (deps.typescript || safeFs.existsSync(path.join(projectPath, 'tsconfig.json'))) {
         result.type = PROJECT_TYPES.TYPESCRIPT;
         result.hasTypeScript = true;
       } else {
@@ -86,9 +86,9 @@ function detectProjectType(projectPath) {
       }
 
       // Detect package manager
-      if (fs.existsSync(path.join(projectPath, 'pnpm-lock.yaml'))) {
+      if (safeFs.existsSync(path.join(projectPath, 'pnpm-lock.yaml'))) {
         result.packageManager = 'pnpm';
-      } else if (fs.existsSync(path.join(projectPath, 'yarn.lock'))) {
+      } else if (safeFs.existsSync(path.join(projectPath, 'yarn.lock'))) {
         result.packageManager = 'yarn';
       } else {
         result.packageManager = 'npm';
@@ -109,10 +109,10 @@ function detectProjectType(projectPath) {
   // Check for Python
   const requirementsTxt = path.join(projectPath, 'requirements.txt');
   const pyprojectToml = path.join(projectPath, 'pyproject.toml');
-  if (fs.existsSync(requirementsTxt) || fs.existsSync(pyprojectToml)) {
+  if (safeFs.existsSync(requirementsTxt) || safeFs.existsSync(pyprojectToml)) {
     result.type = PROJECT_TYPES.PYTHON;
     result.name = 'Python Project';
-    result.packageManager = fs.existsSync(path.join(projectPath, 'poetry.lock'))
+    result.packageManager = safeFs.existsSync(path.join(projectPath, 'poetry.lock'))
       ? 'poetry'
       : 'pip';
     return result;
@@ -120,7 +120,7 @@ function detectProjectType(projectPath) {
 
   // Check for Go
   const goMod = path.join(projectPath, 'go.mod');
-  if (fs.existsSync(goMod)) {
+  if (safeFs.existsSync(goMod)) {
     result.type = PROJECT_TYPES.GO;
     result.name = 'Go Project';
     result.packageManager = 'go';
@@ -129,7 +129,7 @@ function detectProjectType(projectPath) {
 
   // Check for Rust
   const cargoToml = path.join(projectPath, 'Cargo.toml');
-  if (fs.existsSync(cargoToml)) {
+  if (safeFs.existsSync(cargoToml)) {
     result.type = PROJECT_TYPES.RUST;
     result.name = 'Rust Project';
     result.packageManager = 'cargo';
@@ -511,10 +511,10 @@ function generateCIConfig(projectPath, projectInfo, config) {
  */
 function writeCIConfig(filePath, content) {
   const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) {
+    safeFs.mkdirSync(dir, { recursive: true });
   }
-  fs.writeFileSync(filePath, content);
+  safeFs.writeFileSync(filePath, content);
 }
 
 /**

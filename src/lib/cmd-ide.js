@@ -9,8 +9,8 @@
  *   ctoc ide list
  */
 
-const fs = require('fs');
 const path = require('path');
+const safeFs = require('./safe-fs');
 const { detectStack } = require('../lib/stack-detector');
 const {
   detectIDE,
@@ -139,7 +139,7 @@ function checkExistingConfigs(projectPath) {
   ];
 
   checks.forEach(check => {
-    if (fs.existsSync(path.join(projectPath, check.path))) {
+    if (safeFs.existsSync(path.join(projectPath, check.path))) {
       configs.push(check.name);
     }
   });
@@ -205,7 +205,7 @@ function initCommand(projectPath, ideType, options = {}) {
 
       generated.forEach(file => {
         const targetPath = path.join(projectPath, file.path);
-        const exists = fs.existsSync(targetPath);
+        const exists = safeFs.existsSync(targetPath);
 
         if (dryRun) {
           console.log(`  ${c.dim}[dry-run]${c.reset} ${exists ? 'update' : 'create'}: ${file.path}`);
@@ -215,8 +215,8 @@ function initCommand(projectPath, ideType, options = {}) {
 
         // Ensure directory exists
         const dir = path.dirname(targetPath);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
+        if (!safeFs.existsSync(dir)) {
+          safeFs.mkdirSync(dir, { recursive: true });
         }
 
         let finalContent = file.content;
@@ -224,7 +224,7 @@ function initCommand(projectPath, ideType, options = {}) {
         // Merge with existing if applicable
         if (exists && !force && merge !== false) {
           try {
-            const existingContent = fs.readFileSync(targetPath, 'utf8');
+            const existingContent = safeFs.readFileSync(targetPath, 'utf8');
             if (file.path.endsWith('.json')) {
               finalContent = mergeConfigs(existingContent, file.content);
               console.log(`  ${c.green}✓${c.reset} merged: ${file.path}`);
@@ -240,7 +240,7 @@ function initCommand(projectPath, ideType, options = {}) {
           }
         }
 
-        fs.writeFileSync(targetPath, finalContent);
+        safeFs.writeFileSync(targetPath, finalContent);
         console.log(`  ${c.green}✓${c.reset} ${exists ? 'updated' : 'created'}: ${file.path}`);
         results.push({ file: file.path, status: exists ? 'updated' : 'created' });
       });

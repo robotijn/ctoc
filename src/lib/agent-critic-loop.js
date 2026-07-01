@@ -7,7 +7,7 @@
  * @module lib/agent-critic-loop
  */
 
-const fs = require('fs').promises;
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 // Simple YAML-like serialization (JSON with comments stripped)
@@ -67,7 +67,7 @@ const SELF_CRITIQUE_QUESTIONS = {
  */
 async function bootstrapAgentCritic() {
   const agentCriticPath = path.join(__dirname, '..', '..', 'agents', 'pipeline', 'agent-critic.md');
-  let currentVersion = await fs.readFile(agentCriticPath, 'utf8');
+  let currentVersion = await safeFs.promises.readFile(agentCriticPath, 'utf8');
   let round = 1;
   let score = 0;
   const scoreHistory = [];
@@ -111,7 +111,7 @@ async function bootstrapAgentCritic() {
       currentVersion = applyFix(currentVersion, issue);
     }
 
-    await fs.writeFile(agentCriticPath, currentVersion);
+    await safeFs.promises.writeFile(agentCriticPath, currentVersion);
     round++;
   }
 
@@ -141,7 +141,7 @@ async function bootstrapAgentCritic() {
 async function improveAgent(agentPath, options = {}) {
   const { maxRounds = MAX_ROUNDS, dryRun = false } = options;
 
-  let agent = await fs.readFile(agentPath, 'utf8');
+  let agent = await safeFs.promises.readFile(agentPath, 'utf8');
   let round = 1;
   const scoreHistory = [];
   const critiques = [];
@@ -222,7 +222,7 @@ async function improveAgent(agentPath, options = {}) {
       agent = await revertRegressions(agent, qaReport.regressions);
     }
 
-    await fs.writeFile(agentPath, agent);
+    await safeFs.promises.writeFile(agentPath, agent);
     round++;
   }
 
@@ -380,7 +380,7 @@ async function saveGrade(agentPath, score, history, status) {
   let grades = {};
 
   try {
-    const existing = await fs.readFile(GRADES_FILE, 'utf8');
+    const existing = await safeFs.promises.readFile(GRADES_FILE, 'utf8');
     grades = simpleYaml.load(existing) || {};
   } catch (e) {
     // File doesn't exist yet
@@ -400,8 +400,8 @@ async function saveGrade(agentPath, score, history, status) {
   };
 
   // Ensure directory exists
-  await fs.mkdir(path.dirname(GRADES_FILE), { recursive: true });
-  await fs.writeFile(GRADES_FILE, simpleYaml.dump(grades));
+  await safeFs.promises.mkdir(path.dirname(GRADES_FILE), { recursive: true });
+  await safeFs.promises.writeFile(GRADES_FILE, simpleYaml.dump(grades));
 }
 
 /**
@@ -429,9 +429,9 @@ ${history.map(h => `- Round ${h.round}: ${h.scores.overall}/10 (${h.issues} issu
 ---
 `;
 
-  const content = await fs.readFile(agentPath, 'utf8');
+  const content = await safeFs.promises.readFile(agentPath, 'utf8');
   if (!content.includes('## Known Limitations')) {
-    await fs.writeFile(agentPath, content + '\n' + limitations);
+    await safeFs.promises.writeFile(agentPath, content + '\n' + limitations);
   }
 }
 
@@ -544,7 +544,7 @@ async function batchProcess(agentPaths, options = {}) {
  */
 async function getGrades() {
   try {
-    const content = await fs.readFile(GRADES_FILE, 'utf8');
+    const content = await safeFs.promises.readFile(GRADES_FILE, 'utf8');
     return simpleYaml.load(content) || {};
   } catch (e) {
     return {};

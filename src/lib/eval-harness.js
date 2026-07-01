@@ -24,7 +24,7 @@
 
 'use strict';
 
-const fsp = require('fs').promises;
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -281,7 +281,7 @@ async function loadCases(projectRoot, skillFilter) {
 
   let exists = false;
   try {
-    const stat = await fsp.stat(root);
+    const stat = await safeFs.promises.stat(root);
     exists = stat.isDirectory();
   } catch (e) {
     exists = false;
@@ -292,7 +292,7 @@ async function loadCases(projectRoot, skillFilter) {
   const skillsRoot = path.join(root, 'skills');
   let skillsExists = false;
   try {
-    const stat = await fsp.stat(skillsRoot);
+    const stat = await safeFs.promises.stat(skillsRoot);
     skillsExists = stat.isDirectory();
   } catch (e) {
     skillsExists = false;
@@ -309,7 +309,7 @@ async function loadCases(projectRoot, skillFilter) {
     let validation = { ok: false, errors: ['not parsed'] };
 
     try {
-      const content = await fsp.readFile(filePath, 'utf8');
+      const content = await safeFs.promises.readFile(filePath, 'utf8');
       caseObj = parseCase(content);
       validation = validateCase(caseObj);
       // Cross-check: case.skill should match the directory path
@@ -349,7 +349,7 @@ async function collectCaseFiles(skillsRoot, skillFilter) {
   async function walk(dir) {
     let entries;
     try {
-      entries = await fsp.readdir(dir, { withFileTypes: true });
+      entries = await safeFs.promises.readdir(dir, { withFileTypes: true });
     } catch (e) {
       return;
     }

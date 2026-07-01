@@ -10,7 +10,7 @@
 
 const { DependencyAuditor, SEVERITY } = require('../lib/dependency-auditor');
 const { QualityGate, GATE_STATUS } = require('../lib/quality-gate');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -146,10 +146,10 @@ async function auditDependencies(projectRoot, options = {}) {
 
   // Save results
   const resultsDir = path.join(projectRoot, '.ctoc', 'security');
-  if (!fs.existsSync(resultsDir)) {
-    fs.mkdirSync(resultsDir, { recursive: true });
+  if (!safeFs.existsSync(resultsDir)) {
+    safeFs.mkdirSync(resultsDir, { recursive: true });
   }
-  fs.writeFileSync(
+  safeFs.writeFileSync(
     path.join(resultsDir, 'dependency-audit.json'),
     JSON.stringify(results, null, 2)
   );
@@ -184,12 +184,12 @@ async function auditAll(projectRoot) {
 async function generateReport(projectRoot, format) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'dependency-audit.json');
 
-  if (!fs.existsSync(resultsPath)) {
+  if (!safeFs.existsSync(resultsPath)) {
     // Run audit first
     await auditDependencies(projectRoot, {});
   }
 
-  const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+  const results = JSON.parse(safeFs.readFileSync(resultsPath, 'utf8'));
 
   let report;
   switch (format) {
@@ -299,11 +299,11 @@ function generateTextReport(results) {
 async function checkGate(projectRoot, mode) {
   const resultsPath = path.join(projectRoot, '.ctoc', 'security', 'dependency-audit.json');
 
-  if (!fs.existsSync(resultsPath)) {
+  if (!safeFs.existsSync(resultsPath)) {
     await auditDependencies(projectRoot, {});
   }
 
-  const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+  const results = JSON.parse(safeFs.readFileSync(resultsPath, 'utf8'));
 
   // Prepare metrics
   const metrics = {

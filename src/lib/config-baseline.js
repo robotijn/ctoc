@@ -25,9 +25,9 @@
  *     https://visuresolutions.com/alm-guide/software-development-process-for-safety-critical-systems/
  */
 
-const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const safeFs = require('./safe-fs');
 
 const BASELINES_ROOT = '.ctoc/baselines';
 
@@ -56,9 +56,9 @@ function writeBaseline(projectRoot, opts = {}) {
 
   const baselineDir = path.join(projectRoot, BASELINES_ROOT, version);
   const manifestPath = path.join(baselineDir, 'manifest.yaml');
-  if (fs.existsSync(manifestPath) && !opts.force) {
+  if (safeFs.existsSync(manifestPath) && !opts.force) {
     // Existing baseline — read and return without rewriting.
-    const content = fs.readFileSync(manifestPath, 'utf8');
+    const content = safeFs.readFileSync(manifestPath, 'utf8');
     const m = content.match(/^baseline_hash:\s+(\S+)$/m);
     return {
       version,
@@ -73,7 +73,7 @@ function writeBaseline(projectRoot, opts = {}) {
   const fileEntries = [];
   for (const rel of SOURCE_DIRS) {
     const full = path.join(projectRoot, rel);
-    if (!fs.existsSync(full)) continue;
+    if (!safeFs.existsSync(full)) continue;
     walkFiles(full, (filepath) => {
       const relpath = path.relative(projectRoot, filepath);
       const sha256 = hashFile(filepath);
@@ -90,8 +90,8 @@ function writeBaseline(projectRoot, opts = {}) {
   const nodeVersion = process.version;
   let packageJson = null;
   const pkgPath = path.join(projectRoot, 'package.json');
-  if (fs.existsSync(pkgPath)) {
-    try { packageJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); } catch { /* ignore: best-effort, non-fatal */ }
+  if (safeFs.existsSync(pkgPath)) {
+    try { packageJson = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8')); } catch { /* ignore: best-effort, non-fatal */ }
   }
   const dependencies = packageJson && packageJson.dependencies ? packageJson.dependencies : {};
   const devDependencies = packageJson && packageJson.devDependencies ? packageJson.devDependencies : {};
@@ -102,8 +102,8 @@ function writeBaseline(projectRoot, opts = {}) {
   // Tool-qualification records.
   const toolQualPath = path.join(projectRoot, '.ctoc/tool-qualification');
   let qualifiedTools = [];
-  if (fs.existsSync(toolQualPath)) {
-    qualifiedTools = fs.readdirSync(toolQualPath)
+  if (safeFs.existsSync(toolQualPath)) {
+    qualifiedTools = safeFs.readdirSync(toolQualPath)
       .filter(f => f.endsWith('.yaml') && !f.startsWith('_'))
       .map(f => f.replace(/\.yaml$/, ''));
   }
@@ -135,10 +135,10 @@ function writeBaseline(projectRoot, opts = {}) {
     ``,
   ].join('\n');
 
-  fs.writeFileSync(manifestPath, lines);
+  safeFs.writeFileSync(manifestPath, lines);
 
   // File hashes go into a separate file (large, line-oriented).
-  fs.writeFileSync(
+  safeFs.writeFileSync(
     path.join(baselineDir, 'file-hashes.txt'),
     fileEntries.map(f => `${f.sha256}  ${f.relpath}`).join('\n') + '\n'
   );
@@ -158,18 +158,18 @@ function writeBaseline(projectRoot, opts = {}) {
  */
 function verifyBaseline(projectRoot, version) {
   const hashesPath = path.join(projectRoot, BASELINES_ROOT, version, 'file-hashes.txt');
-  if (!fs.existsSync(hashesPath)) {
+  if (!safeFs.existsSync(hashesPath)) {
     throw new Error(`config-baseline.verifyBaseline: no baseline for version ${version}`);
   }
   const expected = {};
-  for (const line of fs.readFileSync(hashesPath, 'utf8').split('\n')) {
+  for (const line of safeFs.readFileSync(hashesPath, 'utf8').split('\n')) {
     const m = line.match(/^(\S+)\s+(\S.+)$/);
     if (m) expected[m[2]] = m[1];
   }
   const drift = [];
   for (const [rel, expectedHash] of Object.entries(expected)) {
     const full = path.join(projectRoot, rel);
-    if (!fs.existsSync(full)) {
+    if (!safeFs.existsSync(full)) {
       drift.push({ relpath: rel, status: 'missing', expected: expectedHash });
       continue;
     }
@@ -182,7 +182,7 @@ function verifyBaseline(projectRoot, version) {
   const seen = new Set(Object.keys(expected));
   for (const rel of SOURCE_DIRS) {
     const full = path.join(projectRoot, rel);
-    if (!fs.existsSync(full)) continue;
+    if (!safeFs.existsSync(full)) continue;
     walkFiles(full, (filepath) => {
       const relpath = path.relative(projectRoot, filepath);
       if (!seen.has(relpath)) {
@@ -195,8 +195,8 @@ function verifyBaseline(projectRoot, version) {
 
 function readVersion(projectRoot) {
   const versionPath = path.join(projectRoot, 'VERSION');
-  if (!fs.existsSync(versionPath)) return null;
-  return fs.readFileSync(versionPath, 'utf8').trim();
+  if (!safeFs.existsSync(versionPath)) return null;
+  return safeFs.readFileSync(versionPath, 'utf8').trim();
 }
 
 function readActiveRegimes(projectRoot) {
@@ -209,7 +209,7 @@ function readActiveRegimes(projectRoot) {
 }
 
 function walkFiles(dir, callback) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.git')) continue;
     if (entry.name === 'node_modules') continue;
     const full = path.join(dir, entry.name);
@@ -219,12 +219,12 @@ function walkFiles(dir, callback) {
 }
 
 function hashFile(filepath) {
-  const data = fs.readFileSync(filepath);
+  const data = safeFs.readFileSync(filepath);
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 module.exports = {

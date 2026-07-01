@@ -25,7 +25,7 @@
  * B10: Added merge-style config updates
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -65,10 +65,10 @@ const AVAILABLE_FIXES = {
     category: FIX_CATEGORIES.linting,
     risk: RISK_LEVELS.low,
     languages: ['javascript', 'typescript'],
-    detector: (project) => fs.existsSync(path.join(project, 'package.json')) &&
-      (fs.existsSync(path.join(project, 'eslint.config.js')) ||
-       fs.existsSync(path.join(project, '.eslintrc.js')) ||
-       fs.existsSync(path.join(project, '.eslintrc.json'))),
+    detector: (project) => safeFs.existsSync(path.join(project, 'package.json')) &&
+      (safeFs.existsSync(path.join(project, 'eslint.config.js')) ||
+       safeFs.existsSync(path.join(project, '.eslintrc.js')) ||
+       safeFs.existsSync(path.join(project, '.eslintrc.json'))),
     fixer: async (project, options) => {
       return runCommand('npx eslint . --fix', project, options);
     }
@@ -83,8 +83,8 @@ const AVAILABLE_FIXES = {
     languages: ['python'],
     detector: (project) => {
       const pyproject = path.join(project, 'pyproject.toml');
-      return fs.existsSync(pyproject) &&
-        fs.readFileSync(pyproject, 'utf8').includes('[tool.ruff]');
+      return safeFs.existsSync(pyproject) &&
+        safeFs.readFileSync(pyproject, 'utf8').includes('[tool.ruff]');
     },
     fixer: async (project, options) => {
       return runCommand('ruff check --fix .', project, options);
@@ -117,14 +117,14 @@ const AVAILABLE_FIXES = {
     detector: (project) => {
       const pkg = readPackageJson(project);
       const hasJS = pkg && (pkg.devDependencies?.typescript || pkg.dependencies?.typescript ||
-                           fs.existsSync(path.join(project, 'tsconfig.json')));
-      const noConfig = !fs.existsSync(path.join(project, 'eslint.config.js')) &&
-                       !fs.existsSync(path.join(project, '.eslintrc.js')) &&
-                       !fs.existsSync(path.join(project, '.eslintrc.json'));
+                           safeFs.existsSync(path.join(project, 'tsconfig.json')));
+      const noConfig = !safeFs.existsSync(path.join(project, 'eslint.config.js')) &&
+                       !safeFs.existsSync(path.join(project, '.eslintrc.js')) &&
+                       !safeFs.existsSync(path.join(project, '.eslintrc.json'));
       return hasJS && noConfig;
     },
     fixer: async (project, options) => {
-      const isTS = fs.existsSync(path.join(project, 'tsconfig.json'));
+      const isTS = safeFs.existsSync(path.join(project, 'tsconfig.json'));
       const config = generateEslintConfig(isTS);
       return writeConfigFile(project, 'eslint.config.js', config, options);
     }
@@ -139,9 +139,9 @@ const AVAILABLE_FIXES = {
     languages: ['typescript'],
     detector: (project) => {
       const tsconfigPath = path.join(project, 'tsconfig.json');
-      if (!fs.existsSync(tsconfigPath)) return false;
+      if (!safeFs.existsSync(tsconfigPath)) return false;
       try {
-        const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf8'));
+        const tsconfig = JSON.parse(safeFs.readFileSync(tsconfigPath, 'utf8'));
         return !tsconfig.compilerOptions?.strict;
       } catch (e) {
         return false;
@@ -194,11 +194,11 @@ const AVAILABLE_FIXES = {
     risk: RISK_LEVELS.safe,
     languages: ['javascript', 'typescript'],
     detector: (project) => {
-      const hasVitest = fs.existsSync(path.join(project, 'vitest.config.ts')) ||
-                       fs.existsSync(path.join(project, 'vitest.config.js'));
+      const hasVitest = safeFs.existsSync(path.join(project, 'vitest.config.ts')) ||
+                       safeFs.existsSync(path.join(project, 'vitest.config.js'));
       if (hasVitest) {
-        const config = fs.readFileSync(
-          path.join(project, fs.existsSync(path.join(project, 'vitest.config.ts')) ?
+        const config = safeFs.readFileSync(
+          path.join(project, safeFs.existsSync(path.join(project, 'vitest.config.ts')) ?
             'vitest.config.ts' : 'vitest.config.js'),
           'utf8'
         );
@@ -234,8 +234,8 @@ const AVAILABLE_FIXES = {
     languages: ['*'],
     detector: (project) => {
       const gitignorePath = path.join(project, '.gitignore');
-      if (!fs.existsSync(gitignorePath)) return true;
-      const content = fs.readFileSync(gitignorePath, 'utf8');
+      if (!safeFs.existsSync(gitignorePath)) return true;
+      const content = safeFs.readFileSync(gitignorePath, 'utf8');
       return !content.includes('.env') || !content.includes('node_modules');
     },
     fixer: async (project, options) => {
@@ -299,7 +299,7 @@ const AVAILABLE_FIXES = {
     category: FIX_CATEGORIES.config,
     risk: RISK_LEVELS.safe,
     languages: ['*'],
-    detector: (project) => !fs.existsSync(path.join(project, '.editorconfig')),
+    detector: (project) => !safeFs.existsSync(path.join(project, '.editorconfig')),
     fixer: async (project, options) => {
       const config = `# EditorConfig - https://editorconfig.org
 root = true
@@ -605,8 +605,8 @@ class AutoFixer {
 function readPackageJson(projectPath) {
   const pkgPath = path.join(projectPath, 'package.json');
   try {
-    if (fs.existsSync(pkgPath)) {
-      return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    if (safeFs.existsSync(pkgPath)) {
+      return JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
     }
   } catch (e) { /* ignore: malformed or unreadable package.json, treat as absent */ }
   return null;
@@ -618,8 +618,8 @@ function readPackageJson(projectPath) {
  * @returns {string|null} Test framework
  */
 function detectTestFramework(projectPath) {
-  if (fs.existsSync(path.join(projectPath, 'vitest.config.ts')) ||
-      fs.existsSync(path.join(projectPath, 'vitest.config.js'))) {
+  if (safeFs.existsSync(path.join(projectPath, 'vitest.config.ts')) ||
+      safeFs.existsSync(path.join(projectPath, 'vitest.config.js'))) {
     return 'vitest';
   }
 
@@ -693,7 +693,7 @@ function writeConfigFile(projectPath, filename, content, options = {}) {
   }
 
   // Don't overwrite existing files
-  if (fs.existsSync(filePath)) {
+  if (safeFs.existsSync(filePath)) {
     return {
       success: false,
       message: `File already exists: ${filename}`
@@ -701,7 +701,7 @@ function writeConfigFile(projectPath, filename, content, options = {}) {
   }
 
   try {
-    fs.writeFileSync(filePath, content);
+    safeFs.writeFileSync(filePath, content);
     return {
       success: true,
       message: `Created ${filename}`,
@@ -736,14 +736,14 @@ function mergeJsonConfig(projectPath, filename, updates, options = {}) {
 
   try {
     let existing = {};
-    if (fs.existsSync(filePath)) {
-      existing = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (safeFs.existsSync(filePath)) {
+      existing = JSON.parse(safeFs.readFileSync(filePath, 'utf8'));
     }
 
     // Deep merge
     const merged = deepMerge(existing, updates);
 
-    fs.writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n');
+    safeFs.writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n');
 
     return {
       success: true,
@@ -779,8 +779,8 @@ function appendToFile(projectPath, filename, content, options = {}) {
 
   try {
     let existing = '';
-    if (fs.existsSync(filePath)) {
-      existing = fs.readFileSync(filePath, 'utf8');
+    if (safeFs.existsSync(filePath)) {
+      existing = safeFs.readFileSync(filePath, 'utf8');
     }
 
     // Only add entries that don't exist
@@ -799,7 +799,7 @@ function appendToFile(projectPath, filename, content, options = {}) {
     }
 
     const finalContent = existing.trim() + '\n\n# Added by CTOC\n' + newLines.join('\n') + '\n';
-    fs.writeFileSync(filePath, finalContent);
+    safeFs.writeFileSync(filePath, finalContent);
 
     return {
       success: true,

@@ -10,7 +10,7 @@
  *   ctoc coverage files [--below <threshold>]
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { CoverageChecker, THRESHOLDS } = require('../lib/coverage-checker');
 
@@ -246,7 +246,7 @@ async function enforceCoverage(projectRoot, mode, customThreshold) {
 async function showTrend(projectRoot) {
   const historyPath = path.join(projectRoot, '.ctoc', 'coverage-history.json');
 
-  if (!fs.existsSync(historyPath)) {
+  if (!safeFs.existsSync(historyPath)) {
     return {
       success: true,
       hasHistory: false,
@@ -260,7 +260,7 @@ async function showTrend(projectRoot) {
   }
 
   try {
-    const history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+    const history = JSON.parse(safeFs.readFileSync(historyPath, 'utf8'));
 
     if (history.length === 0) {
       return {
@@ -362,7 +362,7 @@ async function showFilesCoverage(projectRoot, mode, below) {
 
   let detailedPath = null;
   for (const p of detailedPaths) {
-    if (fs.existsSync(p.path)) {
+    if (safeFs.existsSync(p.path)) {
       detailedPath = p;
       break;
     }
@@ -448,7 +448,7 @@ function findCoverageReport(projectRoot) {
 
   for (const relative of locations) {
     const full = path.join(projectRoot, relative);
-    if (fs.existsSync(full)) {
+    if (safeFs.existsSync(full)) {
       return { path: full, relative };
     }
   }
@@ -463,7 +463,7 @@ function findCoverageReport(projectRoot) {
  * @returns {Array<Object>} File coverage data
  */
 function parseFileCoverage(reportPath, format) {
-  const content = fs.readFileSync(reportPath, 'utf8');
+  const content = safeFs.readFileSync(reportPath, 'utf8');
 
   if (format === 'istanbul') {
     const data = JSON.parse(content);
@@ -583,14 +583,14 @@ function saveCoverageHistory(projectRoot, coverage) {
   const ctocDir = path.join(projectRoot, '.ctoc');
   const historyPath = path.join(ctocDir, 'coverage-history.json');
 
-  if (!fs.existsSync(ctocDir)) {
-    fs.mkdirSync(ctocDir, { recursive: true });
+  if (!safeFs.existsSync(ctocDir)) {
+    safeFs.mkdirSync(ctocDir, { recursive: true });
   }
 
   let history = [];
-  if (fs.existsSync(historyPath)) {
+  if (safeFs.existsSync(historyPath)) {
     try {
-      history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+      history = JSON.parse(safeFs.readFileSync(historyPath, 'utf8'));
     } catch (e) {
       history = [];
     }
@@ -606,7 +606,7 @@ function saveCoverageHistory(projectRoot, coverage) {
     history = history.slice(-100);
   }
 
-  fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
+  safeFs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
 }
 
 module.exports = {

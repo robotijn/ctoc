@@ -13,7 +13,7 @@
  */
 
 const { execSync } = require('child_process');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -127,7 +127,7 @@ class DependencyAuditor {
     for (const [name, config] of Object.entries(PACKAGE_MANAGERS)) {
       // Check lock files first (more specific)
       for (const lockFile of config.lockFiles) {
-        if (fs.existsSync(path.join(this.projectRoot, lockFile))) {
+        if (safeFs.existsSync(path.join(this.projectRoot, lockFile))) {
           if (!detected.includes(name)) {
             detected.push(name);
           }
@@ -138,7 +138,7 @@ class DependencyAuditor {
       // Then check config files
       if (!detected.includes(name)) {
         for (const configFile of config.configFiles) {
-          if (fs.existsSync(path.join(this.projectRoot, configFile))) {
+          if (safeFs.existsSync(path.join(this.projectRoot, configFile))) {
             // For config-only detection, use the default manager
             if (configFile === 'package.json' && !detected.some(d => ['npm', 'yarn', 'pnpm'].includes(d))) {
               detected.push('npm');

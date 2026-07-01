@@ -3,7 +3,7 @@
  * Handle plan operations: approve, reject, move, etc.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { parseMetadata } = require('./state');
 const { refineLoop, appendDeferredQuestions } = require('./iron-loop');
@@ -48,14 +48,14 @@ function movePlan(planPath, destination, projectPath) {
   const plansDir = path.join(root, 'plans');
   const destDir = path.join(plansDir, destination);
 
-  if (!fs.existsSync(destDir)) {
-    fs.mkdirSync(destDir, { recursive: true });
+  if (!safeFs.existsSync(destDir)) {
+    safeFs.mkdirSync(destDir, { recursive: true });
   }
 
   const fileName = path.basename(planPath);
   const newPath = path.join(destDir, fileName);
 
-  fs.renameSync(planPath, newPath);
+  safeFs.renameSync(planPath, newPath);
   return newPath;
 }
 
@@ -94,9 +94,9 @@ function approvePlan(planPath, projectPath) {
       // Add human approval marker for gate crossings
       const isHumanGate = HUMAN_GATES[from] === to;
       if (isHumanGate) {
-        let content = fs.readFileSync(planPath, 'utf8');
+        let content = safeFs.readFileSync(planPath, 'utf8');
         content = addApprovalMarker(content, from, to);
-        fs.writeFileSync(planPath, content);
+        safeFs.writeFileSync(planPath, content);
       }
 
       // If moving to todo, apply Iron Loop
@@ -159,7 +159,7 @@ function approvePlan(planPath, projectPath) {
 // Apply Iron Loop automation to plan
 // Runs Integrator + Critic refinement loop to generate detailed execution steps
 function applyIronLoop(planPath) {
-  let content = fs.readFileSync(planPath, 'utf8');
+  let content = safeFs.readFileSync(planPath, 'utf8');
   const metadata = parseMetadata(content);
 
   if (metadata.iron_loop) {
@@ -176,13 +176,13 @@ function applyIronLoop(planPath) {
     }
 
     // Update metadata to mark iron_loop as applied
-    content = fs.readFileSync(planPath, 'utf8');
+    content = safeFs.readFileSync(planPath, 'utf8');
     if (content.match(/^---\n/)) {
       content = content.replace(/^---\n/, '---\niron_loop: true\n');
     } else {
       content = `---\niron_loop: true\n---\n\n${content}`;
     }
-    fs.writeFileSync(planPath, content);
+    safeFs.writeFileSync(planPath, content);
   } catch (err) {
     // Fallback to basic template if refinement fails
     console.error('Iron Loop refinement failed, using basic template:', err.message);
@@ -192,7 +192,7 @@ function applyIronLoop(planPath) {
 
 // Fallback basic Iron Loop template
 function applyBasicIronLoopTemplate(planPath) {
-  let content = fs.readFileSync(planPath, 'utf8');
+  let content = safeFs.readFileSync(planPath, 'utf8');
 
   const ironLoopTemplate = `
 
@@ -237,13 +237,13 @@ function applyBasicIronLoopTemplate(planPath) {
   }
 
   content += ironLoopTemplate;
-  fs.writeFileSync(planPath, content);
+  safeFs.writeFileSync(planPath, content);
 }
 
 // Reject a plan with feedback
 function rejectPlan(planPath, feedback, projectPath) {
   const root = projectPath || findProjectRoot();
-  let content = fs.readFileSync(planPath, 'utf8');
+  let content = safeFs.readFileSync(planPath, 'utf8');
   const metadata = parseMetadata(content);
 
   const revision = (metadata.revision || 0) + 1;
@@ -269,7 +269,7 @@ ${feedback}
   }
 
   content = rejectionHeader + content;
-  fs.writeFileSync(planPath, content);
+  safeFs.writeFileSync(planPath, content);
 
   // Move to functional
   return movePlan(planPath, 'functional', root);
@@ -281,25 +281,25 @@ function renamePlan(planPath, newName) {
   const ext = path.extname(planPath);
   const newPath = path.join(dir, newName + ext);
 
-  fs.renameSync(planPath, newPath);
+  safeFs.renameSync(planPath, newPath);
   return newPath;
 }
 
 // Delete a plan
 function deletePlan(planPath) {
-  fs.unlinkSync(planPath);
+  safeFs.unlinkSync(planPath);
 }
 
 // Move plan up in queue
 function moveUpInQueue(planPath, projectPath) {
   const root = projectPath || findProjectRoot();
   const plansDir = path.join(root, 'plans', 'todo');
-  const plans = fs.readdirSync(plansDir)
+  const plans = safeFs.readdirSync(plansDir)
     .filter(f => f.endsWith('.md'))
     .map(f => ({
       name: f,
       path: path.join(plansDir, f),
-      stat: fs.statSync(path.join(plansDir, f))
+      stat: safeFs.statSync(path.join(plansDir, f))
     }))
     .sort((a, b) => a.stat.birthtime - b.stat.birthtime);
 
@@ -312,9 +312,9 @@ function moveUpInQueue(planPath, projectPath) {
   const earlier = new Date(now - 1000);
 
   // Touch current plan to be earlier
-  fs.utimesSync(planPath, earlier, earlier);
+  safeFs.utimesSync(planPath, earlier, earlier);
   // Touch previous plan to be now
-  fs.utimesSync(prevPlan.path, now, now);
+  safeFs.utimesSync(prevPlan.path, now, now);
 
   return true;
 }
@@ -323,12 +323,12 @@ function moveUpInQueue(planPath, projectPath) {
 function moveDownInQueue(planPath, projectPath) {
   const root = projectPath || findProjectRoot();
   const plansDir = path.join(root, 'plans', 'todo');
-  const plans = fs.readdirSync(plansDir)
+  const plans = safeFs.readdirSync(plansDir)
     .filter(f => f.endsWith('.md'))
     .map(f => ({
       name: f,
       path: path.join(plansDir, f),
-      stat: fs.statSync(path.join(plansDir, f))
+      stat: safeFs.statSync(path.join(plansDir, f))
     }))
     .sort((a, b) => a.stat.birthtime - b.stat.birthtime);
 
@@ -340,9 +340,9 @@ function moveDownInQueue(planPath, projectPath) {
   const earlier = new Date(now - 1000);
 
   // Touch next plan to be earlier
-  fs.utimesSync(nextPlan.path, earlier, earlier);
+  safeFs.utimesSync(nextPlan.path, earlier, earlier);
   // Touch current plan to be now
-  fs.utimesSync(planPath, now, now);
+  safeFs.utimesSync(planPath, now, now);
 
   return true;
 }
@@ -450,10 +450,10 @@ function completeExecution(planPath, projectPath, options = {}) {
 
   // If forced with errors, add warning to plan
   if (!validation.valid && options.force) {
-    let content = fs.readFileSync(planPath, 'utf8');
+    let content = safeFs.readFileSync(planPath, 'utf8');
     const forceWarning = `\n\n---\n## ⚠️ FORCED TO REVIEW\n\nThis plan was forced to review despite validation errors:\n${validation.errors.map(e => `- ${e}`).join('\n')}\n\nApproved by: CTO-Chief override\nDate: ${new Date().toISOString()}\n---\n`;
     content += forceWarning;
-    fs.writeFileSync(planPath, content);
+    safeFs.writeFileSync(planPath, content);
   }
 
   clearStatus(planPath);
@@ -642,7 +642,7 @@ function createCanvas(visionSlug, canvasType, projectPath, options = {}) {
   // I1: warn if parent vision not found at expected locations
   const visionPath = path.join(root, 'plans', 'vision', `${visionSlug}.md`);
   const doneVisionPath = path.join(root, 'plans', 'done', `${visionSlug}.md`);
-  if (!fs.existsSync(visionPath) && !fs.existsSync(doneVisionPath)) {
+  if (!safeFs.existsSync(visionPath) && !safeFs.existsSync(doneVisionPath)) {
     warnings.push(`No parent vision found at plans/vision/${visionSlug}.md or plans/done/${visionSlug}.md. Canvas will be created as an orphan.`);
   }
 
@@ -651,23 +651,23 @@ function createCanvas(visionSlug, canvasType, projectPath, options = {}) {
     : 'business-model-canvas.md.template';
   const templatePath = path.join(root, '.ctoc', 'templates', templateName);
 
-  if (!fs.existsSync(templatePath)) {
+  if (!safeFs.existsSync(templatePath)) {
     throw new Error(`Canvas template not found: ${templatePath}`);
   }
 
   const canvasDir = path.join(root, 'plans', 'canvas');
-  if (!fs.existsSync(canvasDir)) {
-    fs.mkdirSync(canvasDir, { recursive: true });
+  if (!safeFs.existsSync(canvasDir)) {
+    safeFs.mkdirSync(canvasDir, { recursive: true });
   }
 
   const filePath = path.join(canvasDir, `${visionSlug}.md`);
 
   // I2: refuse to silently overwrite existing canvas
-  if (fs.existsSync(filePath) && !options.overwrite) {
+  if (safeFs.existsSync(filePath) && !options.overwrite) {
     throw new Error(`Canvas already exists at ${filePath}. Pass { overwrite: true } to replace.`);
   }
 
-  let template = fs.readFileSync(templatePath, 'utf8');
+  let template = safeFs.readFileSync(templatePath, 'utf8');
 
   const displayName = visionSlug
     .split('-')
@@ -678,7 +678,7 @@ function createCanvas(visionSlug, canvasType, projectPath, options = {}) {
     .replace(/\{\{DATE\}\}/g, new Date().toISOString())
     .replace(/\{\{VISION_SLUG\}\}/g, visionSlug);
 
-  fs.writeFileSync(filePath, template);
+  safeFs.writeFileSync(filePath, template);
 
   return {
     name: visionSlug,
@@ -706,11 +706,11 @@ function cleanupStaleInProgress(projectPath) {
   for (const plan of plans) {
     // Log cleanup event to .ctoc/logs/cleanup.json
     const logDir = path.join(root, '.ctoc', 'logs');
-    fs.mkdirSync(logDir, { recursive: true });
+    safeFs.mkdirSync(logDir, { recursive: true });
     const logFile = path.join(logDir, 'cleanup.json');
     let log = [];
     try {
-      log = fs.existsSync(logFile) ? JSON.parse(fs.readFileSync(logFile, 'utf8')) : [];
+      log = safeFs.existsSync(logFile) ? JSON.parse(safeFs.readFileSync(logFile, 'utf8')) : [];
     } catch { /* ignore */ }
     log.push({
       plan: plan.name,
@@ -719,7 +719,7 @@ function cleanupStaleInProgress(projectPath) {
       reason: 'orphaned',
       at: new Date().toISOString()
     });
-    fs.writeFileSync(logFile, JSON.stringify(log, null, 2));
+    safeFs.writeFileSync(logFile, JSON.stringify(log, null, 2));
 
     movePlan(plan.path, 'review', root);
     cleanedUp.push(plan.name);

@@ -22,7 +22,7 @@
  *     https://c2pa.org/specifications/specifications/
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const PROVENANCE_LOG = '.ctoc/ai-provenance.jsonl';
@@ -72,7 +72,7 @@ function logEvent(projectRoot, event) {
     intent: event.intent || 'generation',
     content_sha256: event.content_sha256 || null,
   };
-  fs.appendFileSync(
+  safeFs.appendFileSync(
     path.join(projectRoot, PROVENANCE_LOG),
     JSON.stringify(recorded) + '\n'
   );
@@ -125,9 +125,9 @@ function isStamped(content) {
  */
 function getEventsSince(projectRoot, sinceISO) {
   const logPath = path.join(projectRoot, PROVENANCE_LOG);
-  if (!fs.existsSync(logPath)) return [];
+  if (!safeFs.existsSync(logPath)) return [];
   const cutoff = new Date(sinceISO).getTime();
-  return fs.readFileSync(logPath, 'utf8')
+  return safeFs.readFileSync(logPath, 'utf8')
     .split('\n')
     .filter(Boolean)
     .map(line => JSON.parse(line))
@@ -135,7 +135,7 @@ function getEventsSince(projectRoot, sinceISO) {
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 module.exports = {

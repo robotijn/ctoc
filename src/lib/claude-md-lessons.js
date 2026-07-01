@@ -9,7 +9,7 @@
  * `~/.claude` or any path outside the supplied target.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
@@ -40,9 +40,9 @@ const MAX_CLAUDE_MD_BYTES = 2 * 1024 * 1024; // 2 MiB
  */
 function resolveLessonsSource(ctocRoot) {
   const primary = path.join(__dirname, '..', '..', '.ctoc', 'templates', 'operating-lessons.md');
-  if (fs.existsSync(primary)) return primary;
+  if (safeFs.existsSync(primary)) return primary;
   const fallback = ctocRoot ? path.join(ctocRoot, '.ctoc', 'templates', 'operating-lessons.md') : null;
-  if (fallback && fs.existsSync(fallback)) return fallback;
+  if (fallback && safeFs.existsSync(fallback)) return fallback;
   return null;
 }
 
@@ -188,7 +188,7 @@ function computeHash(bodyLF) {
 }
 
 /**
- * Atomic write: temp file in os.tmpdir() then fs.renameSync. On a cross-device
+ * Atomic write: temp file in os.tmpdir() then safeFs.renameSync. On a cross-device
  * rename (EXDEV) retry once with a temp file in the target's own directory so
  * the rename stays atomic on the same filesystem. No direct writeFileSync to
  * the target path.
@@ -204,12 +204,12 @@ function atomicWrite(targetPath, contentWithEol) {
   );
   // 'wx' = O_EXCL: fail closed if the (CSPRNG-random) temp path already exists,
   // so a pre-planted file or symlink at that path is never followed/overwritten.
-  fs.writeFileSync(tmp, contentWithEol, { encoding: 'utf8', flag: 'wx' });
+  safeFs.writeFileSync(tmp, contentWithEol, { encoding: 'utf8', flag: 'wx' });
   try {
-    fs.renameSync(tmp, targetPath);
+    safeFs.renameSync(tmp, targetPath);
   } catch (e) {
     if (e.code !== 'EXDEV') {
-      try { fs.unlinkSync(tmp); } catch (_) { /* best-effort temp cleanup */ }
+      try { safeFs.unlinkSync(tmp); } catch (_) { /* best-effort temp cleanup */ }
       throw e;
     }
     // Fresh random name for the same-filesystem retry, also opened exclusively.
@@ -217,9 +217,9 @@ function atomicWrite(targetPath, contentWithEol) {
       path.dirname(targetPath),
       '.' + base + '.ctoc-tmp-' + crypto.randomBytes(6).toString('hex')
     );
-    fs.writeFileSync(sameDirTmp, contentWithEol, { encoding: 'utf8', flag: 'wx' });
-    fs.renameSync(sameDirTmp, targetPath);
-    try { fs.unlinkSync(tmp); } catch (_) { /* best-effort temp cleanup */ }
+    safeFs.writeFileSync(sameDirTmp, contentWithEol, { encoding: 'utf8', flag: 'wx' });
+    safeFs.renameSync(sameDirTmp, targetPath);
+    try { safeFs.unlinkSync(tmp); } catch (_) { /* best-effort temp cleanup */ }
   }
 }
 
@@ -251,7 +251,7 @@ function ensureLessonsBlock(claudeMdPath, ctocRoot) {
     }
 
     // 2. Read + parse the canonical block.
-    const srcLines = normalizeEol(fs.readFileSync(src, 'utf8')).normalized.split('\n');
+    const srcLines = normalizeEol(safeFs.readFileSync(src, 'utf8')).normalized.split('\n');
     const srcBlock = findManagedBlock(srcLines);
     if (!srcBlock || srcBlock.malformed) {
       process.stderr.write(
@@ -265,14 +265,14 @@ function ensureLessonsBlock(claudeMdPath, ctocRoot) {
     const canonicalHash = computeHash(canonicalBody);
 
     // 3. Create the target if it does not exist.
-    if (!fs.existsSync(claudeMdPath)) {
+    if (!safeFs.existsSync(claudeMdPath)) {
       atomicWrite(claudeMdPath, canonicalBlock + '\n');
       return true;
     }
 
     // 4. Read the target (guarding against a pathologically large file).
     let stat = null;
-    try { stat = fs.statSync(claudeMdPath); } catch (_) { stat = null; }
+    try { stat = safeFs.statSync(claudeMdPath); } catch (_) { stat = null; }
     if (stat && stat.size > MAX_CLAUDE_MD_BYTES) {
       process.stderr.write(
         '[CTOC] ensureLessonsBlock: ' + claudeMdPath + ' is ' + stat.size +
@@ -280,7 +280,7 @@ function ensureLessonsBlock(claudeMdPath, ctocRoot) {
       );
       return false;
     }
-    const raw = fs.readFileSync(claudeMdPath, 'utf8');
+    const raw = safeFs.readFileSync(claudeMdPath, 'utf8');
     const { normalized: tgtNorm, eol } = normalizeEol(raw);
     const tgtLines = tgtNorm.split('\n');
     const blk = findManagedBlock(tgtLines);

@@ -21,7 +21,7 @@
  * - B5: Configuration customization
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -77,7 +77,7 @@ function runCommand(cmd, options = {}) {
  */
 function isGitRepo(dir) {
   const gitDir = path.join(dir, '.git');
-  return fs.existsSync(gitDir);
+  return safeFs.existsSync(gitDir);
 }
 
 /**
@@ -86,7 +86,7 @@ function isGitRepo(dir) {
 function getGitHooksDir(projectRoot) {
   const gitDir = path.join(projectRoot, '.git');
 
-  if (!fs.existsSync(gitDir)) {
+  if (!safeFs.existsSync(gitDir)) {
     throw new Error('Not a git repository');
   }
 
@@ -122,8 +122,8 @@ class HuskyInstaller {
    * Check if Husky is installed
    */
   isInstalled() {
-    return fs.existsSync(this.huskyDir) &&
-           fs.existsSync(path.join(this.projectRoot, 'node_modules', 'husky'));
+    return safeFs.existsSync(this.huskyDir) &&
+           safeFs.existsSync(path.join(this.projectRoot, 'node_modules', 'husky'));
   }
 
   /**
@@ -134,7 +134,7 @@ class HuskyInstaller {
 
     // Check for package.json
     const pkgPath = path.join(this.projectRoot, 'package.json');
-    if (!fs.existsSync(pkgPath)) {
+    if (!safeFs.existsSync(pkgPath)) {
       throw new Error('package.json not found. Husky requires a Node.js project.');
     }
 
@@ -164,16 +164,16 @@ class HuskyInstaller {
       const templateFile = path.join(templateDir, `${hookType}.template`);
       const hookFile = path.join(this.huskyDir, hookType);
 
-      if (fs.existsSync(templateFile)) {
+      if (safeFs.existsSync(templateFile)) {
         // Check for existing hook
-        if (fs.existsSync(hookFile)) {
+        if (safeFs.existsSync(hookFile)) {
           console.log(`  Skipping ${hookType} (already exists)`);
           continue;
         }
 
         try {
-          const content = fs.readFileSync(templateFile, 'utf8');
-          fs.writeFileSync(hookFile, content, { mode: 0o755 });
+          const content = safeFs.readFileSync(templateFile, 'utf8');
+          safeFs.writeFileSync(hookFile, content, { mode: 0o755 });
           results.installed.push(hookType);
           console.log(`  Installed ${hookType}`);
         } catch (error) {
@@ -197,12 +197,12 @@ class HuskyInstaller {
   _addPrepareScript() {
     const pkgPath = path.join(this.projectRoot, 'package.json');
     try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      const pkg = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
 
       if (!pkg.scripts) pkg.scripts = {};
       if (!pkg.scripts.prepare) {
         pkg.scripts.prepare = 'husky';
-        fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+        safeFs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
         console.log('  Added prepare script to package.json');
       }
     } catch (error) {
@@ -216,10 +216,10 @@ class HuskyInstaller {
   _createLintStagedConfig() {
     const configPath = path.join(this.projectRoot, '.lintstagedrc.json');
 
-    if (fs.existsSync(configPath)) return;
+    if (safeFs.existsSync(configPath)) return;
 
     // Detect project type and create appropriate config
-    const hasTs = fs.existsSync(path.join(this.projectRoot, 'tsconfig.json'));
+    const hasTs = safeFs.existsSync(path.join(this.projectRoot, 'tsconfig.json'));
 
     const config = {
       '*.{js,jsx,ts,tsx}': ['eslint --fix', 'prettier --write'],
@@ -232,7 +232,7 @@ class HuskyInstaller {
     }
 
     try {
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+      safeFs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
       console.log('  Created .lintstagedrc.json');
     } catch (error) {
       console.warn(`  Warning: Could not create lint-staged config: ${error.message}`);
@@ -243,8 +243,8 @@ class HuskyInstaller {
    * Remove Husky hooks
    */
   uninstall() {
-    if (fs.existsSync(this.huskyDir)) {
-      fs.rmSync(this.huskyDir, { recursive: true, force: true });
+    if (safeFs.existsSync(this.huskyDir)) {
+      safeFs.rmSync(this.huskyDir, { recursive: true, force: true });
       console.log('Removed .husky directory');
     }
 
@@ -267,7 +267,7 @@ class PreCommitInstaller {
    * Check if pre-commit is installed
    */
   isInstalled() {
-    return fs.existsSync(this.configFile) && hasCommand('pre-commit');
+    return safeFs.existsSync(this.configFile) && hasCommand('pre-commit');
   }
 
   /**
@@ -300,16 +300,16 @@ class PreCommitInstaller {
     // Copy appropriate config template
     const templateFile = path.join(TEMPLATE_DIR, 'pre-commit-config', `${projectType}.yaml.template`);
 
-    if (!fs.existsSync(templateFile)) {
+    if (!safeFs.existsSync(templateFile)) {
       throw new Error(`Unknown project type: ${projectType}`);
     }
 
     // Check for existing config
-    if (fs.existsSync(this.configFile)) {
+    if (safeFs.existsSync(this.configFile)) {
       console.log('  .pre-commit-config.yaml already exists, skipping');
     } else {
-      const content = fs.readFileSync(templateFile, 'utf8');
-      fs.writeFileSync(this.configFile, content);
+      const content = safeFs.readFileSync(templateFile, 'utf8');
+      safeFs.writeFileSync(this.configFile, content);
       results.installed.push('.pre-commit-config.yaml');
       console.log(`  Created .pre-commit-config.yaml (${projectType})`);
     }
@@ -347,17 +347,17 @@ class PreCommitInstaller {
   _detectProjectType() {
     const projectRoot = this.projectRoot;
 
-    if (fs.existsSync(path.join(projectRoot, 'tsconfig.json'))) {
+    if (safeFs.existsSync(path.join(projectRoot, 'tsconfig.json'))) {
       return 'typescript';
     }
 
-    if (fs.existsSync(path.join(projectRoot, 'pyproject.toml')) ||
-        fs.existsSync(path.join(projectRoot, 'setup.py')) ||
-        fs.existsSync(path.join(projectRoot, 'requirements.txt'))) {
+    if (safeFs.existsSync(path.join(projectRoot, 'pyproject.toml')) ||
+        safeFs.existsSync(path.join(projectRoot, 'setup.py')) ||
+        safeFs.existsSync(path.join(projectRoot, 'requirements.txt'))) {
       return 'python';
     }
 
-    if (fs.existsSync(path.join(projectRoot, 'go.mod'))) {
+    if (safeFs.existsSync(path.join(projectRoot, 'go.mod'))) {
       return 'go';
     }
 
@@ -373,8 +373,8 @@ class PreCommitInstaller {
     runCommand('pre-commit uninstall --hook-type commit-msg', { cwd: this.projectRoot, silent: true });
     runCommand('pre-commit uninstall --hook-type pre-push', { cwd: this.projectRoot, silent: true });
 
-    if (fs.existsSync(this.configFile)) {
-      fs.unlinkSync(this.configFile);
+    if (safeFs.existsSync(this.configFile)) {
+      safeFs.unlinkSync(this.configFile);
       console.log('Removed .pre-commit-config.yaml');
     }
   }
@@ -394,7 +394,7 @@ class NativeHooksInstaller {
    * Check if native hooks are installed
    */
   isInstalled() {
-    return fs.existsSync(path.join(this.hooksDir, 'pre-commit'));
+    return safeFs.existsSync(path.join(this.hooksDir, 'pre-commit'));
   }
 
   /**
@@ -404,8 +404,8 @@ class NativeHooksInstaller {
     const results = { installed: [], errors: [] };
 
     // Ensure hooks directory exists
-    if (!fs.existsSync(this.hooksDir)) {
-      fs.mkdirSync(this.hooksDir, { recursive: true });
+    if (!safeFs.existsSync(this.hooksDir)) {
+      safeFs.mkdirSync(this.hooksDir, { recursive: true });
     }
 
     // Install each hook type
@@ -413,12 +413,12 @@ class NativeHooksInstaller {
       const templateFile = path.join(TEMPLATE_DIR, `${hookType}.sh.template`);
       const hookFile = path.join(this.hooksDir, hookType);
 
-      if (!fs.existsSync(templateFile)) continue;
+      if (!safeFs.existsSync(templateFile)) continue;
 
       // Check for existing hook
-      if (fs.existsSync(hookFile)) {
+      if (safeFs.existsSync(hookFile)) {
         // Read existing hook to check if it's a CTOC hook
-        const existing = fs.readFileSync(hookFile, 'utf8');
+        const existing = safeFs.readFileSync(hookFile, 'utf8');
         if (!existing.includes('CTOC')) {
           console.log(`  Skipping ${hookType} (non-CTOC hook exists)`);
           continue;
@@ -426,8 +426,8 @@ class NativeHooksInstaller {
       }
 
       try {
-        const content = fs.readFileSync(templateFile, 'utf8');
-        fs.writeFileSync(hookFile, content, { mode: 0o755 });
+        const content = safeFs.readFileSync(templateFile, 'utf8');
+        safeFs.writeFileSync(hookFile, content, { mode: 0o755 });
         results.installed.push(hookType);
         console.log(`  Installed ${hookType}`);
       } catch (error) {
@@ -445,11 +445,11 @@ class NativeHooksInstaller {
     for (const hookType of HOOK_TYPES) {
       const hookFile = path.join(this.hooksDir, hookType);
 
-      if (fs.existsSync(hookFile)) {
+      if (safeFs.existsSync(hookFile)) {
         // Only remove if it's a CTOC hook
-        const content = fs.readFileSync(hookFile, 'utf8');
+        const content = safeFs.readFileSync(hookFile, 'utf8');
         if (content.includes('CTOC')) {
-          fs.unlinkSync(hookFile);
+          safeFs.unlinkSync(hookFile);
           console.log(`  Removed ${hookType}`);
         }
       }
@@ -479,13 +479,13 @@ function installPostCommitHook(projectRoot, options = {}) {
   const agentHookPath = path.join(pluginRoot, 'hooks', 'post-commit.js');
 
   // Ensure hooks directory exists
-  if (!fs.existsSync(hooksDir)) {
-    fs.mkdirSync(hooksDir, { recursive: true });
+  if (!safeFs.existsSync(hooksDir)) {
+    safeFs.mkdirSync(hooksDir, { recursive: true });
   }
 
   // Check for existing hook
-  if (fs.existsSync(hookPath)) {
-    const existing = fs.readFileSync(hookPath, 'utf8');
+  if (safeFs.existsSync(hookPath)) {
+    const existing = safeFs.readFileSync(hookPath, 'utf8');
     if (existing.includes('CTOC')) {
       return { installed: false, skipped: true, reason: 'CTOC post-commit hook already installed' };
     }
@@ -495,9 +495,9 @@ function installPostCommitHook(projectRoot, options = {}) {
 # CTOC post-commit hook - triggers background quality agent
 node "${agentHookPath}" 2>/dev/null &
 `;
-    fs.appendFileSync(hookPath, appendContent);
+    safeFs.appendFileSync(hookPath, appendContent);
     // Ensure executable
-    fs.chmodSync(hookPath, 0o755);
+    safeFs.chmodSync(hookPath, 0o755);
     return { installed: true, appended: true };
   }
 
@@ -511,7 +511,7 @@ node "${agentHookPath}" 2>/dev/null &
 node "${agentHookPath}" 2>/dev/null &
 `;
 
-  fs.writeFileSync(hookPath, hookContent, { mode: 0o755 });
+  safeFs.writeFileSync(hookPath, hookContent, { mode: 0o755 });
   return { installed: true };
 }
 
@@ -524,11 +524,11 @@ function uninstallPostCommitHook(projectRoot) {
   const hooksDir = getGitHooksDir(projectRoot);
   const hookPath = path.join(hooksDir, 'post-commit');
 
-  if (!fs.existsSync(hookPath)) {
+  if (!safeFs.existsSync(hookPath)) {
     return { removed: false, reason: 'No post-commit hook found' };
   }
 
-  const content = fs.readFileSync(hookPath, 'utf8');
+  const content = safeFs.readFileSync(hookPath, 'utf8');
   if (!content.includes('CTOC')) {
     return { removed: false, reason: 'Post-commit hook is not a CTOC hook' };
   }
@@ -543,7 +543,7 @@ function uninstallPostCommitHook(projectRoot) {
   );
 
   if (nonCtocLines.length === 0) {
-    fs.unlinkSync(hookPath);
+    safeFs.unlinkSync(hookPath);
     return { removed: true };
   }
 
@@ -551,7 +551,7 @@ function uninstallPostCommitHook(projectRoot) {
   const cleanedContent = lines
     .filter(line => !line.includes('CTOC') && !line.includes('post-commit.js'))
     .join('\n');
-  fs.writeFileSync(hookPath, cleanedContent, { mode: 0o755 });
+  safeFs.writeFileSync(hookPath, cleanedContent, { mode: 0o755 });
   return { removed: true, partial: true };
 }
 
@@ -581,12 +581,12 @@ class HooksInstaller {
     if (this.precommit.isInstalled()) return SYSTEMS.PRECOMMIT;
 
     // Detect based on project type
-    if (fs.existsSync(path.join(this.projectRoot, 'package.json'))) {
+    if (safeFs.existsSync(path.join(this.projectRoot, 'package.json'))) {
       return SYSTEMS.HUSKY;
     }
 
-    if (fs.existsSync(path.join(this.projectRoot, 'pyproject.toml')) ||
-        fs.existsSync(path.join(this.projectRoot, 'setup.py'))) {
+    if (safeFs.existsSync(path.join(this.projectRoot, 'pyproject.toml')) ||
+        safeFs.existsSync(path.join(this.projectRoot, 'setup.py'))) {
       return SYSTEMS.PRECOMMIT;
     }
 

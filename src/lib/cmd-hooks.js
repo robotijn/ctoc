@@ -22,7 +22,7 @@
  * - B5: Integration with quality command
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { HooksInstaller, SYSTEMS, HOOK_TYPES } = require('../lib/hooks-installer');
 const { detectStack } = require('../lib/stack-detector');
@@ -66,7 +66,7 @@ async function initHooks(options) {
   }
 
   // Check for git repository
-  if (!fs.existsSync(path.join(projectRoot, '.git'))) {
+  if (!safeFs.existsSync(path.join(projectRoot, '.git'))) {
     return {
       success: false,
       error: 'Not a git repository. Run `git init` first.'
@@ -102,8 +102,8 @@ async function initHooks(options) {
         system: detectedSystem,
         projectType: type === 'auto' ? stack.primary.language || 'multi-lang' : type,
         wouldInstall: HOOK_TYPES.filter(h =>
-          fs.existsSync(path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hooks', `${h}.sh.template`)) ||
-          fs.existsSync(path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hooks', 'husky', `${h}.template`))
+          safeFs.existsSync(path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hooks', `${h}.sh.template`)) ||
+          safeFs.existsSync(path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hooks', 'husky', `${h}.template`))
         ),
         message: generateDryRunMessage(detectedSystem, stack)
       };
@@ -146,14 +146,14 @@ function getStatus(options = {}) {
 
     for (const hookType of HOOK_TYPES) {
       hooks[hookType] = {
-        native: fs.existsSync(path.join(gitHooksDir, hookType)),
-        husky: fs.existsSync(path.join(huskyDir, hookType))
+        native: safeFs.existsSync(path.join(gitHooksDir, hookType)),
+        husky: safeFs.existsSync(path.join(huskyDir, hookType))
       };
     }
 
     // Check pre-commit config
     const precommitConfig = path.join(projectRoot, '.pre-commit-config.yaml');
-    const hasPrecommitConfig = fs.existsSync(precommitConfig);
+    const hasPrecommitConfig = safeFs.existsSync(precommitConfig);
 
     return {
       success: true,
@@ -241,7 +241,7 @@ async function testHook(options = {}) {
 
   let hookPath = null;
   for (const loc of locations) {
-    if (fs.existsSync(loc)) {
+    if (safeFs.existsSync(loc)) {
       hookPath = loc;
       break;
     }

@@ -7,7 +7,7 @@
  * @module lib/grading-system
  */
 
-const fs = require('fs').promises;
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 // Simple JSON-based storage (YAML-compatible keys)
@@ -163,7 +163,7 @@ function getScoreMeaning(score) {
  */
 async function loadGrades() {
   try {
-    const content = await fs.readFile(getGradesFile(), 'utf8');
+    const content = await safeFs.promises.readFile(getGradesFile(), 'utf8');
     return simpleYaml.load(content) || {};
   } catch (e) {
     return {};
@@ -178,8 +178,8 @@ async function loadGrades() {
  */
 async function saveGrades(grades) {
   const gradesFile = getGradesFile();
-  await fs.mkdir(path.dirname(gradesFile), { recursive: true });
-  await fs.writeFile(gradesFile, simpleYaml.dump(grades));
+  await safeFs.promises.mkdir(path.dirname(gradesFile), { recursive: true });
+  await safeFs.promises.writeFile(gradesFile, simpleYaml.dump(grades));
 }
 
 /**

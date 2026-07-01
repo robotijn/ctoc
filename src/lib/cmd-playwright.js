@@ -11,6 +11,7 @@
  */
 
 const path = require('path');
+const safeFs = require('./safe-fs');
 const { PlaywrightScaffolder } = require('../lib/playwright-scaffolder');
 const { FrameworkDetector } = require('../lib/framework-detector');
 
@@ -213,7 +214,6 @@ async function detectWebFramework(projectRoot) {
  * @returns {boolean} True if Playwright is configured
  */
 function isPlaywrightConfigured(projectRoot) {
-  const fs = require('fs');
   const configFiles = [
     'playwright.config.ts',
     'playwright.config.js',
@@ -221,7 +221,7 @@ function isPlaywrightConfigured(projectRoot) {
   ];
 
   for (const configFile of configFiles) {
-    if (fs.existsSync(path.join(projectRoot, configFile))) {
+    if (safeFs.existsSync(path.join(projectRoot, configFile))) {
       return true;
     }
   }

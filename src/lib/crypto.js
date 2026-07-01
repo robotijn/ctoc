@@ -6,9 +6,9 @@
  */
 
 const crypto = require('crypto');
-const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const safeFs = require('./safe-fs');
 
 const CTOC_HOME = path.join(os.homedir(), '.ctoc');
 const SECRET_FILE = path.join(CTOC_HOME, '.secret');
@@ -18,13 +18,13 @@ const SECRET_LENGTH = 64; // 512 bits
  * Gets the installation secret, creating one if it doesn't exist
  */
 function getInstallationSecret() {
-  if (!fs.existsSync(CTOC_HOME)) {
-    fs.mkdirSync(CTOC_HOME, { recursive: true });
+  if (!safeFs.existsSync(CTOC_HOME)) {
+    safeFs.mkdirSync(CTOC_HOME, { recursive: true });
   }
 
-  if (fs.existsSync(SECRET_FILE)) {
+  if (safeFs.existsSync(SECRET_FILE)) {
     try {
-      const secret = fs.readFileSync(SECRET_FILE);
+      const secret = safeFs.readFileSync(SECRET_FILE);
       if (secret.length >= SECRET_LENGTH) {
         return secret;
       }
@@ -34,7 +34,7 @@ function getInstallationSecret() {
   }
 
   const secret = crypto.randomBytes(SECRET_LENGTH);
-  fs.writeFileSync(SECRET_FILE, secret, { mode: 0o600 });
+  safeFs.writeFileSync(SECRET_FILE, secret, { mode: 0o600 });
   return secret;
 }
 
@@ -134,12 +134,12 @@ function verifyState(state) {
  * Creates a hash of file content for gate approval tracking
  */
 function hashFile(filePath) {
-  if (!fs.existsSync(filePath)) {
+  if (!safeFs.existsSync(filePath)) {
     return null;
   }
 
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = safeFs.readFileSync(filePath, 'utf8');
     const hash = crypto.createHash('sha256');
     hash.update(content);
     return hash.digest('hex');

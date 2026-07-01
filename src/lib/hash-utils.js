@@ -9,7 +9,7 @@
  */
 
 const crypto = require('crypto');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -24,11 +24,11 @@ const HASH_ALGORITHM = 'sha256';
  */
 function hashFile(filePath) {
   try {
-    if (!fs.existsSync(filePath)) {
+    if (!safeFs.existsSync(filePath)) {
       return null;
     }
 
-    const content = fs.readFileSync(filePath);
+    const content = safeFs.readFileSync(filePath);
     const hash = crypto.createHash(HASH_ALGORITHM);
     hash.update(content);
     return hash.digest('hex');
@@ -166,7 +166,7 @@ function hashFilesComposite(filePaths) {
  */
 function createHashEntry(filePath) {
   const hash = hashFile(filePath);
-  const stats = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
+  const stats = safeFs.existsSync(filePath) ? safeFs.statSync(filePath) : null;
 
   return {
     hash,
@@ -230,9 +230,9 @@ function hashDirectory(dirPath, options = {}) {
 
   function walkDir(dir, depth = 0) {
     if (depth > maxDepth) return;
-    if (!fs.existsSync(dir)) return;
+    if (!safeFs.existsSync(dir)) return;
 
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const entries = safeFs.readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
@@ -302,7 +302,7 @@ if (require.main === module) {
 
   const target = path.resolve(args[0]);
 
-  if (fs.statSync(target).isDirectory()) {
+  if (safeFs.statSync(target).isDirectory()) {
     const result = hashDirectory(target);
     console.log(`Directory: ${result.directory}`);
     console.log(`Files: ${result.fileCount}`);

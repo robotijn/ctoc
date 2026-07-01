@@ -22,7 +22,7 @@
  *     https://www.bis.org/publ/bcbs_nl36.htm
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -47,7 +47,7 @@ function record(projectRoot, event) {
     inputs: event.inputs || [],
     outputs: event.outputs || [],
   };
-  fs.appendFileSync(path.join(projectRoot, LINEAGE_LOG), JSON.stringify(entry) + '\n');
+  safeFs.appendFileSync(path.join(projectRoot, LINEAGE_LOG), JSON.stringify(entry) + '\n');
   return entry;
 }
 
@@ -111,8 +111,8 @@ function renderLineage(projectRoot, dispatchId) {
 
 function readAll(projectRoot) {
   const p = path.join(projectRoot, LINEAGE_LOG);
-  if (!fs.existsSync(p)) return [];
-  return fs.readFileSync(p, 'utf8').split('\n').filter(Boolean).map(line => {
+  if (!safeFs.existsSync(p)) return [];
+  return safeFs.readFileSync(p, 'utf8').split('\n').filter(Boolean).map(line => {
     try { return JSON.parse(line); } catch { return null; }
   }).filter(Boolean);
 }
@@ -124,7 +124,7 @@ function hashList(items) {
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 module.exports = {

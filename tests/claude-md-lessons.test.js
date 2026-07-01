@@ -55,6 +55,12 @@ function loadModuleWithoutSource(t) {
   const code = fs.readFileSync(require.resolve('../src/lib/claude-md-lessons'), 'utf8');
   const modPath = path.join(modDir, 'claude-md-lessons.js');
   fs.writeFileSync(modPath, code, 'utf8');
+  // claude-md-lessons.js requires('./safe-fs') (LH1 fs choke point) — copy that
+  // code dependency alongside so the relative require resolves in the temp tree.
+  // This helper removes the DATA source (operating-lessons.md up the tree), not
+  // the module's code deps.
+  const safeFsCode = fs.readFileSync(require.resolve('../src/lib/safe-fs'), 'utf8');
+  fs.writeFileSync(path.join(modDir, 'safe-fs.js'), safeFsCode, 'utf8');
   const expectedPrimary = path.join(root, '.ctoc', 'templates', 'operating-lessons.md');
   return { mod: require(modPath), root, expectedPrimary };
 }

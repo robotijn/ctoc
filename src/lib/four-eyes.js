@@ -31,7 +31,7 @@
 
 'use strict';
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const ROLES_PATH = path.join('.ctoc', 'roles.yaml');
@@ -105,8 +105,8 @@ function coerceScalar(v) {
  */
 function loadRoles(projectRoot) {
   const rolesPath = path.join(projectRoot, ROLES_PATH);
-  if (!fs.existsSync(rolesPath)) return [];
-  const content = fs.readFileSync(rolesPath, 'utf8');
+  if (!safeFs.existsSync(rolesPath)) return [];
+  const content = safeFs.readFileSync(rolesPath, 'utf8');
   const parsed = parseRolesYaml(content);
   return Array.isArray(parsed.roles) ? parsed.roles : [];
 }
@@ -161,20 +161,20 @@ function verifyFourEyes(plan, projectRoot) {
 
   if (typeof plan === 'string') {
     // Convenience: caller passed a path.
-    if (!fs.existsSync(plan)) {
+    if (!safeFs.existsSync(plan)) {
       return { passed: false, reason: `Plan not found: ${plan}`, author: null, independent: null };
     }
-    planText = fs.readFileSync(plan, 'utf8');
+    planText = safeFs.readFileSync(plan, 'utf8');
     if (!root) root = inferProjectRoot(plan);
   } else if (plan && typeof plan === 'object') {
     if (typeof plan.text === 'string') {
       planText = plan.text;
       root = root || plan.projectRoot;
     } else if (typeof plan.path === 'string') {
-      if (!fs.existsSync(plan.path)) {
+      if (!safeFs.existsSync(plan.path)) {
         return { passed: false, reason: `Plan not found: ${plan.path}`, author: null, independent: null };
       }
-      planText = fs.readFileSync(plan.path, 'utf8');
+      planText = safeFs.readFileSync(plan.path, 'utf8');
       root = root || plan.projectRoot || inferProjectRoot(plan.path);
     } else {
       return { passed: false, reason: 'verifyFourEyes: expected { path } or { text, projectRoot }', author: null, independent: null };
@@ -261,7 +261,7 @@ function inferProjectRoot(planPath) {
   let dir = path.dirname(path.resolve(planPath));
   const root = path.parse(dir).root;
   while (dir !== root) {
-    if (fs.existsSync(path.join(dir, '.ctoc'))) return dir;
+    if (safeFs.existsSync(path.join(dir, '.ctoc'))) return dir;
     const next = path.dirname(dir);
     if (next === dir) break;
     dir = next;
