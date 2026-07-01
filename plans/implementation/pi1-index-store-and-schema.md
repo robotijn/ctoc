@@ -14,7 +14,7 @@ parent_vision: "done/local-semantic-plan-index.md"
 program: ctoc-planning-intelligence
 order: 1
 depends_on: []
-acceptance_criteria_count: 15
+acceptance_criteria_count: 18
 risk_level: HIGH
 files:
   - "src/lib/plan-index/db.js"
@@ -73,19 +73,30 @@ index works in offline and air-gapped environments from first run.
   Then `.ctoc/index/plans.db` is created, `SELECT vec_version()` returns a
   non-empty string, and `PRAGMA compile_options` confirms FTS5 is compiled in
 
+- [ ] **Scenario: Store opens in WAL mode with a non-zero busy timeout**
+  Given `openStore(dbPath)` has just returned a store
+  When `PRAGMA journal_mode` and `PRAGMA busy_timeout` are queried on `store.db`
+  Then `journal_mode` returns `wal` and `busy_timeout` returns `5000`, so the
+  multi-process sync path (menu + PostToolUse hook + reconciliation sweep all
+  touching `plans.db`) does not deadlock on `SQLITE_BUSY`; the WAL side-files
+  (`plans.db-wal`, `plans.db-shm`) are covered by the existing `.ctoc/index/`
+  gitignore entry
+
 - [ ] **Scenario: Parameterized vector table creation with cosine metric**
   Given the store is open and no vec0 virtual table exists
   When `initVectorTable(384)` is called
   Then a vec0 virtual table is created accepting 384-float vectors with cosine
   distance metric; `SELECT sql FROM sqlite_master WHERE name = 'vec_plans'`
-  contains `distance_metric=cosine`; and `PRAGMA table_info` confirms the
-  embedding column at dimension 384
+  contains `distance_metric=cosine` and `float[384]` (the vec0 dimension is
+  exposed via `sqlite_master.sql`, not `PRAGMA table_info`; see Decision D10)
 
-- [ ] **Scenario: Dimension mismatch is handled deterministically**
-  Given a vec0 table already exists at dimension 384
+- [ ] **Scenario: Dimension mismatch triggers a full tri-table reset**
+  Given a vec0 table already exists at dimension 384 with at least one stored unit
   When `initVectorTable(512)` is called
-  Then the old table is dropped and a new one at dimension 512 is created; no
-  silent mismatch, no thrown error, and a warning is logged to `.ctoc/logs/`
+  Then the `vec_plans`, `fts_plans`, and `units` tables are all cleared and
+  `vec_plans` is recreated at dimension 512; no silent mismatch, no thrown error,
+  a warning is logged to `.ctoc/logs/`, and the pre-existing unit is absent from
+  all three tables (no orphaned metadata; `getUnit` returns null)
 
 - [ ] **Scenario: upsertUnit + getUnit round-trip including vector**
   Given the store is initialized at dimension 384
@@ -123,6 +134,24 @@ index works in offline and air-gapped environments from first run.
   When `loadVec0Extension(db)` is called
   Then it throws an `Error` whose `.message` contains the current
   `process.platform`, `process.arch`, and the list of supported combinations
+
+- [ ] **Scenario: Binary selection — supported platform but binary not vendored**
+  Given the runtime is a supported platform/arch but the resolved binary file is
+  absent (e.g., a fresh checkout before the maintainer ran `vendor-vec0.js`)
+  When `loadVec0Extension(db)` is called
+  Then it throws an `Error` whose `.message` contains the resolved absolute path
+  of the missing binary and points at the maintainer `vendor-vec0.js` step — a
+  distinct, actionable error separate from the unsupported-platform case
+
+- [ ] **Scenario: Binary selection — incompatible binary (e.g. musl libc)**
+  Given the runtime key is supported and the binary file exists, but the native
+  library fails to load (e.g. the glibc-linked `.so` on an Alpine/musl host, or
+  any raw `dlopen` failure)
+  When `loadVec0Extension(db)` is called
+  Then the raw loader error is caught and re-thrown as an `Error` whose `.message`
+  names `process.platform`, `process.arch`, the libc flavor when detectable, and
+  directs the caller to PI0's degrade path (rebuild-from-plans / no-index); the
+  process never surfaces a bare, unhelpful `dlopen` error
 
 - [ ] **Scenario: Rebuildable cache**
   Given a populated database
@@ -184,9 +213,12 @@ index works in offline and air-gapped environments from first run.
 ### In Scope
 - Open/create SQLite at `.ctoc/index/plans.db` via `node:sqlite`
   `new DatabaseSync(path, { allowExtension: true })` then `enableLoadExtension(true)`
-- Resolve and load the vendored `vec0` binary from
-  `src/lib/plan-index/binaries/<platform>-<arch>/vec0.{dylib,so,dll}` — committed
-  to the repo, no runtime download, no network call
+- Resolve and load the vendored `sqlite-vec` binary from
+  `src/lib/plan-index/binaries/<platform>-<arch>/vec.{dylib,so,dll}` — committed
+  to the repo, no runtime download, no network call. **The file is named
+  `vec.{ext}` (not `vec0.{ext}`)** so SQLite's filename-derived extension entry
+  point resolves to `sqlite3_vec_init` (the symbol sqlite-vec actually exports);
+  see §6.4 and Decision D9
 - FTS5 virtual table for BM25 lexical search over plan/section text
 - `vec0` virtual table with **caller-supplied dimension** via `initVectorTable(dim)`;
   declared with `distance_metric=cosine` at creation time; deferred until PI2 calls
@@ -205,12 +237,13 @@ index works in offline and air-gapped environments from first run.
 - `src/lib/plan-index/index.js` barrel that exports the public API
 - `.gitignore` entry for `.ctoc/index/` (DB is git-ignored; binaries under
   `src/lib/plan-index/binaries/` are committed)
-- `src/scripts/vendor-vec0.js` — maintainer-only binary refresh tool; fetches
-  and checksum-verifies updated binaries; **never imported at runtime**
+- `src/scripts/vendor-vec0.js` — maintainer-only binary refresh tool; fetches,
+  checksum-verifies, and writes the per-platform binaries as `vec.<ext>` (see
+  D9); a networked, out-of-band, human-run action (F8); **never imported at runtime**
 - Register `plan_index` block in `SETTINGS_SCHEMA` in `src/lib/settings.js`
   (keys: `engine_preference`, `ollama_base_url`, `duplicate_threshold` — stubs
   for PI2/PI5/PI6; PI1 reads no settings itself at runtime)
-- `tests/plan-index-store.test.js` — covers all 13 scenarios above
+- `tests/plan-index-store.test.js` — covers all 20 test scenarios (ST-01…ST-20)
 
 ### Out of Scope
 - Producing vectors (PI2)
@@ -232,8 +265,8 @@ All tests run without network access. No Ollama or external service required.
 | Test ID | Description                                    | Key Assertion                                                              |
 |---------|------------------------------------------------|----------------------------------------------------------------------------|
 | ST-01   | openStore creates DB and loads vec0            | `SELECT vec_version()` returns string matching `^\d+\.\d+\.\d+$`          |
-| ST-02   | initVectorTable(384) creates vec0 with cosine  | `sqlite_master` sql contains `distance_metric=cosine`; column dim = 384    |
-| ST-03   | Dimension mismatch drops and recreates         | New table reflects dim 512; no error thrown; warning logged                |
+| ST-02   | initVectorTable(384) creates vec0 with cosine  | `sqlite_master.sql` contains `distance_metric=cosine` and `float[384]` (dim via sqlite_master, not table_info) |
+| ST-03   | Dimension mismatch → FULL tri-table reset      | New table reflects dim 512; no error thrown; warning logged; pre-existing unit gone from units + fts_plans + vec_plans |
 | ST-04   | upsertUnit + getUnit full round-trip           | All fields equal including kind; vector byte-for-byte Float32 match        |
 | ST-05   | Forced mid-write: no partial row               | getUnit pre-state unchanged after interrupted tx                           |
 | ST-06   | deleteUnit removes from FTS5 and vec0          | getUnit null; `SELECT COUNT(*)` = 0 on fts_plans AND vec_plans             |
@@ -248,6 +281,9 @@ All tests run without network access. No Ollama or external service required.
 | ST-15   | kind column: plan vs section separability      | COUNT(*) WHERE kind='plan' = 1; WHERE kind='section' = 1; bad kind throws  |
 | ST-16   | getFilesForPlan returns globs, [] if none      | Returns declared `files:` globs; missing → []; never throws                |
 | ST-17   | moveUnit re-paths without re-embed              | plan_path updated in all tables; vector + contentHash unchanged            |
+| ST-18   | Supported platform, binary not vendored, throws| existsSync false at resolved path → error names resolved absolute path + `vendor-vec0.js` step |
+| ST-19   | Incompatible binary (dlopen/musl) throws       | loadExtension throws → re-thrown error names platform + arch + libc + degrade path; no bare dlopen |
+| ST-20   | openStore sets WAL + busy_timeout              | `PRAGMA journal_mode` = wal; `PRAGMA busy_timeout` = 5000                  |
 
 ## Risks
 
@@ -261,6 +297,27 @@ All tests run without network access. No Ollama or external service required.
     comment in `vec0-loader.js`; CI smoke test calls `SELECT vec_version()` on
     every run to detect ABI breakage immediately; Node version pinning is
     PI0's capability gate — do not add `.nvmrc` or `package.json engines` here
+
+- **Extension entry-point derivation (F1)**: `node:sqlite`
+  `DatabaseSync.loadExtension(path)` is single-arg — no explicit entry-point
+  parameter — so SQLite derives the C symbol from the filename. sqlite-vec exports
+  `sqlite3_vec_init`, which only resolves if the file is named `vec.<ext>` (a
+  `vec0.<ext>` name derives the non-existent `sqlite3_vec0_init` and fails).
+  - Likelihood: HIGH if mis-named (certainty of failure), otherwise N/A
+  - Impact: HIGH (extension never loads → store non-functional — a slice-killer)
+  - Mitigation: vendor the binary as `vec.<ext>` (D9); the **mandatory Step 8
+    pre-IMPLEMENT spike** proves `loadExtension(vec0Path)` + `SELECT vec_version()`
+    on the dev machine before any store code is written; see `## Blocking Prerequisites`
+
+- **musl / Alpine libc incompatibility (F2)**: sqlite-vec ships glibc-linked `.so`
+  binaries; on a musl host `existsSync` passes but `dlopen` throws a raw, unhelpful
+  error.
+  - Likelihood: MEDIUM (Alpine is common in CI/containers)
+  - Impact: MEDIUM (Linux-musl only; degradable)
+  - Mitigation: `loadVec0Extension` wraps the load in try/catch and re-throws an
+    actionable error naming platform/arch/libc + PI0's degrade path (rebuild-from-plans
+    / no-index); musl is documented known-unsupported (D11); a musl-linked build is a
+    future maintainer TODO, not a PI1 blocker; tested by ST-19
 
 - **Windows DLL load path**: `enableLoadExtension` on Windows may require the
   DLL's directory to be on PATH, or an absolute path must be passed.
@@ -312,6 +369,27 @@ All tests run without network access. No Ollama or external service required.
 - PI3 calls `upsertUnit` / `deleteUnit` / `getUnit` via the PI1 barrel.
 - PI0 owns capability gate (feature-detect node:sqlite/vec0/FTS5) and composition
   root; PI1 is constructed and initialized by PI0, not self-bootstrapped.
+
+## Blocking Prerequisites (gate IMPLEMENT — Step 10)
+
+Step 10 (IMPLEMENT) MUST NOT begin until BOTH of these are satisfied. They are hard
+gates, not soft warnings:
+
+1. **Native `vec0` binaries are vendored (maintainer action, F8).** A human
+   maintainer has run `node src/scripts/vendor-vec0.js` once — a networked,
+   out-of-band action — to fetch, SHA256-verify, and commit the five per-platform
+   sqlite-vec v0.1.9 loadable extensions under
+   `src/lib/plan-index/binaries/<platform>-<arch>/vec.<ext>`. No automated Iron-Loop
+   agent fetches or commits these; if they are absent the loop stalls and surfaces the
+   blocker to the human — it does not route around it or write a stub.
+2. **The Step 8 load spike passes (F1).** On the dev machine, single-arg
+   `db.loadExtension(vec0Path)` loads and `SELECT vec_version()` returns a version
+   string. If it fails, the entry-point/arity mismatch is resolved first (filename
+   `vec.<ext>` → derived symbol `sqlite3_vec_init`; §6.4 / D9), before any store code
+   is written.
+
+Ordering: maintainer vendors binaries → Step 8 spike proves the load → Step 8 tests
+are authored → Steps 9–10 implement.
 
 ## Decisions Taken Under Ambiguity
 
@@ -369,7 +447,7 @@ leaves with no intra-package imports of each other.
 | `schema.js` | DDL constants; create base schema (`units`, `fts_plans`); create/recreate the parameterized `vec_plans`; dimension-mismatch policy + warning log. **No extension loading.** | none | `BASE_DDL`, `initSchema(db)`, `initVectorTable(db, dimension, logDir)`, `readVecDimension(db)` |
 | `db.js` | `openStore` composition; the six CRUD/query primitives bound to a store handle; transaction helper; Float32 ⇄ BLOB (de)serialization. | `./schema`, `./vec0-loader` | `openStore(dbPath)` |
 | `index.js` | Public barrel — the only entry point other CTOC code imports. | `./db`, `./vec0-loader` | `openStore`, `loadVec0Extension`, `resolveVec0BinaryPath`, `SUPPORTED_PLATFORMS` |
-| `binaries/<platform>-<arch>/vec0.{dylib,so,dll}` | Committed-vendored sqlite-vec v0.1.9 loadable extensions (5 platforms). Not source; produced by the maintainer tool. | — | — |
+| `binaries/<platform>-<arch>/vec.{dylib,so,dll}` | Committed-vendored sqlite-vec v0.1.9 loadable extensions (5 platforms), named `vec.{ext}` so SQLite derives the `sqlite3_vec_init` entry point (§6.4/D9). Not source; produced by the maintainer tool. | — | — |
 
 `src/scripts/vendor-vec0.js` is a **maintainer-only** tool (fetch + SHA256-verify +
 write the five binaries). It is never on the runtime import graph (asserted by ST-13).
@@ -547,19 +625,47 @@ arch     = process.arch                // 'arm64'  | 'x64'
 key      = `${platform}-${arch}`
 SUPPORTED_PLATFORMS = ['darwin-arm64','darwin-x64','linux-x64','linux-arm64','win32-x64']
 ext      = { darwin:'dylib', linux:'so', win32:'dll' }[platform]
-resolved = path.resolve(__dirname, 'binaries', key, `vec0.${ext}`)   // absolute
+resolved = path.resolve(__dirname, 'binaries', key, `vec.${ext}`)    // absolute
 ```
+
+**Entry-point contract (F1 — load-bearing).** `node:sqlite`
+`DatabaseSync.loadExtension(path)` is **single-argument**: it takes the path only
+and has **no** parameter for an explicit C entry-point symbol (passing a 2nd arg
+throws `TypeError`). SQLite therefore derives the entry point from the *filename*:
+for a file `<name>.<ext>` it tries `sqlite3_extension_init` first (which sqlite-vec
+does not export) then `sqlite3_<name>_init`. sqlite-vec's exported symbol is
+`sqlite3_vec_init`, so the vendored file **must be named `vec.<ext>`** (→ derives
+`sqlite3_vec_init`). A file named `vec0.<ext>` would derive the non-existent
+`sqlite3_vec0_init` and auto-load fails. The maintainer script writes the binaries
+under the `vec.<ext>` name for exactly this reason. The filename→symbol derivation
+is confirmed empirically by the Step 8 spike (see `## Blocking Prerequisites`)
+before any store code is written; see Decision D9.
 
 `loadVec0Extension(db)`:
 1. If `key ∉ SUPPORTED_PLATFORMS` → throw `Error` whose message names
    `process.platform`, `process.arch`, and the supported list (ST-10).
 2. If supported but `!fs.existsSync(resolved)` → throw `Error` naming the resolved
-   absolute path (binary not vendored — distinct, actionable maintainer error).
-3. `db.enableLoadExtension(true)` → `db.loadExtension(resolved)`; if the default
-   filename-derived entrypoint fails, retry `db.loadExtension(resolved,
-   'sqlite3_vec_init')` (sqlite-vec's init symbol) → `db.enableLoadExtension(false)`
-   (re-disable after the single load: defense-in-depth).
-4. Verify with `SELECT vec_version()`.
+   absolute path AND the `vendor-vec0.js` maintainer step (binary not vendored —
+   distinct, actionable maintainer error; ST-18).
+3. `db.enableLoadExtension(true)`; then **single-arg** `db.loadExtension(resolved)`
+   wrapped in `try/catch`. On throw (F2 — e.g. a glibc-linked `.so` on a musl/Alpine
+   host where `existsSync` passed but `dlopen` fails, or any raw loader error),
+   re-throw an `Error` whose message names `process.platform`, `process.arch`, the
+   detected libc flavor (see below), the resolved path, and directs the caller to
+   PI0's degrade path (rebuild-from-plans / no-index). Never let a bare `dlopen`
+   string escape unwrapped. `finally → db.enableLoadExtension(false)` (re-disable
+   after the single load: defense-in-depth). **No 2-arg `loadExtension` retry** —
+   the API does not accept one; correctness comes from the filename above (ST-19).
+4. Verify with `SELECT vec_version()`; if it throws or returns empty, treat it as a
+   load failure per step 3.
+
+**libc detection (best-effort).** On `linux`, derive the flavor for the error
+message from `process.report.getReport().header.glibcVersionRuntime` (present ⇒
+glibc; absent ⇒ likely musl) — best-effort only, never a hard gate. **musl is
+known-unsupported**: sqlite-vec ships glibc-linked `.so` binaries and CTOC vendors
+those; a musl build is an out-of-scope future maintainer TODO (Decision D11), so on
+musl the store degrades to PI0's no-index path with the clear error above rather
+than crashing.
 
 **Windows DLL note** (carried from the Risks section): always pass the
 `path.resolve`-d **absolute** path to `loadExtension` — `win32` extension loading is
@@ -574,11 +680,20 @@ OSes uniformly; `path.join`/`path.resolve` keep separators correct cross-platfor
   wrote, so the regex is reliable); returns `null` if the table is absent.
 - absent → `CREATE VIRTUAL TABLE vec_plans … float[dimension] … cosine`.
 - same dimension → no-op (idempotent; this is what makes ST-11 rebuild reproducible).
-- different dimension → `DROP TABLE vec_plans` + recreate at the new dimension +
-  append a `warn` entry to `.ctoc/logs/plan-index.json`; **no throw** (the DB is a
-  rebuildable cache). The logger mirrors `src/lib/enforcement-log.js`: create the
-  log dir if missing, append `{ timestamp, level:'warn', event:'vec_table_dimension_change',
-  from_dimension, to_dimension, message }`, rotate at a max-entries cap.
+- different dimension → **FULL tri-table reset** (F4). A dimension change means every
+  stored vector is now invalid, so recreating `vec_plans` alone would leave orphaned
+  `units` + `fts_plans` rows whose vectors are gone — and `getUnit`'s tri-table INNER
+  JOIN would then return `null` for metadata that still exists (silent inconsistency).
+  Instead, in one transaction: `DROP TABLE vec_plans`, `DELETE FROM fts_plans`,
+  `DELETE FROM units`, then recreate `vec_plans` at the new dimension. This is safe
+  because the DB is a rebuildable cache (the `.md` plans are the source of truth) and
+  PI3's reconciliation sweep re-populates all three tables on its next pass. A `warn`
+  entry is appended to `.ctoc/logs/plan-index.json`; **no throw**. The logger mirrors
+  `src/lib/enforcement-log.js`: create the log dir if missing, append
+  `{ timestamp, level:'warn', event:'vec_table_dimension_change', from_dimension,
+  to_dimension, rows_cleared, message }`, rotate at a max-entries cap. (Alternative
+  considered — keep metadata and force an immediate re-embed sweep — rejected for PI1:
+  re-embedding is PI2/PI3's job and PI1 must not depend on them; see Decision D12.)
 
 `logDir` is derived once in `openStore` from `dbPath`:
 `path.resolve(path.dirname(dbPath), '..', 'logs')` (from `…/.ctoc/index/` up to
@@ -591,19 +706,32 @@ OSes uniformly; `path.join`/`path.resolve` keep separators correct cross-platfor
 
 ### 7.1 `openStore(dbPath: string) → PlanIndexStore`
 - `fs.mkdirSync(path.dirname(dbPath), { recursive: true })`; `db = new
-  DatabaseSync(dbPath, { allowExtension: true })`; `loadVec0Extension(db)`;
-  `initSchema(db)` (creates `units` + `fts_plans`; **not** `vec_plans`).
+  DatabaseSync(dbPath, { allowExtension: true })`; **immediately** run
+  `db.exec('PRAGMA journal_mode=WAL')` and `db.exec('PRAGMA busy_timeout=5000')`
+  (F3 — the vision's sync is multi-trigger, multi-process: menu + PostToolUse hook
+  + reconciliation sweep all open `plans.db`; the default rollback journal + zero
+  busy-timeout would surface `SQLITE_BUSY` and hang the live menu. WAL lets readers
+  and one writer proceed concurrently; the 5 s busy-timeout absorbs brief writer
+  contention). Then `loadVec0Extension(db)`; `initSchema(db)` (creates `units` +
+  `fts_plans`; **not** `vec_plans`).
+- The WAL side-files `plans.db-wal` / `plans.db-shm` live alongside `plans.db` under
+  `.ctoc/index/` and are covered by the existing `.ctoc/index/` gitignore entry (no
+  extra ignore rule needed).
 - Returns `{ db, initVectorTable, upsertUnit, getUnit, deleteUnit, moveUnit,
   getFilesForPlan, close }` with `logDir` captured in the closure.
 - Throws: propagates `loadVec0Extension` errors (unsupported platform / missing
-  binary). Idempotent re-open on an existing DB reuses the schema unchanged.
-- Covers ST-01 (vec_version non-empty; FTS5 in `PRAGMA compile_options`), ST-11.
+  binary / incompatible binary). Idempotent re-open on an existing DB reuses the
+  schema unchanged (WAL mode persists on the file; re-applying the PRAGMAs is a
+  cheap no-op).
+- Covers ST-01 (vec_version non-empty; FTS5 in `PRAGMA compile_options`), ST-20
+  (WAL + busy_timeout), ST-11.
 
 ### 7.2 `store.initVectorTable(dimension: number) → void`
 - Validates `dimension` is a positive integer (else `TypeError`). Applies the §6.5
   absent / same / different policy. Cosine declared at creation.
 - Covers ST-02 (`sqlite_master.sql` contains `distance_metric=cosine` and
-  `float[384]`; `PRAGMA table_info` shows the `embedding` column), ST-03.
+  `float[384]` — dimension verified via `sqlite_master.sql`, not `PRAGMA table_info`;
+  see D10), ST-03.
 
 ### 7.3 `store.upsertUnit(unit) → number` (returns rowid)
 `unit = { planPath, sectionId, kind, text, vector, files, parentVision, stepLabel, contentHash }`
@@ -642,11 +770,20 @@ OSes uniformly; `path.join`/`path.resolve` keep separators correct cross-platfor
 - `SELECT files FROM units WHERE plan_path=? AND kind='plan' LIMIT 1` → `JSON.parse`
   → array. Returns `[]` when there is no plan-level row or `files` is empty; **never
   throws**. Keyed on plan path/slug, not section.
+- **Opaque-key contract (F6):** `plan_path` is an **opaque exact-match key** — PI1
+  does no normalization; a lookup succeeds only if the caller passes the identical
+  string used at `upsertUnit`. The barrel JSDoc must state this verbatim ("plan_path
+  is an opaque key; callers must normalize consistently"). Consistent normalization
+  is carried forward as a **required PI3 (sync/upsert) and PI6 (conflict /
+  getFilesForPlan) acceptance criterion** — flagged here so it is not lost when those
+  slices are planned; see Decision D5.
 - Covers ST-16.
 
 ### 7.8 `loadVec0Extension(db) → string` (returns vec_version) + `settings.js` block
-`loadVec0Extension` per §6.4 — covers ST-07/08/09 (supported), ST-10 (unsupported),
-and ST-13 (no `vendor-vec0.js` in the require cache). Add to `SETTINGS_SCHEMA`:
+`loadVec0Extension` per §6.4 — covers ST-07/08/09 (supported), ST-10 (unsupported
+platform), ST-18 (supported platform but binary not vendored), ST-19 (incompatible
+binary / musl `dlopen` failure), and ST-13 (no `vendor-vec0.js` in the require
+cache). Add to `SETTINGS_SCHEMA`:
 
 ```js
 plan_index: {
@@ -668,17 +805,18 @@ Satisfies the settings-suite invariants (every setting has `key`/`label`/`type`/
 
 ## Acceptance Criteria → Test Mapping (`tests/plan-index-store.test.js`)
 
-15 acceptance criteria expand to **17 tests** (the single "supported platform"
-criterion fans out to ST-07/08/09, one per OS). All run with **zero network**, under
-`node:test`. Tests that need a temp DB use `fs.mkdtempSync(os.tmpdir(), …)` and clean
-up. Every ST below is a distinct `test()` with a meaningful assertion (no empty
-catches, no assertionless passes).
+18 acceptance criteria expand to **20 tests** (the single "supported platform"
+criterion fans out to ST-07/08/09, one per OS; three new error/concurrency branches
+add ST-18/19/20). All run with **zero network**, under `node:test`. Tests that need a
+temp DB use `fs.mkdtempSync(os.tmpdir(), …)` and clean up. Every ST below is a
+distinct `test()` with a meaningful assertion (no empty catches, no assertionless
+passes).
 
 | ST | Primitive(s) | Key assertion |
 |----|-------------|---------------|
 | ST-01 | openStore | `vec_version()` matches `^\d+\.\d+\.\d+$`; `PRAGMA compile_options` includes `ENABLE_FTS5` |
 | ST-02 | initVectorTable | `sqlite_master.sql` for `vec_plans` contains `distance_metric=cosine` and `float[384]` |
-| ST-03 | initVectorTable | after `initVectorTable(512)` over an existing dim-384 table: new sql shows `float[512]`; no throw; a `warn` row appended to `.ctoc/logs/plan-index.json` |
+| ST-03 | initVectorTable | after `initVectorTable(512)` over an existing dim-384 table holding a unit: new sql shows `float[512]`; no throw; a `warn` row appended to `.ctoc/logs/plan-index.json`; **the pre-existing unit is gone from `units`, `fts_plans`, AND `vec_plans` (full reset — no orphaned metadata; `getUnit` returns null, not a JOIN miss)** |
 | ST-04 | upsertUnit+getUnit | every field equals input incl. `kind`/`contentHash`/`files`(array)/`parentVision`; `Buffer.compare(inBytes, outBytes) === 0` |
 | ST-05 | upsertUnit (tx) | upsert with a wrong-dimension vector throws and `getUnit` still returns the original unit byte-for-byte (rollback proven via real failure, not a mock) |
 | ST-06 | deleteUnit | `getUnit`→null; `COUNT(*) FROM fts_plans WHERE plan_path=? AND section_id=?`=0; `COUNT(*) FROM vec_plans WHERE rowid=?`=0 |
@@ -693,22 +831,36 @@ catches, no assertionless passes).
 | ST-15 | upsertUnit | one `kind='plan'` + one `kind='section'` for same plan → each `COUNT(*)`=1; `kind='unknown'` throws |
 | ST-16 | getFilesForPlan | returns `['src/lib/a.js','src/lib/b/**']`; a plan with no `files:` → `[]`; never throws |
 | ST-17 | moveUnit+getUnit | `plan_path` updated in `units` + `fts_plans`; `vec_plans` row intact at same rowid; `getUnit(toPath)` vector + `contentHash` unchanged (`Buffer.compare === 0`) |
+| ST-18 | loadVec0Extension | supported key but binary file absent (temp `binaries/` dir with no file, or `resolveVec0BinaryPath` pointed at an empty dir) → `Error.message` contains the resolved absolute path and points at the `vendor-vec0.js` maintainer step |
+| ST-19 | loadVec0Extension | supported key, file present, but `loadExtension` throws (drive the branch by placing a non-library file at the resolved path so `existsSync` passes but `dlopen` fails) → caught + re-thrown `Error.message` names platform + arch + libc flavor + degrade path; assert no bare `dlopen` string leaks |
+| ST-20 | openStore | after `openStore`, `PRAGMA journal_mode` returns `wal` and `PRAGMA busy_timeout` returns `5000` |
 
 ## Steps 8–16 — Execution Checklist (Iron Loop)
 
-- [ ] **Step 8 — TEST** (test-maker): write `tests/plan-index-store.test.js` first
-  (TDD red) — all 17 ST cases from the mapping above, `node:test` idiom, temp DBs via
-  `mkdtempSync`, zero network. Tests fail until Steps 9–10 land code + binaries.
-  Empirically confirm three binary-dependent facts and adjust assertions to the
-  real binary (not stubs): the `vec0` load entrypoint (default vs `sqlite3_vec_init`),
-  whether `PRAGMA table_info(vec_plans)` exposes the dimension or only `sqlite_master.sql`
-  does, and that `SELECT embedding FROM vec_plans WHERE rowid=?` returns the raw
-  float32 BLOB.
-- [ ] **Step 9 — PREPARE** (quality-checker): create `src/lib/plan-index/`; **maintainer
-  runs `node src/scripts/vendor-vec0.js`** once to fetch + SHA256-verify + commit the
-  5 platform binaries under `binaries/<platform>-<arch>/` (one-time, networked,
+- [ ] **Step 8 — TEST** (test-maker). **First sub-item is a mandatory pre-IMPLEMENT
+  spike (F1) — no store code is written until it passes:** on the dev machine, load the
+  vendored binary with the **single-arg** `db.loadExtension(vec0Path)` and run
+  `SELECT vec_version()`; prove both succeed. If the load fails, resolve the
+  entry-point/arity problem *before proceeding* — confirm the file is named `vec.<ext>`
+  so SQLite derives `sqlite3_vec_init` (§6.4 / D9), and confirm `loadExtension` rejects
+  a 2nd argument. Record the confirmed filename→symbol behavior in `vec0-loader.js`.
+  This spike is gated on the binaries already being vendored (see `## Blocking
+  Prerequisites`). **Then** write `tests/plan-index-store.test.js` (TDD red) — all 20 ST
+  cases from the mapping above, `node:test` idiom, temp DBs via `mkdtempSync`, zero
+  network. Tests fail until Steps 9–10 land code + binaries. Empirically confirm the
+  remaining binary-dependent facts and adjust assertions to the real binary (not stubs):
+  the dimension is exposed via `sqlite_master.sql` (not `PRAGMA table_info`; D10), and
+  `SELECT embedding FROM vec_plans WHERE rowid=?` returns the raw float32 BLOB.
+- [ ] **Step 9 — PREPARE** (quality-checker): create `src/lib/plan-index/`.
+  **Binary vendoring is a human-maintainer, out-of-band, networked action performed
+  BEFORE the Step 8 spike/tests can pass — NOT something an automated Iron-Loop agent
+  fetches or commits (F8).** The maintainer runs `node src/scripts/vendor-vec0.js` once
+  to fetch + SHA256-verify + commit the 5 platform binaries under
+  `binaries/<platform>-<arch>/` **named `vec.<ext>`** (one-time, networked,
   maintainer-only — never CI/runtime). Record the version triple (Node 24 / SQLite
-  3.51.2 / sqlite-vec 0.1.9) in a `vec0-loader.js` header comment.
+  3.51.2 / sqlite-vec 0.1.9) in a `vec0-loader.js` header comment. Ordering: maintainer
+  vendors binaries → Step 8 spike proves the load → Step 8 tests authored → Steps 9–10
+  implement. See `## Blocking Prerequisites`.
 - [ ] **Step 10 — IMPLEMENT** (implementer): build `vec0-loader.js`, `schema.js`,
   `db.js`, `index.js`, `src/scripts/vendor-vec0.js`; add the `plan_index` block to
   `src/lib/settings.js`; append `.ctoc/index/` to `.gitignore`. One IMPLEMENT step,
@@ -726,7 +878,7 @@ catches, no assertionless passes).
   `vendor-vec0.js`; `blobToVector` copies out of the Buffer pool (no memory aliasing);
   no secrets; error messages leak no sensitive paths beyond the intended binary path.
 - [ ] **Step 14 — VERIFY** (verifier): `node --test tests/*.test.js` → `# fail 0`,
-  all 17 ST green, **0 skipped, 0 flaky**; lint + `tsc` checkJs clean (no new warnings —
+  all 20 ST green, **0 skipped, 0 flaky**; lint + `tsc` checkJs clean (no new warnings —
   warnings are treated as bugs); coverage ≥ 80% on `src/lib/plan-index/**`; confirm
   `settings.test.js` and `environment-mode.test.js` still pass (the additive
   `plan_index` block must not regress them).
@@ -762,10 +914,14 @@ catches, no assertionless passes).
 - **D4 — FTS5 tokenizer = `unicode61` default.** Identifier/path tokenizer tuning
   (`tokenchars`) is deferred to PI4 (retrieval quality / RRF), which is out of PI1's
   storage-foundation scope. The fixed DDL keeps ST-11 rebuild reproducible.
-- **D5 — `plan_path` is stored/returned verbatim; normalization is PI3's job.** ST-16
-  passes a bare slug (`pi6-conflict.md`) while other scenarios use full paths
-  (`plans/todo/x.md`). PI1 keys on the exact `plan_path` string supplied at upsert;
-  the sync layer (PI3) is responsible for normalizing paths before calling in.
+- **D5 — `plan_path` is an opaque, verbatim key; normalization is PI3/PI6's job (F6).**
+  ST-16 passes a bare slug (`pi6-conflict.md`) while other scenarios use full paths
+  (`plans/todo/x.md`). PI1 keys on the exact `plan_path` string supplied at upsert and
+  does no normalization; the barrel JSDoc states this verbatim ("plan_path is an opaque
+  key; callers must normalize consistently"). Consistent normalization is carried
+  forward as a **required acceptance criterion for PI3 (sync/upsert) and PI6 (conflict
+  detection / getFilesForPlan)** so the contract is not lost — the deferral is
+  deliberate and scoped, not an omission.
 - **D6 — Node experimental-SQLite warning is left in place.** `require('node:sqlite')`
   emits a one-line `ExperimentalWarning` to stderr (observed live on Node 24.14.1).
   This is Node's informational banner for a built-in feature, not a deprecation, our
@@ -782,3 +938,35 @@ catches, no assertionless passes).
   version-check only the binary matching the current `process.platform`/`arch` (you
   cannot `dlopen` a foreign-arch `.so`/`.dll`). This keeps the suite green on any one
   OS while still guarding that all five binaries are vendored.
+- **D9 — sqlite-vec binary is vendored as `vec.<ext>`, not `vec0.<ext>` (F1).**
+  `node:sqlite` `DatabaseSync.loadExtension(path)` is single-argument (no explicit
+  entry-point parameter; a 2nd arg throws `TypeError`), so SQLite must derive the C
+  entry point from the filename. sqlite-vec exports `sqlite3_vec_init`; SQLite derives
+  `sqlite3_<name>_init` from `<name>.<ext>`, so the file is named `vec.<ext>` (derives
+  `sqlite3_vec_init`). A `vec0.<ext>` name would derive the non-existent
+  `sqlite3_vec0_init` and fail. The Step 8 spike confirms this empirically on the dev
+  machine before any store code is written; if a platform derives differently, the
+  filename is adjusted there and the finding recorded in `vec0-loader.js`. The prior
+  2-arg `loadExtension(resolved, 'sqlite3_vec_init')` retry is removed — the API does
+  not support it.
+- **D10 — vec0 dimension is verified via `sqlite_master.sql`, not `PRAGMA table_info`
+  (F7).** vec0 is a virtual table; `PRAGMA table_info(vec_plans)` does not reliably
+  expose the declared `float[N]` dimension, whereas `SELECT sql FROM sqlite_master
+  WHERE name='vec_plans'` returns the exact `CREATE VIRTUAL TABLE … float[N] …` DDL.
+  All dimension assertions (the AC, ST-02, ST-11) read the dimension from
+  `sqlite_master.sql`. Step 8 confirms empirically whether `table_info` also happens to
+  expose it; the AC does not depend on that.
+- **D11 — musl/Alpine is known-unsupported for now (F2).** sqlite-vec ships
+  glibc-linked `.so` binaries; on a musl host `existsSync` passes but `dlopen` throws.
+  `loadVec0Extension` catches this and re-throws an actionable error (platform, arch,
+  detected libc, degrade path), so CTOC degrades to PI0's no-index / rebuild-from-plans
+  path rather than crashing. A dedicated musl-linked vec0 build is an out-of-scope
+  future maintainer TODO; PI1 does not attempt it.
+- **D12 — dimension change performs a FULL tri-table reset, not a vec-only recreate
+  (F4).** A different-dimension `initVectorTable` invalidates every stored vector, so
+  PI1 clears `units` + `fts_plans` + `vec_plans` together (one transaction) rather than
+  dropping `vec_plans` alone and orphaning metadata (which would make `getUnit`'s INNER
+  JOIN silently return null). This is safe because the DB is a rebuildable cache and
+  PI3's reconciliation re-populates it. The alternative (keep metadata, force an
+  immediate re-embed) was rejected: re-embedding is PI2/PI3's responsibility and PI1
+  must carry no dependency on them.
