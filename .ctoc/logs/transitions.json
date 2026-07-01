@@ -264,5 +264,47 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-06-30T22:02:42.943Z",
+    "plan": "LH1-fs-security-warning-hygiene.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-01T06:36:17.740Z",
+    "plan": "LH1-fs-security-warning-hygiene.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-01T08:40:59.917Z",
+    "plan": "LH1-fs-security-warning-hygiene.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
