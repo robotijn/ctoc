@@ -384,12 +384,40 @@ gates, not soft warnings:
    blocker to the human — it does not route around it or write a stub.
 2. **The Step 8 load spike passes (F1).** On the dev machine, single-arg
    `db.loadExtension(vec0Path)` loads and `SELECT vec_version()` returns a version
-   string. If it fails, the entry-point/arity mismatch is resolved first (filename
-   `vec.<ext>` → derived symbol `sqlite3_vec_init`; §6.4 / D9), before any store code
-   is written.
+   string. **STATUS: PASSED on darwin-arm64 (see Spike Results below).** Remaining
+   before IMPLEMENT: the maintainer vendors the other four platform binaries and the
+   spike is re-confirmed per platform in CI.
 
 Ordering: maintainer vendors binaries → Step 8 spike proves the load → Step 8 tests
 are authored → Steps 9–10 implement.
+
+### Step-8 Spike Results (empirical — darwin-arm64, Node 24.14.1, sqlite-vec 0.1.9, 2026-07-01)
+
+Ran the F1 spike against the real sqlite-vec loadable extension. Findings supersede
+the pre-spike theory in §6.4 / D9:
+
+- **loadExtension works single-arg with the DEFAULT `vec0.<ext>` filename.** The
+  critic's theory — that `vec0.dylib` derives entry point `sqlite3_vec0_init` and
+  fails — is **empirically false**: `db.loadExtension(resolve('vec0.dylib'))`
+  (single-arg) loaded cleanly, `SELECT vec_version()` returned `v0.1.9`, and a
+  `CREATE VIRTUAL TABLE … USING vec0(embedding float[3])` + knn round-trip succeeded
+  (query `[1,0,0]` → rowid 1, distance 0). **⇒ D9's rename to `vec.<ext>` is NOT
+  required.** Recommendation: vendor the binaries under their shipped name
+  (`vec0.<ext>`); keep the rename only as a documented per-platform *fallback* if
+  some platform's entry-point derivation ever fails the spike. Simpler vendoring.
+- **D13 (NEW, critical implementer contract) — rowid MUST be bound as `BigInt`.**
+  vec0's implicit `rowid` primary key rejects a JS `number` bound by `node:sqlite`
+  (it binds as REAL): `INSERT INTO t(rowid, embedding) VALUES (1, ?)` throws
+  `"Only integers are allowed for primary key values"`, whereas `(1n, ?)` (BigInt)
+  succeeds. `upsertUnit` (§7.3) and `moveUnit` (§7.6) MUST bind rowid as BigInt
+  (coerce with `BigInt(rowid)` at the store boundary). A Step-8 test MUST assert an
+  insert with a numeric rowid is handled (coerced) and one binding raw REAL fails —
+  otherwise every write silently fails at runtime (a no-stub-rule gotcha).
+- **2-arg `loadExtension(path, entry)` did not throw** on this build (the extra arg
+  was tolerated), but the single-arg form is the contract; do not rely on the 2-arg
+  form.
+- Embeddings bind as `Uint8Array` over a `Float32Array` buffer; `enableLoadExtension(false)`
+  after load works (keep the security re-disable in §6.4).
 
 ## Decisions Taken Under Ambiguity
 
