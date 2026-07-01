@@ -12,7 +12,7 @@
  * sole point where JSON → human-readable form happens.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 
 /**
  * Render a parsed letter object as Markdown.
@@ -155,7 +155,7 @@ function describeStuckIssue(issue) {
  * Render a letter file (by path) to Markdown.
  */
 function renderLetterFile(letterPath) {
-  const json = JSON.parse(fs.readFileSync(letterPath, 'utf8'));
+  const json = JSON.parse(safeFs.readFileSync(letterPath, 'utf8'));
   return renderLetterAsMarkdown(json);
 }
 

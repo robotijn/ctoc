@@ -43,7 +43,7 @@
  * @property {number}          count       === candidates.length.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /** 14-day advisory age threshold, in milliseconds. */
@@ -256,7 +256,7 @@ function declaredFileExists(root, declared) {
   // guarantee literal rather than incidental.
   const parts = declared.split(/[\\/]+/).filter((p) => p.length > 0 && p !== '.' && p !== '..');
   if (parts.length === 0) return true; // nothing meaningful to check
-  return fs.existsSync(path.join(root, ...parts));
+  return safeFs.existsSync(path.join(root, ...parts));
 }
 
 /**
@@ -351,7 +351,7 @@ function verifyStaleCandidate(candidate, root, opts = {}) {
   const planFsPath = path.join(root, 'plans', candidate.stage, candidate.plan + '.md');
   let content = '';
   try {
-    content = fs.readFileSync(planFsPath, 'utf8');
+    content = safeFs.readFileSync(planFsPath, 'utf8');
   } catch {
     content = ''; // degrade; do not throw
   }
@@ -607,17 +607,17 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
   /** @type {StaleCandidate[]} */
   const candidates = [];
   const plansDir = path.join(root, 'plans');
-  if (!fs.existsSync(plansDir)) {
+  if (!safeFs.existsSync(plansDir)) {
     return { candidates, count: 0 };
   }
 
   for (const stage of GATE_SOURCE_STAGES) {
     const stageDir = path.join(plansDir, stage);
-    if (!fs.existsSync(stageDir)) continue;
+    if (!safeFs.existsSync(stageDir)) continue;
 
     let entries;
     try {
-      entries = fs.readdirSync(stageDir);
+      entries = safeFs.readdirSync(stageDir);
     } catch {
       continue; // stage dir unreadable — skip the whole stage, keep going
     }
@@ -649,7 +649,7 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
       // stat supplies the advisory mtime, so no second stat is needed.
       let st;
       try {
-        st = fs.lstatSync(filePath);
+        st = safeFs.lstatSync(filePath);
       } catch {
         continue; // file vanished between readdir and stat — skip
       }
@@ -658,7 +658,7 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
 
       let content;
       try {
-        content = fs.readFileSync(filePath, 'utf8');
+        content = safeFs.readFileSync(filePath, 'utf8');
       } catch {
         continue; // file vanished or became unreadable mid-scan — skip
       }

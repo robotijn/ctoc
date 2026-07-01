@@ -9,7 +9,7 @@
  * - TypeScript support
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { FrameworkDetector } = require('./framework-detector');
 
@@ -46,20 +46,20 @@ class PlaywrightScaffolder {
     // Ensure test directory exists
     const testDir = this.detector.getTestDirectory();
     const testDirPath = path.join(this.projectRoot, testDir);
-    if (!fs.existsSync(testDirPath)) {
-      fs.mkdirSync(testDirPath, { recursive: true });
+    if (!safeFs.existsSync(testDirPath)) {
+      safeFs.mkdirSync(testDirPath, { recursive: true });
     }
 
     // Create playwright.config.ts
     const configContent = this.generateConfig();
     const configPath = path.join(this.projectRoot, 'playwright.config.ts');
-    fs.writeFileSync(configPath, configContent);
+    safeFs.writeFileSync(configPath, configContent);
     createdFiles.push('playwright.config.ts');
 
     // Create example test
     const exampleContent = this.generateExampleTest();
     const examplePath = path.join(testDirPath, 'example.spec.ts');
-    fs.writeFileSync(examplePath, exampleContent);
+    safeFs.writeFileSync(examplePath, exampleContent);
     createdFiles.push(`${testDir}/example.spec.ts`);
 
     // Create Page Object Model structure if requested
@@ -251,8 +251,8 @@ test.describe('Performance', () => {
     const createdFiles = [];
     const pagesDir = path.join(this.projectRoot, testDir, 'pages');
 
-    if (!fs.existsSync(pagesDir)) {
-      fs.mkdirSync(pagesDir, { recursive: true });
+    if (!safeFs.existsSync(pagesDir)) {
+      safeFs.mkdirSync(pagesDir, { recursive: true });
     }
 
     // Create BasePage
@@ -320,7 +320,7 @@ export abstract class BasePage {
 `;
 
     const basePagePath = path.join(pagesDir, 'BasePage.ts');
-    fs.writeFileSync(basePagePath, basePageContent);
+    safeFs.writeFileSync(basePagePath, basePageContent);
     createdFiles.push(`${testDir}/pages/BasePage.ts`);
 
     // Create HomePage example
@@ -373,7 +373,7 @@ export class HomePage extends BasePage {
 `;
 
     const homePagePath = path.join(pagesDir, 'HomePage.ts');
-    fs.writeFileSync(homePagePath, homePageContent);
+    safeFs.writeFileSync(homePagePath, homePageContent);
     createdFiles.push(`${testDir}/pages/HomePage.ts`);
 
     // Create index.ts for exports
@@ -382,7 +382,7 @@ export { HomePage } from './HomePage';
 `;
 
     const indexPath = path.join(pagesDir, 'index.ts');
-    fs.writeFileSync(indexPath, indexContent);
+    safeFs.writeFileSync(indexPath, indexContent);
     createdFiles.push(`${testDir}/pages/index.ts`);
 
     return createdFiles;
@@ -394,8 +394,8 @@ export { HomePage } from './HomePage';
    */
   generateCIWorkflow() {
     const workflowDir = path.join(this.projectRoot, '.github', 'workflows');
-    if (!fs.existsSync(workflowDir)) {
-      fs.mkdirSync(workflowDir, { recursive: true });
+    if (!safeFs.existsSync(workflowDir)) {
+      safeFs.mkdirSync(workflowDir, { recursive: true });
     }
 
     const content = `name: Playwright E2E Tests
@@ -443,7 +443,7 @@ jobs:
 `;
 
     const workflowPath = path.join(workflowDir, 'playwright.yml');
-    fs.writeFileSync(workflowPath, content);
+    safeFs.writeFileSync(workflowPath, content);
     return '.github/workflows/playwright.yml';
   }
 

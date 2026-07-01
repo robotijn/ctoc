@@ -8,7 +8,7 @@
  * 3. Remote fetch from GitHub
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const https = require('https');
 const { CTOC_HOME } = require('./crypto');
@@ -24,8 +24,8 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
  * Ensures cache directory exists
  */
 function ensureCacheDir() {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  if (!safeFs.existsSync(CACHE_DIR)) {
+    safeFs.mkdirSync(CACHE_DIR, { recursive: true });
   }
 }
 
@@ -60,12 +60,12 @@ function getCached(cacheKey) {
   ensureCacheDir();
   const cachePath = path.join(CACHE_DIR, cacheKey + '.json');
 
-  if (!fs.existsSync(cachePath)) {
+  if (!safeFs.existsSync(cachePath)) {
     return null;
   }
 
   try {
-    const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    const cached = JSON.parse(safeFs.readFileSync(cachePath, 'utf8'));
     if (Date.now() - cached.timestamp < CACHE_TTL) {
       return cached.content;
     }
@@ -83,7 +83,7 @@ function setCache(cacheKey, content) {
   ensureCacheDir();
   const cachePath = path.join(CACHE_DIR, cacheKey + '.json');
 
-  fs.writeFileSync(cachePath, JSON.stringify({
+  safeFs.writeFileSync(cachePath, JSON.stringify({
     timestamp: Date.now(),
     content
   }));
@@ -107,8 +107,8 @@ function loadEmbeddedSkill(skillName, type, category = null) {
     return null;
   }
 
-  if (fs.existsSync(skillPath)) {
-    return fs.readFileSync(skillPath, 'utf8');
+  if (safeFs.existsSync(skillPath)) {
+    return safeFs.readFileSync(skillPath, 'utf8');
   }
 
   return null;
@@ -121,9 +121,9 @@ function loadEmbeddedSkill(skillName, type, category = null) {
 async function loadSkillsIndex() {
   // First, try local embedded index
   const localIndex = path.join(__dirname, '..', 'data', 'skills-index.json');
-  if (fs.existsSync(localIndex)) {
+  if (safeFs.existsSync(localIndex)) {
     try {
-      return JSON.parse(fs.readFileSync(localIndex, 'utf8'));
+      return JSON.parse(safeFs.readFileSync(localIndex, 'utf8'));
     } catch (e) {
       // Fall through to cache
     }
@@ -283,17 +283,17 @@ function getEmbeddedSkillsCounts() {
 
   // Count languages
   const langDir = path.join(EMBEDDED_SKILLS_DIR, 'languages');
-  if (fs.existsSync(langDir)) {
-    counts.languages = fs.readdirSync(langDir).filter(f => f.endsWith('.md')).length;
+  if (safeFs.existsSync(langDir)) {
+    counts.languages = safeFs.readdirSync(langDir).filter(f => f.endsWith('.md')).length;
   }
 
   // Count frameworks by category
   const fwDir = path.join(EMBEDDED_SKILLS_DIR, 'frameworks');
-  if (fs.existsSync(fwDir)) {
+  if (safeFs.existsSync(fwDir)) {
     for (const category of ['web', 'ai-ml', 'data', 'devops', 'mobile']) {
       const catDir = path.join(fwDir, category);
-      if (fs.existsSync(catDir)) {
-        const count = fs.readdirSync(catDir).filter(f => f.endsWith('.md')).length;
+      if (safeFs.existsSync(catDir)) {
+        const count = safeFs.readdirSync(catDir).filter(f => f.endsWith('.md')).length;
         counts.frameworks[category] = count;
         counts.frameworks.total += count;
       }
@@ -308,10 +308,10 @@ function getEmbeddedSkillsCounts() {
  */
 function clearCache() {
   ensureCacheDir();
-  const files = fs.readdirSync(CACHE_DIR);
+  const files = safeFs.readdirSync(CACHE_DIR);
   for (const file of files) {
     if (file.endsWith('.json')) {
-      fs.unlinkSync(path.join(CACHE_DIR, file));
+      safeFs.unlinkSync(path.join(CACHE_DIR, file));
     }
   }
 }

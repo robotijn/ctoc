@@ -12,7 +12,7 @@
  * Cross-platform: uses path.join, fs.promises, no shell-outs.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const SETTINGS_PATH = '.ctoc/settings.yaml';
@@ -169,9 +169,9 @@ function coerce(v) {
  */
 function loadActiveProfiles(projectRoot) {
   const settingsPath = path.join(projectRoot, SETTINGS_PATH);
-  if (!fs.existsSync(settingsPath)) return { profiles: [], overrides: {} };
+  if (!safeFs.existsSync(settingsPath)) return { profiles: [], overrides: {} };
 
-  const content = fs.readFileSync(settingsPath, 'utf8');
+  const content = safeFs.readFileSync(settingsPath, 'utf8');
 
   // Extract just the regulatory_regime block
   const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|Z)/m);
@@ -210,10 +210,10 @@ function loadActiveProfiles(projectRoot) {
  */
 function loadProfile(projectRoot, profileName) {
   const profilePath = path.join(projectRoot, PROFILES_DIR, `${profileName}.yaml`);
-  if (!fs.existsSync(profilePath)) {
+  if (!safeFs.existsSync(profilePath)) {
     return null;
   }
-  const content = fs.readFileSync(profilePath, 'utf8');
+  const content = safeFs.readFileSync(profilePath, 'utf8');
   const parsed = parseYAMLShallow(content);
   return parsed;
 }
@@ -300,8 +300,8 @@ function regimeSummary(projectRoot) {
  */
 function listAvailableProfiles(projectRoot) {
   const dir = path.join(projectRoot, PROFILES_DIR);
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir)
+  if (!safeFs.existsSync(dir)) return [];
+  return safeFs.readdirSync(dir)
     .filter(f => f.endsWith('.yaml'))
     .map(f => f.replace(/\.yaml$/, ''))
     .sort();

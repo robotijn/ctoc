@@ -3,7 +3,7 @@
  * Handles plan files, agent status, and navigation
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { readStatus, getStatusIcon } = require('./background');
 const { findProjectRoot } = require('./project-root');
@@ -17,16 +17,16 @@ function getPlansDir(projectPath) {
 
 // Read plans from a directory
 function readPlans(dirPath) {
-  if (!fs.existsSync(dirPath)) {
+  if (!safeFs.existsSync(dirPath)) {
     return [];
   }
 
-  const files = fs.readdirSync(dirPath)
+  const files = safeFs.readdirSync(dirPath)
     .filter(f => f.endsWith('.md'))
     .map(f => {
       const filePath = path.join(dirPath, f);
-      const stat = fs.statSync(filePath);
-      const content = fs.readFileSync(filePath, 'utf8');
+      const stat = safeFs.statSync(filePath);
+      const content = safeFs.readFileSync(filePath, 'utf8');
       const metadata = parseMetadata(content);
 
       // Read background processing status
@@ -120,7 +120,7 @@ function getAgentStatus(projectPath) {
       const stateFile = path.join(root, '.ctoc', 'state', 'agent.json');
       let step = null, phase = null, task = null;
       try {
-        const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+        const state = JSON.parse(safeFs.readFileSync(stateFile, 'utf8'));
         step = state.step || null;
         phase = state.phase || null;
         task = state.task || null;
@@ -167,8 +167,8 @@ function setAgentStatus(projectPath, status) {
   const stateFile = path.join(stateDir, 'agent.json');
 
   // Ensure state directory exists
-  if (!fs.existsSync(stateDir)) {
-    fs.mkdirSync(stateDir, { recursive: true });
+  if (!safeFs.existsSync(stateDir)) {
+    safeFs.mkdirSync(stateDir, { recursive: true });
   }
 
   const agentStatus = {
@@ -181,7 +181,7 @@ function setAgentStatus(projectPath, status) {
     updatedAt: new Date().toISOString()
   };
 
-  fs.writeFileSync(stateFile, JSON.stringify(agentStatus, null, 2));
+  safeFs.writeFileSync(stateFile, JSON.stringify(agentStatus, null, 2));
   return agentStatus;
 }
 
@@ -195,8 +195,8 @@ function clearAgentStatus(projectPath) {
   const stateFile = path.join(stateDir, 'agent.json');
 
   // Ensure state directory exists
-  if (!fs.existsSync(stateDir)) {
-    fs.mkdirSync(stateDir, { recursive: true });
+  if (!safeFs.existsSync(stateDir)) {
+    safeFs.mkdirSync(stateDir, { recursive: true });
   }
 
   const agentStatus = {
@@ -208,7 +208,7 @@ function clearAgentStatus(projectPath) {
     completedAt: new Date().toISOString()
   };
 
-  fs.writeFileSync(stateFile, JSON.stringify(agentStatus, null, 2));
+  safeFs.writeFileSync(stateFile, JSON.stringify(agentStatus, null, 2));
   return agentStatus;
 }
 
@@ -223,7 +223,7 @@ function getNextFromTodo(projectPath) {
   const plansDir = getPlansDir(root);
   const todoDir = path.join(plansDir, 'todo');
 
-  if (!fs.existsSync(todoDir)) {
+  if (!safeFs.existsSync(todoDir)) {
     return null;
   }
 
@@ -302,12 +302,12 @@ function getSettings(projectPath) {
     finishedItemsToShow: 10
   };
 
-  if (!fs.existsSync(settingsFile)) {
+  if (!safeFs.existsSync(settingsFile)) {
     return defaults;
   }
 
   try {
-    const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+    const settings = JSON.parse(safeFs.readFileSync(settingsFile, 'utf8'));
     return { ...defaults, ...settings };
   } catch {
     return defaults;
@@ -319,11 +319,11 @@ function saveSettings(settings, projectPath) {
   const settingsDir = path.join(root, '.ctoc');
   const settingsFile = path.join(settingsDir, 'settings.json');
 
-  if (!fs.existsSync(settingsDir)) {
-    fs.mkdirSync(settingsDir, { recursive: true });
+  if (!safeFs.existsSync(settingsDir)) {
+    safeFs.mkdirSync(settingsDir, { recursive: true });
   }
 
-  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+  safeFs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
 }
 
 // Get vision counts for dashboard (memoized)
@@ -332,11 +332,11 @@ const getVisionCounts = memoize(function getVisionCountsImpl(projectPath) {
   const plansDir = getPlansDir(root);
   const visionDir = path.join(plansDir, 'vision');
 
-  if (!fs.existsSync(visionDir)) {
+  if (!safeFs.existsSync(visionDir)) {
     return { total: 0, exploring: 0, ready: 0, converted: 0 };
   }
 
-  const files = fs.readdirSync(visionDir)
+  const files = safeFs.readdirSync(visionDir)
     .filter(f => f.endsWith('.md') && f !== '.gitkeep');
 
   let exploring = 0;
@@ -345,7 +345,7 @@ const getVisionCounts = memoize(function getVisionCountsImpl(projectPath) {
   let decomposing = 0;
 
   files.forEach(f => {
-    const content = fs.readFileSync(path.join(visionDir, f), 'utf8');
+    const content = safeFs.readFileSync(path.join(visionDir, f), 'utf8');
     const statusMatch = content.match(/^- Status: (\w+)$/m);
     const status = statusMatch ? statusMatch[1] : 'exploring';
 

@@ -57,7 +57,7 @@
 
 'use strict';
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -89,11 +89,11 @@ function getPosture(planPath) {
     throw new Error('getPosture: planPath must be a non-empty string');
   }
   const resolved = path.resolve(planPath);
-  if (!fs.existsSync(resolved)) {
+  if (!safeFs.existsSync(resolved)) {
     throw new Error(`getPosture: plan not found: ${resolved}`);
   }
 
-  const text = fs.readFileSync(resolved, 'utf8');
+  const text = safeFs.readFileSync(resolved, 'utf8');
   const fmMatch = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
   if (!fmMatch) {
     // No frontmatter at all — treat as default. This matches Heppner: the

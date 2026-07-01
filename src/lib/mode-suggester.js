@@ -695,7 +695,7 @@ class ModeSuggester {
     }
 
     // Editor config
-    if (!fs.existsSync(path.join(analysis.project, '.editorconfig'))) {
+    if (!safeFs.existsSync(path.join(analysis.project, '.editorconfig'))) {
       wins.push('Add .editorconfig for consistent formatting');
     }
 
@@ -703,8 +703,8 @@ class ModeSuggester {
   }
 }
 
-// Import fs for quick wins check
-const fs = require('fs');
+// Import safe-fs for quick wins check
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 module.exports = {

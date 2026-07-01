@@ -3,7 +3,7 @@
  * Detects languages and frameworks in a project
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const LANGUAGE_PATTERNS = {
@@ -135,14 +135,14 @@ function detectLanguages(projectPath) {
     for (const file of patterns.files) {
       if (file.includes('*')) {
         try {
-          const files = fs.readdirSync(projectPath);
+          const files = safeFs.readdirSync(projectPath);
           if (files.some(f => matchGlob(f, file))) {
             found = true;
             break;
           }
         } catch (e) { /* ignore: unreadable dir means no match for this pattern */ }
       } else {
-        if (fs.existsSync(path.join(projectPath, file))) {
+        if (safeFs.existsSync(path.join(projectPath, file))) {
           found = true;
           break;
         }
@@ -168,10 +168,10 @@ function detectLanguages(projectPath) {
  */
 function readPackageDeps(projectPath) {
   const pkgPath = path.join(projectPath, 'package.json');
-  if (!fs.existsSync(pkgPath)) return {};
+  if (!safeFs.existsSync(pkgPath)) return {};
 
   try {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const pkg = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
     return { ...pkg.dependencies, ...pkg.devDependencies };
   } catch (e) {
     return {};
@@ -183,10 +183,10 @@ function readPackageDeps(projectPath) {
  */
 function readPythonDeps(projectPath) {
   const reqPath = path.join(projectPath, 'requirements.txt');
-  if (!fs.existsSync(reqPath)) return [];
+  if (!safeFs.existsSync(reqPath)) return [];
 
   try {
-    return fs.readFileSync(reqPath, 'utf8').split('\n').map(l => l.trim().split(/[=<>]/)[0]);
+    return safeFs.readFileSync(reqPath, 'utf8').split('\n').map(l => l.trim().split(/[=<>]/)[0]);
   } catch (e) {
     return [];
   }
@@ -213,7 +213,7 @@ function detectFrameworks(projectPath, languages) {
     // Check files
     if (config.files) {
       for (const file of config.files) {
-        if (fs.existsSync(path.join(projectPath, file))) {
+        if (safeFs.existsSync(path.join(projectPath, file))) {
           found = true;
           break;
         }

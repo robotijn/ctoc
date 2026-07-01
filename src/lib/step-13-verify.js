@@ -10,7 +10,7 @@
  */
 
 const { execSync } = require('child_process');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -68,10 +68,10 @@ function runFallbackChecks(projectPath) {
   const errors = [];
 
   // Detect project type
-  const hasPackageJson = fs.existsSync(path.join(projectPath, 'package.json'));
-  const hasPyproject = fs.existsSync(path.join(projectPath, 'pyproject.toml'));
-  const hasGoMod = fs.existsSync(path.join(projectPath, 'go.mod'));
-  const hasCargoToml = fs.existsSync(path.join(projectPath, 'Cargo.toml'));
+  const hasPackageJson = safeFs.existsSync(path.join(projectPath, 'package.json'));
+  const hasPyproject = safeFs.existsSync(path.join(projectPath, 'pyproject.toml'));
+  const hasGoMod = safeFs.existsSync(path.join(projectPath, 'go.mod'));
+  const hasCargoToml = safeFs.existsSync(path.join(projectPath, 'Cargo.toml'));
 
   // Lint checks
   const lintCommands = [];

@@ -17,6 +17,7 @@
  */
 
 const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -59,15 +60,15 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;  // 5MB
  */
 function safeFileExists(filePath, repoRoot) {
   try {
-    const resolvedPath = fs.realpathSync(filePath);
-    const resolvedRoot = fs.realpathSync(repoRoot);
+    const resolvedPath = safeFs.realpathSync(filePath);
+    const resolvedRoot = safeFs.realpathSync(repoRoot);
 
     // Ensure file is within repo
     if (!resolvedPath.startsWith(resolvedRoot)) {
       return false;
     }
 
-    return fs.existsSync(resolvedPath);
+    return safeFs.existsSync(resolvedPath);
   } catch {
     return false;
   }
@@ -78,7 +79,7 @@ function safeFileExists(filePath, repoRoot) {
  */
 function safeStats(filePath) {
   try {
-    return fs.statSync(filePath);
+    return safeFs.statSync(filePath);
   } catch {
     return null;
   }
@@ -98,7 +99,7 @@ function isBinaryExtension(filePath) {
 function isBinaryContent(filePath) {
   try {
     const buffer = Buffer.alloc(8000);
-    const fd = fs.openSync(filePath, 'r');
+    const fd = safeFs.openSync(filePath, 'r');
     const bytesRead = fs.readSync(fd, buffer, 0, 8000, 0);
     fs.closeSync(fd);
 
@@ -301,7 +302,7 @@ class StagedFiles {
         // readFileSync takes no length option; the previous { length: 100 }
         // third argument was silently ignored by Node and is removed here.
         // Behavior is otherwise unchanged: detect a shell shebang.
-        const content = fs.readFileSync(fullPath, 'utf8');
+        const content = safeFs.readFileSync(fullPath, 'utf8');
         return content.startsWith('#!') && content.includes('sh');
       } catch {
         return false;

@@ -11,7 +11,7 @@
  * - Git HEAD tracking
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
@@ -62,8 +62,8 @@ function getGitHead() {
  */
 function ensureStateDir() {
   const dir = getStateDir();
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) {
+    safeFs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -76,8 +76,8 @@ function atomicWrite(filePath, data) {
   const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
   const tempPath = `${filePath}.tmp.${process.pid}`;
 
-  fs.writeFileSync(tempPath, content, 'utf8');
-  fs.renameSync(tempPath, filePath);
+  safeFs.writeFileSync(tempPath, content, 'utf8');
+  safeFs.renameSync(tempPath, filePath);
 }
 
 /**
@@ -85,10 +85,10 @@ function atomicWrite(filePath, data) {
  */
 function safeRead(filePath, defaultValue = null) {
   try {
-    if (!fs.existsSync(filePath)) {
+    if (!safeFs.existsSync(filePath)) {
       return defaultValue;
     }
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = safeFs.readFileSync(filePath, 'utf8');
     return JSON.parse(content);
   } catch (err) {
     console.warn(`Warning: Could not read ${filePath}: ${err.message}`);
@@ -117,9 +117,9 @@ function acquireLock() {
   const lockFile = getLockFilePath();
 
   // Check for existing lock
-  if (fs.existsSync(lockFile)) {
+  if (safeFs.existsSync(lockFile)) {
     try {
-      const lockData = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+      const lockData = JSON.parse(safeFs.readFileSync(lockFile, 'utf8'));
 
       // Check if lock holder is still alive
       if (isProcessAlive(lockData.pid)) {
@@ -129,10 +129,10 @@ function acquireLock() {
 
       // Stale lock - previous process crashed
       console.log(`Removing stale lock from crashed process (PID: ${lockData.pid})`);
-      fs.unlinkSync(lockFile);
+      safeFs.unlinkSync(lockFile);
     } catch {
       // Corrupted lock file, remove it
-      fs.unlinkSync(lockFile);
+      safeFs.unlinkSync(lockFile);
     }
   }
 
@@ -153,11 +153,11 @@ function acquireLock() {
 function releaseLock() {
   const lockFile = getLockFilePath();
   try {
-    if (fs.existsSync(lockFile)) {
+    if (safeFs.existsSync(lockFile)) {
       const lockData = safeRead(lockFile);
       // Only release if we own the lock
       if (lockData && lockData.pid === process.pid) {
-        fs.unlinkSync(lockFile);
+        safeFs.unlinkSync(lockFile);
       }
     }
   } catch (err) {
@@ -270,7 +270,7 @@ function recoverIfNeeded() {
 
   // Check for stale "running" state without lock
   if (status.overallStatus === 'running') {
-    if (!fs.existsSync(lockFile)) {
+    if (!safeFs.existsSync(lockFile)) {
       console.log('Detected interrupted quality check, resetting state...');
       updateStatus({
         overallStatus: 'unknown',

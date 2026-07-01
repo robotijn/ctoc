@@ -17,7 +17,7 @@
  * settings.json that src/lib/deployment.js reads.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const SETTINGS_TABS = [
@@ -147,9 +147,9 @@ function getSettingsPath(projectPath = process.cwd()) {
 // Read the raw settings file (no defaults merged). Returns {} if absent/invalid.
 function readRawSettings(projectPath = process.cwd()) {
   const settingsPath = getSettingsPath(projectPath);
-  if (!fs.existsSync(settingsPath)) return {};
+  if (!safeFs.existsSync(settingsPath)) return {};
   try {
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    return JSON.parse(safeFs.readFileSync(settingsPath, 'utf8'));
   } catch {
     return {};
   }
@@ -202,11 +202,11 @@ function saveSettings(settings, projectPath = process.cwd()) {
   const settingsDir = path.join(projectPath, '.ctoc');
   const settingsPath = getSettingsPath(projectPath);
 
-  if (!fs.existsSync(settingsDir)) {
-    fs.mkdirSync(settingsDir, { recursive: true });
+  if (!safeFs.existsSync(settingsDir)) {
+    safeFs.mkdirSync(settingsDir, { recursive: true });
   }
 
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  safeFs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 // Get a single setting

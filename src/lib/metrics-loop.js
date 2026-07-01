@@ -28,7 +28,7 @@
  *     https://en.wikipedia.org/wiki/Defect_density
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 // ─────────────────────────────────────────────────────────────────────
@@ -42,18 +42,18 @@ const PLANS_DONE_DIR = path.join('plans', 'done');
 const LOOPS_DIR = path.join('.ctoc', 'loops');
 
 function safeReadDir(p) {
-  if (!fs.existsSync(p)) return [];
+  if (!safeFs.existsSync(p)) return [];
   try {
-    return fs.readdirSync(p);
+    return safeFs.readdirSync(p);
   } catch (_e) {
     return [];
   }
 }
 
 function safeReadFile(p) {
-  if (!fs.existsSync(p)) return null;
+  if (!safeFs.existsSync(p)) return null;
   try {
-    return fs.readFileSync(p, 'utf8');
+    return safeFs.readFileSync(p, 'utf8');
   } catch (_e) {
     return null;
   }
@@ -112,7 +112,7 @@ function loadDispatches(projectRoot) {
     const subPath = path.join(dir, subdir);
     let stat;
     try {
-      stat = fs.statSync(subPath);
+      stat = safeFs.statSync(subPath);
     } catch (_e) {
       continue;
     }

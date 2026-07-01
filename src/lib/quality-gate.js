@@ -9,7 +9,7 @@
  * - Architecture: Dependency violations, circular dependencies
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -626,11 +626,11 @@ class QualityGate {
     results.results = this.results;
 
     const dir = path.dirname(outputPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (!safeFs.existsSync(dir)) {
+      safeFs.mkdirSync(dir, { recursive: true });
     }
 
-    fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
+    safeFs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
   }
 
   /**
@@ -639,12 +639,12 @@ class QualityGate {
    * @returns {Object} Loaded thresholds
    */
   static loadConfig(configPath) {
-    if (!fs.existsSync(configPath)) {
+    if (!safeFs.existsSync(configPath)) {
       return {};
     }
 
     const ext = path.extname(configPath);
-    const content = fs.readFileSync(configPath, 'utf8');
+    const content = safeFs.readFileSync(configPath, 'utf8');
 
     if (ext === '.json') {
       return JSON.parse(content);

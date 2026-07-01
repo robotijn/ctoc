@@ -13,7 +13,7 @@
  * Provides utility functions for kpi-planner, product-reviewer, experiment-designer.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const ROOT = process.cwd();
@@ -21,8 +21,8 @@ const CANONICAL_KPI_PATH = path.join(ROOT, '.ctoc', 'templates', 'product-kpis.y
 const REVIEWS_DIR = path.join(ROOT, '.ctoc', 'product-loop', 'reviews');
 const EXPERIMENTS_DIR = path.join(ROOT, '.ctoc', 'product-loop', 'experiments');
 
-function ensureDir(d) { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); }
-function readFile(p, fallback = '') { return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : fallback; }
+function ensureDir(d) { if (!safeFs.existsSync(d)) safeFs.mkdirSync(d, { recursive: true }); }
+function readFile(p, fallback = '') { return safeFs.existsSync(p) ? safeFs.readFileSync(p, 'utf8') : fallback; }
 
 // ─────────────────────────────────────────────────────────────────────
 //  KPI library loading
@@ -109,7 +109,7 @@ function saveProjectKPIPlan(slug, plan) {
   const p = projectKPIPlanPath(slug);
   ensureDir(path.dirname(p));
   const yaml = renderKPIPlan(plan);
-  fs.writeFileSync(p, yaml);
+  safeFs.writeFileSync(p, yaml);
   return p;
 }
 
@@ -138,8 +138,8 @@ function renderKPIPlan(plan) {
 // ─────────────────────────────────────────────────────────────────────
 
 function listReviews() {
-  if (!fs.existsSync(REVIEWS_DIR)) return [];
-  return fs.readdirSync(REVIEWS_DIR).filter(f => f.endsWith('.md')).map(f => path.join(REVIEWS_DIR, f)).sort();
+  if (!safeFs.existsSync(REVIEWS_DIR)) return [];
+  return safeFs.readdirSync(REVIEWS_DIR).filter(f => f.endsWith('.md')).map(f => path.join(REVIEWS_DIR, f)).sort();
 }
 
 function latestReview() {
@@ -150,16 +150,16 @@ function latestReview() {
 function saveReview(date, content) {
   ensureDir(REVIEWS_DIR);
   const p = path.join(REVIEWS_DIR, `${date}.md`);
-  fs.writeFileSync(p, content);
+  safeFs.writeFileSync(p, content);
   return p;
 }
 
 function listExperiments({ status } = {}) {
-  if (!fs.existsSync(EXPERIMENTS_DIR)) return [];
-  const files = fs.readdirSync(EXPERIMENTS_DIR).filter(f => f.endsWith('.yaml'));
+  if (!safeFs.existsSync(EXPERIMENTS_DIR)) return [];
+  const files = safeFs.readdirSync(EXPERIMENTS_DIR).filter(f => f.endsWith('.yaml'));
   const out = [];
   for (const f of files) {
-    const content = fs.readFileSync(path.join(EXPERIMENTS_DIR, f), 'utf8');
+    const content = safeFs.readFileSync(path.join(EXPERIMENTS_DIR, f), 'utf8');
     const statusMatch = content.match(/^status:\s*(\S+)/m);
     const expStatus = statusMatch ? statusMatch[1] : 'unknown';
     if (status && expStatus !== status) continue;
@@ -171,7 +171,7 @@ function listExperiments({ status } = {}) {
 function saveExperiment(id, content) {
   ensureDir(EXPERIMENTS_DIR);
   const p = path.join(EXPERIMENTS_DIR, `${id}.yaml`);
-  fs.writeFileSync(p, content);
+  safeFs.writeFileSync(p, content);
   return p;
 }
 

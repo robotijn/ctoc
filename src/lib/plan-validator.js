@@ -4,7 +4,7 @@
  * Addresses: executor autonomy issues, missing validation, instruction adherence.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { parseMetadata } = require('./state');
 const { findProjectRoot } = require('./project-root');
@@ -33,7 +33,7 @@ const ESCALATION_STATUSES = ['SKIPPED', 'BLOCKED', 'DEFERRED'];
 function validateForReview(planPath, projectPath) {
   projectPath = projectPath || findProjectRoot();
 
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
   const metadata = parseMetadata(content);
 
   const result = {
@@ -307,7 +307,7 @@ function validateNoContradictions(content, projectPath) {
       ? filePath
       : path.join(projectPath, filePath);
 
-    const exists = fs.existsSync(fullPath);
+    const exists = safeFs.existsSync(fullPath);
     result.checklist[`file_${filePath}`] = { claimed: 'created', exists };
 
     if (!exists) {
@@ -332,7 +332,7 @@ function validateNoContradictions(content, projectPath) {
       continue;
     }
 
-    const exists = fs.existsSync(fullPath);
+    const exists = safeFs.existsSync(fullPath);
     result.checklist[`script_${scriptPath}`] = { referenced: true, exists };
 
     if (!exists) {
@@ -379,7 +379,7 @@ function checkForTestFiles(projectPath) {
 
   for (const pattern of testPatterns) {
     const testPath = path.join(projectPath, pattern);
-    if (fs.existsSync(testPath)) {
+    if (safeFs.existsSync(testPath)) {
       return true;
     }
   }
@@ -441,7 +441,7 @@ function validateInstructionAdherence(content, metadata) {
  * Validate plan before moving from functional to implementation
  */
 function validateFunctionalToImpl(planPath, projectPath) {
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
 
   const result = {
     valid: true,
@@ -489,7 +489,7 @@ function validateFunctionalToImpl(planPath, projectPath) {
  * Validate plan before moving from review to done
  */
 function validateReviewToDone(planPath, projectPath) {
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
   const metadata = parseMetadata(content);
 
   const result = {
@@ -526,7 +526,7 @@ function validateReviewToDone(planPath, projectPath) {
  * @returns {ValidationResult}
  */
 function validateVisionForDecomposition(planPath, projectPath) {
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
 
   const result = {
     valid: true,
@@ -612,7 +612,7 @@ function validateTransition(planPath, fromStage, toStage, projectPath) {
  * Validate plan before execution starts
  */
 function validateForExecution(planPath, projectPath) {
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
   const metadata = parseMetadata(content);
 
   const result = {
@@ -649,7 +649,7 @@ function validateForExecution(planPath, projectPath) {
  * Validate plan before adding to queue
  */
 function validateForQueue(planPath, projectPath) {
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
 
   const result = {
     valid: true,

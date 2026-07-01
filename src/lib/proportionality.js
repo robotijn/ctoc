@@ -25,7 +25,7 @@
  * Cross-platform: uses path.join and fs.promises only. No shell-outs.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const LOG_DIR = '.ctoc/proportionality-log';
@@ -167,9 +167,9 @@ async function logProportionalityDecision(kickbackId, factors, decision, opts) {
   };
 
   const logPath = logPathFor(projectRoot, now);
-  await fs.promises.mkdir(path.dirname(logPath), { recursive: true });
+  await safeFs.promises.mkdir(path.dirname(logPath), { recursive: true });
 
-  const isNew = !fs.existsSync(logPath);
+  const isNew = !safeFs.existsSync(logPath);
   const header = isNew
     ? [
         '# =============================================================================',
@@ -197,7 +197,7 @@ async function logProportionalityDecision(kickbackId, factors, decision, opts) {
 
   const block = lines.join('\n') + '\n';
 
-  await fs.promises.appendFile(logPath, header + block, 'utf8');
+  await safeFs.promises.appendFile(logPath, header + block, 'utf8');
 
   return { path: logPath, entry };
 }

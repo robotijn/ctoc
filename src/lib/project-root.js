@@ -3,7 +3,7 @@
  * Ensures CTOC always operates from the project root, regardless of current directory.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -25,15 +25,15 @@ function findProjectRoot(startDir = process.cwd()) {
   // Search up to 15 levels (handles deep nesting)
   for (let i = 0; i < 15; i++) {
     // Priority 1: CTOC markers (strongest indicators)
-    if (fs.existsSync(path.join(dir, '.ctoc'))) {
+    if (safeFs.existsSync(path.join(dir, '.ctoc'))) {
       return dir;
     }
-    if (fs.existsSync(path.join(dir, 'plans'))) {
+    if (safeFs.existsSync(path.join(dir, 'plans'))) {
       // Verify it's a CTOC plans directory (has expected subdirs)
       const plansDir = path.join(dir, 'plans');
-      if (fs.statSync(plansDir).isDirectory()) {
+      if (safeFs.statSync(plansDir).isDirectory()) {
         const subDirs = ['vision', 'functional', 'implementation', 'todo', 'done', 'in-progress', 'review'];
-        const hasCtocPlans = subDirs.some(sub => fs.existsSync(path.join(plansDir, sub)));
+        const hasCtocPlans = subDirs.some(sub => safeFs.existsSync(path.join(plansDir, sub)));
         if (hasCtocPlans) {
           return dir;
         }
@@ -41,14 +41,14 @@ function findProjectRoot(startDir = process.cwd()) {
     }
 
     // Priority 2: Git repository root
-    if (fs.existsSync(path.join(dir, '.git'))) {
+    if (safeFs.existsSync(path.join(dir, '.git'))) {
       return dir;
     }
 
     // Priority 3: Common project root files
     const projectFiles = ['CLAUDE.md', 'package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'pom.xml', 'build.gradle'];
     for (const file of projectFiles) {
-      if (fs.existsSync(path.join(dir, file))) {
+      if (safeFs.existsSync(path.join(dir, file))) {
         return dir;
       }
     }

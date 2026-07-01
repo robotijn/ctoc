@@ -11,7 +11,7 @@
  * @module lib/pipeline-orchestrator
  */
 
-const fs = require('fs').promises;
+const safeFs = require('./safe-fs');
 const path = require('path');
 const EventEmitter = require('events');
 
@@ -93,7 +93,7 @@ class PipelineOrchestrator extends EventEmitter {
 
     try {
       // Load agent
-      ctx.agent = await fs.readFile(agentPath, 'utf8');
+      ctx.agent = await safeFs.promises.readFile(agentPath, 'utf8');
       ctx.originalAgent = ctx.agent;
 
       // Main improvement loop
@@ -185,7 +185,7 @@ class PipelineOrchestrator extends EventEmitter {
 
         // Save progress
         if (!this.options.dryRun) {
-          await fs.writeFile(agentPath, ctx.agent);
+          await safeFs.promises.writeFile(agentPath, ctx.agent);
         }
 
         ctx.round++;

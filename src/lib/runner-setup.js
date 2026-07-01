@@ -8,7 +8,7 @@
  */
 
 const { execSync } = require('child_process');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const os = require('os');
 const https = require('https');
@@ -46,9 +46,9 @@ const DEFAULT_RUNNER_PATH = path.join(os.homedir(), 'actions-runner');
 function getRepoInfo(projectPath = process.cwd()) {
   try {
     const gitConfig = path.join(projectPath, '.git', 'config');
-    if (!fs.existsSync(gitConfig)) return null;
+    if (!safeFs.existsSync(gitConfig)) return null;
 
-    const config = fs.readFileSync(gitConfig, 'utf8');
+    const config = safeFs.readFileSync(gitConfig, 'utf8');
     const urlMatch = config.match(/url\s*=\s*.*github\.com[:/]([^/]+)\/([^/\s.]+)/);
 
     if (urlMatch) {
@@ -139,8 +139,8 @@ async function downloadRunner(version, targetPath = DEFAULT_RUNNER_PATH) {
   const filePath = path.join(targetPath, filename);
 
   // Create directory
-  if (!fs.existsSync(targetPath)) {
-    fs.mkdirSync(targetPath, { recursive: true });
+  if (!safeFs.existsSync(targetPath)) {
+    safeFs.mkdirSync(targetPath, { recursive: true });
   }
 
   // Download using curl (more reliable than https module for large files)
@@ -158,7 +158,7 @@ async function downloadRunner(version, targetPath = DEFAULT_RUNNER_PATH) {
   });
 
   // Cleanup archive
-  fs.unlinkSync(filePath);
+  safeFs.unlinkSync(filePath);
 
   return targetPath;
 }
@@ -178,7 +178,7 @@ async function configureRunner(options) {
   } = options;
 
   const configScript = path.join(runnerPath, 'config.sh');
-  if (!fs.existsSync(configScript)) {
+  if (!safeFs.existsSync(configScript)) {
     throw new Error('Runner not installed. Run download first.');
   }
 
@@ -254,7 +254,7 @@ function installService(runnerPath = DEFAULT_RUNNER_PATH) {
 function getServiceStatus(runnerPath = DEFAULT_RUNNER_PATH) {
   const svcScript = path.join(runnerPath, 'svc.sh');
 
-  if (!fs.existsSync(svcScript)) {
+  if (!safeFs.existsSync(svcScript)) {
     return { installed: false, running: false };
   }
 
@@ -284,11 +284,11 @@ function getServiceStatus(runnerPath = DEFAULT_RUNNER_PATH) {
 function updateWorkflows(projectPath, mode = 'hybrid') {
   const workflowsDir = path.join(projectPath, '.github', 'workflows');
 
-  if (!fs.existsSync(workflowsDir)) {
+  if (!safeFs.existsSync(workflowsDir)) {
     return { updated: false, message: 'No workflows directory found' };
   }
 
-  const files = fs.readdirSync(workflowsDir)
+  const files = safeFs.readdirSync(workflowsDir)
     .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
 
   const updated = [];
@@ -300,7 +300,7 @@ function updateWorkflows(projectPath, mode = 'hybrid') {
 
   for (const file of files) {
     const filePath = path.join(workflowsDir, file);
-    let content = fs.readFileSync(filePath, 'utf8');
+    let content = safeFs.readFileSync(filePath, 'utf8');
 
     // Check if already configured for self-hosted
     if (content.includes('self-hosted')) {
@@ -316,7 +316,7 @@ function updateWorkflows(projectPath, mode = 'hybrid') {
 
     // Backup original
     const backupPath = filePath + '.backup';
-    fs.writeFileSync(backupPath, content);
+    safeFs.writeFileSync(backupPath, content);
     backedUp.push(file);
 
     // Reset regex
@@ -332,7 +332,7 @@ function updateWorkflows(projectPath, mode = 'hybrid') {
       content = content.replace(ubuntuPattern, 'runs-on: [self-hosted, local]');
     }
 
-    fs.writeFileSync(filePath, content);
+    safeFs.writeFileSync(filePath, content);
     updated.push(file);
   }
 
@@ -349,14 +349,14 @@ function uninstallRunner(runnerPath = DEFAULT_RUNNER_PATH) {
 
   try {
     // Stop and uninstall service
-    if (fs.existsSync(svcScript)) {
+    if (safeFs.existsSync(svcScript)) {
       execSync(`sudo ${svcScript} stop || true`, { cwd: runnerPath, stdio: 'pipe' });
       execSync(`sudo ${svcScript} uninstall || true`, { cwd: runnerPath, stdio: 'pipe' });
     }
 
     // Remove runner configuration
     const configScript = path.join(runnerPath, 'config.sh');
-    if (fs.existsSync(configScript)) {
+    if (safeFs.existsSync(configScript)) {
       execSync(`./config.sh remove --token DUMMY 2>/dev/null || true`, {
         cwd: runnerPath,
         stdio: 'pipe'
@@ -364,7 +364,7 @@ function uninstallRunner(runnerPath = DEFAULT_RUNNER_PATH) {
     }
 
     // Remove directory
-    fs.rmSync(runnerPath, { recursive: true, force: true });
+    safeFs.rmSync(runnerPath, { recursive: true, force: true });
 
     return { success: true };
   } catch (error) {

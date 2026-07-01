@@ -11,7 +11,7 @@
  * - Documentation: 10%
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { CoverageChecker } = require('./coverage-checker');
 const { ArchitectureDetector } = require('./architecture-detector');
@@ -146,7 +146,7 @@ class QualityScorer {
     let coverageData = null;
     for (const { path: relPath, format } of coveragePaths) {
       const fullPath = path.join(this.projectPath, relPath);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         try {
           const checker = new CoverageChecker(this.options.mode);
           coverageData = checker.parseCoverage(format, fullPath);
@@ -213,7 +213,7 @@ class QualityScorer {
 
     let hasLintConfig = false;
     for (const config of lintConfigs) {
-      if (fs.existsSync(path.join(this.projectPath, config))) {
+      if (safeFs.existsSync(path.join(this.projectPath, config))) {
         hasLintConfig = true;
         result.source = config;
         break;
@@ -227,9 +227,9 @@ class QualityScorer {
 
     // Try to read actual lint results if available
     const lintResultsPath = path.join(this.projectPath, 'lint-results.json');
-    if (fs.existsSync(lintResultsPath)) {
+    if (safeFs.existsSync(lintResultsPath)) {
       try {
-        const lintData = JSON.parse(fs.readFileSync(lintResultsPath, 'utf8'));
+        const lintData = JSON.parse(safeFs.readFileSync(lintResultsPath, 'utf8'));
         if (Array.isArray(lintData)) {
           // ESLint format
           for (const file of lintData) {
@@ -295,9 +295,9 @@ class QualityScorer {
 
     for (const { path: relPath, format } of securityPaths) {
       const fullPath = path.join(this.projectPath, relPath);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         try {
-          const data = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          const data = JSON.parse(safeFs.readFileSync(fullPath, 'utf8'));
           result.source = relPath;
 
           if (format === 'npm' && data.metadata) {
@@ -319,7 +319,7 @@ class QualityScorer {
     }
 
     // Check for package-lock.json (indicates npm project that can be audited)
-    const hasPackageLock = fs.existsSync(path.join(this.projectPath, 'package-lock.json'));
+    const hasPackageLock = safeFs.existsSync(path.join(this.projectPath, 'package-lock.json'));
     if (hasPackageLock && !result.source) {
       result.details.push('Run "npm audit" to check for vulnerabilities');
     }
@@ -369,9 +369,9 @@ class QualityScorer {
 
     // Try to find complexity report
     const complexityPath = path.join(this.projectPath, 'complexity-report.json');
-    if (fs.existsSync(complexityPath)) {
+    if (safeFs.existsSync(complexityPath)) {
       try {
-        const data = JSON.parse(fs.readFileSync(complexityPath, 'utf8'));
+        const data = JSON.parse(safeFs.readFileSync(complexityPath, 'utf8'));
         result.source = 'complexity-report.json';
 
         if (data.summary) {
@@ -509,12 +509,12 @@ class QualityScorer {
     const readmePaths = ['README.md', 'readme.md', 'README', 'README.txt'];
     for (const readmePath of readmePaths) {
       const fullPath = path.join(this.projectPath, readmePath);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         result.metrics.hasReadme = true;
         result.source = readmePath;
 
         // Score README completeness
-        const content = fs.readFileSync(fullPath, 'utf8').toLowerCase();
+        const content = safeFs.readFileSync(fullPath, 'utf8').toLowerCase();
         let readmeScore = 0;
 
         if (content.includes('install')) readmeScore += 20;
@@ -538,7 +538,7 @@ class QualityScorer {
     const typeDefPaths = ['tsconfig.json', 'types/', '@types/', 'index.d.ts'];
     for (const typeDefPath of typeDefPaths) {
       const fullPath = path.join(this.projectPath, typeDefPath);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         result.metrics.hasTypeDefs = true;
         result.score += 2; // 2 points for type definitions
         break;
@@ -549,7 +549,7 @@ class QualityScorer {
     const apiDocPaths = ['docs/', 'documentation/', 'api/', 'API.md', 'doc/'];
     for (const docPath of apiDocPaths) {
       const fullPath = path.join(this.projectPath, docPath);
-      if (fs.existsSync(fullPath)) {
+      if (safeFs.existsSync(fullPath)) {
         result.metrics.apiDocCoverage = 50; // Assume 50% if docs exist
         result.score += 2; // 2 points for having docs folder
         break;
@@ -744,12 +744,12 @@ class QualityScorer {
   loadHistory() {
     try {
       const historyDir = path.dirname(this.options.historyPath);
-      if (!fs.existsSync(historyDir)) {
-        fs.mkdirSync(historyDir, { recursive: true });
+      if (!safeFs.existsSync(historyDir)) {
+        safeFs.mkdirSync(historyDir, { recursive: true });
       }
 
-      if (fs.existsSync(this.options.historyPath)) {
-        const data = fs.readFileSync(this.options.historyPath, 'utf8');
+      if (safeFs.existsSync(this.options.historyPath)) {
+        const data = safeFs.readFileSync(this.options.historyPath, 'utf8');
         return JSON.parse(data);
       }
     } catch (e) {
@@ -783,10 +783,10 @@ class QualityScorer {
 
     try {
       const historyDir = path.dirname(this.options.historyPath);
-      if (!fs.existsSync(historyDir)) {
-        fs.mkdirSync(historyDir, { recursive: true });
+      if (!safeFs.existsSync(historyDir)) {
+        safeFs.mkdirSync(historyDir, { recursive: true });
       }
-      fs.writeFileSync(this.options.historyPath, JSON.stringify(this.history, null, 2));
+      safeFs.writeFileSync(this.options.historyPath, JSON.stringify(this.history, null, 2));
     } catch (e) {
       // Ignore history save errors
     }

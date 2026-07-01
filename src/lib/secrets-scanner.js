@@ -12,7 +12,7 @@
  * - Generic high-entropy strings
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -280,7 +280,7 @@ class SecretsScanner {
 
     // Check file size
     try {
-      const stats = fs.statSync(filePath);
+      const stats = safeFs.statSync(filePath);
       if (stats.size > this.options.maxFileSize) return false;
     } catch (e) {
       return false;
@@ -298,7 +298,7 @@ class SecretsScanner {
 
     const walk = (dir) => {
       try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        const entries = safeFs.readdirSync(dir, { withFileTypes: true });
 
         for (const entry of entries) {
           const fullPath = path.join(dir, entry.name);
@@ -401,7 +401,7 @@ class SecretsScanner {
     const findings = [];
 
     try {
-      const content = fs.readFileSync(filePath, 'utf8');
+      const content = safeFs.readFileSync(filePath, 'utf8');
       const lines = content.split('\n');
       const relativePath = path.relative(this.projectRoot, filePath);
 

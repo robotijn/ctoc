@@ -13,7 +13,7 @@
  *      CLAUDE.md "Pipeline Philosophy" section
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const SECTIONS = Object.freeze({
@@ -76,11 +76,11 @@ const DEFAULT_PREFS = Object.freeze({
  */
 function loadDashboardPrefs(projectRoot) {
   const prefsFile = path.join(projectRoot, '.ctoc', 'state', 'dashboard-prefs.json');
-  if (!fs.existsSync(prefsFile)) {
+  if (!safeFs.existsSync(prefsFile)) {
     return JSON.parse(JSON.stringify(DEFAULT_PREFS));
   }
   try {
-    const parsed = JSON.parse(fs.readFileSync(prefsFile, 'utf8'));
+    const parsed = JSON.parse(safeFs.readFileSync(prefsFile, 'utf8'));
     // Merge with defaults so missing keys don't cause undefineds downstream
     return {
       collapsed: {
@@ -104,11 +104,11 @@ function loadDashboardPrefs(projectRoot) {
  */
 function saveDashboardPrefs(prefs, projectRoot) {
   const stateDir = path.join(projectRoot, '.ctoc', 'state');
-  if (!fs.existsSync(stateDir)) {
-    fs.mkdirSync(stateDir, { recursive: true });
+  if (!safeFs.existsSync(stateDir)) {
+    safeFs.mkdirSync(stateDir, { recursive: true });
   }
   const prefsFile = path.join(stateDir, 'dashboard-prefs.json');
-  fs.writeFileSync(prefsFile, JSON.stringify(prefs, null, 2));
+  safeFs.writeFileSync(prefsFile, JSON.stringify(prefs, null, 2));
 }
 
 module.exports = {

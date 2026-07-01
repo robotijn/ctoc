@@ -30,7 +30,7 @@
  * this module; actions never imports inbox).
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 // movePlan ONLY — approvePlan is deliberately NOT imported (structural gate-safety, D2).
 const { movePlan } = require('./actions');
@@ -83,14 +83,14 @@ function _stampMarker(content, reason) {
 function _appendLog(root, entry, now = Date.now()) {
   try {
     const dir = path.join(root, ...CLEANUP_LOG.slice(0, -1));
-    fs.mkdirSync(dir, { recursive: true });
+    safeFs.mkdirSync(dir, { recursive: true });
     const logPath = path.join(root, ...CLEANUP_LOG);
     let arr = [];
-    if (fs.existsSync(logPath)) {
+    if (safeFs.existsSync(logPath)) {
       let parsed;
       let corrupt = false;
       try {
-        parsed = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+        parsed = JSON.parse(safeFs.readFileSync(logPath, 'utf8'));
       } catch {
         corrupt = true;
       }
@@ -98,7 +98,7 @@ function _appendLog(root, entry, now = Date.now()) {
         // Preserve the corrupt file aside — never silently discard history.
         const asidePath = logPath + '.corrupt-' + now;
         try {
-          fs.renameSync(logPath, asidePath);
+          safeFs.renameSync(logPath, asidePath);
           arr = [];
         } catch (e) {
           // Could not preserve it; do NOT overwrite/wipe it. Skip the append.
@@ -111,8 +111,8 @@ function _appendLog(root, entry, now = Date.now()) {
     }
     arr.push(entry);
     const tmpPath = logPath + '.tmp-' + now + '-' + process.pid;
-    fs.writeFileSync(tmpPath, JSON.stringify(arr, null, 2));
-    fs.renameSync(tmpPath, logPath); // atomic publish
+    safeFs.writeFileSync(tmpPath, JSON.stringify(arr, null, 2));
+    safeFs.renameSync(tmpPath, logPath); // atomic publish
   } catch {
     // best-effort: never abort a completed move because logging failed
   }
@@ -138,13 +138,13 @@ function _rootFromPath(planPath) {
  * @param {string} action log action ('archive-to-done' | 'advance-via-reconciliation')
  */
 function _stampAndArchive(planPath, root, action) {
-  if (!fs.existsSync(planPath)) {
+  if (!safeFs.existsSync(planPath)) {
     throw new Error('stale-cleanup: plan not found: ' + planPath);
   }
   // Security (TOCTOU): re-assert the source is a REGULAR file at mutation time.
   // Closes the window where a scan-time plain file is swapped for a symlink (or a
   // directory) before we write through it.
-  const srcStat = fs.lstatSync(planPath);
+  const srcStat = safeFs.lstatSync(planPath);
   if (!srcStat.isFile()) {
     throw new Error('stale-cleanup: refusing to archive ' + planPath + ': not a regular file');
   }
@@ -152,18 +152,18 @@ function _stampAndArchive(planPath, root, action) {
   const doneDir = path.join(root, 'plans', 'done');
   const dest = path.join(doneDir, path.basename(planPath));
   // F1: never overwrite a real shipped plan that already occupies done/<slug>.md.
-  if (fs.existsSync(dest)) {
+  if (safeFs.existsSync(dest)) {
     throw new Error(
       'refusing to archive ' + slug + ': plans/done/' + slug + '.md already exists (would overwrite shipped work)'
     );
   }
   const iso = new Date().toISOString();
   const from = _stageFromPath(planPath);
-  const content = fs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
   const stamped = _stampMarker(content, 'stale-reconciliation ' + iso);
-  fs.writeFileSync(planPath, stamped); // WRITE strictly BEFORE rename (M5)
-  fs.mkdirSync(doneDir, { recursive: true });
-  fs.renameSync(planPath, dest);
+  safeFs.writeFileSync(planPath, stamped); // WRITE strictly BEFORE rename (M5)
+  safeFs.mkdirSync(doneDir, { recursive: true });
+  safeFs.renameSync(planPath, dest);
   _appendLog(root, {
     plan: path.basename(planPath, '.md'),
     from,
@@ -235,7 +235,7 @@ function deletePlan(planPath, { explicitlyRejected = false } = {}) {
   }
   const stage = _stageFromPath(planPath);
   const root = _rootFromPath(planPath);
-  fs.unlinkSync(planPath);
+  safeFs.unlinkSync(planPath);
   _appendLog(root, {
     plan: path.basename(planPath, '.md'),
     from: stage,

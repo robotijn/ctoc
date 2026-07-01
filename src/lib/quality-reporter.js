@@ -3,7 +3,7 @@
  * Generates quality reports in multiple formats (JSON, HTML, Markdown, Terminal)
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -566,11 +566,11 @@ class QualityReporter {
     const content = this.generate(format);
     const dir = path.dirname(filePath);
 
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (!safeFs.existsSync(dir)) {
+      safeFs.mkdirSync(dir, { recursive: true });
     }
 
-    fs.writeFileSync(filePath, content);
+    safeFs.writeFileSync(filePath, content);
   }
 }
 

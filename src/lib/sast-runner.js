@@ -11,7 +11,7 @@
  */
 
 const { execSync } = require('child_process');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -141,7 +141,7 @@ class SASTRunner {
     for (const [lang, markers] of Object.entries(LANGUAGE_MARKERS)) {
       for (const marker of markers) {
         const markerPath = path.join(this.projectRoot, marker);
-        if (fs.existsSync(markerPath)) {
+        if (safeFs.existsSync(markerPath)) {
           if (!detected.includes(lang)) {
             detected.push(lang);
           }

@@ -25,7 +25,7 @@
  * escape-phrase check.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const STAGE_PRIORITY = ['in-progress', 'todo', 'implementation'];
@@ -74,7 +74,7 @@ function globToRegex(glob) {
  */
 function readPlanFiles(planPath) {
   let content;
-  try { content = fs.readFileSync(planPath, 'utf8'); } catch { return []; }
+  try { content = safeFs.readFileSync(planPath, 'utf8'); } catch { return []; }
   const fm = content.match(/^---\n([\s\S]*?)\n---/);
   if (!fm) return [];
   const fmBody = fm[1];
@@ -122,8 +122,8 @@ function findCoveringPlan(targetFile, root) {
 
   for (const stage of STAGE_PRIORITY) {
     const stageDir = path.join(root, 'plans', stage);
-    if (!fs.existsSync(stageDir)) continue;
-    const files = fs.readdirSync(stageDir).filter(f => f.endsWith('.md') && f !== '.gitkeep');
+    if (!safeFs.existsSync(stageDir)) continue;
+    const files = safeFs.readdirSync(stageDir).filter(f => f.endsWith('.md') && f !== '.gitkeep');
 
     let best = null;
     for (const f of files) {

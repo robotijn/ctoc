@@ -8,7 +8,7 @@
  */
 
 const { execSync } = require('child_process');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const os = require('os');
 const path = require('path');
 
@@ -37,7 +37,7 @@ const REQUIREMENTS = {
  */
 function isWSL() {
   try {
-    const release = fs.readFileSync('/proc/version', 'utf8').toLowerCase();
+    const release = safeFs.readFileSync('/proc/version', 'utf8').toLowerCase();
     return release.includes('microsoft') || release.includes('wsl');
   } catch {
     return false;
@@ -218,12 +218,12 @@ function checkExistingRunner(runnerPath = path.join(os.homedir(), 'actions-runne
   const configPath = path.join(runnerPath, '.runner');
   const svcPath = path.join(runnerPath, 'svc.sh');
 
-  if (!fs.existsSync(runnerPath)) {
+  if (!safeFs.existsSync(runnerPath)) {
     return { installed: false, configured: false, running: false };
   }
 
-  const installed = fs.existsSync(path.join(runnerPath, 'run.sh'));
-  const configured = fs.existsSync(configPath);
+  const installed = safeFs.existsSync(path.join(runnerPath, 'run.sh'));
+  const configured = safeFs.existsSync(configPath);
 
   let running = false;
   if (configured) {
@@ -241,7 +241,7 @@ function checkExistingRunner(runnerPath = path.join(os.homedir(), 'actions-runne
   let config = null;
   if (configured) {
     try {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      config = JSON.parse(safeFs.readFileSync(configPath, 'utf8'));
     } catch { /* ignore: best-effort, non-fatal */ }
   }
 

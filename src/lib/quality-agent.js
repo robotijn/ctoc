@@ -17,7 +17,7 @@
 
 const { execSync } = require('child_process');
 const path = require('path');
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 
 const qualityState = require('./quality-state');
 const toolDetector = require('./tool-detector');
@@ -317,11 +317,11 @@ async function runSecurityScan() {
   ];
 
   for (const file of changedFiles) {
-    if (!fs.existsSync(file)) continue;
+    if (!safeFs.existsSync(file)) continue;
     if (file.includes('node_modules') || file.includes('.git')) continue;
 
     try {
-      const content = fs.readFileSync(file, 'utf8');
+      const content = safeFs.readFileSync(file, 'utf8');
       for (const pattern of secretPatterns) {
         if (pattern.test(content)) {
           console.log(`   Potential secret detected in ${file}`);

@@ -14,7 +14,7 @@
  *   node menu.js validate {stage}/{file}    -> validateScreen(stage, file)
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { getPlanCounts, readPlans, getPlansDir, getAgentStatus, getVisionCounts, getVisionStubs } = require('./state');
 const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs } = require('./sections');
@@ -112,7 +112,7 @@ function getVersion(projectPath) {
   try {
     // When used as plugin, __dirname is the lib/ dir of the plugin
     const versionPath = path.join(__dirname, '..', '..', 'VERSION');
-    return fs.readFileSync(versionPath, 'utf8').trim();
+    return safeFs.readFileSync(versionPath, 'utf8').trim();
   } catch {
     return '?.?.?';
   }
@@ -1009,8 +1009,8 @@ function planActions(stage, file, projectPath) {
   text += `${'─'.repeat(40)}\n`;
 
   // Read summary if file exists
-  if (fs.existsSync(planPath)) {
-    const content = fs.readFileSync(planPath, 'utf8');
+  if (safeFs.existsSync(planPath)) {
+    const content = safeFs.readFileSync(planPath, 'utf8');
     const titleMatch = content.match(/^#\s+(.+)$/m);
     if (titleMatch) {
       text += `\n  ${titleMatch[1]}\n`;
@@ -1066,8 +1066,8 @@ function planActionsMore(stage, file, projectPath) {
   let text = `[${stage}] ${planName}\n`;
   text += `${'─'.repeat(40)}\n`;
 
-  if (fs.existsSync(planPath)) {
-    const content = fs.readFileSync(planPath, 'utf8');
+  if (safeFs.existsSync(planPath)) {
+    const content = safeFs.readFileSync(planPath, 'utf8');
     const titleMatch = content.match(/^#\s+(.+)$/m);
     if (titleMatch) {
       text += `\n  ${titleMatch[1]}\n`;
@@ -1117,8 +1117,8 @@ function reviewActions(stage, file, projectPath) {
   let text = `[Review] ${planName}\n`;
   text += `${'─'.repeat(40)}\n`;
 
-  if (fs.existsSync(planPath)) {
-    const content = fs.readFileSync(planPath, 'utf8');
+  if (safeFs.existsSync(planPath)) {
+    const content = safeFs.readFileSync(planPath, 'utf8');
     const titleMatch = content.match(/^#\s+(.+)$/m);
     if (titleMatch) {
       text += `\n  ${titleMatch[1]}\n`;

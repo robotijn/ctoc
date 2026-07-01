@@ -3,7 +3,7 @@
  * Iron Loop state persistence with cryptographic signing
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { signState, verifyState, hashPath, CTOC_HOME } = require('./crypto');
 
@@ -54,8 +54,8 @@ const STEP_DESCRIPTIONS = {
  * Ensures state directory exists
  */
 function ensureStateDir() {
-  if (!fs.existsSync(STATE_DIR)) {
-    fs.mkdirSync(STATE_DIR, { recursive: true });
+  if (!safeFs.existsSync(STATE_DIR)) {
+    safeFs.mkdirSync(STATE_DIR, { recursive: true });
   }
 }
 
@@ -96,19 +96,19 @@ function createState(projectPath, feature, language, framework) {
 function loadState(projectPath) {
   const statePath = getStatePath(projectPath);
 
-  if (!fs.existsSync(statePath)) {
+  if (!safeFs.existsSync(statePath)) {
     return { state: null, valid: false, error: 'No state file' };
   }
 
   try {
-    const content = fs.readFileSync(statePath, 'utf8');
+    const content = safeFs.readFileSync(statePath, 'utf8');
     const state = JSON.parse(content);
 
     // Check if unsigned (legacy v2.x state)
     if (!state._signature) {
       // Migrate to signed format
       const signedState = signState({ ...state, _version: STATE_SCHEMA_VERSION, _migrated_at: new Date().toISOString() });
-      fs.writeFileSync(statePath, JSON.stringify(signedState, null, 2));
+      safeFs.writeFileSync(statePath, JSON.stringify(signedState, null, 2));
       return { state: signedState, valid: true, migrated: true };
     }
 
@@ -135,7 +135,7 @@ function saveState(projectPath, state) {
   state.lastActivity = new Date().toISOString();
 
   const signedState = signState(state);
-  fs.writeFileSync(statePath, JSON.stringify(signedState, null, 2));
+  safeFs.writeFileSync(statePath, JSON.stringify(signedState, null, 2));
 
   return signedState;
 }

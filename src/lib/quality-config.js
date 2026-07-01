@@ -6,7 +6,7 @@
  * across 20 programming languages with three quality modes: strict, strictest, and legacy.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
@@ -360,7 +360,7 @@ class QualityConfig {
     if (pattern.includes('*')) {
       const basePattern = pattern.replace(/\*/g, '');
       try {
-        const files = fs.readdirSync(this.projectRoot);
+        const files = safeFs.readdirSync(this.projectRoot);
         return files.some(f => {
           if (pattern.startsWith('*.')) {
             return f.endsWith(basePattern);
@@ -374,7 +374,7 @@ class QualityConfig {
 
     // Handle exact file names
     const filePath = path.join(this.projectRoot, pattern);
-    return fs.existsSync(filePath);
+    return safeFs.existsSync(filePath);
   }
 
   /**
@@ -421,8 +421,8 @@ class QualityConfig {
       `${mode}.md`
     );
 
-    if (fs.existsSync(skillPath)) {
-      return fs.readFileSync(skillPath, 'utf8');
+    if (safeFs.existsSync(skillPath)) {
+      return safeFs.readFileSync(skillPath, 'utf8');
     }
 
     return null;
@@ -485,10 +485,10 @@ class QualityConfig {
         const outputPath = path.join(this.projectRoot, filename);
         // Ensure directory exists
         const dir = path.dirname(outputPath);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
+        if (!safeFs.existsSync(dir)) {
+          safeFs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFileSync(outputPath, content);
+        safeFs.writeFileSync(outputPath, content);
         applied.files.push(filename);
       }
     }
@@ -538,7 +538,7 @@ class QualityConfig {
     // Check if linter config exists
     if (config.linterConfig) {
       const linterPath = path.join(this.projectRoot, config.linterConfig);
-      if (!fs.existsSync(linterPath)) {
+      if (!safeFs.existsSync(linterPath)) {
         issues.push({
           type: 'missing-config',
           file: config.linterConfig,
@@ -550,7 +550,7 @@ class QualityConfig {
     // Check if type checker config exists
     if (config.typeCheckerConfig) {
       const typeCheckerPath = path.join(this.projectRoot, config.typeCheckerConfig);
-      if (!fs.existsSync(typeCheckerPath)) {
+      if (!safeFs.existsSync(typeCheckerPath)) {
         issues.push({
           type: 'missing-config',
           file: config.typeCheckerConfig,

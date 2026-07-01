@@ -20,7 +20,7 @@
  *     https://blog.pagefreezer.com/what-is-ediscovery-reference-model-edrm
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 
 const HOLD_DIR = '.ctoc/legal-hold';
@@ -32,13 +32,13 @@ const HOLD_DIR = '.ctoc/legal-hold';
  */
 function activeHolds(projectRoot) {
   const dir = path.join(projectRoot, HOLD_DIR);
-  if (!fs.existsSync(dir)) return [];
+  if (!safeFs.existsSync(dir)) return [];
   const out = [];
-  for (const entry of fs.readdirSync(dir)) {
+  for (const entry of safeFs.readdirSync(dir)) {
     if (!entry.endsWith('.yaml') && !entry.endsWith('.yml')) continue;
     if (entry.startsWith('_')) continue; // skip template/_README files
     const full = path.join(dir, entry);
-    const content = fs.readFileSync(full, 'utf8');
+    const content = safeFs.readFileSync(full, 'utf8');
     if (/^status:\s*active\s*$/m.test(content)) {
       out.push({
         id: entry.replace(/\.(yaml|yml)$/, ''),
@@ -99,7 +99,7 @@ function institute(projectRoot, holdData) {
   const dir = path.join(projectRoot, HOLD_DIR);
   ensureDir(dir);
   const holdPath = path.join(dir, `${holdData.id}.yaml`);
-  if (fs.existsSync(holdPath)) {
+  if (safeFs.existsSync(holdPath)) {
     throw new Error(`legal-hold.institute: hold ${holdData.id} already exists`);
   }
   const now = new Date().toISOString();
@@ -116,7 +116,7 @@ function institute(projectRoot, holdData) {
     `# Releasing a hold requires explicit user action and a recorded reason.`,
     ``,
   ].join('\n');
-  fs.writeFileSync(holdPath, content);
+  safeFs.writeFileSync(holdPath, content);
   return { id: holdData.id, instituted_at: now, path: path.relative(projectRoot, holdPath) };
 }
 
@@ -125,13 +125,13 @@ function institute(projectRoot, holdData) {
  */
 function release(projectRoot, holdId, reason) {
   const holdPath = path.join(projectRoot, HOLD_DIR, `${holdId}.yaml`);
-  if (!fs.existsSync(holdPath)) {
+  if (!safeFs.existsSync(holdPath)) {
     throw new Error(`legal-hold.release: no such hold ${holdId}`);
   }
-  let content = fs.readFileSync(holdPath, 'utf8');
+  let content = safeFs.readFileSync(holdPath, 'utf8');
   content = content.replace(/^status:\s*active\s*$/m, `status: released`);
   content += `released_at: ${new Date().toISOString()}\nrelease_reason: ${escape(reason || '(unspecified)')}\n`;
-  fs.writeFileSync(holdPath, content);
+  safeFs.writeFileSync(holdPath, content);
   return { id: holdId, released_at: new Date().toISOString() };
 }
 
@@ -154,7 +154,7 @@ function escape(text) {
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 module.exports = {

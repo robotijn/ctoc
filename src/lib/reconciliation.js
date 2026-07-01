@@ -19,7 +19,7 @@
  *     https://atlan.com/know/data-governance/bcbs-239-data-lineage/
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -34,10 +34,10 @@ const { execSync } = require('child_process');
 function reconcile(projectRoot, planPath, opts = {}) {
   const baseRef = opts.baseRef || 'HEAD~1';
   const planFull = path.join(projectRoot, planPath);
-  if (!fs.existsSync(planFull)) {
+  if (!safeFs.existsSync(planFull)) {
     return { ok: false, error: `plan not found: ${planPath}` };
   }
-  const plan = fs.readFileSync(planFull, 'utf8');
+  const plan = safeFs.readFileSync(planFull, 'utf8');
 
   // Extract the declared `files:` list from frontmatter.
   const declaredFiles = extractDeclaredFiles(plan);

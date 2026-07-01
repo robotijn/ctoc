@@ -22,7 +22,7 @@
  * Cross-platform Node 18+, no native deps.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const { retentionDays, RETENTION_CATEGORIES } = require('./regulatory-regime');
 
@@ -52,7 +52,7 @@ function findOlderThanRetention(projectRoot, category) {
   const days = retentionDays(projectRoot, category);
   const relPath = CATEGORY_PATHS[category];
   const absPath = path.join(projectRoot, relPath);
-  if (!fs.existsSync(absPath)) {
+  if (!safeFs.existsSync(absPath)) {
     return { category, retention_days: days, candidates: [], scanned_path: relPath, note: 'directory does not exist' };
   }
 
@@ -84,13 +84,13 @@ function sweepAll(projectRoot, opts = {}) {
 }
 
 function walk(dir, callback) {
-  if (!fs.existsSync(dir)) return;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  if (!safeFs.existsSync(dir)) return;
+  for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.git')) continue;
     const full = path.join(dir, entry.name);
     let stat;
     try {
-      stat = fs.statSync(full);
+      stat = safeFs.statSync(full);
     } catch {
       continue;
     }

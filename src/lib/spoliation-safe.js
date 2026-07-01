@@ -20,7 +20,7 @@
  *     https://judicature.duke.edu/articles/rule-37e-the-new-law-of-electronic-spoliation/
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -43,12 +43,12 @@ const MANIFEST_NAME = 'preservation-manifest.jsonl';
  */
 function snapshot(projectRoot, targetPath, reason) {
   const fullPath = path.join(projectRoot, targetPath);
-  if (!fs.existsSync(fullPath)) {
+  if (!safeFs.existsSync(fullPath)) {
     throw new Error(`spoliation-safe.snapshot: source path does not exist: ${targetPath}`);
   }
   ensureDir(path.join(projectRoot, PRESERVATION_ROOT));
 
-  const stat = fs.statSync(fullPath);
+  const stat = safeFs.statSync(fullPath);
   const isDir = stat.isDirectory();
   const fileList = isDir ? collectFiles(fullPath) : [{ rel: path.basename(fullPath), full: fullPath }];
 
@@ -68,7 +68,7 @@ function snapshot(projectRoot, targetPath, reason) {
   for (const f of fileList) {
     const dest = path.join(destDir, f.rel);
     ensureDir(path.dirname(dest));
-    fs.copyFileSync(f.full, dest);
+    safeFs.copyFileSync(f.full, dest);
   }
 
   // Write a manifest into the preservation directory.
@@ -81,11 +81,11 @@ function snapshot(projectRoot, targetPath, reason) {
     file_count: fileList.length,
     file_hashes: fileHashes,
   };
-  fs.writeFileSync(path.join(destDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+  safeFs.writeFileSync(path.join(destDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
   // Append to the global preservation log (append-only).
   const logPath = path.join(projectRoot, PRESERVATION_ROOT, MANIFEST_NAME);
-  fs.appendFileSync(logPath, JSON.stringify({
+  safeFs.appendFileSync(logPath, JSON.stringify({
     preservation_id: preservationId,
     source_path: targetPath,
     snapshotted_at: manifest.snapshotted_at,
@@ -106,14 +106,14 @@ function snapshot(projectRoot, targetPath, reason) {
  */
 function restore(projectRoot, preservationId, destPath) {
   const sourceDir = path.join(projectRoot, PRESERVATION_ROOT, preservationId);
-  if (!fs.existsSync(sourceDir)) {
+  if (!safeFs.existsSync(sourceDir)) {
     throw new Error(`spoliation-safe.restore: preservation id not found: ${preservationId}`);
   }
   const manifestPath = path.join(sourceDir, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) {
+  if (!safeFs.existsSync(manifestPath)) {
     throw new Error(`spoliation-safe.restore: manifest missing for ${preservationId}`);
   }
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const manifest = JSON.parse(safeFs.readFileSync(manifestPath, 'utf8'));
   const dest = path.join(projectRoot, destPath || manifest.source_path);
 
   if (manifest.is_directory) {
@@ -122,12 +122,12 @@ function restore(projectRoot, preservationId, destPath) {
       const sourceFile = path.join(sourceDir, fh.relpath);
       const destFile = path.join(dest, fh.relpath);
       ensureDir(path.dirname(destFile));
-      fs.copyFileSync(sourceFile, destFile);
+      safeFs.copyFileSync(sourceFile, destFile);
     }
   } else {
     ensureDir(path.dirname(dest));
     const sourceFile = path.join(sourceDir, path.basename(manifest.source_path));
-    fs.copyFileSync(sourceFile, dest);
+    safeFs.copyFileSync(sourceFile, dest);
   }
 
   return { restored_to: path.relative(projectRoot, dest), preservation_id: preservationId };
@@ -138,14 +138,14 @@ function restore(projectRoot, preservationId, destPath) {
  */
 function listPreservations(projectRoot) {
   const logPath = path.join(projectRoot, PRESERVATION_ROOT, MANIFEST_NAME);
-  if (!fs.existsSync(logPath)) return [];
-  return fs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line));
+  if (!safeFs.existsSync(logPath)) return [];
+  return safeFs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line));
 }
 
 function collectFiles(dir) {
   const out = [];
   function inner(current) {
-    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+    for (const entry of safeFs.readdirSync(current, { withFileTypes: true })) {
       const full = path.join(current, entry.name);
       const rel = path.relative(dir, full);
       if (entry.isDirectory()) inner(full);
@@ -157,12 +157,12 @@ function collectFiles(dir) {
 }
 
 function hashFile(filepath) {
-  const data = fs.readFileSync(filepath);
+  const data = safeFs.readFileSync(filepath);
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
 function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
 }
 
 module.exports = {

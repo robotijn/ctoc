@@ -13,7 +13,7 @@
  * drive the loop via Claude Code's Task tool. See v6.9.7 for the wiring.
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -102,7 +102,7 @@ const DYNAMIC_CRITICS_BY_PATTERN = [
 function findProjectRoot(start = process.cwd()) {
   let dir = start;
   for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, '.claude-plugin')) || fs.existsSync(path.join(dir, '.ctoc'))) {
+    if (safeFs.existsSync(path.join(dir, '.claude-plugin')) || safeFs.existsSync(path.join(dir, '.ctoc'))) {
       return dir;
     }
     const parent = path.dirname(dir);
@@ -125,7 +125,7 @@ function letterDir(planSlug, root = findProjectRoot()) {
 }
 
 function ensureDir(d) {
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+  if (!safeFs.existsSync(d)) safeFs.mkdirSync(d, { recursive: true });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -142,10 +142,10 @@ function isoNow() {
 
 function loadJournal(planSlug, root) {
   const p = journalPath(planSlug, root);
-  if (!fs.existsSync(p)) {
+  if (!safeFs.existsSync(p)) {
     return { plan: planSlug, started_at: null, phase: null, rounds: [] };
   }
-  const content = fs.readFileSync(p, 'utf8');
+  const content = safeFs.readFileSync(p, 'utf8');
   return parseJournalYaml(content, planSlug);
 }
 
@@ -163,7 +163,7 @@ function appendRound(planSlug, roundEntry, root = findProjectRoot()) {
   if (!journal.started_at) journal.started_at = isoNow();
   if (!journal.phase) journal.phase = roundEntry.phase;
   journal.rounds.push({ ...roundEntry, timestamp: roundEntry.timestamp || isoNow() });
-  fs.writeFileSync(journalPath(planSlug, root), serializeJournalYaml(journal));
+  safeFs.writeFileSync(journalPath(planSlug, root), serializeJournalYaml(journal));
   return journal;
 }
 
@@ -461,8 +461,8 @@ function shouldRunLoop({ effortLevel = 'medium', files = [], recentMessages = []
 
 function loadTriggers(root = findProjectRoot()) {
   const p = path.join(root, '.ctoc', 'config', 'refinement-triggers.yaml');
-  if (!fs.existsSync(p)) return { trigger_loop_when_files_match: [], bypass_escape_phrases: ESCAPE_PHRASES };
-  const content = fs.readFileSync(p, 'utf8');
+  if (!safeFs.existsSync(p)) return { trigger_loop_when_files_match: [], bypass_escape_phrases: ESCAPE_PHRASES };
+  const content = safeFs.readFileSync(p, 'utf8');
   const triggers = [];
   let inTriggers = false;
   for (const rawLine of content.split('\n')) {
@@ -557,7 +557,7 @@ function buildLetter({ planSlug, round, phase, summary, issues }) {
 function writeLetter(planSlug, letter, root = findProjectRoot()) {
   ensureDir(letterDir(planSlug, root));
   const p = path.join(letterDir(planSlug, root), `${letter.letter_id}.json`);
-  fs.writeFileSync(p, JSON.stringify(letter, null, 2) + '\n');
+  safeFs.writeFileSync(p, JSON.stringify(letter, null, 2) + '\n');
   return p;
 }
 

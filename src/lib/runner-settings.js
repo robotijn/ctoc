@@ -7,7 +7,7 @@
  * @module lib/runner-settings
  */
 
-const fs = require('fs');
+const safeFs = require('./safe-fs');
 const path = require('path');
 const os = require('os');
 
@@ -28,12 +28,12 @@ function getSettingsPath() {
 function loadSettings() {
   const settingsPath = getSettingsPath();
 
-  if (!fs.existsSync(settingsPath)) {
+  if (!safeFs.existsSync(settingsPath)) {
     return getDefaultSettings();
   }
 
   try {
-    const content = fs.readFileSync(settingsPath, 'utf8');
+    const content = safeFs.readFileSync(settingsPath, 'utf8');
     // Simple YAML parsing - no external dependency
     return parseSimpleYaml(content);
   } catch {
@@ -106,15 +106,15 @@ function saveSettings(settings) {
   const settingsPath = getSettingsPath();
   const settingsDir = path.dirname(settingsPath);
 
-  if (!fs.existsSync(settingsDir)) {
-    fs.mkdirSync(settingsDir, { recursive: true });
+  if (!safeFs.existsSync(settingsDir)) {
+    safeFs.mkdirSync(settingsDir, { recursive: true });
   }
 
   // Read existing settings to merge
   let existing = {};
-  if (fs.existsSync(settingsPath)) {
+  if (safeFs.existsSync(settingsPath)) {
     try {
-      const content = fs.readFileSync(settingsPath, 'utf8');
+      const content = safeFs.readFileSync(settingsPath, 'utf8');
       existing = parseSimpleYaml(content);
     } catch { /* ignore: best-effort, non-fatal */ }
   }
@@ -124,7 +124,7 @@ function saveSettings(settings) {
 
   // Generate YAML content
   const content = generateYaml(merged);
-  fs.writeFileSync(settingsPath, content);
+  safeFs.writeFileSync(settingsPath, content);
 }
 
 /**
