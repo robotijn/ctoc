@@ -73,6 +73,10 @@ function readLog(logPath) {
   try { return JSON.parse(fs.readFileSync(logPath, 'utf8')); } catch { return []; }
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // ── ST-01 (AC1): openStore on absent file yields an empty, usable store ───────
 
 test('ST-01 openStore on an absent file yields an empty, usable store', () => {
@@ -515,6 +519,46 @@ test('ST-19 a stale lock is stolen so writes never hang', () => {
   }
 });
 
+// ── F1 (HIGH): default opts must not create a lock-steal dead-zone ─────────────
+//
+// Regression: DEFAULTS acquireTimeoutMs (5000) < staleLockMs (10000) created a
+// dead-zone — a crashed holder's lock aged < (staleLockMs − acquireTimeoutMs)
+// could NOT be stolen before the acquiring writer's deadline, so the write blocked
+// the full acquireTimeoutMs then threw `lock acquire timeout` and was LOST (AC19
+// violated). The invariant acquireTimeoutMs > staleLockMs closes the dead-zone.
+
+test('F1 default opts steal a freshly-abandoned lock (no lost write / menu freeze)', () => {
+  const { dir, jsonPath, lockPath } = tmpIndex();
+  try {
+    const store = openStore(jsonPath); // DEFAULT opts — the exact config the menu uses
+    store.upsertUnit(fullUnit({ planPath: 'a.md', sectionId: 's1', embedding: randEmb(3, 1) }));
+
+    // A crashed holder's lock, abandoned ~4s ago — squarely inside the old
+    // dead-zone (aged < staleLockMs − acquireTimeoutMs = 10000 − 5000 = 5000ms).
+    fs.writeFileSync(lockPath, JSON.stringify({ id: 'dead:holder', pid: 99999, ts: 0 }));
+    const past = new Date(Date.now() - 4000);
+    fs.utimesSync(lockPath, past, past);
+
+    const started = Date.now();
+    // Must NOT throw: the write waits until the lock crosses staleLockMs, steals
+    // it, and succeeds within the (larger) acquire window. Under the old defaults
+    // this threw `lock acquire timeout` and the write was silently lost.
+    store.upsertUnit(fullUnit({ planPath: 'b.md', sectionId: 's1', embedding: randEmb(3, 2) }));
+    const elapsed = Date.now() - started;
+
+    assert.ok(store.getUnit('b.md', 's1'), 'write completed by stealing the abandoned lock (not lost)');
+    assert.ok(elapsed < store.__test.acquireTimeoutMs, 'completed within the acquire window');
+
+    // The invariant itself must hold for the DEFAULT configuration.
+    assert.ok(
+      store.__test.acquireTimeoutMs > store.__test.staleLockMs,
+      `invariant acquireTimeoutMs (${store.__test.acquireTimeoutMs}) > staleLockMs (${store.__test.staleLockMs})`
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── ST-20 (AC20): writes serialized; reads lock-free ──────────────────────────
 
 test('ST-20 a held lock serializes writes while reads stay lock-free', () => {
@@ -523,26 +567,204 @@ test('ST-20 a held lock serializes writes while reads stay lock-free', () => {
     const seed = openStore(jsonPath);
     seed.upsertUnit(fullUnit({ planPath: 'a.md', sectionId: 's1', embedding: f32([1, 0, 0]) }));
 
-    // A fresh (non-stale) lock is held by "another process".
-    fs.writeFileSync(lockPath, `${process.pid}:${Date.now()}`);
+    // A lock held by "another process". Its mtime is dated into the FUTURE so it
+    // can NEVER be judged stale — a deterministic stand-in for a LIVE holder
+    // (which in production keeps its own lock fresh via the heartbeat, F2). This
+    // isolates the bounded-acquire TIMEOUT path with no real-time race.
+    fs.writeFileSync(lockPath, JSON.stringify({ id: 'other:holder', pid: 424242, ts: Date.now() }));
+    const future = new Date(Date.now() + 3600_000);
+    fs.utimesSync(lockPath, future, future);
 
-    const store = openStore(jsonPath, { staleLockMs: 60000, acquireTimeoutMs: 150, acquireBackoffMs: 10 });
+    // staleLockMs 50; acquireTimeoutMs 30 is clamped up to 100 to preserve the
+    // acquireTimeoutMs > staleLockMs invariant (F1).
+    const store = openStore(jsonPath, { staleLockMs: 50, acquireTimeoutMs: 30, acquireBackoffMs: 5 });
+    assert.ok(store.__test.acquireTimeoutMs > store.__test.staleLockMs, 'clamp preserves the invariant');
 
     // Reads never take the lock — they return immediately from the snapshot.
     assert.ok(store.getUnit('a.md', 's1'), 'lock-free getUnit returns while lock held');
     assert.equal(store.search(f32([1, 0, 0]), 5).length, 1, 'lock-free search returns while lock held');
 
-    // A fresh (non-stale) held lock blocks a second acquire until the timeout.
+    // A live (never-stale) held lock serializes writes: a second acquire waits the
+    // bounded window then times out rather than clobbering the holder.
     assert.throws(
       () => store.upsertUnit(fullUnit({ planPath: 'b.md', sectionId: 's1', embedding: f32([0, 1, 0]) })),
       /lock acquire timeout/,
-      'write blocks (bounded) on a held lock'
+      'write blocks (bounded) on a live held lock'
     );
 
-    // Release the lock → the write now succeeds.
+    // Holder releases → the write now succeeds; the prior unit survives (no clobber).
     fs.unlinkSync(lockPath);
     store.upsertUnit(fullUnit({ planPath: 'b.md', sectionId: 's1', embedding: f32([0, 1, 0]) }));
     assert.ok(store.getUnit('b.md', 's1'), 'write succeeds once the lock is released');
+    assert.ok(store.getUnit('a.md', 's1'), 'prior unit still present (no clobber)');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── F2 (MED): owner token → safe release; heartbeat → no wrongful steal ────────
+
+test('F2 releaseLock never deletes a lock owned by a different token (unsafe release)', () => {
+  const { dir, jsonPath, lockPath } = tmpIndex();
+  try {
+    const store = openStore(jsonPath);
+    // A foreign holder's lock (different owner token) must be left untouched.
+    fs.writeFileSync(lockPath, JSON.stringify({ id: 'someone-else:xyz', pid: 777, ts: Date.now() }));
+    store.__test.releaseLock();
+    assert.ok(fs.existsSync(lockPath), 'foreign owner\'s lock preserved (never blindly unlinked)');
+    // A lock carrying OUR token IS released.
+    fs.writeFileSync(lockPath, JSON.stringify({ id: store.__test.ownerId, pid: process.pid, ts: Date.now() }));
+    store.__test.releaseLock();
+    assert.equal(fs.existsSync(lockPath), false, 'our own lock is released');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('F2 a heartbeating holder keeps its lock fresh (a live long holder is not stolen)', async () => {
+  const { dir, jsonPath, lockPath } = tmpIndex();
+  try {
+    const staleLockMs = 120;
+    const store = openStore(jsonPath, { staleLockMs, acquireTimeoutMs: staleLockMs * 3, acquireBackoffMs: 10 });
+    store.__test.acquireLock();                 // writes our owner token
+    const stop = store.__test.startHeartbeat(); // refreshes mtime every staleLockMs/2
+    try {
+      // Hold well past staleLockMs with the event loop FREE so the heartbeat fires;
+      // without it the lock would age past staleLockMs and be wrongly stolen.
+      await delay(staleLockMs * 2);
+      const age = Date.now() - fs.statSync(lockPath).mtimeMs;
+      assert.ok(age < staleLockMs, `heartbeat kept the lock fresh (age ${age}ms < staleLockMs ${staleLockMs}ms)`);
+    } finally {
+      stop();
+      store.__test.releaseLock();
+    }
+    assert.equal(fs.existsSync(lockPath), false, 'lock released cleanly after the heartbeat stopped');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── F3 (MED): openStore degrades to in-memory rather than throwing into the menu
+
+test('F3 openStore with an un-creatable index dir degrades to in-memory (never throws)', () => {
+  const { dir } = tmpIndex();
+  try {
+    // Squat the parent with a FILE so mkdir of the index dir fails (ENOTDIR).
+    const blocker = path.join(dir, 'blocker');
+    fs.writeFileSync(blocker, 'not a directory');
+    const jsonPath = path.join(blocker, 'index', 'plan-index.json');
+    let store;
+    assert.doesNotThrow(() => { store = openStore(jsonPath); }, 'openStore does not throw on an un-creatable dir');
+    assert.ok(store.__test.memoryOnly, 'store is in memory-only mode');
+    store.upsertUnit(fullUnit({ planPath: 'm.md', sectionId: 's1', embedding: randEmb(4, 1) }));
+    assert.ok(store.getUnit('m.md', 's1'), 'in-memory upsert + getUnit works');
+    assert.equal(store.search(randEmb(4, 1), 3).length, 1, 'in-memory search works');
+    assert.doesNotThrow(() => store.save(), 'save() is a best-effort no-op, never throws');
+    assert.equal(fs.existsSync(jsonPath), false, 'nothing persisted to the un-creatable path');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── MED (security): NUL in a composite-key component ───────────────────────────
+
+test('MED NUL in a composite-key component is rejected on upsert and skipped on load', () => {
+  const { dir, jsonPath, logPath } = tmpIndex();
+  try {
+    const store = openStore(jsonPath);
+    // Upsert rejects a NUL in planPath or sectionId (would collide/shadow keys).
+    assert.throws(() => store.upsertUnit(fullUnit({ planPath: 'a\x00b', sectionId: 'c', embedding: randEmb(4, 1) })), /NUL/);
+    assert.throws(() => store.upsertUnit(fullUnit({ planPath: 'a', sectionId: 'b\x00c', embedding: randEmb(4, 2) })), /NUL/);
+    assert.equal(store.size, 0, 'no NUL-keyed unit stored');
+
+    // A good unit persisted, then a poisoned (NUL) unit injected on disk.
+    store.upsertUnit(fullUnit({ planPath: 'good.md', sectionId: 's1', embedding: randEmb(4, 3) }));
+    store.save();
+    const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    data.units.push({
+      planPath: 'evil\x00shadow.md', sectionId: 's1', kind: 'section', text: 'x',
+      files: [], parentVision: null, stepLabel: null, contentHash: 'hz',
+      embedding: base64Of(randEmb(4, 4))
+    });
+    fs.writeFileSync(jsonPath, JSON.stringify(data));
+
+    // The store still opens; the NUL unit is skipped+warned, the clean unit survives.
+    const reopened = openStore(jsonPath);
+    assert.equal(reopened.size, 1, 'only the clean unit loaded (NUL unit skipped)');
+    assert.ok(reopened.getUnit('good.md', 's1'), 'clean unit present');
+    const log = readLog(logPath);
+    assert.ok(log.some(e => e.event === 'unit_skipped_nul_key' && e.level === 'warn'), 'NUL-unit skip warned');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── F7 (LOW): non-finite embedding values poison ranking ───────────────────────
+
+test('F7 upsert rejects an embedding containing a non-finite value (NaN/Infinity)', () => {
+  const { dir, jsonPath } = tmpIndex();
+  try {
+    const store = openStore(jsonPath);
+    assert.throws(() => store.upsertUnit(fullUnit({ embedding: f32([1, NaN, 0]) })), /non-finite/);
+    assert.throws(() => store.upsertUnit(fullUnit({ embedding: f32([1, Infinity, 0]) })), /non-finite/);
+    assert.equal(store.size, 0, 'no poisoned unit stored');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── F5 (LOW): orphaned temp sweep on openStore ────────────────────────────────
+
+test('F5 openStore sweeps orphaned *.tmp-* siblings older than staleLockMs', () => {
+  const { dir, jsonPath } = tmpIndex();
+  try {
+    const idxDir = path.dirname(jsonPath);
+    fs.mkdirSync(idxDir, { recursive: true });
+    const base = path.basename(jsonPath);
+    const oldTmp = path.join(idxDir, `${base}.tmp-999-1-abc`);
+    const freshTmp = path.join(idxDir, `${base}.tmp-999-2-def`);
+    fs.writeFileSync(oldTmp, 'orphan');
+    fs.writeFileSync(freshTmp, 'in-flight');
+    const past = new Date(Date.now() - 60000);
+    fs.utimesSync(oldTmp, past, past); // older than staleLockMs → orphan
+
+    openStore(jsonPath, { staleLockMs: 5000 });
+    assert.equal(fs.existsSync(oldTmp), false, 'orphaned old temp swept');
+    assert.equal(fs.existsSync(freshTmp), true, 'fresh (possibly in-flight) temp preserved');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── F8 (LOW): moveUnit destination collision has defined behavior ──────────────
+
+test('F8 moveUnit onto an existing destination overwrites it (defined) and warns', () => {
+  const { dir, jsonPath, logPath } = tmpIndex();
+  try {
+    const store = openStore(jsonPath);
+    store.upsertUnit(fullUnit({ planPath: 'from.md', sectionId: 's1', contentHash: 'hFROM', embedding: randEmb(4, 1) }));
+    store.upsertUnit(fullUnit({ planPath: 'to.md', sectionId: 's1', contentHash: 'hTO', embedding: randEmb(4, 2) }));
+    const moved = store.moveUnit('from.md', 'to.md');
+    assert.equal(moved, 1, 'one unit re-pathed');
+    assert.equal(store.getUnit('from.md', 's1'), null, 'source gone');
+    const dest = store.getUnit('to.md', 's1');
+    assert.equal(dest.contentHash, 'hFROM', 'destination overwritten by the moved unit (last-write-wins)');
+    assert.equal(store.size, 1, 'collision collapsed to a single unit');
+    const log = readLog(logPath);
+    assert.ok(log.some(e => e.event === 'move_collision' && e.level === 'warn'), 'collision warned');
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── F9 (LOW): withBatch moveUnit validates args symmetrically with public moveUnit
+
+test('F9 withBatch moveUnit enforces the same arg validation as public moveUnit', () => {
+  const { dir, jsonPath } = tmpIndex();
+  try {
+    const store = openStore(jsonPath);
+    assert.throws(() => store.withBatch((api) => api.moveUnit('', 'to.md')), /fromPath/);
+    assert.throws(() => store.withBatch((api) => api.moveUnit('from.md', '')), /toPath/);
   } finally {
     cleanup(dir);
   }

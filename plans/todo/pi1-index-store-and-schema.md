@@ -537,6 +537,63 @@ not lost; each is re-planned in its own slice, not here:
     green (the additive `plan_index` block and the new `src/lib/plan-index/` subdirectory
     do not regress the schema-shape or top-level module-count invariants).
 
+- **D12 — Pre-Gate-3 review kickback: concurrency + key-safety hardening (2026-07-01).**
+  A five-critic adversarial review of the concurrency model produced a kickback
+  (1 HIGH + 3 MED + 6 LOW), all resolved in `store.js` + `plan-index-store.test.js`
+  (no other files touched; all I/O still via `safe-fs`; no new non-literal RegExp):
+  - *F1 (HIGH) — lock-steal dead-zone.* The old defaults `acquireTimeoutMs` (5000) <
+    `staleLockMs` (10000) created a dead-zone: a lock abandoned < (stale − acquire)
+    ago could not be stolen before the acquire deadline, so the write blocked the
+    full `acquireTimeoutMs` then threw `lock acquire timeout` and was LOST (AC19
+    violation, proven by a RED test that threw after 5000 ms). **Fix:** invariant
+    `acquireTimeoutMs > staleLockMs`. New defaults **`staleLockMs = 5000`,
+    `acquireTimeoutMs = 15000`** (fast crash recovery; a bounded acquire that always
+    outlasts the stale threshold), `acquireBackoffMs = 25` unchanged. openStore
+    **clamps** a caller value `acquireTimeoutMs <= staleLockMs` up to `2 ×
+    staleLockMs` (forgiving, not a throw). The clamp margin of `2×` gives ≥ one full
+    stale-threshold of headroom to detect-and-steal after a lock is abandoned.
+  - *F2 (MED) — wrongful steal of a live holder + unsafe release.* (a) Each handle
+    writes an **owner token** `{ id, pid, host, ts }` into the lock; `releaseLock`
+    reads it and unlinks **only** when `token.id === ownerId` — never another
+    owner's lock (nor a legacy/unparseable one). (b) A **heartbeat** (`setInterval`
+    at `staleLockMs/2`, `unref`'d, cleared in `finally`) rewrites our token to keep
+    the mtime fresh so a legitimately long holder is not judged stale. Documented
+    limitation: a fully-synchronous holder blocks the event loop, so the timer fires
+    only across yield points / in another process — acceptable because CTOC's
+    per-op work is sub-ms and real contention is cross-process (menu/hook/sweep).
+  - *F3 (MED) — openStore threw into the menu.* `mkdirSync` is now wrapped; on
+    failure (read-only parent, or a file squatting the index-dir path) the store
+    **degrades to in-memory-only** (reads/writes work in memory; `save()` is a
+    best-effort no-op + warn) instead of throwing — honouring the fail-open promise.
+  - *MED (security) — composite-key NUL injection.* `validateUpsertInput` throws if
+    `planPath`/`sectionId` contains the `\x00` separator (else `("a\0b","c")` and
+    `("a","b\0c")` collide); load **skips + warns** such a unit per-unit (`event:
+    unit_skipped_nul_key`) so the rest of the index still opens.
+  - *F4 (LOW)* — `acquireLock` checks the deadline at the TOP of every loop
+    iteration (the stat-threw and post-steal `continue` paths no longer busy-spin).
+  - *F5 (LOW)* — openStore sweeps orphaned `*.tmp-*` siblings older than
+    `staleLockMs` (crash between temp-write and rename); best-effort, never throws.
+  - *F6 (LOW)* — the "little-endian" JSDoc is corrected to "native-endian
+    (machine-local, rebuildable cache)".
+  - *F7 (LOW)* — `validateUpsertInput` rejects an embedding with any non-finite
+    value (NaN/±Infinity), which would poison `_norm` and make the sort undefined.
+  - *F8 (LOW) — moveUnit destination collision.* **Defined behavior chosen:** the
+    moved unit **overwrites** the destination `(toPath, sectionId)` (last-write-wins
+    on the rename target) and the collision is warn-logged (`event: move_collision`)
+    so it is observable — chosen over throwing so a re-path (rename) stays a
+    non-fatal data operation consistent with moveUnit's `0`-on-no-match contract.
+  - *F9 (LOW)* — the `withBatch` `moveUnit` façade now routes through the same
+    empty/non-string arg validation as the public `moveUnit` (was asymmetric).
+  - *Testing seam:* a non-enumerable `store.__test` exposes the lock primitives +
+    effective lock config so the token/heartbeat/invariant behaviors can be driven
+    directly (a synchronous single-process test cannot otherwise hold a live lock
+    across a blocking acquirer). Not part of the public API; never enumerated.
+  - *Verify (2026-07-01 kickback):* `plan-index-store.test.js` **29/29 pass, 0
+    skipped** (F1 proven RED→GREEN); full suite **2629 pass / 0 fail / 0 skipped**;
+    `eslint . --max-warnings 0` exit 0; `typecheck.test.js` green; `store.js`
+    coverage **97.07 % line / 95.65 % funcs** (≥ 80 % gate met). Plan left in
+    `plans/todo/` (Gate 3 is the human's).
+
 ---
 
 # Implementation Details

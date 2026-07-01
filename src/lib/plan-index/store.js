@@ -12,14 +12,22 @@
  *   • Each record holds the raw Float32Array embedding (lossless) plus a derived,
  *     in-memory-only `_norm` (L2 norm) recomputed on load — NEVER persisted.
  *   • Persistence: one JSON file { version, dimension, units:[] }; each embedding
- *     is base64 of the Float32Array little-endian buffer (byte-exact + compact).
+ *     is base64 of the Float32Array native-endian buffer (byte-exact + compact —
+ *     the index is a machine-local, rebuildable cache, so machine endianness is
+ *     immaterial).
  *   • search: brute-force cosine over map.values(), O(N·dim) — right-sized for
  *     CTOC's ~1,720-unit corpus (Decision D2).
  *   • Concurrency (Decision D6): every read-modify-write takes an exclusive
- *     create lockfile, RELOADS the file under the lock (so a concurrent external
- *     write is merged, not clobbered), atomically saves (temp-sibling + rename),
- *     then releases. A stale lock (mtime older than staleLockMs) is stolen so a
- *     crashed holder never hangs the menu. Reads take NO lock.
+ *     create lockfile carrying an OWNER TOKEN, RELOADS the file under the lock (so
+ *     a concurrent external write is merged, not clobbered), atomically saves
+ *     (temp-sibling + rename), then releases ONLY its own lock. While a lock is
+ *     held a HEARTBEAT refreshes its mtime so a legitimately long holder is never
+ *     mistaken for a crashed one; a genuinely stale lock (mtime older than
+ *     staleLockMs) is stolen so a crashed holder never hangs the menu. The
+ *     invariant acquireTimeoutMs > staleLockMs (enforced by a clamp in openStore)
+ *     guarantees a bounded acquire always outlasts the stale threshold, so a
+ *     freshly-abandoned lock is stolen rather than timing out the write. Reads
+ *     take NO lock.
  *
  * ALL filesystem access routes through src/lib/safe-fs.js — the audited choke
  * point (LH1). There is no raw `fs` in this module.
@@ -28,6 +36,7 @@
 'use strict';
 
 const path = require('path');
+const os = require('os');
 const safeFs = require('../safe-fs');
 
 /** Reserved sectionId for the plan-level unit of a plan (Decision D10). */
@@ -39,8 +48,12 @@ const MAX_LOG_ENTRIES = 500;
 
 const DEFAULTS = Object.freeze({
   version: 1,
-  staleLockMs: 10000,
-  acquireTimeoutMs: 5000,
+  // F1: acquireTimeoutMs MUST exceed staleLockMs (invariant enforced in openStore).
+  // A short stale threshold means a crashed holder is recovered fast; a strictly
+  // larger acquire window guarantees the acquiring writer outlives that threshold
+  // and steals a freshly-abandoned lock rather than timing out (a lost write).
+  staleLockMs: 5000,
+  acquireTimeoutMs: 15000,
   acquireBackoffMs: 25
 });
 
@@ -67,8 +80,10 @@ const DEFAULTS = Object.freeze({
 /**
  * @typedef {Object} OpenOpts
  * @property {number} [version]           Expected persisted schema version (default 1).
- * @property {number} [staleLockMs]       Lock steal threshold in ms (default 10000).
- * @property {number} [acquireTimeoutMs]  Bounded lock-acquire timeout (default 5000).
+ * @property {number} [staleLockMs]       Lock steal threshold in ms (default 5000).
+ * @property {number} [acquireTimeoutMs]  Bounded lock-acquire timeout (default 15000).
+ *   Clamped up to `2 × staleLockMs` if a caller passes a value `<= staleLockMs`,
+ *   to preserve the acquireTimeoutMs > staleLockMs invariant (F1).
  * @property {number} [acquireBackoffMs]  Backoff between acquire attempts (default 25).
  */
 
@@ -100,7 +115,9 @@ function l2norm(v) {
 // ── embedding (de)serialization ────────────────────────────────────────────────
 
 /**
- * Encode a Float32Array as base64 of its little-endian byte buffer (byte-exact).
+ * Encode a Float32Array as base64 of its native-endian (machine-local,
+ * rebuildable cache) byte buffer — byte-exact and compact. The index is never
+ * shared across machines, so machine endianness is immaterial.
  * @param {Float32Array} f
  * @returns {string}
  */
@@ -110,7 +127,8 @@ function encodeEmbedding(f) {
 
 /**
  * Decode a base64 embedding back to a fresh Float32Array (copied out of Node's
- * shared Buffer pool so the result never aliases pooled memory).
+ * shared Buffer pool so the result never aliases pooled memory). The bytes are
+ * interpreted native-endian (machine-local, rebuildable cache), matching encode.
  * @param {string} str
  * @returns {Float32Array}
  */
@@ -143,22 +161,48 @@ function openStore(jsonPath, opts = {}) {
 
   const version = opts.version ?? DEFAULTS.version;
   const staleLockMs = opts.staleLockMs ?? DEFAULTS.staleLockMs;
-  const acquireTimeoutMs = opts.acquireTimeoutMs ?? DEFAULTS.acquireTimeoutMs;
   const acquireBackoffMs = opts.acquireBackoffMs ?? DEFAULTS.acquireBackoffMs;
+  // F1 INVARIANT: acquireTimeoutMs > staleLockMs. A bounded acquire that is not
+  // strictly longer than the stale threshold creates a dead-zone where a
+  // freshly-abandoned lock times out the write (a lost write / menu freeze)
+  // before it can ever be stolen. Clamp up (forgiving) rather than throw so a
+  // caller that passes a small/legacy acquireTimeoutMs is corrected, not broken.
+  let acquireTimeoutMs = opts.acquireTimeoutMs ?? DEFAULTS.acquireTimeoutMs;
+  if (acquireTimeoutMs <= staleLockMs) {
+    acquireTimeoutMs = staleLockMs * 2;
+  }
 
   const dir = path.dirname(jsonPath);
   const lockPath = `${jsonPath}.lock`;
+  const tmpPrefix = `${path.basename(jsonPath)}.tmp-`;
   // .ctoc/index/plan-index.json → .ctoc/logs
   const logDir = path.resolve(dir, '..', 'logs');
 
-  // Ensure the index directory exists (a directory, not the index file — AC1
-  // requires no index FILE until save()).
-  safeFs.mkdirSync(dir, { recursive: true });
+  // A per-handle owner identity written into the lock file so releaseLock only
+  // ever deletes a lock this handle created (F2) — never another owner's lock.
+  const ownerId = `${process.pid}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
   /** @type {Map<string, any>} */
   let units = new Map();
   /** @type {number | null} */
   let dimension = null;
+  // F3: when the index directory cannot be created (read-only parent, or a file
+  // squatting the path), degrade to an in-memory-only store rather than throwing
+  // into the caller (openStore must never break the menu — the fail-open promise).
+  let memoryOnly = false;
+
+  // Ensure the index directory exists (a directory, not the index file — AC1
+  // requires no index FILE until save()). F3: wrapped — a failure degrades to an
+  // in-memory-only store instead of throwing synchronously into openStore.
+  try {
+    safeFs.mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    memoryOnly = true;
+    warnLog('index_dir_uncreatable', {
+      dir,
+      message: err && err.message ? err.message : String(err)
+    });
+  }
 
   // ── warn logger (mirrors src/lib/enforcement-log.js; never throws) ───────────
 
@@ -261,6 +305,9 @@ function openStore(jsonPath, opts = {}) {
    * + a warn. Never throws.
    */
   function loadFromDisk() {
+    // In-memory-only degraded mode (F3): there is no disk to reload from; keep the
+    // current in-memory Map as the sole source of truth.
+    if (memoryOnly) return;
     if (!safeFs.existsSync(jsonPath)) {
       units = new Map();
       dimension = null;
@@ -275,6 +322,17 @@ function openStore(jsonPath, opts = {}) {
       const next = new Map();
       let dim = null;
       for (const u of data.units) {
+        // MED (security): a NUL (KEY_SEP) inside planPath/sectionId would let
+        // ("a\0b","c") collide with ("a","b\0c"). Skip+warn such a unit on load
+        // (per-unit fail-open) so the rest of the index still opens.
+        if (u && typeof u === 'object' &&
+            ((typeof u.planPath === 'string' && u.planPath.indexOf(KEY_SEP) !== -1) ||
+             (typeof u.sectionId === 'string' && u.sectionId.indexOf(KEY_SEP) !== -1))) {
+          warnLog('unit_skipped_nul_key', {
+            planPath: typeof u.planPath === 'string' ? JSON.stringify(u.planPath) : String(u.planPath)
+          });
+          continue;
+        }
         validateLoadedUnit(u);
         const emb = decodeEmbedding(u.embedding);
         if (dim === null) dim = emb.length;
@@ -307,6 +365,12 @@ function openStore(jsonPath, opts = {}) {
    * unlinked and the error is rethrown, leaving the prior file intact (AC17).
    */
   function atomicSave() {
+    // F3: in degraded in-memory-only mode there is no writable directory; persist
+    // is a best-effort no-op (a warn was already logged at openStore).
+    if (memoryOnly) {
+      warnLog('save_skipped_memory_only', {});
+      return;
+    }
     const tmpPath = `${jsonPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const payload = serialize();
     try {
@@ -316,6 +380,30 @@ function openStore(jsonPath, opts = {}) {
       try { safeFs.unlinkSync(tmpPath); } catch { /* temp may not exist */ }
       throw err;
     }
+  }
+
+  /**
+   * F5: best-effort sweep of orphaned `*.tmp-*` siblings left by a crash between
+   * a temp write and its rename. Only temps older than staleLockMs are removed
+   * (a fresh temp may belong to an in-flight save by another process). Never
+   * throws — a broken sweep must never break openStore.
+   */
+  function sweepOrphanTemps() {
+    if (memoryOnly) return;
+    try {
+      const entries = safeFs.readdirSync(dir);
+      const now = Date.now();
+      for (const name of entries) {
+        if (!name.startsWith(tmpPrefix)) continue;
+        const full = path.join(dir, name);
+        try {
+          const st = safeFs.statSync(full);
+          if (now - st.mtimeMs > staleLockMs) {
+            safeFs.unlinkSync(full);
+          }
+        } catch { /* raced away or vanished — ignore */ }
+      }
+    } catch { /* dir unreadable — best-effort, ignore */ }
   }
 
   // ── locking ──────────────────────────────────────────────────────────────────
@@ -329,15 +417,65 @@ function openStore(jsonPath, opts = {}) {
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
   }
 
+  /** The lock-file payload for THIS handle, freshly time-stamped. */
+  function serializeToken() {
+    return JSON.stringify({ id: ownerId, pid: process.pid, host: os.hostname(), ts: Date.now() });
+  }
+
   /**
-   * Acquire the exclusive lock via atomic create ('wx'). Steals a lock whose mtime
-   * exceeds staleLockMs (crashed holder). Bounded by acquireTimeoutMs.
+   * Parse a lock-file payload into its owner token, or null for an unparseable /
+   * legacy (`pid:ts`) lock we cannot prove is ours.
+   * @param {string} raw
+   * @returns {{ id: string } | null}
+   */
+  function parseToken(raw) {
+    try {
+      const t = JSON.parse(raw);
+      if (t && typeof t === 'object' && typeof t.id === 'string') return t;
+    } catch { /* legacy plain-string or corrupt payload */ }
+    return null;
+  }
+
+  /**
+   * F2 (heartbeat): while a lock is held, periodically (interval < staleLockMs)
+   * rewrite our token so its mtime stays fresh — a legitimately long holder
+   * (e.g. a long withBatch reconciliation, or an async gap) is NOT mistaken for a
+   * crashed one and wrongly stolen. Only refreshes a lock still owned by us.
+   * Returns a stop function; the timer is unref'd so it never keeps the process
+   * alive. NOTE: a fully-synchronous holder blocks the event loop, so the timer
+   * fires only across yield points / in another process (each process runs its
+   * own loop) — sufficient for CTOC, whose per-op work is sub-millisecond and
+   * whose real contention is cross-process (menu / hook / sweep).
+   * @returns {() => void}
+   */
+  function startHeartbeat() {
+    const interval = Math.max(1, Math.floor(staleLockMs / 2));
+    const timer = setInterval(() => {
+      try {
+        const tok = parseToken(safeFs.readFileSync(lockPath, 'utf8'));
+        if (tok && tok.id === ownerId) {
+          safeFs.writeFileSync(lockPath, serializeToken()); // rewrite → refreshes mtime
+        }
+      } catch { /* lock gone / unreadable — nothing of ours to refresh */ }
+    }, interval);
+    if (timer && typeof timer.unref === 'function') timer.unref();
+    return function stopHeartbeat() { clearInterval(timer); };
+  }
+
+  /**
+   * Acquire the exclusive lock via atomic create ('wx'), writing our owner token.
+   * Steals a lock whose mtime exceeds staleLockMs (crashed holder). Bounded by
+   * acquireTimeoutMs. F4: the deadline is checked at the TOP of every iteration so
+   * neither the stat-threw path nor the post-steal path can busy-spin past it.
    */
   function acquireLock() {
     const deadline = Date.now() + acquireTimeoutMs;
     for (;;) {
+      if (Date.now() >= deadline) {
+        throw new Error(`plan-index: lock acquire timeout after ${acquireTimeoutMs}ms (${lockPath})`);
+      }
       try {
-        safeFs.writeFileSync(lockPath, `${process.pid}:${Date.now()}`, { flag: 'wx' });
+        safeFs.writeFileSync(lockPath, serializeToken(), { flag: 'wx' });
         return;
       } catch (err) {
         if (!err || err.code !== 'EEXIST') throw err;
@@ -351,35 +489,50 @@ function openStore(jsonPath, opts = {}) {
         } catch {
           continue; // lock vanished between create and stat — retry immediately
         }
-        if (Date.now() >= deadline) {
-          throw new Error(`plan-index: lock acquire timeout after ${acquireTimeoutMs}ms (${lockPath})`);
-        }
         sleep(acquireBackoffMs);
       }
     }
   }
 
-  /** Release the lock (tolerates the lock already being gone — e.g. stolen). */
+  /**
+   * Release the lock — but ONLY if it still carries OUR owner token (F2). If the
+   * lock was stolen and re-created by another owner, we must never delete their
+   * lock. Tolerates the lock already being gone (e.g. stolen).
+   */
   function releaseLock() {
-    try { safeFs.unlinkSync(lockPath); } catch { /* already gone */ }
+    try {
+      const tok = parseToken(safeFs.readFileSync(lockPath, 'utf8'));
+      if (tok && tok.id === ownerId) {
+        safeFs.unlinkSync(lockPath);
+      }
+      // foreign token, or an unparseable/legacy lock we cannot prove is ours →
+      // leave it in place (never delete another owner's lock).
+    } catch { /* already gone */ }
   }
 
   /**
    * Run a mutation under the exclusive lock with reload-under-lock semantics:
-   * acquire → reload from disk (merge concurrent external writes) → mutate →
-   * atomically save → release. This is what makes concurrent writes lossless.
+   * acquire → start heartbeat → reload from disk (merge concurrent external
+   * writes) → mutate → atomically save → stop heartbeat → release. This is what
+   * makes concurrent writes lossless. In degraded in-memory-only mode (F3) there
+   * is no lock or disk: the mutation runs directly against the in-memory Map.
    * @template T
    * @param {() => T} fn
    * @returns {T}
    */
   function withLock(fn) {
+    if (memoryOnly) {
+      return fn(); // no disk, no lock — in-memory Map is the source of truth
+    }
     acquireLock();
+    const stopHeartbeat = startHeartbeat();
     try {
       loadFromDisk();
       const r = fn();
       atomicSave();
       return r;
     } finally {
+      stopHeartbeat();
       releaseLock();
     }
   }
@@ -398,11 +551,24 @@ function openStore(jsonPath, opts = {}) {
     if (typeof unit.sectionId !== 'string' || unit.sectionId.length === 0) {
       throw new Error('plan-index: upsertUnit requires a non-empty sectionId');
     }
+    // MED (security): reject a NUL (KEY_SEP) in either key component — otherwise
+    // ("a\0b","c") and ("a","b\0c") produce the SAME composite key and shadow one
+    // another. The separator must never appear inside a key component.
+    if (unit.planPath.indexOf(KEY_SEP) !== -1 || unit.sectionId.indexOf(KEY_SEP) !== -1) {
+      throw new Error('plan-index: upsertUnit planPath/sectionId must not contain a NUL (\\x00) byte');
+    }
     if (unit.kind !== 'plan' && unit.kind !== 'section') {
       throw new Error(`plan-index: upsertUnit invalid kind ${JSON.stringify(unit.kind)} (expected 'plan' or 'section')`);
     }
     if (!(unit.embedding instanceof Float32Array) || unit.embedding.length === 0) {
       throw new Error('plan-index: upsertUnit requires a non-empty Float32Array embedding');
+    }
+    // F7: a non-finite value (NaN/±Infinity) poisons _norm and makes cosine
+    // scores — and therefore the search sort order — undefined. Reject loudly.
+    for (let i = 0; i < unit.embedding.length; i++) {
+      if (!Number.isFinite(unit.embedding[i])) {
+        throw new Error(`plan-index: upsertUnit embedding contains a non-finite value at index ${i}`);
+      }
     }
     if (typeof unit.contentHash !== 'string' || unit.contentHash.length === 0) {
       throw new Error('plan-index: upsertUnit requires a non-empty contentHash');
@@ -462,9 +628,32 @@ function openStore(jsonPath, opts = {}) {
     }
     for (const rec of matched) {
       rec.planPath = toPath; // embedding, _norm, contentHash untouched
-      units.set(key(toPath, rec.sectionId), rec);
+      const destKey = key(toPath, rec.sectionId);
+      // F8: a unit may already exist at (toPath, sectionId). DEFINED BEHAVIOR
+      // (Decision): the moved unit overwrites the destination (last-write-wins on
+      // the rename target), and the collision is warn-logged so it is observable.
+      if (units.has(destKey)) {
+        warnLog('move_collision', { toPath, sectionId: rec.sectionId });
+      }
+      units.set(destKey, rec);
     }
     return matched.length;
+  }
+
+  /**
+   * Validate moveUnit's arguments (shared by the public method and the withBatch
+   * façade — F9). Empty/non-string paths are a caller bug and throw; a well-formed
+   * fromPath that matches nothing is data (returns 0), not a bug.
+   * @param {string} fromPath
+   * @param {string} toPath
+   */
+  function validateMoveArgs(fromPath, toPath) {
+    if (typeof fromPath !== 'string' || fromPath.length === 0) {
+      throw new Error('plan-index: moveUnit requires a non-empty fromPath');
+    }
+    if (typeof toPath !== 'string' || toPath.length === 0) {
+      throw new Error('plan-index: moveUnit requires a non-empty toPath');
+    }
   }
 
   // ── public API ────────────────────────────────────────────────────────────────
@@ -509,12 +698,7 @@ function openStore(jsonPath, opts = {}) {
    * @returns {number} count re-pathed (0 if none matched)
    */
   function moveUnit(fromPath, toPath) {
-    if (typeof fromPath !== 'string' || fromPath.length === 0) {
-      throw new Error('plan-index: moveUnit requires a non-empty fromPath');
-    }
-    if (typeof toPath !== 'string' || toPath.length === 0) {
-      throw new Error('plan-index: moveUnit requires a non-empty toPath');
-    }
+    validateMoveArgs(fromPath, toPath);
     return withLock(() => applyMove(fromPath, toPath));
   }
 
@@ -587,14 +771,16 @@ function openStore(jsonPath, opts = {}) {
     return withLock(() => fn({
       upsertUnit: (u) => { validateUpsertInput(u); return applyUpsert(u); },
       deleteUnit: (p, s) => (typeof p === 'string' && typeof s === 'string' ? units.delete(key(p, s)) : false),
-      moveUnit: (f, t) => applyMove(f, t),
+      // F9: route through the SAME empty/non-string validation as public moveUnit.
+      moveUnit: (f, t) => { validateMoveArgs(f, t); return applyMove(f, t); },
       getUnit,
       getFilesForPlan,
       search
     }));
   }
 
-  // Initial fail-open load.
+  // F5: clear orphaned temp siblings from a prior crash, then fail-open load.
+  sweepOrphanTemps();
   loadFromDisk();
 
   const store = {
@@ -609,6 +795,25 @@ function openStore(jsonPath, opts = {}) {
   };
   Object.defineProperty(store, 'dimension', { get: () => dimension, enumerable: true });
   Object.defineProperty(store, 'size', { get: () => units.size, enumerable: true });
+  // Non-enumerable testing seam: exposes the concurrency primitives + effective
+  // lock config so the lock/heartbeat/token invariants can be exercised directly
+  // (a synchronous single-process test cannot otherwise drive a live holder past a
+  // blocking acquirer). Not part of the public API; never enumerated.
+  Object.defineProperty(store, '__test', {
+    enumerable: false,
+    value: Object.freeze({
+      acquireLock,
+      releaseLock,
+      startHeartbeat,
+      sweepOrphanTemps,
+      lockPath,
+      ownerId,
+      get memoryOnly() { return memoryOnly; },
+      staleLockMs,
+      acquireTimeoutMs,
+      acquireBackoffMs
+    })
+  });
   return store;
 }
 
