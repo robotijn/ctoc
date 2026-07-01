@@ -90,6 +90,18 @@ const SETTINGS_SCHEMA = {
       { key: 'redactSecrets', label: 'Redact secrets in logs', type: 'toggle', default: true },
       { key: 'showCostEstimates', label: 'Show cost estimates', type: 'toggle', default: true }
     ]
+  },
+  // Forward-declared for the semantic plan-index (PI1 pivot, Decision D8). PI1
+  // itself reads NONE of these at runtime; they are additive so PI2 (embedding
+  // engine) and PI5/PI6 (duplicate-guard) are not stranded. No new settings tab
+  // (UI is out of scope; the tab-count invariant holds).
+  plan_index: {
+    label: 'Plan Index Settings',
+    settings: [
+      { key: 'engine_preference', label: 'Embedding engine preference', type: 'select', options: ['auto', 'ollama', 'in-process'], default: 'auto' },
+      { key: 'ollama_base_url', label: 'Ollama base URL', type: 'string', default: 'http://localhost:11434' },
+      { key: 'duplicate_threshold', label: 'Duplicate-guard threshold', type: 'number', default: 0.85 }
+    ]
   }
   // NOTE: no `deployment` category here. Deployment is configured via the
   // deployment-setup agent into the nested `deployment` block of settings.json
