@@ -106,20 +106,20 @@ invisible when healthy and self-heals when not.
 
 ## Acceptance Criteria
 
-- [ ] **AC1 — Scenario: openStore on an absent file yields an empty, usable store**
+- [x] **AC1 — Scenario: openStore on an absent file yields an empty, usable store**
   Given `.ctoc/index/plan-index.json` does not exist on disk
   When `openStore(jsonPath)` is called
   Then a usable store is returned, `search(anyQuery, 5)` returns `[]`, no file is
   written to disk until `save()` is called, and nothing throws
 
-- [ ] **AC2 — Scenario: openStore loads a persisted index losslessly**
+- [x] **AC2 — Scenario: openStore loads a persisted index losslessly**
   Given a valid `plan-index.json` with N units previously written by `save()`
   When `openStore(jsonPath)` is called
   Then `getUnit(planPath, sectionId)` returns each unit with every metadata field
   intact and its `embedding` as a `Float32Array` whose bytes equal the persisted
   bytes (`Buffer.compare === 0`)
 
-- [ ] **AC3 — Scenario: corrupt/invalid index file → fail-open rebuild (never throws)**
+- [x] **AC3 — Scenario: corrupt/invalid index file → fail-open rebuild (never throws)**
   Given `plan-index.json` contains malformed JSON, or valid JSON of the wrong shape
   (missing `units`, wrong `version`, non-array `units`)
   When `openStore(jsonPath)` is called
@@ -127,7 +127,7 @@ invisible when healthy and self-heals when not.
   `.ctoc/logs/plan-index.json`, and nothing is thrown into the caller (the menu
   never crashes on a poisoned cache; the index is a rebuildable cache)
 
-- [ ] **AC4 — Scenario: upsertUnit + getUnit round-trip (embedding byte-for-byte)**
+- [x] **AC4 — Scenario: upsertUnit + getUnit round-trip (embedding byte-for-byte)**
   Given the store is open
   When `upsertUnit({ planPath, sectionId, kind: 'section', text, embedding:
   Float32Array(384), files, parentVision, stepLabel, contentHash })` is called
@@ -136,24 +136,24 @@ invisible when healthy and self-heals when not.
   and the `embedding` as a `Float32Array` equal float-for-float to the input
   (Float32 precision preserved; no lossy conversion)
 
-- [ ] **AC5 — Scenario: upsertUnit is an idempotent replace keyed on (planPath, sectionId)**
+- [x] **AC5 — Scenario: upsertUnit is an idempotent replace keyed on (planPath, sectionId)**
   Given a unit already exists at `(p, s)`
   When `upsertUnit` is called again with the same `(p, s)` and new text/embedding
   Then the stored unit is replaced (not duplicated), the total unit count is
   unchanged, and `getUnit(p, s)` returns the new values
 
-- [ ] **AC6 — Scenario: getUnit on a miss returns null and never throws**
+- [x] **AC6 — Scenario: getUnit on a miss returns null and never throws**
   Given `(p, s)` is not present
   When `getUnit(p, s)` is called
   Then it returns `null` (never throws, never returns a partial object)
 
-- [ ] **AC7 — Scenario: deleteUnit removes a unit; absent delete is a no-op**
+- [x] **AC7 — Scenario: deleteUnit removes a unit; absent delete is a no-op**
   Given a unit exists at `(p, s)`
   When `deleteUnit(p, s)` is called
   Then it returns `true`, `getUnit(p, s)` returns `null`; and a subsequent
   `deleteUnit(p, s)` returns `false` without throwing
 
-- [ ] **AC8 — Scenario: moveUnit re-paths a plan's units without re-embedding**
+- [x] **AC8 — Scenario: moveUnit re-paths a plan's units without re-embedding**
   Given units exist for `plans/todo/x.md` (a plan-level unit and ≥1 section unit),
   each with a stored `embedding` and `contentHash`
   When `moveUnit('plans/todo/x.md', 'plans/in-progress/x.md')` is called
@@ -162,7 +162,7 @@ invisible when healthy and self-heals when not.
   the return value is the count of re-pathed units, `getUnit('plans/todo/x.md', …)`
   returns `null`, and moving a non-existent `fromPath` returns `0`
 
-- [ ] **AC9 — Scenario: getFilesForPlan returns a plan's declared files**
+- [x] **AC9 — Scenario: getFilesForPlan returns a plan's declared files**
   Given a plan-level unit upserted for `pi6-conflict.md` with
   `files: ['src/lib/a.js', 'src/lib/b/**']`
   When `getFilesForPlan('pi6-conflict.md')` is called
@@ -170,14 +170,14 @@ invisible when healthy and self-heals when not.
   unit (or empty `files`) it returns `[]` and never throws; the lookup is keyed on
   plan path/slug, not section
 
-- [ ] **AC10 — Scenario: kind separates plan-level and section-level units; bad kind rejected**
+- [x] **AC10 — Scenario: kind separates plan-level and section-level units; bad kind rejected**
   Given units upserted for the same plan path — one `kind: 'plan'` (sentinel
   `sectionId: '__plan__'`) and one `kind: 'section'`
   When they are stored and queried
   Then both coexist and are individually retrievable, and `upsertUnit` with an
   invalid `kind` (e.g. `'unknown'`) throws a clear `Error` before any state changes
 
-- [ ] **AC11 — Scenario: search ranks by cosine angle, not magnitude**
+- [x] **AC11 — Scenario: search ranks by cosine angle, not magnitude**
   Given the store holds unit A with embedding `[10, 1, 0]` and unit B with embedding
   `[0.1, 0.995, 0]` (dimension 3)
   When `search([1, 0, 0], 2)` is called
@@ -185,7 +185,7 @@ invisible when healthy and self-heals when not.
   (L2) distance were used the order would reverse (L2 A ≈ 9.06 > B ≈ 1.34) —
   confirming the metric is cosine, not L2
 
-- [ ] **AC12 — Scenario: search honours k and opts (kind filter, self-exclusion)**
+- [x] **AC12 — Scenario: search honours k and opts (kind filter, self-exclusion)**
   Given a store with mixed `kind: 'plan'` and `kind: 'section'` units across several
   plans
   When `search(q, k, { kind: 'section' })` is called
@@ -193,18 +193,18 @@ invisible when healthy and self-heals when not.
   result has `kind === 'section'`; and `search(q, k, { excludePlanPath: 'p.md' })`
   returns no unit whose `planPath === 'p.md'`
 
-- [ ] **AC13 — Scenario: search validates query dimension**
+- [x] **AC13 — Scenario: search validates query dimension**
   Given the store's dimension is 384
   When `search(Float32Array(512), 5)` is called
   Then it throws a clear `Error` naming the expected dimension (384) and the received
   dimension (512) — a wrong-dimension query is a caller bug, surfaced loudly
 
-- [ ] **AC14 — Scenario: dimension is inferred from the first embedding**
+- [x] **AC14 — Scenario: dimension is inferred from the first embedding**
   Given a freshly opened, empty store (`store.dimension === null`)
   When the first `upsertUnit` with a `Float32Array(384)` embedding is applied
   Then `store.dimension === 384` thereafter and persists across `save()`/`openStore`
 
-- [ ] **AC15 — Scenario: dimension mismatch on upsert → full reset + warn (no throw)**
+- [x] **AC15 — Scenario: dimension mismatch on upsert → full reset + warn (no throw)**
   Given a store at dimension 384 holding ≥1 unit
   When `upsertUnit` is called with a `Float32Array(512)` embedding (the calibrated
   model changed)
@@ -213,7 +213,7 @@ invisible when healthy and self-heals when not.
   is thrown — the index is a rebuildable cache; PI3 reconciliation re-populates it.
   Post-reset consistency is asserted: exactly one unit remains and it is the new one
 
-- [ ] **AC16 — Scenario: save() persists the canonical shape and round-trips through disk**
+- [x] **AC16 — Scenario: save() persists the canonical shape and round-trips through disk**
   Given a store with several units
   When `save()` is called
   Then `plan-index.json` exists containing `{ version, dimension, units: [...] }`
@@ -221,14 +221,14 @@ invisible when healthy and self-heals when not.
   `*.tmp-*` sidecar file lingers in the directory, and a fresh `openStore` of that
   file yields units equal (metadata + embedding bytes) to the pre-save store
 
-- [ ] **AC17 — Scenario: atomic write leaves the prior file intact on failure**
+- [x] **AC17 — Scenario: atomic write leaves the prior file intact on failure**
   Given a valid `plan-index.json` exists on disk
   When a `save()` fails after serialization but before the rename completes
   (simulated by making the temp write throw)
   Then the original `plan-index.json` is unchanged byte-for-byte (temp-file + rename
   guarantees no torn/partial index is ever observed)
 
-- [ ] **AC18 — Scenario: concurrency — reload-under-lock prevents lost updates (clobber)**
+- [x] **AC18 — Scenario: concurrency — reload-under-lock prevents lost updates (clobber)**
   Given store handle A is open in memory holding unit X, and a *separate* writer
   appends unit Y directly to `plan-index.json`
   When handle A performs `upsertUnit(Z)` (a locked read-modify-write that reloads
@@ -237,7 +237,7 @@ invisible when healthy and self-heals when not.
   in-memory snapshot. This is the "green tests but the human's menu clobbers the
   index" failure, designed out and asserted
 
-- [ ] **AC19 — Scenario: concurrency — a stale lock is stolen (writes never hang)**
+- [x] **AC19 — Scenario: concurrency — a stale lock is stolen (writes never hang)**
   Given a lock file `plan-index.json.lock` exists with an mtime older than the stale
   threshold (e.g. 10 s)
   When a write acquires the lock
@@ -245,7 +245,7 @@ invisible when healthy and self-heals when not.
   a crashed lock-holder never hangs the live menu. This is the "green tests but the
   human's menu hangs" failure, designed out and asserted
 
-- [ ] **AC20 — Scenario: concurrency — writes are serialized; reads are lock-free**
+- [x] **AC20 — Scenario: concurrency — writes are serialized; reads are lock-free**
   Given a write holds the exclusive lock for its read-modify-write section
   When a second write attempts to acquire the lock while it is held (fresh, not
   stale)
