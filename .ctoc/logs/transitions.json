@@ -334,5 +334,19 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-01T17:32:13.350Z",
+    "plan": "NB1-task-registry-and-scheduler.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]

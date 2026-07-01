@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-01T17:32:13.348Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "NB1 — Task Registry and Scheduler"
 type: functional
 status: functional
