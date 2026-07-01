@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.9.96-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.9.97-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-110-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
@@ -792,7 +792,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.9.96'
+getVersion()       // → '6.9.97'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -803,11 +803,11 @@ Files synced by `release()`: `VERSION` (source of truth), `.claude-plugin/market
 **Project structure:**
 ```
 ctoc/
-├── docs/            15 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
+├── docs/            16 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
 │                    PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md, EVALUATION_HARNESS.md,
 │                    INDEPENDENCE.md, REGULATORY_OPS.md, REALTIME.md, PROCESS_FMEA.md,
 │                    CRITICAL_CONTROL_POINTS.md, CONTINUOUS_IMPROVEMENT.md,
-│                    CONFIG_SOURCES.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+│                    CONFIG_SOURCES.md, SECURITY_LINT.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
 ├── src/
 │   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       13 Claude Code hooks (session, pre/post tool use, andon-halt)
@@ -851,6 +851,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.9.96** · Built by [@robotijn](https://github.com/robotijn)
+**6.9.97** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

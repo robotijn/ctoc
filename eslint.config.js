@@ -121,15 +121,21 @@ module.exports = [
       // Surface every spawn/exec call for human review; keep as warn so the suite
       // can still pass while making the surface visible.
       'security/detect-child-process': 'warn',
-      // Dynamic fs paths are pervasive and intentional (plan/state file I/O driven
-      // by user input by design). Keeping as warn avoids hundreds of unactionable
-      // errors while still flagging the pattern. Justification: this repo's core job
-      // is reading/writing plan files at computed paths; these are not bugs.
-      'security/detect-non-literal-fs-filename': 'warn',
-      // Dynamic require is used for optional/peer module loading — warn, not error.
-      'security/detect-non-literal-require': 'warn',
-      // Regex from variables appears in detectors; warn (potential ReDoS surface).
-      'security/detect-non-literal-regexp': 'warn',
+      // LH1 (v6.9.9x): all computed-path fs calls route through the audited
+      // src/lib/safe-fs.js choke point (single eslint-disable there); all
+      // non-literal RegExp construction routes through src/lib/regex-utils.js.
+      // With those invariants in place these rules are promoted to ERROR so a
+      // raw fs/RegExp call on a computed value fails the gate — see
+      // docs/SECURITY_LINT.md. Enforced with --max-warnings 0 (package.json).
+      'security/detect-non-literal-fs-filename': 'error',
+      // Dynamic require removed (LH1): callers use literal requires. Error keeps it out.
+      'security/detect-non-literal-require': 'error',
+      // Non-literal RegExp routes through regex-utils.safeRegExp; raw use is an error.
+      'security/detect-non-literal-regexp': 'error',
+      // ReDoS: catastrophic-backtracking regexes are real bugs (LH1 fixed all 14).
+      'security/detect-unsafe-regex': 'error',
+      // Non-constant-time secret compares are real; error (LH1 audited the one hit).
+      'security/detect-possible-timing-attacks': 'error',
       // Object-injection is extremely noisy and low-signal on trusted internal data.
       // Justification: nearly every bracket access on an object trips this; it does
       // not distinguish trusted keys from attacker-controlled ones. Downgraded to off
@@ -153,10 +159,17 @@ module.exports = [
       }
     },
     rules: {
-      // Tests legitimately exercise child_process and dynamic paths against fixtures.
+      // Tests legitimately exercise child_process, dynamic paths, and dynamic
+      // regexes against fixtures/trusted data — not a production security surface.
+      // Off here so the promoted-to-error security rules don't false-fail the
+      // suite; production code (src/) still enforces them at error under
+      // --max-warnings 0 via the safe-fs / regex-utils choke points.
       'security/detect-child-process': 'off',
       'security/detect-non-literal-fs-filename': 'off',
-      'security/detect-non-literal-require': 'off'
+      'security/detect-non-literal-require': 'off',
+      'security/detect-non-literal-regexp': 'off',
+      'security/detect-unsafe-regex': 'off',
+      'security/detect-possible-timing-attacks': 'off'
     }
   }
 ];
