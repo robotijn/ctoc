@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-01T14:49:39.392Z
+gate_crossed: vision → functional (Gate 0)
+---
+
+---
 type: vision
 status: vision
 created: 2026-07-01
