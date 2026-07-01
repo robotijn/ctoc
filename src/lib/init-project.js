@@ -13,6 +13,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 
 // Quality commands per language
@@ -484,7 +485,7 @@ function renderTemplate(templatePath, vars) {
   let content = safeFs.readFileSync(templatePath, 'utf8');
 
   for (const [key, value] of Object.entries(vars)) {
-    content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    content = content.replace(safeRegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
   }
 
   return content;

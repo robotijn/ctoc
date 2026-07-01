@@ -198,26 +198,12 @@ function parseGitHubActions(workflowPath, projectPath) {
     nodeVersion = nodeMatch[1];
   }
 
-  // Extract run commands
-  const runRegex = /-\s*name:\s*([^\n]+)\s*\n\s*run:\s*\|?\s*\n?((?:[ \t]+[^\n]+\n?)+|[^\n]+)/g;
-  let match;
-
-  while ((match = runRegex.exec(content)) !== null) {
-    const name = match[1].trim();
-    const commands = match[2].trim().split('\n').map(c => c.trim()).filter(c => c);
-
-    for (const cmd of commands) {
-      checks.push({
-        name: name,
-        command: cmd,
-        type: detectCheckType(cmd),
-        job: 'main'
-      });
-    }
-  }
+  // Extract `- name: … / run: …` step commands (line-based, ReDoS-safe).
+  for (const check of extractGitHubRunChecks(content)) checks.push(check);
 
   // Also extract simple `run:` lines
   const simpleRunRegex = /run:\s*([^\n|]+)$/gm;
+  let match;
   while ((match = simpleRunRegex.exec(content)) !== null) {
     const cmd = match[1].trim();
     if (cmd && !checks.some(c => c.command === cmd)) {
@@ -262,24 +248,8 @@ function parseGitLabCI(configPath, projectPath) {
     container = imageMatch[1];
   }
 
-  // Extract script commands (simple parsing)
-  const scriptRegex = /script:\s*\n((?:[ \t]+-[^\n]+\n?)+)/g;
-  let match;
-
-  while ((match = scriptRegex.exec(content)) !== null) {
-    const scripts = match[1].split('\n')
-      .map(line => line.trim().replace(/^-\s*/, ''))
-      .filter(line => line);
-
-    for (const cmd of scripts) {
-      checks.push({
-        name: cmd.slice(0, 40),
-        command: cmd,
-        type: detectCheckType(cmd),
-        job: 'gitlab'
-      });
-    }
-  }
+  // Extract `script:` block commands (line-based, ReDoS-safe).
+  for (const check of extractGitLabScriptChecks(content)) checks.push(check);
 
   return {
     found: true,
@@ -508,6 +478,72 @@ function parseCIConfig(projectPath = process.cwd()) {
   }
 }
 
+/**
+ * Extract GitHub Actions run-step checks from workflow content. Finds each
+ * `- name: X` step whose next non-blank line is a `run:` (inline `run: cmd` or a
+ * block scalar `run: |` followed by indented command lines) and yields one check
+ * per command. Line-based — no nested-quantifier regex, so ReDoS-safe. Exported
+ * for direct testing.
+ * @param {string} content
+ * @returns {Array<{name:string,command:string,type:string,job:string}>}
+ */
+function extractGitHubRunChecks(content) {
+  const checks = [];
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const nameMatch = lines[i].match(/^\s*-\s*name:\s*(.+?)\s*$/);
+    if (!nameMatch) continue;
+
+    // The `run:` must be the next non-blank line (mirrors `…name:…\n\s*run:`).
+    let runIdx = i + 1;
+    while (runIdx < lines.length && lines[runIdx].trim() === '') runIdx++;
+    if (runIdx >= lines.length) continue;
+    const runMatch = lines[runIdx].match(/^\s*run:\s*\|?\s*(.*?)\s*$/);
+    if (!runMatch) continue;
+
+    const name = nameMatch[1].trim();
+    const commands = [];
+    const inline = runMatch[1].trim();
+    if (inline) {
+      commands.push(inline);
+    } else {
+      // Block scalar: consecutive indented lines are the commands.
+      for (let j = runIdx + 1; j < lines.length; j++) {
+        if (!/^[ \t]+\S/.test(lines[j])) break;
+        const cmd = lines[j].trim();
+        if (cmd) commands.push(cmd);
+      }
+    }
+    for (const cmd of commands) {
+      checks.push({ name, command: cmd, type: detectCheckType(cmd), job: 'main' });
+    }
+  }
+  return checks;
+}
+
+/**
+ * Extract GitLab CI script-block checks from config content. Finds each
+ * `script:` / `before_script:` / `after_script:` header followed by indented
+ * `- command` lines. Line-based — no nested-quantifier regex, so ReDoS-safe.
+ * Exported for direct testing.
+ * @param {string} content
+ * @returns {Array<{name:string,command:string,type:string,job:string}>}
+ */
+function extractGitLabScriptChecks(content) {
+  const checks = [];
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^\s*[a-z_]*script:[ \t]*$/.test(lines[i])) continue;
+    for (let j = i + 1; j < lines.length; j++) {
+      if (!/^[ \t]+-[^\n]/.test(lines[j])) break;
+      const cmd = lines[j].trim().replace(/^-\s*/, '');
+      if (!cmd) continue;
+      checks.push({ name: cmd.slice(0, 40), command: cmd, type: detectCheckType(cmd), job: 'gitlab' });
+    }
+  }
+  return checks;
+}
+
 module.exports = {
   parseCIConfig,
   detectCISystem,
@@ -515,6 +551,8 @@ module.exports = {
   filterRelevantChecks,
   getDefaultChecks,
   detectDefaultContainer,
+  extractGitHubRunChecks,
+  extractGitLabScriptChecks,
   CHECK_TYPES,
   CI_SYSTEMS
 };

@@ -11,6 +11,7 @@
  */
 
 const path = require('path');
+const { safeRegExp } = require('./regex-utils');
 const safeFs = require('./safe-fs');
 
 /**
@@ -168,7 +169,7 @@ class CoverageChecker {
 
     // Simple XML parsing for JaCoCo counters
     const parseCounter = (type) => {
-      const regex = new RegExp(`<counter type="${type}" missed="(\\d+)" covered="(\\d+)"`);
+      const regex = safeRegExp(`<counter type="${type}" missed="(\\d+)" covered="(\\d+)"`);
       const match = content.match(regex);
       if (match) {
         const missed = parseInt(match[1], 10);

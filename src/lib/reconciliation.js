@@ -20,6 +20,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -94,8 +95,21 @@ function extractDeclaredFiles(planContent) {
   // files: [a, b, c] OR multi-line list
   const inline = fm.match(/^files:\s*\[([^\]]+)\]/m);
   if (inline) return inline[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-  const block = fm.match(/^files:\s*\n((?:\s+-\s+\S.*\n?)+)/m);
-  if (block) return [...block[1].matchAll(/-\s+(\S.+)/g)].map(m => m[1].trim().replace(/^["']|["']$/g, ''));
+  // Block form: a `files:` header line followed by indented "- item" lines.
+  // Scanned line-by-line (no nested-quantifier regex, so ReDoS-safe); items are
+  // then extracted with the same per-item pattern the inline form uses.
+  const fmLines = fm.split('\n');
+  const headerIdx = fmLines.findIndex(l => /^files:[ \t]*$/.test(l));
+  if (headerIdx !== -1) {
+    const blockLines = [];
+    for (let i = headerIdx + 1; i < fmLines.length; i++) {
+      if (/^\s+-\s+\S/.test(fmLines[i])) blockLines.push(fmLines[i]);
+      else break;
+    }
+    if (blockLines.length) {
+      return [...blockLines.join('\n').matchAll(/-\s+(\S.+)/g)].map(m => m[1].trim().replace(/^["']|["']$/g, ''));
+    }
+  }
   return [];
 }
 
@@ -122,9 +136,10 @@ function matchesGlob(filepath, glob) {
   if (glob === filepath) return true;
   const escaped = glob.replace(/[.+^$(){}|]/g, '\\$&');
   const regex = '^' + escaped.replace(/\*\*/g, '.~~').replace(/\*/g, '[^/]*').replace(/\.~~/g, '.*') + '$';
-  return new RegExp(regex).test(filepath);
+  return safeRegExp(regex).test(filepath);
 }
 
 module.exports = {
   reconcile,
+  extractDeclaredFiles,
 };

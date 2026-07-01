@@ -4,6 +4,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 
 const LANGUAGE_PATTERNS = {
@@ -119,7 +120,7 @@ function matchGlob(str, pattern) {
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.');
-  return new RegExp(`^${regexPattern}$`).test(str);
+  return safeRegExp(`^${regexPattern}$`).test(str);
 }
 
 /**

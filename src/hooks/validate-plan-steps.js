@@ -16,6 +16,7 @@
  */
 
 const safeFs = require('../lib/safe-fs');
+const { safeRegExp } = require('../lib/regex-utils');
 
 /**
  * Canonical step labels - these are MANDATORY and must NOT be changed.
@@ -65,11 +66,11 @@ function validatePlanStepLabels(planPath) {
     // Trailing (?![\w-]) is REQUIRED: without it "TEST" matches inside the known-
     // wrong label "TESTING" (and "REVIEW" inside "REVIEWS"), so a wrong label
     // would silently pass the step-label gate.
-    const stepPattern = new RegExp(`Step\\s*${num}[:\\s]+${escapedLabel}(?![\\w-])`, 'i');
+    const stepPattern = safeRegExp(`Step\\s*${num}[:\\s]+${escapedLabel}(?![\\w-])`, 'i');
 
     if (!stepPattern.test(content)) {
       // Check if there's a wrong label at this position
-      const anyLabelPattern = new RegExp(`Step\\s*${num}[:\\s]+(\\w[\\w-]*)`, 'i');
+      const anyLabelPattern = safeRegExp(`Step\\s*${num}[:\\s]+(\\w[\\w-]*)`, 'i');
       const wrongMatch = content.match(anyLabelPattern);
 
       if (wrongMatch) {

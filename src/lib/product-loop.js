@@ -14,6 +14,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 
 const ROOT = process.cwd();
@@ -43,11 +44,11 @@ function loadCanonicalKPIs() {
     const id = m[1];
     const body = m[2];
     const get = (key) => {
-      const r = body.match(new RegExp(`^\\s*${key}:\\s*(.+)$`, 'm'));
+      const r = body.match(safeRegExp(`^\\s*${key}:\\s*(.+)$`, 'm'));
       return r ? r[1].trim().replace(/^["']|["']$/g, '') : null;
     };
     const getList = (key) => {
-      const r = body.match(new RegExp(`^\\s*${key}:\\s*\\[([^\\]]*)\\]`, 'm'));
+      const r = body.match(safeRegExp(`^\\s*${key}:\\s*\\[([^\\]]*)\\]`, 'm'));
       if (r) return r[1].split(',').map(s => s.trim()).filter(Boolean);
       return [];
     };
@@ -85,9 +86,27 @@ function loadTemplateKPIPlan(templateId) {
   const p = path.join(ROOT, '.ctoc', 'templates', templateId, 'kpi-plan.yaml');
   const content = readFile(p);
   if (!content) return null;
-  const launchMatch = content.match(/^launch_kpis:\s*\n((?:\s+-\s+\S.*\n)+)/m);
-  const launchKpis = launchMatch ? [...launchMatch[1].matchAll(/-\s+(\S+)/g)].map(x => x[1]) : [];
-  return { template_id: templateId, launch_kpis: launchKpis, raw: content };
+  return { template_id: templateId, launch_kpis: parseLaunchKpis(content), raw: content };
+}
+
+/**
+ * Extract the launch KPI ids from a template kpi-plan.yaml body (the `- id`
+ * entries under a `launch_kpis:` block). Line-based (no nested-quantifier regex,
+ * so ReDoS-safe). Exported for direct testing.
+ * @param {string} content
+ * @returns {string[]}
+ */
+function parseLaunchKpis(content) {
+  const lines = content.split('\n');
+  const idx = lines.findIndex(l => /^launch_kpis:[ \t]*$/.test(l));
+  if (idx === -1) return [];
+  const blockLines = [];
+  for (let i = idx + 1; i < lines.length; i++) {
+    if (/^\s+-\s+\S/.test(lines[i])) blockLines.push(lines[i]);
+    else break;
+  }
+  if (!blockLines.length) return [];
+  return [...blockLines.join('\n').matchAll(/-\s+(\S+)/g)].map(x => x[1]);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -221,6 +240,7 @@ module.exports = {
   loadCanonicalKPIs,
   getApplicableKPIs,
   loadTemplateKPIPlan,
+  parseLaunchKpis,
   // Project KPI plan
   loadProjectKPIPlan,
   saveProjectKPIPlan,

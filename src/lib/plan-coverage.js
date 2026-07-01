@@ -26,6 +26,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 
 const STAGE_PRIORITY = ['in-progress', 'todo', 'implementation'];
@@ -62,7 +63,7 @@ function globToRegex(glob) {
     }
   }
   out += '$';
-  return new RegExp(out);
+  return safeRegExp(out);
 }
 
 /**

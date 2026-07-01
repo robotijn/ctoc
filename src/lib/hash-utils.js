@@ -9,6 +9,7 @@
  */
 
 const crypto = require('crypto');
+const { safeRegExp, escapeRegExp } = require('./regex-utils');
 const safeFs = require('./safe-fs');
 const path = require('path');
 
@@ -242,7 +243,10 @@ function hashDirectory(dirPath, options = {}) {
       const shouldExclude = exclude.some(pattern => {
         if (pattern.includes('*')) {
           // Simple glob matching
-          const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+          // Convert a glob to a regex with FULL metacharacter escaping: escape
+          // everything, then turn the (now-escaped) `\*` back into `.*`. This
+          // fixes the previous partial escaping (e.g. `.` matched any char).
+          const regex = safeRegExp(escapeRegExp(pattern).replace(/\\\*/g, '.*'));
           return regex.test(relativePath);
         }
         return relativePath.includes(pattern) || entry.name === pattern;

@@ -1,6 +1,6 @@
 {
   "name": "ctoc",
-  "version": "6.9.95",
+  "version": "6.9.96",
   "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
   "commands": "./src/commands/"
 }

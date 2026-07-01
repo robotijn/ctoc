@@ -177,29 +177,48 @@ function loadActiveProfiles(projectRoot) {
   const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|Z)/m);
   if (!blockMatch) return { profiles: [], overrides: {} };
 
-  const block = blockMatch[1];
+  return parseRegimeBlock(blockMatch[1]);
+}
 
-  // active_profiles list
-  const profilesMatch = block.match(/^\s+active_profiles:\s*(?:\[([^\]]*)\]|\n((?:\s+-\s+\S+\n?)+))/m);
+/**
+ * Parse the indented body of a `regulatory_regime:` block into its
+ * active_profiles list and overrides map. Line-based (no nested-quantifier
+ * regex, so ReDoS-safe); exported for direct testing.
+ *
+ * @param {string} blockBody - everything under the `regulatory_regime:` key
+ * @returns {{ profiles: string[], overrides: Object }}
+ */
+function parseRegimeBlock(blockBody) {
+  const lines = blockBody.split('\n');
+
+  // active_profiles: an inline `[a, b]` list OR a block list of `- name` lines.
   let profiles = [];
-  if (profilesMatch) {
-    if (profilesMatch[1] !== undefined) {
-      // Inline list
-      profiles = profilesMatch[1].split(',').map(s => s.trim()).filter(Boolean);
-    } else if (profilesMatch[2]) {
-      // Block list
-      profiles = [...profilesMatch[2].matchAll(/-\s+(\S+)/g)].map(m => m[1]);
+  for (let i = 0; i < lines.length; i++) {
+    const header = lines[i].match(/^\s+active_profiles:[ \t]*(.*)$/);
+    if (!header) continue;
+    const inline = header[1].trim().match(/^\[([^\]]*)\]/);
+    if (inline) {
+      profiles = inline[1].split(',').map(s => s.trim()).filter(Boolean);
+    } else if (header[1].trim() === '') {
+      for (let j = i + 1; j < lines.length; j++) {
+        const item = lines[j].match(/^\s+-\s+(\S+)/);
+        if (!item) break;
+        profiles.push(item[1]);
+      }
     }
+    break;
   }
 
-  // overrides map
-  const overridesMatch = block.match(/^\s+overrides:\s*\n((?:\s+\S+:\s+\S+\n?)+)/m);
-  let overrides = {};
-  if (overridesMatch) {
-    for (const line of overridesMatch[1].split('\n')) {
-      const kv = line.match(/^\s+(\S+):\s+(\S+)\s*$/);
+  // overrides: a map of `key: value` lines under an `overrides:` header.
+  const overrides = {};
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^\s+overrides:[ \t]*$/.test(lines[i])) continue;
+    for (let j = i + 1; j < lines.length; j++) {
+      if (!/^\s+\S+:\s+\S+/.test(lines[j])) break;
+      const kv = lines[j].match(/^\s+(\S+):\s+(\S+)\s*$/);
       if (kv) overrides[kv[1]] = coerce(kv[2]);
     }
+    break;
   }
 
   return { profiles, overrides };
@@ -312,6 +331,7 @@ module.exports = {
   RETENTION_CATEGORIES,
   DEFAULT_RETENTION_DAYS,
   loadActiveProfiles,
+  parseRegimeBlock,
   loadProfile,
   effectiveControls,
   isControlEnabled,

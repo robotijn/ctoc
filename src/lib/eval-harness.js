@@ -224,8 +224,15 @@ function validateCase(caseObj) {
     errors.push('id must be lowercase, hyphen-separated, starting with letter or digit');
   }
 
-  if (typeof caseObj.skill === 'string' && !/^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)+$/.test(caseObj.skill)) {
-    errors.push('skill must be a path like "category/skill-name"');
+  if (typeof caseObj.skill === 'string') {
+    // Validate a "category/skill-name" path. Splitting on "/" and testing each
+    // segment against a literal, linear regex matches the same inputs as
+    // `^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)+$` without its nested quantifier.
+    const segments = caseObj.skill.split('/');
+    const skillOk = segments.length >= 2 && segments.every(s => /^[a-z0-9][a-z0-9-]*$/.test(s));
+    if (!skillOk) {
+      errors.push('skill must be a path like "category/skill-name"');
+    }
   }
 
   if (caseObj.expected_findings !== undefined && !Array.isArray(caseObj.expected_findings)) {

@@ -17,6 +17,7 @@
  */
 
 const safeFs = require('../lib/safe-fs');
+const { safeRegExp } = require('../lib/regex-utils');
 const path = require('path');
 
 const root = process.cwd();
@@ -68,13 +69,13 @@ function parseFrontmatter(content) {
 }
 
 function readField(fm, name) {
-  const re = new RegExp(`^${name}:\\s*(.+)$`, 'm');
+  const re = safeRegExp(`^${name}:\\s*(.+)$`, 'm');
   const m = fm.raw.match(re);
   return m ? m[1].trim() : null;
 }
 
 function hasField(fm, name) {
-  const re = new RegExp(`^${name}:\\s*`, 'm');
+  const re = safeRegExp(`^${name}:\\s*`, 'm');
   return re.test(fm.raw);
 }
 

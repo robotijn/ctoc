@@ -20,14 +20,19 @@ const path = require('path');
 const fs = require('fs');
 const safeFs = require('../lib/safe-fs');
 
-function safeRequire(modulePath) {
-  try { return require(modulePath); } catch { return null; }
-}
-
-const detector = safeRequire('../lib/ctoc-project-detector');
-const coverage = safeRequire('../lib/plan-coverage');
-const enforcementLog = safeRequire('../lib/enforcement-log');
-const escapePhrases = safeRequire('../lib/escape-phrases');
+// These four sibling modules are loaded fail-soft (a missing/broken module
+// degrades enforcement rather than crashing the hook). Each is a LITERAL
+// require in its own try/catch — no dynamic require(variable) surface — so the
+// module graph is statically analyzable and security/detect-non-literal-require
+// stays clean.
+let detector = null;
+try { detector = require('../lib/ctoc-project-detector'); } catch { detector = null; }
+let coverage = null;
+try { coverage = require('../lib/plan-coverage'); } catch { coverage = null; }
+let enforcementLog = null;
+try { enforcementLog = require('../lib/enforcement-log'); } catch { enforcementLog = null; }
+let escapePhrases = null;
+try { escapePhrases = require('../lib/escape-phrases'); } catch { escapePhrases = null; }
 
 const WHITELIST = [
   '.gitignore',

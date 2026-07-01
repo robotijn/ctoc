@@ -133,8 +133,9 @@ function commandVersion(command) {
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
-    // Extract version number
-    const match = output.match(/(\d+\.\d+(\.\d+)?)/);
+    // Extract version number. Alternation (3-part first) avoids the nested
+    // quantifier of `(\d+\.\d+(\.\d+)?)` while matching the same inputs.
+    const match = output.match(/(\d+\.\d+\.\d+|\d+\.\d+)/);
     return match ? match[1] : output.trim().slice(0, 20);
   } catch {
     return null;

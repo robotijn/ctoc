@@ -11,6 +11,8 @@
  * complex" should NOT match "trivial fix").
  */
 
+const { safeRegExp, escapeRegExp } = require('./regex-utils');
+
 const ESCAPE_PHRASES = Object.freeze([
   'hotfix',
   'trivial fix',
@@ -34,7 +36,7 @@ function matchEscapePhrase(text) {
   for (const phrase of ESCAPE_PHRASES) {
     // Word-bounded: ensure phrase doesn't appear inside another word.
     // \b doesn't work cleanly with multi-word phrases, so we use lookarounds.
-    const pattern = new RegExp(`(^|[^a-z0-9])${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`, 'i');
+    const pattern = safeRegExp(`(^|[^a-z0-9])${escapeRegExp(phrase)}([^a-z0-9]|$)`, 'i');
     if (pattern.test(normalized)) return phrase;
   }
   return null;

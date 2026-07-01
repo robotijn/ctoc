@@ -49,10 +49,17 @@ function loadSettings() {
 function parseSimpleYaml(content) {
   const settings = getDefaultSettings();
 
-  // Look for ci section
-  const ciMatch = content.match(/^ci:\s*\n((?:\s+.+\n)*)/m);
-  if (ciMatch) {
-    const ciSection = ciMatch[1];
+  // Look for the `ci:` section: the header line then its indented lines.
+  // Scanned line-by-line (no nested-quantifier regex, so ReDoS-safe).
+  const lines = content.split('\n');
+  const ciIdx = lines.findIndex(l => /^ci:[ \t]*$/.test(l));
+  if (ciIdx !== -1) {
+    const sectionLines = [];
+    for (let i = ciIdx + 1; i < lines.length; i++) {
+      if (/^\s+.+$/.test(lines[i])) sectionLines.push(lines[i]);
+      else break;
+    }
+    const ciSection = sectionLines.length ? sectionLines.join('\n') + '\n' : '';
 
     // Parse runner_preference (allows hyphens like "self-hosted")
     const prefMatch = ciSection.match(/runner_preference:\s*["']?([\w-]+|null)["']?/);
@@ -212,5 +219,6 @@ module.exports = {
   setRunnerPreference,
   markSelfHostedConfigured,
   hasAskedPreference,
-  getDefaultSettings
+  getDefaultSettings,
+  parseSimpleYaml
 };

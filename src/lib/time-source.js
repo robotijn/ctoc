@@ -125,7 +125,9 @@ function parseChronycTracking(text) {
  */
 function chronyOffsetToMs(value) {
   if (!value) return null;
-  const m = value.match(/(-?\d+(?:\.\d+)?)\s*seconds?/);
+  // Alternation (decimal first) matches the same numbers as `(-?\d+(?:\.\d+)?)`
+  // without the nested quantifier that trips detect-unsafe-regex.
+  const m = value.match(/(-?\d+\.\d+|-?\d+)\s*seconds?/);
   if (!m) return null;
   const seconds = parseFloat(m[1]);
   if (!Number.isFinite(seconds)) return null;

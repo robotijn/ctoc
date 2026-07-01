@@ -21,6 +21,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 
 const HOLD_DIR = '.ctoc/legal-hold';
@@ -136,12 +137,12 @@ function release(projectRoot, holdId, reason) {
 }
 
 function extractField(content, key) {
-  const m = content.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
+  const m = content.match(safeRegExp(`^${key}:\\s*(.+)$`, 'm'));
   return m ? m[1].trim() : null;
 }
 
 function extractListField(content, key) {
-  const m = content.match(new RegExp(`^${key}:\\s*\\n((?:\\s+-\\s+\\S.*\\n?)+)`, 'm'));
+  const m = content.match(safeRegExp(`^${key}:\\s*\\n((?:\\s+-\\s+\\S.*\\n?)+)`, 'm'));
   if (!m) return [];
   return [...m[1].matchAll(/-\s+(\S.*)/g)].map(x => x[1].trim());
 }

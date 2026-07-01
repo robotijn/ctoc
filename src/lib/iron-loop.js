@@ -4,6 +4,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 
 /**
  * Marker for Iron Loop execution steps section.
@@ -368,8 +369,8 @@ function scoreCompleteness(execPlan) {
 
   for (const [num, label] of Object.entries(canonicalLabels)) {
     const escapedLabel = label.replace('-', '[-\\s]');
-    const labelPattern = new RegExp(`Step\\s*${num}[:\\s]+${escapedLabel}`, 'i');
-    const stepPresent = new RegExp(`Step\\s*${num}[:\\s]`, 'i');
+    const labelPattern = safeRegExp(`Step\\s*${num}[:\\s]+${escapedLabel}`, 'i');
+    const stepPresent = safeRegExp(`Step\\s*${num}[:\\s]`, 'i');
 
     if (!labelPattern.test(execPlan)) {
       if (stepPresent.test(execPlan)) {

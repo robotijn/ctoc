@@ -17,6 +17,7 @@
  */
 
 const fs = require('fs');
+const { safeRegExp } = require('./regex-utils');
 const safeFs = require('./safe-fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -232,7 +233,9 @@ class StagedFiles {
    */
   getByPattern(pattern, options = {}) {
     const files = this.getFiles(options);
-    const regex = new RegExp(pattern);
+    // `pattern` is a caller-supplied regex (string or RegExp), not a glob — see
+    // getByPattern callers — so it is passed through verbatim (no escaping).
+    const regex = safeRegExp(pattern);
     return files.filter(file => regex.test(file));
   }
 

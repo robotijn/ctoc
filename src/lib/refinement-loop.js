@@ -14,6 +14,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -439,7 +440,7 @@ function shouldRunLoop({ effortLevel = 'medium', files = [], recentMessages = []
   // Escape phrases bypass
   for (const msg of recentMessages) {
     for (const phrase of ESCAPE_PHRASES) {
-      const re = new RegExp(`\\b${phrase.replace(/\s+/g, '\\s+')}\\b`, 'i');
+      const re = safeRegExp(`\\b${phrase.replace(/\s+/g, '\\s+')}\\b`, 'i');
       if (re.test(msg)) return { run: false, reason: 'escape-phrase', matched: phrase };
     }
   }
@@ -489,7 +490,7 @@ function globMatch(filePath, glob) {
     .replace(/\*\*/g, '__DOUBLE_STAR__')
     .replace(/\*/g, '[^/]*')
     .replace(/__DOUBLE_STAR__/g, '.*') + '$';
-  return new RegExp(re).test(filePath);
+  return safeRegExp(re).test(filePath);
 }
 
 // ─────────────────────────────────────────────────────────────────────

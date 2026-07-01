@@ -4,6 +4,7 @@
  */
 
 const safeFs = require('../lib/safe-fs');
+const { safeRegExp } = require('../lib/regex-utils');
 const path = require('path');
 const { c, renderActionMenu, renderFooter } = require('../lib/tui');
 const { getPlansDir, timeAgo } = require('../lib/state');
@@ -349,7 +350,7 @@ function saveVisionProgress(visionPath, section, answer) {
   const now = new Date().toISOString();
 
   // Update the section with the answer
-  const sectionPattern = new RegExp(`(### ${section}\\n)⏳ \\(not yet answered\\)`, 'm');
+  const sectionPattern = safeRegExp(`(### ${section}\\n)⏳ \\(not yet answered\\)`, 'm');
   content = content.replace(sectionPattern, `$1✓ ${answer}`);
 
   // Update last updated timestamp

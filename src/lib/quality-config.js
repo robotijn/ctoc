@@ -516,7 +516,9 @@ class QualityConfig {
         lastFilename = filenameMatch[1];
       }
 
-      const codeMatch = section.match(/```(?:\w+)?\n([\s\S]*?)```/);
+      // `\w*` (not `(?:\w+)?`) matches the same language tag while keeping the
+      // pattern free of nested quantifiers (detect-unsafe-regex / ReDoS-safe).
+      const codeMatch = section.match(/```\w*\n([\s\S]*?)```/);
       if (codeMatch && lastFilename) {
         configs[lastFilename] = codeMatch[1].trim();
       }

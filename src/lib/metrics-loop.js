@@ -29,6 +29,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 
 // ─────────────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ function safeReadFile(p) {
  */
 function getYamlField(content, field) {
   if (!content) return null;
-  const re = new RegExp(`^${field}:\\s*(.*)$`, 'm');
+  const re = safeRegExp(`^${field}:\\s*(.*)$`, 'm');
   const m = content.match(re);
   if (!m) return null;
   let v = m[1].trim();

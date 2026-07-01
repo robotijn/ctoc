@@ -5,6 +5,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 const { parseMetadata } = require('./state');
 const { findProjectRoot } = require('./project-root');
@@ -197,7 +198,7 @@ function validateEscalations(content, metadata) {
 
   // Look for SKIPPED/BLOCKED without approval
   for (const status of ESCALATION_STATUSES) {
-    const pattern = new RegExp(`(Step\\s*\\d+[^\\n]*${status})`, 'gi');
+    const pattern = safeRegExp(`(Step\\s*\\d+[^\\n]*${status})`, 'gi');
     const matches = region.match(pattern) || [];
 
     for (const match of matches) {
@@ -205,7 +206,7 @@ function validateEscalations(content, metadata) {
       const stepNum = stepMatch ? stepMatch[1] : 'unknown';
 
       // Check if there's an approval/justification nearby
-      const approvalPattern = new RegExp(`Step\\s*${stepNum}[^\\n]*${status}[^\\n]*(?:APPROVED|JUSTIFIED|REASON:|ESCALATED)`, 'i');
+      const approvalPattern = safeRegExp(`Step\\s*${stepNum}[^\\n]*${status}[^\\n]*(?:APPROVED|JUSTIFIED|REASON:|ESCALATED)`, 'i');
       const hasApproval = approvalPattern.test(region);
 
       result.checklist[`escalation_${stepNum}_${status}`] = {
@@ -745,7 +746,7 @@ function validateStepLabels(content) {
 
   // 1. Check all 9 canonical labels are present
   for (const [num, label] of Object.entries(CANONICAL_STEP_LABELS)) {
-    const stepPattern = new RegExp(`Step\\s*${num}[:\\s]+${label.replace('-', '[-\\s]')}`, 'i');
+    const stepPattern = safeRegExp(`Step\\s*${num}[:\\s]+${label.replace('-', '[-\\s]')}`, 'i');
     const hasStep = stepPattern.test(content);
 
     result.checklist[`label_step_${num}`] = {
@@ -755,7 +756,7 @@ function validateStepLabels(content) {
 
     if (!hasStep) {
       // Check for wrong label at this step number
-      const anyLabelPattern = new RegExp(`Step\\s*${num}[:\\s]+(\\w[\\w-]*)`, 'i');
+      const anyLabelPattern = safeRegExp(`Step\\s*${num}[:\\s]+(\\w[\\w-]*)`, 'i');
       const wrongLabel = content.match(anyLabelPattern);
 
       if (wrongLabel) {
@@ -823,7 +824,7 @@ function validateStepLabels(content) {
  */
 function extractStepSection(content, stepNum) {
   const nextStep = stepNum + 1;
-  const pattern = new RegExp(
+  const pattern = safeRegExp(
     `Step\\s*${stepNum}[:\\s][^\\n]*\\n([\\s\\S]*?)(?=###\\s*Step\\s*${nextStep}|###\\s*Step\\s*\\d|## |$)`,
     'i'
   );

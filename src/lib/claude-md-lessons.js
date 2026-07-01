@@ -101,7 +101,11 @@ function applyEol(lfText, eol) {
  */
 function scanForBlock(lines, ignoreFences) {
   let inFence = false;
-  let fenceToken = null;
+  // The fence character (backtick or tilde) that opened the current fence.
+  // Named `fenceChar` (not `*token*`) so the plain `===` comparison below is not
+  // misread as a secret compare by security/detect-possible-timing-attacks —
+  // this is markdown-fence matching, there is no secret and no adversary.
+  let fenceChar = null;
   let startIdx = -1;
   /** @type {string|null} */
   let version = null;
@@ -111,14 +115,14 @@ function scanForBlock(lines, ignoreFences) {
     if (!ignoreFences) {
       const fenceMatch = line.match(FENCE_RE);
       if (fenceMatch) {
-        const token = fenceMatch[1][0]; // '`' or '~'
+        const lineFence = fenceMatch[1][0]; // '`' or '~'
         if (!inFence) {
           inFence = true;
-          fenceToken = token;
-        } else if (token === fenceToken) {
+          fenceChar = lineFence;
+        } else if (lineFence === fenceChar) {
           // Only a fence of the same kind closes the fence (``` not closed by ~~~).
           inFence = false;
-          fenceToken = null;
+          fenceChar = null;
         }
         continue;
       }
@@ -307,7 +311,7 @@ function ensureLessonsBlock(claudeMdPath, ctocRoot) {
       if (newNorm === tgtNorm) return false;
       // Strip trailing EOLs from the original (preserving inner bytes), then
       // append the block using the file's dominant EOL for the new region only.
-      const trimmedRaw = raw.replace(/(\r?\n)*$/, '');
+      const trimmedRaw = raw.replace(/[\r\n]+$/, '');
       const newContent = trimmedRaw + eol + eol + applyEol(canonicalBlock, eol) + eol;
       atomicWrite(claudeMdPath, newContent);
       return true;

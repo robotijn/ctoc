@@ -44,6 +44,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp, escapeRegExp } = require('./regex-utils');
 const path = require('path');
 
 /** 14-day advisory age threshold, in milliseconds. */
@@ -448,7 +449,7 @@ function verifyStaleCandidate(candidate, root, opts = {}) {
     if (cache) cache.records = records;
   }
 
-  const re = new RegExp('\\b' + candidate.plan.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+  const re = safeRegExp('\\b' + escapeRegExp(candidate.plan) + '\\b', 'i');
   const slugMatchCommits = [];
   let slugMatchAfterEntry = false;
   for (const r of records) {

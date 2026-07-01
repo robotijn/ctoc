@@ -269,8 +269,11 @@ function parseTestCounts(output, framework) {
     return counts;
   }
 
-  // Pytest format: X passed, Y failed
-  const pytestMatch = output.match(/(\d+)\s*passed.*?(\d+)?\s*failed/i);
+  // Pytest format: X passed, Y failed. A pytest summary that reports "failed"
+  // always includes the count, so the count is mandatory (`(\d+)` not `(\d+)?`)
+  // — this removes the nested quantifier (ReDoS-safe) with identical behavior:
+  // "N passed" with no failures has no "failed" token and still falls through.
+  const pytestMatch = output.match(/(\d+)\s*passed.*?(\d+)\s*failed/i);
   if (pytestMatch) {
     counts.passed = parseInt(pytestMatch[1], 10);
     counts.failed = parseInt(pytestMatch[2] || 0, 10);

@@ -129,7 +129,10 @@ const SECRET_PATTERNS = [
   // Private Keys
   {
     type: 'PRIVATE_KEY',
-    pattern: /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----/g,
+    // `(?:RSA )?` (single space, no nested quantifier) instead of `(RSA\s+)?`
+    // keeps this ReDoS-safe; PEM headers use single spaces. The capture group
+    // was unused. Outer `\s+` (BEGIN/PRIVATE) preserved for whitespace tolerance.
+    pattern: /-----BEGIN\s+(?:RSA )?PRIVATE\s+KEY-----/g,
     description: 'RSA Private Key'
   },
   {

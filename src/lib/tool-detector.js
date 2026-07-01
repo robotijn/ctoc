@@ -10,6 +10,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const { safeRegExp, escapeRegExp } = require('./regex-utils');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -85,7 +86,9 @@ function detectLanguages(projectPath = process.cwd()) {
   for (const [lang, markers] of Object.entries(LANGUAGE_MARKERS)) {
     for (const marker of markers) {
       const pattern = marker.includes('*')
-        ? new RegExp(marker.replace('*', '.*'))
+        // Full metachar escaping, then `\*` → `.*` (fixes prior partial escape:
+        // only the first `*` was replaced and `.` matched any char).
+        ? safeRegExp(escapeRegExp(marker).replace(/\\\*/g, '.*'))
         : null;
 
       if (pattern) {
