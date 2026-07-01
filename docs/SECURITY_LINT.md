@@ -24,8 +24,13 @@ signal on trusted internal data).
 ## The two choke points
 
 ### `src/lib/safe-fs.js` — filesystem
-The **single** file in `src/` allowed to call `fs.<method>(computedPath)`. It
-carries the sole `/* eslint-disable security/detect-non-literal-fs-filename */`.
+The **single** file in `src/` allowed to call `fs.<method>()` on a
+**computed / variable** path — the choke point governs non-static paths
+specifically. Static fs calls elsewhere are fine and stay on raw `fs`: a string
+literal, or `path.join()` over literals / `__dirname` (e.g.
+`src/hooks/post-commit.js`'s `fs.existsSync(path.join(gitDir, 'MERGE_HEAD'))`),
+is not flagged by `detect-non-literal-fs-filename`. This file carries the sole
+`/* eslint-disable security/detect-non-literal-fs-filename */`.
 Every wrapper validates its path argument (non-empty string, no NUL byte) and
 **fails closed** before delegating to Node's `fs` — converting a heuristic
 warning into a real, tested invariant. Behavior is validation-only: a successful

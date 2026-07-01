@@ -12,11 +12,16 @@
  * tested invariant.
  *
  * The wrappers call fs.<method>(computedPath, ...) DIRECTLY (not via dynamic
- * dispatch) so every real fs path call in src/ is visible, in one place, to a
- * human auditor — and so this single file-level disable is genuinely
- * load-bearing. Because this is the only place raw fs path calls live, the
- * detect-non-literal-fs-filename rule is disabled HERE and ONLY HERE, which
- * lets the rule be promoted to `error` everywhere else with --max-warnings 0.
+ * dispatch) so every real fs call on a COMPUTED/variable path in src/ is
+ * visible, in one place, to a human auditor — and so this single file-level
+ * disable is genuinely load-bearing. This is the only place NON-STATIC fs path
+ * calls are permitted; the choke point governs variable paths specifically.
+ * Static fs calls elsewhere — a string literal, or `path.join()` over literals /
+ * `__dirname` (e.g. src/hooks/post-commit.js's `fs.existsSync(path.join(gitDir,
+ * 'MERGE_HEAD'))`) — are NOT flagged by detect-non-literal-fs-filename and are
+ * allowed to stay on raw fs. Because this file holds every variable-path call,
+ * the rule is disabled HERE and ONLY HERE, letting it be promoted to `error`
+ * everywhere else with --max-warnings 0.
  *
  * Each wrapper mirrors the underlying fs signature explicitly (no variadic
  * spread) so the codebase stays type-clean under `tsc --checkJs`: a spread of

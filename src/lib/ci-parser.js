@@ -489,7 +489,10 @@ function parseCIConfig(projectPath = process.cwd()) {
  */
 function extractGitHubRunChecks(content) {
   const checks = [];
-  const lines = content.split('\n');
+  // Split on \r?\n so CRLF (Windows) content parses identically to LF — the
+  // `$`-anchored line patterns below cannot match a trailing \r, so a bare
+  // \n split would return EMPTY on CRLF input (cross-platform regression).
+  const lines = content.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const nameMatch = lines[i].match(/^\s*-\s*name:\s*(.+?)\s*$/);
     if (!nameMatch) continue;
@@ -507,11 +510,20 @@ function extractGitHubRunChecks(content) {
     if (inline) {
       commands.push(inline);
     } else {
-      // Block scalar: consecutive indented lines are the commands.
+      // Block scalar (`run: |`): collect EVERY command line of the block (the
+      // old regex captured only the first — a latent bug; see plan §4.6#7). A
+      // line belongs to the block only while its indentation is STRICTLY
+      // GREATER than the `run:` key's own indent; the first non-blank line at or
+      // below the key's indent is a sibling YAML key (e.g. `env:`/`CI:`/`TOKEN:`)
+      // and TERMINATES the block — so sibling values (secrets) are never
+      // mistaken for commands. Blank / whitespace-only lines inside the block are
+      // tolerated (they do not truncate — mirrors the old `\s`-spanning capture).
+      const runIndent = lines[runIdx].match(/^[ \t]*/)[0].length;
       for (let j = runIdx + 1; j < lines.length; j++) {
-        if (!/^[ \t]+\S/.test(lines[j])) break;
-        const cmd = lines[j].trim();
-        if (cmd) commands.push(cmd);
+        if (lines[j].trim() === '') continue;
+        const indent = lines[j].match(/^[ \t]*/)[0].length;
+        if (indent <= runIndent) break;
+        commands.push(lines[j].trim());
       }
     }
     for (const cmd of commands) {
@@ -531,7 +543,9 @@ function extractGitHubRunChecks(content) {
  */
 function extractGitLabScriptChecks(content) {
   const checks = [];
-  const lines = content.split('\n');
+  // Split on \r?\n for CRLF-safety (see extractGitHubRunChecks): the
+  // `[ \t]*$`-anchored header pattern cannot match a trailing \r.
+  const lines = content.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     if (!/^\s*[a-z_]*script:[ \t]*$/.test(lines[i])) continue;
     for (let j = i + 1; j < lines.length; j++) {

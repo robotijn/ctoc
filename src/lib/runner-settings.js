@@ -51,13 +51,16 @@ function parseSimpleYaml(content) {
 
   // Look for the `ci:` section: the header line then its indented lines.
   // Scanned line-by-line (no nested-quantifier regex, so ReDoS-safe).
-  const lines = content.split('\n');
+  // CRLF-safe split (see ci-parser): the `$`-anchored patterns cannot match a
+  // trailing \r, so a bare \n split would return EMPTY on CRLF input.
+  const lines = content.split(/\r?\n/);
   const ciIdx = lines.findIndex(l => /^ci:[ \t]*$/.test(l));
   if (ciIdx !== -1) {
     const sectionLines = [];
     for (let i = ciIdx + 1; i < lines.length; i++) {
+      if (lines[i].trim() === '') continue;           // blank inside section: tolerate
       if (/^\s+.+$/.test(lines[i])) sectionLines.push(lines[i]);
-      else break;
+      else break;                                     // dedented / non-indented ends section
     }
     const ciSection = sectionLines.length ? sectionLines.join('\n') + '\n' : '';
 

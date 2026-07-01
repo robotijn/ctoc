@@ -6,8 +6,9 @@
  * ESLint *error* (not warning) introduced anywhere in src/** or tests/** will fail
  * `node --test tests/*.test.js`.
  *
- * Warnings (the eslint-plugin-security advisories) do not fail the build — ESLint
- * exits 0 with warnings present. Only errors cause a non-zero exit.
+ * As of LH1, warnings ALSO fail the build: the run passes `--max-warnings 0`, so a
+ * single re-introduced warning (e.g. a security-plugin advisory) makes ESLint exit
+ * non-zero and reds this gate. The repo currently lints clean (0 errors, 0 warnings).
  *
  * Cross-platform: uses process.execPath via npm's bin resolution and never assumes
  * a shell.
@@ -33,7 +34,7 @@ describe('Lint enforcement', () => {
       `ESLint is not installed at ${ESLINT_BIN}. Run \`npm install\` so the lint gate can run.`
     );
 
-    const res = spawnSync(process.execPath, [ESLINT_BIN, '.', '--format', 'stylish'], {
+    const res = spawnSync(process.execPath, [ESLINT_BIN, '.', '--max-warnings', '0', '--format', 'stylish'], {
       cwd: REPO,
       encoding: 'utf8',
       // Generous buffer: a full run over src/** + tests/** can be large.
@@ -42,8 +43,9 @@ describe('Lint enforcement', () => {
 
     assert.equal(res.error, undefined, `Failed to launch ESLint: ${res.error && res.error.message}`);
 
-    // ESLint exit codes: 0 = no errors (warnings allowed), 1 = lint errors,
-    // 2 = config/internal failure. Anything non-zero is a failure for this gate.
+    // With --max-warnings 0, ESLint exit codes: 0 = no errors AND no warnings,
+    // 1 = lint errors OR warnings present, 2 = config/internal failure.
+    // Anything non-zero is a failure for this gate.
     if (res.status !== 0) {
       const out = `${res.stdout || ''}${res.stderr || ''}`.trim();
       assert.fail(

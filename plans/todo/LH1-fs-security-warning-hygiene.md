@@ -426,10 +426,14 @@ specific child_process sites as they arise.
 1. **No `path.normalize` in safe-fs** (directive override of ALIGN §A's mention).
    Validation only → byte-identical fs semantics; normalization could silently
    change behavior (`..` collapse, trailing slashes) callers may rely on.
-2. **safeFs.existsSync / accessSync become strict-throwing** on invalid path
+2. **safeFs.existsSync becomes strict-throwing** on invalid path
    (fs.existsSync returns false). Intentional fail-closed; surfaces latent
    `existsSync(undefined)`-style caller bugs. Wave agents fix any caller relying
    on the old false-return (none expected); Step 14 full-suite catches them.
+   (Correction, LH1 kickback: safe-fs does NOT wrap/export `accessSync` — no
+   such wrapper exists and there are 0 callers, so there is nothing to make
+   strict-throwing. The `access`/`accessSync` blind spot is instead pinned to
+   zero by `tests/safe-fs-blindspot.test.js`.)
 3. **Explicit per-method wrappers** (not dynamic `fs[name]`) so the sole
    eslint-disable is load-bearing (dynamic dispatch made it "unused" → eslint-9
    `reportUnusedDisableDirectives` warning) and so a human sees the full fs
@@ -444,6 +448,26 @@ specific child_process sites as they arise.
 6. **readme-numbers guard bumped 108→109** this run — mechanical acknowledgment
    of the sanctioned new module; explicitly not migration/config-flip. Required
    to keep the suite green.
+7. **GitHub `run: |` block now captures ALL commands, not just the first**
+   (LH1 kickback, MEDIUM-1). The old newline-spanning regex captured only the
+   first command of a block scalar — a latent bug. The line-based rewrite yields
+   one check per command, which is the DESIRED behavior. To keep this safe, the
+   block TERMINATES at the first non-blank line whose indentation is ≤ the `run:`
+   key's own indent: a step's sibling YAML keys (`env:`, `CI:`, `TOKEN: …`) sit at
+   the step indent (shallower than the block body) and are therefore never
+   mistaken for commands — preventing secret values from being captured. Blank /
+   whitespace-only lines inside the block are tolerated (do not truncate),
+   mirroring the old `\s`-spanning capture. All 5 other block parsers keep exact
+   OLD-regex parity (proven by a differential harness on LF / multi-item /
+   blank-line inputs); this GitHub parser is the one intentional divergence.
+8. **All 6 line-based block parsers made CRLF-safe** (LH1 kickback, HIGH).
+   `.split('\n')` left a trailing `\r` on every line, and the `$`-anchored
+   line patterns (`[ \t]*$`, `(.*)$`, `\S`) cannot match across `\r`, so on
+   CRLF (Windows) input the parsers returned EMPTY — a cross-platform-non-
+   negotiable violation. Fixed by splitting on `/\r?\n/` at every site
+   (ci-parser ×2, reconciliation, regulatory-regime, product-loop,
+   runner-settings) plus making `extractDeclaredFiles`'s frontmatter fence
+   regex `\r?\n`-tolerant. Each parser has a CRLF==LF regression test.
 
 ## Notes
 

@@ -89,7 +89,9 @@ function reconcile(projectRoot, planPath, opts = {}) {
 }
 
 function extractDeclaredFiles(planContent) {
-  const fmMatch = planContent.match(/^---\n([\s\S]*?)\n---/m);
+  // CRLF-safe: tolerate \r before every \n so a Windows-authored plan's
+  // frontmatter fence and split both match (bare \n would fail on `---\r\n`).
+  const fmMatch = planContent.match(/^---\r?\n([\s\S]*?)\r?\n---/m);
   if (!fmMatch) return [];
   const fm = fmMatch[1];
   // files: [a, b, c] OR multi-line list
@@ -98,13 +100,14 @@ function extractDeclaredFiles(planContent) {
   // Block form: a `files:` header line followed by indented "- item" lines.
   // Scanned line-by-line (no nested-quantifier regex, so ReDoS-safe); items are
   // then extracted with the same per-item pattern the inline form uses.
-  const fmLines = fm.split('\n');
+  const fmLines = fm.split(/\r?\n/);
   const headerIdx = fmLines.findIndex(l => /^files:[ \t]*$/.test(l));
   if (headerIdx !== -1) {
     const blockLines = [];
     for (let i = headerIdx + 1; i < fmLines.length; i++) {
+      if (fmLines[i].trim() === '') continue;              // blank inside block: tolerate
       if (/^\s+-\s+\S/.test(fmLines[i])) blockLines.push(fmLines[i]);
-      else break;
+      else break;                                          // dedented / non-item ends block
     }
     if (blockLines.length) {
       return [...blockLines.join('\n').matchAll(/-\s+(\S.+)/g)].map(m => m[1].trim().replace(/^["']|["']$/g, ''));

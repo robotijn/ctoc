@@ -189,7 +189,9 @@ function loadActiveProfiles(projectRoot) {
  * @returns {{ profiles: string[], overrides: Object }}
  */
 function parseRegimeBlock(blockBody) {
-  const lines = blockBody.split('\n');
+  // CRLF-safe split (see ci-parser): the `$`-anchored patterns below cannot
+  // match a trailing \r, so a bare \n split would return EMPTY on CRLF input.
+  const lines = blockBody.split(/\r?\n/);
 
   // active_profiles: an inline `[a, b]` list OR a block list of `- name` lines.
   let profiles = [];
@@ -201,8 +203,9 @@ function parseRegimeBlock(blockBody) {
       profiles = inline[1].split(',').map(s => s.trim()).filter(Boolean);
     } else if (header[1].trim() === '') {
       for (let j = i + 1; j < lines.length; j++) {
+        if (lines[j].trim() === '') continue;         // blank inside list: tolerate
         const item = lines[j].match(/^\s+-\s+(\S+)/);
-        if (!item) break;
+        if (!item) break;                             // dedented / non-item ends list
         profiles.push(item[1]);
       }
     }
@@ -214,7 +217,8 @@ function parseRegimeBlock(blockBody) {
   for (let i = 0; i < lines.length; i++) {
     if (!/^\s+overrides:[ \t]*$/.test(lines[i])) continue;
     for (let j = i + 1; j < lines.length; j++) {
-      if (!/^\s+\S+:\s+\S+/.test(lines[j])) break;
+      if (lines[j].trim() === '') continue;           // blank inside map: tolerate
+      if (!/^\s+\S+:\s+\S+/.test(lines[j])) break;    // dedented / non-kv ends map
       const kv = lines[j].match(/^\s+(\S+):\s+(\S+)\s*$/);
       if (kv) overrides[kv[1]] = coerce(kv[2]);
     }

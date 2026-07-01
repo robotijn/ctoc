@@ -97,13 +97,16 @@ function loadTemplateKPIPlan(templateId) {
  * @returns {string[]}
  */
 function parseLaunchKpis(content) {
-  const lines = content.split('\n');
+  // CRLF-safe split (see ci-parser): the `$`-anchored header cannot match a
+  // trailing \r, so a bare \n split would return EMPTY on CRLF input.
+  const lines = content.split(/\r?\n/);
   const idx = lines.findIndex(l => /^launch_kpis:[ \t]*$/.test(l));
   if (idx === -1) return [];
   const blockLines = [];
   for (let i = idx + 1; i < lines.length; i++) {
+    if (lines[i].trim() === '') continue;             // blank inside block: tolerate
     if (/^\s+-\s+\S/.test(lines[i])) blockLines.push(lines[i]);
-    else break;
+    else break;                                       // dedented / non-item ends block
   }
   if (!blockLines.length) return [];
   return [...blockLines.join('\n').matchAll(/-\s+(\S+)/g)].map(x => x[1]);
