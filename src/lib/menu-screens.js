@@ -844,26 +844,39 @@ function dashboardCommands(projectPath) {
     '◀ Pipeline': ''
   };
 
-  // NB3: reach the background-task board when the registry holds any task. Label
-  // key only (never a digit — Rule 1). FAIL-OPEN: a corrupt/unreadable registry
-  // omits the entry rather than breaking the Commands screen (load already fails
-  // open to empty; the try/catch is defense in depth).
+  const questions = [{
+    question: 'Select a command:',
+    header: 'Commands',
+    options
+  }];
+
+  // NB3 (HIGH fix): reach the background-task board via a RIDE-ALONG second question
+  // — NOT a 5th option on the primary Commands question. AskUserQuestion caps each
+  // question at 4 options; a spliced 5th sat before ◀ Pipeline, so truncation would
+  // drop Back and strand the user. Mirrors the environment (Rule 8) / stale (Rule 10)
+  // ride-along pattern: the primary question stays at its 4 options with ◀ Pipeline
+  // intact; the board rides along as its own ≤4-option, label-keyed question (never a
+  // digit — Rule 1). FAIL-OPEN: a corrupt/unreadable registry omits the ride-along
+  // rather than breaking Commands (load already fails open to empty; the try/catch is
+  // defense in depth).
   let hasBackgroundTasks = false;
   try { hasBackgroundTasks = taskRegistry.load(root).tasks.length > 0; } catch { hasBackgroundTasks = false; }
   if (hasBackgroundTasks) {
-    options.splice(options.length - 1, 0, { label: 'Background tasks ▸', description: 'View the background task board' });
-    actions['Background tasks ▸'] = 'tasks';
+    questions.push({
+      question: 'Background tasks?',
+      header: 'Background tasks',
+      options: [
+        { label: 'View board ▸', description: 'View the background task board' },
+        { label: 'Not now', description: 'Dismiss for this menu turn' },
+      ],
+    });
+    actions['View board ▸'] = 'tasks'; // label key only — NEVER a digit (Rule 1)
+    actions['Not now'] = '';           // no-op (driver falls through to the Commands answer)
   }
 
   return {
     text,
-    ask: {
-      questions: [{
-        question: 'Select a command:',
-        header: 'Commands',
-        options
-      }]
-    },
+    ask: { questions },
     actions
   };
 }
@@ -1440,9 +1453,19 @@ function taskAdd(root, rest) {
  * @returns {Array<{id:string, kind:string, plan:(string|null), touches:string[], gitOp:boolean}>}
  */
 function computePromote(reg) {
-  return taskRegistry.nextRunnable(reg).map((t) => ({
-    id: t.id, kind: t.kind, plan: t.plan, touches: t.touches, gitOp: t.gitOp
-  }));
+  return taskRegistry.nextRunnable(reg)
+    // NB3 (LOW, defense in depth): only ids of the canonical `t<n>` shape may ride
+    // into a `menu task start <id>` dispatch instruction, and id/plan are stripped of
+    // control chars — a crafted registry entry can never inject an ANSI/newline
+    // payload into the COMPLETION turn (mirrors the render layer's stripCtl guard).
+    .filter((t) => /^t\d+$/.test(t.id))
+    .map((t) => ({
+      id: stripCtl(t.id),
+      kind: t.kind,
+      plan: t.plan == null ? t.plan : stripCtl(t.plan),
+      touches: t.touches,
+      gitOp: t.gitOp
+    }));
 }
 
 /** `menu task start|fail|cancel` — a single-status transition on a non-terminal task. */

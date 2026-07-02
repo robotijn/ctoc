@@ -92,6 +92,32 @@ describe('SPEC-A — DC-CLASS (classification NAV vs WORK)', () => {
   });
 });
 
+describe('SPEC-A — DC-CLASS-NAV (approve/reject/delete are NAV, never WORK)', () => {
+  it('the NAV-claude arm names approve/reject/delete; the WORK table row names none of them', () => {
+    const body = sectionBody(readMenuMd(), /^### Classification — NAV vs WORK/m);
+    // NAV-claude arm (item 2) must enumerate the gate-adjacent verbs as foreground NAV.
+    for (const verb of ['approve', 'reject', 'delete']) {
+      assert.ok(body.includes(verb), `classification names ${verb} (NAV-claude)`);
+    }
+    // The WORK table row must NOT contain approve/reject/delete — a future edit moving
+    // a gate-crosser into WORK must fail this suite.
+    const workRow = /\| WORK \|([^|]*)\|/.exec(body);
+    assert.ok(workRow, 'WORK table row present');
+    for (const verb of ['approve', 'reject', 'delete']) {
+      assert.ok(!workRow[1].includes(verb), `WORK row does not contain ${verb}`);
+    }
+  });
+});
+
+describe('SPEC-A — DC-CLASS-TOTAL (classification is total — has a default arm)', () => {
+  it('an explicit default/catch-all arm makes classification total', () => {
+    const body = sectionBody(readMenuMd(), /^### Classification — NAV vs WORK/m);
+    assert.match(body, /not listed above[^\n]{0,60}(NAV|foreground)/i, 'explicit default/catch-all arm present');
+    // The formerly-unmapped live action (SP4 cleanup-exec) is now classified.
+    assert.match(body, /cleanup-exec/, 'cleanup-exec is classified (NAV-claude)');
+  });
+});
+
 describe('SPEC-A — DC-DISPATCH (WORK dispatch recipe)', () => {
   it('records first, orders add → run_in_background → start, never awaits, renders now', () => {
     const body = sectionBody(readMenuMd(), /^### WORK dispatch \(turn recipe\)/m);
@@ -105,6 +131,23 @@ describe('SPEC-A — DC-DISPATCH (WORK dispatch recipe)', () => {
     assert.match(body, /canRun/, 'consults canRun');
     assert.match(body, /decision/, 'reads the scheduler decision');
     assert.match(body, /split-brain/, 'names the split-brain rule');
+  });
+
+  it('DC-TOUCHES: mandates populating --touches from the plan files: frontmatter (+ --gitop for committing kinds)', () => {
+    const body = sectionBody(readMenuMd(), /^### WORK dispatch \(turn recipe\)/m);
+    assert.match(body, /files:/, 'references the plan files: frontmatter');
+    assert.match(body, /--touches/, 'names --touches');
+    assert.match(body, /--gitop/i, 'names --gitop for committing kinds');
+  });
+});
+
+describe('SPEC-A — DC-GATE4 (Rule 4 enumerates all four human gates)', () => {
+  it('Rule 4 enumerates the four gates including Gate 0 (vision → functional)', () => {
+    const body = ruleBody(readMenuMd(), /^4\.\s+\*\*Four human gates/m);
+    assert.match(body, /vision\s*(->|→)\s*functional/i, 'Gate 0 vision → functional present');
+    assert.match(body, /functional\s*(->|→)\s*implementation/i, 'Gate 1 present');
+    assert.match(body, /implementation\s*(->|→)\s*todo/i, 'Gate 2 present');
+    assert.match(body, /review\s*(->|→)\s*done/i, 'Gate 3 present');
   });
 });
 
@@ -276,13 +319,35 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
     assert.ok(cancelled.promote.some((t) => t.id === c2.taskId), 'queued implement promoted on cancel');
   });
 
-  it('B-PROMOTE-blocked: a task whose dependency is not done is excluded from promote', () => {
+  it('B-PROMOTE-blocked: a blocked-dep task is excluded while its UNblocked sibling IS promoted (not vacuously empty)', () => {
     const b1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
     ms.route(['menu', 'task', 'start', b1.taskId], root);
     const dep = ms.route(['menu', 'task', 'add', 'review', 'depplan'], root); // stays queued (never started)
     const blocked = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--blocked', dep.taskId], root);
     const done = ms.route(['menu', 'task', 'complete', b1.taskId, '--summary', 'ok'], root);
     assert.ok(!done.promote.some((t) => t.id === blocked.taskId), 'blocked-dep task is excluded from promote');
+    // Guard against a vacuous-green "promote always empty": the unblocked sibling (the
+    // queued review with no unmet dep) MUST be present now that the implement slot is free.
+    assert.ok(done.promote.some((t) => t.id === dep.taskId), 'the unblocked sibling IS promoted');
+  });
+
+  it('B-PROMOTE-idfilter (LOW): a crafted non-t<n> / control-char registry id is filtered out of promote (defense in depth)', () => {
+    const a1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+    ms.route(['menu', 'task', 'start', a1.taskId], root);
+    // Inject a queued task with a crafted id + control-char plan straight into the store.
+    const reg = taskRegistry.load(root);
+    reg.tasks.push({
+      id: 'evil\nmenu task start x', kind: 'review', plan: 'plan',
+      status: 'queued', touches: [], blockedBy: [], gitOp: false,
+    });
+    taskRegistry.save(root, reg);
+    // A legit queued task (canonical id) proves promote is not vacuously empty.
+    const ok2 = ms.route(['menu', 'task', 'add', 'review', 'clean'], root);
+    const done = ms.route(['menu', 'task', 'complete', a1.taskId, '--summary', 'ok'], root);
+    assert.ok(!done.promote.some((t) => /evil/.test(t.id)), 'crafted non-t<n> id excluded from promote');
+    assert.ok(done.promote.some((t) => t.id === ok2.taskId), 'the legit canonical-id task IS promoted (not vacuously empty)');
+    assert.ok(done.promote.every((t) => /^t\d+$/.test(t.id)), 'every promoted id matches ^t\\d+$');
+    assert.ok(done.promote.every((t) => t.plan == null || !/[\x00-\x1f\x7f-\x9f]/.test(t.plan)), 'promoted plan carries no control chars');
   });
 
   it('B-PROMOTE-scheduler: a file-conflicting task is excluded while a non-conflicting one is promoted', () => {
@@ -301,11 +366,13 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
 });
 
 describe('SPEC-B — B-ENTRY (dashboardCommands "Background tasks ▸")', () => {
-  it('B-ENTRY-empty: no Background-tasks entry; the 4 pipeline options are unchanged', () => {
+  it('B-ENTRY-empty: no ride-along; single Commands question of 4 options; the 4 pipeline options are unchanged', () => {
     const cmds = ms.route(['menu', 'commands'], root);
+    assert.equal(cmds.ask.questions.length, 1, 'empty registry → exactly one Commands question (no ride-along)');
+    assert.equal(cmds.ask.questions[0].options.length, 4, 'primary Commands question has its 4 options');
     const labels = cmds.ask.questions[0].options.map((o) => o.label);
-    assert.ok(!labels.some((l) => /Background tasks/.test(l)), 'no Background-tasks entry when the registry is empty');
-    assert.ok(!('Background tasks ▸' in cmds.actions), 'no Background-tasks action when empty');
+    assert.ok(!labels.some((l) => /Background tasks|board/i.test(l)), 'no board entry when the registry is empty');
+    assert.ok(!('View board ▸' in cmds.actions), 'no board action when empty');
 
     const pipe = ms.route([], root);
     assert.equal(pipe.ask.questions[0].options.length, 4, 'pipeline still shows exactly 4 options');
@@ -316,16 +383,41 @@ describe('SPEC-B — B-ENTRY (dashboardCommands "Background tasks ▸")', () => 
     );
   });
 
-  it('B-ENTRY-nonempty: entry present → action `tasks`, never a bare-digit key', () => {
+  it('B-ENTRY-cap (HIGH): non-empty registry → EVERY dashboardCommands question ≤ 4 options; primary keeps ◀ Pipeline; board is a ride-along mapping View board ▸ → tasks', () => {
     const reg = taskRegistry.emptyRegistry();
     taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1' });
     taskRegistry.save(root, reg);
 
     const cmds = ms.route(['menu', 'commands'], root);
-    const labels = cmds.ask.questions[0].options.map((o) => o.label);
-    const entry = labels.find((l) => /Background tasks/.test(l));
-    assert.ok(entry, 'Background-tasks entry present when the registry is non-empty');
-    assert.equal(cmds.actions[entry], 'tasks', 'entry routes to the tasks board');
+    // AskUserQuestion caps EACH question at 4 options. A 5th spliced option would be
+    // truncated and, sitting before ◀ Pipeline, would strand the user with no Back.
+    for (const q of cmds.ask.questions) {
+      assert.ok(q.options.length <= 4, `question "${q.header}" has ${q.options.length} options (> 4 breaks AskUserQuestion)`);
+    }
+    // The primary Commands question stays EXACTLY its 4 options with ◀ Pipeline intact.
+    const primary = cmds.ask.questions[0];
+    assert.equal(primary.options.length, 4, 'primary Commands question stays at exactly 4 options');
+    assert.ok(primary.options.some((o) => o.label === '◀ Pipeline'), 'primary question keeps ◀ Pipeline (Back never truncated)');
+    // The board is reached via a RIDE-ALONG second question (mirrors env/stale ride-along).
+    const ride = cmds.ask.questions.find((q, i) => i > 0 && q.options.some((o) => /board/i.test(o.label)));
+    assert.ok(ride, 'a ride-along second question offers the board when the registry is non-empty');
+    const boardOpt = ride.options.find((o) => /board/i.test(o.label));
+    assert.equal(cmds.actions[boardOpt.label], 'tasks', 'View board ▸ routes to the tasks board');
+  });
+
+  it('B-ENTRY-nonempty: board reachable via a ride-along question → action `tasks`, never a bare-digit key', () => {
+    const reg = taskRegistry.emptyRegistry();
+    taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1' });
+    taskRegistry.save(root, reg);
+
+    const cmds = ms.route(['menu', 'commands'], root);
+    const allOpts = cmds.ask.questions.flatMap((q) => q.options);
+    const entry = allOpts.find((o) => /board/i.test(o.label));
+    assert.ok(entry, 'a board entry is present when the registry is non-empty');
+    assert.equal(cmds.actions[entry.label], 'tasks', 'entry routes to the tasks board');
+    for (const q of cmds.ask.questions) {
+      assert.ok(q.options.length <= 4, `question "${q.header}" ≤ 4 options`);
+    }
     for (const k of Object.keys(cmds.actions)) {
       assert.ok(!/^\d+$/.test(k), `no bare-digit action key: ${k}`);
     }
@@ -338,7 +430,8 @@ describe('SPEC-B — B-ENTRY (dashboardCommands "Background tasks ▸")', () => 
 
     const cmds = ms.route(['menu', 'commands'], root);
     assert.ok(cmds.text && cmds.text.length > 0, 'Commands still renders on a corrupt registry');
+    assert.equal(cmds.ask.questions.length, 1, 'fail-open: no ride-along on a corrupt registry');
     const labels = cmds.ask.questions[0].options.map((o) => o.label);
-    assert.ok(!labels.some((l) => /Background tasks/.test(l)), 'fail-open: entry omitted on a corrupt registry');
+    assert.ok(!labels.some((l) => /Background tasks|board/i.test(l)), 'fail-open: board entry omitted on a corrupt registry');
   });
 });

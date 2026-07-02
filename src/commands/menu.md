@@ -69,14 +69,20 @@ Resolve the user's reply to an action string `A`, then classify:
    `plan` / `stubs` / `validate` / `inbox` / `tasks` / `task` → **NAV**: render the
    screen synchronously, record no task, minimal reasoning.
 2. `A` is a **NAV-claude** action (`view-edit`, `approve`, `reject`, `delete`,
-   `edit`, `edit-stubs`, `add-stub`, `sync`, `set-environment`, `env-decide-later`,
-   `stop-agent`, `vision`) → run it in the **foreground**, then render. EXCEPTION: a
-   gate-approve with an autonomous follow-on (Gate 0 → `product-owner`, Gate 1 →
-   `implementation-planner`) runs the foreground approve, then dispatches that
-   follow-on as **WORK**.
+   `edit`, `edit-stubs`, `add-stub`, `cleanup-exec`, `sync`, `set-environment`,
+   `env-decide-later`, `stop-agent`, `vision`) → run it in the **foreground**, then
+   render. EXCEPTION: a gate-approve on a functional plan (Gate 1) with an autonomous
+   follow-on runs the foreground approve, then dispatches `implementation-planner` as
+   **WORK**.
 3. `A` is a **WORK-claude** action (`start-agent` → `implement`, `decompose`,
    `discuss`, `approve-stubs` → `plan`, a `create-plan` discussion → `discuss`) →
    the **WORK dispatch** recipe below. WORK is **never** run in the foreground.
+   Note: `approve-stubs` crosses **Gate 0** (vision → functional) in the foreground
+   and hands the stubs off to `product-owner` as that WORK follow-on — the Gate-0
+   follow-on lives on this WORK path, not on the `claude:approve` exception above.
+4. **Default (total).** Any other `claude:` action not listed above → foreground
+   **NAV**: run it, then render. Classification is **total** — every menu turn is
+   exactly one of the two planes (no unmapped action).
 
 | Class | Actions | Handling |
 |-------|---------|----------|
@@ -85,7 +91,7 @@ Resolve the user's reply to an action string `A`, then classify:
 
 ### WORK dispatch (turn recipe)
 
-1. **Record first.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js" menu task add K [P] [--touches files] [--gitop] [--blocked ids]` → `{taskId, decision, reason}`. This consults the NB1 scheduler (`canRun`) as it records — the `decision` is `run` or `queue`.
+1. **Record first.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js" menu task add K [P] [--touches files] [--gitop] [--blocked ids]` → `{taskId, decision, reason}`. This consults the NB1 scheduler (`canRun`) as it records — the `decision` is `run` or `queue`. **Populate `--touches`** for any file-editing kind (implement, quality, security, review) by deriving the file list from the target plan's `files:` frontmatter, and set `--gitop` for any kind that commits or pushes — **so the scheduler can enforce file-conflict and git-exclusive scheduling.** An empty `--touches` makes NB1's file-conflict rule a no-op, so two parallel file-editing WORK tasks (e.g. quality + security on the same plan) could clobber each other; always derive it from `files:`.
 2. **Dispatch only on `run`.** If `decision === "run"`: launch `Agent(run_in_background)` with a self-contained brief, THEN `menu task start <taskId>`. If `decision === "queue"`: record only — **do not** launch an agent; show the queued task and its `reason`.
 3. **Render now.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"` and display the dashboard with a one-line status. **Never `await`** the agent's completion.
 
@@ -128,7 +134,7 @@ selected by task id (`t<n>`) as free-text; numbers still open plans only (Rule 1
 1. **Numbers are reserved EXCLUSIVELY for opening a plan.** A number must NEVER be a shortcut for navigation or any other action, on any screen. On a plan list (`inputMode: "plan-select"`) do NOT call AskUserQuestion — render the list and accept a FREE-TEXT reply: a number of any length (e.g. `25`) opens that plan via `actions[number]`; `n`/`new` and `b`/`back` are the only non-plan shortcuts (words, never numbers). On other screens, present the options and accept the option's word/label (case-insensitive) — AskUserQuestion may be used there, but a number must never map to a non-plan action.
 2. Auto-discuss when creating new plans — ask every discussion question via the `.ctoc/ask-me-questions.md` matrix format: one question per turn, the Unicode-box matrix first, then AskUserQuestion
 3. Dashboard pipeline shows the 3 v7 sections: Business, Implementation, Execution, More (counts in descriptions, labels are stable)
-4. 3 human gates: functional->implementation, implementation->todo, review->done
+4. **Four human gates** (Gate 0–3, per CLAUDE.md's "4 Mandatory Approval Points"): vision->functional (Gate 0), functional->implementation (Gate 1), implementation->todo (Gate 2), review->done (Gate 3). Each is foreground and human-only; no background task ever crosses one.
 5. Pre-validate before every approve (run `validate` command first)
 6. Menu rendering and all CTOC slash commands inherit the user's chosen session model; no model pin is set in command frontmatter (removed in v6.9.28 to avoid forced context compaction in long sessions)
 7. The menu auto-initializes CTOC on first run: if the project has no `.ctoc/` directory, `menu.js` runs `initProject()` before rendering (creates `.ctoc/`, `plans/`, `CLAUDE.md` if absent). There is no separate init command — opening the menu is the trigger.
