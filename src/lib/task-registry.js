@@ -51,6 +51,12 @@ const REGISTRY_VERSION = 1;
 const MAX_CONCURRENT = 5;
 /** Warn-log rotation cap (mirrors store.js). */
 const MAX_LOG_ENTRIES = 500;
+/**
+ * Sanity cap on the number of task entries accepted from disk. A giant crafted
+ * registry above this is treated as untrusted → fail open to empty + warn
+ * (defense-in-depth; NB1 never legitimately holds this many background tasks).
+ */
+const MAX_TASKS = 10000;
 
 /** The valid task kinds (vision §3a enumeration). */
 const KINDS = Object.freeze(new Set([
@@ -162,7 +168,9 @@ function highestIdSuffix(tasks) {
   for (const t of tasks) {
     if (t && typeof t.id === 'string' && t.id.startsWith('t')) {
       const n = Number(t.id.slice(1));
-      if (Number.isInteger(n) && n > max) max = n;
+      // isSafeInteger (not isInteger): an id suffix ≥ 2^53 cannot be incremented
+      // without collision, so it must not seed `seq` — treat it as absent.
+      if (Number.isSafeInteger(n) && n > max) max = n;
     }
   }
   return max;
@@ -229,6 +237,11 @@ function load(root) {
     warnLog(root, 'registry_load_failed', { message: 'registry file has an unexpected shape or version' });
     return emptyRegistry();
   }
+  if (data.tasks.length > MAX_TASKS) {
+    // A giant crafted registry is untrusted → fail open to empty + warn.
+    warnLog(root, 'registry_too_large', { count: data.tasks.length, max: MAX_TASKS });
+    return emptyRegistry();
+  }
 
   const byId = new Map();
   for (const raw of data.tasks) {
@@ -247,7 +260,15 @@ function load(root) {
   }
 
   const tasks = Array.from(byId.values());
-  const fileSeq = Number.isInteger(data.seq) && data.seq >= 0 ? data.seq : 0;
+  // seq must be a SAFE non-negative integer. A crafted seq ≥ 2^53 breaks ++seq
+  // monotonicity (seq + 1 === seq) → id reuse; clamp it (fail-open) to a safe value
+  // derived from the real ids and warn. An absent seq (legacy file) is normal → no warn.
+  let fileSeq = 0;
+  if (Number.isSafeInteger(data.seq) && data.seq >= 0) {
+    fileSeq = data.seq;
+  } else if (data.seq != null) {
+    warnLog(root, 'registry_seq_clamped', { seq: String(data.seq) });
+  }
   const seq = Math.max(fileSeq, highestIdSuffix(tasks));
   return { version: REGISTRY_VERSION, seq, tasks };
 }
@@ -273,7 +294,7 @@ function save(root, registry) {
   const tmp = `${target}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const payload = JSON.stringify({
     version: REGISTRY_VERSION,
-    seq: Number.isInteger(registry.seq) && registry.seq >= 0 ? registry.seq : 0,
+    seq: Number.isSafeInteger(registry.seq) && registry.seq >= 0 ? registry.seq : 0,
     tasks: Array.isArray(registry.tasks) ? registry.tasks : []
   }, null, 2);
   try {
@@ -300,6 +321,37 @@ function findTask(registry, id) {
 }
 
 /**
+ * Shared shape validation for a task-like input — used by BOTH `addTask` (its
+ * `spec`) and `canRun` (its `candidate`) so the safety oracle can never silently
+ * false-safe. A bare-string `touches` (e.g. `'a.js'` instead of `['a.js']`) would
+ * make `isEditing()` false and coerce Rule 4's file set to `[]` → `canRun` would
+ * wrongly return `{run:true}` against a running task on the same file (or a running
+ * gitOp). Both entry points therefore reject a malformed shape LOUDLY.
+ * @param {any} obj  the spec/candidate to validate.
+ * @param {string} ctx  caller name, embedded in the error message.
+ * @param {{strictGitOp?:boolean}} [opts]  when `strictGitOp` is true a non-boolean
+ *        `gitOp` throws (canRun — a safety oracle demands a real boolean); `addTask`
+ *        omits this and strict-coerces `gitOp` (`=== true`) instead.
+ * @returns {void}
+ * @throws {TypeError} obj is not an object
+ * @throws {Error} non-array touches / non-array blockedBy / non-boolean gitOp
+ */
+function assertTaskShape(obj, ctx, opts = {}) {
+  if (!obj || typeof obj !== 'object') {
+    throw new TypeError(`task-registry: ${ctx} requires an object`);
+  }
+  if (obj.touches != null && !Array.isArray(obj.touches)) {
+    throw new Error(`task-registry: ${ctx} touches must be an array`);
+  }
+  if (obj.blockedBy != null && !Array.isArray(obj.blockedBy)) {
+    throw new Error(`task-registry: ${ctx} blockedBy must be an array`);
+  }
+  if (opts.strictGitOp && obj.gitOp != null && typeof obj.gitOp !== 'boolean') {
+    throw new Error(`task-registry: ${ctx} gitOp must be a boolean`);
+  }
+}
+
+/**
  * Append a new queued task. Assigns a monotonic id from `seq` (no reuse). Builds
  * the task from NAMED fields (never spreads `spec` → no prototype pollution).
  * @param {{seq:number, tasks:Array<object>}} registry
@@ -309,17 +361,9 @@ function findTask(registry, id) {
  * @throws {Error} invalid kind / non-array touches / non-array blockedBy
  */
 function addTask(registry, spec) {
-  if (!spec || typeof spec !== 'object') {
-    throw new TypeError('task-registry: addTask requires a spec object');
-  }
+  assertTaskShape(spec, 'addTask');
   if (typeof spec.kind !== 'string' || !KINDS.has(spec.kind)) {
     throw new Error(`task-registry: addTask invalid kind ${JSON.stringify(spec.kind)}`);
-  }
-  if (spec.touches != null && !Array.isArray(spec.touches)) {
-    throw new Error('task-registry: addTask touches must be an array');
-  }
-  if (spec.blockedBy != null && !Array.isArray(spec.blockedBy)) {
-    throw new Error('task-registry: addTask blockedBy must be an array');
   }
   const task = {
     id: 't' + (++registry.seq),
@@ -363,7 +407,11 @@ function updateTask(registry, id, patch) {
       throw new Error('task-registry: updateTask invalid status ' + JSON.stringify(target));
     }
     if (target !== task.status) {
-      const allowed = VALID_TRANSITIONS[task.status];
+      // Guard the object lookup with hasOwnProperty (belt-and-suspenders vs a
+      // prototype-chain key sneaking in as a "valid" transition source).
+      const allowed = Object.prototype.hasOwnProperty.call(VALID_TRANSITIONS, task.status)
+        ? VALID_TRANSITIONS[task.status]
+        : null;
       if (!allowed || !allowed.has(target)) {
         throw new Error(`task-registry: invalid transition ${task.status} → ${target}`);
       }
@@ -471,8 +519,15 @@ function evaluateConcurrency(candidate, running) {
  * @param {object} candidate
  * @param {{tasks:Array<object>}} registry
  * @returns {{run:boolean, reason:string}}
+ * @throws {TypeError} candidate is not an object
+ * @throws {Error} candidate has a non-array touches/blockedBy or a non-boolean gitOp
+ *   (fail-loud, consistent with addTask — a safety oracle must never false-safe on a
+ *   malformed candidate). registry.tasks are already normalized (addTask/load), so
+ *   nextRunnable — which reads them directly, never through canRun — inherits the
+ *   guarantee without re-validating.
  */
 function canRun(candidate, registry) {
+  assertTaskShape(candidate, 'canRun', { strictGitOp: true });
   if (!depsSatisfied(candidate, registry)) return { run: false, reason: 'blocked-dep' };
   return evaluateConcurrency(candidate, runningTasks(registry, candidate.id));
 }

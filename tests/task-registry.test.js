@@ -242,6 +242,36 @@ describe('Scheduler — canRun', () => {
     assert.equal(d.run, true);
     assert.equal(d.reason, 'ok');
   });
+
+  it('F1: canRun validates the candidate and throws on a malformed shape — never false-safes', () => {
+    // A running task edits a.js. A candidate with a BARE-STRING touches ('a.js'
+    // instead of ['a.js']) would make isEditing() false and coerce Rule 4 to []
+    // → canRun would wrongly return {run:true} against the same-file running task.
+    // The safety oracle must instead reject the malformed candidate LOUDLY.
+    const r = mkReg([T({ id: 't1', kind: 'review', touches: ['a.js'] })]);
+    assert.throws(
+      () => reg.canRun({ kind: 'review', touches: 'a.js' }, r),
+      /touches must be an array/
+    );
+    assert.throws(
+      () => reg.canRun({ kind: 'review', blockedBy: 't1' }, r),
+      /blockedBy must be an array/
+    );
+    assert.throws(
+      () => reg.canRun({ kind: 'review', gitOp: 'yes' }, r),
+      /gitOp must be a boolean/
+    );
+    assert.throws(() => reg.canRun(null, r), TypeError);
+
+    // A well-formed candidate still evaluates normally (disjoint file → ok).
+    const ok = reg.canRun(C({ id: 't2', kind: 'review', touches: ['c.js'] }), r);
+    assert.equal(ok.run, true);
+    assert.equal(ok.reason, 'ok');
+    // …and a well-formed same-file candidate is correctly blocked (not false-safed).
+    const blocked = reg.canRun(C({ id: 't3', kind: 'review', touches: ['a.js'] }), r);
+    assert.equal(blocked.run, false);
+    assert.equal(blocked.reason, 'file-conflict');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -274,6 +304,59 @@ describe('Scheduler — nextRunnable', () => {
     const r = mkReg([done, cand]);
     // canRun-level: dep satisfied → ok.
     assert.equal(reg.canRun(cand, r).run, true);
+  });
+
+  it('F2: nextRunnable is JOINTLY startable across every rule in one multi-rule pass', () => {
+    // One registry exercising all rules cumulatively:
+    //   2 running (r1 edits a.js, r2 edits r2.js)
+    //   queued FIFO: editor-on-a.js, second-editor-on-a.js, implement#1,
+    //                implement#2, gitOp, disjoint-editor-on-z.js
+    const running = [
+      T({ id: 'r1', kind: 'review', status: 'running', touches: ['a.js'] }),
+      T({ id: 'r2', kind: 'review', status: 'running', touches: ['r2.js'] })
+    ];
+    const queued = [
+      C({ id: 'q1', kind: 'review', touches: ['a.js'] }),      // file-conflict vs r1 → blocked
+      C({ id: 'q2', kind: 'review', touches: ['a.js'] }),      // file-conflict vs r1 → blocked
+      C({ id: 'q3', kind: 'implement', touches: ['i1.js'] }),  // no running implement → accepted
+      C({ id: 'q4', kind: 'implement', touches: ['i2.js'] }),  // plan-serial vs accepted q3 → blocked
+      C({ id: 'q5', kind: 'sync', gitOp: true, touches: [] }), // git-exclusive vs running editors → blocked
+      C({ id: 'q6', kind: 'review', touches: ['z.js'] })       // disjoint, slot free → accepted
+    ];
+    const r = mkReg([...running, ...queued]);
+
+    const returned = reg.nextRunnable(r);
+    assert.deepEqual(returned.map(t => t.id), ['q3', 'q6'], 'exact FIFO-greedy subset');
+
+    // Each returned task individually satisfies the ladder vs the REAL running set.
+    for (const t of returned) {
+      assert.equal(reg.canRun(t, r).run, true, `${t.id} passes canRun`);
+    }
+
+    // The UNION (real-running ∪ returned) jointly satisfies EVERY invariant.
+    const union = [...running, ...returned];
+    // ≤5 concurrent
+    assert.ok(union.length <= reg.MAX_CONCURRENT, 'union ≤ MAX_CONCURRENT');
+    // at most one plan-mutating
+    assert.ok(
+      union.filter(t => reg.PLAN_MUTATING_KINDS.has(t.kind)).length <= 1,
+      'at most one plan-mutating in union'
+    );
+    // no gitOp alongside any editing/git task
+    const gitOps = union.filter(t => t.gitOp === true);
+    const editing = union.filter(t => Array.isArray(t.touches) && t.touches.length > 0);
+    if (gitOps.length > 0) {
+      assert.equal(gitOps.length, 1, 'at most one git op in union');
+      assert.equal(editing.length, 0, 'no editing task alongside a git op');
+    }
+    // no two share a touched file
+    const seen = new Set();
+    for (const t of union) {
+      for (const f of (Array.isArray(t.touches) ? t.touches : [])) {
+        assert.ok(!seen.has(f), `no two tasks share touched file ${f}`);
+        seen.add(f);
+      }
+    }
   });
 });
 
@@ -322,7 +405,7 @@ describe('Edge / boundary behavior', () => {
     // queued → running → done
     reg.updateTask(r, t.id, { status: 'running' });
     reg.updateTask(r, t.id, { status: 'done' });
-    assert.equal(reg.load ? t.status : t.status, 'done');
+    assert.equal(t.status, 'done');
 
     // fresh task: queued → running → failed
     const t2 = reg.addTask(r, { kind: 'review' });
@@ -569,6 +652,63 @@ describe('Edge / boundary behavior', () => {
     assert.equal(r.tasks.filter(t => t.id === 't1').length, 1);
     assert.equal(r.tasks[0].label, 'second');
     assert.ok(reg.readWarnLog(root).some(w => w.event === 'task_id_collision'));
+  });
+
+  it('F4: an absurd seq on load never mints a duplicate id on the next two addTask calls', () => {
+    const p = reg.registryPath(root);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    // A crafted seq beyond Number.MAX_SAFE_INTEGER breaks ++seq monotonicity
+    // (seq + 1 === seq), which would reuse ids. load() must clamp it to a safe value.
+    fs.writeFileSync(p, JSON.stringify({
+      version: reg.REGISTRY_VERSION,
+      seq: Number.MAX_SAFE_INTEGER + 1000,
+      tasks: [T({ id: 't2', kind: 'plan', status: 'queued' })]
+    }));
+
+    const r = reg.load(root);
+    const a = reg.addTask(r, { kind: 'plan' });
+    const b = reg.addTask(r, { kind: 'plan' });
+
+    const ids = r.tasks.map(t => t.id);
+    assert.equal(new Set(ids).size, ids.length, 'no duplicate ids after two adds');
+    assert.notEqual(a.id, b.id, 'the two new ids differ');
+    assert.notEqual(a.id, 't2');
+    assert.notEqual(b.id, 't2');
+    assert.ok(
+      reg.readWarnLog(root).some(w => w.event === 'registry_seq_clamped'),
+      'the absurd seq clamp is surfaced (recorded), not swallowed'
+    );
+  });
+
+  it('F5a: out-of-terminal transitions failed→running AND orphaned→running both throw', () => {
+    const r = reg.emptyRegistry();
+
+    // Drive one task to failed, another to orphaned.
+    const tf = reg.addTask(r, { kind: 'review' });
+    reg.updateTask(r, tf.id, { status: 'running' });
+    reg.updateTask(r, tf.id, { status: 'failed' });
+    assert.throws(() => reg.updateTask(r, tf.id, { status: 'running' }), /invalid transition/);
+
+    const to = reg.addTask(r, { kind: 'sync' });
+    reg.updateTask(r, to.id, { status: 'running' });
+    reg.updateTask(r, to.id, { status: 'orphaned' });
+    assert.throws(() => reg.updateTask(r, to.id, { status: 'running' }), /invalid transition/);
+  });
+
+  it('F5b: cyclic and self blockedBy stay permanently blocked-dep; nextRunnable returns [] without hanging', () => {
+    // Cycle: t1 blockedBy t2, t2 blockedBy t1 (neither can ever be done first).
+    const cyclic = mkReg([
+      C({ id: 't1', kind: 'review', blockedBy: ['t2'] }),
+      C({ id: 't2', kind: 'review', blockedBy: ['t1'] })
+    ]);
+    assert.equal(reg.canRun(cyclic.tasks[0], cyclic).reason, 'blocked-dep');
+    assert.equal(reg.canRun(cyclic.tasks[1], cyclic).reason, 'blocked-dep');
+    assert.deepEqual(reg.nextRunnable(cyclic), []); // returns, does not recurse/hang
+
+    // Self-dependency: t1 blockedBy t1.
+    const selfDep = mkReg([C({ id: 't1', kind: 'review', blockedBy: ['t1'] })]);
+    assert.equal(reg.canRun(selfDep.tasks[0], selfDep).reason, 'blocked-dep');
+    assert.deepEqual(reg.nextRunnable(selfDep), []);
   });
 });
 

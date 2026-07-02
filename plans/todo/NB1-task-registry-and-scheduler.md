@@ -645,7 +645,7 @@ No cycles. No orphans (test file consumes the module). No layer violations (lib�
 | Risk | Mitigation | Where |
 |---|---|---|
 | Version bump wipes real (non-rebuildable) queued tasks on `load` | v1 is the only shipping version → never triggers now; **flag: add `migrateRegistry` before shipping v2** (NB4/future). Fail-open-empty + warn is the interim. | `load` version check |
-| git-vs-git not serialized by Rule 3 (spec is git-vs-editing) | Documented decision; recommend NB2/NB3 give git tasks a `touches` sentinel so Rule 4 covers it; confirm at Gate 2. | `evaluateConcurrency` Rule 3 |
+| Two git operations interleave (index-lock / interleaved-commit corruption) | **Serialized in code (2026-07-01 Gate-2 decision).** Rule 3 was strengthened: a `gitOp` candidate is blocked by any running **editing-OR-git** task, and an editing candidate is blocked by any running `gitOp` — so two `gitOp` tasks never run concurrently; only **read-only** tasks (empty `touches`, not `gitOp`) may run alongside a git task. No `touches`-sentinel hack needed. Pinned by ST-14b (git-vs-git blocked) + ST-14c (read-only-alongside-git). | `evaluateConcurrency` Rule 3 |
 | Clock skew reorders `ts.created` | FIFO uses array/`seq` order, not timestamps → scheduling unaffected. | `nextRunnable`, id/seq |
 | Greedy FIFO leaves a slot idle behind a blocked head | Intentional (FIFO fairness > packing, per vision); documented, not a defect. | `nextRunnable` |
 | Registry/harness drift (records ≠ real agent state) | Out of NB1 scope; NB1 provides the pure model NB4 reconciles against. | — |
@@ -693,8 +693,15 @@ migrations, no schema/contract changes to existing modules.
    Node module (unlike deterministic-replay Workflow scripts where `Date` is
    banned); and scheduling never depends on `ts` (uses `seq`/array order), so clock
    behavior cannot affect correctness. (Step 6.)
-9. **git-vs-git left un-serialized (literal D5 ladder)** — flagged for Gate 2;
-   recommended sentinel-`touches` convention noted. (Step 6, Risks.)
+9. **git-vs-git IS serialized (2026-07-01 Gate-2 decision).** Rule 3 was
+   strengthened beyond the literal git-vs-editing D5 ladder: a `gitOp` candidate is
+   blocked by any running **editing-OR-git** task (`isEditing(t) || t.gitOp`), and an
+   editing candidate is blocked by any running `gitOp`. So two `gitOp` tasks never
+   run concurrently (git index-lock / interleaved-commit safety), while **read-only**
+   tasks (empty `touches`, not `gitOp`) still run alongside a git task. This is the
+   simplest correct rule — no `touches`-sentinel convention needed — and matches the
+   "run git solo" project memory. Pinned by ST-14b (git-vs-git blocked) and ST-14c
+   (read-only-alongside-git). (Step 6, Risks.)
 10. **`updateTask` on unknown id throws** — single-writer ⇒ a miss is a caller bug,
     fail loud (not a silent no-op). (Step 7.)
 11. **`README.md` + `tests/readme-numbers.test.js` added to this plan's `files:`
@@ -710,6 +717,43 @@ migrations, no schema/contract changes to existing modules.
     (the shape the blueprint specifies) does NOT make `.add()` throw. The
     meaningful, honest assertion is `Object.isFrozen(KINDS)` + membership checks.
     (Step 8, ST "Exported constants".)
+
+### Pre-Gate-3 review hardenings (2026-07-02 — both reviewers SHIP-READY; cheap MEDIUM/LOW clears)
+
+> This module is the safety authority for all future background dispatch (NB2–NB4),
+> so the cheap hardenings the reviewers flagged were cleared before Gate 3. No public
+> API changed; suite stays green.
+
+13. **F1 (MED) — `canRun` validates its candidate the same way `addTask` validates a
+    spec (fail-loud, shared helper).** Previously `canRun` accepted an arbitrary
+    candidate and never validated it, so a malformed candidate with a bare-string
+    `touches` (e.g. `'a.js'`) made `isEditing` false and coerced Rule 4's file set to
+    `[]` → `canRun` returned `{run:true}` even against a running task on the same file
+    or a running gitOp — a **false-safe door in the safety oracle**. Factored a shared
+    `assertTaskShape(obj, ctx, {strictGitOp})` used by BOTH `addTask` and `canRun`:
+    THROW on non-array `touches`, non-array `blockedBy`, and (canRun only, via
+    `strictGitOp`) a non-boolean `gitOp`. `addTask` keeps its `gitOp === true`
+    strict-coercion (ST-23 contract); `canRun` demands a real boolean (an oracle must
+    not treat a truthy `'yes'` as git). `nextRunnable` reads `registry.tasks` directly
+    (never through `canRun`); those are already normalized by `addTask`/`load`, so it
+    inherits the guarantee without re-validating — confirmed. Test F1 (RED before,
+    GREEN after).
+14. **F4 (LOW) — `load` clamps `seq`/id-suffixes to `Number.isSafeInteger`.** A crafted
+    `seq ≥ 2^53` breaks `++seq` monotonicity (`seq + 1 === seq`) → id reuse.
+    `highestIdSuffix` now ignores unsafe suffixes (`isSafeInteger`), and `load` treats
+    a non-safe/negative `seq` as absent → clamps to `max(0, highestSafeIdSuffix)` and
+    warns `registry_seq_clamped` (fail-open; an absent legacy `seq` is normal → no
+    warn). `save` mirrors the `isSafeInteger` guard for consistency. Test F4.
+15. **F5 (LOW) — pinned previously-unpinned edges (no code change).** F5a asserts BOTH
+    `failed→running` and `orphaned→running` throw (only `done→running` was pinned).
+    F5b asserts cyclic (`t1↔t2`) and self (`t1 blockedBy t1`) `blockedBy` leave the
+    task(s) permanently `blocked-dep` and `nextRunnable` returns `[]` without hanging
+    (proves the shallow, non-recursive dependency check).
+16. **Security LOWs (defense-in-depth).** (a) `MAX_TASKS` (10000) sanity cap in `load`
+    — a larger registry is untrusted → fail open to empty + `registry_too_large` warn.
+    (b) The `VALID_TRANSITIONS[status]` lookup in `updateTask` is guarded with
+    `Object.prototype.hasOwnProperty.call(...)` so no prototype-chain key can pose as a
+    valid transition source. Both belt-and-suspenders; existing behavior unchanged.
 
 ---
 
