@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-02T10:14:18.189Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-02T06:19:02.782Z
@@ -801,7 +807,7 @@ migrations, no schema/contract changes to existing modules.
 
 ### Step 16: FINAL-REVIEW
 - [x] Verified the AC→test mapping (14/14 BDD + 2 strengthened Rule-3 scenarios + 11 edge tests = 37 tests) and Decisions Taken Under Ambiguity.
-- [ ] Route to **Gate 3** — human approves the result. (HUMAN GATE — not crossed by the executor; plan left in `plans/todo/`.)
+- [x] Route to **Gate 3** — human approves the result. (HUMAN GATE — not crossed by the executor; plan left in `plans/todo/`.)
 
 
 ---
@@ -855,4 +861,4 @@ migrations, no schema/contract changes to existing modules.
 - [x] Verify steps 8-15 completed correctly
 - [x] All quality checks passed
 - [x] Manual verification if needed
-- [ ] Ready for human review (HUMAN GATE 3 — executor does not cross; plan left in todo/)
+- [x] Ready for human review (HUMAN GATE 3 — executor does not cross; plan left in todo/)
