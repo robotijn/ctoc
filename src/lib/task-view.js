@@ -37,6 +37,39 @@ const stripCtl = (s) => String(s == null ? '' : s).replace(/[\x00-\x1f\x7f-\x9f]
 // Terminal statuses (mirror of NB1's frozen set — NB1 does not export it).
 const TERMINAL = new Set(['done', 'failed', 'orphaned']);
 
+// NAV-ROUTE allowlist (Decision 5, the feature's load-bearing safety invariant):
+// a task's next-action may ONLY be a navigation route — never a `claude:*`
+// mutation that could cross a human gate. Literal regex (allowed — the security
+// lint bans `new RegExp` on a non-literal, not a literal pattern). The allowed
+// verbs mirror the menu driver's navigation vocabulary; anything else (including
+// any `claude:` action) is rejected.
+const NAV_ROUTE = /^(plan|browse|section|inbox|tasks|task|validate)\b/;
+const CLAUDE_ACTION = /^claude:/;
+
+// Pagination caps (defense against an oversized/crafted registry flooding a
+// screen). Independent of NB1's MAX_TASKS — these bound the RENDER, not the store.
+const BOARD_GROUP_CAP = 50;
+const LIST_CAP = 100;
+
+// Board id shape: a selectable task id is `t<n>` and NOTHING else. This keeps
+// Rule 1 ("numbers open plans ONLY") sacred — a crafted bare-digit id ("3") or a
+// reserved key ("b"/"back") can never become a board action key.
+const TASK_ID = /^t\d+$/;
+
+/**
+ * A next-action string is safe to EMIT as a selectable action iff it is a
+ * navigation route AND not a `claude:` mutation. Every attacker-influenceable
+ * value passes through `stripCtl` first so control chars cannot smuggle a verb.
+ * Exported so the store (menu-screens.taskComplete) validates against the SAME
+ * allowlist — defense in depth (render layer + store layer).
+ * @param {*} s
+ * @returns {boolean}
+ */
+function isNavRoute(s) {
+  const v = stripCtl(String(s == null ? '' : s));
+  return NAV_ROUTE.test(v) && !CLAUDE_ACTION.test(v);
+}
+
 /**
  * The human-readable plan name of a task: the basename of `plan` without `.md`,
  * control-stripped. `''` when the task carries no plan.
@@ -180,14 +213,24 @@ function renderTaskBoard(registry) {
   for (const [heading, list] of groups) {
     if (!list.length) continue;
     text += `\n${heading} (${list.length})\n`;
-    for (const t of list) {
+    const shown = list.slice(0, BOARD_GROUP_CAP);
+    for (const t of shown) {
       const status = t.result && t.result.cancelled ? 'cancelled' : t.status;
       let suffix = '';
       if (t.status === 'done' && t.result && Number.isInteger(t.result.gate)) {
         suffix = ` → Gate ${t.result.gate} ready`;
       }
-      text += `  • ${stripCtl(t.id)}  ${taskLabel(t)}  [${status}]${suffix}\n`;
-      actions[t.id] = `task ${t.id}`;
+      // Rule 1: only a well-formed `t<n>` id is selectable. A crafted bare-digit
+      // ("3") or reserved key ("b"/"back") id is rendered as a NON-selectable row
+      // (never added to the action map) so it can neither re-break "numbers open
+      // plans ONLY" nor clobber the Back affordance.
+      const selectable = TASK_ID.test(String(t.id));
+      const tag = selectable ? '' : '  (unavailable)';
+      text += `  • ${stripCtl(t.id)}  ${taskLabel(t)}  [${status}]${suffix}${tag}\n`;
+      if (selectable) actions[t.id] = `task ${t.id}`;
+    }
+    if (list.length > BOARD_GROUP_CAP) {
+      text += `  … +${list.length - BOARD_GROUP_CAP} more\n`;
     }
   }
   text += "\n  Reply with a task id (e.g. t3) to open it, or 'b' for back.\n\n\n";
@@ -237,15 +280,27 @@ function renderTaskDetail(registry, id) {
   if (TERMINAL.has(task.status) && task.result && task.result.summary) {
     text += `  result: ${stripCtl(task.result.summary)}\n`;
   }
+  // Echo the gate as INFORMATIONAL text (parity with the board/inbox) even when
+  // the next-action is absent or dropped — so a gate-ready done task still SHOWS
+  // "Gate N ready" while the ACTION stays nav-only or Back (never a gate cross).
+  if (task.result && Number.isInteger(task.result.gate)) {
+    text += `  gate:   Gate ${task.result.gate} ready\n`;
+  }
   text += '\n\n\n';
 
   const options = [];
   const actions = {};
-  if (task.status === 'done' && task.result && task.result.nextAction) {
+  // Nav-only invariant: emit the next-action option ONLY when the stored route is
+  // a navigation route (allowlist) and NOT a `claude:` mutation. A crafted or
+  // `--next`-supplied `claude:approve review/x.md` is DROPPED here (degrades to
+  // Back only) — the renderer enforces the invariant its JSDoc documents and does
+  // NOT trust the caller/registry. The stripCtl'd value becomes the action.
+  if (task.status === 'done' && task.result && task.result.nextAction != null
+      && isNavRoute(task.result.nextAction)) {
     const gate = Number.isInteger(task.result.gate) ? task.result.gate : null;
     const label = gate != null ? `Gate ${gate} ready ▸` : `Open ${planName(task) || 'next'} ▸`;
     options.push({ label, description: 'Navigate to the next action (does not perform it)' });
-    actions[label] = String(task.result.nextAction);
+    actions[label] = stripCtl(String(task.result.nextAction));
   }
   options.push({ label: '◀ Back', description: 'Return to the task board' });
   actions['◀ Back'] = 'tasks';
@@ -285,10 +340,12 @@ function renderTaskList(registry) {
   const tasks = registry && Array.isArray(registry.tasks) ? registry.tasks : [];
   if (!tasks.length) return '';
   let out = '';
-  for (const t of tasks) {
+  const shown = tasks.slice(0, LIST_CAP);
+  for (const t of shown) {
     const status = t.result && t.result.cancelled ? 'cancelled' : t.status;
     out += `  ${stripCtl(t.id)}  ${stripCtl(t.kind)}  ${planName(t) || stripCtl(t.label) || '-'}  [${status}]\n`;
   }
+  if (tasks.length > LIST_CAP) out += `  … +${tasks.length - LIST_CAP} more\n`;
   return out;
 }
 
@@ -298,4 +355,5 @@ module.exports = {
   renderTaskDetail,
   tasksInboxLine,
   renderTaskList,
+  isNavRoute,
 };

@@ -701,6 +701,39 @@ dashboard change text-only and additive, and empty/absent registry adds zero out
     single JSDoc `@type` cast on the runtime-narrowed value keeps the typecheck
     baseline at 89 (no regression) without loosening `canRun`'s contract.
 
+12. **Pre-Gate-3 review KICKBACK — next-action is NAV-ONLY, enforced at BOTH the
+    store and the render layer (HIGH, gate-crossing hole).** Two reviewers converged
+    on a load-bearing hole: `renderTaskDetail` emitted `result.nextAction` VERBATIM
+    as an option's action value, and `taskComplete` stored a `--next`/b64 `nextAction`
+    with no validation. A crafted or `--next`-supplied `claude:approve review/x.md`
+    rendered as "Gate N ready ▸ (does not perform it)" but, on selection, executed
+    `approvePlan()` → crossed a human gate. Fix (defense in depth):
+    (a) **Store** (`taskComplete`): a supplied `nextAction` is validated against the
+    NAV-ROUTE allowlist (`taskView.isNavRoute`); a non-nav value (any `claude:*` or a
+    verb outside `plan|browse|section|inbox|tasks|task|validate`) REJECTS the whole
+    complete with `{ok:false, error:'nextAction must be a navigation route'}` — it is
+    never persisted. The happy path (a real `plan review/x.md`) is unaffected.
+    (b) **Render** (`renderTaskDetail`): the next-action option is emitted ONLY when
+    `isNavRoute(stripCtl(nextAction))` holds; otherwise the option is DROPPED (degrade
+    to Back only). The stripCtl'd value is the action. The renderer enforces its own
+    JSDoc invariant and does NOT trust the caller/registry (a tampered `tasks.json`
+    with a `claude:*` nextAction still cannot surface a gate-crosser). `isNavRoute` is
+    a single exported predicate in `task-view.js` so both layers use the SAME literal
+    allowlist regex (no `new RegExp`). The gate is still echoed as INFORMATIONAL text
+    in the detail screen even when the action is dropped/absent (parity with board/inbox).
+13. **Board bare-digit / reserved-key hardening (MED, Rule 1 regression).** A crafted
+    registry id like `"3"` previously became a bare-digit board action key (re-breaking
+    "numbers open plans ONLY") and `"b"`/`"back"` clobbered the Back affordance. Fix:
+    only a `t<n>` id (`/^t\d+$/`) is selectable — a non-conforming id renders as a
+    non-selectable row (`(unavailable)`) and is never added to the action map. The
+    reserved `b`/`back` keys are therefore never overwritten.
+14. **Bounded inputs / pagination (LOW).** `decodeB64` rejects a raw `--b64` value
+    longer than 65536 chars BEFORE `Buffer.from` (memory/DoS guard). `renderTaskBoard`
+    caps each status group at 50 rows and `renderTaskList` caps at 100 total rows, each
+    with a `… +N more` overflow line — independent of NB1's MAX_TASKS (these bound the
+    RENDER, not the store). Terminal-guard coverage extended: start/fail/cancel on an
+    already-terminal task all fail soft `{ok:false}` (was only complete-on-done).
+
 ## Verification (as built)
 
 - `node --test tests/menu-task-wiring.test.js` → 23 pass, 0 fail, 0 skipped (16
@@ -711,6 +744,23 @@ dashboard change text-only and additive, and empty/absent registry adds zero out
 - `npx eslint . --max-warnings 0` → exit 0.
 - `tests/typecheck.test.js` → green (baseline 89 held).
 - `task-view.js` coverage: 100% line / 82.61% branch / 100% funcs (≥80% lines+branches).
+
+### Pre-Gate-3 review KICKBACK (nav-only gate-safety + supporting fixes)
+
+- TDD: the negative gate-safety tests FAILED before the fix (9 red: GS1 store
+  accepted `claude:approve`; GS2/GS3/GS3b renderer emitted the `claude:`/opaque
+  action; GS6 gate-text; MED1 bare-digit key; B1/B2/B3 bounds/pagination), then
+  PASSED after (0 fail).
+- `node --test tests/menu-task-wiring.test.js` → **35 pass, 0 fail, 0 skipped**
+  (23 prior + 12 new: GS1–GS6, GS3b, MED1, TG1, B1–B3).
+- `node --test tests/*.test.js` → **2706 pass, 0 fail, 0 skipped, 0 todo**
+  (regression set still green: e2e-menu-lifecycle, menu-environment,
+  inbox-stale-stream, menu-screens, readme-numbers, typecheck).
+- `npx eslint . --max-warnings 0` → exit 0.
+- `tests/typecheck.test.js` → green (baseline held).
+- `task-view.js` coverage: **100% line / 83.59% branch / 100% funcs** (≥80%).
+- Files touched (kickback): `src/lib/task-view.js`, `src/lib/menu-screens.js`,
+  `tests/menu-task-wiring.test.js` ONLY. Plan left in `plans/todo/`.
 
 ## Files touched (as built)
 

@@ -1334,7 +1334,12 @@ function loadReg(root) {
  */
 function decodeB64(v) {
   try {
-    const obj = JSON.parse(Buffer.from(String(v), 'base64').toString('utf8'));
+    const raw = String(v);
+    // Bound the input BEFORE decoding — a crafted oversized `--b64` must not be
+    // buffered/parsed (memory/DoS guard). 65536 chars comfortably covers any
+    // legitimate compact-JSON task payload.
+    if (raw.length > 65536) return null;
+    const obj = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
     return obj && typeof obj === 'object' ? obj : null;
   } catch {
     return null;
@@ -1449,6 +1454,13 @@ function taskComplete(root, rest) {
   const extra = p.b64 ? decodeB64(p.b64) : null;
   const summary = p.summary != null ? p.summary : (extra && typeof extra.summary === 'string' ? extra.summary : undefined);
   const nextAction = p.next != null ? p.next : (extra && typeof extra.nextAction === 'string' ? extra.nextAction : undefined);
+  // Gate-safety (Decision 5, load-bearing): a supplied nextAction may ONLY be a
+  // navigation route — never a `claude:*` gate-crosser. Reject the WHOLE complete
+  // rather than persist a route that would render as an executable gate cross.
+  // Same allowlist the renderer enforces (taskView.isNavRoute) → defense in depth.
+  if (nextAction != null && !taskView.isNavRoute(nextAction)) {
+    return { ok: false, error: 'nextAction must be a navigation route', text: 'Rejected: nextAction must be a navigation route (not a gate-crossing action).' };
+  }
   let gate;
   const gRaw = p.gate != null ? p.gate : (extra ? extra.gate : undefined);
   if (gRaw != null) {

@@ -370,3 +370,163 @@ describe('NB2 — edge cases (E1–E7)', () => {
     assert.match(src, /taskRegistry\.save/, 'registry writes go through task-registry.save');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Gate-safety (HIGH): the task-detail next-action is NAV-ONLY. A crafted or
+// `--next`-supplied `claude:*` route must NEVER render as an executable action
+// nor persist — that would cross a human gate. Defense in depth: BOTH the store
+// (taskComplete) and the renderer (renderTaskDetail) enforce the nav-route
+// allowlist (Decision 5, the feature's load-bearing safety invariant).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('NB2 — gate-safety: next-action is navigation-only (HIGH)', () => {
+  it('GS1: store rejects a complete whose nextAction is a claude: gate-crosser', () => {
+    const add = ms.route(['menu', 'task', 'add', 'review', 'LH1'], root);
+    ms.route(['menu', 'task', 'start', add.taskId], root);
+    const res = ms.route(['menu', 'task', 'complete', add.taskId, '--gate', '3', '--next', 'claude:approve review/x.md'], root);
+    assert.equal(res.ok, false, 'store rejects a gate-crossing nextAction');
+    assert.match(res.error, /navigation route/, 'error explains nextAction must be a nav route');
+    // the crafted complete did NOT persist (task must not be silently marked done)
+    const t = taskRegistry.load(root).tasks.find(x => x.id === add.taskId);
+    assert.notEqual(t.status, 'done', 'gate-crossing complete was not persisted');
+    assert.ok(!(t.result && t.result.nextAction === 'claude:approve review/x.md'), 'crafted route not stored');
+  });
+
+  it('GS2: crafted registry with a claude:approve nextAction renders NO gate-crossing action', () => {
+    // seed a done task directly (bypass the store, simulating a tampered tasks.json)
+    const reg = mkReg([
+      T({ id: 't1', kind: 'review', plan: 'x', status: 'done', result: { ok: true, summary: 's', nextAction: 'claude:approve review/x.md', gate: 3 } }),
+    ]);
+    const d = taskView.renderTaskDetail(reg, 't1');
+    const vals = Object.values(d.actions);
+    assert.ok(!vals.some(v => /^claude:/.test(v)), 'no claude: action value emitted');
+    assert.ok(!vals.includes('claude:approve review/x.md'), 'gate-crossing option not present');
+    // degrades to Back-only (nav-only invariant) — never a non-nav action
+    assert.deepEqual(Object.keys(d.actions), ['◀ Back']);
+    // …but the gate is still SHOWN as informational text (parity with board/inbox)
+    assert.match(d.text, /Gate 3 ready/, 'gate shown as text even when the action is dropped');
+  });
+
+  it('GS3: claude:reject nextAction is likewise dropped (Back-only)', () => {
+    const reg = mkReg([
+      T({ id: 't1', kind: 'review', plan: 'x', status: 'done', result: { ok: true, nextAction: 'claude:reject review/x.md' } }),
+    ]);
+    const d = taskView.renderTaskDetail(reg, 't1');
+    assert.ok(!Object.values(d.actions).some(v => /^claude:/.test(v)), 'no claude: action');
+    assert.deepEqual(Object.keys(d.actions), ['◀ Back']);
+  });
+
+  it('GS3b: a non-allowlisted opaque route is also dropped to Back-only', () => {
+    const reg = mkReg([
+      T({ id: 't1', kind: 'review', plan: 'x', status: 'done', result: { ok: true, nextAction: 'rm -rf review/x.md' } }),
+    ]);
+    const d = taskView.renderTaskDetail(reg, 't1');
+    assert.deepEqual(Object.keys(d.actions), ['◀ Back'], 'unknown route not emitted');
+  });
+
+  it('GS4: a real nav-route nextAction still renders its option (positive path preserved)', () => {
+    const reg = mkReg([
+      T({ id: 't1', kind: 'review', plan: 'LH1', status: 'done', result: { ok: true, summary: 's', nextAction: 'plan review/LH1.md' } }),
+    ]);
+    const d = taskView.renderTaskDetail(reg, 't1');
+    assert.ok(Object.values(d.actions).includes('plan review/LH1.md'), 'nav route option present');
+  });
+
+  it('GS5: store accepts a complete with a real nav-route nextAction', () => {
+    const add = ms.route(['menu', 'task', 'add', 'review', 'LH1'], root);
+    ms.route(['menu', 'task', 'start', add.taskId], root);
+    const res = ms.route(['menu', 'task', 'complete', add.taskId, '--next', 'plan review/LH1.md'], root);
+    assert.equal(res.ok, true, 'nav-route complete accepted');
+    const t = taskRegistry.load(root).tasks.find(x => x.id === add.taskId);
+    assert.equal(t.status, 'done');
+    assert.equal(t.result.nextAction, 'plan review/LH1.md');
+  });
+
+  it('GS6: detail echoes Gate N as text even when nextAction is absent', () => {
+    const reg = mkReg([
+      T({ id: 't1', kind: 'review', plan: 'LH1', status: 'done', result: { ok: true, summary: 's', gate: 2 } }),
+    ]);
+    const d = taskView.renderTaskDetail(reg, 't1');
+    assert.match(d.text, /Gate 2 ready/, 'gate shown as informational text');
+    assert.deepEqual(Object.keys(d.actions), ['◀ Back'], 'no nextAction → only Back');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Board bare-digit / reserved-key hardening (MED): a crafted registry id must
+// never yield a bare-digit action key (re-breaking "numbers open plans ONLY")
+// nor clobber the reserved b/back affordance.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('NB2 — board id hardening (MED)', () => {
+  it('MED1: crafted ids "3"/"b" never enter the action map; only t<n> is selectable', () => {
+    const reg = mkReg([
+      T({ id: '3', kind: 'review', plan: 'p3', status: 'done' }),
+      T({ id: 'b', kind: 'review', plan: 'pb', status: 'done' }),
+      T({ id: 't5', kind: 'review', plan: 'p5', status: 'done' }),
+    ]);
+    const board = taskView.renderTaskBoard(reg);
+    assert.equal(board.actions['t5'], 'task t5', 't5 selectable');
+    assert.ok(!('3' in board.actions), 'bare-digit id excluded from action map');
+    assert.equal(board.actions['b'], '', 'crafted "b" id did not clobber the Back affordance');
+    assert.equal(board.actions['back'], '', 'back affordance intact');
+    for (const k of Object.keys(board.actions)) {
+      assert.ok(!/^\d+$/.test(k), `no bare-digit action key: ${k}`);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Terminal-guard on ALL mutating subcommands (LOW): start/fail/cancel on an
+// already-terminal task fail soft (not just complete-on-done).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('NB2 — terminal-guard on start/fail/cancel (LOW)', () => {
+  it('TG1: start/fail/cancel on a done task all fail soft {ok:false}', () => {
+    const add = ms.route(['menu', 'task', 'add', 'review', 'LH1'], root);
+    ms.route(['menu', 'task', 'start', add.taskId], root);
+    ms.route(['menu', 'task', 'complete', add.taskId, '--summary', 'ok'], root); // → done (terminal)
+    for (const sub of ['start', 'fail', 'cancel']) {
+      const res = ms.route(['menu', 'task', sub, add.taskId], root);
+      assert.equal(res.ok, false, `${sub} on a terminal task fails soft`);
+      assert.ok(/transition/.test(res.error), `${sub} error names the transition: ${res.error}`);
+    }
+    assert.equal(taskRegistry.load(root).tasks.find(x => x.id === add.taskId).status, 'done', 'registry intact');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Bounded inputs / pagination (LOW).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('NB2 — bounded inputs + pagination (LOW)', () => {
+  it('B1: oversized --b64 payload (> 65536 raw) is rejected (not applied)', () => {
+    const big = 'x'.repeat(70000);
+    const payload = Buffer.from(JSON.stringify({ label: big }), 'utf8').toString('base64');
+    assert.ok(payload.length > 65536, 'payload exceeds the cap');
+    const add = ms.route(['menu', 'task', 'add', 'review', 'p', '--b64', payload], root);
+    assert.equal(add.ok, true, 'add still succeeds (b64 ignored, not fatal)');
+    const t = taskRegistry.load(root).tasks.find(x => x.id === add.taskId);
+    assert.notEqual(t.label, big, 'oversized b64 payload was NOT applied');
+  });
+
+  it('B2: board caps a status group at 50 rows with an overflow line', () => {
+    const tasks = [];
+    for (let i = 1; i <= 60; i++) tasks.push(T({ id: 't' + i, kind: 'review', plan: 'p' + i, status: 'done' }));
+    const board = taskView.renderTaskBoard(mkReg(tasks));
+    const rows = (board.text.match(/^\s+• /gm) || []).length;
+    assert.ok(rows <= 50, `board group capped at 50 (got ${rows})`);
+    assert.match(board.text, /\+10 more/, 'overflow line present');
+    const selectable = Object.keys(board.actions).filter(k => /^t\d+$/.test(k));
+    assert.ok(selectable.length <= 50, 'only capped rows are selectable');
+  });
+
+  it('B3: list caps total rows at 100 with an overflow line', () => {
+    const tasks = [];
+    for (let i = 1; i <= 130; i++) tasks.push(T({ id: 't' + i, kind: 'review', plan: 'p' + i, status: 'done' }));
+    const list = taskView.renderTaskList(mkReg(tasks));
+    const rows = (list.match(/\[done\]/g) || []).length;
+    assert.ok(rows <= 100, `list capped at 100 (got ${rows})`);
+    assert.match(list, /\+30 more/, 'overflow line present');
+  });
+});
