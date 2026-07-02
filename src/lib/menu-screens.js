@@ -25,6 +25,14 @@ const { getInboxCounts, listStaleCandidates } = require('./inbox');
 const staleDetector = require('./stale-detector');
 const { validateTransition } = require('./plan-validator');
 const { findProjectRoot } = require('./project-root');
+// NB2: the background-task registry (fs choke point via safe-fs) + its pure view.
+const taskRegistry = require('./task-registry');
+const taskView = require('./task-view');
+
+// NB2: terminal task statuses (mirror of NB1's frozen set — not exported by NB1).
+// A mutation subcommand targeting a terminal task is an illegal transition and is
+// rejected fail-soft at the CLI boundary before touching updateTask.
+const TASK_TERMINAL = new Set(['done', 'failed', 'orphaned']);
 
 // Security (S1): strip C0 (0x00-0x1F) and C1 (0x7F-0x9F) control chars before
 // rendering any attacker-influenceable string (e.g. a plan slug derived from a
@@ -169,22 +177,41 @@ function buildDashboardTable(projectPath) {
     out += '\n';
   }
 
+  // NB2: TASKS section — background-task run/queue/done counts. Rendered BEFORE
+  // the INBOX block (order: sections → TASKS → INBOX → AGENT, per the vision mock).
+  // Fail-open: a corrupt/absent registry loads as empty → renderTasksSection === ''
+  // → ZERO added output, so the dashboard is byte-for-byte unchanged for a project
+  // with no background tasks (protects every dashboard substring/count regression).
+  let taskReg;
+  try { taskReg = taskRegistry.load(root); } catch { taskReg = taskRegistry.emptyRegistry(); }
+  let tasksBlock = '';
+  try { tasksBlock = taskView.renderTasksSection(taskReg); } catch { tasksBlock = ''; }
+  if (tasksBlock) out += tasksBlock + '\n';
+
   // Inbox (A3 — async-overnight surface; SP2 adds the possibly-stale stream)
   const inbox = getInboxCounts(root);
   const stale = inbox.staleCandidates || 0;
   const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale;
+  // NB2: completed background work slots into the inbox as a pull notice (D3).
+  let bgLine = '';
+  try { bgLine = taskView.tasksInboxLine(taskReg); } catch { bgLine = ''; }
   out += `INBOX\n`;
-  if (inboxTotal === 0) {
+  // "Inbox clear" only when BOTH the async items AND the background line are empty —
+  // otherwise done tasks would print both "Inbox clear" and the bg line.
+  if (inboxTotal === 0 && !bgLine) {
     out += `  ○ Inbox clear — no async items waiting\n`;
   } else {
-    out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}\n`;
-    out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review\n`;
-    out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates\n`;
-    // SP2: conditional — present iff > 0 (M2), absent when 0 (M3). "possibly-stale"
-    // (not "stale") sets correct expectations: cheap detection is unverified (SP3).
-    if (stale > 0) {
-      out += `  ⊙ ${stale} possibly-stale plan${stale === 1 ? '' : 's'}\n`;
+    if (inboxTotal > 0) {
+      out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}\n`;
+      out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review\n`;
+      out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates\n`;
+      // SP2: conditional — present iff > 0 (M2), absent when 0 (M3). "possibly-stale"
+      // (not "stale") sets correct expectations: cheap detection is unverified (SP3).
+      if (stale > 0) {
+        out += `  ⊙ ${stale} possibly-stale plan${stale === 1 ? '' : 's'}\n`;
+      }
     }
+    if (bgLine) out += bgLine;
   }
   out += '\n';
 
@@ -1282,6 +1309,221 @@ function validateScreen(stage, file, projectPath) {
   };
 }
 
+// ===========================================================================
+// NB2 — Task wiring. `menu task <sub>` records/reads NB1 registry state; the
+// `tasks` and `task <id>` routes render the board and detail screens. All
+// registry I/O goes through task-registry (the safe-fs choke point) — NEVER raw
+// fs here. NB2 records INTENT only; it launches nothing (NB3 dispatches).
+// ===========================================================================
+
+/**
+ * Load the registry, fail-open to empty (a corrupt/absent registry must never
+ * brick the NAV plane).
+ * @param {string} root
+ * @returns {{version:number, seq:number, tasks:Array<object>}}
+ */
+function loadReg(root) {
+  try { return taskRegistry.load(root); } catch { return taskRegistry.emptyRegistry(); }
+}
+
+/**
+ * Decode a `--b64` payload (base64 of compact JSON). Returns `null` on any
+ * malformed input (fail-soft; the caller falls back to positional/flag args).
+ * @param {string} v
+ * @returns {object|null}
+ */
+function decodeB64(v) {
+  try {
+    const obj = JSON.parse(Buffer.from(String(v), 'base64').toString('utf8'));
+    return obj && typeof obj === 'object' ? obj : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse `menu task <sub>` args into positionals + flags. Whitespace-free tokens
+ * only (argv is split on whitespace by menu.js); `--touches`/`--blocked` split on
+ * a LITERAL comma (no dynamic RegExp). No `new RegExp` anywhere.
+ * @param {string[]} subArgs
+ * @returns {object}
+ */
+function parseTaskArgs(subArgs) {
+  const out = { positional: [], gitop: false, fail: false };
+  const args = Array.isArray(subArgs) ? subArgs : [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    switch (a) {
+      case '--touches': out.touches = String(args[++i] == null ? '' : args[i]).split(',').filter(Boolean); break;
+      case '--blocked': out.blocked = String(args[++i] == null ? '' : args[i]).split(',').filter(Boolean); break;
+      case '--gitop': out.gitop = true; break;
+      case '--fail': out.fail = true; break;
+      case '--label': out.label = String(args[++i] == null ? '' : args[i]); break;
+      case '--summary': out.summary = String(args[++i] == null ? '' : args[i]); break;
+      case '--next': out.next = String(args[++i] == null ? '' : args[i]); break;
+      case '--gate': out.gate = args[++i]; break;
+      case '--b64': out.b64 = String(args[++i] == null ? '' : args[i]); break;
+      default: out.positional.push(a);
+    }
+  }
+  return out;
+}
+
+/**
+ * Build an addTask spec from parsed args. Populates NAMED fields only (never
+ * spreads a decoded payload → no prototype pollution). A `--b64` payload, when
+ * present, overrides matching named fields.
+ * @param {object} p  parsed args
+ * @returns {object} spec for task-registry.addTask
+ */
+function buildAddSpec(p) {
+  const spec = { kind: p.positional[0], plan: p.positional[1] == null ? null : p.positional[1] };
+  if (p.touches) spec.touches = p.touches;
+  if (p.blocked) spec.blockedBy = p.blocked;
+  if (p.gitop) spec.gitOp = true;
+  if (p.label != null) spec.label = p.label;
+  if (p.b64) {
+    const d = decodeB64(p.b64);
+    if (d) {
+      if (typeof d.kind === 'string') spec.kind = d.kind;
+      if ('plan' in d) spec.plan = d.plan;
+      if (typeof d.label === 'string') spec.label = d.label;
+      if (Array.isArray(d.touches)) spec.touches = d.touches;
+      if (Array.isArray(d.blockedBy)) spec.blockedBy = d.blockedBy;
+      if (typeof d.gitOp === 'boolean') spec.gitOp = d.gitOp;
+    }
+  }
+  return spec;
+}
+
+/** `menu task add` — persist a queued task + report a scheduler decision. */
+function taskAdd(root, rest) {
+  const p = parseTaskArgs(rest);
+  const spec = buildAddSpec(p);
+  const reg = taskRegistry.load(root);
+  const task = taskRegistry.addTask(reg, spec);
+  const decision = taskRegistry.canRun(task, reg);
+  taskRegistry.save(root, reg);
+  return {
+    ok: true,
+    taskId: task.id,
+    decision: decision.run ? 'run' : 'queue',
+    reason: decision.reason,
+    status: 'queued',
+    text: `Task ${task.id} queued (${task.kind}${task.plan ? ' ' + stripCtl(task.plan) : ''}) — ${decision.run ? 'run' : 'queue'}: ${decision.reason}`,
+  };
+}
+
+/** `menu task start|fail|cancel` — a single-status transition on a non-terminal task. */
+function taskTransition(root, rest, kind) {
+  const p = parseTaskArgs(rest);
+  const id = p.positional[0];
+  const reg = taskRegistry.load(root);
+  const task = reg.tasks.find((t) => t.id === id);
+  if (!task) throw new Error('task-registry: unknown task id ' + String(id));
+  const targetOf = { start: 'running', fail: 'failed', cancel: 'failed' };
+  if (TASK_TERMINAL.has(task.status)) {
+    throw new Error(`task-registry: invalid transition ${task.status} → ${targetOf[kind]}`);
+  }
+  let patch;
+  if (kind === 'start') patch = { status: 'running' };
+  else if (kind === 'fail') patch = { status: 'failed', result: { ok: false, summary: p.summary || 'failed' } };
+  else patch = { status: 'failed', result: { ok: false, summary: 'cancelled', cancelled: true } };
+  taskRegistry.updateTask(reg, id, patch);
+  taskRegistry.save(root, reg);
+  const res = { ok: true, taskId: id, status: patch.status, text: `Task ${id} → ${patch.status}` };
+  if (kind === 'cancel') res.cancelled = true;
+  return res;
+}
+
+/** `menu task complete` — running → done, storing an optional result payload. */
+function taskComplete(root, rest) {
+  const p = parseTaskArgs(rest);
+  const id = p.positional[0];
+  const reg = taskRegistry.load(root);
+  const task = reg.tasks.find((t) => t.id === id);
+  if (!task) throw new Error('task-registry: unknown task id ' + String(id));
+  if (TASK_TERMINAL.has(task.status)) {
+    throw new Error(`task-registry: invalid transition ${task.status} → done`);
+  }
+  const extra = p.b64 ? decodeB64(p.b64) : null;
+  const summary = p.summary != null ? p.summary : (extra && typeof extra.summary === 'string' ? extra.summary : undefined);
+  const nextAction = p.next != null ? p.next : (extra && typeof extra.nextAction === 'string' ? extra.nextAction : undefined);
+  let gate;
+  const gRaw = p.gate != null ? p.gate : (extra ? extra.gate : undefined);
+  if (gRaw != null) {
+    const g = parseInt(gRaw, 10);
+    if (Number.isInteger(g)) gate = g;
+  }
+  const result = { ok: !p.fail };
+  if (summary != null) result.summary = summary;
+  if (nextAction != null) result.nextAction = nextAction;
+  if (gate != null) result.gate = gate;
+  taskRegistry.updateTask(reg, id, { status: 'done', result });
+  taskRegistry.save(root, reg);
+  return { ok: true, taskId: id, status: 'done', text: `Task ${id} → done` };
+}
+
+/** `menu task list` — a pure read of the registry for rendering. */
+function taskList(root) {
+  const reg = taskRegistry.load(root);
+  return {
+    ok: true,
+    tasks: reg.tasks.map((t) => ({ id: t.id, kind: t.kind, status: t.status, label: t.label, plan: t.plan })),
+    text: taskView.renderTaskList(reg),
+  };
+}
+
+/**
+ * `menu task <sub>` dispatcher. Mutations FAIL-SOFT at this boundary: an illegal
+ * transition / unknown id / invalid kind is a caller error, not data corruption,
+ * so it returns `{ok:false,error,text}` and the process still exits 0 with JSON —
+ * the NAV plane never crashes. (task-registry.save stays fail-LOUD; a real write
+ * failure surfaces its message here, never swallowed.)
+ * @param {string[]} subArgs
+ * @param {string} [projectPath]
+ * @returns {Object}
+ */
+function taskCommand(subArgs, projectPath) {
+  const root = getProjectPath(projectPath);
+  const sub = subArgs[0];
+  const rest = subArgs.slice(1);
+  try {
+    switch (sub) {
+      case 'add': return taskAdd(root, rest);
+      case 'start': return taskTransition(root, rest, 'start');
+      case 'complete': return taskComplete(root, rest);
+      case 'fail': return taskTransition(root, rest, 'fail');
+      case 'cancel': return taskTransition(root, rest, 'cancel');
+      case 'list': return taskList(root);
+      case 'board': return taskView.renderTaskBoard(loadReg(root));
+      default:
+        return { ok: false, error: 'unknown task subcommand', text: `Unknown task subcommand: ${stripCtl(String(sub == null ? '' : sub))}` };
+    }
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err), text: 'Task command failed.' };
+  }
+}
+
+/**
+ * The task-board screen (route `tasks` / `menu task board`).
+ * @param {string} [projectPath]
+ */
+function taskBoardScreen(projectPath) {
+  const root = getProjectPath(projectPath);
+  return taskView.renderTaskBoard(loadReg(root));
+}
+
+/**
+ * The task-detail screen (route `task <id>`).
+ * @param {string} id
+ * @param {string} [projectPath]
+ */
+function taskDetailScreen(id, projectPath) {
+  const root = getProjectPath(projectPath);
+  return taskView.renderTaskDetail(loadReg(root), id);
+}
+
 /**
  * Route a command string to the appropriate screen function
  *
@@ -1301,7 +1543,18 @@ function route(args, projectPath) {
       if (args[1] === 'commands') {
         return dashboardCommands(projectPath);
       }
+      // NB2: `menu task <sub> …` records/reads background-task state.
+      if (args[1] === 'task') {
+        return taskCommand(args.slice(2), projectPath);
+      }
       return dashboardPipeline(projectPath);
+
+    // NB2: distinct top-level nav commands (no collision with `menu task …`).
+    case 'tasks':
+      return taskBoardScreen(projectPath);
+
+    case 'task':
+      return taskDetailScreen(args[1], projectPath);
 
     case 'browse':
       return stageBrowse(args[1], projectPath);
@@ -1387,6 +1640,10 @@ module.exports = {
   reviewActions,
   discussMenu,
   validateScreen,
+  // NB2 — task wiring
+  taskCommand,
+  taskBoardScreen,
+  taskDetailScreen,
   // Router
   route,
   // Helpers (exported for testing)

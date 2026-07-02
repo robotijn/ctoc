@@ -668,3 +668,65 @@ dashboard change text-only and additive, and empty/absent registry adds zero out
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+---
+
+## Decisions Taken Under Ambiguity (NB2 IMPLEMENTATION — Steps 8–16)
+
+8. **Terminal-guard at the CLI boundary (makes E5 fail-soft correctly).** NB1's
+   `updateTask` treats a *same-status* patch as a silent no-op (it short-circuits
+   before the transition check), so `complete` on an already-`done` task would NOT
+   throw and would wrongly return `{ok:true}`. The Test-Plan E5 requires
+   `{ok:false, error}` naming the transition. Resolution: `taskTransition`/
+   `taskComplete` explicitly reject a mutation whose SOURCE task is terminal
+   (`done|failed|orphaned`) BEFORE calling `updateTask`, throwing
+   `invalid transition <status> → <target>` → caught → `{ok:false,error}`. This is
+   also semantically correct (terminal = terminal; no re-mutation). NB1 is
+   untouched; `TASK_TERMINAL` is a local mirror of NB1's frozen set (NB1 does not
+   export it). Legitimate transitions (queued→running, running→done, queued/running→
+   failed) still flow through `updateTask`, which enforces the rest.
+9. **`done` line "awaiting review" count = done tasks not carrying
+   `result.reviewed===true`.** The model has no first-class "reviewed" flag, so
+   every `done` task is treated as awaiting review unless a caller stamps
+   `result.reviewed`. Matches the AC ("3 done → 3 awaiting review") and leaves a
+   forward hook for NB4 without inventing NB1 state.
+10. **`waitReason` returns the raw scheduler reason for non-dep waits.** For a
+    blocked-dep it resolves dep ids → dep `planName`/label ("waits: pi1"); for
+    `max-concurrent`/`plan-serial`/`git-exclusive`/`file-conflict` it surfaces the
+    reason token verbatim; any `canRun` throw (malformed candidate) degrades to
+    `'queued'`. Keeps the section honest without duplicating NB1's ladder.
+11. **TypeScript `--checkJs` cast at the `canRun` call in `waitReason`.** task-view's
+    exported registry params are typed `{tasks?:Array<object>}` (optional — reflects
+    the fail-open reality), but NB1 `canRun` requires `{tasks:Array<object>}`. A
+    single JSDoc `@type` cast on the runtime-narrowed value keeps the typecheck
+    baseline at 89 (no regression) without loosening `canRun`'s contract.
+
+## Verification (as built)
+
+- `node --test tests/menu-task-wiring.test.js` → 23 pass, 0 fail, 0 skipped (16
+  S1–S9/E1–E7 + 7 added branch-coverage units).
+- `node --test tests/*.test.js` → 2694 pass, **0 fail**, 0 skipped, 0 todo
+  (regression set green: e2e-menu-lifecycle, menu-environment, inbox-stale-stream,
+  menu-screens, readme-numbers, typecheck).
+- `npx eslint . --max-warnings 0` → exit 0.
+- `tests/typecheck.test.js` → green (baseline 89 held).
+- `task-view.js` coverage: 100% line / 82.61% branch / 100% funcs (≥80% lines+branches).
+
+## Files touched (as built)
+
+- `src/lib/task-view.js` (NEW, pure) — `renderTasksSection`, `renderTaskBoard`,
+  `renderTaskDetail`, `tasksInboxLine`, `renderTaskList` + locals (`stripCtl`,
+  `planName`, `taskLabel`, `byStatus`, `waitReason`). Imports only `path` +
+  pure `canRun`. No fs.
+- `src/lib/menu-screens.js` (EDIT) — imports `task-registry`+`task-view`;
+  `buildDashboardTable` TASKS block (before INBOX) + INBOX `bgLine` restructure;
+  `route` cases `menu task`, `tasks`, `task <id>`; `taskCommand` + `taskAdd`/
+  `taskTransition`/`taskComplete`/`taskList` + `parseTaskArgs`/`buildAddSpec`/
+  `decodeB64`/`loadReg` + `taskBoardScreen`/`taskDetailScreen`; exports added.
+  `dashboardPipeline` ask/actions UNTOUCHED (4 options preserved). Registry I/O
+  only via `taskRegistry.load/save` (no raw fs; menu-screens never names `tasks.json`).
+- `tests/menu-task-wiring.test.js` (NEW) — 23 tests.
+- `README.md` + `tests/readme-numbers.test.js` — module count 111→112 (both the
+  ground-truth `countTopLevelJs` assertion and the README claim).
+- `src/commands/menu.js`, `src/tabs/overview.js` — **NO CHANGE** (verified: menu.js
+  forwards argv to route(); overview.js unmounted dead code).
