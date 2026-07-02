@@ -261,29 +261,29 @@ low`, no `model:`.
 ## Execution Plan (Steps 8–16)
 
 ### Step 8 — TEST
-- [ ] Write tests/menu-protocol.test.js — all SPEC-A doc-contract + SPEC-B behavioral assertions (RED first).
+- [x] Write tests/menu-protocol.test.js — all SPEC-A doc-contract + SPEC-B behavioral assertions (RED first). 25 tests, initially 5 pass / 20 fail (RED); all 25 GREEN after implement.
 
 ### Step 9 — PREPARE
-- [ ] Confirm no new deps; reuse the mkdtempSync tmp-root harness from menu-task-wiring.test.js.
+- [x] Confirm no new deps; reuse the mkdtempSync tmp-root harness from menu-task-wiring.test.js. No new deps; node:test + assert/strict + fs/os/path only.
 
 ### Step 10 — IMPLEMENT
-- [ ] 10a menu.md: insert the Two-Plane Protocol section (6 subsections) + Rules 11–13 + edit the start-agent/discuss/decompose rows; preserve Rules 1–10, effort:low, no model:.
-- [ ] 10b menu-screens.js: fold `promote: nextRunnable(reg).map(...)` into taskComplete + taskTransition(fail/cancel) success returns; add the conditional `Background tasks ▸ → tasks` option to dashboardCommands gated on a non-empty registry (fail-open to omit).
+- [x] 10a menu.md: inserted the Two-Plane Protocol section (6 subsections) + Rules 11–13 + edited the start-agent/discuss/decompose rows; preserved Rules 1–10, effort:low, no model:.
+- [x] 10b menu-screens.js: added `computePromote(reg)` helper; folded `promote` into taskComplete + taskTransition(fail/cancel) success returns; added the conditional `Background tasks ▸ → tasks` option to dashboardCommands gated on a non-empty registry (fail-open to omit).
 
 ### Step 11 — REVIEW
-- [ ] Self-review: classification table total; gate-sacredness reinforced; Rules renumber cleanly; no existing rule altered in meaning.
+- [x] Self-review: classification table total (NAV/WORK rows); gate-sacredness reinforced (Rule 13 + Human-gates subsection cite Rule 4 sacred); Rules 1–13 renumber cleanly; no existing rule altered in meaning.
 
 ### Step 12 — OPTIMIZE
-- [ ] Tighten recipes to minimal-reasoning form; no duplicated prose between the section and Rules 11–13.
+- [x] Recipes kept in minimal-reasoning numbered-step form; the interactive framing is stated once in the section, the action rows cross-reference it (no heavy duplication).
 
 ### Step 13 — SECURE
-- [ ] --next stays nav-only (isNavRoute); no background task auto-crosses a gate; promote[] contains only registry-resident tasks; no new fs/exec; entry-point control-char safe.
+- [x] --next stays nav-only (taskComplete's isNavRoute guard unchanged); no background task auto-crosses a gate; promote[] is `nextRunnable(reg)` → only registry-resident queued tasks; no new fs/exec (computePromote is pure; dashboardCommands reads via taskRegistry.load/safe-fs); no new RegExp on non-literals; eslint --max-warnings 0 exit 0.
 
 ### Step 14 — VERIFY
-- [ ] node --test tests/*.test.js → # fail 0 (menu-protocol, slash-command-no-model-pin, inbox-stale-stream SP2 Rule-10, menu-screens, menu-task-wiring); coverage ≥80% on the menu-screens.js additions.
+- [x] node --test tests/*.test.js → tests 2731, pass 2731, # fail 0, skipped 0. Named guards green: menu-protocol 25/25, slash-command-no-model-pin 5/5, inbox-stale-stream (SP2 Rule-10) 18/18, menu-screens 30/30, menu-task-wiring 35/35. eslint exit 0; typecheck 1/1; readme-numbers 47/47 (untouched). Coverage: every added executable line in menu-screens.js (851-855, 1442-1445, 1469, 1507) is exercised (only the defensive fail-open catch fallback is unmeasured) → ≥80% on the additions.
 
 ### Step 15 — DOCUMENT
-- [ ] JSDoc the promote field on taskComplete/taskTransition and the dashboardCommands conditional.
+- [x] JSDoc on `computePromote`; inline NB3 comments on the promote fold in taskComplete/taskTransition and the dashboardCommands fail-open conditional.
 
 ### Step 16 — FINAL-REVIEW
 - [ ] implementation-reviewer verifies 14 dimensions + human-gate sacredness + AC→assertion map; Gate 3 (human).
@@ -293,6 +293,9 @@ low`, no `model:`.
 - **D-2 (legacy start-agent lock):** the legacy startAgent() lock + dashboard AGENT section are left untouched for backward-compat; unifying with the task plane → NB4.
 - **D-3 (sync is NAV):** claude:sync is deterministic fast Node → NAV.
 - **D-4 (promote-in-response):** fold nextRunnable into the complete/fail/cancel response (atomic, scheduler-consulted every completion) rather than a standalone `menu task next` query.
+- **D-5 (start omits promote):** the `promote[]` fold is added to `complete`, `fail`, and `cancel` only — NOT to `start`. A `start` transition FILLS a concurrency slot rather than freeing one, so it can never make a queued task newly-runnable; computing promote there would be dead work and could mislead the COMPLETION recipe into a spurious dispatch. `start` therefore returns its existing shape unchanged.
+- **D-6 (promote item shape):** each `promote[]` entry carries only `{id, kind, plan, touches, gitOp}` — the scheduler inputs plus the id the dispatcher needs — never the whole task object (avoids leaking `result`/`ts`/`agentTaskId` into the render turn and keeps the COMPLETION turn minimal-reasoning). `computePromote(reg)` is a single private helper reused by both `taskComplete` and `taskTransition` (DRY).
+- **D-7 (entry placement — Commands, not Pipeline):** the `Background tasks ▸` entry is spliced into `dashboardCommands` (the "More ▶" screen) immediately before `◀ Pipeline`, NOT into `dashboardPipeline`. This keeps the 4-option pipeline (Business/Implementation/Execution/More ▶) byte-stable (its regression tests stay green) while the board is reachable one level in, per the plan's Reaching-the-task-board subsection. Gated on `taskRegistry.load(root).tasks.length > 0` with a fail-open try/catch (a corrupt registry omits the entry rather than breaking Commands).
 
 
 ---

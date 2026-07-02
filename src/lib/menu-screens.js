@@ -844,6 +844,17 @@ function dashboardCommands(projectPath) {
     '◀ Pipeline': ''
   };
 
+  // NB3: reach the background-task board when the registry holds any task. Label
+  // key only (never a digit — Rule 1). FAIL-OPEN: a corrupt/unreadable registry
+  // omits the entry rather than breaking the Commands screen (load already fails
+  // open to empty; the try/catch is defense in depth).
+  let hasBackgroundTasks = false;
+  try { hasBackgroundTasks = taskRegistry.load(root).tasks.length > 0; } catch { hasBackgroundTasks = false; }
+  if (hasBackgroundTasks) {
+    options.splice(options.length - 1, 0, { label: 'Background tasks ▸', description: 'View the background task board' });
+    actions['Background tasks ▸'] = 'tasks';
+  }
+
   return {
     text,
     ask: {
@@ -1419,6 +1430,21 @@ function taskAdd(root, rest) {
   };
 }
 
+/**
+ * NB3: the scheduler's newly-runnable set, projected onto the just-saved in-memory
+ * registry, as a compact promote list. This is the ONLY sanctioned promotion source
+ * for the COMPLETION turn — Claude dispatches exactly these tasks (never a queued
+ * task the scheduler did not return). Each entry carries only what the dispatcher
+ * needs (id + the scheduler inputs), never the whole task object.
+ * @param {{tasks:Array<object>}} reg  a post-save in-memory registry value
+ * @returns {Array<{id:string, kind:string, plan:(string|null), touches:string[], gitOp:boolean}>}
+ */
+function computePromote(reg) {
+  return taskRegistry.nextRunnable(reg).map((t) => ({
+    id: t.id, kind: t.kind, plan: t.plan, touches: t.touches, gitOp: t.gitOp
+  }));
+}
+
 /** `menu task start|fail|cancel` — a single-status transition on a non-terminal task. */
 function taskTransition(root, rest, kind) {
   const p = parseTaskArgs(rest);
@@ -1438,6 +1464,9 @@ function taskTransition(root, rest, kind) {
   taskRegistry.save(root, reg);
   const res = { ok: true, taskId: id, status: patch.status, text: `Task ${id} → ${patch.status}` };
   if (kind === 'cancel') res.cancelled = true;
+  // NB3: fail/cancel free a slot → surface the scheduler's newly-runnable set so the
+  // COMPLETION turn can promote them (start never frees a slot, so it omits promote).
+  if (kind === 'fail' || kind === 'cancel') res.promote = computePromote(reg);
   return res;
 }
 
@@ -1473,7 +1502,9 @@ function taskComplete(root, rest) {
   if (gate != null) result.gate = gate;
   taskRegistry.updateTask(reg, id, { status: 'done', result });
   taskRegistry.save(root, reg);
-  return { ok: true, taskId: id, status: 'done', text: `Task ${id} → done` };
+  // NB3: a completion frees a slot → surface the scheduler's newly-runnable set for
+  // the COMPLETION turn to promote (scheduler-consulted every completion, Decision 4).
+  return { ok: true, taskId: id, status: 'done', text: `Task ${id} → done`, promote: computePromote(reg) };
 }
 
 /** `menu task list` — a pure read of the registry for rendering. */
