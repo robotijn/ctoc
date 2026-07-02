@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-02T18:07:03.745Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "NB3 — Menu Protocol Rewrite (NAV vs WORK)"
 type: functional
 status: functional

@@ -418,5 +418,19 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-02T18:07:03.746Z",
+    "plan": "NB3-menu-protocol-rewrite.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
