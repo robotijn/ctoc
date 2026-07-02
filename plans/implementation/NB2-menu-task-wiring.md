@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-02T11:00:25.970Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "NB2 — Menu Task Wiring"
 type: functional
 status: functional
