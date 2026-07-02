@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-02T13:07:23.021Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-02T11:40:23.760Z
@@ -543,50 +549,50 @@ dashboard change text-only and additive, and empty/absent registry adds zero out
 ## Execution Plan (Iron Loop Steps 8–16 — canonical labels)
 
 ### Step 8: TEST
-- [ ] Write `tests/menu-task-wiring.test.js` (TDD-red): create the temp-root harness and
+- [x] Write `tests/menu-task-wiring.test.js` (TDD-red): create the temp-root harness and
   the 16 tests S1–S9 + E1–E7 above; assert against `route()`/`renderTask*`. Tests fail
   first (task-view + routes not yet present).
 
 ### Step 9: PREPARE
-- [ ] Confirm NB1 API surface (`load/save/emptyRegistry/addTask/updateTask/canRun`,
+- [x] Confirm NB1 API surface (`load/save/emptyRegistry/addTask/updateTask/canRun`,
   consts) is available; confirm no new deps; confirm `src/lib/` sanitizer pattern to
   reuse. No directories to create (`task-registry.save` makes `.ctoc/state`).
 
 ### Step 10: IMPLEMENT (single step; sub-items per file)
-- [ ] Create `src/lib/task-view.js` — `renderTasksSection`, `renderTaskBoard`,
+- [x] Create `src/lib/task-view.js` — `renderTasksSection`, `renderTaskBoard`,
   `renderTaskDetail`, `tasksInboxLine`, `renderTaskList` + local helpers (`stripCtl`,
   `byStatus`, `waitReason`); pure, no fs; imports only pure `canRun`.
-- [ ] Modify `src/lib/menu-screens.js` — imports; `buildDashboardTable` TASKS block +
+- [x] Modify `src/lib/menu-screens.js` — imports; `buildDashboardTable` TASKS block +
   INBOX bgLine restructure; `route` cases `menu task`, `tasks`, `task <id>`;
   `taskCommand`/`taskBoardScreen`/`taskDetailScreen`/`loadReg`/`parseTaskArgs`; exports.
-- [ ] Modify `README.md` (111→112, add `task-view`) and `tests/readme-numbers.test.js`
+- [x] Modify `README.md` (111→112, add `task-view`) and `tests/readme-numbers.test.js`
   (both assertions 111→112).
 
 ### Step 11: REVIEW
-- [ ] Self-review vs ADR + Decisions: menu.js/overview.js untouched; dashboard changes
+- [x] Self-review vs ADR + Decisions: menu.js/overview.js untouched; dashboard changes
   text-only; no bare-digit keys; no gate crossing; all registry fs via task-registry.
 
 ### Step 12: OPTIMIZE
-- [ ] Single `taskRegistry.load` per dashboard render; task-view O(n) over tasks; no
+- [x] Single `taskRegistry.load` per dashboard render; task-view O(n) over tasks; no
   duplicate scans. Remove any dead branch.
 
 ### Step 13: SECURE
-- [ ] Every attacker-influenceable field (`label`/`plan`/`kind`/`summary`) passes
+- [x] Every attacker-influenceable field (`label`/`plan`/`kind`/`summary`) passes
   `stripCtl` before render (C0/C1 control-char strip). No `new RegExp` on non-literals.
   `--b64` decode wrapped in try/catch (malformed base64 → `{ok:false,error}`). No path
   built from task fields (registry path is computed by task-registry from root).
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/*.test.js` → `# fail 0`, incl. the full regression set above and
+- [x] `node --test tests/*.test.js` → `# fail 0`, incl. the full regression set above and
   `tests/readme-numbers.test.js`. Coverage ≥ 80% on new code; 0 skipped, 0 flaky.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on every task-view export and the new menu-screens functions; note the
+- [x] JSDoc on every task-view export and the new menu-screens functions; note the
   `menu task <sub>` contracts. (menu.md driver documentation of `inputMode:'task-select'`
   is an NB3 cross-reference, not an NB2 edit.)
 
 ### Step 16: FINAL-REVIEW
-- [ ] `implementation-reviewer` verifies the 14 quality dimensions; Gate 3 (human).
+- [x] `implementation-reviewer` verifies the 14 quality dimensions; Gate 3 (human).
 
 ---
 
@@ -621,53 +627,53 @@ dashboard change text-only and additive, and empty/absent registry adds zero out
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 ---
 
