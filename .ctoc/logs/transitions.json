@@ -390,5 +390,19 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-02T11:40:23.762Z",
+    "plan": "NB2-menu-task-wiring.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
