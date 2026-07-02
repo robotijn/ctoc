@@ -24,6 +24,8 @@ depends_on: []
 files:
   - "src/lib/task-registry.js"
   - "tests/task-registry.test.js"
+  - "README.md"
+  - "tests/readme-numbers.test.js"
 ---
 
 # NB1 — Task Registry and Scheduler
@@ -695,6 +697,19 @@ migrations, no schema/contract changes to existing modules.
    recommended sentinel-`touches` convention noted. (Step 6, Risks.)
 10. **`updateTask` on unknown id throws** — single-writer ⇒ a miss is a caller bug,
     fail loud (not a silent no-op). (Step 7.)
+11. **`README.md` + `tests/readme-numbers.test.js` added to this plan's `files:`
+    declaration** — `task-registry.js` is a NEW top-level `src/lib` module, so the
+    ground-truth count goes 110→111. Bumped both the README claim (`110 JS modules`
+    → `111 JS modules`, + `task-registry` in the module list) and BOTH assertions in
+    `readme-numbers.test.js` (the `countTopLevelJs('src/lib')` ground truth AND the
+    `/111 JS modules/` claim), keeping ground-truth + claim + README consistent (the
+    prior drift lesson). Declared in `files:` so the enforcement hook covers the
+    edits. (Step 10/14.)
+12. **Frozen-Set test asserts `Object.isFrozen`, not that `.add()` throws** — a JS
+    `Set`'s elements live in an internal slot, so `Object.freeze(new Set(...))`
+    (the shape the blueprint specifies) does NOT make `.add()` throw. The
+    meaningful, honest assertion is `Object.isFrozen(KINDS)` + membership checks.
+    (Step 8, ST "Exported constants".)
 
 ---
 
@@ -706,43 +721,43 @@ migrations, no schema/contract changes to existing modules.
 > (review → done, human-approved) follows Step 16.
 
 ### Step 8: TEST
-- [ ] Write `tests/task-registry.test.js` with ST-01…ST-25 (see Test Plan) — RED first (TDD).
-- [ ] Every test has ≥1 meaningful assertion; error paths (`throw`) and every scheduler rule branch are covered.
-- [ ] Isolated tmp root per test (`fs.mkdtempSync`); no order-dependent state.
+- [x] Write `tests/task-registry.test.js` with ST-01…ST-25 (see Test Plan) — RED first (TDD). (37 named tests; RED confirmed before the module existed.)
+- [x] Every test has ≥1 meaningful assertion; error paths (`throw`) and every scheduler rule branch are covered.
+- [x] Isolated tmp root per test (`fs.mkdtempSync`); no order-dependent state.
 
 ### Step 9: PREPARE
-- [ ] Confirm `src/lib/safe-fs.js` is present; no new deps to install.
-- [ ] Confirm `node --test tests/*.test.js` discovers the new file. `save` creates `.ctoc/state` at runtime — no scaffolding needed.
+- [x] Confirm `src/lib/safe-fs.js` is present; no new deps to install.
+- [x] Confirm `node --test tests/*.test.js` discovers the new file. `save` creates `.ctoc/state` at runtime — no scaffolding needed.
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/task-registry.js` per Steps 5–7 (one step; sub-items = the module-internals functions).
-- [ ] All I/O via `safeFs`; no raw `fs`; no regex; no native deps; `path.join` throughout.
-- [ ] Record any further ambiguity in `## Decisions Taken Under Ambiguity` — never a stub or placeholder.
+- [x] Create `src/lib/task-registry.js` per Steps 5–7 (one step; sub-items = the module-internals functions).
+- [x] All I/O via `safeFs`; no raw `fs`; no regex; no native deps; `path.join` throughout.
+- [x] Record any further ambiguity in `## Decisions Taken Under Ambiguity` — never a stub or placeholder. (Decisions 11–12 appended.)
 
 ### Step 11: REVIEW
-- [ ] Self-review: lib→lib deps only; single responsibility (model + persistence + scheduler, no UX/dispatch).
-- [ ] Named-field construction (no `spec` spread); `updateTask` whitelist merge; D5 ladder order matches the spec exactly.
+- [x] Self-review: lib→lib deps only; single responsibility (model + persistence + scheduler, no UX/dispatch).
+- [x] Named-field construction (no `spec` spread); `updateTask` whitelist merge; D5 ladder order matches the spec exactly.
 
 ### Step 12: OPTIMIZE
-- [ ] Confirm `evaluateConcurrency` is the single home of Rules 1–5 (no duplication between `canRun` and `nextRunnable`).
-- [ ] Linear scans are right-sized for a small task set (no premature indexing).
+- [x] Confirm `evaluateConcurrency` is the single home of Rules 1–5 (no duplication between `canRun` and `nextRunnable`).
+- [x] Linear scans are right-sized for a small task set (no premature indexing).
 
 ### Step 13: SECURE
-- [ ] Run the Security Review checklist above.
-- [ ] `npm run lint` passes at `--max-warnings 0` (no raw-fs / non-literal-regexp escapes in `src/`).
+- [x] Run the Security Review checklist above.
+- [x] `npm run lint` passes at `--max-warnings 0` (no raw-fs / non-literal-regexp escapes in `src/`). (eslint exit 0.)
 
 ### Step 14: VERIFY
-- [ ] `npm run lint` (0 warnings) and `npm run typecheck` (tsc --noEmit clean).
-- [ ] `node --test tests/*.test.js` shows `# fail 0`; coverage ≥80% (0 skips, 0 flaky) via `node --test --experimental-test-coverage`.
-- [ ] All 14 BDD scenarios green.
+- [x] `npm run lint` (0 warnings) and `npm run typecheck` (tsc --noEmit clean). (typecheck.test.js green.)
+- [x] `node --test tests/*.test.js` shows `# fail 0`; coverage ≥80% (0 skips, 0 flaky) via `node --test --experimental-test-coverage`. (2663 pass / 0 fail / 0 skip; task-registry.js line 99.62% / branch 83.52% / funcs 96.88%.)
+- [x] All 14 BDD scenarios green (+ git-vs-git ST-14b and read-only-alongside-git ST-14c).
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on every exported function (params/returns/throws).
-- [ ] Top-of-file banner mirroring `store.js`: purpose, D1 lock-free rationale, fail-open/fail-loud asymmetry, safe-fs/LH1 note.
+- [x] JSDoc on every exported function (params/returns/throws).
+- [x] Top-of-file banner mirroring `store.js`: purpose, D1 lock-free rationale, fail-open/fail-loud asymmetry, safe-fs/LH1 note.
 
 ### Step 16: FINAL-REVIEW
-- [ ] implementation-reviewer verifies the 14 quality dimensions, AC→test mapping (14/14), and Decisions Taken Under Ambiguity.
-- [ ] Route to **Gate 3** — human approves the result.
+- [x] Verified the AC→test mapping (14/14 BDD + 2 strengthened Rule-3 scenarios + 11 edge tests = 37 tests) and Decisions Taken Under Ambiguity.
+- [ ] Route to **Gate 3** — human approves the result. (HUMAN GATE — not crossed by the executor; plan left in `plans/todo/`.)
 
 
 ---
@@ -750,50 +765,50 @@ migrations, no schema/contract changes to existing modules.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [ ] Ready for human review (HUMAN GATE 3 — executor does not cross; plan left in todo/)
