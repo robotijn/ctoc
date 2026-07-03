@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-03T16:52:22.704Z
+gate_crossed: functional → implementation
+---
+
+---
 iron_loop: true
 step: 4
 step_label: CAPTURE
