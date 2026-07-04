@@ -255,6 +255,24 @@ describe('classifier — functional not-started is not DOA (SD1)', () => {
     assert.equal(noStage.category, 'dead-on-arrival', 'undefined stage ⇒ DOA (fail-toward-teeth)');
     assert.equal(noStage.proposedAction, 'revert');
   });
+
+  it('positive death evidence keeps teeth even at a not-started stage: explicitlyRejected ⇒ DOA/delete', () => {
+    // The not-started gate exempts explicitlyRejected — a functional plan that was
+    // AFFIRMATIVELY rejected is dead, not merely unbuilt (future-hardens for when
+    // explicitlyRejected gets wired; today verify hardcodes it false).
+    const ev = { ...missingFilesEvidence(), explicitlyRejected: true };
+    const p = classifyStaleCandidate(baseCandidate('p-rejected-func', 'functional'), ev);
+    assert.equal(p.category, 'dead-on-arrival', 'explicit rejection overrides the not-started gate');
+    assert.equal(p.proposedAction, 'delete');
+  });
+
+  it('null / non-object candidate degrades to inconclusive, never throws (entry totality)', () => {
+    for (const bad of [null, undefined, 'x', 42]) {
+      const p = classifyStaleCandidate(bad, missingFilesEvidence());
+      assert.equal(p.category, 'inconclusive');
+      assert.equal(p.proposedAction, null);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
