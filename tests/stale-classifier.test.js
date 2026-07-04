@@ -147,7 +147,10 @@ describe('classifier — approved-but-stranded', () => {
 
 describe('classifier — dead-on-arrival default revert', () => {
   it('files gone, no slug commits, no approval, not explicitlyRejected ⇒ revert', () => {
-    const cand = baseCandidate('p-dead');
+    // SD1: DOA is stage-gated. baseCandidate defaults to 'functional' (now a
+    // not-started stage), so this fixture is relocated to 'implementation' — a
+    // stage where declared files SHOULD exist, so missing files ⇒ DOA still fires.
+    const cand = baseCandidate('p-dead', 'implementation');
     const evidence = {
       gitAvailable: true,
       error: null,
@@ -174,7 +177,8 @@ describe('classifier — dead-on-arrival default revert', () => {
 
 describe('classifier — dead-on-arrival delete iff explicitlyRejected', () => {
   it('same as revert fixture + explicitlyRejected:true ⇒ delete', () => {
-    const cand = baseCandidate('p-rejected');
+    // SD1: relocated to 'implementation' (files-expected stage) so DOA fires.
+    const cand = baseCandidate('p-rejected', 'implementation');
     const evidence = {
       gitAvailable: true,
       error: null,
@@ -192,6 +196,89 @@ describe('classifier — dead-on-arrival delete iff explicitlyRejected', () => {
     const p = classifyStaleCandidate(cand, evidence);
     assert.equal(p.category, 'dead-on-arrival');
     assert.equal(p.proposedAction, 'delete');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4b — SD1: classifier is STAGE-AWARE for the DOA / not-started boundary
+// ---------------------------------------------------------------------------
+
+// The exact missing-files evidence shape that trivially satisfies the DOA
+// predicate (anyFileMissing, 0 slug commits, not approved). The ONLY thing that
+// should decide DOA-vs-not-started for this evidence is candidate.stage.
+const missingFilesEvidence = () => ({
+  gitAvailable: true,
+  error: null,
+  approvedBy: null,
+  declaredFiles: ['src/lib/gone.js'],
+  allFilesExist: false,
+  anyFileMissing: true,
+  stageEntryEpoch: 1700000000,
+  filesLastModifiedEpoch: null,
+  filesModifiedAfterEntry: false,
+  slugMatchCommits: [],
+  slugMatchAfterEntry: false,
+  explicitlyRejected: false,
+});
+
+describe('classifier — functional not-started is not DOA (SD1)', () => {
+  it('functional stage + missing-files/no-slug/not-approved ⇒ inconclusive, null, "not started"', () => {
+    const cand = baseCandidate('p-fresh', 'functional');
+    const p = classifyStaleCandidate(cand, missingFilesEvidence());
+    assert.equal(p.category, 'inconclusive', 'not-started ⇒ inconclusive, not DOA');
+    assert.equal(p.proposedAction, null, 'not-started ⇒ NO cleanup action');
+    assert.notEqual(p.category, 'dead-on-arrival');
+    assert.ok(!['revert', 'delete'].includes(p.proposedAction), 'never revert/delete a not-started plan');
+    assert.match(p.evidence.join(' '), /not started/i, 'evidence explains the benign not-started state');
+  });
+
+  it('PAIRED: SAME evidence at implementation stage ⇒ dead-on-arrival/revert (gate discriminates on stage only)', () => {
+    const cand = baseCandidate('p-fresh', 'implementation');
+    const p = classifyStaleCandidate(cand, missingFilesEvidence());
+    assert.equal(p.category, 'dead-on-arrival', 'implementation stage ⇒ DOA — detector not blinded');
+    assert.equal(p.proposedAction, 'revert');
+  });
+
+  it('vision + canvas stages are also not-started (allowlist) ⇒ inconclusive, null', () => {
+    for (const stage of ['vision', 'canvas']) {
+      const p = classifyStaleCandidate(baseCandidate('p-early', stage), missingFilesEvidence());
+      assert.equal(p.category, 'inconclusive', stage + ' ⇒ not-started');
+      assert.equal(p.proposedAction, null, stage + ' ⇒ no action');
+    }
+  });
+
+  it('unknown/undefined stage keeps DOA teeth (Set.has(undefined)===false) ⇒ dead-on-arrival', () => {
+    // Allowlist polarity: any stage NOT in the benign set stays DOA-eligible.
+    const unknown = classifyStaleCandidate(baseCandidate('p-unknown', 'review'), missingFilesEvidence());
+    assert.equal(unknown.category, 'dead-on-arrival', 'review is files-expected ⇒ DOA');
+    const noStage = classifyStaleCandidate({ plan: 'p-nostage' }, missingFilesEvidence());
+    assert.equal(noStage.category, 'dead-on-arrival', 'undefined stage ⇒ DOA (fail-toward-teeth)');
+    assert.equal(noStage.proposedAction, 'revert');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4c — SD1: CTOC's own unbuilt functional backlog produces 0 cleanup actions
+// ---------------------------------------------------------------------------
+
+describe("classifier — CTOC functional backlog clears DOA (SD1 dogfooding set)", () => {
+  it('every unbuilt functional roadmap plan ⇒ 0 revert/delete proposals, 0 dead-on-arrival', () => {
+    const backlog = [
+      'PI0', 'PI2', 'PI3', 'PI4', 'PI5', 'PI6',
+      'EC1', 'EC2', 'EC3', 'EC4', 'EC5', 'EC6',
+      'CU1', 'CU4a', 'CU4b', 'CU4c', 'CU5', 'SP5', 'NB4',
+    ];
+    let actionable = 0;
+    let doa = 0;
+    for (const slug of backlog) {
+      const p = classifyStaleCandidate(baseCandidate(slug, 'functional'), missingFilesEvidence());
+      assert.equal(p.proposedAction, null, slug + ' must propose no action');
+      assert.notEqual(p.category, 'dead-on-arrival', slug + ' must not be dead-on-arrival');
+      if (['revert', 'delete'].includes(p.proposedAction)) actionable++;
+      if (p.category === 'dead-on-arrival') doa++;
+    }
+    assert.equal(actionable, 0, 'no unbuilt functional backlog plan proposes revert/delete');
+    assert.equal(doa, 0, 'no unbuilt functional backlog plan is dead-on-arrival');
   });
 });
 
@@ -417,7 +504,11 @@ describe('menu — inboxVerifyProposals render', () => {
   // file (the entry is navigation, not execution).
   it('route([inbox,verify]) with an actionable DOA ⇒ Clean up ▸ + Back; read-only; no digit', () => {
     const sb = makeSandbox();
-    writeStalePlan(sb, 'functional', 'p-render'); // DOA: missing declared file
+    // SD1: DOA is stage-gated. p-render is written at 'implementation' (a
+    // files-expected stage) so its missing declared file still ⇒ dead-on-arrival
+    // and surfaces the 'Clean up ▸' entry. A functional-stage plan would now be
+    // not-started/inconclusive and would render NO cleanup entry.
+    writeStalePlan(sb, 'implementation', 'p-render'); // DOA: missing declared file
     const spy = spyChildProcess({ execFileSync: () => '1700000000' });
     // Read-only render guard: any plan-file write/rename/rm flips this.
     const origWrite = fs.writeFileSync;

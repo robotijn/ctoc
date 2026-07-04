@@ -403,56 +403,72 @@ categories intact; existing suites green. Confirm no gate crossed automatically.
 4. **Frontmatter advanced to `step: 7 / SPEC`, `status: implementation`** to reflect
    the authored blueprint and the plan's actual directory; `iron_loop: true` retained.
 
+### Execution decisions (Steps 8–16, 2026-07-04)
+
+5. **Blueprint verified against live code before editing** — the Step 5/6/7 quotes
+   (DOA rule ladder, `candidate.stage`, `slugMatchCount`, evidence shape,
+   `menu-screens.js` `ORDER`/`CLEANUP_ORDER`) matched the real source exactly. No
+   discrepancy found; implemented as specified.
+6. **CTOC backlog test set expanded to the literal 19-plan brief** —
+   `[PI0, PI2, PI3, PI4, PI5, PI6, EC1–EC6, CU1, CU4a, CU4b, CU4c, CU5, SP5, NB4]`
+   (CU4 split into CU4a/b/c per the execution brief). Slugs are opaque to the
+   classifier, so the set validates the stage-gate over a realistic count; all 19
+   produce `proposedAction: null`, `category !== 'dead-on-arrival'`.
+7. **Added a `missingFilesEvidence()` shared fixture in the test file** — the exact
+   DOA-trigger evidence shape, so the not-started vs implementation-DOA paired
+   assertions differ ONLY by `candidate.stage`, proving the gate discriminates on
+   stage alone (detector not blinded). Not a behavior change; a test-clarity choice.
+
 
 ---
 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 3 new assertions failed against the stage-blind classifier (28 tests, 3 fail)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none; no new deps
+- [x] Check prerequisites — `files:` unchanged; scope stays stale-detector.js + tests
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — added `NOT_STARTED_STAGES` frozen Set + guarded not-started early-return before the DOA rule
+- [x] Add error handling — `candidate && candidate.stage` keeps the classifier total; `Set.has(undefined)===false`
+- [x] Wire up integration points — reuses `inconclusive`; zero downstream change
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — guard predicate matches DOA predicate + benign-stage allowlist; first-match ordering cannot shadow rules 3/4 (they need approvedBy / slug match)
+- [x] Verify integration points work together — inconclusive renders in menu-screens ORDER, absent from CLEANUP_ORDER ⇒ no cleanup entry
+- [x] Check error handling completeness — pure, total, degrade-never-throw preserved
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — Set lookup O(1); slugMatchCount reused, not recomputed
+- [x] Optimize critical paths
+- [x] Simplify complex code — minimal single-branch change
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — no new input surface, no fs/subprocess
+- [x] Sanitize outputs — evidence line interpolates only `candidate.stage` (internal enum-ish); static string, control-char-free
+- [x] No secrets in code
+- [x] Safe file operations — none added
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `npx eslint . --max-warnings 0` exit 0; `tests/typecheck.test.js` 1/1 pass
+- [x] Run ALL tests (TDD Green) — `tests/stale-classifier.test.js` 28/28; full suite `tests/*.test.js` 2742/2742, fail 0
+- [x] Check coverage >= 80% — stale-detector.js 92.54% lines / 90.91% functions; new branch covered taken + not-taken
+- [x] 0 skipped, 0 flaky tests — 0 skipped across the suite
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — JSDoc on `NOT_STARTED_STAGES` + inline comment on the new rule
+- [x] Add JSDoc comments to new functions — no new function; constant documented
+- [x] Update CHANGELOG if needed — n/a (leaf classifier fix; version bump handled at release)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed — CAPTURE ACs (a)–(e) satisfied: functional not-started clears; implementation DOA retained; 0 actionable across the 19-plan backlog set; shipped/approved intact; existing suites green
+- [x] Manual verification if needed
+- [x] Ready for human review — plan NOT moved between stages (remains in todo/)

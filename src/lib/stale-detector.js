@@ -67,6 +67,18 @@ const MAX_PLAN_BYTES = 1 << 20; // 1 MiB
 const GATE_SOURCE_STAGES = Object.freeze(['functional', 'implementation', 'review']);
 
 /**
+ * Stages at which declared files are NOT yet expected to exist — a missing-files
+ * signal here means the plan is UNBUILT (not started), never abandoned. DOA is
+ * gated OUT of these stages. Any stage NOT in this set is treated as
+ * "files should exist" so DOA keeps its teeth for implementation/todo/in-progress/
+ * review AND for any unknown/malformed stage (fail-toward-keeping-teeth, since
+ * `Set.has(undefined) === false`). The polarity is deliberately an allowlist of
+ * BENIGN stages, not of files-expected stages.
+ * @type {ReadonlySet<string>}
+ */
+const NOT_STARTED_STAGES = Object.freeze(new Set(['vision', 'canvas', 'functional']));
+
+/**
  * Concatenate the bodies of EVERY consecutive leading `---…---` frontmatter
  * block into one combined region string.
  *
@@ -543,7 +555,34 @@ function classifyStaleCandidate(candidate, evidence) {
 
   const slugMatchCount = (evidence.slugMatchCommits || []).length;
 
-  // 1. DEAD-ON-ARRIVAL — files gone, nothing shipped, never approved.
+  // 1. NOT-STARTED (stage gate) — a pre-implementation-stage plan whose ONLY
+  //    staleness signal is missing files has not begun work: benign, not stale.
+  //    This gates the DOA rule so an UNBUILT vision/canvas/functional plan is
+  //    never proposed for revert/delete. Reuses the `inconclusive` category with
+  //    a null action so NO cleanup path (SP4) ever acts on it (`inconclusive` is
+  //    absent from menu-screens.js CLEANUP_ORDER). `candidate && candidate.stage`
+  //    keeps the classifier total: a null candidate or missing stage yields
+  //    `Set.has(undefined) === false` ⇒ falls through to DOA (the pre-fix default).
+  if (
+    evidence.anyFileMissing &&
+    slugMatchCount === 0 &&
+    !evidence.approvedBy &&
+    NOT_STARTED_STAGES.has(candidate && candidate.stage)
+  ) {
+    return {
+      plan,
+      category: 'inconclusive',
+      proposedAction: null,
+      evidence: [
+        'not started: ' + candidate.stage +
+          '-stage plan; declared files not yet built (benign, not stale)',
+      ],
+    };
+  }
+
+  // 2. DEAD-ON-ARRIVAL — files gone, nothing shipped, never approved. Now only
+  //    reachable PAST the not-started stages (implementation/todo/in-progress/
+  //    review and any unknown stage).
   if (evidence.anyFileMissing && slugMatchCount === 0 && !evidence.approvedBy) {
     return {
       plan,
