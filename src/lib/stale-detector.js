@@ -538,6 +538,11 @@ function buildEvidenceLines(evidence) {
  * @returns {StaleProposal} exactly { plan, category, proposedAction, evidence }.
  */
 function classifyStaleCandidate(candidate, evidence) {
+  // Entry totality: a null/non-object candidate degrades to inconclusive rather
+  // than throwing on a property read (the classifier is degrade-never-throw).
+  if (!candidate || typeof candidate !== 'object') {
+    return { plan: null, category: 'inconclusive', proposedAction: null, evidence: ['invalid candidate'] };
+  }
   const plan = candidate.plan;
 
   // 0. Missing / git-unavailable evidence ⇒ inconclusive (degraded signal).
@@ -560,14 +565,17 @@ function classifyStaleCandidate(candidate, evidence) {
   //    This gates the DOA rule so an UNBUILT vision/canvas/functional plan is
   //    never proposed for revert/delete. Reuses the `inconclusive` category with
   //    a null action so NO cleanup path (SP4) ever acts on it (`inconclusive` is
-  //    absent from menu-screens.js CLEANUP_ORDER). `candidate && candidate.stage`
-  //    keeps the classifier total: a null candidate or missing stage yields
-  //    `Set.has(undefined) === false` ⇒ falls through to DOA (the pre-fix default).
+  //    absent from menu-screens.js CLEANUP_ORDER). Exempts `explicitlyRejected`:
+  //    POSITIVE death evidence keeps its teeth at every stage (falls through to
+  //    DOA/delete even at a not-started stage — missing files there is only benign
+  //    ABSENT a rejection). A missing/unknown stage yields
+  //    `Set.has(undefined) === false` ⇒ also falls through to DOA (the pre-fix default).
   if (
     evidence.anyFileMissing &&
     slugMatchCount === 0 &&
     !evidence.approvedBy &&
-    NOT_STARTED_STAGES.has(candidate && candidate.stage)
+    !evidence.explicitlyRejected &&
+    NOT_STARTED_STAGES.has(candidate.stage)
   ) {
     return {
       plan,
@@ -592,7 +600,7 @@ function classifyStaleCandidate(candidate, evidence) {
     };
   }
 
-  // 2. APPROVED-BUT-STRANDED — carries approval AND work continued after entry.
+  // 3. APPROVED-BUT-STRANDED — carries approval AND work continued after entry.
   if (evidence.approvedBy && evidence.filesModifiedAfterEntry) {
     return {
       plan,
@@ -602,7 +610,7 @@ function classifyStaleCandidate(candidate, evidence) {
     };
   }
 
-  // 3. SHIPPED-BUT-EARLY — slug-match AND files modified after entry, all present.
+  // 4. SHIPPED-BUT-EARLY — slug-match AND files modified after entry, all present.
   if (evidence.slugMatchAfterEntry && evidence.filesModifiedAfterEntry && evidence.allFilesExist) {
     return {
       plan,
@@ -612,7 +620,7 @@ function classifyStaleCandidate(candidate, evidence) {
     };
   }
 
-  // 4. INCONCLUSIVE — everything else (incl. age-only, thin/partial evidence).
+  // 5. INCONCLUSIVE — everything else (incl. age-only, thin/partial evidence).
   return {
     plan,
     category: 'inconclusive',
