@@ -330,6 +330,9 @@ every time, not from memory.
 
 ## Execution Plan (Iron Loop Steps 8-16)
 
+> **Steps 8-16 completed 2026-07-05.** All boxes below checked; results captured
+> in the second "Execution Plan (Steps 8-16)" block and "Execution decisions".
+
 ### Step 8: TEST (TDD Red)
 Write `tests/cache-freshness.test.js` using `node:test` + `node:assert/strict`
 BEFORE touching `actions.js`. Use `mkdtempSync(path.join(os.tmpdir(), 'ctoc-cf1-'))`
@@ -452,56 +455,79 @@ core logic.
 - **`writeState` from ASSESS does not exist** — wired the real non-move writers
   (`createCanvas`, `deletePlan`, queue reorder) instead. Trust the code.
 
+### Execution decisions (Steps 8-16, 2026-07-05)
+- **Line numbers verified fresh, differed from the blueprint.** Read the current
+  `actions.js`; the real `invalidate()` call-sites are: `movePlan` line **63**
+  (after `renameSync`), `deletePlan` line **296** (after `unlinkSync`),
+  `moveUpInQueue` line **325** (before `return true`), `moveDownInQueue` line
+  **354** (before `return true`), `createCanvas` line **690** (after the final
+  `writeFileSync`). Import at line **15**. The blueprint's `~58/~682/~291/~319/~347`
+  estimates were close but stale; wired the REAL lines read from disk (CF1's own
+  rule — the file wins).
+- **`renameSync` appears twice** (`movePlan` and `renamePlan`). Only `movePlan`
+  got `invalidate()`; `renamePlan` is a same-stage rename that does not change any
+  count, so it is intentionally NOT wired.
+- **Added `deletePlan` / `moveUpInQueue` / `moveDownInQueue` / `createCanvas`
+  coverage to `tests/cache-freshness.test.js`.** Existing suites only mocked the
+  queue writers and did not exercise the real `deletePlan` path, so the changed
+  lines needed direct exercise to hit ≥80% changed-line coverage. Result: 100%
+  of the 6 changed lines covered.
+- **Queue-reorder tests assert cache-clear only, not FIFO mechanics.** The
+  reorder relies on `utimesSync` (mtime), while the sort is by `birthtime`; the
+  reorder outcome is filesystem/timing-dependent and unrelated to CF1. Tests read
+  the actual on-disk FIFO order, pick a movable target, assert the call returns
+  true and clears the cache, and that counts stay disk-fresh — the CF1 contract.
+
 
 ---
 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (`tests/cache-freshness.test.js`, 11 cases)
+- [x] Test error conditions (empty-project edge → zero counts)
+- [x] Run tests - expect RED (failing): pre-fix `tests 7, pass 2, fail 5` (AC1, all AC2, AC4)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none — pure `node:` builtins)
+- [x] Check prerequisites (`cache.js` exports `invalidate` + `_debug`; all 3 count fns accept `projectPath`)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (tmp roots via `mkdtempSync`)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (import + 5 `invalidate()` choke points)
+- [x] Add error handling (n/a — `invalidate()` is a local `Map.clear()`)
+- [x] Wire up integration points (movePlan/deletePlan/queue-reorder/createCanvas)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code (every count-changing writer invalidates or is move-followed)
+- [x] Verify integration points work together (approve/start/complete covered by movePlan)
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (no invalidate on move-followed writers)
+- [x] Optimize critical paths (no hot-loop invalidation; writes are rare/human-paced)
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal — no new path handling)
+- [x] Sanitize outputs (n/a)
+- [x] No secrets in code
+- [x] Safe file operations (`safeFs` unchanged; no `new RegExp` on non-literals)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (`eslint . --max-warnings 0` exit 0; typecheck pass 1 fail 0)
+- [x] Run ALL tests (TDD Green): `tests 2755, pass 2755, fail 0`; new file `tests 11, pass 11, fail 0`
+- [x] Check coverage >= 80% (100% of the 6 changed actions.js lines exercised)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (`agents/_shared/ancestry-read.md` prong-2 append)
+- [x] Add JSDoc comments to new functions (movePlan choke-point note; inline `// CF1:` comments)
+- [x] Update CHANGELOG if needed (n/a — internal correctness wire-up)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed (AC1 red→green proof captured)
+- [x] Ready for human review (Gate 3 — human-only; plan left in todo, NOT moved)
