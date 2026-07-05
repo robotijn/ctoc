@@ -10,6 +10,8 @@ const { parseMetadata, readPlans, getPlansDir } = require('./state');
 const { movePlan } = require('./actions');
 const { clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
+// CF1: bust the in-process read cache on every count-mutating write.
+const { invalidate } = require('./cache');
 
 /**
  * Get the canvas file path for a given vision slug, if a canvas exists.
@@ -183,6 +185,9 @@ To be refined during Product Owner review.
 `;
 
   safeFs.writeFileSync(filePath, content);
+  // CF1: a new plans/functional/*.md stub changes getPlanCounts().functional —
+  // bust the read cache AFTER the successful write.
+  invalidate();
 
   return {
     name: fileName.replace('.md', ''),
@@ -297,6 +302,9 @@ function listStubs(visionSlug, projectPath) {
 function removeStub(stubPath) {
   if (safeFs.existsSync(stubPath)) {
     safeFs.unlinkSync(stubPath);
+    // CF1: removing a plans/functional/*.md stub changes the counts — bust the
+    // read cache AFTER the successful unlink (only when a file was actually removed).
+    invalidate();
   }
   clearStatus(stubPath);
 }
@@ -361,6 +369,9 @@ ${criteria.join('\n')}
 `;
 
   safeFs.writeFileSync(filePath, content);
+  // CF1: the merged plans/functional/*.md changes the counts — bust the read
+  // cache AFTER the successful write (before the originals are removed).
+  invalidate();
 
   // Remove originals
   stubPaths.forEach(p => removeStub(p));
