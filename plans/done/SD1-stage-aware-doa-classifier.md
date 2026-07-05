@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-05T08:35:11.623Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-04T11:16:18.172Z
@@ -96,29 +102,29 @@ trust its proposals without risking my pending roadmap.
 
 ### BDD Scenarios
 
-- [ ] **Scenario: a not-started functional plan is not dead-on-arrival**
+- [x] **Scenario: a not-started functional plan is not dead-on-arrival**
   Given a `functional`-stage candidate with missing declared files, no
   slug-commits, and no approval
   When `classifyStaleCandidate` runs
   Then its category is NOT `dead-on-arrival` and its proposedAction is NOT
   `revert`/`delete` (it is `not-started`/`inconclusive` with no cleanup action)
 
-- [ ] **Scenario: an implementation-stage plan with missing files is still DOA**
+- [x] **Scenario: an implementation-stage plan with missing files is still DOA**
   Given an `implementation`-stage candidate with the same missing-files evidence
   Then it IS classified `dead-on-arrival` (files should exist by this stage) —
   the fix must not blind the detector to real abandonment past functional
 
-- [ ] **Scenario: CTOC's own 18 false positives clear**
+- [x] **Scenario: CTOC's own 18 false positives clear**
   Given the current backlog (PI0–6, EC1–6, CU*, SP5 — all functional, unbuilt)
   When verification runs
   Then none are proposed for `revert`/`delete` (0 dead-on-arrival among them)
 
-- [ ] **Scenario: genuinely abandoned plans still surface**
+- [x] **Scenario: genuinely abandoned plans still surface**
   Given an implementation+ plan that is explicitly rejected or past-threshold-old
   with no activity
   Then it is still classified for cleanup (the detector keeps its teeth)
 
-- [ ] **Scenario: behavior/tests unchanged elsewhere**
+- [x] **Scenario: behavior/tests unchanged elsewhere**
   Given the existing stale-classifier + cleanup suites
   Then they pass (adjust only the assertions the corrected semantics require)
 
