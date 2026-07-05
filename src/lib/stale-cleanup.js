@@ -34,6 +34,10 @@ const safeFs = require('./safe-fs');
 const path = require('path');
 // movePlan ONLY — approvePlan is deliberately NOT imported (structural gate-safety, D2).
 const { movePlan } = require('./actions');
+// CF1: bust the in-process read cache on every count-mutating write. cache.js
+// imports nothing (no require cycle) and exports no approvePlan — it does NOT
+// widen the gate-safety surface (D2 preserved).
+const { invalidate } = require('./cache');
 // listStaleCandidates ONLY — RE-DERIVE a plan's current stage at exec time (D1/D8).
 const { listStaleCandidates } = require('./inbox');
 
@@ -164,6 +168,10 @@ function _stampAndArchive(planPath, root, action) {
   safeFs.writeFileSync(planPath, stamped); // WRITE strictly BEFORE rename (M5)
   safeFs.mkdirSync(doneDir, { recursive: true });
   safeFs.renameSync(planPath, dest);
+  // CF1: the plan left its gate-source stage for done/ — bust the read cache
+  // AFTER the successful rename. Strictly post-write; the stamp-before-rename
+  // (M5) ordering above is untouched.
+  invalidate();
   _appendLog(root, {
     plan: path.basename(planPath, '.md'),
     from,
@@ -236,6 +244,9 @@ function deletePlan(planPath, { explicitlyRejected = false } = {}) {
   const stage = _stageFromPath(planPath);
   const root = _rootFromPath(planPath);
   safeFs.unlinkSync(planPath);
+  // CF1: deleting a plan file changes the counts — bust the read cache AFTER the
+  // successful unlink (a throwing unlink never needlessly clears).
+  invalidate();
   _appendLog(root, {
     plan: path.basename(planPath, '.md'),
     from: stage,

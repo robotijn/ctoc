@@ -22,6 +22,10 @@ priority: HIGH
 depends_on: []
 files:
   - src/lib/actions.js
+  - src/lib/sync.js
+  - src/lib/stale-cleanup.js
+  - src/lib/vision-decomposer.js
+  - src/lib/inbox.js
   - agents/_shared/ancestry-read.md
   - tests/cache-freshness.test.js
 ---
@@ -454,6 +458,97 @@ core logic.
   busts the cache, so a second call would be redundant.
 - **`writeState` from ASSESS does not exist** — wired the real non-move writers
   (`createCanvas`, `deletePlan`, queue reorder) instead. Trust the code.
+
+### CF1 KICKBACK — external (non-actions) writers (2026-07-05)
+
+**Why kicked back:** the actions.js slice was complete, but count-mutating writes
+OUTSIDE actions.js still left stale reads — violating CF1's own invariant ("every
+count-mutating write busts the cache; always read files, not memory"). Four
+modules perform raw plan/inbox-file writes that bypass `actions.movePlan`:
+`sync.moveToReviewAfterPush`, `stale-cleanup` (`archivePlan`/`reconcilePlan` via
+`_stampAndArchive`, and `deletePlan`), `vision-decomposer`
+(`createStub`/`removeStub`/`mergeStubs`), and `inbox`
+(`createQuestion`/`createDecision`). Each now busts the cache post-write.
+
+**Fix pattern (obeyed exactly):** `const { invalidate } = require('./cache');`
+once per file near the requires; `invalidate()` (no arg → clear-all) called
+STRICTLY AFTER the successful `renameSync`/`unlinkSync`/`writeFileSync` and before
+the return, so a throwing write never needlessly clears and a successful one
+always does. `cache.js` imports nothing → no require cycle introduced anywhere.
+inbox.js reused its existing `require('./cache')` (added `invalidate` to the
+`memoize` destructure). All four are in `src/lib/` → `require('./cache')`.
+
+**Exact invalidate() call-sites (file:REAL-line, read fresh from the final files):**
+- `src/lib/sync.js:18` import; `src/lib/sync.js:142` — `moveToReviewAfterPush`,
+  after `safeFs.renameSync(planPath, newPath)` (raw rename into review/;
+  changes `getPlanCounts().review` + `getInboxCounts().gatesWaiting`).
+- `src/lib/stale-cleanup.js:40` import; `:174` — `_stampAndArchive`, after
+  `safeFs.renameSync(planPath, dest)` (used by `archivePlan`/`reconcilePlan`);
+  `:249` — `deletePlan`, after `safeFs.unlinkSync(planPath)`.
+- `src/lib/vision-decomposer.js:14` import; `:190` — `createStub` after
+  `writeFileSync`; `:307` — `removeStub` after `unlinkSync` (INSIDE the
+  `existsSync` guard, so a missing file never clears); `:374` — `mergeStubs`
+  after the merged `writeFileSync`.
+- `src/lib/inbox.js:21` import (`memoize, invalidate` — reused existing require);
+  `:95` — `createQuestion` after `writeFileSync`; `:136` — `createDecision`
+  after `writeFileSync`.
+
+**Gate-safety (SP4) CONFIRMED UNTOUCHED (stale-cleanup.js):** `invalidate()` sits
+strictly AFTER the write in both `_stampAndArchive` and `deletePlan`. The
+stamp-before-rename (M5) ordering — `writeFileSync(stamped)` then
+`mkdirSync(doneDir)` then `renameSync` — is byte-for-byte unchanged;
+`invalidate()` is inserted only AFTER the `renameSync`, before `_appendLog`. No
+reference to `approvePlan` added (D2 structural gate-safety preserved: the module
+still imports only `movePlan` from actions + `listStaleCandidates` from inbox +
+the new zero-dep `cache`). No gate-marker, fail-closed, or refusal logic altered.
+`revertPlan` still routes through `movePlan` (which already invalidates) — left
+alone. Verified: `tests/stale-cleanup-human-gate.test.js` → 28/28 pass. A new
+negative test (`F2_refused_delete_does_not_clear_cache`) proves a REFUSED delete
+(throws before unlink) leaves the cache intact — post-write invalidate confirmed.
+
+**Tests added (tests/cache-freshness.test.js — new describe block, one per
+external path):** `F1_moveToReviewAfterPush_busts_plan_and_inbox_counts`,
+`F2a_archivePlan_busts_plan_counts`, `F2b_deletePlan_busts_plan_counts`,
+`F2_refused_delete_does_not_clear_cache` (gate-safety negative),
+`F3a_createStub_busts_plan_counts`, `F3b_removeStub_busts_plan_counts`,
+`F3c_mergeStubs_busts_plan_counts`, `F4a_createQuestion_busts_inbox_counts`,
+`F4b_createDecision_busts_inbox_counts`. Each populates the real count read
+(`getPlanCounts`/`getInboxCounts`) in an isolated `mkdtempSync` tmp project,
+performs the real external write, and asserts (a) `cache._debug().size === 0`
+immediately after AND (b) the next count read is disk-fresh (not the stale cached
+value). No always-green tests; F2a also asserts the gate marker is still stamped.
+
+**RED→GREEN proof:** with the 4 source fixes stashed, all 8 fix-path tests FAIL
+(F1, F2a, F2b, F3a, F3b, F3c, F4a, F4b) while the gate-safety negative
+(`F2_refused_delete_does_not_clear_cache`) PASSES (needs no fix). With fixes
+restored, `node --test tests/cache-freshness.test.js` → **tests 20, pass 20,
+fail 0, skipped 0**.
+
+**Verification tallies (2026-07-05):**
+- `node --test tests/cache-freshness.test.js` → tests 20, pass 20, fail 0, skipped 0.
+- `node --test tests/*.test.js` → **tests 2764, pass 2764, fail 0, skipped 0, todo 0**
+  (was 2755; +9 new external-path cases). `stale-cleanup-human-gate.test.js` 28/28;
+  `sync.test.js`+`inbox.test.js`+`inbox-stale-stream.test.js` 65/65.
+- `npx eslint . --max-warnings 0` → exit 0.
+- `npx tsc --noEmit` → 89 errors BOTH on the working tree AND on HEAD (identical
+  pre-existing checkJs baseline); this change introduces ZERO new tsc errors, and
+  none of the errors sit on an `invalidate()` line (project gate `npm run
+  typecheck` unchanged vs baseline).
+- Coverage on changed lines: inbox.js 100% line; stale-cleanup.js 99.42% (only
+  uncovered = `_stageFromPath` helper 121-122, not a changed line); every one of
+  the 8 `invalidate()` call-sites is directly exercised by a passing test (none
+  fall in an uncovered range) → 100% of the changed lines covered.
+
+**Decisions taken under ambiguity (this kickback):**
+- `removeStub` invalidate placed INSIDE the `existsSync` guard so a no-op remove
+  (file already gone) never clears the cache — matches the "only a successful
+  write busts" rule.
+- `mergeStubs` gets its own invalidate after the merged `writeFileSync` even
+  though the subsequent `removeStub` calls also invalidate — the write must bust
+  the cache regardless of whether any originals are removed.
+- `reconcilePlan` is covered transitively (it calls `_stampAndArchive`, which now
+  invalidates) — no separate call needed; F2a exercises the shared primitive.
+- Plan NOT moved between stages (stays in `todo/`); Gate 3 is human-only.
 
 ### Execution decisions (Steps 8-16, 2026-07-05)
 - **Line numbers verified fresh, differed from the blueprint.** Read the current

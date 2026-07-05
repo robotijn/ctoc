@@ -14,6 +14,8 @@ const { execSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
 const { getSetting } = require('./settings');
+// CF1: bust the in-process read cache on every count-mutating write.
+const { invalidate } = require('./cache');
 
 let syncInterval = null;
 let lastSync = null;
@@ -135,6 +137,9 @@ function moveToReviewAfterPush(planPath, projectPath = process.cwd()) {
   const newPath = path.join(reviewDir, fileName);
 
   safeFs.renameSync(planPath, newPath);
+  // CF1: a raw rename into review/ changes getPlanCounts().review +
+  // getInboxCounts().gatesWaiting; bust the cache AFTER the successful move.
+  invalidate();
 
   return { moved: true, newPath };
 }

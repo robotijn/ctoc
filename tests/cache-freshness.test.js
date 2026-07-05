@@ -25,6 +25,11 @@ const os = require('os');
 const cache = require('../src/lib/cache');
 const actions = require('../src/lib/actions');
 const { getPlanCounts, getVisionCounts } = require('../src/lib/state');
+const sync = require('../src/lib/sync');
+const staleCleanup = require('../src/lib/stale-cleanup');
+const visionDecomposer = require('../src/lib/vision-decomposer');
+const inbox = require('../src/lib/inbox');
+const { getInboxCounts } = inbox;
 
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
 
@@ -266,5 +271,198 @@ describe('CF1 — read cache is busted on every state write', () => {
       assert.equal(counts[stage], 0, `empty ${stage} count is 0`);
     }
     assert.ok(cache._debug().size > 0, 'empty read is still cached');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// CF1 KICKBACK — count-mutating writes OUTSIDE actions.js must also bust cache.
+//
+// The actions.js slice wires movePlan/deletePlan/queue-reorder/createCanvas.
+// But four other modules perform raw plan-file writes that bypass actions.js:
+//   - sync.moveToReviewAfterPush        (raw renameSync into review/)
+//   - stale-cleanup archivePlan/deletePlan (rename into done/ ; unlinkSync)
+//   - vision-decomposer createStub/removeStub/mergeStubs (functional/*.md writes)
+//   - inbox createQuestion/createDecision (.ctoc/inbox writes → getInboxCounts)
+// Each below is a per-path regression proving the external write busts the cache
+// (next count read is disk-fresh AND/OR the store is empty immediately after).
+// ───────────────────────────────────────────────────────────────────────────
+describe('CF1 KICKBACK — external (non-actions) writers bust the cache', () => {
+  let root;
+
+  beforeEach(() => {
+    root = createTempProject();
+    cache.invalidate();
+  });
+
+  afterEach(() => {
+    cleanup(root);
+    cache.invalidate();
+  });
+
+  // ── F1: sync.moveToReviewAfterPush (raw rename into review/) ──
+  it('F1_moveToReviewAfterPush_busts_plan_and_inbox_counts', () => {
+    // A todo plan (not a gate-source stage) so review/gatesWaiting both change.
+    const planPath = writePlan(root, 'todo', 'cf1-ext-push');
+
+    const beforePlan = getPlanCounts(root);
+    assert.equal(beforePlan.todo, 1, 'precondition: one plan in todo');
+    assert.equal(beforePlan.review, 0, 'precondition: none in review');
+    const beforeInbox = getInboxCounts(root);
+    assert.equal(beforeInbox.gatesWaiting, 0, 'precondition: none waiting at a gate');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    const res = sync.moveToReviewAfterPush(planPath, root);
+    assert.equal(res.moved, true, 'precondition: the plan was moved to review');
+
+    // Clear-all empties the store immediately after the successful rename.
+    assert.equal(cache._debug().size, 0, 'F1: cache cleared by the raw rename');
+
+    const afterPlan = getPlanCounts(root);
+    assert.equal(afterPlan.todo, 0, 'F1: todo recomputes to 0 (not stale 1)');
+    assert.equal(afterPlan.review, 1, 'F1: review recomputes to 1');
+    const afterInbox = getInboxCounts(root);
+    assert.equal(afterInbox.gatesWaiting, 1, 'F1: gatesWaiting recomputes to 1 (review is a gate source)');
+  });
+
+  // ── F2a: stale-cleanup archivePlan (stamp + rename into done/) ──
+  it('F2a_archivePlan_busts_plan_counts', () => {
+    // review/ is a valid gate-source/archivable stage; a fresh plan there.
+    const planPath = writePlan(root, 'review', 'cf1-ext-archive');
+
+    const before = getPlanCounts(root);
+    assert.equal(before.review, 1, 'precondition: one plan in review');
+    assert.equal(before.done, 0, 'precondition: none in done');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    const res = staleCleanup.archivePlan(planPath, root);
+    assert.equal(res.to, 'done', 'precondition: archived to done');
+
+    // Gate-safety (SP4): the stamp-before-rename ordering is untouched; the
+    // stamped marker must be present in the archived file.
+    const archived = fs.readFileSync(res.path, 'utf8');
+    assert.match(archived, /approved_by: human/, 'F2a: gate marker stamped (M5 ordering intact)');
+    assert.match(archived, /gate_crossed: stale-reconciliation/, 'F2a: reconciliation marker present');
+
+    assert.equal(cache._debug().size, 0, 'F2a: cache cleared by the archive rename');
+    const after = getPlanCounts(root);
+    assert.equal(after.review, 0, 'F2a: review recomputes to 0 (not stale 1)');
+    assert.equal(after.done, 1, 'F2a: done recomputes to 1');
+  });
+
+  // ── F2b: stale-cleanup deletePlan (unlinkSync) ──
+  it('F2b_deletePlan_busts_plan_counts', () => {
+    const planPath = writePlan(root, 'review', 'cf1-ext-delete');
+
+    const before = getPlanCounts(root);
+    assert.equal(before.review, 1, 'precondition: one plan in review');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    const res = staleCleanup.deletePlan(planPath, { explicitlyRejected: true });
+    assert.equal(res.action, 'delete', 'precondition: deleted');
+
+    assert.equal(cache._debug().size, 0, 'F2b: cache cleared by the unlink');
+    const after = getPlanCounts(root);
+    assert.equal(after.review, 0, 'F2b: review recomputes to 0 after delete (not stale 1)');
+  });
+
+  // ── F2 gate-safety negative: a REFUSED delete never clears the cache ──
+  it('F2_refused_delete_does_not_clear_cache', () => {
+    const planPath = writePlan(root, 'review', 'cf1-ext-refuse');
+    getPlanCounts(root); // populate
+    const sizeBefore = cache._debug().size;
+    assert.ok(sizeBefore > 0, 'precondition: cache populated');
+
+    // explicitlyRejected not set → deletePlan throws BEFORE any unlink.
+    assert.throws(
+      () => staleCleanup.deletePlan(planPath),
+      /refusing delete/,
+      'precondition: refused delete throws'
+    );
+
+    // A throwing write must NOT needlessly clear the cache (invalidate is post-write).
+    assert.equal(cache._debug().size, sizeBefore, 'F2: refused delete left the cache intact');
+    assert.ok(fs.existsSync(planPath), 'F2: the plan file was not removed');
+  });
+
+  // ── F3a: vision-decomposer createStub (new functional/*.md) ──
+  it('F3a_createStub_busts_plan_counts', () => {
+    const before = getPlanCounts(root);
+    assert.equal(before.functional, 0, 'precondition: no functional stubs');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    const visionPath = path.join(root, 'plans', 'vision', 'cf1-vis.md');
+    const stub = visionDecomposer.createStub(
+      'cf1-vis', { title: 'Goal Alpha', scope: 'scope' }, visionPath, root
+    );
+    assert.ok(fs.existsSync(stub.path), 'precondition: stub written');
+
+    assert.equal(cache._debug().size, 0, 'F3a: cache cleared by the stub write');
+    const after = getPlanCounts(root);
+    assert.equal(after.functional, 1, 'F3a: functional recomputes to 1 (not stale 0)');
+  });
+
+  // ── F3b: vision-decomposer removeStub (unlinkSync) ──
+  it('F3b_removeStub_busts_plan_counts', () => {
+    const visionPath = path.join(root, 'plans', 'vision', 'cf1-vis.md');
+    const stub = visionDecomposer.createStub(
+      'cf1-vis', { title: 'Goal Beta', scope: 'scope' }, visionPath, root
+    );
+    const before = getPlanCounts(root);
+    assert.equal(before.functional, 1, 'precondition: one functional stub');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    visionDecomposer.removeStub(stub.path);
+
+    assert.equal(cache._debug().size, 0, 'F3b: cache cleared by the stub unlink');
+    const after = getPlanCounts(root);
+    assert.equal(after.functional, 0, 'F3b: functional recomputes to 0 after removal (not stale 1)');
+  });
+
+  // ── F3c: vision-decomposer mergeStubs (new functional/*.md + removes originals) ──
+  it('F3c_mergeStubs_busts_plan_counts', () => {
+    const visionPath = path.join(root, 'plans', 'vision', 'cf1-vis.md');
+    const a = visionDecomposer.createStub('cf1-vis', { title: 'Goal A', scope: 'a' }, visionPath, root);
+    const b = visionDecomposer.createStub('cf1-vis', { title: 'Goal B', scope: 'b' }, visionPath, root);
+
+    const before = getPlanCounts(root);
+    assert.equal(before.functional, 2, 'precondition: two functional stubs');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    const merged = visionDecomposer.mergeStubs([a.path, b.path], 'Merged Goal', root);
+    assert.ok(fs.existsSync(merged.path), 'precondition: merged stub written');
+
+    assert.equal(cache._debug().size, 0, 'F3c: cache cleared by the merge write');
+    const after = getPlanCounts(root);
+    assert.equal(after.functional, 1, 'F3c: functional recomputes to 1 (2 originals removed, 1 merged)');
+  });
+
+  // ── F4a: inbox createQuestion (.ctoc/inbox/questions write) ──
+  it('F4a_createQuestion_busts_inbox_counts', () => {
+    const before = getInboxCounts(root);
+    assert.equal(before.questions, 0, 'precondition: no questions');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    inbox.createQuestion(
+      { source_plan: 'cf1', source_step: '10', question: 'q?', context: 'ctx' }, root
+    );
+
+    assert.equal(cache._debug().size, 0, 'F4a: cache cleared by the question write');
+    const after = getInboxCounts(root);
+    assert.equal(after.questions, 1, 'F4a: questions recomputes to 1 (not stale 0)');
+  });
+
+  // ── F4b: inbox createDecision (.ctoc/inbox/decisions write) ──
+  it('F4b_createDecision_busts_inbox_counts', () => {
+    const before = getInboxCounts(root);
+    assert.equal(before.decisions, 0, 'precondition: no decisions');
+    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
+
+    inbox.createDecision(
+      { plan: 'cf1', step: '10', ambiguity: 'x', choice: 'y', rationale: 'z' }, root
+    );
+
+    assert.equal(cache._debug().size, 0, 'F4b: cache cleared by the decision write');
+    const after = getInboxCounts(root);
+    assert.equal(after.decisions, 1, 'F4b: decisions recomputes to 1 (not stale 0)');
   });
 });

@@ -16,7 +16,9 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
-const { memoize } = require('./cache');
+// CF1: `invalidate` busts the read cache on every count-mutating write (reuses
+// the existing cache require — no new import needed).
+const { memoize, invalidate } = require('./cache');
 
 // SP1 cheap stale-plan scan. Imported as a NAMESPACE (not destructured) so the
 // call site is late-bound: SP2 tests rewire staleDetector.scanCheapCandidates on
@@ -88,6 +90,9 @@ ${opts.question || ''}
 ${opts.context || ''}
 `;
   safeFs.writeFileSync(filePath, content);
+  // CF1: a new question file changes getInboxCounts().questions — bust the read
+  // cache AFTER the successful write.
+  invalidate();
   return { id, path: filePath };
 }
 
@@ -126,6 +131,9 @@ ${opts.choice || ''}
 ${opts.rationale || ''}
 `;
   safeFs.writeFileSync(filePath, content);
+  // CF1: a new decision file changes getInboxCounts().decisions — bust the read
+  // cache AFTER the successful write.
+  invalidate();
   return { id, path: filePath };
 }
 
