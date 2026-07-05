@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-05T17:49:12.584Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "CF1 — Invalidate the read cache on every state write (always read fresh)"
 type: functional
 status: functional
@@ -8,6 +14,7 @@ priority: HIGH
 depends_on: []
 files:
   - src/lib/actions.js
+  - agents/_shared/ancestry-read.md
   - tests/cache-freshness.test.js
 ---
 
@@ -100,14 +107,16 @@ numbers served from memory.
   `movePlan` write path + any other plan/state file writer) in `src/lib/actions.js`.
 - A `tests/cache-freshness.test.js` proving move → fresh recompute (the stale-read
   regression guard).
+- **Strengthen `agents/_shared/ancestry-read.md`** (prong 2 of the directive): add
+  a binding mandate that every agent READ the actual current target files (code +
+  full plan ancestry) FRESH before acting and TRUST THE CODE over any brief's
+  quotes/summary/recollection — reporting discrepancies. This is the
+  agent-definition-level enforcement of "never act from memory."
 
 ### Out of Scope
 
 - Removing/replacing the cache (keep the perf; approach A).
 - The interactive TUI render loop itself (the invalidate-on-write fix covers it).
-- Agent-read-fresh behavior (a behavioral rule, not this code fix — see the
-  `feedback_always_read_files_fresh` memory + the `agents/_shared/ancestry-read`
-  strengthening, tracked separately).
 
 ## Notes
 
