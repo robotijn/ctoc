@@ -516,5 +516,19 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-05T18:04:48.171Z",
+    "plan": "CF1-invalidate-read-cache-on-write.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
