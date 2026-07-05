@@ -11,6 +11,7 @@ const { writeStatus, clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
 const { validateForReview } = require('./plan-validator');
 const { logTransition } = require('./transition-log');
+const { invalidate } = require('./cache');
 
 /**
  * Background Agent Types
@@ -42,7 +43,10 @@ function initBackgroundAgent(planPath, agentType, message) {
   });
 }
 
-// Move plan to new location
+// Move plan to new location.
+// PRIMARY cache choke point: every stage transition flows through here
+// (approve/reject/start/complete/queue-removal/cleanup), so invalidating the
+// read cache at the end busts stale counts for all of them (CF1).
 function movePlan(planPath, destination, projectPath) {
   const root = projectPath || findProjectRoot();
   const plansDir = path.join(root, 'plans');
@@ -56,6 +60,7 @@ function movePlan(planPath, destination, projectPath) {
   const newPath = path.join(destDir, fileName);
 
   safeFs.renameSync(planPath, newPath);
+  invalidate(); // CF1: bust cached counts so the next read reflects the move
   return newPath;
 }
 
@@ -288,6 +293,7 @@ function renamePlan(planPath, newName) {
 // Delete a plan
 function deletePlan(planPath) {
   safeFs.unlinkSync(planPath);
+  invalidate(); // CF1: removing a plan file changes counts; bust the cache
 }
 
 // Move plan up in queue
@@ -316,6 +322,7 @@ function moveUpInQueue(planPath, projectPath) {
   // Touch previous plan to be now
   safeFs.utimesSync(prevPlan.path, now, now);
 
+  invalidate(); // CF1: FIFO reorder is a write; bust the cache for the "every write busts" invariant
   return true;
 }
 
@@ -344,6 +351,7 @@ function moveDownInQueue(planPath, projectPath) {
   // Touch current plan to be now
   safeFs.utimesSync(planPath, now, now);
 
+  invalidate(); // CF1: FIFO reorder is a write; bust the cache for the "every write busts" invariant
   return true;
 }
 
@@ -679,6 +687,7 @@ function createCanvas(visionSlug, canvasType, projectPath, options = {}) {
     .replace(/\{\{VISION_SLUG\}\}/g, visionSlug);
 
   safeFs.writeFileSync(filePath, template);
+  invalidate(); // CF1: a new canvas file changes getPlanCounts().canvas; bust the cache
 
   return {
     name: visionSlug,
