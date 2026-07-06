@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-06T08:04:11.838Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-05T18:04:48.169Z
@@ -87,29 +93,29 @@ numbers served from memory.
 
 ### BDD Scenarios
 
-- [ ] **Scenario: a plan move busts the cached counts**
+- [x] **Scenario: a plan move busts the cached counts**
   Given `getPlanCounts` has been called (populating the cache) for a project
   When a plan is moved between stages (e.g. `movePlan` / `approvePlan`)
   And `getPlanCounts` is called again within the TTL window
   Then it returns counts reflecting the MOVE (recomputed from disk), not the
   stale cached value
 
-- [ ] **Scenario: every mutating op invalidates**
+- [x] **Scenario: every mutating op invalidates**
   Given the read cache is populated
   When any of approvePlan / movePlan / startExecution / completeExecution runs
   Then the cache is invalidated (the next count read recomputes from disk)
 
-- [ ] **Scenario: read-only navigation still benefits from the cache**
+- [x] **Scenario: read-only navigation still benefits from the cache**
   Given no write occurs
   When the dashboard render calls the memoized counts multiple times within TTL
   Then the cache still serves the repeated in-render reads (perf preserved)
 
-- [ ] **Scenario: vision counts also fresh**
+- [x] **Scenario: vision counts also fresh**
   Given getVisionCounts is cached
   When a vision-stage plan moves
   Then the next getVisionCounts recomputes
 
-- [ ] **Scenario: behavior unchanged elsewhere**
+- [x] **Scenario: behavior unchanged elsewhere**
   Given the full suite
   Then it stays green (this is a correctness wire-up, no feature change)
 
@@ -344,85 +350,85 @@ tmp roots with a real `plans/<stage>/` layout; call the real `actions` API and
 `state` reads with an explicit `projectPath` (all count fns accept it). Use
 `cache._debug()` and `cache.invalidate()` from `../src/lib/cache`. Named tests
 mapping every BDD AC:
-- [ ] `AC1_move_busts_plan_counts` — call `getPlanCounts(root)` (populate); move a
+- [x] `AC1_move_busts_plan_counts` — call `getPlanCounts(root)` (populate); move a
       plan `todo`→`in-progress` via `actions.movePlan(...)` (or `startExecution`);
       call `getPlanCounts(root)` again WITHIN TTL; assert `todo`/`inProgress`
       counts reflect the move. **FAILS before the fix (returns stale cached
       counts), passes after.** This is the stale-read regression guard.
-- [ ] `AC2_every_mutating_op_invalidates` — parametrized over
+- [x] `AC2_every_mutating_op_invalidates` — parametrized over
       `approvePlan` (functional→implementation), `startExecution`,
       `completeExecution` (with a plan that passes `validateForReview`, or
       `force:true`): each leaves the next `getPlanCounts` fresh. Assert via
       `cache._debug().size === 0` immediately after the op (clear-all empties the
       store) AND a fresh count read reflects disk.
-- [ ] `AC3_readonly_preserves_cache` — populate via `getPlanCounts(root)`; call it
+- [x] `AC3_readonly_preserves_cache` — populate via `getPlanCounts(root)`; call it
       again WITHIN TTL with NO write between; assert the underlying impl is NOT
       recomputed. Verify by asserting `cache._debug().size` is unchanged and the
       cached entry key `getPlanCounts::<root>` is still present between the two
       reads (perf preserved). (Counter-spy alternative: wrap via a call count on a
       temp memoized fn to prove no recompute.)
-- [ ] `AC4_vision_counts_fresh` — call `getVisionCounts(root)` (populate);
+- [x] `AC4_vision_counts_fresh` — call `getVisionCounts(root)` (populate);
       change vision state on disk (add/move a `plans/vision/*.md` or flip a
       `- Status:` line) through the real write path (`movePlan` from vision, or a
       direct vision write that must be a wired choke point); call
       `getVisionCounts(root)` again WITHIN TTL; assert it recomputes.
-- [ ] `AC5_suite_stays_green` — implicit: whole run `node --test tests/*.test.js`
+- [x] `AC5_suite_stays_green` — implicit: whole run `node --test tests/*.test.js`
       shows `# fail 0` (asserted at Step 14, not a standalone case).
 Each test has ≥1 meaningful assertion; error/edge paths (empty stage dir → 0
 counts) included; no order dependence (fresh `mkdtempSync` per test); no mocked
 core logic.
 
 ### Step 9: PREPARE
-- [ ] No new dependencies (pure `node:` builtins + existing `safe-fs`).
-- [ ] Confirm `src/lib/cache.js` exports `invalidate` and `_debug` (it does).
-- [ ] Confirm all three count fns accept an explicit `projectPath`/`root` arg (they
+- [x] No new dependencies (pure `node:` builtins + existing `safe-fs`).
+- [x] Confirm `src/lib/cache.js` exports `invalidate` and `_debug` (it does).
+- [x] Confirm all three count fns accept an explicit `projectPath`/`root` arg (they
       do) so tests can use isolated tmp roots.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/actions.js`: add `const { invalidate } = require('./cache');` to the
+- [x] `src/lib/actions.js`: add `const { invalidate } = require('./cache');` to the
       import block (top, near the other `require('./...')` lines).
-- [ ] `movePlan` (`:46`): add `invalidate();` after `safeFs.renameSync(...)` and
+- [x] `movePlan` (`:46`): add `invalidate();` after `safeFs.renameSync(...)` and
       before `return newPath;`.
-- [ ] `createCanvas` (`:630`): add `invalidate();` after the final
+- [x] `createCanvas` (`:630`): add `invalidate();` after the final
       `safeFs.writeFileSync(filePath, template);` and before `return { ... }`.
-- [ ] `deletePlan` (`:289`): add `invalidate();` after `safeFs.unlinkSync(planPath);`.
-- [ ] `moveUpInQueue` (`:294`) and `moveDownInQueue` (`:323`): add `invalidate();`
+- [x] `deletePlan` (`:289`): add `invalidate();` after `safeFs.unlinkSync(planPath);`.
+- [x] `moveUpInQueue` (`:294`) and `moveDownInQueue` (`:323`): add `invalidate();`
       before `return true;`.
-- [ ] Do NOT add invalidate to `approvePlan`/`rejectPlan`/`completeExecution`/
+- [x] Do NOT add invalidate to `approvePlan`/`rejectPlan`/`completeExecution`/
       `applyIronLoop` marker writes — each is followed by `movePlan`, which busts
       the cache (documented above; avoids redundant calls).
-- [ ] All fs stays via `safeFs` (unchanged). No `new RegExp` on non-literals
+- [x] All fs stays via `safeFs` (unchanged). No `new RegExp` on non-literals
       introduced. Cross-platform (`path.join`, no separators) preserved.
 
 ### Step 11: REVIEW
-- [ ] Self-review: every count-changing writer either calls `invalidate()` or is
+- [x] Self-review: every count-changing writer either calls `invalidate()` or is
       move-followed. No writer that changes `getPlanCounts`/`getVisionCounts`/
       `getInboxCounts` output is missed. Import added once. No behavior change
       beyond freshness.
 
 ### Step 12: OPTIMIZE
-- [ ] Confirm clear-all is the minimal correct wiring (no redundant invalidate on
+- [x] Confirm clear-all is the minimal correct wiring (no redundant invalidate on
       move-followed writers). No hot-loop invalidation added (writes are rare).
 
 ### Step 13: SECURE
-- [ ] No new input surface, no path handling change, no regex on untrusted input,
+- [x] No new input surface, no path handling change, no regex on untrusted input,
       no secrets. `invalidate()` is a local `Map.clear()` — no injection vector.
       Confirm no `new RegExp`/dynamic regex introduced.
 
 ### Step 14: VERIFY
-- [ ] Run `node --test tests/cache-freshness.test.js` — new tests pass.
-- [ ] Run the full suite `node --test tests/*.test.js` — `# fail 0`, including the
+- [x] Run `node --test tests/cache-freshness.test.js` — new tests pass.
+- [x] Run the full suite `node --test tests/*.test.js` — `# fail 0`, including the
       unchanged `tests/cache.test.js` and `tests/agent-modernization.test.js`
       (ancestry-read.md append keeps them green).
-- [ ] Lint / typecheck as configured. Coverage on `actions.js` new lines ≥ 80%
+- [x] Lint / typecheck as configured. Coverage on `actions.js` new lines ≥ 80%
       (each choke point exercised by AC1/AC2/AC4 + a create/delete case).
 
 ### Step 15: DOCUMENT
-- [ ] Update `agents/_shared/ancestry-read.md` with the Prong-2 append block above.
-- [ ] Brief JSDoc note on `movePlan` that it busts the read cache (one line).
+- [x] Update `agents/_shared/ancestry-read.md` with the Prong-2 append block above.
+- [x] Brief JSDoc note on `movePlan` that it busts the read cache (one line).
 
 ### Step 16: FINAL-REVIEW
-- [ ] Confirm invariant holds, suite green, ancestry-read strengthened, no scope
+- [x] Confirm invariant holds, suite green, ancestry-read strengthened, no scope
       creep beyond the `files:` list (`src/lib/actions.js`,
       `agents/_shared/ancestry-read.md`, `tests/cache-freshness.test.js`).
 
