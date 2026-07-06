@@ -108,12 +108,17 @@ When a background task fires its task-notification:
 ### ON-OPEN RECONCILE (NB4)
 
 On menu open (a NAV render), the dashboard reconciles the task registry against the
-live harness **`TaskList`** before rendering. The main loop SHOULD pass the live
-harness agent-id list into the render as `liveAgentIds` so a `running` task with a
-matching live agent is left alone and one with no matching live agent is marked
-`orphaned` precisely; absent that list (the `menu.js` child process cannot read the
-Task tool), a **staleness threshold backstops** — a long-`running` task with no
-confirmable live agent is orphaned. An `orphaned` task no longer counts toward the ≤5
+live harness **`TaskList`** before rendering. When the Task tool is available, the
+main loop **MUST** pass the live harness agent-id list into the render as
+`liveAgentIds` so a `running` task with a matching live agent is left alone and one
+with no matching live agent is marked `orphaned` precisely. This is load-bearing: it
+is the only thing that prevents a legitimately long-running background agent (e.g. an
+`implement` task running past the staleness threshold) from being falsely orphaned
+and offered for a duplicate re-run. Only when that list genuinely cannot be obtained
+(the `menu.js` child process running with no Task-tool access, or a true session
+restart where the harness reports no agents) does the **staleness threshold
+backstop** — a long-`running` task with no confirmable live agent is orphaned, which
+is exactly correct in the restart case where the agent really is gone. An `orphaned` task no longer counts toward the ≤5
 concurrency limit and is **offered for re-run through the scheduler**
 (`canRun`/`nextRunnable`), never a direct launch. A **`failed`** task always surfaces
 in the task plane / inbox (never silently lost). Reconciliation is fully fail-open: a
