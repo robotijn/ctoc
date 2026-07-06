@@ -544,5 +544,33 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-06T08:30:47.679Z",
+    "plan": "test-suite-hardening.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-06T08:30:47.681Z",
+    "plan": "test-suite-hardening-r2.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
