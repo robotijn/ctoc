@@ -600,5 +600,19 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-06T12:24:27.991Z",
+    "plan": "NB4-reconciliation-and-resilience.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
