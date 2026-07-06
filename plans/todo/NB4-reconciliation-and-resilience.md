@@ -586,50 +586,79 @@ and the save-failure catch each exercised).
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — MODULE_NOT_FOUND (0 pass / 1 fail) before impl
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (pure JS, reuses task-registry + safe-fs)
+- [x] Check prerequisites — task-registry exports load/save/nextRunnable/canRun/registryPath/MAX_CONCURRENT; safe-fs has readdirSync/lstatSync/unlinkSync/utimesSync
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — tmp fixtures create .ctoc/state per-test
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — reconcile/reconcileState/sweepTempArtifacts
+- [x] Add error handling — total fail-open; save-failure caught; sweep best-effort
+- [x] Wire up integration points — menu-screens buildDashboardTable reconcile call + orphan surfacing; menu.md ON-OPEN RECONCILE protocol note
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — pure reconcile has no I/O; orphaned excluded from concurrency via reused status filter (zero NB1 change); consumer touch minimal
+- [x] Verify integration points work together — end-to-end smoke: stale running → orphaned on dashboard open, slot freed, re-run line rendered
+- [x] Check error handling completeness — corrupt/save-fail/sweep-fail all covered by tests
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single pass over tasks; liveAgentIds normalized to a Set once
+- [x] Optimize critical paths — reconcileState loads once, saves only on change (orphaned/swept non-empty)
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — temp sweep bounded to .ctoc/state + literal `tasks.json.tmp-` prefix; canonical tasks.json unreachable
+- [x] Sanitize outputs — no dynamic RegExp (literal startsWith)
+- [x] No secrets in code
+- [x] Safe file operations — all fs via safe-fs; no registry-input spread; corrupt input fails open not crash
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint . --max-warnings 0 exit 0; tsc 89 errors == baseline (0 new)
+- [x] Run ALL tests (TDD Green) — task-reconcile 16/16 pass; full suite 2784 pass / 0 fail
+- [x] Check coverage >= 80% — task-reconcile.js 96.47% lines / 83.13% branches / 100% funcs
+- [x] 0 skipped, 0 flaky tests — full suite 0 skipped / 0 cancelled / 0 todo
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — menu.md ON-OPEN RECONCILE note; README module count 112→113
+- [x] Add JSDoc comments to new functions — module header + JSDoc on all 3 exports + ReconcileReport typedef
+- [x] Update CHANGELOG if needed — n/a (versioned at release)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — end-to-end dashboard smoke test passed
+- [ ] Ready for human review — Gate 3 (human approves) — NOT crossed by executor
+
+## Decisions Taken Under Ambiguity (Execution, Steps 8–16)
+
+- **D-NB4-6 (13→16 named tests):** the SPEC listed 13 tests; implemented 16 named
+  `it`s — all 13 plus 3 defensive extras (`freshly-orphaned task is not swept the same
+  pass`, `sweepTempArtifacts on an absent state dir returns [] and never throws`,
+  `reconcileState-corrupt-registry-fails-open`). Superset of the contract, every test
+  a meaningful assertion, no always-green.
+- **D-NB4-7 (menu-screens liveAgentIds = null at pure-script time):** the `menu.js`
+  child process has no access to the harness Task tool, so the consumer passes
+  `liveAgentIds: null` → the staleness backstop governs on-open reconciliation. This is
+  the correct, safe conservative path (per the plan's CONSUMER note and D-NB4-4); the
+  precise-liveAgentIds transport remains the menu.md protocol hand-off for the main loop.
+- **D-NB4-8 (CF1 completeness-guard: whitelist, not cache.invalidate):** the CF1 guard
+  flagged task-reconcile.js as a mutating fs writer. Per the plan's verified analysis,
+  it writes ONLY `.ctoc/state/tasks.json` (via task-registry.save) + unlinks
+  `.ctoc/state/tasks.json.tmp-*` — a non-counted state file (getPlanCounts/getVisionCounts/
+  getInboxCounts never read it). The correct resolution is a justified WHITELIST entry
+  in cache-freshness.test.js (adjacent to task-registry.js's), NOT a cache.invalidate()
+  call — adding invalidate would be a false wiring on a path no memoized counter reads.
+- **D-NB4-9 (report typedef for tsc baseline-neutrality):** `reconcileState` adds
+  `saveFailed`/`tempSwept` to the report object, which tsc rejected against the shape
+  inferred from `reconcile`. Resolved by an explicit `@typedef ReconcileReport` (with
+  those fields optional) annotating both call sites — keeps tsc at the 89 baseline with
+  zero new errors, no `@ts-ignore`, no baseline bump.
+- **D-NB4-10 (readme module-count bump 112→113):** adding src/lib/task-reconcile.js
+  raised the top-level src/lib module count. Bumped the two readme-numbers.test.js
+  assertions (112→113) and the README project-structure line to match (LH1-style drift),
+  confirmed readme-numbers.test.js green.

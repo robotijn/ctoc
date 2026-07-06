@@ -565,6 +565,11 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // Writes .ctoc/.../task-registry + log JSON via atomic temp-then-rename — a
     // registry/log, not a plan/vision/inbox *.md.
     ['task-registry.js', 'writes .ctoc/ task-registry + log JSON (atomic temp+rename), not a counted file'],
+    // NB4: reconcileState persists the reconciled registry via task-registry.save
+    // (.ctoc/state/tasks.json) and unlinks orphaned .ctoc/state/tasks.json.tmp-*
+    // artifacts — same non-counted state file as task-registry.js. getPlanCounts /
+    // getVisionCounts / getInboxCounts never read tasks.json, so no cache to bust.
+    ['task-reconcile.js', 'writes/unlinks .ctoc/state/tasks.json(+.tmp-*) via task-registry.save, not a plan/vision/inbox file'],
     // Writes .ctoc/traceability/matrix.yaml — a traceability artifact, not counted.
     ['traceability-matrix.js', 'writes .ctoc/traceability/matrix.yaml, not a plan/vision/inbox file'],
     // Writes .ctoc/audit/dispatches/*.yaml + .ctoc/agents/dispatch-grades.yaml —
