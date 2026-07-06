@@ -23,6 +23,8 @@ priority: MEDIUM
 depends_on: [NB1, NB2]
 files:
   - "src/lib/task-reconcile.js"
+  - "src/lib/menu-screens.js"
+  - "src/commands/menu.md"
   - "tests/task-reconcile.test.js"
 ---
 
