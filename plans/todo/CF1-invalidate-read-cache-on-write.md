@@ -550,6 +550,75 @@ fail 0, skipped 0**.
   invalidates) — no separate call needed; F2a exercises the shared primitive.
 - Plan NOT moved between stages (stays in `todo/`); Gate 3 is human-only.
 
+### CF1 COMPLETENESS GUARD — self-enforcing drift-catcher (2026-07-06)
+
+**Why added:** the per-path behavioral tests (F1–F4b) pin the writers that exist
+TODAY, but nothing stopped a FUTURE `src/lib` writer from mutating a count-relevant
+file and forgetting `cache.invalidate()` — the exact drift the CF1 pre-ship review
+caught (four modules bypassing `actions.movePlan`). Added ONE self-enforcing guard
+`describe` block (`CF1 completeness — every count-mutating writer invalidates`) to
+`tests/cache-freshness.test.js` (already in CF1 `files:`) that pins the RULE, so a
+new un-wired writer FAILS CI. No `src/` touched.
+
+**Ground truth (read fresh from src/lib on 2026-07-06):** the three memoized reads
+count `getPlanCounts` → `plans/{canvas,functional,implementation,review,todo,
+in-progress,done}/*.md`; `getVisionCounts` → `plans/vision/*.md`; `getInboxCounts`
+→ `.ctoc/inbox/{questions,decisions}/*.md` + `plans/{functional,implementation,
+review}`.
+
+**Detection heuristic (broad, low-false-negative by design):** a `src/lib/*.js`
+file is a candidate count-mutating writer iff it (a) contains a mutating fs op
+`(safeFs|fs).(renameSync|unlinkSync|writeFileSync|appendFileSync|cpSync|rmSync)(`
+AND (b) references a count-relevant path token (`\bplans\b`/`getPlansDir`/stage
+literals/`\binbox\b`/`QUESTIONS_DIR`/`DECISIONS_DIR`/…). Broad whole-file matching
+(not per-write-site) is deliberate: a future writer that builds its plan path
+inline is still caught. **Safe predicate:** imports+uses `invalidate` from
+`./cache`, OR uses `movePlan` (which itself invalidates). All regexes are LITERAL
+(no `new RegExp` on non-literals) so the test lints clean.
+
+**WHITELIST (file → reason — the honest residue, verified against each file's
+actual write targets; MINIMAL — no real count writer is exempted):**
+- `safe-fs.js` — the fs wrapper; writes only what callers pass, owns no count path.
+- `state.js` — writes `.ctoc/state/agent.json` + `.ctoc/settings.json` only (reads
+  counts, never writes a plan/vision/inbox file).
+- `init-project.js` — one-time scaffold (CLAUDE.md/.ctoc/settings/.gitignore) before
+  any cache exists.
+- `iron-loop.js` — edits a plan body IN PLACE (appends step sections); never
+  creates/deletes/moves a plan file → counts invariant.
+- `background.js` — `.ctoc/` bg-status sidecar JSON, not a counted `*.md`.
+- `config-baseline.js` — `.ctoc/baselines/<ver>/manifest.yaml`.
+- `legal-hold.js` — `.ctoc/legal-hold/<id>.yaml`.
+- `product-loop.js` — `.ctoc/templates/product-kpis.yaml`.
+- `refinement-loop.js` — `.ctoc/loops/<slug>/{journal,letters}`.
+- `sections.js` — `.ctoc/state/dashboard-prefs.json`.
+- `task-registry.js` — `.ctoc/` task-registry + log JSON (atomic temp+rename).
+- `traceability-matrix.js` — `.ctoc/traceability/matrix.yaml`.
+- `v8-dispatcher.js` — `.ctoc/audit/dispatches/*.yaml` + `dispatch-grades.yaml`.
+
+A `whitelist is minimal` honesty test asserts every entry is a REAL, currently
+broad-flagged, non-busting file — so a whitelist entry cannot silently mask a real
+writer or rot into dead weight. (This check already earned its keep: it rejected an
+initial `cmd-ide.js` entry that the final tightened regex does not flag.)
+
+**Self-test (proves non-vacuous — the LH1 safe-fs-blindspot pattern):** a synthetic
+source that `writeFileSync`s a `plans/todo/*.md` WITHOUT importing invalidate is run
+through the predicates and asserted to be FLAGGED (detected ∧ ¬busts); the wired
+variant (adds the import + `invalidate()`) is asserted NOT flagged. Additionally
+verified end-to-end: planting a real `src/lib/_cf1_planted_drift.js` un-wired writer
+makes the guard FAIL naming the file with an actionable fix message; removed after.
+
+**Regression pin:** the 5 known writers (`actions`/`sync`/`stale-cleanup`/
+`vision-decomposer`/`inbox`) are asserted detected AND safe AND not-whitelisted.
+
+**Verification tallies (2026-07-06):**
+- `node --test tests/cache-freshness.test.js` → tests 24, pass 24, fail 0, skipped 0
+  (was 20; +4: self-test, 5-writer pin, the guard, whitelist-honesty).
+- planted-drift proof: guard FAILS naming `_cf1_planted_drift.js`; passes after removal.
+- `node --test tests/*.test.js` → tests 2768, pass 2768, fail 0, skipped 0, todo 0
+  (was 2764; +4).
+- `npx eslint . --max-warnings 0` → exit 0.
+- Plan NOT moved (stays in `todo/`); Gate 3 is human-only.
+
 ### Execution decisions (Steps 8-16, 2026-07-05)
 - **Line numbers verified fresh, differed from the blueprint.** Read the current
   `actions.js`; the real `invalidate()` call-sites are: `movePlan` line **63**

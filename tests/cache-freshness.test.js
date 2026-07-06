@@ -466,3 +466,228 @@ describe('CF1 KICKBACK — external (non-actions) writers bust the cache', () =>
     assert.equal(after.decisions, 1, 'F4b: decisions recomputes to 1 (not stale 0)');
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// CF1 COMPLETENESS GUARD — self-enforcing: a FUTURE src/lib writer that mutates
+// a count-relevant file but forgets cache.invalidate() FAILS CI here.
+//
+// This is the drift-catcher for the exact failure the CF1 pre-ship review found:
+// the actions.js slice invalidated, but four other modules performed raw
+// plan/inbox writes that bypassed it and left stale counts. Behavioral per-path
+// tests (above) pin the writers that exist TODAY; this guard pins the RULE, so
+// a writer added TOMORROW cannot silently reintroduce the bug.
+//
+// The three memoized count reads (verified fresh from src/lib on 2026-07-06):
+//   getPlanCounts   (state.js)  → counts *.md in plans/{canvas,functional,
+//                                  implementation,review,todo,in-progress,done}
+//   getVisionCounts (state.js)  → counts/parses plans/vision/*.md
+//   getInboxCounts  (inbox.js)  → counts .ctoc/inbox/{questions,decisions}/*.md
+//                                  + plans/{functional,implementation,review}
+// A file that performs a MUTATING fs op on any of those paths MUST bust the
+// cache — by importing `invalidate` from ./cache, OR by routing its write
+// through actions.movePlan (which already invalidates).
+//
+// Detection is deliberately BROAD (whole-file: a mutating fs call AND any
+// count-relevant path token) to MINIMIZE FALSE NEGATIVES — a future writer that
+// builds its plan path inline (not via a nicely-named variable) is still caught.
+// The residue of broad-flagged files that write genuinely non-count paths is
+// handled by an explicit, DOCUMENTED whitelist below (never by loosening the
+// detector) so the guard stays honest, not a rubber stamp.
+// ───────────────────────────────────────────────────────────────────────────
+describe('CF1 completeness — every count-mutating writer invalidates', () => {
+  const libDir = path.join(__dirname, '..', 'src', 'lib');
+
+  // A mutating filesystem op on the safe-fs wrapper (or raw fs). Literal regex
+  // (no `new RegExp` on a non-literal) so the test lints clean.
+  const MUTATING_FS = /(?:safeFs|fs)\.(?:renameSync|unlinkSync|writeFileSync|appendFileSync|cpSync|rmSync)\(/;
+
+  // A count-relevant path token: the write MIGHT target a plan-stage, vision, or
+  // inbox file that one of the three memoized reads counts. Broad by design.
+  const COUNT_RELEVANT_PATH =
+    /\bplans\b|getPlansDir|getPlanDir|['"]vision['"]|['"]canvas['"]|['"]functional['"]|['"]todo['"]|['"]review['"]|['"]done['"]|['"]in-progress['"]|\binbox\b|QUESTIONS_DIR|DECISIONS_DIR|getQuestionsDir|getDecisionsDir/;
+
+  // "Safe" = the writer busts the cache: imports invalidate from ./cache, OR
+  // imports/uses movePlan from ./actions (movePlan itself invalidates).
+  const IMPORTS_INVALIDATE = /require\(['"]\.\/cache['"]\)/;
+  const USES_INVALIDATE = /\binvalidate\b/;
+  const USES_MOVEPLAN = /\bmovePlan\b/;
+
+  /**
+   * Detection predicate: does this source perform a count-mutating write?
+   * (broad: a mutating fs op AND a count-relevant path token co-occur)
+   */
+  function isCountMutatingWriter(src) {
+    return MUTATING_FS.test(src) && COUNT_RELEVANT_PATH.test(src);
+  }
+
+  /**
+   * Safety predicate: does this source bust the read cache?
+   * Safe iff it imports+uses invalidate from ./cache, OR uses movePlan.
+   */
+  function bustsCache(src) {
+    const invalidateWired = IMPORTS_INVALIDATE.test(src) && USES_INVALIDATE.test(src);
+    return invalidateWired || USES_MOVEPLAN.test(src);
+  }
+
+  // ── WHITELIST — broad-flagged files that write a GENUINELY non-count path. ──
+  // Each entry is justified from reading the file's ACTUAL write targets fresh
+  // (2026-07-06). Keep MINIMAL: never whitelist a real count writer to go green.
+  const WHITELIST = new Map([
+    // The fs wrapper itself — owns NO count path; it writes whatever a caller
+    // passes. Detecting it would be detecting the primitive, not a count writer.
+    ['safe-fs.js', 'the safeFs wrapper — writes only what callers pass; owns no count path of its own'],
+    // Reads plan counts but its WRITES target .ctoc/state/agent.json and
+    // .ctoc/settings.json — neither is counted by any memoized read.
+    ['state.js', 'writes .ctoc/state/agent.json + .ctoc/settings.json only; reads counts but never writes a plan/vision/inbox file'],
+    // One-time scaffold (CLAUDE.md, .ctoc/settings, .ctoc/state, .gitignore)
+    // that runs BEFORE any cache exists — nothing to invalidate.
+    ['init-project.js', 'one-time project scaffold before any cache exists; writes CLAUDE.md/.ctoc/settings/.gitignore, no plan/vision/inbox file'],
+    // Edits a plan file IN PLACE (appends "## Execution Plan"/"## Deferred
+    // Questions" to an existing plan). Never creates/deletes/moves a plan file,
+    // so the plan-stage counts are invariant — an in-place body edit changes
+    // content, not the count.
+    ['iron-loop.js', 'edits an existing plan body in place (appends step sections); never creates/deletes/moves a plan file, so counts are invariant'],
+    // Writes bg-status sidecar JSON in .ctoc/ keyed by plan path — not a *.md in
+    // a stage dir; getPlanCounts/getInboxCounts do not count status sidecars.
+    ['background.js', 'writes .ctoc/ background-status sidecar JSON, not a counted *.md plan file'],
+    // Writes .ctoc/baselines/<version>/manifest.yaml — a release baseline, not a
+    // plan/vision/inbox file.
+    ['config-baseline.js', 'writes .ctoc/baselines/<version>/manifest.yaml (release baseline), not a counted file'],
+    // Writes .ctoc/.../holds/<id>.yaml legal-hold records — not counted.
+    ['legal-hold.js', 'writes .ctoc/legal-hold/<id>.yaml records, not a plan/vision/inbox file'],
+    // Writes .ctoc/templates/product-kpis.yaml (KPI library) — not counted.
+    ['product-loop.js', 'writes .ctoc/templates/product-kpis.yaml (KPI library), not a counted file'],
+    // Writes .ctoc/loops/<slug>/journal + letters — refinement artifacts, not
+    // plan/vision/inbox files.
+    ['refinement-loop.js', 'writes .ctoc/loops/<slug>/{journal,letters} refinement artifacts, not a counted file'],
+    // Writes .ctoc/state/dashboard-prefs.json — UI prefs, not counted.
+    ['sections.js', 'writes .ctoc/state/dashboard-prefs.json (UI prefs), not a counted file'],
+    // Writes .ctoc/.../task-registry + log JSON via atomic temp-then-rename — a
+    // registry/log, not a plan/vision/inbox *.md.
+    ['task-registry.js', 'writes .ctoc/ task-registry + log JSON (atomic temp+rename), not a counted file'],
+    // Writes .ctoc/traceability/matrix.yaml — a traceability artifact, not counted.
+    ['traceability-matrix.js', 'writes .ctoc/traceability/matrix.yaml, not a plan/vision/inbox file'],
+    // Writes .ctoc/audit/dispatches/*.yaml + .ctoc/agents/dispatch-grades.yaml —
+    // audit trail, not counted.
+    ['v8-dispatcher.js', 'writes .ctoc/audit/dispatches/*.yaml + dispatch-grades.yaml (audit trail), not a counted file'],
+  ]);
+
+  // The known count-mutating writers already wired (CF1 + its kickback). These
+  // are the regression pins: they MUST be detected AND MUST pass the safety
+  // predicate. If a refactor drops the wiring from any of these, this fails.
+  const KNOWN_WIRED_WRITERS = ['actions.js', 'sync.js', 'stale-cleanup.js', 'vision-decomposer.js', 'inbox.js'];
+
+  // Enumerate real src/lib source files fresh from disk.
+  function libFiles() {
+    return fs.readdirSync(libDir).filter(f => f.endsWith('.js'));
+  }
+
+  // ── SELF-TEST: the guard must FLAG a planted un-wired writer (proves the ──
+  // ── predicates are not vacuously green — the LH1 safe-fs-blindspot pattern). ─
+  it('self-test: detection+safety FLAG a planted un-wired plan writer', () => {
+    // A synthetic module that writes a plan file WITHOUT importing invalidate
+    // and WITHOUT routing through movePlan → a genuine CF1 violation.
+    const plantedUnwired = [
+      "const safeFs = require('./safe-fs');",
+      "const path = require('path');",
+      'function badWriter(root, slug) {',
+      "  const p = path.join(root, 'plans', 'todo', slug + '.md');",
+      "  safeFs.writeFileSync(p, '---\\ntitle: x\\n---\\n');",
+      '  return p;',
+      '}',
+      'module.exports = { badWriter };',
+    ].join('\n');
+
+    assert.equal(
+      isCountMutatingWriter(plantedUnwired), true,
+      'self-test: a plans/todo writeFileSync is detected as count-mutating'
+    );
+    assert.equal(
+      bustsCache(plantedUnwired), false,
+      'self-test: the un-wired writer is correctly seen as NOT busting the cache'
+    );
+    // The guard's verdict on this planted source is FAIL → proves non-vacuous.
+    const wouldFlag = isCountMutatingWriter(plantedUnwired) && !bustsCache(plantedUnwired);
+    assert.equal(wouldFlag, true, 'self-test: the guard WOULD flag the planted un-wired writer');
+
+    // And a matching wired variant (adds the invalidate import + call) must NOT
+    // be flagged — proves the safety predicate actually clears a fixed writer.
+    const plantedWired = plantedUnwired
+      .replace("const path = require('path');", "const path = require('path');\nconst { invalidate } = require('./cache');")
+      .replace('  return p;', '  invalidate();\n  return p;');
+    assert.equal(bustsCache(plantedWired), true, 'self-test: adding invalidate() clears the writer');
+    assert.equal(
+      isCountMutatingWriter(plantedWired) && !bustsCache(plantedWired), false,
+      'self-test: the wired variant is NOT flagged'
+    );
+  });
+
+  // ── REGRESSION PIN: the 5 known writers are detected AND pass. ──
+  it('the 5 known count-mutating writers are detected and wired', () => {
+    for (const name of KNOWN_WIRED_WRITERS) {
+      const src = fs.readFileSync(path.join(libDir, name), 'utf8');
+      assert.equal(
+        isCountMutatingWriter(src), true,
+        `regression: ${name} is detected as a count-mutating writer`
+      );
+      assert.equal(
+        bustsCache(src), true,
+        `regression: ${name} busts the cache (imports invalidate or uses movePlan)`
+      );
+      // None of the real wired writers should be on the whitelist (they must be
+      // proven by the predicate, not exempted).
+      assert.equal(
+        WHITELIST.has(name), false,
+        `regression: ${name} must NOT be whitelisted — it is a real wired writer`
+      );
+    }
+  });
+
+  // ── THE GUARD: every detected count-mutating writer either busts the cache ──
+  // ── or is an explicitly-justified whitelist entry. A future un-wired writer ──
+  // ── lands here as a hard failure with an actionable message. ──
+  it('every count-mutating src/lib writer busts the cache (or is whitelisted)', () => {
+    const offenders = [];
+    for (const name of libFiles()) {
+      const src = fs.readFileSync(path.join(libDir, name), 'utf8');
+      if (!isCountMutatingWriter(src)) continue;      // not a count writer
+      if (bustsCache(src)) continue;                  // wired — good
+      if (WHITELIST.has(name)) continue;              // documented non-count writer
+      // A mutating write on a count-relevant path with no invalidate/movePlan
+      // and no whitelist justification → the exact CF1 drift.
+      offenders.push(name);
+    }
+    assert.deepEqual(
+      offenders, [],
+      offenders.length === 0
+        ? 'all count-mutating writers bust the cache'
+        : `CF1 VIOLATION: ${offenders.join(', ')} perform a mutating fs op on a ` +
+          'count-relevant path (plan-stage/vision/inbox) but never bust the read ' +
+          'cache. Add `const { invalidate } = require(\'./cache\');` and call ' +
+          '`invalidate();` immediately AFTER the successful write (before return), ' +
+          'OR route the write through actions.movePlan. If the write genuinely ' +
+          'targets a non-count path, add a justified entry to the WHITELIST in ' +
+          'this test with the exact path it writes.'
+    );
+  });
+
+  // ── WHITELIST HONESTY: every whitelist entry must actually exist and must ──
+  // ── actually be broad-flagged (else it is dead weight hiding nothing). ──
+  it('whitelist is minimal — every entry is a real, currently-flagged file', () => {
+    const present = new Set(libFiles());
+    for (const [name, reason] of WHITELIST) {
+      assert.ok(present.has(name), `whitelist entry ${name} must be a real src/lib file`);
+      assert.ok(reason && reason.length > 20, `whitelist entry ${name} must carry a real justification`);
+      const src = fs.readFileSync(path.join(libDir, name), 'utf8');
+      // It must be BROAD-FLAGGED (detected as a candidate) AND NOT already busting
+      // the cache — otherwise it does not need exempting and is dead weight.
+      const detected = isCountMutatingWriter(src);
+      const safe = bustsCache(src);
+      assert.equal(
+        detected && !safe, true,
+        `whitelist entry ${name} is dead weight: it is not a broad-flagged non-busting ` +
+        'writer (remove it, or it is masking a real writer — investigate).'
+      );
+    }
+  });
+});
