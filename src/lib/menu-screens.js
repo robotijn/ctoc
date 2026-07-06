@@ -28,6 +28,8 @@ const { findProjectRoot } = require('./project-root');
 // NB2: the background-task registry (fs choke point via safe-fs) + its pure view.
 const taskRegistry = require('./task-registry');
 const taskView = require('./task-view');
+// NB4: on-open reconciliation of the registry against the live harness TaskList.
+const taskReconcile = require('./task-reconcile');
 
 // NB2: terminal task statuses (mirror of NB1's frozen set — not exported by NB1).
 // A mutation subcommand targeting a terminal task is an illegal transition and is
@@ -182,11 +184,28 @@ function buildDashboardTable(projectPath) {
   // Fail-open: a corrupt/absent registry loads as empty → renderTasksSection === ''
   // → ZERO added output, so the dashboard is byte-for-byte unchanged for a project
   // with no background tasks (protects every dashboard substring/count regression).
+  // NB4: reconcile the registry against the live harness TaskList BEFORE rendering,
+  // so a session-restart orphan (a `running` task with no live agent) stops blocking
+  // the ≤5 concurrency count and is offered for re-run. The menu.js child process has
+  // no access to the harness Task tool, so it passes liveAgentIds: null → the
+  // staleness backstop governs (conservative but correct). Fully fail-open: ANY
+  // reconcile failure falls back to the plain load so the dashboard always renders.
+  let orphanedCount = 0;
+  try {
+    const { report } = taskReconcile.reconcileState(root, { liveAgentIds: null });
+    orphanedCount = (report && Array.isArray(report.orphaned)) ? report.orphaned.length : 0;
+  } catch { /* reconcile is best-effort; a failure must never brick the dashboard */ }
   let taskReg;
   try { taskReg = taskRegistry.load(root); } catch { taskReg = taskRegistry.emptyRegistry(); }
   let tasksBlock = '';
   try { tasksBlock = taskView.renderTasksSection(taskReg); } catch { tasksBlock = ''; }
   if (tasksBlock) out += tasksBlock + '\n';
+  // NB4: surface newly-orphaned tasks on the existing TASKS line as a re-run offer.
+  // Re-run is routed through the scheduler (canRun/nextRunnable) by the menu driver,
+  // never a direct launch (menu.md Two-Plane Protocol). No new screen (D-NB4-5).
+  if (orphanedCount > 0) {
+    out += `  ⚠ ${orphanedCount} task${orphanedCount === 1 ? '' : 's'} orphaned — offer re-run\n`;
+  }
 
   // Inbox (A3 — async-overnight surface; SP2 adds the possibly-stale stream)
   const inbox = getInboxCounts(root);

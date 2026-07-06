@@ -105,6 +105,21 @@ When a background task fires its task-notification:
 2. Emit **ONE** compact, pull-based inbox notice. **Do not** change or hijack the user's current screen — completions pull, they never push.
 3. **Promote.** For each task in the response's `promote[]` (the scheduler's `nextRunnable` set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
 
+### ON-OPEN RECONCILE (NB4)
+
+On menu open (a NAV render), the dashboard reconciles the task registry against the
+live harness **`TaskList`** before rendering. The main loop SHOULD pass the live
+harness agent-id list into the render as `liveAgentIds` so a `running` task with a
+matching live agent is left alone and one with no matching live agent is marked
+`orphaned` precisely; absent that list (the `menu.js` child process cannot read the
+Task tool), a **staleness threshold backstops** — a long-`running` task with no
+confirmable live agent is orphaned. An `orphaned` task no longer counts toward the ≤5
+concurrency limit and is **offered for re-run through the scheduler**
+(`canRun`/`nextRunnable`), never a direct launch. A **`failed`** task always surfaces
+in the task plane / inbox (never silently lost). Reconciliation is fully fail-open: a
+corrupt registry or a save failure never blocks navigation — the dashboard still
+renders.
+
 ### Human gates stay foreground
 
 The four human gates are **never** auto-crossed by a background task. A background
