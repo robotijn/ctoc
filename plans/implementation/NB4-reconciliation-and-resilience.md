@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-06T09:49:10.570Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "NB4 — Reconciliation and Resilience"
 type: functional
 status: functional
