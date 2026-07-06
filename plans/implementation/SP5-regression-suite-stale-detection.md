@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-06T13:40:30.801Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "SP5 — Regression suite for stale detection & gate safety"
 created: "2026-06-15T00:00:00Z"
 priority: HIGH
@@ -9,8 +15,9 @@ order: 5
 depends_on: [SP4-human-gated-cleanup-review]
 files:
   - tests/stale-detection-regression.test.js
+  - tests/gates.test.js
 status: refined
-acceptance_criteria_count: 8
+acceptance_criteria_count: 9
 risk_level: LOW
 ---
 
@@ -141,6 +148,21 @@ Without a cross-slice regression test, any future change to any of the four modu
   When the cleanup dispatcher is invoked without an approval flag
   Then no plan file in the sandbox has been moved, stamped, or deleted
   And both proposals are still present in the pending list
+
+- [ ] **Scenario: gates.test.js asserts the REAL human-gate contract (folded defect fix)**
+  Given `tests/gates.test.js` currently constructs literal option arrays inside each
+  test and asserts properties of those literals (imports nothing from `src/`) — an
+  always-green tautology that a pre-ship review flagged as false-confidence
+  When `gates.test.js` is rewritten to drive the real exported gate logic
+  Then it exercises `approvePlan` (actions.js) in an `os.tmpdir()` sandbox: approving
+  a plan at each `HUMAN_GATES` source stage (functional→implementation,
+  implementation→todo, review→done) writes an `approved_by: human` marker whose value
+  trims to exactly `human` and moves the plan to the correct destination
+  And a transition that is NOT a defined human gate does not receive a gate marker
+  And (if `human-gate-check.js` exposes a testable seam) a plan at a gate destination
+  lacking the marker is detected as a violation
+  And every assertion targets real source behavior — mutating the gate logic breaks a
+  test (no literal-only tautology remains)
 
 - [ ] **Scenario: Suite runs cross-platform with hermetic temp sandbox and nowMs injection**
   Given `os.tmpdir()` returns a platform-specific temp directory (e.g. `C:\Temp` on Windows)
