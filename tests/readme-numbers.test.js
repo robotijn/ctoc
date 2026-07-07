@@ -139,8 +139,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countSlashCommandSpecs(), 3);
   });
 
-  it('src/hooks/: 13 hook files (andon-halt added v6.9.27)', () => {
-    assert.equal(countTopLevelFiles('src/hooks'), 13);
+  it('src/hooks/: 15 hook files (guard-files + stop-test-gate added for OM2)', () => {
+    assert.equal(countTopLevelFiles('src/hooks'), 15);
   });
 
   it('src/tabs/: 8 dashboard tab files', () => {

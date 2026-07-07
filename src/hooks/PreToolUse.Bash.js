@@ -53,6 +53,41 @@ const ALWAYS_ALLOWED = [
   /^\s*echo\s+[^>]+$/
 ];
 
+// Irreversible / destructive commands — always blocked regardless of the Iron
+// Loop step. Ported verbatim from the opus-pack guard-bash.sh blocklist. Every
+// entry is a LITERAL, case-insensitive RegExp (no dynamic / data-derived
+// construction), so there is no new-RegExp-on-untrusted-input surface. These
+// are pure shell-command STRING matches, inherently cross-platform to check.
+const IRREVERSIBLE_PATTERNS = [
+  /git\s+push\s+.*--force(-with-lease)?/i,
+  /git\s+push\s+-f\b/i,
+  /git\s+reset\s+--hard/i,
+  /git\s+clean\s+-[a-z]*f/i,
+  /git\s+checkout\s+\.\s*$/i,
+  /git\s+(branch|push).*(-D|--delete)/i,
+  /rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)/i,
+  /rm\s+-rf/i,
+  /DROP\s+(TABLE|DATABASE|SCHEMA)/i,
+  /TRUNCATE\s+TABLE/i,
+  /DELETE\s+FROM\s+\w+\s*;?\s*$/i,
+  /terraform\s+destroy/i,
+  /kubectl\s+delete\s+(namespace|deployment|pvc)/i,
+  /mkfs\./i,
+  /dd\s+if=/i,
+  />\s*\/dev\/sd/i,
+  /chmod\s+-R\s+777/i,
+];
+
+/**
+ * True when the command matches any irreversible/destructive pattern.
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isIrreversibleCommand(command) {
+  if (!command) return false;
+  return IRREVERSIBLE_PATTERNS.some(p => p.test(command));
+}
+
 // git global flags that take a separate argument (so the next token is the
 // flag's value, not the subcommand). Used to find the real subcommand.
 const GIT_VALUE_FLAGS = new Set(['-c', '-C', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--super-prefix']);
@@ -173,6 +208,21 @@ async function main() {
 
   if (!command) {
     process.exit(0);
+  }
+
+  // OM2: Irreversible-command blocklist — the FIRST deny layer, BEFORE the
+  // plan-move / commit / write gates, so a destructive command is denied
+  // regardless of the Iron Loop step. Same input channel (CLAUDE_TOOL_INPUT)
+  // and same block signal (exit 1) as every other Bash gate.
+  if (isIrreversibleCommand(command)) {
+    const irreversibleState = loadState(projectPath);
+    writeToTerminal(formatBlocked(
+      command,
+      irreversibleState.state,
+      'Irreversible/destructive command. State the action and its blast radius to the human and get explicit confirmation; the human runs it directly (or temporarily disables this guard).',
+      'IRREVERSIBLE'
+    ));
+    process.exit(1);
   }
 
   // D4: Block raw mv/cp of plan files between stage directories

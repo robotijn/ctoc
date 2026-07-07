@@ -701,50 +701,84 @@ gate to `todo` (Gate 2) remains required and is NOT crossed here.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (`tests/opuspack-hooks.test.js`, 43 cases)
+- [x] Test error conditions (fail-open, no-suite, loop-guard, malformed stdin)
+- [x] Run tests - expect RED (failing) — confirmed RED (hooks missing + fold absent)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none; Node built-ins only (zero runtime deps)
+- [x] Check prerequisites — confirmed `safe-fs`, `project-root`, `state-manager`, `ui` present
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — `.ctoc/state/` created lazily by the counter writer
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Fold blocklist into `PreToolUse.Bash.js` (first deny layer)
+- [x] Create `guard-files.js` (secret guard, env+stdin, fail-open)
+- [x] Create `stop-test-gate.js` (Stop hook, opt-in, loop-guard)
+- [x] Register both in `.claude-plugin/hooks.json`
+- [x] Bump `tests/readme-numbers.test.js` 13 → 15
+- [x] Add error handling (fail-open on guard-files + stop-test-gate)
+- [x] Wire up integration points — GREEN (43/43)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review vs the I/O convention per event type (F1) — matched
+- [x] Verify no-sentinel dedup (F2) — structural test asserts no `allow-commit`
+- [x] Check error handling completeness — fail-open paths verified
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Single-pass `.some()` match on both pattern arrays
+- [x] No redundant reads; settings read once; counter read/write minimal
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Literal case-insensitive RegExps only — no dynamic RegExp on untrusted input
+- [x] `spawnSync(shell:false)` + argv arrays — no command injection
+- [x] No traversal (guard-files only matches strings; counter via `safe-fs`+`path.join`)
+- [x] No secrets in code (patterns match names, not values)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint — `npx eslint . --max-warnings 0` → exit 0
+- [x] Type check — `npm run typecheck` baseline-neutral (0 of my 5 files in the 89 pre-existing errors)
+- [x] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → tests 2855, **pass 2855, fail 0, skipped 0**
+- [x] Coverage >= 80% on the 3 hooks — guard-files 93.28%, PreToolUse.Bash 86.44%, stop-test-gate 94.37%
+- [x] 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] JSDoc headers on both new hooks (exit-code contract, I/O channel, fail-open, cross-platform)
+- [x] Blocklist fold documented inline in `PreToolUse.Bash.js`
+- [ ] CLAUDE.md hook-inventory prose (13 → 15) — NOT updated: `CLAUDE.md` is not in `files:`; updating it would silently widen scope. Reported to human (see Execution Record).
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Steps 8-15 completed
+- [x] All quality checks passed
+- [ ] Human review pending (Gate 3 — not crossed here; plan left in todo per work order)
+
+---
+
+## Execution Record (Steps 8–16, executor, read-fresh)
+
+**Fold placement (real lines in `src/hooks/PreToolUse.Bash.js`):**
+- `const IRREVERSIBLE_PATTERNS = [...]` + `isIrreversibleCommand()` helper at **line 61** (right after `ALWAYS_ALLOWED`, before `GIT_VALUE_FLAGS`).
+- Deny layer in `main()` at **lines 213–224** — `if (isIrreversibleCommand(command))` fires immediately after `if (!command) process.exit(0)` and BEFORE the plan-move / commit / write gates, so a destructive command is denied regardless of Iron Loop step. Reuses `writeToTerminal(formatBlocked(command, state, reason, 'IRREVERSIBLE'))` + `process.exit(1)`. All 17 patterns ported verbatim as literal case-insensitive regexes. Commit sentinel NOT ported (existing step-15 commit gate + `isCommitCommand` untouched).
+
+**The 3 hooks — input/exit conventions as built:**
+- `PreToolUse.Bash.js` (fold): input `CLAUDE_TOOL_INPUT` env JSON; block = `exit 1`, allow = `exit 0` (matches existing Bash gate).
+- `guard-files.js` (NEW, matcher `Read|Edit|Write|Bash`): input env `CLAUDE_TOOL_INPUT` **AND** stdin JSON; target = `"<file_path> <command>"`; block = `exit 1`, allow = `exit 0`, **fail-OPEN = `exit 0`** on internal error (matches `PreToolUse.Edit.js`). Exports `{ isSecretTarget, PROTECTED_PATTERNS }` for tests; runs `main()` only under `require.main === module`. Backslash paths normalized `\`→`/` for Windows.
+- `stop-test-gate.js` (NEW, Stop hook): block = `exit 2`, allow/fail-open = `exit 0` (matches `andon-halt.js`). Exports `{ resolveTestCommand, readFailCount, writeFailCount, readStopTestGate }`.
+
+**Stop-gate default-OFF proof:** `readStopTestGate()` returns `true` only when `general.stopTestGate: true`; `isGateEnabled()` returns false when the key is absent or `false`. Test `exits 0 when stopTestGate is not set (default OFF, no suite run)` planted a RED suite with NO settings key → **exit 0** (near-instant, suite never run). `stopTestGate: false` explicit → exit 0. Only `true` runs the suite.
+
+**Normal-git-not-blocked proof (CRITICAL):** dedicated allow-test `NORMAL git commit / push / add are NOT blocked by the blocklist` at step 15: `git add -A`, `git add .`, `git commit -m "msg"`, `git push origin main`, `git push` all → **exit 0**. The blocklist patterns only match `--force`/`-f`, `--delete`/`-D`, and `checkout .` — a plain `git push origin main` / `git commit` / `git add .` matches none. `git checkout .` (destructive) is blocked; `git checkout main` (benign) is allowed. Commit-before-step-15 still blocked by the EXISTING commit gate (not the blocklist), proving the fold did not open a bypass.
+
+**Tallies:**
+- opuspack-hooks.test.js: **43 pass, 0 fail, 0 skipped** (RED→GREEN).
+- Full suite `node --test tests/*.test.js`: **tests 2855, pass 2855, fail 0, skipped 0, todo 0**.
+- Regression (security-bash-hook + readme-numbers + hooks): 212 pass, 0 fail.
+- eslint `. --max-warnings 0`: **exit 0** (one stray `eslint-disable` directive removed).
+- tsc: baseline-neutral (89 pre-existing errors, 0 in my 5 files).
+- `ls src/hooks/*.js | wc -l` = **15**; readme-numbers count test green.
+- hooks.json: PreToolUse now 7 entries (guard-files added), Stop 1 entry (stop-test-gate); Bash matcher unchanged (fold is in-file).
+
+**Decisions taken under ambiguity (executor):**
+- **D-OM2-12:** Implemented the stop-gate opt-in as a **settings.yaml-only flat read** inside `stop-test-gate.js` (no `src/lib/settings.js` schema key), the MINIMAL-SCOPE path the planner recommended — keeps `files:` tight and matches how the other safety-critical hooks read config. `src/lib/settings.js` was NOT touched.
+- **D-OM2-13:** `CLAUDE.md` hook-inventory prose (13 → 15) NOT edited — `CLAUDE.md` is outside the plan's `files:`; editing it would silently widen scope. Flagged for the human instead of freelancing an out-of-scope edit.
+- **D-OM2-14:** counter stored as JSON `{ "fails": N }` at `.ctoc/state/.test-gate-fails` via `safe-fs` + `path.join` (per D-OM2-9); cleared on green and on the 3rd stand-down.
