@@ -825,7 +825,7 @@ ctoc/
 │                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
 │                    5 gap-fill SKILL.md added in v6.9.24; 8 cross-industry
 │                    SKILL.md added in v6.9.27.
-├── tests/           71 test files (1504 passing tests)
+├── tests/           109 test files (2799 passing tests)
 ├── .ctoc/           Config, templates, operations, audit, loop journals
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
