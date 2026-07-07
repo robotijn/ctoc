@@ -620,6 +620,31 @@ function initProject(projectDir, options = {}) {
     }
   }
 
+  // 3c. Ensure CTOC-managed operating-manual block (generic craft layer).
+  //     Single canonical source: .ctoc/templates/operating-manual.md (resolved via __dirname).
+  //     Runs after 3b so it appends the manual block to a CLAUDE.md that already exists
+  //     (project nouns + lessons lead; the manual block lands at EOF). Like 3b, it acts
+  //     ONLY on a CLAUDE.md that init itself created OR that already carries the managed
+  //     block — it never silently rewrites a user's hand-authored CLAUDE.md that has none
+  //     (that first-injection is owned by SessionStart). mergeOperatingManual is fail-open
+  //     internally; the extra try/catch mirrors 3b for defense-in-depth.
+  if (!dryRun) {
+    try {
+      const { mergeOperatingManual, BEGIN_MARKER } = require('./operating-manual');
+      const ctocRoot = path.resolve(__dirname, '..', '..');   // same base as templatePath
+      const wasCreated = created.includes('CLAUDE.md');
+      const hasBlock = safeFs.existsSync(claudeMdPath) &&
+        safeFs.readFileSync(claudeMdPath, 'utf8').includes(BEGIN_MARKER);
+      if (wasCreated || hasBlock) {
+        const res = mergeOperatingManual(projectDir, { ctocRoot });
+        if (res.action !== 'unchanged') created.push('CLAUDE.md (operating-manual block)');
+      }
+    } catch (err) {
+      // Fail-open: a manual-merge failure must never break project init.
+      skipped.push('CLAUDE.md operating-manual block (' + err.message + ')');
+    }
+  }
+
   // 4. Generate IRON_LOOP.md
   const ironLoopPath = path.join(projectDir, 'IRON_LOOP.md');
   if (!safeFs.existsSync(ironLoopPath) || force) {

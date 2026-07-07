@@ -31,6 +31,26 @@ function refreshLocalLessons() {
   }
 }
 
+/**
+ * Refresh the local project's CTOC-managed operating-manual block (generic craft
+ * layer). Only runs when cwd looks like a project (has package.json OR .ctoc/) so
+ * `/ctoc:update` never writes a stray CLAUDE.md into a non-project directory.
+ * Fail-open: a merge failure is logged to stderr and NEVER aborts the update.
+ */
+function refreshLocalManual() {
+  try {
+    const cwd = process.cwd();
+    const looksLikeProject =
+      safeFs.existsSync(path.join(cwd, 'package.json')) ||
+      safeFs.existsSync(path.join(cwd, '.ctoc'));
+    if (!looksLikeProject) return;
+    const { mergeOperatingManual } = require('../lib/operating-manual');
+    mergeOperatingManual(cwd, { ctocRoot: path.resolve(__dirname, '..', '..') });
+  } catch (err) {
+    console.error('[CTOC] Operating-manual block refresh skipped:', err.message);
+  }
+}
+
 function run(cmd, opts = {}) {
   try {
     return execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...opts }).trim();
@@ -114,6 +134,7 @@ function update() {
     console.log('\n' + '─'.repeat(40));
     console.log(`✓ Already up to date (v${newVersion})`);
     refreshLocalLessons();          // (a) refresh even when version unchanged
+    refreshLocalManual();           // (a) refresh the operating-manual block too
     return;
   }
 
@@ -189,8 +210,9 @@ function update() {
     console.log('   No old versions to remove');
   }
 
-  // 7b. Refresh local CLAUDE.md operating-lessons block after a successful upgrade.
+  // 7b. Refresh local CLAUDE.md managed blocks after a successful upgrade.
   refreshLocalLessons();            // (b) refresh after version change
+  refreshLocalManual();             // (b) refresh the operating-manual block too
 
   console.log('\n' + '─'.repeat(40));
   console.log(`✓ Updated to CTOC v${newVersion}`);
@@ -201,4 +223,4 @@ if (require.main === module) {
   update();
 }
 
-module.exports = { update, refreshLocalLessons, getCurrentVersion, getLatestVersion };
+module.exports = { update, refreshLocalLessons, refreshLocalManual, getCurrentVersion, getLatestVersion };
