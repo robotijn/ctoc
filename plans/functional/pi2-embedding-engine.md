@@ -24,18 +24,31 @@ gate: "Pending Approval (Gate 1: functional → implementation)"
 
 # PI2 — Embedding Engine: Probe, Ollama, Fallback & Calibration
 
+> **Architecture pivot alignment (2026-07-07).** Embeddings are
+> **storage-agnostic** and this slice is essentially unaffected by the pivot: the
+> probe / Ollama-first / in-process fallback / first-run calibration are all
+> unchanged. Only the **SINK** changes — PI2 hands `Float32Array` vectors to
+> PI3/PI0, which write them into PI1's **pure-JS in-memory + JSON store** (base64
+> Float32 inside `.ctoc/index/plan-index.json`) via `upsertUnit`, **not** into the
+> superseded native vector table. There is **no** `initVectorTable` call: the
+> store infers and locks its dimension from the first `upsertUnit`, so PI2's
+> calibrated `dimension` reaches the store implicitly through the vectors it
+> produces. The lexical (BM25) half is a pure-JS inverted index built in PI4 (not
+> a native full-text engine), so this slice still owns only strong **dense**
+> vectors.
+
 ## Problem Statement
 
 Plans must be turned into strong dense vectors on local hardware to power
 semantic retrieval. There is currently no embedding engine, no hardware probe to
 select the right model, and no mechanism to measure whether a model's encode
-latency fits the five-second-per-plan budget. FTS5 (PI1) owns the lexical half;
-this slice owns only dense vectors. Without it the vec0 table initialized by PI1
-remains empty and every semantic capability is inert. The engine must work
-out-of-the-box on any developer machine, automatically selecting the best
-available backend and model via a first-run calibration that is never repeated
-unnecessarily. Calibration runs in the background (invoked by PI0); the menu is
-never blocked.
+latency fits the five-second-per-plan budget. The lexical (BM25) half is a
+pure-JS inverted index owned by PI4; this slice owns only dense vectors. Without
+it the PI1 store holds no embeddings and every semantic capability is inert. The
+engine must work out-of-the-box on any developer machine, automatically selecting
+the best available backend and model via a first-run calibration that is never
+repeated unnecessarily. Calibration runs in the background (invoked by PI0); the
+menu is never blocked.
 
 ## Business Alignment
 
@@ -95,11 +108,13 @@ involvement.
   When `loadCalibration()` is called in a new process
   Then it returns the persisted object without running the benchmark again
 
-- [ ] **Scenario: Calibration dimension is the single source of truth for vec0**
+- [ ] **Scenario: Calibration dimension flows into the store via the first upsert**
   Given calibration has completed and persisted `dimension: 768`
-  When PI1's `initVectorTable` is called with `loadCalibration().dimension`
-  Then the vec0 table is created at exactly 768 floats (confirmed via
-  `SELECT sql FROM sqlite_master WHERE name = 'vec_plans'` containing `float[768]`)
+  When the first embedding PI2 produces (a `Float32Array(768)`) is written to the
+  PI1 store via `upsertUnit`
+  Then `store.dimension === 768` thereafter (the store infers and locks the
+  dimension from the first embedding — there is no `initVectorTable` call and no
+  schema step; the store owns the dimension per PI1 Decision D7)
 
 - [ ] **Scenario: Plan-summary extraction is deterministic**
   Given a `.md` plan file with a title, frontmatter block, and section headings
@@ -216,7 +231,7 @@ except for the smoke test (EM-12) which skips loudly when absent.
 | EM-02   | embed() with Ollama forced absent                         | Returns Float32Array[] from fallback; no unhandled throw                              |
 | EM-03   | Calibration: stub clock → skips over-budget, pins correct | `pinned === 'nomic-embed-text'`; calibration.json has measuredP95ms: 2400             |
 | EM-04   | Calibration persists and is reloaded on next call         | Second loadCalibration() returns same object, no benchmark re-run                    |
-| EM-05   | Calibration dimension → PI1 initVectorTable               | sqlite_master sql contains `float[768]` for the calibrated dimension                 |
+| EM-05   | Calibration dimension → PI1 store via first upsert        | after upserting a `Float32Array(768)`, `store.dimension === 768` (inferred, no `initVectorTable`) |
 | EM-06   | extractSummary determinism                                | result1 === result2 (strict equality); no network call                                |
 | EM-07   | extractSummary positive: contains title + headings        | Output contains YAML title, '## Problem Statement', '## Scope'                       |
 | EM-08   | extractSummary excludes section body prose                | Body paragraph text not in output; heading text IS in output                          |
@@ -266,7 +281,8 @@ except for the smoke test (EM-12) which skips loudly when absent.
 
 ### Dependency Risks
 - **PI1 must be complete before EM-05 integration test**: The integration boundary
-  test (calibration dimension → PI1 initVectorTable) requires PI1's `openStore`.
+  test (calibration dimension → PI1 store via the first `upsertUnit`) requires
+  PI1's `openStore`.
   - Likelihood: HIGH (structural)
   - Impact: LOW (EM-05 can be conditionally skipped when PI1 is not yet merged;
     all other EM tests are independent)
@@ -281,15 +297,19 @@ except for the smoke test (EM-12) which skips loudly when absent.
 
 ## Dependencies
 
-- **PI1** (`pi1-index-store-and-schema`): `initVectorTable(dimension)` call in
-  the integration test EM-05 only; PI2 itself does not call the store at runtime.
+- **PI1** (`pi1-index-store-and-schema`): the pure-JS store's `upsertUnit` (which
+  the store's dimension is inferred from) is exercised in the integration test
+  EM-05 only; PI2 itself does not call the store at runtime — it produces
+  `Float32Array` vectors that PI3/PI0 write via `upsertUnit`. There is **no**
+  `initVectorTable` (deleted by the pivot; the store infers dimension).
 - **`src/lib/state.js` `parseMetadata`**: reused by `summary-extract.js` for
   frontmatter parsing; no new module-level dependency added.
 - **Node 24 built-in `fetch`** (or `node:http`) for Ollama probe — no npm package.
 - **ONNX Runtime** (optional, lazy-loaded to `~/.ctoc`): not a hard dependency;
   the in-process engine degrades gracefully if the runtime is unavailable.
-- **PI0**: invokes `runCalibration()` in the background and calls
-  `initVectorTable(loadCalibration().dimension)` on the PI1 store.
+- **PI0**: invokes `runCalibration()` in the background and wires the PI2 embedder
+  into the composition root; the first `upsertUnit` of a calibrated-dimension
+  vector locks the PI1 store's dimension (no `initVectorTable` call).
 
 ## Decisions Taken Under Ambiguity
 
@@ -318,7 +338,7 @@ except for the smoke test (EM-12) which skips loudly when absent.
   `['mxbai-embed-large', 'nomic-embed-text', 'all-minilm']` for Ollama;
   a single fixed ONNX model (`all-MiniLM-L6-v2`) for the in-process path.
 - **calibration.json location**: `.ctoc/index/calibration.json` (same directory
-  as `plans.db`); git-ignored; per-machine; never committed.
+  as `plan-index.json`); git-ignored; per-machine; never committed.
 - **Summary extraction scope**: Title (YAML `title:` via `parseMetadata`) +
   selected frontmatter string fields (`status`, `priority`, `parent_vision`) +
   all H2–H3 heading lines. Body prose is excluded. This is the deterministic
