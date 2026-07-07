@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T13:27:22.207Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "PI0 — Bootstrap, Runtime Capability-Gate & Composition Root"
 created: "2026-06-28T00:00:00Z"
 type: feature
