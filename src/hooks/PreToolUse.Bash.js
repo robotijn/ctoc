@@ -54,29 +54,77 @@ const ALWAYS_ALLOWED = [
 ];
 
 // Irreversible / destructive commands — always blocked regardless of the Iron
-// Loop step. Ported verbatim from the opus-pack guard-bash.sh blocklist. Every
-// entry is a LITERAL, case-insensitive RegExp (no dynamic / data-derived
-// construction), so there is no new-RegExp-on-untrusted-input surface. These
-// are pure shell-command STRING matches, inherently cross-platform to check.
+// Loop step. Ported from the opus-pack guard-bash.sh blocklist and hardened
+// against ReDoS + command-boundary false-matches. Every entry is a LITERAL,
+// case-insensitive RegExp (no dynamic / data-derived construction), so there is
+// no new-RegExp-on-untrusted-input surface. These are pure shell-command STRING
+// matches, inherently cross-platform to check.
+//
+// Destructive command WORDS (dd, mkfs, chmod, terraform, kubectl) are anchored
+// at a command boundary `(?:^|[\s;&|(])` so they only match at the start of a
+// command or after a shell separator — NOT inside a longer word: `add if=` does
+// NOT match `dd if=`, `perform -rf` does NOT match `rm -rf`.
+//
+// Git destructive SUBCOMMANDS (push --force, reset --hard, clean -f, branch -D,
+// checkout .) are NOT matched here — they are resolved through the git
+// token-walk in isDestructiveGitCommand(), so interposed global flags
+// (`git -c k=v push --force`, `git -C dir reset --hard`) cannot bypass them.
 const IRREVERSIBLE_PATTERNS = [
-  /git\s+push\s+.*--force(-with-lease)?/i,
-  /git\s+push\s+-f\b/i,
-  /git\s+reset\s+--hard/i,
-  /git\s+clean\s+-[a-z]*f/i,
-  /git\s+checkout\s+\.\s*$/i,
-  /git\s+(branch|push).*(-D|--delete)/i,
-  /rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)/i,
-  /rm\s+-rf/i,
-  /DROP\s+(TABLE|DATABASE|SCHEMA)/i,
-  /TRUNCATE\s+TABLE/i,
-  /DELETE\s+FROM\s+\w+\s*;?\s*$/i,
-  /terraform\s+destroy/i,
-  /kubectl\s+delete\s+(namespace|deployment|pvc)/i,
-  /mkfs\./i,
-  /dd\s+if=/i,
+  // Force-push net: lazy `.*?` single flexible run — non-backtracking, runs
+  // <1ms on a 200k-space input (the old `.*--force` form was O(n²), ~13s).
+  // Also catches force-push even with interposed global flags.
+  /\bgit\b.*\bpush\b.*?--force(-with-lease)?\b/i,
+  /(?:^|[\s;&|(])DROP\s+(TABLE|DATABASE|SCHEMA)/i,
+  /(?:^|[\s;&|(])TRUNCATE\s+TABLE/i,
+  /(?:^|[\s;&|(])terraform\s+destroy\b/i,
+  /(?:^|[\s;&|(])kubectl\s+delete\s+(namespace|deployment|pvc)/i,
+  /(?:^|[\s;&|(])mkfs\./i,
+  /(?:^|[\s;&|(])dd\s+if=/i,
   />\s*\/dev\/sd/i,
-  /chmod\s+-R\s+777/i,
+  /(?:^|[\s;&|(])chmod\s+-R\s+777/i,
 ];
+
+// SQL-driver tokens. DELETE/DROP/TRUNCATE only count as destructive when the
+// command actually invokes a database driver — so a shell echo or prose
+// mentioning "DELETE FROM" is ALLOWED, while a real driver-issued delete (with
+// or WITHOUT a WHERE clause) is BLOCKED. Chosen over dropping the `$` anchor
+// because it eliminates the benign-echo false-positive entirely.
+const SQL_DRIVER = /\b(psql|mysql|mariadb|sqlite3|sqlcmd|mongo|mongosh)\b/i;
+const SQL_DELETE = /\bDELETE\s+FROM\s+\w+/i;
+
+/**
+ * True when a `rm` command word (anchored at a command boundary) carries BOTH a
+ * recursive flag and a force flag, in any order / position / split form:
+ *   rm -rf, rm -fr, rm -r -f, rm -f -r, rm --recursive --force, rm -R -f, …
+ * Recursive: -r, -R, --recursive, or a combined short cluster containing r/R.
+ * Force:     -f, --force, or a combined short cluster containing f.
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isDestructiveRm(command) {
+  // Anchor `rm` at a command boundary so `confirm -rf` / `perform -rf` do NOT
+  // match. Capture the argument tail up to the next command separator.
+  const m = command.match(/(?:^|[\s;&|(])rm\s+([^;&|]*)/i);
+  if (!m) return false;
+  const args = m[1];
+  // Collect the flag tokens (leading `-`), ignoring path operands.
+  const flagTokens = args.split(/\s+/).filter(t => t.startsWith('-'));
+  let recursive = false;
+  let force = false;
+  for (const tok of flagTokens) {
+    if (tok === '--recursive' || tok === '--force') {
+      if (tok === '--recursive') recursive = true;
+      if (tok === '--force') force = true;
+      continue;
+    }
+    // Short cluster like -rf, -R, -fr, -r, -f. Inspect the letters.
+    if (/^-[a-z]+$/i.test(tok)) {
+      if (/r/i.test(tok)) recursive = true;
+      if (/f/.test(tok)) force = true; // force flag is lowercase f (upper-F not force)
+    }
+  }
+  return recursive && force;
+}
 
 /**
  * True when the command matches any irreversible/destructive pattern.
@@ -85,12 +133,75 @@ const IRREVERSIBLE_PATTERNS = [
  */
 function isIrreversibleCommand(command) {
   if (!command) return false;
-  return IRREVERSIBLE_PATTERNS.some(p => p.test(command));
+  if (IRREVERSIBLE_PATTERNS.some(p => p.test(command))) return true;
+  if (isDestructiveRm(command)) return true;
+  if (isDestructiveGitCommand(command)) return true;
+  if (SQL_DRIVER.test(command) && SQL_DELETE.test(command)) return true;
+  return false;
 }
 
 // git global flags that take a separate argument (so the next token is the
 // flag's value, not the subcommand). Used to find the real subcommand.
 const GIT_VALUE_FLAGS = new Set(['-c', '-C', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--super-prefix']);
+
+/**
+ * Resolve the real git subcommand + its argument tokens for one command,
+ * skipping git GLOBAL flags (`-c k=v`, `-C dir`, `--git-dir=…`) via the same
+ * token-walk isCommitCommand uses. Returns null when the segment is not a git
+ * invocation. Splits on chaining/substitution boundaries and returns the FIRST
+ * git subcommand found (sufficient for the destructive-git check, which OR-folds
+ * over segments below).
+ * @param {string} command
+ * @returns {Array<{sub: string, args: string[]}>} one entry per git segment
+ */
+function resolveGitSubcommands(command) {
+  const out = [];
+  const segments = String(command).split(/[\n;]|&&|\|\||\||\$\(|`|\(/);
+  for (const seg of segments) {
+    const tokens = seg.trim().split(/\s+/).filter(Boolean);
+    const gi = tokens.indexOf('git');
+    if (gi === -1) continue;
+    let i = gi + 1;
+    while (i < tokens.length) {
+      const t = tokens[i];
+      if (GIT_VALUE_FLAGS.has(t)) { i += 2; continue; }   // global flag + value
+      if (t.startsWith('-')) { i += 1; continue; }        // other global flag (incl. --foo=bar)
+      out.push({ sub: t, args: tokens.slice(i + 1) });    // resolved subcommand + args
+      break;
+    }
+  }
+  return out;
+}
+
+/**
+ * True when a git invocation resolves to a DESTRUCTIVE subcommand — regardless
+ * of interposed global flags (`git -c core.pager=cat push --force`,
+ * `git -C dir reset --hard`, `git --git-dir=.g clean -d -f`):
+ *   push … --force / --force-with-lease / -f   (also caught by the regex net)
+ *   reset --hard
+ *   clean  with -f / --force anywhere
+ *   branch with -D / --delete
+ *   checkout .   (discards working-tree changes)
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isDestructiveGitCommand(command) {
+  for (const { sub, args } of resolveGitSubcommands(command)) {
+    if (sub === 'push') {
+      if (args.some(a => a === '--force' || a === '--force-with-lease' || a === '-f' ||
+        a === '--delete' || a === '-D')) return true;
+    } else if (sub === 'reset') {
+      if (args.includes('--hard')) return true;
+    } else if (sub === 'clean') {
+      if (args.some(a => a === '--force' || (/^-[a-z]*f[a-z]*$/i.test(a)))) return true;
+    } else if (sub === 'branch') {
+      if (args.some(a => a === '-D' || a === '--delete')) return true;
+    } else if (sub === 'checkout') {
+      if (args.includes('.')) return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Check if command is a write command

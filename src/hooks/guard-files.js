@@ -29,16 +29,30 @@ const fs = require('fs');
  * Literal, case-insensitive RegExps — no interpolation of untrusted data.
  */
 const PROTECTED_PATTERNS = [
-  /\.env\b/i,                       // .env, .env.local, `cat .env | ...`
+  // .env family — BLOCK .env / .env.local / .env.production / .envrc (direnv),
+  // but EXCLUDE committable templates (.env.example / .env.sample / .env.template).
+  // Negative lookahead on the template suffixes; \b keeps `.env` boundary-safe.
+  // No greedy suffix capture (ReDoS-safe): the word boundary + lookahead suffice.
+  /\.env(?!\.(?:example|sample|template)\b)\b/i,
+  /\.envrc\b/i,
   /secrets?\.(ya?ml|json|toml)/i,
-  /credentials/i,
-  /id_(rsa|ed25519|ecdsa)/i,
-  /\.pem($|\s)/i,
-  /\.key($|\s)/i,
+  // credentials as a FILE target (`.credentials`, `credentials`, `credentials.json`)
+  // — NOT source files named ABOUT credentials (`get-credentials.ts` ALLOWED).
+  // Anchored to a path-segment start (`/`, `\`, or string start) + optional dot;
+  // the trailing \b (ReDoS-safe, no optional suffix group) ends the token.
+  /(?:^|[/\\])\.?credentials\b/i,
+  // private keys: rsa/dsa/ed25519/ecdsa + any other id_* key file
+  /id_(rsa|dsa|ed25519|ecdsa|\w+)/i,
+  // .pem / .key anywhere in a path segment (so `server.key.backup` blocks too).
+  /\.(pem|key)\b/i,
   /\.kube\/config/i,
   /\.aws\//i,
   /\.ssh\//i,
-  /token/i,
+  // secret TOKEN files/contexts only — NOT `tokenizer.js` / `refreshToken.js`.
+  // Requires an EXPLICIT `_`/`-` separator (access_token, refresh-token,
+  // auth_token) so camelCase `refreshToken` does not match; plus `.token` and
+  // `token(s).<secret-ext>` file forms (access_token.json, api_token.txt, …).
+  /(^|[/_.-])((access|refresh|auth)[_-]token|\.token|tokens?\.(json|ya?ml|txt|env))\b/i,
 ];
 
 /**

@@ -782,3 +782,105 @@ gate to `todo` (Gate 2) remains required and is NOT crossed here.
 - **D-OM2-12:** Implemented the stop-gate opt-in as a **settings.yaml-only flat read** inside `stop-test-gate.js` (no `src/lib/settings.js` schema key), the MINIMAL-SCOPE path the planner recommended — keeps `files:` tight and matches how the other safety-critical hooks read config. `src/lib/settings.js` was NOT touched.
 - **D-OM2-13:** `CLAUDE.md` hook-inventory prose (13 → 15) NOT edited — `CLAUDE.md` is outside the plan's `files:`; editing it would silently widen scope. Flagged for the human instead of freelancing an out-of-scope edit.
 - **D-OM2-14:** counter stored as JSON `{ "fails": N }` at `.ctoc/state/.test-gate-fails` via `safe-fs` + `path.join` (per D-OM2-9); cleared on green and on the 3rd stand-down.
+
+## Consolidated pre-Gate-3 KICKBACK (code-review + security-scan, read-fresh, TDD RED→GREEN)
+
+Both the code review and the security scan kicked back on the same surface: 2 pattern
+arrays (`IRREVERSIBLE_PATTERNS`, `PROTECTED_PATTERNS`) + 1 parser (`readStopTestGate`).
+Applied as ONE consolidated fix pass. Files touched: `src/hooks/PreToolUse.Bash.js`,
+`src/hooks/guard-files.js`, `src/hooks/stop-test-gate.js`, `tests/opuspack-hooks.test.js`.
+`isCommitCommand`, the step-15 commit gate, the write gate, and the mv/cp plan-move gate
+are byte-identical (untouched).
+
+### resolveGitSubcommand approach (FIX 1b/1f — the core defect)
+Factored `resolveGitSubcommands(command)` — a shared helper that reuses the EXISTING
+`isCommitCommand` token-walk mechanism: split on chaining/substitution boundaries
+(`[\n;] && || | $( \` (`), find `git`, then walk tokens skipping git GLOBAL flags via the
+same `GIT_VALUE_FLAGS` set (`-c`/`-C`/`--git-dir`/… consume flag+value; other `-…` consume
+one), and return `{ sub, args }` for the RESOLVED subcommand. `isDestructiveGitCommand()`
+OR-folds over the segments and tests the destructive rules against the resolved
+subcommand+args:
+- `push` → blocks if args include `--force` / `--force-with-lease` / `-f` / `--delete` / `-D`
+- `reset` → blocks if args include `--hard`
+- `clean` → blocks if args include `--force` or any `-…f…` short cluster
+- `branch` → blocks if args include `-D` / `--delete`
+- `checkout` → blocks if args include `.`
+Result: `git -c core.pager=cat push --force`, `git -C dir reset --hard`,
+`git --git-dir=.g clean -d -f`, `git -c a=b branch -D x`, `git -c a=b checkout .` all BLOCK
+regardless of interposed global flags. No duplication of the walk logic.
+
+### Final regex / matcher for each fixed pattern
+- **F1 ReDoS (force-push):** `/git\s+push\s+.*--force(-with-lease)?/i` (O(n²), 14.2s on 200k
+  spaces) → `/\bgit\b.*\bpush\b.*?--force(-with-lease)?\b/i` (lazy `.*?`, single flexible run,
+  non-backtracking). **Timing before/after: 14229ms → 1ms** on a 200k-space input.
+- **F2 rm split/long-form:** replaced the two combined-cluster regexes with `isDestructiveRm()`
+  — anchors `rm` at a command boundary `(?:^|[\s;&|(])`, tokenizes the arg tail, blocks iff a
+  recursive flag (`-r`/`-R`/`--recursive`/`-…r…`) AND a force flag (`-f`/`--force`/`-…f…`) are
+  both present in any order/position. Catches `rm -rf`, `-fr`, `-r -f`, `-f -r`,
+  `--recursive --force`, `-R -f`.
+- **F2 git clean split flags:** handled by the resolver (`clean` + `-f`/`--force` anywhere).
+- **HIGH-2/3, LOW-2 command-word anchors:** destructive command WORDS anchored at
+  `(?:^|[\s;&|(])` — `dd`, `mkfs`, `terraform destroy`, `kubectl delete`, `chmod -R 777`.
+  `add if=` / `confirm -rf` / `perform -rf` now ALLOW; `; rm -rf` / `&& dd if=` still BLOCK.
+- **HIGH-4 DELETE FROM (SQL-driver-token approach, chosen — the preferred option):**
+  `/DELETE\s+FROM\s+\w+\s*;?\s*$/i` (blocked benign echoes, missed `… WHERE …`) →
+  DELETE only counts when a driver token is present: `SQL_DRIVER =
+  /\b(psql|mysql|mariadb|sqlite3|sqlcmd|mongo|mongosh)\b/i` AND `SQL_DELETE =
+  /\bDELETE\s+FROM\s+\w+/i` (no `$` anchor, so `WHERE` clauses match). `echo DELETE FROM t`
+  ALLOWS; `psql -c "DELETE FROM t WHERE 1=1"` and `psql -c "DELETE FROM users"` BLOCK.
+  `DROP`/`TRUNCATE` remain driver-INDEPENDENT (command-boundary anchored) — matches the
+  existing acceptance tests. NOTE: the pre-existing test asserting bare `DELETE FROM t;`
+  blocks was corrected to ALLOW (a driver-less DELETE is indistinguishable from prose).
+- **guard-files token over-block (MED-1):** `/token/i` → the task's suggested regex was found
+  (read-fresh, verified) to STILL block `refreshToken.js` because `refresh[_-]?token` matches
+  camelCase `refreshToken`. **Decision:** require an EXPLICIT `_`/`-` separator:
+  `/(^|[/_.-])((access|refresh|auth)[_-]token|\.token|tokens?\.(json|ya?ml|txt|env))\b/i`.
+  `tokenizer.js`/`refreshToken.js`/`tokens.test.js` ALLOW; `access_token.json`/`.token`/
+  `api_token.txt` BLOCK.
+- **guard-files credentials (MED-2):** `/credentials/i` → `/(?:^|[/\\])\.?credentials\b/i`
+  (path-segment-anchored, ReDoS-safe: no optional suffix group). `get-credentials.ts` ALLOWS;
+  `.credentials`/`credentials.json`/`.aws/credentials` BLOCK.
+- **guard-files .env (MED-2):** `/\.env\b/i` → `/\.env(?!\.(?:example|sample|template)\b)\b/i`
+  (negative lookahead excludes committable templates; ReDoS-safe, no greedy suffix capture)
+  plus a new `/\.envrc\b/i` for direnv. `.env`/`.env.local`/`.env.production` BLOCK;
+  `.env.example`/`.env.sample`/`.env.template` ALLOW.
+- **guard-files keys (F3):** `/\.pem($|\s)/i` + `/\.key($|\s)/i` → `/\.(pem|key)\b/i` (match
+  anywhere in a path segment, so `server.key.backup` blocks); `id_(rsa|ed25519|ecdsa)` →
+  `id_(rsa|dsa|ed25519|ecdsa|\w+)` (adds `id_dsa` + any other `id_*` key file).
+  Two `security/detect-unsafe-regex` eslint errors on the first `.env`/`credentials` drafts
+  (greedy `(\.[\w.-]+)?\b` / `(\.\w+)?` suffix groups) were eliminated by the boundary-only
+  forms above — verified SAFE via `safe-regex`.
+
+### readStopTestGate indent-depth fix (FIX 3 / LOW-1)
+Tracks the direct-child indent of each top-level section: `stopTestGate` is accepted ONLY
+when `section === 'general'` AND its indent equals the section's first-child indent. A nested
+`general:\n  sub:\n    stopTestGate: true` is at a deeper indent → returns FALSE (default OFF).
+Surrounding quotes stripped from the value before `=== true` (mirrors andon-halt.js
+`readYamlFlat`): `general:\n  stopTestGate: "true"` → gate ENABLED. Default-OFF + fail-open
+preserved.
+
+### TDD RED→GREEN proof
+New boundary/bypass tests were added FIRST and run against the OLD (stashed) source:
+**18 failing test groups RED**, including the ReDoS probe at **14,236ms** (the O(n²) blowup)
+and every bypass/over-block case. Fixes restored → all GREEN.
+
+### Normal-allow / destructive-block matrix (real hook subprocess, exit codes)
+ALLOW (exit 0): `git add -A`·`git add .`·`git commit -m "x"`·`git push origin main`·`git push`·
+`git checkout main`·`git checkout -b feat`·`npm test`·`node --test`·`add if=x`·`confirm -rf`·
+`perform -rf`·`echo DELETE FROM t`·`rm file.txt`·`git status` — **all exit 0**.
+BLOCK (exit 1): `git push --force`·`git -c x=y push --force`·`git -c core.pager=cat push --force`·
+`git reset --hard`·`git -c x=y reset --hard`·`git -C /repo reset --hard`·`rm -rf x`·`rm -r -f x`·
+`rm -f -r x`·`rm --recursive --force x`·`rm -R -f x`·`git clean -d -f`·`git clean -f`·
+`git --git-dir=.g clean -d -f`·`git checkout .`·`git branch -D x`·`git branch --delete x`·
+`git push origin --delete feature`·`DROP TABLE x`·`TRUNCATE TABLE t`·
+`psql -c "DELETE FROM t WHERE 1=1"`·`terraform destroy`·`kubectl delete namespace ns`·
+`mkfs.ext4 /dev/sdb`·`dd if=/dev/zero of=x`·`chmod -R 777 .` — **all exit 1**. TOTAL FAILURES: 0.
+
+### Tallies (post-fix)
+- `node --test tests/opuspack-hooks.test.js`: **tests 69, pass 69, fail 0, skipped 0** (was 43;
+  +26 new boundary/bypass/ReDoS/guard/stop-gate assertions).
+- Full suite `node --test tests/*.test.js`: **tests 2881, pass 2881, fail 0, skipped 0**.
+- ReDoS timing test: force-push pattern **1ms** on 200k spaces (< 100ms). Before: 14229ms.
+- `npx eslint . --max-warnings 0`: **exit 0** (no new-RegExp-on-nonliteral; all literal regexes
+  + token-walk on split tokens).
+- tsc: baseline-neutral — 0 errors in the 4 touched files (pre-existing errors elsewhere only).

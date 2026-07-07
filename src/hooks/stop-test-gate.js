@@ -48,7 +48,8 @@ const MAX_ATTEMPTS = 3;
  */
 function readStopTestGate(content) {
   if (!content) return false;
-  let section = null;
+  let section = null;      // current top-level section name
+  let childIndent = null;  // indent of the FIRST key under that section (its direct-child level)
   for (const raw of content.split('\n')) {
     const line = raw.replace(/#.*$/, '');
     if (line.trim() === '') continue;
@@ -56,12 +57,22 @@ function readStopTestGate(content) {
     const m = line.match(/^[ \t]*([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/);
     if (!m) continue;
     const key = m[1];
-    const val = m[2].trim();
+    // Strip surrounding quotes from the value before the === true compare
+    // (mirrors andon-halt.js readYamlFlat).
+    const val = m[2].trim().replace(/^["']|["']$/g, '');
     if (indent === 0) {
       section = key;
+      childIndent = null; // reset — first nested key defines the child level
       continue;
     }
-    if (section === 'general' && key === 'stopTestGate') {
+    // Establish the direct-child indent from the first nested key of a section.
+    if (section !== null && childIndent === null) {
+      childIndent = indent;
+    }
+    // Accept stopTestGate ONLY as a DIRECT child of `general` (exact child
+    // indent). A deeper `general:\n  sub:\n    stopTestGate: true` is NOT a
+    // direct child and must be ignored.
+    if (section === 'general' && key === 'stopTestGate' && indent === childIndent) {
       return val === 'true';
     }
   }
