@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T12:35:54.972Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-07T11:48:33.210Z
@@ -666,7 +672,7 @@ path (0/1/2) exercised.
 - **Step 9 — PREPARE:** confirm Node built-ins only (zero deps); create no dirs
   (`.ctoc/state/` already exists at runtime; hook creates the counter lazily).
 - **Step 10 — IMPLEMENT (one step, sub-items):** (a) fold blocklist into
-  `PreToolUse.Bash.js`; (b) create `guard-files.js`; (c) create `stop-test-gate.js`;
+  `PreToolUse.Bash.js`; (b) create `src/hooks/guard-files.js`; (c) create `src/hooks/stop-test-gate.js`;
   (d) register both in `.claude-plugin/hooks.json`; (e) bump
   `tests/readme-numbers.test.js` 13 → 15. Record any ambiguity in
   `## Decisions Taken Under Ambiguity` (no stubs).
@@ -713,8 +719,8 @@ gate to `todo` (Gate 2) remains required and is NOT crossed here.
 
 ### Step 10: IMPLEMENT
 - [x] Fold blocklist into `PreToolUse.Bash.js` (first deny layer)
-- [x] Create `guard-files.js` (secret guard, env+stdin, fail-open)
-- [x] Create `stop-test-gate.js` (Stop hook, opt-in, loop-guard)
+- [x] Create `src/hooks/guard-files.js` (secret guard, env+stdin, fail-open)
+- [x] Create `src/hooks/stop-test-gate.js` (Stop hook, opt-in, loop-guard)
 - [x] Register both in `.claude-plugin/hooks.json`
 - [x] Bump `tests/readme-numbers.test.js` 13 → 15
 - [x] Add error handling (fail-open on guard-files + stop-test-gate)
