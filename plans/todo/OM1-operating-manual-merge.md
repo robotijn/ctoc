@@ -27,6 +27,7 @@ files:
   - tests/operating-manual.test.js
   - README.md
   - tests/readme-numbers.test.js
+  - .ctoc/templates/operating-manual.md
 ---
 
 # OM1 — Merge the (fully-generic) Opus operating manual into project CLAUDE.md on init + update
@@ -695,50 +696,95 @@ Line + branch ≥ 80%.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — confirmed MODULE_NOT_FOUND before impl
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (stdlib + safe-fs only)
+- [x] Check prerequisites
+- [x] Verify dev environment ready — `node --test` runs
+- [x] Create directories/config if needed — `.ctoc/templates/` exists
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling — fail-open, never throws
+- [x] Wire up integration points — init 3c + update.js both sites
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together — init + update suites green
+- [x] Check error handling completeness — malformed + missing-template paths tested
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single template read, single CLAUDE.md read
+- [x] Optimize critical paths — O(n) literal line-scan; `unchanged` short-circuits write
+- [x] Simplify complex code — no version/hash gate (D-OM1-7 simpler than lessons)
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — projectRoot joined only with 'CLAUDE.md'
+- [x] Sanitize outputs — one-line stderr, no stack/secret leak
+- [x] No secrets in code
+- [x] Safe file operations — all fs via safe-fs; CSPRNG temp + wx/O_EXCL
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral (89→89)
+- [x] Run ALL tests (TDD Green) — 2811 pass / 0 fail / 0 skipped
+- [x] Check coverage >= 80% — every action branch + fail-open paths exercised
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — README line 814 (113→114)
+- [x] Add JSDoc comments to new functions — full JSDoc mirroring claude-md-lessons
+- [x] Update CHANGELOG if needed — n/a (no CHANGELOG maintained in-repo)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — grep template: 0 forbidden strings
+- [ ] Ready for human review — awaiting Gate 3 (human approves review→done)
+
+---
+
+## Decisions Taken Under Ambiguity (executor, Steps 8–16)
+
+- **D-OM1-10 (init first-injection guard — REGRESSION FIX):** The blueprint's step-3c
+  snippet called `mergeOperatingManual(projectDir, …)` unconditionally inside
+  `!dryRun`. This broke the pre-existing init-project test
+  `does not overwrite existing files without force` (init-project.test.js:287),
+  which seeds a hand-written `# Existing` CLAUDE.md and asserts it is byte-unchanged
+  after `initProject` without force. The lessons block (3b) already guards this with
+  `wasCreated || hasBlock` (init-project.js:611-614) and explicitly does NOT
+  first-inject into a user's hand-authored CLAUDE.md (that is owned by SessionStart).
+  **Decision:** mirror the 3b guard exactly in 3c — merge the manual block only when
+  init itself created the CLAUDE.md OR a manual `BEGIN_MARKER` already exists.
+  This preserves the init contract, matches the audited sibling's behavior, and still
+  satisfies BDD scenario 2 (a fresh project → init creates CLAUDE.md → `wasCreated`
+  fires → block lands). Standalone `mergeOperatingManual` still supports the
+  `inserted` (append-after-existing) path for `/ctoc:update` and direct callers,
+  which is where "project nouns lead" (BDD scenario 4 / D-OM1-6) applies. The
+  `(b) initProject wiring` test uses a fresh dir (no CLAUDE.md) so init creates it
+  and the block lands; the `(d)` append-after-existing behavior is proven on the
+  direct `mergeOperatingManual` call, which is the path `/ctoc:update` uses.
+
+- **D-OM1-11 (second README count assertion — discrepancy):** The blueprint's drift
+  note cited only `readme-numbers.test.js:131-133` for the `113→114` bump. In fact
+  `readme-numbers.test.js` pins the count in **two** places: the structured
+  `countTopLevelJs('src/lib') === 113` assertion (line 131-133) AND a prose regex
+  `assert.match(README, /113 JS modules/)` at **line 256-257**. Both were bumped to
+  114. Logged as a read-fresh discrepancy: the blueprint under-counted the pinned
+  assertions by one.
+
+- **D-OM1-12 (reuse shape — CONFIRMED MIRROR, not import):** Per D-OM1-5,
+  `operating-manual.js` MIRRORS `claude-md-lessons.js`'s mechanics
+  (`normalizeEol`/`applyEol`, `atomicWrite` temp+rename with `wx`/O_EXCL + EXDEV
+  same-dir fallback, 2 MiB cap, byte-preserving splice, fail-open) but does NOT
+  import it and does NOT extract a shared helper. `claude-md-lessons.js` was left
+  untouched (out of scope). No reusable block-upsert helper is exported by the
+  lessons module (its surface is coupled to versioned markers + a SHA-256 hash
+  gate), so faithful mirroring was the correct path.
+
+- **D-OM1-13 (no version/hash gate):** Per D-OM1-7, this module uses plain
+  body-equality for the idempotent `unchanged` short-circuit (no `LESSONS_VERSION`
+  / `computeHash` machinery). The template is the single source of truth; "refresh"
+  means "make the block body equal the template body". Simpler and correct.
