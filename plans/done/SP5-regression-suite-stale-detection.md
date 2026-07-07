@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T10:19:45.230Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-06T14:15:43.548Z
@@ -101,7 +107,7 @@ Without a cross-slice regression test, any future change to any of the four modu
 
 ### BDD Scenarios
 
-- [ ] **Scenario: Negative regression — implementation-stage plan with Gate-1 marker not flagged**
+- [x] **Scenario: Negative regression — implementation-stage plan with Gate-1 marker not flagged**
   Given a temp-dir sandbox with a `plans/implementation/` directory
   And a plan file `healthy-impl-plan.md` in `plans/implementation/` with `approved_by: human` in its YAML frontmatter (normal Gate-1 marker)
   And all files listed in the plan's `files:` frontmatter exist in the sandbox
@@ -110,7 +116,7 @@ Without a cross-slice regression test, any future change to any of the four modu
   And `count` is 0
   And no `marker-in-source-stage` signal is emitted for this plan
 
-- [ ] **Scenario: Positive regression — stranded review plan always flagged and classified**
+- [x] **Scenario: Positive regression — stranded review plan always flagged and classified**
   Given a temp-dir sandbox with a `plans/review/` directory
   And a plan file `stranded-plan.md` in `plans/review/` with `approved_by: human` in its YAML frontmatter
   And stubbed evidence that the plan's declared files were last modified by a commit after the plan's stage entry
@@ -120,7 +126,7 @@ Without a cross-slice regression test, any future change to any of the four modu
   Then `category` is `'approved-but-stranded'`
   And `proposedAction` is `'advance-via-reconciliation'`
 
-- [ ] **Scenario: Shipped-and-stranded functional plan detected via missing-files**
+- [x] **Scenario: Shipped-and-stranded functional plan detected via missing-files**
   Given a temp-dir sandbox with a `plans/functional/` directory
   And a plan file `shipped-stranded.md` with `files: [src/lib/shipped.js]` in its YAML frontmatter
   And `src/lib/shipped.js` does NOT exist in the sandbox (files were removed when work shipped)
@@ -128,7 +134,7 @@ Without a cross-slice regression test, any future change to any of the four modu
   Then `candidates` contains `shipped-stranded` with signal `missing-files` and `actionable: true`
   And `classifyStaleCandidate(candidate, evidence)` classifies it appropriately based on git evidence
 
-- [ ] **Scenario: Age-only plan is advisory, never actionable (nowMs injection)**
+- [x] **Scenario: Age-only plan is advisory, never actionable (nowMs injection)**
   Given a plan in `plans/implementation/` with no `approved_by` marker and all declared `files:` present in the sandbox
   And no git commits referencing the plan slug in the stubbed evidence
   When `scanCheapCandidates(sandboxRoot, { nowMs: planWriteTime + 15 * 24 * 3600 * 1000 + 1 })` runs (simulating 15 days elapsed via nowMs injection — no fs.utimesSync)
@@ -137,27 +143,27 @@ Without a cross-slice regression test, any future change to any of the four modu
   Then `category` is `'inconclusive'`
   And `proposedAction` is `null`
 
-- [ ] **Scenario: Gate-safety — approved-but-stranded reconciliation does NOT call approvePlan**
+- [x] **Scenario: Gate-safety — approved-but-stranded reconciliation does NOT call approvePlan**
   Given a spy on `approvePlan` injected via `executeCleanup(proposal, root, { approvePlan: spyFn })`
   And an `approved-but-stranded` proposal submitted to `executeCleanup`
   When the cleanup is executed after explicit human approval
   Then `spyFn` (the `approvePlan` spy) was NOT called
   And the plan was moved to `done/` via the reconciliation path in `stale-cleanup.js`
 
-- [ ] **Scenario: Gate-safety — movePlan not called directly for reconciliation**
+- [x] **Scenario: Gate-safety — movePlan not called directly for reconciliation**
   Given a spy on `movePlan` injected via `executeCleanup(proposal, root, { movePlan: spyFn2 })`
   And an `approved-but-stranded` proposal submitted to `executeCleanup`
   When the cleanup executes
   Then `spyFn2` (the `movePlan` spy) was NOT called directly by the cleanup execution
 
-- [ ] **Scenario: No action without explicit approve**
+- [x] **Scenario: No action without explicit approve**
   Given 2 proposals constructed in the test harness
   And no approve signal sent by the test harness
   When the cleanup dispatcher is invoked without an approval flag
   Then no plan file in the sandbox has been moved, stamped, or deleted
   And both proposals are still present in the pending list
 
-- [ ] **Scenario: gates.test.js asserts the REAL human-gate contract (folded defect fix)**
+- [x] **Scenario: gates.test.js asserts the REAL human-gate contract (folded defect fix)**
   Given `tests/gates.test.js` currently constructs literal option arrays inside each
   test and asserts properties of those literals (imports nothing from `src/`) — an
   always-green tautology that a pre-ship review flagged as false-confidence
@@ -172,7 +178,7 @@ Without a cross-slice regression test, any future change to any of the four modu
   And every assertion targets real source behavior — mutating the gate logic breaks a
   test (no literal-only tautology remains)
 
-- [ ] **Scenario: Suite runs cross-platform with hermetic temp sandbox and nowMs injection**
+- [x] **Scenario: Suite runs cross-platform with hermetic temp sandbox and nowMs injection**
   Given `os.tmpdir()` returns a platform-specific temp directory (e.g. `C:\Temp` on Windows)
   When the regression suite creates sandbox directories using `path.join(os.tmpdir(), 'ctoc-test-' + Date.now())`
   Then all directory creation, plan fixture writing, and path resolution succeeds without a path error
