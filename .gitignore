@@ -30,3 +30,6 @@ Thumbs.db
 
 # Local example/demo projects — not part of the plugin distribution
 examples/
+
+# Working artifact: opus operating pack (source for the genericized template)
+opus48-operating-pack.zip
