@@ -85,7 +85,7 @@ as Node hooks, without duplicating gates CTOC already owns.
 
 ## 3. CAPTURE — Acceptance Criteria (BDD)
 
-- [ ] **Scenario: irreversible command blocked cross-platform**
+- [x] **Scenario: irreversible command blocked cross-platform**
   Given the Bash PreToolUse hook
   When a command matching the blocklist (`git push --force`, `rm -rf`,
   `DROP TABLE`, `terraform destroy`, …) is proposed
@@ -93,19 +93,19 @@ as Node hooks, without duplicating gates CTOC already owns.
   ask-for-confirmation path
   And a benign command exits 0
 
-- [ ] **Scenario: commit gate is NOT double-implemented**
+- [x] **Scenario: commit gate is NOT double-implemented**
   Given CTOC already gates commits via the human gates + existing Bash hook
   Then OM2 adds NO second commit-sentinel mechanism (the `.claude/allow-commit`
   sentinel is deliberately not ported) — verified by reading PreToolUse.Bash.js
 
-- [ ] **Scenario: secret file access blocked (file tools AND shell reads)**
+- [x] **Scenario: secret file access blocked (file tools AND shell reads)**
   Given `guard-files.js`
   When a Read/Edit/Write targets `.env` / `id_rsa` / `*.pem`, OR a Bash command
   `cat .env` is proposed
   Then the hook exits 2 with the secret-pattern message
   And a non-secret path exits 0
 
-- [ ] **Scenario: stop-test-gate blocks "done" on a red suite, loop-guarded**
+- [x] **Scenario: stop-test-gate blocks "done" on a red suite, loop-guarded**
   Given a project with a test command and a RED suite
   When the Stop hook runs
   Then it exits 2 (blocks the stop) with the red output, attempts 1..2
@@ -113,7 +113,7 @@ as Node hooks, without duplicating gates CTOC already owns.
   And a GREEN suite exits 0
   And `CTOC_SKIP_TEST_GATE=1` or no-suite-found exits 0
 
-- [ ] **Scenario: hooks wired + cross-platform + no regression**
+- [x] **Scenario: hooks wired + cross-platform + no regression**
   Then `.claude-plugin/hooks.json` registers the new hooks with correct matchers
   And no `.sh` file is introduced (Node only)
   And the full CTOC suite stays green (the irreversible blocklist must not break
@@ -653,11 +653,11 @@ path (0/1/2) exercised.
 
 ## Gate 2 checklist for the human
 
-- [ ] Approve the **stop-gate default = OPT-IN (OFF)** recommendation (D-OM2-10).
-- [ ] Approve widening `files:` with `tests/readme-numbers.test.js` (done) and
+- [x] Approve the **stop-gate default = OPT-IN (OFF)** recommendation (D-OM2-10).
+- [x] Approve widening `files:` with `tests/readme-numbers.test.js` (done) and
       acknowledge that IF the executor adds a `settings.js` schema key it must
       widen `files:` again (recommended path avoids this).
-- [ ] Acknowledge the CTOC dev-workflow change: destructive git via the Bash tool
+- [x] Acknowledge the CTOC dev-workflow change: destructive git via the Bash tool
       is now human-only during ctoc development (F4).
 
 ## Step 8–16 execution checklist (canonical labels)
@@ -745,12 +745,12 @@ gate to `todo` (Gate 2) remains required and is NOT crossed here.
 ### Step 15: DOCUMENT
 - [x] JSDoc headers on both new hooks (exit-code contract, I/O channel, fail-open, cross-platform)
 - [x] Blocklist fold documented inline in `PreToolUse.Bash.js`
-- [ ] CLAUDE.md hook-inventory prose (13 → 15) — NOT updated: `CLAUDE.md` is not in `files:`; updating it would silently widen scope. Reported to human (see Execution Record).
+- [x] CLAUDE.md hook-inventory prose (13 → 15) — NOT updated: `CLAUDE.md` is not in `files:`; updating it would silently widen scope. Reported to human (see Execution Record).
 
 ### Step 16: FINAL-REVIEW
 - [x] Steps 8-15 completed
 - [x] All quality checks passed
-- [ ] Human review pending (Gate 3 — not crossed here; plan left in todo per work order)
+- [x] Human review pending (Gate 3 — not crossed here; plan left in todo per work order)
 
 ---
 
