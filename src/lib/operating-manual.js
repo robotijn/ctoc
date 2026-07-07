@@ -121,7 +121,8 @@ function atomicWrite(targetPath, contentWithEol) {
  * @param {{ ctocRoot?: string }} [opts] - `ctocRoot` is a fallback base used only
  *                               to locate the template if the __dirname-relative
  *                               primary is unavailable.
- * @returns {{ action: 'created' | 'inserted' | 'updated' | 'unchanged', path: string }}
+ * @returns {{ action: 'created' | 'inserted' | 'updated' | 'unchanged', path: string | null }}
+ *   (`path` is null only when `projectRoot` is not a non-empty string — fail-open)
  *   - `created`   — CLAUDE.md did not exist; wrote a new file containing the block.
  *   - `inserted`  — CLAUDE.md existed without the block; appended it at EOF.
  *   - `updated`   — block existed; body replaced in place (outside bytes preserved).
@@ -129,6 +130,12 @@ function atomicWrite(targetPath, contentWithEol) {
  *                   was caught (fail-open: never throws).
  */
 function mergeOperatingManual(projectRoot, opts = {}) {
+  // Fail-open on invalid input: a null/non-string projectRoot must NOT throw
+  // (the "NEVER throws" contract must hold at the module boundary, not only at
+  // the shipped call-sites which happen to wrap this).
+  if (typeof projectRoot !== 'string' || projectRoot.length === 0) {
+    return { action: 'unchanged', path: null };
+  }
   const claudeMdPath = path.join(projectRoot, 'CLAUDE.md');
   try {
     // 1. Resolve the canonical template.
