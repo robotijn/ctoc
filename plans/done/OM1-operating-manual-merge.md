@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T11:22:02.468Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-07T10:48:47.567Z
@@ -85,7 +91,7 @@ non-destructive to project-specific CLAUDE.md content.
 
 ## 3. CAPTURE — Acceptance Criteria (BDD)
 
-- [ ] **Scenario: Fully-generic template ships (zero personal identity)**
+- [x] **Scenario: Fully-generic template ships (zero personal identity)**
   Given `.ctoc/templates/operating-manual.md`
   Then it contains ALL load-bearing craft verbatim (7 hard rules, 8 epistemics,
   agentic conduct, failure patterns, self-test)
@@ -94,27 +100,27 @@ non-destructive to project-specific CLAUDE.md content.
   [credentials]" identity line and the AI-professor/PhD descriptors are stripped
   And no operator/identity placeholder or setting is required to render it
 
-- [ ] **Scenario: init merges the manual block into a new project CLAUDE.md**
+- [x] **Scenario: init merges the manual block into a new project CLAUDE.md**
   Given a fresh project with no `.ctoc/`
   When `initProject(root)` runs
   Then the project CLAUDE.md contains exactly one
   `<!-- BEGIN ctoc:operating-manual -->…<!-- END ctoc:operating-manual -->` block
   holding the full generic operating manual
 
-- [ ] **Scenario: update re-syncs the block idempotently (no duplication)**
+- [x] **Scenario: update re-syncs the block idempotently (no duplication)**
   Given a project CLAUDE.md that already carries the manual block
   When the merge runs again (via `/ctoc:update` or a second init)
   Then there is still exactly ONE manual block, content refreshed from the current
   template, and all content OUTSIDE the block is byte-unchanged
 
-- [ ] **Scenario: merge preserves an existing hand-written CLAUDE.md**
+- [x] **Scenario: merge preserves an existing hand-written CLAUDE.md**
   Given a project CLAUDE.md with existing project content and no manual block
   When the merge runs
   Then the manual block is added (after the project-specific content — project nouns
   lead, universal craft follows) and none of the pre-existing content is lost or
   reordered
 
-- [ ] **Scenario: cross-platform + atomic**
+- [x] **Scenario: cross-platform + atomic**
   Then all path handling uses path.join / os, the CLAUDE.md write is atomic via
   safe-fs, and the full suite stays green on the CTOC repo
 
@@ -742,7 +748,7 @@ Line + branch ≥ 80%.
 - [x] Verify steps 8-15 completed correctly
 - [x] All quality checks passed
 - [x] Manual verification if needed — grep template: 0 forbidden strings
-- [ ] Ready for human review — awaiting Gate 3 (human approves review→done)
+- [x] Ready for human review — awaiting Gate 3 (human approves review→done)
 
 ---
 
