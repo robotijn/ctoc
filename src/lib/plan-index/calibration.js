@@ -194,7 +194,10 @@ async function runCalibration(deps = {}) {
   // Benchmark each present candidate; exclude any p95 >= budget (EM-03).
   const measured = [];
   for (const model of present) {
-    const p95ms = await measureP95(model, client, deps.clock);
+    const rawP95 = await measureP95(model, client, deps.clock);
+    // A non-finite measurement (e.g. a malformed injected clock) is treated as
+    // over-budget so it can never be pinned or persisted as `undefined` (F1).
+    const p95ms = Number.isFinite(rawP95) ? rawP95 : Infinity;
     measured.push({ model, p95ms });
     if (p95ms >= BUDGET_MS) {
       log(`${model}: p95 ${p95ms}ms >= budget ${BUDGET_MS}ms — excluded`);
@@ -232,7 +235,8 @@ async function runCalibration(deps = {}) {
     pinned: winner.model,
     dimension,
     backend: 'ollama',
-    measuredP95ms: winner.p95ms
+    // Persist an explicit number|null — never a silently-dropped `undefined` key (F1).
+    measuredP95ms: Number.isFinite(winner.p95ms) ? winner.p95ms : null
   };
   persist(projectPath, result);
   return result;
