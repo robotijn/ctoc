@@ -723,50 +723,81 @@ passing → Gate 3 (human approval) before `review → done`.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (`tests/plan-index-embedding.test.js`, EM-01…EM-12 + extra branch tests)
+- [x] Test error conditions (shape mismatch, non-200, non-finite, unreachable probe, count mismatch, none-in-budget)
+- [x] Run tests - expect RED (failing) — confirmed RED: all requires failed (`Cannot find module`)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (Node 24 built-in `fetch`, zero npm runtime deps)
+- [x] Check prerequisites — `../state.parseMetadata`, `../settings.getSetting(cat,key,path)`, `../safe-fs`, PI1 `openStore` all verified fresh
+- [x] Verify dev environment ready — Node v24.14.1
+- [x] Create directories/config if needed — modules live in existing `src/lib/plan-index/`
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — 6 modules in dependency order (summary-extract → hardware-probe → ollama-client → inprocess-engine → embedder → calibration)
+- [x] Add error handling — fail-open in every `embed` path; bounded AbortController timeouts; shape validation; fail-soft summary extract
+- [x] Wire up integration points — EM-05 integration against shipped PI1 `openStore`/`upsertUnit` passes
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — vs §File Specifications + §Security Review
+- [x] Verify integration points work together — EM-05 store dimension-lock via first upsert
+- [x] Check error handling completeness — every fetch bounded; every backend L2-normalized; fallback never rejects
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single batch POST per plan; one client instance; single-pass L2-normalize
+- [x] Optimize critical paths — signed feature-hashing fallback is O(tokens), no allocations per token
+- [x] Simplify complex code — no stubs; candidate order = size order avoids a separate sort
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — only code-derived `path.join` paths; all fs via `safe-fs`
+- [x] Sanitize outputs — Ollama response shape validated (finite, equal-length rows) before Float32Array
+- [x] No secrets in code — Ollama is unauthenticated local HTTP; no keys
+- [x] Safe file operations — `safe-fs` choke point; bounded timeouts prevent DoS/hang
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `npx eslint . --max-warnings 0` exit 0; tsc 89 errors (baseline-neutral, no regression)
+- [x] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → 2919 pass, 0 fail
+- [x] Check coverage >= 80% — line coverage: summary-extract 97.5, hardware-probe 95.6, ollama-client 97.65, inprocess 100, embedder 97.18, calibration 95.2
+- [x] 0 skipped, 0 flaky tests — 0 skipped (EM-12 ran against live `snowflake-arctic-embed2`; LOUD-skips only when no embedding model present)
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — module-header comment per file (per-machine calibration, DA-1/DA-2 rationale)
+- [x] Add JSDoc comments to new functions — every export has JSDoc with @param/@returns
+- [x] Update CHANGELOG if needed — N/A (per Correction #3, no README/version bump: plan-index/ is a subdir, outside readme-numbers count)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed — lint 0, tsc baseline-neutral, 2919/0, coverage >=80% all 6 modules
+- [x] Manual verification if needed — EM-12 real-model smoke passed on live Ollama
+- [ ] Ready for human review — awaiting Gate 3 (review → done) human approval
+
+---
+
+## Decisions Taken Under Ambiguity (Step-10 execution log)
+
+- **EM-12 smoke test target (execution-time decision).** The plan's EM-12 phrasing
+  hardcoded `nomic-embed-text` as "the calibrated model." On the execution machine
+  Ollama was reachable but had NO `nomic-embed-text` / `mxbai-embed-large` /
+  `all-minilm` installed — forcing `'ollama'` with a missing model silently
+  fail-opened to the in-process hashing embedder, which has no semantics and gave a
+  0.13 margin (< 0.15), a FALSE result masquerading as a real-model test. Decision:
+  EM-12 now discovers an actually-loaded embedding model from `/api/tags` (name
+  matches `/embed/i`), drives the real Ollama backend directly against it, and
+  LOUD-skips (`t.skip`) when NO embedding model is present or the embed call fails.
+  This makes the smoke test honest: it exercises real semantics when a real
+  embedding model exists (verified against `snowflake-arctic-embed2`, margin ≥ 0.15),
+  and never green-washes a fallback. Rationale: a smoke test that passes on the
+  semantics-free fallback is worse than no test.
+- **`clock` injection shape.** `runCalibration`'s injectable clock accepts EITHER
+  `{ p95For(model) }` (deterministic per-model p95 for EM-03) OR `{ now() }` (a
+  monotonic timer the real micro-benchmark times against). `p95For` takes
+  precedence when present. This keeps EM-03 fully deterministic while allowing a
+  real timed benchmark in production without a second code path.
+- **`pinned` field is a convenience alias of `model`.** `runCalibration` returns
+  both `model` and `pinned` (equal) so callers/tests can use either; the JSDoc
+  return type marks `pinned?` optional because the idempotent no-op path returns
+  the persisted object (which stores `pinned` but whose type is inferred from
+  `loadCalibration`). Baseline-neutral for tsc.
+- **No `no-await-in-loop` suppressions.** That rule is not enabled in this repo's
+  eslint config; the sequential benchmark/timing loops carry no disable directive
+  (an unused directive is itself a warning under `--max-warnings 0`).
