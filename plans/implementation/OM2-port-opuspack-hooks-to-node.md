@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T11:38:43.675Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "OM2 — Port the opus-pack bash guard hooks to cross-platform CTOC Node hooks"
 type: functional
 status: functional
