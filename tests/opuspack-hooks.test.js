@@ -193,11 +193,15 @@ describe('OM2 blocklist fold — irreversible commands blocked (exit 1)', () => 
     assertBashBlocked('rm -rf .');
   });
 
-  it('SQL destructive', () => {
+  it('SQL destructive (DROP/TRUNCATE are driver-independent; DELETE requires a driver token)', () => {
     assertBashBlocked('DROP TABLE users;');
     assertBashBlocked('DROP DATABASE app');
     assertBashBlocked('TRUNCATE TABLE t');
-    assertBashBlocked('DELETE FROM t;');
+    // A bare `DELETE FROM t;` with no DB-driver token is indistinguishable from
+    // a shell echo / prose and is now ALLOWED (the driver-token approach — see
+    // the SQL driver DELETE describe block for the real driver-issued block).
+    assertBashAllowed('DELETE FROM t;');
+    assertBashBlocked('psql -c "DELETE FROM t;"');
   });
 
   it('terraform destroy', () => {
@@ -215,6 +219,90 @@ describe('OM2 blocklist fold — irreversible commands blocked (exit 1)', () => 
     assertBashBlocked('dd if=/dev/zero of=x');
     assertBashBlocked('echo x > /dev/sda');
     assertBashBlocked('chmod -R 777 .');
+  });
+});
+
+// ── Boundary / bypass regression cases (the gap that let OM2 ship) ──────────
+describe('OM2 blocklist fold — git global-flag bypass BLOCKED (exit 1)', () => {
+  beforeEach(() => setState(15)); // commits allowed, so blocklist is the sole blocker
+
+  it('interposed global flags do not bypass destructive git subcommands', () => {
+    assertBashBlocked('git -c x=y push --force');
+    assertBashBlocked('git -c core.pager=cat push --force');
+    assertBashBlocked('git -c x=y reset --hard');
+    assertBashBlocked('git -C /repo reset --hard');
+    assertBashBlocked('git --git-dir=.g clean -d -f');
+    assertBashBlocked('git -c a=b branch -D feat');
+    assertBashBlocked('git -c a=b checkout .');
+  });
+});
+
+describe('OM2 blocklist fold — rm split/long-form BLOCKED (exit 1)', () => {
+  beforeEach(() => setState(15));
+
+  it('recursive+force in any order/split/long form blocks', () => {
+    assertBashBlocked('rm -r -f x');
+    assertBashBlocked('rm -f -r x');
+    assertBashBlocked('rm --recursive --force x');
+    assertBashBlocked('rm -R -f x');
+    assertBashBlocked('rm -rf x');
+    assertBashBlocked('rm -fr x');
+  });
+});
+
+describe('OM2 blocklist fold — git clean split flags BLOCKED (exit 1)', () => {
+  beforeEach(() => setState(15));
+  it('clean with -f anywhere blocks', () => {
+    assertBashBlocked('git clean -d -f');
+    assertBashBlocked('git clean --force');
+    assertBashBlocked('git clean -d --force');
+  });
+});
+
+describe('OM2 blocklist fold — SQL driver DELETE BLOCKED, echoes ALLOWED', () => {
+  beforeEach(() => setState(15));
+  it('driver-issued DELETE (with or without WHERE) blocks', () => {
+    assertBashBlocked('psql -c "DELETE FROM t WHERE 1=1"');
+    assertBashBlocked('psql -c "DELETE FROM users"');
+    assertBashBlocked('mysql -e "DELETE FROM t"');
+  });
+  it('a shell echo / prose mentioning DELETE FROM is allowed', () => {
+    assertBashAllowed('echo DELETE FROM t');
+    assertBashAllowed('echo "please DELETE FROM the list"');
+  });
+});
+
+describe('OM2 blocklist fold — command-word left-anchors ALLOW look-alikes', () => {
+  beforeEach(() => setState(15));
+  it('longer words containing a destructive command word are allowed', () => {
+    assertBashAllowed('add if=x');       // not `dd if=`
+    assertBashAllowed('confirm -rf');    // not `rm -rf`
+    assertBashAllowed('perform -rf x');  // not `rm -rf`
+  });
+  it('the real destructive form after a separator still blocks', () => {
+    assertBashBlocked('echo hi; rm -rf x');
+    assertBashBlocked('true && dd if=/dev/zero of=x');
+  });
+});
+
+describe('OM2 blocklist fold — force-push pattern is ReDoS-safe (<100ms)', () => {
+  beforeEach(() => setState(15));
+  it('200k-space non-matching input returns fast', () => {
+    const evil = 'git push ' + ' '.repeat(200000) + ' origin main';
+    const t = Date.now();
+    const res = runBash(evil);
+    const ms = Date.now() - t;
+    assert.equal(res.signal, null, 'hook crashed on ReDoS probe');
+    assert.equal(res.status, 0, `benign padded push must allow, got ${res.status}`);
+    assert.ok(ms < 100 + 3000, `force-push match must be near-instant; whole-process took ${ms}ms`);
+  });
+  it('the pattern itself matches a 200k-space input in <100ms (unit timing)', () => {
+    const re = /\bgit\b.*\bpush\b.*?--force(-with-lease)?\b/i;
+    const evil = 'git push ' + ' '.repeat(200000) + ' x';
+    const t = Date.now();
+    re.test(evil);
+    const ms = Date.now() - t;
+    assert.ok(ms < 100, `force-push regex must run <100ms on 200k spaces, took ${ms}ms`);
   });
 });
 
@@ -298,6 +386,45 @@ describe('OM2 guard-files — non-secret allowed (exit 0)', () => {
   });
 });
 
+// ── Over-block regression: code files NAMED ABOUT secrets must ALLOW ─────────
+describe('OM2 guard-files — secret-lookalike source files ALLOWED (exit 0)', () => {
+  const allowed = [
+    '/proj/src/tokenizer.js',
+    '/proj/src/refreshToken.js',
+    '/proj/tokens.test.js',
+    '/proj/lib/get-credentials.ts',
+    '/proj/.env.example',
+    '/proj/.env.sample',
+    '/proj/.env.template',
+  ];
+  for (const fp of allowed) {
+    it(`allows ${fp}`, () => {
+      const res = runGuardFiles({ file_path: fp });
+      assert.equal(res.status, 0, `expected ALLOW for ${fp}, got ${res.status}\n${res.stderr}`);
+    });
+  }
+});
+
+// ── Under-block regression: real secret files/variants must BLOCK ───────────
+describe('OM2 guard-files — additional secret variants BLOCKED (exit 1)', () => {
+  const blocked = [
+    '/proj/access_token.json',
+    '/proj/.envrc',
+    '/home/u/.ssh/id_dsa',
+    '/proj/server.key.backup',
+    '/proj/.env.local',
+    '/proj/.env.production',
+    '/proj/.credentials',
+    '/proj/credentials.json',
+  ];
+  for (const fp of blocked) {
+    it(`blocks ${fp}`, () => {
+      const res = runGuardFiles({ file_path: fp });
+      assert.equal(res.status, 1, `expected BLOCK for ${fp}, got ${res.status}\n${res.stderr}`);
+    });
+  }
+});
+
 describe('OM2 guard-files — cross-platform + fail-open', () => {
   it('blocks a Windows backslash secret path (separator normalization)', () => {
     const res = runGuardFiles({ file_path: 'C:\\Users\\x\\.ssh\\id_rsa' });
@@ -330,6 +457,26 @@ describe('OM2 stop-test-gate — opt-in default OFF', () => {
     const dir = makeStopProject({ testExit: 1, stopTestGate: false });
     const res = runStopGate(dir);
     assert.equal(res.status, 0, res.stderr);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a NESTED general.*.stopTestGate is NOT a direct child -> OFF (exit 0)', () => {
+    // stopTestGate under a sub-map of general must be ignored (default OFF), so a
+    // red suite is NOT run and the stop is allowed.
+    const dir = makeStopProject({ testExit: 1, stopTestGate: false });
+    fs.writeFileSync(path.join(dir, '.ctoc', 'settings.yaml'),
+      'general:\n  sub:\n    stopTestGate: true\n');
+    const res = runStopGate(dir);
+    assert.equal(res.status, 0, `nested stopTestGate must be OFF, got ${res.status}\n${res.stderr}`);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a QUOTED direct-child stopTestGate value is honored (exit 2 on red)', () => {
+    const dir = makeStopProject({ testExit: 1, stopTestGate: false });
+    fs.writeFileSync(path.join(dir, '.ctoc', 'settings.yaml'),
+      'general:\n  stopTestGate: "true"\n');
+    const res = runStopGate(dir);
+    assert.equal(res.status, 2, `quoted true must enable gate, got ${res.status}\n${res.stderr}`);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
