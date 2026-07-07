@@ -226,6 +226,20 @@ test('(fail-open) lone BEGIN marker (no END) → unchanged, file untouched, no t
   } finally { rmTmp(dir); }
 });
 
+// ── fail-open: invalid projectRoot → no throw (module-boundary contract) ─────
+
+test('(fail-open) null/undefined/non-string/empty projectRoot → unchanged, no throw', () => {
+  for (const bad of [null, undefined, '', 42, {}, []]) {
+    let res;
+    assert.doesNotThrow(
+      () => { res = mergeOperatingManual(bad, { ctocRoot: CTOC_ROOT }); },
+      'mergeOperatingManual must never throw on invalid projectRoot: ' + String(bad)
+    );
+    assert.equal(res.action, 'unchanged', 'invalid projectRoot → unchanged');
+    assert.equal(res.path, null, 'invalid projectRoot → path null');
+  }
+});
+
 // ── fail-open: missing template → no throw, unchanged ────────────────────────
 
 test('(fail-open) unresolvable template (bogus ctocRoot, primary forced away) → no throw', () => {
