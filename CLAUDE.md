@@ -226,7 +226,7 @@ ctoc/
   docs/                  IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
-    hooks/               15 Claude Code hooks (session start, pre-tool-use, post-tool-use)
+    hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use)
     lib/                 114 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)

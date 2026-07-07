@@ -716,6 +716,36 @@ function openStore(jsonPath, opts = {}) {
   }
 
   /**
+   * The DISTINCT normalized planPaths currently in the store. Lock-free, read-only,
+   * O(n) over the units Map. Added for PI3's reconciliation sweep (orphan
+   * enumeration): the sweep compares this against the on-disk plan set to find
+   * stored units whose file no longer exists. Additive — no existing behavior
+   * changes; callers must have normalized planPaths consistently at upsert (D9).
+   * @returns {string[]}
+   */
+  function listPlanPaths() {
+    const seen = new Set();
+    for (const rec of units.values()) seen.add(rec.planPath);
+    return [...seen];
+  }
+
+  /**
+   * The sectionIds of every unit stored under `planPath` (plan-level `__plan__`
+   * plus each section). Lock-free, read-only, O(n). Added for PI3 orphan removal so
+   * a deleted plan's section units are cleaned alongside its plan-level unit.
+   * @param {string} planPath
+   * @returns {string[]}
+   */
+  function listUnitSectionIds(planPath) {
+    if (typeof planPath !== 'string') return [];
+    const ids = [];
+    for (const rec of units.values()) {
+      if (rec.planPath === planPath) ids.push(rec.sectionId);
+    }
+    return ids;
+  }
+
+  /**
    * Brute-force cosine nearest-neighbour search. Lock-free.
    * @param {Float32Array} queryEmbedding
    * @param {number} k
@@ -775,6 +805,8 @@ function openStore(jsonPath, opts = {}) {
       moveUnit: (f, t) => { validateMoveArgs(f, t); return applyMove(f, t); },
       getUnit,
       getFilesForPlan,
+      listPlanPaths,
+      listUnitSectionIds,
       search
     }));
   }
@@ -789,6 +821,8 @@ function openStore(jsonPath, opts = {}) {
     deleteUnit,
     moveUnit,
     getFilesForPlan,
+    listPlanPaths,
+    listUnitSectionIds,
     search,
     save,
     withBatch

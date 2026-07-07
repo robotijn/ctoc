@@ -139,8 +139,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countSlashCommandSpecs(), 3);
   });
 
-  it('src/hooks/: 15 hook files (guard-files + stop-test-gate added for OM2)', () => {
-    assert.equal(countTopLevelFiles('src/hooks'), 15);
+  it('src/hooks/: 16 hook files (PostToolUse.plan-index-sync added for PI3)', () => {
+    assert.equal(countTopLevelFiles('src/hooks'), 16);
   });
 
   it('src/tabs/: 8 dashboard tab files', () => {
@@ -249,8 +249,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /3 slash commands/);
   });
 
-  it('Project structure: 12 Claude Code hooks', () => {
-    assert.match(README, /13 Claude Code hooks/);
+  it('Project structure: 16 Claude Code hooks', () => {
+    assert.match(README, /16 Claude Code hooks/);
   });
 
   it('Project structure: 114 JS modules in src/lib', () => {
