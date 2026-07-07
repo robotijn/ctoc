@@ -61,7 +61,86 @@ function movePlan(planPath, destination, projectPath) {
 
   safeFs.renameSync(planPath, newPath);
   invalidate(); // CF1: bust cached counts so the next read reflects the move
+
+  // PI3: additive, fail-open plan-index sync guard. A pure stage move only renames
+  // the file (bytes byte-identical before/after), so the plan's contentHash is
+  // unchanged → re-path the stored units via store.moveUnit (NO re-embed). Wrapped
+  // in try/catch: an index error is logged and swallowed — it must NEVER break the
+  // primary rename (the index is a rebuildable cache; SY-13). PI0 owns the store
+  // wiring; until PI0 is integrated the wiring is absent and this is a no-op.
+  try {
+    const wiring = loadPlanIndexWiring();
+    if (wiring && wiring.store && typeof wiring.store.moveUnit === 'function') {
+      const fromNorm = normalizePlanIndexPath(root, planPath);
+      const toNorm = normalizePlanIndexPath(root, newPath);
+      wiring.store.moveUnit(fromNorm, toNorm); // pure re-path; embedder untouched
+    }
+  } catch (err) {
+    logPlanIndexError(root, 'movePlan', err);
+  }
+
   return newPath;
+}
+
+/**
+ * Best-effort load of PI0's plan-index composition-root wiring. Returns
+ * `{ store, embedder, calibrationReady }` or null if PI0 is not yet integrated
+ * (fail-open). Lazy-required inside the guard so there is no load-time cycle.
+ * @returns {object|null}
+ */
+function loadPlanIndexWiring() {
+  try {
+    // The PI0 wiring seam does not exist until PI0 integration lands. Require it
+    // through an aliased binding so static module resolution does not flag a
+    // missing module, while the argument stays a string literal (fail-open).
+    const req = require;
+    const wiring = req('./plan-index/wiring');
+    if (wiring && typeof wiring.getWiring === 'function') {
+      const w = wiring.getWiring();
+      if (w && w.store) return w;
+    }
+  } catch {
+    /* PI0 wiring not present — fail-open */
+  }
+  return null;
+}
+
+/**
+ * Normalize a plan path to the canonical `plans/<stage>/<slug>.md` POSIX form the
+ * plan index keys on (PI1 D9). Cross-platform.
+ * @param {string} root
+ * @param {string} planPath
+ * @returns {string}
+ */
+function normalizePlanIndexPath(root, planPath) {
+  const rel = path.relative(root, planPath);
+  const posix = rel.split(path.sep).join('/').replace(/\\/g, '/');
+  const idx = posix.lastIndexOf('plans/');
+  return idx >= 0 ? posix.slice(idx) : posix;
+}
+
+/**
+ * Best-effort error log to `.ctoc/logs/plan-index-sync.json`. Never throws.
+ * @param {string} root
+ * @param {string} source
+ * @param {Error} err
+ */
+function logPlanIndexError(root, source, err) {
+  try {
+    const logDir = path.join(root, '.ctoc', 'logs');
+    if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true });
+    const logPath = path.join(logDir, 'plan-index-sync.json');
+    let log = [];
+    if (safeFs.existsSync(logPath)) {
+      try { log = JSON.parse(safeFs.readFileSync(logPath, 'utf8')); } catch { log = []; }
+    }
+    if (!Array.isArray(log)) log = [];
+    log.push({ timestamp: new Date().toISOString(), source, error: err && err.message });
+    if (log.length > 500) log = log.slice(-500);
+    safeFs.writeFileSync(logPath, JSON.stringify(log, null, 2));
+  } catch {
+    /* best-effort */
+  }
 }
 
 // Human gates: transitions that require human approval marker
