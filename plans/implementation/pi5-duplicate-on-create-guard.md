@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T13:27:22.211Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "PI5 — Duplicate-on-Create Guard (warns, never blocks)"
 created: "2026-06-28T00:00:00Z"
 type: feature
