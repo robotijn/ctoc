@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T15:39:24.306Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-07T13:45:57.840Z
@@ -94,14 +100,14 @@ self-correcting regardless of what external tool modified the plans.
 
 ## Acceptance Criteria
 
-- [ ] **Scenario: Write tool creates a plan — PostToolUse hook indexes it**
+- [x] **Scenario: Write tool creates a plan — PostToolUse hook indexes it**
   Given an empty index and the `PostToolUse.plan-index-sync.js` hook is active
   When Claude's Write tool creates a new file at `plans/functional/new-plan.md`
   Then the hook fires `syncUnit` with `tool_input.file_path` pointing to the new
   file; `store.getUnit('plans/functional/new-plan.md', '__plan__')` returns the
   plan-level unit (`PLAN_SENTINEL` sectionId) with the correct `contentHash`
 
-- [ ] **Scenario: Move a plan — old path removed, new path present; no re-embed on pure stage move**
+- [x] **Scenario: Move a plan — old path removed, new path present; no re-embed on pure stage move**
   Given a plan indexed at `plans/vision/x.md` with content hash H and a mock
   embedder spy reset to 0 calls
   When `movePlan('plans/vision/x.md', 'done')` is called (content unchanged,
@@ -113,7 +119,7 @@ self-correcting regardless of what external tool modified the plans.
   embedder spy call count remains 0 (content hash unchanged — re-embed skipped by
   the hash guard in `movePlan`, which uses `moveUnit`'s no-re-embed re-path)
 
-- [ ] **Scenario: Edit tool modifies a plan — PostToolUse hook re-indexes it**
+- [x] **Scenario: Edit tool modifies a plan — PostToolUse hook re-indexes it**
   Given a plan indexed with content hash A
   When Claude's Edit tool modifies the plan file and the
   `PostToolUse.plan-index-sync.js` hook fires with the file path
@@ -121,26 +127,26 @@ self-correcting regardless of what external tool modified the plans.
   from A to hash B (the new content hash) — an idempotent replace keyed on
   `(planPath, sectionId)`; the old hash A is no longer stored
 
-- [ ] **Scenario: Plan file deleted — reconcileIndex sweep removes orphaned unit**
+- [x] **Scenario: Plan file deleted — reconcileIndex sweep removes orphaned unit**
   Given a plan indexed at `plans/functional/y.md`
   When the plan file is removed from the filesystem by any external tool
   Then after `reconcileIndex(plansRoot, { store, embedder })` is run (calling
   `store.deleteUnit` for the orphaned unit),
   `store.getUnit('plans/functional/y.md', '__plan__')` returns null
 
-- [ ] **Scenario: Manual editor save caught by sweep**
+- [x] **Scenario: Manual editor save caught by sweep**
   Given a plan file is modified directly by a text editor (outside CTOC control)
   When `reconcileIndex(plansRoot, { store, embedder })` is run
   Then the unit for that file is re-embedded and the stored hash matches the new
   content hash
 
-- [ ] **Scenario: Simulated git pull caught by sweep**
+- [x] **Scenario: Simulated git pull caught by sweep**
   Given a plan file's content is replaced by writing new bytes directly to the
   filesystem (simulating a `git pull` change outside CTOC)
   When `reconcileIndex(plansRoot, { store, embedder })` is run
   Then the updated unit is in the DB; no manual intervention is required
 
-- [ ] **Scenario: Sweep re-embeds only changed units (call count assertion)**
+- [x] **Scenario: Sweep re-embeds only changed units (call count assertion)**
   Given 5 plans where 4 units are seeded DIRECTLY via `store.upsertUnit({ ...,
   contentHash: currentFileHash, embedding: stubVector })` (bypassing the
   embedder), 1 plan has its file content modified on disk, and the mock embedder
@@ -150,7 +156,7 @@ self-correcting regardless of what external tool modified the plans.
   Then `mockEmbedder.callCount === 1` (only the changed plan is re-embedded);
   the 4 unchanged plans produce zero embedder calls
 
-- [ ] **Scenario: syncUnit is idempotent**
+- [x] **Scenario: syncUnit is idempotent**
   Given a plan is already indexed with hash `def456`
   When `syncUnit(path, { store, embedder })` is called twice on the same
   unchanged file
@@ -159,35 +165,35 @@ self-correcting regardless of what external tool modified the plans.
   duplicate unit is created (`upsertUnit` is an idempotent replace keyed on
   `(planPath, sectionId)`); no second embed call is made
 
-- [ ] **Scenario: syncUnit with stub embedder — stored embedding matches stub**
+- [x] **Scenario: syncUnit with stub embedder — stored embedding matches stub**
   Given a stub embedder that returns a fixed `Float32Array` of zeros at the
   configured dimension
   When `syncUnit(path, { store, embedder: stubEmbedder })` is called
   Then `store.getUnit(path, '__plan__').embedding` equals the stub zero array
   byte-for-byte (Float32 precision preserved through the store round-trip)
 
-- [ ] **Scenario: PostToolUse hook fires syncUnit for plans/ file**
+- [x] **Scenario: PostToolUse hook fires syncUnit for plans/ file**
   Given the `PostToolUse.plan-index-sync.js` hook is active and a plan file
   under `plans/` is written by a Claude tool call
   When the hook fires
   Then a syncUnit spy is called with that specific file path; no error surfaces
   to the user; the hook exits in < 10 ms (fire-and-forget)
 
-- [ ] **Scenario: Cross-platform — all file ops use path.join and fs.promises**
+- [x] **Scenario: Cross-platform — all file ops use path.join and fs.promises**
   Given CTOC is running on Windows (mocked via `process.platform = 'win32'`)
   When `reconcileIndex` walks `plans/**`
   Then all file reads use `fs.promises.readFile` with `path.join`-constructed
   paths; no shell commands are invoked; no hardcoded `/` separators appear in
   the walk logic
 
-- [ ] **Scenario: Error isolation — throwing embedder does not block movePlan**
+- [x] **Scenario: Error isolation — throwing embedder does not block movePlan**
   Given a mock embedder that throws `Error('embed failed')` on every call
   When `movePlan('plans/vision/x.md', 'done')` is called
   Then the file is present at `plans/done/x.md` on disk (primary action
   succeeded), the error is written to `.ctoc/logs/` (logged, not swallowed
   silently), and no unhandled rejection or thrown error surfaces to the caller
 
-- [ ] **Scenario: calibrationReady gate — syncUnit no-ops until calibration completes**
+- [x] **Scenario: calibrationReady gate — syncUnit no-ops until calibration completes**
   Given `calibrationReady()` returns false (no `calibration.json` exists yet)
   When `syncUnit(path, { store, embedder })` is called
   Then the embedder is NOT called, no store write is made (no `upsertUnit`), and
@@ -899,34 +905,34 @@ function.
 > OPTIMIZE → SECURE → VERIFY → DOCUMENT → FINAL-REVIEW. `iron_loop: true` is set in
 > the first frontmatter block so `validateForExecution` passes at todo→in-progress.
 
-- [ ] **Step 8: TEST** — Write `tests/plan-index-sync.test.js` FIRST (TDD-red):
+- [x] **Step 8: TEST** — Write `tests/plan-index-sync.test.js` FIRST (TDD-red):
   all 15 cases SY-01…SY-15 mapped above, with the stub embedder + mock/real
   store harness. Tests fail (modules do not yet exist).
-- [ ] **Step 9: PREPARE** — Ensure `src/lib/plan-index/` exists (it does);
+- [x] **Step 9: PREPARE** — Ensure `src/lib/plan-index/` exists (it does);
   confirm `hash-utils.hashString`, `safe-fs.promises`, `state.parseMetadata`,
   barrel `PLAN_SENTINEL` are importable; create the `os.tmpdir()` scratch harness.
-- [ ] **Step 10: IMPLEMENT** — Create the four files in dependency order
+- [x] **Step 10: IMPLEMENT** — Create the four files in dependency order
   (content-hash.js → sync-unit.js → reconcile.js → PostToolUse.plan-index-sync.js),
   add the additive `movePlan` guard in actions.js, register the hook in
   `.claude-plugin/hooks.json`, and bump the hook count in
   `tests/readme-numbers.test.js` (15→16) + `CLAUDE.md`. Pick orphan-enumeration
   option (a) or (b) and record it in `## Decisions Taken Under Ambiguity`.
   NO stubs — make the documented choice and ship working code.
-- [ ] **Step 11: REVIEW** — Self-review vs the Architecture Validation Checks
+- [x] **Step 11: REVIEW** — Self-review vs the Architecture Validation Checks
   below (dependency direction inward; DI embedder/calibration; barrel-only PI1
   import; fail-open hot paths).
-- [ ] **Step 12: OPTIMIZE** — Confirm the sweep takes exactly one lock
+- [x] **Step 12: OPTIMIZE** — Confirm the sweep takes exactly one lock
   (`withBatch`), one embed per changed unit, no redundant re-reads.
-- [ ] **Step 13: SECURE** — Run the Security Review checklist (path traversal on
+- [x] **Step 13: SECURE** — Run the Security Review checklist (path traversal on
   `file_path`, normalization/D9 consistency, no NUL in keys — PI1 rejects it, log
   messages leak no secrets).
-- [ ] **Step 14: VERIFY** — `node --test tests/plan-index-sync.test.js` and the
+- [x] **Step 14: VERIFY** — `node --test tests/plan-index-sync.test.js` and the
   full suite green (`# fail 0`); lint/typecheck clean; coverage ≥ 80% on new
   modules; benchmark the sweep at 200 plans and record p95 (Risk mitigation).
-- [ ] **Step 15: DOCUMENT** — JSDoc on every export (signatures above); update
+- [x] **Step 15: DOCUMENT** — JSDoc on every export (signatures above); update
   the module header comments; ensure `## Decisions Taken Under Ambiguity` records
   the orphan-enumeration choice and normalizePath form.
-- [ ] **Step 16: FINAL-REVIEW** — implementation-reviewer verifies 14 quality
+- [x] **Step 16: FINAL-REVIEW** — implementation-reviewer verifies 14 quality
   dimensions + this checklist; Gate 3 is human-approved (never auto-crossed).
 
 ## Acceptance Criteria Mapping
@@ -963,21 +969,21 @@ Every BDD scenario maps to ≥ 1 implementation site and ≥ 1 named test. No ga
 
 ## Security Review (for Step 13 SECURE)
 
-- [ ] **Path traversal** — `file_path` from the hook payload is normalized and
+- [x] **Path traversal** — `file_path` from the hook payload is normalized and
   matched against `plans/**/*.md` before use; a path escaping `plans/` is ignored
   (no-op, not an error). `reconcileIndex` walks only under `plansRoot`.
-- [ ] **Key-injection / NUL** — PI1's `upsertUnit` rejects a NUL in
+- [x] **Key-injection / NUL** — PI1's `upsertUnit` rejects a NUL in
   `planPath`/`sectionId` (store.js 557) and `loadFromDisk` skips+warns NUL keys;
   PI3's `normalizePath` produces plain `plans/...md` strings — no NUL, no
   separator ambiguity (D9 consistent form).
-- [ ] **No secrets** — no keys/tokens; log messages carry only paths + error
+- [x] **No secrets** — no keys/tokens; log messages carry only paths + error
   `.message`.
-- [ ] **Safe file ops** — all fs via `safe-fs`; writes target only
+- [x] **Safe file ops** — all fs via `safe-fs`; writes target only
   `.ctoc/index/*` (via the store) and `.ctoc/logs/*` (error log). Never writes
   `plans/**`.
-- [ ] **Error messages** — logged to `.ctoc/logs/`, not surfaced to the user; no
+- [x] **Error messages** — logged to `.ctoc/logs/`, not surfaced to the user; no
   stack traces to end users.
-- [ ] **No command injection** — zero `exec`/`execSync`/shell; pure fs + crypto.
+- [x] **No command injection** — zero `exec`/`execSync`/shell; pure fs + crypto.
 
 ## CF1 / `cache.invalidate` analysis (confirmed — does NOT trip the guard)
 
@@ -1105,4 +1111,4 @@ Every BDD scenario maps to ≥ 1 implementation site and ≥ 1 named test. No ga
 - [x] Verify steps 8-15 completed correctly
 - [x] All quality checks passed
 - [x] Manual verification if needed
-- [ ] Ready for human review — Gate 3 (review → done) is a HUMAN gate; NOT auto-crossed
+- [x] Ready for human review — Gate 3 (review → done) is a HUMAN gate; NOT auto-crossed

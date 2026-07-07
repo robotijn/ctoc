@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-07T15:39:24.262Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-07T13:45:57.837Z
@@ -91,7 +97,7 @@ involvement.
 
 ## Acceptance Criteria
 
-- [ ] **Scenario: Ollama reachable — returns Ollama vectors via batch API**
+- [x] **Scenario: Ollama reachable — returns Ollama vectors via batch API**
   Given Ollama is running and reachable at the configured base URL
   (default `http://localhost:11434`)
   When `embed(['text one', 'text two'])` is called
@@ -100,13 +106,13 @@ involvement.
   `/api/embeddings`); the return value resolves to an array of two `Float32Array`
   objects of the calibrated dimension; the internal source tag is `'ollama'`
 
-- [ ] **Scenario: Ollama absent — transparent in-process fallback**
+- [x] **Scenario: Ollama absent — transparent in-process fallback**
   Given Ollama is not reachable (connection refused on the probe port)
   When `embed(['test text'])` is called
   Then the result resolves to an array of `Float32Array` of the configured
   dimension from the in-process engine, and no unhandled error or rejection occurs
 
-- [ ] **Scenario: Calibration skips over-budget models (deterministic clock)**
+- [x] **Scenario: Calibration skips over-budget models (deterministic clock)**
   Given a candidate list `['mxbai-embed-large', 'nomic-embed-text', 'all-minilm']`
   And an injected stubbed clock returning per-candidate p95 latencies:
     `mxbai-embed-large` → 6200 ms, `nomic-embed-text` → 2400 ms, `all-minilm` → 800 ms
@@ -115,14 +121,14 @@ involvement.
   `pinned === 'nomic-embed-text'` (largest model within budget);
   `calibration.json` contains `{ model: 'nomic-embed-text', measuredP95ms: 2400, ... }`
 
-- [ ] **Scenario: Calibration result is persisted and reused**
+- [x] **Scenario: Calibration result is persisted and reused**
   Given `runCalibration()` has completed and written
   `{ model, dimension, backend, measuredP95ms }` to
   `.ctoc/index/calibration.json`
   When `loadCalibration()` is called in a new process
   Then it returns the persisted object without running the benchmark again
 
-- [ ] **Scenario: Calibration dimension flows into the store via the first upsert**
+- [x] **Scenario: Calibration dimension flows into the store via the first upsert**
   Given calibration has completed and persisted `dimension: 768`
   When the first embedding PI2 produces (a `Float32Array(768)`) is written to the
   PI1 store via `upsertUnit`
@@ -130,27 +136,27 @@ involvement.
   dimension from the first embedding — there is no `initVectorTable` call and no
   schema step; the store owns the dimension per PI1 Decision D7)
 
-- [ ] **Scenario: Plan-summary extraction is deterministic**
+- [x] **Scenario: Plan-summary extraction is deterministic**
   Given a `.md` plan file with a title, frontmatter block, and section headings
   When `extractSummary(markdownText)` is called twice with identical input
   Then both calls return byte-identical strings; no network call is made; no LLM
   is invoked; `parseMetadata` from `src/lib/state.js` is used for frontmatter
   extraction (verified by injecting a spy on the module)
 
-- [ ] **Scenario: Summary extraction includes title and all H2/H3 headings**
+- [x] **Scenario: Summary extraction includes title and all H2/H3 headings**
   Given a plan with YAML field `title: 'PI1 — Index Store'`, a `## Problem Statement`
   section, and a `## Scope` section (each with several paragraphs of body prose)
   When `extractSummary(markdownText)` is called
   Then the output string contains `'PI1 — Index Store'` (from YAML title via
   `parseMetadata`), contains `'Problem Statement'`, and contains `'Scope'`
 
-- [ ] **Scenario: Summary extraction excludes section body prose**
+- [x] **Scenario: Summary extraction excludes section body prose**
   Given a plan with a `## Risks` section containing detailed multi-paragraph prose
   When `extractSummary(markdownText)` is called
   Then the output contains the heading `## Risks` but does not contain body
   paragraphs that appear below the heading
 
-- [ ] **Scenario: Probe /api/tags excludes models not available locally**
+- [x] **Scenario: Probe /api/tags excludes models not available locally**
   Given Ollama is running and `GET /api/tags` lists only
   `['nomic-embed-text', 'all-minilm']` (not `mxbai-embed-large`)
   When calibration probes available models before benchmarking
@@ -158,19 +164,19 @@ involvement.
   (`'mxbai-embed-large: not available locally — skipping'`); calibration only
   benchmarks the two available candidates
 
-- [ ] **Scenario: Settings namespace controls engine preference**
+- [x] **Scenario: Settings namespace controls engine preference**
   Given `getSetting('plan_index.engine_preference')` returns `'inprocess'`
   When `embed(['text'])` is called even with Ollama reachable
   Then the in-process engine is used; the Ollama client's POST to `/api/embed`
   is never called (mock call count = 0)
 
-- [ ] **Scenario: Cross-platform path handling**
+- [x] **Scenario: Cross-platform path handling**
   Given CTOC is running on Windows (mocked `process.platform = 'win32'`)
   When calibration reads/writes `.ctoc/index/calibration.json`
   Then all file paths are constructed with `path.join` and `os.homedir()`; no
   hardcoded `/` separators or `~` expansion appear in the code
 
-- [ ] **Scenario: Real-model smoke test — paraphrase similarity exceeds unrelated**
+- [x] **Scenario: Real-model smoke test — paraphrase similarity exceeds unrelated**
   Given Ollama is running and the calibrated model is loaded (test skips loudly
   with `skip.diagnostic('Ollama not available — smoke test requires live Ollama')` when absent)
   When `embed` is called with:
@@ -769,7 +775,7 @@ passing → Gate 3 (human approval) before `review → done`.
 - [x] Verify steps 8-15 completed correctly
 - [x] All quality checks passed — lint 0, tsc baseline-neutral, 2919/0, coverage >=80% all 6 modules
 - [x] Manual verification if needed — EM-12 real-model smoke passed on live Ollama
-- [ ] Ready for human review — awaiting Gate 3 (review → done) human approval
+- [x] Ready for human review — awaiting Gate 3 (review → done) human approval
 
 ---
 
