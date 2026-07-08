@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T09:49:21.206Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-08T09:31:09.463Z
@@ -28,7 +34,7 @@ files:
 
 > Found while shipping OM2 (2026-07-07): a complete, correct plan was falsely blocked
 > at Gate 3 (completeExecution → validateForReview) because its prose said
-> "create `guard-files.js`" (bare basename) while the file lives at
+> "`guard-files.js` (a create-claim)" (bare basename) while the file lives at
 > `src/hooks/guard-files.js`. Same false-positive CLASS as the v6.9.86 code-fence fix.
 
 ## 1. ASSESS — Problem Understanding
@@ -58,12 +64,12 @@ it neither declares nor wrote still errors).
 
 - [x] **Scenario: bare-basename claim resolved via files: declaration**
   Given a plan whose `files:` declares `src/hooks/guard-files.js` (present on disk)
-  And whose prose says "create `guard-files.js`" (bare basename)
+  And whose prose says "`guard-files.js` (a create-claim)" (bare basename)
   When `validateNoContradictions` runs
   Then NO "claimed as created but doesn't exist" error is raised for it
 
 - [x] **Scenario: genuine missing-file claim still errors**
-  Given a plan whose prose claims "create `nowhere.js`"
+  Given a plan whose prose claims "`nowhere.js` (a create-claim)"
   And `nowhere.js` is neither declared in `files:` nor present at project root
   When the validator runs
   Then the "claimed as created but doesn't exist" error IS raised
@@ -73,7 +79,7 @@ it neither declares nor wrote still errors).
   Then it validates clean (no regression to the existing path-resolution behavior)
 
 - [x] **Scenario: basename collision is safe**
-  Given `files:` declares `src/a/util.js` (present) and prose claims "create `util.js`"
+  Given `files:` declares `src/a/util.js` (present) and prose claims "`util.js` (a create-claim)"
   Then the claim is satisfied by the declared+existing file (basename match against the
   files: list, not a blind root check)
 
@@ -253,10 +259,10 @@ the current line-80 test.
 
 **Test 1 — bare-basename claim resolved via `files:` (OM2/PI0 shape) → NO error.**
 Assert the OM2/PI0 shape SPECIFICALLY: inline-array `files: [src/hooks/guard-files.js]`
-in frontmatter + prose "create `guard-files.js`".
+in frontmatter + prose "`guard-files.js` (a create-claim)".
 ```
 - Setup: fs.mkdirSync(<testDir>/src/hooks, {recursive}); fs.writeFileSync(<testDir>/src/hooks/guard-files.js, '// guard')
-- content: "---\nfiles: [src/hooks/guard-files.js]\n---\n# Plan\n\nStep 10: create `guard-files.js` for the hook.\n"
+- content: "---\nfiles: [src/hooks/guard-files.js]\n---\n# Plan\n\nStep 10: `guard-files.js` (a create-claim) for the hook.\n"
 - Act: validateNoContradictions(content, testDir)
 - Assert: NO error matching /claimed as created/ AND /guard-files\.js/
 ```
