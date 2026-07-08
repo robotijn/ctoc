@@ -174,50 +174,63 @@ includes `gdpr`. Ready for batched Gate 2 with siblings s2, s3.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions (unknown-profile guard returns null)
+- [x] Run tests - expect RED (failing) — RED confirmed: before-hook ENOENT on missing gdpr.yaml cancelled all 6 tests
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none required
+- [x] Check prerequisites — dsar_handler/retention_schedule/audit_hash_chain all verified in KNOWN_CONTROLS; gdpr_dsar_log verified in RETENTION_CATEGORIES
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — .ctoc/regulatory-regimes/ already exists
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — created gdpr.yaml modeled exactly on eu-ai-act-high-risk.yaml
+- [x] Add error handling — N/A (pure data file; loader handles absence via null)
+- [x] Wire up integration points — loaded by existing loadProfile/listAvailableProfiles/effectiveControls, no src changes
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — YAML round-trips through parseYAMLShallow; name matches filename stem; block lists parse
+- [x] Verify integration points work together — effectiveControls union-merges the 3 controls when gdpr active
+- [x] Check error handling completeness — unknown profile returns null (asserted)
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — profile minimal: only the 3 mandated controls, no speculative extras
+- [x] Optimize critical paths — N/A
+- [x] Simplify complex code — N/A
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — profile name is literal 'gdpr'; loader uses path.join into PROFILES_DIR
+- [x] Sanitize outputs — N/A
+- [x] No secrets in code — public regulatory URLs only
+- [x] Safe file operations — test writes only under os.tmpdir() mkdtemp, cleaned in after(); no gate/enforcement key in YAML
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0 (--max-warnings 0); tsc baseline-neutral (89 pre-existing errors, 0 from slice files)
+- [x] Run ALL tests (TDD Green) — slice 6/6 pass; full suite 3151 pass / 0 fail / 0 skipped / 0 cancelled
+- [x] Check coverage >= 80% — data slice; every declared key and every control asserted (100% of surface exercised)
+- [x] 0 skipped, 0 flaky tests — confirmed
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — see Decision D1 (settings.yaml comment deferred to stay within file-coverage contract)
+- [x] Add JSDoc comments to new functions — N/A (no new functions)
+- [x] Update CHANGELOG if needed — N/A for a data slice
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — loader loads gdpr.yaml, listAvailableProfiles includes gdpr, all controls in KNOWN_CONTROLS
+- [x] Ready for human review (batched Gate 2 with siblings s2, s3)
+
+## Decisions Taken Under Ambiguity
+
+- **D1 — settings.yaml doc comment deferred (Step 15).** The plan's Step 15 asks to add a
+  `#   - gdpr ...` line to the "Available profiles" comment block in `.ctoc/settings.yaml`.
+  However, this slice's frontmatter `files:` declares only `.ctoc/regulatory-regimes/gdpr.yaml`
+  and `tests/ec1-gdpr-profile.test.js`. Editing `.ctoc/settings.yaml` would fall outside the
+  plan's file-coverage contract (scope creep against the declared `files:`). Decision: do NOT
+  edit settings.yaml in this slice. The comment is purely cosmetic (it does not affect
+  `active_profiles` or any behavior — `listAvailableProfiles` discovers gdpr.yaml directly from
+  the directory, proven by the passing test). If the docs comment is desired, add it in a slice
+  whose `files:` includes `.ctoc/settings.yaml`, or via an explicit doc-only follow-up. No
+  functional impact.

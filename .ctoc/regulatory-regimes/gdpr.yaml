@@ -1,0 +1,27 @@
+name: gdpr
+display_name: "General Data Protection Regulation (Regulation (EU) 2016/679)"
+description: "Applicable to controllers and processors of personal data of individuals in the European Union."
+authoritative_sources:
+  - title: "GDPR Article 15 — Right of access by the data subject"
+    url: "https://gdpr-info.eu/art-15-gdpr/"
+  - title: "GDPR Article 17 — Right to erasure (right to be forgotten)"
+    url: "https://gdpr-info.eu/art-17-gdpr/"
+  - title: "GDPR Article 30 — Records of processing activities"
+    url: "https://gdpr-info.eu/art-30-gdpr/"
+  - title: "GDPR Article 33 — Notification of a personal data breach to the supervisory authority"
+    url: "https://gdpr-info.eu/art-33-gdpr/"
+effective_date: "2018-05-25"
+applies_to: "Controllers and processors of personal data of individuals in the European Union, regardless of where the processing takes place"
+required_controls:
+  - dsar_handler
+  - retention_schedule
+  - audit_hash_chain
+retention:
+  gdpr_dsar_log: 1095
+notes: |
+  Article 15 grants data subjects the right of access; the dsar_handler control
+  operationalises the Data Subject Access Request workflow. Article 17 grants the
+  right to erasure. Article 30 requires records of processing activities. Article 33
+  requires breach notification to the supervisory authority within seventy-two hours
+  of becoming aware of a personal data breach. Penalty tiers up to twenty million
+  euros or four percent of total worldwide annual turnover, whichever is higher.
