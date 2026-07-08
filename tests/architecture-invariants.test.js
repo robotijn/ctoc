@@ -115,6 +115,7 @@ describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
     'agents/planning/vision-decomposer.md',
     'agents/planning/product-owner.md',
     'agents/planning/implementation-planner.md',
+    'agents/infrastructure/deployment-setup.md',
   ];
 
   it('synthesizer agent exists at agents/coordinator/synthesizer.md', () => {
