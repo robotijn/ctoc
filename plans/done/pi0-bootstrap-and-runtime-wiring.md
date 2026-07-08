@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T08:57:42.150Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-08T08:27:27.824Z
@@ -796,7 +802,7 @@ wiring/bootstrap `deps` seam so no real fetch runs).
 
 #### Test Cases
 1. **Backfill populates the index over a tmp plans fixture (AC "First-run backfill").**
-   Create `tmp/plans/todo/foo.md` + `tmp/plans/done/bar.md` (frontmatter + a `## `
+   Seed fixtures under `tmp/plans/todo/foo.md` + `tmp/plans/done/bar.md` (frontmatter + a `## `
    section). Call `runBackfill(tmp, { reconcileIndex, runCalibration: async()=>({
    backend:'in-process', model:'all-MiniLM-L6-v2', dimension:8 }), getWiring: ()=>({
    store: realTmpStore, embedder: stubEmbedder, calibrationReady: ()=>true }) })`.
@@ -837,7 +843,7 @@ wiring/bootstrap `deps` seam so no real fetch runs).
 - `tests/plan-index-store.test.js`, `plan-index-sync.test.js`, `plan-index-embedding.test.js`
   — unchanged (PI0 adds only the barrel `getWiring` export; do not alter store/sync).
 - `tests/readme-numbers.test.js` — `src/hooks/` still 16 files (no new hook file);
-  the added hooks.json registration does not change the file count.
+  the `.claude-plugin/hooks.json` registration entry does not change the file count.
 - The full suite: `node --test tests/*.test.js` → `# fail 0`.
 
 ## Iron Loop Steps 8–16 (canonical labels — MANDATORY, enforced by validate-plan-steps.js)
