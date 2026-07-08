@@ -265,50 +265,100 @@ Confirm: dashboard never gated, question asked once, persistence round-trips on 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 8 tests: 4 pass (absent-branch), 4 fail (ride-along-present) → RED confirmed
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none
+- [x] Check prerequisites — EC1-s2 (`compliance-regime.js` exports shouldRunGdpr/shouldRunEuAiAct/writeActiveProfiles) + EC1-s1 (gdpr.yaml, eu-ai-act-high-risk.yaml) confirmed on disk
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — n/a
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — menu.js: import + needsComplianceRegimePrompt + attachComplianceQuestion + main() conditional attach + exports; menu.md: action row + Rule 14
+- [x] Add error handling — fail-open predicate (try/catch→false); defensive ask/actions guards in attach
+- [x] Wire up integration points — attach in main() JSON branch after env attach
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — dashboard built (route([])) BEFORE attach; Pipeline stays first; only live menu.js touched (PI4)
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — reused env ride-along shape verbatim, no new abstraction; single shouldRun* call each
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — no user path input; app.projectPath from findProjectRoot
+- [x] Sanitize outputs — closed 4-option enum → fixed action strings; no free-text interpolation
+- [x] No secrets in code
+- [x] Safe file operations — menu.js writes nothing; writer is s2's targeted-replace; no gate key reachable
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint . --max-warnings 0 → exit 0; tsc baseline-neutral (4 pre-existing menu.js errors only, no new)
+- [x] Run ALL tests (TDD Green) — node --test tests/*.test.js → tests 3180, pass 3180, fail 0
+- [x] Check coverage >= 80% — new helpers fully exercised (present/absent/both-pending/fail-open branches)
+- [x] 0 skipped, 0 flaky tests — skipped 0, todo 0
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — menu.md claude:set-compliance-regime row + Rule 14
+- [x] Add JSDoc comments to new functions — cross-ref comment above attachComplianceQuestion ("MIRRORS attachEnvironmentQuestion")
+- [x] Update CHANGELOG if needed — n/a
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — real-menu-drive proof: dashboard intact + question rides along (see decisions)
+- [x] Ready for human review — batched Gate 2 with siblings s1, s2 (plan left in todo per CTO Chief directive)
+
+---
+
+## Decisions Taken Under Ambiguity (EC1-s3 execution)
+
+1. **Plan left in `plans/todo/` (not moved to in-progress or review).** The CTO Chief
+   dispatch directive was explicit: "Do NOT move the plan." EC1-s3 batches with siblings
+   s1/s2 at Gate 2 (plan's Step 16). I implemented Steps 8–16 in place and did not cross any
+   human gate. (Rule 1 note: `EC1-s1-gdpr-profile.md` sits in the legacy `plans/in-progress/`
+   dir, but its code deliverables — gdpr.yaml, eu-ai-act-high-risk.yaml — are already shipped
+   on disk; it is a stale kanban artifact, not active work. Dependencies verified present.)
+
+2. **`attachComplianceQuestion(result, projectPath)` keeps the `projectPath` param unused.**
+   The plan spec's signature includes it for parity with the write-side, but the write happens
+   in the `claude:set-compliance-regime` action handler (menu.md), not in the attach. ESLint's
+   `args: after-used` does not flag a trailing unused arg, so the signature stays as specified
+   with no lint suppression needed (removed the initial eslint-disable directive that ESLint
+   itself reported as unused).
+
+3. **Pinned menu-structure tests updated to isolate ride-alongs.** Three existing tests
+   (`menu-environment.test.js` env-unset/env-set cases; `e2e-menu-lifecycle.test.js` cases 6 &
+   6b) asserted exact question counts (2 and 1) and now would see the compliance question also
+   ride along when no profile is active. Per the plan's coexistence contract (both ride-alongs
+   present, ≤4), I updated those fixtures to mark a compliance profile active
+   (`active_profiles: [gdpr]` in a real settings.yaml) so each suite pins the ENVIRONMENT
+   ride-along in isolation. The compliance ride-along has its own suite. No environment behavior
+   changed; the coexistence (env + compliance + Pipeline, ≤4) is pinned by
+   compliance-ride-along.test.js cases 4 & 5.
+
+4. **Test fixture uses inline `active_profiles: [...]` + a trailing top-level key.** The real
+   reader (`regulatory-regime.js:loadActiveProfiles`) extracts the `regulatory_regime:` block up
+   to the next top-level key, so the fixture settings.yaml carries a following `general:` key to
+   terminate the block. This matches the real settings.yaml shape and the writer's round-trip
+   format (EC1-s2).
+
+## Execution Proof (for review)
+
+- **RED→GREEN:** new suite 8 tests → RED 4 fail (ride-along-present cases) / GREEN 8 pass.
+- **Real ride-along attachment (live menu.js `main()` JSON branch):**
+  `if (needsComplianceRegimePrompt(app.projectPath)) attachComplianceQuestion(result, app.projectPath);`
+  placed AFTER the environment attach and BEFORE the `justInitialized` text prepend / `console.log`.
+  Order: dashboard built → env attach → compliance attach → init note → print.
+- **Real-menu-drive proof (execFileSync(menu.js) → JSON):** compliance question rides along
+  when unset (`▼ Business/Implementation/Execution` all present + `ask.questions[0].header ===
+  'Pipeline'` + a `Compliance` question with exactly 4 options); when a profile is active it
+  does NOT ride along; end-to-end persistence via `writeActiveProfiles` → not re-asked; gate
+  surface never carries `enforcementMode`/`requireReviewGate`.
+- **Tallies:** compliance-ride-along 8/8; menu-environment 4/4; e2e-menu-lifecycle 10/10;
+  readme-numbers 47/47; full suite tests 3180 / pass 3180 / fail 0 / skipped 0 / todo 0;
+  eslint exit 0; tsc baseline-neutral.

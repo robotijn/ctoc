@@ -28,6 +28,15 @@ function projectWith(settings) {
   if (settings !== undefined) {
     fs.writeFileSync(path.join(dir, '.ctoc', 'settings.json'), JSON.stringify(settings));
   }
+  // EC1-s3: a SECOND ride-along (the compliance-regime question) also attaches
+  // when no EU compliance profile is active. These tests pin the ENVIRONMENT
+  // ride-along in isolation, so mark a compliance profile active (gdpr) to
+  // suppress that second ride-along. The compliance ride-along has its own
+  // suite in tests/compliance-ride-along.test.js.
+  fs.writeFileSync(
+    path.join(dir, '.ctoc', 'settings.yaml'),
+    'regulatory_regime:\n  active_profiles: [gdpr]\n  overrides: {}\n\ngeneral:\n  x: 1\n'
+  );
   return dir;
 }
 after(() => tmpDirs.forEach(d => fs.rmSync(d, { recursive: true, force: true })));
