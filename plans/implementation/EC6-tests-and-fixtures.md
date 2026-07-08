@@ -12,24 +12,13 @@ type: feature
 parent_vision: eu-compliance-agents-gdpr-ai-act
 program: ctoc-eu-compliance
 order: 6
+is_slice_index: true
 depends_on:
   - EC1-compliance-mode-setting
   - EC2-gdpr-agent-plan-and-code
   - EC3-eu-ai-act-agent-plan-and-code
   - EC4-eu-solution-recommender
   - EC5-iron-loop-integration
-files:
-  - tests/compliance-mode.test.js
-  - tests/gdpr-agent.test.js
-  - tests/eu-ai-act-agent.test.js
-  - tests/eu-solution-recommender.test.js
-  - tests/compliance-iron-loop.test.js
-  - tests/fixtures/compliance/pii-collecting-plan.md
-  - tests/fixtures/compliance/annex-iii-ai-plan.md
-  - tests/fixtures/compliance/prohibited-practice-plan.md
-  - tests/fixtures/compliance/sample-pii-code.js
-  - tests/fixtures/compliance/sample-ai-act-code.js
-  - tests/fixtures/compliance/fixture-manifest.yaml
 status: refined
 acceptance_criteria_count: 13
 risk_level: MEDIUM
@@ -292,3 +281,73 @@ Without EC6, the compliance program ships without provable end-to-end behavior o
 - **Severity contract tested at JS helper output, not schema rejection.** The refinement-loop schema permits severity `critical`, `medium`, and `low` — it does not reject non-critical. The wire-contract test asserts that `normalizeSeverity()` in the JS helpers produces `severity: "critical"` for any input severity value. This is the behavioral contract, asserted at the emitter level. Schema validation is a separate concern.
 - **fixture-manifest.yaml includes coverage_gaps.** Decision: the manifest documents which GDPR Articles and EU AI Act Articles are not yet covered by fixtures. This makes the incompleteness explicit and tracked, preventing a false sense of full regulatory coverage. The gap list is updated whenever a new fixture is added.
 - **Slice-local vs. central tests.** Decision: each of EC1–EC5 keeps a focused unit test in its own `files:` (so a slice can ship green on its own); EC6 owns the cross-slice integration tests, shared fixtures, and safety invariants. This avoids coupling every slice to a single mega-test file while still guaranteeing integrated coverage.
+
+---
+
+## Slices (dependency-ordered)
+
+> This plan is now an INDEX. It is not executed through the Iron Loop; its two slice
+> files are. Gate 2 and Gate 3 batch across both siblings via
+> `approveSubplans('EC6-tests-and-fixtures', fromStage)` — ONE human decision covers the set.
+
+| # | Slice file | Scope (one line) | files: | depends_on |
+|---|------------|------------------|--------|------------|
+| 1 | `EC6-tests-and-fixtures-s1-shared-fixtures.md` | The shared `tests/fixtures/compliance/` library (3 plan fixtures + 2 code fixtures + `fixture-manifest.yaml`) driving the SHIPPED `classifyFromPlanText` from real files, plus manifest completeness/validity/`skill_version`/`coverage_gaps` checks. | `tests/fixtures/compliance/{pii-collecting-plan.md, annex-iii-ai-plan.md, prohibited-practice-plan.md, sample-pii-code.js, sample-ai-act-code.js, fixture-manifest.yaml}`, `tests/compliance-fixtures.test.js` | none |
+| 2 | `EC6-tests-and-fixtures-s2-recommender-integration.md` | The missing `tests/eu-solution-recommender.test.js` — fixture-driven INTEGRATION of EC4: `createFetcher` (stubbed) → injected-failure → `applyFallback` (labeled `unverified_this_run`) → `validateOutputSchema` across all three buckets, driven by the s1 fixture. | `tests/eu-solution-recommender.test.js` | `EC6-tests-and-fixtures-s1-shared-fixtures` |
+
+Max dependency-chain depth = 1 (s2 → s1). No cycles.
+
+## What is ALREADY covered vs. the genuine EC6 gap (honest scope)
+
+**Decomposer honesty note (SIP1):** most of the coverage the original EC6 `files:` list
+implied has **already shipped** as cross-slice tests during EC1–EC5. Grounding this in the
+real tree (read fresh):
+
+**Already covered — do NOT re-test (would be redundant):**
+- **Cross-agent END-TO-END compliance flow** — the file EC6 originally scoped as
+  `tests/compliance-iron-loop.test.js` is effectively **already shipped** as
+  `tests/compliance-integration.test.js` (11 describes): it drives the REAL flow —
+  real `shouldRunGdpr`/`shouldRunEuAiAct` reading a real tmp `.ctoc/settings.yaml` + a copy
+  of the shipped `regulatory-regimes/`, the REAL `src/lib/inbox.js` with disk read-back —
+  and proves: profile-active dispatch, cross-regime dedup, **single Inbox write**, empty-
+  `active_profiles` **provable no-op** (plan bytes unchanged), **advisory** (a critical
+  finding moves NO plan across a stage), fail-open, and the **gate invariant** (`HUMAN_GATES`
+  has exactly the 3 destination keys `done/implementation/todo`; the seam source names no
+  gate/enforcement key and requires no hook).
+- **Trigger → seam wiring** — `tests/cto-chief-compliance-dispatch.test.js` drives
+  `writeComplianceTrigger` → read-back → `runComplianceForTransition` → real Inbox, and
+  asserts Gate 0–3 are all still named (4-gate topology) and no gate key is touched.
+- **Per-module units** — `classifyFromPlanText` branches, `normalizeSeverity` critical-
+  upgrade + wire contract, `mapPiiFieldToArticles`, dedup, `validateOutputSchema`/
+  `createFetcher`/`applyFallback` (each throw branch), and compliance-mode safety are
+  covered by `eu-ai-act-helpers.test.js`, `gdpr-helpers.test.js`, `compliance-dedup.test.js`,
+  `eu-recommender-helpers.test.js`, `gdpr-agent-runner.test.js`, `eu-ai-act-agent-runner.test.js`,
+  `compliance-mode.test.js` (+ agent-definition/registry tests).
+
+**Genuine remaining gap — what these two slices add (and nothing else):**
+1. **Shared fixture library (s1).** `tests/fixtures/compliance/` **does not exist**; NO
+   shipped test references it. Every current classify test uses ad-hoc inline strings — the
+   exact "each slice invents its own fixture" inconsistency this plan set out to fix. s1
+   creates the one shared corpus + drives the SHIPPED classifier from those real files, and
+   validates the machine-readable manifest (completeness, article-validity, `skill_version`,
+   `coverage_gaps`).
+2. **Recommender fixture-driven integration (s2).** The parent-scoped
+   `tests/eu-solution-recommender.test.js` **does not exist**. The recommender is currently
+   only UNIT-tested per-function; no test composes the real flow (stub-fetcher →
+   injected-failure → labeled fallback → schema-valid across all three buckets). s2 adds
+   exactly that composition, driven by the s1 fixture.
+
+**Why 2 slices, not 5:** the parent's original 5-file `files:` list predated EC1–EC5
+shipping their own cross-slice tests. Re-authoring `compliance-mode.test.js`,
+`gdpr-agent.test.js`, `eu-ai-act-agent.test.js`, or a separate `compliance-iron-loop.test.js`
+would **duplicate** shipped coverage and violate the anti-redundancy brief. EC6 is honestly
+a **2-slice verification top-up**: the missing shared fixtures + the missing recommender
+integration. No redundant slices were invented to pad the count.
+
+**Not-weakened-gate assertion (already proven, referenced not duplicated):** the
+gate-invariant proof (4-gate topology intact; no compliance value mutates `requireReviewGate`
+/ `enforcementMode`; no compliance flow moves a plan) is already asserted in
+`compliance-integration.test.js` (case 9) and `cto-chief-compliance-dispatch.test.js`
+(case 7). Per the parent's own "gate-invariant test owned by EC6, referenced not
+duplicated" decision, these two slices do **not** re-implement it — re-adding it would be
+the drift the decision forbids.
