@@ -65,11 +65,36 @@ function readStdin() {
 function safeParse(s) { try { return JSON.parse(s); } catch { return {}; } }
 
 /**
+ * Resolve the project root of the plan file being synced, so the wiring, the
+ * `plansRoot`/`logDir`, and `syncUnit`'s key-normalization all anchor on ONE root.
+ * Derived from the written plan's own project (climb from its directory) — NOT blindly
+ * `process.cwd()`, which can differ from the plan's project on a symlinked checkout or
+ * a multi-root session and would key syncUnit against a DIFFERENT store than getWiring
+ * opened (the F1 dormancy bug). Fail-open: falls back to `process.cwd()`.
+ * @param {string} planFilePath  Absolute (or relative) path to the written plan .md.
+ * @returns {string}
+ */
+function resolveRootForPlan(planFilePath) {
+  try {
+    const { findProjectRoot } = require('../lib/project-root');
+    const start = path.dirname(path.resolve(planFilePath));
+    return findProjectRoot(start);
+  } catch {
+    return process.cwd();
+  }
+}
+
+/**
  * Best-effort load of PI0's composition-root wiring. Returns
  * `{ store, embedder, calibrationReady }` or null if PI0 is not yet integrated.
+ *
+ * @param {string} [root] The plan's project root. Passed through so `getWiring` opens
+ *   the store keyed IDENTICALLY to the root `syncUnit` normalizes its keys against
+ *   (F1). getWiring realpath-canonicalizes it (F2) so a symlinked root and its
+ *   realpath share ONE store. Omitted → getWiring falls back to its own resolution.
  * @returns {object|null}
  */
-function loadWiring() {
+function loadWiring(root) {
   try {
     // PI0 owns this module; absent until PI0 integration lands (fail-open). The
     // require goes through an aliased binding so the static typechecker does not
@@ -78,7 +103,9 @@ function loadWiring() {
     const req = require;
     const wiring = req('../lib/plan-index/wiring');
     if (wiring && typeof wiring.getWiring === 'function') {
-      const w = wiring.getWiring();
+      const w = typeof root === 'string' && root.length > 0
+        ? wiring.getWiring({ projectPath: root })
+        : wiring.getWiring();
       if (w && w.store && typeof w.embedder === 'function') return w;
     }
   } catch {
@@ -119,12 +146,18 @@ async function main() {
     const fp = payload && payload.tool_input && payload.tool_input.file_path;
     if (!isPlanMd(fp)) { process.exit(0); return; }
 
-    const wiring = loadWiring();
+    // Derive ONE root from the written plan's own project and use it for BOTH the
+    // wiring (store keying) and syncUnit's plansRoot/logDir (key normalization), so the
+    // hook can never silently diverge onto a different store than the one getWiring
+    // opened (F1). getWiring realpath-canonicalizes the root (F2).
+    const root = resolveRootForPlan(fp);
+
+    const wiring = loadWiring(root);
     if (!wiring) { process.exit(0); return; } // PI0 not integrated → fail-open
 
     const { syncUnit } = require('../lib/plan-index/sync-unit');
-    const logDir = path.join(process.cwd(), '.ctoc', 'logs');
-    const plansRoot = path.join(process.cwd(), 'plans');
+    const logDir = path.join(root, '.ctoc', 'logs');
+    const plansRoot = path.join(root, 'plans');
     // Fire-and-forget: do NOT await the embed; log any rejection.
     Promise.resolve()
       .then(() => syncUnit(fp, {

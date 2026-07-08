@@ -74,7 +74,11 @@ test('smoke #2: getWiring() returns the exact shape movePlan + the hook require'
     assert.strictEqual(typeof w.calibrationReady, 'function');
     assert.strictEqual(typeof w.isIndexAvailable, 'function');
     assert.strictEqual(typeof w.degradedReason, 'function');
-    assert.strictEqual(w.projectPath, path.resolve(dir));
+    // F2: projectPath is the REALPATH-canonical root (a symlinked root and its
+    // realpath must map to ONE store). On a system whose tmpdir is itself a symlink
+    // (macOS: /var → /private/var) this is the realpath, not the lexical resolve.
+    const canonical = fs.realpathSync.native(path.resolve(dir));
+    assert.strictEqual(w.projectPath, canonical);
   } finally { rmTmp(dir); }
 });
 
@@ -167,5 +171,107 @@ test('smoke #8: loadPlanIndexWiring-equivalent resolves a live wiring (seam is L
     assert.ok(w && w.store, 'the guard now resolves a non-null wiring with a store');
     // The hook's stricter predicate: w.store && typeof w.embedder === 'function'.
     assert.ok(w.store && typeof w.embedder === 'function', 'hook predicate satisfied');
+  } finally { rmTmp(dir); }
+});
+
+// ── Helper: build a minimal CTOC project tree with a seeded plan-index unit. ─────
+// Returns { root, indexPath }. `root` has plans/todo/demo.md and a plan-index.json
+// containing one unit keyed on `plans/todo/demo.md`. The store is opened against the
+// REAL openStore so this exercises the production store on disk (not a mock).
+function seedProject(root, planRel = 'plans/todo/demo.md') {
+  const actions = require('../src/lib/actions');
+  const { openStore } = require('../src/lib/plan-index');
+  const wiringMod = require('../src/lib/plan-index/wiring');
+  fs.mkdirSync(path.join(root, 'plans', 'todo'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'plans', 'in-progress'), { recursive: true });
+  // Marker so findProjectRoot(root) resolves to `root` itself (a `.ctoc` dir).
+  fs.mkdirSync(path.join(root, '.ctoc', 'index'), { recursive: true });
+  const planAbs = path.join(root, ...planRel.split('/'));
+  fs.writeFileSync(planAbs, '# Demo plan\n\nbody\n');
+  // Seed the unit via the SAME store getWiring will open for `root`, so the seed
+  // lands in the exact store the (fixed) guard must re-path.
+  const w = wiringMod.getWiring({ projectPath: root });
+  w.store.upsertUnit({
+    planPath: planRel, sectionId: '__plan__', kind: 'plan',
+    text: 'demo', embedding: new Float32Array([1, 0]), contentHash: 'seed'
+  });
+  w.store.save();
+  return { root, planAbs, openStore, actions };
+}
+
+// ── F1 regression (argless-consumer, projectPath ≠ cwd): the guard must re-path ──
+// This is the DORMANCY-CLASS repro. The movePlan guard calls getWiring() ARGLESS
+// (keyed on the cwd-derived root) but normalizes its moveUnit keys against `root =
+// projectPath`. When projectPath ≠ the cwd-derived root, the guard opened the WRONG
+// store and silently no-op'd (pi1-inert wearing a live mask). Drive it exactly as
+// production: do NOT pre-seed getWiring with {projectPath} for the guard's own call.
+test('smoke #9 (F1): movePlan with projectPath ≠ cwd re-paths the index (argless guard)', () => {
+  const dir = mkTmp();
+  try {
+    // A tmp project root that is NOT the process cwd (cwd = the ctoc repo, which has
+    // its own .ctoc → findProjectRoot(cwd) resolves THERE, a different store).
+    const proj = path.join(dir, 'proj');
+    const { planAbs, openStore, actions } = seedProject(proj);
+    // Reset the singleton so the guard's argless getWiring() constructs fresh exactly
+    // as production would in a process that never pre-seeded {projectPath: proj}.
+    getWiring.__reset();
+
+    const newPath = actions.movePlan(planAbs, 'in-progress', proj);
+    assert.strictEqual(newPath, path.join(proj, 'plans', 'in-progress', 'demo.md'));
+
+    // Re-open the project's OWN store fresh from disk and assert the re-path landed.
+    getWiring.__reset();
+    const store = openStore(path.join(proj, '.ctoc', 'index', 'plan-index.json'));
+    const paths = store.listPlanPaths();
+    assert.ok(paths.includes('plans/in-progress/demo.md'),
+      `expected re-pathed unit at plans/in-progress/demo.md, got ${JSON.stringify(paths)}`);
+    assert.ok(!paths.includes('plans/todo/demo.md'),
+      `old path must be gone, got ${JSON.stringify(paths)}`);
+  } finally { rmTmp(dir); }
+});
+
+// ── F1 + F2 regression (symlinked root): realpath-canonical keys must match ──────
+// A symlinked project root (`link → real`) whose realpath differs from the link path.
+// The guard opens the store keyed on the canonicalized root and normalizes keys the
+// same way, so a movePlan through the SYMLINK re-paths the SAME store the seed used.
+test('smoke #10 (F1+F2): movePlan through a symlinked root re-paths the same store', () => {
+  const dir = mkTmp();
+  try {
+    const real = path.join(dir, 'real');
+    // Seed against the REAL (canonical) root first.
+    const { openStore } = seedProject(real);
+    const actions = require('../src/lib/actions');
+
+    // A symlink pointing at the real root; its lexical path ≠ its realpath.
+    const link = path.join(dir, 'link');
+    try {
+      fs.symlinkSync(real, link, 'dir');
+    } catch {
+      // Platforms without symlink permission (e.g. Windows w/o dev-mode): skip the
+      // symlink half but STILL assert the plain projectPath path re-paths (F1).
+      getWiring.__reset();
+      const planAbsReal = path.join(real, 'plans', 'todo', 'demo.md');
+      actions.movePlan(planAbsReal, 'in-progress', real);
+      getWiring.__reset();
+      const s = openStore(path.join(real, '.ctoc', 'index', 'plan-index.json'));
+      assert.ok(s.listPlanPaths().includes('plans/in-progress/demo.md'));
+      return;
+    }
+
+    getWiring.__reset();
+    // Drive movePlan through the SYMLINKED path — projectPath is the link, whose
+    // realpath is `real`. Canonicalization must make the guard open `real`'s store.
+    const planAbsLink = path.join(link, 'plans', 'todo', 'demo.md');
+    actions.movePlan(planAbsLink, 'in-progress', link);
+
+    // Re-open the REAL (canonical) store and assert the re-path landed there — proving
+    // link and realpath map to ONE store (F2) and the seam went live (F1).
+    getWiring.__reset();
+    const store = openStore(path.join(real, '.ctoc', 'index', 'plan-index.json'));
+    const paths = store.listPlanPaths();
+    assert.ok(paths.includes('plans/in-progress/demo.md'),
+      `symlinked movePlan must re-path the canonical store, got ${JSON.stringify(paths)}`);
+    assert.ok(!paths.includes('plans/todo/demo.md'),
+      `old path must be gone in the canonical store, got ${JSON.stringify(paths)}`);
   } finally { rmTmp(dir); }
 });

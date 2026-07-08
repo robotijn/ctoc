@@ -32,6 +32,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 // Require the store module DIRECTLY (not the `./index` barrel) to avoid a require
 // cycle: the barrel re-exports `getWiring` from this module, so importing the barrel
 // here would form `index → wiring → index` and yield a partially-initialized barrel
@@ -52,17 +53,41 @@ const { findProjectRoot } = require('../project-root');
 const CACHE = new Map();
 
 /**
- * Resolve the caller's projectPath to an absolute root. Arg wins; else the shared
- * project-root finder; else `process.cwd()`. Never throws.
+ * Realpath-canonicalize an absolute path (F2). A symlinked checkout (`/var` →
+ * `/private/var`) and its realpath must map to the SAME singleton cache key AND the
+ * SAME opened store file — otherwise the movePlan guard keys its moveUnit against one
+ * store while getWiring opened another, and the re-path silently no-ops. Uses
+ * `fs.realpathSync.native`; falls back to the input (non-realpath'd) on ANY error —
+ * realpath throws for a not-yet-existing path, so fail-open preserves the prior
+ * behavior for a fresh project whose root does not yet exist on disk.
+ *
+ * IMPORTANT: `normalizePlanIndexPath` in `src/lib/actions.js` canonicalizes its root
+ * the SAME way (its `canonicalizeRoot`), so the store-open root and the
+ * key-normalization root are byte-identical.
+ * @param {string} abs
+ * @returns {string}
+ */
+function canonicalizeRoot(abs) {
+  try {
+    return fs.realpathSync.native(abs);
+  } catch {
+    return abs; // fail-open: never let root canonicalization break the wiring
+  }
+}
+
+/**
+ * Resolve the caller's projectPath to an absolute, realpath-canonical root. Arg wins;
+ * else the shared project-root finder; else `process.cwd()`. Realpath-canonicalized
+ * (F2) so a symlinked root and its realpath share ONE singleton + store. Never throws.
  * @param {string} [projectPath]
  * @returns {string}
  */
 function resolveRoot(projectPath) {
   try {
     if (typeof projectPath === 'string' && projectPath.length > 0) {
-      return path.resolve(projectPath);
+      return canonicalizeRoot(path.resolve(projectPath));
     }
-    return path.resolve(findProjectRoot(process.cwd()));
+    return canonicalizeRoot(path.resolve(findProjectRoot(process.cwd())));
   } catch {
     return process.cwd();
   }
