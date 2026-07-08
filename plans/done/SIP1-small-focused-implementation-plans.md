@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T10:34:23.505Z
+gate_crossed: review → done
+---
+
+---
 iron_loop: true
 approved_by: human
 approved_at: 2026-07-08T10:12:29.099Z
@@ -71,7 +77,7 @@ complete, a crash loses only one small slice, and each slice is independently re
 
 ## 3. CAPTURE — Acceptance Criteria (BDD)
 
-- [ ] **Scenario: the planner decomposes into small cohesive-slice plans**
+- [x] **Scenario: the planner decomposes into small cohesive-slice plans**
   Given an approved functional plan with multiple modules
   When the implementation-planner runs
   Then it writes N ≥ 2 separate implementation plan files (not one big blueprint)
@@ -80,24 +86,24 @@ complete, a crash loses only one small slice, and each slice is independently re
   And each carries its own small `# Implementation Details` + canonical Step 8–16 checklist
   And the slices are dependency-ordered via `depends_on`
 
-- [ ] **Scenario: parent_plan is a recognized, validated frontmatter field**
+- [x] **Scenario: parent_plan is a recognized, validated frontmatter field**
   Given an implementation sub-plan with `parent_plan: <slug>`
   When `plan-validator` runs
   Then `parent_plan` is accepted (not flagged as unknown) and, if present, must name a
   real plan slug (a dangling parent is a validation warning)
 
-- [ ] **Scenario: batched Gate 2 approves all siblings of a parent at once**
+- [x] **Scenario: batched Gate 2 approves all siblings of a parent at once**
   Given 4 implementation sub-plans sharing `parent_plan: X` in `implementation/`
   When the human approves the parent's Gate 2 (implementation→todo)
   Then a batched-approve helper crosses ALL 4 to `todo/` in one call (human marker on each),
   never auto-crossing without the human's single approval
 
-- [ ] **Scenario: batched Gate 3 ships all siblings of a parent at once**
+- [x] **Scenario: batched Gate 3 ships all siblings of a parent at once**
   Given the parent's sub-plans all in `review/` (built + reviewed)
   When the human approves the parent's Gate 3 (review→done)
   Then all siblings cross review→done in one batched-approve call
 
-- [ ] **Scenario: sequential, dependency-ordered implementation preserved**
+- [x] **Scenario: sequential, dependency-ordered implementation preserved**
   Given sub-plans with a `depends_on` chain
   Then they are implemented one at a time in dependency order (the plan-serial rule holds);
   a slice whose dependency is unbuilt is not started
@@ -727,53 +733,53 @@ case. No gap.
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Write `tests/subplan-decomposition.test.js` FIRST (TDD Red) with all 13 cases
+- [x] Write `tests/subplan-decomposition.test.js` FIRST (TDD Red) with all 13 cases
       above: `listSubplans` (1–3), `approveSubplans` Gate 2/Gate 3/fail-safe/order/
       bad-stage (4–8), `validateParentPlan` accept/dangling/absent (9–11), gate
       wiring (12), prose contracts (13). Tests fail (functions not yet added).
 
 ### Step 9: PREPARE
-- [ ] Confirm `state.js` exports `readPlans`, `getPlansDir`, `parseMetadata` (they do).
-- [ ] Confirm `plan-validator.js` exports `validateForQueue`, `validateReviewToDone`
+- [x] Confirm `state.js` exports `readPlans`, `getPlansDir`, `parseMetadata` (they do).
+- [x] Confirm `plan-validator.js` exports `validateForQueue`, `validateReviewToDone`
       (they do — lines 875–888).
-- [ ] No new npm deps; `node:test` + `node --test tests/*.test.js` is the runner.
+- [x] No new npm deps; `node:test` + `node --test tests/*.test.js` is the runner.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/plan-validator.js`: add `validateParentPlan` + `planSlugExists`; wire
+- [x] `src/lib/plan-validator.js`: add `validateParentPlan` + `planSlugExists`; wire
       into `validateForQueue` and `validateForReview`; export `validateParentPlan`.
-- [ ] `src/lib/actions.js`: extend the `state`/`plan-validator` destructured imports;
+- [x] `src/lib/actions.js`: extend the `state`/`plan-validator` destructured imports;
       add `topoOrderByDependsOn`, `listSubplans`, `approveSubplans`; export the two
       public functions.
-- [ ] `agents/planning/implementation-planner.md`: rewrite Role + add Phase 4b
+- [x] `agents/planning/implementation-planner.md`: rewrite Role + add Phase 4b
       (decompose), the slice-sizing rule, naming convention, per-slice frontmatter
       contract, Phase 5 write change, Batched Gates note.
-- [ ] `docs/IRON_LOOP.md` + `CLAUDE.md`: prose edits (1 functional → N implementation;
+- [x] `docs/IRON_LOOP.md` + `CLAUDE.md`: prose edits (1 functional → N implementation;
       batched gates).
 
 ### Step 11: REVIEW
-- [ ] Self-review: `approveSubplans` composes `approvePlan` (no re-implemented gate);
+- [x] Self-review: `approveSubplans` composes `approvePlan` (no re-implemented gate);
       `validateParentPlan` warns-only; layering intact (validator ⟂ actions, both →
       state); no orphaned exports.
 
 ### Step 12: OPTIMIZE
-- [ ] `listSubplans` reads each stage dir once; `planSlugExists` uses `readdirSync`
+- [x] `listSubplans` reads each stage dir once; `planSlugExists` uses `readdirSync`
       (names only), not full `readPlans`, to stay cheap. Confirm no redundant reads.
 
 ### Step 13: SECURE
-- [ ] Verify `parent_plan` is never joined into a filesystem path (basename compare
+- [x] Verify `parent_plan` is never joined into a filesystem path (basename compare
       only); path-traversal-safe; gate integrity property holds (Security Review).
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/*.test.js` — all pass, `# fail 0`, 0 skipped, coverage ≥ 80%
+- [x] `node --test tests/*.test.js` — all pass, `# fail 0`, 0 skipped, coverage ≥ 80%
       on the new code. Run `node src/scripts/release.js` if VERSION bumped.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on `listSubplans`, `approveSubplans`, `validateParentPlan`,
+- [x] JSDoc on `listSubplans`, `approveSubplans`, `validateParentPlan`,
       `planSlugExists`, `topoOrderByDependsOn`. Confirm IRON_LOOP.md + CLAUDE.md edits
       landed (they are also Step-10 deliverables; here confirm accuracy).
 
 ### Step 16: FINAL-REVIEW
-- [ ] Human reviews at Gate 3. Verify: batched gates preserve the human marker,
+- [x] Human reviews at Gate 3. Verify: batched gates preserve the human marker,
       dangling-parent is a warning, planner prompt mandates 1→N decomposition,
       all tests green.
 
@@ -908,4 +914,4 @@ case. No gap.
 - [x] Verify steps 8-15 completed correctly
 - [x] All quality checks passed
 - [x] Manual verification if needed (no-auto-cross proof executed)
-- [ ] Ready for human review (Gate 2/Gate 3 — HUMAN GATE, not crossed by executor)
+- [x] Ready for human review (Gate 2/Gate 3 — HUMAN GATE, not crossed by executor)
