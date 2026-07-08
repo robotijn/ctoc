@@ -233,7 +233,40 @@ deployment-setup; suite green.
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **RED→GREEN ordering demonstration.** To prove the invariant genuinely enforces
+  the contract (not a vacuous pass), I added the `TIER_1_AGENTS` array entry FIRST
+  to establish RED (2 failing assertions: `tier: 1` and `reports_to: cto-chief`
+  read against the real `deployment-setup.md`), then added the three frontmatter
+  fields to reach GREEN. This inverts the plan's Step-10 sub-item order (frontmatter
+  first) but is functionally equivalent — the final working-tree state is identical
+  (both edits present) and the plan's stated goal (frontmatter valid, entry covered)
+  holds. The plan-listed ordering exists to avoid committing a broken intermediate;
+  since nothing is committed between edits, the RED→GREEN sequencing is the correct
+  TDD demonstration and leaves the same end state.
+- **Field placement + shape.** Mirrored `implementation-planner.md` exactly:
+  `reports_to: cto-chief`, `dispatch_protocol: v1`, `tier: 1`, appended after
+  `model: sonnet` inside the frontmatter fence. `model: sonnet` and existing
+  `tools:` preserved. Body untouched. This matches the regex `/^tier:\s*1$/m`.
+- **tsc baseline.** 89 pre-existing tsc errors in `src/` (TypeScript-checked JS);
+  none reference my two edited files (an agent `.md` and a test `.js`). This slice
+  is tsc baseline-neutral — zero new errors introduced.
+
+## Verification Results (Steps 8–16)
+
+- RED (array entry only, real agent file read): `tests 43, pass 41, fail 2, skipped 0`
+  — the 2 failures are `every Tier 1 agent declares tier: 1` and
+  `... reports_to: cto-chief` for `agents/infrastructure/deployment-setup.md`.
+- GREEN (frontmatter fields added): `tests 43, pass 43, fail 0, skipped 0`.
+- deployment-setup now enforced as Tier-1: present in `TIER_1_AGENTS` AND carries
+  `tier: 1` / `reports_to: cto-chief` / `dispatch_protocol: v1`.
+- Full suite `node --test tests/*.test.js`: `tests 3399, pass 3399, fail 0,
+  skipped 0, todo 0`.
+- `npx eslint . --max-warnings 0`: exit 0.
+- `npx tsc --noEmit`: 89 errors, all pre-existing, 0 in edited files (baseline-neutral).
