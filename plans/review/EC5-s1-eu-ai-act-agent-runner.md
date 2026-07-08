@@ -202,46 +202,61 @@ the profile with no mocks.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/eu-ai-act-agent-runner.test.js` covering cases 1–9 above
-- [ ] Include the GATE-INVARIANT test (case 9) asserting HUMAN_GATES has 3 keys and the runner names no gate key
-- [ ] Test error conditions (non-array, missing arg, non-string root)
-- [ ] Run tests — expect RED (module does not exist yet)
+- [x] Write `tests/eu-ai-act-agent-runner.test.js` covering cases 1–9 above
+- [x] Include the GATE-INVARIANT test (case 9) asserting HUMAN_GATES has 3 keys and the runner names no gate key
+- [x] Test error conditions (non-array, missing arg, non-string root)
+- [x] Run tests — expect RED (module does not exist yet) → CONFIRMED MODULE_NOT_FOUND
 
 ### Step 9: PREPARE
-- [ ] Confirm `compliance-regime.js`, `eu-ai-act-helpers.js`, `inbox.js` exports match the imports
-- [ ] Confirm the tmp-project fixture writes a real `.ctoc/settings.yaml` + `eu-ai-act-high-risk.yaml`
-- [ ] No new dependencies required
+- [x] Confirm `compliance-regime.js`, `eu-ai-act-helpers.js`, `inbox.js` exports match the imports (shouldRunEuAiAct; filterToEuAiAct/normalizeSeverity/routeFinding; createQuestion — all present)
+- [x] Confirm the tmp-project fixture writes a real `.ctoc/settings.yaml` + copies shipped regulatory-regimes/ (incl. eu-ai-act-high-risk.yaml)
+- [x] No new dependencies required
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/eu-ai-act-agent-runner.js` mirroring `gdpr-agent-runner.js`
-- [ ] Add `buildContext(finding)` naming EU-AI-Act facts (risk_class, category, confidence)
-- [ ] Wire gate-first → filterToEuAiAct → normalizeSeverity → routeFinding → inbox/letter
-- [ ] Export `{ runEuAiActFindings }`
+- [x] Create `src/lib/eu-ai-act-agent-runner.js` mirroring `gdpr-agent-runner.js`
+- [x] Add `buildContext(finding)` naming EU-AI-Act facts (risk_class, severity, annex_iii_category, confidence, kind, regulation_ref)
+- [x] Wire gate-first → filterToEuAiAct → normalizeSeverity → routeFinding → inbox/letter
+- [x] Export `{ runEuAiActFindings }`
 
 ### Step 11: REVIEW
-- [ ] Self-review: structural parity with the GDPR runner (same return shape, same seam)
-- [ ] Verify the gate is checked BEFORE any read/write
-- [ ] Verify no gate key is referenced anywhere in the module
+- [x] Self-review: structural parity with the GDPR runner (same return shape, same seam)
+- [x] Verify the gate is checked BEFORE any read/write
+- [x] Verify no gate key is referenced anywhere in the module (asserted by test 9b)
 
 ### Step 12: OPTIMIZE
-- [ ] Remove any redundant per-finding work; single pass over kept findings
-- [ ] Keep buildContext allocation minimal
+- [x] Single pass over kept findings; no redundant per-finding work
+- [x] buildContext builds a small array, pushes only present optional facts
 
 ### Step 13: SECURE
-- [ ] Validate inputs (findings coercion, non-string root fail-open)
-- [ ] No secrets; only Inbox writes; no path construction in this module
+- [x] Validate inputs (findings coercion to []; non-string root fail-open via gate)
+- [x] No secrets; only Inbox writes; no path construction in this module
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check (`node --check`, project checkJs if configured)
-- [ ] Run ALL tests (TDD Green): `node --test tests/eu-ai-act-agent-runner.test.js`
-- [ ] Coverage ≥ 80%; 0 skipped, 0 flaky
-- [ ] Confirm gate-invariant test passes
+- [x] Lint: `npx eslint . --max-warnings 0` → exit 0; tsc baseline-neutral (89 errors before/after, 0 from this module)
+- [x] Run ALL tests (TDD Green): `node --test tests/eu-ai-act-agent-runner.test.js` → 12 pass / 0 fail; full suite 3321 pass / 0 fail / 0 skipped
+- [x] Coverage: line 100%, branch 88.89%, funcs 100% (≥80%); 0 skipped, 0 flaky
+- [x] Gate-invariant test passes (9a HUMAN_GATES 3 keys; 9b runner names no gate key)
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on `runEuAiActFindings` and `buildContext`
-- [ ] Module header documenting the gate-first / fail-strict-filter contract
+- [x] JSDoc on `runEuAiActFindings` and `buildContext`
+- [x] Module header documenting the gate-first / fail-strict-filter contract
+- [x] README + readme-numbers count bumped 119 → 120 (new src/lib module)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify Steps 8–15 completed
-- [ ] Gate-invariant + no-op + routing tests all green
-- [ ] Ready for human review
+- [x] Steps 8–15 completed
+- [x] Gate-invariant + no-op + routing tests all green
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+1. **`buildContext` optional-fact set.** The plan named `risk_class`, `severity`,
+   and "(when present) `annex_iii_category`, `confidence`, `kind`,
+   `regulation_ref`". Implemented exactly that: `risk_class` + `severity` always,
+   the other four pushed only when truthy. Mirrors the GDPR runner's blob shape.
+2. **README module-list entry placement.** Added `eu-ai-act-agent-runner`
+   immediately after `eu-ai-act-helpers` in the src/lib enumeration (keeping the
+   EU-AI-Act modules adjacent, mirroring gdpr-helpers → gdpr-agent-runner) and
+   bumped the count 119 → 120 in both README and readme-numbers.test.js.
+3. **Extra fail-strict test (5b).** Added a sub-case proving a MISSING `regulation`
+   field is dropped (the rule core's fail-strict edge beyond a foreign regulation
+   value). Not required by the plan's case list but tightens the drop-branch proof.
