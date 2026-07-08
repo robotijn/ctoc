@@ -1482,5 +1482,103 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T19:13:51.735Z",
+    "plan": "EC2-s1-gdpr-helpers.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T19:13:51.760Z",
+    "plan": "EC2-s2-skill-enum-gdpr-6-9.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T19:13:51.787Z",
+    "plan": "EC2-s3-gdpr-agent-definition.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T19:13:51.811Z",
+    "plan": "EC2-s4-wire-gate-and-routing.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T19:13:51.847Z",
+    "plan": "EC3-eu-ai-act-agent-plan-and-code-s1-helpers.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T19:13:51.871Z",
+    "plan": "EC3-eu-ai-act-agent-plan-and-code-s2-agent.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T19:13:51.895Z",
+    "plan": "EC3-eu-ai-act-agent-plan-and-code-s3-registry-wiring.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
