@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T20:52:40.367Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "CU2 — Tier 1 mainstream languages reference upgrade"
 created: "2026-06-15T00:00:00Z"
 priority: HIGH

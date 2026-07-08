@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T20:52:40.492Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "CU5 — Tier 3 wrapper-coverage (13 unwrapped skills → WRAP ALL)"
 created: "2026-06-15T00:00:00Z"
 priority: LOW

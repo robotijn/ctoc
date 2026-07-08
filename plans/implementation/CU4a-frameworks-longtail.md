@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T20:52:40.418Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "CU4a — Frameworks long-tail reference upgrade"
 created: "2026-06-15T00:00:00Z"
 priority: MEDIUM
