@@ -193,50 +193,99 @@ URL).
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (tests/skill-regulatory-citations.test.js — 7 content-contract checks, reads the REAL SKILL.md, zero doubles)
+- [x] Test error conditions (sibling-divergence check asserts checker + sbom-cra-checker carry identical facts)
+- [x] Run tests - expect RED (failing) — all 7 failed against the ungrounded file (baseline confirmed by grep: no 2024/2847, no dates, no NTIA, no last-verified)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none)
+- [x] Check prerequisites (network access confirmed)
+- [x] Verify dev environment ready
+- [x] WEB-VERIFY CRA facts at edit time against authoritative sources (see Decisions)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Add surgical CRA citation block + last-verified line to dependency-checker/SKILL.md
+- [x] Additive only — no existing section rewritten
+- [x] One step, one file
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review: all four literal facts present, each with a source URL; wording mirrors sibling
+- [x] Diff is additive-only (one contiguous block inserted)
+- [x] No other section changed
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Kept the block compact — a citation, not a compliance treatise; defers conformance audit to dependency-auditor / sbom-cra-checker
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] No code / no path handling — content-only edit to one skill file
+- [x] All source URLs are official public domains (eur-lex.europa.eu, digital-strategy.ec.europa.eu, enisa.europa.eu, ntia.gov)
+- [x] Only the one enumerated file edited
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] eslint . --max-warnings 0 → exit 0
+- [x] tsc --noEmit baseline-neutral (tsconfig include = src/**/*.js; my Markdown + test are out of scope; 0 new errors)
+- [x] node --test (excluding the pre-existing s5 test file) → 3406 pass, 0 fail, 0 skipped
+- [x] New slice test GREEN: 7/7 pass
+- [x] Coverage N/A — content grounding, not code (content-contract assertions substitute)
+- [x] 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Decisions Taken Under Ambiguity appended (below) with each CRA fact + source URL + retrieval date
+- [x] No CHANGELOG change needed (skill content edit)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Only dependency-checker/SKILL.md edited within this slice (+ own regression test); no s5 files touched
+- [x] All citations sourced; last verified present; nothing fabricated — every fact traceable to an official URL
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+1. **WebSearch tool unavailable → verified via direct HTTPS fetch of authoritative sources.**
+   The executor environment exposes no WebSearch tool; the hard "web-verified" rule was
+   satisfied by fetching the primary official documents directly over HTTPS and grepping the
+   OJ text itself (stronger than a search snippet). Every fact below was read from the source
+   document, not from memory:
+   - **Reg. (EU) 2024/2847** (of 23 October 2024, *on horizontal cybersecurity requirements
+     for products with digital elements — Cyber Resilience Act*) — regulation number + title
+     read verbatim from EUR-Lex OJ text.
+     source: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202402847 (HTTP 200, retrieved 2026-07-08)
+   - **11 September 2026** — Article 14 (reporting obligations for actively-exploited
+     vulnerabilities and severe incidents) applies from this date. Read verbatim from Art. 71:
+     "*However, Article 14 shall apply from 11 September 2026.*"
+     source: EUR-Lex Reg. (EU) 2024/2847, Art. 71 (retrieved 2026-07-08); EC CRA Reporting
+     https://digital-strategy.ec.europa.eu/en/policies/cra-reporting (HTTP 200); ENISA SRP
+     https://www.enisa.europa.eu/topics/product-security-and-certification/single-reporting-platform-srp (HTTP 200)
+   - **11 December 2027** — the Regulation applies in full. Read verbatim from Art. 71:
+     "*This Regulation shall apply from 11 December 2027.*"
+     source: EUR-Lex Reg. (EU) 2024/2847, Art. 71 (retrieved 2026-07-08)
+   - **Fines EUR 15 000 000 or 2.5% of total worldwide annual turnover, whichever is higher**
+     (Art. 64, for infringement of the Art. 13/14 essential requirements). Read verbatim:
+     "*administrative fines of up to EUR 15 000 000 or, if the offender is an undertaking, up
+     to 2,5 % of the its total worldwide annual turnover … whichever is higher.*"
+     source: EUR-Lex Reg. (EU) 2024/2847, Art. 64 (retrieved 2026-07-08)
+   - **NTIA minimum elements** — *The Minimum Elements For a Software Bill of Materials (SBOM)*,
+     July 2021; report title confirmed verbatim from ntia.gov.
+     source: https://www.ntia.gov/report/2021/minimum-elements-software-bill-materials-sbom (HTTP 200, retrieved 2026-07-08)
+
+2. **`last verified:` date = 2026-07-08 (the actual retrieval date).** Per the plan's
+   ambiguity guidance, the retrieval date is used because the facts WERE re-verified against
+   EUR-Lex / EC / ENISA / NTIA at edit time — not a hardcoded audit date.
+
+3. **Primary source = EUR-Lex (not the EC policy page) for the regulation/dates/fines.**
+   The sibling `sbom-cra-checker` cites the EC policy page for Art. 64; I cite the EUR-Lex OJ
+   text directly (the authoritative primary source) and retain the EC/ENISA/NTIA URLs the
+   siblings use. Cross-checked: no divergence on the regulation number, the two dates, or the
+   fine figure.
+
+4. **Regression test added (tests/skill-regulatory-citations.test.js).** The plan says "no new
+   test file" but explicitly permits a regression test that reads the real file (line 121).
+   Given the CU1 series has sibling slices that touch skills, a durable guard against the
+   citation being dropped is worth the one file. It reads the real SKILL.md — zero mocks —
+   mirroring the established sibling convention in tests/skill-example-source-gaps.test.js.
+
+5. **Pre-existing suite failure is out of scope and NOT mine.** `tests/skill-example-source-gaps.test.js`
+   (the s5 slice's test) fails because `skills/mobile/react-native-bridge-checker/SKILL.md` lacks
+   a `## Sources` section — s5 is still in plans/todo and was left partially applied in the working
+   tree (posthog/sentry modified, react-native-bridge-checker + its Sources not finished). I did
+   NOT touch any s5 file. Excluding that one test file, the suite is 3406 pass / 0 fail. Flagged
+   for the caller/s5 executor; not fixed here (outside this slice's files: contract).
