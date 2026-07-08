@@ -153,36 +153,55 @@ profile path (string) --> readEnforcementDates --> { dates..., verified: false }
 ## Execution Plan (Steps 8–16)
 
 ### Step 8: TEST
-- [ ] Write `tests/eu-ai-act-helpers.test.js` with all 17 cases above (RED first). Use `mkdtempSync` for the `readEnforcementDates` fixture (copy `.ctoc/regulatory-regimes/eu-ai-act-high-risk.yaml` into the tmp dir). `node:test` + `assert/strict` only.
+- [x] Write `tests/eu-ai-act-helpers.test.js` with all 17 cases above (RED first). Use `mkdtempSync` for the `readEnforcementDates` fixture (copy `.ctoc/regulatory-regimes/eu-ai-act-high-risk.yaml` into the tmp dir). `node:test` + `assert/strict` only.
 
 ### Step 9: PREPARE
-- [ ] Confirm no new dependencies — reuse existing `./safe-fs` and Node builtins (`fs`/`os`/`path` for the test harness). No install.
+- [x] Confirm no new dependencies — reuse existing `./safe-fs` and Node builtins (`fs`/`os`/`path` for the test harness). No install.
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/eu-ai-act-helpers.js`: `'use strict'`, `require('./safe-fs')`, frozen `RISK_TIER_TABLE` + `EU_AI_ACT_REGULATION`, the five JSDoc'd exports (`classifyFromPlanText`, `filterToEuAiAct`, `normalizeSeverity`, `routeFinding`, `readEnforcementDates`), `module.exports` at the bottom. No stubs — every branch returns working values (no-stub rule).
+- [x] Create `src/lib/eu-ai-act-helpers.js`: `'use strict'`, `require('./safe-fs')`, frozen `RISK_TIER_TABLE` + `EU_AI_ACT_REGULATION`, the five JSDoc'd exports (`classifyFromPlanText`, `filterToEuAiAct`, `normalizeSeverity`, `routeFinding`, `readEnforcementDates`), `module.exports` at the bottom. No stubs — every branch returns working values (no-stub rule).
 
 ### Step 11: REVIEW
-- [ ] Self-review: filter is fail-strict (missing `regulation` dropped); `normalizeSeverity`/`filterToEuAiAct` never mutate input; classifier heuristics use the skill's real `annex_iii_category` enum spellings; `readEnforcementDates` reads (never hardcodes) dates.
+- [x] Self-review: filter is fail-strict (missing `regulation` dropped); `normalizeSeverity`/`filterToEuAiAct` never mutate input; classifier heuristics use the skill's real `annex_iii_category` enum spellings; `readEnforcementDates` reads (never hardcodes) dates.
 
 ### Step 12: OPTIMIZE
-- [ ] Keyword tables defined once as module constants; matching is single-pass; no redundant re-parsing of the profile.
+- [x] Keyword tables defined once as module constants; matching is single-pass; no redundant re-parsing of the profile.
 
 ### Step 13: SECURE
-- [ ] Verify the Security Review checklist above holds in code: no dynamic `RegExp` on input, `Object.freeze` on `RISK_TIER_TABLE`, shallow-copy in `normalizeSeverity`, `safe-fs` read only, fail-open `readEnforcementDates`. Lint clean (`--max-warnings 0`).
+- [x] Verify the Security Review checklist above holds in code: no dynamic `RegExp` on input, `Object.freeze` on `RISK_TIER_TABLE`, shallow-copy in `normalizeSeverity`, `safe-fs` read only, fail-open `readEnforcementDates`. Lint clean (`--max-warnings 0`).
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/eu-ai-act-helpers.test.js` → all 17 GREEN, 0 skipped, 0 flaky. Then `node --test tests/*.test.js` → `# fail 0` (no regression). Coverage on `eu-ai-act-helpers.js` ≥ 80%. Lint + typecheck pass.
+- [x] `node --test tests/eu-ai-act-helpers.test.js` → all 17 GREEN, 0 skipped, 0 flaky. Then `node --test tests/*.test.js` → `# fail 0` (no regression). Coverage on `eu-ai-act-helpers.js` ≥ 80%. Lint + typecheck pass.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on all five exports (params, returns, throws-never contract, fail-open notes). Module header comment stating the scope-isolation-via-output-filter decision and the "dates read from profile, not hardcoded" invariant.
+- [x] JSDoc on all five exports (params, returns, throws-never contract, fail-open notes). Module header comment stating the scope-isolation-via-output-filter decision and the "dates read from profile, not hardcoded" invariant.
 
 ### Step 16: FINAL-REVIEW
-- [ ] implementation-reviewer verifies the 14 quality dimensions + AC→assertion map for scenarios covered by this slice (classifier, filter, normalizer, router, date reader). No human gate crossed by this slice. Gate 3 approval is batched at the EC3 parent level.
+- [x] implementation-reviewer verifies the 14 quality dimensions + AC→assertion map for scenarios covered by this slice (classifier, filter, normalizer, router, date reader). No human gate crossed by this slice. Gate 3 approval is batched at the EC3 parent level.
 
 ## Decisions Taken Under Ambiguity
 
 - **Helpers test is `tests/eu-ai-act-helpers.test.js`, not the parent-plan's single `tests/eu-ai-act-agent.test.js`.** The parent EC3 plan lists one test file covering both helpers and agent content. Per SIP1 a module ships with its own test; splitting the helper unit-tests (this slice) from the agent-content-contract tests (s2) into two files keeps each slice a clean single-pass unit and avoids two slices writing the same file. The `files:` coverage hook scopes each slice to its own test file.
 - **`readEnforcementDates` parses the profile with a minimal targeted YAML read (the `effective_date:` line + the `notes:` block), not a full YAML library**, mirroring `compliance-regime.js`'s targeted single-line approach — no new dependency, CRLF-tolerant, fail-open.
+
+- **Added the Art. 4 AI-literacy (2 Feb 2025) and Chapter V GPAI (2 Aug 2025) milestone dates + an explicit "Annex III high-risk obligations effective August 2 2026" phrase to the `notes:` block of `.ctoc/regulatory-regimes/eu-ai-act-high-risk.yaml`.** The tests require `readEnforcementDates` to return those four milestones, and the no-hardcode invariant forbids baking them into the function. The original `notes:` prose stated only Art. 5 (2 Feb 2025) and the general high-risk (2 Aug 2026) dates — so the Art. 4 and Chapter V dates were added to the PROFILE (the source of truth, matching SKILL.md `deadline_relevance`), and `readEnforcementDates` reads all four from prose via static anchor regexes. This preserves "dates read from profile, never hardcoded": edit the YAML and the returned dates change (proven by test 16b). The profile edit touches only the human-readable `notes:` block — no structured key, no hook-critical field.
+
+- **Every classifier keyword pattern is a STATIC literal `RegExp` and was rewritten to be linear-time** to satisfy `security/detect-unsafe-regex` at `--max-warnings 0` (warnings-are-bugs). The safe-regex heuristic flagged several patterns that chained `\s+` beside optional non-capturing groups / alternations (`(?:facial|face)[-\s]?(?:image\s+)?`, the credit/GPAI alternations). Rather than suppress, each was split into multiple simple single-space patterns (no nested/overlapping unbounded quantifiers). No dynamic `RegExp` is ever built from plan input.
+
+- **`readEnforcementDates`'s prose-date anchors use `new RegExp(staticString + WORD_DATE)`** where every fragment is a module-level string LITERAL (never the untrusted profile content or plan input) — this is not a `detect-non-literal-regexp` finding (lint exit 0) and carries no ReDoS surface (bounded profile file, linear anchors).
+
+## Execution Result (EC3-s1)
+
+- **RED → GREEN:** test file written first, ran RED (module absent: "Cannot find module '../src/lib/eu-ai-act-helpers'"), then GREEN after implement.
+- **`node --test tests/eu-ai-act-helpers.test.js`:** 22 pass / 0 fail / 0 skipped (17 plan cases, several split into sub-cases a/b for branch coverage).
+- **Fail-strict proof:** test 9 (`[{kind:'missing-inventory'}]` → `[]`), test 7 (`nist-ai-rmf` + `iso-42001` → `[]`), test 9b (null/undefined regulation + non-object entries dropped) all pass — any finding whose `regulation !== 'eu-ai-act'` (incl. missing) is DROPPED.
+- **Dates-from-profile:** test 16 reads `2025-02-02` (Art.5/Art.4), `2025-08-02` (Chapter V GPAI), `2026-08-02` (Annex III + effective_date) from the profile with `verified:false`; test 16b edits `effective_date` in a fixture and the returned value changes (proves not hardcoded); test 17 missing file → all-null + `verified:false`, no throw.
+- **`node --test tests/*.test.js`:** 3238 pass / 0 fail / 0 skipped — `# fail 0`.
+- **`npx eslint . --max-warnings 0`:** exit 0.
+- **tsc:** baseline-neutral — 89 pre-existing errors unchanged, ZERO in `eu-ai-act-helpers.js` / `tests/eu-ai-act-helpers.test.js` / `readme-numbers.test.js`.
+- **Count bump:** `src/lib/` 117 → 118 (README line + both `readme-numbers.test.js` assertions updated; readme-numbers 47 pass / 0 fail).
+- **Coverage on `eu-ai-act-helpers.js`:** 99.11% line / 89.58% branch / 100% function (≥ 80%). Uncovered: the fail-open catch block only.
+- Plan intentionally NOT moved (dispatch scope: implement this slice's files only).
 
 
 ---
@@ -190,50 +209,50 @@ profile path (string) --> readEnforcementDates --> { dates..., verified: false }
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
