@@ -268,6 +268,19 @@ agents:
     description: Plan-ancestry + code-scan GDPR agent; gated on the gdpr regulatory profile.
     parallel_safe: true
 
+  eu-ai-act-agent:
+    path: agents/compliance/eu-ai-act-agent.md
+    model: opus
+    category: compliance
+    tier: 2
+    role: specialist
+    reports_to: cto-chief
+    gated_by: shouldRunEuAiAct         # EC1 — advisory: runs only when the eu-ai-act-high-risk profile is active
+    extends_skill: compliance/ai-governance-checker   # wraps ai-governance-checker, filtered to EU AI Act only
+    regime_profile: eu-ai-act-high-risk
+    description: EU AI Act (Regulation (EU) 2024/1689) plan-inspection + code-scan specialist; wraps ai-governance-checker, filters output to EU AI Act only.
+    parallel_safe: true
+
 # ===============================================================================
 #  IRON LOOP v2.1
 # ===============================================================================
