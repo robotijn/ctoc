@@ -181,6 +181,65 @@ test('SR-A2 tokenize returns [] for empty / whitespace-only input', () => {
   assert.deepEqual(tokenize('   \n\t '), []);
 });
 
+// MEDIUM-1 (PI4-s4 kickback): the tokenizer now SPLITS compound identifiers into
+// their sub-tokens (camelCase humps + . - _ boundaries) so a partial-identifier
+// query recalls a doc that only ever wrote the whole identifier. The prior second
+// loop was dead (it only kept punctuation-bearing raw tokens already covered by the
+// primary split) and its comment lied. This pins the corrected behavior.
+test('SR-A1b tokenize splits compound identifiers into sub-tokens (partial-identifier recall)', () => {
+  const camel = tokenize('parseYAMLShallow');
+  assert.ok(camel.includes('parse'), 'camelCase sub-token "parse"');
+  assert.ok(camel.includes('yaml'), 'acronym sub-token "yaml"');
+  assert.ok(camel.includes('shallow'), 'camelCase sub-token "shallow"');
+  assert.ok(camel.includes('parseyamlshallow'), 'whole identifier still present (exact recall)');
+
+  const kebab = tokenize('parse-yaml-shallow');
+  assert.ok(kebab.includes('parse') && kebab.includes('yaml') && kebab.includes('shallow'),
+    'hyphenated identifier splits into sub-tokens');
+
+  const snake = tokenize('parse_yaml_shallow');
+  assert.ok(snake.includes('parse') && snake.includes('yaml') && snake.includes('shallow'),
+    'snake_case identifier splits into sub-tokens');
+
+  // Partial-identifier recall end to end: a doc that only wrote the compound
+  // identifier is retrievable by a bare sub-word query.
+  const units = [
+    { planPath: 'yaml-plan.md', text: 'the parseYAMLShallow helper reads frontmatter' },
+    { planPath: 'other-plan.md', text: 'clerk authentication signup and login flow' },
+  ];
+  const ranked = scoreBM25(buildBM25Index(units), tokenize('yaml'));
+  assert.equal(ranked[0] && ranked[0].id, 'yaml-plan.md',
+    'a "yaml" query recalls the doc that only wrote parseYAMLShallow');
+});
+
+// LOW-1 (PI4-s4 kickback): the BM25/vector fusion id for a section unit MUST use the
+// store's real composite-key convention (NUL, KEY_SEP='\x00'), NOT a space join —
+// otherwise ("a b","c") and ("a","b c") would collide on the same fusion id. This
+// drives a section-kind search over two units whose (planPath, sectionId) pairs
+// space-join to the SAME string but NUL-join distinctly, and asserts they remain two
+// distinct results (no collapse). Fails if the fusion id ever reverts to a space join.
+test('SR-A5 section fusion id uses the NUL composite-key convention (no id collision)', async () => {
+  // Two units that a SPACE join would collapse: ("a b","c") vs ("a","b c").
+  const units = [
+    { planPath: 'a b', sectionId: 'c',   text: 'quality gate coverage lint alpha' },
+    { planPath: 'a',   sectionId: 'b c', text: 'quality gate coverage lint beta' },
+  ];
+  const viewByKey = new Map();
+  for (const u of units) viewByKey.set(`${u.planPath} ${u.sectionId}`, u);
+  const store = {
+    size: units.length,
+    listPlanPaths: () => [...new Set(units.map((u) => u.planPath))],
+    listUnitSectionIds: (pp) => units.filter((u) => u.planPath === pp).map((u) => u.sectionId),
+    getUnit: (pp, sid) => viewByKey.get(`${pp} ${sid}`) || null,
+    search: () => [], // BM25-only path is enough to exercise the id join
+  };
+  const embedder = async () => ({ vectors: [] }); // degrade → BM25-only
+  const results = await search('quality gate coverage', { store, embedder, kind: 'section' });
+  const ids = results.map((r) => `${r.planPath} ${r.sectionId}`);
+  assert.equal(new Set(ids).size, results.length, 'no two results share a fusion id');
+  assert.equal(results.length, 2, 'both distinct section units survive (no collision collapse)');
+});
+
 test('SR-A3 scoreBM25 ranks a doc containing the query term above one that does not', () => {
   const units = [
     { planPath: 'a.md', text: 'the quality gate enforces coverage and lint' },

@@ -12,6 +12,8 @@ parent_plan: pi4-semantic-search-and-related-plans
 depends_on: pi4-semantic-search-and-related-plans-s3-related-and-barrel
 priority: HIGH
 files:
+  - "src/areas/pipeline.js"
+  - "src/lib/plan-index/search.js"
   - "src/commands/menu.js"
   - "src/tabs/overview.js"
   - "src/areas/inbox.js"
@@ -382,3 +384,68 @@ four blocks.
   code was altered to satisfy the type checker.
 - **Bounded result sets.** `related`/inbox helper cap at top-5; `search` caps at
   top-10 (perceived-latency mitigation named in the parent risk table).
+
+## Pre-Gate-3 KICKBACK — LIVE-wiring fix (the "polished shell over an unusable product" failure)
+
+The s4 review found the entire slice was wired into the LEGACY, UNMOUNTED
+`src/tabs/overview.js` and into a `menu.js` search handler that never accumulated a
+query or rendered results — so NONE of it reached the human (the live menu mounts
+`src/areas/pipeline.js` + `src/areas/inbox.js`, not overview). Every helper passed in
+isolation while the flow was dead end to end. Fixed:
+
+- **CRITICAL-1/2 — Related Plans panel LIVE (pipeline).** `src/areas/pipeline.js` now
+  IMPORTS `renderRelatedPanel` + `prefetchRelated` from `src/tabs/overview.js` (kept
+  as the single canonical home of the bridge + Scenario-7 indicator to avoid drift),
+  calls `renderRelatedPanel(app)` in its `render` output (line ~66, directly under the
+  section counts), and exposes a fail-open `activate(app)` (line ~91) that seeds a
+  `selectedPlan` from the first in-progress/todo/implementation plan (`pickSeedPlan`)
+  and awaits `prefetchRelated` off the render path. Verified: a rendered live-pipeline
+  string CONTAINS the populated panel (`Related Plans` + neighbours in score order).
+- **CRITICAL-3 — inbox related LIVE.** `src/areas/inbox.js` now imports
+  `listRelatedForInbox` and exposes a fail-open `activate(app)` (line ~90) that seeds a
+  slug from the first plan-at-gate, sets `app.inboxRelated = await
+  listRelatedForInbox(slug, root)`, and re-renders via the existing
+  `renderInboxRelated`.
+- **CRITICAL-4 — search input + results LIVE (menu).** `src/commands/menu.js` gains a
+  real search SUB-MODE: `handleSearchInput(str,key,app)` (accumulates keystrokes into
+  `app.searchQuery`, handles backspace/escape, returns `{run:true}` on enter),
+  `renderSearch(app)` (shows the live query line + ranked `app.searchResults`), a
+  `handleKey` search-mode branch (line ~321, BEFORE the global `q`-quit so typing `q`
+  no longer quits) that runs `enterSearchMode` on enter, a `render` branch (line ~183)
+  that displays the results, and `activateCurrentArea()` (fired from `resetTabState`
+  and initial `main`) that kicks each area's `activate`. Verified: `/` → type → Enter
+  yields `app.searchQuery` captured AND the rendered output CONTAINS the ranked hits.
+- **THE END-TO-END TEST (was missing).** `tests/plan-index-search-ui.test.js` adds 5
+  human-flow tests (E1–E5) that drive the REAL `menu.handleKey`/`render` loop and the
+  live `pipeline`/`inbox` `activate`+`render` (capturing `process.stdout.write`), NOT
+  direct helper calls. Proven RED→GREEN: 0/5 pass against the dead HEAD wiring →
+  5/5 pass after the fix. The 20 original direct-call tests are kept.
+- **MEDIUM-1 — tokenize dead branch (search.js).** The second compound-token loop only
+  retained punctuation-bearing raw tokens already covered by the primary split, and
+  its comment lied. Replaced with a real `splitCompound` that splits camelCase humps
+  and `.`/`-`/`_` boundaries into sub-tokens (`parseYAMLShallow` → `parse,yaml,shallow`)
+  for partial-identifier recall, WHILE still emitting the whole lowercased identifier
+  for exact recall. Comment corrected. Pinned by `SR-A1b` in
+  `tests/plan-index-search.test.js` (a bare `yaml` query now recalls a doc that only
+  wrote `parseYAMLShallow`).
+- **LOW-1 — id-join invariant (search.js).** The BM25/vector fusion id for section
+  units now uses the store's real composite-key convention (NUL, `KEY_SEP='\x00'`) via
+  a `fusionId(kind,planPath,sectionId)` helper + a documented `FUSION_KEY_SEP='\x00'`
+  constant, replacing the space join that could collide `("a b","c")` with
+  `("a","b c")`. Pinned by `SR-A5` (asserts two such units never collapse to one id).
+- **tsc neutrality.** Three new union/optional-method accesses (`handleSearchInput`'s
+  `{run}` shape, the area-module `.activate`) got documentation-only `/** @type {any}
+  */` casts (the plan's established precedent). tsc `--noEmit` error count stays at the
+  89 baseline (measured 89 before → 89 after). No runtime code altered for the type
+  checker.
+
+### Verification tallies (this kickback)
+- E2E RED→GREEN: `--test-name-pattern='E2E'` → **0 pass / 5 fail** on dead HEAD wiring;
+  **5 pass / 0 fail** after the fix.
+- `node --test tests/plan-index-search-ui.test.js` → **28 pass / 0 fail / 0 skipped**.
+- `node --test tests/plan-index-search.test.js` → **24 pass / 0 fail** (adds SR-A1b, SR-A5).
+- `node --test tests/*.test.js` → **3074 pass / 0 fail / 0 skipped** (663 suites).
+- `npx eslint . --max-warnings 0` → **exit 0**.
+- `npx tsc --noEmit` → **89 errors (baseline-neutral)**.
+- Pinned suites green: `area-modules` 19/19, `enforcement-hook` 11/11.
+- Plan NOT moved (left in `review/`).

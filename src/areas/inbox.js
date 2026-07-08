@@ -8,7 +8,7 @@
  */
 
 const { c, line, renderFooter } = require('../lib/tui');
-const { getInboxCounts, listQuestions, listDecisions, listPlansAtGates } = require('../lib/inbox');
+const { getInboxCounts, listQuestions, listDecisions, listPlansAtGates, listRelatedForInbox } = require('../lib/inbox');
 
 function render(app) {
   const root = app.projectPath || process.cwd();
@@ -87,8 +87,34 @@ function renderInboxRelated(app) {
   }
 }
 
+/**
+ * PI4-s4 kickback: async-fetch half of the inbox related-plans bridge. Called on
+ * inbox area activation (tab switch into inbox), OFF the render path. Seeds a slug
+ * from the first plan waiting at a gate (the plan the human is most likely acting
+ * on), fetches its related plans via `listRelatedForInbox`, and stashes the array
+ * on `app.inboxRelated` for `renderInboxRelated` to read SYNCHRONOUSLY. Fully
+ * fail-open: no plan-at-gate / unavailable barrel / any error → `app.inboxRelated = []`
+ * and NEVER throws or rejects. The caller fires this fire-and-forget and re-renders.
+ * @param {object} app - TUI app state; uses/sets `app.projectPath`, `app.selectedPlan`, `app.inboxRelated`
+ * @returns {Promise<void>}
+ */
+async function activate(app) {
+  try {
+    const root = (app && app.projectPath) || process.cwd();
+    let seed = app && app.selectedPlan;
+    if (typeof seed !== 'string' || seed.length === 0) {
+      const gated = listPlansAtGates(root);
+      seed = (Array.isArray(gated) && gated[0] && gated[0].plan) || null;
+    }
+    if (!seed) { app.inboxRelated = []; return; }
+    app.inboxRelated = await listRelatedForInbox(seed, root);
+  } catch {
+    if (app) app.inboxRelated = []; // fail-open — activation never breaks the menu
+  }
+}
+
 function handleKey(_key, _app) {
   return false;
 }
 
-module.exports = { render, handleKey };
+module.exports = { render, handleKey, activate };
