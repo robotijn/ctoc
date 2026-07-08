@@ -24,12 +24,22 @@
  *      always sees the duplicate note regardless of the enforcement outcome, and the
  *      guard is strictly additive — it does not weaken or alter enforcement.
  *
- * stdin handling: `PreToolUse.Edit.js` runs its enforcement IIFE at require-time and
- * reads stdin (fd 0) itself. To avoid running enforcement (and consuming stdin) merely
- * by importing this module in a test, the Edit delegate is required ONLY on the
- * production entry (`require.main === module`), AFTER the advisory guard has run off
- * the parsed stdin payload. The test imports the module and drives `run(payload, deps)`
- * directly, so enforcement is never triggered by importing.
+ * stdin handling (PI5-s2 CRITICAL FIX): a pipe is SINGLE-CONSUMER — fd 0 can be
+ * drained exactly ONCE. The previous design read stdin here AND let the Edit
+ * delegate's require-time IIFE read stdin AGAIN — the second read hit an empty
+ * pipe, so enforcement saw target `(unknown)`, matched nothing in the plan
+ * whitelist, and BLOCKED every plan-file write (exit 1); the escape-phrase bypass
+ * broke too. The fix: `main()` reads + parses stdin exactly ONCE, runs the
+ * advisory guard on that payload, then calls the delegate's exported
+ * `enforce(parsed)` with the SAME parsed payload. `PreToolUse.Edit.js` no longer
+ * reads stdin when imported (its stdin read is guarded by `require.main ===
+ * module`), so there is NO second fd-0 read anywhere. Enforcement fires on the
+ * real target: plan writes ALLOW, unplanned writes BLOCK, escape phrases work.
+ *
+ * The test imports the module and drives `run(payload, deps)` directly (never
+ * touching stdin), plus a spawned-subprocess integration test drives the REAL
+ * hook end-to-end (the PI4 lesson: unit tests on run() alone never exercised the
+ * production stdin/delegate path that shipped broken).
  *
  * Exit codes: the advisory guard never exits; the delegated enforcement owns exit
  * (0 = allowed, 1 = blocked).
@@ -150,6 +160,45 @@ function emitWarnings(warnings, deps) {
 }
 
 /**
+ * Resolve the `checkDuplicate` implementation used by the production path (no
+ * injected `deps.checkDuplicate`).
+ *
+ * PRODUCTION: lazy-requires the real `../lib/plan-index/duplicate-guard`.
+ *
+ * TEST SEAM (spawned-subprocess integration test only): if
+ * `process.env.CTOC_DUPLICATE_GUARD_TEST_FIXTURE` is set, it names a JSON file
+ * containing a pre-scored warnings array (`[{ plan, similarity }]`). This lets the
+ * spawned REAL hook surface a deterministic advisory warning WITHOUT an embedded
+ * index / Ollama — proving the warning reaches a human through the production
+ * `main()`/stdin/`enforce` path (the PI4 "measure is the human" lesson), while the
+ * real duplicate logic stays byte-for-byte untouched. Production never sets this
+ * env var; if the fixture is missing/unreadable/invalid the seam falls through to
+ * the real guard (fail-open). The returned function is async + fail-open, matching
+ * the real `checkDuplicate` contract.
+ *
+ * @returns {(summary: string, options: object) => Promise<Array<{plan:string,similarity:number}>>}
+ */
+function resolveCheckDuplicate() {
+  const fixturePath = process.env.CTOC_DUPLICATE_GUARD_TEST_FIXTURE;
+  if (fixturePath) {
+    return async () => {
+      try {
+        const raw = safeFs.readFileSync(fixturePath, 'utf8');
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return []; // fail-open: a bad fixture never breaks a write
+      }
+    };
+  }
+  try {
+    return require('../lib/plan-index/duplicate-guard').checkDuplicate;
+  } catch {
+    return () => Promise.resolve([]);
+  }
+}
+
+/**
  * The advisory-guard entry, decoupled from stdin/exit so a test can drive it directly.
  * Accepts an ALREADY-PARSED PreToolUse payload and optional injected `deps`. Detects a
  * `plans/**\/*.md` target, derives the summary, `await`s `checkDuplicate`, emits + logs
@@ -181,7 +230,7 @@ async function run(payload, deps = {}) {
     const checkDuplicate =
       typeof deps.checkDuplicate === 'function'
         ? deps.checkDuplicate
-        : require('../lib/plan-index/duplicate-guard').checkDuplicate;
+        : resolveCheckDuplicate();
 
     if (typeof checkDuplicate !== 'function') {
       return { warned: false, warnings: [] };
@@ -218,10 +267,13 @@ function readStdinRaw() {
 }
 
 /**
- * Production entry. Reads stdin once, runs the advisory guard on the parsed payload,
- * then delegates to the enforcement hook (`./PreToolUse.Edit.js`). The enforcement
- * delegate reads stdin itself and owns the block/allow decision — the advisory guard
- * never blocks and never exits.
+ * Production entry. Reads + parses stdin exactly ONCE (a pipe is single-consumer),
+ * runs the advisory guard on that parsed payload, then hands the SAME parsed
+ * payload to the enforcement delegate's exported `enforce(parsed)`. There is NO
+ * second fd-0 read: `PreToolUse.Edit.js` guards its own stdin read behind
+ * `require.main === module`, so importing it here does not touch stdin. The
+ * delegate owns the block/allow decision and the exit; the advisory guard never
+ * blocks and never exits.
  *
  * @returns {Promise<void>}
  */
@@ -240,16 +292,28 @@ async function main() {
       /* advisory guard is fail-open; never let it suppress enforcement */
     }
   }
-  // Delegate enforcement (UNCHANGED). Requiring it runs its IIFE, which re-reads
-  // stdin (fd 0) and owns the exit decision. Kept as a LITERAL require for the
-  // static module graph. Failing to load the delegate must NOT block the write:
-  // fail OPEN (exit 0) so an advisory-hook fault never suppresses a legitimate write.
+  // Delegate enforcement with the SAME parsed payload we already read (single
+  // read, then hand off). Importing the delegate does NOT run its IIFE or read
+  // stdin (guarded by require.main === module), so no second fd-0 read occurs —
+  // this is the fix for the drained-pipe → target '(unknown)' → block-everything
+  // bug. Failing to load/run the delegate must NOT block the write: fail OPEN
+  // (exit 0) so an advisory-hook fault never suppresses a legitimate write.
+  let enforce;
   try {
-    require('./PreToolUse.Edit.js');
+    ({ enforce } = require('./PreToolUse.Edit.js'));
   } catch (err) {
     process.stderr.write(`[CTOC] Write hook: enforcement delegate failed to load (failing open): ${err.message}\n`);
     process.exit(0);
+    return;
   }
+  if (typeof enforce !== 'function') {
+    process.stderr.write('[CTOC] Write hook: enforcement delegate has no enforce() (failing open)\n');
+    process.exit(0);
+    return;
+  }
+  // enforce() owns the exit (0 = allowed, 1 = blocked). It runs the real
+  // whitelist/coverage/escape-phrase decision on the real target from `parsed`.
+  await enforce(parsed);
 }
 
 module.exports = { run, main, isPlanTarget, deriveSummary, normalizeRel, SUMMARY_CHAR_CAP };
