@@ -267,51 +267,67 @@ comparator directly (the parent's "pre-measured similarities" contract).
 ## Execution Plan
 
 ### Step 8: TEST (TDD Red)
-- [ ] Create `tests/plan-index-duplicate-guard.test.js` with all 9 cases above,
+- [x] Create `tests/plan-index-duplicate-guard.test.js` with all 9 cases above,
       using injected stub `search` + stub `getSetting` (no network, no real embed).
-- [ ] Run — all fail (module does not exist yet). Confirms Red.
+- [x] Run — all fail (module does not exist yet). Confirms Red. (19-test file failed
+      to load: `Cannot find module '../src/lib/plan-index/duplicate-guard'`.)
 
 ### Step 9: PREPARE
-- [ ] No new dependencies. Confirm `src/lib/plan-index/index.js` exports `search`
-      (barrel lazy getter — shipped) and `src/lib/settings.js` exports `getSetting`
-      (shipped). Confirm `tests/fixtures/plan-index/search-fixture.json` exists for
-      realistic plan paths.
+- [x] No new dependencies. Confirmed `src/lib/plan-index/index.js` re-exports `search`
+      (barrel lazy getter → `require('./search').search` — shipped) and
+      `src/lib/settings.js` exports `getSetting(category, key, projectPath)`
+      (shipped, 3-arg). `tests/fixtures/plan-index/search-fixture.json` exists (its
+      cluster/plan-path structure mirrored into the baked per-test stub scores).
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/plan-index/duplicate-guard.js` exporting async
+- [x] Created `src/lib/plan-index/duplicate-guard.js` exporting async
       `checkDuplicate(draftSummary, options)` per the File Specification:
-      single `try/catch` fail-open body; lazy-require barrel `search` + `getSetting`
-      unless injected; read threshold via
+      single `try/catch` fail-open body; lazy-require real `search` (`./search`) +
+      `getSetting` (`../settings`) unless injected; read threshold via
       `getSetting('plan_index','duplicate_threshold',projectPath)`; `await search(...)`
-      with `excludePlanPath`+`limit`; filter `score >= threshold`; map to
-      `{ plan, similarity }`; sort desc; export `DEFAULT_DUPLICATE_LIMIT`.
-- [ ] No stubs, no TODOs (no-stub rule).
+      with `excludePlanPath`+`limit`; filter `Number.isFinite(score) && score >=
+      threshold`; map to `{ plan, similarity }`; sort desc; export
+      `DEFAULT_DUPLICATE_LIMIT = 5`.
+- [x] No stubs, no TODOs (no-stub rule).
 
 ### Step 11: REVIEW
-- [ ] Self-review against Architecture Validation checklist above; confirm no
-      `lib → hooks` import and the body cannot throw.
+- [x] Self-reviewed against Architecture Validation checklist: no `lib → hooks`
+      import (imports only `./search`, `../settings`); the entire body is a single
+      `try { … } catch { return []; }` — it cannot throw. Non-function
+      search/getSetting also guarded → `[]`.
 
 ### Step 12: OPTIMIZE
-- [ ] Confirm exactly ONE `await search(...)` (search() owns the single embed);
-      no redundant retrieval, no per-result async.
+- [x] Confirmed exactly ONE `await search(...)` (search() owns the single embed);
+      no redundant retrieval, no per-result async; a single filter→map→sort pass.
 
 ### Step 13: SECURE
-- [ ] Verify the Security Review checklist items hold in the final code
-      (fail-open, finiteness guards, no fs/path/shell).
+- [x] Security Review checklist holds: fail-open; `Number.isFinite` guards on both
+      threshold and each result `score`; input type/emptiness guard; no fs/path/os;
+      no shell/exec; results mapped into fresh `{ plan, similarity }` literals (no
+      untrusted-key merge → no prototype pollution).
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/plan-index-duplicate-guard.test.js` → `# fail 0`.
-- [ ] Coverage ≥ 80% on `duplicate-guard.js`; 0 skipped, 0 flaky.
-- [ ] Full suite `node --test tests/*.test.js` → `# fail 0` (no regression).
+- [x] `node --test tests/plan-index-duplicate-guard.test.js` → 19 tests, pass 19,
+      fail 0, skipped 0.
+- [x] Coverage on `duplicate-guard.js`: 98.48% line / 92.31% branch / 100% func
+      (≥ 80%); 0 skipped, 0 flaky.
+- [x] Full suite `node --test tests/*.test.js` → tests 3094, pass 3094, fail 0,
+      skipped 0 (no regression). `npx eslint . --max-warnings 0` exit 0. tsc
+      ratcheting baseline unchanged at 89 (baseline-neutral). readme-numbers 47/47.
 
 ### Step 15: DOCUMENT
-- [ ] Module header JSDoc: purpose (thin threshold layer over PI4 `search`),
-      fail-open contract, the score-semantics note, threshold source + signature.
+- [x] Module header JSDoc written: purpose (thin threshold layer over PI4 `search`),
+      fail-open contract, RRF-vs-cosine score-semantics note, threshold source +
+      3-arg signature, DI-for-tests contract; `checkDuplicate` + `DEFAULT_DUPLICATE_LIMIT`
+      documented. No CHANGELOG/README bump (internal lib, subdir count untracked).
 
 ### Step 16: FINAL-REVIEW
-- [ ] Confirm: single export `checkDuplicate`; never throws; empty-index/no-match/
-      bad-input/error all → `[]`; `>=` comparator; `selfPlanPath` → `excludePlanPath`;
-      quality bar met. Ready for batched Gate 2 with sibling `s2`.
+- [x] Confirmed: single logical export `checkDuplicate` (+ `DEFAULT_DUPLICATE_LIMIT`
+      constant); never throws (fail-open proven — a throwing `search` RESOLVES `[]`,
+      not a rejection); empty-index/no-match/bad-input/error all → `[]`; `>=`
+      comparator (boundary equality is a match); `selfPlanPath` → `excludePlanPath`;
+      quality bar met. Ready for batched Gate 2 with sibling `s2`. (Plan NOT moved —
+      remains in todo per instruction.)
 
 ## Decisions Taken Under Ambiguity
 
@@ -341,6 +357,29 @@ comparator directly (the parent's "pre-measured similarities" contract).
 - **`limit` default `5` (`DEFAULT_DUPLICATE_LIMIT`).** A duplicate warning should
   name a handful of nearest plans, not the full top-10 search default. Chosen
   small; overridable via `options.limit`.
+
+- **Real `search` required from `./search`, NOT read off the `./index` barrel
+  getter (tsc-neutrality).** The plan's File Spec said "lazy-require the barrel
+  `search` (`./index`)". The barrel exposes `search` via
+  `Object.defineProperties(module.exports, { search: { get() { return
+  require('./search').search; } } })`. `tsc --checkJs` does NOT see
+  `defineProperties`-installed properties on `module.exports`, so
+  `require('./index').search` raised `TS2339: Property 'search' does not exist`,
+  bumping the ratcheting typecheck baseline 89 → 90 and failing
+  `tests/typecheck.test.js`. Decision: the production fallback lazy-requires
+  `require('./search').search` directly. This is BEHAVIORALLY IDENTICAL — the
+  barrel getter is literally `require('./search').search` — keeps the same lazy
+  require (no eager cycle) and the same fail-open guard (non-function → `[]`), and
+  restores tsc baseline-neutrality (89, unchanged). No hook or barrel behavior
+  changes; `s2` still consumes `checkDuplicate` unchanged.
+
+- **Whitespace-only `draftSummary` treated as empty → `[]` (search not called).**
+  The spec says "non-empty string". A summary that is all whitespace carries no
+  query signal and the real `search()` would tokenize it to nothing anyway; the
+  guard uses `draftSummary.trim() === ''` so `'   \n\t '` short-circuits to `[]`
+  WITHOUT calling `search`, consistent with the null/`''`/non-string cases. This
+  is stricter than a bare `length === 0` check but strictly safer (no wasted embed
+  attempt) and is unit-tested.
 
 
 ---
