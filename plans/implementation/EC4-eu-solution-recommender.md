@@ -12,18 +12,41 @@ type: feature
 parent_vision: eu-compliance-agents-gdpr-ai-act
 program: ctoc-eu-compliance
 order: 4
+is_slice_index: true
 depends_on:
   - EC2-gdpr-agent-plan-and-code
   - EC3-eu-ai-act-agent-plan-and-code
-files:
-  - agents/compliance/eu-solution-recommender.md
-  - src/lib/eu-recommender-helpers.js
-  - agents/compliance/gdpr-agent.md
-  - agents/compliance/eu-ai-act-agent.md
-  - tests/eu-solution-recommender.test.js
-status: refined
+status: decomposed
 acceptance_criteria_count: 12
 risk_level: MEDIUM
+---
+
+> **This plan is a SLICE INDEX.** Per SIP1, EC4 has been decomposed into 3 dependency-ordered
+> implementation slices (below). This file is no longer a build target — it carries no `files:`
+> and no `iron_loop` block; each SLICE carries its own focused `files:`, its own `iron_loop: true`,
+> and its own canonical Step 8–16 Execution Plan, and is built independently through the Iron Loop.
+> The upstream functional context (ASSESS / ALIGN / CAPTURE / Scope / Risks) is preserved below.
+> Gate 2 and Gate 3 are approved for ALL three siblings at once via `approveSubplans('EC4-eu-solution-recommender', …)` — one human decision per batch; each sibling still receives its own `approved_by: human` marker.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | files: | depends_on |
+|---|------------|------------------|--------|------------|
+| 1 | `EC4-s1-recommender-helpers.md` | Deterministic rule core: `validateOutputSchema` (canonical snake_case schema, rejects `selected`/hosted-without-region/verified-source-without-date), `validatePriceString` (rejects evaluative language), `checkMonotonicity` (unique strictly-increasing `quality_rank` per bucket), `createFetcher` (injectable web boundary — fail-soft), `applyFallback` (per-field `unverified_this_run`) — pure/near-pure module + its unit test (stub fetcher, no network). | `src/lib/eu-recommender-helpers.js`, `tests/eu-recommender-helpers.test.js` | none |
+| 2 | `EC4-s2-recommender-agent.md` | The web-sourced Tier-2 agent (`tools: WebSearch, WebFetch`) — finding-in / three-bucket-out; references all five s1 helpers by name; sole web boundary is `createFetcher(WebSearch, WebFetch)`; EU-region-only hosted; price-as-fact + no fabricated numbers (every figure sourced); fallback-and-continue; advisory, no gate, no auto-select. Asserted by a PI4 content-contract test on the real file. | `agents/compliance/eu-solution-recommender.md`, `tests/eu-solution-recommender-agent.test.js` | s1 |
+| 3 | `EC4-s3-registry-wiring.md` | The one integration point: register `eu-solution-recommender` in `.ctoc/operations-registry.yaml` (LIVE discoverability surface; keyed-map entry after `eu-ai-act-agent`; `tools`, `invoked_by: [gdpr-agent, eu-ai-act-agent]`, no `gated_by`, no `review_gate`) + a LIVE registry-resolution + gate-integrity (3/3/banner) test. | `.ctoc/operations-registry.yaml`, `tests/eu-solution-recommender-registry.test.js` | s2 |
+
+**Dependency chain:** `s1 → s2 → s3` (depth 3 — at the SIP1 max, no deeper; no cycle). Implementation stays sequential + dependency-ordered: s1 builds first (nothing depends on the recommender), then s2 (references s1's exports), then s3 (points its registry `path` at s2's agent file).
+
+### Test-file naming decision (avoids cross-slice file ownership collision)
+
+The `files:` list in the ORIGINAL EC4 frontmatter named `tests/eu-solution-recommender.test.js`. That file is owned by **EC6 (tests-and-fixtures)** — the fixture-driven end-to-end integration test that drives the agent across both regimes. Per the SIP1 rule "never two slices owning the same file," EC4's own slice tests are named distinctly and follow the EC2/EC3 module+contract-test precedent:
+- **s1** → `tests/eu-recommender-helpers.test.js` (the module's own unit test — mirrors `gdpr-helpers.test.js` accompanying `gdpr-helpers.js`).
+- **s2** → `tests/eu-solution-recommender-agent.test.js` (the agent-prose content contract — the `-agent` suffix distinguishes it from EC6's integration test, mirroring how `gdpr-agent-definition.test.js` is separate from the runner test).
+- **s3** → `tests/eu-solution-recommender-registry.test.js` (the LIVE registry-wiring test — mirrors `eu-ai-act-agent-registry.test.js`).
+
+EC6's `tests/eu-solution-recommender.test.js` therefore remains EC6's alone — no collision.
+
 ---
 
 # EC4 — Web-sourced EU solution recommender (hosted / self-hosted / library)
