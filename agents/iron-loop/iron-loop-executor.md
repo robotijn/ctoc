@@ -6,7 +6,7 @@ model: opus
 effort: high
 reads_ancestry: true
 async_choice_protocol: enabled
-model_optimized_for: opus-4-7
+model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---

@@ -86,7 +86,7 @@ describe('Phase 1 modernized agents have v7 frontmatter', () => {
       assert.match(content, /effort:\s*(xhigh|high|medium|low)/, `${agentPath} declares effort`);
       assert.match(content, /reads_ancestry:\s*(true|false)/, `${agentPath} declares reads_ancestry`);
       assert.match(content, /async_choice_protocol:\s*enabled/, `${agentPath} declares async_choice_protocol`);
-      assert.match(content, /model_optimized_for:\s*opus-4-7/, `${agentPath} declares model_optimized_for`);
+      assert.match(content, /model_optimized_for:\s*opus-4-8/, `${agentPath} declares model_optimized_for`);
     });
 
     it(`${agentPath} references at least one shared snippet`, () => {

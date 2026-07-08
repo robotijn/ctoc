@@ -238,50 +238,76 @@ land together. Confirm suite green. Confirm no out-of-scope edit.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (assertion flip is the test — line 89 opus-4-7 → opus-4-8)
+- [x] Test error conditions (RED proven: 3 orchestrators fail before agent bump)
+- [x] Run tests - expect RED (failing) — confirmed 3 failures on vision-advisor/product-owner/implementation-planner
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none)
+- [x] Check prerequisites (grep confirms 21 opus-4-7; 14 in-scope each with exactly 1 occurrence)
+- [x] Verify dev environment ready (baseline suite 3399 pass, 0 fail)
+- [x] Create directories/config if needed (none)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (14 agents bumped + test line 89 flipped, one atomic working-tree state)
+- [x] Add error handling (N/A — declarative frontmatter)
+- [x] Wire up integration points (skill-loading.test.js line 255 branch applied — see decision)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code (diff: 14 agents one line each; 7 out-of-scope untouched; line 89 flipped; line 255 unchanged per proof)
+- [x] Verify integration points work together (both governing tests green: 186 pass)
+- [x] Check error handling completeness (N/A)
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (mechanical substitution; no second model_optimized_for line introduced — grep verified)
+- [x] Optimize critical paths (N/A)
+- [x] Simplify complex code (N/A)
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) (no runtime path handling)
+- [x] Sanitize outputs (N/A — model identifier string only)
+- [x] No secrets in code (verified)
+- [x] Safe file operations (only 16 enumerated files touched; 7 out-of-scope excluded)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (eslint exit 0; tsc baseline-neutral — pre-existing .js diagnostics only, zero new)
+- [x] Run ALL tests (TDD Green) — node --test tests/*.test.js → 3399 pass, 0 fail
+- [x] Check coverage >= 80% (content-contract tests read real files; no new source code)
+- [x] 0 skipped, 0 flaky tests (0 skipped confirmed)
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (decision recorded below)
+- [x] Add JSDoc comments to new functions (N/A — no new functions)
+- [x] Update CHANGELOG if needed (deferred to caller's commit per CU1 versioning)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed (suite green, lint clean, atomic)
+- [x] Manual verification if needed (grep 21 → 7 confirmed)
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+### D1 — skill-loading.test.js line 255 NOT edited (branch chosen by proof at Step 8)
+The plan gated the line-255 flip on the on-disk value of the converted SKILL.md files
+that `listConvertedSkills()` (via `agent-resolver.listConvertedAgents`) loops. **Step 8
+read the real files: all 85 converted SKILL.md files carry `model_optimized_for: opus-4-7`
+on disk (value distribution `{ 'opus-4-7': 85 }`, 0 missing).** None of the 85 converted
+skills is in CU1's `files:` list, so this slice does not bump any of them. Per the plan's
+explicit instruction ("If the converted skills are still `opus-4-7`, line 255 stays
+`opus-4-7` and is NOT edited by this slice"), flipping line 255 to `'opus-4-8'` would RED
+the skill-loading test for all 85 converted skills. **Decision: leave
+`tests/skill-loading.test.js` line 255 asserting `'opus-4-7'` — unedited.** The parent's
+"update both test files" is satisfied for `agent-modernization.test.js` (governs the 3
+in-scope orchestrators); the `skill-loading.test.js` edit is correctly deferred to the
+CU-series slice that bumps the 85 converted SKILL.md files. Proven: full suite green
+(3399 pass, 0 fail) with line 255 unchanged.
+
+### D2 — CU1 grep delta (recorded for s6 ledger)
+`grep -rl "model_optimized_for: opus-4-7" agents/`: **21 before → 7 after** (dropped by
+exactly 14 in-scope). The 7 remaining are out-of-scope and NOT edited (no-churn rule):
+`agents/compliance/eu-ai-act-agent.md`, `agents/compliance/eu-solution-recommender.md`,
+`agents/compliance/gdpr-agent.md`, `agents/coordinator/ivv-chief.md`,
+`agents/planning/kpi-planner.md`, `agents/planning/stack-chooser.md`,
+`agents/planning/unit-economics-modeler.md`. The AC's "returns empty" is a full-corpus
+goal met across the CU-series, not by CU1 alone.
