@@ -347,3 +347,24 @@ describe('v8 Architecture — Dispatch authority', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+//  Frontmatter conformance — SKILL.md corpus invariant
+//
+//  Every SKILL.md must declare `type: skill` and MUST NOT use the
+//  deprecated `allowed-tools:` frontmatter key (all tool declarations use
+//  the canonical `tools:` key). Reads the real corpus off disk — no doubles.
+// ─────────────────────────────────────────────────────────────────────
+
+describe('Frontmatter conformance — SKILL.md', () => {
+  it('every SKILL.md declares type: skill and uses tools: (never allowed-tools:)', () => {
+    const skills = walkSkillFiles(path.join(projectRoot, 'skills'));
+    assert.ok(skills.length > 0, 'expected to find SKILL.md files under skills/');
+    for (const skill of skills) {
+      const { fm } = readFM(skill);
+      const rel = path.relative(projectRoot, skill);
+      assert.match(fm, /^type:\s*skill\s*$/m, `${rel} must declare type: skill`);
+      assert.doesNotMatch(fm, /^allowed-tools:/m, `${rel} must NOT use deprecated allowed-tools: (use tools:)`);
+    }
+  });
+});

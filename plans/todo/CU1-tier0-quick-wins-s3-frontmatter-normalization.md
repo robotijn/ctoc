@@ -200,50 +200,94 @@ fixes; suite green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **`tools:` value format.** The 5 realtime/safety files carried the YAML-array
+  form `allowed-tools: [Read, Grep, Glob]`. The plan's File Specifications
+  mandate the comma-separated STRING form the rest of the corpus uses
+  (`grep -rh "^tools:" skills/` shows the whole corpus uses string form, zero
+  array form). Chose `tools: Read, Grep, Glob` for all 5 — tool set
+  `{Read, Grep, Glob}` identical before/after (proven by `git diff`: the only
+  changed characters are the key name and the bracket→comma-string reformat; no
+  tool added or dropped).
+- **`type: skill` field placement in unit-test-runner.** Sibling skills
+  (the 5 realtime/safety files) place `type: skill` immediately after
+  `description:`. Matched that field order — inserted `type: skill` on the line
+  after `description:`, before `when_to_load:`. No other field touched.
+- **Conformance-test regex for `type: skill`.** Used `/^type:\s*skill\s*$/m`
+  (anchored, whole-value) so a field like `type: skill-index` would NOT falsely
+  satisfy it. Reused the existing `walkSkillFiles` + `readFM` helpers (no walker
+  duplication, per Step 12).
+- **No out-of-scope finding.** The corpus-wide conformance block passes for
+  EVERY SKILL.md (44/44 in architecture-invariants). No SKILL.md outside this
+  slice's 6 files was missing `type: skill` or carrying `allowed-tools:`. No
+  no-churn out-of-scope edit was needed.
+- **Plan not moved (per executor instruction).** Left in `plans/todo/` and NOT
+  staged; the caller commits. This slice shares
+  `tests/architecture-invariants.test.js` with s1 (already merged — the
+  `deployment-setup` TIER_1_AGENTS addition is present on disk); the new
+  describe block was appended additively at end-of-file, disturbing no existing
+  test.
+
+## Verification Tallies (executor)
+
+- (a) RED→GREEN: RED = 44 tests / 43 pass / 1 fail (conformance caught the 5
+  `allowed-tools:` files); GREEN = 44 tests / 44 pass / 0 fail.
+- (b) `grep -rl "allowed-tools:" skills/` AFTER = **0** (empty).
+- (c) `unit-test-runner/SKILL.md` now has `type: skill` (line 4).
+- (d) `node --test tests/architecture-invariants.test.js` = 44 pass / 0 fail.
+- (e) `node --test tests/*.test.js` = **# fail 0**, 3410 tests / 3410 pass /
+  0 skipped.
+- (f) `npx eslint . --max-warnings 0` = exit **0**.
+- (g) `tsc --noEmit` = baseline-neutral: 89 pre-existing errors, ALL in
+  untouched `src/` JS files; 0 reference this slice's 7 files.
+- (h) 5 tool-set values UNCHANGED: `{Read, Grep, Glob}` before and after in all
+  5 files (git diff shows only the key rename).
