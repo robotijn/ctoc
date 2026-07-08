@@ -56,23 +56,23 @@ it neither declares nor wrote still errors).
 
 ## 3. CAPTURE — Acceptance Criteria (BDD)
 
-- [ ] **Scenario: bare-basename claim resolved via files: declaration**
+- [x] **Scenario: bare-basename claim resolved via files: declaration**
   Given a plan whose `files:` declares `src/hooks/guard-files.js` (present on disk)
   And whose prose says "create `guard-files.js`" (bare basename)
   When `validateNoContradictions` runs
   Then NO "claimed as created but doesn't exist" error is raised for it
 
-- [ ] **Scenario: genuine missing-file claim still errors**
+- [x] **Scenario: genuine missing-file claim still errors**
   Given a plan whose prose claims "create `nowhere.js`"
   And `nowhere.js` is neither declared in `files:` nor present at project root
   When the validator runs
   Then the "claimed as created but doesn't exist" error IS raised
 
-- [ ] **Scenario: full-path claim still works unchanged**
+- [x] **Scenario: full-path claim still works unchanged**
   Given a plan claiming "create `src/hooks/guard-files.js`" (present)
   Then it validates clean (no regression to the existing path-resolution behavior)
 
-- [ ] **Scenario: basename collision is safe**
+- [x] **Scenario: basename collision is safe**
   Given `files:` declares `src/a/util.js` (present) and prose claims "create `util.js`"
   Then the claim is satisfied by the declared+existing file (basename match against the
   files: list, not a blind root check)
@@ -436,7 +436,7 @@ the unsatisfied path. Error path and happy path both covered.
 - [x] Verify steps 8-15 completed correctly
 - [x] All quality checks passed
 - [x] Manual verification if needed — OM2-shape integration proof confirms no false block
-- [ ] Ready for human review — Gate 3 (review → done) is a HUMAN gate; awaiting user approval
+- [x] Ready for human review — Gate 3 (review → done) is a HUMAN gate; awaiting user approval
 
 ## Decisions Taken Under Ambiguity (executor, 2026-07-08)
 
