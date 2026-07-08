@@ -380,3 +380,203 @@ describe('lib/inbox listRelatedForInbox helper', () => {
     assert.equal(typeof inbox.listRelatedForInbox, 'function', 'adds listRelatedForInbox');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// END-TO-END HUMAN-FLOW TESTS (PI4-s4 pre-Gate-3 kickback)
+//
+// "The measure is the human." The tests above drive the extracted helper functions
+// DIRECTLY — which is exactly why the s4 wiring shipped dead: every helper passed in
+// isolation while NONE of it reached the mounted menu. These tests instead drive the
+// REAL key-dispatch / render loop end to end and assert the rendered output the human
+// actually sees CONTAINS the search results and the Related Plans panel. They FAIL
+// against dead wiring (panel not called from the live area, search input not
+// accumulated, no results render branch) and PASS only once the flow reaches a human.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const MENU = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
+const AREA_PIPELINE = path.join(__dirname, '..', 'src', 'areas', 'pipeline.js');
+
+/** Capture everything written to process.stdout while `fn` runs; restore after. */
+function captureStdout(fn) {
+  const orig = process.stdout.write;
+  let buf = '';
+  process.stdout.write = (chunk) => { buf += String(chunk); return true; };
+  try { fn(); } finally { process.stdout.write = orig; }
+  return buf;
+}
+
+/** Load menu.js bound to a stubbed barrel (fresh require so overview/pipeline rebind too). */
+function loadMenuWithBarrel(stub) {
+  const barrelResolved = require.resolve(BARREL);
+  const prevBarrel = require.cache[barrelResolved];
+  require.cache[barrelResolved] = { id: barrelResolved, filename: barrelResolved, loaded: true, exports: stub };
+  // Drop menu + everything it pulls in that binds the barrel, so they re-require the stub.
+  for (const m of [MENU, AREA_PIPELINE, OVERVIEW, AREA_INBOX, LIB_INBOX]) {
+    delete require.cache[require.resolve(m)];
+  }
+  const menu = require(MENU);
+  return {
+    menu,
+    restore() {
+      if (prevBarrel) require.cache[barrelResolved] = prevBarrel;
+      else delete require.cache[barrelResolved];
+      for (const m of [MENU, AREA_PIPELINE, OVERVIEW, AREA_INBOX, LIB_INBOX]) {
+        delete require.cache[require.resolve(m)];
+      }
+    },
+  };
+}
+
+describe('E2E — menu search flow reaches the human (real handleKey/render loop)', () => {
+  test('E1. "/" + typed query + Enter → app.searchQuery captured AND results rendered', async () => {
+    const { menu, restore } = loadMenuWithBarrel({
+      search: async () => [
+        { planPath: 'auth-login-plan', score: 0.91 },
+        { planPath: 'auth-session-plan', score: 0.77 },
+      ],
+    });
+    try {
+      const app = menu.app;
+      // Reset to the clean list landing state the human starts from.
+      app.mode = 'list';
+      app.searchMode = false;
+      app.searchQuery = undefined;
+      app.searchResults = undefined;
+
+      // Press '/' to enter search — driven through the REAL top-level handleKey.
+      let out = captureStdout(() => menu.handleKey('/', { sequence: '/' }));
+      assert.equal(app.searchMode, true, 'search sub-mode entered via handleKey');
+      assert.equal(app.searchQuery, '', 'empty query buffer seeded');
+      assert.match(strip(out), /Search plans/, 'search prompt rendered to the human');
+
+      // Type the query one keystroke at a time (the accumulation the dead wiring lacked).
+      for (const ch of 'auth') {
+        captureStdout(() => menu.handleKey(ch, { sequence: ch }));
+      }
+      assert.equal(app.searchQuery, 'auth', 'keystrokes ACCUMULATED into app.searchQuery');
+
+      // Press Enter → runs the async search off the key path. Capture the follow-up
+      // render that fires when the promise resolves.
+      captureStdout(() => menu.handleKey('\r', { name: 'return' }));
+      await new Promise((r) => setImmediate(r)); // let the fire-and-forget search resolve
+      const rendered = strip(captureStdout(() => menu.render()));
+
+      assert.ok(Array.isArray(app.searchResults) && app.searchResults.length === 2,
+        'search results stashed on app.searchResults');
+      assert.match(rendered, /Results/, 'results section rendered');
+      assert.match(rendered, /auth-login-plan/, 'ranked hit #1 visible to the human');
+      assert.match(rendered, /auth-session-plan/, 'ranked hit #2 visible to the human');
+      assert.ok(rendered.indexOf('auth-login-plan') < rendered.indexOf('auth-session-plan'),
+        'results rendered in score-rank order');
+    } finally {
+      restore();
+    }
+  });
+
+  test('E2. Esc exits search mode and clears the query (human can back out)', () => {
+    const { menu, restore } = loadMenuWithBarrel({ search: async () => [] });
+    try {
+      const app = menu.app;
+      app.mode = 'list'; app.searchMode = false; app.searchQuery = undefined;
+      captureStdout(() => menu.handleKey('/', { sequence: '/' }));
+      captureStdout(() => menu.handleKey('x', { sequence: 'x' }));
+      assert.equal(app.searchQuery, 'x');
+      captureStdout(() => menu.handleKey('', { name: 'escape' }));
+      assert.equal(app.searchMode, false, 'escape exits search mode');
+      assert.equal(app.searchQuery, '', 'query cleared on escape');
+    } finally {
+      restore();
+    }
+  });
+
+  test('E3. typing "q" while searching does NOT quit the process (search owns keystrokes)', () => {
+    const { menu, restore } = loadMenuWithBarrel({ search: async () => [] });
+    try {
+      const app = menu.app;
+      app.mode = 'list'; app.searchMode = false; app.searchQuery = undefined;
+      captureStdout(() => menu.handleKey('/', { sequence: '/' }));
+      // 'q' would normally quit; in search mode it must accumulate instead. If it
+      // quit, process.exit would fire and this assertion would never run.
+      captureStdout(() => menu.handleKey('q', { name: 'q', sequence: 'q' }));
+      assert.equal(app.searchQuery, 'q', "'q' accumulated as text, did not quit");
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('E2E — pipeline dashboard shows the Related Plans panel populated (live area)', () => {
+  test('E4. activate() populates app.relatedPlans and render() shows them on the LIVE dashboard', async () => {
+    // Stub the barrel: non-zero store (so we pass the Scenario-7 building gate) and a
+    // related() returning two neighbours. Fresh-load pipeline so it binds the stub.
+    const pipelineResolved = require.resolve(AREA_PIPELINE);
+    const barrelResolved = require.resolve(BARREL);
+    const prevBarrel = require.cache[barrelResolved];
+    require.cache[barrelResolved] = {
+      id: barrelResolved, filename: barrelResolved, loaded: true,
+      exports: {
+        getWiring: () => ({ store: { size: 5 } }),
+        related: async () => [
+          { planPath: 'nearby-plan-a', score: 0.88 },
+          { planPath: 'nearby-plan-b', score: 0.71 },
+        ],
+      },
+    };
+    delete require.cache[pipelineResolved];
+    delete require.cache[require.resolve(OVERVIEW)];
+    const pipeline = require(AREA_PIPELINE);
+    try {
+      assert.equal(typeof pipeline.activate, 'function', 'pipeline exposes activate()');
+
+      // BEFORE activation the render must NOT contain a stale related list.
+      const app = { projectPath: process.cwd(), selectedPlan: 'seed-plan' };
+      const before = strip(pipeline.render(app));
+      assert.doesNotMatch(before, /nearby-plan-a/, 'no related plans before activation');
+
+      // Activation is the fire-and-forget pre-fetch the live menu runs on tab entry.
+      await pipeline.activate(app);
+      assert.ok(Array.isArray(app.relatedPlans) && app.relatedPlans.length === 2,
+        'activate() stashed related plans on the app');
+
+      const after = strip(pipeline.render(app));
+      assert.match(after, /Related Plans/, 'Related Plans panel rendered on the live dashboard');
+      assert.match(after, /nearby-plan-a/, 'related neighbour #1 visible to the human');
+      assert.match(after, /nearby-plan-b/, 'related neighbour #2 visible to the human');
+      // dashboard is still whole (the panel is additive, fail-open)
+      assert.match(after, /Business/, 'pipeline sections still rendered alongside the panel');
+    } finally {
+      if (prevBarrel) require.cache[barrelResolved] = prevBarrel;
+      else delete require.cache[barrelResolved];
+      delete require.cache[pipelineResolved];
+      delete require.cache[require.resolve(OVERVIEW)];
+    }
+  });
+
+  test('E5. inbox area activate() populates app.inboxRelated → rendered before footer', async () => {
+    const barrelResolved = require.resolve(BARREL);
+    const prevBarrel = require.cache[barrelResolved];
+    require.cache[barrelResolved] = {
+      id: barrelResolved, filename: barrelResolved, loaded: true,
+      exports: { related: async () => [{ planPath: 'inbox-neighbour', score: 0.6 }] },
+    };
+    delete require.cache[require.resolve(AREA_INBOX)];
+    delete require.cache[require.resolve(LIB_INBOX)];
+    const area = require(AREA_INBOX);
+    try {
+      assert.equal(typeof area.activate, 'function', 'inbox area exposes activate()');
+      const app = { projectPath: process.cwd(), selectedPlan: 'seed-plan' };
+      await area.activate(app);
+      assert.ok(Array.isArray(app.inboxRelated) && app.inboxRelated.length === 1,
+        'activate() stashed inbox related on the app');
+      const out = strip(area.render(app));
+      assert.match(out, /inbox-neighbour/, 'inbox related neighbour visible to the human');
+      assert.ok(out.indexOf('inbox-neighbour') < out.indexOf('areas'),
+        'related block precedes the footer');
+    } finally {
+      if (prevBarrel) require.cache[barrelResolved] = prevBarrel;
+      else delete require.cache[barrelResolved];
+      delete require.cache[require.resolve(AREA_INBOX)];
+      delete require.cache[require.resolve(LIB_INBOX)];
+    }
+  });
+});

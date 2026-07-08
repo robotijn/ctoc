@@ -77,6 +77,7 @@ async function enterSearchMode(app, query) {
  * shape — guarded by `app.mode === 'list'` so it NEVER shadows text input. `/` is
  * the conventional search key and does not collide with the existing `s` Settings
  * shortcut. Returns true (consumed) only when the search key fires in list mode.
+ * Entering search mode also seeds an empty query buffer so the human can type.
  * @param {{sequence?: string}} key
  * @param {object} app
  * @returns {boolean} true if the key was consumed (search entered)
@@ -84,9 +85,87 @@ async function enterSearchMode(app, query) {
 function handleSearchKey(key, app) {
   if (key && key.sequence === '/' && app && app.mode === 'list') {
     app.searchMode = true;
+    if (typeof app.searchQuery !== 'string') app.searchQuery = '';
     return true;
   }
   return false;
+}
+
+// PI4-s4 kickback: the search SUB-MODE key handler. Once `/` has put the app into
+// search mode, subsequent keystrokes ACCUMULATE into `app.searchQuery` (the live
+// query the human is typing), backspace deletes the last char, escape exits, and
+// enter/return runs the search — stashing ranked hits on `app.searchResults` for
+// `renderSearch` to display. This is what makes the flow reach the human: `/` →
+// type → see ranked results. Fully fail-open (the search itself never rejects).
+/**
+ * Handle a keystroke while the app is in the search sub-mode.
+ * @param {string} str - the raw input string (unused; kept for handleKey parity)
+ * @param {{name?: string, sequence?: string, ctrl?: boolean}} key
+ * @param {object} app - TUI app state; uses/sets `app.searchQuery`, `app.searchResults`, `app.searchMode`
+ * @returns {{ run: boolean } | boolean} `{run:true}` when enter submitted a query
+ *   (caller runs the async search + re-renders); `true` when the key was consumed
+ *   in-place (re-render only); `false` when not consumed.
+ */
+function handleSearchInput(str, key, app) {
+  if (!app || app.searchMode !== true) return false;
+  if (typeof app.searchQuery !== 'string') app.searchQuery = '';
+  if (key && (key.name === 'escape')) {
+    app.searchMode = false;
+    app.searchQuery = '';
+    app.searchResults = [];
+    return true;
+  }
+  if (key && (key.name === 'return' || key.name === 'enter')) {
+    return { run: true }; // caller kicks the async search off the key path
+  }
+  if (key && key.name === 'backspace') {
+    app.searchQuery = app.searchQuery.slice(0, -1);
+    return true;
+  }
+  // Accumulate a single printable character (ignore ctrl-combos and the leading '/').
+  if (key && typeof key.sequence === 'string' && key.sequence.length === 1 &&
+      !key.ctrl && key.sequence !== '/') {
+    app.searchQuery += key.sequence;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * PI4-s4 kickback: SYNCHRONOUS render of the search sub-mode — the query line the
+ * human is typing plus the ranked results stashed on `app.searchResults`. This is
+ * the render branch that surfaces search to the human; without it a `/` + query +
+ * enter went nowhere. Fully fail-open: any surprise returns a minimal, intact
+ * prompt so the menu never breaks.
+ * @param {object} app
+ * @returns {string}
+ */
+function renderSearch(app) {
+  try {
+    const query = (app && typeof app.searchQuery === 'string') ? app.searchQuery : '';
+    let out = '\n';
+    out += `${c.bold}Search plans${c.reset}\n\n`;
+    out += `  ${c.cyan}/${c.reset} ${query}${c.dim}_${c.reset}\n\n`;
+    const results = Array.isArray(app && app.searchResults) ? app.searchResults : [];
+    if (results.length === 0) {
+      out += `  ${c.dim}${query.length === 0 ? 'Type a query, then Enter to search.' : 'No results.'}${c.reset}\n\n`;
+    } else {
+      out += `${c.bold}Results${c.reset}\n`;
+      let rank = 1;
+      for (const r of results.slice(0, 10)) {
+        const id = (r && (r.planPath || r.planSlug || r.plan)) || '?';
+        const score = (r && typeof r.score === 'number') ? ` ${c.dim}${r.score.toFixed(2)}${c.reset}` : '';
+        out += `  ${c.dim}${String(rank).padStart(2)}.${c.reset} ${c.cyan}${id}${c.reset}${score}\n`;
+        rank += 1;
+      }
+      out += '\n';
+    }
+    out += line() + '\n';
+    out += `${c.dim}type query · Enter search · Esc cancel${c.reset}\n`;
+    return out;
+  } catch {
+    return `\n${c.bold}Search plans${c.reset}\n\n  ${c.dim}search unavailable${c.reset}\n`;
+  }
 }
 
 // Read version from VERSION file
@@ -173,7 +252,12 @@ function render() {
   const currentTab = TABS[app.tabIndex];
   const tabModule = tabModules[currentTab.id];
 
-  if (app.mode === 'view' && app.viewContent) {
+  if (app.searchMode) {
+    // PI4-s4 kickback: the search sub-mode owns the content area — it shows the live
+    // query the human is typing and the ranked results. Rendered ABOVE tab content
+    // so a `/` + query + enter actually reaches the human on the live menu.
+    output += renderSearch(app);
+  } else if (app.mode === 'view' && app.viewContent) {
     output += renderView(app.viewContent);
   } else if (app.mode === 'actions' && app.selectedPlan) {
     if (tabModule.renderActions) {
@@ -230,8 +314,30 @@ function renderView(content) {
 
 // Handle keyboard input
 function handleKey(str, key) {
-  // Global keys (don't quit if user is typing in an input field)
-  if (key.name === 'q' && !app.directInput && !app.inputValue && app.mode !== 'reject-input') {
+  // PI4-s4 kickback: while the search sub-mode is active it OWNS keystrokes —
+  // keys accumulate into `app.searchQuery`, enter runs the search, escape exits.
+  // This must run BEFORE the global quit / tab / shortcut handlers so typing a
+  // query (including 'q', digits, 's', 'b') never triggers those shortcuts.
+  if (app.searchMode) {
+    // `handleSearchInput` returns `false | true | {run:true}`; the `{run}` shape
+    // signals "enter submitted a query". Cast to any so tsc's union narrowing does
+    // not flag the `.run` read — documentation-only, runtime unchanged (the plan's
+    // established @type {any} precedent for lazy/union shapes).
+    /** @type {any} */
+    const res = handleSearchInput(str, key, app);
+    if (res && res.run) {
+      // Enter submitted the query: kick the async search off the key path, then
+      // re-render when it resolves. Fully fail-open (enterSearchMode never rejects).
+      Promise.resolve(enterSearchMode(app, app.searchQuery || '')).then(render).catch(() => {});
+      render();
+      return;
+    }
+    if (res) { render(); return; }
+    // Not consumed by the search handler (unexpected key) → fall through to globals.
+  }
+
+  // Global keys (don't quit if user is typing in an input field or searching)
+  if (key.name === 'q' && !app.searchMode && !app.directInput && !app.inputValue && app.mode !== 'reject-input') {
     cleanup();
     process.exit(0);
   }
@@ -260,11 +366,11 @@ function handleKey(str, key) {
     return;
   }
 
-  // PI4-s4: "Search plans" shortcut ('/' in list mode). Additive + fail-open —
-  // kicks off the async search fetch (never awaited on the key path) and re-renders.
-  // A search fault can never crash the menu (enterSearchMode is fully fail-open).
+  // PI4-s4: "Search plans" shortcut ('/' in list mode). Enters the search sub-mode
+  // with an empty query buffer; from here `handleSearchInput` (above) accumulates
+  // keystrokes and enter runs the search. Additive + fail-open.
   if (handleSearchKey(key, app)) {
-    Promise.resolve(enterSearchMode(app, app.searchQuery || '')).then(render).catch(() => {});
+    app.searchResults = [];
     render();
     return;
   }
@@ -311,6 +417,31 @@ function resetTabState() {
 
   // Reset tab-specific modules
   if (overviewTab.reset) overviewTab.reset();
+
+  // PI4-s4 kickback: fire the newly-active area's async activation (related-plans
+  // pre-fetch) OFF the render path, then re-render when it resolves. This is what
+  // populates `app.relatedPlans` (pipeline) / `app.inboxRelated` (inbox) so the
+  // panels actually reach the human. Fire-and-forget + fully fail-open.
+  activateCurrentArea();
+}
+
+// PI4-s4 kickback: if the current area exposes an async `activate(app)`, kick it off
+// the render path (fire-and-forget) and re-render on resolve. Fail-open: a missing
+// activate, a throw, or a rejection is swallowed — activation NEVER breaks the menu.
+function activateCurrentArea() {
+  try {
+    const currentTab = TABS[app.tabIndex];
+    // Only the pipeline/inbox areas expose `activate`; cast to any so tsc's union
+    // over the five area modules does not flag the optional-method access
+    // (documentation-only; the guarded `typeof … === 'function'` is the real check).
+    /** @type {any} */
+    const tabModule = tabModules[currentTab.id];
+    if (tabModule && typeof tabModule.activate === 'function') {
+      Promise.resolve(tabModule.activate(app)).then(render).catch(() => {});
+    }
+  } catch {
+    // fail-open — activation must never break the menu
+  }
 }
 
 // Handle window resize
@@ -367,6 +498,9 @@ function main() {
     setupKeyboard(handleKey);
     app.navStack.push('Overview');
     if (justInitialized) app.message = 'CTOC initialized for this project';
+    // PI4-s4 kickback: kick the landing area's related-plans pre-fetch so the panel
+    // is populated on first paint (fire-and-forget, fail-open).
+    activateCurrentArea();
     render();
   } else {
     // Non-interactive with no args: JSON dashboard output for Claude.
@@ -390,4 +524,13 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { ensureInitialized, enterSearchMode, handleSearchKey };
+module.exports = {
+  ensureInitialized,
+  enterSearchMode,
+  handleSearchKey,
+  handleSearchInput,
+  renderSearch,
+  handleKey,
+  render,
+  app,
+};

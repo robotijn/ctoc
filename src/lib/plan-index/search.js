@@ -51,6 +51,28 @@
 const { fuseRRF } = require('./fusion');
 const { PLAN_SENTINEL } = require('./store');
 
+/**
+ * LOW-1: the composite-key separator for a `planPath`+`sectionId` fusion id MUST
+ * match the store's real composite key (store.js `KEY_SEP = '\x00'`). The store
+ * REJECTS a NUL byte inside either key component on upsert, so this separator can
+ * never collide two distinct units — whereas a space join could (`("a b","c")` vs
+ * `("a","b c")`). We define it locally (store.js does not export KEY_SEP) and pin
+ * the invariant with `tests/plan-index-search.test.js` (no-collision assertion).
+ */
+const FUSION_KEY_SEP = '\x00';
+
+/**
+ * Build the fusion/id key for a unit, matching the store's composite-key convention.
+ * Plan-level units key on `planPath` alone; section units on `planPath` NUL `sectionId`.
+ * @param {'plan'|'section'} kind
+ * @param {string} planPath
+ * @param {string} sectionId
+ * @returns {string}
+ */
+function fusionId(kind, planPath, sectionId) {
+  return kind === 'section' ? `${planPath}${FUSION_KEY_SEP}${sectionId}` : planPath;
+}
+
 /** Default top-N for search (parent NFR: "default top-10", a named constant). */
 const DEFAULT_SEARCH_LIMIT = 10;
 
@@ -60,31 +82,61 @@ const BM25_K1 = 1.2;
 const BM25_B = 0.75;
 
 /**
- * Tokenize text for the BM25 lexical index: lowercase, split on runs of
- * non-alphanumeric characters, drop empties, AND retain each original
- * whitespace-delimited token (lowercased) so a compound identifier like
- * `parseYAMLShallow` survives as one token for exact-identifier recall.
+ * Tokenize text for the BM25 lexical index. Three token families are emitted so a
+ * compound identifier is recallable both whole AND by its parts:
+ *
+ *   1. Non-alphanumeric split — lowercase, split on runs of non-`[a-z0-9]`
+ *      (path separators, punctuation, whitespace), drop empties. This already
+ *      lowercases `parseYAMLShallow` → `parseyamlshallow` as a single token, so an
+ *      exact-identifier query still hits (Scenario 2 exact-token recall).
+ *   2. Whole raw identifiers — each ORIGINAL (pre-lowercase) whitespace-delimited
+ *      token that contains an inner separator (`.`, `-`, `_`) or a camelCase hump is
+ *      retained lowercased as one token, so `parseYAMLShallow` / `parse-yaml-shallow`
+ *      remain addressable verbatim.
+ *   3. Sub-tokens — those same compound identifiers are ALSO split into their parts
+ *      (camelCase humps and `.`/`-`/`_` boundaries) — `parseYAMLShallow` →
+ *      `parse`,`yaml`,`shallow` — giving partial-identifier recall (a query for
+ *      `yaml` matches a doc that only ever wrote `parseYAMLShallow`).
  *
  * @param {string} text
  * @returns {string[]} tokens (may contain duplicates — BM25 counts term frequency)
  */
 function tokenize(text) {
   if (typeof text !== 'string' || text.length === 0) return [];
-  const lower = text.toLowerCase();
   const tokens = [];
-  // Split pieces on non-alphanumeric boundaries (path separators, punctuation).
-  for (const piece of lower.split(/[^a-z0-9]+/)) {
+  // (1) primary split on non-alphanumeric boundaries.
+  for (const piece of text.toLowerCase().split(/[^a-z0-9]+/)) {
     if (piece.length > 0) tokens.push(piece);
   }
-  // Raw whitespace-delimited tokens (lowercased) — keeps a hyphen/dot-joined
-  // identifier addressable as a single token when the query repeats it verbatim.
-  for (const raw of lower.split(/\s+/)) {
-    if (raw.length > 0 && raw !== '' && !/^[a-z0-9]+$/.test(raw)) {
-      // only add compound (non-simple) raw tokens; a bare word already appears above
-      tokens.push(raw);
-    }
+  // (2)+(3) compound identifiers: keep the whole (lowercased) AND its sub-tokens.
+  for (const raw of text.split(/\s+/)) {
+    if (raw.length === 0) continue;
+    const parts = splitCompound(raw); // camelCase + . - _ boundaries
+    if (parts.length <= 1) continue;  // not compound → already covered by (1)
+    tokens.push(raw.toLowerCase());   // whole identifier, verbatim recall
+    for (const p of parts) tokens.push(p); // sub-tokens, partial-identifier recall
   }
   return tokens;
+}
+
+/**
+ * Split a raw identifier into its lowercase sub-tokens on camelCase humps and
+ * `.`/`-`/`_` boundaries. `parseYAMLShallow` → `parse`,`yaml`,`shallow`;
+ * `parse-yaml-shallow` → `parse`,`yaml`,`shallow`. Returns `[]`/`[word]` for a
+ * simple word (no inner boundary) so callers can cheaply detect "not compound".
+ * @param {string} raw
+ * @returns {string[]}
+ */
+function splitCompound(raw) {
+  return raw
+    // camelCase / PascalCase / ACRONYMFollowed-by-word boundaries → space
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    // explicit separators → space
+    .replace(/[._-]+/g, ' ')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
 }
 
 /**
@@ -193,7 +245,7 @@ function collectUnits(store, kind, excludePlanPath) {
       for (const sectionId of sectionIds) {
         if (sectionId === PLAN_SENTINEL) continue;
         const view = store.getUnit(planPath, sectionId);
-        if (view) out.push({ id: `${planPath} ${sectionId}`, planPath, sectionId, text: view.text || '', view });
+        if (view) out.push({ id: fusionId('section', planPath, sectionId), planPath, sectionId, text: view.text || '', view });
       }
     } else {
       const view = store.getUnit(planPath, PLAN_SENTINEL);
@@ -282,7 +334,7 @@ async function search(query, opts = {}) {
     try {
       const knn = store.search(qVec, limit, { kind, excludePlanPath });
       for (const hit of Array.isArray(knn) ? knn : []) {
-        const id = kind === 'section' ? `${hit.planPath} ${hit.sectionId}` : hit.planPath;
+        const id = fusionId(kind, hit.planPath, hit.sectionId);
         knnList.push({ id });
         if (!viewById.has(id)) viewById.set(id, hit);
         if (!idToLocation.has(id)) idToLocation.set(id, { planPath: hit.planPath, sectionId: hit.sectionId });
