@@ -27,7 +27,7 @@ related_skills:
   - specialized/resilience-checker
 effort_level: high
 model_optimized_for: opus-4-7
-allowed-tools: [Read, Grep, Glob]
+tools: Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

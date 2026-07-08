@@ -1,6 +1,7 @@
 ---
 name: unit-test-runner
 description: Executes unit tests and reports results + coverage — Step 14 VERIFY quality gate.
+type: skill
 when_to_load:
   - "run unit test"
   - "run unit tests"
