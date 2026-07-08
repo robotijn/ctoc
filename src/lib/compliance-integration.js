@@ -36,11 +36,28 @@
  * Inbox questions written by the runners. (Asserted by the gate-invariant test:
  * this source names no gate key and requires no hook.)
  *
- * Fail-open contract:
+ * Fail-open contract (SEAM fail-open, RUNNER fail-loud — the load-bearing split):
  *   - non-string `projectRoot` ⇒ both runners' gates resolve false ⇒ empty summary,
  *     `deduped:0`, no throw;
  *   - missing/`undefined` `opts` or non-array findings fields ⇒ coerced to `[]`;
- *   - never throws for the documented fail-open cases.
+ *   - The GDPR RUNNER stays fail-loud: it THROWS via `validateFindingSchema` on a
+ *     missing/unknown `gdpr_article` — a bad code must never be silently EMITTED to
+ *     the Inbox (that is the runner's single-responsibility guard, unchanged here).
+ *     The SEAM wraps that guard so the SEAM never throws: BEFORE dispatching GDPR
+ *     findings, the seam partitions them into schema-VALID vs INVALID by calling
+ *     `validateFindingSchema` per finding inside a try/catch (mirroring the
+ *     EU-AI-Act runner's `filterToEuAiAct` fail-strict-DROP). Valid findings are
+ *     dispatched to the runner (which re-validates them, always passing); invalid
+ *     findings are DROPPED and RECORDED in `summary.droppedFindings` — never emitted,
+ *     never silently lost. The runner therefore only ever RECEIVES valid findings,
+ *     so its loud throw never fires through this seam.
+ *   - The two regimes run INDEPENDENTLY: a failure (or empty result) in one regime
+ *     NEVER aborts or skips the other. Each runner dispatch is additionally wrapped
+ *     in a try/catch as defense-in-depth — any unexpected throw is recorded in
+ *     `droppedFindings` and the other regime still runs. This closes the confirmed
+ *     defect where an unguarded GDPR throw aborted the seam and silently dropped a
+ *     valid sibling EU-AI-Act finding (non-atomic cross-regime contamination).
+ *   - never throws for any input; the seam's contract is total.
  *
  * Dependency direction: lib → lib only. Imports the two runners and the pure dedup
  * module — nothing from hooks or commands. Cross-platform by delegation: builds no
@@ -52,6 +69,7 @@
 const { runGdprFindings } = require('./gdpr-agent-runner');
 const { runEuAiActFindings } = require('./eu-ai-act-agent-runner');
 const { deduplicateFindings } = require('./compliance-dedup');
+const { validateFindingSchema } = require('./gdpr-helpers');
 
 /**
  * Split a findings list into plan-stage vs code-stage using the SAME predicate the
@@ -98,20 +116,54 @@ function regimeOf(finding) {
 }
 
 /**
- * Orchestrate both regime runners with cross-regime plan-stage dedup and a
- * guaranteed single-write. See the module header for the full contract.
+ * Partition a list of GDPR-bound findings into schema-VALID vs INVALID using the
+ * runner's own `validateFindingSchema`, wrapped per finding in a try/catch so the
+ * SEAM never throws (the runner stays fail-loud; the seam turns that loud throw
+ * into a fail-strict DROP + RECORD, mirroring the EU-AI-Act `filterToEuAiAct`
+ * pattern). A finding that throws (unknown/missing `gdpr_article`, or a non-object
+ * element) is DROPPED and recorded with its cause — never emitted, never silently
+ * lost. Never mutates its input; never throws.
+ *
+ * @param {object[]} findings - GDPR-bound findings (plan-stage survivors and/or
+ *   code-stage findings) headed for `runGdprFindings`.
+ * @returns {{ valid: object[], dropped: Array<{ regime: 'gdpr', finding: any, reason: string }> }}
+ */
+function partitionValidGdpr(findings) {
+  const valid = [];
+  /** @type {Array<{ regime: 'gdpr', finding: any, reason: string }>} */
+  const dropped = [];
+  for (const finding of findings) {
+    try {
+      validateFindingSchema(finding);
+      valid.push(finding);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      dropped.push({ regime: 'gdpr', finding, reason });
+    }
+  }
+  return { valid, dropped };
+}
+
+/**
+ * Orchestrate both regime runners with cross-regime plan-stage dedup, a
+ * guaranteed single-write, and a total (never-throws) seam. See the module header
+ * for the full SEAM-fail-open / RUNNER-fail-loud contract.
  *
  * @param {string} projectRoot - resolved project root (delegated to the runners'
  *   gates and Inbox writer; a wrong/non-string root fails safe to an empty summary).
  * @param {{ gdprFindings?: object[], euAiActFindings?: object[] }} [opts] - the raw
  *   findings each agent derived. Missing/non-array fields ⇒ `[]`.
- * @returns {{ gdprRan: boolean, euAiActRan: boolean, inboxIds: string[], letters: object[], deduped: number }}
+ * @returns {{ gdprRan: boolean, euAiActRan: boolean, inboxIds: string[], letters: object[], deduped: number, droppedFindings: Array<{ regime: string, finding: any, reason: string }> }}
  *   - `gdprRan` / `euAiActRan`: each runner's authoritative gate result;
  *   - `inboxIds`: all created Inbox question ids (single-write ⇒ deduped count);
  *   - `letters`: all code-stage findings collected across both regimes (never
  *     cross-deduped);
  *   - `deduped`: count of cross-regime plan-stage duplicates collapsed (0 when
- *     fewer than two plan-stage findings survive to merge).
+ *     fewer than two plan-stage findings survive to merge);
+ *   - `droppedFindings`: findings the seam DID NOT emit — schema-invalid GDPR
+ *     findings the runner would have thrown on, plus any finding lost to an
+ *     unexpected runner throw (defense-in-depth). Always an array (empty on the
+ *     clean path) so callers can surface it without a presence check.
  */
 function runComplianceForTransition(projectRoot, opts) {
   const o = opts && typeof opts === 'object' ? opts : {};
@@ -132,11 +184,39 @@ function runComplianceForTransition(projectRoot, opts) {
     else gdprPlan.push(finding);
   }
 
-  // 4. Dispatch to each runner: its deduped plan-stage survivors + its own
-  //    code-stage findings (untouched). Each runner gates internally; an off
-  //    profile ⇒ {ran:false} ⇒ no side effects, so this is a provable no-op.
-  const gdprRes = runGdprFindings(projectRoot, [...gdprPlan, ...g.codeStage]);
-  const aiActRes = runEuAiActFindings(projectRoot, [...aiActPlan, ...a.codeStage]);
+  /** @type {Array<{ regime: string, finding: any, reason: string }>} */
+  const droppedFindings = [];
+
+  // 4. SEAM FAIL-OPEN: before dispatching GDPR findings, partition them into
+  //    schema-VALID vs INVALID using the runner's own validator wrapped per
+  //    finding (mirrors the EU-AI-Act filterToEuAiAct fail-strict-drop). The
+  //    runner stays fail-loud on what it RECEIVES; the seam only ever hands it
+  //    valid findings, so its throw never fires here. Invalid findings are
+  //    dropped and recorded — never emitted, never silently lost.
+  const { valid: gdprValid, dropped: gdprDropped } = partitionValidGdpr([...gdprPlan, ...g.codeStage]);
+  droppedFindings.push(...gdprDropped);
+
+  // 5. Dispatch each runner INDEPENDENTLY: a failure/empty in one regime must
+  //    NEVER abort or skip the other. Each dispatch is wrapped in try/catch as
+  //    defense-in-depth — any unexpected throw is recorded and the other regime
+  //    still runs. Each runner gates internally; an off profile ⇒ {ran:false} ⇒
+  //    no side effects, so an empty-profile run stays a provable no-op.
+  let gdprRes = { ran: false, inbox: [], letter: [] };
+  try {
+    gdprRes = runGdprFindings(projectRoot, gdprValid);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    droppedFindings.push({ regime: 'gdpr', finding: gdprValid, reason: `runGdprFindings threw: ${msg}` });
+  }
+
+  const aiActInput = [...aiActPlan, ...a.codeStage];
+  let aiActRes = { ran: false, inbox: [], letter: [] };
+  try {
+    aiActRes = runEuAiActFindings(projectRoot, aiActInput);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    droppedFindings.push({ regime: 'eu-ai-act', finding: aiActInput, reason: `runEuAiActFindings threw: ${msg}` });
+  }
 
   return {
     gdprRan: gdprRes.ran,
@@ -144,6 +224,7 @@ function runComplianceForTransition(projectRoot, opts) {
     inboxIds: [...gdprRes.inbox, ...aiActRes.inbox],
     letters: [...gdprRes.letter, ...aiActRes.letter],
     deduped,
+    droppedFindings,
   };
 }
 

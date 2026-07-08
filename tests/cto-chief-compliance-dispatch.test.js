@@ -280,7 +280,7 @@ describe('LIVE flow — gate off: empty profiles is a provable no-op', () => {
       euAiActFindings: [euAiActPlanFinding()],
     });
     assert.deepEqual(res, {
-      gdprRan: false, euAiActRan: false, inboxIds: [], letters: [], deduped: 0,
+      gdprRan: false, euAiActRan: false, inboxIds: [], letters: [], deduped: 0, droppedFindings: [],
     });
     assert.deepEqual(listQuestionFiles(root), [], 'no real Inbox file written when both gates are off');
 
