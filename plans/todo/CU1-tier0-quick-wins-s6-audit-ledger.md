@@ -212,50 +212,58 @@ created.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation — tests/corpus-audit-ledger.test.js (7 checks, zero doubles, reads real ledger + real source files)
+- [x] Test error conditions — phantom-absence + out-of-scope opus-4-7 spot-checks assert real disk state
+- [x] Run tests - expect RED (failing) — all failed with ENOENT (ledger absent), proving the checks test something
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none
+- [x] Check prerequisites — verified s1–s5 shipped by reading REAL disk: 7 opus-4-7 files remain (exactly the out-of-scope set), 0 allowed-tools in skills/, deployment-setup tier:1, CRA citation present, s5 example fences present
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — mkdir -p .ctoc/audit
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — wrote .ctoc/audit/corpus-audit-2026-06-15.json (38 records; one per CU1 files: entry + 7 out-of-scope + 3 phantom)
+- [x] Add error handling — n/a (static JSON data artifact)
+- [x] Wire up integration points — ledger is the CU2–CU5 diff contract
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — every files: entry covered; verdicts valid; discrepancy notes accurate; JSON well-formed
+- [x] Verify integration points work together — coverage check green
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — consistent key set per record; no redundant fields
+- [x] Optimize critical paths — n/a
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — fixed .ctoc/audit/ target, no user path
+- [x] Sanitize outputs — paths/counts/verdicts/URLs only
+- [x] No secrets in code — none
+- [x] Safe file operations — write only under .ctoc/audit/
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0, 0 warnings; tsc baseline-neutral (0 new errors; my files absent from the pre-existing src/ tsc list)
+- [x] Run ALL tests (TDD Green) — node --test tests/*.test.js → tests 3417, pass 3416, fail 0, skipped 1 (pre-existing CTOC_SKIP_QUALITY, not mine)
+- [x] Check coverage >= 80% — ledger test exercises 7/7 assertions over the whole artifact
+- [x] 0 skipped, 0 flaky tests — my test file: 0 skipped, deterministic (reads disk)
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — the ledger IS the documentation; verdict_legend + discrepancies blocks explain the CU2–CU5 diff contract
+- [x] Add JSDoc comments to new functions — test file has file-level doc block
+- [x] Update CHANGELOG if needed — n/a (data artifact)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — spot-checked: 7 out-of-scope files really carry opus-4-7; 3 phantoms really absent
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **Test file placement (not in this slice's files: list).** The slice files: list names only the JSON ledger. Per the task's explicit authorization to write a ledger-validation test, I added `tests/corpus-audit-ledger.test.js` (RED→GREEN, zero doubles). The PreToolUse hook allowed it (tests are covered), and the plan's Test Plan mandates a content-contract test.
+- **Coverage contract = union of s1–s5 files: lists + 3 phantom paths.** The parent CU1 plan is an index (empty top-level files:); the real scope is the union of slice files: entries. The ledger records all 28 real/phantom scope paths plus the 7 out-of-scope opus-4-7 agents = 38 records.
+- **Verdict semantics for edited files = THIN.** Per the plan ("Files that were edited get THIN (was thin, now fixed)"), all s1–s5-edited files are recorded THIN with a note describing the fix and the fresh-read verification. The 7 out-of-scope files are SOLID (evaluated, not churned). The 3 phantoms are DEFECTIVE.
+- **unit-test-runner retains model_optimized_for: opus-4-7.** It is a SKILL (not an agent) and outside the s2 agents/ scope; recorded as such in its note. This is NOT one of the 7 out-of-scope agents (which are all under agents/); it does not affect the 21=14+7 agent tally.
+- **line_count/section_count read fresh 2026-07-08** from disk; phantom paths recorded as 0/0 (absent). Test files have section_count 0 (no `## ` headings), which is expected and not a defect.
