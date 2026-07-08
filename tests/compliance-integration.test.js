@@ -241,7 +241,7 @@ describe('runComplianceForTransition — empty profiles is a provable no-op', ()
       euAiActFindings: [euAiActPlanFinding()],
     });
     assert.deepEqual(res, {
-      gdprRan: false, euAiActRan: false, inboxIds: [], letters: [], deduped: 0,
+      gdprRan: false, euAiActRan: false, inboxIds: [], letters: [], deduped: 0, droppedFindings: [],
     });
     assert.deepEqual(listQuestionFiles(root), [], 'no question file written when both gates are off');
     const planBytesAfter = fs.readFileSync(planPath);
@@ -293,7 +293,7 @@ describe('runComplianceForTransition — fail-open on bad input', () => {
       });
     });
     assert.deepEqual(res, {
-      gdprRan: false, euAiActRan: false, inboxIds: [], letters: [], deduped: 0,
+      gdprRan: false, euAiActRan: false, inboxIds: [], letters: [], deduped: 0, droppedFindings: [],
     });
   });
 
@@ -346,5 +346,125 @@ describe('runComplianceForTransition — gate invariant (no human gate added/wea
     assert.doesNotMatch(moduleSrc, /review_gate/, 'seam names no review_gate');
     assert.doesNotMatch(moduleSrc, /require\(['"]\.\.\/hooks\//, 'seam does not require any hook');
     assert.doesNotMatch(moduleSrc, /require\(['"]\.\/actions['"]\)/, 'seam does not require the plan-moving actions module');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 10. SEAM FAIL-OPEN — a bad gdpr_article never throws, never contaminates
+//     the sibling regime, and is recorded (not silently lost).
+//
+// The GDPR RUNNER stays fail-loud: it THROWS via validateFindingSchema on an
+// unknown gdpr_article — a bad code must never be silently EMITTED. The SEAM
+// wraps that: it partitions GDPR findings into schema-valid vs invalid per
+// finding (mirroring the EU-AI-Act filterToEuAiAct fail-strict-drop), so the
+// runner only ever RECEIVES valid findings and the seam itself never throws.
+//
+// Regression: before the fix, the unguarded runGdprFindings call ran BEFORE
+// runEuAiActFindings, so a throwing GDPR finding aborted the whole seam and
+// SILENTLY DROPPED the valid EU-AI-Act finding (non-atomic cross-regime
+// contamination). These tests are RED before the fix (they throw / drop the
+// EU finding) and GREEN after.
+// ─────────────────────────────────────────────────────────────────────
+
+describe('runComplianceForTransition — seam fail-open on a bad gdpr_article (never contaminates the other regime)', () => {
+  it('10a. bad gdpr_article + VALID EU-AI-Act finding ⇒ no throw, the EU finding STILL attaches to the real Inbox, the bad GDPR finding is recorded as dropped', () => {
+    const root = projectWith('[gdpr, eu-ai-act-high-risk]');
+    let res;
+    assert.doesNotThrow(() => {
+      res = seam.runComplianceForTransition(root, {
+        // Unknown code — the runner would THROW on this. The seam must DROP it.
+        gdprFindings: [gdprPlanFinding({ gdpr_article: 'GDPR-999', message: 'bogus article finding' })],
+        // A perfectly valid EU-AI-Act finding that MUST survive the GDPR failure.
+        euAiActFindings: [euAiActPlanFinding()],
+      });
+    }, 'the seam does NOT throw on a bad gdpr_article');
+
+    // Both gates ran.
+    assert.equal(res.gdprRan, true, 'GDPR gate on');
+    assert.equal(res.euAiActRan, true, 'EU-AI-Act gate on');
+
+    // ATOMICITY / INDEPENDENCE: the EU-AI-Act finding reaches the REAL Inbox on
+    // disk despite the bad GDPR finding. Disk readback — no mocks.
+    const files = listQuestionFiles(root);
+    assert.equal(files.length, 1, 'exactly ONE question file on disk — the EU-AI-Act finding');
+    const body = fs.readFileSync(path.join(questionsDir(root), files[0]), 'utf8');
+    assert.match(body, /high-risk training data lacks Art\.10 governance/, 'the EU-AI-Act finding survived and attached');
+    assert.match(body, /source_step:\s*compliance-eu-ai-act/, 'routed through the EU-AI-Act runner (sibling regime unaffected)');
+
+    // The bad GDPR finding produced NO Inbox id.
+    assert.equal(res.inboxIds.length, 1, 'only the EU-AI-Act finding produced an Inbox id');
+
+    // HONESTY: the dropped bad finding is RECORDED, not silently lost.
+    assert.ok(Array.isArray(res.droppedFindings), 'summary surfaces a droppedFindings array');
+    assert.equal(res.droppedFindings.length, 1, 'exactly one finding recorded as dropped');
+    const dropped = res.droppedFindings[0];
+    assert.equal(dropped.regime, 'gdpr', 'the dropped finding is attributed to the GDPR regime');
+    assert.match(String(dropped.reason), /GDPR-999|unknown gdpr_article|gdpr_article/i, 'the drop reason names the offending code / cause');
+  });
+
+  it('10b. bad GDPR finding alongside a GOOD GDPR finding ⇒ the good one attaches, the bad one is recorded, no throw', () => {
+    const root = projectWith('[gdpr]');
+    let res;
+    assert.doesNotThrow(() => {
+      res = seam.runComplianceForTransition(root, {
+        gdprFindings: [
+          gdprPlanFinding({ gdpr_article: 'GDPR-999', kind: 'bogus', regulation_ref: 'nope', message: 'bad article' }),
+          gdprPlanFinding({ gdpr_article: 'GDPR-17', kind: 'data-retention', regulation_ref: 'gdpr art. 5(1)(e)', message: 'good retention finding' }),
+        ],
+      });
+    }, 'a bad GDPR finding does not abort the good GDPR finding');
+
+    assert.equal(res.gdprRan, true);
+    // Exactly the GOOD finding reaches the Inbox.
+    const files = listQuestionFiles(root);
+    assert.equal(files.length, 1, 'exactly ONE question file on disk — the valid GDPR finding');
+    const body = fs.readFileSync(path.join(questionsDir(root), files[0]), 'utf8');
+    assert.match(body, /good retention finding/, 'the valid GDPR finding attached');
+    assert.doesNotMatch(body, /bad article/, 'the invalid GDPR finding was NOT emitted');
+    assert.equal(res.inboxIds.length, 1, 'one Inbox id — only the valid finding');
+
+    // The bad one is recorded.
+    assert.equal(res.droppedFindings.length, 1, 'the invalid GDPR finding is recorded as dropped');
+    assert.equal(res.droppedFindings[0].regime, 'gdpr');
+  });
+
+  it('10c. a non-object / null GDPR finding is contained (no throw), recorded, and never emitted', () => {
+    const root = projectWith('[gdpr, eu-ai-act-high-risk]');
+    let res;
+    assert.doesNotThrow(() => {
+      res = seam.runComplianceForTransition(root, {
+        // null is a plan-stage element (splitByRoute keeps it plan-stage);
+        // validateFindingSchema throws a TypeError on it — the seam must contain that.
+        gdprFindings: [/** @type {any} */ (null), gdprPlanFinding({ message: 'valid alongside null' })],
+        euAiActFindings: [euAiActPlanFinding()],
+      });
+    }, 'a null GDPR finding does not throw the seam');
+
+    // The valid GDPR finding + the EU-AI-Act finding both attach; null is dropped.
+    const bodies = readAllQuestionBodies(root).join('\n---\n');
+    assert.match(bodies, /valid alongside null/, 'the valid GDPR finding attached');
+    assert.match(bodies, /high-risk training data lacks Art\.10 governance/, 'the EU-AI-Act finding attached (sibling unaffected)');
+    assert.equal(listQuestionFiles(root).length, 2, 'exactly two question files — the two valid findings');
+
+    // The null is recorded as dropped.
+    assert.ok(res.droppedFindings.length >= 1, 'the null finding is recorded as dropped');
+    assert.ok(res.droppedFindings.some(d => d.regime === 'gdpr'), 'the dropped null is attributed to GDPR');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 11. Summary honesty on the clean path — droppedFindings is present + empty
+//     when nothing is dropped (so callers can always read it).
+// ─────────────────────────────────────────────────────────────────────
+
+describe('runComplianceForTransition — droppedFindings is always present', () => {
+  it('11. all-valid findings ⇒ droppedFindings is an empty array (never undefined)', () => {
+    const root = projectWith('[gdpr, eu-ai-act-high-risk]');
+    const res = seam.runComplianceForTransition(root, {
+      gdprFindings: [gdprPlanFinding()],
+      euAiActFindings: [euAiActPlanFinding()],
+    });
+    assert.ok(Array.isArray(res.droppedFindings), 'droppedFindings present on the clean path');
+    assert.equal(res.droppedFindings.length, 0, 'nothing dropped when every finding is valid');
   });
 });

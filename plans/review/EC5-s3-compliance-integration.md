@@ -299,3 +299,45 @@ dir with a real `.ctoc/settings.yaml` and both regime YAMLs, so gating is real
    `regulation_ref` (the dedup topic key, e.g. `gdpr art. 5(1)(e)`) is independent
    of `gdpr_article` and is what drives the cross-regime merge with EU-AI-Act's
    `eu-ai-act art. 10` (both map to topic `data-governance` via the s2 table).
+
+4. **SEAM fail-open vs RUNNER fail-loud (Gate-3 kickback fix).** Adversarial
+   review confirmed a CRITICAL defect: `runComplianceForTransition` called
+   `runGdprFindings` with NO try/catch, and it ran BEFORE `runEuAiActFindings`. A
+   GDPR finding with a missing/unknown `gdpr_article` makes the runner THROW (via
+   `validateFindingSchema` — correctly fail-loud, so a bad code is never silently
+   emitted). Because the unguarded GDPR call ran first, that throw (a) violated the
+   seam's documented "never throws / fail-open" contract that the CTO Chief live
+   dispatch depends on, and (b) caused a PARTIAL, NON-ATOMIC write: a valid GDPR
+   finding written to the Inbox, then the throw aborting, and the valid sibling
+   EU-AI-Act finding SILENTLY DROPPED (cross-regime contamination).
+
+   The fix does NOT touch the runner — the runner must stay fail-loud, because a
+   bad code must never be silently EMITTED to the Inbox (that is its
+   single-responsibility guard). Instead the SEAM absorbs the loud throw:
+
+   - **Per-finding partition (mirrors EU-AI-Act `filterToEuAiAct` fail-strict-drop):**
+     before dispatching GDPR findings, `partitionValidGdpr` calls
+     `validateFindingSchema` on EACH finding inside a try/catch. Valid findings are
+     dispatched to the runner (which re-validates them — always passing, so its
+     throw never fires through the seam); invalid findings are DROPPED and RECORDED
+     in `summary.droppedFindings` (regime + finding + reason). Never emitted, never
+     silently lost. This is the exact "runner fail-loud on what it receives, seam
+     fail-strict-drop on what it forwards" split.
+   - **Independent regimes + defense-in-depth:** each runner dispatch is wrapped in
+     its own try/catch so a failure/empty in one regime NEVER aborts or skips the
+     other; any unexpected runner throw is recorded in `droppedFindings` and the
+     other regime still runs.
+   - **Honest summary:** the return gains `droppedFindings: Array<{regime, finding,
+     reason}>`, always present (empty on the clean path) so a human/caller can see
+     exactly what was dropped and why.
+
+   All prior correctness properties are preserved unchanged: single deduped write
+   (dedup BEFORE dispatch, each survivor to exactly one runner), advisory (no plan
+   move), gate-off no-op, and the gate invariant (the seam still names no
+   enforcement/gate key and requires no hook/actions module). Two downstream
+   consumer tests (`cto-chief-compliance-dispatch.test.js` case 5, and the two
+   `compliance-integration.test.js` exact-summary deepEquals) were updated for the
+   additive `droppedFindings` field. New seam-level tests (10a/10b/10c/11) prove
+   RED→GREEN: bad `gdpr_article` no longer throws and the sibling EU-AI-Act finding
+   still reaches the real Inbox (disk readback), the dropped finding is recorded,
+   and `droppedFindings` is always present.
