@@ -1,0 +1,321 @@
+{
+  "audit_date": "2026-06-15",
+  "produced_by": "CU1-tier0-quick-wins",
+  "ledger_purpose": "Per-file verdict artifact covering every CU1 target. The no-silent-skip contract for downstream corpus plans (CU2-CU5): each must diff its scope against this ledger. Absence of a downstream target from this ledger is an error in the downstream plan, not a free pass. Recorded 2026-07-08 by slice s6 (runs LAST) against the FINAL on-disk state after s1-s5 shipped; line_count and section_count read fresh from disk.",
+  "verdict_legend": {
+    "SOLID": "evaluated and found in good health; either not edited (out-of-scope / no-churn) or already substantive",
+    "THIN": "was thin/incomplete; edited by CU1 s1-s5 and now fixed",
+    "DEFECTIVE": "path in the CU1 files: list does not exist on disk; recorded so downstream plans do not silently skip; NOT created, NOT edited"
+  },
+  "discrepancies": {
+    "model_bump_count": "grep -rl \"model_optimized_for: opus-4-7\" agents/ returned 21 files, not the audit's ~18 estimate. Of those 21, 14 were in CU1 s2 scope and were bumped off opus-4-7 (now 0 of the 14 carry it). The remaining 7 are OUT of the CU1 files: list and were NOT edited (no-churn); they still carry opus-4-7 on disk and are recorded below as SOLID with an out-of-scope note. Net: 21 total = 14 fixed (in-scope) + 7 deferred (out-of-scope). Re-verified 2026-07-08: grep now returns exactly the 7 out-of-scope files.",
+    "allowed_tools_skills": "grep -rl \"allowed-tools:\" skills/ returned 5 files at audit time (matches the ~5 estimate); s3 normalized frontmatter and re-verified 2026-07-08 returns 0 remaining allowed-tools declarations in skills/.",
+    "phantom_paths": "Three CU1 files: entries do not exist on disk: agents/planning/functional-reviewer.md, agents/planning/implementation-plan-reviewer.md, agents/planning/iron-loop-integrator.md. Likely a mislabel; the real integrator lives at agents/iron-loop/iron-loop-integrator.md (already a separate, valid files: entry, bumped by s2). Recorded DEFECTIVE below; none created, none edited."
+  },
+  "records": [
+    {
+      "path": "agents/infrastructure/deployment-setup.md",
+      "line_count": 579,
+      "section_count": 17,
+      "verdict": "THIN",
+      "slice": "s1",
+      "note": "Added tier: 1, reports_to: cto-chief, dispatch_protocol: v1 frontmatter. Now enrolled as a Tier-1 agent; enforced by TIER_1_AGENTS in tests/architecture-invariants.test.js (line ~118). Verified on disk 2026-07-08."
+    },
+    {
+      "path": "tests/architecture-invariants.test.js",
+      "line_count": 370,
+      "section_count": 0,
+      "verdict": "THIN",
+      "slice": "s1+s3",
+      "note": "Extended so TIER_1_AGENTS includes agents/infrastructure/deployment-setup.md (s1) and to assert frontmatter normalization (s3). Test file: section_count 0 (no '## ' markdown headings) is expected."
+    },
+    {
+      "path": "agents/coordinator/cto-chief.md",
+      "line_count": 848,
+      "section_count": 18,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off model_optimized_for: opus-4-7 in the s2 atomic model bump. Verified no longer carries opus-4-7 on disk 2026-07-08 (grep -rl over agents/ returns only the 7 out-of-scope files)."
+    },
+    {
+      "path": "agents/coordinator/synthesizer.md",
+      "line_count": 253,
+      "section_count": 7,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). No longer in the opus-4-7 grep set. Verified 2026-07-08."
+    },
+    {
+      "path": "agents/iron-loop/iron-loop-integrator.md",
+      "line_count": 209,
+      "section_count": 8,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "The REAL integrator (distinct from the phantom agents/planning/iron-loop-integrator.md). Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/iron-loop/iron-loop-critic.md",
+      "line_count": 209,
+      "section_count": 7,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/iron-loop/iron-loop-executor.md",
+      "line_count": 258,
+      "section_count": 8,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/pipeline/agent-writer.md",
+      "line_count": 213,
+      "section_count": 11,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/pipeline/agent-critic.md",
+      "line_count": 863,
+      "section_count": 19,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/pipeline/agent-tester.md",
+      "line_count": 280,
+      "section_count": 11,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/pipeline/agent-qa.md",
+      "line_count": 279,
+      "section_count": 10,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/pipeline/agent-publisher.md",
+      "line_count": 292,
+      "section_count": 11,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/planning/vision-advisor.md",
+      "line_count": 611,
+      "section_count": 29,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/planning/vision-decomposer.md",
+      "line_count": 646,
+      "section_count": 15,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/planning/product-owner.md",
+      "line_count": 566,
+      "section_count": 24,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). Verified 2026-07-08."
+    },
+    {
+      "path": "agents/planning/implementation-planner.md",
+      "line_count": 658,
+      "section_count": 25,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Bumped off opus-4-7 (s2). This completes the 14 in-scope agents of the 21-file opus-4-7 set. Verified 2026-07-08."
+    },
+    {
+      "path": "tests/agent-modernization.test.js",
+      "line_count": 101,
+      "section_count": 0,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Regression test for the s2 model bump. Test file: section_count 0 is expected."
+    },
+    {
+      "path": "tests/skill-loading.test.js",
+      "line_count": 300,
+      "section_count": 0,
+      "verdict": "THIN",
+      "slice": "s2",
+      "note": "Regression test for skill loading after the model bump. Test file: section_count 0 is expected."
+    },
+    {
+      "path": "skills/realtime/hil-harness/SKILL.md",
+      "line_count": 534,
+      "section_count": 17,
+      "verdict": "THIN",
+      "slice": "s3",
+      "note": "Frontmatter normalized (s3). allowed-tools removed; re-verified 2026-07-08 grep -rl allowed-tools: over skills/ returns 0."
+    },
+    {
+      "path": "skills/realtime/wcet-budget/SKILL.md",
+      "line_count": 450,
+      "section_count": 16,
+      "verdict": "THIN",
+      "slice": "s3",
+      "note": "Frontmatter normalized (s3). Verified 2026-07-08."
+    },
+    {
+      "path": "skills/safety/fault-tree-builder/SKILL.md",
+      "line_count": 459,
+      "section_count": 13,
+      "verdict": "THIN",
+      "slice": "s3",
+      "note": "Frontmatter normalized (s3). Verified 2026-07-08."
+    },
+    {
+      "path": "skills/safety/fmeda-analyzer/SKILL.md",
+      "line_count": 492,
+      "section_count": 12,
+      "verdict": "THIN",
+      "slice": "s3",
+      "note": "Frontmatter normalized (s3). Verified 2026-07-08."
+    },
+    {
+      "path": "skills/safety/redundancy-pattern-picker/SKILL.md",
+      "line_count": 383,
+      "section_count": 13,
+      "verdict": "THIN",
+      "slice": "s3",
+      "note": "Frontmatter normalized (s3). Verified 2026-07-08."
+    },
+    {
+      "path": "skills/testing/runners/unit-test-runner/SKILL.md",
+      "line_count": 554,
+      "section_count": 16,
+      "verdict": "THIN",
+      "slice": "s3",
+      "note": "Frontmatter normalized (s3): model: sonnet present. Retains model_optimized_for: opus-4-7 (line ~20) which is a SKILL, not an agent, and out of the s2 agents/ scope; noted for CU-tracking but no divergence from CU1 acceptance. Verified 2026-07-08."
+    },
+    {
+      "path": "skills/security/dependency-checker/SKILL.md",
+      "line_count": 529,
+      "section_count": 12,
+      "verdict": "THIN",
+      "slice": "s4",
+      "note": "Added EU Cyber Resilience Act citation: Reg. (EU) 2024/2847 (23 Oct 2024); reporting duty applies 11 Sep 2026, full application 11 Dec 2027; Art. 71 application dates; Art. 64 fines; NTIA SBOM minimum elements (July 2021). Sources: EUR-Lex OJ:L_202402847, digital-strategy.ec.europa.eu CRA reporting, ENISA SRP, ntia.gov. last verified: 2026-07-08. Verified on disk 2026-07-08."
+    },
+    {
+      "path": "skills/saas/posthog-analytics/SKILL.md",
+      "line_count": 710,
+      "section_count": 12,
+      "verdict": "THIN",
+      "slice": "s5",
+      "note": "Example/source gaps filled (s5); 58 code-fence markers present on disk. Verified 2026-07-08."
+    },
+    {
+      "path": "skills/saas/sentry-errors/SKILL.md",
+      "line_count": 621,
+      "section_count": 17,
+      "verdict": "THIN",
+      "slice": "s5",
+      "note": "Example/source gaps filled (s5); 44 code-fence markers present on disk. Verified 2026-07-08."
+    },
+    {
+      "path": "skills/mobile/react-native-bridge-checker/SKILL.md",
+      "line_count": 617,
+      "section_count": 13,
+      "verdict": "THIN",
+      "slice": "s5",
+      "note": "Example/source gaps filled (s5), incl. rn-bridge sources; 32 code-fence markers present on disk. Verified 2026-07-08."
+    },
+    {
+      "path": "agents/planning/functional-reviewer.md",
+      "line_count": 0,
+      "section_count": 0,
+      "verdict": "DEFECTIVE",
+      "slice": "phantom",
+      "note": "Path in the CU1 files: list does not exist on disk; likely a mislabel. No file edited, none created. Confirmed absent 2026-07-08."
+    },
+    {
+      "path": "agents/planning/implementation-plan-reviewer.md",
+      "line_count": 0,
+      "section_count": 0,
+      "verdict": "DEFECTIVE",
+      "slice": "phantom",
+      "note": "Path in the CU1 files: list does not exist on disk; likely a mislabel. No file edited, none created. Confirmed absent 2026-07-08."
+    },
+    {
+      "path": "agents/planning/iron-loop-integrator.md",
+      "line_count": 0,
+      "section_count": 0,
+      "verdict": "DEFECTIVE",
+      "slice": "phantom",
+      "note": "Path in the CU1 files: list does not exist on disk; likely a mislabel. The real integrator is agents/iron-loop/iron-loop-integrator.md (recorded above, bumped by s2). No file edited, none created. Confirmed absent 2026-07-08."
+    },
+    {
+      "path": "agents/compliance/eu-ai-act-agent.md",
+      "line_count": 129,
+      "section_count": 7,
+      "verdict": "SOLID",
+      "slice": "out-of-scope",
+      "note": "Carries model_optimized_for: opus-4-7 but is OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08."
+    },
+    {
+      "path": "agents/compliance/eu-solution-recommender.md",
+      "line_count": 159,
+      "section_count": 11,
+      "verdict": "SOLID",
+      "slice": "out-of-scope",
+      "note": "Carries opus-4-7 but OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08."
+    },
+    {
+      "path": "agents/compliance/gdpr-agent.md",
+      "line_count": 97,
+      "section_count": 5,
+      "verdict": "SOLID",
+      "slice": "out-of-scope",
+      "note": "Carries opus-4-7 but OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08."
+    },
+    {
+      "path": "agents/coordinator/ivv-chief.md",
+      "line_count": 211,
+      "section_count": 9,
+      "verdict": "SOLID",
+      "slice": "out-of-scope",
+      "note": "Carries opus-4-7 but OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08."
+    },
+    {
+      "path": "agents/planning/kpi-planner.md",
+      "line_count": 152,
+      "section_count": 6,
+      "verdict": "SOLID",
+      "slice": "out-of-scope",
+      "note": "Carries opus-4-7 but OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08."
+    },
+    {
+      "path": "agents/planning/stack-chooser.md",
+      "line_count": 146,
+      "section_count": 5,
+      "verdict": "SOLID",
+      "slice": "out-of-scope",
+      "note": "Carries opus-4-7 but OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08."
+    },
+    {
+      "path": "agents/planning/unit-economics-modeler.md",
+      "line_count": 140,
+      "section_count": 9,
+      "verdict": "SOLID",
+      "slice": "out-of-scope",
+      "note": "Carries opus-4-7 but OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08. This is the 7th of the 7 out-of-scope files; 14 in-scope + 7 out-of-scope = 21 total opus-4-7 files (vs the audit's ~18 estimate)."
+    }
+  ]
+}
