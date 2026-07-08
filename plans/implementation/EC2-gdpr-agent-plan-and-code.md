@@ -14,18 +14,36 @@ program: ctoc-eu-compliance
 order: 2
 depends_on:
   - EC1-compliance-mode-setting
-files:
-  - agents/compliance/gdpr-agent.md
-  - src/lib/gdpr-helpers.js
-  - skills/compliance/gdpr-compliance-checker/SKILL.md
-  - .ctoc/operations-registry.yaml
-  - tests/gdpr-agent.test.js
+is_slice_index: true
 status: refined
 acceptance_criteria_count: 12
 risk_level: HIGH
 ---
 
 # EC2 — GDPR agent (plan-inspection + code-scan, extends gdpr-compliance-checker)
+
+> **This plan is a SLICE INDEX.** It was decomposed (SIP1) into 4 small, dependency-ordered
+> implementation slices, each an independently Iron-Loop-executed unit (~1 module/agent + its
+> test). This file retains the upstream ASSESS / ALIGN / CAPTURE / Scope / Risks context and
+> indexes the slices; it declares no `files:` of its own and is not itself built. The slices below
+> carry `iron_loop: true` and the canonical Steps 8–16. This index stays in `plans/implementation/`.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | files: | depends_on |
+|---|------------|------------------|--------|------------|
+| 1 | `EC2-s1-gdpr-helpers.md` | Deterministic rule core: `VALID_GDPR_ARTICLES` (incl. GDPR-6/9), `PII_FIELD_TO_ARTICLES`, `mapPiiFieldToArticles`, `normalizeSeverity`, `validateFindingSchema`, `routeFinding` — pure module + its test. | `src/lib/gdpr-helpers.js`, `tests/gdpr-helpers.test.js` | EC1-s2-compliance-regime-resolver |
+| 2 | `EC2-s2-skill-enum-gdpr-6-9.md` | Additive: add `GDPR-6` & `GDPR-9` to the skill's `gdpr_article` enum; parity test asserting the enum equals `VALID_GDPR_ARTICLES`. | `skills/compliance/gdpr-compliance-checker/SKILL.md`, `tests/gdpr-skill-enum.test.js` | EC2-s1-gdpr-helpers |
+| 3 | `EC2-s3-gdpr-agent-definition.md` | New `gdpr-agent.md` (plan-ancestry + code-scan wrapper, gates on `shouldRunGdpr`, restates no skill rule); remove old wrapper; content test. | `agents/compliance/gdpr-agent.md`, `agents/compliance/gdpr-compliance-checker.md`, `tests/gdpr-agent-definition.test.js` | EC2-s1-gdpr-helpers, EC2-s2-skill-enum-gdpr-6-9 |
+| 4 | `EC2-s4-wire-gate-and-routing.md` | LIVE wiring: `gdpr-agent-runner.js` gates on `shouldRunGdpr`, validates+normalizes+routes findings (real Inbox / letter), registry entry; test drives the real flow. | `src/lib/gdpr-agent-runner.js`, `tests/gdpr-agent-runner.test.js`, `.ctoc/operations-registry.yaml` | EC2-s1-gdpr-helpers, EC2-s3-gdpr-agent-definition |
+
+**Dependency chain (max depth 3, no cycles):** `s1 → s2`, `s1 → s3`, `s2 → s3`, `{s1, s3} → s4`.
+Sequencing note: `s1` depends on the already-done `EC1-s2-compliance-regime-resolver`
+(`shouldRunGdpr`). Slices build sequentially, FIFO, in the order s1 → s2 → s3 → s4.
+
+**Batched gates:** Gate 2 (implementation→todo) and Gate 3 (review→done) approve all four
+siblings at once via one human decision per parent-batch; each sibling still receives its own
+`approved_by: human` marker. No human gate is added by any slice (advisory findings only).
 
 ## 1. ASSESS
 
