@@ -14,16 +14,31 @@ program: ctoc-eu-compliance
 order: 3
 depends_on:
   - EC1-compliance-mode-setting
-files:
-  - agents/compliance/eu-ai-act-agent.md
-  - src/lib/eu-ai-act-helpers.js
-  - skills/compliance/ai-governance-checker/SKILL.md
-  - .ctoc/operations-registry.yaml
-  - tests/eu-ai-act-agent.test.js
+is_slice_index: true
+slice_count: 3
 status: refined
 acceptance_criteria_count: 12
 risk_level: HIGH
 ---
+
+> **This plan is a SLICE INDEX.** It was decomposed (per SIP1) into 3 dependency-ordered
+> implementation slices, each an independently Iron-Loop-executed unit (~1 module/agent +
+> its test). This parent carries the upstream functional context (ASSESS → ALIGN → CAPTURE
+> → Scope → Risks) and the slice table below; it declares no `files:` and no `iron_loop`
+> and is NOT itself built — the slices are. Gate 2 (implementation→todo) and Gate 3
+> (review→done) are approved for all three siblings AT ONCE via the batched-gate helper —
+> one human decision per parent-batch. The four human gates are untouched.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | files: | depends_on |
+|---|------------|------------------|--------|------------|
+| 1 | `EC3-eu-ai-act-agent-plan-and-code-s1-helpers.md` | Deterministic core `eu-ai-act-helpers.js` — `classifyFromPlanText`, `filterToEuAiAct` (fail-strict on `regulation !== "eu-ai-act"`), `normalizeSeverity`, `routeFinding`, `readEnforcementDates` — + its unit test. Foundation; no slice deps. | `src/lib/eu-ai-act-helpers.js`, `tests/eu-ai-act-helpers.test.js` | none |
+| 2 | `EC3-eu-ai-act-agent-plan-and-code-s2-agent.md` | Tier-2 agent `eu-ai-act-agent.md` — plan-ancestry inspection + code-scan wrapper over `ai-governance-checker`, gated on `shouldRunEuAiAct`, `max_subagents: 0`, references the s1 helpers by name; + content-contract test (agent prose asserted where a contract exists, per PI4). | `agents/compliance/eu-ai-act-agent.md`, `tests/eu-ai-act-agent.test.js` | s1 |
+| 3 | `EC3-eu-ai-act-agent-plan-and-code-s3-registry-wiring.md` | Register `eu-ai-act-agent` in `.ctoc/operations-registry.yaml` (live dispatch surface, gated on `shouldRunEuAiAct`); + registry-resolution test (path resolves, gate recorded, no human gate weakened). | `.ctoc/operations-registry.yaml`, `tests/eu-ai-act-agent-registry.test.js` | s2 |
+
+**Dependency chain:** s1 → s2 → s3 (depth 3, at the SIP1 max; no cycles). Build sequential, FIFO.
+**Not sliced separately:** `skills/compliance/ai-governance-checker/SKILL.md` is NOT modified — the agent wraps the existing skill and filters its output; no rule is re-stated or edited (parent AC "No rule from the skill is re-stated in the agent"). It therefore appears in no slice's `files:`.
 
 # EC3 — EU AI Act agent (plan-inspection + code-scan, extends ai-governance-checker)
 
@@ -183,6 +198,10 @@ Every project with `eu-ai-act-high-risk` in `active_profiles` gets EU AI Act ris
 ---
 
 ## Scope
+
+> The In-Scope list below is the FULL feature scope, now split across the 3 slices in the
+> table at the top of this index (s1 = `eu-ai-act-helpers.js` + test; s2 = the agent +
+> content test; s3 = registry wiring + test). Each bullet is realised by exactly one slice.
 
 ### In Scope
 
