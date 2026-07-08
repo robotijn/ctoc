@@ -562,6 +562,40 @@ CREATE INDEX analytics_events_event_idx        ON analytics_events(event, occurr
 CREATE INDEX analytics_events_org_idx          ON analytics_events(org_id, occurred_at DESC);
 ```
 
+### SQL query footgun (HogQL / warehouse — unbounded event scan)
+
+PostHog's Insights/SQL surface is backed by ClickHouse (HogQL compiles to ClickHouse SQL), and the warehouse mirror above is columnar/append-only. In both, an aggregate over the events table with **no date filter** forces a full-partition scan of the entire event history — the single most common cause of a timed-out or wildly-expensive PostHog SQL insight, and of a runaway warehouse bill. ClickHouse (and PostHog's event storage) is partitioned by time; a `WHERE` that prunes by `occurred_at`/`timestamp` lets the engine skip almost every partition. A funnel or conversion query that omits it reads years of rows to answer a "last 7 days" question.
+
+```sql
+-- BAD: no date filter → full-history scan of every partition.
+-- On PostHog's HogQL editor this times out; on the warehouse mirror it scans
+-- the entire analytics_events table and bills for every byte read.
+SELECT
+  properties ->> 'plan'            AS plan,
+  count(*)                         AS signups
+FROM analytics_events
+WHERE event = 'signup_completed'   -- no time bound: reads ALL history
+GROUP BY plan
+ORDER BY signups DESC;
+```
+
+```sql
+-- SAFE: bound by occurred_at so partition pruning skips old data, and put the
+-- time predicate FIRST so it prunes before the event filter is evaluated.
+-- Reads only the 7-day window's partitions instead of the whole table.
+SELECT
+  properties ->> 'plan'            AS plan,
+  count(*)                         AS signups
+FROM analytics_events
+WHERE occurred_at >= now() - INTERVAL '7 days'   -- prune partitions first
+  AND occurred_at <  now()
+  AND event = 'signup_completed'
+GROUP BY plan
+ORDER BY signups DESC;
+-- In the HogQL editor the equivalent is `WHERE timestamp >= now() - INTERVAL 7 DAY`;
+-- always express the analysis window explicitly rather than scanning all events.
+```
+
 ## Tool Integration (2026)
 
 | Tool | Purpose | When |

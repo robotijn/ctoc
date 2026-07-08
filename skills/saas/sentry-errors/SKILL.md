@@ -416,6 +416,66 @@ int main(void) {
 
 For C++ services, the same SDK works — wrap `sentry_capture_event` in your exception translator. Symbol upload (`sentry-cli debug-files upload`) is the equivalent of source-map upload: without it, native stack traces are useless.
 
+### C++ (C++20/23) — flush before exit or lose the last events (BAD / SAFE)
+
+`sentry-native` hands captured events to a **background worker thread** and returns immediately. If the process exits — normally or via a fatal signal handler — before that worker drains its queue, the events in flight are **silently lost**. The two APIs that matter (verified against the canonical `sentry.h`): `int sentry_flush(uint64_t timeout_ms)` blocks the calling thread until the worker finishes or the timeout is hit, **returning `0` on success and non-zero on timeout**; `int sentry_close(void)` shuts the client down and forces a final flush. Fire-and-forget capture right before `exit()` / `std::terminate` is the classic footgun: the crash you most want is the one you never receive.
+
+```cpp
+// BAD (C++20): capture then exit immediately — the background worker never
+// drains, so the event is lost. Common in a std::terminate / signal path.
+#include <sentry.h>
+#include <cstdlib>
+
+[[noreturn]] void on_fatal(const std::exception& e) {
+    sentry_value_t evt = sentry_value_new_message_event(
+        SENTRY_LEVEL_FATAL, "logger", e.what());
+    sentry_capture_event(evt);   // queued on the worker, not yet sent
+    std::exit(EXIT_FAILURE);     // BAD: process dies before the worker flushes → event lost
+}
+```
+
+```cpp
+// SAFE (C++20/23): bound the shutdown wait, flush explicitly, and guarantee
+// sentry_close() runs on every exit path via RAII. No event dropped on a
+// graceful (or handled-fatal) exit.
+#include <sentry.h>
+#include <cstdlib>
+#include <cstdint>
+
+// RAII guard: sentry_close() runs even if a later throw unwinds main().
+struct SentryGuard {
+    SentryGuard() {
+        sentry_options_t* opts = sentry_options_new();
+        sentry_options_set_dsn(opts, std::getenv("SENTRY_DSN"));
+        sentry_options_set_release(opts, std::getenv("GIT_COMMIT_SHA"));
+        // Cap how long shutdown may block the worker drain (milliseconds).
+        sentry_options_set_shutdown_timeout(opts, 3000);
+        sentry_init(opts);
+    }
+    ~SentryGuard() { sentry_close(); }   // forces a final flush on scope exit
+    SentryGuard(const SentryGuard&) = delete;
+    SentryGuard& operator=(const SentryGuard&) = delete;
+};
+
+[[noreturn]] void on_fatal(const std::exception& e) {
+    sentry_value_t evt = sentry_value_new_message_event(
+        SENTRY_LEVEL_FATAL, "logger", e.what());
+    sentry_capture_event(evt);
+    // Block up to 3s for the worker to send; non-zero return means it timed out.
+    if (sentry_flush(3000) != 0) {
+        // Log locally — the event may not have reached Sentry within the window.
+    }
+    sentry_close();              // final drain before terminating
+    std::exit(EXIT_FAILURE);
+}
+
+int main() {
+    SentryGuard sentry;          // init on construct, close on every return path
+    // ... app code ...
+    return 0;                    // ~SentryGuard() flushes + closes here
+}
+```
+
 ## SQL — correlating queries to errors via spans
 
 Sentry does not ingest raw SQL as a separate signal — queries appear as spans on traces. To make them debuggable:

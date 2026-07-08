@@ -175,50 +175,103 @@ posthog (SQL) and sentry (C++); rn-bridge at ≥10 dated refs; nothing fabricate
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **posthog SQL footgun choice.** The file already carried a SQL BAD/SAFE pair,
+  but it was a *schema/index* example (distinct_id mapping), not the
+  *query* footgun the plan specifies. Rather than rewrite it (no-churn rule), I
+  ADDED a new subsection "SQL query footgun (HogQL / warehouse — unbounded event
+  scan)": BAD = aggregate over `analytics_events` with no time predicate →
+  full-partition scan (times out in the HogQL editor, bills the whole table on
+  the warehouse mirror); SAFE = `WHERE occurred_at >= now() - INTERVAL '7 days'`
+  placed first so partition pruning skips old data. Grounded in ClickHouse's
+  time-partitioned storage (PostHog's event backend) — a real, canonical PostHog
+  SQL performance footgun.
+
+- **sentry C++ example fence + BAD/SAFE.** The existing native section used a
+  single `c`-fenced SAFE-only `sentry-native` init. The plan requires a
+  `cpp`/`c++`-marked block with a non-trivial concern. Added a new subsection
+  "C++ (C++20/23) — flush before exit or lose the last events (BAD / SAFE)":
+  BAD = `sentry_capture_event` then `std::exit` before the background worker
+  drains → event lost; SAFE = RAII `SentryGuard` (`sentry_close()` in the
+  destructor) + explicit `sentry_flush(3000)` with its non-zero-on-timeout
+  return checked. The C++ SAFE example is placed *before* the pre-existing `c`
+  init snippet is unaffected — both remain.
+
+- **sentry-native API verified, not invented.** `sentry_flush(uint64_t timeout)`
+  returns 0 on success / non-zero on timeout and blocks the caller until the
+  worker drains or times out; `sentry_close(void)` forces a final flush;
+  `sentry_options_set_shutdown_timeout(opts, ms)` caps the drain. All three
+  confirmed against the canonical header
+  `getsentry/sentry-native/include/sentry.h` (curl'd at edit time) and the
+  official native docs — no invented API.
+
+- **react-native sources: 13 real dated refs (bar was ≥10).** Added a "## Sources"
+  section (the file previously had none). Every URL was curl-verified HTTP 200 at
+  edit time. Living doc pages carry a retrieval date (2026-07-08); the two RN
+  blog posts carry their publication dates, which I confirmed from the page
+  metadata (0.76 = 2024-10-23, 0.81 = 2025-08-12). No WebSearch tool was
+  available in this executor context, so verification was done by direct HTTP
+  fetch against the official sites (reactnative.dev, docs.expo.dev,
+  developer.android.com, developer.apple.com) — no reliance on memory, nothing
+  fabricated.
+
+- **Content-contract test added (in scope per plan).** The plan said "no new test
+  file" but permitted a regression test that reads the REAL SKILL.md files. I
+  added `tests/skill-example-source-gaps.test.js` (3 assertions, zero doubles),
+  RED before the edits and GREEN after — this is the TDD evidence the caller
+  asked for. It reads the real files with `fs.readFileSync`.
+
+- **Out-of-slice working-tree files left untouched.**
+  `skills/security/dependency-checker/SKILL.md` (modified) and
+  `tests/skill-regulatory-citations.test.js` (untracked) were already present in
+  the working tree from a sibling slice; they are outside this slice's `files:`
+  declaration and I did not touch them.
