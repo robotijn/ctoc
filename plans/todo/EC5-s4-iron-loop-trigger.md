@@ -233,3 +233,55 @@ writeComplianceTrigger(planPath, projectRoot)
   the trigger seam and keeps it independently testable. If the reviewer prefers a
   thin re-export from `iron-loop.js`, that is a one-line follow-up; the logic
   stays here.
+
+- **Line-based frontmatter upsert instead of a single block regex (Step 14
+  lint kickback).** The first implementation used one regex
+  (`compliance_trigger:` header + `(?:\r?\n[ \t]+...)*` child lines) to match
+  the block to replace. `eslint security/detect-unsafe-regex` flagged it as a
+  potential ReDoS. Rewrote `upsertTriggerBlock` line-by-line (find the header
+  index, consume the following indented child lines, splice in the new block) —
+  no backtracking, mirrors `regulatory-regime.js`'s ReDoS-safe line parsing.
+  Lint returns to exit 0.
+
+- **Function-form `String.replace` for the frontmatter splice.** `content.replace(fm[0], newFrontmatter)`
+  as a STRING would interpret `$&`/`$1`/`$$` in any user frontmatter as
+  replacement patterns and corrupt the file. Switched to a function replacement
+  (`() => rebuilt`) so every `$` is treated literally. The rendered
+  `compliance_trigger:` block itself contains only booleans + the fixed literal
+  `cto-chief`, so it is injection-free by construction; the guard protects the
+  surrounding frontmatter.
+
+- **Doc-comment wording avoids the forbidden `dispatcher:'iron-loop'` literal.**
+  The NO-DISPATCH test greps the source for `dispatcher\s*:\s*['"]iron-loop['"]`
+  to prove the module never assigns that value. A prose reference to the
+  forbidden literal in a JSDoc comment tripped it (a legitimate source-level
+  invariant catching a documentation string). Reworded the comments to say "the
+  Iron Loop itself" rather than quoting the literal — the invariant now cleanly
+  distinguishes assignment from prose.
+
+## Verification (EC5-s4, executed)
+
+- RED→GREEN: with only the test present, `require('../src/lib/iron-loop-compliance-trigger')`
+  failed (module absent) → 1 fail; after IMPLEMENT → 17 pass, 0 fail.
+- `node --test tests/iron-loop-compliance-trigger.test.js` → tests 17, pass 17, fail 0.
+- Emitted trigger shape: `{ runGdpr: boolean, runEuAiAct: boolean, dispatcher: 'cto-chief' }`;
+  frontmatter block:
+  `compliance_trigger:` / `  runGdpr: <bool>` / `  runEuAiAct: <bool>` / `  dispatcher: cto-chief`.
+- `dispatcher: 'cto-chief'` proof: asserted across all four profile combos
+  (both / gdpr-only / eu-ai-act-only / neither) AND `assert.notEqual(..., 'iron-loop')`;
+  source-grep asserts `dispatcher:'iron-loop'` is never assigned and `dispatcher:'cto-chief'` is.
+- Dispatches-nothing proof: source-grep asserts NO require of any
+  agent/dispatch/runner module (incl. gdpr-agent-runner, eu-ai-act-agent-runner,
+  compliance-integration), no `child_process`/`spawn`/`exec`, no `Task`, and no
+  `renameSync`/`unlink` (no plan move/delete). The module only returns a
+  descriptor and, in the writer, does a single targeted frontmatter write.
+- `node --test tests/*.test.js` → tests 3354, pass 3354, fail 0, skipped 0.
+  `iron-loop.js` md5 unchanged (8358040a264d243aebd7da60d28f0fe6); its 49 tests green.
+- `npx eslint . --max-warnings 0` → exit 0. `tsc --noEmit` baseline-neutral
+  (89 pre-existing errors, 0 in the new file).
+- Count bump: src/lib 121→122; README structure line + `tests/readme-numbers.test.js`
+  (two assertions) updated to 122; readme-numbers suite green.
+- Coverage (new module): 98.27% line / 91.67% branch / 100% function — ≥80%.
+- Gate invariant: `HUMAN_GATES` still has exactly `implementation`, `todo`,
+  `done`; module names no gate key (HUMAN_GATES/requireReviewGate/enforcementMode/review_gate)
+  and requires no hook.
