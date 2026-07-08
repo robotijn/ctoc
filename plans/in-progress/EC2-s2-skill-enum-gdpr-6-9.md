@@ -184,50 +184,68 @@ existing test regressed. Plan stays in `implementation/`. Ready for batched Gate
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — tests 4, pass 1, fail 3
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none
+- [x] Check prerequisites — VALID_GDPR_ARTICLES (s1) confirmed present, 14 codes
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none
+- [x] Pre-scan (parent risk): grep tests/*.test.js for a fixed 12-value enum assertion — NONE found; no existing test needed updating
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — added "GDPR-6" and "GDPR-9" to the gdpr_article enum (numeric-ascending), additive only
+- [x] Add error handling — N/A (markdown; guard is the parity test)
+- [x] Wire up integration points — enum now parity-equal to VALID_GDPR_ARTICLES
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — SKILL.md diff = 2 lines, enum block only; nothing else touched
+- [x] Verify integration points work together — parity test GREEN
+- [x] Check error handling completeness — static regex, CRLF-tolerant
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — none; two-token additive edit, rest of file not reflowed
+- [x] Optimize critical paths — N/A
+- [x] Simplify complex code — N/A
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — fixed repo-relative path via path.join, no user input
+- [x] Sanitize outputs — N/A
+- [x] No secrets in code
+- [x] Safe file operations — test is read-only; implementation edits only the one enum block
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint . exit 0 (0 warnings); tsc baseline-neutral (0 new errors, none reference gdpr files)
+- [x] Run ALL tests (TDD Green) — full suite: tests 3200, pass 3200, fail 0
+- [x] Check coverage >= 80% — content/parity test exercises s1's VALID_GDPR_ARTICLES; full suite green
+- [x] 0 skipped, 0 flaky tests — skipped 0, todo 0
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — additive enum extension noted; no README count change (no new module)
+- [x] Add JSDoc comments to new functions — extractSkillEnum documented in the test
+- [x] Update CHANGELOG if needed — commit note covers it
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — both codes present, all 14 enumerated, parity proven, no regression
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **Enum wrap point:** placed the line break after `"GDPR-17"` so the first
+  continuation line stays a comfortable width (7 codes on line 1, 7 on line 2).
+  The plan mandated numeric-ascending token order, not a specific wrap column;
+  this keeps both lines balanced. The parity test is wrap-agnostic (it joins the
+  continuation block before tokenizing), so the exact break point is cosmetic.
+- **Pre-scan result (parent MEDIUM-impact risk):** grepped `tests/*.test.js` for
+  a fixed 12-value `gdpr_article` enum assertion. Only `tests/gdpr-helpers.test.js`
+  references `gdpr_article`, and it asserts membership (`VALID_GDPR_ARTICLES.has`),
+  not an exact fixed list. No existing assertion pins the enum to 12 values, so
+  NO existing test required updating — the additive edit is regression-safe.
+- **tsc baseline:** the repo's `tsc --noEmit` has ~100 pre-existing errors in
+  unrelated `src/*` files (inbox.js, menu.js, state.js, etc.). None reference
+  gdpr-helpers.js, SKILL.md, or the new test. This slice adds zero new tsc
+  errors — baseline-neutral. Not this slice's job to fix the pre-existing set.

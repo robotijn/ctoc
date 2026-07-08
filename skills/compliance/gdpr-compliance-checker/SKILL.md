@@ -641,8 +641,8 @@ kind: missing-consent-banner
        | missing-article-13-notice
        | missing-article-14-notice
        | special-category-without-explicit-consent
-gdpr_article: "GDPR-7" | "GDPR-13" | "GDPR-14" | "GDPR-15" | "GDPR-17" | "GDPR-20"
-             | "GDPR-28" | "GDPR-30" | "GDPR-33" | "GDPR-34" | "GDPR-37" | "GDPR-Chapter-V"
+gdpr_article: "GDPR-6" | "GDPR-7" | "GDPR-9" | "GDPR-13" | "GDPR-14" | "GDPR-15" | "GDPR-17"
+             | "GDPR-20" | "GDPR-28" | "GDPR-30" | "GDPR-33" | "GDPR-34" | "GDPR-37" | "GDPR-Chapter-V"
 target_file: src/api/users/route.ts
 target_line: 42
 sink: "db.user.update({ data: { isDeleted: true } })"   # the offending operation
