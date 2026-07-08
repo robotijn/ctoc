@@ -1048,5 +1048,61 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T11:54:28.699Z",
+    "plan": "pi4-semantic-search-and-related-plans-s1-fusion.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T11:54:28.724Z",
+    "plan": "pi4-semantic-search-and-related-plans-s2-search.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T11:54:28.748Z",
+    "plan": "pi4-semantic-search-and-related-plans-s3-related-and-barrel.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T11:54:28.772Z",
+    "plan": "pi4-semantic-search-and-related-plans-s4-ui-wiring.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
