@@ -267,7 +267,7 @@ async function detectConflicts(planSlug, opts = {}) {
     if (overlap.length === 0) continue;
     // Broad-overlap downgrade: any candidate glob that sweeps > 50% of the index.
     const broad = Array.isArray(candFiles)
-      && candFiles.some((g) => (g.indexOf('*') !== -1 || g.indexOf('?') !== -1) && isBroadGlob(g, indexFiles()));
+      && candFiles.some((g) => typeof g === 'string' && (g.indexOf('*') !== -1 || g.indexOf('?') !== -1) && isBroadGlob(g, indexFiles()));
     rows.push({
       conflictingPlan: candidate,
       overlappingFiles: overlap,

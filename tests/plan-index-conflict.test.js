@@ -110,6 +110,28 @@ test.after(() => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  F1 regression — a non-string element in a candidate's files: (malformed YAML)
+//  on the overlap+broad-glob path must NOT throw out of detectConflicts.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+test('CF-F1 non-string files: element on the overlap path → no throw, still flagged', async () => {
+  const vec = [1, 0, 0, 0, 0, 0, 0, 0]; // identical vectors → cosine 1.0 ≥ 0.78 threshold
+  const store = buildStore([
+    { planSlug: 'target', sectionVec: vec, files: ['src/lib/shared.js'] },
+    // candidate: similar (same vec) AND file-overlapping AND a NON-STRING element +
+    // a broad glob — the exact shape that threw on `g.indexOf` before the typeof guard.
+    { planSlug: 'cand', sectionVec: vec, files: ['src/lib/shared.js', 12345, null, 'src/**'] },
+  ]);
+  let rows;
+  await assert.doesNotReject(
+    async () => { rows = await detectConflicts('target', { store, embedder: spyEmbedder() }); },
+    'a non-string files: element must not throw out of detectConflicts (F1)'
+  );
+  assert.equal(rows.length, 1, 'candidate still flagged (similar + overlapping)');
+  assert.equal(rows[0].conflictingPlan, 'cand');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  Group A — the AND (both halves) + the two hard-fails
 // ═══════════════════════════════════════════════════════════════════════════════
 
