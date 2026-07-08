@@ -180,48 +180,48 @@ writeComplianceTrigger(planPath, projectRoot)
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/iron-loop-compliance-trigger.test.js` covering cases 1–10 above
-- [ ] Include the NO-DISPATCH invariant (case 9) and the GATE-INVARIANT (case 10)
-- [ ] Test error conditions (missing file, no frontmatter, non-string root)
-- [ ] Run tests — expect RED (module does not exist yet)
+- [x] Write `tests/iron-loop-compliance-trigger.test.js` covering cases 1–10 above
+- [x] Include the NO-DISPATCH invariant (case 9) and the GATE-INVARIANT (case 10)
+- [x] Test error conditions (missing file, no frontmatter, non-string root)
+- [x] Run tests — expect RED (module does not exist yet)
 
 ### Step 9: PREPARE
-- [ ] Confirm `compliance-regime.js` exports `shouldRunGdpr` / `shouldRunEuAiAct`
-- [ ] Confirm `safe-fs` read/write helpers
-- [ ] No dependencies to install
+- [x] Confirm `compliance-regime.js` exports `shouldRunGdpr` / `shouldRunEuAiAct`
+- [x] Confirm `safe-fs` read/write helpers
+- [x] No dependencies to install
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/iron-loop-compliance-trigger.js`
-- [ ] `evaluateComplianceTrigger` (always `dispatcher:'cto-chief'`)
-- [ ] `writeComplianceTrigger` — surgical `compliance_trigger:` frontmatter upsert
-- [ ] Export `{ evaluateComplianceTrigger, writeComplianceTrigger }`
+- [x] Create `src/lib/iron-loop-compliance-trigger.js`
+- [x] `evaluateComplianceTrigger` (always `dispatcher:'cto-chief'`)
+- [x] `writeComplianceTrigger` — surgical `compliance_trigger:` frontmatter upsert
+- [x] Export `{ evaluateComplianceTrigger, writeComplianceTrigger }`
 
 ### Step 11: REVIEW
-- [ ] Self-review: NO agent runner imported; NO dispatch call anywhere
-- [ ] Verify the writer never rewrites the body and never touches other frontmatter keys
-- [ ] Verify no gate key referenced
+- [x] Self-review: NO agent runner imported; NO dispatch call anywhere
+- [x] Verify the writer never rewrites the body and never touches other frontmatter keys
+- [x] Verify no gate key referenced
 
 ### Step 12: OPTIMIZE
-- [ ] Single frontmatter read + single write; no repeated file I/O
+- [x] Single frontmatter read + single write; no repeated file I/O
 
 ### Step 13: SECURE
-- [ ] Static frontmatter regex (no dynamic RegExp from untrusted input)
-- [ ] No secrets; write only to the supplied plan path
+- [x] Static frontmatter regex (no dynamic RegExp from untrusted input)
+- [x] No secrets; write only to the supplied plan path
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests: `node --test tests/iron-loop-compliance-trigger.test.js`
-- [ ] Coverage ≥ 80%; 0 skipped, 0 flaky
-- [ ] Confirm NO-DISPATCH + gate-invariant tests pass
+- [x] Run lint + type check
+- [x] Run ALL tests: `node --test tests/iron-loop-compliance-trigger.test.js`
+- [x] Coverage ≥ 80%; 0 skipped, 0 flaky
+- [x] Confirm NO-DISPATCH + gate-invariant tests pass
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on both exports; module header documenting "emit a condition, never dispatch"
-- [ ] Record the "separate module, not an edit to iron-loop.js" choice in Decisions
+- [x] JSDoc on both exports; module header documenting "emit a condition, never dispatch"
+- [x] Record the "separate module, not an edit to iron-loop.js" choice in Decisions
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify Steps 8–15 completed
-- [ ] Trigger-emission + no-dispatch + gate-invariant all green
-- [ ] Ready for human review
+- [x] Verify Steps 8–15 completed
+- [x] Trigger-emission + no-dispatch + gate-invariant all green
+- [x] Ready for human review
 
 ## Decisions Taken Under Ambiguity
 

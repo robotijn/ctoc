@@ -270,45 +270,45 @@ the only callable), enforcing the parent's "injectable-fetcher-is-the-sole-web-b
 ## Execution Plan (Steps 8–16)
 
 ### Step 8: TEST
-- [ ] Write `tests/eu-recommender-helpers.test.js` with all 17 cases + the hand-written stub
+- [x] Write `tests/eu-recommender-helpers.test.js` with all 17 cases + the hand-written stub
       fetcher. Run — expect RED (module absent, `MODULE_NOT_FOUND`).
 
 ### Step 9: PREPARE
-- [ ] No new deps (node:test + builtins; optional `./safe-fs` already exists). Re-read the parent's
+- [x] No new deps (node:test + builtins; optional `./safe-fs` already exists). Re-read the parent's
       locked schema keys, the five price patterns, and the monotonicity contract fresh to seed
       `CANONICAL_SCHEMA_KEYS` / `EVALUATIVE_PRICE_PATTERNS` byte-for-byte.
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/eu-recommender-helpers.js` per the File Specification: frozen
+- [x] Create `src/lib/eu-recommender-helpers.js` per the File Specification: frozen
       `CANONICAL_SCHEMA_KEYS` / `VALID_BUCKETS` / `EVALUATIVE_PRICE_PATTERNS`, the five exports,
       JSDoc, `module.exports`. Standard lib module pattern (imports [none/safe-fs] → constants →
       JSDoc functions → exports). No stubs, no TODOs — make documented choices and continue.
 
 ### Step 11: REVIEW
-- [ ] Verify the four pure functions import nothing gate-related; verify `createFetcher` makes no
+- [x] Verify the four pure functions import nothing gate-related; verify `createFetcher` makes no
       web call itself (delegates only); verify the schema key Set equals the parent's 10 keys
       exactly; verify `applyFallback` does not mutate its input.
 
 ### Step 12: OPTIMIZE
-- [ ] Keep it thin — no classes, no factories beyond the required `createFetcher`; match
+- [x] Keep it thin — no classes, no factories beyond the required `createFetcher`; match
       `eu-ai-act-helpers.js` simplicity. Freeze all constants.
 
 ### Step 13: SECURE
-- [ ] Run the security checklist; confirm every validator throws (never silently passes), all
+- [x] Run the security checklist; confirm every validator throws (never silently passes), all
       price RegExp are static/word-bounded (no ReDoS), and constants are frozen.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/eu-recommender-helpers.test.js` → `# fail 0`; coverage ≥ 80% (both
+- [x] `node --test tests/eu-recommender-helpers.test.js` → `# fail 0`; coverage ≥ 80% (both
       `createFetcher` branches hit). Then full suite `node --test tests/*.test.js` → `# fail 0`
       (no regression). eslint `--max-warnings 0` exit 0.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on all five exports + a module header comment stating this is the deterministic
+- [x] JSDoc on all five exports + a module header comment stating this is the deterministic
       authority for the recommender's output contract, that the web boundary is the injected
       fetcher (the agent injects the real tools; tests inject a stub), and that it imports no gate.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Confirm all 17 cases pass, purity/no-gate-import holds, schema + price + monotonicity
+- [x] Confirm all 17 cases pass, purity/no-gate-import holds, schema + price + monotonicity
       contracts exact. Plan stays in `implementation/` (executor does NOT cross Gate 2). Ready for
       batched Gate 2 with EC4 siblings.
 
@@ -318,47 +318,47 @@ the only callable), enforcing the parent's "injectable-fetcher-is-the-sole-web-b
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
 - [x] Verify steps 8-15 completed correctly

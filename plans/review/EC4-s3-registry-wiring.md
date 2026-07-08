@@ -177,46 +177,46 @@ integrity invariant (case 6) are the key real-flow / safety checks.
 ## Execution Plan (Steps 8–16)
 
 ### Step 8: TEST
-- [ ] Write `tests/eu-solution-recommender-registry.test.js` — the 7 resolution + gate-integrity
+- [x] Write `tests/eu-solution-recommender-registry.test.js` — the 7 resolution + gate-integrity
       assertions above (RED first: entry-present + path-resolves fail until this edit + the s2 file
       both land). Parse via the existing registry loader if one exists, else a YAML/text read;
       resolve paths against the project root.
 
 ### Step 9: PREPARE
-- [ ] Confirm s2 shipped `agents/compliance/eu-solution-recommender.md` (the `path` target). Read
+- [x] Confirm s2 shipped `agents/compliance/eu-solution-recommender.md` (the `path` target). Read
       the CURRENT `COMPLIANCE AGENTS` grouping fresh (keyed-map shape via the `gdpr-agent`/
       `eu-ai-act-agent` precedent) so the new entry matches exactly. No new deps.
 
 ### Step 10: IMPLEMENT
-- [ ] Add the `eu-solution-recommender` entry to the `agents:` block immediately after
+- [x] Add the `eu-solution-recommender` entry to the `agents:` block immediately after
       `eu-ai-act-agent`, matching the on-disk key shape; include `path`, `model: opus`,
       `category: compliance`, `tier: 2`, `role`, `reports_to`, `tools: [WebSearch, WebFetch]`,
       `invoked_by: [gdpr-agent, eu-ai-act-agent]`, `description`, `parallel_safe: true`. Add NO
       `gated_by` and NO `review_gate`. Touch NO other block. No stubs.
 
 ### Step 11: REVIEW
-- [ ] Self-review: `path` points at the real s2 file; entry shape matches neighbours; the banner +
+- [x] Self-review: `path` points at the real s2 file; entry shape matches neighbours; the banner +
       three `human_gate: true` + three `review_gate: true` markers are byte-identical (`git diff` =
       additive-only, 0 deletions); the new entry has no `review_gate`.
 
 ### Step 12: OPTIMIZE
-- [ ] Single additive entry; no reordering of the existing roster.
+- [x] Single additive entry; no reordering of the existing roster.
 
 ### Step 13: SECURE
-- [ ] Verify no human gate weakened (case 6 green, 3/3/banner unchanged); no non-`agents` block
+- [x] Verify no human gate weakened (case 6 green, 3/3/banner unchanged); no non-`agents` block
       mutated; the new entry stays advisory (no `review_gate`).
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/eu-solution-recommender-registry.test.js` → all 7 GREEN, 0 skipped. Then
+- [x] `node --test tests/eu-solution-recommender-registry.test.js` → all 7 GREEN, 0 skipped. Then
       `node --test tests/*.test.js` → `# fail 0` (registry-shape / architecture-invariants tests
       still pass with the new entry). eslint `--max-warnings 0` exit 0.
 
 ### Step 15: DOCUMENT
-- [ ] Inline YAML comment on the entry noting it is the one web-enabled compliance agent, is invoked
+- [x] Inline YAML comment on the entry noting it is the one web-enabled compliance agent, is invoked
       by EC2/EC3 (not self-gated), and stays advisory.
 
 ### Step 16: FINAL-REVIEW
-- [ ] implementation-reviewer verifies the entry resolves, the invoked-by note is recorded, and no
+- [x] implementation-reviewer verifies the entry resolves, the invoked-by note is recorded, and no
       human gate was weakened (3/3/banner intact). Plan stays in `implementation/` (executor does
       NOT cross Gate 2). Gate 3 approval batched at the EC4 parent level.
 
