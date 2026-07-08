@@ -255,6 +255,19 @@ agents:
     description: Interactive deployment pipeline setup — guides users through environment, strategy, and approval configuration
     always_available: true
 
+  # -----------------------------------------------------------------------------
+  #  COMPLIANCE AGENTS (gated on the active regulatory profile)
+  # -----------------------------------------------------------------------------
+
+  gdpr-agent:
+    path: agents/compliance/gdpr-agent.md
+    model: opus
+    category: compliance
+    tier: 2
+    gated_by: shouldRunGdpr           # advisory: runs only when the gdpr profile is active
+    description: Plan-ancestry + code-scan GDPR agent; gated on the gdpr regulatory profile.
+    parallel_safe: true
+
 # ===============================================================================
 #  IRON LOOP v2.1
 # ===============================================================================
