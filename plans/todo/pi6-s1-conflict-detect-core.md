@@ -333,50 +333,93 @@ hard-fails are falsifiable; barrel export reachable; no UI touched in this slice
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none — pure JS over shipped deps)
+- [x] Check prerequisites (related kind/limit passthrough, getFilesForPlan, listPlanPaths, globToRegex, getSetting confirmed)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (fixture dir already exists)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling (TypeError-only throw; fail-open everywhere else)
+- [x] Wire up integration points (barrel getter + settings-schema registration)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together (barrel through-call test green)
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (collectAllIndexFiles built lazily, once)
+- [x] Optimize critical paths (≤20 candidate reads via related cap; single-pass max-score grouping)
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal — opaque keys, no path math)
+- [x] Sanitize outputs (TypeError names only the arg; no state leak)
+- [x] No secrets in code
+- [x] Safe file operations (writes nothing; glob via audited ReDoS-safe globToRegex)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (eslint exit 0, no dynamic RegExp; tsc baseline-neutral at 89)
+- [x] Run ALL tests (TDD Green) — full suite # fail 0 (3126→3130 pass)
+- [x] Check coverage >= 80% (line 96.50% on conflict-detect.js)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (JSDoc + module header)
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed (n/a — internal lib slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed (falsifiability of the two AND hard-fails proven)
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **Settings-schema registration of `conflict_threshold`.** The plan states the
+  setting is "registered by PI1 alongside `duplicate_threshold`", but the shipped
+  `plan_index` schema in `src/lib/settings.js` only had `duplicate_threshold`. Since
+  `getSetting` reads solely from the on-disk settings file (no schema-default merge),
+  an unregistered key returns `undefined`. DECISION: additively register
+  `{ key: 'conflict_threshold', type: 'number', default: 0.78 }` in the schema (so the
+  settings UI can surface it) AND keep the module-level `DEFAULT_CONFLICT_THRESHOLD =
+  0.78` as the runtime fallback for when `getSetting` returns undefined/non-number/throws.
+  Belt-and-suspenders; matches the plan's stated default exactly.
+
+- **Fixture seed vector = section vector.** `related(kind:'section')` SEEDS from the
+  target plan's stored `__plan__` embedding (per related.js — no re-embed) and scans
+  section-kind units. So the seed must live in the SAME vector space as the sections.
+  DECISION: the test fixture upserts each plan's `__plan__` unit with the SAME baked
+  vector as its `goals` section unit, so cosine(target.__plan__, candidate.section)
+  equals the intended pinned value. (An orthogonal plan-level vector — my first
+  attempt — makes every section cosine ~0 and flags nothing.)
+
+- **`collectAllIndexFiles` computed lazily.** The plan's top-N-cap scenario requires
+  "≤20 candidate files-lookups". Eagerly enumerating every plan's files for the
+  broad-glob % would blow that count on a large index. DECISION: compute the index-wide
+  file set lazily — only the first time a flagged candidate actually carries a glob.
+  All-literal candidate sets (the common case) never pay the O(plans) enumeration, so
+  the per-candidate cost stays at a single capped `getFilesForPlan` read.
+
+- **tsc: two type errors fixed with a JSDoc cast + explicit row type (s1 precedent).**
+  `related`'s `embedder` param narrows tighter than the generic `Function` carried from
+  `opts.embedder`; and the `rows` array's `severity` inferred as `string` rather than
+  the literal union. DECISION: `embedder: /** @type {any} */ (embedder)` at the single
+  `related` call and an explicit `@type` annotation on `rows` — keeps tsc baseline-neutral
+  at 89 without weakening runtime behavior. (No need to require ./related directly; the
+  cast sufficed.)
+
+- **Branch coverage 71.59% vs 80% ideal — line coverage 96.50%.** The uncovered branches
+  are exclusively fail-open `catch` arms that only fire if the audited `globToRegex` or
+  `store.listPlanPaths` throws — conditions unreachable with the real dependencies, and
+  deliberately given NO injection seam (adding one would introduce a non-literal-RegExp /
+  sabotaged-glob path that the security posture forbids). DECISION: meet the mandated
+  line ≥80% (achieved 96.50%) and accept the branch shortfall on genuinely-unreachable
+  defensive catches rather than manufacture artificial sabotage seams.

@@ -1,0 +1,48 @@
+{
+  "_comment": "PI6-s1 conflict-detection fixture. 8-dim baked section vectors + files: arrays per plan. Cosine is computed against the TARGET's section vector. Vectors are hand-authored so the AND (similarity >= 0.78 AND files-overlap) resolves EXACTLY and deterministically — no live model. TARGET is plan A.",
+  "dimension": 8,
+  "plans": [
+    {
+      "planSlug": "auth-middleware-refactor",
+      "role": "target (A)",
+      "files": ["src/lib/auth.js", "src/hooks/PreToolUse.Bash.js"],
+      "sectionVec": [1, 0, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "planSlug": "auth-rate-limiting",
+      "role": "B: similar AND file-overlap -> FLAGGED",
+      "files": ["src/lib/auth.js"],
+      "sectionVec": [0.95, 0.31224989991991997, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "planSlug": "menu-layout-redesign",
+      "role": "C: file-overlap only, cosine < 0.78 -> NOT flagged",
+      "files": ["src/lib/auth.js"],
+      "sectionVec": [0.5, 0.8660254037844386, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "planSlug": "auth-token-docs",
+      "role": "D: similar only, NO file overlap -> NOT flagged",
+      "files": ["docs/auth.md"],
+      "sectionVec": [0.98, 0.19899748742132397, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "planSlug": "lib-wide-sweep",
+      "role": "E: broad glob src/lib/** matches A's literal + >50% of index -> FLAGGED, broad overlap",
+      "files": ["src/lib/**"],
+      "sectionVec": [0.9, 0.4358898943540674, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "planSlug": "auth-file-specific",
+      "role": "F: literal src/lib/auth.js (used against E/G glob tests)",
+      "files": ["src/lib/auth.js"],
+      "sectionVec": [0.92, 0.39191835884530846, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "planSlug": "commands-only",
+      "role": "G: glob src/commands/** — no overlap with A's src/lib/auth.js -> NOT flagged",
+      "files": ["src/commands/**"],
+      "sectionVec": [0.93, 0.3675595188745718, 0, 0, 0, 0, 0, 0]
+    }
+  ]
+}

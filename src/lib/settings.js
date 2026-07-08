@@ -100,7 +100,8 @@ const SETTINGS_SCHEMA = {
     settings: [
       { key: 'engine_preference', label: 'Embedding engine preference', type: 'select', options: ['auto', 'ollama', 'in-process'], default: 'auto' },
       { key: 'ollama_base_url', label: 'Ollama base URL', type: 'string', default: 'http://localhost:11434' },
-      { key: 'duplicate_threshold', label: 'Duplicate-guard threshold', type: 'number', default: 0.85 }
+      { key: 'duplicate_threshold', label: 'Duplicate-guard threshold', type: 'number', default: 0.85 },
+      { key: 'conflict_threshold', label: 'Conflict-detection threshold', type: 'number', default: 0.78 }
     ]
   }
   // NOTE: no `deployment` category here. Deployment is configured via the
