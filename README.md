@@ -8,12 +8,12 @@
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
   <img alt="Version" src="https://img.shields.io/badge/version-6.10.3-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
-  <img alt="Agents" src="https://img.shields.io/badge/agents-111-orange">
+  <img alt="Agents" src="https://img.shields.io/badge/agents-112-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **111 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **421-file skill library** (99 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **112 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **421-file skill library** (99 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -203,7 +203,7 @@ So choosing `dev` softens enforcement *unless* you've set `enforcementMode` your
 | Iterative refinement to zero findings | Refinement loop (incl. warnings) | None | None | None |
 | Human approval gates | 4 mandatory checkpoints | None | None | None |
 | Quality verification | Automated gate (Step 14) | Manual | Manual | None |
-| Specialist agents | 111 across 22 categories | None | DIY | None |
+| Specialist agents | 112 across 22 categories | None | DIY | None |
 | Specialist skill library (engineered, sourced) | 99 SKILL.md bodies through critique loop | None | None | None |
 | Production-readiness checklist | SaaS templates with 20+ block-severity checks | None | None | None |
 | Post-launch product loop | KPI library + experiment designer | None | None | None |
@@ -294,7 +294,7 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 
 - **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
-- **111 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, and more
+- **112 agents** across 22 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, and more
 - **421 skill files** — 99 Tier-2 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — Iterative critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) before Gate 3 — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
@@ -476,7 +476,7 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 
 ## Agents
 
-**111 agents across 22 categories** — [browse all →](agents/)
+**112 agents across 22 categories** — [browse all →](agents/)
 
 <details>
 <summary><strong>Full agent list</strong></summary>
@@ -816,7 +816,7 @@ ctoc/
 │   ├── tabs/        8 legacy tab modules (superseded by areas/, kept for drill-in flows)
 │   ├── scripts/     13 build/release utilities
 │   └── data/        Static data files
-├── agents/          111 agent definitions across 22 categories
+├── agents/          112 agent definitions across 22 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
 │                     async-choice-protocol, no-stub-rule, warnings-are-critical)
 ├── skills/          421 skill files: 99 Tier-2 specialist bodies (SKILL.md)

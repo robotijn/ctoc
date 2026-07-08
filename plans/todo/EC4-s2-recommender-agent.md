@@ -255,48 +255,73 @@ guard, and the no-gate pair are all asserted on the real file.
 ## Execution Plan (Steps 8–16)
 
 ### Step 8: TEST
-- [ ] Write `tests/eu-solution-recommender-agent.test.js` with the 13 content-contract cases (read
-      the real file fresh, split frontmatter, assert). Run — expect RED (agent file absent).
+- [x] Write `tests/eu-solution-recommender-agent.test.js` with the 13 content-contract cases (read
+      the real file fresh, split frontmatter, assert). Run — expect RED (agent file absent). DONE:
+      RED confirmed — all 13 failed with ENOENT (agent absent).
 
 ### Step 9: PREPARE
-- [ ] Confirm s1 shipped `src/lib/eu-recommender-helpers.js` (the five helper names the agent must
+- [x] Confirm s1 shipped `src/lib/eu-recommender-helpers.js` (the five helper names the agent must
       reference). Read the CURRENT `agents/compliance/eu-ai-act-agent.md` + `gdpr-agent.md`
       frontmatter shape fresh so the new agent matches the Tier-2 convention exactly. No new deps.
+      DONE: s1 present (5 helpers verified); sibling frontmatter mirrored (tools line = WebSearch,
+      WebFetch instead of Read, Grep).
 
 ### Step 10: IMPLEMENT
-- [ ] Create `agents/compliance/eu-solution-recommender.md` per the File Specification: the Tier-2
+- [x] Create `agents/compliance/eu-solution-recommender.md` per the File Specification: the Tier-2
       frontmatter with `tools: WebSearch, WebFetch`, and the body sections (Role, Input, Output,
       Deterministic layer, Web boundary, Verification + fallback, EU-region rule, Price as fact,
       Quality-rank criteria, No auto-select / no new gate, Rule authority (DRY)). Reference the five
-      s1 helpers by name; restate no rule; bake in no date/price literal. No stubs.
+      s1 helpers by name; restate no rule; bake in no date/price literal. No stubs. DONE.
 
 ### Step 11: REVIEW
-- [ ] Self-review: `tools:` is exactly `WebSearch, WebFetch` (no Bash/Edit/Write); all five s1
+- [x] Self-review: `tools:` is exactly `WebSearch, WebFetch` (no Bash/Edit/Write); all five s1
       helpers named; `self_hosted` (snake_case) used; no hardcoded price/date literal; DRY holds
       (nothing copied from s1 or the parent); the no-gate statement is present and no positive
-      "adds a new gate" claim exists.
+      "adds a new gate" claim exists. DONE — all asserted by the 13 GREEN cases.
 
 ### Step 12: OPTIMIZE
-- [ ] Keep the agent thin — reference authorities, do not duplicate; match the sibling agents'
-      length/structure.
+- [x] Keep the agent thin — reference authorities, do not duplicate; match the sibling agents'
+      length/structure. DONE — agent mirrors eu-ai-act-agent.md length/structure.
 
 ### Step 13: SECURE
-- [ ] Confirm the agent declares only web tools (cannot write/execute), adds no gate, and bakes in
-      no fabricated figure — all covered by the test's cases 3, 8, 10, 12.
+- [x] Confirm the agent declares only web tools (cannot write/execute), adds no gate, and bakes in
+      no fabricated figure — all covered by the test's cases 3, 8, 10, 12. DONE.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/eu-solution-recommender-agent.test.js` → all 13 GREEN, 0 skipped. Then
+- [x] `node --test tests/eu-solution-recommender-agent.test.js` → all 13 GREEN, 0 skipped. Then
       `node --test tests/*.test.js` → `# fail 0` (no regression; architecture-invariants + any
       agent-frontmatter test still green with the new agent). eslint `--max-warnings 0` exit 0.
+      DONE: slice test 13/13; full suite 3301 pass / 0 fail / 0 skipped; eslint exit 0; tsc
+      baseline-neutral (100 pre-existing src/ errors, none in this slice's files).
 
 ### Step 15: DOCUMENT
-- [ ] The agent file IS the documentation; ensure its Rule-authority (DRY) section names both
+- [x] The agent file IS the documentation; ensure its Rule-authority (DRY) section names both
       authorities. Add the test-file header comment stating this is the PI4 content-contract proof.
+      DONE. Also bumped agent count 111→112 in README (badge + 5 claims), CLAUDE.md, and
+      tests/readme-numbers.test.js.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Confirm all 13 cases pass, the DRY + no-gate + no-fabrication guards hold, and the web-boundary
+- [x] Confirm all 13 cases pass, the DRY + no-gate + no-fabrication guards hold, and the web-boundary
       fact is asserted. Plan stays in `implementation/` (executor does NOT cross Gate 2). Ready for
-      batched Gate 2 with EC4 siblings.
+      batched Gate 2 with EC4 siblings. DONE — plan left in place (not moved).
+
+## Decisions Taken Under Ambiguity
+
+- **`self-hosted` hyphenation in the frontmatter `description`.** Test case 6 forbids the hyphenated
+  `self-hosted` only in the BODY (the machine-readable bucket key must be snake_case `self_hosted`).
+  The frontmatter `description` is human-facing prose, and the sibling convention uses natural
+  English there. Kept the hyphenated `self-hosted` in the one-line `description:` (frontmatter,
+  human prose) and used snake_case `self_hosted` everywhere in the body (the contract). Rephrased the
+  Web-boundary prose "self-hosted projects" → "self_hosted deployables" to keep the body clean.
+- **`{ok:false}` phrasing in the fallback section.** Test case 9 requires the fail-soft fetch result
+  be named. Used the literal `{ ok: false }` form matching s1's `createFetcher` normalized return, so
+  the agent prose and the helper's actual contract are word-identical.
+- **tsc baseline.** The repo has 100 pre-existing `tsc --noEmit` errors, all under `src/`. This slice
+  ships only a markdown agent + a `.test.js` + doc edits — none typechecked into `src/`. Treated tsc
+  as baseline-neutral (confirmed none of this slice's files appear in the error list) rather than
+  attempting to fix unrelated pre-existing `src/` type errors.
+- **Plan not moved.** Per the executor brief for this slice ("Do NOT move the plan"), the plan file
+  stays in `plans/todo/`; only this slice's two whitelisted files were staged.
 
 
 ---
