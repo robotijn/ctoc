@@ -187,49 +187,49 @@ deduplicateFindings(ec2, ec3)
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/compliance-dedup.test.js` covering cases 1–10 above
-- [ ] Include the GATE-INVARIANT test (case 10)
-- [ ] Test error conditions (non-array inputs, frozen inputs, unknown refs)
-- [ ] Run tests — expect RED (module does not exist yet)
+- [x] Write `tests/compliance-dedup.test.js` covering cases 1–10 above
+- [x] Include the GATE-INVARIANT test (case 10)
+- [x] Test error conditions (non-array inputs, frozen inputs, unknown refs)
+- [x] Run tests — expect RED (module does not exist yet)
 
 ### Step 9: PREPARE
-- [ ] Confirm the parent's worked-example finding shapes (kind, regulation_ref, confidence)
-- [ ] No dependencies to install
+- [x] Confirm the parent's worked-example finding shapes (kind, regulation_ref, confidence)
+- [x] No dependencies to install
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/compliance-dedup.js`
-- [ ] Add frozen `REGULATION_TOPIC_TABLE` and `CONFIDENCE_ORDER`
-- [ ] Implement `normalizeRegulationRef`, `dedupKey`, `deduplicateFindings`
-- [ ] Merge-message augmentation naming both regulation sources
-- [ ] Export `{ deduplicateFindings, normalizeRegulationRef, dedupKey }`
+- [x] Create `src/lib/compliance-dedup.js`
+- [x] Add frozen `REGULATION_TOPIC_TABLE` and `CONFIDENCE_ORDER`
+- [x] Implement `normalizeRegulationRef`, `dedupKey`, `deduplicateFindings`
+- [x] Merge-message augmentation naming both regulation sources
+- [x] Export `{ deduplicateFindings, normalizeRegulationRef, dedupKey }`
 
 ### Step 11: REVIEW
-- [ ] Self-review: conservative-merge rule holds (different kind never merges)
-- [ ] Verify inputs are never mutated
-- [ ] Verify no gate key is referenced
+- [x] Self-review: conservative-merge rule holds (different kind never merges)
+- [x] Verify inputs are never mutated
+- [x] Verify no gate key is referenced
 
 ### Step 12: OPTIMIZE
-- [ ] Single grouping pass (Map); no repeated scans
-- [ ] Avoid building the merge message when a group has one member
+- [x] Single grouping pass (Map); no repeated scans
+- [x] Avoid building the merge message when a group has one member
 
 ### Step 13: SECURE
-- [ ] Frozen table; no untrusted key assignment
-- [ ] No secrets; no I/O
+- [x] Frozen table; no untrusted key assignment
+- [x] No secrets; no I/O
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests: `node --test tests/compliance-dedup.test.js`
-- [ ] Coverage ≥ 80%; 0 skipped, 0 flaky
-- [ ] Confirm gate-invariant test passes
+- [x] Run lint + type check
+- [x] Run ALL tests: `node --test tests/compliance-dedup.test.js`
+- [x] Coverage ≥ 80%; 0 skipped, 0 flaky
+- [x] Confirm gate-invariant test passes
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on all three exports
-- [ ] Comment documenting the conservative-merge table as data, not runtime regex
+- [x] JSDoc on all three exports
+- [x] Comment documenting the conservative-merge table as data, not runtime regex
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify Steps 8–15 completed
-- [ ] Merge / no-merge / gate-invariant tests green
-- [ ] Ready for human review
+- [x] Verify Steps 8–15 completed
+- [x] Merge / no-merge / gate-invariant tests green
+- [x] Ready for human review
 
 ## Decisions Taken Under Ambiguity
 

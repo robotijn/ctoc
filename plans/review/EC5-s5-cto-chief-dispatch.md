@@ -167,39 +167,39 @@ markdown with a REAL end-to-end flow through EC5-s4 + EC5-s3 against a tmp proje
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/cto-chief-compliance-dispatch.test.js` covering cases 1–7 above
-- [ ] Include the LIVE end-to-end flow (cases 3–6) driving the REAL Inbox + gates
-- [ ] Include the GATE-INVARIANT (case 7)
-- [ ] Run tests — expect RED (instruction not yet in the markdown)
+- [x] Write `tests/cto-chief-compliance-dispatch.test.js` covering cases 1–7 above
+- [x] Include the LIVE end-to-end flow (cases 3–6) driving the REAL Inbox + gates
+- [x] Include the GATE-INVARIANT (case 7)
+- [x] Run tests — expect RED (instruction not yet in the markdown)
 
 ### Step 9: PREPARE
-- [ ] Confirm EC5-s3 (`compliance-integration`) and EC5-s4 (`iron-loop-compliance-trigger`) are built (depends_on)
-- [ ] Confirm the tmp-project fixture writes real settings + both regime YAMLs
+- [x] Confirm EC5-s3 (`compliance-integration`) and EC5-s4 (`iron-loop-compliance-trigger`) are built (depends_on)
+- [x] Confirm the tmp-project fixture writes real settings + both regime YAMLs
 
 ### Step 10: IMPLEMENT
-- [ ] Add the compliance dispatch subsection to `agents/coordinator/cto-chief.md`
-- [ ] Reference the real functions (`evaluateComplianceTrigger`, `runComplianceForTransition`) and `dispatcher: "cto-chief"`
-- [ ] State advisory / no-new-gate / library-does-not-dispatch explicitly
-- [ ] Touch NO existing gate rule
+- [x] Add the compliance dispatch subsection to `agents/coordinator/cto-chief.md`
+- [x] Reference the real functions (`evaluateComplianceTrigger`, `runComplianceForTransition`) and `dispatcher: "cto-chief"`
+- [x] State advisory / no-new-gate / library-does-not-dispatch explicitly
+- [x] Touch NO existing gate rule
 
 ### Step 11: REVIEW
-- [ ] Self-review: instruction is traceable to the real code seam
-- [ ] Verify no human-gate rule was altered; 4 gates still described
+- [x] Self-review: instruction is traceable to the real code seam
+- [x] Verify no human-gate rule was altered; 4 gates still described
 
 ### Step 12: OPTIMIZE
-- [ ] Keep the instruction concise and adjacent to existing compliance dispatch guidance
+- [x] Keep the instruction concise and adjacent to existing compliance dispatch guidance
 
 ### Step 13: SECURE
-- [ ] No secrets; additive prose only; test uses tmp dirs
+- [x] No secrets; additive prose only; test uses tmp dirs
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests: `node --test tests/cto-chief-compliance-dispatch.test.js`
-- [ ] Coverage ≥ 80% on any exercised code; 0 skipped, 0 flaky
-- [ ] Confirm live-flow + dispatcher-identity + gate-invariant tests pass
+- [x] Run lint + type check
+- [x] Run ALL tests: `node --test tests/cto-chief-compliance-dispatch.test.js`
+- [x] Coverage ≥ 80% on any exercised code; 0 skipped, 0 flaky
+- [x] Confirm live-flow + dispatcher-identity + gate-invariant tests pass
 
 ### Step 15: DOCUMENT
-- [ ] The instruction itself is the documentation; ensure it names the seam + dispatcher
+- [x] The instruction itself is the documentation; ensure it names the seam + dispatcher
 
 ### Step 16: FINAL-REVIEW
 - [x] Verify Steps 8–15 completed
