@@ -1,0 +1,102 @@
+# Shared compliance fixture manifest (EC6-s1)
+#
+# The single machine-readable source of truth for the shared compliance fixtures
+# under tests/fixtures/compliance/. tests/compliance-fixtures.test.js drives the
+# SHIPPED, pure classifier (src/lib/eu-ai-act-helpers.js:classifyFromPlanText)
+# against each plan fixture on disk and asserts the returned
+# { risk_class, annex_iii_category, confidence } triple matches the
+# expected_* fields below, and that every GDPR article referenced here is a
+# member of src/lib/gdpr-helpers.js:VALID_GDPR_ARTICLES.
+#
+# JS-ASSERTED contract  = the classification triple + GDPR-article membership.
+# METADATA (not JS-asserted, agent/skill layer) = the finding_kinds maps; these
+#   are produced by the agent prose + skill, not by any shipped JS export, and are
+#   tracked here + covered by fixtures + manual review (per the parent EC6
+#   "coverage scoped to JS files" decision). No fabricated legal claims: every
+#   regulation_ref points at a real Article of the real regulation.
+#
+# skill_version pins the compliance-skill baseline these expectations were
+# authored against (drift mitigation): CTOC VERSION + the two skills whose
+# deterministic cores this fixture set exercises.
+
+skill_version: "ctoc-6.10.3 (gdpr-compliance-checker + ai-governance-checker)"
+
+fixtures:
+
+  pii-collecting-plan.md:
+    regime: gdpr
+    # Each field must resolve via mapPiiFieldToArticles() to a subset of
+    # VALID_GDPR_ARTICLES (asserted by the fixture-driven GDPR test).
+    pii_fields: [email, ipAddress]
+    finding_kinds:
+      missing-consent-banner:
+        gdpr_article: GDPR-7
+        regulation_ref: "GDPR Art. 7 (conditions for consent)"
+        confidence: high
+      missing-article-13-notice:
+        gdpr_article: GDPR-13
+        regulation_ref: "GDPR Art. 13 (information at collection)"
+        confidence: high
+      non-eu-transfer-without-sccs-dpf:
+        gdpr_article: GDPR-Chapter-V
+        regulation_ref: "GDPR Chapter V (international transfers)"
+        confidence: medium
+
+  annex-iii-ai-plan.md:
+    regime: eu-ai-act
+    # Asserted against the shipped classifier output for the real file text.
+    expected_risk_class: high-risk
+    expected_annex_iii_category: 4-employment
+    expected_confidence: medium
+    finding_kinds:
+      missing-inventory:
+        regulation_ref: "EU-AI-Act Art. 11 (technical documentation)"
+        confidence: high
+      missing-technical-docs:
+        regulation_ref: "EU-AI-Act Art. 11 + Annex IV"
+        confidence: medium
+      missing-oversight:
+        regulation_ref: "EU-AI-Act Art. 14 (human oversight)"
+        confidence: medium
+
+  prohibited-practice-plan.md:
+    regime: eu-ai-act
+    expected_risk_class: prohibited
+    expected_annex_iii_category: null
+    expected_confidence: high
+    finding_kinds:
+      prohibited-use-detected:
+        regulation_ref: "EU-AI-Act Art. 5 (prohibited practices)"
+        penalty_ref: "EU-AI-Act Art. 99 (up to EUR 35M or 7% of worldwide annual turnover)"
+        severity: critical
+        confidence: high
+
+  sample-pii-code.js:
+    regime: gdpr
+    finding_kinds:
+      missing-consent-banner:
+        gdpr_article: GDPR-7
+        regulation_ref: "GDPR Art. 7 (conditions for consent)"
+        confidence: high
+      non-eu-transfer-without-sccs-dpf:
+        gdpr_article: GDPR-Chapter-V
+        regulation_ref: "GDPR Chapter V (international transfers)"
+        confidence: medium
+
+  sample-ai-act-code.js:
+    regime: eu-ai-act
+    finding_kinds:
+      missing-oversight:
+        regulation_ref: "EU-AI-Act Art. 14 (human oversight)"
+        confidence: medium
+      missing-inventory:
+        regulation_ref: "EU-AI-Act Art. 11 (technical documentation)"
+        confidence: high
+
+# Regulatory-completeness gaps this shared fixture set does NOT yet exercise —
+# tracked, not hidden, so a later slice can fill them deliberately (the user
+# schedules; this only reports the technical gap).
+coverage_gaps:
+  gdpr_articles_uncovered: [GDPR-9, GDPR-14, GDPR-15, GDPR-20, GDPR-28, GDPR-30, GDPR-33, GDPR-34, GDPR-37]
+  ai_act_categories_uncovered: [1-biometrics, 2-critical-infrastructure, 3-education, 5-essential-services, 6-law-enforcement, 7-migration, 8-justice]
+  regimes_uncovered: [limited-risk-transparency, gpai-provider]

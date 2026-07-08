@@ -303,56 +303,98 @@ adds only test data + a read-only test).
   for the agent/skill scanner; a test that `require`d them would execute fixture code —
   rejected. The manifest-completeness test asserts existence + non-empty content only.
 
+### Decisions taken during execution (EC6-s1 build)
+
+- **YAML reader = the repo's own zero-dep `src/lib/budget.js:parseYaml`, NOT `js-yaml`.**
+  The plan directed "reuse the repo's existing YAML reader, add no dependency." `js-yaml`
+  resolves at runtime only transitively (via eslint) and is NOT a declared dependency —
+  relying on it would break on a clean install and violates "add no dependency." So the
+  test imports `parseYaml` from `budget.js`. Consequence: `budget.js:parseYaml` supports
+  nested maps + scalars + inline arrays, but NOT YAML block sequences (`- item`) or
+  inline flow maps (`{ k: v }`). The manifest was therefore authored in a FLATTENED shape
+  — `finding_kinds` is a nested MAP keyed by finding-kind name (not a sequence of flow
+  maps as the plan's illustrative example showed), and `pii_fields` / `coverage_gaps`
+  lists use inline-array syntax. Same information, parser-compatible representation.
+
+- **`skill_version` pinned to a REAL, verifiable value.** The two compliance SKILL.md
+  files (`gdpr-compliance-checker`, `ai-governance-checker`) carry no `version:`
+  frontmatter field, so there was no per-skill version string to cite. To avoid a
+  fabricated number, `skill_version` pins the repo's actual `VERSION` (6.10.3) plus the
+  two skill names whose deterministic cores the fixtures exercise:
+  `"ctoc-6.10.3 (gdpr-compliance-checker + ai-governance-checker)"`.
+
+- **Fixture prose verified against the SHIPPED regexes before authoring.** The Annex III
+  fixture uses "screening résumés and ranking candidates for a hiring decision"
+  (matches `ANNEX_III_PATTERNS` employment entry → `4-employment`); the prohibited fixture
+  uses "real-time remote biometric identification" (matches `PROHIBITED_PATTERNS`). Both
+  were run through `classifyFromPlanText` from source and produce the documented triples
+  deterministically.
+
+- **No fabricated legal claims.** Every `regulation_ref` cites a real Article: GDPR Arts.
+  6/7/13/17 + Chapter V; EU-AI-Act Arts. 5/11/14 + Annex IV; the prohibited-practice
+  penalty tier cites Art. 99 (up to EUR 35M or 7% of worldwide annual turnover), which is
+  the Act's actual top tier for Art. 5 infringements.
+
+### VERIFY results (exact numbers)
+- (a) RED→GREEN: RED 10 tests / 0 pass / 10 fail → GREEN 10 tests / 10 pass / 0 fail / 0 skipped.
+- (b) `node --test tests/compliance-fixtures.test.js`: 10 pass, 0 fail, 0 skipped.
+- (c) Real classifier proof: test reads each fixture via `path.join(__dirname,'fixtures','compliance',name)` + `fs.readFileSync`, calls the shipped `require('../src/lib/eu-ai-act-helpers.js').classifyFromPlanText`, asserts the returned triple vs manifest. No mock/stub of the classifier (grep: only the comment stating it is never mocked).
+- (d) Every manifest GDPR article ∈ VALID_GDPR_ARTICLES: GDPR-7, GDPR-13, GDPR-Chapter-V — all members (asserted by the "every GDPR finding-kind references a real article" test).
+- (e) `node --test tests/*.test.js`: 3388 tests, 3388 pass, # fail 0, 0 skipped.
+- (f) `npx eslint . --max-warnings 0`: exit 0.
+- (g) tsc: baseline-neutral — 89 pre-existing errors with slice removed, 89 with slice present; none reference any slice file.
+- (h) No README module bump: `tests/readme-numbers.test.js` 47/47 pass (test data + test only; no new src/lib module).
+
 
 ---
 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 10 tests, 0 pass, 10 fail (fixtures/manifest absent)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none added; reused repo's zero-dep `budget.js:parseYaml`
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — created `tests/fixtures/compliance/`
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — 6 fixtures + manifest created
+- [x] Add error handling — every fixture load asserts existence + non-empty
+- [x] Wire up integration points — manifest keys match test expectations exactly
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — fixtures deterministic vs shipped regexes; cross-platform paths
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single `loadFixture(name)` helper
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — all paths `path.join(__dirname, 'fixtures', 'compliance', <literal>)`
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations — read-only; fixtures loaded as text, never `require`d
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `npx eslint . --max-warnings 0` exit 0; tsc baseline-neutral (89→89, none in slice)
+- [x] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → 3388 pass, # fail 0
+- [x] Check coverage >= 80% — N/A (adds test data + test, no new src/lib module; readme-numbers 47/47 green)
+- [x] 0 skipped, 0 flaky tests — slice 10/10 pass, 0 skipped
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — header doc block in `tests/compliance-fixtures.test.js`
+- [x] Add JSDoc comments to new functions — `loadFixture` / `loadManifest` documented
+- [x] Update CHANGELOG if needed — N/A (test-only slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
