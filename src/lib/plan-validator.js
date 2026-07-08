@@ -90,6 +90,9 @@ function validateForReview(planPath, projectPath) {
   result.warnings.push(...instructionValidation.warnings);
   result.checklist.instructions = instructionValidation.checklist;
 
+  // 6. SIP1: a dangling parent_plan is a WARNING at the review gate (never blocks).
+  mergeParentPlanWarnings(result, content, projectPath);
+
   return result;
 }
 
@@ -690,6 +693,7 @@ function validateForExecution(planPath, projectPath) {
  * Validate plan before adding to queue
  */
 function validateForQueue(planPath, projectPath) {
+  projectPath = projectPath || findProjectRoot();
   const content = safeFs.readFileSync(planPath, 'utf8');
 
   const result = {
@@ -709,6 +713,111 @@ function validateForQueue(planPath, projectPath) {
   if (!hasTitle) {
     result.errors.push('Plan missing title (# heading)');
     result.valid = false;
+  }
+
+  // SIP1: a dangling parent_plan reference is a WARNING (never blocks the queue
+  // gate) — merge only warnings, never flip `valid`.
+  mergeParentPlanWarnings(result, content, projectPath);
+
+  return result;
+}
+
+/**
+ * Merge the (warning-only) result of validateParentPlan into a gate result.
+ * Never copies errors and never flips `valid` — a dangling parent is soft
+ * (SIP1 D-VP-3): filesystem links are eventually consistent.
+ *
+ * @param {ValidationResult} result - the gate result to mutate
+ * @param {string} content - plan file content
+ * @param {string} projectPath - project root
+ */
+function mergeParentPlanWarnings(result, content, projectPath) {
+  const parentResult = validateParentPlan(content, projectPath);
+  result.warnings.push(...parentResult.warnings);
+  result.checklist.parentPlan = parentResult.checklist;
+}
+
+/**
+ * Scan the plan stage directories for a plan file whose slug matches `slug`.
+ * Read-only, cross-platform, traversal-safe: `slug` is compared by
+ * `path.basename(f, '.md')` only — it is NEVER joined into a filesystem path,
+ * so a malicious `parent_plan: ../../etc` simply matches nothing.
+ *
+ * A leading stage prefix on the value (e.g. `implementation/SIP1`) is tolerated:
+ * only the final path segment is compared.
+ *
+ * @param {string} projectPath - project root
+ * @param {string} slug - the parent_plan value (bare slug or `stage/slug`)
+ * @returns {boolean} true iff some `plans/<stage>/<slug>.md` exists
+ */
+function planSlugExists(projectPath, slug) {
+  if (typeof slug !== 'string' || slug.length === 0) return false;
+  // Strip any leading stage prefix / directory portion; compare the bare name.
+  const bare = path.basename(String(slug).replace(/\.md$/i, ''));
+  if (bare.length === 0 || bare === '.' || bare === '..') return false;
+
+  const stages = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
+  const plansDir = path.join(projectPath, 'plans');
+
+  for (const stage of stages) {
+    const dir = path.join(plansDir, stage);
+    if (!safeFs.existsSync(dir)) continue;
+    let entries;
+    try {
+      entries = safeFs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const f of entries) {
+      if (!f.endsWith('.md')) continue;
+      if (path.basename(f, '.md') === bare) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Validate the optional `parent_plan` frontmatter field (SIP1).
+ *
+ * - Absent `parent_plan` → clean pass (top-level plans have no parent).
+ * - Present + resolvable → accepted (recognized, no warning).
+ * - Present + dangling (names no plan under plans/) → WARNING, never an error,
+ *   never flips `valid` to false (D-VP-3: filesystem links are eventually
+ *   consistent, mirroring how `parent_vision` links stubs).
+ *
+ * Never throws on plan content; returns a ValidationResult.
+ *
+ * @param {string} content - plan file content
+ * @param {string} projectPath - project root
+ * @returns {ValidationResult}
+ */
+function validateParentPlan(content, projectPath) {
+  projectPath = projectPath || findProjectRoot();
+
+  const result = {
+    valid: true,
+    errors: [],
+    warnings: [],
+    checklist: {}
+  };
+
+  const metadata = parseMetadata(content);
+  const parent = metadata.parent_plan;
+
+  // Optional field: absent → clean pass.
+  if (parent === undefined || parent === null || parent === '' || parent === 'none') {
+    result.checklist.parentPlan = { present: false, resolved: null };
+    return result;
+  }
+
+  const parentSlug = String(parent);
+  const exists = planSlugExists(projectPath, parentSlug);
+  result.checklist.parentPlan = { present: true, value: parentSlug, resolved: exists };
+
+  if (!exists) {
+    result.warnings.push(
+      `parent_plan "${parentSlug}" names no existing plan (dangling reference)`
+    );
   }
 
   return result;
@@ -879,6 +988,7 @@ module.exports = {
   validateFunctionalToImpl,
   validateVisionForDecomposition,
   validateReviewToDone,
+  validateParentPlan,
   validateNoContradictions,
   validateTransition,
   validateStepLabels,

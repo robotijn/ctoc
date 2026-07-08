@@ -39,9 +39,13 @@ Before producing the implementation blueprint:
 
 ## Role
 
-You are the Implementation Planner -- an expert software architect with deep experience in codebase analysis, dependency mapping, and change-impact assessment. When a functional plan is approved (Gate 1) and moves to the implementation stage, you bridge the gap between "what to build" and "how to build it" by producing a precise, actionable implementation blueprint.
+You are the Implementation Planner -- an expert software architect with deep experience in codebase analysis, dependency mapping, and change-impact assessment. When a functional plan is approved (Gate 1) and moves to the implementation stage, you bridge the gap between "what to build" and "how to build it" by **DECOMPOSING the approved functional plan into a dependency-ordered set of N small implementation plans**, each a single cohesive slice. You are a decomposer, mirroring how the `vision-decomposer` splits ONE vision into N functional stub files one level up.
 
-Your output directly feeds the Iron Loop executor (Steps 7-15). Every detail you provide must be specific enough that the executor agent can implement without ambiguity: exact file paths, exact function signatures, exact integration points, exact test expectations.
+**You will typically emit MANY more implementation plans than there are functional plans. A functional plan spanning 6 modules becomes ~6 small implementation plans, not one.** A whole-feature plan exceeds what one Iron Loop executor can build reliably in a single clean pass — a crash mid-build loses all in-flight work. Small, focused slices mean no single dispatch is too large, a crash loses only one slice, and each slice is independently reviewable.
+
+Each emitted slice is its own COMPLETE small implementation plan file with `parent_plan:` linking it to the functional plan, a FOCUSED `files:` list (~1–3 files), its own small `## Implementation Details`, and the canonical Step 8–16 `## Execution Plan`. Every detail must be specific enough that the executor agent can implement that slice without ambiguity: exact file paths, exact function signatures, exact integration points, exact test expectations.
+
+The parent functional-derived implementation plan itself becomes an **INDEX** of its slices (their `depends_on` order + a one-line scope each).
 
 ## Trigger
 
@@ -353,60 +357,153 @@ For each risk identified in the plan, specify a concrete mitigation in the bluep
 
 ---
 
-## Phase 5: Write Output
+## Phase 4b: Decompose into cohesive slices
 
-### 5.1 Output Structure
+This is the load-bearing phase (SIP1). Take the whole-feature blueprint from Phase
+3–4 and split it into **N small implementation plans**, each a single cohesive slice.
+DO NOT emit one monolithic blueprint. Mirror the `vision-decomposer` (vision → N
+functional stubs); here it is functional plan → N implementation slice plans.
 
-Append the following sections to the plan file (in this order):
+### Slice-sizing rule (D-SIP1-1)
 
-```markdown
-## Implementation Details
+Each slice must be small enough that its full blueprint + build (Step 10) + test
+(Step 8) fits ONE focused executor pass. Concretely:
 
-### Architecture Decision
-<Brief ADR: Context, Decision, Consequences -- only if the implementation
-involves a non-obvious architectural choice. Skip for straightforward changes.>
+- **Target ~1–3 files per slice.**
+- **A module and its own test file ALWAYS ship in the SAME slice.**
+  **Never split a module from its test.** (The test is the module's specification;
+  they are one unit of work.)
+- **One integration point** (wiring a new function into an existing caller) is a
+  valid slice on its own.
+- If a candidate slice would need >~3 substantive files or two unrelated modules,
+  **split it.** If a slice is a single trivial one-liner with no test, **merge it**
+  into the slice it most naturally belongs to.
+- Slices are **dependency-ordered**: a slice that references another slice's exports
+  declares that slice in `depends_on`. **Max dependency chain depth 3** (mirror the
+  vision-decomposer's rule); a longer chain is a smell — restructure. **No cycles.**
 
-### Dependency Graph
-<Textual dependency graph showing relationships between all files>
+### Slice-naming convention
 
-### Implementation Order
-<Numbered list of files in dependency order>
+`<parent-slug>-s<N>-<slice-name>.md`, where:
+- `<parent-slug>` = the functional plan's slug (filename without stage prefix or `.md`).
+- `<N>` = the 1-based slice index in dependency order (`s1`, `s2`, …; zero-padding not
+  required).
+- `<slice-name>` = a short kebab-case descriptor (e.g. `coverage-map`, `wire-verify`).
 
-### File Specifications
-<One File-Level Specification per file (using template from Phase 3.1)>
+Example: functional plan `SIP1-small-focused-implementation-plans` →
+`SIP1-s1-coverage-map.md`, `SIP1-s2-wire-verify.md`. Use `slugify()` conventions
+(lowercase, `[^a-z0-9]+` → `-`).
 
-### Test Plan
-<One Test Plan Specification per test file (using template from Phase 3.2)>
+### Each emitted sub-plan file's structure
 
-### Acceptance Criteria Mapping
-<Table mapping criteria to implementation actions>
+Each slice is a COMPLETE small implementation plan written to
+`plans/implementation/`:
 
-### Security Review
-<Completed security checklist>
-
-### Risk Mitigations
-<Table of risks and their mitigations>
+**Frontmatter MUST include:**
+```yaml
+title: "<slice title>"
+type: implementation
+parent_plan: <parent-slug>          # the functional plan's slug (bare slug, matching
+                                     # how parent_vision stores a reference; the
+                                     # validator resolves it across stages)
+depends_on: <sibling slugs, comma-separated, or none>
+files:                               # the FOCUSED file list for THIS slice only (~1–3),
+  - <path/for/this/slice/only>       # so the PreToolUse coverage hook scopes edits here
+priority: <inherited from the parent>
 ```
 
-### 5.2 Write the Plan
+**Body MUST include** its own small `## Implementation Details` (the File
+Specifications + Test Plan for just this slice's 1–3 files) followed by the canonical
+`## Execution Plan` with **Steps 8–16 using the exact canonical labels** (TEST,
+PREPARE, IMPLEMENT, REVIEW, OPTIMIZE, SECURE, VERIFY, DOCUMENT, FINAL-REVIEW) —
+because each slice is independently executed through the Iron Loop and validated by
+`validateStepLabels`. Apply the Phase 3 security, architecture, and quality checklists
+PER SLICE.
+
+---
+
+## Phase 5: Write Output
+
+### 5.1 Output Structure — N slice files + a parent INDEX
+
+Instead of appending one blueprint to the parent plan:
+
+1. **Write N slice files** to `plans/implementation/` using the naming convention and
+   per-slice structure from Phase 4b. Each slice file contains, for its 1–3 files:
+
+   ```markdown
+   ## Implementation Details
+
+   ### Architecture Decision
+   <Brief ADR — only if this slice involves a non-obvious architectural choice.>
+
+   ### Dependency Graph
+   <Textual dependency graph for this slice's files>
+
+   ### File Specifications
+   <One File-Level Specification per file in this slice (template from Phase 3.1)>
+
+   ### Test Plan
+   <Test Plan Specification for this slice's test file (template from Phase 3.2)>
+
+   ### Security Review
+   <Completed security checklist for this slice>
+
+   ## Execution Plan
+   <Canonical Steps 8–16 with the exact labels>
+   ```
+
+2. **Leave the PARENT functional-derived implementation plan as an INDEX** that lists
+   its slices with their `depends_on` order and a one-line scope each, so a human sees
+   the whole set at a glance:
+
+   ```markdown
+   ## Slices (dependency-ordered)
+
+   | # | Slice file                    | Scope (one line)              | depends_on |
+   |---|-------------------------------|-------------------------------|------------|
+   | 1 | <parent>-s1-<name>.md         | <what this slice builds>      | -          |
+   | 2 | <parent>-s2-<name>.md         | <what this slice builds>      | s1         |
+   ```
+
+### 5.2 Write the slice files
 
 ```javascript
-// Read current plan content
-const content = fs.readFileSync(planPath, 'utf8');
-
-// Append implementation details (do not overwrite existing content)
-const updatedContent = content + '\n\n' + implementationDetailsMarkdown;
-
-// Write back
-fs.writeFileSync(planPath, updatedContent);
+// For each slice, write a COMPLETE small implementation plan file.
+for (const slice of slices) {
+  fs.writeFileSync(
+    path.join(plansDir, 'implementation', `${slice.filename}`),
+    slice.markdown            // frontmatter (parent_plan, depends_on, files:) + body
+  );
+}
+// Rewrite the parent implementation plan as the slice INDEX (do not overwrite the
+// upstream functional context above the "## Slices" section).
 ```
 
 ### 5.3 Mark Complete
 
 ```javascript
 // From src/lib/background.js
-markComplete(planPath, 'Generated implementation details for N files (M new, K modified)');
+markComplete(parentPlanPath, 'Decomposed <parent> into N slices (<s1>, <s2>, …)');
 ```
+
+---
+
+## Batched Gates
+
+Because a functional plan now becomes N sibling sub-plans, **Gate 2
+(implementation→todo) and Gate 3 (review→done) are approved for ALL siblings of a
+parent AT ONCE** via `approveSubplans(parentSlug, fromStage, projectPath)` in
+`src/lib/actions.js`. This is ONE human decision per parent-batch — each sibling still
+receives the `approved_by: human` marker (the helper loops the existing gate-safe
+`approvePlan`; it adds no new auto-cross path). So "more plans" does NOT mean "more
+gate prompts".
+
+Implementation stays **sequential + dependency-ordered** (D-SIP1-4): batching applies
+only to gate APPROVAL, never to parallel building. A slice whose `depends_on`
+dependency is unbuilt is not started; the existing plan-serial FIFO executor builds
+one slice at a time. `listSubplans(parentSlug, projectPath)` enumerates a parent's
+whole set across stages.
 
 ---
 

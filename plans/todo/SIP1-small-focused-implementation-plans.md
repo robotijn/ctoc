@@ -813,56 +813,99 @@ case. No gap.
   single-slice implementation plan, NOT a set of `parent_plan`-linked sub-plans. The
   feature applies to FUTURE functional plans processed by the rewritten planner.
 
+### Decisions taken during execution (Steps 8–16, 2026-07-08)
+
+- **D-EXEC-1 (test granularity — 13 scenarios expressed as 16 `it()` blocks):** the
+  plan's 13 named cases are all present; three were split into their own `it()` for
+  clean isolation — the case-13 prose contract became three separate assertions
+  (`implementation-planner.md`, `IRON_LOOP.md`, `CLAUDE.md`), and an extra
+  `approveSubplans` missing-`parentSlug` guard test was added alongside the bad-stage
+  throw. Net: 16 test cases, all green, every required scenario covered plus two
+  defensive extras.
+- **D-EXEC-2 (`mergeParentPlanWarnings` private helper):** to wire the warning-only
+  `validateParentPlan` into BOTH `validateForQueue` and `validateForReview` without
+  duplicating the "push warnings, never errors, never flip valid" logic, a small
+  private `mergeParentPlanWarnings(result, content, projectPath)` was added. It copies
+  ONLY `warnings` (plus a `checklist.parentPlan` entry) — it structurally cannot flip
+  a gate to invalid. This keeps the soft-link guarantee (D-VP-3) in one place.
+- **D-EXEC-3 (`validateForQueue` now resolves `projectPath`):** `validateForQueue`
+  previously ignored its `projectPath` arg; it now defaults it via `findProjectRoot()`
+  (matching `validateForReview`) so the parent-plan scan has a root. No behavior change
+  for existing callers (the actions.js gate path always passes an explicit root).
+- **D-EXEC-4 (`parseDependsOn` local to actions.js):** `depends_on` parsing (comma
+  split, `none`/absent → `[]`) lives as a private helper in actions.js, consumed by
+  both `listSubplans` (to populate `dependsOn`) and `topoOrderByDependsOn`. Pure string
+  ops, no regex on plan input (prototype-pollution-safe).
+- **D-EXEC-5 (prose phrasing pinned to the contract test):** the "never split a module
+  from its test" sentence is kept on a single line in `implementation-planner.md` so
+  the prose-contract regex matches without being weakened — the assertion stays strict.
+
+### Verification results (2026-07-08)
+
+- RED→GREEN: new suite 16 tests → RED 0 pass / 16 fail (missing exports) → GREEN 16
+  pass / 0 fail / 0 skipped.
+- No-auto-cross proof: a `parent_plan` sub-plan with NO `approveSubplans` call stays in
+  `implementation/` carrying no `approved_by: human`; the call crosses it to `todo/`
+  and stamps `approved_by: human` (via the existing gate-safe `approvePlan` — no new
+  cross path).
+- Full suite: `node --test tests/*.test.js` → 2992 tests, 2992 pass, 0 fail, 0 skipped,
+  0 todo (existing actions/validator/gate suites green — `approvePlan` unchanged).
+- `npx eslint . --max-warnings 0` → exit 0. `npx tsc --noEmit` baseline-neutral (0 new
+  error types on `actions.js`/`plan-validator.js`; same 4 pre-existing categories before
+  and after). `readme-numbers.test.js` → 47/47 (no top-level lib module added).
+- `parent_plan` validation confirmed warning-only: dangling parent never flips `valid`,
+  never adds an error, at both the queue and review gates.
+
 
 ---
 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (`tests/subplan-decomposition.test.js`, 16 cases)
+- [x] Test error conditions (missing parentSlug, bad fromStage, invalid sibling, dangling parent)
+- [x] Run tests - expect RED (failing) — RED confirmed: 0 pass / 16 fail (missing exports)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none — node:test built-in)
+- [x] Check prerequisites (state.js exports readPlans/getPlansDir/parseMetadata; plan-validator exports validateForQueue/validateReviewToDone)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (tmp fixtures created per-test)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (validateParentPlan + planSlugExists + wiring; listSubplans + approveSubplans + topoOrderByDependsOn; planner rewrite; IRON_LOOP + CLAUDE docs)
+- [x] Add error handling (throw on missing parentSlug / bad fromStage; per-sibling try/catch → skipped)
+- [x] Wire up integration points (validateForQueue + validateForReview merge parent-plan warnings; approveSubplans loops approvePlan)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code (approveSubplans composes approvePlan — no re-implemented gate; validateParentPlan warns-only; validator ⟂ actions layering intact)
+- [x] Verify integration points work together (gate-wiring test green)
+- [x] Check error handling completeness (fail-safe reports-not-aborts test green)
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths (planSlugExists uses readdirSync — names only, not full readPlans)
+- [x] Simplify complex code (single topo pass; parseDependsOn shared)
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — parent_plan basename-compared only, never joined into a path
+- [x] Sanitize outputs (skipped reasons are plan-public data)
+- [x] No secrets in code
+- [x] Safe file operations (only approvePlan→movePlan writes; listSubplans/validateParentPlan read-only)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral (0 new error types)
+- [x] Run ALL tests (TDD Green) — 2992 pass / 0 fail; new suite 16/16
+- [x] Check coverage >= 80% (every branch of the 5 new functions exercised)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (IRON_LOOP.md 1→N + batched gates; CLAUDE.md terse note; implementation-planner.md Phase 4b)
+- [x] Add JSDoc comments to new functions (listSubplans, approveSubplans, topoOrderByDependsOn, parseDependsOn, validateParentPlan, planSlugExists, mergeParentPlanWarnings)
+- [x] Update CHANGELOG if needed (n/a — version bump handled at release)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed (no-auto-cross proof executed)
+- [ ] Ready for human review (Gate 2/Gate 3 — HUMAN GATE, not crossed by executor)
