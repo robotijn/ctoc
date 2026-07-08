@@ -361,7 +361,43 @@ the only callable), enforcing the parent's "injectable-fetcher-is-the-sole-web-b
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review (batched Gate 2 with EC4 siblings — plan NOT moved by executor)
+
+## Decisions Taken Under Ambiguity (EC4-s1)
+
+1. **Zero runtime imports.** The plan permitted an optional `require('./safe-fs')` if
+   `applyFallback` read a skill-documented figure from disk. Chose the plan's PREFERRED path:
+   the figure is passed IN by the caller (`applyFallback(option, skillDocumentedFigure, fieldName)`),
+   keeping the function pure. Result: the module imports nothing at all — no gate, no
+   `compliance-regime.js`, no `safe-fs`, no sibling — fully isolated and unit-testable, matching
+   the `eu-ai-act-helpers.js` "stays independently testable" discipline.
+
+2. **`createFetcher` is fail-soft over BOTH sync and async injected calls.** The spec described a
+   try/catch returning `{ ok:false, error }`. A synchronous try/catch alone would let a rejected
+   Promise (the realistic shape for `WebFetch`/rate-limit `429`) escape. Added a thenable branch in
+   `normalizeCall`: if the injected call returns a Promise, chain it so a rejection also becomes
+   `{ ok:false, error }` and a resolution becomes `{ ok:true, data }`. This honors the parent's
+   "no crash, no block" metric for the real async tool handles without changing the sync contract
+   the tests assert. Every thrown non-Error is wrapped in `new Error(String(e))` so `.error` is
+   always an `Error`.
+
+3. **Monotonicity = strictly increasing (uniqueness folded in).** The parent said "monotonically
+   non-decreasing AND unique". With uniqueness, non-decreasing collapses to strictly increasing.
+   Implemented exactly that: `rank[i] > prev` AND no repeat (tracked in a `Set`), with distinct,
+   named error messages for the two distinguishable offenses — `duplicate quality_rank <n>` (checked
+   first, so an equal-value repeat reports as a duplicate) vs. `not monotonic at index <i>` (a
+   strict decrease). `quality_rank` is additionally required to be a positive integer.
+
+4. **`EVALUATIVE_PRICE_PATTERNS` JSDoc typed `readonly RegExp[]`.** `Object.freeze([...])` yields a
+   readonly array under `--checkJs`; annotating it `RegExp[]` (mutable) added one TS4104 error
+   (baseline would regress 89→90). Corrected the JSDoc to `readonly RegExp[]` — the accurate type,
+   never a suppression. tsc stayed baseline-neutral at 89.
+
+5. **Pre-existing full-suite failures are out of scope.** `tests/iron-loop-enforcer.test.js`'s two
+   "live repo state" cases fail with `Block findings: ["gate-destinations-approved"]` on the CLEAN
+   tree (verified via `git stash` of all four EC4-s1 files — the failures persisted with my changes
+   removed). This is a plan sitting at a gate destination without an `approved_by: human` marker,
+   unrelated to this slice. Not touched.
