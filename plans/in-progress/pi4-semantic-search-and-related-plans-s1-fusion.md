@@ -224,50 +224,76 @@ no-op holds; RRF constant is the single exported source of truth s2 will import.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — confirmed: pass 0 / fail 1 (import fails, fusion.js absent)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (node:test built in)
+- [x] Check prerequisites — `src/lib/plan-index/` exists
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none; confirmed no pre-existing fusion.js (clean CREATE)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — RRF_K, fuseRRF, reciprocalRank
+- [x] Add error handling — TypeError on all bad-input paths
+- [x] Wire up integration points — leaf module; s2 will import (no wiring here)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — leaf (no imports), tie-break deterministic, k plumbed via opts, matches plan-index/*.js style ('use strict', JSDoc, module.exports at bottom)
+- [x] Verify integration points work together — export shape matches s2 contract
+- [x] Check error handling completeness — outer/inner/id/k + reciprocalRank all validated
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single O(N) accumulate pass, one sort, no list copies
+- [x] Optimize critical paths — Map get/set O(1); no accidental O(N²)
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — type-checked; no fs/path/os at all
+- [x] Sanitize outputs — pure numeric/id output
+- [x] No secrets in code
+- [x] Safe file operations — N/A (zero I/O); Map accumulator prevents __proto__ pollution (case 7b proves it)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral (0 errors referencing fusion.js)
+- [x] Run ALL tests (TDD Green) — slice 11/11; full suite 3003 pass / 0 fail
+- [x] Check coverage >= 80% — fusion.js line 99.11% / branch 97.06% / funcs 100%
+- [x] 0 skipped, 0 flaky tests — skipped 0, todo 0
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — module header (RRF def, k=60 rationale, index-agnostic + proto-safety note)
+- [x] Add JSDoc comments to new functions — all three exports
+- [x] Update CHANGELOG if needed — N/A for this slice
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — 2 files only; all parent acceptance-mapping criteria have a test
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **`opts.k` validation:** The spec lists throw conditions for non-array/non-id inputs but does
+  not name a rule for a non-numeric `k`. Chose to throw `TypeError` when `opts.k` is present and
+  not a finite number (fail-loud on caller bug, consistent with the "no silent coercion" security
+  note). `k` defaults to `RRF_K` when `opts.k` is `undefined`. Test case 7 covers `{ k: 'nope' }`.
+- **Proto-safety implementation:** Used a `Map` accumulator (not `Object.create(null)`). The plan
+  named either as acceptable; `Map` gives O(1) get/set, iterates in insertion order, and cannot be
+  polluted by an `id` of `"__proto__"`/`"constructor"`. Added test case 7b asserting an `id` of
+  `"__proto__"` fuses correctly and leaves `{}.polluted === undefined`.
+- **`reciprocalRank` on repeated ids:** Spec says "first element whose id === expectedId". Made
+  this explicit with test case 6b (repeated id returns the rank of the FIRST occurrence).
+- **Falsifiability assertion tolerance:** Case 8 asserts `mrrRRF >= (mrrA + mrrB)/2 - 1e-12` (with
+  a floating-point epsilon) rather than a strict `>=`, so the "≥ mean" guarantee is not tripped by
+  IEEE-754 rounding when RRF exactly equals the mean. Matches the parent's "≥ mean" phrasing.
+
+## Verification Results (executor)
+
+- (a) RED→GREEN: RED pass 0 / fail 1 (module missing) → GREEN 11/11.
+- (b) `node --test tests/plan-index-fusion.test.js`: tests 11, pass 11, fail 0, skipped 0.
+- (c) `node --test tests/*.test.js`: tests 3003, pass 3003, **fail 0**, skipped 0, todo 0.
+- (d) `npx eslint . --max-warnings 0`: exit 0.
+- (e) tsc: baseline-neutral — 0 errors reference `src/lib/plan-index/fusion.js`.
+- (f) readme-numbers: 47/47 pass (plan-index/ subdir not counted by `countTopLevelJs`; no bump).
+- (g) Coverage (fusion.js): line 99.11%, branch 97.06%, funcs 100% — all ≥ 80%.
