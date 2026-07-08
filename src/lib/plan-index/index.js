@@ -74,5 +74,15 @@ Object.defineProperties(module.exports, {
     enumerable: true,
     configurable: true,
     get() { try { return require('./related').related; } catch { return undefined; } }
+  },
+  // PI6-s1 public surface (additive). `detectConflicts` (the AND of section-vector
+  // similarity ∩ glob-aware `files:` overlap) is imported by the s2 overview panel
+  // and s3 inbox surface through this single barrel — same fail-open lazy-getter
+  // pattern as `search`/`related`: a broken conflict-detect.js resolves to
+  // undefined and can never break the barrel for existing PI1/PI0/PI4 consumers.
+  detectConflicts: {
+    enumerable: true,
+    configurable: true,
+    get() { try { return require('./conflict-detect').detectConflicts; } catch { return undefined; } }
   }
 });
