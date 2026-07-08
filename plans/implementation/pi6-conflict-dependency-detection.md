@@ -9,6 +9,7 @@ title: "PI6 — Conflict & Dependency Detection (vector similarity AND files ove
 created: "2026-06-28T00:00:00Z"
 type: feature
 status: functional
+is_slice_index: true
 priority: MEDIUM
 parent_vision: "done/local-semantic-plan-index.md"
 program: ctoc-planning-intelligence
@@ -19,16 +20,31 @@ depends_on:
 acceptance_criteria_count: 7
 risk_level: MEDIUM
 gate_status: "Pending Approval (Gate 1: functional → implementation)"
-files:
-  - "src/lib/plan-index/conflict-detect.js"
-  - "src/lib/plan-index/index.js"
-  - "src/tabs/overview.js"
-  - "src/areas/inbox.js"
-  - "src/lib/inbox.js"
-  - "tests/plan-index-conflict.test.js"
 ---
 
 # PI6 — Conflict & Dependency Detection (vector similarity AND files overlap)
+
+> **This is a SLICE INDEX, not an executable plan.** PI6 is decomposed into the
+> dependency-ordered slices below; each slice is its own implementation plan with its
+> own `files:` and canonical Iron Loop (Steps 8–16). This parent carries only the
+> shared context (Problem / Business Alignment / Acceptance Criteria / Scope / Risks /
+> Rollback / Dependencies) that all slices inherit. It declares no module-level `files:`
+> (files live per-slice) and no `iron_loop` (only the slices execute).
+>
+> **Surface correction (2026-07-08).** The conflict UI surface is the LIVE mounted
+> `src/areas/pipeline.js`, NOT the legacy unmounted `src/tabs/overview.js`. PI4 proved
+> features wired into `overview.js` are dead to the human (PI4-s4 was itself a kickback
+> that moved the Related-Plans panel from `overview.js` into `pipeline.js`). The `src/tabs/
+> overview.js` / `src/areas/inbox.js` / `src/lib/inbox.js` targets in the pre-slice prose
+> below are SUPERSEDED by the pipeline surface in s2; treat that prose as historical
+> context, not as the executable target.
+
+## Slices (dependency-ordered)
+
+| # | Slice | Files | depends_on |
+|---|---|---|---|
+| s1 | [`pi6-s1-conflict-detect-core`](pi6-s1-conflict-detect-core.md) — the pure `detectConflicts(planSlug, opts)` engine (section-vector similarity AND glob-aware `files:` overlap, fail-open) + the additive barrel export + its unit test | `src/lib/plan-index/conflict-detect.js`, `src/lib/plan-index/index.js`, `tests/plan-index-conflict.test.js` | none |
+| s2 | [`pi6-s2-pipeline-conflict-surface`](pi6-s2-pipeline-conflict-surface.md) — wire `detectConflicts` into the LIVE mounted `src/areas/pipeline.js` (`render`/`activate` bridge, mirroring PI4-s4's Related-Plans panel) so the dashboard a user sees shows the "potential conflict or dependency" flag + a real-pipeline-render test | `src/areas/pipeline.js`, `tests/plan-index-conflict-surface.test.js` | `pi6-s1-conflict-detect-core` |
 
 > **Architecture pivot alignment (2026-07-07).** Retargeted to PI1's **pure-JS
 > in-memory + JSON store** (the superseded native-vector-database design is fully

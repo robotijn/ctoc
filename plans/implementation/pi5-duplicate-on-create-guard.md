@@ -9,6 +9,7 @@ title: "PI5 — Duplicate-on-Create Guard (warns, never blocks)"
 created: "2026-06-28T00:00:00Z"
 type: feature
 status: functional
+is_slice_index: true
 priority: MEDIUM
 parent_vision: "done/local-semantic-plan-index.md"
 program: ctoc-planning-intelligence
@@ -19,14 +20,23 @@ depends_on:
 acceptance_criteria_count: 7
 risk_level: MEDIUM
 gate_status: "Pending Approval (Gate 1: functional → implementation)"
-files:
-  - "src/lib/plan-index/duplicate-guard.js"
-  - "src/lib/plan-index/index.js"
-  - "src/hooks/PreToolUse.Write.js"
-  - "tests/plan-index-duplicate-guard.test.js"
 ---
 
 # PI5 — Duplicate-on-Create Guard (warns, never blocks)
+
+> **This is a SLICE INDEX, not an executable plan.** PI5 is decomposed into the
+> dependency-ordered slices below; each slice is its own implementation plan with its
+> own `files:` and canonical Iron Loop (Steps 8–16). This parent carries only the
+> shared context (Problem / Business Alignment / Acceptance Criteria / Scope / Risks /
+> Rollback / Dependencies) that all slices inherit. It declares no module-level `files:`
+> (files live per-slice) and no `iron_loop` (only the slices execute).
+
+## Slices (dependency-ordered)
+
+| # | Slice | Files | depends_on |
+|---|---|---|---|
+| s1 | [`pi5-duplicate-on-create-guard-s1-duplicate-guard`](pi5-duplicate-on-create-guard-s1-duplicate-guard.md) — the pure `checkDuplicate(draftSummary, options)` threshold-over-retrieval module (async, fail-open) + its unit test | `src/lib/plan-index/duplicate-guard.js`, `tests/plan-index-duplicate-guard.test.js` | none |
+| s2 | [`pi5-duplicate-on-create-guard-s2-write-hook`](pi5-duplicate-on-create-guard-s2-write-hook.md) — the LIVE advisory `PreToolUse.Write` hook that calls `checkDuplicate` for `plans/**/*.md` writes, surfaces a named warning + logs it, ALWAYS exits 0 (warns, never blocks) + its real-hook test | `src/hooks/PreToolUse.Write.js`, `tests/plan-index-duplicate-hook.test.js` | `pi5-duplicate-on-create-guard-s1-duplicate-guard` |
 
 ## Problem Statement
 
