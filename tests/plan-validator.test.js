@@ -79,6 +79,103 @@ describe('Plan Validator Tests', () => {
     console.log('# validateNoContradictions: still flags real missing created file');
   });
 
+  // === contradiction parser: files:-declaration basename fallback — VP1 ===
+
+  test('VP1 #1: bare-basename claim resolved via files: declaration (OM2/PI0 shape) → no error', () => {
+    // OM2/PI0 shape: inline-array files: [src/hooks/guard-files.js] declares the
+    // authoritative subpath; prose refers to it by bare basename. The bare name
+    // resolves to <root>/guard-files.js (absent), but the declared file EXISTS,
+    // so the claim is satisfied and must NOT error.
+    fs.mkdirSync(path.join(testDir, 'src', 'hooks'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src', 'hooks', 'guard-files.js'), '// guard');
+
+    const content = [
+      '---',
+      'files: [src/hooks/guard-files.js]',
+      '---',
+      '# Plan',
+      '',
+      'Step 10: create `guard-files.js` for the hook.',
+      '',
+    ].join('\n');
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      !result.errors.some(e => /claimed as created/i.test(e) && /guard-files\.js/.test(e)),
+      `bare-basename claim of a declared+existing file must not error, got: ${JSON.stringify(result.errors)}`
+    );
+    console.log('# VP1 #1: bare-basename resolved via files: declaration');
+  });
+
+  test('VP1 #2: genuine missing-file claim still errors', () => {
+    // nowhere.js is neither declared in files: nor present at project root —
+    // the genuine contradiction must still be flagged (D-VP1-2).
+    const content = [
+      '---',
+      'files: [src/lib/plan-validator.js]',
+      '---',
+      '# Plan',
+      '',
+      'Created `nowhere.js` for the feature.',
+      '',
+    ].join('\n');
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /nowhere\.js/.test(e)),
+      `genuine missing-file claim must still be flagged, got: ${JSON.stringify(result.errors)}`
+    );
+    console.log('# VP1 #2: genuine missing-file claim still errors');
+  });
+
+  test('VP1 #3: full-path claim still clean (no regression to path resolution)', () => {
+    fs.mkdirSync(path.join(testDir, 'src', 'hooks'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src', 'hooks', 'guard-files.js'), '// guard');
+
+    const content = [
+      '---',
+      'files: [src/hooks/guard-files.js]',
+      '---',
+      '# Plan',
+      '',
+      'Create `src/hooks/guard-files.js`.',
+      '',
+    ].join('\n');
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      !result.errors.some(e => /claimed as created/i.test(e)),
+      `full-path claim of an existing file must resolve unchanged, got: ${JSON.stringify(result.errors)}`
+    );
+    console.log('# VP1 #3: full-path claim still clean');
+  });
+
+  test('VP1 #4: basename collision safe — declared+existing satisfies bare claim', () => {
+    fs.mkdirSync(path.join(testDir, 'src', 'a'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src', 'a', 'util.js'), '// util');
+
+    const content = [
+      '---',
+      'files: [src/a/util.js]',
+      '---',
+      '# Plan',
+      '',
+      'add `util.js`.',
+      '',
+    ].join('\n');
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      !result.errors.some(e => /claimed as created/i.test(e) && /util\.js/.test(e)),
+      `declared+existing file must satisfy a bare-basename claim, got: ${JSON.stringify(result.errors)}`
+    );
+    console.log('# VP1 #4: basename collision safe');
+  });
+
   // === functional -> implementation ===
 
   test('functional->implementation: passes with problem, criteria, scope', () => {

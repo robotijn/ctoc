@@ -390,50 +390,66 @@ the unsatisfied path. Error path and happy path both covered.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation — 4 VP1 tests added to `tests/plan-validator.test.js`
+- [x] Test error conditions — test #2 asserts the genuine-missing claim STILL errors
+- [x] Run tests - expect RED (failing) — test #1 FAILED before fix (false-positive fired); #2/#3/#4 already passed
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none; reused in-repo `stale-detector.js`
+- [x] Check prerequisites — `extractFrontmatterRegion`, `parseFilesField` exported; `path`/`safeFs` already imported
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — tests create tmp subpaths via fs.mkdirSync
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature — require added; `declaredFiles` parsed once; Pattern-1 error push gated by `satisfiedByDeclaration` basename fallback
+- [x] Add error handling — genuine-missing still errors (D-VP1-2 preserved)
+- [x] Wire up integration points — Pattern 2/3 untouched; regex not broadened
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — no import cycle (stale-detector does not require plan-validator); single hunk; matches module style
+- [x] Verify integration points work together — OM2-shape integration proof passes
+- [x] Check error handling completeness — both branches (satisfied / unsatisfied) exercised
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — `declaredFiles` parsed once per call, not per match
+- [x] Optimize critical paths — content already in memory, no re-read
+- [x] Simplify complex code — basename equality is a plain `===`
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — `declaredFileExistsUnder` drops `.`/`..`/empty segments; existence stays under projectPath
+- [x] Sanitize outputs — n/a (existence booleans + literal strings)
+- [x] No secrets in code
+- [x] Safe file operations — read-only `safeFs.existsSync` only
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `npx eslint . --max-warnings 0` exit 0; tsc baseline-neutral (0 errors in edited files)
+- [x] Run ALL tests (TDD Green) — plan-validator 21/21; full suite `node --test tests/*.test.js` → 2976 pass, # fail 0
+- [x] Check coverage >= 80% — new branch exercised both directions (tests 1/3/4 satisfied, 2 unsatisfied)
+- [x] 0 skipped, 0 flaky tests — 0 skipped in full suite
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — n/a external
+- [x] Add JSDoc comments to new functions — `validateNoContradictions` JSDoc notes D-VP1-1/D-VP1-2; `declaredFileExistsUnder` documented
+- [x] Update CHANGELOG if needed — n/a (version bump handled at release)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — OM2-shape integration proof confirms no false block
+- [ ] Ready for human review — Gate 3 (review → done) is a HUMAN gate; awaiting user approval
+
+## Decisions Taken Under Ambiguity (executor, 2026-07-08)
+
+- **D-VP1-4 (`declaredFileExists` not exported — read-fresh correction):** the blueprint's
+  D-VP1-3 asserts `declaredFileExists` is exported by `stale-detector.js` (module.exports
+  line 736). Read fresh, that `module.exports` exports `extractFrontmatterRegion` and
+  `parseFilesField` but NOT `declaredFileExists` (the function exists at line 264 but is
+  private). Adding it to stale-detector's exports would edit a file OUTSIDE VP1's declared
+  `files:` (`src/lib/plan-validator.js`, `tests/plan-validator.test.js`) — out of scope and
+  hook-blocked. Resolution: require only the two exported parsers and inline a local
+  `declaredFileExistsUnder(root, declared)` that replicates `declaredFileExists`'s exact
+  traversal-safe segment-filter + existence logic. Behaviorally identical for all 4 BDD
+  cases; keeps the fix strictly within VP1's scope. Require style: named-destructure
+  top-of-file require (`const { extractFrontmatterRegion, parseFilesField } = require('./stale-detector');`),
+  matching the file's existing `const { parseMetadata } = require('./state');` idiom; literal
+  path, no dynamic require.
