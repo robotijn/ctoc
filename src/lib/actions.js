@@ -69,7 +69,13 @@ function movePlan(planPath, destination, projectPath) {
   // primary rename (the index is a rebuildable cache; SY-13). PI0 owns the store
   // wiring; until PI0 is integrated the wiring is absent and this is a no-op.
   try {
-    const wiring = loadPlanIndexWiring();
+    // F1: pass the SAME `root` used to normalize the moveUnit keys (below) so the
+    // guard opens the store keyed on that identical root. Passing `getWiring()` argless
+    // resolved it against `process.cwd()` instead — on a symlinked checkout or any
+    // `movePlan(projectPath ≠ cwd)` that re-pathed the WRONG store and silently no-op'd
+    // (the seam looked live but re-pathed nothing). Keyed on `root`, the seam goes live
+    // even when projectPath ≠ cwd.
+    const wiring = loadPlanIndexWiring(root);
     if (wiring && wiring.store && typeof wiring.store.moveUnit === 'function') {
       const fromNorm = normalizePlanIndexPath(root, planPath);
       const toNorm = normalizePlanIndexPath(root, newPath);
@@ -86,9 +92,15 @@ function movePlan(planPath, destination, projectPath) {
  * Best-effort load of PI0's plan-index composition-root wiring. Returns
  * `{ store, embedder, calibrationReady }` or null if PI0 is not yet integrated
  * (fail-open). Lazy-required inside the guard so there is no load-time cycle.
+ *
+ * @param {string} [root] The resolved project root the CALLER normalizes its store
+ *   keys against. It MUST be passed through so `getWiring` opens the store keyed on
+ *   the same root — otherwise `getWiring()` argless resolves against `process.cwd()`
+ *   and re-paths a DIFFERENT store (the F1 dormancy bug). When omitted, `getWiring`
+ *   falls back to its own resolution (backward-compatible).
  * @returns {object|null}
  */
-function loadPlanIndexWiring() {
+function loadPlanIndexWiring(root) {
   try {
     // The PI0 wiring seam does not exist until PI0 integration lands. Require it
     // through an aliased binding so static module resolution does not flag a
@@ -96,7 +108,12 @@ function loadPlanIndexWiring() {
     const req = require;
     const wiring = req('./plan-index/wiring');
     if (wiring && typeof wiring.getWiring === 'function') {
-      const w = wiring.getWiring();
+      // Pass the caller's root so the opened store is keyed IDENTICALLY to the keys
+      // the caller normalizes (F1). getWiring canonicalizes the root via realpath so a
+      // symlinked root and its realpath map to the SAME singleton/store (F2).
+      const w = typeof root === 'string' && root.length > 0
+        ? wiring.getWiring({ projectPath: root })
+        : wiring.getWiring();
       if (w && w.store) return w;
     }
   } catch {
@@ -106,14 +123,40 @@ function loadPlanIndexWiring() {
 }
 
 /**
+ * Realpath-canonicalize a directory (fail-open). Mirrors `wiring.canonicalizeRoot`
+ * so the store-open root (in getWiring) and the key-normalization root here are
+ * byte-identical on a symlinked checkout (F2). Falls back to the input on any error
+ * (realpath throws for a not-yet-existing path).
+ * @param {string} dir
+ * @returns {string}
+ */
+function canonicalizeRoot(dir) {
+  try {
+    return require('fs').realpathSync.native(dir);
+  } catch {
+    return dir;
+  }
+}
+
+/**
  * Normalize a plan path to the canonical `plans/<stage>/<slug>.md` POSIX form the
  * plan index keys on (PI1 D9). Cross-platform.
+ *
+ * F2: `root` is realpath-canonicalized the SAME way `wiring.getWiring` canonicalizes
+ * the root it opens the store against, so on a symlinked root the `path.relative`
+ * anchor and the store-open anchor are byte-identical and the keys never diverge.
+ * (The result is additionally sliced from the last `plans/` segment, so the key is
+ * anchor-robust; canonicalizing `root` keeps the relative computation itself sound
+ * when `planPath` is reached through a symlink.)
  * @param {string} root
  * @param {string} planPath
  * @returns {string}
  */
 function normalizePlanIndexPath(root, planPath) {
-  const rel = path.relative(root, planPath);
+  const canonRoot = canonicalizeRoot(root);
+  const canonPlan = canonicalizeRoot(path.dirname(planPath));
+  const planBase = path.basename(planPath);
+  const rel = path.relative(canonRoot, path.join(canonPlan, planBase));
   const posix = rel.split(path.sep).join('/').replace(/\\/g, '/');
   const idx = posix.lastIndexOf('plans/');
   return idx >= 0 ? posix.slice(idx) : posix;

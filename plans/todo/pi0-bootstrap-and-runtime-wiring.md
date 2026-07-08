@@ -1045,3 +1045,80 @@ breaks the menu/pipeline when the embedder is absent. Gate 3 (human approval) be
   store-constructed signal (what movePlan/the hook gate on). Embedding-source reachability is
   the async quality-tier signal via `probeEmbeddingSource`/`degradedReason`, never flipping
   the store off — matching the pivot note (in-process fallback keeps availability true).
+
+---
+
+## Pre-Gate-3 KICKBACK — "seams-go-live" was only CONDITIONALLY true (F1 + F2 fix)
+
+**Finding (adversarial review before Gate 3).** The seam looked live but re-pathed
+the WRONG store whenever the caller's key-normalization root differed from the
+cwd-derived root. Both hot-path consumers called `getWiring()` ARGLESS (keyed on the
+`process.cwd()`-derived root) while normalizing their moveUnit/syncUnit keys against a
+DIFFERENT root (`root = projectPath || findProjectRoot()` in `movePlan`; `plansRoot =
+path.join(process.cwd(),'plans')` in the hook). On a symlinked checkout, or any
+`movePlan(projectPath ≠ cwd)` / multi-root session, the guard opened one store and
+mutated keys destined for another → `store.moveUnit` matched nothing → silent no-op
+(pi1-inert wearing a live mask). Reproduced by two new regression tests that drove the
+guard exactly as production (argless internal `getWiring`), asserted the re-path, and
+FAILED against the pre-fix code.
+
+**FIX 1 — align the store key to the normalization root.**
+- `src/lib/actions.js` movePlan guard: `loadPlanIndexWiring()` now takes the caller's
+  `root` (the same `const root = projectPath || findProjectRoot()` at movePlan line 51)
+  and forwards it as `wiring.getWiring({ projectPath: root })`. The store is now keyed
+  on the identical root the moveUnit keys are normalized against → the seam goes live
+  even when `projectPath ≠ cwd`. All other movePlan behavior (rename, `invalidate()`,
+  return value) is byte-unchanged.
+- `src/hooks/PostToolUse.plan-index-sync.js`: new `resolveRootForPlan(fp)` derives ONE
+  root from the WRITTEN plan's own project (`findProjectRoot(dirname(fp))`, not blind
+  `process.cwd()`). `main()` uses that single `root` for `getWiring({projectPath:root})`,
+  `plansRoot = path.join(root,'plans')`, and `logDir = path.join(root,'.ctoc','logs')` —
+  so the store the hook opens and the root `syncUnit` normalizes its keys against can
+  never diverge.
+
+**FIX 2 — realpath-canonicalize the wiring key (symlink robustness).**
+- `src/lib/plan-index/wiring.js`: new `canonicalizeRoot(abs)` = `fs.realpathSync.native`
+  with fail-open (returns the input if realpath throws, e.g. a not-yet-existing root).
+  `resolveRoot` now canonicalizes the resolved `projectPath` used as BOTH the singleton
+  CACHE key and the `openStore` path, so a symlinked root (`/var → /private/var`) and its
+  realpath map to the SAME singleton + store.
+- `src/lib/actions.js` `normalizePlanIndexPath`: canonicalizes `root` (and the plan's
+  directory) the SAME way (`canonicalizeRoot` via `realpathSync.native`, fail-open), so
+  the store-open anchor and the key-normalization anchor are byte-identical on a
+  symlinked checkout. (Keys are additionally sliced from the last `plans/` segment, so
+  they are anchor-robust; canonicalizing keeps the `path.relative` computation sound when
+  the plan is reached through a symlink.)
+
+**Consequence for smoke #2.** `getWiring().projectPath` is now the realpath-canonical
+root; the smoke #2 assertion was updated from `path.resolve(dir)` to
+`fs.realpathSync.native(path.resolve(dir))` to codify the F2 contract (identical on
+systems without a symlinked tmpdir; the realpath on macOS where `/var` is a symlink).
+
+**FIX 3 — regression tests (`tests/plan-index-smoke.test.js`).**
+- `smoke #9 (F1)`: seeds a real tmp project's OWN store with a `plans/todo/demo.md` unit,
+  `__reset()`s the singleton, then calls the REAL `actions.movePlan(planAbs,'in-progress',
+  proj)` with `proj ≠ process.cwd()` and the guard's `getWiring` used ARGLESS internally.
+  Asserts the re-path landed (`listPlanPaths()` shows `plans/in-progress/demo.md`, old
+  gone). FAILS pre-fix (unit stuck at `plans/todo/demo.md`), PASSES post-fix.
+- `smoke #10 (F1+F2)`: seeds against the canonical root, `symlinkSync`s a link → real,
+  drives `movePlan` through the SYMLINKED projectPath, and asserts the re-path landed in
+  the CANONICAL store (link + realpath → one store). Skips the symlink half with a plain
+  `projectPath ≠ cwd` assertion on platforms without symlink permission (Windows w/o
+  dev-mode). FAILS pre-fix, PASSES post-fix.
+- smoke #8 (dormancy live-mask) is KEPT; #9/#10 add the stronger argless-consumer variant.
+
+**FIX 4 (reconcile.js:185 comment) — SKIPPED.** `reconcile.js` is not in PI0's `files:`
+scope nor any other active plan's scope; per the no-scope-widening rule the one-line
+clarifying comment was NOT applied (noted only).
+
+**Verification (exact numbers).**
+- Regression before/after: `smoke #9` + `smoke #10` FAIL against pre-fix source (test
+  present, source reverted via stash) → both PASS after Fix 1+2. Proven both directions.
+- `node --test tests/plan-index-smoke.test.js tests/plan-index-bootstrap.test.js` →
+  **21 pass, 0 fail, 0 skipped** (was 19; +2 F1 regressions).
+- Full suite `node --test tests/*.test.js` → **# fail 0, 2972 pass, 0 skipped, 0 todo**
+  (was 2970; the getWiring change broke no actions/movePlan/hook tests).
+- `npx eslint . --max-warnings 0` → exit 0.
+- `npx tsc --noEmit` → 89 errors before AND after (baseline-neutral; 0 new; all
+  pre-existing, none in the edited regions).
+- Non-index movePlan behavior + `invalidate()` byte-unchanged (not present in the diff).
