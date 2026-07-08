@@ -1104,5 +1104,61 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T12:36:24.626Z",
+    "plan": "pi5-duplicate-on-create-guard-s1-duplicate-guard.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T12:36:24.654Z",
+    "plan": "pi5-duplicate-on-create-guard-s2-write-hook.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T12:36:24.694Z",
+    "plan": "pi6-s1-conflict-detect-core.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-08T12:36:24.721Z",
+    "plan": "pi6-s2-pipeline-conflict-surface.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
