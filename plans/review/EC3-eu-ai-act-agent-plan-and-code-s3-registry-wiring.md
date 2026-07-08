@@ -138,31 +138,31 @@ depends_on: s2. Depth 3 (s1 → s2 → s3) — at the SIP1 max chain depth, no d
 ## Execution Plan (Steps 8–16)
 
 ### Step 8: TEST
-- [ ] Write `tests/eu-ai-act-agent-registry.test.js` — the 6 resolution assertions above (RED first: entry-present + path-resolves fail until s3 edit + s2 file both land). Parse the registry via the existing loader if one exists, else a YAML read; resolve paths against the project root.
+- [x] Write `tests/eu-ai-act-agent-registry.test.js` — the 6 resolution assertions above (RED first: entry-present + path-resolves fail until s3 edit + s2 file both land). Parse the registry via the existing loader if one exists, else a YAML read; resolve paths against the project root.
 
 ### Step 9: PREPARE
-- [ ] Confirm s2 shipped `agents/compliance/eu-ai-act-agent.md` (the `path` target). Read the CURRENT `agents:` block shape in `.ctoc/operations-registry.yaml` fresh (keyed-map vs list-with-`name:`) so the new entry matches exactly. No new deps.
+- [x] Confirm s2 shipped `agents/compliance/eu-ai-act-agent.md` (the `path` target). Read the CURRENT `agents:` block shape in `.ctoc/operations-registry.yaml` fresh (keyed-map vs list-with-`name:`) so the new entry matches exactly. No new deps.
 
 ### Step 10: IMPLEMENT
-- [ ] Add the `eu-ai-act-agent` entry to the `agents:` block adjacent to the other compliance agents, matching the on-disk key shape; include `path`, `tier: 2`, `category: compliance`, `gated_by: shouldRunEuAiAct`, `extends_skill`, `regime_profile`, `description`. Touch NO other block. No stubs.
+- [x] Add the `eu-ai-act-agent` entry to the `agents:` block adjacent to the other compliance agents, matching the on-disk key shape; include `path`, `tier: 2`, `category: compliance`, `gated_by: shouldRunEuAiAct`, `extends_skill`, `regime_profile`, `description`. Touch NO other block. No stubs.
 
 ### Step 11: REVIEW
-- [ ] Self-review: `path` points at the real s2 file; entry shape matches neighbors; `enforcement`/`operations` blocks byte-identical (diff the file — only the additive entry changed).
+- [x] Self-review: `path` points at the real s2 file; entry shape matches neighbors; `enforcement`/`operations` blocks byte-identical (diff the file — only the additive entry changed).
 
 ### Step 12: OPTIMIZE
-- [ ] Single additive entry; no reordering of the existing roster.
+- [x] Single additive entry; no reordering of the existing roster.
 
 ### Step 13: SECURE
-- [ ] Verify no human gate weakened (test case 5 green); no `enforcement`/`operations` mutation; lint config if a config-lint step exists.
+- [x] Verify no human gate weakened (test case 5 green); no `enforcement`/`operations` mutation; lint config if a config-lint step exists.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/eu-ai-act-agent-registry.test.js` → all 6 GREEN, 0 skipped. Then `node --test tests/*.test.js` → `# fail 0` (registry-shape / architecture-invariants tests still pass). If a registry-schema test exists, it must stay green with the new entry.
+- [x] `node --test tests/eu-ai-act-agent-registry.test.js` → all 6 GREEN, 0 skipped. Then `node --test tests/*.test.js` → `# fail 0` (registry-shape / architecture-invariants tests still pass). If a registry-schema test exists, it must stay green with the new entry.
 
 ### Step 15: DOCUMENT
-- [ ] Inline YAML comment on the entry noting the EC1 gate (`gated_by: shouldRunEuAiAct`) and that it wraps `ai-governance-checker` scoped to EU AI Act.
+- [x] Inline YAML comment on the entry noting the EC1 gate (`gated_by: shouldRunEuAiAct`) and that it wraps `ai-governance-checker` scoped to EU AI Act.
 
 ### Step 16: FINAL-REVIEW
-- [ ] implementation-reviewer verifies the entry resolves, the gate is recorded, and no human gate was weakened. Gate 3 approval batched at the EC3 parent level.
+- [x] implementation-reviewer verifies the entry resolves, the gate is recorded, and no human gate was weakened. Gate 3 approval batched at the EC3 parent level.
 
 ## Decisions Taken Under Ambiguity
 

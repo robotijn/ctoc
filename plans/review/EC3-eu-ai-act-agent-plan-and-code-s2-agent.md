@@ -165,31 +165,31 @@ regime_profile: eu-ai-act-high-risk
 ## Execution Plan (Steps 8–16)
 
 ### Step 8: TEST
-- [ ] Write `tests/eu-ai-act-agent.test.js` — the 8 content-contract assertions above (RED first; they fail until the agent file exists). `node:test` + `assert/strict`; read the agent markdown via `fs.readFileSync` on the project-root-resolved path.
+- [x] Write `tests/eu-ai-act-agent.test.js` — the 8 content-contract assertions above (RED first; they fail until the agent file exists). `node:test` + `assert/strict`; read the agent markdown via `fs.readFileSync` on the project-root-resolved path.
 
 ### Step 9: PREPARE
-- [ ] Confirm s1 (`eu-ai-act-helpers.js`) exists and its export names are exactly `classifyFromPlanText`, `filterToEuAiAct`, `normalizeSeverity`, `routeFinding`, `readEnforcementDates` (the agent must name them identically). No new deps.
+- [x] Confirm s1 (`eu-ai-act-helpers.js`) exists and its export names are exactly `classifyFromPlanText`, `filterToEuAiAct`, `normalizeSeverity`, `routeFinding`, `readEnforcementDates` (the agent must name them identically). No new deps.
 
 ### Step 10: IMPLEMENT
-- [ ] Create `agents/compliance/eu-ai-act-agent.md` — frontmatter + body sections per the File Specification. Reference the s1 helpers and `shouldRunEuAiAct` by name; delegate the code scan to the skill; cite dates ONLY via `readEnforcementDates`; no literal date strings; no copied skill rule/phase/letter-field. No stubs.
+- [x] Create `agents/compliance/eu-ai-act-agent.md` — frontmatter + body sections per the File Specification. Reference the s1 helpers and `shouldRunEuAiAct` by name; delegate the code scan to the skill; cite dates ONLY via `readEnforcementDates`; no literal date strings; no copied skill rule/phase/letter-field. No stubs.
 
 ### Step 11: REVIEW
-- [ ] Self-review against AC scenarios: gate named, `max_subagents: 0`, five helpers referenced, no skill rule re-stated, dates from profile, scope isolation stated, no new gate. Cross-check `defers_to` mirrors the skill.
+- [x] Self-review against AC scenarios: gate named, `max_subagents: 0`, five helpers referenced, no skill rule re-stated, dates from profile, scope isolation stated, no new gate. Cross-check `defers_to` mirrors the skill.
 
 ### Step 12: OPTIMIZE
-- [ ] Keep the agent thin — delegate maximally, duplicate nothing from the skill; prose is minimal and reasoning-cheap.
+- [x] Keep the agent thin — delegate maximally, duplicate nothing from the skill; prose is minimal and reasoning-cheap.
 
 ### Step 13: SECURE
-- [ ] Verify: gate-false is a true no-op; no new human gate introduced; test reads a fixed path only. Lint the test (`--max-warnings 0`).
+- [x] Verify: gate-false is a true no-op; no new human gate introduced; test reads a fixed path only. Lint the test (`--max-warnings 0`).
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/eu-ai-act-agent.test.js` → all 8 GREEN, 0 skipped. Then `node --test tests/*.test.js` → `# fail 0`. Typecheck + lint pass.
+- [x] `node --test tests/eu-ai-act-agent.test.js` → all 8 GREEN, 0 skipped. Then `node --test tests/*.test.js` → `# fail 0`. Typecheck + lint pass.
 
 ### Step 15: DOCUMENT
-- [ ] The agent file is self-documenting; add a one-line header note that all EU-AI-Act rule logic lives in the skill and all machine-checkable rules in `src/lib/eu-ai-act-helpers.js`.
+- [x] The agent file is self-documenting; add a one-line header note that all EU-AI-Act rule logic lives in the skill and all machine-checkable rules in `src/lib/eu-ai-act-helpers.js`.
 
 ### Step 16: FINAL-REVIEW
-- [ ] implementation-reviewer verifies the agent re-states no skill rule, honors `max_subagents: 0`, gates on EC1, and touches no human gate. Gate 3 approval batched at the EC3 parent level.
+- [x] implementation-reviewer verifies the agent re-states no skill rule, honors `max_subagents: 0`, gates on EC1, and touches no human gate. Gate 3 approval batched at the EC3 parent level.
 
 ## Decisions Taken Under Ambiguity
 
@@ -246,50 +246,50 @@ regime_profile: eu-ai-act-high-risk
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
