@@ -309,50 +309,77 @@ barrel; self-exclusion and empty-index no-op proven; PI5/PI6 can now
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — MODULE_NOT_FOUND (related.js absent)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (s2 search.js, store.js, wiring.js present)
+- [x] Check prerequisites — s2 `search.js` shipped, exports `search`
+- [x] Verify dev environment ready — node:test, fixture reused
+- [x] Create directories/config if needed — none
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — related.js + additive barrel
+- [x] Add error handling — TypeError on bad slug; fail-open [] everywhere else
+- [x] Wire up integration points — barrel lazy getters for search + related
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — barrel additive (2 getters), no cycle
+- [x] Verify integration points work together — barrel through-call test (RL-D3)
+- [x] Check error handling completeness — seeded/fallback/null/empty/throw all [] 
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — no re-embed on seeded path (RL-A2 proves)
+- [x] Optimize critical paths — bounded limit into store.search (top-5)
+- [x] Simplify complex code — single seed-vs-fallback branch
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — planSlug opaque key, no fs here
+- [x] Sanitize outputs — delegates to Map-based store.search
+- [x] No secrets in code
+- [x] Safe file operations — no fs/path/os in related.js
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral (0 new errors)
+- [x] Run ALL tests (TDD Green) — 3041/3041 pass, 0 fail
+- [x] Check coverage >= 80% — related.js line 97.32%, branch 81.82%, fn 100%
+- [x] 0 skipped, 0 flaky tests — 0 skipped, 0 todo
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — module header ADRs in related.js
+- [x] Add JSDoc comments to new functions — related() + DEFAULT_RELATED_LIMIT
+- [x] Update CHANGELOG if needed — n/a (internal slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — barrel through-call verified
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **D-s3-1 — `embedder: null` vs `undefined` semantics for the no-embedder degrade.**
+  The wiring-resolution guard fires on `embedder === undefined`. To let a caller
+  FORCE the no-embedder fallback degrade (`[]`) without picking up the ambient
+  project embedder via `getWiring`, `null` is treated as "explicitly no embedder"
+  (skips wiring, hits `typeof embedder !== 'function'` → `[]`), while `undefined`
+  means "resolve from wiring". This mirrors s2's injected-or-wired contract and is
+  what the RL-B4 test asserts.
+
+- **D-s3-2 — seeded path returns `store.search` views verbatim.** `related` returns
+  the store-search result array as-is (each carries planPath, sectionId, kind, text,
+  files, embedding, score) rather than reshaping. This keeps the shape identical to
+  s2 `search()` output so the s4 UI renders both surfaces uniformly. Self-exclusion
+  is `store.search`'s `excludePlanPath` (parent decision), never a post-filter here.
+
+- **D-s3-3 — additive barrel getters are fail-open lazy getters (not eager).** Even
+  though `search.js`/`related.js` are side-effect-free and could be eager-required,
+  they are exposed as the SAME `try/catch → undefined` lazy getters as the PI0
+  getters, so a broken PI4 submodule can never break the barrel for existing PI1/PI0
+  consumers. The Barrel Integrity invariant (RL-D1..D4) is thereby structural, not
+  incidental. No circular-dependency warning on load (RL-D4).
+
+- **D-s3-4 — fallback failure is also fail-open.** If the text-seeded fallback's s2
+  `search` throws, `related` catches and returns `[]` rather than propagating —
+  consistent with "never break the menu/overview render". Covered by RL-B7.

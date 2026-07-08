@@ -59,5 +59,20 @@ Object.defineProperties(module.exports, {
     enumerable: true,
     configurable: true,
     get() { try { return require('./bootstrap').isBackfillNeeded; } catch { return undefined; } }
+  },
+  // PI4 public surface (additive). `search` (s2) + `related` (s3) are the retrieval
+  // API PI5/PI6 and the s4 UI consume through this single barrel. Exposed as the
+  // SAME fail-open lazy getters as the getters above: a broken search.js/related.js
+  // can never break the barrel for existing PI1/PI0 consumers (Barrel Integrity).
+  // String-literal require in every getter (no non-literal-require).
+  search: {
+    enumerable: true,
+    configurable: true,
+    get() { try { return require('./search').search; } catch { return undefined; } }
+  },
+  related: {
+    enumerable: true,
+    configurable: true,
+    get() { try { return require('./related').related; } catch { return undefined; } }
   }
 });
