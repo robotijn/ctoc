@@ -911,17 +911,38 @@ function listSubplans(parentSlug, projectPath) {
   }
   const root = projectPath || findProjectRoot();
   const plansDir = getPlansDir(root);
+  // parseMetadata (via readPlans) reads only the FIRST frontmatter block, but a
+  // gate-approval marker is prepended as its own block once a plan crosses Gate 2 —
+  // pushing `parent_plan`/`depends_on` into the SECOND block where parseMetadata
+  // can't see them (so listSubplans returned 0 for review-stage slices). Read the
+  // MERGED frontmatter region (all blocks) instead. Lazy require avoids the
+  // stale-detector <-> actions require cycle.
+  const { extractFrontmatterRegion } = require('./stale-detector');
+  const unquote = (v) => v === undefined ? undefined : v.replace(/^["']|["']$/g, '').trim();
+  const readParent = (region) => { const m = region.match(/^\s*parent_plan\s*:\s*(.+?)\s*$/m); return m ? unquote(m[1]) : undefined; };
+  const readDeps = (region) => { const m = region.match(/^\s*depends_on\s*:\s*(.+?)\s*$/m); return m ? unquote(m[1]) : undefined; };
 
   const out = [];
   for (const stage of SUBPLAN_STAGES) {
     const plans = readPlans(path.join(plansDir, stage));
     for (const plan of plans) {
-      if (plan.metadata && String(plan.metadata.parent_plan) === parentSlug) {
+      let parentPlan = plan.metadata && plan.metadata.parent_plan;
+      let dependsOn = plan.metadata && plan.metadata.depends_on;
+      if (String(parentPlan) !== parentSlug) {
+        try {
+          const region = extractFrontmatterRegion(safeFs.readFileSync(plan.path, 'utf8'));
+          const p = readParent(region);
+          if (p !== undefined) parentPlan = p;
+          const d = readDeps(region);
+          if (d !== undefined) dependsOn = d;
+        } catch { /* fail-open: fall back to first-block metadata */ }
+      }
+      if (String(parentPlan) === parentSlug) {
         out.push({
           slug: plan.name,
           stage,
           path: plan.path,
-          dependsOn: parseDependsOn(plan.metadata.depends_on),
+          dependsOn: parseDependsOn(dependsOn),
           bgStatus: plan.bgStatus || 'none'
         });
       }
