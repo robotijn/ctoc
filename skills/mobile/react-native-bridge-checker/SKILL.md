@@ -575,6 +575,35 @@ reference: https://docs.expo.dev/eas-update/code-signing/
 
 The integrator uses `confidence` and `platform` to weight findings: a `confidence: low` finding on a single file does not block phase advancement on its own; a `confidence: high` finding tagged `kind: unsigned_ota` or `kind: secrets_in_asyncstorage` is treated as a release blocker.
 
+## Sources
+
+All URLs verified reachable on the retrieval date shown. Living documentation pages carry a retrieval date; dated blog/release posts carry their publication date.
+
+**Architecture — bridge, JSI, Fabric, TurboModules**
+- [React Native — Architecture landing page](https://reactnative.dev/architecture/landing-page) — retrieved 2026-07-08
+- [React Native — Architecture overview (Fabric, TurboModules, JSI, Codegen)](https://reactnative.dev/architecture/overview) — retrieved 2026-07-08
+- [React Native — The New Architecture (landing)](https://reactnative.dev/docs/the-new-architecture/landing-page) — retrieved 2026-07-08
+- [React Native — Turbo Native Modules introduction](https://reactnative.dev/docs/turbo-native-modules-introduction) — retrieved 2026-07-08
+- [React Native — Fabric Native Components introduction](https://reactnative.dev/docs/fabric-native-components-introduction) — retrieved 2026-07-08
+
+**Hermes engine**
+- [React Native — Using Hermes](https://reactnative.dev/docs/hermes) — retrieved 2026-07-08
+
+**Release / New Architecture default (dated posts)**
+- [React Native 0.76 — New Architecture by default (React Native blog)](https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture) — published 2024-10-23
+- [React Native 0.81 release (React Native blog)](https://reactnative.dev/blog/2025/08/12/react-native-0.81) — published 2025-08-12
+
+**OTA code-signing & secure storage (Expo)**
+- [Expo — EAS Update code signing](https://docs.expo.dev/eas-update/code-signing/) — retrieved 2026-07-08
+- [Expo — SecureStore (Keychain / Keystore) SDK reference](https://docs.expo.dev/versions/latest/sdk/securestore/) — retrieved 2026-07-08
+
+**Deep-link / universal-link verification (platform docs)**
+- [Android Developers — Verify Android App Links (Digital Asset Links, autoVerify)](https://developer.android.com/training/app-links/verify-android-applinks) — retrieved 2026-07-08
+- [Apple Developer — Supporting universal links in your app (AASA)](https://developer.apple.com/documentation/xcode/supporting-universal-links-in-your-app) — retrieved 2026-07-08
+
+**Performance / profiling**
+- [React Native — Profiling](https://reactnative.dev/docs/profiling) — retrieved 2026-07-08
+
 ---
 
 ## Refinement Loop — critic mode (v6.9.8)
