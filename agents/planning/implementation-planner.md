@@ -571,15 +571,15 @@ This agent produces the blueprint that feeds directly into the Iron Loop executi
 
 | Iron Loop Step | What This Blueprint Provides |
 |---------------|---------------------------|
-| **Step 7: TEST** | Test Plan Specification -- exact test file paths, test case descriptions, assertions |
-| **Step 8: PREPARE** | Dependency list, required directories, prerequisite checks |
-| **Step 9: IMPLEMENT** | File Specifications -- exact paths, signatures, integration points, data flow |
-| **Step 10: REVIEW** | Architecture Validation Checks -- what to verify during self-review |
-| **Step 11: OPTIMIZE** | Dependency Graph -- identifies redundant paths or unnecessary complexity |
-| **Step 12: SECURE** | Security Review Checklist -- specific items to verify |
-| **Step 13: VERIFY** | Acceptance Criteria Mapping -- what assertions must pass |
-| **Step 14: DOCUMENT** | File purposes and JSDoc signatures -- what documentation to generate |
-| **Step 15: FINAL-REVIEW** | Complete checklist of all quality bar items |
+| **Step 8: TEST** | Test Plan Specification -- exact test file paths, test case descriptions, assertions |
+| **Step 9: PREPARE** | Dependency list, required directories, prerequisite checks |
+| **Step 10: IMPLEMENT** | File Specifications -- exact paths, signatures, integration points, data flow |
+| **Step 11: REVIEW** | Architecture Validation Checks -- what to verify during self-review |
+| **Step 12: OPTIMIZE** | Dependency Graph -- identifies redundant paths or unnecessary complexity |
+| **Step 13: SECURE** | Security Review Checklist -- specific items to verify |
+| **Step 14: VERIFY** | Acceptance Criteria Mapping -- what assertions must pass |
+| **Step 15: DOCUMENT** | File purposes and JSDoc signatures -- what documentation to generate |
+| **Step 16: FINAL-REVIEW** | Complete checklist of all quality bar items |
 
 After the Implementation Planner completes, the plan proceeds to Gate 2 (human approval) before entering the todo queue for execution.
 
