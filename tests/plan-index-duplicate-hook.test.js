@@ -25,8 +25,11 @@ const assert = require('node:assert');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { spawnSync } = require('child_process');
 
 const hook = require('../src/hooks/PreToolUse.Write.js');
+
+const WRITE_HOOK_PATH = path.join(__dirname, '..', 'src', 'hooks', 'PreToolUse.Write.js');
 
 // Route the advisory log sink to a throwaway dir so the tests never touch the real
 // project `.ctoc/logs/plan-index.log`. Injected as `deps.projectPath` on every run().
@@ -215,5 +218,155 @@ describe('PI5-s2 PreToolUse.Write advisory duplicate guard — run(payload, deps
     assert.strictEqual(hook.isPlanTarget('plans/a.txt'), false);
     assert.strictEqual(hook.isPlanTarget(''), false);
     assert.strictEqual(hook.isPlanTarget(null), false);
+  });
+});
+
+/**
+ * SPAWNED-SUBPROCESS integration — drives the REAL hook via
+ * `execFileSync(process.execPath, [WRITE_HOOK_PATH], { input })`, exercising the
+ * production `main()` → single stdin read → advisory `run()` → `enforce(parsed)`
+ * path that the isolated `run()` unit tests NEVER covered (the PI4 lesson, and the
+ * exact gap that let the drained-pipe "block every plan write" bug ship).
+ *
+ * These FAIL against the pre-fix code (the delegate re-read a drained pipe → target
+ * '(unknown)' → BLOCK/exit 1 on a plan write; escape bypass broken) and PASS after
+ * the single-read-then-hand-off fix.
+ */
+describe('PI5-s2 PreToolUse.Write — REAL spawned hook (stdin/delegate integration)', () => {
+  let projectDir = '';
+  let fixtureFile = '';
+
+  /** Build a minimal CTOC project the enforcement hook recognizes. */
+  before(() => {
+    // realpath so the child's process.cwd() (which resolves symlinks, e.g. macOS
+    // /var → /private/var) matches the absolute target paths — otherwise
+    // path.relative(cwd, target) yields a traversal path and the whitelist rejects it.
+    projectDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pi5-spawn-')));
+    fs.mkdirSync(path.join(projectDir, '.ctoc', 'logs'), { recursive: true });
+    // CTOC marker so ctoc-project-detector.isCtocProject() → true.
+    fs.writeFileSync(
+      path.join(projectDir, 'CLAUDE.md'),
+      '# CTOC Project Instructions\n\nThis project uses CTOC.\n'
+    );
+    for (const stage of ['functional', 'implementation', 'todo', 'in-progress', 'review', 'done']) {
+      fs.mkdirSync(path.join(projectDir, 'plans', stage), { recursive: true });
+    }
+    // A pre-scored fixture so the spawned real hook surfaces a deterministic
+    // advisory warning without an embedded index / Ollama.
+    fixtureFile = path.join(projectDir, 'dup-fixture.json');
+    fs.writeFileSync(
+      fixtureFile,
+      JSON.stringify([{ plan: 'plans/functional/auth-middleware-refactor.md', similarity: 0.87 }])
+    );
+  });
+
+  after(() => {
+    try { fs.rmSync(projectDir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  });
+
+  /**
+   * Spawn the real Write hook with a JSON payload on stdin. Returns
+   * `{ status, stdout, stderr }`. `status === 0` means the write was ALLOWED.
+   * Uses `spawnSync` so stderr (the advisory warning) is captured on BOTH the
+   * success (exit 0) and failure (exit != 0) paths — `execFileSync` drops stderr
+   * on the success path.
+   *
+   * @param {object} payload - PreToolUse payload written to the child's stdin
+   * @param {object} [extraEnv] - extra env vars for the child
+   */
+  function spawnHook(payload, extraEnv = {}) {
+    const res = spawnSync(process.execPath, [WRITE_HOOK_PATH], {
+      input: JSON.stringify(payload),
+      cwd: projectDir, // enforce() uses process.cwd() as the project root
+      env: {
+        ...process.env,
+        // Ensure the env-var target path in getTargetFile() does not shadow stdin.
+        CLAUDE_TOOL_INPUT: '',
+        ...extraEnv,
+      },
+      encoding: 'utf8',
+    });
+    return {
+      status: typeof res.status === 'number' ? res.status : 1,
+      stdout: res.stdout ? String(res.stdout) : '',
+      stderr: res.stderr ? String(res.stderr) : '',
+    };
+  }
+
+  // (a) plan write similar to an indexed plan → ⚠ warning AND exit 0 (ALLOWED,
+  //     not target '(unknown)' / exit 1). This is the core regression assertion.
+  it('a near-duplicate plan write is BOTH warned AND allowed (exit 0)', () => {
+    const payload = {
+      tool_name: 'Write',
+      tool_input: {
+        file_path: path.join(projectDir, 'plans', 'functional', 'auth-layer-cleanup.md'),
+        content: '---\ntitle: Auth layer cleanup\n---\n## Goal\nRefactor auth middleware.',
+      },
+    };
+    const { status, stderr } = spawnHook(payload, {
+      CTOC_DUPLICATE_GUARD_TEST_FIXTURE: fixtureFile,
+    });
+
+    assert.strictEqual(status, 0, `plan write must be ALLOWED (exit 0), got ${status}; stderr:\n${stderr}`);
+    assert.ok(
+      stderr.includes('auth-middleware-refactor') && stderr.includes('0.87'),
+      `the advisory warning (slug + score) must surface on stderr; got:\n${stderr}`
+    );
+    assert.ok(
+      !stderr.includes('(unknown)'),
+      `enforcement must NOT see target '(unknown)' (drained-pipe bug); got:\n${stderr}`
+    );
+  });
+
+  // (b) unplanned / non-whitelisted write, no escape phrase → BLOCKED (exit != 0).
+  it('an unplanned non-whitelisted write with no escape phrase is BLOCKED (exit != 0)', () => {
+    const payload = {
+      tool_name: 'Write',
+      tool_input: {
+        file_path: path.join(projectDir, 'src', 'lib', 'unplanned.js'),
+        content: 'module.exports = 1;\n',
+      },
+    };
+    const { status, stderr } = spawnHook(payload);
+    assert.notStrictEqual(status, 0, `unplanned write must be BLOCKED; stderr:\n${stderr}`);
+    assert.ok(stderr.includes('BLOCKED'), `block message must surface; got:\n${stderr}`);
+  });
+
+  // (c) unplanned write WITH an escape phrase in the transcript → ALLOWED (exit 0).
+  //     Proves the escape-phrase bypass works through the Write hook + real enforce().
+  it('an unplanned write with an escape phrase in the transcript is ALLOWED (exit 0)', () => {
+    const transcriptPath = path.join(projectDir, 'transcript.jsonl');
+    fs.writeFileSync(
+      transcriptPath,
+      JSON.stringify({ role: 'user', content: 'please hotfix this quickly' }) + '\n'
+    );
+    const payload = {
+      tool_name: 'Write',
+      transcript_path: transcriptPath,
+      tool_input: {
+        file_path: path.join(projectDir, 'src', 'lib', 'unplanned-escape.js'),
+        content: 'module.exports = 2;\n',
+      },
+    };
+    const { status, stderr } = spawnHook(payload);
+    assert.strictEqual(status, 0, `escape-phrase write must be ALLOWED (exit 0); stderr:\n${stderr}`);
+  });
+
+  // (d) a plan write with NO duplicate → exit 0, no advisory warning.
+  it('a plan write with no duplicate → exit 0 and no advisory warning', () => {
+    const emptyFixture = path.join(projectDir, 'empty-fixture.json');
+    fs.writeFileSync(emptyFixture, JSON.stringify([]));
+    const payload = {
+      tool_name: 'Write',
+      tool_input: {
+        file_path: path.join(projectDir, 'plans', 'functional', 'brand-new-plan.md'),
+        content: '---\ntitle: Brand new plan\n---\n## Goal\nSomething entirely novel.',
+      },
+    };
+    const { status, stderr } = spawnHook(payload, {
+      CTOC_DUPLICATE_GUARD_TEST_FIXTURE: emptyFixture,
+    });
+    assert.strictEqual(status, 0, `novel plan write must be ALLOWED (exit 0); stderr:\n${stderr}`);
+    assert.ok(!stderr.includes('possible duplicate'), `no advisory line for a novel plan; got:\n${stderr}`);
   });
 });

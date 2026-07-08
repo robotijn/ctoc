@@ -443,15 +443,17 @@ through the real hook, not that a function returns a value in isolation.
   in a try/catch that fails OPEN (exit 0) so an advisory-layer fault can never suppress a
   legitimate write — but it can also never *weaken* enforcement, because on the normal
   path the real Edit IIFE runs and owns the block/allow decision unchanged.
-- **stdin is read ONCE in `main()` (`fs.readFileSync(0)`), the guard runs on the parsed
-  object, then the delegate is required and re-reads stdin (fd 0) itself.** Per the plan's
-  stdin decision, a clean single-read-then-hand-off is not achievable without editing
-  `PreToolUse.Edit.js` (out of scope), so the delegate reads stdin as today. On a normal
-  interactive/agent write, fd 0 is a pipe that yields the same payload to both reads; the
-  guard never *consumes* the delegate's read in a way that starves it (the guard's read is
-  its own `readFileSync(0)`, and the delegate does its own). A malformed/empty payload →
-  guard skips, delegate still runs. This matches the plan's "enforcement is never starved"
-  requirement.
+- **~~stdin is read ONCE in `main()` (`fs.readFileSync(0)`), the guard runs on the parsed
+  object, then the delegate is required and re-reads stdin (fd 0) itself.~~ THIS DECISION
+  WAS WRONG AND SHIPPED A CRITICAL BUG — SUPERSEDED by the PI5-s2 stdin fix below.** The
+  claim that "fd 0 is a pipe that yields the same payload to both reads" is FALSE: **a pipe
+  is single-consumer.** The first read (the advisory guard's `readStdinRaw`) DRAINS fd 0;
+  the delegate's second `fs.readFileSync(0)` then read an EMPTY pipe → `stdinJson = null` →
+  `getTargetFile(null) = null` → target `(unknown)` → the `plans/**/*.md` whitelist never
+  matched → **EVERY plan-file write was BLOCKED (exit 1)**, and the escape-phrase bypass
+  (which reads `transcript_path` from the same drained payload) broke. The false-green unit
+  tests never caught it because they drive `run()` in isolation and never exercise the
+  production `main()`/stdin/delegate path (the exact PI4 lesson). See the fix decision below.
 - **File writes go through `src/lib/safe-fs` (`safeFs.mkdirSync` / `safeFs.appendFileSync`),
   NOT raw `fs`.** The repo's `security/detect-non-literal-fs-filename` ESLint rule (enforced
   by `tests/lint.test.js`) flags raw `fs.mkdirSync`/`fs.appendFileSync` on a computed path.
@@ -466,6 +468,38 @@ through the real hook, not that a function returns a value in isolation.
 - **Tests inject `projectPath` = a per-run `os.tmpdir()` scratch dir** so the advisory-log
   sink never touches the real project `.ctoc/logs/plan-index.log` — the suite stays
   hermetic and leaves no artifact in the repo.
+
+### PI5-s2 CRITICAL FIX — drained-pipe → block-everything (pre-Gate-3 kickback, 2026-07-08)
+
+- **Root cause: a pipe is SINGLE-CONSUMER; fd 0 was read twice.** `main()`'s advisory guard
+  drained stdin (`readStdinRaw` → `fs.readFileSync(0)`), then `require('./PreToolUse.Edit.js')`
+  fired the delegate's require-time IIFE, which read stdin AGAIN (`readStdinJson` →
+  `fs.readFileSync(0)`) on the now-empty pipe. Result: `stdinJson = null` →
+  `getTargetFile(null) = null` → target `(unknown)` → the `plans/**/*.md` whitelist never
+  matched → **every plan-file write BLOCKED (exit 1)**, escape-phrase bypass broken (it reads
+  `transcript_path` from the same null payload).
+- **Fix — single-read-then-hand-off (both hooks touched, enforcement preserved byte-for-byte):**
+  1. **`PreToolUse.Edit.js`** — the enforcement decision is extracted into an exported
+     `async function enforce(stdinJson)` that does NO stdin read; it takes an already-parsed
+     payload and runs the identical whitelist → CTOC-detect → coverage → escape-phrase → block
+     flow with the identical exit codes and logging (the only change is that the local
+     `stdinJson = readStdinJson()` line moved OUT of the function to the single caller). A
+     direct-invocation IIFE `if (require.main === module) enforce(readStdinJson());` reads
+     stdin ONCE when the file is run as an Edit hook — so Edit.js's own behavior is unchanged.
+     Importing the module (from Write.js or a test) no longer reads stdin or runs enforcement.
+  2. **`PreToolUse.Write.js`** — `main()` reads + parses stdin exactly ONCE, runs the advisory
+     dup-guard on that payload (⚠ warning to stderr + log, never blocks), then calls the
+     delegate's exported `enforce(parsed)` with that SAME parsed payload. NO second fd-0 read
+     anywhere. Real enforcement fires on the real target: plan writes ALLOW, unplanned writes
+     BLOCK, escape phrases work.
+- **The test gap that let this ship (now closed): a SPAWNED-SUBPROCESS integration test.** The
+  old suite drove `run()` in isolation and never exercised the production `main()`/stdin/delegate
+  path (the PI4 lesson, verbatim). Added `execFileSync(process.execPath, [writeHookPath], { input })`
+  cases against a temp CTOC project with a plan whitelist, asserting: (a) a `plans/**/*.md` write
+  similar to an indexed plan → ⚠ warning AND exit 0 (allowed, not `(unknown)`/exit 1); (b) an
+  unplanned/non-whitelisted write, no escape phrase → BLOCKED (exit non-zero); (c) an unplanned
+  write WITH an escape phrase in the transcript → ALLOWED (exit 0); (d) a plan write with no
+  duplicate → exit 0, no warning. These FAIL against the drained-pipe code and PASS after the fix.
 
 
 ---

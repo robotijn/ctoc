@@ -14,6 +14,20 @@
  * Fails OPEN on internal error (better to skip enforcement than break flow).
  *
  * Exit codes: 0 = allowed, 1 = blocked.
+ *
+ * stdin contract (PI5-s2 fix). A pipe is SINGLE-CONSUMER: fd 0 can be drained
+ * exactly once. The enforcement decision is therefore factored into an exported
+ * `enforce(parsedPayload)` that does NO stdin read — it operates on an
+ * already-parsed payload. Two entry points feed it:
+ *   • DIRECT invocation (this file run as a hook on an Edit tool): the bottom
+ *     IIFE reads stdin ONCE, parses it, and calls `enforce(parsed)`.
+ *   • DELEGATED invocation (PreToolUse.Write.js): the Write hook reads stdin
+ *     ONCE and calls the exported `enforce(parsed)` with that SAME payload — so
+ *     the delegate never re-reads a now-empty pipe (the bug this fixes).
+ * `enforce` preserves the whitelist → CTOC-detect → coverage → escape-phrase →
+ * block flow, its exit codes, and its logging byte-for-byte. Guarded with
+ * `require.main === module` so importing the module never runs enforcement or
+ * consumes stdin.
  */
 
 const path = require('path');
@@ -143,10 +157,24 @@ function allow(outcome, info) {
   process.exit(0);
 }
 
-(async function main() {
+/**
+ * The enforcement decision, operating on an ALREADY-PARSED PreToolUse payload.
+ * Performs NO stdin read (a pipe is single-consumer — the caller owns the one
+ * read). Runs the exact whitelist → CTOC-detect → coverage → escape-phrase →
+ * block flow and exits with the same codes as before (0 = allowed, 1 = blocked).
+ *
+ * Called by:
+ *   • the direct-invocation IIFE below (this file run as an Edit hook), and
+ *   • PreToolUse.Write.js's main() (the delegate), which passes the SAME parsed
+ *     payload it already read from stdin — so enforcement fires on the real
+ *     target instead of a drained pipe.
+ *
+ * @param {object|null} stdinJson - parsed PreToolUse payload (may be null)
+ * @returns {Promise<void>} always terminates the process via process.exit
+ */
+async function enforce(stdinJson) {
   try {
     const root = process.cwd();
-    const stdinJson = readStdinJson();
     const tool = (stdinJson && stdinJson.tool_name) || 'Edit';
     const targetFile = getTargetFile(stdinJson);
 
@@ -192,4 +220,14 @@ function allow(outcome, info) {
     process.stderr.write(`[CTOC v7] enforcement hook error (failing open): ${err.message}\n`);
     process.exit(0);
   }
-})();
+}
+
+module.exports = { enforce, isWhitelisted, getTargetFile, readStdinJson };
+
+// Direct invocation: this file run as a PreToolUse hook on an Edit tool. Read
+// stdin ONCE here (the single consumer of the pipe) and hand the parsed payload
+// to enforce(). Guarded so merely importing the module (e.g. from Write.js or a
+// test) never consumes stdin or runs enforcement.
+if (require.main === module) {
+  enforce(readStdinJson());
+}
