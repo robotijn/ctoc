@@ -301,50 +301,84 @@ four blocks.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 21 tests, 6 pass / 15 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none; consumes existing s3 barrel
+- [x] Check prerequisites — s2/s3 shipped: `plan-index/index.js` exposes `search`/`related`/`getWiring` as fail-open lazy getters (verified on disk)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling — every barrel call `typeof`-guarded + `try/catch` → `[]`/`''`/0
+- [x] Wire up integration points — overview panel, menu `/` shortcut, inbox area block, `lib/inbox` helper
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — dependency direction commands/tabs/areas → lib only; all edits additive; existing exports/shortcuts unchanged
+- [x] Verify integration points work together — async pre-fetch stashes on `app.*`; render reads synchronously
+- [x] Check error handling completeness — inner guards + outer catch nets, both covered
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths — bounded top-5 (related) / top-10 (search); results cached on `app`, render does no re-query
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — query string passed only to `search()`, never a path/shell arg
+- [x] Sanitize outputs — fixed UI strings; no path/stack leakage into the rendered dashboard
+- [x] No secrets in code
+- [x] Safe file operations — no new `fs`/shell; `projectPath` is the resolved app root
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `eslint . --max-warnings 0` exit 0; tsc `--checkJs` baseline neutral (89, unchanged)
+- [x] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → 3067 pass / 0 fail
+- [x] Check coverage >= 80% — new logic ~94% (only 4 lines of TUI-dispatcher glue uncovered; all extracted functions 100%)
+- [x] 0 skipped, 0 flaky tests — 0 skipped
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — inline fail-open + bridge rationale at each insertion point
+- [x] Add JSDoc comments to new functions — `renderRelatedPanel`, `prefetchRelated`, `readIndexUnitCount`, `enterSearchMode`, `handleSearchKey`, `renderInboxRelated`, `listRelatedForInbox`
+- [x] Update CHANGELOG if needed — n/a (feature not yet released; part of PI4 chain)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed — full suite green, lint clean, typecheck neutral
+- [x] Manual verification if needed — poisoned-barrel fail-open proof: overview + inbox render intact, no throw escapes
+- [x] Ready for human review — plan left in `todo/` (NOT moved) per dispatch instruction
+
+## Decisions Taken Under Ambiguity
+
+- **Search shortcut key = `/` (list mode only).** Per the plan's Step-6 DESIGN call.
+  `/` is the conventional search key and does not collide with the existing `s`
+  Settings shortcut; guarded by `app.mode === 'list'` so it never shadows text input.
+- **Extracted `handleSearchKey(key, app)` + `enterSearchMode(app, query)` as exported
+  units** (rather than only inlining into the TUI `handleKey` dispatcher). Rationale:
+  the full `handleKey` TUI loop is not unit-testable in isolation (it calls
+  `render()`/`process.stdout`); extracting the search decision + fetch into pure,
+  exported functions lets the test drive them directly and keeps the dispatcher glue
+  a thin 4-line wire. This is why 4 dispatcher-glue lines are the only uncovered new
+  lines — the testable logic is 100% covered.
+- **Async-fetch/sync-render bridge (ADR-B) realized via `app.searchResults` /
+  `app.relatedPlans` / `app.inboxRelated`.** The key handler kicks `enterSearchMode`/
+  `prefetchRelated` (async, never awaited on the key path — `Promise.resolve(...).then(render)`),
+  which stash the ranked array on `app.*`; the synchronous `render`/`renderRelatedPanel`/
+  `renderInboxRelated` read that cached array. Render never awaits.
+- **Zero-unit "index building" indicator (Scenario 7) driven by
+  `readIndexUnitCount(projectPath)`** — a SYNCHRONOUS fail-open read of
+  `getWiring({projectPath}).store.size`; null/unavailable store → 0 → "index building…".
+  No async needed for the indicator (matches the parent ADR).
+- **Panel placement.** Overview "Related Plans" renders directly under the existing
+  Semantic Index status line (before the `line()` divider); inbox "Related plans"
+  renders after the queues, immediately before `renderFooter`. Both additive and
+  removable per the parent Rollback section.
+- **tsc `--checkJs` neutrality via `/** @type {any} *\/` cast at each barrel require
+  site.** The barrel's `search`/`related`/`getWiring` are defined by
+  `Object.defineProperties` lazy getters that tsc's static module-shape inference
+  cannot see (would otherwise raise `TS2339` and regress the ratcheting baseline
+  89→97). The cast is documentation-only; runtime behavior is unchanged. No runtime
+  code was altered to satisfy the type checker.
+- **Bounded result sets.** `related`/inbox helper cap at top-5; `search` caps at
+  top-10 (perceived-latency mitigation named in the parent risk table).

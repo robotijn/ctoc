@@ -219,6 +219,32 @@ function listStaleCandidates(root) {
   return staleDetector.scanCheapCandidates(root).candidates;
 }
 
+/**
+ * PI4-s4: fetch the plans most related to `planSlug` for the inbox surface, via
+ * the plan-index barrel `related(planSlug, { projectPath })`. Fully fail-open:
+ * a missing barrel export, a non-string seed, or a throwing/rejecting `related`
+ * all resolve to `[]` — this NEVER rejects, so a semantic-feature fault can never
+ * break the inbox render (the load-bearing fail-open invariant). Bounded to the
+ * top 5 neighbours. Additive: existing exports are unchanged.
+ * @param {string} planSlug - the seed plan identifier (store `planPath` key)
+ * @param {string} root - the resolved project root
+ * @returns {Promise<Array<object & {planPath: string, score: number}>>}
+ */
+async function listRelatedForInbox(planSlug, root) {
+  try {
+    if (typeof planSlug !== 'string' || planSlug.length === 0) return [];
+    // `related` is a lazy Object.defineProperties getter on the barrel that tsc's
+    // static module-shape inference cannot see — cast to any to keep --checkJs neutral.
+    /** @type {any} */
+    const planIndex = require('./plan-index');
+    if (typeof planIndex.related !== 'function') return [];
+    const results = await planIndex.related(planSlug, { projectPath: root, limit: 5 });
+    return Array.isArray(results) ? results.slice(0, 5) : [];
+  } catch {
+    return []; // fail-open — never reject, never break the inbox
+  }
+}
+
 const getInboxCounts = memoize(function getInboxCountsImpl(root) {
   return {
     questions: listQuestions(root).length,
@@ -237,4 +263,5 @@ module.exports = {
   listStaleCandidates,
   createQuestion,
   createDecision,
+  listRelatedForInbox,
 };

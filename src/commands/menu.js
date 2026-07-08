@@ -43,6 +43,52 @@ function attachEnvironmentQuestion(result) {
   return result;
 }
 
+// PI4-s4: "Search plans" flow (additive, fail-open). `enterSearchMode` is the
+// async-fetch half of the async-fetch/sync-render bridge: it awaits the barrel
+// `search(query)`, stashes the ranked results on `app.searchResults`, and NEVER
+// rejects — a missing barrel export or a throwing `search` yields an empty result
+// set (fail-open), so a semantic-feature fault can never crash the menu (the
+// load-bearing invariant / readIndexStatus precedent). Bounded to the top 10 hits.
+/**
+ * Run a plan search and stash ranked results on the app for synchronous render.
+ * @param {object} app - TUI app state; uses `app.projectPath`
+ * @param {string} query - the user's search query string
+ * @returns {Promise<void>}
+ */
+async function enterSearchMode(app, query) {
+  app.searchMode = true;
+  const projectPath = (app && app.projectPath) || process.cwd();
+  try {
+    if (typeof query !== 'string' || query.length === 0) { app.searchResults = []; return; }
+    // `search` is a lazy Object.defineProperties getter on the barrel that tsc's
+    // static module-shape inference cannot see — cast to any to keep --checkJs neutral.
+    /** @type {any} */
+    const planIndex = require('../lib/plan-index');
+    if (typeof planIndex.search !== 'function') { app.searchResults = []; return; }
+    const results = await planIndex.search(query, { projectPath, limit: 10 });
+    app.searchResults = Array.isArray(results) ? results.slice(0, 10) : [];
+  } catch {
+    app.searchResults = []; // fail-open — never reject, never crash the menu
+  }
+}
+
+/**
+ * PI4-s4: the "Search plans" keyboard shortcut. Mirrors the Settings shortcut
+ * shape — guarded by `app.mode === 'list'` so it NEVER shadows text input. `/` is
+ * the conventional search key and does not collide with the existing `s` Settings
+ * shortcut. Returns true (consumed) only when the search key fires in list mode.
+ * @param {{sequence?: string}} key
+ * @param {object} app
+ * @returns {boolean} true if the key was consumed (search entered)
+ */
+function handleSearchKey(key, app) {
+  if (key && key.sequence === '/' && app && app.mode === 'list') {
+    app.searchMode = true;
+    return true;
+  }
+  return false;
+}
+
 // Read version from VERSION file
 let VERSION;
 try {
@@ -214,6 +260,15 @@ function handleKey(str, key) {
     return;
   }
 
+  // PI4-s4: "Search plans" shortcut ('/' in list mode). Additive + fail-open —
+  // kicks off the async search fetch (never awaited on the key path) and re-renders.
+  // A search fault can never crash the menu (enterSearchMode is fully fail-open).
+  if (handleSearchKey(key, app)) {
+    Promise.resolve(enterSearchMode(app, app.searchQuery || '')).then(render).catch(() => {});
+    render();
+    return;
+  }
+
   // Numeric area shortcuts (1-5)
   if (/^[1-5]$/.test(key.sequence) && app.mode === 'list') {
     const idx = parseInt(key.sequence, 10) - 1;
@@ -335,4 +390,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { ensureInitialized };
+module.exports = { ensureInitialized, enterSearchMode, handleSearchKey };
