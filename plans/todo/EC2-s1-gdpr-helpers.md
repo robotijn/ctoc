@@ -239,50 +239,73 @@ Confirm all 14 cases pass, purity holds, `email`/special-category contracts exac
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — confirmed MODULE_NOT_FOUND (1 fail)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (pure module)
+- [x] Check prerequisites — confirmed SKILL.md gdpr_article enum + email contract
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points — exports for s3/s4 reference
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — purity confirmed (no imports)
+- [x] Verify integration points work together — email map byte-exact
+- [x] Check error handling completeness — throw + fail-safe paths tested
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code — frozen constants, no classes
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — no paths in module
+- [x] Sanitize outputs — validators throw, never wrong shape
+- [x] No secrets in code
+- [x] Safe file operations — none (pure)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral (0 new errors)
+- [x] Run ALL tests (TDD Green) — 3196 pass, 0 fail, 0 skipped
+- [x] Check coverage >= 80% — gdpr-helpers.js 100% line/branch/funcs
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — README lib count 115→116 + gdpr-helpers listed
+- [x] Add JSDoc comments to new functions — all 4 exports + constants
+- [x] Update CHANGELOG if needed — n/a (version bump at release)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review — plan stays in implementation/todo; executor does NOT cross Gate 2
+
+## Decisions Taken Under Ambiguity
+
+- **Extra PII field entries beyond the plan's named ones.** The plan named `email`,
+  `ipaddress`/`ip`, and the seven special-category fields explicitly, and said the map
+  must include these "at minimum" grounded in the skill's `piiFields` list. I additionally
+  seeded the other direct/online identifiers from the skill's `piiFields` (`phone`, `name`,
+  `firstname`, `lastname`, `address`, `cookieid`, `deviceid`, `fingerprint`) with the same
+  `["GDPR-6","GDPR-13","GDPR-17"]` trigger set, since they are collected-from-subject
+  identifiers with the identical lawful-basis / info-at-collection / erasure obligations.
+  Rationale documented inline. Deliberately did NOT add `password`/`secret`/`token`/`ssn`
+  etc. — those carry different (auth-artefact / gov-issued) Article profiles the parent
+  did not specify, so mapping them would be guessing; they return `[]` until a later slice
+  specifies their exact Article set. Caught-at-review if wrong.
+- **Special-category Article set = `["GDPR-6","GDPR-9","GDPR-13"]`.** The plan said special
+  fields "include `GDPR-9` (plus `GDPR-6`, `GDPR-13`)". I did NOT add `GDPR-17` to the
+  special set — the plan's parenthetical named only 6/13, so I honoured that literally.
+- **`mapPiiFieldToArticles` returns a copy (`.slice()`)** of the mapped array rather than
+  the frozen source reference, so a caller mutating the result can never affect the shared
+  map. Pure-function hygiene; not specified but strictly safer.
+- **`validateFindingSchema` treats empty-string `gdpr_article` as "required" (missing).**
+  The plan distinguished "missing" vs "unknown"; an empty string is neither a valid code
+  nor a meaningful value, so it takes the `gdpr_article is required` path.
