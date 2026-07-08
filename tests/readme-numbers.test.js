@@ -106,8 +106,8 @@ function countQualityConfigs() {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('Ground truth — project counts (sanity checks)', () => {
-  it('agents/: 110 .md files (excluding _shared/, ivv-chief added in v6.9.27)', () => {
-    assert.equal(countAgentMdFiles(), 110);
+  it('agents/: 111 .md files (excluding _shared/, eu-ai-act-agent added in EC3-s2)', () => {
+    assert.equal(countAgentMdFiles(), 111);
   });
 
   it('agents/: 22 categories', () => {
@@ -193,24 +193,24 @@ describe('Ground truth — project counts (sanity checks)', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('README — explicit numeric claims match reality', () => {
-  it('badge: agents-110', () => {
-    assert.match(README, /agents-110-orange/);
+  it('badge: agents-111', () => {
+    assert.match(README, /agents-111-orange/);
   });
 
   it('badge: skills-413 (v6.9.24+)', () => {
     assert.match(README, /skills-421-blue/);
   });
 
-  it('lead paragraph: 110 agents across 22 categories', () => {
-    assert.match(README, /\*\*110 agents\*\* across \*\*22 categories\*\*/);
+  it('lead paragraph: 111 agents across 22 categories', () => {
+    assert.match(README, /\*\*111 agents\*\* across \*\*22 categories\*\*/);
   });
 
-  it('Compare table: 110 across 22 categories', () => {
-    assert.match(README, /110 across 22 categories/);
+  it('Compare table: 111 across 22 categories', () => {
+    assert.match(README, /111 across 22 categories/);
   });
 
-  it('Key Features: 110 agents across 22 categories', () => {
-    assert.match(README, /\*\*110 agents\*\* across 22 categories/);
+  it('Key Features: 111 agents across 22 categories', () => {
+    assert.match(README, /\*\*111 agents\*\* across 22 categories/);
   });
 
   it('Key Features: 421 skill files (v6.9.24+)', () => {
@@ -257,16 +257,16 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /118 JS modules/);
   });
 
-  it('Project structure: 110 agent definitions across 22 categories', () => {
-    assert.match(README, /110 agent definitions across 22 categories/);
+  it('Project structure: 111 agent definitions across 22 categories', () => {
+    assert.match(README, /111 agent definitions across 22 categories/);
   });
 
   it('Project structure: 421 skill files (v6.9.24+)', () => {
     assert.match(README, /421 skill files/);
   });
 
-  it('Agents intro: 110 agents across 22 categories', () => {
-    assert.match(README, /\*\*110 agents across 22 categories\*\*/);
+  it('Agents intro: 111 agents across 22 categories', () => {
+    assert.match(README, /\*\*111 agents across 22 categories\*\*/);
   });
 
   it('Skills intro: 421 skill files (v6.9.24+)', () => {
