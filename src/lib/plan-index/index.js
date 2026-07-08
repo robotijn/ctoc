@@ -24,3 +24,40 @@
 const { openStore, PLAN_SENTINEL } = require('./store');
 
 module.exports = { openStore, PLAN_SENTINEL };
+
+// PI0 composition-root re-exports (additive). PI4–PI6 consume `getWiring` /
+// `kickBackfillBackground` through this single barrel surface.
+//
+// These are exposed as LAZY GETTERS, not eager requires, on purpose: `bootstrap`
+// pulls in `reconcile → sync-unit → content-hash`, and `content-hash`/`reconcile`
+// require THIS barrel back (for `PLAN_SENTINEL`). Eagerly requiring bootstrap at
+// barrel-load time therefore forms a cycle that leaves a co-loading module's
+// exports (e.g. `hashUnit`) transiently undefined — a real circular-dependency
+// warning + broken PI3 tests. Deferring the require to first PROPERTY ACCESS breaks
+// the cycle: PI1/PI3 consumers that only touch `openStore`/`PLAN_SENTINEL` never
+// trigger it, and a PI4+ consumer reading `getWiring` loads a fully-initialized
+// graph. Each getter is fail-open (returns undefined if the submodule cannot load)
+// so a broken wiring/bootstrap can NEVER break the barrel for existing consumers.
+// The require argument is a STRING LITERAL in every getter (no non-literal-require).
+Object.defineProperties(module.exports, {
+  getWiring: {
+    enumerable: true,
+    configurable: true,
+    get() { try { return require('./wiring').getWiring; } catch { return undefined; } }
+  },
+  probeEmbeddingSource: {
+    enumerable: true,
+    configurable: true,
+    get() { try { return require('./wiring').probeEmbeddingSource; } catch { return undefined; } }
+  },
+  kickBackfillBackground: {
+    enumerable: true,
+    configurable: true,
+    get() { try { return require('./bootstrap').kickBackfillBackground; } catch { return undefined; } }
+  },
+  isBackfillNeeded: {
+    enumerable: true,
+    configurable: true,
+    get() { try { return require('./bootstrap').isBackfillNeeded; } catch { return undefined; } }
+  }
+});

@@ -3,10 +3,31 @@
  * Shows plan counts, agent status, and release controls
  */
 
+const path = require('path');
 const { c, line, renderFooter } = require('../lib/tui');
 const { getPlanCounts, getAgentStatus } = require('../lib/state');
 const { getVersion, bump } = require('../lib/version');
 const { getVisionCounts } = require('./vision');
+const safeFs = require('../lib/safe-fs');
+
+/**
+ * Read the plan-index build status written by the bootstrap child. Fail-open: a
+ * missing OR corrupt `.ctoc/index/build-status.json` yields `null` → NO status line
+ * is rendered and the dashboard is unchanged. A read error here must NEVER break the
+ * dashboard render (the explicit PI0 constraint; the pi1 / task-reconcile precedent).
+ * @param {string} projectPath
+ * @returns {{ state?: string, swept?: number, message?: string }|null}
+ */
+function readIndexStatus(projectPath) {
+  try {
+    const file = path.join(projectPath, '.ctoc', 'index', 'build-status.json');
+    if (!safeFs.existsSync(file)) return null;
+    const parsed = JSON.parse(safeFs.readFileSync(file, 'utf8'));
+    return (parsed && typeof parsed === 'object') ? parsed : null;
+  } catch {
+    return null; // fail-open — never break the dashboard
+  }
+}
 
 // Release mode state
 let releaseMode = false;
@@ -34,7 +55,20 @@ function render(app) {
   output += `  Implementation  ${c.cyan}${counts.implementation}${c.reset} drafts\n`;
   output += `  Todo            ${c.cyan}${counts.todo}${c.reset} queued\n`;
   output += `  In Progress     ${c.cyan}${counts.inProgress}${c.reset} active\n`;
-  output += `  Review          ${c.cyan}${counts.review}${c.reset} pending\n\n`;
+  output += `  Review          ${c.cyan}${counts.review}${c.reset} pending\n`;
+
+  // Semantic index build status (fail-open — omitted entirely when unavailable).
+  const idx = readIndexStatus(projectPath);
+  if (idx) {
+    if (idx.state === 'building') {
+      output += `  ${c.dim}Semantic Index  building… ${idx.swept || 0} plans${c.reset}\n`;
+    } else if (idx.state === 'ready') {
+      output += `  ${c.dim}Semantic Index  ready (${idx.swept || 0} plans)${c.reset}\n`;
+    } else if (idx.state === 'error') {
+      output += `  ${c.yellow}Semantic Index  unavailable — ${idx.message || 'see logs'}${c.reset}\n`;
+    }
+  }
+  output += '\n';
 
   output += line() + '\n\n';
 
