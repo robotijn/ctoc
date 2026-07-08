@@ -287,6 +287,8 @@ ctoc/
 
 **Step 10 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
 
+**1 functional plan → N small implementation plans (SIP1).** Steps 5–7 decompose the functional plan into cohesive slices (~1–3 files, a module + its test kept together), each `parent_plan`-linked and `depends_on`-ordered, named `<parent-slug>-s<N>-<slice-name>.md`, each with its own Step 8–16. The `implementation-planner` typically emits many more implementation plans than functional plans. The parent implementation plan is an INDEX of its slices. Gates 2 & 3 batch per parent via `approveSubplans(parentSlug, fromStage)` in `src/lib/actions.js` — one human decision crosses every sibling (each stamped `approved_by: human`; loops the gate-safe `approvePlan`, no new auto-cross). `listSubplans(parentSlug)` enumerates a parent's set.
+
 **Step 14 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage >= 80%, 0 skipped, 0 flaky. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in [IRON_LOOP.md](./docs/IRON_LOOP.md).
 
 **Circuit breaker**: Max 3 kickbacks to the same step, max 5 total kickbacks per plan. If exceeded, escalate to user with a summary of what keeps failing and why.

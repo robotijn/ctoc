@@ -5,11 +5,11 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
-const { parseMetadata } = require('./state');
+const { parseMetadata, readPlans, getPlansDir } = require('./state');
 const { refineLoop, appendDeferredQuestions } = require('./iron-loop');
 const { writeStatus, clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
-const { validateForReview } = require('./plan-validator');
+const { validateForReview, validateForQueue, validateReviewToDone } = require('./plan-validator');
 const { logTransition } = require('./transition-log');
 const { invalidate } = require('./cache');
 
@@ -859,6 +859,192 @@ function cleanupStaleInProgress(projectPath) {
   return cleanedUp;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SIP1: sub-plan enumeration + batched-gate approval.
+//
+// A functional plan is decomposed by the implementation-planner into N small
+// implementation plans, each linked to the parent via `parent_plan:` and ordered
+// via `depends_on:`. `listSubplans` enumerates that set; `approveSubplans` crosses
+// a whole batch through ONE human gate by LOOPING the existing gate-safe
+// `approvePlan` per sibling (each still stamped `approved_by: human`). This adds
+// NO new auto-cross path — it is a convenience over one human decision.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Stages scanned for sub-plans of a parent (mirrors the plan stage set).
+ */
+const SUBPLAN_STAGES = ['functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
+
+/**
+ * Stages from which a sub-plan SET may be batch-approved (the two human gates a
+ * sibling set crosses together: implementation→todo and review→done).
+ */
+const BATCHED_GATE_SOURCES = ['implementation', 'review'];
+
+/**
+ * Parse a `depends_on` frontmatter value into a trimmed slug array.
+ * `none`/absent/empty → []. Comma-separated → each trimmed non-empty token.
+ *
+ * @param {*} raw - the parsed frontmatter value (string, or undefined)
+ * @returns {string[]}
+ */
+function parseDependsOn(raw) {
+  if (raw === undefined || raw === null) return [];
+  const s = String(raw).trim();
+  if (s === '' || s.toLowerCase() === 'none') return [];
+  return s.split(',').map(t => t.trim()).filter(t => t.length > 0);
+}
+
+/**
+ * Enumerate every plan under `plans/` whose frontmatter `parent_plan` equals
+ * `parentSlug`. Mirrors `readPlans` (state.js) across all stages. Read-only.
+ *
+ * @param {string} parentSlug - the parent functional plan's slug
+ * @param {string} [projectPath] - project root
+ * @returns {Array<{slug: string, stage: string, path: string, dependsOn: string[], bgStatus: string}>}
+ *   oldest-first per stage, in SUBPLAN_STAGES order.
+ * @throws {Error} 'parentSlug required' when parentSlug is falsy/non-string.
+ */
+function listSubplans(parentSlug, projectPath) {
+  if (typeof parentSlug !== 'string' || parentSlug.length === 0) {
+    throw new Error('parentSlug required');
+  }
+  const root = projectPath || findProjectRoot();
+  const plansDir = getPlansDir(root);
+
+  const out = [];
+  for (const stage of SUBPLAN_STAGES) {
+    const plans = readPlans(path.join(plansDir, stage));
+    for (const plan of plans) {
+      if (plan.metadata && String(plan.metadata.parent_plan) === parentSlug) {
+        out.push({
+          slug: plan.name,
+          stage,
+          path: plan.path,
+          dependsOn: parseDependsOn(plan.metadata.depends_on),
+          bgStatus: plan.bgStatus || 'none'
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Order a set of sub-plans so a dependency precedes its dependents (Kahn topo
+ * sort over `depends_on`). Best-effort: on a cycle (should not happen — the
+ * planner caps chain depth at 3 with no cycles) the remaining nodes are appended
+ * in input order rather than throwing. Only intra-batch edges are honored;
+ * a `depends_on` naming a sibling outside the batch is ignored for ordering.
+ *
+ * @param {Array<{slug: string, dependsOn: string[]}>} subplans
+ * @returns {Array} the same objects, dependency-ordered
+ */
+function topoOrderByDependsOn(subplans) {
+  const bySlug = new Map(subplans.map(s => [s.slug, s]));
+  const indeg = new Map(subplans.map(s => [s.slug, 0]));
+  const dependents = new Map(subplans.map(s => [s.slug, []]));
+
+  for (const s of subplans) {
+    for (const dep of s.dependsOn) {
+      if (!bySlug.has(dep)) continue; // edge outside the batch — ignore for ordering
+      indeg.set(s.slug, indeg.get(s.slug) + 1);
+      dependents.get(dep).push(s.slug);
+    }
+  }
+
+  // Seed the queue with zero-indegree nodes, preserving input order.
+  const queue = subplans.filter(s => indeg.get(s.slug) === 0).map(s => s.slug);
+  const ordered = [];
+  const seen = new Set();
+
+  while (queue.length > 0) {
+    const slug = queue.shift();
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    ordered.push(bySlug.get(slug));
+    for (const child of dependents.get(slug)) {
+      indeg.set(child, indeg.get(child) - 1);
+      if (indeg.get(child) === 0) queue.push(child);
+    }
+  }
+
+  // Cycle fallback: append any nodes not yet emitted, in input order.
+  if (ordered.length < subplans.length) {
+    for (const s of subplans) {
+      if (!seen.has(s.slug)) ordered.push(s);
+    }
+  }
+  return ordered;
+}
+
+/**
+ * Batch-approve ALL sub-plans of `parentSlug` currently in `fromStage`, crossing
+ * each ONE gate via the EXISTING gate-safe `approvePlan`. This is the single
+ * human decision expressed as a loop — NOT a new auto-cross path; every sibling
+ * receives the `approved_by: human` marker via `approvePlan`/`addApprovalMarker`.
+ *
+ * Fail-safe (SIP1 D-AS-2): before crossing, each sibling is validated for the
+ * transition (implementation→queue / review→done). A sibling that FAILS
+ * validation, or whose `approvePlan` throws, is REPORTED in `skipped` with a
+ * reason and left in place; the batch CONTINUES. No silent skips.
+ *
+ * @param {string} parentSlug - the parent functional plan's slug
+ * @param {string} fromStage - 'implementation' or 'review'
+ * @param {string} [projectPath] - project root
+ * @returns {{approved: string[], skipped: Array<{slug: string, reason: string}>, results: Array<{slug: string, newPath: string, humanGate: boolean}>}}
+ * @throws {Error} 'parentSlug required'; 'fromStage must be a gate source stage (implementation|review)'
+ */
+function approveSubplans(parentSlug, fromStage, projectPath) {
+  if (typeof parentSlug !== 'string' || parentSlug.length === 0) {
+    throw new Error('parentSlug required');
+  }
+  if (!BATCHED_GATE_SOURCES.includes(fromStage)) {
+    throw new Error('fromStage must be a gate source stage (implementation|review)');
+  }
+  const root = projectPath || findProjectRoot();
+
+  const validator = fromStage === 'implementation' ? validateForQueue : validateReviewToDone;
+
+  const batch = topoOrderByDependsOn(
+    listSubplans(parentSlug, root).filter(s => s.stage === fromStage)
+  );
+
+  const approved = [];
+  const skipped = [];
+  const results = [];
+
+  for (const sub of batch) {
+    // Per-sibling validate. A failed validation is reported, never silently skipped.
+    let validation;
+    try {
+      validation = validator(sub.path, root);
+    } catch (err) {
+      skipped.push({ slug: sub.slug, reason: `validation error: ${err.message}` });
+      continue;
+    }
+    if (validation && validation.valid === false) {
+      const reason = (validation.errors && validation.errors.length > 0)
+        ? validation.errors.join('; ')
+        : 'failed validation';
+      skipped.push({ slug: sub.slug, reason });
+      continue;
+    }
+
+    // Cross the gate via the EXISTING gate-safe approvePlan (human marker + move).
+    try {
+      const { newPath, humanGate } = approvePlan(sub.path, root);
+      approved.push(sub.slug);
+      results.push({ slug: sub.slug, newPath, humanGate });
+    } catch (err) {
+      // One bad sibling never aborts the batch (async-overnight resilience).
+      skipped.push({ slug: sub.slug, reason: err.message });
+    }
+  }
+
+  return { approved, skipped, results };
+}
+
 module.exports = {
   movePlan,
   approvePlan,
@@ -886,5 +1072,8 @@ module.exports = {
   stopAgent,
   advanceAgent,
   cleanupStaleInProgress,
-  createCanvas
+  createCanvas,
+  // SIP1: sub-plan enumeration + batched-gate approval
+  listSubplans,
+  approveSubplans
 };

@@ -29,7 +29,7 @@ The 16 steps map to 3 task-aligned dashboard sections:
 | Section | Stages (in plan files) | Iron Loop steps | Purpose |
 |---|---|---|---|
 | **Business** | vision · canvas · functional | 1–4 (IDEATE, ASSESS, ALIGN, CAPTURE) | WHY + business viability + product requirements |
-| **Implementation** | implementation · todo | 5–7 (PLAN, DESIGN, SPEC) | Technical context, then ready-to-execute |
+| **Implementation** | implementation · todo | 5–7 (PLAN, DESIGN, SPEC) — **decomposes 1 functional plan into N small, cohesive-slice implementation plans** | Technical context, then ready-to-execute |
 | **Execution** | in-progress · review · done | 8–16 (TEST→FINAL-REVIEW) | Doing the work, verifying, shipping |
 
 The boundary at `todo` is load-bearing: everything before it builds context; everything from it executes. See [CLAUDE.md "Pipeline Philosophy"](../CLAUDE.md) for the four load-bearing principles.
@@ -45,8 +45,8 @@ The boundary at `todo` is load-bearing: everything before it builds context; eve
 | 3 | ALIGN | Connect the solution to user goals and business value |
 | 4 | CAPTURE | Write requirements as testable BDD scenarios |
 | 5 | PLAN | Choose the technical approach with tradeoffs documented |
-| 6 | DESIGN | Define the architecture: components, interfaces, data flow |
-| 7 | SPEC | Refine until the plan survives 10 rounds of adversarial review |
+| 6 | DESIGN | Define the architecture and **slice the work into N small, independently-buildable implementation plans** |
+| 7 | SPEC | Refine until the plan survives 10 rounds of adversarial review (**per slice**) |
 | 8 | TEST | Write failing tests first — code does not exist yet |
 | 9 | PREPARE | Set up the environment and scan existing code for risks |
 | 10 | IMPLEMENT | Write all the code in one step, sub-items for each file |
@@ -101,6 +101,30 @@ PHASE 2: IMPLEMENTATION PLANNING (Steps 5-7) - Technical Role
        |-- All 5/5? -> Iron-solid execution plan
        |-- Max rounds? -> Auto-approve + Deferred Questions for Step 16
    |-> HUMAN GATE: User approves technical approach
+
+### 1 functional plan → N small implementation plans (SIP1)
+
+Steps 5–7 do NOT produce one big implementation plan per functional plan. The
+`implementation-planner` **decomposes** the approved functional plan into **N small**,
+cohesive-slice implementation plans — typically **many more implementation plans than
+functional plans** (a 6-module feature → ~6 slices). Each slice is:
+
+- ~1–3 files (a module + its test kept together — never split a module from its test);
+- `parent_plan`-linked to the functional plan and `depends_on`-ordered (max chain
+  depth 3, no cycles);
+- named `<parent-slug>-s<N>-<slice-name>.md` (e.g. `SIP1-s1-coverage-map.md`);
+- carrying its own `## Implementation Details` and canonical Step 8–16 execution plan.
+
+The parent functional-derived implementation plan becomes an **INDEX** of its slices.
+Small slices mean no single Iron Loop dispatch is too large to complete cleanly; a
+crash loses one slice, not a whole feature.
+
+**Batched gates:** Gate 2 (implementation→todo) and Gate 3 (review→done) are approved
+for ALL siblings of a parent AT ONCE via `approveSubplans(parentSlug, fromStage,
+projectPath)` in `src/lib/actions.js` — ONE human decision crosses every sibling, each
+stamped `approved_by: human` (the helper loops the existing gate-safe `approvePlan`; no
+new auto-cross path). So more plans does NOT mean more prompts. Build stays sequential
++ dependency-ordered; `listSubplans(parentSlug)` enumerates a parent's set.
 
 AUTOMATED — agents execute, you review
 ═══════════════════════════════════════════════════════════════
