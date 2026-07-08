@@ -1,5 +1,12 @@
 ---
 iron_loop: true
+approved_by: human
+approved_at: 2026-07-08T21:09:40.549Z
+gate_crossed: implementation → todo
+---
+
+---
+iron_loop: true
 title: "CU1 s4 — dependency-checker CRA citations (web-verified) + last-verified lines"
 type: implementation
 parent_plan: CU1-tier0-quick-wins
@@ -179,3 +186,57 @@ URL).
 | Wrong CRA date gives false confidence (HIGH impact) | Web-verify against EUR-Lex/EC/ENISA at edit time; cite source URL so the date is traceable | Step 9, Step 15 |
 | Fabricated number/date (hard user rule) | Every fact carries an official source URL; mirror sibling skills that already cite them | Step 9, Step 11, Step 16 |
 | Section rewrite churn | Surgical addition only; diff must show additions, not rewrites | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
