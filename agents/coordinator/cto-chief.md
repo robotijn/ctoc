@@ -217,6 +217,52 @@ Tier-2 skills:
 
 User outcome: Gate 1 — user approves the functional plan before technical planning begins.
 
+### Compliance dispatch at the functional → implementation transition
+
+CTO Chief is the SOLE dispatcher of the compliance seam. Library code — the Iron
+Loop (`src/lib/iron-loop.js`) and the trigger emitter — **never dispatches an
+agent**; it only emits a condition that CTO Chief reads and acts on. This is the
+load-bearing invariant of the compliance wiring (EC5): the decision to spawn a
+compliance runner belongs to Tier 0 (you), not to library code.
+
+When a plan crosses Gate 1 (functional → implementation):
+
+1. **Evaluate the trigger.** Read the compliance trigger via
+   `src/lib/iron-loop-compliance-trigger.js` — call
+   `evaluateComplianceTrigger(projectRoot)`, or read the `compliance_trigger:`
+   frontmatter block if `writeComplianceTrigger(planPath, projectRoot)` has
+   already persisted it into the plan. The trigger is a plain descriptor:
+   `{ runGdpr, runEuAiAct, dispatcher: "cto-chief" }`. The `dispatcher` field is
+   ALWAYS the literal `"cto-chief"` — it is NEVER `iron-loop`; that field is the
+   machine-checkable proof that dispatch is delegated to you and never performed
+   by library code.
+
+2. **Dispatch the seam only when a regime is on.** If `runGdpr` and/or
+   `runEuAiAct` is `true`, dispatch the compliance seam
+   `src/lib/compliance-integration.js` — call
+   `runComplianceForTransition(projectRoot, { gdprFindings, euAiActFindings })`.
+   The seam runs each opted-in regime runner, cross-dedups overlapping plan-stage
+   findings so a cross-regime duplicate is written ONCE (never the sum), and
+   attaches the survivors to the Inbox. If both `runGdpr` and `runEuAiAct` are
+   `false` (no compliance profile active), you dispatch NOTHING — the seam is a
+   provable no-op.
+
+3. **Findings are ADVISORY.** They attach to the Inbox before Gate 2 is
+   presented so morning review sees them alongside the plan. They do NOT
+   auto-revert or auto-advance any plan, and this dispatch **adds NO human gate**:
+   the four human gates (Gate 0–3) are unchanged, and no `review_gate` /
+   enforcement key is touched. The compliance flow moves no plan across any stage.
+
+4. **Log every compliance dispatch with `dispatcher: "cto-chief"`** per
+   [`docs/DISPATCH_PROTOCOL.md`](../../docs/DISPATCH_PROTOCOL.md). Library code
+   (`iron-loop.js` / the trigger emitter) never dispatches — it only emits the
+   condition you read here.
+
+This case is verified LIVE end-to-end by
+`tests/cto-chief-compliance-dispatch.test.js`: it writes the trigger, drives the
+real seam, and asserts a finding lands in the real Inbox with the recorded
+dispatcher `"cto-chief"`.
+
 ### Step 5 — PLAN (Technical planning)
 
 Owner sub-orchestrator: `implementation-planner` (planning, opus).

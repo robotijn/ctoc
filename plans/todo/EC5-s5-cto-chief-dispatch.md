@@ -202,6 +202,78 @@ markdown with a REAL end-to-end flow through EC5-s4 + EC5-s3 against a tmp proje
 - [ ] The instruction itself is the documentation; ensure it names the seam + dispatcher
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify Steps 8–15 completed
-- [ ] Instruction present + LIVE flow + dispatcher=cto-chief + gate-invariant all green
-- [ ] Ready for human review
+- [x] Verify Steps 8–15 completed
+- [x] Instruction present + LIVE flow + dispatcher=cto-chief + gate-invariant all green
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+1. **Placement of the compliance-dispatch subsection.** The plan says "adjacent
+   to the existing `compliance/gdpr-compliance-checker` bullet." That bullet
+   appears twice (Step 6.5 THREAT MODEL and Step 13 SECURE), but the plan is
+   explicit that the case belongs at the **functional → implementation
+   transition** (Gate 1). Those two existing bullets are at Step 6.5 and Step 13
+   — later phases, not Gate 1. Chose to place the new `### Compliance dispatch at
+   the functional → implementation transition` subsection **immediately after
+   Step 4 CAPTURE's "Gate 1" outcome line and before Step 5 PLAN** — the exact
+   Gate-1 seam the plan names. This is more faithful to the transition semantics
+   than co-locating with a Step-13 bullet. Additive; no existing content moved.
+
+2. **Case-insensitive `advisory` match in the content test.** The instruction
+   emphasises the word with "**Findings are ADVISORY.**" (all-caps for emphasis).
+   The initial test regex `/[Aa]dvisory/` did not match "ADVISORY". Chose to
+   relax the test to `/advisory/i` rather than de-emphasise the prose — the
+   all-caps emphasis is the higher-quality human-facing wording, and the test's
+   intent is "the case states findings are advisory," which case-insensitive
+   matching captures correctly.
+
+3. **Body-bytes-unchanged assertion for the gate-off no-op (case 5).** EC5-s4's
+   `writeComplianceTrigger` upserts a `compliance_trigger:` block INSIDE the plan
+   frontmatter even when both gates are off (the trigger descriptor is still
+   `{runGdpr:false, runEuAiAct:false, dispatcher:'cto-chief'}`), so a
+   whole-file byte comparison would (correctly) differ. The no-op guarantee that
+   matters is: no Inbox write, no plan MOVED, and the plan **body** (everything
+   after the closing frontmatter delimiter) untouched. The test asserts exactly
+   that — body bytes identical + zero Inbox files — which is the real,
+   load-bearing no-op property, not an over-strict whole-file identity that would
+   contradict the shipped EC5-s4 trigger-persistence behaviour.
+
+4. **Dispatcher proof read from two sources.** To make the "dispatcher is
+   cto-chief, never iron-loop" claim robust, case 3 asserts it BOTH from the
+   in-memory `writeComplianceTrigger(...).trigger.dispatcher` return AND from the
+   persisted frontmatter on disk (`/dispatcher:\s*cto-chief/` present,
+   `/dispatcher:\s*iron-loop/` absent). Reading disk state is the read-fresh
+   discipline and proves the wiring survives serialisation.
+
+## Verification Results (Steps 8–16)
+
+- **RED → GREEN:** initial run — content cases 1–2 FAILED (instruction absent),
+  live-flow cases 3–7 PASSED against the real shipped seam. After adding the
+  subsection: 8/8 pass.
+- **`node --test tests/cto-chief-compliance-dispatch.test.js`:** tests 8,
+  suites 6, pass 8, fail 0.
+- **LIVE end-to-end proof:** case 3 writes the trigger into a real plan's
+  frontmatter, reads it back from disk, re-evaluates the gate, dispatches
+  `runComplianceForTransition`, and reads exactly ONE real Inbox question file
+  from `.ctoc/inbox/questions/` on disk carrying the GDPR message + `source_step:
+  compliance-gdpr`. Case 4: both regimes on, overlapping finding ⇒ `deduped:1`,
+  ONE file on disk (single-write). Case 5: empty profiles ⇒ trigger both false,
+  no Inbox file, plan body byte-unchanged.
+- **Dispatcher proof:** trigger `dispatcher === 'cto-chief'` (in-memory AND
+  persisted frontmatter), NEVER `'iron-loop'` — asserted in cases 3, 4, 5.
+- **Full suite `node --test tests/*.test.js`:** tests 3374, suites 731, pass
+  3374, **fail 0**, exit 0. architecture-invariants + readme-numbers +
+  cto-chief-toplevel all green (edit is additive; no agent-count claim moved —
+  no new agent `.md`).
+- **`npx eslint . --max-warnings 0`:** exit 0.
+- **`npx tsc --noEmit`:** 89 errors WITH the slice, 89 errors WITHOUT it —
+  baseline-neutral; the slice contributes zero tsc errors (none reference
+  cto-chief.md or the two seam modules).
+- **Gate invariant:** case 7 asserts `HUMAN_GATES` has exactly the 3 destination
+  keys (implementation, todo, done — the 4-gate topology), and that neither the
+  trigger emitter nor the integration seam names a gate key or requires a hook /
+  the plan-moving actions module. Case 2 asserts the new subsection names no
+  `iron-loop` dispatcher, adds no `Gate 4`, and introduces no `review_gate: true`.
+
+_(Plan NOT moved — execution stops at Step 16 per slice brief; Gate 2 is a human
+gate and this plan remains in `todo/`.)_
