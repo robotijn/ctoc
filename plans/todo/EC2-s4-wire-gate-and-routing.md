@@ -280,50 +280,72 @@ Ready for batched Gate 2 with siblings s1–s3.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — confirmed MODULE_NOT_FOUND
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none required
+- [x] Check prerequisites — s1 helpers, s3 agent file, EC1-s2 shouldRunGdpr, real inbox.createQuestion all confirmed
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — Inbox creates its own dirs
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling — gate-first, fail-open, loud-throw on unknown code
+- [x] Wire up integration points — real Inbox + registry entry
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together — real modules, disk readback
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths — thin straight-line gate→loop→route, no caching (read-fresh)
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — root delegated to path.join callees; findings validated pre-emission
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations — only inbox.createQuestion (safeFs) + additive registry entry
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral (89 pre-existing, 0 new)
+- [x] Run ALL tests (TDD Green) — full suite 3216 pass / 0 fail
+- [x] Check coverage >= 80% — 100% line / 86.67% branch / 100% func on runner
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — README lib count 116→117 + readme-numbers guard bumped
+- [x] Add JSDoc comments to new functions — module header + runGdprFindings JSDoc
+- [x] Update CHANGELOG if needed — n/a for this slice
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — real Inbox disk readback proven
+- [x] Ready for human review — plan stays in todo/ (batched Gate 2 with s1–s3)
+
+## Decisions Taken Under Ambiguity
+
+- **Inbox `context` blob shape.** The plan specifies `context: <article + confidence + kind>`
+  without a serialization. Chose newline-delimited `key: value` lines
+  (`article: … / severity: … / confidence: … / kind: …`), matching the readable
+  frontmatter/body style `inbox.createQuestion` already emits. `severity` is
+  included (always `critical` post-normalization) so morning review sees the
+  normalization result on the human surface; `confidence`/`kind` are included
+  only when present.
+- **`ran` on non-array findings with the gate ON.** Kept `ran: true` (gate was on;
+  the run genuinely executed, just over an empty list) per the plan's Error
+  Handling ("Non-array `findings` ⇒ treated as `[]` (ran:true, empty results)").
+- **Registry gate-safety assertion (test 8).** The registry has no `enforcement:`
+  block (that lives in `.ctoc/settings.yaml`). Grounded the "no human gate
+  weakened" invariant on the registry's actual gate-shaped structure: the
+  "NEVER block humans" Core Principles banner intact, exactly the three
+  iron-loop `human_gate: true` markers unchanged, and the additive gdpr-agent
+  entry carrying no `review_gate: true`.
+- **`gated_by` key.** Added `gated_by: shouldRunGdpr` to the registry entry per
+  the executor brief (advisory metadata only; the real gate is enforced in
+  `runGdprFindings`, not by the registry).
