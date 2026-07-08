@@ -16,46 +16,35 @@ depends_on: []
 status: refined
 acceptance_criteria_count: 16
 risk_level: LOW
-files:
-  - agents/infrastructure/deployment-setup.md
-  - tests/architecture-invariants.test.js
-  - tests/agent-modernization.test.js
-  - tests/skill-loading.test.js
-  - agents/coordinator/cto-chief.md
-  - agents/coordinator/synthesizer.md
-  - agents/iron-loop/iron-loop-integrator.md
-  - agents/iron-loop/iron-loop-critic.md
-  - agents/iron-loop/iron-loop-executor.md
-  - agents/pipeline/agent-writer.md
-  - agents/pipeline/agent-critic.md
-  - agents/pipeline/agent-tester.md
-  - agents/pipeline/agent-qa.md
-  - agents/pipeline/agent-publisher.md
-  - agents/planning/vision-advisor.md
-  - agents/planning/vision-decomposer.md
-  - agents/planning/product-owner.md
-  - agents/planning/implementation-planner.md
-  - agents/planning/functional-reviewer.md
-  - agents/planning/implementation-plan-reviewer.md
-  - agents/planning/iron-loop-integrator.md
-  - agents/implementation/test-maker.md
-  - agents/implementation/quality-checker.md
-  - agents/implementation/implementer.md
-  - agents/implementation/self-reviewer.md
-  - agents/implementation/optimizer.md
-  - agents/implementation/security-scanner.md
-  - agents/implementation/verifier.md
-  - agents/implementation/documenter.md
-  - agents/implementation/implementation-reviewer.md
-  - skills/security/dependency-checker/SKILL.md
-  - skills/testing/runners/unit-test-runner/SKILL.md
-  - skills/saas/posthog-analytics/SKILL.md
-  - skills/saas/sentry-errors/SKILL.md
-  - skills/mobile/react-native-bridge-checker/SKILL.md
-  - .ctoc/audit/corpus-audit-2026-06-15.json
+is_slice_index: true
+# This is the INDEX for the CU1 decomposition. Per SIP1, the per-file `files:`
+# coverage lives on the SLICE plans (s1–s6), not here — the index is not itself
+# executed through the Iron Loop (no `iron_loop:` key). See "## Slices" below.
 ---
 
 # CU1 — Tier 0 quick wins
+
+## Slices (dependency-ordered)
+
+This functional-derived plan is decomposed into 6 cohesive-slice implementation
+plans per SIP1. Each slice is a COMPLETE small implementation plan with its own
+focused `files:`, its own `## Implementation Details`, and canonical Iron Loop
+Steps 8–16. Gates 2 and 3 batch across all six via `approveSubplans('CU1-tier0-quick-wins', ...)`.
+
+| # | Slice file | Scope (one line) | files: | depends_on |
+|---|------------|------------------|--------|------------|
+| 1 | `CU1-tier0-quick-wins-s1-deployment-setup-tier1.md` | Add v8 Tier-1 frontmatter to deployment-setup + add it to `TIER_1_AGENTS` (frontmatter-before-test) | `agents/infrastructure/deployment-setup.md`, `tests/architecture-invariants.test.js` | none |
+| 2 | `CU1-tier0-quick-wins-s2-atomic-model-bump.md` | **ATOMIC** `opus-4-7`→`opus-4-8` across the 14 in-scope agents + `agent-modernization.test.js` line 89 (+ conditional `skill-loading.test.js` line 255), one commit | 14 agent files + `tests/agent-modernization.test.js` + `tests/skill-loading.test.js` | none |
+| 3 | `CU1-tier0-quick-wins-s3-frontmatter-normalization.md` | `allowed-tools:`→`tools:` in 5 realtime/safety skills + `type: skill` on unit-test-runner + new SKILL.md conformance test | 5 realtime/safety SKILL.md, `skills/testing/runners/unit-test-runner/SKILL.md`, `tests/architecture-invariants.test.js` | none (serialize vs s1 — shared test file) |
+| 4 | `CU1-tier0-quick-wins-s4-regulatory-citations.md` | Web-verified CRA citations (Reg. (EU) 2024/2847, 11 Sep 2026, 11 Dec 2027, NTIA) + `last verified:` in dependency-checker | `skills/security/dependency-checker/SKILL.md` | none |
+| 5 | `CU1-tier0-quick-wins-s5-example-and-source-gaps.md` | posthog SQL BAD/SAFE pair + sentry C++ example + react-native ≥10 dated source refs | `skills/saas/posthog-analytics/SKILL.md`, `skills/saas/sentry-errors/SKILL.md`, `skills/mobile/react-native-bridge-checker/SKILL.md` | none |
+| 6 | `CU1-tier0-quick-wins-s6-audit-ledger.md` | Per-file audit ledger `.ctoc/audit/corpus-audit-2026-06-15.json` (runs LAST — records s1–s5 verdicts + discrepancies) | `.ctoc/audit/corpus-audit-2026-06-15.json` | s1, s2, s3, s4, s5 |
+
+**Decomposer notes recorded during grounding (2026-07-08, verified against real files):**
+- `grep -rl "model_optimized_for: opus-4-7" agents/` = **21** files (audit said ~18). Only **14** are in scope; the other 7 (`compliance/eu-ai-act-agent`, `compliance/eu-solution-recommender`, `compliance/gdpr-agent`, `coordinator/ivv-chief`, `planning/kpi-planner`, `planning/stack-chooser`, `planning/unit-economics-modeler`) are OUT of scope — recorded in the s6 ledger, NOT edited (no-churn).
+- `grep -rl "allowed-tools:" skills/` = **5** files (matches ~5): realtime/hil-harness, realtime/wcet-budget, safety/fault-tree-builder, safety/fmeda-analyzer, safety/redundancy-pattern-picker.
+- **3 phantom paths** in the original `files:` list do NOT exist on disk: `agents/planning/functional-reviewer.md`, `agents/planning/implementation-plan-reviewer.md`, `agents/planning/iron-loop-integrator.md` (real integrator is `agents/iron-loop/iron-loop-integrator.md`, already a separate entry). Recorded DEFECTIVE in the s6 ledger; NOT created, NOT edited.
+- The atomic guarantee (s2) is kept WHOLE: the 14 agent files land with `agent-modernization.test.js` line 89 in a single commit; `skill-loading.test.js` line 255 flips only on the branch the executor proves green at Step 8 (it reads the on-disk converted-skill values — no guess).
 
 ## 1. ASSESS
 
