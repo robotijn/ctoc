@@ -302,6 +302,11 @@ describe('e2e: menu state machine via real process', () => {
     fs.writeFileSync(
       path.join(tempProject, '.ctoc', 'settings.json'),
       JSON.stringify({ general: { timezone: 'UTC' } }, null, 2));
+    // EC1-s3: mark a compliance profile active so its ride-along does NOT also
+    // attach — this case pins the ENVIRONMENT ride-along count in isolation.
+    fs.writeFileSync(
+      path.join(tempProject, '.ctoc', 'settings.yaml'),
+      'regulatory_regime:\n  active_profiles: [gdpr]\n  overrides: {}\n\ngeneral:\n  x: 1\n');
 
     const { json } = runMenu([]);
 
@@ -326,6 +331,11 @@ describe('e2e: menu state machine via real process', () => {
     fs.writeFileSync(
       path.join(tempProject, '.ctoc', 'settings.json'),
       JSON.stringify({ general: { environment: 'prod' } }, null, 2));
+    // EC1-s3: mark a compliance profile active so its ride-along does NOT attach
+    // — this case pins the "single pipeline question" count when env is set.
+    fs.writeFileSync(
+      path.join(tempProject, '.ctoc', 'settings.yaml'),
+      'regulatory_regime:\n  active_profiles: [gdpr]\n  overrides: {}\n\ngeneral:\n  x: 1\n');
 
     const { json } = runMenu([]);
     assert.match(json.text, /▼ Business/, 'overview visible');

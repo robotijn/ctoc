@@ -12,6 +12,7 @@ const { NavStack } = require('../lib/state');
 const { startAutoSync, stopAutoSync } = require('../lib/sync');
 const { findProjectRoot } = require('../lib/project-root');
 const { needsEnvironmentPrompt } = require('../lib/settings');
+const { shouldRunGdpr, shouldRunEuAiAct } = require('../lib/compliance-regime');
 
 // First-run environment question. NEVER replaces the dashboard — it is
 // attached as a SECOND question alongside the pipeline question, so the plan
@@ -39,6 +40,61 @@ function attachEnvironmentQuestion(result) {
     'Staging': 'claude:set-environment staging',
     'Production': 'claude:set-environment prod',
     'Decide later': 'claude:env-decide-later'
+  });
+  return result;
+}
+
+// First-run EU compliance-regime question (EC1-s3). MIRRORS
+// `attachEnvironmentQuestion` above exactly — it NEVER replaces the dashboard;
+// it is attached as an additional question alongside the always-first Pipeline
+// question, so the plan overview is always visible. It never gates and never
+// weakens a human gate: choosing a profile only writes
+// `regulatory_regime.active_profiles` in settings.yaml (via
+// `claude:set-compliance-regime`), which cannot reach a gate key.
+//
+// Prompt-once predicate: when NEITHER EU compliance profile is active, the
+// question rides along. `shouldRunGdpr`/`shouldRunEuAiAct` are read-fresh from
+// the live settings.yaml (EC1-s2). Fail-open (try/catch → false): a compliance
+// read fault must never block the dashboard render (the load-bearing menu
+// invariant, `enterSearchMode`/`activateCurrentArea` precedent).
+function needsComplianceRegimePrompt(projectRoot) {
+  try {
+    return !shouldRunGdpr(projectRoot) && !shouldRunEuAiAct(projectRoot);
+  } catch {
+    return false;
+  }
+}
+
+// Mirror of `attachEnvironmentQuestion`. Attaches the compliance-regime question
+// (and its `claude:set-compliance-regime` actions) additively — the dashboard is
+// built first and stays intact; this only appends. Defensive guards mirror the
+// additive contract so a malformed `result` (missing `ask`/`actions`) never
+// throws (the real `route([])` always supplies both, per menu-screens.js).
+function attachComplianceQuestion(result, projectPath) {
+  result.ask = result.ask || { questions: [] };
+  result.ask.questions = result.ask.questions || [];
+  result.actions = result.actions || {};
+  result.text =
+    '⚖ No EU compliance regime chosen yet — pick one (gdpr = processes EU ' +
+    'personal data under Regulation (EU) 2016/679 · eu-ai-act = deploys AI ' +
+    'systems in the EU market under Regulation (EU) 2024/1689). The four human ' +
+    'gates stay mandatory. Changeable later in settings.yaml.\n\n' +
+    result.text;
+  result.ask.questions.push({
+    question: 'Which EU compliance regime applies to this project?',
+    header: 'Compliance',
+    options: [
+      { label: 'None', description: 'No EU compliance regime — skip the GDPR / EU AI Act controls' },
+      { label: 'GDPR', description: 'Processes EU personal data — Regulation (EU) 2016/679' },
+      { label: 'EU AI Act', description: 'Deploys AI systems in the EU market — Regulation (EU) 2024/1689' },
+      { label: 'Both', description: 'GDPR and the EU AI Act both apply' }
+    ]
+  });
+  Object.assign(result.actions, {
+    'None': 'claude:set-compliance-regime none',
+    'GDPR': 'claude:set-compliance-regime gdpr',
+    'EU AI Act': 'claude:set-compliance-regime eu-ai-act',
+    'Both': 'claude:set-compliance-regime both'
   });
   return result;
 }
@@ -512,6 +568,13 @@ function main() {
     if (needsEnvironmentPrompt(app.projectPath)) {
       attachEnvironmentQuestion(result);
     }
+    // EC1-s3: the compliance-regime question rides along AFTER the environment
+    // attach — dashboard built → environment attach → compliance attach → init
+    // note → print. Both ride-alongs sit alongside the always-first Pipeline
+    // question; neither replaces or gates the overview.
+    if (needsComplianceRegimePrompt(app.projectPath)) {
+      attachComplianceQuestion(result, app.projectPath);
+    }
     if (justInitialized) {
       result.text = 'CTOC initialized for this project (automatic — no init command needed).\n\n' + result.text;
     }
@@ -526,6 +589,8 @@ if (require.main === module) {
 
 module.exports = {
   ensureInitialized,
+  needsComplianceRegimePrompt,
+  attachComplianceQuestion,
   enterSearchMode,
   handleSearchKey,
   handleSearchInput,
