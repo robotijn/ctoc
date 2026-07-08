@@ -1,0 +1,5 @@
+{
+  "bucket": "hosted",
+  "name": "Deliberately malformed record — truncated JSON to force a REAL parse error",
+  "source_url": "https://example.eu/broken",
+  "price": "this file is intentionally invalid JSON: the object is never closed

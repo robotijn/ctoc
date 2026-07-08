@@ -167,9 +167,13 @@ test('fixture-driven GDPR field mapping — PII fields are real triggers in VALI
 
 test('manifest completeness — bi-directional fixture/manifest correspondence', () => {
   const manifest = loadManifest();
+  // This shared manifest owns the FLAT file set directly under compliance/.
+  // Subdirectories are separate fixture groups (e.g. recommender/) that carry
+  // their own manifest, so they are excluded here — only files are in scope.
   const onDisk = fs
-    .readdirSync(FIXTURE_DIR)
-    .filter((f) => f !== MANIFEST_NAME);
+    .readdirSync(FIXTURE_DIR, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name !== MANIFEST_NAME)
+    .map((e) => e.name);
 
   // Every physical fixture appears as a manifest key.
   for (const f of onDisk) {

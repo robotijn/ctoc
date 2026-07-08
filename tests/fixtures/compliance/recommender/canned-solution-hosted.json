@@ -1,0 +1,12 @@
+{
+  "bucket": "hosted",
+  "name": "Scaleway Managed Database (EU)",
+  "source_url": "https://www.scaleway.com/en/database/",
+  "retrieved_date": "2026-07-08",
+  "price": "listed per-node hourly rate on the vendor pricing page (source_url); figure not re-verified this run",
+  "quality_rank": 1,
+  "region": "fr-par",
+  "verified_source": null,
+  "verified_date": null,
+  "unverified_this_run": true
+}

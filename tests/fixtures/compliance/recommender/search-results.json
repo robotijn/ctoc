@@ -1,0 +1,21 @@
+{
+  "query": "EU-hosted vector database managed service",
+  "retrieved_date": "2026-07-08",
+  "results": [
+    {
+      "title": "Scaleway Managed Database",
+      "url": "https://www.scaleway.com/en/database/",
+      "bucket": "hosted"
+    },
+    {
+      "title": "PostgreSQL",
+      "url": "https://www.postgresql.org/",
+      "bucket": "self_hosted"
+    },
+    {
+      "title": "pgvector",
+      "url": "https://github.com/pgvector/pgvector",
+      "bucket": "library"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "bucket": "library",
+  "name": "pgvector (Postgres extension)",
+  "source_url": "https://github.com/pgvector/pgvector/blob/master/LICENSE",
+  "retrieved_date": "2026-07-08",
+  "price": "open-source / no license fee (PostgreSQL Licence per repository LICENSE file at source_url)",
+  "quality_rank": 3,
+  "region": null,
+  "verified_source": null,
+  "verified_date": null,
+  "unverified_this_run": true
+}

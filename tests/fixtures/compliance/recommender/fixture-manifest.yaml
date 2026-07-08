@@ -1,0 +1,54 @@
+# Recommender fixture manifest (real-I/O, ZERO test doubles)
+#
+# These fixtures drive tests/eu-recommender-helpers.test.js and
+# tests/eu-solution-recommender.test.js against the SHIPPED recommender core
+# (src/lib/eu-recommender-helpers.js). There are NO hand-written fake/stub
+# closures: the webSearch/webFetch functions injected into createFetcher are
+# REAL functions performing REAL file I/O (fs.readFileSync + JSON.parse) against
+# the REAL files listed below.
+#
+#  - SUCCESS path: the injected webFetch reads a real canned-solution-*.json
+#    file from disk and returns the parsed record.
+#  - FAILURE path: the injected webFetch reads a path that genuinely does NOT
+#    exist (real ENOENT) or reads malformed-solution.json (real SyntaxError from
+#    JSON.parse). createFetcher's fail-soft wraps the REAL error as
+#    { ok:false, error }. No error is hand-thrown.
+#
+# No fabricated legal/price claims. Each canned-solution record cites a real
+# vendor page via source_url + retrieved_date. Where a live figure was NOT
+# re-verified in this run the record carries verified_source:null /
+# verified_date:null and unverified_this_run:true — the truthful state, never a
+# fabricated "verified" price or date.
+
+fixtures:
+
+  canned-solution-hosted.json:
+    bucket: hosted
+    vendor: "Scaleway Managed Database (EU)"
+    source_url: "https://www.scaleway.com/en/database/"
+    retrieved_date: "2026-07-08"
+    note: "EU region (fr-par). Price cited to vendor page; not re-verified this run."
+
+  canned-solution-self-hosted.json:
+    bucket: self_hosted
+    vendor: "PostgreSQL (self-hosted on EU infrastructure)"
+    source_url: "https://www.postgresql.org/about/licence/"
+    retrieved_date: "2026-07-08"
+    note: "Open-source PostgreSQL Licence; infra cost applies. region:null (non-hosted)."
+
+  canned-solution-library.json:
+    bucket: library
+    vendor: "pgvector (Postgres extension)"
+    source_url: "https://github.com/pgvector/pgvector/blob/master/LICENSE"
+    retrieved_date: "2026-07-08"
+    note: "Open-source PostgreSQL Licence per repository LICENSE file. region:null."
+
+  search-results.json:
+    purpose: "Real search-results record read by the injected webSearch fn."
+    retrieved_date: "2026-07-08"
+
+  malformed-solution.json:
+    purpose: >
+      Deliberately invalid JSON on disk. Reading + JSON.parse throws a REAL
+      SyntaxError, exercising createFetcher's fail-soft FAILURE path without any
+      hand-thrown fake error.
