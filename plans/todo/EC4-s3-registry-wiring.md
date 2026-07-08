@@ -226,50 +226,63 @@ integrity invariant (case 6) are the key real-flow / safety checks.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — tests 1-5 RED (entry absent), 6-8 green pre-edit
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none
+- [x] Check prerequisites — s2 agent file exists on disk (path target satisfied)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — n/a
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature — additive eu-solution-recommender entry after eu-ai-act-agent
+- [x] Add error handling — n/a (static config); dangling-path guarded by test
+- [x] Wire up integration points — path, tools, invoked_by recorded
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — entry shape mirrors neighbours; git diff additive-only (15+/0-)
+- [x] Verify integration points work together — path resolves to real s2 file
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — single additive entry, no roster reorder
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — fixed repo-relative path
+- [x] Sanitize outputs — n/a
+- [x] No secrets in code
+- [x] Safe file operations — only whitelisted registry edited; no gate weakened (3/3/banner intact)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral (0 errors reference slice files)
+- [x] Run ALL tests (TDD Green) — new test 8/8; full suite 3309/3309
+- [x] Check coverage >= 80% — config wiring; every load-bearing field asserted
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — inline YAML comment on the entry
+- [x] Add JSDoc comments to new functions — test-file header docblock
+- [x] Update CHANGELOG if needed — n/a (batched at EC4 parent)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review — plan stays in place (executor does NOT cross Gate 2)
+
+## Decisions Taken Under Ambiguity
+
+- **s2 dependency satisfied via shipped artifact.** `depends_on: EC4-s2` and s2's plan
+  file is still in `todo/`, but the s2 agent file `agents/compliance/eu-solution-recommender.md`
+  already exists on disk. Since s3's only hard dependency is that path target existing (guarded
+  by test case 2, the dangling-pointer check), the dependency is satisfied and s3 was implemented
+  as directed. If s2's plan is later re-run, the entry's path already matches its output.
+- **`tools:` as inline flow list `[WebSearch, WebFetch]`.** The plan INTENT block used an inline
+  list; the s2 agent frontmatter uses `tools: WebSearch, WebFetch` (comma string). I used the
+  YAML flow-sequence `[WebSearch, WebFetch]` in the registry to match the plan's stated shape and
+  keep the test's substring assertions unambiguous. Semantically identical to the neighbours.
+- **Entry placement + comment.** Placed immediately after `eu-ai-act-agent` inside the COMPLIANCE
+  AGENTS grouping (before IRON LOOP), with a 3-line comment noting it is the one web-enabled agent,
+  invoked by EC2/EC3, not self-gated, advisory only — satisfying Step 15 inline documentation.

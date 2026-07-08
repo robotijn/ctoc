@@ -281,6 +281,21 @@ agents:
     description: EU AI Act (Regulation (EU) 2024/1689) plan-inspection + code-scan specialist; wraps ai-governance-checker, filters output to EU AI Act only.
     parallel_safe: true
 
+  # The ONE web-enabled compliance agent. Invoked BY the gated EC2/EC3 agents when
+  # a finding needs remediation options; not self-gated (activation scoped by the
+  # caller's own regulatory-profile gate). Advisory only — carries no review_gate.
+  eu-solution-recommender:
+    path: agents/compliance/eu-solution-recommender.md
+    model: opus
+    category: compliance
+    tier: 2
+    role: specialist
+    reports_to: cto-chief
+    tools: [WebSearch, WebFetch]
+    invoked_by: [gdpr-agent, eu-ai-act-agent]
+    description: Web-sourced EU-compliance solution recommender; turns an EC2/EC3 finding into ranked hosted / self-hosted / library options with verified prices and sources. Advisory only.
+    parallel_safe: true
+
 # ===============================================================================
 #  IRON LOOP v2.1
 # ===============================================================================
