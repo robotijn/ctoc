@@ -230,3 +230,38 @@ deduplicateFindings(ec2, ec3)
 - [ ] Verify Steps 8–15 completed
 - [ ] Merge / no-merge / gate-invariant tests green
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+- **Confidence tie ⇒ EC2/first-seen survives via strictly-greater displacement.**
+  The plan says "on a tie keep the EC2 (GDPR) finding (stable, first-argument
+  precedence)." Implemented by concatenating EC2 first and requiring the
+  challenger's confidence rank to be *strictly greater* than the incumbent's to
+  displace it. Because EC2 members are always inserted before EC3 members, a tie
+  keeps the earlier-seen (EC2) finding. (Ref: plan lines 50–52, 116.)
+
+- **Non-object collision preserves BOTH under a synthetic key.** The plan says a
+  non-object element "is passed through unchanged" and that findings with no
+  discernible `kind` are never merged. If a non-object element shares a computed
+  `dedupKey` (e.g. two `null`s both key `::`), merging them into one would drop
+  data. Chosen behaviour: re-insert the incoming non-mergeable element under a
+  fresh unique `key#N` so every non-object element survives distinctly (test
+  case 6b asserts `[null,5,'x']` ⇒ length 3). This is the conservative reading of
+  "never merged / passed through unchanged." (Ref: plan lines 128–129.)
+
+- **Merged `message` format.** The plan requires the survivor's `message` to name
+  BOTH regulation sources but does not fix a string format. Chosen:
+  `"<existing message?> Cross-regime overlap: <survivorRef> ↔ <otherRef>."` —
+  appended to any pre-existing message, else standalone. Deterministic and
+  contains both `regulation_ref` values (asserted by cases 1 and 3).
+
+- **Extra exports `REGULATION_TOPIC_TABLE` / `CONFIDENCE_ORDER`.** Exported (in
+  addition to the three named in the plan's `##### Exports`) as read-only frozen
+  constants so EC5-s3 and tests can assert the merge table without re-declaring
+  it. Frozen — no untrusted assignment. No behaviour change.
+
+- **README count bump 120→121 (this slice's obligation).** New `src/lib` module
+  triggers the `readme-numbers` guard. Bumped the module-list line + the
+  "121 JS modules" claim in `README.md`, and both pinned assertions in
+  `tests/readme-numbers.test.js`. `CLAUDE.md`'s "114 JS modules" prose was left
+  untouched (out of this slice's `files:` scope and not guarded by the count test).
