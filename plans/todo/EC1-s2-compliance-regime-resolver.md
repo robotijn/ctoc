@@ -265,50 +265,73 @@ invariant all pass. Ready for batched Gate 2 with siblings s1, s3.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — confirmed MODULE_NOT_FOUND
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (safe-fs + regulatory-regime exist)
+- [x] Check prerequisites — gdpr.yaml (EC1-s1) + eu-ai-act-high-risk.yaml present
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling — fail-open reads + writes
+- [x] Wire up integration points — derives from loadActiveProfiles (one source of truth)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — dependency direction lib→lib only; no hook/command import
+- [x] Verify integration points work together — round-trip write→read proven in tests
+- [x] Check error handling completeness — missing file / no line / wrong root / fs throw all covered
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — thin module, no caching (read-fresh)
+- [x] Optimize critical paths
+- [x] Simplify complex code — three functions + one internal helper
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — profileNames never build a path; fixed settings.yaml only
+- [x] Sanitize outputs — returns { ok, profiles }, no leaked paths
+- [x] No secrets in code
+- [x] Safe file operations — safeFs; targeted single-line replace; no gate mutator (test 13)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint . exit 0; tsc baseline-neutral
+- [x] Run ALL tests (TDD Green) — 3172 pass, 0 fail
+- [x] Check coverage >= 80% — every branch of writeActiveProfiles + both resolvers exercised
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — README lib module count 114→115
+- [x] Add JSDoc comments to new functions — all three exports + module header
+- [x] Update CHANGELOG if needed — n/a (README numbers updated + guard test)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review — plan remains in todo/ (executor does NOT cross Gate 2)
+
+## Decisions Taken Under Ambiguity
+
+1. **Argument order `writeActiveProfiles(projectRoot, profileNames)`** — the plan's
+   File Specification (the CONTRACT) mandates `(projectRoot, profileNames)`; a
+   dispatch brief used the reverse `(profiles, root?)`. Followed the plan contract.
+   All `shouldRun*` take `(projectRoot)`.
+2. **JSDoc `@param {string} projectRoot` (not optional) on `writeActiveProfiles`** —
+   marking it optional while `profileNames` is required tripped tsc TS1016 (required
+   param after optional) and broke the ratcheting typecheck baseline. Documented it
+   as required; the runtime guard still returns `{ ok:false }` for a bad/missing root
+   (fail-open preserved), so behavior is unchanged and the baseline stays neutral.
+3. **Module comment does not spell the literal gate-key identifiers** — test 13b
+   greps the module source for `enforcementMode`/`requireReviewGate` and asserts
+   ABSENCE (proving the module cannot mutate a gate key). The reassuring prose was
+   reworded to "the enforcement-mode or review-gate settings" so the guard stays
+   strict rather than being weakened to accommodate documentation.
+4. **`writeActiveProfiles([])` returns `{ ok: true, profiles: <current> }` with no
+   write** — the plan says selecting `none` is a no-op OK; implemented as an early
+   return before any fs write, leaving the file byte-identical.
+5. **README count bump 114→115** — a new `src/lib` top-level module was added; bumped
+   the structure line and the `115 JS modules` claim, and updated the two
+   readme-numbers guard assertions (`countTopLevelJs === 115`, `/115 JS modules/`).
