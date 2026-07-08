@@ -226,50 +226,92 @@ removed, skill kept. Plan stays in `implementation/`. Ready for batched Gate 2.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 6 tests, 1 pass, 5 fail
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none)
+- [x] Check prerequisites (s1 helpers + s2 enum present; old wrapper path confirmed)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (agents/compliance/ exists)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (gdpr-agent.md created; old wrapper deleted)
+- [x] Add error handling (gate-first, fail-open contract stated in prose)
+- [x] Wire up integration points (references gate + helpers + skill by name; s4 does the write)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code (no skill rule restated; gate + 4 helpers named)
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (reference-not-repeat prose)
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — test uses fixed repo-relative paths
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations — tools: Read, Grep only (no Write/Bash/Edit); no gate added
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint exit 0; tsc baseline-neutral
+- [x] Run ALL tests (TDD Green) — 3204 pass, # fail 0
+- [x] Check coverage >= 80% (content-contract test; no JS branch target)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (agent count net-zero = 110; no README/CLAUDE.md bump needed)
+- [x] Add JSDoc comments to new functions (n/a — markdown agent + content test)
+- [x] Update CHANGELOG if needed (n/a for this slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity (EC2-s3 execution)
+
+1. **Frontmatter source of truth — File Specification over sibling wrappers.** The
+   three existing `agents/compliance/*.md` files (audit-log-checker, license-scanner,
+   and the deleted gdpr-compliance-checker) are all thin `type: wrapper` stubs with
+   minimal frontmatter. The plan's File Specification mandates the richer Tier-2
+   agent-def frontmatter (tier/model/effort_level/reads_ancestry/dispatch_protocol/
+   confidence_calibration/parallel_safe/effort_budget.max_subagents/reports_to). I
+   followed the File Specification verbatim, matching the full-frontmatter Tier-1
+   pattern used by e.g. `agents/pipeline/agent-writer.md`, not the sibling stubs.
+
+2. **`max_subagents: 0` expressed under `effort_budget`.** The frontmatter block in
+   the plan nests `max_subagents: 0` under `effort_budget:`. The content test asserts
+   `max_subagents:\s*0` (indentation-agnostic), so the nested form satisfies it while
+   matching the plan's literal YAML.
+
+3. **Skill-vs-agent reference disambiguation — the three out-of-slice references were
+   NOT touched.** `cto-chief.md`, `ivv-chief.md`, and `tests/skill-loading.test.js`
+   reference `compliance/gdpr-compliance-checker`, but every one points at the **SKILL**
+   (`skills/compliance/gdpr-compliance-checker`), which is KEPT. Deleting the wrapper
+   AGENT file does not invalidate them. The plan scopes edits to exactly three files;
+   I did not edit these, and the full suite stays green with them unchanged.
+
+4. **Agent count — net-zero, no README/CLAUDE.md bump.** `readme-numbers.test.js`
+   pins `countAgentMdFiles() === 110` and the README `agents-110` badge / `110 agents`
+   claims. Delete-one + add-one = 110 unchanged (verified: 110). No doc numeric claim
+   changed, so no README/CLAUDE.md edit was made or needed. Test passes in the green
+   full suite.
+
+5. **tsc pre-existing errors left as-is.** `npx tsc --noEmit` reports pre-existing
+   errors in unrelated `src/lib`/`src/tabs`/`src/scripts` modules. This slice touched
+   no `.js` under `src/`; zero tsc errors reference `gdpr-agent.md` or
+   `gdpr-agent-definition.test.js`. Baseline-neutral — out of scope to fix here.
+
+### VERIFY tallies
+- RED (before impl): 6 tests, 1 pass, 5 fail.
+- GREEN (`node --test tests/gdpr-agent-definition.test.js`): 6 tests, 6 pass, 0 fail, 0 skipped, 0 todo.
+- Full suite (`node --test tests/*.test.js`): 3204 tests, 3204 pass, # fail 0, 0 skipped, 0 todo.
+- `npx eslint . --max-warnings 0`: exit 0.
+- tsc: baseline-neutral (0 errors reference this slice; pre-existing errors unrelated).
+- Old wrapper deleted, new agent present, agents/ .md count = 110 (net-zero).
