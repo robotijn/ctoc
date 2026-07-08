@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T20:52:40.393Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "CU3 — Tier 1 high-traffic frameworks reference upgrade"
 created: "2026-06-15T00:00:00Z"
 priority: HIGH
