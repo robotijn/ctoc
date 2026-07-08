@@ -18,6 +18,7 @@ created: "2026-06-28T00:00:00Z"
 type: feature
 status: functional
 priority: HIGH
+state: in-progress
 parent_vision: "done/local-semantic-plan-index.md"
 program: ctoc-planning-intelligence
 order: 4
@@ -964,50 +965,83 @@ breaks the menu/pipeline when the embedder is absent. Gate 3 (human approval) be
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — both files fail MODULE_NOT_FOUND (wiring/bootstrap absent)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none; no engines bump
+- [x] Check prerequisites — openStore, embed({vectors,source}), loadCalibration/runCalibration, probeOllama, reconcileIndex(plansRoot,{store,embedder,calibrationReady,logDir}) all confirmed fresh
+- [x] Verify dev environment ready — both dormant consumer contracts (getWiring(); hook needs typeof embedder==='function') confirmed
+- [x] Create directories/config if needed — .ctoc/index/ already git-ignored (.gitignore:18)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature — wiring.js (getWiring singleton + probeEmbeddingSource + embedder adapter), bootstrap.js (isBackfillNeeded/kickBackfillBackground/runBackfill + --backfill child), index.js barrel re-export, hooks.json registration, SessionStart 5a kick, overview.js status line
+- [x] Add error handling — fail-open at every layer (store/wiring/kick/child/overview)
+- [x] Wire up integration points — actions.js + PostToolUse hook go LIVE unchanged; PI0 tests 17/17 GREEN
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — fixed a require-cycle (index↔wiring): wiring now imports ./store directly (contract-equivalent to the barrel's re-export), eliminating the circular-dependency WARNING (warnings are bugs)
+- [x] Verify integration points work together — barrel exports all resolve (getWiring/probeEmbeddingSource/kickBackfillBackground/isBackfillNeeded/openStore/PLAN_SENTINEL) in BOTH load orders; seam-go-live proven (w.store + w.embedder fn)
+- [x] Check error handling completeness — fail-open at store/wiring/kick/child/overview; embedder one-arg returns {vectors}; consumers untouched
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — no async probe on getWiring's synchronous path; probeEmbeddingSource is the separate async quality-tier gate only
+- [x] Optimize critical paths — singleton CACHE (keyed on resolved root) avoids re-openStore per movePlan/hook call; isBackfillNeeded reads only store.size (O(1)-ish, no plans walk)
+- [x] Simplify complex code — no change needed; injected-deps path bypasses the cache cleanly for tests
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — all paths via path.join under .ctoc/index and .ctoc/logs; getWiring normalizes projectPath via path.resolve
+- [x] Sanitize outputs — status/log JSON written defensively; no secrets emitted
+- [x] No secrets in code — none introduced
+- [x] Safe file operations — safe-fs only (no raw fs); detached child spawns process.execPath with an ARRAY argv (no shell → no command injection), stdio:'ignore'; PostToolUse matcher does not widen any gate
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `npx eslint . --max-warnings 0` exit 0; lint.test.js green (fixed a non-literal-require by inlining string-literal requires in the barrel getters); tsc baseline-neutral (5 pre-existing errors unchanged; 0 new from PI0)
+- [x] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → # fail 0, 2968 pass, 0 skipped, 0 todo
+- [x] Check coverage >= 80% — wiring.js 96.52% line / 86.49% branch; bootstrap.js 93.83% line / 66.13% branch (remaining uncovered = best-effort fail-open catches + the --backfill child entry). readme-numbers green: src/hooks/ stays 16 files (no hook-count bump)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — module headers on wiring.js + bootstrap.js mirror the PI1/PI2/PI3 style and state that PI0 turns the dormant PI3 guard/hook LIVE
+- [x] Add JSDoc comments to new functions — getWiring, probeEmbeddingSource, isBackfillNeeded, kickBackfillBackground, runBackfill all documented with the fail-open contract
+- [x] Update CHANGELOG if needed — no CHANGELOG file in this project (version via VERSION + commit messages); N/A
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly — all acceptance criteria map to code + tests (smoke #1-8, bootstrap #1-8b)
+- [x] All quality checks passed — full suite # fail 0 (2970 pass), eslint exit 0, tsc baseline-neutral, coverage ≥80% new modules, 16 hook files (no bump)
+- [x] Manual verification — seams-go-live proven: getWiring resolves w.store + typeof w.embedder === 'function' (both consumers' predicates satisfied)
+- [x] Ready for human review — Gate 3 (human approval) required before done; plan NOT moved by the executor
+
+---
+
+## PI0 Execution — Decisions Taken Under Ambiguity (Steps 8–16)
+
+- **Require-cycle resolution (wiring):** `wiring.js` imports `openStore` from `./store`
+  DIRECTLY, not the `./index` barrel. The barrel re-exports `getWiring` from wiring, so
+  importing the barrel inside wiring formed `index → wiring → index` and produced a
+  partially-initialized barrel (an `undefined` re-export + a Node circular-dependency
+  WARNING — and warnings are bugs). `openStore` lives in `./store`; the barrel is a pure
+  re-export of it, so this is contract-equivalent.
+- **Require-cycle resolution (barrel):** the barrel's PI0 re-exports (`getWiring`,
+  `probeEmbeddingSource`, `kickBackfillBackground`, `isBackfillNeeded`) are exposed as
+  LAZY GETTERS (deferred to first property access), not eager requires. Eagerly requiring
+  `bootstrap` at barrel-load pulled in `reconcile → sync-unit → content-hash`, and
+  `content-hash`/`reconcile` require the barrel back for `PLAN_SENTINEL` — the cycle left
+  `content-hash.hashUnit` transiently undefined and broke all 14 PI3 reconcile/sync tests.
+  Lazy getters break the cycle: PI1/PI3 consumers that only touch `openStore`/`PLAN_SENTINEL`
+  never trigger the deeper graph. Each getter is fail-open (undefined if the submodule
+  cannot load) and uses a STRING-LITERAL require (no `security/detect-non-literal-require`).
+- **State tracking:** the plan file stays in `plans/todo/` with `state: in-progress` in
+  frontmatter (this repo tracks in-progress as a YAML state, not a directory). The executor
+  did NOT cross any human gate; Gate 3 (review → done) remains the human's.
+- **SessionStart placement:** the backfill kick is step 5a — immediately after the plans/
+  directory-creation loop, before the CLAUDE.md lessons block — using the in-scope
+  `projectPath`. Double-guarded (try/catch + kickBackfillBackground is itself non-throwing).
+- **overview placement:** the `Semantic Index` status line renders right after the `Review`
+  count in the Pipeline section, via a local fail-open `readIndexStatus` (missing/corrupt →
+  null → NO line, dashboard unchanged). Added `path` + `safe-fs` imports at the top.
+- **Embedder-source availability signal:** `isIndexAvailable()` is the SYNCHRONOUS
+  store-constructed signal (what movePlan/the hook gate on). Embedding-source reachability is
+  the async quality-tier signal via `probeEmbeddingSource`/`degradedReason`, never flipping
+  the store off — matching the pivot note (in-process fallback keeps availability true).

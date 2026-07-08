@@ -97,6 +97,20 @@ async function main() {
     }
   }
 
+  // 5a. Plan-index backfill kick (fire-and-forget, fail-open). Never blocks session
+  //     start: the actual reconcile + calibration run in a DETACHED child process;
+  //     this only spawns and returns. Double-guarded — kickBackfillBackground is
+  //     itself non-throwing, and this try/catch is a belt-and-braces backstop so a
+  //     missing/broken bootstrap module can NEVER break session start (the pi1 /
+  //     task-reconcile precedent). Backfilling CTOC's own plans/ is desirable (it
+  //     dogfoods), so no self-repo guard here.
+  try {
+    const { isBackfillNeeded, kickBackfillBackground } = require('../lib/plan-index/bootstrap');
+    if (isBackfillNeeded(projectPath)) kickBackfillBackground(projectPath);
+  } catch (err) {
+    console.error('[CTOC] Plan-index backfill kick skipped:', err && err.message);
+  }
+
   // 5b. Ensure CTOC-managed operating-lessons block in CLAUDE.md (fail-open).
   //     MUST NOT throw, block, or perceptibly slow session start. Double-guarded:
   //     ensureLessonsBlock itself never throws; this try/catch is a belt-and-braces backstop.

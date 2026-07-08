@@ -15,6 +15,15 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/PostToolUse.status-check.js\""
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/PostToolUse.plan-index-sync.js\""
+          }
+        ]
       }
     ],
     "PreToolUse": [
