@@ -2,6 +2,8 @@
 approved_by: human
 approved_at: 2026-07-08T13:52:32.816Z
 gate_crossed: functional → implementation
+is_slice_index: true
+files: []
 ---
 
 ---
@@ -16,19 +18,58 @@ depends_on:
   - EC1-compliance-mode-setting
   - EC2-gdpr-agent-plan-and-code
   - EC3-eu-ai-act-agent-plan-and-code
-files:
-  - src/lib/iron-loop.js
-  - src/lib/inbox.js
-  - src/lib/compliance-dedup.js
-  - .ctoc/operations-registry.yaml
-  - agents/coordinator/cto-chief.md
-  - tests/compliance-iron-loop.test.js
 status: refined
 acceptance_criteria_count: 11
 risk_level: HIGH
 ---
 
+> **This plan is a SLICE INDEX.** It was decomposed (per SIP1) into the small,
+> dependency-ordered implementation slices listed in the **## Slices** section
+> below. The upstream ASSESS / ALIGN / CAPTURE / Scope / Risks context is
+> retained here as the shared context for all slices; each slice carries its own
+> focused `files:`, `## Implementation Details`, and canonical Steps 8–16
+> `## Execution Plan`. This index declares no `files:` and no `iron_loop` block —
+> it is not itself executed; its slices are.
+>
+> **Registry note (read-fresh correction).** The parent originally listed
+> `.ctoc/operations-registry.yaml` in `files:`, but EC2-s3 and EC3-s3 already
+> shipped the `gdpr-agent` and `eu-ai-act-agent` registry entries (asserted by
+> `tests/gdpr-agent-runner.test.js` and `tests/eu-ai-act-agent-registry.test.js`).
+> No further registry edit is needed, so no slice owns that file. Likewise
+> `src/lib/inbox.js` needs no new export (slices call the existing
+> `inbox.createQuestion`), and `src/lib/iron-loop.js` is intentionally NOT edited —
+> the trigger seam lives in a dedicated `iron-loop-compliance-trigger.js` (see
+> EC5-s4) to protect iron-loop.js's step-label validation. The cross-agent
+> end-to-end fixture suite `tests/compliance-iron-loop.test.js` is owned by EC6;
+> each EC5 code slice ships its OWN per-module test instead.
+
 # EC5 — Iron Loop integration of compliance findings (early, advisory, gates intact)
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | depends_on |
+|---|------------|------------------|------------|
+| 1 | `EC5-s1-eu-ai-act-agent-runner.md` | New `src/lib/eu-ai-act-agent-runner.js` — the missing gate-then-route runner (parity with `gdpr-agent-runner.js`): gate on `shouldRunEuAiAct`, `filterToEuAiAct` → normalize → route to Inbox/letter. | none |
+| 2 | `EC5-s2-compliance-dedup.md` | New `src/lib/compliance-dedup.js` — pure `deduplicateFindings(ec2, ec3)` on `(kind, regulation_ref_normalized)`, conservative-merge table, EC2-on-tie. | none |
+| 3 | `EC5-s3-compliance-integration.md` | New `src/lib/compliance-integration.js` — the functional→implementation seam: run both runners, cross-dedup plan-stage findings, single-write to Inbox; advisory, no plan move. | s1, s2 |
+| 4 | `EC5-s4-iron-loop-trigger.md` | New `src/lib/iron-loop-compliance-trigger.js` — library EMITS the trigger condition (`dispatcher:'cto-chief'`) to plan frontmatter; dispatches NOTHING. | none |
+| 5 | `EC5-s5-cto-chief-dispatch.md` | Add the compliance dispatch case to `agents/coordinator/cto-chief.md` (sole dispatcher) + LIVE end-to-end test driving the real trigger→integration→Inbox flow. | s3, s4 |
+
+**Dependency DAG** (max chain depth 3, no cycles): `s1 → s3`, `s2 → s3`, `s3 → s5`, `s4 → s5`. Longest chain `s1/s2 → s3 → s5` = depth 3.
+
+**Gate invariant (in EVERY code slice test).** Each of s1–s5 carries a test that
+reads `src/hooks/human-gate-check.js`, asserts `HUMAN_GATES` still has exactly the
+3 destination keys (`implementation`, `todo`, `done`) — i.e. the 4-gate topology
+(Gate 0–3) is unchanged — and asserts the slice's own source names no gate key
+(`HUMAN_GATES` / `requireReviewGate` / `enforcementMode` / `review_gate`).
+Compliance findings are advisory and EARLY: they attach to the Inbox before Gate 2
+and NEVER add, weaken, or block a human gate. s3 and s5 additionally prove
+advisory behaviour by asserting the plan is not moved across any stage.
+
+**Batched gates.** Gate 2 (implementation→todo) is approved for ALL five siblings
+at once via `approveSubplans('EC5-iron-loop-integration', 'implementation', ...)`.
+Implementation stays sequential + dependency-ordered: no slice starts before its
+`depends_on` siblings are built.
 
 ## 1. ASSESS
 
