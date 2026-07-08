@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T09:02:49.685Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "VP1 — Resolve created-file claims against the plan's files: declaration"
 type: functional
 status: functional
