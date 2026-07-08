@@ -1,0 +1,488 @@
+{
+  "_comment": "Deterministic hermetic fixture for tests/plan-index-search.test.js. 8-dim unit vectors give controlled cosine rankings; no Ollama / no network. Generated once, checked in.",
+  "dimension": 8,
+  "plans": [
+    {
+      "planPath": "plans/ps1-sync-state.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 0,
+      "text": "How CTOC syncs plan state across the kanban board and reconciles stage transitions with the state machine.",
+      "files": [],
+      "embedding": [
+        0.9578262852211513,
+        0,
+        0,
+        0.2873478855663454,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/ps2-state-machine.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 0,
+      "text": "The plan state machine: in-progress tracking, FIFO todo queue ordering, and stage move validation.",
+      "files": [],
+      "embedding": [
+        0.9535826651341417,
+        0,
+        0,
+        0,
+        0.3011313679370974,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/ps3-kanban-board.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 0,
+      "text": "Kanban board rendering of plan stages and drag transitions between columns in the dashboard.",
+      "files": [],
+      "embedding": [
+        0.9486832980505139,
+        0,
+        0,
+        0,
+        0,
+        0.31622776601683794,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/ps4-frontmatter.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 0,
+      "text": "Frontmatter parsing utilities. The parseYAMLShallow helper reads plan YAML headers without a full parser.",
+      "files": [],
+      "embedding": [
+        0.8944271909999159,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.4472135954999579,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/ah1-clerk-auth.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 1,
+      "text": "Clerk authentication signup login and email verification with MFA and session handling for the app.",
+      "files": [],
+      "embedding": [
+        0,
+        0.9578262852211513,
+        0,
+        0.2873478855663454,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/ah2-pretool-hook.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 1,
+      "text": "PreToolUse enforcement hook that intercepts edits and blocks writes outside plan-covered files.",
+      "files": [],
+      "embedding": [
+        0,
+        0.9535826651341417,
+        0,
+        0,
+        0.3011313679370974,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/ah3-gate-check.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 1,
+      "text": "Human gate check hook detecting gate violations and auto-reverting plans that cross a gate.",
+      "files": [],
+      "embedding": [
+        0,
+        0.9486832980505139,
+        0,
+        0,
+        0,
+        0.31622776601683794,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/qg1-coverage.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 2,
+      "text": "Quality gate enforcing eighty percent test coverage lint typecheck and zero skipped tests before ship.",
+      "files": [],
+      "embedding": [
+        0,
+        0,
+        0.9578262852211513,
+        0.2873478855663454,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/qg2-security-scan.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 2,
+      "text": "Security scanner checking input validation path traversal and secret exposure across the codebase.",
+      "files": [],
+      "embedding": [
+        0,
+        0,
+        0.9535826651341417,
+        0,
+        0.3011313679370974,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "planPath": "plans/qg3-review-dims.md",
+      "sectionId": "__plan__",
+      "kind": "plan",
+      "cluster": 2,
+      "text": "The fourteen quality dimensions used by review agents aligned to ISO twenty five zero one zero.",
+      "files": [],
+      "embedding": [
+        0,
+        0,
+        0.9486832980505139,
+        0,
+        0,
+        0.31622776601683794,
+        0,
+        0
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "qkind": "exact",
+      "query": "How does CTOC sync plan state",
+      "expected": "plans/ps1-sync-state.md",
+      "embedding": [
+        0.9578262852211513,
+        0,
+        0,
+        0.2873478855663454,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "plan state machine todo queue ordering",
+      "expected": "plans/ps2-state-machine.md",
+      "embedding": [
+        0.9535826651341417,
+        0,
+        0,
+        0,
+        0.3011313679370974,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "kanban board plan stages transitions",
+      "expected": "plans/ps3-kanban-board.md",
+      "embedding": [
+        0.9486832980505139,
+        0,
+        0,
+        0,
+        0,
+        0.31622776601683794,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "Clerk authentication signup login MFA",
+      "expected": "plans/ah1-clerk-auth.md",
+      "embedding": [
+        0,
+        0.9578262852211513,
+        0,
+        0.2873478855663454,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "PreToolUse enforcement hook blocks edits",
+      "expected": "plans/ah2-pretool-hook.md",
+      "embedding": [
+        0,
+        0.9535826651341417,
+        0,
+        0,
+        0.3011313679370974,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "human gate check auto-reverting plans",
+      "expected": "plans/ah3-gate-check.md",
+      "embedding": [
+        0,
+        0.9486832980505139,
+        0,
+        0,
+        0,
+        0.31622776601683794,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "quality gate eighty percent coverage lint typecheck",
+      "expected": "plans/qg1-coverage.md",
+      "embedding": [
+        0,
+        0,
+        0.9578262852211513,
+        0.2873478855663454,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "security scanner path traversal secret exposure",
+      "expected": "plans/qg2-security-scan.md",
+      "embedding": [
+        0,
+        0,
+        0.9535826651341417,
+        0,
+        0.3011313679370974,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "fourteen quality dimensions review agents",
+      "expected": "plans/qg3-review-dims.md",
+      "embedding": [
+        0,
+        0,
+        0.9486832980505139,
+        0,
+        0,
+        0.31622776601683794,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "exact",
+      "query": "parseYAMLShallow",
+      "expected": "plans/ps4-frontmatter.md",
+      "embedding": [
+        0,
+        0.6882472016116853,
+        0.6882472016116853,
+        0,
+        0,
+        0,
+        0,
+        0.2294157338705618
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "reconcile board columns with the machine that tracks progress",
+      "expected": "plans/ps1-sync-state.md",
+      "embedding": [
+        0.9551573261744535,
+        0,
+        0,
+        0.29609877111408056,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "first-in-first-out ordering of pending work items",
+      "expected": "plans/ps2-state-machine.md",
+      "embedding": [
+        0.9506656990656241,
+        0,
+        0,
+        0,
+        0.31021722811615104,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "visual columns you drag cards between on a dashboard",
+      "expected": "plans/ps3-kanban-board.md",
+      "embedding": [
+        0.9454845668267112,
+        0,
+        0,
+        0,
+        0,
+        0.32566690635142276,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "let a returning user prove identity before entering",
+      "expected": "plans/ah1-clerk-auth.md",
+      "embedding": [
+        0,
+        0.9551573261744535,
+        0,
+        0.29609877111408056,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "intercept a file mutation and refuse it when out of scope",
+      "expected": "plans/ah2-pretool-hook.md",
+      "embedding": [
+        0,
+        0.9506656990656241,
+        0,
+        0,
+        0.31021722811615104,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "undo a forbidden approval-boundary crossing automatically",
+      "expected": "plans/ah3-gate-check.md",
+      "embedding": [
+        0,
+        0.9454845668267112,
+        0,
+        0,
+        0,
+        0.32566690635142276,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "refuse to release code below the required test threshold",
+      "expected": "plans/qg1-coverage.md",
+      "embedding": [
+        0,
+        0,
+        0.9551573261744535,
+        0.29609877111408056,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "audit for leaked credentials and unsafe file access",
+      "expected": "plans/qg2-security-scan.md",
+      "embedding": [
+        0,
+        0,
+        0.9506656990656241,
+        0,
+        0.31021722811615104,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "the rubric graders use to judge each change",
+      "expected": "plans/qg3-review-dims.md",
+      "embedding": [
+        0,
+        0,
+        0.9454845668267112,
+        0,
+        0,
+        0.32566690635142276,
+        0,
+        0
+      ]
+    },
+    {
+      "qkind": "paraphrase",
+      "query": "store plan headers without a heavyweight document reader",
+      "expected": "plans/ps4-frontmatter.md",
+      "embedding": [
+        0.876215908676647,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.4819187497721558,
+        0
+      ]
+    }
+  ]
+}

@@ -305,50 +305,77 @@ that is s3); all 6 mapped parent criteria have passing tests; degrade path prove
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — module-not-found on `search.js`, confirmed RED
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (pure JS, node:test)
+- [x] Check prerequisites — s1 `fusion.js` exports `fuseRRF`/`RRF_K`/`reciprocalRank`; store exports `PLAN_SENTINEL` + `search(qVec,k,opts)`/`size` (read fresh)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — `tests/fixtures/plan-index/` created; `search-fixture.json` checked in
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — full BM25 (k1=1.2,b=0.75) + KNN via `store.search` + `fuseRRF`; no stubs
+- [x] Add error handling — non-string query throws `TypeError`; empty/null store → `[]`; empty embedder → `no-embedding` degrade; store.search throw → `vector-error` degrade
+- [x] Wire up integration points — s1 `fuseRRF`, store `PLAN_SENTINEL`, lazy `getWiring`
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — no import cycle (search→fusion leaf, search→store constant only); async isolated to one `await embedder([query])`; DI seam clean; `DEFAULT_SEARCH_LIMIT`/`BM25_K1`/`BM25_B` named constants
+- [x] Verify integration points work together — enumerates the store via the REAL PI1 surface (`listPlanPaths`+`getUnit`), calls `store.search` with the real 3-arg signature
+- [x] Check error handling completeness — every throw/degrade branch exercised by a test
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — one BM25 build per search; KNN bounded to `limit`
+- [x] Optimize critical paths — no O(N²); Map accumulators
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — `query` type-checked; `limit` coerced to positive int; `kind`/`excludePlanPath` passed only as known SearchOpts fields
+- [x] Sanitize outputs — degrade marker is a fixed string; error names the arg only
+- [x] No secrets in code
+- [x] Safe file operations — search.js does no fs/path/os; all I/O inside the PI1 store; BM25 index + RRF use Map (proto-pollution-safe)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `eslint . --max-warnings 0` exit 0; `tsc --noEmit` baseline-neutral (89 errors, 0 in search.js)
+- [x] Run ALL tests (TDD Green) — `node --test tests/plan-index-search.test.js` 22/22 pass; `node --test tests/*.test.js` 3025 pass, # fail 0
+- [x] Check coverage >= 80% — search.js line 99.39%, branch 84.96%, funcs 100%
+- [x] 0 skipped, 0 flaky tests — 0 skipped, deterministic (pre-measured fixture vectors)
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — module header (ADRs: one-async-point, BM25 params, degrade path, DI seam)
+- [x] Add JSDoc comments to new functions — `search`, `tokenize`, `buildBM25Index`, `scoreBM25`, `collectUnits`, `normalizeLimit`
+- [x] Update CHANGELOG if needed — n/a (versioned via release.js at commit)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — ablation proven non-vacuous (hybrid strictly beats BM25-only on 6/10 paraphrase queries, incl. cases BM25 misses entirely)
+- [x] Ready for human review — 2 files + fixture; search.js is INTERNAL (no barrel edit — that is s3)
+
+## Decisions Taken Under Ambiguity
+
+- **Tokenizer regex + raw-identifier retention.** Lowercase, split on `/[^a-z0-9]+/`
+  (so `src/lib/state.js` → `src`,`lib`,`state`,`js` and `parseYAMLShallow` →
+  `parseyamlshallow`), and ADDITIONALLY retain each *compound* (non-simple)
+  whitespace-delimited raw token lowercased (e.g. `src/lib/state.js`) so a query
+  that repeats a slash/dot-joined identifier verbatim still hits. A bare simple word
+  is NOT re-added (avoids double-counting its term frequency). No stemming, no
+  stopword removal — the corpus is tiny and over-processing hurts exact-token recall
+  (parent Scenario 2). Documented per the No-stub rule.
+- **BM25 IDF variant.** Classic Robertson probabilistic IDF `log(1 + (N−n+0.5)/(n+0.5))`
+  clamped at ≥ 0 so a term present in > half the corpus never contributes a negative
+  weight (which would corrupt the RRF input ordering). k1=1.2, b=0.75 as specified.
+- **Store enumeration via the public PI1 surface, not a private seam.** The BM25
+  corpus is built by enumerating `store.listPlanPaths()` + `store.getUnit(planPath,
+  '__plan__')` (and `listUnitSectionIds` for `kind:'section'`) — the real shipped
+  handle methods — rather than reaching into store internals. A store missing those
+  methods degrades to a KNN-only result (defensive `collectUnits` guard), never a
+  throw.
+- **Degrade marker delivery.** The `degraded` marker (`'no-embedding'` |
+  `'vector-error'`) is attached as a NON-enumerable property on the returned array,
+  so callers/JSON serialization of the results array are unaffected while a caller
+  that checks `results.degraded` sees the legible degrade reason.
+- **`kind:'section'` composite id.** Section-level results use `"${planPath}
+  ${sectionId}"` as the RRF/BM25 id (space-joined) — distinct from the plan-level id
+  which is the bare `planPath`; both map back to a view via `viewById`.
