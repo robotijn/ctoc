@@ -219,47 +219,83 @@ dir with a real `.ctoc/settings.yaml` and both regime YAMLs, so gating is real
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/compliance-integration.test.js` covering cases 1–9 above
-- [ ] Include the no-op diff (case 6), the no-move advisory proof (case 7), and the GATE-INVARIANT (case 9)
-- [ ] Test error conditions (non-string root, missing opts)
-- [ ] Run tests — expect RED (module does not exist yet)
+- [x] Write `tests/compliance-integration.test.js` covering cases 1–9 above
+- [x] Include the no-op diff (case 6), the no-move advisory proof (case 7), and the GATE-INVARIANT (case 9)
+- [x] Test error conditions (non-string root, missing opts)
+- [x] Run tests — expect RED (module does not exist yet) — confirmed MODULE_NOT_FOUND
 
 ### Step 9: PREPARE
-- [ ] Confirm EC5-s1 (`eu-ai-act-agent-runner`) and EC5-s2 (`compliance-dedup`) are built (depends_on)
-- [ ] Confirm `gdpr-agent-runner.js` export `runGdprFindings`
-- [ ] Confirm the survivor `regime` tag is available from dedup (coordinate with s2 finding shape)
+- [x] Confirm EC5-s1 (`eu-ai-act-agent-runner`) and EC5-s2 (`compliance-dedup`) are built (depends_on)
+- [x] Confirm `gdpr-agent-runner.js` export `runGdprFindings`
+- [x] Confirm the survivor `regime` tag is available from dedup (coordinate with s2 finding shape) — see Decision 2
 
 ### Step 10: IMPLEMENT
-- [ ] Create `src/lib/compliance-integration.js`
-- [ ] `splitByRoute` helper (code-stage = non-empty target_file)
-- [ ] Cross-regime plan-stage dedup + single-write partition by survivor regime
-- [ ] Aggregate summary `{ gdprRan, euAiActRan, inboxIds, letters, deduped }`
-- [ ] Export `{ runComplianceForTransition }`
+- [x] Create `src/lib/compliance-integration.js`
+- [x] `splitByRoute` helper (code-stage = non-empty target_file)
+- [x] Cross-regime plan-stage dedup + single-write partition by survivor regime
+- [x] Aggregate summary `{ gdprRan, euAiActRan, inboxIds, letters, deduped }`
+- [x] Export `{ runComplianceForTransition }`
 
 ### Step 11: REVIEW
-- [ ] Self-review: merged findings are written EXACTLY once (single-write invariant)
-- [ ] Verify the seam never moves a plan / never calls a gate-crossing function
-- [ ] Verify no gate key referenced
+- [x] Self-review: merged findings are written EXACTLY once (single-write invariant) — proven by test 3 (2 in, 1 file on disk)
+- [x] Verify the seam never moves a plan / never calls a gate-crossing function
+- [x] Verify no gate key referenced
 
 ### Step 12: OPTIMIZE
-- [ ] Single split + single dedup pass; no duplicate scans
-- [ ] Avoid re-running a runner when its regime is off (runner short-circuits anyway)
+- [x] Single split + single dedup pass; no duplicate scans
+- [x] Avoid re-running a runner when its regime is off (runner short-circuits anyway)
 
 ### Step 13: SECURE
-- [ ] Validate inputs; non-string root fail-open
-- [ ] No secrets; Inbox-only writes via runners
+- [x] Validate inputs; non-string root fail-open
+- [x] No secrets; Inbox-only writes via runners
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests: `node --test tests/compliance-integration.test.js`
-- [ ] Coverage ≥ 80%; 0 skipped, 0 flaky
-- [ ] Confirm no-op, no-move, and gate-invariant tests pass
+- [x] Run lint + type check — `npx eslint . --max-warnings 0` exit 0; tsc baseline-neutral (0 new errors)
+- [x] Run ALL tests: `node --test tests/compliance-integration.test.js` — 12/12 pass
+- [x] Coverage ≥ 80%; 0 skipped, 0 flaky — 100% line/branch/func on the new module
+- [x] Confirm no-op, no-move, and gate-invariant tests pass
+- [x] Full suite `node --test tests/*.test.js` — 3366 pass, 0 fail, 0 skipped
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on `runComplianceForTransition` and the single-write / dedup contract
-- [ ] Module header documenting advisory / gate-untouched guarantees
+- [x] JSDoc on `runComplianceForTransition` and the single-write / dedup contract
+- [x] Module header documenting advisory / gate-untouched guarantees
+- [x] README + readme-numbers count bumped 122 → 123
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify Steps 8–15 completed
-- [ ] Single-write + dedup + advisory-no-move + gate-invariant all green
-- [ ] Ready for human review
+- [x] Verify Steps 8–15 completed
+- [x] Single-write + dedup + advisory-no-move + gate-invariant all green
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+1. **Double-write avoidance (the load-bearing composition choice).** The EC2/EC5-s1
+   runners write-and-return: each plan-stage finding they receive is written to the
+   Inbox exactly once by the runner itself. The plan requires cross-regime dedup
+   BEFORE Inbox attachment (parent Success Metric 6) but the runners own the write.
+   Resolution: the seam dedups the RAW plan-stage findings first via
+   `deduplicateFindings`, then partitions each merged survivor to EXACTLY ONE runner
+   by the survivor's regime shape. Because dedup already collapsed cross-regime
+   duplicates to a single survivor, and each survivor is dispatched to a single
+   runner, every merged finding is written once and only once. The runners remain
+   the sole Inbox writers (single responsibility); no new Inbox writer is introduced.
+   Proven by test 3: two overlapping findings in ⇒ `deduped:1`, exactly ONE Inbox id
+   and ONE question file on disk (not two — not the sum).
+
+2. **Survivor regime derived from finding SHAPE, not a stored `regime` tag.** The
+   plan's Step 9 anticipated a `regime` tag on the dedup survivor, but EC5-s2's
+   `deduplicateFindings` does not add one — the survivor is a shallow copy of the
+   higher-confidence winner (EC2/GDPR-first on a tie). So `regimeOf(finding)` derives
+   the dispatch regime from the survivor's shape: `regulation === 'eu-ai-act'` ⇒
+   EU-AI-Act runner; everything else (incl. a GDPR finding carrying `gdpr_article`,
+   or a tagless survivor) ⇒ GDPR runner. This is the documented GDPR-first default
+   and is CORRECT for single-write: the EU-AI-Act runner fail-strictly DROPS any
+   finding whose `regulation !== 'eu-ai-act'`, so a GDPR-shaped survivor MUST go to
+   the GDPR runner to be written at all. On a tie, dedup keeps the GDPR (first-seen)
+   survivor, whose shape routes it back to the GDPR runner — self-consistent.
+
+3. **`gdpr_article` in test fixtures uses VALID_GDPR_ARTICLES codes** (e.g.
+   `GDPR-17` for retention, `GDPR-6` for lawful basis), because the GDPR runner's
+   `validateFindingSchema` throws on an unknown code before any emission. The
+   `regulation_ref` (the dedup topic key, e.g. `gdpr art. 5(1)(e)`) is independent
+   of `gdpr_article` and is what drives the cross-regime merge with EU-AI-Act's
+   `eu-ai-act art. 10` (both map to topic `data-governance` via the s2 table).
