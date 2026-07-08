@@ -360,56 +360,77 @@ LEGACY `src/tabs/overview.js` render path is NOT the surface (the dead-tab bug i
   semantic-index fault can NEVER break the mounted dashboard — the load-bearing invariant
   pipeline.js already enforces for Related Plans.
 
+### Executor decisions (Steps 8–16, 2026-07-08)
+
+- **Helper bodies co-located IN `src/areas/pipeline.js`, NOT `src/tabs/overview.js`.**
+  The plan's prose offered both placements (see the "NOTE ON FILE OWNERSHIP" and the
+  bridge-home decision), explicitly recording the co-located-in-pipeline.js variant as an
+  acceptable equivalent that keeps all edits within this slice's declared `files:`. The
+  executor took that variant on directive: `renderConflictPanel` + `prefetchConflicts` are
+  defined directly in `pipeline.js`, so the LIVE wiring carries ZERO dependency on the dead
+  `overview.js` render path (which PI4 proved is unmounted). `src/tabs/overview.js` was NOT
+  touched (confirmed: empty git diff). This keeps the slice within its declared `files:`
+  (`src/areas/pipeline.js` + its test) and eliminates any coupling to the dead tab.
+- **Test drives the REAL mounted render (PI4 "measure is the human" lesson).** Case 1
+  drives `pipeline.prefetchConflicts(app)` then `pipeline.render(app)` and asserts the
+  rendered dashboard STRING contains the conflicting plan (`auth-rate-limiting`), the
+  overlapping file (`src/lib/auth.js`), and the severity label — proving the flag reaches
+  the surface a human actually sees, not a helper return in isolation. Case 9 drives the
+  real `pipeline.activate(app)` to prove the conflict prefetch sits inside the same
+  fail-open activation guard as Related Plans (menu never breaks).
+- **No CHANGELOG entry.** This is an internal pre-release vector-chain slice; version bump
+  and changelog are handled at release, not per-slice. No stub, no TODO written.
+
 
 ---
 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (`tests/plan-index-conflict-surface.test.js`, 10 cases)
+- [x] Test error conditions (throw / undefined export / no-seed / poison / activation fail-open)
+- [x] Run tests - expect RED (failing) — RED: 10 tests, 1 pass, 9 fail
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none)
+- [x] Check prerequisites (PI6-s1 `detectConflicts` confirmed on barrel via lazy getter)
+- [x] Verify dev environment ready (re-read pipeline.js insertion points + PI4-s4 bridge)
+- [x] Create directories/config if needed (none)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (helpers IN pipeline.js, not overview.js)
+- [x] Add error handling (fail-open: render→'', prefetch→[], activate resets app.conflicts)
+- [x] Wire up integration points (render() + activate() + module.exports)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code (wiring is in LIVE pipeline.js render/activate; not overview)
+- [x] Verify integration points work together (E2E test drives real render after prefetch)
+- [x] Check error handling completeness (all three fail-open branches proven)
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (async fetch off render path; sync render reads cached array)
+- [x] Optimize critical paths (detectConflicts awaited once per activation; display capped at 5)
+- [x] Simplify complex code (mirrors the Related-Plans pair exactly)
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal; projectPath falls back to process.cwd())
+- [x] Sanitize outputs (array guards; overlappingFiles `|| []` before join; TUI text only)
+- [x] No secrets in code
+- [x] Safe file operations (no writes)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (eslint exit 0; tsc baseline-neutral 89→89)
+- [x] Run ALL tests (TDD Green) — new suite 10/10; full suite 3140 pass, 0 fail
+- [x] Check coverage >= 80% (added helpers fully exercised; file line 82.67%)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (JSDoc + insertion-point comments in pipeline.js)
+- [x] Add JSDoc comments to new functions (prefetchConflicts + renderConflictPanel)
+- [x] Update CHANGELOG if needed (n/a — pre-release slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed (panel-appears + fail-open proven against real render)
+- [x] Ready for human review
