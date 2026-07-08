@@ -66,6 +66,37 @@ function writePlan(tmp, stage, slug, { parent, dependsOn, valid = true, approved
   return p;
 }
 
+/**
+ * Write a plan whose gate-approval marker block is PREPENDED before the plan's own
+ * frontmatter — exactly what actions.addApprovalMarker produces once a plan crosses
+ * Gate 2. parseMetadata reads only the FIRST block, so parent_plan (in the SECOND
+ * block) is invisible to it. This is the shape that broke the PI4 batched Gate 3.
+ */
+function writeMarkerPrependedPlan(tmp, stage, slug, parent, dependsOn) {
+  const content =
+    '---\napproved_by: human\napproved_at: 2026-07-08T00:00:00.000Z\ngate_crossed: implementation → todo\n---\n\n' +
+    `---\ntitle: "${slug}"\ntype: implementation\nparent_plan: ${parent}\n` +
+    (dependsOn !== undefined ? `depends_on: ${dependsOn}\n` : '') +
+    `priority: HIGH\n---\n\n# ${slug}\n\n## Implementation Details\n\nTechnical approach.\n`;
+  const p = path.join(tmp, 'plans', stage, `${slug}.md`);
+  fs.writeFileSync(p, content);
+  return p;
+}
+
+describe('listSubplans — marker-prepended (PI4 Gate-3 regression)', () => {
+  it('finds a slice whose parent_plan lives in the SECOND frontmatter block', () => {
+    const tmp = makeTmpProject();
+    try {
+      writeMarkerPrependedPlan(tmp, 'review', 'PARENT-s1-a', 'PARENT', 'none');
+      writeMarkerPrependedPlan(tmp, 'review', 'PARENT-s2-b', 'PARENT', 'PARENT-s1-a');
+      const subs = listSubplans('PARENT', tmp);
+      assert.equal(subs.length, 2, 'both marker-prepended slices are found (was 0 before the fix)');
+      const byslug = Object.fromEntries(subs.map(s => [s.slug, s]));
+      assert.deepEqual(byslug['PARENT-s2-b'].dependsOn, ['PARENT-s1-a'], 'depends_on read from the second block too');
+    } finally { cleanup(tmp); }
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // listSubplans
 // ─────────────────────────────────────────────────────────────────────────────
