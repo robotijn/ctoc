@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-08T16:39:46.388Z
+gate_crossed: implementation → todo
+---
+
+---
 title: "EC3-s3 — register eu-ai-act-agent in operations-registry.yaml (dispatch wiring, gated on shouldRunEuAiAct) + registry test"
 type: implementation
 parent_plan: EC3-eu-ai-act-agent-plan-and-code
@@ -162,3 +169,57 @@ depends_on: s2. Depth 3 (s1 → s2 → s3) — at the SIP1 max chain depth, no d
 - **Registry wiring is its own slice, separate from the agent file (s2).** It is a distinct integration point touching a distinct file (`.ctoc/operations-registry.yaml`) and carries its own gate-integrity + dangling-path guard test — a clean single-pass unit, and it must run after s2 so the `path` resolves.
 - **The entry's exact key shape is aligned to the on-disk neighbors at implement time.** The registry header calls itself the single source of truth; the implementer reads the current `agents:` block fresh (Step 9) and matches its convention rather than assuming, per read-fresh.
 - **`gated_by` is a documentation/discovery marker, not an enforcement mechanism.** The actual gate is `shouldRunEuAiAct` in code (EC1); CTO Chief consults it. This entry records the dependency so the roster is self-describing; it introduces no new auto-cross and weakens no human gate.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
