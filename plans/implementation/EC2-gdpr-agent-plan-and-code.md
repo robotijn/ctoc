@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T13:52:32.739Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "EC2 — GDPR agent (plan-inspection + code-scan, extends gdpr-compliance-checker)"
 created: "2026-06-15T00:00:00Z"
 priority: HIGH

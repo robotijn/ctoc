@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T13:52:32.765Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "EC3 — EU AI Act agent (plan-inspection + code-scan, extends ai-governance-checker)"
 created: "2026-06-15T00:00:00Z"
 priority: HIGH
