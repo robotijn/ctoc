@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-08T19:25:50.795Z
+gate_crossed: implementation → todo
+---
+
+---
 title: "EC5-s1 — EU AI Act agent runner (gate-then-route seam)"
 type: implementation
 parent_plan: EC5-iron-loop-integration
