@@ -9,6 +9,7 @@ const { safeRegExp } = require('./regex-utils');
 const path = require('path');
 const { parseMetadata } = require('./state');
 const { findProjectRoot } = require('./project-root');
+const { extractFrontmatterRegion, parseFilesField } = require('./stale-detector');
 
 /**
  * Validation result structure
@@ -283,7 +284,30 @@ function validateAcceptanceCriteria(content) {
 }
 
 /**
- * Check for contradictions between plan and actual code/files
+ * Existence check for a declared (repo-root-relative, possibly POSIX-authored)
+ * path under `root`, cross-platform. Splits on any separator run and drops
+ * empty / `.` / `..` segments so a declared path can never climb above `root`.
+ * Mirrors `stale-detector.declaredFileExists` (which is not exported); kept
+ * local so the fix stays within VP1's declared file scope. Read-only.
+ * @param {string} root
+ * @param {string} declared
+ * @returns {boolean} true if the resolved path exists under root.
+ */
+function declaredFileExistsUnder(root, declared) {
+  const parts = declared.split(/[\\/]+/).filter((p) => p.length > 0 && p !== '.' && p !== '..');
+  if (parts.length === 0) return false;
+  return safeFs.existsSync(path.join(root, ...parts));
+}
+
+/**
+ * Check for contradictions between plan and actual code/files.
+ *
+ * A file claimed as created in prose but absent at its OWN resolved path is
+ * treated as satisfied when the plan's `files:` frontmatter declares a file
+ * with the same basename that EXISTS on disk (D-VP1-1): bare-basename prose for
+ * a legitimately declared+created file (e.g. prose "create `guard-files.js`"
+ * for a declared `src/hooks/guard-files.js`) no longer false-blocks. A claim
+ * matching no declared file and absent on disk still errors (D-VP1-2).
  */
 function validateNoContradictions(content, projectPath) {
   const result = { errors: [], warnings: [], checklist: {} };
@@ -295,6 +319,12 @@ function validateNoContradictions(content, projectPath) {
   const scanContent = content
     .replace(/```[\s\S]*?```/g, '')
     .replace(/~~~[\s\S]*?~~~/g, '');
+
+  // The plan's `files:` frontmatter is the authoritative declaration of what the
+  // plan creates. Parse it once (inline-array, block-list AND scalar forms; all
+  // leading `---…---` blocks merged) so a bare-basename prose claim can be
+  // resolved against it below. Empty [] when the plan declares none.
+  const declaredFiles = parseFilesField(extractFrontmatterRegion(content));
 
   // Pattern 1: File referenced as "created" but doesn't exist. The filename
   // capture excludes quotes, parens and commas so code expressions (which
@@ -312,10 +342,20 @@ function validateNoContradictions(content, projectPath) {
     result.checklist[`file_${filePath}`] = { claimed: 'created', exists };
 
     if (!exists) {
-      result.errors.push(
-        `File "${filePath}" claimed as created but doesn't exist. ` +
-        `Create the file or remove the claim.`
+      const claimedBase = path.basename(filePath);
+      // Claim is satisfied if the plan DECLARES a file with the same basename
+      // that EXISTS on disk (bare-basename prose for a legitimately
+      // declared+created file). Basename equality is a plain string compare —
+      // no regex on plan input.
+      const satisfiedByDeclaration = declaredFiles.some(
+        (declared) => path.basename(declared) === claimedBase && declaredFileExistsUnder(projectPath, declared)
       );
+      if (!satisfiedByDeclaration) {
+        result.errors.push(
+          `File "${filePath}" claimed as created but doesn't exist. ` +
+          `Create the file or remove the claim.`
+        );
+      }
     }
   }
 
