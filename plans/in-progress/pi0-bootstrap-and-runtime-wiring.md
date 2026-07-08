@@ -114,7 +114,7 @@ never a crash, never a silent empty box.
 
 ## Acceptance Criteria
 
-- [ ] **Scenario: Capability gate degrades cleanly when no embedding source**
+- [x] **Scenario: Capability gate degrades cleanly when no embedding source**
   Given a runtime where Ollama is unreachable AND the in-process fallback is
   unusable (no model, download blocked)
   When the index runtime loads
@@ -123,37 +123,37 @@ never a crash, never a silent empty box.
   index unavailable — no embedding source" notice is shown — no exception
   propagates. (No native-module / vector-extension / full-text-engine probe
   exists; the store never gates availability.)
-- [ ] **Scenario: Store opens on every Node with no native prerequisite**
+- [x] **Scenario: Store opens on every Node with no native prerequisite**
   Given any Node version the plugin supports (the `engines` floor is unchanged)
   When the runtime initializes
   Then `openStore('.ctoc/index/plan-index.json')` returns a usable store with no
   native binary, no extension load, and no experimental-runtime warning — the
   pure-JS store imposes zero runtime capability requirement.
-- [ ] **Scenario: First-run backfill populates the index over existing plans**
+- [x] **Scenario: First-run backfill populates the index over existing plans**
   Given a project with N plan files and an empty/missing
   `.ctoc/index/plan-index.json`
   When bootstrap runs
   Then after the background build completes the index contains units for all N
   plans (via `upsertUnit`/`withBatch`) and a search for a known plan's topic
   returns it.
-- [ ] **Scenario: Background build never blocks the menu**
+- [x] **Scenario: Background build never blocks the menu**
   Given calibration has not yet run
   When the user opens the menu
   Then the menu renders within its normal time budget and shows a
   "building index" status; no render call waits on calibration or embedding.
-- [ ] **Scenario: Composition root provides the query embedder to search**
+- [x] **Scenario: Composition root provides the query embedder to search**
   Given the runtime is available and calibrated
   When `search(query)` runs
   Then the query is embedded via the wired PI2 embedder and the vector half of
   retrieval (PI1's brute-force cosine `store.search`) is non-empty (the read
   features never construct their own embedder).
-- [ ] **Scenario: Rebuild equivalence (vision criterion 5)**
+- [x] **Scenario: Rebuild equivalence (vision criterion 5)**
   Given a populated index
   When `.ctoc/index/plan-index.json` is deleted and bootstrap re-runs on the same
   machine with the same calibrated model
   Then the rebuilt index returns the same top-k for a fixed query set as before
   the delete (set-equal within float tolerance).
-- [ ] **Scenario: Committed runtime smoke test**
+- [x] **Scenario: Committed runtime smoke test**
   Given CI on any supported Node
   When `tests/plan-index-smoke.test.js` runs
   Then it opens a real `openStore` over a temp JSON path, upserts two known
