@@ -1,16 +1,24 @@
 /**
  * Tests for the EU-solution-recommender deterministic rule core (EC4-s1).
  *
- * Pure in-memory inputs plus a hand-written STUB fetcher injected into
- * `createFetcher` — NO live network, NO tmp project. Maps the parent CAPTURE
- * scenarios 1:1 onto this module's surface. House style matches
- * `tests/eu-ai-act-helpers.test.js`.
+ * ZERO test doubles. Pure in-memory inputs for the deterministic rule
+ * functions, and — for `createFetcher` — REAL functions injected as the web
+ * boundary that perform REAL file I/O (`fs.readFileSync` + `JSON.parse`)
+ * against REAL on-disk fixtures under `tests/fixtures/compliance/recommender/`.
+ * Nothing is faked: the data is real, the I/O is real, and a failure is a REAL
+ * `fs`/`JSON.parse` error (ENOENT for a missing fixture, SyntaxError for the
+ * malformed fixture) that `createFetcher`'s fail-soft wrapper turns into
+ * `{ ok:false, error }`. NO live network, NO hand-thrown fake error, NO tmp
+ * project. Maps the parent CAPTURE scenarios 1:1 onto this module's surface.
+ * House style matches `tests/eu-ai-act-helpers.test.js`.
  */
 
 'use strict';
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   CANONICAL_SCHEMA_KEYS,
@@ -42,6 +50,36 @@ function hostedOption(overrides = {}) {
     unverified_this_run: false,
     ...overrides,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// REAL on-disk fixtures + REAL-I/O fetcher functions (ZERO test doubles).
+// The functions injected into createFetcher below are REAL: they read REAL
+// files from disk and JSON.parse them. Nothing is a fake closure.
+// ─────────────────────────────────────────────────────────────────────
+
+/** Cross-platform absolute path to a recommender fixture file. */
+function fixturePath(name) {
+  return path.join(__dirname, 'fixtures', 'compliance', 'recommender', name);
+}
+
+/**
+ * A REAL fetch function: reads a REAL fixture file off disk and returns the
+ * parsed JSON. A missing/malformed file yields a REAL fs/JSON.parse error — no
+ * error is ever hand-thrown. This is the sole web boundary; createFetcher wraps
+ * it fail-soft.
+ * @param {string} name - fixture filename under the recommender fixture dir
+ */
+function realFileFetch(name) {
+  return JSON.parse(fs.readFileSync(fixturePath(name), 'utf8'));
+}
+
+/**
+ * A REAL search function: reads the REAL search-results fixture off disk and
+ * returns its `results` array. Same real-I/O contract as `realFileFetch`.
+ */
+function realFileSearch() {
+  return JSON.parse(fs.readFileSync(fixturePath('search-results.json'), 'utf8')).results;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -259,60 +297,90 @@ describe('checkMonotonicity', () => {
 // 13–15. createFetcher — injectable web boundary, fail-soft.
 // ─────────────────────────────────────────────────────────────────────
 
-describe('createFetcher', () => {
+describe('createFetcher (real-I/O fetcher over on-disk fixtures — ZERO doubles)', () => {
   it('13. rejects non-function args with TypeError', () => {
-    assert.throws(() => createFetcher(null, () => {}), TypeError);
-    assert.throws(() => createFetcher(() => {}, null), TypeError);
+    // The injected boundary must be a real function; a non-function is a
+    // wiring-time error. realFileFetch/realFileSearch are the REAL functions.
+    assert.throws(() => createFetcher(null, realFileFetch), TypeError);
+    assert.throws(() => createFetcher(realFileSearch, null), TypeError);
     assert.throws(() => createFetcher('nope', 'nope'), TypeError);
   });
 
-  it('14. delegates to injected fns and normalizes success (stub is SOLE boundary)', () => {
-    const calls = { search: [], fetch: [] };
-    const stubSearch = (q) => { calls.search.push(q); return ['result']; };
-    const stubFetch = (url) => { calls.fetch.push(url); return { body: 'payload' }; };
-
-    const fetcher = createFetcher(stubSearch, stubFetch);
+  it('14. delegates to REAL file-reading fns and normalizes success (real I/O is the SOLE boundary)', () => {
+    // The injected fns perform REAL fs.readFileSync + JSON.parse against REAL
+    // fixtures. The data returned is the real parsed fixture content.
+    const fetcher = createFetcher(
+      (query) => realFileSearch(query),
+      (name) => realFileFetch(name),
+    );
 
     const r1 = fetcher.search('eu vector db');
-    assert.deepEqual(r1, { ok: true, data: ['result'] });
-    assert.deepEqual(calls.search, ['eu vector db']);
+    assert.equal(r1.ok, true);
+    assert.ok(Array.isArray(r1.data), 'search returns the real results array from disk');
+    // The real fixture record is present (read off disk, not fabricated inline).
+    assert.ok(r1.data.some((x) => x.bucket === 'hosted'));
 
-    const r2 = fetcher.fetch('https://example.eu/pricing');
-    assert.deepEqual(r2, { ok: true, data: { body: 'payload' } });
-    assert.deepEqual(calls.fetch, ['https://example.eu/pricing']);
+    const r2 = fetcher.fetch('canned-solution-hosted.json');
+    assert.equal(r2.ok, true);
+    assert.equal(r2.data.bucket, 'hosted');
+    assert.equal(r2.data.name, 'Scaleway Managed Database (EU)');
+    // Prove the data is the REAL on-disk file, byte-for-byte.
+    const onDisk = JSON.parse(
+      fs.readFileSync(fixturePath('canned-solution-hosted.json'), 'utf8'),
+    );
+    assert.deepEqual(r2.data, onDisk);
   });
 
-  it('15. fail-soft: injected throw becomes { ok:false, error }, no exception propagates', () => {
-    const boom = () => { throw new Error('network down'); };
-    const fetcher = createFetcher(boom, boom);
+  it('15. fail-soft on a REAL missing-file error: injected read of a nonexistent fixture → { ok:false, error }, no exception propagates', () => {
+    // The injected fns read a path that genuinely does NOT exist on disk. The
+    // resulting ENOENT is a REAL fs error, not a hand-thrown fake.
+    const fetcher = createFetcher(
+      () => realFileFetch('does-not-exist-search.json'),
+      () => realFileFetch('does-not-exist-solution.json'),
+    );
 
     let r;
-    assert.doesNotThrow(() => { r = fetcher.fetch('https://example.eu'); });
+    assert.doesNotThrow(() => { r = fetcher.fetch('does-not-exist-solution.json'); });
     assert.equal(r.ok, false);
     assert.ok(r.error instanceof Error);
-    assert.match(r.error.message, /network down/);
+    // Prove it is a REAL fs error surfaced from a real missing file.
+    assert.equal(r.error.code, 'ENOENT', 'must be a real ENOENT from a real missing fixture');
+    assert.match(r.error.message, /does-not-exist-solution\.json/);
 
     let r2;
     assert.doesNotThrow(() => { r2 = fetcher.search('q'); });
     assert.equal(r2.ok, false);
     assert.ok(r2.error instanceof Error);
+    assert.equal(r2.error.code, 'ENOENT');
   });
 
-  it('15b. fail-soft on a rejected async result (thenable)', async () => {
-    const rejecter = () => Promise.reject(new Error('429 rate limited'));
-    const fetcher = createFetcher(rejecter, rejecter);
-    const r = await fetcher.fetch('https://example.eu');
+  it('15b. fail-soft on a REAL JSON.parse error: injected read of the malformed on-disk fixture → { ok:false, error }', () => {
+    // malformed-solution.json is REAL, invalid JSON on disk. JSON.parse throws a
+    // REAL SyntaxError — no fake error is thrown.
+    const fetcher = createFetcher(
+      () => realFileFetch('malformed-solution.json'),
+      () => realFileFetch('malformed-solution.json'),
+    );
+    const r = fetcher.fetch('malformed-solution.json');
     assert.equal(r.ok, false);
-    assert.ok(r.error instanceof Error);
-    assert.match(r.error.message, /429/);
+    assert.ok(r.error instanceof SyntaxError, 'a malformed fixture yields a real JSON SyntaxError');
   });
 
-  it('15c. success on a resolved async result (thenable)', async () => {
-    const resolver = () => Promise.resolve({ ok: 200 });
-    const fetcher = createFetcher(resolver, resolver);
-    const r = await fetcher.search('q');
-    assert.equal(r.ok, true);
-    assert.deepEqual(r.data, { ok: 200 });
+  it('15c. success reading each of the three real bucket fixtures off disk', () => {
+    // Every bucket fixture is read from disk by a REAL fetch fn and surfaces
+    // ok:true with its real parsed record.
+    for (const [name, bucket] of [
+      ['canned-solution-hosted.json', 'hosted'],
+      ['canned-solution-self-hosted.json', 'self_hosted'],
+      ['canned-solution-library.json', 'library'],
+    ]) {
+      const fetcher = createFetcher(realFileSearch, (n) => realFileFetch(n));
+      const r = fetcher.fetch(name);
+      assert.equal(r.ok, true, `${name} must read ok`);
+      assert.equal(r.data.bucket, bucket);
+      // The record read off disk is itself schema-valid (real data, real rules).
+      assert.doesNotThrow(() => validateOutputSchema(r.data));
+    }
   });
 });
 

@@ -1,0 +1,12 @@
+{
+  "bucket": "self_hosted",
+  "name": "PostgreSQL (self-hosted on EU infrastructure)",
+  "source_url": "https://www.postgresql.org/about/licence/",
+  "retrieved_date": "2026-07-08",
+  "price": "open-source / no license fee (PostgreSQL Licence) — self-hosting and infrastructure cost applies",
+  "quality_rank": 2,
+  "region": null,
+  "verified_source": null,
+  "verified_date": null,
+  "unverified_this_run": true
+}
