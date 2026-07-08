@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T13:52:32.789Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "EC4 — Web-sourced EU solution recommender (hosted / self-hosted / library)"
 created: "2026-06-15T00:00:00Z"
 priority: HIGH

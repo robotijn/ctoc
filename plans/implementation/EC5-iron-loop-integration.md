@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-08T13:52:32.816Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "EC5 — Iron Loop integration of compliance findings (early, advisory, gates intact)"
 created: "2026-06-15T00:00:00Z"
 priority: MEDIUM
