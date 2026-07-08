@@ -18,17 +18,22 @@ depends_on:
 acceptance_criteria_count: 7
 risk_level: MEDIUM
 gate_status: "Pending Approval (Gate 1: functional → implementation)"
-files:
-  - "src/lib/plan-index/search.js"
-  - "src/lib/plan-index/related.js"
-  - "src/lib/plan-index/fusion.js"
-  - "src/lib/plan-index/index.js"
-  - "src/commands/menu.js"
-  - "src/tabs/overview.js"
-  - "src/areas/inbox.js"
-  - "src/lib/inbox.js"
-  - "tests/plan-index-search.test.js"
+is_slice_index: true
+slices:
+  - "pi4-semantic-search-and-related-plans-s1-fusion"
+  - "pi4-semantic-search-and-related-plans-s2-search"
+  - "pi4-semantic-search-and-related-plans-s3-related-and-barrel"
+  - "pi4-semantic-search-and-related-plans-s4-ui-wiring"
 ---
+
+> **THIS PLAN IS A SLICE INDEX (SIP1).** It is NOT executed directly through the
+> Iron Loop. It has been decomposed into the four dependency-ordered implementation
+> slices listed in the `## Slices` section below; each slice is its own complete,
+> independently-executable implementation plan with a focused `files:` list and its
+> own canonical Step 8–16 execution plan. The whole-feature `files:` list, test plan,
+> and blueprint now live in the slices. The sections below (Problem, Business,
+> Acceptance Criteria, Risks, Test Plan, Decisions) are the SHARED CONTEXT every
+> slice inherits.
 
 # PI4 — Semantic Search & Related-Plans Surfacing (BM25 + Vector RRF)
 
@@ -42,6 +47,25 @@ files:
 > speed differs (sub-millisecond at CTOC's ~1,720-unit scale). There is no native
 > vector table, no native lexical table, no SQL, and no native binary anywhere in
 > this slice.
+
+## Slices (dependency-ordered)
+
+PI4 is decomposed into four cohesive slices, each ~1 module + its test (s4 is the
+single UI-integration slice). Build them strictly in order — a slice whose
+`depends_on` is unbuilt is not started (plan-serial FIFO). Gate 2 and Gate 3 are
+approved for all four siblings at once (batched gates), one human decision per parent.
+
+| # | Slice file | Scope (one line) | Files (this slice) | depends_on |
+|---|---|---|---|---|
+| s1 | `pi4-semantic-search-and-related-plans-s1-fusion.md` | RRF k=60 fusion + MRR helper — pure logic, zero I/O; buildable before PI0 | `src/lib/plan-index/fusion.js`, `tests/plan-index-fusion.test.js` | — |
+| s2 | `pi4-semantic-search-and-related-plans-s2-search.md` | Hybrid `search()`: pure-JS BM25 inverted index + vector via PI1 `store.search` (brute-force cosine) + RRF fuse; owns the ≥20-query falsifiability + ablation + exact-token fixture tests | `src/lib/plan-index/search.js`, `tests/plan-index-search.test.js` | s1 |
+| s3 | `pi4-semantic-search-and-related-plans-s3-related-and-barrel.md` | `related()` seeded from stored `__plan__` vector, self-excluded via `store.search` `excludePlanPath`, `kind` passthrough for PI6; additive `index.js` barrel exposing `search`/`related` (Barrel Integrity test) | `src/lib/plan-index/related.js`, `src/lib/plan-index/index.js`, `tests/plan-index-related.test.js` | s2 |
+| s4 | `pi4-semantic-search-and-related-plans-s4-ui-wiring.md` | UI wiring: menu "Search plans" shortcut, overview "Related Plans" panel (+ zero-unit "index building" indicator), inbox surfacing — all additive, fail-open | `src/commands/menu.js`, `src/tabs/overview.js`, `src/areas/inbox.js`, `src/lib/inbox.js`, `tests/plan-index-search-ui.test.js` | s3 |
+
+**Dependency chain:** s1 → s2 → s3 → s4 (linear, depth 3, no cycles). The vector half
+throughout is PI1's real `store.search(queryEmbedding, k, opts)` brute-force cosine —
+no SQL, no native binary. Query embedding is the single async call (s2), via PI0's
+injected `embedder`; everything else reads the pre-built index synchronously.
 
 ## Problem Statement
 
