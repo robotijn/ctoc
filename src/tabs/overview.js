@@ -29,6 +29,92 @@ function readIndexStatus(projectPath) {
   }
 }
 
+/**
+ * PI4-s4: read the plan-index unit count (store.size) through the barrel wiring.
+ * Fail-open, SYNCHRONOUS — used only to drive the Scenario-7 "index building"
+ * indicator: a zero-unit (or null / unavailable) store means the index has not
+ * been built yet, so the Related Plans panel shows a "building" state instead of
+ * an empty list. Any error → 0 (treated as "not built"). This NEVER throws into
+ * render (the readIndexStatus precedent).
+ * @param {string} projectPath
+ * @returns {number} number of indexed units, or 0 when unavailable
+ */
+function readIndexUnitCount(projectPath) {
+  try {
+    // `search`/`related`/`getWiring` are defined on the barrel via lazy
+    // Object.defineProperties getters (see plan-index/index.js) which tsc's static
+    // module-shape inference cannot see — cast to any so --checkJs stays neutral.
+    /** @type {any} */
+    const planIndex = require('../lib/plan-index');
+    if (typeof planIndex.getWiring !== 'function') return 0;
+    const wiring = planIndex.getWiring({ projectPath });
+    const store = wiring && wiring.store;
+    if (!store || typeof store.size !== 'number') return 0;
+    return store.size;
+  } catch {
+    return 0; // fail-open — a wiring fault reads as "index building"
+  }
+}
+
+/**
+ * PI4-s4: async-fetch half of the async-fetch/sync-render bridge (ADR-B). Called
+ * off the render path (on tab activation / selected-plan change); it awaits the
+ * barrel `related(planSlug)` and stashes the result array on `app.relatedPlans`
+ * for `renderRelatedPanel` to read SYNCHRONOUSLY. Fail-open: an unavailable /
+ * throwing `related` leaves `app.relatedPlans = []` and NEVER rejects — a
+ * semantic-feature fault must never break the dashboard (the load-bearing
+ * invariant). Bounded to the top 5 neighbours (perceived-latency mitigation).
+ * @param {object} app - the TUI app state; `app.projectPath`, `app.selectedPlan`
+ * @returns {Promise<void>}
+ */
+async function prefetchRelated(app) {
+  const projectPath = (app && app.projectPath) || process.cwd();
+  const seed = app && app.selectedPlan;
+  try {
+    if (!seed || typeof seed !== 'string') { app.relatedPlans = []; return; }
+    /** @type {any} */
+    const planIndex = require('../lib/plan-index');
+    if (typeof planIndex.related !== 'function') { app.relatedPlans = []; return; }
+    const results = await planIndex.related(seed, { projectPath, limit: 5 });
+    app.relatedPlans = Array.isArray(results) ? results.slice(0, 5) : [];
+  } catch {
+    app.relatedPlans = []; // fail-open — never reject, never break render
+  }
+}
+
+/**
+ * PI4-s4: SYNCHRONOUS render half of the bridge. Renders the "Related Plans"
+ * panel from the pre-stashed `app.relatedPlans` array. Scenario 7: when the index
+ * has zero units (store.size === 0 / unavailable) it renders an "index building"
+ * indicator INSTEAD of an (empty/stale) list. Fully fail-open — reads only a
+ * cached array + a sync unit count; on any surprise it returns '' so the
+ * dashboard renders unchanged (the readIndexStatus precedent).
+ * @param {object} app
+ * @returns {string} the panel block, or '' when there is nothing to show
+ */
+function renderRelatedPanel(app) {
+  try {
+    const projectPath = (app && app.projectPath) || process.cwd();
+    const units = readIndexUnitCount(projectPath);
+    if (units === 0) {
+      // Scenario 7 — index not built yet: show a building indicator, never a list.
+      return `${c.bold}Related Plans${c.reset}\n  ${c.dim}index building…${c.reset}\n\n`;
+    }
+    const related = Array.isArray(app && app.relatedPlans) ? app.relatedPlans : [];
+    if (related.length === 0) return ''; // no related plans → omit the panel entirely
+    let out = `${c.bold}Related Plans${c.reset}\n`;
+    for (const r of related.slice(0, 5)) {
+      const id = (r && (r.planPath || r.planSlug || r.plan)) || '?';
+      const score = (r && typeof r.score === 'number') ? ` ${c.dim}${r.score.toFixed(2)}${c.reset}` : '';
+      out += `  ${c.cyan}${id}${c.reset}${score}\n`;
+    }
+    out += '\n';
+    return out;
+  } catch {
+    return ''; // fail-open — a panel fault must NEVER break the dashboard
+  }
+}
+
 // Release mode state
 let releaseMode = false;
 let releaseTypeIndex = 0;
@@ -69,6 +155,11 @@ function render(app) {
     }
   }
   output += '\n';
+
+  // PI4-s4: Related Plans panel (additive, fail-open). Renders directly under the
+  // Semantic Index status line; on any fault it returns '' and the dashboard is
+  // unchanged (the readIndexStatus precedent).
+  output += renderRelatedPanel(app);
 
   output += line() + '\n\n';
 
@@ -184,4 +275,4 @@ function reset() {
   releaseTypeIndex = 0;
 }
 
-module.exports = { render, handleKey, reset };
+module.exports = { render, handleKey, reset, renderRelatedPanel, prefetchRelated };

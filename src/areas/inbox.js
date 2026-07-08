@@ -52,9 +52,39 @@ function render(app) {
     }
   }
 
+  // PI4-s4: Related-plans block (additive, fail-open). Reads a pre-fetched array
+  // stashed on `app.inboxRelated` via lib/inbox's `listRelatedForInbox` (the
+  // async-fetch/sync-render bridge). Absent/empty → the block is omitted and the
+  // inbox render is unchanged; this never throws.
+  out += renderInboxRelated(app);
+
   out += line() + '\n';
   out += renderFooter(['←/→ areas', 'q quit']);
   return out;
+}
+
+/**
+ * PI4-s4: SYNCHRONOUS render of the inbox Related-plans block from the pre-stashed
+ * `app.inboxRelated` array. Fail-open: absent/empty/non-array → '' (block omitted);
+ * on any surprise returns '' so the inbox render is never broken.
+ * @param {object} app
+ * @returns {string} the related block, or '' when there is nothing to show
+ */
+function renderInboxRelated(app) {
+  try {
+    const related = Array.isArray(app && app.inboxRelated) ? app.inboxRelated : [];
+    if (related.length === 0) return '';
+    let out = `${c.bold}Related plans${c.reset}\n`;
+    for (const r of related.slice(0, 5)) {
+      const id = (r && (r.planPath || r.planSlug || r.plan)) || '?';
+      const score = (r && typeof r.score === 'number') ? ` ${c.dim}${r.score.toFixed(2)}${c.reset}` : '';
+      out += `  ${c.cyan}${id}${c.reset}${score}\n`;
+    }
+    out += '\n';
+    return out;
+  } catch {
+    return ''; // fail-open — never break the inbox render
+  }
 }
 
 function handleKey(_key, _app) {
