@@ -197,6 +197,49 @@ regime_profile: eu-ai-act-high-risk
 - **"No rule re-stated" is asserted coarsely by absence of specific skill strings** (a phase heading, the `finding_id: <sha256` letter line). A perfect semantic diff against the skill is out of scope for a `node --test` content check; the coarse guard catches the common copy-paste regression and is honest about its bound.
 - **`gated_by`/`extends_skill`/`regime_profile` are added as frontmatter keys** for machine-discoverability of the gate + wrapped skill + profile; they mirror the intent of the existing thin-wrapper `target_skill:` key while carrying the extra EC3 context.
 
+### Execution decisions (EC3-s2 build, 2026-07-08)
+
+- **`tools: Read, Grep` (not `Bash, Read, Grep, Glob`).** The parent File-Spec
+  frontmatter block listed four tools, but the executor brief and the shipped
+  sibling `agents/compliance/gdpr-agent.md` (EC2-s3) both use exactly
+  `Read, Grep` — a plan-ancestry reader needs no shell or glob. Mirrored the
+  sibling for consistency; the content test asserts Read + Grep are present
+  (superset-tolerant), so a future re-add of Glob/Bash would not break it.
+- **Frontmatter mirrors `gdpr-agent.md` exactly** (category/tier/model/
+  effort_level/model_optimized_for/tools/reads_ancestry/dispatch_protocol/
+  confidence_calibration/parallel_safe/effort_budget.max_subagents:0/
+  reports_to), plus the three EC3-specific keys (`gated_by`, `extends_skill`,
+  `regime_profile`). This keeps the new agent structurally identical to its
+  proven sibling — `tests/architecture-invariants.test.js` (agents-scoped Tier
+  checks) and `tests/readme-numbers.test.js` stay green.
+- **Test 9 (no-new-gate) guard rewritten.** The initial `doesNotMatch`
+  `/add a human gate/` false-positived on the legitimate disclaimer "does not
+  add a human gate". Split into a REQUIRED negation assertion (the body must
+  say "no/adds-no human gate" / "human gates are untouched") plus a narrow
+  `doesNotMatch` on a POSITIVE claim only (`introduces/adds/registers/installs
+  a **new** human gate`). Honest and non-fragile.
+- **Agent-count bump 110→111 (EC3 adds one agent, deletes none).** Updated the
+  ground-truth pin in `tests/readme-numbers.test.js` (`countAgentMdFiles() ===
+  111`), all six README `110`→`111` occurrences (badge, lead paragraph, compare
+  table, key-features, agents-intro, project-structure), the six README-claim
+  assertions in the same test, and the `CLAUDE.md` project-structure line. Full
+  suite green afterward.
+- **tsc baseline-neutral confirmed by stash-diff.** `npx tsc --noEmit` emits
+  100 pre-existing diagnostic lines both with and without this slice's changes
+  (agent is markdown; test is plain JS) — zero net new type errors.
+
+### Steps 8–16 completion (EC3-s2)
+
+- Step 8 TEST — `tests/eu-ai-act-agent.test.js` written first, 9/9 RED (agent absent). [x]
+- Step 9 PREPARE — confirmed s1 exports `classifyFromPlanText`, `filterToEuAiAct`, `normalizeSeverity`, `routeFinding`, `readEnforcementDates`; no new deps. [x]
+- Step 10 IMPLEMENT — `agents/compliance/eu-ai-act-agent.md` created; gate-first, ancestry-read, helper-by-name, skill-delegate, dates-from-profile, no stubs, no restated skill rule. [x]
+- Step 11 REVIEW — self-reviewed vs AC: gate named, max_subagents:0, five helpers, no restated rule, dates from profile, scope isolation, no new gate; `defers_to` mirrors the skill. [x]
+- Step 12 OPTIMIZE — agent kept thin; delegates maximally, duplicates nothing. [x]
+- Step 13 SECURE — gate-false is a true no-op; no new human gate; test reads a fixed repo-relative path; eslint clean. [x]
+- Step 14 VERIFY — `node --test tests/eu-ai-act-agent.test.js` 9/9 pass 0 fail 0 skipped; `node --test tests/*.test.js` 3247 pass, # fail 0, 0 skipped; eslint exit 0; tsc baseline-neutral (100=100). [x]
+- Step 15 DOCUMENT — agent self-documents rule authority (skill + helpers); README + CLAUDE.md agent count synced 110→111. [x]
+- Step 16 FINAL-REVIEW — ready for implementation-reviewer; Gate 3 batched at EC3 parent (plan NOT moved). [x]
+
 
 ---
 

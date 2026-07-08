@@ -231,7 +231,7 @@ ctoc/
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)
     data/                Static data files
-  agents/                110 agent definitions across 22 categories
+  agents/                111 agent definitions across 22 categories
   skills/                421 skill files (99 Tier-2 specialist bodies + 322 reference)
   tests/                 109 test files
   .ctoc/                 Config, templates, operations
