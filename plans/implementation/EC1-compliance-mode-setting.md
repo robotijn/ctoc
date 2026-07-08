@@ -13,19 +13,35 @@ parent_vision: eu-compliance-agents-gdpr-ai-act
 program: ctoc-eu-compliance
 order: 1
 depends_on: []
-files:
-  - src/lib/regulatory-regime.js
-  - src/lib/compliance-regime.js
-  - src/commands/menu.js
-  - .ctoc/settings.yaml
-  - .ctoc/regulatory-regimes/gdpr.yaml
-  - tests/compliance-mode.test.js
+is_slice_index: true
 status: refined
 acceptance_criteria_count: 10
 risk_level: MEDIUM
 ---
 
 # EC1 — Regulatory-regime compliance gating + ride-along profile activation
+
+> **This plan is a SLICE INDEX** (`is_slice_index: true`). It was decomposed by the
+> implementation-planner (SIP1) into the dependency-ordered slices below. Each slice is a
+> COMPLETE small implementation plan (its own focused `files:`, its own `## Implementation
+> Details`, and the canonical Step 8–16 Execution Plan) executed independently through the Iron
+> Loop. The upstream ASSESS / ALIGN / CAPTURE / Scope / Risks / Decisions context below is
+> retained as the shared rationale for all slices. Gate 2 (implementation→todo) and Gate 3
+> (review→done) are approved for ALL siblings AT ONCE (batched, one human decision per
+> parent-batch); building stays sequential + dependency-ordered.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | files: | depends_on |
+|---|------------|------------------|--------|------------|
+| 1 | `EC1-s1-gdpr-profile.md` | Add the `gdpr` regime profile YAML (first-class, loadable by the existing regime system) + loadability test driving the real loader. | `.ctoc/regulatory-regimes/gdpr.yaml`, `tests/ec1-gdpr-profile.test.js` | none |
+| 2 | `EC1-s2-compliance-regime-resolver.md` | New `src/lib/compliance-regime.js`: `shouldRunGdpr` / `shouldRunEuAiAct` derived from `loadActiveProfiles()`, plus the tested targeted-replace `writeActiveProfiles` settings.yaml writer + full truth-table / graceful-degradation / gate-invariant test. | `src/lib/compliance-regime.js`, `tests/compliance-mode.test.js` | `EC1-s1-gdpr-profile` |
+| 3 | `EC1-s3-menu-ride-along.md` | Wire the compliance-regime ride-along question into the LIVE `menu.js` main() JSON path (mirrors the environment ride-along); action persists via `writeActiveProfiles`; test drives the real menu end-to-end. | `src/commands/menu.js`, `src/commands/menu.md`, `tests/compliance-ride-along.test.js` | `EC1-s1-gdpr-profile`, `EC1-s2-compliance-regime-resolver` |
+
+Dependency chain depth: 2 (`s3 → s2 → s1`). No cycles. A slice whose `depends_on` is unbuilt is
+not started (plan-serial FIFO). The parent's original `files:` module list is intentionally
+removed from this index so the PreToolUse coverage hook scopes edits to each slice's focused
+`files:` — not to the whole feature.
 
 ## 1. ASSESS
 
