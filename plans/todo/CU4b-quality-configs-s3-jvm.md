@@ -138,43 +138,43 @@ identifier assertions before upgrade. After upgrade all pass; `node --test tests
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/cu4b-jvm-configs.test.js` — reads the 2 REAL files, zero doubles;
+- [x] Write `tests/cu4b-jvm-configs.test.js` — reads the 2 REAL files, zero doubles;
       asserts `>5` sections, required sections, Java identifiers, `>=4` fences, dated http
       source, NO Kotlin/Scala tokens, gradient tokens.
-- [ ] Run — expect RED.
+- [x] Run — expect RED.
 
 ### Step 9: PREPARE
-- [ ] READ `java/strict.md` (structure template) fresh off disk.
-- [ ] **WEB-VERIFY at edit time** (no invented versions): current Checkstyle, SpotBugs,
+- [x] READ `java/strict.md` (structure template) fresh off disk.
+- [x] **WEB-VERIFY at edit time** (no invented versions): current Checkstyle, SpotBugs,
       PMD, JaCoCo versions + the maven plugin coordinates/versions, JDK 21 (Temurin) facts,
       the Checkstyle module names used. Capture each source URL + retrieval date ≥ 2025-01-01.
 
 ### Step 10: IMPLEMENT
-- [ ] Expand BOTH java configs to `> 5` `##` sections using java/strict STRUCTURE with
+- [x] Expand BOTH java configs to `> 5` `##` sections using java/strict STRUCTURE with
       Java-correct values; keep the strict/legacy gradient. ONE step. No Kotlin/Scala value.
       Each section identifier-bearing; each version inline-dated-sourced.
 
 ### Step 11: REVIEW
-- [ ] Self-review: gradient correct; no Kotlin/Scala token; each section identifier-bearing;
+- [x] Self-review: gradient correct; no Kotlin/Scala token; each section identifier-bearing;
       each version sourced; existing Checkstyle/compiler-flags/coverage/complexity retained.
 
 ### Step 12: OPTIMIZE
-- [ ] Density at java/strict level; tables where java/strict uses tables; no filler.
+- [x] Density at java/strict level; tables where java/strict uses tables; no filler.
 
 ### Step 13: SECURE
-- [ ] All source URLs official; only the 3 files edited.
+- [x] All source URLs official; only the 3 files edited.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/cu4b-jvm-configs.test.js` → GREEN.
-- [ ] `node --test tests/*.test.js` → `# fail 0`, 0 skipped.
+- [x] `node --test tests/cu4b-jvm-configs.test.js` → GREEN.
+- [x] `node --test tests/*.test.js` → `# fail 0`, 0 skipped.
 
 ### Step 15: DOCUMENT
-- [ ] Append to `## Decisions Taken Under Ambiguity`: UPGRADED verdict for java/legacy,
+- [x] Append to `## Decisions Taken Under Ambiguity`: UPGRADED verdict for java/legacy,
       java/strictest; template = java/strict (same-family, structure); each Checkstyle/
       SpotBugs/PMD/JaCoCo/JDK version with its dated source URL.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Only the 3 enumerated files changed; nothing fabricated; java/strict read but NOT
+- [x] Only the 3 enumerated files changed; nothing fabricated; java/strict read but NOT
       edited (no-churn).
 
 ## Risk Mitigations
@@ -187,7 +187,42 @@ identifier assertions before upgrade. After upgrade all pass; `node --test tests
 
 ## Decisions Taken Under Ambiguity
 
-(To be completed by the executor at Step 15 — must record: the UPGRADED verdict for
-java/legacy.md and java/strictest.md; template used = java/strict.md (same-family,
-STRUCTURE only); and each web-verified Checkstyle / SpotBugs / PMD / JaCoCo / JDK version
-with its dated http source URL and retrieval date ≥ 2025-01-01. Never invent a version.)
+**Verdict:** UPGRADED both `java/legacy.md` (45→221 lines, 5→8 `##` sections) and
+`java/strictest.md` (63→279 lines, 5→9 `##` sections). Template = `java/strict.md`
+(same-family, STRUCTURE only; read fresh off disk, NOT edited). Every existing
+fragment (Checkstyle limits, `-Xlint:all -Werror` compiler block, Javadoc modules,
+coverage/complexity tables) retained; added SpotBugs, PMD, JaCoCo enforcement, full
+`pom.xml`, Commands, and GitHub-Actions CI.
+
+**Web-verified versions (retrieved 2026-07-09):**
+
+| Tool | Version | Source |
+|------|---------|--------|
+| Checkstyle | 13.7.0 (rel. 2026-06-28) | https://github.com/checkstyle/checkstyle/releases |
+| maven-checkstyle-plugin | 3.6.0 | https://central.sonatype.com/ (Maven Central) |
+| SpotBugs | 4.10.2 | https://github.com/spotbugs/spotbugs/releases |
+| spotbugs-maven-plugin | 4.10.2.0 | https://github.com/spotbugs/spotbugs-maven-plugin/releases |
+| PMD | 7.26.0 | https://github.com/pmd/pmd/releases |
+| maven-pmd-plugin | 3.28.0 | https://central.sonatype.com/ (Maven Central) |
+| jacoco-maven-plugin | 0.8.13 | https://central.sonatype.com/ (Maven Central) |
+| maven-compiler-plugin | 3.15.0 (GA) | https://central.sonatype.com/ (Maven Central) |
+| Temurin JDK 21 | jdk-21.0.11+10 | https://api.adoptium.net/ |
+
+**Decisions taken under ambiguity:**
+- **JaCoCo version 0.8.13, not 0.8.15.** GitHub's latest tag is `v0.8.15`, but that
+  reflects the JaCoCo core/agent; the `jacoco-maven-plugin` GA artifact published to
+  Maven Central is **0.8.13** (retrieved 2026-07-09). A `pom.xml` references the
+  plugin coordinate, so 0.8.13 is the correct, resolvable value. Chose the Maven
+  Central plugin GA over the GitHub core tag to avoid an unresolvable dependency.
+- **maven-compiler-plugin 3.15.0 (GA), not 4.0.0-beta-4.** Maven Central's newest
+  entry is a beta; pinned the latest stable GA (3.15.0) since a legacy/strictest
+  quality gate must not depend on a pre-release plugin.
+- **Strictness gradient (real correctness axis):** legacy = `severity=warning`,
+  `failOnViolation=false`, JaCoCo 50% line-only with `haltOnFailure=false`, SpotBugs
+  `effort=Default`/`threshold=Medium`, PMD `bestpractices` only, CI
+  `continue-on-error`. strictest = `severity=error`, `failOnViolation=true` +
+  `violationSeverity=error`, JaCoCo 90% line+branch with `haltOnFailure=true`,
+  SpotBugs `effort=Max`/`threshold=Low` + `check` execution, PMD 5 rulesets with
+  `check`, `-Xlint:all -Werror` on `maven-compiler-plugin`, blocking CI.
+- **No Kotlin/Scala values.** Verified 0 leaked `detekt`/`ktlint`/`gradle.kts`/
+  `scalafmt`/`scalastyle` tokens in both files (grep + test guard).

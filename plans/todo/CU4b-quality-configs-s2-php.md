@@ -192,8 +192,48 @@ before upgrade. After upgrade all pass; `node --test tests/*.test.js` → `# fai
 
 ## Decisions Taken Under Ambiguity
 
-(To be completed by the executor at Step 15 — must record: the UPGRADED verdict for
-php/legacy.md and php/strictest.md; template used = php/strict.md (same-family, STRUCTURE
-only; ruby/strictest depth-reference only, no value copied); and each web-verified
-PHPStan / psalm / PHP-CS-Fixer / PHP_CodeSniffer / PHPUnit / PHP 8.3 version with its
-dated http source URL and retrieval date ≥ 2025-01-01. Never invent a version or level.)
+**Executed 2026-07-09 (Steps 8–16, TDD).**
+
+- **Verdict: UPGRADED.** Both `php/legacy.md` (4 `##`/32 lines → 12 `##`/~185 lines) and
+  `php/strictest.md` (4 `##`/36 lines → 12 `##`/~200 lines) upgraded to sibling-family
+  depth. Structure mirrors `php/strict.md` (same-family, structure only). `ruby/strictest`
+  NOT read/copied — zero Ruby tokens (asserted by the cross-language guard test).
+
+- **PHPStan level correction (documented decision, not a fabrication).** The plan pinned
+  strictest at "PHPStan level 9 (max)". Web verification on 2026-07-09
+  (https://phpstan.org/user-guide/rule-levels) shows **PHPStan 2.x exposes 11 levels
+  (0–10); level 10 is the strictest** — level 9 is no longer the maximum. To honor HARD
+  RULE 2 (no fabricated levels), strictest uses **level 10** with the level-8/9-era strict
+  flags (`treatPhpDocTypesAsCertain: false`, `checkMissingIterableValueType`,
+  `checkGenericClassInNonGenericObjectType`) retained on top. The content-contract test
+  was authored to assert `level: 10` for strictest accordingly.
+
+- **PHPUnit line choice.** Latest PHPUnit is 13.2.4 but requires PHP >= 8.4. Since the
+  slice targets **PHP 8.3**, both files pin **PHPUnit 12.5.31** (requires PHP >= 8.3 —
+  https://packagist.org/packages/phpunit/phpunit). Choosing the 8.4-only line 13 would
+  contradict the PHP 8.3 target.
+
+- **Psalm scope.** Psalm 6.16.1 (`errorLevel="1"`, its strictest) is added to strictest
+  only; legacy intentionally omits it (documented in the file) to avoid a second type
+  engine's noise before the PHPStan baseline is under control.
+
+- **Web-verified versions / levels (all retrieved 2026-07-09):**
+  - PHPStan **2.2.5**, 11 levels 0–10 (10 strictest) — https://packagist.org/packages/phpstan/phpstan ; https://phpstan.org/user-guide/rule-levels ; baseline: https://phpstan.org/user-guide/baseline
+  - Psalm **6.16.1**, `errorLevel` 1 strictest — https://packagist.org/packages/vimeo/psalm ; https://psalm.dev/docs/running_psalm/configuration/
+  - PHP-CS-Fixer **3.95.12** — https://packagist.org/packages/friendsofphp/php-cs-fixer
+  - PHP_CodeSniffer **4.0.1** — https://packagist.org/packages/squizlabs/php_codesniffer
+  - PHPUnit **12.5.31** (PHP >= 8.3) — https://packagist.org/packages/phpunit/phpunit
+  - PHP **8.3** released 23 Nov 2023, security support to 31 Dec 2027 (active support
+    ended 31 Dec 2025) — https://www.php.net/supported-versions.php
+  - setup-php **2.37.2** (`@v2`) — https://github.com/shivammathur/setup-php/releases
+
+- **Warning-is-a-bug note:** PHP 8.3 left *active* support on 31 Dec 2025 (security-only
+  now). The plan pins 8.3 as the target so it is honored; flagging for the parent's
+  awareness — a future slice may want an 8.4 variant.
+
+- **Test:** `tests/cu4b-php-configs.test.js` (node:test, zero doubles, reads both real
+  files off disk). RED before upgrade: 17 tests / 2 pass / 15 fail. GREEN after: 17 tests
+  / 17 pass / 0 fail / 0 skipped. eslint on the test file: exit 0.
+
+- **Barrier pattern honored:** only the 3 enumerated files touched; full suite NOT run;
+  nothing staged; plan NOT moved.
