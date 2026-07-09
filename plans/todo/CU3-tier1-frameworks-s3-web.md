@@ -273,3 +273,61 @@ respective version claims; no cross-language BAD/SAFE examples; tests green.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity (CU3-s3, 2026-07-09)
+
+### Web-verified facts + sources (retrieved 2026-07-09)
+All version/security claims below were verified against official sources at edit
+time. Nothing fabricated; unverifiable claims omitted.
+
+- **React current stable = 19.2.7** — npm registry `dist-tags.latest`
+  (npm view react version / dist-tags). https://www.npmjs.com/package/react
+- **Next.js current `latest` = 16.2.10; Next.js 15.x latest stable = 15.5.20**
+  (backport-maintained) — npm registry `dist-tags` + version list
+  (npm view next dist-tags). App-Router Server/Client + Server Actions patterns
+  named "Next.js 15" apply to 15 and forward to 16. https://www.npmjs.com/package/next
+- **CVE-2025-55184** — React Server Components pre-auth DoS via unsafe deserialization
+  of a Server Function payload. **CWE-502**, CVSS 7.5 HIGH, published 2025-12-11.
+  Fixed in `react-server-dom-*` 19.0.2 / 19.1.3 / 19.2.2. Verified: NVD
+  (services.nvd.nist.gov cveId=CVE-2025-55184) → GHSA-2m3v-v2m8-q956
+  (https://github.com/advisories/GHSA-2m3v-v2m8-q956).
+- **CVE-2025-55183** — React Server Components information leak (crafted request can
+  return a Server Function's source). CVSS 5.3 MEDIUM, published 2025-12-11. Fixed in
+  the same 19.0.2 / 19.1.3 / 19.2.2 line. Verified: NVD (cveId=CVE-2025-55183) →
+  GHSA-925w-6v3x-g4j4 (https://github.com/advisories/GHSA-925w-6v3x-g4j4).
+- **CWE-79** (Cross-Site Scripting) — https://cwe.mitre.org/data/definitions/79.html
+  (HTTP 200 verified). Applied to `dangerouslySetInnerHTML` in react.md.
+- **CWE-20** (Improper Input Validation) + **CWE-639** (Authorization Bypass / IDOR),
+  **CWE-502** (Deserialization) — all cwe.mitre.org pages verified reachable (HTTP
+  200). Applied to the nextjs.md Server Actions section.
+
+### Corpus-audit verdicts (audit file outside slice `files:` → recorded here per CU2-s1 precedent)
+- `skills/frameworks/web/react.md` — verdict **UPGRADED** (CU3-s3): 6 sections/63 lines
+  → **13 sections/232 lines**. Added Async/Concurrency (useSyncExternalStore tearing,
+  useEffect stale-closure/StrictMode double-invoke, useActionState/useOptimistic),
+  Error Handling, Security (CWE-79 dangerouslySetInnerHTML XSS + RSC CVEs), Testing,
+  Performance, Version-specific (dated), References. Existing 6 sections preserved;
+  only the stale "19.0.3+" security line corrected to verified 19.0.2/19.1.3/19.2.2.
+- `skills/frameworks/web/nextjs.md` — verdict **UPGRADED** (CU3-s3): 6 sections/70 lines
+  → **15 sections/252 lines**. Added Server/Client boundary, Server Actions
+  (input-validation CWE-20 + auth + IDOR CWE-639), Caching & Data, Security—Edge
+  Runtime & Secret Exposure (NEXT_PUBLIC_ leak), Error Handling, Performance,
+  Version-specific (dated), References. Existing 6 sections preserved; stale
+  "15.1.4+" security line corrected to the transitive-RSC advisory framing.
+
+### Decisions
+1. **Named "Next.js 15" despite 16 being GA** — the plan's AC mandates naming
+   "Next.js 15" App-Router patterns; those patterns are unchanged in 16. Noted 16.2.10
+   is current `latest` and 15.5.20 is the current 15.x stable so the guide is not
+   misleading.
+2. **RSC CVEs framed as React-native / Next.js-transitive** — CVE-2025-55184/55183 are
+   `react-server-dom-*` (RSC) advisories, not Next.js-core. react.md owns them
+   directly; nextjs.md documents them as inherited via bundled `react-server-dom-webpack`.
+   This corrects the prior guides, which attributed the same CVEs directly to each
+   project with stale fix versions (19.0.3+/15.1.4+).
+3. **nextjs "Security" required-section** — spread across Server Actions, "Security —
+   Edge Runtime & Secret Exposure", and the version section rather than one monolithic
+   heading; the Edge heading carries the literal "Security" token so the content-contract
+   regex matches accurately.
+4. **Added a nextjs Performance section** — the plan's required-sections list mandates
+   Performance for both files; added real streaming/waterfall/bundle footguns (no padding).
