@@ -235,50 +235,101 @@ Confirm: only the four enumerated files edited; every version/security claim sou
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — RED: 21 tests, 7 pass, 14 fail
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (node:test built-in)
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — web-verified all versions/CVE (see Decisions)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — additive only; 5 original sections preserved verbatim
+- [x] Add error handling — Error Handling section added to each guide
+- [x] Wire up integration points — H1 + frontmatter intact
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — every section names a concrete identifier + dated source
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — additions dense, correction-focused, no padding
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — test uses path.join(__dirname,'..') + fixed paths
+- [x] Sanitize outputs
+- [x] No secrets in code — all URLs public official domains; no DB creds in examples
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint . --max-warnings 0 exit 0; tsc baseline-neutral (89→89, none of my files)
+- [x] Run ALL tests (TDD Green) — node --test tests/*.test.js: tests 3627, pass 3627, fail 0
+- [x] Check coverage >= 80% — content-contract grounding (per plan Coverage note); slice test 21/21
+- [x] 0 skipped, 0 flaky tests — skipped 0, cancelled 0
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — the three guides ARE the docs; verdicts recorded below
+- [x] Add JSDoc comments to new functions — test file has file-level doc block
+- [x] Update CHANGELOG if needed — n/a (skill-content slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — CWE-89 named in prisma; pandas 3.x / numpy 2.x named; no cross-language BAD/SAFE
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+### Per-file UPGRADED verdicts (audit ledger is outside this slice's `files:` — recorded here per CU2 s1 precedent)
+| path | before (sect/lines) | after (sect/lines) | verdict | slice |
+|------|--------------------|--------------------|---------|-------|
+| skills/frameworks/data/pandas.md | 5 / 60 | 12 / 187 | UPGRADED | CU3-s4 |
+| skills/frameworks/data/numpy.md | 5 / 51 | 13 / 194 | UPGRADED | CU3-s4 |
+| skills/frameworks/data/prisma.md | 5 / 55 | 13 / 231 | UPGRADED | CU3-s4 |
+
+### Web-verified facts (id → name → url → retrieved)
+- **pandas 3.0.3** — current stable, uploaded 2026-05-11, requires_python >= 3.11 —
+  https://pypi.org/pypi/pandas/json — retrieved 2026-07-09.
+- **pandas 2.3.3** — latest 2.x line (CoW opt-in), uploaded 2025-09-29 —
+  https://pypi.org/pypi/pandas/json — retrieved 2026-07-09.
+- **pandas Copy-on-Write default in 3.0** (chained assignment raises
+  ChainedAssignmentError) — https://pandas.pydata.org/docs/whatsnew/v3.0.0.html +
+  https://pandas.pydata.org/docs/user_guide/copy_on_write.html — retrieved 2026-07-09.
+- **numpy 2.5.1** — current stable, uploaded 2026-07-04, requires_python >= 3.12 —
+  https://pypi.org/pypi/numpy/json — retrieved 2026-07-09.
+- **numpy 2.0 NEP 50 scalar promotion** (value-independent promotion) —
+  https://numpy.org/neps/nep-0050-scalar-promotion.html +
+  https://numpy.org/doc/stable/numpy_2_0_migration_guide.html — retrieved 2026-07-09.
+- **prisma / @prisma/client 7.8.0** — current stable, published 2026-04-22 —
+  https://registry.npmjs.org/prisma + https://registry.npmjs.org/@prisma/client —
+  retrieved 2026-07-09.
+- **CWE-89** — "Improper Neutralization of Special Elements used in an SQL Command
+  ('SQL Injection')" — https://cwe.mitre.org/data/definitions/89.html — retrieved
+  2026-07-09.
+
+### Decisions
+1. **pandas version framing.** The plan text mandates naming "pandas 2.x" for CoW,
+   but at edit time the current stable is **pandas 3.0.3** and CoW is the default/
+   only mode in 3.0 (opt-in on the latest 2.x, 2.3.3). Rather than name a stale
+   version, I named the **verified current 3.0.3** as the CoW-default line AND kept
+   the 2.x opt-in path (`pd.options.mode.copy_on_write = True`) — satisfying the AC
+   intent (CoW correctness) with a non-fabricated current version. The test accepts
+   `pandas 3` OR `pandas 2` so it does not hard-code a version that will drift.
+2. **Audit ledger untouched.** Per task instruction ("do NOT touch the audit
+   ledger") and the plan's fallback (Step 15), UPGRADED verdicts are recorded in
+   this section instead of `.ctoc/audit/corpus-audit-2026-06-15.json`, for the s5
+   completeness check to reconcile.
+3. **numpy Error Handling + prisma Testing sections.** The content-contract test
+   requires both an Error-Handling and a Testing heading per file. numpy's numeric
+   error model (`np.seterr`/`np.errstate` — silent inf/nan) and prisma's
+   throwaway-DB integration testing are both real, substantive footgun surfaces, so
+   these were added as genuine sections, not padding.
+4. **tsc baseline.** Repo has 89 pre-existing `tsc --noEmit` errors (JS-first
+   project). My slice adds only markdown + one `node:test` JS file; stashing the
+   tracked .md edits left the count at 89 (baseline-neutral). None of my four files
+   appear in tsc output.
