@@ -248,55 +248,97 @@ official URL); no cross-language BAD/SAFE examples added; tests green.
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
 
 
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-09 (CU2 s1). All version/security facts web-verified at edit time
+against official sources; nothing invented. Sources + retrieval dates:
+
+**Verified facts + sources (retrieved 2026-07-09):**
+- Python 3.14 released 2025-10-07, latest 3.14.6 (2026-06-10); 3.13 released
+  2024-10-07 (EOL 2029-10-31); 3.12 released 2023-10-02, `distutils` removed,
+  f-string tokenizer rewritten (PEP 701). Source: https://endoflife.date/python
+- Free-threaded Python (`python3.14t`) is officially supported: PEP 779 **Final**
+  (verified status "Final" on page). Source: https://peps.python.org/pep-0779/ ;
+  PEP 703 https://peps.python.org/pep-0703/ ; PEP 695 (type params, 3.12)
+  https://peps.python.org/pep-0695/ ; PEP 654 (ExceptionGroup/except*)
+  https://peps.python.org/pep-0654/
+- Node.js 24 "Krypton" active LTS (entered LTS 2025-10-28), latest 24.18.0
+  (2026-06-23), EOL 2028-04-30; 22 "Jod" maintenance (EOL 2027-04-30); 20 "Iron"
+  EOL 2026-04-30. Sources: https://endoflife.date/nodejs and
+  https://nodejs.org/en/about/previous-releases (codenames Krypton/Jod/Iron
+  confirmed on page).
+- TypeScript 5.9.3 released 2025-09-30 (last 5.x line; 5.9.2 2025-07-31, 5.8.2
+  2025-02-28); TypeScript 7.0.2 (Go-native "tsgo" rewrite) published 2026-07-08 on
+  npm (`dist-tags.latest`). Source: https://registry.npmjs.org/typescript
+- CWE ids verified against cwe.mitre.org (catalog v4.20): CWE-1321 "Improperly
+  Controlled Modification of Object Prototype Attributes ('Prototype Pollution')";
+  CWE-502 "Deserialization of Untrusted Data"; CWE-78 "OS Command Injection";
+  CWE-1333 "Inefficient Regular Expression Complexity" (ReDoS); CWE-79 XSS.
+
+**Decision — corpus-audit not written (scope precedence):** Step 15 asks to append
+UPGRADED records to `.ctoc/audit/corpus-audit-2026-06-15.json`, but that file is
+NOT in this slice's `files:` declaration, and the plan's own Security Review + Step
+16 both mandate "only the four enumerated files [are] touched/edited." Faced with
+the in-plan contradiction, I honored the stricter, repeated four-files-only
+constraint and did NOT edit the fifth file. The three UPGRADED verdicts are
+recorded here instead:
+  - skills/languages/python.md — 48→189 lines, 5→11 `## ` sections, UPGRADED.
+  - skills/languages/javascript.md — 49→172 lines, 5→11 `## ` sections, UPGRADED.
+  - skills/languages/typescript.md — 50→174 lines, 5→12 `## ` sections, UPGRADED.
+
+**Nothing omitted for lack of a source** — every version, date, and CWE written is
+traceable to one of the URLs above.
+
+
 ---
 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
