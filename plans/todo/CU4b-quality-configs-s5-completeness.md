@@ -129,45 +129,45 @@ tests/*.test.js` → `# fail 0`.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/cu4b-completeness.test.js` — reads all 9 REAL config files + the real
+- [x] Write `tests/cu4b-completeness.test.js` — reads all 9 REAL config files + the real
       ledger + the real CU4b slice plans, zero doubles; asserts existence, `>5` sections,
       `>90` lines, dated http source, per-language identifier, corpus-wide cross-language
       guard, reconciled UPGRADED verdict per file (no omission), scope-boundary (no thin
       config left outside the 9), NAMED.length === 9.
-- [ ] Run — expect RED until s1–s4 have landed + recorded verdicts.
+- [x] Run — expect RED until s1–s4 have landed + recorded verdicts.
 
 ### Step 9: PREPARE
-- [ ] Confirm s1–s4 are complete (their upgrades on disk + UPGRADED verdicts in their
+- [x] Confirm s1–s4 are complete (their upgrades on disk + UPGRADED verdicts in their
       slice-plan Decisions sections). Read `tests/cu3-completeness.test.js` fresh as the
       structural precedent to mirror.
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the completeness test exactly as specified (reconciled-verdict + scope
+- [x] Implement the completeness test exactly as specified (reconciled-verdict + scope
       boundary). ONE step, one file. No config edited.
 
 ### Step 11: REVIEW
-- [ ] Self-review: the 9-file NAMED set matches the parent index Scope table; the reconcile
+- [x] Self-review: the 9-file NAMED set matches the parent index Scope table; the reconcile
       scans ledger + all CU4b slice plans; the scope-boundary catches any thin config left
       outside the 9.
 
 ### Step 12: OPTIMIZE
-- [ ] Read each file once; share helpers with the cu3-completeness structure; no redundant IO.
+- [x] Read each file once; share helpers with the cu3-completeness structure; no redundant IO.
 
 ### Step 13: SECURE
-- [ ] READ-ONLY on ledger + slice plans; only the new test file created; no secrets.
+- [x] READ-ONLY on ledger + slice plans; only the new test file created; no secrets.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/cu4b-completeness.test.js` → GREEN (after s1–s4).
-- [ ] `node --test tests/*.test.js` → `# fail 0`, 0 skipped, 0 flaky.
+- [x] `node --test tests/cu4b-completeness.test.js` → GREEN (after s1–s4).
+- [x] `node --test tests/*.test.js` → `# fail 0`, 0 skipped, 0 flaky.
 
 ### Step 15: DOCUMENT
-- [ ] Append to `## Decisions Taken Under Ambiguity`: confirm the 9-file scope closed
+- [x] Append to `## Decisions Taken Under Ambiguity`: confirm the 9-file scope closed
       (in-scope-9 = UPGRADED ∪ SOLID-SKIPPED; SOLID-SKIPPED expected empty — all 9 were
       thin and upgraded); note the reconciled-verdict mechanism (CU3 precedent) used
       because the CU1 ledger is out of every slice's `files:`.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Only `tests/cu4b-completeness.test.js` created; the CU1 ledger NOT edited; the gate
+- [x] Only `tests/cu4b-completeness.test.js` created; the CU1 ledger NOT edited; the gate
       proves no thin quality-config file is silently skipped.
 
 ## Risk Mitigations
@@ -180,9 +180,39 @@ tests/*.test.js` → `# fail 0`.
 
 ## Decisions Taken Under Ambiguity
 
-(To be completed by the executor at Step 15 — must record: confirmation that the 9-file
-in-scope set equals UPGRADED ∪ SOLID-SKIPPED with SOLID-SKIPPED empty; and that the
-reconciled-verdict mechanism was used — verdicts read from the s1–s4 slice-plan Decisions
-sections + the audit ledger — because the CU1 ledger `.ctoc/audit/corpus-audit-2026-06-15.json`
-is out of every CU4b slice's `files:` and must not be churned. Nothing fabricated — every
-assertion reads a real on-disk file.)
+Executor (Steps 8–16, 2026-07-09):
+
+1. **9-file scope closed; SOLID-SKIPPED empty.** Read-fresh enumeration of every
+   `skills/quality-configs/**/*.md` on disk (62 files) confirms the in-scope-9 = UPGRADED ∪
+   SOLID-SKIPPED with **SOLID-SKIPPED empty** — all 9 named files were thin and are now
+   upgraded; NO thin quality-config (`<= 5` `##` sections) exists anywhere on disk outside
+   the 9. The lowest non-CU4b config is `go/legacy.md`, `python/legacy.md`, `index.md`,
+   `python/strictest.md`, `rust/strict.md` at 6 sections each (all `> 5`, pre-existing SOLID).
+   The 9 named files' upgraded state: csharp/legacy 7·161ln, csharp/strict 7·177ln,
+   csharp/strictest 7·174ln, php/legacy 9·171ln, php/strictest 9·203ln, java/legacy 8·222ln,
+   java/strictest 9·280ln, go/strictest 8·222ln, rust/legacy 10·169ln — every one `> 5`
+   sections and `> 90` lines.
+
+2. **Reconciled-verdict mechanism (CU2/CU3 precedent).** The CU1 audit ledger
+   `.ctoc/audit/corpus-audit-2026-06-15.json` is OUT of every CU4b slice's `files:` (it is
+   CU1's DONE artifact), so verdicts were NOT written there. The completeness test reconciles
+   each of the 9 files' UPGRADED verdict by scanning READ-ONLY: (a) the ledger, then (b) all
+   CU4b slice plan files across `plans/{implementation,todo,in-progress,review,done}`. All 9
+   named paths are present in the corpus and an `UPGRADED` token is present. No omission.
+
+3. **Section floor = 5 (`n > 5`) for all 9.** Each started at `<= 5` sections (the parent's
+   Scope-confirmation table); `> 5` defeats a no-op false-green. No per-file floor variance
+   needed (unlike CU3's react/nextjs at 6).
+
+4. **TDD RED→GREEN demonstrated (zero doubles).** Because s1–s4 already landed, the gate is
+   GREEN against real disk (58 assertions pass). RED was proven in an isolated scratch mirror
+   of the tree: reverting `csharp/legacy.md` to a 2-section stub fails 4 assertions (section
+   floor, line floor, dated source, language identifier); adding a thin `python/strictest.md`
+   OUTSIDE the 9 fails the scope-boundary assertion with a precise "silently skipped" message.
+   The committed test reads only REAL on-disk files (`fs.readFileSync`) — no mocks/fixtures.
+
+5. **VERIFY.** `node --test tests/cu4b-completeness.test.js` → 58 pass / 0 fail / 0 skipped.
+   `node --test tests/*.test.js` → 3843 pass / **# fail 0** / 0 skipped. `npx eslint .
+   --max-warnings 0` → exit 0. `tsc --noEmit` → baseline-neutral (89 pre-existing errors all in
+   `src/**`; zero in `tests/`; the new file adds zero type errors). Nothing fabricated — every
+   assertion reads a real on-disk file.
