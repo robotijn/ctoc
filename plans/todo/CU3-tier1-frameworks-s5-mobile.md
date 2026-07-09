@@ -1,6 +1,13 @@
 ---
 iron_loop: true
 approved_by: human
+approved_at: 2026-07-09T15:53:09.587Z
+gate_crossed: implementation → todo
+---
+
+---
+iron_loop: true
+approved_by: human
 approved_at: 2026-07-08T20:52:40.393Z
 gate_crossed: functional → implementation
 ---
@@ -270,3 +277,57 @@ cross-language BAD/SAFE examples; tests green.
 | ai-ml scope bleed into CU4a | Completeness test asserts no ai-ml file beyond the 6 named is CU3-attributed; Step 16 confirms the boundary | Step 11, Step 14, Step 16 |
 | Frontmatter corruption breaks skills.json indexing | Additions below the H1/frontmatter; run full suite + confirm triggers | Step 14 |
 | OTA-security note incomplete/unsourced | RN + Expo OTA sections name integrity/signing/runtimeVersion + a source ≥ 2025-01-01; test asserts an OTA-security mention | Step 10, Step 14 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
