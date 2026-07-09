@@ -153,49 +153,49 @@ identifier assertions; rust/legacy fails the Rustfmt/coverage-tool/Commands requ
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/cu4b-go-rust-configs.test.js` — reads BOTH REAL files, zero doubles;
+- [x] Write `tests/cu4b-go-rust-configs.test.js` — reads BOTH REAL files, zero doubles;
       asserts per-file `>5` sections, required sections, language identifiers, `>=4` fences,
       dated http source, cross-language guard (no rust token in go / no go token in rust),
       gradient tokens.
-- [ ] Run — expect RED.
+- [x] Run — expect RED.
 
 ### Step 9: PREPARE
-- [ ] READ `go/strict.md` and `rust/strict.md` (structure templates) fresh off disk.
-- [ ] **WEB-VERIFY at edit time** (no invented versions): current golangci-lint version +
+- [x] READ `go/strict.md` and `rust/strict.md` (structure templates) fresh off disk.
+- [x] **WEB-VERIFY at edit time** (no invented versions): current golangci-lint version +
       action, current stable Go version, current clippy/rustfmt (via rustup), current
       cargo-llvm-cov version, the current stable Rust edition. Capture each source URL +
       retrieval date ≥ 2025-01-01.
 
 ### Step 10: IMPLEMENT
-- [ ] Expand go/strictest to `> 5` `##` using go/strict STRUCTURE (add Makefile/Directory/
+- [x] Expand go/strictest to `> 5` `##` using go/strict STRUCTURE (add Makefile/Directory/
       CI, pin golangci-lint version). Expand rust/legacy to `> 5` `##` using rust/strict
       STRUCTURE (add Rustfmt/cargo-llvm-cov/Commands/Install/CI, keep relaxed legacy limits).
       ONE step. NO go value in rust and NO rust value in go. Each section identifier-bearing;
       each version inline-dated-sourced.
 
 ### Step 11: REVIEW
-- [ ] Self-review: go gradient (strictest/90%/enable-all) and rust gradient (legacy/50%/
+- [x] Self-review: go gradient (strictest/90%/enable-all) and rust gradient (legacy/50%/
       unsafe=warn) correct; no cross-language token in either file; each section
       identifier-bearing; each version sourced; existing blocks retained.
 
 ### Step 12: OPTIMIZE
-- [ ] Density at go/strict and rust/strict level; tables where the templates use tables;
+- [x] Density at go/strict and rust/strict level; tables where the templates use tables;
       no filler.
 
 ### Step 13: SECURE
-- [ ] All source URLs official; only the 3 files edited.
+- [x] All source URLs official; only the 3 files edited.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/cu4b-go-rust-configs.test.js` → GREEN.
-- [ ] `node --test tests/*.test.js` → `# fail 0`, 0 skipped.
+- [x] `node --test tests/cu4b-go-rust-configs.test.js` → GREEN.
+- [x] `node --test tests/*.test.js` → `# fail 0`, 0 skipped.
 
 ### Step 15: DOCUMENT
-- [ ] Append to `## Decisions Taken Under Ambiguity`: UPGRADED verdict for go/strictest and
+- [x] Append to `## Decisions Taken Under Ambiguity`: UPGRADED verdict for go/strictest and
       rust/legacy; templates = go/strict (go), rust/strict (rust); each golangci-lint / Go /
       clippy / rustfmt / cargo-llvm-cov / Rust-edition version with its dated source URL.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Only the 3 enumerated files changed; nothing fabricated; go/strict + rust/strict read
+- [x] Only the 3 enumerated files changed; nothing fabricated; go/strict + rust/strict read
       but NOT edited (no-churn).
 
 ## Risk Mitigations
