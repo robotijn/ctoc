@@ -208,8 +208,50 @@ identifier assertions; rust/legacy fails the Rustfmt/coverage-tool/Commands requ
 
 ## Decisions Taken Under Ambiguity
 
-(To be completed by the executor at Step 15 — must record: the UPGRADED verdict for
-go/strictest.md and rust/legacy.md; templates used = go/strict.md (go) and rust/strict.md
-(rust), both same-family, STRUCTURE only; and each web-verified golangci-lint / Go /
-clippy / rustfmt / cargo-llvm-cov / Rust-edition version with its dated http source URL and
-retrieval date ≥ 2025-01-01. Never invent a version.)
+**Executed 2026-07-09 (barrier-pattern slice — verified own test only, left UNSTAGED, plan NOT moved).**
+
+**Verdict: BOTH UPGRADED.**
+- `go/strictest.md`: 5 `##`/101 lines → **8 `##`/221 lines**. Structure template = `go/strict.md`
+  (same-family, READ-ONLY, no churn confirmed via `git status`). Added Makefile, Directory
+  Structure, and CI Integration sections; kept the maximal preset, tight complexity table (gocyclo
+  7 / gocognit 10 / funlen 30 / nestif 3 / revive limits) and 90% coverage. Correct tier =
+  MAXIMAL.
+- `rust/legacy.md`: 5 `##`/44 lines → **10 `##`/168 lines**. Structure template = `rust/strict.md`
+  (same-family, READ-ONLY, no churn confirmed). Added Rustfmt, cargo-llvm-cov coverage tool,
+  Commands, Edition Migration, Install, and CI sections; kept the RELAXED legacy limits (cognitive
+  25 / args 8 / lines 100), `unsafe_code = "warn"`, `style = "allow"`, and 50% coverage. Correct
+  tier = LENIENT/MIGRATION.
+
+**Web-verified versions (all retrieved 2026-07-09, dated inline in each file):**
+- golangci-lint **v2.12.2** — https://github.com/golangci/golangci-lint/releases/tag/v2.12.2 (published 2026-05-06)
+- Go **1.26.5** stable — https://go.dev/dl/ (2026-07-09)
+- golangci-lint-action **v9.3.0** — https://github.com/golangci/golangci-lint-action/releases/tag/v9.3.0 (2026-06-29)
+- actions/setup-go **v6.5.0** — https://github.com/actions/setup-go/releases/tag/v6.5.0 (2026-06-24)
+- Rust **1.97.0** stable — https://github.com/rust-lang/rust/releases/tag/1.97.0 (2026-07-09)
+- Rust **2024 edition** stable since 1.85 — https://blog.rust-lang.org/2025/02/20/Rust-1.85.0/ (2025-02-20)
+- cargo-llvm-cov **v0.8.7** — https://github.com/taiki-e/cargo-llvm-cov/releases/tag/v0.8.7 (2026-05-13)
+- golangci-lint v2 config schema (`version: "2"`, `linters.default: all`, `linters.settings`,
+  top-level `formatters`) — https://raw.githubusercontent.com/golangci/golangci-lint/main/.golangci.reference.yml + https://golangci-lint.run/docs/configuration/file/ (2026-07-09)
+- clippy/rustfmt thresholds + `[lints]` table + cargo-llvm-cov `--fail-under-lines` — doc.rust-lang.org/clippy, rust-lang.github.io/rustfmt, github.com/taiki-e/cargo-llvm-cov (2026-07-09)
+
+**AMBIGUITY DECISION — golangci-lint v1 → v2 config migration (documented choice, no-stub rule).**
+The original `go/strictest.md` shipped the **deprecated v1 schema** (`linters.enable-all: true`,
+`linters-settings:`, `severity.default-severity`). golangci-lint v2 (current, v2.12.2) **removed**
+`enable-all` in favor of `linters.default: all`, moved settings under `linters.settings`, split
+`gofmt`/`goimports` into a top-level `formatters` block, and renamed `severity.default-severity`
+→ `severity.default`. Per the "warnings are bugs" + "no fabricated" rules I shipped the **current
+v2 schema** and documented the v1→v2 delta inline. Consequence: the plan's originally-suggested
+gradient token `enable-all` is NOT present (it is the removed v1 key); my content-contract test
+asserts the v2-correct tokens `version: "2"` + `default: all` instead. Also corrected the v2 module
+import path (`github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2`).
+
+**AMBIGUITY DECISION — test cross-language guard false-positive.** My own guard `/go install/`
+matched inside `cargo install` in the rust file. Fixed by anchoring the Go CLI verb with `\bgo install`
+(word boundary does not fire inside "cargo"); the assertion still blocks a real `go install` leak.
+
+**VERIFY tallies (own test only — full suite deliberately NOT run per barrier pattern):**
+- RED (thin files): `node --test tests/cu4b-go-rust-configs.test.js` → 18 tests, 5 pass, **13 fail**.
+- GREEN (after upgrade): → **18 tests, 18 pass, 0 fail, 0 skipped**.
+- `eslint tests/cu4b-go-rust-configs.test.js` → **exit 0**.
+- `git status`: only the 3 slice files touched (2 modified + 1 untracked); `go/strict.md` +
+  `rust/strict.md` unchanged. Left UNSTAGED; plan NOT moved.
