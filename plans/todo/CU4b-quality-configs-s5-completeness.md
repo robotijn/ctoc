@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-09T21:40:58.385Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.442Z
 gate_crossed: functional → implementation
