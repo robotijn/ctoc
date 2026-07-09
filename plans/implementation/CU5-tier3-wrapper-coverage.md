@@ -346,3 +346,82 @@ by implementation-time cross-check, with WRAP or documented NO-WRAP for each,
 - **Wrapper body text** — copied verbatim from the canonical example at
   `agents/quality/code-reviewer.md`. No variation per wrapper; consistency over
   creativity.
+
+## Slices (dependency-ordered) — SIP1 decomposition
+
+This parent plan is an **INDEX**. Per SIP1, the implementation-planner decomposed
+the 13-wrapper build into 5 small, dependency-ordered implementation slices (one
+category-group per wrapper slice + a trailing count/architecture/ledger
+reconciliation slice). Each slice is a COMPLETE implementation plan with its own
+`parent_plan: CU5-tier3-wrapper-coverage`, focused `files:`, `iron_loop: true`,
+and canonical Step 8-16 execution plan. Each slice inherits this parent's Gate-1
+`approved_by: human` marker. Gate 2 and Gate 3 are approved for the whole batch at
+once via `approveSubplans('CU5-tier3-wrapper-coverage', <fromStage>)`.
+
+### Implementation-time cross-check result (authoritative)
+
+Diffing every `skills/**/SKILL.md` (99 skills) against every agent `target_skill:`
+(85 thin wrappers) ∪ `extends_skill:` (1: `ai-governance-checker`, wrapped by
+`eu-ai-act-agent`) pointer yields **exactly 13 unwrapped skills** — matching the
+parent's corrected baseline of 13 (not the audit's overstated 15). **All 13
+receive WRAP; 0 NO-WRAP.** Every one is dispatched by name by `cto-chief` and/or
+`ivv-chief`, so no dispatch-absence evidence exists to justify a NO-WRAP verdict
+(burden of proof on NO-WRAP, per the parent — unmet). The 13:
+
+| # | Unwrapped skill | Category (dir action) | Slice |
+|---|-----------------|----------------------|-------|
+| 1 | safety/fault-tree-builder | safety (NEW dir) | s1 |
+| 2 | safety/fmeda-analyzer | safety (NEW dir) | s1 |
+| 3 | safety/redundancy-pattern-picker | safety (NEW dir) | s1 |
+| 4 | security/cra-incident-clocks | security (existing) | s2 |
+| 5 | security/incident-responder | security (existing) | s2 |
+| 6 | security/threat-modeler | security (existing) | s2 |
+| 7 | legal/clm-obligations | legal (NEW dir) | s3 |
+| 8 | legal/dsar-handler | legal (NEW dir) | s3 |
+| 9 | realtime/hil-harness | realtime (NEW dir) | s3 |
+| 10 | realtime/wcet-budget | realtime (NEW dir) | s3 |
+| 11 | compliance/gdpr-compliance-checker | compliance (existing; coexists with rich gdpr-agent) | s4 |
+| 12 | compliance/sbom-cra-checker | compliance (existing) | s4 |
+| 13 | ai-quality/llm-security-tester | ai-quality (existing) | s4 |
+
+### Schema reconciliation (recorded so the executor does not re-litigate)
+
+Two wrapper shapes exist in the repo. This decomposition uses the **thin 3-field
+wrapper** (`name:` + `type: wrapper` + `target_skill:` + one redirect body line;
+canonical `agents/quality/code-reviewer.md`) that THIS parent plan mandates
+(constraints lines 128-132, ACs "wrapper uses exact 3-field schema"). The rich
+Tier-2 agents `agents/compliance/gdpr-agent.md` and
+`agents/compliance/eu-ai-act-agent.md` are the reference for the DRY "restate no
+rule" principle and `reports_to: cto-chief` routing — NOT a template to copy onto
+these wrappers. The thin wrapper satisfies "restate no rule" by pointing at the
+SKILL.md and copying nothing from it. The approved parent plan is authoritative
+over the rich shape.
+
+### Slice list
+
+| # | Slice file | Scope (one line) | depends_on |
+|---|------------|------------------|------------|
+| 1 | `CU5-tier3-wrapper-coverage-s1-safety-wrappers.md` | 3 safety wrappers + new `agents/safety/` + content-contract test | - |
+| 2 | `CU5-tier3-wrapper-coverage-s2-security-wrappers.md` | 3 security wrappers (existing dir) + content-contract test | - |
+| 3 | `CU5-tier3-wrapper-coverage-s3-legal-realtime-wrappers.md` | 4 wrappers + new `agents/legal/` & `agents/realtime/` + content-contract test | - |
+| 4 | `CU5-tier3-wrapper-coverage-s4-compliance-aiquality-wrappers.md` | 3 wrappers (existing dirs) + gdpr coexistence check + content-contract test | - |
+| 5 | `CU5-tier3-wrapper-coverage-s5-count-architecture-reconcile.md` | Bump agent counts 112→125 & categories 22→25 (README, CLAUDE.md, docs, `readme-numbers.test.js`), append ledger verdicts, coverage-completeness test | s1, s2, s3, s4 |
+
+Dependency chain depth is 2 (s1-s4 are independent; s5 depends on all four) —
+within the SIP1 max-depth-3 rule, no cycles. Slices s1-s4 each run a SCOPED Step-14
+VERIFY (their own content-contract test) because adding wrappers deterministically
+breaks the pinned `assert.equal(countAgentMdFiles(), 112)` / `countAgentCategories(), 22)`;
+s5 is the single slice that reconciles those pins and restores FULL-suite green.
+
+### HARD-RULE coverage across the batch
+
+- **WRAP ALL (burden of proof on NO-WRAP):** s1-s4 wrap all 13; s5's
+  coverage-completeness test proves the unwrapped set is empty. 0 NO-WRAP.
+- **Real thing, no doubles:** every slice's content-contract test reads the REAL
+  wrapper `.md` off disk; s5's completeness test walks the REAL corpus. No
+  mocks/stubs/fakes anywhere.
+- **Agent-count discipline:** s5 bumps README (6 places) + CLAUDE.md + docs +
+  `readme-numbers.test.js` (112→125, 22→25) and appends the audit-ledger verdicts.
+- **Never weaken a human gate:** every slice asserts the wrapper gate invariant
+  (`type: wrapper` advisory surface carries no gate); s5 re-asserts it corpus-wide
+  and touches no hook/gate logic.
