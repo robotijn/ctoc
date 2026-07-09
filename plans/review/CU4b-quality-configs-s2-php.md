@@ -141,45 +141,45 @@ before upgrade. After upgrade all pass; `node --test tests/*.test.js` → `# fai
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write `tests/cu4b-php-configs.test.js` — reads the 2 REAL files, zero doubles;
+- [x] Write `tests/cu4b-php-configs.test.js` — reads the 2 REAL files, zero doubles;
       asserts `>5` sections, required sections, PHP identifiers, `>=4` fences, dated http
       source, NO Ruby tokens, gradient tokens.
-- [ ] Run — expect RED (both php files fail before upgrade).
+- [x] Run — expect RED (both php files fail before upgrade).
 
 ### Step 9: PREPARE
-- [ ] READ `php/strict.md` (structure template) fresh; skim ruby/strictest for depth only.
-- [ ] **WEB-VERIFY at edit time** (no invented versions): current PHPStan version + level
+- [x] READ `php/strict.md` (structure template) fresh; skim ruby/strictest for depth only.
+- [x] **WEB-VERIFY at edit time** (no invented versions): current PHPStan version + level
       semantics, psalm current version + error levels, PHP-CS-Fixer + PHP_CodeSniffer PSR-12
       ruleset, PHPUnit current version, PHP 8.3 release facts, `declare(strict_types=1)`
       semantics. Capture each source URL + retrieval date ≥ 2025-01-01.
 
 ### Step 10: IMPLEMENT
-- [ ] Expand BOTH php configs to `> 5` `##` sections using php/strict STRUCTURE with
+- [x] Expand BOTH php configs to `> 5` `##` sections using php/strict STRUCTURE with
       PHP-correct values; keep the level-9-strictest / level-5+baseline-legacy gradient.
       ONE step. No Ruby value copied. Each section names an identifier; each version claim
       inline-dated-sourced.
 
 ### Step 11: REVIEW
-- [ ] Self-review: gradient correct; no Ruby token; each section identifier-bearing; each
+- [x] Self-review: gradient correct; no Ruby token; each section identifier-bearing; each
       version sourced; existing PHPStan/coverage/complexity blocks retained.
 
 ### Step 12: OPTIMIZE
-- [ ] Density at php/strict level; tables where php/strict uses tables; no filler.
+- [x] Density at php/strict level; tables where php/strict uses tables; no filler.
 
 ### Step 13: SECURE
-- [ ] All source URLs official; only the 3 files edited.
+- [x] All source URLs official; only the 3 files edited.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/cu4b-php-configs.test.js` → GREEN.
-- [ ] `node --test tests/*.test.js` → `# fail 0`, 0 skipped.
+- [x] `node --test tests/cu4b-php-configs.test.js` → GREEN.
+- [x] `node --test tests/*.test.js` → `# fail 0`, 0 skipped.
 
 ### Step 15: DOCUMENT
-- [ ] Append to `## Decisions Taken Under Ambiguity`: UPGRADED verdict for php/legacy,
+- [x] Append to `## Decisions Taken Under Ambiguity`: UPGRADED verdict for php/legacy,
       php/strictest; template = php/strict (same-family, structure); each PHPStan/psalm/
       PHPCS/PHPUnit/PHP version with its dated source URL.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Only the 3 enumerated files changed; nothing fabricated; php/strict + ruby/strictest
+- [x] Only the 3 enumerated files changed; nothing fabricated; php/strict + ruby/strictest
       read but NOT edited (no-churn).
 
 ## Risk Mitigations
