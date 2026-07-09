@@ -16,11 +16,61 @@ depends_on: [CU1-tier0-quick-wins]
 status: refined
 acceptance_criteria_count: 9
 risk_level: LOW
-files:
-  - skills/languages/*.md
+is_slice_index: true
 ---
 
 # CU4c — Non-mainstream languages reference upgrade
+
+> **This plan is a SLICE INDEX** (`is_slice_index: true`). Per SIP1, the
+> implementation-planner decomposed CU4c's 41 thin non-mainstream language-guide upgrades
+> into **12 cohesive slices** (11 upgrade slices + 1 completeness slice), each a COMPLETE
+> small implementation plan with its own `## Implementation Details`, canonical Step 8–16
+> `## Execution Plan`, and a real-file content-contract test (zero doubles). Slices are
+> grouped by shared **research-pass coherence** (one research+write pass produces guides
+> whose footgun/CVE/version families overlap), and the 11 upgrade slices are **disjoint by
+> file**, so `depends_on: none` between them. The final slice (s12) `depends_on` all eleven
+> upgrade slices — it is the no-silent-skip completeness gate that records an audit-ledger
+> verdict for every one of the 41 files and asserts the completeness diff is empty (chain
+> depth 2, no cycles). Gate 2 & Gate 3 still batch per parent via `approveSubplans` — ONE
+> human decision crosses every sibling; each is stamped `approved_by: human`. CU4c itself
+> `depends_on: [CU1-tier0-quick-wins]` and is independent of CU3/CU4a/CU4b (different files).
+>
+> **Every slice bakes in the four HARD RULES** (non-negotiable): (1) **NO STUBS** — each
+> guide becomes a substantive correction surface (real footguns, version gotchas, security
+> awareness for that language). (2) **NO FABRICATED NUMBERS/CVEs/VERSIONS** — every version,
+> CVE/CWE, date, and best-practice claim is WEB-VERIFIED against official sources at edit
+> time and carries an inline dated http source ≥ 2025-01-01; if unverifiable, the claim is
+> OMITTED and its absence noted in the audit findings (these are niche languages —
+> verification discipline matters MORE, not less). (3) **ZERO TEST DOUBLES** — each slice's
+> content-contract test reads the REAL guide files off disk and asserts substance (>5 `## `
+> sections, required footgun sections, ≥1 dated http source), no mocks/stubs/fakes. (4)
+> **SINGLE-LANGUAGE EXAMPLES** — the 7-language BAD/SAFE cross-coverage rule is exempt here;
+> examples are idiomatic + current within each language.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Guides upgraded (`files:`) | Scope (one line) | depends_on |
+|---|------------|----------------------------|------------------|------------|
+| 1 | `CU4c-nonmainstream-languages-s1-functional-typed.md` | `haskell.md`, `ocaml.md`, `fsharp.md`, `scala.md` + `tests/cu4c-functional-typed-guides.test.js` | Typed-FP: laziness/space-leaks, effects/monads, exhaustive match, JVM/.NET deserialization CWE-502 (fsharp/scala) — GHC/OCaml5/.NET/Scala3 web-verified, dated. | none |
+| 2 | `CU4c-nonmainstream-languages-s2-functional-lisp-beam.md` | `clojure.md`, `scheme.md`, `erlang.md`, `elixir.md` + `tests/cu4c-lisp-beam-guides.test.js` | Lisp/BEAM: macro hygiene + `eval`/read injection (CWE-94), STM/`core.async`, OTP supervision + mailbox/atom exhaustion + `binary_to_term` CWE-502 — dated. | none |
+| 3 | `CU4c-nonmainstream-languages-s3-scripting-unix.md` | `bash.md`, `perl.md`, `tcl.md`, `lua.md` + `tests/cu4c-scripting-unix-guides.test.js` | Unix scripting: command/code injection (CWE-78/94), quoting/word-splitting, taint mode, embedding/`eval` — Bash5/Perl5/Tcl8.6-9/Lua5.4 web-verified, dated. | none |
+| 4 | `CU4c-nonmainstream-languages-s4-dynamic-oo-scripting.md` | `ruby.md`, `php.md`, `groovy.md`, `coffeescript.md` + `tests/cu4c-dynamic-oo-scripting-guides.test.js` | Dynamic-OO: Ruby YJIT/Ractors/3.4 + `YAML.safe_load` CWE-502, PHP `unserialize` CWE-502 + PDO CWE-89, Groovy CWE-94/502 + Spock, CoffeeScript legacy/migration — dated. | none |
+| 5 | `CU4c-nonmainstream-languages-s5-systems-modern.md` | `zig.md`, `nim.md`, `crystal.md`, `d.md` + `tests/cu4c-systems-modern-guides.test.js` | Modern systems: allocators/`errdefer`, ORC GC, fibers/preview-MT, `@safe`/`@nogc`/DIP1000; memory-safety CWE-416/787/190 — Zig-0.x pinned, dated. | none |
+| 6 | `CU4c-nonmainstream-languages-s6-legacy-native.md` | `fortran.md`, `assembly.md`, `cobol.md`, `objectivec.md` + `tests/cu4c-legacy-native-guides.test.js` | Legacy/native: array/buffer overflow CWE-125/787/121, ABI/calling conventions, `PIC` truncation + embedded-SQL CWE-89, ARC retain cycles + CWE-134 — ISO/ISA-scoped, dated. | none |
+| 7 | `CU4c-nonmainstream-languages-s7-enterprise-domain.md` | `abap.md`, `apex.md`, `vba.md`, `matlab.md` + `tests/cu4c-enterprise-domain-guides.test.js` | Enterprise platforms: Open-SQL/SOQL injection CWE-89 + governor limits + `AUTHORITY-CHECK`, VBA macro CWE-78 `Auto_Open`, MATLAB `eval` CWE-94 — vendor-verified figures (or omitted), dated. | none |
+| 8 | `CU4c-nonmainstream-languages-s8-data-query.md` | `sql.md`, `graphql.md`, `r.md` + `tests/cu4c-data-query-guides.test.js` | Data/query: SQLi CWE-89 + `EXPLAIN`/indexing, GraphQL DoS CWE-770 + DataLoader/depth-limit, R `eval(parse())` CWE-94 + vectorization — dialect-scoped, dated. | none |
+| 9 | `CU4c-nonmainstream-languages-s9-contract-hdl.md` | `solidity.md`, `verilog.md`, `vhdl.md` + `tests/cu4c-contract-hdl-guides.test.js` | Contract/HDL: reentrancy SWC-107 + overflow SWC-101 + gas, blocking/non-blocking race + latch inference + sim-synth mismatch, signal/variable delta-cycle — IEEE/SWC-sourced, dated. | none |
+| 10 | `CU4c-nonmainstream-languages-s10-numeric-logic-infra.md` | `julia.md`, `prolog.md`, `terraform.md`, `powershell.md` + `tests/cu4c-numeric-logic-infra-guides.test.js` | Numeric/logic/IaC/shell: Julia `@inbounds` CWE-125 + type instability, Prolog cut + `safe_goal` CWE-94, Terraform state-secret CWE-312 + `for_each`, PowerShell `iex` CWE-94 + exec-policy caveat — dated. | none |
+| 11 | `CU4c-nonmainstream-languages-s11-mobile-modern.md` | `kotlin.md`, `swift.md`, `dart.md` + `tests/cu4c-mobile-modern-guides.test.js` | Modern mobile: Kotlin 2.0/K2 + coroutines/`GlobalScope` + interop CWE-502, Swift 6 strict concurrency `@Sendable`/`@MainActor` + SwiftUI, Dart isolates + sound null safety — dated. | none |
+| 12 | `CU4c-nonmainstream-languages-s12-completeness-check.md` | `.ctoc/audit/corpus-audit-2026-06-15.json` + `tests/cu4c-completeness.test.js` | Completeness gate: records a ledger verdict (UPGRADED/SOLID-SKIPPED) for every one of the 41 files; test reads the REAL ledger + 41 guides and asserts the completeness diff is empty + no CU2 file touched. | s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11 |
+
+**Coverage of the 41 files (audit-ledger diff, confirmed 2026-07-09 — all at exactly 5 `## `
+sections, none a CU2 file):** s1 haskell·ocaml·fsharp·scala · s2 clojure·scheme·erlang·elixir
+· s3 bash·perl·tcl·lua · s4 ruby·php·groovy·coffeescript · s5 zig·nim·crystal·d · s6
+fortran·assembly·cobol·objectivec · s7 abap·apex·vba·matlab · s8 sql·graphql·r · s9
+solidity·verilog·vhdl · s10 julia·prolog·terraform·powershell · s11 kotlin·swift·dart.
+**Union = all 41, no overlap, no omission.** The completeness check (audit-ledger diff of
+the in-scope 41 against UPGRADED ∪ SOLID-SKIPPED) runs at the end in s12.
 
 ## 1. ASSESS
 
