@@ -19,12 +19,25 @@ const INSTALLED_FILE = path.join(PLUGINS_DIR, 'installed_plugins.json');
 /**
  * Refresh the local project's CTOC-managed operating-lessons block. Fail-open:
  * a lessons-injection failure is logged to stderr and NEVER aborts the version update.
+ *
+ * `ctocRoot` is the installed CTOC plugin root to resolve BOTH the lib module and
+ * its template FROM. The after-update call site MUST pass the freshly-installed,
+ * never-deleted cache version dir: the "Clean old versions" step deletes the OLD
+ * dir this script runs from, so a `__dirname`-relative require/template read would
+ * hit ENOENT and (fail-open) silently skip the refresh. Defaults to the current
+ * install (`__dirname`/../..) — correct only on the up-to-date path, where the
+ * running dir is not deleted.
+ *
+ * @param {string} [ctocRoot] - Absolute path to the surviving CTOC install root.
  */
-function refreshLocalLessons() {
+function refreshLocalLessons(ctocRoot = path.resolve(__dirname, '..', '..')) {
   try {
-    const { ensureLessonsBlock } = require('../lib/claude-md-lessons');
+    // ctocRoot is a CTOC-controlled install path (a default from __dirname or the
+    // freshly-installed cache version dir), never user input — the require must be
+    // resolved FROM the surviving install so a self-deleted old dir cannot ENOENT it.
+    // eslint-disable-next-line security/detect-non-literal-require
+    const { ensureLessonsBlock } = require(path.join(ctocRoot, 'src', 'lib', 'claude-md-lessons'));
     const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
-    const ctocRoot = path.resolve(__dirname, '..', '..');
     ensureLessonsBlock(claudeMdPath, ctocRoot);
   } catch (err) {
     console.error('[CTOC] Lessons block refresh skipped:', err.message);
@@ -36,16 +49,24 @@ function refreshLocalLessons() {
  * layer). Only runs when cwd looks like a project (has package.json OR .ctoc/) so
  * `/ctoc:update` never writes a stray CLAUDE.md into a non-project directory.
  * Fail-open: a merge failure is logged to stderr and NEVER aborts the update.
+ *
+ * See {@link refreshLocalLessons} for why `ctocRoot` must be the surviving,
+ * freshly-installed cache dir on the after-update path (self-delete safety).
+ *
+ * @param {string} [ctocRoot] - Absolute path to the surviving CTOC install root.
  */
-function refreshLocalManual() {
+function refreshLocalManual(ctocRoot = path.resolve(__dirname, '..', '..')) {
   try {
     const cwd = process.cwd();
     const looksLikeProject =
       safeFs.existsSync(path.join(cwd, 'package.json')) ||
       safeFs.existsSync(path.join(cwd, '.ctoc'));
     if (!looksLikeProject) return;
-    const { mergeOperatingManual } = require('../lib/operating-manual');
-    mergeOperatingManual(cwd, { ctocRoot: path.resolve(__dirname, '..', '..') });
+    // ctocRoot is a CTOC-controlled install path (see refreshLocalLessons), never
+    // user input; resolved FROM the surviving install for self-delete safety.
+    // eslint-disable-next-line security/detect-non-literal-require
+    const { mergeOperatingManual } = require(path.join(ctocRoot, 'src', 'lib', 'operating-manual'));
+    mergeOperatingManual(cwd, { ctocRoot });
   } catch (err) {
     console.error('[CTOC] Operating-manual block refresh skipped:', err.message);
   }
@@ -211,8 +232,11 @@ function update() {
   }
 
   // 7b. Refresh local CLAUDE.md managed blocks after a successful upgrade.
-  refreshLocalLessons();            // (b) refresh after version change
-  refreshLocalManual();             // (b) refresh the operating-manual block too
+  // Pass the freshly-installed, NEVER-deleted cacheVersionDir: the "Clean old
+  // versions" step above deleted the OLD dir this script runs from, so resolving
+  // the require/template from __dirname would ENOENT and silently skip (fail-open).
+  refreshLocalLessons(cacheVersionDir);   // (b) refresh after version change
+  refreshLocalManual(cacheVersionDir);    // (b) refresh the operating-manual block too
 
   console.log('\n' + '─'.repeat(40));
   console.log(`✓ Updated to CTOC v${newVersion}`);
