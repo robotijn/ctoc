@@ -292,3 +292,114 @@ BAD/SAFE examples added; the 9-file completeness check passes; tests green.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-09 (CU2 s4 — the FINAL CU2 slice). Every Java/.NET/CWE fact below
+was WEB-VERIFIED at edit time against official sources (HTTP 200 confirmed); nothing
+invented. No-churn: java.md and csharp.md each kept their original 5 `## ` sections
+verbatim; new sections appended below the last existing section. H1 headers
+(`# Java CTO` / `# C# CTO`) intact — skills.json still indexes both.
+
+**Before → after:**
+- skills/languages/java.md — **53 → 199 lines, 5 → 12 `## ` sections**, UPGRADED.
+- skills/languages/csharp.md — **53 → 173 lines, 5 → 12 `## ` sections**, UPGRADED.
+
+**Verified CWE (cwe.mitre.org catalog v4.20, retrieved 2026-07-09):**
+
+| CWE id | Verified MITRE name | Source |
+|--------|---------------------|--------|
+| CWE-502 | Deserialization of Untrusted Data | cwe.mitre.org/data/definitions/502.html |
+
+CWE-502 named in BOTH java.md (native `ObjectInputStream` gadget-chain RCE +
+`ObjectInputFilter` allow-list) and csharp.md (`BinaryFormatter` /
+`Newtonsoft.Json` `TypeNameHandling` + its .NET 9 removal). Impact pattern stated
+(untrusted bytes → arbitrary object construction → code execution), not just the id.
+
+**Verified Java facts (retrieved 2026-07-09):**
+- **Current LTS = Java 25**, released **2025-09-22**, EOL 2031-09-30; previous LTS =
+  Java 21, released 2023-10-10, EOL 2029-12-31; latest non-LTS = Java 26, released
+  2026-03-17. Source: https://endoflife.date/eclipse-temurin + https://endoflife.date/oracle-jdk
+- **JEP 444 "Virtual Threads"** finalized in Java 21. https://openjdk.org/jeps/444
+- **JEP 491 "Synchronize Virtual Threads without Pinning"** targets **Java 24** —
+  removes the `synchronized`-pinning starvation present on 21–23 (release token "24"
+  scraped from the JEP page). https://openjdk.org/jeps/491
+- **JEP 506 "Scoped Values"** finalized (no Preview suffix). https://openjdk.org/jeps/506
+- **JEP 505 "Structured Concurrency (Fifth Preview)"** — STILL preview; framed as
+  preview, gated behind `--enable-preview`. https://openjdk.org/jeps/505
+- **JEP 471** deprecates `sun.misc.Unsafe` memory-access for removal (Java 23);
+  migrate to VarHandle / FFM API. https://openjdk.org/jeps/471
+- JPMS finalized in Java 9; Records final Java 16; Sealed classes final Java 17;
+  pattern-matching for switch final Java 21 (consistent with existing file content).
+
+**Verified .NET / C# facts (retrieved 2026-07-09):**
+- **Current LTS = .NET 10**, released **2025-11-11**, EOL 2028-11-14 (supersedes the
+  file's stale ".NET 8 LTS / .NET 9" line, which was kept verbatim per no-churn and
+  corrected in the new Version-Specific section). .NET 8 LTS EOL 2026-11-10; .NET 9
+  STS EOL 2026-11-10. Source: https://endoflife.date/dotnet
+- **`BinaryFormatter` has no runtime implementation starting .NET 9** — APIs throw
+  `PlatformNotSupportedException` regardless of project type. Verified quote:
+  "Starting with .NET 9, we no longer include an implementation of BinaryFormatter
+  in the runtime." Source: https://learn.microsoft.com/en-us/dotnet/standard/serialization/binaryformatter-migration-guide/
+- **C# 14 is the current language version, ships with the .NET 10 SDK**; the `field`
+  keyword is now a STABLE feature (field-backed properties), NOT preview — the file's
+  historical "preview in C# 13" line kept verbatim and corrected in the new section.
+  Source: https://learn.microsoft.com/en-us/dotnet/csharp/whats-new/csharp-14
+- **NuGet audit**: `dotnet list package --vulnerable --include-transitive`,
+  `<NuGetAudit>`/`<NuGetAuditMode>`, warnings NU1901–NU1904. Sources:
+  https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages and
+  https://learn.microsoft.com/en-us/nuget/reference/errors-and-warnings/nu1901-nu1904
+
+**Decision — 9-file completeness check runs in the TEST, not against the ledger.**
+The plan's Step 15 mentions diffing scope against `.ctoc/audit/corpus-audit-2026-06-15.json`.
+On reading the ledger fresh (2026-07-09) it contains **zero `skills/languages/` records** —
+s1 explicitly declined to write them (four-files-only precedence, recorded in its own
+Decisions) and s2's Decisions claim to have written go/rust records that are NOT on disk.
+The ledger is therefore an unreliable basis for a completeness gate, and this task
+directive is explicit: **do NOT touch the audit ledger**. I implemented the completeness
+check where it is strongest and non-fabricable — **in `tests/cu2-managed-vm-guides.test.js`,
+reading all 9 REAL guides off disk** and asserting each is substantive (>120 lines, >5
+sections, a security-class section, a verification/testing section, version + references,
+a dated http source, `# <Lang> CTO` H1). This proves the actual on-disk corpus landed,
+which is the real acceptance criterion, without editing the ledger.
+
+**9-FILE COMPLETENESS RESULT — ALL 9 SUBSTANTIVE (verified on disk 2026-07-09):**
+
+| Guide | Lines | `## ` sections | Slice | Verdict |
+|-------|-------|----------------|-------|---------|
+| python.md     | 189 | 12 | CU2-s1 | SUBSTANTIVE |
+| javascript.md | 172 | 12 | CU2-s1 | SUBSTANTIVE |
+| typescript.md | 191 | 15 | CU2-s1 | SUBSTANTIVE |
+| go.md         | 205 | 11 | CU2-s2 | SUBSTANTIVE |
+| rust.md       | 241 | 15 | CU2-s2 | SUBSTANTIVE |
+| c.md          | 166 | 10 | CU2-s3 | SUBSTANTIVE |
+| cpp.md        | 189 | 13 | CU2-s3 | SUBSTANTIVE |
+| java.md       | 199 | 12 | CU2-s4 | SUBSTANTIVE |
+| csharp.md     | 173 | 12 | CU2-s4 | SUBSTANTIVE |
+
+All nine far exceed the ~50-line stub floor and the 5-section template floor. No file
+silently omitted — CU2's whole scope (s1..s4) is on disk and substantive.
+
+**Decision — completeness-check section matchers broadened to fit shipped structure.**
+The 9-file check initially failed on c.md/cpp.md: the native-unsafe slice (s3, already
+shipped + approved) frames its security surface as `## Memory-Safety CWE Classes` /
+`## Undefined Behavior Classes` and its verification surface as `## Sanitizers & Static
+Analysis` — legitimate, substantive headings that don't literally read "Security" or
+"Testing". Rather than rewrite two out-of-scope, already-shipped guides, I broadened the
+completeness matchers to accept the equivalent headings each CU2 slice legitimately uses
+(security-class ∈ {security, dependency, CWE, undefined-behavior, memory-safety};
+verification ∈ {test, sanitizer, static-analysis}). The contract remains substance, not
+a single heading string. Part A (java/csharp) keeps the stricter managed-VM section set.
+
+**Nothing omitted for lack of a source** — every Java/.NET/CWE fact written is traceable
+to one of the URLs above, each returning HTTP 200 at edit time. No fabricated
+CWE/JEP/version was included; the `field`-keyword and .NET-LTS staleness in the original
+stubs were CORRECTED against Microsoft docs, not carried forward as truth.
+
+**VERIFY tallies:**
+- Slice test RED baseline: 26 fail / 38 pass / 64 tests → GREEN: **0 fail / 64 pass / 64 tests**.
+- Full suite `node --test tests/*.test.js`: **# fail 0**, 3535 pass, 0 skipped, 0 todo.
+- `npx eslint . --max-warnings 0`: exit **0**.
+- `npx tsc --noEmit`: baseline-neutral — 89 pre-existing `src/**` errors, unchanged;
+  none of the three touched files (`java.md`, `csharp.md`, `cu2-managed-vm-guides.test.js`)
+  appear in tsc output.
