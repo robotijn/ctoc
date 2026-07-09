@@ -271,50 +271,120 @@ three touched (pytorch/tensorflow/transformers are s1 scope); tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+**Web-verified facts (all retrieved 2026-07-09; every claim carries an inline dated
+source in the guide bodies):**
+
+- **langchain 1.3.12** — current stable, uploaded 2026-07-08, requires_python
+  `>=3.10,<4.0`. Provider/graph packages verified same day: `langchain-anthropic`
+  1.4.8, `langchain-openai` 1.3.4, `langgraph` 1.2.8.
+  Source: https://pypi.org/pypi/langchain/json (PyPI JSON API).
+- **LangChain 1.0 API removals CONFIRMED** — LCEL pipe syntax removed, `LLMChain`
+  removed, `AgentExecutor` deprecated in favor of LangGraph (`create_react_agent`).
+  Source: python.langchain.com v1 migration docs.
+- **CVE-2025-68664 — VERIFIED REAL, NOT dropped.** NVD `totalResults: 1`, published
+  2025-12-23. Serialization injection in LangChain `dumps()`/`dumpd()` (does not
+  escape free-form dicts carrying the internal `'lc'` key), **CWE-502**, **CVSS 3.1
+  base 9.3 CRITICAL** (`CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:L/A:N`). **Patched in
+  0.3.81 (0.x line) and 1.2.5 (1.x line).** The pre-existing guide claim ("upgrade
+  to 1.2.5+") is CORRECT and is now sourced; I ADDED the second fixed version
+  (0.3.81) and the CWE/CVSS/mechanism that NVD confirms.
+  Source: https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2025-68664 →
+  https://nvd.nist.gov/vuln/detail/CVE-2025-68664 . (GitHub advisory search returned
+  Not Found for this ID; NVD is the authoritative confirmation used.)
+- **anthropic 0.116.0** — current SDK, uploaded 2026-07-02, requires_python `>=3.9`.
+  Source: https://pypi.org/pypi/anthropic/json .
+- **openai 2.44.0** — current SDK, uploaded 2026-06-24, requires_python `>=3.9`.
+  Source: https://pypi.org/pypi/openai/json ; release tag v2.44.0 published
+  2026-06-24 (github.com/openai/openai-python releases).
+
+**Verified model IDs used (nothing invented — fabrication-guard allowlist in the
+test enforces this):**
+
+- Anthropic (environment/CLAUDE.md authoritative current Claude models, cross-checked
+  against docs.anthropic.com model overview): `claude-fable-5` (Fable 5),
+  `claude-opus-4-8` (Opus 4.8), `claude-sonnet-4-6` (Sonnet 4.6),
+  `claude-haiku-4-5-20251001` (Haiku 4.5, pinned/dated).
+- OpenAI (openai-python official README, main @ v2.44.0, plus platform.openai.com
+  /docs/models): `gpt-5.5`, `gpt-5.4`, `gpt-4o`, `gpt-4o-2024-08-06` (pinned
+  structured-output snapshot from the SDK's helpers.md example), `gpt-realtime-2`.
+
+**No-churn exception — stale model-ID CORRECTION (documented choice):** the plan's
+no-churn rule preserves existing content verbatim, BUT the pre-existing
+anthropic-sdk.md "Correct Patterns" / "Version Gotchas" sections hard-coded
+`claude-sonnet-4-20250514` and `claude-opus-4-20250514` (Claude 4, now superseded).
+A stale/incorrect model ID is exactly the fabrication class the hard user rule
+forbids shipping, and the test's fabrication guard flagged them. Choice: CORRECT
+the three occurrences to the current verified IDs (`claude-sonnet-4-6`,
+`claude-opus-4-8`) rather than leave a wrong ID standing. Prose in those sections is
+otherwise unchanged. All other original content is preserved verbatim; new sections
+are purely additive.
+
+**Structured-output API note:** `client.chat.completions.parse()` is now a STABLE
+openai-python method (graduated out of `client.beta`); the guide reflects the stable
+call. Source: github.com/openai/openai-python helpers.md + README (v2.44.0).
+
+**Audit-ledger fallback (CU2 s1 precedent):** `.ctoc/audit/corpus-audit-2026-06-15.json`
+is OUTSIDE this slice's `files:` declaration and the executor brief forbids touching
+the audit ledger, so per-file UPGRADED verdicts are recorded HERE for the s5
+completeness check to reconcile:
+- `skills/frameworks/ai-ml/langchain.md` — verdict UPGRADED (slice CU3-s2): 5→14
+  sections, 53→208 lines; adds 1.0 migration, prompt-injection+mitigation, sourced
+  CVE-2025-68664/CWE-502, async/retry, perf, LangSmith, testing, dated Version+Refs.
+- `skills/frameworks/ai-ml/anthropic-sdk.md` — verdict UPGRADED (slice CU3-s2): 5→14
+  sections, 76→229 lines; adds verified model-ID table, async/sync selection, prompt
+  caching footguns, token budget, tool_use validation+injection, retries/rate-limits,
+  testing, dated Version+Refs; corrected two stale Claude-4 model IDs.
+- `skills/frameworks/ai-ml/openai-sdk.md` — verdict UPGRADED (slice CU3-s2): 5→15
+  sections, 64→217 lines; adds verified model-ID table, v0→v1 client migration,
+  parse() vs JSON mode, async selection, retries/backoff, security/injection, perf,
+  testing, dated Version+Refs.
