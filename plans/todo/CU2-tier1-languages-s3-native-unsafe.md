@@ -291,3 +291,49 @@ support verified, not assumed); no cross-language BAD/SAFE examples added; tests
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+All facts below were WEB-VERIFIED at edit time (2026-07-09); nothing fabricated.
+
+**Verified CWE identifiers (MITRE catalog v4.20, cwe.mitre.org):**
+
+| CWE id | Verified MITRE name | Source (retrieved 2026-07-09) |
+|--------|---------------------|-------------------------------|
+| CWE-121 | Stack-based Buffer Overflow | cwe.mitre.org/data/definitions/121.html |
+| CWE-122 | Heap-based Buffer Overflow | cwe.mitre.org/data/definitions/122.html |
+| CWE-416 | Use After Free | cwe.mitre.org/data/definitions/416.html |
+| CWE-134 | Use of Externally-Controlled Format String | cwe.mitre.org/data/definitions/134.html |
+| CWE-190 | Integer Overflow or Wraparound | cwe.mitre.org/data/definitions/190.html |
+| CWE-476 | NULL Pointer Dereference | cwe.mitre.org/data/definitions/476.html |
+| CWE-401 | Missing Release of Memory after Effective Lifetime | cwe.mitre.org/data/definitions/401.html |
+
+CWE-476 (c.md error-handling) and CWE-401 (cpp.md shared_ptr cycle leak) were
+ADDED beyond the plan's mandated five — both verified real; the content-contract
+test's fabrication guard allowlists exactly these seven and rejects any other
+`CWE-NNN` token.
+
+**Verified standard/version facts:**
+- GCC 15 defaults to `-std=gnu23` (C23) — gcc.gnu.org/gcc-15/changes.html.
+- Clang still defaults to `-std=gnu17` (C17) — clang.llvm.org/docs/CommandGuide/clang.html.
+  DECISION: documented the toolchain split rather than the plan's single "current
+  default" phrasing, because GCC and Clang genuinely disagree — assuming one would
+  be the fabrication the plan warns against.
+- C++20 = ISO/IEC 14882:2020; C++23 = ISO/IEC 14882:2024 (isocpp.org, Wikipedia).
+- C++26 = working draft N5046, feature-complete March 2026 ISO meeting, NOT yet a
+  published ISO standard as of 2026-07-09 — phrased as "working draft," not shipped.
+- `import std;` is C++23 but needs a recent toolchain + built std module
+  (en.wikipedia.org/wiki/C%2B%2B23) — documented as an availability caveat.
+
+**Verified sanitizer flags (LLVM docs, retrieved 2026-07-09):**
+`-fsanitize=address` (clang.llvm.org/docs/AddressSanitizer.html),
+`-fsanitize=undefined` (…/UndefinedBehaviorSanitizer.html),
+`-fsanitize=thread` (…/ThreadSanitizer.html).
+
+**`_FORTIFY_SOURCE` decision:** cited `-D_FORTIFY_SOURCE=2` as the universally
+supported baseline and qualified `=3` as "recent GCC/Clang" (not pinned to a
+specific version I could not scrape cleanly), with the stable glibc-manual URL —
+avoiding an unverified version claim.
+
+**Line/section counts:** c.md 58→166 lines (5→10 `##`), cpp.md 58→189 lines
+(5→13 `##`). Existing 5 sections in each preserved verbatim (additive only).
