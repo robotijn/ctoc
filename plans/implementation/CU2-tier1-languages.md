@@ -16,19 +16,38 @@ depends_on: [CU1-tier0-quick-wins]
 status: refined
 acceptance_criteria_count: 13
 risk_level: LOW
-files:
-  - skills/languages/python.md
-  - skills/languages/javascript.md
-  - skills/languages/typescript.md
-  - skills/languages/go.md
-  - skills/languages/java.md
-  - skills/languages/rust.md
-  - skills/languages/csharp.md
-  - skills/languages/c.md
-  - skills/languages/cpp.md
+is_slice_index: true
 ---
 
 # CU2 — Tier 1 mainstream languages reference upgrade
+
+> **This plan is a SLICE INDEX** (`is_slice_index: true`). Per SIP1, the
+> implementation-planner decomposed CU2's 9 language-guide upgrades into 4 cohesive
+> slices, each a COMPLETE small implementation plan with its own `## Implementation
+> Details`, canonical Step 8–16 `## Execution Plan`, and a real-file content-contract
+> test (zero doubles). Slices are grouped by shared research-pass coherence (a single
+> research+write pass produces guides whose footgun/CVE/version families overlap), and
+> are **disjoint by file**, so `depends_on: none` between them (parallel-safe per the
+> CU2 constraint block — Gate 2 & Gate 3 still batch per parent via `approveSubplans`,
+> ONE human decision). CU2 itself `depends_on: [CU1-tier0-quick-wins]` (DONE); no slice
+> depends on another slice. Each slice bakes in the four HARD RULES: **NO STUBS**,
+> **NO FABRICATED NUMBERS/CVEs/VERSIONS (web-verify every fact, inline dated source ≥
+> 2025-01-01)**, **ZERO TEST DOUBLES (content-contract test reads the real guide off
+> disk)**, and **single-language examples** (7-language BAD/SAFE rule is exempt here).
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Guides upgraded (`files:`) | Scope (one line) | depends_on |
+|---|------------|----------------------------|------------------|------------|
+| 1 | `CU2-tier1-languages-s1-dynamic-web.md` | `skills/languages/python.md`, `skills/languages/javascript.md`, `skills/languages/typescript.md` + `tests/cu2-dynamic-web-guides.test.js` | Dynamic/web: GIL/asyncio, event-loop/Promise, strict-mode/`unknown`; PyPI/npm supply-chain (prototype pollution CWE-1321); current Python 3.12+/Node LTS/TS 5.x — web-verified, dated. | none |
+| 2 | `CU2-tier1-languages-s2-systems.md` | `skills/languages/go.md`, `skills/languages/rust.md` + `tests/cu2-systems-guides.test.js` | Systems: goroutine leaks + `errors.Is`/`As` + `govulncheck`; ownership/lifetimes + async-tokio deadlocks + `unsafe`/editions + `cargo audit`/RUSTSEC — web-verified Go/tokio versions, dated. | none |
+| 3 | `CU2-tier1-languages-s3-native-unsafe.md` | `skills/languages/c.md`, `skills/languages/cpp.md` + `tests/cu2-native-unsafe-guides.test.js` | Native/unsafe: memory-safety CWEs (121/122/416/134/190) + ASan/UBSan flags; C++ UB classes + smart-pointer/iterator-invalidation + C++20/23 — every CWE links cwe.mitre.org, dated. | none |
+| 4 | `CU2-tier1-languages-s4-managed-vm.md` | `skills/languages/java.md`, `skills/languages/csharp.md` + `tests/cu2-managed-vm-guides.test.js` | Managed-VM: deserialization CWE-502 (both) + virtual threads/JPMS + `ConfigureAwait`/`async void`/nullable + Maven/NuGet audit; current Java LTS + .NET LTS — web-verified, dated. Runs the final 9-file completeness check. | none |
+
+**Coverage of the 9 files:** s1 = python, javascript, typescript · s2 = go, rust ·
+s3 = c, cpp · s4 = java, csharp. Union = all 9, no overlap, no omission. The
+completeness check (audit-ledger diff of the in-scope 9 against UPGRADED ∪
+SOLID-SKIPPED) runs at the end of s4.
 
 ## 1. ASSESS
 
