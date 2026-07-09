@@ -284,50 +284,124 @@ cross-language BAD/SAFE examples; tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 79 tests, 57 pass / 22 fail (mobile thin)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none — node:test only)
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Web-verify current versions (RN 0.86.0, Flutter 3.44.5 / Dart 3.12.2, Expo SDK 57)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (3 guides de-stubbed)
+- [x] Add error handling (footgun BAD→SAFE demos per section)
+- [x] Wire up integration points (H1/frontmatter intact; skills indexing preserved)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code (each guide >5 sections; every claim sourced)
+- [x] Verify integration points work together (expo↔RN OTA/managed coherent)
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (dense, no padding)
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (tests use path.join + fixed relative paths; no traversal)
+- [x] Sanitize outputs (content-only edits, read-only test reads)
+- [x] No secrets in code (all URLs public official domains)
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (eslint . exit 0; tsc baseline-neutral, 0 new errors)
+- [x] Run ALL tests (TDD Green) — 3706/3706 pass, # fail 0
+- [x] Check coverage >= 80% (content-contract grounding per plan coverage note)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (the three guides ARE the docs)
+- [x] Add JSDoc comments to new functions (test file headers document intent)
+- [x] Update CHANGELOG if needed (N/A — content slice; verdicts recorded below)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+1. **Audit ledger NOT touched (in-plan contradiction resolved against the ledger).**
+   The plan's Step 15 prose asserts "the audit JSON IS in this slice's `files:`
+   set — no contradiction for s5", but the slice's actual YAML `files:` frontmatter
+   (lines 23–28) lists only the three guides + two tests — the audit JSON is NOT
+   declared. The dispatch brief also explicitly said "do NOT touch the audit
+   ledger." The frontmatter + the brief win over the prose. Therefore per-file
+   UPGRADED verdicts are recorded HERE (CU2 s1 / sibling-slice precedent: s1–s4
+   each recorded their verdicts in their own Decisions section for the same
+   reason), and `.ctoc/audit/corpus-audit-2026-06-15.json` was read-only.
+
+2. **Completeness test reconciles verdicts from plan Decisions, not the ledger.**
+   Because no CU3 framework-guide verdict lives in the audit JSON (all recorded in
+   sibling plan Decisions sections), `tests/cu3-completeness.test.js` reconciles
+   the "no silent omission" verdict for each of the 14 named files by scanning the
+   audit ledger AND the CU3 slice plan files on disk. A named file with NO verdict
+   in either source FAILS. This is the honest reconciliation the plan mandates
+   given the ledger-untouched constraint.
+
+3. **Stale mobile CVEs OMITTED (no fabrication).** OSV returned only old advisories
+   for these packages — GHSA-7f53-fmmv-mfjv / CVE-2020-1920 (react-native ReDoS,
+   fixed ≤ 0.64.1), GHSA-wr5g-q49g-548w / CVE-2023-28131 (expo OAuth, fixed
+   < 48.0.0), GHSA-rwx9-wqj8-vr77 / CVE-2020-24653 (fixed < 9.1.0) — all fixed
+   long before the current versions. Citing them as current would mislead, so per
+   HARD RULE 2 they were OMITTED. The OTA-security sections are instead grounded in
+   the authoritative vulnerability CLASS **CWE-494 "Download of Code Without
+   Integrity Check"** (cwe.mitre.org/data/definitions/494.html) plus official
+   integrity guidance (Expo Updates code signing), which is the real, current
+   footgun for OTA delivery.
+
+### Web-verified facts + sources (retrieved 2026-07-09)
+
+| Fact | Value | Source (retrieved 2026-07-09) |
+|------|-------|--------------------------------|
+| React Native current release | 0.86.0 (published 2026-06-09) | registry.npmjs.org/react-native (dist-tags.latest + time) |
+| New Architecture default | since RN 0.76 (Fabric + TurboModules + bridgeless) | reactnative.dev/architecture |
+| Flutter stable | 3.44.5 (released 2026-07-06) | storage.googleapis.com/flutter_infra_release/releases/releases_macos.json (current stable) |
+| Dart SDK (bundled) | 3.12.2 | same Flutter releases JSON |
+| Expo SDK current | SDK 57 (`expo` 57.0.4, published 2026-07-07) | registry.npmjs.org/expo (dist-tags.latest + time) |
+| OTA integrity vuln class | CWE-494 "Download of Code Without Integrity Check" | cwe.mitre.org/data/definitions/494.html |
+| Expo Updates code signing | signing key + codeSigningCertificate | docs.expo.dev/eas-update/code-signing |
+
+### Per-file UPGRADED verdicts (audit ledger outside `files:` → recorded here, CU2 s1 precedent)
+
+| path | before (sect / lines) | after (sect / lines) | verdict | slice |
+|------|------------------------|-----------------------|---------|-------|
+| skills/frameworks/mobile/react-native.md | 5 / 51 | 12 / 189 | UPGRADED | CU3-s5 |
+| skills/frameworks/mobile/flutter.md | 5 / 57 | 13 / 207 | UPGRADED | CU3-s5 |
+| skills/frameworks/mobile/expo.md | 5 / 55 | 12 / 185 | UPGRADED | CU3-s5 |
+
+### 14-file completeness check result (all line counts, verified GREEN)
+
+| # | guide | sections | lines | floor | verdict source |
+|---|-------|----------|-------|-------|----------------|
+| 1 | skills/frameworks/ai-ml/pytorch.md | 12 | 194 | >5 | CU3-s1 Decisions |
+| 2 | skills/frameworks/ai-ml/tensorflow.md | 12 | 178 | >5 | CU3-s1 Decisions |
+| 3 | skills/frameworks/ai-ml/langchain.md | 14 | 208 | >5 | CU3-s2 Decisions |
+| 4 | skills/frameworks/ai-ml/transformers.md | 15 | 219 | >5 | CU3-s1 Decisions |
+| 5 | skills/frameworks/ai-ml/anthropic-sdk.md | 14 | 229 | >5 | CU3-s2 Decisions |
+| 6 | skills/frameworks/ai-ml/openai-sdk.md | 15 | 217 | >5 | CU3-s2 Decisions |
+| 7 | skills/frameworks/web/react.md | 13 | 232 | >6 | CU3-s3 Decisions |
+| 8 | skills/frameworks/web/nextjs.md | 15 | 252 | >6 | CU3-s3 Decisions |
+| 9 | skills/frameworks/data/pandas.md | 12 | 187 | >5 | CU3-s4 Decisions |
+| 10 | skills/frameworks/data/numpy.md | 13 | 194 | >5 | CU3-s4 Decisions |
+| 11 | skills/frameworks/data/prisma.md | 13 | 231 | >5 | CU3-s4 Decisions |
+| 12 | skills/frameworks/mobile/react-native.md | 12 | 189 | >5 | CU3-s5 (this) |
+| 13 | skills/frameworks/mobile/flutter.md | 13 | 207 | >5 | CU3-s5 (this) |
+| 14 | skills/frameworks/mobile/expo.md | 12 | 185 | >5 | CU3-s5 (this) |
+
+All 14 exceed their floor, carry a ≥2025 dated http source, and have a recorded
+verdict — the 14-file completeness check is GREEN. ai-ml boundary holds: exactly
+the 6 named ai-ml files are substantive; no ai-ml file beyond them is CU3-attributed.
