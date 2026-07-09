@@ -16,24 +16,44 @@ depends_on: [CU1-tier0-quick-wins]
 status: refined
 acceptance_criteria_count: 14
 risk_level: MEDIUM
-files:
-  - skills/frameworks/ai-ml/pytorch.md
-  - skills/frameworks/ai-ml/tensorflow.md
-  - skills/frameworks/ai-ml/langchain.md
-  - skills/frameworks/ai-ml/transformers.md
-  - skills/frameworks/ai-ml/anthropic-sdk.md
-  - skills/frameworks/ai-ml/openai-sdk.md
-  - skills/frameworks/web/react.md
-  - skills/frameworks/web/nextjs.md
-  - skills/frameworks/data/pandas.md
-  - skills/frameworks/data/numpy.md
-  - skills/frameworks/data/prisma.md
-  - skills/frameworks/mobile/react-native.md
-  - skills/frameworks/mobile/flutter.md
-  - skills/frameworks/mobile/expo.md
+is_slice_index: true
 ---
 
 # CU3 — Tier 1 high-traffic frameworks reference upgrade
+
+> **This plan is a SLICE INDEX** (`is_slice_index: true`). Per SIP1, the
+> implementation-planner decomposed CU3's 14 framework-guide upgrades into 5
+> cohesive slices, each a COMPLETE small implementation plan with its own `##
+> Implementation Details`, canonical Step 8–16 `## Execution Plan`, and a real-file
+> content-contract test (zero doubles). Slices are grouped by shared research-pass
+> coherence (a single research+write pass produces guides whose footgun/CVE/version
+> families overlap) and are **disjoint by file**, so `depends_on: none` between them
+> (parallel-safe per the CU3 constraint block — Gate 2 & Gate 3 still batch per
+> parent via `approveSubplans`, ONE human decision; each sibling inherits this
+> parent's Gate-1 `approved_by: human` marker, same as CU1/CU2). CU3 itself
+> `depends_on: [CU1-tier0-quick-wins]`; no slice depends on another slice. Each
+> slice bakes in the four HARD RULES: **NO STUBS**, **NO FABRICATED
+> NUMBERS/CVEs/VERSIONS (web-verify every fact, inline dated source ≥ 2025-01-01;
+> for the two SDKs use REAL current SDK versions + REAL current model IDs — never
+> invented)**, **ZERO TEST DOUBLES (content-contract test reads the real guide off
+> disk)**, and **single-framework examples** (7-language BAD/SAFE rule is exempt).
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Guides upgraded (`files:`) | Scope (one line) | depends_on |
+|---|------------|----------------------------|------------------|------------|
+| 1 | `CU3-tier1-frameworks-s1-ai-ml-deeplearning.md` | `ai-ml/pytorch.md`, `ai-ml/tensorflow.md`, `ai-ml/transformers.md` + `tests/cu3-ai-ml-deeplearning-guides.test.js` | ai-ml deep-learning: CUDA/device coupling, DataLoader/mixed-precision/`torch.compile`, eager-vs-graph `tf.function`, SavedModel/HDF5, tokenizer↔model coupling; pickle/`.pt`/`.bin` serialization = **CWE-502** — web-verified PyTorch/TF/transformers versions, dated. | none |
+| 2 | `CU3-tier1-frameworks-s2-ai-ml-llm-sdk.md` | `ai-ml/langchain.md`, `ai-ml/anthropic-sdk.md`, `ai-ml/openai-sdk.md` + `tests/cu3-ai-ml-llm-sdk-guides.test.js` | ai-ml LLM/SDK: **LangChain 1.0** (LCEL/LLMChain/AgentExecutor removed), **CVE-2025-68664** re-verified, prompt-injection + mitigation; prompt-caching/`AsyncAnthropic`/`AsyncOpenAI`/structured-output — **REAL SDK versions + REAL model IDs** (verified, never invented), dated. | none |
+| 3 | `CU3-tier1-frameworks-s3-web.md` | `web/react.md`, `web/nextjs.md` + `tests/cu3-web-guides.test.js` | web: **React 19** hooks (`useActionState`/`useOptimistic`) + concurrent-render tearing + `dangerouslySetInnerHTML` XSS (**CWE-79**); **Next.js 15** Server/Client boundary + Server-Actions input validation + edge runtime + App-Router caching — web-verified, dated. **Raised floor: both start at 6 sections → test asserts `> 6`.** | none |
+| 4 | `CU3-tier1-frameworks-s4-data.md` | `data/pandas.md`, `data/numpy.md`, `data/prisma.md` + `tests/cu3-data-guides.test.js` | data: pandas `SettingWithCopyWarning`/CoW (**pandas 2.x**); numpy broadcasting/view-vs-copy/NEP-50 (**numpy 2.x**); prisma N+1 + raw-query **CWE-89** SQL injection + migration/pool safety — web-verified, dated. | none |
+| 5 | `CU3-tier1-frameworks-s5-mobile.md` | `mobile/react-native.md`, `mobile/flutter.md`, `mobile/expo.md` + `tests/cu3-mobile-guides.test.js` + `tests/cu3-completeness.test.js` | mobile: RN new-arch (JSI/Fabric/TurboModules) + Hermes + `useNativeDriver` + OTA integrity; Flutter rebuild/null-safety/isolate; Expo managed-vs-bare + EAS + `expo-updates` runtimeVersion — web-verified SDK versions, dated. **Runs the final 14-file completeness check** (`tests/cu3-completeness.test.js`). | none |
+
+**Coverage of the 14 files:** s1 = pytorch, tensorflow, transformers · s2 =
+langchain, anthropic-sdk, openai-sdk · s3 = react, nextjs · s4 = pandas, numpy,
+prisma · s5 = react-native, flutter, expo. Union = all 14, no overlap, no omission.
+The completeness check (audit-ledger diff of the in-scope 14 against UPGRADED ∪
+SOLID-SKIPPED, plus the ai-ml-scope-boundary assertion that no ai-ml file beyond the
+6 named is CU3-attributed) runs at the end of s5.
 
 ## 1. ASSESS
 
