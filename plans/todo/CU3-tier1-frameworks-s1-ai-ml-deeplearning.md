@@ -273,50 +273,107 @@ these three touched (openai-sdk/anthropic-sdk/langchain are s2 scope); tests gre
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+### Web-verified facts + sources (retrieved 2026-07-09)
+
+Every version/security claim in the three guides was verified at edit time
+against the authoritative source; none invented. If a fact could not be verified
+it was omitted.
+
+| Fact | Verified value | Source (URL) | Retrieved / upload date |
+|------|----------------|--------------|-------------------------|
+| PyTorch current stable | 2.13.0, requires_python ≥3.10 | https://pypi.org/project/torch/ + https://github.com/pytorch/pytorch/releases (tag v2.13.0) | uploaded 2026-07-08, retrieved 2026-07-09 |
+| PyTorch `torch.load` default | `weights_only=True` since 2.6 (breaking, security-motivated); conda dropped in 2.6 | https://pytorch.org/docs/stable/generated/torch.load.html + 2.6 release notes | retrieved 2026-07-09 |
+| TensorFlow current stable | 2.21.0, requires_python ≥3.10 | https://pypi.org/project/tensorflow/ | uploaded 2026-03-06, retrieved 2026-07-09 |
+| Keras current | 3.15.0, requires_python ≥3.11; default backend since TF 2.16 | https://pypi.org/project/keras/ | uploaded 2026-06-24, retrieved 2026-07-09 |
+| transformers current stable | 5.13.0, requires_python ≥3.10 | https://pypi.org/project/transformers/ | uploaded 2026-07-03, retrieved 2026-07-09 |
+| safetensors current | 0.8.0; preferred/default weight format | https://pypi.org/project/safetensors/ | uploaded 2026-06-09, retrieved 2026-07-09 |
+| CWE-502 | "Deserialization of Untrusted Data" | https://cwe.mitre.org/data/definitions/502.html | retrieved 2026-07-09 |
+
+Note: endoflife.date has no pytorch/tensorflow pages (404), so versions were
+verified via the PyPI JSON API (real upload timestamps) + the PyTorch GitHub
+release list — both official, authoritative sources.
+
+### Choices
+
+1. **Two required sections not enumerated in the transformers spec were added as
+   genuine content, not padding.** The content-contract test requires all seven
+   correction-surface sections (Async/Concurrency, Error Handling,
+   Security/Dependency, Testing, Performance, Version, References) in *all three*
+   guides for a uniform depth bar. The transformers spec called out tokenizer
+   coupling / trust_remote_code / safetensors / caching but not an explicit
+   `## Performance` or a device/concurrency header. Rather than stub, I added
+   `## Device Placement & Concurrency Footguns` (device_map sharding, model.device
+   ordering, KV-cache thread-safety) and `## Performance Traps` (unbatched
+   pipeline, fp32 default, KV-cache O(n²), quantization, length bucketing) — all
+   real, framework-specific transformers footguns. No-churn: existing 5 sections
+   preserved verbatim.
+
+2. **Audit ledger NOT touched.** Step 15 said to append UPGRADED records to
+   `.ctoc/audit/corpus-audit-2026-06-15.json` UNLESS that file is outside this
+   slice's `files:` declaration — it is (only the 3 guides + the test are
+   declared, and the dispatch brief explicitly said do NOT touch the audit
+   ledger). Per the plan's own fallback and the brief, the three UPGRADED verdicts
+   are recorded here instead for the s5 completeness check to reconcile.
+
+3. **`torch.load weights_only` history kept as v2.6 (settled fact).** The default
+   flipped in PyTorch 2.6 (early 2025) — a historical, non-churning fact already
+   in the file. Preserved verbatim; the current-version claim (2.13.0) is
+   additive.
+
+### UPGRADED verdicts (for s5 CU3 completeness reconciliation)
+
+| Path | Before | After (lines / `## ` sections) | Verdict |
+|------|--------|-------------------------------|---------|
+| skills/frameworks/ai-ml/pytorch.md | 50 lines / 5 sec | 194 lines / 12 sec | UPGRADED (CU3-s1) |
+| skills/frameworks/ai-ml/tensorflow.md | 50 lines / 5 sec | 178 lines / 12 sec | UPGRADED (CU3-s1) |
+| skills/frameworks/ai-ml/transformers.md | 58 lines / 5 sec | 219 lines / 15 sec | UPGRADED (CU3-s1) |
