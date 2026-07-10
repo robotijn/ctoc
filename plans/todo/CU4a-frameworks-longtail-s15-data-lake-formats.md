@@ -275,3 +275,66 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (BARRIER-PATTERN: slice test only, left unstaged, audit
+ledger untouched). Every version/CVE/CWE claim below was web-verified at edit
+time against the cited official source; retrieval date 2026-07-10.
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+- **PyIceberg 0.11.1** — PyPI JSON, uploaded 2026-03-03, requires_python
+  `>=3.10,<4.0`. https://pypi.org/pypi/pyiceberg/json
+- **Apache Iceberg (Java/spec) 1.11.0** — GitHub release `apache-iceberg-1.11.0`,
+  published 2026-05-20. https://github.com/apache/iceberg/releases
+- **CVE-2026-42812** (CWE-732/284/20/863, published 2026-05-04) — Iceberg table
+  metadata as control files; `write.metadata.path` authorization class.
+  https://nvd.nist.gov/vuln/detail/CVE-2026-42812
+- **Apache Hudi 1.2.0** — GitHub release `release-1.2.0`, published 2026-05-23.
+  https://github.com/apache/hudi/releases ; https://hudi.apache.org/releases/release-1.2.0
+- **delta-spark 4.3.1** — PyPI JSON, uploaded 2026-07-08, requires_python `>=3.10`.
+  https://pypi.org/pypi/delta-spark/json
+- **Delta Lake 4.3.1** — GitHub release `v4.3.1`, published 2026-07-08.
+  https://github.com/delta-io/delta/releases
+- **pyarrow 25.0.0** — PyPI JSON, uploaded 2026-07-10, requires_python `>=3.10`.
+  https://pypi.org/pypi/pyarrow/json
+- **Apache Arrow 25.0.0** — GitHub release `apache-arrow-25.0.0`, published 2026-07-10.
+  https://github.com/apache/arrow/releases
+- **CVE-2023-47248** (CWE-502, published 2023-11-09) — PyArrow IPC/Parquet
+  deserialization RCE, versions 0.14.0–14.0.0. https://nvd.nist.gov/vuln/detail/CVE-2023-47248
+- **CVE-2026-25087** (CWE-416 use-after-free, published 2026-02-17) — Apache Arrow
+  C++ 15.0.0–23.0.0, IPC-file pre-buffering + variadic (Binary/String View) buffers.
+  https://nvd.nist.gov/vuln/detail/CVE-2026-25087
+
+### Omit-if-unverifiable (recorded absences)
+- **Hudi CVE** — NVD keyword search "apache hudi" returned no matching CVE at edit
+  time. Per the omit-if-no-source rule, NO CVE/CWE claim was asserted in hudi.md;
+  the security section covers credential/isolation footguns only.
+- **Delta Lake CVE** — NVD keyword search "delta lake" returned only Linux-kernel
+  false matches (no Delta-Lake-project CVE). No CVE/CWE was asserted in
+  delta-lake.md; security is framed around the VACUUM-retention destructive
+  privilege and credential handling.
+
+### Interpretation decisions
+- **Version tokens**: cited BOTH the Python client version (PyPI) and the
+  engine/spec version (GitHub) for iceberg/delta/arrow, because the runtime jar must
+  be engine-pinned — the Python pin alone gives false confidence. Hudi has no
+  first-class Python package, so only the GitHub/site release is cited.
+- **CWE inclusion**: CWE ids added ONLY where a real, framework-specific NVD CVE
+  grounds them (Iceberg CWE-732; Arrow CWE-502/CWE-416). No CWE invented to satisfy
+  a section quota.
+- **No-churn**: the original 5 sections + H1 `# <Framework> CTO` header preserved
+  verbatim in all 4 files; new sections appended below. skills.json trigger indexing
+  unaffected (H1 assertion is green in the slice test).
+- **Single-framework examples**: each guide's code is in its own framework only
+  (SQL/PySpark for iceberg/hudi/delta, pyarrow for arrow); the 7-language BAD/SAFE
+  rule is exempt per the CU4a single-framework exemption.
+
+### Verification (slice test only — full suite NOT run per BARRIER-PATTERN)
+- RED (pre-implement): 61 tests, 17 pass, 44 fail.
+- GREEN (post-implement): `node --test tests/cu4a-data-lake-formats-guides.test.js`
+  → 61 tests, 61 pass, 0 fail, 0 skipped.
+- `npx eslint tests/cu4a-data-lake-formats-guides.test.js` → exit 0.
+- Line counts before→after: iceberg 68→192, hudi 68→179, delta-lake 65→186,
+  arrow 65→185.
+- Left unstaged; caller commits. Plan not moved. Audit ledger not touched.

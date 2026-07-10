@@ -275,3 +275,35 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+**Barrier pattern (this run):** verified ONLY the slice test `tests/cu4a-data-batch-spark-guides.test.js`
+(NOT the full suite), left everything UNSTAGED, and did NOT touch
+`.ctoc/audit/corpus-audit-2026-06-15.json` (the Step-15 audit-ledger append is
+deferred to the caller/integrator to avoid a concurrent-write conflict across
+sibling barrier slices). All facts web-verified at edit time 2026-07-10.
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+| Framework | Fact asserted | Source URL |
+|---|---|---|
+| Spark | pyspark **4.1.2** current (uploaded 2026-05-21); 4.0 line at **4.0.3** (2026-06-11) | https://pypi.org/pypi/pyspark/json |
+| Spark | AQE / skew-join / broadcast tuning; ANSI-on-by-default in 4.0 | https://spark.apache.org/docs/latest/sql-performance-tuning.html · https://spark.apache.org/docs/latest/sql-migration-guide.html |
+| Spark | UI/master/REST exposure hardening | https://spark.apache.org/docs/latest/security.html |
+| dbt | dbt-core **1.11.12** current stable (uploaded 2026-07-01); 1.12 RC, 2.0 alpha | https://pypi.org/pypi/dbt-core/json |
+| dbt | incremental (`is_incremental`, unique_key, on_schema_change), materializations, snapshots, tests | https://docs.getdbt.com/docs/build/incremental-models · /materializations · /snapshots · /data-tests |
+| Airbyte | Airbyte **2.0.0** current (published 2025-10-15) | https://github.com/airbytehq/airbyte/releases |
+| Airbyte | incremental+dedup, CDC (WAL/slot), typing & deduping, schema-change management | https://docs.airbyte.com/using-airbyte/core-concepts/sync-modes/incremental-append-deduped · /understanding-airbyte/cdc · /using-airbyte/core-concepts/typing-deduping |
+| Fivetran | fivetran-connector-sdk **2.10.1** current (uploaded 2026-07-08) | https://pypi.org/pypi/fivetran-connector-sdk/json |
+| Fivetran | MAR pricing, sync/capture-deletes, system columns, schema changes, column hashing | https://www.fivetran.com/docs/usage-based-pricing · /core-concepts/sync-modes · /system-columns-and-tables · /schema-changes · /columns/column-hashing |
+| Security (shared) | **CWE-89** SQL Injection (Spark `spark.sql` string interp; dbt Jinja-into-SQL) | https://cwe.mitre.org/data/definitions/89.html |
+| Security (shared) | **CWE-798** Use of Hard-coded Credentials (Airbyte/Fivetran connector secrets) | https://cwe.mitre.org/data/definitions/798.html |
+
+### Choices made
+- **`is_incremental()` without `unique_key` = duplicates** framed as the primary dbt merge footgun (merge/delete+insert strategies), grounded in docs.getdbt.com.
+- **Fivetran version token**: Fivetran is a managed SaaS with no user-visible single "version"; cited the versioned **Connector SDK (fivetran-connector-sdk 2.10.1)** as the concrete, dated identifier the plan requires, and noted the managed connectors are continuously updated (not user-pinned).
+- **Airbyte "basic normalization removed"**: reflected the modern Typing & Deduping model rather than the legacy raw-JSON + dbt-normalization path.
+- **Performance-section naming**: the plan's Test-Plan item 3 requires a Performance/Testing section; each guide's perf/cost material lives in its footgun section, so those headings name Performance explicitly (e.g. "Shuffle, Skew & Partition Footguns (Performance)") rather than adding a thin separate stub — denser and truer to the content.
+
+### Omitted for lack of a dated authoritative source
+- No CVE (as opposed to CWE) was asserted for any of the four: no framework-specific CVE with a dated NVD/MITRE advisory ≥ 2025-01-01 was confirmed at edit time for the exact footguns covered, so only the two **CWE class identifiers** (CWE-89, CWE-798) — both real MITRE pages — are cited. Per the hard rule, unverifiable CVE claims were omitted rather than invented.

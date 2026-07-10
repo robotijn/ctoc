@@ -271,7 +271,70 @@ ONE step, 4 files + the test file.
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+**Web-verified facts (all sources retrieved 2026-07-10; environment clock at edit
+time = 2026-07-10, ahead of the model's Jan-2026 knowledge — trusted the live
+official mirrors/PyPI/Maven over stale prior knowledge):**
+
+Versions:
+- **Kafka 4.3.1** — current stable, dated 2026-06-23. Sources:
+  https://kafka.apache.org/downloads ; https://archive.apache.org/dist/kafka/4.3.1/
+  (mirror listing shows 2026-06-23 22:22 upload). The 4.x line is KRaft-only
+  (ZooKeeper removed) — stated in the guide as a version gotcha.
+- **Flink 2.3.0** — current stable, dated 2026-06-22. Sources:
+  https://flink.apache.org/downloads/ (latest stable) ;
+  https://archive.apache.org/dist/flink/flink-2.3.0/ (2026-06-22 mirror upload).
+- **Apache Beam 2.75.0** — current PyPI release, uploaded 2026-07-08,
+  requires_python >=3.10. Source: https://pypi.org/pypi/apache-beam/json
+  (info.version=2.75.0, urls[0].upload_time=2026-07-08T06:21:11).
+- **Debezium 3.6.0.Final** — current stable, published to Maven Central 2026-07-01.
+  Sources: https://repo1.maven.org/maven2/io/debezium/debezium-core/maven-metadata.xml
+  (<latest>3.6.0.Final</latest>, <lastUpdated>20260701...</lastUpdated>) ;
+  directory listing dated 2026-07-01 08:40.
+
+CWE identifiers (each title confirmed against cwe.mitre.org at edit time):
+- **CWE-502** Deserialization of Untrusted Data — kafka (Java deserializer footgun).
+- **CWE-200** Exposure of Sensitive Information to an Unauthorized Actor — kafka,
+  flink, beam, debezium (unauthenticated broker / REST UI / verbose logs).
+- **CWE-1188** Initialization of a Resource with an Insecure Default — flink
+  (unauthenticated JobManager REST/UI default).
+- **CWE-798** Use of Hard-coded Credentials — beam (PipelineOptions creds),
+  debezium (inline connector creds).
+- **CWE-522** Insufficiently Protected Credentials — debezium (creds in the
+  readable Connect config topic).
+All five verified via `curl https://cwe.mitre.org/data/definitions/<id>.html` on
+2026-07-10; each guide inlines the cwe.mitre.org URL.
+
+**Omitted for lack of a cleanly verifiable dated source (hard no-fabrication rule):**
+- **No specific CVE numbers asserted.** kafka.apache.org/cve-list and
+  flink.apache.org security page did not yield machine-scrapeable, individually
+  NVD/MITRE-verifiable CVE IDs at edit time, so per rule (2b) NO specific CVE is
+  claimed in any of the 4 guides. Security content is grounded in stable CWE
+  *classes* (verified above) + configuration footguns, not in version-pinned CVEs.
+  The plan explicitly notes "none required in this family."
+
+**Design decisions:**
+- Additive-only: git numstat shows 0 deletions on all 4 guides (kafka +130, flink
+  +112, beam +120, debezium +129 insertions); original 5 sections + `# <Framework>
+  CTO` H1 preserved verbatim (skills.json indexing intact).
+- Single-framework idiomatic examples only (7-language BAD/SAFE rule EXEMPT per
+  CU4a single-framework exemption): kafka=confluent-kafka Python, flink=PyFlink,
+  beam=Python SDK, debezium=Connect JSON config.
+- Test `it('carries at least four fenced code lines')` phrasing kept from CU3
+  convention (asserts >= 4 ``` fences = >= 2 blocks).
+- BARRIER-PATTERN honored: verified ONLY this slice's own test (did NOT run
+  tests/*.test.js), left everything UNSTAGED, did NOT touch the audit ledger
+  (.ctoc/audit/corpus-audit-2026-06-15.json) — caller/s31 owns that. Plan NOT moved.
+
+**Verification results:**
+- RED (pre-implement): 32 tests, 10 pass, 22 fail.
+- GREEN (post-implement): 32 tests, 32 pass, 0 fail, 0 skipped, 0 todo.
+- `npx eslint tests/cu4a-data-streaming-core-guides.test.js` → exit 0.
+- Line counts before→after: kafka 72→202, flink 62→174, beam 78→198, debezium 61→190.
+- Section counts: kafka 12, flink 12, beam 13, debezium 13 (all > 5 floor).
