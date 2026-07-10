@@ -325,3 +325,58 @@ traceable to official URLs); no cross-language BAD/SAFE examples added; tests gr
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (barrier-pattern: verified own test only, left everything unstaged).
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+Every version/security claim in the four guides carries an inline dated source
+≥ 2025-01-01. Verification performed at edit time:
+
+- **GHC**: 9.14.1 released **2025-12-19** is the current stable/supported line;
+  9.12.4 (2026-03-27) and 9.10.3 (2025-09-11) are prior supported minors.
+  Source: https://endoflife.date/ghc (JSON API confirmed live).
+- **GHC2024** language edition + `RequiredTypeArguments` (GHC 9.10 series).
+  Source: https://downloads.haskell.org/ghc/latest/docs/users_guide/
+- **OCaml**: 5.5.0 released **2026-06-19** (latest); 5.4.0 (2025-10-09),
+  5.3.0 (2025-01-08); 4.14.4 (2026-06-15) maintained 4.x. Domains + effect
+  handlers since 5.0.0. Source: https://github.com/ocaml/ocaml/releases
+  (GitHub releases API confirmed tag_name 5.5.0, published_at 2026-06-19T11:45:57Z).
+- **.NET**: 10 is LTS, released **2025-11-11**, latest 10.0.9 (2026-06-09),
+  supported to 2028-11-14; .NET 9 EOL 2026-11-10. Source: https://endoflife.date/dotnet.
+- **F# 10** ships with .NET 10 SDK. Source:
+  https://learn.microsoft.com/en-us/dotnet/fsharp/whats-new/fsharp-10 (HTTP 200,
+  page names "F# 10"). F# 9 page also live (shipped with .NET 9).
+- **Scala**: 3.8.4 (2026-06-05) current Next line; 3.3.x is the LTS line
+  (3.3.8, 2026-06-11). Source: https://endoflife.date/scala.
+- **CWE-502** "Deserialization of Untrusted Data" — official page title +
+  name confirmed. Source: https://cwe.mitre.org/data/definitions/502.html.
+  Applied to fsharp (BinaryFormatter/.NET) and scala (JVM ObjectInputStream);
+  OCaml `Marshal` documented as the OCaml-native analog trust boundary.
+
+### Decisions
+- **BinaryFormatter status (F#)**: stated as "removed/obsoleted in modern .NET"
+  rather than pinning a specific removal API version, because the precise
+  obsoletion/removal timeline spans multiple .NET releases; the security-guide
+  URL (learn.microsoft.com binaryformatter-security-guide) is the durable source.
+- **OCaml `Marshal` + CWE-502**: CWE-502 is a language-agnostic weakness class;
+  OCaml has no assigned CVE for `Marshal` unsafe-input, so it is described as the
+  "OCaml analog of CWE-502 / deserialization trust boundary" and grounded in the
+  OCaml Manual `Marshal` safety note rather than asserting a CVE number. This
+  honors the omit-if-no-source rule (no fabricated CVE).
+- **GHC "LTS" wording**: endoflife.date marks 9.14 `lts:true`; the guide says
+  "current stable line (marked the current supported/LTS release)" to match the
+  source without over-claiming a formal LTS program (Haskell has no formal LTS
+  beyond Stackage LTS, which is orthogonal).
+- **No-churn honored**: all four guides' original 5 `## ` sections preserved
+  verbatim; new sections appended below. Sections 5→12 each; lines: haskell
+  61→182, ocaml 57→171, fsharp 60→179, scala 56→174. Fences 8 each (≥4 required).
+- **Barrier-pattern**: verified only `tests/cu4c-functional-typed-guides.test.js`
+  (RED 4 pass/24 fail → GREEN 28/28); did NOT run the full suite; nothing staged;
+  plan NOT moved. Caller runs the integrated suite + commits.
+- **Audit artifact (Step 15 corpus-audit append)**: NOT written by this executor
+  — barrier-pattern scopes edits to the 5 enumerated files only. Recorded here as
+  a deferred sub-task for the caller/completeness slice (s12).
+- **README.md**: pre-existing working-tree modification, NOT part of this slice
+  and NOT touched by this executor; left as-is, unstaged.

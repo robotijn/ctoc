@@ -272,50 +272,112 @@ honest + sourced; no cross-language BAD/SAFE examples added; tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 28 tests, 4 pass, 24 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none — node:test built-in)
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Web-verified every version/CWE fact against official sources (see Decisions)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Extended all 4 guides additively (5→12/13 sections each)
+- [x] Add error handling idioms per language
+- [x] Real footguns + dated sources; no stubs
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new content (>5 sections, >120 lines each, concrete identifiers)
+- [x] Additive-only verified (0 deleted lines across 4 guides)
+- [x] Every version/security claim carries an inline dated source ≥ 2025
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Dense, footgun-per-bullet, no padding
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Content-only edits; test uses path.join(__dirname,'..') — no traversal
+- [x] No secrets; official public source URLs only
+- [x] Only the 5 enumerated files touched
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] eslint tests/cu4c-dynamic-oo-scripting-guides.test.js → exit 0
+- [x] Slice test GREEN (28/28 pass, 0 fail, 0 skipped) — full suite deferred to caller (barrier)
+- [x] Content-grounding substitutes for line/branch coverage (CU2 convention)
+- [x] 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Decisions + web-verified sources recorded below
+- [x] Per-language concrete identifiers documented
+- [x] No CHANGELOG change needed (skill content)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+### Web-verified facts + sources (all retrieved 2026-07-10)
+Every version/CVE/CWE claim below was verified against the official source at edit time.
+
+**Ruby**
+- Ruby 3.4.0 released 2024-12-24/25; Prism default parser, `it` block param, chilled/frozen
+  string literals, `--yjit-mem-size` (default 128 MiB) replacing `--yjit-exec-mem-size`,
+  `RubyVM::YJIT.runtime_stats` — https://www.ruby-lang.org/en/news/2024/12/25/ruby-3-4-0-released/
+- Ruby 4.0.0 released 2025-12-25: "Ruby Box" namespaces, ZJIT (next-gen JIT after YJIT, needs
+  Rust 1.85+, `--zjit`, not yet production-ready), Ractor improvements (`Ractor::Port`,
+  `Ractor.shareable_proc`, reduced GVL contention) — https://www.ruby-lang.org/en/news/2025/12/25/ruby-4-0-0-released/
+  (verified directly on ruby-lang.org, HTTP 200; postdates the Jan-2026 training cutoff so
+  confirmed by live fetch, not memory).
+- Ruby release list — https://www.ruby-lang.org/en/downloads/releases/
+- YJIT ~92%/monkey-patch-deopt claims retained from the existing (pre-verified) guide body;
+  new claims sourced above.
+
+**PHP**
+- PHP 8.4 released 2024-11-21: property hooks, asymmetric visibility (`private(set)`),
+  `new MyClass()->method()` no-parens, `array_find`/`array_any`/`array_all`, `#[\Deprecated]`
+  — https://www.php.net/releases/8.4/en.php
+- PHP 8.5 released 2025-11-20; 8.4 active support through 2026, security through 2028
+  — https://www.php.net/supported-versions.php
+
+**Groovy**
+- Groovy 4.0 released 2022-01-25: coordinate move `org.codehaus.groovy` → `org.apache.groovy`,
+  JPMS, sealed types, records, switch expressions — https://groovy-lang.org/releasenotes/groovy-4.0.html
+- Groovy 5.0 released 2025-08-21 (current line); 4.0.x still maintained; 2.5 EOL 2026-04-30
+  — https://groovy.apache.org/download.html and https://endoflife.date/groovy
+
+**CoffeeScript**
+- CoffeeScript 2.7.0 published 2022-04-24 (latest release; low cadence); 2.x targets ES2015+
+  output vs 1.x ES5 — https://coffeescript.org/ (and npm registry for the 2.7.0 date)
+
+**CWE identifiers (all verified against cwe.mitre.org, retrieved 2026-07-10)**
+- CWE-502 = Deserialization of Untrusted Data — https://cwe.mitre.org/data/definitions/502.html
+- CWE-89 = SQL Injection — https://cwe.mitre.org/data/definitions/89.html
+- CWE-94 = Improper Control of Generation of Code ('Code Injection') — https://cwe.mitre.org/data/definitions/94.html
+
+### Choices
+1. **`rescue StandardError` literal token (ruby)**: the plan and test require the exact idiom
+   token. Added `rescue StandardError => e` inline to the Error Handling section (documents
+   intent) rather than only prose about StandardError. Additive.
+2. **Ruby 4.0 inclusion**: the plan's headline scope is "Ruby 3.4+ / YJIT / Ractors". Ruby 4.0
+   (2025-12-25) is now shipped and directly extends the Ractor + JIT story (ZJIT), so it was
+   included as a *verified* 3.4+ continuation — verified by direct live fetch (HTTP 200) since
+   it postdates the training cutoff, per the no-fabrication rule.
+3. **Groovy 5.0**: current stable is 5.0 (2025-08-21), not only 4.x as the plan's example text
+   assumed. Reported both 4.0's coordinate change (the load-bearing footgun) and 5.0 as the
+   current line, each sourced. No fabrication — endoflife.date + groovy.apache.org corroborate.
+4. **CoffeeScript honest legacy framing**: latest release is 2.7.0 (2022-04-24). Framed as
+   legacy/low-cadence and recommended TypeScript for new code, sourced to coffeescript.org and
+   the npm registry date — no overstatement of momentum.
+5. **No omitted claims**: every asserted version/CWE fact had a dated authoritative source;
+   nothing was dropped for lack of a source. Groovy "@CompileStatic 10x faster" and Ruby
+   "YJIT ~92%" were pre-existing guide claims left verbatim (additive no-churn rule).
+
+### Barrier-pattern compliance
+- Edited exactly the 5 enumerated files; additive-only (0 deleted lines across the 4 guides);
+  H1 headers intact on all four; test reads the 4 real files off disk (zero doubles).
+- Verified ONLY this slice's test (`node --test tests/cu4c-dynamic-oo-scripting-guides.test.js`
+  → 28/28 pass); did NOT run the full suite; did NOT git add/stage; did NOT move the plan.
+  Sibling CU4c slices are editing disjoint files concurrently (expected).

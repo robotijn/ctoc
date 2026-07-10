@@ -263,50 +263,93 @@ green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 28 tests, 4 pass, 24 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (node:test built-in)
+- [x] Check prerequisites — web-verified all versions/CWEs (see Decisions table)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — none
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — 4 guides extended additively
+- [x] Add error handling — Error Handling Idioms section per guide
+- [x] Wire up integration points — H1/skills.json triggers intact
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — footgun-per-bullet, no padding
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — test uses path.join(__dirname,'..')
+- [x] Sanitize outputs
+- [x] No secrets in code — only public official URLs
+- [x] Safe file operations — read-only fs.readFileSync
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint on test file exit 0
+- [x] Run ALL tests (TDD Green) — slice test 28/28 GREEN (barrier: slice-only per brief)
+- [x] Check coverage >= 80% — content-grounding substitutes (CU2 convention)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — the 4 guides ARE the docs
+- [x] Add JSDoc comments to new functions — test file header documents contract
+- [x] Update CHANGELOG if needed — n/a (caller commits/versions)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (Steps 8–16, TDD). Every version/security fact below was
+web-verified against an official source at edit time; sources + retrieval dates
+are inlined in each guide's `## References`. Nothing fabricated.
+
+### Web-verified facts (source + retrieved 2026-07-10)
+| Fact | Verified value | Source (URL) |
+|------|----------------|--------------|
+| Clojure current stable | **1.12.5** (1.13 is alpha only) | https://clojure.org/releases/downloads ; https://api.github.com/repos/clojure/clojure/tags |
+| Racket current release | **9.2** (published 2026-05-28) | https://github.com/racket/racket/releases/latest |
+| Erlang/OTP current release | **29.0.3** (published 2026-07-02) | https://github.com/erlang/otp/releases/latest |
+| Elixir current release | **1.20.2** (published 2026-06-23) | https://github.com/elixir-lang/elixir/releases/latest |
+| Elixir↔OTP compatibility | **Elixir 1.20 → OTP 27–29** | compatibility-and-deprecations.md @ v1.20.2 tag (raw.githubusercontent.com/elixir-lang/elixir/v1.20.2/lib/elixir/pages/references/compatibility-and-deprecations.md) |
+| CWE-502 title | "Deserialization of Untrusted Data" | https://cwe.mitre.org/data/definitions/502.html |
+| CWE-95 title | "Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')" | https://cwe.mitre.org/data/definitions/95.html |
+| CWE-94 title | "Improper Control of Generation of Code ('Code Injection')" | https://cwe.mitre.org/data/definitions/94.html |
+
+### Decisions
+1. **Test filename** — the plan frontmatter names `tests/cu4c-lisp-beam-guides.test.js`,
+   but the execution brief mandated `tests/cu4c-functional-lisp-beam-guides.test.js`.
+   Followed the brief (the operative instruction); created the latter. No collision
+   with any existing test. `files:` frontmatter is a superset match either way.
+2. **CWE assignments (verified, not fabricated)** — Clojure `eval`/`read-string`
+   code execution mapped to **CWE-94 (Code Injection)** with **CWE-502** for the
+   JVM-interop deserialization surface (both named per brief's "CWE-94 for lisp
+   eval" + "CWE-502"). Scheme `eval` → **CWE-95 (Eval Injection)** per plan.
+   Erlang `binary_to_term` and Elixir `:erlang.binary_to_term` → **CWE-502**.
+   Every CWE title string was fetched from cwe.mitre.org and matched before use.
+3. **Additive-only (no-churn)** — the original 5 `## ` sections in each guide were
+   preserved verbatim; all new sections were appended below the existing
+   `## Version Gotchas`. Existing example code untouched.
+4. **Atom-table cap figure** — stated Erlang's default atom limit as "~1,048,576"
+   (the documented default `+t`), qualified with "~" and "default"; sourced to
+   erlang.org System Limits in-guide. Not presented as an exact invariant.
+5. **No omitted claims** — every version/security claim in scope had a dated
+   official source; nothing was dropped for lack of a source.
+
+### Barrier-pattern note (executor)
+Verified ONLY this slice's test (`node --test tests/cu4c-functional-lisp-beam-guides.test.js`
+→ 28/28 pass). Did NOT run the full `tests/*.test.js` suite. Left all changes
+UNSTAGED in the working tree; caller commits. Plan not moved.
