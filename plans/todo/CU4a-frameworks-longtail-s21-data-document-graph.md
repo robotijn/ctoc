@@ -275,3 +275,67 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (barrier-pattern parallel slice: verified own test only, left
+unstaged, did NOT touch the audit ledger `.ctoc/audit/corpus-audit-2026-06-15.json`,
+did NOT move the plan — caller commits and appends the ledger).
+
+### Web-verified facts + sources (all retrieved 2026-07-10)
+
+**MongoDB**
+- Server **8.0.27** (LTS line) / **8.2.12** (rapid) — https://www.mongodb.com/docs/manual/release-notes/8.0/
+- Node driver `mongodb` **7.5.0** — https://registry.npmjs.org/mongodb
+- `pymongo` **4.17.0** (uploaded 2026-04-20) — https://pypi.org/pypi/pymongo/json
+- 16 MB BSON limit + aggregation 100 MB stage cap — https://www.mongodb.com/docs/manual/reference/limits/ , https://www.mongodb.com/docs/manual/core/aggregation-pipeline-limits/
+- $where / operator injection = CWE-943 — https://cwe.mitre.org/data/definitions/943.html
+
+**ArangoDB**
+- Server **3.12** stable (Docker `arangodb/arangodb:3.12`) — https://docs.arangodb.com/3.12/
+- `python-arango` **8.3.3** (uploaded 2026-06-01) — https://pypi.org/pypi/python-arango/json
+- AQL bind parameters — https://docs.arangodb.com/3.12/aql/fundamentals/bind-parameters/
+- AQL injection = CWE-943 — https://cwe.mitre.org/data/definitions/943.html
+
+**Neo4j**
+- Server **2026.06.0** (calendar line) / **5.26 LTS** — https://neo4j.com/release-notes/database/
+- `neo4j` driver **6.2.0** (PyPI upload 2026-05-04; npm neo4j-driver 6.2.0) — https://pypi.org/pypi/neo4j/json , https://registry.npmjs.org/neo4j-driver
+- Cypher parameters — https://neo4j.com/docs/cypher-manual/current/syntax/parameters/
+- Cypher injection = CWE-943 — https://cwe.mitre.org/data/definitions/943.html
+
+**Dgraph**
+- Server **v25.3.8** (GitHub release published 2026-07-09; Docker `dgraph/standalone:v25.3`) — https://github.com/dgraph-io/dgraph/releases
+- `pydgraph` **25.2.0** (uploaded 2026-02-25) — https://pypi.org/pypi/pydgraph/json
+- Upsert block / consistency — https://dgraph.io/docs/mutations/upsert-block/ , https://dgraph.io/docs/design-concepts/consistency-model/
+- DQL query injection class = CWE-943 — https://cwe.mitre.org/data/definitions/943.html
+
+**CWE-943 title** confirmed against MITRE at edit time: "Improper Neutralization of
+Special Elements in Data Query Logic" (https://cwe.mitre.org/data/definitions/943.html).
+NoSQL / graph-query injection is **CWE-943, NOT CWE-89** (CWE-89 is SQL); guides state
+this contrast explicitly and the content test forbids labeling the weakness AS CWE-89.
+
+### Decisions
+1. **NoSQL/graph injection labeled CWE-943 throughout** (mongodb $where/operator,
+   ArangoDB AQL, Neo4j Cypher, Dgraph DQL). CWE-89 is SQL and is never assigned; the
+   test asserts CWE-943 present and forbids `is/=/: CWE-89`.
+2. **Existing "v23" Dgraph install line left verbatim** (no-churn rule preserves the
+   original 5 sections) but the new Version-Specific section flags it as outdated and
+   directs new work to `dgraph/standalone:v25.3` — additive correction, no rewrite.
+3. **GitHub API rate-limited mid-verification** for ArangoDB/Neo4j tag listings;
+   fell back to the official docs/release-notes pages (docs.arangodb.com/3.12,
+   neo4j.com/release-notes/database) which authoritatively confirm the stable lines.
+   No version asserted without a dated official source. Nothing omitted-for-lack-of-source.
+4. **`doesNotMatch` guard refined** from `/CWE-89\b/` to `/\b(is|=|:)\s*CWE-89\b/i`
+   so the pedagogically-valuable "CWE-943, not CWE-89" contrast is allowed while an
+   actual mislabel (`is/= CWE-89`) still fails — preserves the anti-mislabel intent.
+5. **Single-framework idiomatic examples only** (CU4a exemption from the 7-language
+   BAD/SAFE rule): mongodb→JS driver, arangodb→AQL/arangojs/JS-txn, neo4j→Cypher/JS,
+   dgraph→DQL/GraphQL/Go.
+
+### Verification tally (own test only — barrier pattern)
+- RED (pre-implement): 28 tests, 11 pass, 17 fail.
+- GREEN (post-implement): 28 tests, **28 pass, 0 fail**, 0 skipped, 0 todo.
+- `npx eslint tests/cu4a-data-document-graph-guides.test.js` → exit 0.
+- Line counts (before→after, `git show HEAD` vs working tree): mongodb 62→210,
+  arangodb 60→192, neo4j 57→195, dgraph 68→208; test file NEW → 156.
+- Full `tests/*.test.js` intentionally NOT run (barrier pattern — caller runs the suite).

@@ -275,3 +275,46 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (barrier-pattern: verified ONLY this slice's own test, left the
+working tree UNSTAGED, did NOT touch the audit ledger; caller commits).
+
+### Web-verified facts (source URL + retrieval date, all ≥ 2025-01-01)
+
+| Fact | Value | Source (retrieved 2026-07-10) |
+|------|-------|-------------------------------|
+| Elasticsearch current stable | **9.4.3**, published 2026-06-30 | https://github.com/elastic/elasticsearch/releases/latest (GitHub API `tag_name` v9.4.3) |
+| Elasticsearch license fork | Elastic License 2.0 / SSPL; AGPLv3 re-added 2024 | https://www.elastic.co/blog/elasticsearch-is-open-source-again (HTTP 200) |
+| ES deep-pagination window | `index.max_result_window` default 10 000; use `search_after`+PIT | https://www.elastic.co/guide/en/elasticsearch/reference/current/paginate-search-results.html |
+| OpenSearch current stable | **3.7.0**, published 2026-06-09 | https://github.com/opensearch-project/OpenSearch/releases/latest (GitHub API `tag_name` 3.7.0) |
+| OpenSearch license/lineage | Apache 2.0; fork of Elasticsearch 7.10 | https://opensearch.org/about.html |
+| Typesense current stable | **v30.2**, published 2026-04-19 | https://github.com/typesense/typesense/releases/latest (GitHub API `tag_name` v30.2) |
+| Meilisearch current stable | **v1.49.0**, published 2026-07-06 | https://github.com/meilisearch/meilisearch/releases/latest (GitHub API `tag_name` v1.49.0) |
+| CWE-798 (hard-coded credentials) | real MITRE id, title "Use of Hard-coded Credentials" | https://cwe.mitre.org/data/definitions/798.html (HTTP 200, title confirmed) |
+
+- **CWE-798** is used in typesense.md and meilisearch.md (scoped/admin/master API-key
+  exposure) — it is the correct MITRE identifier for hard-coded/embedded credentials.
+  ES/OpenSearch guides describe the same class in prose + link CWE-798.
+- **No CVEs asserted.** No framework-specific CVE met the "official dated source at
+  edit time" bar for a general correction surface, so per the omit-if-no-source rule
+  none were fabricated. The guides assert only version + license + CWE-798 facts,
+  each carrying a dated source ≥ 2025-01-01.
+
+### Choices made (no stubs)
+
+1. **Test regex flexibility.** The `Correctness`/`Footgun` required-section regexes
+   accept a family of headings (mapping/schema/settings/analyzer; correctness/
+   relevancy/pagination/tuning) so each of the 4 differently-named surfaces
+   (ES/OpenSearch "Mapping Footguns", Typesense "Schema Footguns", Meilisearch
+   "Settings Footguns") satisfies the same content contract without a false floor.
+2. **Version tokens in test.** Per-framework version assertions accept both the exact
+   patch (`9.4.3`, `3.7.0`, `v1.49`) and the minor line (`9.4`, `3.7`, `1.49`, `v30`)
+   so a routine patch bump on the real docs does not fail the content test while a
+   drop of the version entirely still does.
+3. **Single-framework idiomatic examples only** (CU4a exemption from the 7-language
+   BAD/SAFE rule): Python for ES, JSON+Python for OpenSearch, JS for Typesense and
+   Meilisearch — each in the framework's own canonical client.
+4. **Additive-only.** All 4 diffs are 0-deletion (existing 5 sections + H1 preserved
+   verbatim); 7 new `## ` sections appended to each (5 → 12 sections).
