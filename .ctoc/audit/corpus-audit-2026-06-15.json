@@ -738,5 +738,817 @@
         "dispatch_evidence": "rich gdpr-agent.md references skills/compliance/gdpr-compliance-checker/SKILL.md by body path; thin wrapper deleted per EC2-s3 (tests/gdpr-agent-definition.test.js)"
       }
     ]
+  },
+  "cu4a_verdicts": {
+    "produced_by": "CU4a-frameworks-longtail-s31-completeness-check",
+    "recorded_date": "2026-07-10",
+    "legend": {
+      "UPGRADED": "The long-tail framework guide was thin (<= 5 \"## \" sections) at audit time and now has > 5 sections on disk after its CU4a upgrade slice (s1-s30). section_count read fresh from disk.",
+      "SOLID-SKIPPED": "The file was already substantive at audit time and deliberately not rewritten (rationale recorded). None in CU4a — all 114 were thin."
+    },
+    "scope_note": "The 114 CU4a in-scope files = all skills/frameworks/{ai-ml,data,mobile,devops}/*.md at <= 5 \"## \" sections at audit time MINUS the CU3-named framework guides (ai-ml pytorch/tensorflow/langchain/transformers/anthropic-sdk/openai-sdk; data pandas/numpy/prisma; mobile react-native/flutter/expo; web react/nextjs). Confirmed fresh 2026-07-10 as exactly 114 (38 ai-ml + 49 data + 12 mobile + 15 devops). web/*.md OUT OF SCOPE (all >= 6 sections). No CU3-named or web file recorded here.",
+    "count": 114,
+    "upgraded_count": 114,
+    "solid_skipped_count": 0,
+    "verdicts": [
+      {
+        "path": "skills/frameworks/ai-ml/vllm.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s1",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/tensorrt.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s1",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/triton.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s1",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/deepspeed.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s1",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/ggml.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s2",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/llama-cpp.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s2",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/onnx.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s2",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/ollama.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s2",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/jax.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s3",
+        "date": "2026-07-10",
+        "section_count": 14
+      },
+      {
+        "path": "skills/frameworks/ai-ml/keras.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s3",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/fastai.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s3",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/scikit-learn.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s3",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/accelerate.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s4",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/peft.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s4",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/trl.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s4",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/bitsandbytes.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s4",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/unsloth.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s4",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/llamaindex.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s5",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/autogen.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s5",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/crewai.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s5",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/semantic-kernel.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s5",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/dspy.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s5",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/pinecone.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s6",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/weaviate.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s6",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/qdrant.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s6",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/chromadb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s6",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/milvus.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s6",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/pgvector.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s6",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/ai-ml/mlflow.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s7",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/wandb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s7",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/ray.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s8",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/modal.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s8",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/replicate.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s8",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/gradio.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s9",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/streamlit.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s9",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/huggingface-hub.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s10",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/datasets.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s10",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/ai-ml/diffusers.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s10",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/kafka.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s11",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/flink.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s11",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/beam.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s11",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/debezium.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s11",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/spark.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s12",
+        "date": "2026-07-10",
+        "section_count": 10
+      },
+      {
+        "path": "skills/frameworks/data/dbt.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s12",
+        "date": "2026-07-10",
+        "section_count": 10
+      },
+      {
+        "path": "skills/frameworks/data/airbyte.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s12",
+        "date": "2026-07-10",
+        "section_count": 10
+      },
+      {
+        "path": "skills/frameworks/data/fivetran.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s12",
+        "date": "2026-07-10",
+        "section_count": 10
+      },
+      {
+        "path": "skills/frameworks/data/snowflake.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s13",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/clickhouse.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s13",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/duckdb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s13",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/trino.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s14",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/presto.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s14",
+        "date": "2026-07-10",
+        "section_count": 14
+      },
+      {
+        "path": "skills/frameworks/data/questdb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s14",
+        "date": "2026-07-10",
+        "section_count": 14
+      },
+      {
+        "path": "skills/frameworks/data/iceberg.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s15",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/hudi.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s15",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/delta-lake.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s15",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/arrow.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s15",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/polars.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s16",
+        "date": "2026-07-10",
+        "section_count": 14
+      },
+      {
+        "path": "skills/frameworks/data/dask.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s16",
+        "date": "2026-07-10",
+        "section_count": 14
+      },
+      {
+        "path": "skills/frameworks/data/vaex.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s16",
+        "date": "2026-07-10",
+        "section_count": 14
+      },
+      {
+        "path": "skills/frameworks/data/cockroachdb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s17",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/planetscale.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s17",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/neon.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s17",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/supabase.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s17",
+        "date": "2026-07-10",
+        "section_count": 14
+      },
+      {
+        "path": "skills/frameworks/data/sqlite.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s18",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/timescaledb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s18",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/sqlalchemy.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s18",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/alembic.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s18",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/drizzle.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s18",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/redis.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s19",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/valkey.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s19",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/memcached.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s19",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/cassandra.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s20",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/scylladb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s20",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/dynamodb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s20",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/couchbase.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s20",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/data/mongodb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s21",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/arangodb.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s21",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/neo4j.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s21",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/dgraph.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s21",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/elasticsearch.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s22",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/opensearch.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s22",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/typesense.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s22",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/meilisearch.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s22",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/data/airflow.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s23",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/data/dagster.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s23",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/data/prefect.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s23",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/data/great-expectations.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s23",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/mobile/swiftui.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s24",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/mobile/jetpack-compose.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s24",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/mobile/compose-multiplatform.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s24",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/mobile/maui.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s25",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/mobile/xamarin.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s25",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/mobile/ionic.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s25",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/mobile/capacitor.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s25",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/mobile/nativescript.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s25",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/mobile/unity.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s26",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/mobile/unreal.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s26",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/mobile/kivy.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s26",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/mobile/beeware.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s26",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/devops/kubernetes.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s27",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/devops/helm.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s27",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/devops/kustomize.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s27",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/devops/docker.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s28",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/devops/podman.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s28",
+        "date": "2026-07-10",
+        "section_count": 13
+      },
+      {
+        "path": "skills/frameworks/devops/pulumi.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s29",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/devops/crossplane.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s29",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/devops/vault.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s29",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/devops/ansible.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s29",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/devops/chef.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s30",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/devops/puppet.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s30",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/devops/saltstack.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s30",
+        "date": "2026-07-10",
+        "section_count": 11
+      },
+      {
+        "path": "skills/frameworks/devops/prometheus.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s30",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/devops/grafana.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s30",
+        "date": "2026-07-10",
+        "section_count": 12
+      },
+      {
+        "path": "skills/frameworks/devops/datadog.md",
+        "cu4a_verdict": "UPGRADED",
+        "slice": "CU4a-s30",
+        "date": "2026-07-10",
+        "section_count": 12
+      }
+    ]
   }
 }
