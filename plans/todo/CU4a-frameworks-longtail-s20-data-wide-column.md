@@ -275,3 +275,65 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (Steps 8–16, TDD, BARRIER-PATTERN: verified only this slice's
+own test, left unstaged, did NOT touch the audit ledger).
+
+### Web-verified facts + sources (retrieved 2026-07-10 at edit time)
+- **Apache Cassandra server 5.0.8** — current stable on the 5.0 line.
+  Source: https://dlcdn.apache.org/cassandra/ (Apache mirror listing).
+- **cassandra-driver (Python) 3.30.1**, uploaded 2026-07-06, CPython 3.10–3.14.
+  Source: https://pypi.org/pypi/cassandra-driver/json (PyPI JSON API).
+- **ScyllaDB calendar-versioned; stable line 2026.1.x, newest GA tag 2026.2.0.**
+  Source: https://github.com/scylladb/scylladb/tags (release tags; `scylla-2026.2.0`
+  is the latest non-candidate GA tag, `scylla-2026.2.1` still a candidate).
+- **scylla-driver (Python) 3.29.11**, uploaded 2026-06-15 — shard-aware fork of
+  cassandra-driver. Source: https://pypi.org/pypi/scylla-driver/json.
+- **boto3 1.43.45** (AWS SDK for Python), uploaded 2026-07-09, requires Python >=3.10.
+  Source: https://pypi.org/pypi/boto3/json.
+- **DynamoDB service quotas** — item size 400 KB; ~3000 RCU / 1000 WCU per partition;
+  LSI item collection ~10 GB. Source:
+  https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotasOverview.html
+- **Couchbase Server 7.x** (bucket→scope→collection, SQL++/N1QL, vector search on 7.6).
+  Source: https://docs.couchbase.com/server/current/ (7.x release notes / learn docs).
+- **couchbase (Python SDK) 4.6.2**, uploaded 2026-06-18 — SDK 4.x (Couchbase++ core).
+  Source: https://pypi.org/pypi/couchbase/json.
+- **CWE-89** (SQL/CQL injection) title confirmed at MITRE v4.20:
+  https://cwe.mitre.org/data/definitions/89.html
+- **CWE-943** (Improper Neutralization of Special Elements in Data Query Logic —
+  NoSQL injection) title confirmed at MITRE v4.20:
+  https://cwe.mitre.org/data/definitions/943.html
+
+### Choices under ambiguity
+1. **ScyllaDB version presentation** — GitHub exposes `scylla-2026.2.0` as a tag but
+   with no attached GitHub *release object* (no published_at). Chose to present the
+   stable line as **2026.1.x with 2026.2.0 as the newest GA tag**, cited to the tags
+   listing (dated by retrieval), and to anchor a firmly-dated version on
+   **scylla-driver 3.29.11 (PyPI, 2026-06-15)** rather than assert an unverifiable
+   server GA date. No fabricated date asserted.
+2. **DynamoDB has no CQL/SQL injection surface** — the typed boto3 API is not string
+   SQL, so I did NOT assert a CWE-89/943 for DynamoDB (would be fabricated). Instead
+   the DynamoDB Security section covers the *real* risks: over-broad IAM
+   (`dynamodb:LeadingKeys` fencing, no `dynamodb:*`/`Resource:*`) and lost-update
+   races (ConditionExpression optimistic concurrency). Test asserts IAM/condition
+   content, not a CWE token, for DynamoDB.
+3. **DynamoDB 400 KB item limit** — the AWS Service Quotas page is JS-rendered so the
+   token wasn't grep-able from raw HTML; cited the canonical AWS Service Quotas doc
+   URL (retrieved 2026-07-10) as the authoritative source, matching sibling-guide
+   practice. This is a long-standing, well-documented hard quota, not an invented number.
+4. **Couchbase N1QL injection = CWE-943, not CWE-89** — N1QL/SQL++ is a data-query
+   language over documents; the correct MITRE class is CWE-943 (data query logic),
+   which the plan and test mandate. Verified at MITRE.
+5. **No omitted claims** — every version/security claim carries a dated ≥2025-01-01
+   http source; nothing was dropped for lack of a source.
+
+### Verification tallies (this slice only)
+- TDD: RED = 28 tests / 9 pass / 19 fail (pre-implementation) → GREEN = 28 tests /
+  28 pass / 0 fail / 0 skipped (`node --test tests/cu4a-data-wide-column-guides.test.js`).
+- eslint on the test file: exit 0.
+- Before→after line counts: cassandra 68→242, scylladb 69→228, dynamodb 70→229,
+  couchbase 60→225. Sections each 5→13 (>5 floor). H1 `# <Framework> CTO` intact on all 4.
+- Full suite NOT run (barrier pattern); files left unstaged for the caller to commit;
+  audit ledger NOT touched.
