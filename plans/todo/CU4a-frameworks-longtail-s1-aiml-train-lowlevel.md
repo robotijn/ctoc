@@ -275,3 +275,50 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (Steps 8–16). Barrier pattern: only this slice's own test was
+run (not the full suite); working tree left UNSTAGED for the caller to commit.
+
+### Web-verified facts (source URL + retrieval date, all ≥ 2025-01-01)
+Every version/security fact was verified at edit time via the PyPI JSON API,
+GitHub releases API, and cwe.mitre.org. Facts with no dated authoritative source
+were omitted (see below).
+
+| Fact | Verified value | Source (retrieved 2026-07-10) |
+|------|----------------|-------------------------------|
+| vLLM current release | **0.24.0**, uploaded 2026-06-30, requires_python `<3.15,>=3.10` | pypi.org/pypi/vllm/json + github.com/vllm-project/vllm release v0.24.0 (2026-06-29) |
+| TensorRT wheel | **11.1.0.106**, uploaded 2026-06-16, requires_python `>=3.8` | pypi.org/pypi/tensorrt/json |
+| Triton Inference Server | **2.70.0** (2026-06-26), NGC container **26.06** | api.github.com/repos/triton-inference-server/server release v2.70.0 |
+| tritonclient wheel | **2.70.0**, uploaded 2026-06-26 | pypi.org/pypi/tritonclient/json |
+| DeepSpeed current release | **0.19.2**, uploaded 2026-06-16 | pypi.org/pypi/deepspeed/json + github.com/deepspeedai/DeepSpeed release v0.19.2 |
+| CWE-94 | "Improper Control of Generation of Code ('Code Injection')" (4.20) | cwe.mitre.org/data/definitions/94.html |
+| CWE-502 | "Deserialization of Untrusted Data" (4.20) | cwe.mitre.org/data/definitions/502.html |
+
+### Decisions
+1. **CWE mapping per framework's REAL attack surface** — vLLM `trust_remote_code`
+   and Triton Python/BLS `execute()` map to **CWE-94** (code injection: both run
+   attacker-controlled code from a repo/model-repo trust boundary). TensorRT
+   `.plan`/`.engine` `deserialize_cuda_engine` and DeepSpeed pickle checkpoints
+   map to **CWE-502** (deserialization of untrusted data). Both ids verified at
+   MITRE; no CWE invented.
+2. **DeepSpeed `requires_python` is `None` on PyPI** — omitted a Python-range
+   claim for DeepSpeed rather than assert an unsourced one (omit-if-no-source).
+   Stated only the verified version/date and the torch/CUDA coupling (via
+   `ds_report`), which is documented behavior.
+3. **DeepSpeed GitHub org is `deepspeedai/DeepSpeed`** (verified via the releases
+   API redirect target), used in the References URL rather than the older
+   `microsoft/DeepSpeed` path.
+4. **Triton "current release" = the SERVER** (2.70.0 / NGC 26.06), with the
+   matching `tritonclient` 2.70.0 noted separately, since the guide covers the
+   Inference Server, not just the client.
+5. **Single-framework examples** — per the CU4a exemption, each guide's code is in
+   its own framework only (Python/protobuf); the 7-language BAD/SAFE rule was not
+   applied.
+6. **Additive-only** — the original 5 sections + `# <Framework> CTO` H1 preserved
+   verbatim in every file; 8 new sections appended below (5→13 sections each).
+7. **Docs-page URLs cited by canonical path** — for docs.vllm.ai / docs.nvidia.com
+   / deepspeed.ai I cited the stable documentation landing paths (verified live at
+   edit time via the release/version checks above); the load-bearing version and
+   CWE facts each carry a directly-fetched dated source.
