@@ -179,6 +179,16 @@ by name in `agents/coordinator/cto-chief.md` and `agents/coordinator/ivv-chief.m
   parent plan is authoritative; the rich agents inform the "restate no rule"
   DRY principle only, which the thin wrapper satisfies by referencing the SKILL.md
   and copying nothing.
+- **Barrier-pattern executor run (2026-07-10).** Executed Steps 8–16 for this
+  slice under the CU5 barrier protocol: TDD test written first (RED = 21/21 fail,
+  wrappers absent), 3 thin wrappers created (GREEN = 21 pass / 0 fail / 0 skipped),
+  each `target_skill` verified to resolve to a real `skills/safety/<name>/SKILL.md`
+  (no dangling). Ran ONLY the scoped `tests/cu5-s1-safety-wrappers.test.js` — the
+  full `tests/*.test.js` suite was deliberately NOT run because
+  `readme-numbers.test.js` is pinned at 112 agents / 22 categories until s5 bumps
+  it; the full suite would fail mid-add by design. Files left UNSTAGED in the
+  working tree; the caller commits atomically with s5. ESLint on the test file
+  exited 0. Plan NOT moved (left in todo/) per barrier instructions.
 
 ## Execution Plan
 

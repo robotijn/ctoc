@@ -128,6 +128,15 @@ WRAP evidence: `security/cra-incident-clocks`, `security/incident-responder`,
   verifies its scoped content-contract test only.
 - **Thin wrapper, not rich agent.** Parent CU5 (Gate-1 approved) mandates the
   thin 3-field form; the rich compliance agents inform the DRY principle only.
+- **Barrier pattern honored (executor, 2026-07-10).** Verified ONLY the scoped
+  test `tests/cu5-s2-security-wrappers.test.js`; did NOT run the full suite and
+  did NOT `git add`/stage. All 4 files left untracked in the working tree for
+  the s5 caller to commit. Plan left in `todo/` (not moved).
+- **On-disk names matched spec exactly.** All three skill directories exist with
+  the literal names `cra-incident-clocks`, `incident-responder`,
+  `threat-modeler`; no rename fallback needed.
+- **RED→GREEN confirmed.** RED: all wrapper reads ENOENT before creation. GREEN:
+  18/18 subtests pass, fail 0, skipped 0. eslint on the test file exit 0.
 
 ## Execution Plan
 

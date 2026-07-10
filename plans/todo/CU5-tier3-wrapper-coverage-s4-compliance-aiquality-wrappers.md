@@ -154,6 +154,26 @@ WRAP evidence: `compliance/gdpr-compliance-checker` (WRAP; coexists with rich
 - **Thin wrapper, not rich agent.** Parent CU5 (Gate-1 approved) mandates the
   thin 3-field form.
 
+### s4 execution log (2026-07-10)
+
+- **TDD RED→GREEN.** Wrote `tests/cu5-s4-compliance-aiquality-wrappers.test.js`
+  FIRST against real on-disk files; RED = 19 tests / 0 pass / 19 fail (wrappers
+  absent). After creating the 3 thin wrappers: GREEN = 19 tests / 19 pass / 0 fail
+  / 0 skipped.
+- **Resolve proof.** All three `target_skill` paths resolve to a real SKILL.md:
+  `skills/compliance/gdpr-compliance-checker/SKILL.md`,
+  `skills/compliance/sbom-cra-checker/SKILL.md`,
+  `skills/ai-quality/llm-security-tester/SKILL.md` (all existsSync true; real dir
+  names matched the plan exactly).
+- **gdpr coexistence verified on disk.** Thin `agents/compliance/gdpr-compliance-checker.md`
+  (type: wrapper) and rich `agents/compliance/gdpr-agent.md` (tier:2 / model:opus,
+  NOT type: wrapper) both exist as DISTINCT files with different content. The
+  wrapper did not overwrite/duplicate the rich agent; `gdpr-agent.md` is UNTOUCHED
+  (empty git diff).
+- **eslint exit 0** on the new test file.
+- **Barrier pattern honored.** Scoped test only (full suite NOT run); nothing
+  staged — all 4 files left untracked in the working tree for s5 to commit.
+
 ## Execution Plan
 
 ### Step 8: TEST
