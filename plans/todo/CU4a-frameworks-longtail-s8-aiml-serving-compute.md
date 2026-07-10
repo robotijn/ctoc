@@ -263,3 +263,54 @@ ONE step, 3 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+**Web-verified facts (edit-time, 2026-07-10):**
+- Ray **2.56.0**, uploaded 2026-06-29 — https://pypi.org/pypi/ray/json (`info.version`).
+- Modal **1.5.1**, uploaded 2026-06-23 — https://pypi.org/pypi/modal/json.
+- Replicate (Python client) **1.0.7**, uploaded 2025-05-27 — https://pypi.org/pypi/replicate/json.
+- Cog **v0.21.0**, published 2026-06-16 — https://api.github.com/repos/replicate/cog/releases/latest.
+- **CVE-2023-48022 "ShadowRay"** — Jobs submission API RCE, **CWE-918** per NVD, vendor-DISPUTED
+  (Ray's documented position: not for use outside a strictly controlled network, so missing auth
+  is by-design). Verified https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2023-48022
+  (status Modified; desc + CWE-918 confirmed). Framed accurately in the guide — real
+  exploited-in-the-wild exposure of open clusters, disputed as a "vuln" only because Ray never
+  promised auth. NOT invented.
+- **CVE-2023-6019** — cpu_profile command injection, **CWE-78**, unauthenticated dashboard RCE,
+  fixed 2.8.1+ — NVD-confirmed.
+- **CVE-2023-6021 / CVE-2023-6020** — LFI (log API / `/static/`), CWE-22/CWE-29 / CWE-862,
+  fixed 2.8.1+ — NVD-confirmed.
+- **CWE-306** (Missing Authentication for Critical Function), **CWE-502** (Deserialization of
+  Untrusted Data), **CWE-798** (Use of Hard-coded Credentials), **CWE-918** (SSRF) — canonical
+  MITRE identifiers (cwe.mitre.org). CWE-798 confirmed queryable in NVD (1168 results); CWE-502
+  and CWE-306 already cited with the same MITRE URLs in sibling guides pytorch.md / ollama.md.
+  MITRE definition pages are JS-rendered so titles could not be scraped, but the ids are
+  authoritative and corroborated by the NVD weakness mappings above — cited via the canonical
+  cwe.mitre.org/data/definitions/<id>.html URLs.
+- **Replicate webhook signature** = **HMAC-SHA256** over the payload with a webhook signing
+  secret — confirmed on https://replicate.com/docs/topics/webhooks/verify-webhook (HMAC + sha256
+  + signature tokens present in page).
+
+**Decisions:**
+1. **Modal 1.x current API names used, with a documented rename table.** The pre-1.0 kwargs the
+   old guide still showed (`allow_concurrent_inputs=`, `container_idle_timeout=`, `keep_warm=`) are
+   deprecated/renamed in the 1.x client (`@modal.concurrent(max_inputs=)`, `scaledown_window=`,
+   `min_containers=`). Rather than silently overwrite, the existing 5 sections are left VERBATIM
+   (no-churn) and the added sections teach the current API plus an explicit "1.x API renames"
+   mapping so a reader of either era is corrected. Sourced to modal.com/docs.
+2. **CVE line for Modal/Replicate OMITTED (omit-if-no-source).** No product-specific CVE for Modal
+   or the Replicate client/Cog was found against an authoritative source at edit time, so none is
+   asserted (hard user rule). Their Security sections rest on CWE-798 (hard-coded credentials) and
+   webhook-signature verification, both grounded. Only Ray carries CVE ids (real, NVD-verified).
+3. **Version token phrasing tightened to a contiguous `Modal 1.5.1` / `replicate 1.0.7`** so the
+   content-contract test's version-token regex matches the exact web-verified release string
+   (fixed the last 2 RED assertions without loosening the test).
+4. **Additive-only, H1 + the original 5 sections preserved verbatim** on all three guides;
+   `# <Framework> CTO` H1 intact (skills.json indexing unaffected).
+
+**Verification (this slice only — barrier pattern, own test only):**
+- `tests/cu4a-aiml-serving-compute-guides.test.js`: RED = 24 tests / 7 pass / 17 fail → GREEN = 24 / 24 / 0.
+- `npx eslint tests/cu4a-aiml-serving-compute-guides.test.js` → exit 0.
+- Line counts before→after: ray 75→245, modal 81→232, replicate 85→213; test NEW 146.
+- Left UNSTAGED; full `tests/*.test.js` NOT run (barrier pattern); audit ledger untouched; plan not moved.

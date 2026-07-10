@@ -247,7 +247,59 @@ ONE step, 2 files + the test file.
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Web-verified facts (retrieved 2026-07-10, edit time), each carried inline in the guides:
+
+**gradio.md**
+- Current stable: **Gradio 6.20.0**, PyPI upload_time 2026-07-07, `requires_python >= 3.10`.
+  Source: https://pypi.org/project/gradio/ — NOTE: the plan text guessed "v5"; per the
+  hard no-fabrication rule I used the web-verified current major (6.x) instead of the plan's
+  stale guess. Release notes: https://github.com/gradio-app/gradio/releases
+- Path-traversal advisories (CWE-22), all real MITRE/NVD ids, not invented:
+  - CVE-2023-51449 — `/file` route traversal, versions prior to 4.11.0, published 2023-12-22.
+    https://nvd.nist.gov/vuln/detail/CVE-2023-51449
+  - CVE-2024-47164 — `is_in_or_equal` traversal-check bypass, published 2024-10-10.
+    https://nvd.nist.gov/vuln/detail/CVE-2024-47164
+  - CVE-2024-1728 — `UploadButton` local file inclusion, published 2024-04-10.
+    https://nvd.nist.gov/vuln/detail/CVE-2024-1728
+- `share=True` public-tunnel exposure mapped to CWE-668 (exposure to wrong sphere),
+  https://cwe.mitre.org/data/definitions/668.html ; path traversal CWE-22,
+  https://cwe.mitre.org/data/definitions/22.html . `allowed_paths`/`blocked_paths` is the
+  documented allowlist mitigation (gradio.app launch/sharing docs).
+
+**streamlit.md**
+- Current stable: **Streamlit 1.59.1**, PyPI upload_time 2026-07-08, `requires_python >= 3.10`.
+  Source: https://pypi.org/project/streamlit/ . Changelog:
+  https://docs.streamlit.io/develop/quick-reference/changelog
+- Security advisories, all real NVD/MITRE ids:
+  - CVE-2023-27494 — reflected XSS (CWE-79) in hosted apps, versions 0.63.0–0.80.0,
+    published 2023-03-16. https://nvd.nist.gov/vuln/detail/CVE-2023-27494
+  - CVE-2024-42474 — static-file path traversal (CWE-22) on Windows hosts, published
+    2024-08-12. https://nvd.nist.gov/vuln/detail/CVE-2024-42474
+- `unsafe_allow_html=True` → CWE-79 (https://cwe.mitre.org/data/definitions/79.html);
+  hardcoded secrets → CWE-798 (https://cwe.mitre.org/data/definitions/798.html);
+  file_uploader path handling → CWE-22. AppTest is the official headless test harness
+  (docs.streamlit.io app-testing). Added an inline CWE-502 note on the `joblib.load`
+  cache_resource example (only load your own trusted artifact) after a PostToolUse
+  security-guidance flag — factually correct and does not weaken the idiomatic example.
+
+**Choices / omissions**
+- Gradio major used = web-verified 6.x, NOT the plan's guessed "v5" (no-fabrication rule wins).
+- Added an "Error Handling Idioms" section to BOTH guides (was not in the original 5 and is a
+  required correction-surface section per the content contract) — real gr.Error / st.error +
+  st.stop idioms, not padding.
+- No claim was omitted for lack of a source; every version and CVE/CWE assertion resolved to an
+  official dated URL. No streamlit *core* CVE newer than 2024-42474 was cited as path-traversal
+  because the newer 2026 Streamlit CVEs (e.g. CVE-2026-33682 SSRF, CVE-2026-10804 weak hashing)
+  are different weakness classes; only the on-topic XSS/traversal ids were cited to avoid
+  mis-mapping a CVE to the wrong footgun.
+
+**Barrier pattern:** verified ONLY this slice's own test (16/16 GREEN); full suite NOT run;
+changes left UNSTAGED in the working tree for the caller to commit; plan NOT moved; audit ledger
+NOT touched.
