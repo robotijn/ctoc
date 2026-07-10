@@ -317,5 +317,304 @@
       "slice": "out-of-scope",
       "note": "Carries opus-4-7 but OUTSIDE the CU1 files: list; not edited (no-churn). Deferred-scope: needs a plan amendment to bump. Still carries opus-4-7 on disk 2026-07-08. This is the 7th of the 7 out-of-scope files; 14 in-scope + 7 out-of-scope = 21 total opus-4-7 files (vs the audit's ~18 estimate)."
     }
-  ]
+  ],
+  "cu4c_verdicts": {
+    "produced_by": "CU4c-nonmainstream-languages-s12-completeness-check",
+    "recorded_date": "2026-07-10",
+    "legend": {
+      "UPGRADED": "was thin (<=5 \"## \" sections at audit 2026-07-09); upgraded by CU4c s1-s11 to >5 sections with a dated >=2025 http source",
+      "SOLID-SKIPPED": "audited already-solid; not rewritten (none for CU4c — all 41 were thin)"
+    },
+    "scope_note": "The 41 non-mainstream language guides = all skills/languages/*.md at <=5 \"## \" sections at audit MINUS the 9 CU2 mainstream (python javascript typescript go java rust csharp c cpp). Union of s1-s11.",
+    "count": 41,
+    "verdicts": [
+      {
+        "path": "skills/languages/haskell.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s1",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/ocaml.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s1",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/fsharp.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s1",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/scala.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s1",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/clojure.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s2",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/scheme.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s2",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/erlang.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s2",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/elixir.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s2",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/bash.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s3",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/perl.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s3",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/tcl.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s3",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/lua.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s3",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/ruby.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s4",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/php.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s4",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/groovy.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s4",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/coffeescript.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s4",
+        "section_count": 13,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/zig.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s5",
+        "section_count": 13,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/nim.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s5",
+        "section_count": 13,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/crystal.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s5",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/d.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s5",
+        "section_count": 13,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/fortran.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s6",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/assembly.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s6",
+        "section_count": 11,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/cobol.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s6",
+        "section_count": 11,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/objectivec.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s6",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/abap.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s7",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/apex.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s7",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/vba.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s7",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/matlab.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s7",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/sql.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s8",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/graphql.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s8",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/r.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s8",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/solidity.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s9",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/verilog.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s9",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/vhdl.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s9",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/julia.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s10",
+        "section_count": 11,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/prolog.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s10",
+        "section_count": 11,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/terraform.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s10",
+        "section_count": 11,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/powershell.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s10",
+        "section_count": 11,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/kotlin.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s11",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/swift.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s11",
+        "section_count": 12,
+        "date": "2026-07-10"
+      },
+      {
+        "path": "skills/languages/dart.md",
+        "cu4c_verdict": "UPGRADED",
+        "slice": "CU4c-s11",
+        "section_count": 12,
+        "date": "2026-07-10"
+      }
+    ]
+  }
 }
