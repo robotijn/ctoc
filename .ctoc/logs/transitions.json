@@ -2448,5 +2448,75 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-10T12:29:05.642Z",
+    "plan": "CU4b-quality-configs-s3-jvm.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-10T12:29:05.668Z",
+    "plan": "CU4b-quality-configs-s2-php.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-10T12:29:05.694Z",
+    "plan": "CU4b-quality-configs-s1-csharp.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-10T12:29:05.718Z",
+    "plan": "CU4b-quality-configs-s4-go-rust.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-10T12:29:05.744Z",
+    "plan": "CU4b-quality-configs-s5-completeness.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]
