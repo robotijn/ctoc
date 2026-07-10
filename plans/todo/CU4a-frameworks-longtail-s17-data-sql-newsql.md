@@ -275,3 +275,67 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed Steps 8–16 (TDD) on 2026-07-10. Barrier pattern: verified ONLY the slice
+test, left everything UNSTAGED, did not touch the audit ledger (Step 15 ledger append
+is deferred to the caller per barrier-pattern instruction — recorded here instead).
+
+### Web-verified facts (source URL + retrieval date, all ≥ 2025-01-01)
+- **CockroachDB v26.2.3** current stable, tag committed **2026-06-24**
+  (v25.4.x is the current LTS line). Source: github.com/cockroachdb/cockroach releases
+  (GitHub tags API), retrieved 2026-07-10.
+- **@planetscale/database 1.20.1** current serverless HTTP driver, published
+  **2026-03-25**. Source: registry.npmjs.org/@planetscale/database, retrieved 2026-07-10.
+- **@neondatabase/serverless 1.1.0** current driver, published **2026-04-17**.
+  Source: registry.npmjs.org/@neondatabase/serverless, retrieved 2026-07-10.
+- **@supabase/supabase-js 2.110.2** current client, published **2026-07-09**.
+  Source: registry.npmjs.org/@supabase/supabase-js, retrieved 2026-07-10.
+
+### Verified identifiers / CWE / error codes (all real, sourced)
+- **CWE-89** "Improper Neutralization of Special Elements used in an SQL Command
+  ('SQL Injection')" (4.20) — cwe.mitre.org/data/definitions/89.html. Used in
+  cockroachdb, planetscale, neon, supabase.
+- **CWE-284** "Improper Access Control" (4.20) — cwe.mitre.org/data/definitions/284.html.
+  Used in supabase (RLS is the auth boundary).
+- **CWE-798** "Use of Hard-coded Credentials" (4.20) — cwe.mitre.org/data/definitions/798.html.
+  Used in supabase (service_role key leak).
+- **SQLSTATE 40001** = `serialization_failure` (CockroachDB retryable txn error) —
+  cockroachlabs.com/docs/stable/transaction-retry-error-reference (HTTP 200, 2026-07-10).
+- **AS OF SYSTEM TIME / follower reads** — cockroachlabs.com/docs/stable/as-of-system-time (200).
+- **Hash-sharded indexes** — cockroachlabs.com/docs/stable/hash-sharded-indexes (200).
+- **PlanetScale no-FK (Vitess)** — planetscale.com/docs/vitess/operating-without-foreign-key-constraints (200).
+- **PlanetScale deploy requests** — planetscale.com/docs/concepts/deploy-requests (200);
+  **branching** …/branching (200); **Query Insights** …/query-insights (200).
+- **Neon connection pooling (-pooler / PgBouncer txn mode)** — neon.com/docs/connect/connection-pooling
+  (canonical redirects neon.tech → neon.com, 200); **serverless driver**
+  neon.com/docs/serverless/serverless-driver (200); **branching**
+  neon.com/docs/introduction/branching (200); **autoscaling** …/autoscaling (200).
+- **Supabase RLS** — supabase.com/docs/guides/database/postgres/row-level-security (200);
+  **API keys (anon vs service_role)** …/guides/api/api-keys (200); **realtime authorization**
+  …/guides/realtime/authorization (200); **Supavisor / connecting** …/database/connecting-to-postgres (200);
+  **PostgREST joins** …/database/joins-and-nesting (200).
+
+### Omitted for lack of a dated authoritative source (per omit-if-unverifiable rule)
+- Neon "~500ms" specific cold-start figure was already in the pre-existing "Version
+  Gotchas" section (kept verbatim, no-churn); the NEW Serverless-Footguns section
+  states the cold-start penalty qualitatively ("a few hundred ms") rather than assert a
+  precise number I could not pin to a current dated Neon doc.
+- The Neon-specific RLS tooling page (neon.com/docs/guides/neon-rls-authorize) returned
+  404 at edit time; RLS is described generically as standard-Postgres RLS and cited to
+  the Supabase/Postgres RLS surface instead — no fabricated Neon-RLS URL was asserted.
+- No CVE was cited for any of the four platforms: no current, dated platform-specific
+  CVE was verifiable against NVD/MITRE at edit time, so per the hard rule none was
+  asserted (the guides cite CWE classes, which are stable weakness identifiers, not CVEs).
+
+### Design decisions
+- **Performance section added** to planetscale/neon/supabase (cockroachdb already had a
+  hot-ranges Performance section) to satisfy the required-section contract — real,
+  framework-specific perf footguns (Vitess scatter-gather, HTTP round-trip N+1, RLS
+  per-row auth.uid() re-eval), not padding.
+- **No-churn honored**: the original 5 template sections + H1 `# <Framework> CTO` header
+  are preserved verbatim in all 4 files; new sections appended below. Final section
+  counts: cockroachdb 12, planetscale 13, neon 13, supabase 14 (all > 5).
+- **Single-framework examples only** (7-language rule exempt per CU4a); each guide's
+  code is in its own framework and idiomatic to the current driver version.

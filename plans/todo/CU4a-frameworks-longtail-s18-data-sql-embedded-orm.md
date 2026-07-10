@@ -234,6 +234,49 @@ ONE step, 5 files + the test file.
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
 
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (Steps 8–16, TDD, barrier-pattern: only the slice test was run and
+verified; the full suite was NOT run; nothing staged; the audit ledger was NOT touched;
+the plan was NOT moved).
+
+### Web-verified facts (source URL + retrieval date 2026-07-10)
+- **SQLite 3.53.3**, dated **2026-06-26** — https://www.sqlite.org/releaselog/3_53_3.html
+- **SQLite STRICT tables** require **3.37.0** (2021-11-27) — https://www.sqlite.org/stricttables.html
+- **SQLite JSONB** since **3.45.0** (2024-01-15) — https://www.sqlite.org/json1.html
+- **TimescaleDB 2.28.2**, dated **2026-06-30** — https://github.com/timescale/timescaledb/releases (GitHub releases API `tag_name`/`published_at`)
+- **SQLAlchemy 2.0.51**, published **2026-06-15** — https://pypi.org/project/SQLAlchemy/ (PyPI JSON API `info.version` + `upload_time`)
+- **Alembic 1.18.5**, published **2026-06-25** — https://pypi.org/project/alembic/ (PyPI JSON API)
+- **drizzle-orm 0.45.2**, published **2026-03-27**; **drizzle-kit 0.31.10**, published **2026-03-17** — https://registry.npmjs.org/drizzle-orm , https://registry.npmjs.org/drizzle-kit (npm registry `dist-tags.latest` + `time`)
+- **CWE-89** "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')" — https://cwe.mitre.org/data/definitions/89.html (verified title "SQL Injection")
+
+### Choices made
+1. **Section headings chosen to satisfy the content contract without churn.** Each guide
+   keeps its original 5 sections verbatim; added sections use the plan-specified
+   correction surfaces (Footguns / Concurrency / Hypertable / ORM / Migration / Query;
+   Correctness or Safety; Security; Testing; Performance; Version-Specific; References).
+2. **No CVE cited — only CWE-89.** None of the five had a currently-relevant, dated
+   authoritative CVE tied to the footguns in scope; per the omit-if-unverifiable rule
+   only CWE-89 (a real MITRE identifier grounded in each framework's raw-SQL surface) is
+   asserted, each linking cwe.mitre.org/89.
+3. **SQLite JSONB date (3.45.0, 2024-01-15) retained** as historical context — pre-2025
+   but it is a stable release-history fact, not a version/security *currency* claim; the
+   currency claims (current release) all carry ≥ 2025-01-01 dated sources.
+4. **drizzle-orm 0.45.2 / drizzle-kit 0.31.10 verified but noted pre-1.0**; the guide
+   flags that minors can break and to pin exact versions.
+5. **Single-framework idiomatic examples only** (CU4a single-framework exemption applied;
+   no 7-language BAD/SAFE cross-coverage).
+6. **Audit ledger intentionally NOT updated** (barrier-pattern instruction overrides the
+   plan's Step 15 audit-append bullet); the caller/orchestrator owns ledger + commit.
+
+### Verification (barrier-pattern)
+- RED: 35 tests, 10 pass, 25 fail (before edits).
+- GREEN: `node --test tests/cu4a-data-sql-embedded-orm-guides.test.js` → 35 tests, 35 pass, 0 fail.
+- `npx eslint tests/cu4a-data-sql-embedded-orm-guides.test.js` → exit 0.
+- Full `tests/*.test.js` deliberately NOT run (barrier-pattern).
+- Line counts (before → after): sqlite 63→207, timescaledb 70→198, sqlalchemy 65→215, alembic 61→196, drizzle 65→209.
+- Nothing staged; working tree left for the caller to commit.
+
 
 ---
 

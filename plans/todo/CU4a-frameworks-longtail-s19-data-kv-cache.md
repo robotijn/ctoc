@@ -263,3 +263,59 @@ ONE step, 3 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed under the BARRIER PATTERN: implemented Steps 8–16, verified ONLY this slice's
+own test (`tests/cu4a-data-kv-cache-guides.test.js`, NOT the full suite), left everything
+UNSTAGED, did NOT touch the audit ledger (`.ctoc/audit/corpus-audit-2026-06-15.json`).
+Step 15's "append to audit ledger" sub-item is therefore intentionally deferred to the
+caller/ledger-owner per the barrier instruction (avoids a concurrent-write clobber with
+sibling slices editing the same JSON).
+
+### Web-verified facts (retrieved 2026-07-10) — every version/CVE/CWE cited on disk
+
+Redis:
+- Redis **8.8.0** current stable, published 2026-05-25; 8.6.x patch line (8.6.4, 2026-06-04).
+  Source: https://github.com/redis/redis/releases (GitHub releases API).
+- **Tri-license from Redis 8** (RSALv2 / SSPLv1 / AGPLv3); 7.2 and earlier remain BSD-3-Clause.
+  Source: https://github.com/redis/redis/blob/8.8.0/LICENSE.txt (LICENSE.txt head confirms).
+- **CVE-2024-31449** — authenticated Lua `bit`-library stack buffer overflow → potential RCE,
+  CVSS 7.0, fixed in 6.2.16 / 7.2.6 / 7.4.1 (CWE-94 code-injection class).
+  Source: https://nvd.nist.gov/vuln/detail/CVE-2024-31449 (NVD API description + CVSS confirmed).
+- **CWE-306** Missing Authentication for Critical Function; **CWE-1188** Initialization of a
+  Resource with an Insecure Default; **CWE-94** Improper Control of Generation of Code.
+  Sources: https://cwe.mitre.org/data/definitions/{306,1188,94}.html (titles confirmed live).
+
+Valkey:
+- Valkey **9.1.0** current stable, published 2026-05-19; 8.1.x maintained line (8.1.8, 2026-06-02).
+  Source: https://github.com/valkey-io/valkey/releases (GitHub releases API).
+  NOTE: plan File Spec anticipated "Valkey 8.x"; the web-verified current stable is 9.1.0,
+  so the guide (and the test regex) name 9.1.0/8.1.x — real over anticipated. Test regex
+  widened from `/Valkey 8\./` to `/Valkey (9|8)\./` to match the verified truth.
+- **BSD-3-Clause** (SPDX `BSD-3-Clause`); fork base is Redis 7.2; forked 2024 due to the Redis 8
+  relicense; Linux Foundation project.
+  Source: https://github.com/valkey-io/valkey/blob/9.1.0/COPYING (SPDX line + BSD text confirmed).
+
+Memcached:
+- Memcached **1.6.45** current stable, tag committed 2026-07-10.
+  Source: https://github.com/memcached/memcached/releases (tags/commit date via GitHub API).
+- **CVE-2018-1000115 / CWE-406** UDP amplification (Network Amplification); UDP off by default
+  since 1.5.6. Source: https://nvd.nist.gov/vuln/detail/CVE-2018-1000115 (NVD description names
+  CWE-406). CWE-406 title confirmed: https://cwe.mitre.org/data/definitions/406.html.
+- Default max item size 1 MB (1048576), default `-c 1024` connections, `-I` raises item size —
+  memcached.org wiki/protocol. Sources linked in the guide's References.
+
+### Claims OMITTED for lack of a dated authoritative source
+- None. Every version, CVE, CWE, and default value asserted on disk resolved to an official
+  source (github.com releases, nvd.nist.gov, cwe.mitre.org) retrieved 2026-07-10. Broad
+  operational tuning (growth factor, io-threads) is cited to the projects' own docs, not
+  invented numbers.
+
+### Test-shape decisions
+- Mirrored the sibling `tests/cu4a-data-warehouse-guides.test.js` structure exactly (zero
+  doubles, `fs.readFileSync` off the real guides). Added a per-file CWE-token + cwe.mitre.org
+  assertion because this family's shared spine is the unauthenticated-exposure RCE class
+  (CWE-306/1188) rather than SQL-injection (CWE-89). Per-framework identifier assertions
+  (redis: SCAN/maxmemory-policy/protected-mode/RDB/AOF/Lua; valkey: SCAN/ACL/eviction/TLS/BSD;
+  memcached: slab/LRU/cas/UDP/1MB) gate substance over padding.

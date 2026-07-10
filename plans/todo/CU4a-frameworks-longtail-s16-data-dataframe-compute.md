@@ -263,3 +263,65 @@ ONE step, 3 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 under the barrier pattern (own test verified only; left unstaged;
+audit ledger NOT touched — the s31 completeness/ledger append is deferred to the
+caller/ledger owner to avoid a concurrent-write conflict with sibling barrier slices).
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+
+**Polars**
+- Current stable **1.42.1**, published **2026-06-30**, `requires_python >= 3.10`.
+  Sources: https://pypi.org/pypi/polars/json (JSON API) and
+  https://github.com/pola-rs/polars/releases/tag/py-1.42.1.
+- Streaming API is `collect(engine="streaming")` on 1.x (older `streaming=True`
+  keyword deprecated); `apply`→`map_elements`, frame `map`→`map_batches`.
+  Source: pola.rs 1.x release notes / lazy + streaming user guides.
+- **No CVE**: OSV query for `polars` (PyPI) returned zero advisories on 2026-07-10.
+  Recorded the absence rather than inventing one. Security section anchors on the
+  real SQL-injection class **CWE-89** (https://cwe.mitre.org/data/definitions/89.html)
+  for `read_database` parameterization — the risk is in the SQL handed to the driver.
+
+**Dask**
+- Current stable **2026.7.0**, published **2026-07-06**, `requires_python >= 3.10`;
+  `distributed` 2026.7.0 alongside. Sources: https://pypi.org/pypi/dask/json,
+  https://pypi.org/pypi/distributed/json, https://github.com/dask/dask/releases/tag/2026.7.0.
+- **CVE-2026-23528** (GHSA-c336-7962-wfj2), published **2026-01-16**, **CWE-79**
+  (stored XSS) + CWE-250 in the Dask **dashboard** → RCE when run behind
+  jupyter-server-proxy in JupyterLab. **Fixed in `distributed` 2026.1.0**
+  (affected range: introduced 0, fixed 2026.1.0). CVSS v4 vector present.
+  Sources: https://github.com/dask/distributed/security/advisories/GHSA-c336-7962-wfj2,
+  https://nvd.nist.gov/vuln/detail/CVE-2026-23528, and OSV vuln record. Verified via
+  api.osv.dev/v1/vulns/GHSA-c336-7962-wfj2.
+- Historical **CVE-2021-42343** (CWE-668, workers on public interfaces, fixed
+  distributed 2021.10.0) referenced lightly for the localhost-binding footgun; its
+  date is < 2025 so it is NOT the section's dated anchor (the 2026 CVE is).
+
+**Vaex**
+- Current release **4.19.0** (meta-package uploaded **2026-02-03**; `vaex-core`
+  4.19.0 uploaded 2025-09-03). Release history (4.17.0 2023 → 4.18.0 2024 → 4.19.0)
+  verifies the "development slowed / maintenance" claim as accurate, not editorial.
+  Sources: https://pypi.org/pypi/vaex/json, https://pypi.org/pypi/vaex-core/json.
+- **No CVE**: OSV query for `vaex` and `vaex-core` (PyPI) returned zero advisories
+  on 2026-07-10. Recorded the absence. Security section anchors on the real
+  path-traversal class **CWE-22** (https://cwe.mitre.org/data/definitions/22.html)
+  for untrusted `vaex.open()` paths.
+
+### Choices
+1. **Added a dedicated `## Performance Traps` section to each guide.** The plan's
+   required correction-surface list (Test Plan case 3) includes a Performance
+   section; the content-contract test asserts `^##.*performance`. Rather than relax
+   the test, added substantive framework-specific performance content to each file.
+2. **Dask is the only file in this triad with a published CVE.** Polars and Vaex
+   have none on OSV/PyPI; per the omit-if-unverifiable rule I did NOT fabricate CVE
+   ids for them and instead cited real MITRE CWE classes (CWE-89 / CWE-22) grounded
+   in each framework's actual attack surface, satisfying the cwe.mitre.org authority
+   assertion honestly.
+3. **Additive-only.** Existing 5 template sections + H1 preserved verbatim on all
+   three files (git diff-stat: insertions only, zero deletions). skills.json
+   indexing unaffected.
+4. **Barrier discipline.** Verified ONLY tests/cu4a-data-dataframe-compute-guides.test.js
+   (24/24 GREEN); did NOT run the full suite; left all changes unstaged; did not
+   touch the audit ledger or any sibling-slice file.
