@@ -616,5 +616,127 @@
         "date": "2026-07-10"
       }
     ]
+  },
+  "cu5_wrapper_verdicts": {
+    "produced_by": "CU5-tier3-wrapper-coverage-s5-count-architecture-reconcile",
+    "recorded_date": "2026-07-10",
+    "legend": {
+      "WRAP": "skill got a NEW thin type:wrapper agent redirect under agents/<category>/ (frontmatter exactly {name,type,target_skill})",
+      "RICH-COVERED": "skill dispatch-reachable via a pre-existing rich agent; no thin wrapper added (would regress a shipped contract)",
+      "NO-WRAP": "skill documented as intentionally not wrapped and not otherwise covered (none for CU5 — the unwrapped set is empty)"
+    },
+    "scope_note": "The 13 previously-unwrapped SKILL.md bodies identified at CU5 decomposition. s1 added 3 safety (NEW category); s2 added 3 security (existing); s3 added 4 legal+realtime (TWO NEW categories); s4 added 3 compliance+ai-quality (existing). Net after honoring EC2-s3: +12 NEW thin wrapper files (the 13th, compliance/gdpr-compliance-checker, is covered by the pre-existing rich gdpr-agent, not re-wrapped), +3 categories.",
+    "count": 12,
+    "wrap_count": 12,
+    "no_wrap_count": 0,
+    "count_discrepancy_finding": "Baseline unwrapped set was 13. Implementation-time cross-check found the 13th (compliance/gdpr-compliance-checker) is already dispatch-reachable via the rich agents/compliance/gdpr-agent.md, whose deletion of the old thin wrapper is asserted by tests/gdpr-agent-definition.test.js (EC2-s3). CU5 therefore added 12 NEW thin wrappers, not 13, and re-introduced NO thin gdpr wrapper. 0 NO-WRAP; final NEW-WRAP count 12; total skills covered 99/99.",
+    "agent_count_reconciliation": "Live agent .md count 112 -> 124 (+12 NEW wrappers; gdpr thin wrapper stays deleted per EC2-s3); category count 22 -> 25 (+safety, +legal, +realtime). Pinned in tests/readme-numbers.test.js and stated in README.md, CLAUDE.md, docs/AGENT_ARCHITECTURE.md.",
+    "operations_registry_finding": "operations-registry.yaml schema does not support wrapper entries; no modification made.",
+    "gdpr_coexistence_finding": "compliance/gdpr-compliance-checker is NOT given a thin type:wrapper redirect: the rich agents/compliance/gdpr-agent.md already delegates to skills/compliance/gdpr-compliance-checker/SKILL.md by body path, and EC2-s3 (tests/gdpr-agent-definition.test.js) mandates that the old thin wrapper stay DELETED. Adding a thin wrapper would regress that shipped contract, so CU5 relies on the rich agent for coverage of this skill.",
+    "verdicts": [
+      {
+        "skill": "safety/fault-tree-builder",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/safety/fault-tree-builder.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "safety/fault-tree-builder",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "safety/fmeda-analyzer",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/safety/fmeda-analyzer.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "safety/fmeda-analyzer",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "safety/redundancy-pattern-picker",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/safety/redundancy-pattern-picker.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "safety/redundancy-pattern-picker",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "security/cra-incident-clocks",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/security/cra-incident-clocks.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "security/cra-incident-clocks",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "security/incident-responder",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/security/incident-responder.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "security/incident-responder",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "security/threat-modeler",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/security/threat-modeler.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "security/threat-modeler",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "legal/clm-obligations",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/legal/clm-obligations.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "legal/clm-obligations",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "legal/dsar-handler",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/legal/dsar-handler.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "legal/dsar-handler",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "realtime/hil-harness",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/realtime/hil-harness.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "realtime/hil-harness",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "realtime/wcet-budget",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/realtime/wcet-budget.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "realtime/wcet-budget",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "compliance/sbom-cra-checker",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/compliance/sbom-cra-checker.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "compliance/sbom-cra-checker",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "ai-quality/llm-security-tester",
+        "verdict": "WRAP",
+        "wrapper_path": "agents/ai-quality/llm-security-tester.md",
+        "wrapper_type": "wrapper",
+        "target_skill": "ai-quality/llm-security-tester",
+        "dispatch_evidence": "mentioned by name in agents/coordinator/cto-chief.md and/or agents/coordinator/ivv-chief.md"
+      },
+      {
+        "skill": "compliance/gdpr-compliance-checker",
+        "verdict": "RICH-COVERED",
+        "covered_by": "agents/compliance/gdpr-agent.md",
+        "no_thin_wrapper": true,
+        "dispatch_evidence": "rich gdpr-agent.md references skills/compliance/gdpr-compliance-checker/SKILL.md by body path; thin wrapper deleted per EC2-s3 (tests/gdpr-agent-definition.test.js)"
+      }
+    ]
   }
 }

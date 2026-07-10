@@ -144,6 +144,14 @@ name in the orchestrators (`agents/coordinator/cto-chief.md` and/or
 - **Scoped VERIFY, not full-suite.** The 112/22 pins are reconciled once in s5.
 - **Thin wrapper, not rich agent.** Parent CU5 (Gate-1 approved) mandates the
   thin 3-field form.
+- **Execution (s3, barrier pattern).** TDD: test written FIRST → RED (29 tests,
+  0 pass, 29 fail, ENOENT on missing wrappers = loud failure). Created 2 new dirs
+  `agents/legal/` + `agents/realtime/` and 4 thin wrappers → GREEN (29 pass, 0
+  fail, 0 skipped). ESLint on the test file exit 0. All 4 `target_skill` values
+  resolve to real `skills/<cat>/<name>/SKILL.md` (no dangling). Per barrier
+  pattern: verified ONLY the scoped test (NOT the full suite); left UNSTAGED in
+  the working tree for s5 to commit; the 112/22 agent-count + category pins are
+  reconciled once in s5. Plan NOT moved.
 
 ## Execution Plan
 
