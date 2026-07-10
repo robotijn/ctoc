@@ -137,23 +137,21 @@ describe('CU3 — 14-file completeness check (real files + reconciled verdicts, 
     }
   });
 
-  it('ai-ml scope boundary holds — no ai-ml file BEYOND the 6 named is CU3-attributed', () => {
-    // Enumerate the on-disk ai-ml guide set. Every ai-ml guide that is substantive
-    // (> 5 sections, i.e. upgraded off the 5-section stub floor) must be one of the
-    // 6 named CU3 files. A substantive ai-ml file NOT in the named set would mean
-    // an ai-ml upgrade leaked into CU3 that belongs to CU4a scope.
+  it('ai-ml scope: the 6 named CU3 ai-ml files are each substantive', () => {
+    // CU3's guarantee for ai-ml is that its 6 named files are upgraded off the
+    // 5-section stub floor. The prior exclusivity assertion ("no OTHER ai-ml file
+    // is substantive") was a point-in-time snapshot that CU4a intentionally
+    // invalidates — CU4a-frameworks-longtail upgrades the ai-ml long-tail. So we
+    // assert only what CU3 owns: its 6 files are substantive. The long-tail is
+    // covered by CU4a's own completeness gate (tests/cu4a-completeness.test.js).
     const aiMlDir = path.join(projectRoot, 'skills/frameworks/ai-ml');
     const namedAiMl = new Set(AI_ML.map((n) => `${n}.md`));
-    for (const f of fs.readdirSync(aiMlDir)) {
-      if (!f.endsWith('.md')) continue;
+    for (const f of namedAiMl) {
       const n = sectionCount(fs.readFileSync(path.join(aiMlDir, f), 'utf8'));
-      if (n > 5) {
-        assert.ok(
-          namedAiMl.has(f),
-          `ai-ml file ${f} is substantive (${n} sections) but is NOT one of the 6 named CU3 ai-ml files ` +
-          `— an ai-ml upgrade beyond CU3 scope (CU4a boundary breach)`
-        );
-      }
+      assert.ok(
+        n > 5,
+        `CU3-named ai-ml file ${f} must be substantive (> 5 sections) but has ${n}`
+      );
     }
     // And confirm the named set is exactly 6 (no drift in the canonical list).
     assert.equal(AI_ML.length, 6, 'the canonical CU3 ai-ml set must be exactly 6 files');
