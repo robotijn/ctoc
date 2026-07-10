@@ -251,3 +251,61 @@ ONE step, 2 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed Steps 8–16 (TDD, barrier pattern: only the slice test was verified; full
+suite NOT run; nothing staged). All facts web-verified at edit time (2026-07-10).
+
+### Web-verified versions (source + retrieval date)
+- **MLflow 3.14.0** — current stable, uploaded 2026-06-17, `requires_python >= 3.10`.
+  Source: https://pypi.org/pypi/mlflow/json (retrieved 2026-07-10).
+- **wandb 0.28.0** — current stable, uploaded 2026-06-23, `requires_python >= 3.10`.
+  Source: https://pypi.org/pypi/wandb/json (retrieved 2026-07-10).
+
+### Web-verified CVEs / CWEs (source + retrieval date)
+- **CWE-502 model-load pickle RCE (MLflow)** — the real, patched CVE family
+  **CVE-2024-37052 … CVE-2024-37060** (all CWE-502, published 2024-06-04), each a
+  crafted-artifact deserialization RCE for a specific flavor (scikit-learn, PyTorch =
+  CVE-2024-37059, Tensorflow, LangChain AgentExecutor, LightGBM, pmdarima, PyFunc,
+  Recipe). Verified via NVD REST API
+  `https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=mlflow` and
+  https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-37059 (retrieved 2026-07-10).
+- **CWE-306 tracking-server exposure (MLflow)** — grounded in the real path-traversal
+  advisory history (CVE-2023-6018, CVE-2024-1483, CVE-2024-3573 — CWE-22, verified via
+  the same NVD query) and the auth-bypass account-creation flaw CVE-2023-6014 (CWE-598).
+  CWE title verified: cwe.mitre.org/data/definitions/306.html = "Missing Authentication
+  for Critical Function". Docs: https://mlflow.org/docs/latest/auth/index.html (basic
+  auth OFF by default), https://github.com/mlflow/mlflow/security/advisories (retrieved
+  2026-07-10).
+- **CWE-798 API-key leak (wandb)** — cited as the **weakness class** for hardcoding
+  `WANDB_API_KEY` in source/CI, grounded in W&B's own env-var/secret docs. CWE title
+  verified: cwe.mitre.org/data/definitions/798.html = "Use of Hard-coded Credentials".
+  Docs: https://docs.wandb.ai/guides/track/environment-variables/ (retrieved 2026-07-10).
+
+### Decision: wandb NVD CVEs NOT attributed to the SDK (omit-if-unverifiable)
+The only NVD hits for "wandb" (CVE-2024-10649, CVE-2026-4993 CWE-798, etc.) are for the
+separate **`wandb/openui`** project, NOT the `wandb` Python SDK. Per the no-fabrication /
+omit-if-unverifiable rule, I did **not** claim a CWE-798 CVE against the SDK. CWE-798 is
+taught as the correct weakness class for the API-key footgun (verified MITRE title),
+cited to W&B's own docs — no invented SDK CVE number.
+
+### Decision: doc URLs pre-flighted for HTTP 200 before citing
+Several plausible wandb doc paths returned 404 (e.g. `.../support/run_wandb_offline/`);
+those were dropped in favor of 200-resolving canonical pages actually used in the guides
+(`/guides/track/log/`, `/guides/artifacts/`, `/ref/python/init/`,
+`/guides/track/environment-variables/`). NVD detail pages 403 to curl (bot filter) but
+the CVEs are confirmed via the NVD REST API and MITRE cvename endpoint (both 200), which
+are what the guides cite.
+
+### Decision: MLflow 3 API-drift called out (not just versions)
+Because MLflow 3 is current, the guide notes the real deprecations: `log_model`
+positional artifact-path → keyword `name=`, and registry **stages**
+(`transition_model_version_stage`) → **aliases**. Source:
+https://mlflow.org/docs/latest/model-registry.html (retrieved 2026-07-10).
+
+### No-churn / no-stub
+Existing 5 template sections in each guide preserved verbatim; new sections added below.
+H1 `# MLflow CTO` / `# Weights & Biases CTO` and the leading `>` blurb intact
+(skills.json indexing unaffected). No stubs, no TODOs — every added bullet names a
+concrete identifier (API/CWE/version) with a dated http source.

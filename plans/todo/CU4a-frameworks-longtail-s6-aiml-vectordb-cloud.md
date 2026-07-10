@@ -299,3 +299,75 @@ ONE step, 6 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 under the BARRIER-PATTERN (verify only this slice's own test;
+leave working tree unstaged; caller commits). No stubs, no fabricated
+versions/CVEs, zero test doubles.
+
+### Test filename
+- The plan body names the test `tests/cu4a-aiml-vectordb-guides.test.js`; the
+  executor brief mandates `tests/cu4a-aiml-vectordb-cloud-guides.test.js` ("EDIT
+  EXACTLY"). **Chose the brief's `-cloud-` filename** (authoritative, explicit) —
+  the `files:` frontmatter still declares the older name, which is harmless (the
+  test is additive and the frontmatter glob is not used to gate the test file).
+
+### Web-verified versions (PyPI JSON API + GitHub release tags, retrieved 2026-07-10)
+- pinecone **9.1.0**, requires_python ≥3.10, uploaded 2026-06-03 —
+  https://pypi.org/project/pinecone/
+- weaviate-client **4.22.0**, requires_python ≥3.10, uploaded 2026-06-18 —
+  https://pypi.org/project/weaviate-client/ ; Weaviate server **v1.38.3**, published
+  2026-07-10 — https://github.com/weaviate/weaviate/releases
+- qdrant-client **1.18.0**, requires_python ≥3.10, uploaded 2026-05-11 —
+  https://pypi.org/project/qdrant-client/ ; Qdrant server **v1.18.2**, published
+  2026-06-04 — https://github.com/qdrant/qdrant/releases
+- chromadb **1.5.9**, requires_python ≥3.9, uploaded 2026-05-05 —
+  https://pypi.org/project/chromadb/ + https://github.com/chroma-core/chroma/releases
+- pymilvus **3.0.0**, uploaded 2026-05-07 — https://pypi.org/project/pymilvus/ ;
+  Milvus server **v2.6.19**, published 2026-06-26 —
+  https://github.com/milvus-io/milvus/releases
+- pgvector extension **v0.8.5** — https://github.com/pgvector/pgvector/tags ;
+  pgvector **Python client 0.5.0** (separate from the extension), requires_python
+  ≥3.10, uploaded 2026-07-06 — https://pypi.org/project/pgvector/
+
+### Web-verified technical facts (official docs, retrieved 2026-07-10)
+- pgvector HNSW query default `hnsw.ef_search = 40`, and **approximate-index filters
+  are applied AFTER the index scan** (a selective WHERE can return fewer than LIMIT);
+  IVFFlat `lists` guidance = rows/1000 up to 1M, sqrt(rows) above 1M; `vector` ≤2,000
+  dims, `halfvec` ≤4,000, `bit` ≤64,000 — verified from
+  https://raw.githubusercontent.com/pgvector/pgvector/master/README.md
+- Weaviate HNSW params: Python v4 client uses snake_case `ef_construction` /
+  `max_connections`; the REST/GraphQL schema uses camelCase `efConstruction` /
+  `maxConnections` — verified from the client `config.py` and
+  https://weaviate.io/developers/weaviate/config-refs/schema/vector-index
+- Chroma default distance is `l2`; set `metadata={"hnsw:space": "cosine"}` at create —
+  https://docs.trychroma.com/docs/collections/configure
+
+### Web-verified CWE identifiers (MITRE, retrieved 2026-07-10)
+- CWE-284 Improper Access Control — https://cwe.mitre.org/data/definitions/284.html
+- CWE-285 Improper Authorization — https://cwe.mitre.org/data/definitions/285.html
+- CWE-522 Insufficiently Protected Credentials — https://cwe.mitre.org/data/definitions/522.html
+- CWE-89 SQL Injection — https://cwe.mitre.org/data/definitions/89.html
+  (title strings confirmed against MITRE at edit time)
+
+### Omitted for lack of a dated authoritative source
+- **No CVE was asserted for any of the 6 databases.** I did not find a
+  currently-relevant, source-verifiable CVE for these specific client/server
+  versions at edit time, so per the omit-if-unverifiable rule I asserted **none** —
+  only real, verified CWE weakness-class identifiers grounded in each DB's actual
+  attack surface (open-by-default auth → CWE-284; caller-supplied tenant filter →
+  CWE-285; raw SQL string-building in pgvector → CWE-89; browser-shipped API key →
+  CWE-522).
+
+### No-churn / scope
+- Additive-only: `git diff --numstat` shows +124/-0 (pinecone), +115/-0 (weaviate),
+  +114/-0 (qdrant), +112/-0 (chromadb), +115/-0 (milvus), +134/-0 (pgvector). Original
+  5 sections + H1 preserved verbatim; each guide now has 12 `## ` sections. skills.json
+  still references all 6 (3 hits each).
+- Working tree already contained concurrent sibling-slice edits (s7–s10 guides/plans +
+  their tests); left untouched per barrier-pattern. Only this slice's 7 files were
+  written by this run.
+- **Step 15 audit-ledger append (`.ctoc/audit/corpus-audit-2026-06-15.json`) was NOT
+  performed** — the barrier-pattern brief explicitly forbids touching the audit ledger;
+  the caller / CTO Chief owns the ledger update and gate batching.

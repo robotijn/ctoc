@@ -263,3 +263,52 @@ ONE step, 3 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Barrier-pattern execution (verified own test only; left unstaged; plan not moved;
+audit ledger untouched — the caller/CTO Chief owns those). All facts web-verified
+at edit time 2026-07-10.
+
+### Web-verified facts + source URLs (retrieved 2026-07-10)
+- **huggingface_hub 1.23.0**, uploaded 2026-07-09, requires_python >= 3.10.0 —
+  PyPI JSON API `https://pypi.org/pypi/huggingface_hub/json`
+  (https://pypi.org/project/huggingface-hub/).
+- **datasets 5.0.0**, uploaded 2026-06-05, requires_python >= 3.10.0 —
+  `https://pypi.org/pypi/datasets/json` (https://pypi.org/project/datasets/).
+- **diffusers 0.39.0**, uploaded 2026-07-03, requires_python >= 3.10.0 —
+  `https://pypi.org/pypi/diffusers/json` (https://pypi.org/project/diffusers/).
+- **safetensors 0.8.0** (current) — `https://pypi.org/pypi/safetensors/json`.
+- **CWE-94** "Improper Control of Generation of Code ('Code Injection')" —
+  https://cwe.mitre.org/data/definitions/94.html (title verified).
+- **CWE-502** "Deserialization of Untrusted Data" —
+  https://cwe.mitre.org/data/definitions/502.html (title verified).
+- **CWE-798** "Use of Hard-coded Credentials" —
+  https://cwe.mitre.org/data/definitions/798.html (title verified).
+
+### Choices
+1. **Version tokens named in prose, not just the References URL** so staleness is
+   visible at the next trigger load (mirrors pytorch.md/transformers.md pattern).
+2. **CWE mapping per framework's real attack surface**: huggingface-hub carries all
+   three (token leak CWE-798, trust_remote_code CWE-94, pickle CWE-502) because it
+   is the download/auth layer; datasets emphasizes CWE-94 (loading-script code
+   execution) — its primary attack surface; diffusers emphasizes CWE-502 (pickle
+   `.bin`/`.ckpt`) + CWE-94 (custom_pipeline/trust_remote_code). No CWE asserted
+   without a verified MITRE title.
+3. **datasets 4.0 script-execution removal** stated as the behavior gate for
+   `trust_remote_code` — sourced to huggingface.co/docs/datasets; the exact deprec
+   release is documented there, so the claim carries a dated doc source rather than
+   an invented CVE.
+4. **SDXL fp16 VAE black-image gotcha** included as a version-independent, widely
+   documented diffusers footgun (huggingface.co/docs/diffusers SDXL guide) — no
+   version/CVE number attached, only the documented behavior + `upcast_vae()` fix.
+5. **No omitted claims** — every asserted version/CWE resolved to an official
+   source at edit time.
+
+### Verification tallies (own test only — barrier pattern)
+- RED: 21 tests, 6 pass, 15 fail (pre-implement).
+- GREEN: 21 tests, 21 pass, 0 fail.
+- eslint tests/cu4a-aiml-hf-data-guides.test.js → exit 0.
+- Full `tests/*.test.js` deliberately NOT run (barrier pattern).
+- Line counts before→after: huggingface-hub 72→197, datasets 77→201,
+  diffusers 74→213. All > 120 and > 5 H2 sections.
