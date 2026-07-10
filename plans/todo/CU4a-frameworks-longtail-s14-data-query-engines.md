@@ -263,3 +263,61 @@ ONE step, 3 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed Steps 8–16 under the BARRIER-PATTERN contract: verified ONLY this slice's
+own test (not the full suite), left all edits UNSTAGED for the caller to commit, did
+NOT move the plan across any gate, and did NOT touch the audit ledger
+(`.ctoc/audit/corpus-audit-2026-06-15.json`) — the caller/completeness pass (s31)
+records verdicts. TDD RED→GREEN confirmed (27 tests: RED 7 pass / 20 fail → GREEN
+27 pass / 0 fail).
+
+**Web-verified facts (all retrieved 2026-07-10; every version/CVE/CWE claim carries
+an inline dated http source in the guide; nothing fabricated):**
+
+- **Trino current release = 482** (published 2026-06-25).
+  Source: https://github.com/trinodb/trino/releases (GitHub Releases API,
+  `tag_name:"482"`). Recorded as "Trino 482 … 2026-06-25".
+- **Presto (PrestoDB) current release = 0.298.1** (published 2026-06-17).
+  Source: https://github.com/prestodb/presto/releases (`tag_name:"0.298.1"`).
+- **QuestDB current release = 9.4.3** (published 2026-06-15).
+  Source: https://github.com/questdb/questdb/releases (`tag_name:"9.4.3"`).
+- **CVE-2026-34214** — Trino Iceberg REST catalog static/vended credential exposure
+  to write-privileged users; affects 439–479, **fixed in 480**; NVD primary
+  weakness **CWE-312** (cleartext storage of sensitive info), published 2026-03-31.
+  Source: https://nvd.nist.gov/vuln/detail/CVE-2026-34214 (verified via
+  services.nvd.nist.gov REST API, description + weaknesses).
+- **CVE-2026-0824** — QuestDB Web Console stored XSS; affects Web Console ≤ 1.11.9,
+  patched 1.1.10-series; **CWE-79**; published 2026-01-10.
+  Source: https://nvd.nist.gov/vuln/detail/CVE-2026-0824.
+- **CWE-89** (SQL injection) cited in all three guides for parameterized-query
+  guidance; page confirmed HTTP 200.
+  Source: https://cwe.mitre.org/data/definitions/89.html. CWE-312 (312.html) and
+  CWE-79 (79.html) likewise confirmed HTTP 200.
+
+**Omit-if-unverifiable decisions:**
+- No fabricated CVEs were added. Only the two real, NVD-confirmed advisories above
+  are cited (one per relevant engine). Presto has no engine-specific CVE cited
+  because the NVD keyword search returned none attributable to the PrestoDB query
+  engine within the dated window — so none was asserted (omit-if-no-source honored);
+  its Security section rests on the real CWE-89 parameterization guidance instead.
+- QuestDB's ILP/PGWire "unauthenticated by default in open-source builds" claim is
+  framed as configuration guidance (bind to localhost / VPN / TLS at proxy) rather
+  than a numbered advisory, since it is a deployment default, not a CVE.
+
+**No-churn:** the original 5 template sections of each guide are preserved verbatim;
+all new `## ` sections are strictly ADDED below them. H1 `# <Framework> CTO` headers
+intact (skills.json trigger indexing unaffected). Single-framework idiomatic
+examples only (7-language cross-coverage rule EXEMPT per CU4a single-framework
+exemption).
+
+**Verify tallies (this slice's own test only — full `tests/*.test.js` intentionally
+NOT run per barrier pattern):**
+- RED: `node --test --test-reporter=tap tests/cu4a-data-query-engines-guides.test.js`
+  → `# tests 27 / # pass 7 / # fail 20`, exit 1.
+- GREEN: same command → `# tests 27 / # pass 27 / # fail 0 / # skipped 0`, exit 0.
+- `npx eslint tests/cu4a-data-query-engines-guides.test.js` → exit 0.
+- Line counts (before → after): trino 64 → 214; presto 66 → 197; questdb 60 → 214.
+  Sections: trino 5 → 13; presto 5 → 14; questdb 5 → 14. New test file: 155 lines.
+- Left UNSTAGED; caller commits. Plan NOT moved. Audit ledger NOT touched.

@@ -259,7 +259,59 @@ ONE step, 3 files + the test file.
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Web-verified facts (all retrieved 2026-07-10; sources inline in each guide's References):
+
+- **snowflake-connector-python 4.6.0**, uploaded 2026-05-28, `requires_python >=3.10`
+  — https://pypi.org/pypi/snowflake-connector-python/json
+- **duckdb (Python) 1.5.4**, uploaded 2026-06-17, `requires_python >=3.10`; engine
+  1.5.0 codename "Variegata" (2026-03-09) — https://pypi.org/pypi/duckdb/json +
+  https://github.com/duckdb/duckdb/releases
+- **clickhouse-connect 1.4.2**, uploaded 2026-07-06, `requires_python >=3.10,<3.15`
+  — https://pypi.org/pypi/clickhouse-connect/json
+- **ClickHouse server**: current LTS line `v25.8.x-lts` (latest tag `v25.8.28.1-lts`,
+  2026-07-05); current fast stable line `v26.5/26.6-stable`
+  — https://github.com/ClickHouse/ClickHouse/releases
+- **CWE-89** = "Improper Neutralization of Special Elements used in an SQL Command
+  ('SQL Injection')" — https://cwe.mitre.org/data/definitions/89.html. Applied to all
+  three (Snowflake bind variables / `IDENTIFIER()`, ClickHouse `{name:Type}` params,
+  DuckDB `?`/`$name` params). Real MITRE identifier, grounded in each engine's driver
+  attack surface — not invented.
+
+Decisions:
+
+1. **CVEs omitted (omit-if-no-source rule).** No current, framework-specific CVE for
+   the snowflake-connector-python / clickhouse-connect / duckdb driver lines was
+   verifiable against NVD/MITRE at edit time with a dated authoritative page, so **no
+   CVE id is asserted** in any of the three guides. Only the always-applicable
+   **CWE-89** class is cited (real, verifiable). This avoids fabricated CVE ids per the
+   hard user rule.
+2. **ClickHouse version token:** cited both the LTS server line (`v25.8.x-lts`) and the
+   Python driver (`clickhouse-connect 1.4.2`) since the driver and server version
+   independently; recommended pinning to LTS for production.
+3. **DuckDB "current stable" = 1.5.4** (latest bugfix on the 1.5 "Variegata" line);
+   noted format-pinning caveat since the on-disk format tracks the engine version.
+4. **No-churn honored:** the original 5 template sections in each guide are preserved
+   verbatim; all new sections were appended below "What NOT to Do". H1 `# <Framework>
+   CTO` headers and any frontmatter left intact (skills.json indexing unaffected —
+   verified by test + grep).
+5. **Single-framework examples only:** Snowflake examples in SQL + Python connector,
+   ClickHouse in SQL + clickhouse-connect Python, DuckDB in Python/SQL — no
+   cross-language BAD/SAFE matrix (CU4a single-framework exemption).
+6. **Step 15 audit ledger NOT touched** (barrier pattern): the executor left
+   `.ctoc/audit/corpus-audit-2026-06-15.json` untouched; the caller/aggregator records
+   the per-file UPGRADED verdicts to avoid concurrent-write clobber across parallel
+   slices.
+
+Verification tallies (slice-scoped only; full suite intentionally NOT run per barrier):
+- RED (before implement): 21 tests, 6 pass, 15 fail.
+- GREEN (after implement): 21 tests, 21 pass, 0 fail, 0 skipped.
+- `eslint tests/cu4a-data-warehouse-guides.test.js` exit 0.
+- Line counts (before → after, `wc -l`): snowflake 59 → 205; clickhouse 65 → 207; duckdb 62 → 199.
+- Section counts (`## `): each guide 5 → 12 (> 5 floor). H1 headers intact.
