@@ -304,3 +304,42 @@ fabricated; no cross-language BAD/SAFE examples added; tests green.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (BARRIER-PATTERN: slice test only, left unstaged for caller to commit).
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+| Fact asserted | Value | Source URL |
+|---|---|---|
+| Current Solidity stable | v0.8.36 (published 2026-07-09) | https://github.com/ethereum/solidity/releases |
+| Reentrancy | SWC-107 → CWE-841 (Improper Enforcement of Behavioral Workflow) | https://swcregistry.io/docs/SWC-107 · https://cwe.mitre.org/data/definitions/841.html |
+| Integer over/underflow | SWC-101 → CWE-682 (Incorrect Calculation) | https://swcregistry.io/docs/SWC-101 |
+| tx.origin auth | SWC-115 → CWE-477 (Use of Obsolete Function) | https://swcregistry.io/docs/SWC-115 |
+| Unchecked call return | SWC-104 → CWE-252 (Unchecked Return Value) | https://swcregistry.io/docs/SWC-104 |
+| Verilog standard | IEEE 1364 (last standalone 1364-2005) | https://en.wikipedia.org/wiki/Verilog |
+| SystemVerilog standard | IEEE 1800 (current 1800-2023) | https://en.wikipedia.org/wiki/SystemVerilog |
+| VHDL standard | IEEE 1076 (current 1076-2019; VHDL-2008 = 1076-2008) | https://en.wikipedia.org/wiki/VHDL |
+| HDL race hazard class | CWE-1298 Hardware Logic Contains Race Conditions | https://cwe.mitre.org/data/definitions/1298.html |
+| Incomplete-FSM / latch class | CWE-1245 Improper Finite State Machines in Hardware Logic | https://cwe.mitre.org/data/definitions/1245.html |
+| Reset hazard class | CWE-1271 Uninitialized Value on Reset | https://cwe.mitre.org/data/definitions/1271.html |
+
+### Decisions
+- **HDL CWE selection.** The plan named "race/latch hazard classes" without fixed CWE ids
+  (HDLs have no SWC-style registry). I mapped them to the REAL MITRE hardware-CWE classes
+  verified at edit time — CWE-1298 (race conditions), CWE-1245 (improper FSMs / latch),
+  CWE-1271 (uninitialized reset) — rather than the software CWE-841 family. No fabricated ids.
+- **SWC→CWE cross-links added** (SWC-101→CWE-682, SWC-115→CWE-477, SWC-104→CWE-252) beyond
+  the plan's explicit SWC-107→CWE-841, because swcregistry.io publishes each mapping; all
+  confirmed live 2026-07-10.
+- **IEEE standard sourcing.** IEEE's own standards.ieee.org pages block scraping; used the
+  Wikipedia standard-summary pages (which cite the IEEE designations) as the dated public
+  source for the standard NUMBERS (1364/1800-2023/1076-2019). Standard numbers are stable
+  facts; no version was invented.
+- **Solidity endoflife.date has no solidity track** — used the authoritative github.com/
+  ethereum/solidity releases feed for the current version instead.
+- **Omitted for lack of a dated authoritative source:** none — every version/SWC/CWE/standard
+  claim carries a verified URL. No niche claim was dropped.
+- **Barrier-pattern compliance:** verified ONLY tests/cu4c-contract-hdl-guides.test.js (21/21
+  green); did NOT run the full tests/*.test.js; did NOT git add/stage; plan left in todo/.
+  Existing 5 sections of each guide preserved verbatim; new sections additive below them.

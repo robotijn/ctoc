@@ -276,50 +276,105 @@ no cross-language BAD/SAFE examples added; tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 28 tests, 4 pass, 24 fail
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none)
+- [x] Check prerequisites — web-verified all versions/CWE/ABI sources (2026-07-10)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (none)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (4 guides extended additively)
+- [x] Add error handling (Error Handling Idioms section per guide)
+- [x] Wire up integration points (H1 headers preserved for skills.json)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (dense, one-footgun-per-bullet)
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal — test uses path.join(__dirname, '..'))
+- [x] Sanitize outputs
+- [x] No secrets in code (public official-domain source URLs only)
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (eslint exit 0 on the slice test)
+- [x] Run slice test (TDD Green) — 28 tests, 28 pass, 0 fail [full suite NOT run per barrier pattern]
+- [x] Check coverage (content-grounding substitutes per CU2 convention)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (References section per guide)
+- [x] Decisions Taken Under Ambiguity appended
+- [x] Update CHANGELOG if needed (n/a)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+**Retrieval date for all web-verified facts: 2026-07-10.** Barrier-pattern executed:
+only the five enumerated files edited; verified ONLY this slice's test (not the full
+suite); left UNSTAGED for the caller to commit. Read-fresh honored (all four guides +
+c.md depth target + sibling test read off disk at edit time).
+
+### Web-verified facts + sources (all HTTP 200 at 2026-07-10)
+- **CWE pages** (all live-checked, HTTP 200): CWE-121 stack overflow, CWE-125 OOB read,
+  CWE-787 OOB write, CWE-134 format string, CWE-89 SQL injection, CWE-502 unsafe
+  deserialization — https://cwe.mitre.org/data/definitions/{121,125,787,134,89,502}.html
+- **Fortran:** `-fcheck=bounds`/`-fcheck=all` confirmed on gfortran Code-Gen-Options
+  page; Fortran 2018 (ISO/IEC 1539-1:2018) + Fortran 2023 (ISO/IEC 1539-1:2023) confirmed
+  on the GFortranStandards wiki. Sources: fortran-lang.org,
+  gcc.gnu.org/onlinedocs/gfortran/Code-Gen-Options.html, gcc.gnu.org/wiki/GFortranStandards.
+- **Assembly:** System V x86-64 psABI 16-byte stack alignment + red zone verified from
+  the psABI raw source (gitlab.com/x86-psABIs/x86-64-ABI, "16-byte" phrasing present);
+  ARM64 AAPCS64 from github.com/ARM-software/abi-aa (200); instruction encodings anchored
+  to felixcloutier.com/x86 (200). Windows x64 (no red zone, shadow space) named as the
+  contrasting ABI.
+- **COBOL:** GnuCOBOL 3.2 confirmed as the current release line via SourceForge
+  best_release feed (`gnucobol-3.2`); COBOL standard ISO/IEC 1989:2023 (successor to
+  1989:2014) via iso.org/standard/74527.html (200). Sources: gnucobol.sourceforge.io,
+  sourceforge.net/projects/gnucobol, iso.org.
+- **Objective-C:** ARC ownership rules anchored to clang AutomaticReferenceCounting
+  (200); NSSecureCoding / `requiringSecureCoding` anchored to
+  developer.apple.com/documentation/foundation/nssecurecoding (200); runtime docs +
+  XCTest from developer.apple.com (200).
+
+### Choices made (no stubs, additive-only)
+1. **Fortran gained a `## Performance Traps` section** (not enumerated in the plan's
+   fortran file-spec, which omitted Performance). The shared content-contract test
+   mandates a Performance section for ALL four guides (the plan's Test Plan lists
+   Performance in REQUIRED_SECTIONS). Rather than weaken the test contract, I added a
+   real, non-padding Performance section (column-major loop order, array temporaries,
+   pointer-aliasing vectorization, `-O2/-march=native`) — legitimate Fortran depth.
+   This is the correct resolution of the plan's internal tension between the fortran
+   file-spec and the shared test contract.
+2. **Assembly's concurrency-equivalent section** is `## Memory / Register / ABI Footguns`
+   (per the plan's explicit framing) — assembly has no single concurrency model; the
+   honest depth surface is calling-convention/ABI/stack-alignment. Every ABI claim is
+   scoped to a named ISA (System V AMD64, Windows x64, ARM64 AAPCS64).
+3. **No fabricated CVEs.** No specific CVE numbers were invented for any guide — only
+   CWE *class* identifiers (verified live against MITRE). Per the omit-if-unverifiable
+   rule, no niche version claim without a dated authoritative source was included.
+4. **Single-language idiomatic examples only** — no cross-language 7-language BAD/SAFE
+   matrix (CU4c single-language carve-out); each fence is in the guide's own language.
+
+### Verification tallies
+- Slice test: RED 28 tests / 4 pass / 24 fail → GREEN 28 tests / 28 pass / 0 fail.
+- eslint on tests/cu4c-legacy-native-guides.test.js: exit 0.
+- Line counts (before → after): fortran 62→155, assembly 61→169, cobol 66→147,
+  objectivec 59→159; new test 146 lines.
+- Full suite NOT run (barrier pattern); files left UNSTAGED; plan NOT moved.

@@ -282,50 +282,97 @@ claim sourced with a date ≥ 2025-01-01; no cross-language BAD/SAFE examples ad
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run slice test (TDD Green) — barrier pattern: slice test only, NOT full suite
+- [x] Content-grounding substitutes for line/branch coverage (CU2 convention)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (guide content is the documentation)
+- [x] Decisions/sources recorded in "Decisions Taken Under Ambiguity"
+- [x] Update CHANGELOG if needed (n/a — content slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity (CU4c-s7, 2026-07-10)
+
+**Web-verified facts + sources (retrieved 2026-07-10 unless noted):**
+- CWE-89 "Improper Neutralization of Special Elements used in an SQL Command ('SQL
+  Injection')", CWE-78 "OS Command Injection", CWE-94 "Improper Control of Generation of
+  Code ('Code Injection')" — exact titles confirmed from MITRE CWE list **v4.20**:
+  https://cwe.mitre.org/data/definitions/{89,78,94}.html
+- MATLAB current release **R2026a** (prior **R2025b**) — confirmed from
+  https://www.mathworks.com/help/matlab/release-notes.html (release-notes page enumerates
+  up to R2026a). Twice-a-year `Rxxxxa`/`Rxxxxb` cadence stated, no fabricated release date.
+- VBA7 / `PtrSafe` / `LongPtr` / `#If VBA7` — confirmed from Microsoft Learn "64-bit Visual
+  Basic for Applications overview" (page title verified via fetch):
+  https://learn.microsoft.com/en-us/office/vba/language/concepts/getting-started/64-bit-visual-basic-for-applications-overview
+- Office macro blocking (Mark of the Web) — confirmed from Microsoft Learn "Macros from the
+  internet are blocked by default in Office" (page title verified via fetch):
+  https://learn.microsoft.com/en-us/deployoffice/security/internet-macros-blocked
+- SAP ABAP keyword documentation (LUW, `COMMIT WORK`, `CL_ABAP_DYN_PRG`, ABAP Unit) reachable
+  (HTTP 200): https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm ;
+  ABAP Cloud released-API model: https://help.sap.com/docs/abap-cloud
+- Salesforce Apex Developer Guide governor limits + testing pages reachable
+  (developer.salesforce.com); three-releases/year (Spring/Summer/Winter) cadence.
+
+**Decisions / omissions under the no-fabrication rule:**
+1. **Salesforce governor-limit numbers (100 SOQL / 150 DML) and 75% coverage** — the live
+   developer.salesforce.com pages are JS-rendered (static HTML is an app shell), so the exact
+   current figures could NOT be re-scraped in this session. These figures were already present
+   in the existing guide and are the long-standing documented per-synchronous-transaction
+   limits. Kept them, but **explicitly framed as "cite the current figure from the Apex
+   Developer Guide, do not hardcode / assume"** and cited the official governor-limits URL, so
+   no un-sourced number is asserted as immutable truth. The content test asserts a
+   governor/bulkification *token*, not a specific number (per the plan's risk mitigation).
+2. **Salesforce API version** — did NOT pin a specific `apiVersion` number (release-gated,
+   unverifiable statically); described the three-releases/year cadence and instruction to pin
+   metadata `apiVersion` deliberately instead of inventing a value.
+3. **SAP / MATLAB / Microsoft version claims** — every version-specific bullet carries an
+   inline dated source `[... retrieved 2026-07-10]` pointing at the official vendor domain; no
+   SAP release number was invented (framed via ABAP Cloud / RAP / released-API model, which are
+   documented model names, not fabricated figures).
+4. **Single-language examples** — per the CU4c carve-out, all code fences are in the guide's OWN
+   language (ABAP/Apex/VBA/MATLAB); no cross-language BAD/SAFE 7-language matrix added.
+
+**Barrier-pattern compliance:** verified ONLY `tests/cu4c-enterprise-domain-guides.test.js`
+(28 pass / 0 fail); did NOT run the full `tests/*.test.js` suite; left all changes UNSTAGED in
+the working tree for the caller to commit; did NOT move this plan.
+
+**Line counts (before → after):** abap 70→200, apex 70→200, vba 65→206, matlab 57→184.
