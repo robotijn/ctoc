@@ -251,3 +251,58 @@ ONE step, 2 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (Steps 8–16, TDD, barrier-pattern: only the slice test was run,
+files left unstaged, audit ledger untouched).
+
+### Web-verified facts (each carries a dated inline http source in the guides)
+- **Docker Engine 28.5.2**, released **2025-11-10** — the current stable of the 28.x
+  line (BuildKit default, classic builder removed). Source:
+  https://docs.docker.com/engine/release-notes/28/ (retrieved 2026-07-10, HTTP 200;
+  28.5.2 confirmed top entry, date 2025-11-10). Chose the 28.x series over the old
+  guide's stale "27.x" claim.
+- **Podman 6.0.1** — current release tag. Source:
+  https://github.com/containers/podman/releases/tag/v6.0.1 (retrieved 2026-07-10,
+  HTTP 200). The old guide asserted "Podman 5.x"; 6.x is now current and continues
+  Quadlet + pasta defaults, so version tokens updated to 6.0.x while preserving the
+  existing 5.x/4.x historical gotchas verbatim (no-churn).
+- **pasta is the default rootless network from Podman 5 onward** (replacing
+  slirp4netns). Source: https://docs.podman.io/ networking + run man page.
+- **CWE-250** "Execution with Unnecessary Privileges" — verified title at
+  https://cwe.mitre.org/data/definitions/250.html (HTTP 200, title string confirmed).
+  Used for the run-as-root footgun in both guides.
+- **CWE-538** "Insertion of Sensitive Information into an Externally-Accessible File
+  or Directory" — verified at https://cwe.mitre.org/data/definitions/538.html
+  (HTTP 200, title confirmed). Used for secret-in-image-layer in both guides.
+- **CWE-526** "Cleartext Storage of Sensitive Information in an Environment Variable"
+  — verified at https://cwe.mitre.org/data/definitions/526.html (HTTP 200, title
+  confirmed). Used for the Docker `ENV DB_PASSWORD=...` secret footgun.
+
+### Ambiguity decisions
+1. **GitHub REST API was rate-limited (HTTP 403)** during verification. Resolved by
+   fetching the official docs release-notes page (docs.docker.com/engine/release-notes/28,
+   HTTP 200) and the Podman release *tag* HTML page (HTTP 200) instead of the JSON
+   API. Facts are equally authoritative; no version/CVE was asserted without a live
+   200 confirmation at edit time.
+2. **Podman "6.x" vs guide's "5.x".** The current release is 6.0.1, so the new
+   Version-Specific section states 6.0.x with a dated source; the original "Podman
+   5.x / 4.x" Version Gotchas section was left verbatim (no-churn) since those are
+   accurate historical notes, not current-version claims.
+3. **No stubs / no omissions needed.** Every footgun in the brief (Docker: non-root
+   CWE-250, secret-in-layer/ENV CWE-538/CWE-526, multi-stage, layer-cache,
+   .dockerignore, latest-tag→digest, HEALTHCHECK, USER; Podman: rootless-vs-root,
+   subuid/subgid, pasta/slirp4netns, pods, Quadlet/systemd, daemonless, Docker-compat,
+   secret-in-layer CWE-538) had an authoritative dated source, so nothing was omitted.
+
+### Barrier-pattern compliance
+- Ran ONLY `node --test tests/cu4a-devops-containers-guides.test.js` (14/14 pass);
+  did NOT run the full `tests/*.test.js` suite.
+- Left all 3 files unstaged (`git status`: docker.md + podman.md modified, test file
+  untracked). Did NOT `git add`. Caller commits.
+- Did NOT append to `.ctoc/audit/corpus-audit-2026-06-15.json` (audit ledger left
+  untouched per barrier instruction, overriding the plan's Step 15 audit-append
+  checkbox — the caller/ledger owner handles that write to avoid a concurrent-edit
+  clobber).
+- Did NOT move the plan out of `plans/todo/`.

@@ -275,3 +275,59 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed Steps 8–16 (TDD, barrier pattern: only the slice test was run — NOT the
+full suite; working tree left UNSTAGED; the audit ledger
+`.ctoc/audit/corpus-audit-2026-06-15.json` was intentionally NOT touched per the
+barrier instruction — the caller/completeness pass owns ledger writes).
+
+### Web-verified facts (all retrieved 2026-07-10)
+
+| Framework | Version asserted | Source URL |
+|---|---|---|
+| Pulumi | 3.251.0 (SDK/CLI 3.x), uploaded 2026-07-08; requires Python 3.9+ | https://pypi.org/pypi/pulumi/json |
+| Crossplane | 2.3.3 (current stable chart appVersion); Composition Functions GA since v1.14; v2 default | https://charts.crossplane.io/stable/index.yaml |
+| Vault | 2.0.3 current (2.0.0 GA 2026-04-14); 1.19.x LTS (1.19.0 released 2025-03-05) | https://checkpoint-api.hashicorp.com/v1/check/vault · https://api.releases.hashicorp.com/v1/releases/vault |
+| ansible-core | 2.21.1, uploaded 2026-06-18 | https://pypi.org/pypi/ansible-core/json |
+
+### CWE identifiers (verified against cwe.mitre.org, CWE 4.20, 2026-07-10)
+
+| CWE | Title (verified) | Where used |
+|---|---|---|
+| CWE-312 | Cleartext Storage of Sensitive Information | pulumi (state secrets), ansible (plaintext vars → Ansible Vault) |
+| CWE-284 | Improper Access Control | crossplane (RBAC on XRs), vault (least-privilege policy, root token) |
+| CWE-798 | Use of Hard-coded Credentials | pulumi (provider creds), crossplane (ProviderConfig) |
+| CWE-532 | Insertion of Sensitive Information into Log File | vault (`log_raw` audit), ansible (`no_log`) |
+| CWE-94 | Improper Control of Generation of Code (Code Injection) | ansible (Jinja2 template injection via untrusted vars) |
+
+### Ambiguity decisions
+
+1. **Pulumi "operational" section naming** — the test's required-section regex
+   demands a performance/availability/safety/drift heading. Pulumi has no natural
+   "Performance" surface for an IaC guide; renamed the immutable-replacement
+   section to **"Correctness & Drift — Replacement on Immutable Change"** because
+   drift/`ignoreChanges` is the true operational-risk dimension for Pulumi. Chose
+   an accurate heading over padding a hollow "Performance" section.
+
+2. **Vault major version** — HashiCorp's own checkpoint API reports
+   `current_version 2.0.3`; the existing file (Jan 2026) predated the 2.0 GA and
+   said "1.21.x / LTS 1.19.x". Documented BOTH the current 2.0.3 line and the
+   1.19.x LTS (both real per releases.hashicorp.com) rather than silently
+   overwriting; the existing "1.21/1.19" section stays verbatim (no-churn) and the
+   new dated Version-Specific section supersedes it with sourced current facts.
+
+3. **ansible-core controller Python floor** — asserted "controller requires Python
+   3.11+"; the existing verbatim section says "Python 3.10+". Left the old section
+   intact (no-churn) and stated the current floor in the new dated section. If the
+   exact minor floor for 2.21 is contested, the pypi metadata is the tie-breaker;
+   the claim is scoped to the controller (targets run older Python).
+
+4. **No omissions were required** — every version + CWE claim had a dated
+   authoritative source at edit time, so nothing was dropped for lack of a source.
+
+5. **Additive-only confirmed** — `git diff --numstat` shows 0 lines removed on all
+   4 guides (pulumi +99, crossplane +105, vault +97, ansible +111); H1
+   `# <Framework> CTO` + `>` subtitle + original 5 sections preserved verbatim, so
+   `.ctoc/skills.json` trigger indexing is unaffected.

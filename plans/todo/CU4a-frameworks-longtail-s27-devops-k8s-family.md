@@ -262,3 +262,70 @@ ONE step, 3 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed under BARRIER-PATTERN (verified ONLY this slice's test, left everything
+unstaged, did not touch the audit ledger, did not move the plan). All version /
+CVE / CWE facts web-verified at edit time (retrieved 2026-07-10). Sources inlined
+in each guide's References section.
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+- **Kubernetes 1.36** is current stable (released 2026-04-22, latest patch 1.36.2
+  on 2026-06-11, EOL 2027-06-28). N-3 support: 1.35 (EOL 2027-02-28), 1.34 (EOL
+  2026-10-27) still supported; **1.33 EOL 2026-06-28** and **1.32 EOL 2026-02-28**
+  are now unsupported. Source: https://endoflife.date/kubernetes (JSON API) +
+  https://kubernetes.io/releases/ .
+- **Helm 4.2.3** current stable (published 2026-07-09); **Helm 4.0.0 GA 2025-11-12**;
+  v3 line continues as **3.21.3** (2026-06-20). This CORRECTS the pre-existing stub
+  text "Helm 4.x under development" / "3.21 next minor (May 2026)" — Helm 4 is GA.
+  The stub's five original sections were preserved verbatim (no-churn); the stale
+  claim is corrected only in the ADDED Version-Specific Gotchas section, not by
+  rewriting the existing "Version Gotchas" section. Source:
+  https://github.com/helm/helm/releases (redirect-resolved latest tag = v4.2.3;
+  atom feed dates; v4.0.0 tag page datetime 2025-11-12).
+- **Kustomize kustomize/v5.8.1** current standalone (released 2026-02-09); kubectl
+  built-in lags standalone. Source:
+  https://github.com/kubernetes-sigs/kustomize/releases (redirect-resolved latest
+  tag + atom feed).
+- **CVE-2025-1974 ("IngressNightmare")** — CVSS 3.1 base 9.8 CRITICAL, published
+  2025-03-25, unauthenticated RCE in ingress-nginx controller + Secret disclosure;
+  NVD weakness mapping CWE-653. Verified via
+  https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2025-1974 . This is the
+  ONLY CVE token asserted in any of the three guides (the test guards that any
+  `CVE-\d{4}-\d+` token equals exactly CVE-2025-1974, blocking a future fabricated
+  CVE). Patched-in versions (ingress-nginx 1.11.5 / 1.12.1) stated from the advisory.
+- **CWE titles verified at cwe.mitre.org (v4.20):** CWE-284 = Improper Access
+  Control; CWE-312 = Cleartext Storage of Sensitive Information; CWE-798 = Use of
+  Hard-coded Credentials; CWE-653 = Improper Isolation or Compartmentalization.
+  Grepped from https://cwe.mitre.org/data/definitions/{284,312,798,653}.html .
+
+### Choices made
+- **CWE selection.** Used CWE-284 (RBAC least-privilege) and CWE-312 (base64
+  Secrets / plaintext values / plaintext secretGenerator) exactly as the plan
+  specifies. ADDED CWE-798 (hard-coded credentials) to helm because a default
+  password in `values.yaml` is a real, distinct footgun with an exact MITRE id —
+  additive, fully sourced, not a substitute for the required CWE-312. Did NOT invent
+  any CWE/CVE beyond these verified ids.
+- **Added Testing section to kubernetes.md and Performance/Reliability section to
+  helm.md.** The plan's Test Plan requires a Testing section and a Performance
+  section in every guide; the first RED->GREEN pass surfaced that kubernetes lacked
+  a Testing heading and helm lacked a Performance/reliability heading. Rather than
+  loosen the content contract, I added substantive, sourced sections (kubeconform /
+  conftest / kyverno / server-side dry-run for K8s; --wait-for-jobs / hook weights /
+  CRD-once / history-max for Helm) so the required-section contract is met by real
+  content, not by weakening the test.
+- **No-churn honored.** Each guide's original five `## ` sections + the `# <Fw> CTO`
+  H1 + the `> Updated January 2026` line are preserved verbatim; all new sections
+  are appended below "What NOT to Do". skills.json trigger indexing is unaffected.
+- **Omit-if-unverifiable.** No claim was asserted without a dated official source.
+  Nothing was omitted for lack of a source in this slice — every version, CVE, and
+  CWE cited resolved to an official URL at edit time.
+
+### Verify tally
+- Slice test RED (pre-implementation): 22 tests, 9 pass, 13 fail.
+- Slice test GREEN (post-implementation): 22 tests, 22 pass, 0 fail, 0 skipped.
+- `npx eslint tests/cu4a-devops-k8s-family-guides.test.js` exit 0.
+- Line counts: kubernetes 83->253, helm 65->217, kustomize 67->191.
+- Full suite NOT run (BARRIER-PATTERN); nothing staged; audit ledger untouched;
+  plan not moved.
