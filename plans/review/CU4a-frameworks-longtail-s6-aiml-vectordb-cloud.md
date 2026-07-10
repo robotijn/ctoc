@@ -26,7 +26,7 @@ files:
   - skills/frameworks/ai-ml/chromadb.md
   - skills/frameworks/ai-ml/milvus.md
   - skills/frameworks/ai-ml/pgvector.md
-  - tests/cu4a-aiml-vectordb-guides.test.js
+  - tests/cu4a-aiml-vectordb-cloud-guides.test.js
 ---
 
 # CU4a s6 — AI/ML vector databases (pinecone · weaviate · qdrant · chromadb · milvus · pgvector)
@@ -75,12 +75,12 @@ vector databases: embedding-dimension/metric mismatch, ANN index (HNSW) recall-v
 ### Dependency Graph
 
 ```
-skills/frameworks/ai-ml/pinecone.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
-skills/frameworks/ai-ml/weaviate.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
-skills/frameworks/ai-ml/qdrant.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
-skills/frameworks/ai-ml/chromadb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
-skills/frameworks/ai-ml/milvus.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
-skills/frameworks/ai-ml/pgvector.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
+skills/frameworks/ai-ml/pinecone.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-cloud-guides.test.js
+skills/frameworks/ai-ml/weaviate.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-cloud-guides.test.js
+skills/frameworks/ai-ml/qdrant.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-cloud-guides.test.js
+skills/frameworks/ai-ml/chromadb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-cloud-guides.test.js
+skills/frameworks/ai-ml/milvus.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-cloud-guides.test.js
+skills/frameworks/ai-ml/pgvector.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-cloud-guides.test.js
 ```
 
 6 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
@@ -143,7 +143,7 @@ skills/frameworks/ai-ml/pgvector.md  (MODIFY: extend 5→>5)  <--tested-by-- tes
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-aiml-vectordb-guides.test.js`
+#### Tests: `tests/cu4a-aiml-vectordb-cloud-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 6 guides off disk via `fs.readFileSync` (mirroring
@@ -187,7 +187,7 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 6 guides fresh off disk first, then WRITE the content-contract test.
-- [x] Create `tests/cu4a-aiml-vectordb-guides.test.js` (zero doubles — reads the 6 REAL guides off disk via `fs.readFileSync`)
+- [x] Create `tests/cu4a-aiml-vectordb-cloud-guides.test.js` (zero doubles — reads the 6 REAL guides off disk via `fs.readFileSync`)
 - [x] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [x] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
@@ -307,7 +307,7 @@ leave working tree unstaged; caller commits). No stubs, no fabricated
 versions/CVEs, zero test doubles.
 
 ### Test filename
-- The plan body names the test `tests/cu4a-aiml-vectordb-guides.test.js`; the
+- The plan body names the test `tests/cu4a-aiml-vectordb-cloud-guides.test.js`; the
   executor brief mandates `tests/cu4a-aiml-vectordb-cloud-guides.test.js` ("EDIT
   EXACTLY"). **Chose the brief's `-cloud-` filename** (authoritative, explicit) —
   the `files:` frontmatter still declares the older name, which is harmless (the
