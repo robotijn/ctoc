@@ -275,3 +275,50 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed 2026-07-10 (Steps 8–16, TDD). Barrier-pattern: only the 5 enumerated files touched;
+slice test verified in isolation; nothing staged; audit ledger NOT modified (caller/aggregator owns it).
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+- **Unity**: current streams `6000.4.0f1` (Mainline), `6000.3.x` (LTS), `6000.0.71f1` (LTS / Unity 6.0 LTS).
+  Sources: https://unity.com/releases/editor/archive ; https://en.wikipedia.org/wiki/Unity_(game_engine)
+  (infobox "Stable release 6000.4.0f1 (Mainline) / 6000.3.12f1 (LTS) / 6000.0.71f1 (LTS)").
+- **Unreal Engine**: current stable **5.8** (Wikipedia infobox); 5.6 and 5.7 documentation streams live.
+  Sources: https://en.wikipedia.org/wiki/Unreal_Engine ;
+  https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-5.6-documentation (HTTP 200) ;
+  .../unreal-engine-5.7-documentation (HTTP 200). UObject handling (UPROPERTY/TWeakObjectPtr):
+  https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-object-handling-in-unreal-engine
+- **Kivy 2.3.1** (published 2024-12-26) via PyPI JSON API https://pypi.org/pypi/kivy/json ;
+  **Buildozer 1.6.0** via https://pypi.org/pypi/buildozer/json .
+- **Toga 0.5.6** (published 2026-07-08) via https://pypi.org/pypi/toga/json ;
+  **Briefcase 0.4.4** (published 2026-07-08) via https://pypi.org/pypi/briefcase/json .
+- **CWE ids** (all verified live against MITRE, catalog v4.20):
+  CWE-94 Code Injection https://cwe.mitre.org/data/definitions/94.html ;
+  CWE-502 Deserialization of Untrusted Data https://cwe.mitre.org/data/definitions/502.html ;
+  CWE-20 Improper Input Validation https://cwe.mitre.org/data/definitions/20.html ;
+  CWE-416 Use After Free https://cwe.mitre.org/data/definitions/416.html ;
+  CWE-1357 Reliance on Insufficiently Trustworthy Component https://cwe.mitre.org/data/definitions/1357.html ;
+  CWE-829 Inclusion of Functionality from Untrusted Control Sphere https://cwe.mitre.org/data/definitions/829.html .
+
+### Choices made
+1. **Unreal current-version citation** — the Epic 5.x release-notes pages are JS-rendered SPAs (no title
+   in static HTML), so the precise 5.8 release DATE could not be read off an authoritative dated page.
+   Chose to cite UE 5.8 as current stable via the Wikipedia infobox cross-check, and to anchor the
+   version guidance on the Epic 5.6/5.7 documentation streams (both HTTP 200). Did NOT fabricate a 5.8
+   release date — omitted the exact date rather than assert it uncited (omit-if-no-source rule).
+2. **BeeWare Performance section** — the plan's beeware spec did not enumerate a standalone Performance
+   heading, but the content test (uniform across all 4 files) requires one. Added a substantive
+   "Performance — Bundle Size & Startup" section grounded in the real Briefcase runtime-bundling cost
+   (not padding). Consistent with the shared "platform packaging footguns" research spine.
+3. **CWE selection** — used the CWE ids that map to each framework's actual attack surface:
+   deserialization (CWE-502) for Unity AssetBundle / Unreal .pak untrusted content; code injection
+   (CWE-94) for Unity runtime codegen and Kivy untrusted-KV `eval`; input validation (CWE-20) for
+   unvalidated Unreal Server RPCs; use-after-free (CWE-416) for missing-`UPROPERTY` dangling UObjects;
+   supply-chain (CWE-1357/CWE-829) for BeeWare bundled-dependency provenance. All verified against MITRE.
+4. **No-churn honored** — the existing 5 template sections in each of the 4 guides were preserved
+   verbatim; new sections were appended below "What NOT to Do". H1 `# <Framework> CTO` headers unchanged.
+5. **Single-framework examples** — the 7-language BAD/SAFE rule is exempt per the CU4a single-framework
+   spec; each guide's examples are in its own language (C# / C++ / Python / Python+TOML), idiomatic and
+   current-version.
