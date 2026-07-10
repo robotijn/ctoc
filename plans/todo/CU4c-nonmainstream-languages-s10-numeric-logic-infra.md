@@ -284,50 +284,88 @@ fabricated; no cross-language BAD/SAFE examples added; tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 28 tests, 4 pass, 24 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none (node:test builtin)
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — n/a
+- [x] WEB-VERIFY every version/security fact (see Decisions below)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — 4 guides extended additively
+- [x] Add error handling — n/a (content-only)
+- [x] Wire up integration points — H1/frontmatter preserved (skills.json intact)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — each guide >5 sections, >120 lines, additive diff
+- [x] Verify integration points work together — H1 headers verified intact
+- [x] Check error handling completeness — each guide names its error-handling idioms
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — dense, footgun-per-bullet, no padding
+- [x] Optimize critical paths — n/a
+- [x] Simplify complex code — n/a
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — test uses path.join(__dirname,'..') + fixed rel paths
+- [x] Sanitize outputs — n/a
+- [x] No secrets in code — only public official domains
+- [x] Safe file operations — read-only fs.readFileSync
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint on new test file exit 0
+- [x] Run ALL tests (TDD Green) — BARRIER PATTERN: ran ONLY this slice test (28/28 pass); full suite left to caller
+- [x] Check coverage >= 80% — content-grounding substitutes (CU2 convention)
+- [x] 0 skipped, 0 flaky tests — 0 skipped, 0 todo
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — the four guides ARE the documentation
+- [x] Add JSDoc comments to new functions — test file has file-level doc block
+- [x] Update CHANGELOG if needed — deferred to caller commit
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed — H1/H2 structure, additive diff confirmed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+All facts WEB-VERIFIED at edit time (retrieved 2026-07-10); each carries an inline dated
+source in its guide. Sources used:
+
+- **Julia** — 1.10 is the current LTS; 1.11.9 and 1.12.6 are current feature releases.
+  Source: https://endoflife.date/julia (2026-07-10), cross-checked https://julialang.org/downloads/.
+- **SWI-Prolog** — stable **9.2.x** series plus a newer **10.x** line; `library(sandbox)` /
+  `safe_goal/1` are SWI-specific. Portable claims anchored to ISO/IEC 13211-1. Sources:
+  https://github.com/SWI-Prolog/swipl-devel/releases and https://www.swi-prolog.org/ (2026-07-10).
+  (Development series is odd-minor 10.1.x — V10.1.11 published 2026-07-05; even-minor = stable.)
+- **Terraform** — 1.15.x current (https://endoflife.date/terraform, 2026-07-10). License
+  relicensed MPL 2.0 → **BUSL-1.1** (Change License MPL 2.0), verified directly in repo
+  LICENSE: https://github.com/hashicorp/terraform/blob/main/LICENSE (2026-07-10).
+- **OpenTofu** — 1.12.x current (https://endoflife.date/opentofu, 2026-07-10); stays
+  **MPL 2.0**, verified in repo LICENSE: https://github.com/opentofu/opentofu/blob/main/LICENSE (2026-07-10).
+- **PowerShell** — 7.x cross-platform (`pwsh`); **7.6 LTS (.NET 10)**, **7.4 LTS (.NET 8)**;
+  Windows PowerShell 5.1 = legacy .NET Framework edition. Source:
+  https://endoflife.date/powershell (2026-07-10), cross-check https://learn.microsoft.com/powershell/.
+- **CWEs** (all cwe.mitre.org, list version 4.20, retrieved 2026-07-10):
+  CWE-125 Out-of-bounds Read; CWE-94 Improper Control of Generation of Code (Code Injection);
+  CWE-78 OS Command Injection; CWE-312 Cleartext Storage of Sensitive Information. Titles
+  verified verbatim against the definition pages.
+
+**Omissions (no dated authoritative source / avoided fabrication):**
+- No specific patch-level for the S3 backend `use_lockfile` introduction is asserted beyond
+  "Terraform 1.10+/OpenTofu" (the exact minor was not re-verified against a dated changelog
+  page, so it is stated only as a range, not a precise version).
+- No CVE numbers are cited — none was needed for these design-level footguns, and inventing
+  one is forbidden. Only CWE *class* identifiers (verified against MITRE) are used.
+
+**Barrier-pattern note:** per dispatch, verified ONLY this slice's test
+(`tests/cu4c-numeric-logic-infra-guides.test.js`: 28/28 green). Did NOT run the full
+`tests/*.test.js` suite, did NOT git-stage, did NOT move the plan. Left in the working tree
+for the caller to commit. Sibling-slice changes (abap/apex/cobol/…, other cu4c test files)
+were already present in the working tree from parallel executors and are untouched by me.

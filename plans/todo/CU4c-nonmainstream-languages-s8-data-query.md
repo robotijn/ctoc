@@ -295,3 +295,54 @@ examples added; tests green.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity (CU4c-s8, 2026-07-10)
+
+**Web-verified facts + sources (retrieved 2026-07-10):**
+- CWE-89 "Improper Neutralization of Special Elements used in an SQL Command ('SQL
+  Injection')" — https://cwe.mitre.org/data/definitions/89.html (CWE list v4.20).
+- CWE-770 "Allocation of Resources Without Limits or Throttling" —
+  https://cwe.mitre.org/data/definitions/770.html (v4.20). Chosen as the query-DoS /
+  depth-complexity class per the plan.
+- CWE-94 "Improper Control of Generation of Code ('Code Injection')" —
+  https://cwe.mitre.org/data/definitions/94.html (v4.20). Used for `eval(parse())`.
+- CWE-78 "OS Command Injection" — https://cwe.mitre.org/data/definitions/78.html
+  (v4.20). Added to R for `system`/`system2`.
+- PostgreSQL `MERGE` first shipped in **PostgreSQL 15** — confirmed via
+  https://www.postgresql.org/docs/release/15.0/ release notes referencing MERGE. So
+  the guide scopes MERGE to PG15+ and points PG14 users to `INSERT ... ON CONFLICT`.
+- **SQL:2023 = ISO/IEC 9075:2023**, current SQL-standard edition (JSON type, SQL/PGQ) —
+  https://www.iso.org/standard/76583.html.
+- R current series **4.x**, latest release branch **4.6** (4.6.1 present in the CRAN
+  source tree; NEWS lists "Changes in R 4.6.1") —
+  https://cran.r-project.org/src/base/R-4/ and CRAN R-release NEWS, retrieved
+  2026-07-10. Native pipe `|>` and `\(x)` lambda are since R 4.1 (base-R facts).
+- GraphQL: latest **ratified** edition is **October 2021**; a **Working Draft**
+  (containing incremental delivery `@defer`/`@stream`) is in progress — confirmed via
+  the editions list at https://spec.graphql.org/ (shows "Working Draft" + October2021
+  as the newest ratified). `@defer`/`@stream` is therefore scoped to the draft, not
+  the ratified edition.
+
+**Decisions:**
+1. **R version stated as "4.x, latest release branch 4.6" rather than a single
+   pinned patch** — the CRAN source tree showed 4.6.1 as the newest tarball on
+   2026-07-10, but patch releases move; scoping to the branch avoids a fabricated /
+   stale exact-patch claim while staying accurate. The load-bearing, stable facts
+   (`|>` and `\(x)` since 4.1) are pinned.
+2. **GraphQL `@defer`/`@stream` presented as Working-Draft, not ratified** — the
+   spec.graphql.org editions list confirmed October 2021 as newest ratified; rather
+   than assert a newer ratified edition I could not verify, I scoped incremental
+   delivery to the draft and told the reader to confirm server support. Omit-if-
+   unverifiable applied here (no fabricated "October 2025 edition").
+3. **CWE list version (4.20)** captured from the live MITRE pages but NOT asserted as
+   a hard fact inside the guides (it churns); guides cite the stable per-CWE URLs.
+4. **SQL dialect scoping** — every dialect-specific claim names the engine
+   (PostgreSQL/MySQL/SQL Server/SQLite); isolation-level defaults and MERGE
+   availability are attributed to specific engines, never asserted as portable SQL.
+5. **No niche claim omitted for lack of source** — all asserted version/security
+   facts had a dated official source ≥ 2025-01-01 (all retrieved 2026-07-10).
+
+**Barrier-pattern compliance:** only my own test
+(`tests/cu4c-data-query-guides.test.js`) was run (21/21 pass, RED→GREEN); the full
+suite was NOT run. Nothing staged; left in the working tree for the caller. Plan not
+moved.
