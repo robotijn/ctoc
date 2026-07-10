@@ -19,6 +19,7 @@ parent_plan: CU4a-frameworks-longtail
 depends_on: CU4a-frameworks-longtail-s1-aiml-train-lowlevel, CU4a-frameworks-longtail-s2-aiml-inference-runtime, CU4a-frameworks-longtail-s3-aiml-numeric-frameworks, CU4a-frameworks-longtail-s4-aiml-finetune-peft, CU4a-frameworks-longtail-s5-aiml-orchestration-agents, CU4a-frameworks-longtail-s6-aiml-vectordb-cloud, CU4a-frameworks-longtail-s7-aiml-experiment-tracking, CU4a-frameworks-longtail-s8-aiml-serving-compute, CU4a-frameworks-longtail-s9-aiml-app-ui, CU4a-frameworks-longtail-s10-aiml-hf-data, CU4a-frameworks-longtail-s11-data-streaming-core, CU4a-frameworks-longtail-s12-data-batch-spark, CU4a-frameworks-longtail-s13-data-warehouse, CU4a-frameworks-longtail-s14-data-query-engines, CU4a-frameworks-longtail-s15-data-lake-formats, CU4a-frameworks-longtail-s16-data-dataframe-compute, CU4a-frameworks-longtail-s17-data-sql-newsql, CU4a-frameworks-longtail-s18-data-sql-embedded-orm, CU4a-frameworks-longtail-s19-data-kv-cache, CU4a-frameworks-longtail-s20-data-wide-column, CU4a-frameworks-longtail-s21-data-document-graph, CU4a-frameworks-longtail-s22-data-search, CU4a-frameworks-longtail-s23-data-orchestration-quality, CU4a-frameworks-longtail-s24-mobile-native-declarative, CU4a-frameworks-longtail-s25-mobile-dotnet-hybrid, CU4a-frameworks-longtail-s26-mobile-gameengine-python, CU4a-frameworks-longtail-s27-devops-k8s-family, CU4a-frameworks-longtail-s28-devops-containers, CU4a-frameworks-longtail-s29-devops-iac-secrets, CU4a-frameworks-longtail-s30-devops-config-observ
 priority: MEDIUM
 risk_level: LOW
+stage: in-progress
 files:
   - .ctoc/audit/corpus-audit-2026-06-15.json
   - tests/cu4a-completeness.test.js
@@ -179,47 +180,56 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Confirm baseline green, then WRITE the completeness test reading the REAL ledger + the REAL 114 guides.
-- [ ] Create `tests/cu4a-completeness.test.js` (zero doubles — `fs.readFileSync` + `JSON.parse` on the real ledger + 114 real guides)
-- [ ] Test error conditions (silent-omission diff, phantom verdict, scope-boundary breach, on-disk drift, fabricated-UPGRADED guard)
-- [ ] Run tests — expect RED on "every in-scope guide is UPGRADED" + "completeness diff empty" until s1–s30 land (this slice runs LAST, per `depends_on`)
+- [x] Create `tests/cu4a-completeness.test.js` (zero doubles — `fs.readFileSync` + `JSON.parse` on the real ledger + 114 real guides)
+- [x] Test error conditions (silent-omission diff, phantom verdict, scope-boundary breach, on-disk drift, fabricated-UPGRADED guard)
+- [x] Run tests — RED: 241 tests, 239 pass, 2 fail (the two ledger-verdict assertions: "CU4a verdict block exists/non-empty" + "completeness diff empty"). All 114 content tests + boundary guards GREEN on disk.
 
 ### Step 9: PREPARE
-- [ ] Confirm s1–s30 complete (all 114 guides now > 5 `## ` sections on disk) and each recorded its per-file `UPGRADED` verdict in the ledger
-- [ ] Re-derive the 114-file in-scope list from disk to confirm the constant still equals 114 (38 + 49 + 12 + 15)
-- [ ] No new dependencies (node:test only)
+- [x] Confirmed s1–s30 complete — all 114 guides > 5 `## ` sections on disk (10–14 sections each); all carry a >= 2025 dated http source
+- [x] Re-derived the 114-file in-scope list from disk = exactly 114 (38 ai-ml + 49 data + 12 mobile + 15 devops); matches the plan's list byte-for-byte
+- [x] No new dependencies (node:test only)
 
 ### Step 10: IMPLEMENT
 Append any missing CU4a verdict entries so all 114 files are recorded; finalize the test. ONE step, two files.
-- [ ] Append 114 CU4a `UPGRADED` / `SOLID-SKIPPED` verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json`; do NOT modify existing records
-- [ ] Guard: the append refuses `UPGRADED` for any file ≤ 5 sections; refuses to overwrite an existing block
-- [ ] Finalize `tests/cu4a-completeness.test.js` (reads the real appended block off disk)
+- [x] Appended 114 CU4a `UPGRADED` verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (0 SOLID-SKIPPED — all 114 were thin); existing records untouched (812 insertions, 0 deletions)
+- [x] Guard held: the append script refuses `UPGRADED` for any file ≤ 5 sections and refuses to overwrite an existing `cu4a_verdicts` block
+- [x] Finalized `tests/cu4a-completeness.test.js` (reads the real appended block off disk)
 
 ### Step 11: REVIEW
-- [ ] Self-review: the 114 in-scope list matches the audit-ledger diff and disk; every file has a CU4a verdict
-- [ ] No CU3-named file and no web file recorded under CU4a; existing ledger records untouched (diff additive)
+- [x] Self-review: the 114 in-scope list matches the audit-ledger diff and disk; every file has a CU4a `UPGRADED` verdict (114/114, zero omissions)
+- [x] No CU3-named file and no web file recorded under CU4a (leak checks return NONE); existing CU1/CU2/CU3/CU4c/CU5 records untouched (records=38, cu4c=41, cu5=13 all intact — additive diff only)
 
 ### Step 12: OPTIMIZE
-- [ ] Keep the ledger additions minimal + structured; the test's IN_SCOPE constant is the single source of the 114 — no duplication
-- [ ] Read-once ledger per helper; flat readdir
+- [x] Ledger additions minimal + structured (single `cu4a_verdicts` object); the test's IN_SCOPE_BY_DIR constant is the single source of the 114 — derived once, no duplication
+- [x] Read-once ledger per helper; flat `readdirSync` per dir
 
 ### Step 13: SECURE
-- [ ] Run the Security Review checklist; `JSON.parse` on the repo ledger only; no `eval`
-- [ ] No path traversal (`path.join(__dirname, '..')` + fixed relative paths); no secrets; only the two enumerated files touched
+- [x] Security Review checklist run; `JSON.parse` on the repo ledger only; no `eval`
+- [x] No path traversal (`path.join(__dirname, '..')` + fixed relative paths); no secrets; only the two enumerated files touched
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; `tests/cu4a-completeness.test.js` GREEN (diff empty, all 114 UPGRADED on disk, scope-boundary guard passes)
-- [ ] Confirm `tests/corpus-audit-ledger.test.js` and `tests/cu3-completeness.test.js` still pass (existing records intact)
-- [ ] Coverage ≥ 80% (content/ledger-grounding substitutes per CU4c s12 convention); 0 skipped, 0 flaky
+- [x] Lint: `npx eslint . --max-warnings 0` → exit 0. Type check: `tsc --noEmit` baseline-neutral (89 pre-existing errors in `src/`, 0 referencing this slice's files — this slice adds no TS)
+- [x] ALL tests (TDD Green): `node --test tests/*.test.js` → 5485 tests, `# fail 0`, 0 skipped, 0 todo. `tests/cu4a-completeness.test.js` GREEN (diff empty, all 114 UPGRADED on disk, scope-boundary guards pass)
+- [x] `tests/corpus-audit-ledger.test.js` + `tests/cu3-completeness.test.js` still pass (trio: 306 tests, 0 fail; existing records intact; cu3 relaxed ai-ml boundary kept GREEN, untouched)
+- [x] Coverage ≥ 80% via content/ledger-grounding (CU4c s12 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Record in `## Decisions Taken Under Ambiguity`: the final 114-file verdict summary, any `SOLID-SKIPPED` rationale (none expected), and per-slice omitted-for-lack-of-source findings aggregated from s1–s30
+- [x] Recorded in `## Decisions Taken Under Ambiguity` below: the final 114-file verdict summary (114 UPGRADED / 0 SOLID-SKIPPED), the cu5 pre-existing count-mismatch finding (out of scope, left untouched), and the cu3 relaxed-boundary note
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify Steps 8–15 completed correctly; all quality checks passed
-- [ ] All 114 CU4a-scope files recorded UPGRADED/SOLID-SKIPPED with zero silent omissions; completeness diff empty
-- [ ] No CU3/web file touched; only the two enumerated files edited; full suite green
-- [ ] Ready for human review (CU4a complete — ready for Gate 2 batch approval with its siblings)
+- [x] Steps 8–15 completed correctly; all quality checks passed
+- [x] All 114 CU4a-scope files recorded UPGRADED with zero silent omissions; completeness diff empty
+- [x] No CU3/web file touched; only the two enumerated files edited; full suite green (5485 pass, 0 fail)
+- [x] Ready for human review (CU4a complete — ready for Gate 2 batch approval with its siblings)
+
+## Decisions Taken Under Ambiguity
+
+- **Ledger verdict block shape.** Mirrored the CU4c `cu4c_verdicts` convention exactly: a single additive top-level `cu4a_verdicts` object carrying `produced_by` / `recorded_date` / `legend` / `scope_note` / `count` / `upgraded_count` / `solid_skipped_count` / `verdicts[]`. Each verdict entry = `{ path, cu4a_verdict, slice, date, section_count }`. `section_count` was added (read fresh off disk at append time) so the "UPGRADED is real" guard is auditable directly from the ledger.
+- **Final 114-file verdict summary.** 114 UPGRADED, 0 SOLID-SKIPPED — every CU4a-scope file was thin (5 `## ` sections) at audit time and is now substantive (10–14 sections) on disk after s1–s30. No file was already-solid, so no SOLID-SKIPPED rationale was needed. Per-slice coverage matches the plan's authoritative table (union = 114, no overlap, no omission).
+- **No fabricated verdict.** The append refuses to write UPGRADED for any file ≤ 5 sections and refuses to overwrite an existing block; all 114 passed the > 5 guard (min 10 sections). The test independently re-reads each of the 114 off disk and asserts > 5 sections + a >= 2025 dated http source.
+- **cu3 relaxed ai-ml boundary — left GREEN, untouched.** `tests/cu3-completeness.test.js` was already reconciled by the caller in wave 1 (its ai-ml exclusivity assertion relaxed because CU4a upgrades the long-tail). This slice did NOT undo that; it re-asserts the complementary guarantee (no CU3-named/web file regressed below floor) inside `cu4a-completeness.test.js` instead. cu3 stays GREEN.
+- **cu5 count mismatch is pre-existing and out of scope.** `cu5_wrapper_verdicts.count` reads 12 while its `verdicts[]` has 13 entries; this discrepancy exists at HEAD (verified via `git show HEAD:`), is not asserted by any test, and lives outside this slice's two `files:`. Left untouched — a no-churn append must not silently "fix" an unrelated block. Flagged here for morning review.
+- **tsc baseline-neutral.** The project has 89 pre-existing `tsc --noEmit` errors in `src/lib` / `src/tabs` / `src/scripts`; none reference this slice's files (a `.test.js` + a `.json`), which add no type surface. Baseline unchanged.
 
 ## Risk Mitigations
 
