@@ -258,50 +258,80 @@ tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 21 tests, 3 pass, 18 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none)
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Web-verified every version/security fact (see Decisions below)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Extended the 3 guides additively (existing 5 sections verbatim)
+- [x] Add error handling idioms per language
+- [x] Wire up integration points (dated sources + CWE links)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new content
+- [x] Each guide > 5 sections and > 120 lines; headline identifiers present
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Dense footgun-per-bullet, no padding
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (test uses path.join, no traversal)
+- [x] Sanitize outputs (n/a — content only)
+- [x] No secrets in code (public official URLs only)
+- [x] Safe file operations; only 4 enumerated files touched
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint (eslint exit 0) + tsc (baseline-neutral; slice added 0 TS)
+- [x] Run ALL tests (TDD Green) — full suite 4134 pass, # fail 0
+- [x] Content-grounding substitutes for coverage (CU2 convention)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Decisions + verified sources recorded below
+- [x] JSDoc header on the new test file
+- [x] CHANGELOG n/a (docs-only skill edit)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Only 4 enumerated files edited; nothing fabricated
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+**Web-verified facts + sources (retrieved 2026-07-10):**
+
+| Claim | Value verified | Source URL |
+|-------|---------------|-----------|
+| Kotlin current stable | 2.4.0 (released 2026-06-03); 2.3 EOL 2026-06-03 | https://endoflife.date/kotlin (endoflife.date/api/kotlin.json) + https://api.github.com/repos/JetBrains/kotlin/releases (tag v2.4.0, published 2026-06-03) |
+| Kotlin K2 default since 2.0 | K2 default in Kotlin 2.0 | https://kotlinlang.org/docs/whatsnew20.html |
+| Swift current stable toolchain | 6.3.3 (released 2026-06-30) | https://api.github.com/repos/swiftlang/swift/releases (tag swift-6.3.3-RELEASE, published 2026-06-30) |
+| Swift 6 language mode / strict concurrency | default complete data-race checking | https://www.swift.org/migration/documentation/migrationguide/ |
+| Dart current stable SDK | 3.12.2 (dated 2026-06-09) | https://storage.googleapis.com/dart-archive/channels/stable/release/latest/VERSION |
+| Flutter current stable | 3.44.6 (released 2026-07-09), ships Dart 3.12.2 | https://storage.googleapis.com/flutter_infra_release/releases/releases_macos.json (current_release.stable) |
+| CWE-502 | "Deserialization of Untrusted Data" (v4.20) | https://cwe.mitre.org/data/definitions/502.html |
+| CWE-476 (referenced conceptually) | "NULL Pointer Dereference" (v4.20) | https://cwe.mitre.org/data/definitions/476.html |
+
+**Omitted for lack of a dated authoritative source at edit time:** none — every
+version/security claim written carries an official dated source. Niche claims
+(e.g. Swift 6.2 `nonisolated` behavior nuance) were kept qualitative and anchored
+to swift.org rather than pinning an unverifiable exact behavior.
+
+**Test-regex fix (not a content change):** the `try!` assertion initially used
+`/\btry!\b/`; `!` is not a `\w` char so the trailing `\b` never matched. Corrected
+to `/\btry!/`. The `try!` footgun content in swift.md was correct throughout.
+
+**tsc:** repo has a pre-existing tsc baseline of ~19 errors in `src/**` JS files
+(state.js, version.js, tabs/*, etc.), all unrelated to this slice. This slice
+added 0 TypeScript and 0 source JS (3 markdown + 1 test), so it is baseline-neutral.
+
+**CU4c carve-out honored:** single-language idiomatic examples only; the 7-language
+BAD/SAFE cross-coverage rule does not apply to single-language reference guides.
+Existing 5 sections in each file preserved verbatim; all new sections appended.
