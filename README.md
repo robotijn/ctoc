@@ -13,7 +13,7 @@
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **112 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **421-file skill library** (99 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **112 agents** across **22 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **421-file skill library** (99 Tier-2 specialist bodies + 322 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. A **local semantic plan-index** gives you meaning-based search, related-plan surfacing, duplicate-guarding, and conflict detection over your plan corpus, and an **advisory EU-compliance program** (GDPR + EU AI Act) flags regulatory exposure as you build — always advising, never overriding a human gate. The result: AI that writes production-quality code on the first try.
 
 ## Install
 
@@ -474,6 +474,37 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 
 ---
 
+## EU Compliance Program (GDPR + EU AI Act)
+
+CTOC ships an **advisory** compliance program that flags GDPR and EU-AI-Act exposure while you plan and build — it never weakens a human gate or blocks a transition on its own. It advises; you decide.
+
+Three Tier-2 compliance agents drive it, plus a supporting library of `src/lib` modules:
+
+| Agent | Role |
+|-------|------|
+| [`compliance/gdpr-agent`](agents/compliance/gdpr-agent.md) | GDPR advisory — lawful basis, data-subject rights, retention, DPIA triggers, cross-border transfer. Runner: `src/lib/gdpr-agent-runner.js`, helpers: `gdpr-helpers.js` |
+| [`compliance/eu-ai-act-agent`](agents/compliance/eu-ai-act-agent.md) | EU AI Act advisory — risk-tier classification (prohibited / high-risk / GPAI), obligations, incident-reporting windows. Runner: `eu-ai-act-agent-runner.js`, helpers: `eu-ai-act-helpers.js` |
+| [`compliance/eu-solution-recommender`](agents/compliance/eu-solution-recommender.md) | Given a flagged obligation, recommends concrete engineering solutions (controls, patterns, artifacts). Helpers: `eu-recommender-helpers.js` |
+
+**Iron Loop integration.** `src/lib/iron-loop-compliance-trigger.js` hooks the loop so compliance analysis fires when a risk-surface glob matches (personal-data schema, model-training paths, GDPR-relevant routes). Findings are **deduplicated** (`compliance-dedup.js`) and **integrated** into the plan (`compliance-integration.js`) alongside a regulatory-regime profile framework (`regulatory-regime.js`, `compliance-regime.js` — see [`REGULATORY_OPS.md`](docs/REGULATORY_OPS.md)). Because it is advisory, no compliance finding can flip a gate; it surfaces the obligation and a recommended fix, and the human decides. Complementary compliance **skills** ship under `skills/compliance/` — `gdpr-compliance-checker`, `audit-log-checker`, `license-scanner`, `sbom-cra-checker`, `ai-governance-checker`.
+
+---
+
+## Local Semantic Plan-Index (vector search over plans)
+
+CTOC keeps a **local vector index** of every plan so it can reason about the plan corpus semantically — no external service, no data leaving the machine. It lives under `src/lib/plan-index/` (19 modules) and is fully shipped and live.
+
+| Capability | What it does | Module |
+|------------|--------------|--------|
+| **Semantic search** | Find plans by meaning, not keyword match | `search.js`, `fusion.js` |
+| **Related plans** | Surface plans semantically adjacent to the one you're editing | `related.js` |
+| **Duplicate guard** | Warn when a new plan restates an existing one before you commit effort | `duplicate-guard.js`, `content-hash.js` |
+| **Conflict detection** | Flag plans whose goals or file targets contradict each other | `conflict-detect.js` |
+
+Embeddings are produced by a local model via `embedder.js` / `ollama-client.js` (with a `hardware-probe.js` capability check and an in-process fallback engine, `inprocess-engine.js`). The store is an in-memory JSON index with brute-force cosine similarity — the right-sized choice below the ~10k-vector ANN crossover for CTOC's corpus. A `PostToolUse.plan-index-sync` hook keeps the index current: `sync-unit.js` + `reconcile.js` re-embed plans as they change, so search always reflects fresh disk state.
+
+---
+
 ## Agents
 
 **112 agents across 22 categories** — [browse all →](agents/)
@@ -492,7 +523,7 @@ SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · cler
 | [Infrastructure](agents/infrastructure/) | 6 | [terraform-validator](agents/infrastructure/terraform-validator.md), [kubernetes-checker](agents/infrastructure/kubernetes-checker.md), [docker-security-checker](agents/infrastructure/docker-security-checker.md), [ci-pipeline-checker](agents/infrastructure/ci-pipeline-checker.md), [ci-runner-setup](agents/infrastructure/ci-runner-setup.md), [deployment-setup](agents/infrastructure/deployment-setup.md) |
 | [Pipeline](agents/pipeline/) | 5 | [agent-writer](agents/pipeline/agent-writer.md), [agent-critic](agents/pipeline/agent-critic.md), [agent-tester](agents/pipeline/agent-tester.md), [agent-qa](agents/pipeline/agent-qa.md), [agent-publisher](agents/pipeline/agent-publisher.md) |
 | [Scouts (Tier 3, Haiku)](agents/scouts/) | 5 | [syntax-scout](agents/scouts/syntax-scout.md), [lint-scout](agents/scouts/lint-scout.md), [test-scout](agents/scouts/test-scout.md), [dep-scout](agents/scouts/dep-scout.md), [secret-scout](agents/scouts/secret-scout.md) |
-| [Compliance](agents/compliance/) | 3 | [gdpr-compliance-checker](agents/compliance/gdpr-compliance-checker.md), [audit-log-checker](agents/compliance/audit-log-checker.md), [license-scanner](agents/compliance/license-scanner.md) |
+| [Compliance](agents/compliance/) | 5 | [gdpr-agent](agents/compliance/gdpr-agent.md), [eu-ai-act-agent](agents/compliance/eu-ai-act-agent.md), [eu-solution-recommender](agents/compliance/eu-solution-recommender.md), [audit-log-checker](agents/compliance/audit-log-checker.md), [license-scanner](agents/compliance/license-scanner.md) |
 | [Coordinator](agents/coordinator/) | 3 | [cto-chief](agents/coordinator/cto-chief.md) (Tier 0), [ivv-chief](agents/coordinator/ivv-chief.md), [synthesizer](agents/coordinator/synthesizer.md) |
 | [Data/ML](agents/data-ml/) | 3 | [data-quality-checker](agents/data-ml/data-quality-checker.md), [ml-model-validator](agents/data-ml/ml-model-validator.md), [feature-store-validator](agents/data-ml/feature-store-validator.md) |
 | [Frontend](agents/frontend/) | 3 | [bundle-analyzer](agents/frontend/bundle-analyzer.md), [component-tester](agents/frontend/component-tester.md), [visual-regression-checker](agents/frontend/visual-regression-checker.md) |
@@ -521,7 +552,7 @@ Agents spawn conditionally based on your project and current Iron Loop step. Sco
 There are two kinds of skills:
 
 1. **Tier-2 specialist skill bodies (99)** — the actual expert agents that run during Iron Loop and refinement-loop steps. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
-2. **Knowledge skills (322)** — language refs, framework refs, and per-language quality configs. Read by agents (or loaded by code paths like `src/lib/quality-config.js` and `src/lib/skill-loader.js`) to inform their work.
+2. **Knowledge skills (322)** — a web-verified **corpus-quality reference library**: 50 language guides, 211 framework guides (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile), and 61 per-language quality-config references. Each was brought current against 2026 authoritative sources (vendor docs, RFCs, official style guides) — no invented statistics. Read by agents, and loaded by code paths like `src/lib/quality-config.js` and `src/lib/skill-loader.js`, to ground their work in current best practice for the exact stack CTOC detected.
 
 > **v6.9.14**: 38 unreachable reference files were deleted from `skills/` after a usage audit confirmed they had zero code or agent references.
 > **v6.9.15–v6.9.23**: all 86 existing `SKILL.md` bodies were rewritten through a websearch → update → critique → update loop (May 2026 sources, 7-language coverage, sourced citations only).
@@ -811,7 +842,17 @@ ctoc/
 ├── src/
 │   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       16 Claude Code hooks (session, pre/post tool use, andon-halt)
-│   ├── lib/         123 JS modules (planning, quality, refinement, dispatcher, regulatory-regime, compliance-regime, compliance-dedup, compliance-integration, iron-loop-compliance-trigger, gdpr-helpers, gdpr-agent-runner, eu-ai-act-helpers, eu-ai-act-agent-runner, eu-recommender-helpers, audit-chain, retention, legal-hold, traceability, lineage, eval-harness, comparator, stale-detector, stale-cleanup, claude-md-lessons, safe-fs, regex-utils, task-registry, task-view, task-reconcile, operating-manual)
+│   ├── lib/         123 JS modules (planning, quality, refinement, dispatcher; the
+│   │                EU-compliance program — regulatory-regime, compliance-regime,
+│   │                compliance-dedup, compliance-integration, iron-loop-compliance-trigger,
+│   │                gdpr-helpers, gdpr-agent-runner, eu-ai-act-helpers,
+│   │                eu-ai-act-agent-runner, eu-recommender-helpers, audit-chain,
+│   │                retention, legal-hold, traceability, lineage; eval-harness,
+│   │                comparator, stale-detector, stale-cleanup, claude-md-lessons,
+│   │                safe-fs, regex-utils, task-registry, task-view, task-reconcile,
+│   │                operating-manual) plus plan-index/ (19 modules — the local
+│   │                semantic vector search: store, embedder, search, related,
+│   │                duplicate-guard, conflict-detect, ollama-client, sync/reconcile)
 │   ├── areas/       5 dashboard areas (pipeline, inbox, agent, library, system)
 │   ├── tabs/        8 legacy tab modules (superseded by areas/, kept for drill-in flows)
 │   ├── scripts/     13 build/release utilities
@@ -825,7 +866,7 @@ ctoc/
 │                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
 │                    5 gap-fill SKILL.md added in v6.9.24; 8 cross-industry
 │                    SKILL.md added in v6.9.27.
-├── tests/           109 test files (2799 passing tests)
+├── tests/           164 test files (guard + behavior suites; run with `node --test tests/*.test.js`)
 ├── .ctoc/           Config, templates, operations, audit, loop journals
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
