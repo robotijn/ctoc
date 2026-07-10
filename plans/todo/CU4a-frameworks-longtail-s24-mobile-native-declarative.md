@@ -263,3 +263,42 @@ ONE step, 3 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed under BARRIER-PATTERN (verify own test only; leave unstaged; do NOT
+touch the audit ledger; caller commits; plan not moved).
+
+### Web-verified facts (all retrieved 2026-07-10, official sources)
+- **Swift 6.3.3** — current release. Source:
+  github.com/swiftlang/swift-org-website `_data/builds/swift_releases.yml`
+  (tag `swift-6.3.3-RELEASE`).
+- **Compose BOM `2026.06.01`** — latest stable `androidx.compose:compose-bom`.
+  Source: maven.google.com `androidx/compose/compose-bom/maven-metadata.xml`
+  (`<latest>2026.06.01</latest>`, `<lastUpdated>20260701...`).
+- **Kotlin 2.4.0** — latest stable stdlib. Source: repo1.maven.org
+  `org/jetbrains/kotlin/kotlin-stdlib/maven-metadata.xml` (Maven Central
+  `<latest>` was `2.4.20-Beta1`, a beta; latest GA = 2.4.0).
+- **Compose Multiplatform 1.11.1** — latest stable CMP Gradle plugin. Source:
+  repo1.maven.org `org/jetbrains/compose/compose-gradle-plugin/maven-metadata.xml`
+  (Maven Central `<latest>` was `1.12.0-beta01`, a beta; latest GA = 1.11.1).
+- **CWE-312 "Cleartext Storage of Sensitive Information"** — verified reachable
+  (HTTP 200) and title-confirmed at cwe.mitre.org/data/definitions/312.html.
+
+### Decisions
+1. **Betas excluded.** Maven `<latest>` for Kotlin (2.4.20-Beta1) and CMP
+   (1.12.0-beta01) point at pre-release builds. Guides cite the latest **GA**
+   (Kotlin 2.4.0, CMP 1.11.1) since the guides advise production code. The beta
+   existence is noted in the CMP guide ("1.12.0 on Maven is still `-beta`").
+2. **GitHub REST API unavailable unauthenticated** (rate-limited/empty in this
+   env). Versions were instead verified from Google Maven + Maven Central
+   `maven-metadata.xml` (authoritative artifact registries) and the swiftlang
+   release-data YAML — all official, dated ≥ 2025.
+3. **Audit ledger NOT appended** (Step 15's `.ctoc/audit/...json` write) —
+   BARRIER-PATTERN forbids touching the ledger; the s31 completeness check /
+   caller owns that append. No silent omission: recorded here instead.
+4. **Full suite NOT run** — BARRIER-PATTERN: verified only
+   `tests/cu4a-mobile-native-declarative-guides.test.js` (21/21 pass). Other
+   working-tree modifications are sibling parallel slices, not this slice.
+5. **No omitted-for-lack-of-source claims** — every version/CWE asserted carries
+   a dated official URL; nothing was dropped for want of a source.

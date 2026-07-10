@@ -287,3 +287,40 @@ ONE step, 5 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Barrier-pattern execution (2026-07-10): verified ONLY this slice's own test
+(`tests/cu4a-mobile-dotnet-hybrid-guides.test.js`), left all edits UNSTAGED, did
+NOT run the full suite, did NOT touch `.ctoc/audit/corpus-audit-2026-06-15.json`
+(the audit-ledger append is deferred to the batching/completeness step per the
+barrier instruction). Caller commits.
+
+### Web-verified facts + sources (retrieved 2026-07-10)
+
+| Fact | Value | Source (verified at edit time) |
+|------|-------|--------------------------------|
+| .NET MAUI current stable | `Microsoft.Maui.Controls` **10.0.80** (.NET 10 wave), published **2026-06-24** | https://www.nuget.org/packages/Microsoft.Maui.Controls (NuGet flat-container + registration index) |
+| MAUI handlers/mappers (not renderers) | handlers + property `Mapper` replaced renderers | https://learn.microsoft.com/dotnet/maui/user-interface/handlers/ (HTTP 200) |
+| MAUI UI-thread marshalling | `MainThread.BeginInvokeOnMainThread` | https://learn.microsoft.com/dotnet/maui/platform-integration/appmodel/main-thread |
+| MAUI SecureStorage | Keychain/Keystore-backed | https://learn.microsoft.com/dotnet/maui/platform-integration/storage/secure-storage (HTTP 200) |
+| Xamarin EOL | **May 1, 2024** — all SDKs, no more patches | https://dotnet.microsoft.com/platform/support/policy/xamarin ("Last updated: May 1, 2024"; body: "Xamarin support ended on May 1, 2024 for all Xamarin SDKs") |
+| Ionic current stable | `@ionic/core` **8.8.13**, published **2026-07-01** | https://www.npmjs.com/package/@ionic/core (npm registry dist-tags.latest) |
+| Capacitor current stable | `@capacitor/core` **8.4.1**, published **2026-06-19** | https://www.npmjs.com/package/@capacitor/core (npm registry dist-tags.latest) |
+| Capacitor `server.url` / `allowNavigation` / `cleartext` / `androidScheme` config keys | confirmed present in config schema | https://capacitorjs.com/docs/config (keys `allowNavigation`, `url`, `cleartext`, `androidScheme` found in page) + https://capacitorjs.com/docs/guides/security (HTTP 200) |
+| NativeScript current stable | `@nativescript/core` **9.0.20**, published **2026-05-27** | https://www.npmjs.com/package/@nativescript/core (npm registry dist-tags.latest) |
+| NativeScript marshalling / multithreading | direct native access + Workers | https://docs.nativescript.org/guide/marshalling (200) + https://docs.nativescript.org/guide/multithreading (200) |
+| CWE-79 (Cross-site Scripting) | real MITRE id | https://cwe.mitre.org/data/definitions/79.html (HTTP 200) |
+| CWE-312 (Cleartext Storage of Sensitive Information) | real MITRE id | https://cwe.mitre.org/data/definitions/312.html (HTTP 200) |
+
+### Choices
+- **CWE-319** (Cleartext Transmission) named in capacitor.md alongside `cleartext:
+  true` because that config literally enables plain http — a real, on-topic
+  identifier grounded in the Capacitor config docs; kept minimal (no separate
+  test assertion added for it, only CWE-79/CWE-312 are asserted).
+- **MAUI version token** asserted as `.NET 10` OR `10.0.80` (regex allows either)
+  since MAUI's major tracks the .NET major and both appear in the guide.
+- **NativeScript version token** regex allows `9.0`/`NativeScript 9`/`8.9` to
+  stay robust to a patch bump; the guide states the exact web-verified `9.0.20`.
+- **No omissions** — every asserted version/CWE had a dated authoritative source
+  at edit time; nothing was dropped for lack of a source.
