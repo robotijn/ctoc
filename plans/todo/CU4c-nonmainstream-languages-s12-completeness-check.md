@@ -196,6 +196,42 @@ Confirm: all 41 CU4c-scope files recorded UPGRADED/SOLID-SKIPPED with zero silen
 completeness diff empty; no CU2 file touched; only the two enumerated files edited; full
 suite green. CU4c is complete and ready for Gate 2 batch approval with its siblings.
 
+## Decisions Taken Under Ambiguity
+
+- **Verdict block shape — object wrapper, not bare array.** The plan says "append CU4c
+  per-file verdicts" without pinning the JSON shape. Chose an additive top-level
+  `cu4c_verdicts` **object** (`{ produced_by, recorded_date, legend, scope_note, count,
+  verdicts[] }`) rather than a bare `cu4c_verdicts[]` array, so the block self-documents its
+  provenance + the UPGRADED/SOLID-SKIPPED legend inline (matching the ledger's existing
+  `verdict_legend`/`produced_by` style). `records[]`, `discrepancies`, and `verdict_legend`
+  are untouched — CU1's no-silent-skip contract is intact (`tests/corpus-audit-ledger.test.js`
+  stays 7/7 green). The completeness test tolerates both shapes.
+- **Verdict enum — all 41 are `UPGRADED`, zero `SOLID-SKIPPED`.** Read fresh 2026-07-10: all
+  41 non-mainstream guides now sit at ≥ 11 `## ` sections (min 11, min 148 lines) with a
+  ≥ 2025 dated http source — every one was genuinely thin at audit (5 sections) and was
+  upgraded by s1–s11. No file qualified for `SOLID-SKIPPED`; the append refuses to write
+  UPGRADED for any file still ≤ 5 sections (guard in the append script), so no verdict is
+  fabricated.
+- **Section-count metadata on each verdict.** Recorded `section_count` on each verdict entry
+  (beyond the plan's minimum `path`/`cu4c_verdict`/`slice`/`date`) so the UPGRADED claim is
+  self-evidencing in the ledger; the test independently re-reads the file off disk and
+  asserts `> 5`, so the stored count is corroborating, not load-bearing.
+- **`date` = 2026-07-10** (the recording date of this completeness slice), not each upgrade
+  slice's individual date — this slice records the aggregate verdict block. Per-slice
+  attribution is preserved via the `slice` field (`CU4c-s1`…`CU4c-s11`).
+- **Scope-boundary is asserted two independent ways.** (1) The hand-maintained `IN_SCOPE`
+  constant (41) is cross-checked against the on-disk `skills/languages/*.md` set minus the 9
+  CU2 mainstream — a drift test fails if they diverge. (2) A ledger-independent no-silent-skip
+  enumeration asserts every non-mainstream guide on disk is `> 5` sections. Both hold, so the
+  41-file scope is proven landed even if the constant were mis-typed.
+
+### Final 41-file verdict summary
+
+All 41 CU4c-scope guides recorded **`UPGRADED`** (0 `SOLID-SKIPPED`, 0 silent omissions,
+0 phantom verdicts). Completeness diff `IN_SCOPE \ (UPGRADED ∪ SOLID-SKIPPED)` = **∅**.
+On-disk range: 11–15 `## ` sections, min 148 lines, each with a ≥ 2025 dated http source.
+No CU2 mainstream file recorded under a CU4c verdict. Full suite `# fail 0` (4268 pass).
+
 ## Risk Mitigations
 
 | Risk | Mitigation | Where |
@@ -212,50 +248,50 @@ suite green. CU4c is complete and ready for Gate 2 batch approval with its sibli
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation (`tests/cu4c-completeness.test.js`, zero doubles — reads real ledger + 41 real guides)
+- [x] Test error conditions (silent-omission diff, phantom verdict, scope-boundary breach, on-disk drift, fabricated-UPGRADED guard)
+- [x] Run tests - expect RED (failing) — RED: 2/134 fail (verdict block absent / completeness diff non-empty)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none — node:test only)
+- [x] Check prerequisites (s1–s11 landed: all 41 guides ≥ 11 `## ` sections on disk, min 148 lines, dated http source)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (none — ledger + test only)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (appended 41 CU4c `UPGRADED` verdicts to the ledger as additive `cu4c_verdicts` block; `records[]` untouched)
+- [x] Add error handling (append script refuses UPGRADED for any file ≤ 5 sections; refuses to overwrite an existing block)
+- [x] Wire up integration points (test reads the real appended block off disk)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code (41 in-scope list == on-disk non-mainstream set; every file has a verdict; no CU2 file recorded; existing records intact)
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations (single IN_SCOPE constant is the sole source of the 41)
+- [x] Optimize critical paths (read-once ledger per helper call; flat readdir)
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal — `path.join(__dirname, '..')` + fixed relative paths)
+- [x] Sanitize outputs (N/A — test asserts only)
+- [x] No secrets in code
+- [x] Safe file operations (`JSON.parse` on repo-controlled ledger; no `eval`; only the 2 enumerated files touched)
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check (`npx eslint . --max-warnings 0` exit 0; tsc baseline-neutral — no new errors from this file)
+- [x] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → # fail 0 (4268 pass); `tests/cu4c-completeness.test.js` 134/134
+- [x] Check coverage >= 80% (content/ledger-grounding substitutes per CU1 s6 / CU2 / CU4b convention)
+- [x] 0 skipped, 0 flaky tests (skipped 0, todo 0)
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (`## Decisions Taken Under Ambiguity` + final 41-file verdict summary appended)
+- [x] Add JSDoc comments to new functions (file header + inline rationale in the test)
+- [x] Update CHANGELOG if needed (N/A — internal audit slice)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed (RED→GREEN; suite green; eslint clean; tsc baseline-neutral)
+- [x] Manual verification if needed (41 UPGRADED, 0 SOLID-SKIPPED, 0 silent omissions, 0 phantom, scope boundary holds)
+- [x] Ready for human review (CU4c complete — ready for Gate 2 batch approval with its siblings)
