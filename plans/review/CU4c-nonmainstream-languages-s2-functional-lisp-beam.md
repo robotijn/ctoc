@@ -24,7 +24,7 @@ files:
   - skills/languages/scheme.md
   - skills/languages/erlang.md
   - skills/languages/elixir.md
-  - tests/cu4c-lisp-beam-guides.test.js
+  - tests/cu4c-functional-lisp-beam-guides.test.js
 ---
 
 # CU4c s2 — Lisp & BEAM language guides (clojure · scheme · erlang · elixir)
@@ -75,10 +75,10 @@ CWE-502**. Disjoint from the typed-FP slice (s1) and every other slice by file.
 ### Dependency Graph
 
 ```
-skills/languages/clojure.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-lisp-beam-guides.test.js
-skills/languages/scheme.md   (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-lisp-beam-guides.test.js
-skills/languages/erlang.md   (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-lisp-beam-guides.test.js
-skills/languages/elixir.md   (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-lisp-beam-guides.test.js
+skills/languages/clojure.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-functional-lisp-beam-guides.test.js
+skills/languages/scheme.md   (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-functional-lisp-beam-guides.test.js
+skills/languages/erlang.md   (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-functional-lisp-beam-guides.test.js
+skills/languages/elixir.md   (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4c-functional-lisp-beam-guides.test.js
 ```
 
 Four disjoint content files + one test. No inter-file code dependency. No cycle.
@@ -172,7 +172,7 @@ Each guide gains these `## ` sections (each names ≥1 concrete identifier + a d
 
 ### Test Plan
 
-#### Tests: `tests/cu4c-lisp-beam-guides.test.js`
+#### Tests: `tests/cu4c-functional-lisp-beam-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL four guides off disk via `fs.readFileSync`
@@ -205,7 +205,7 @@ Content-contract test cases (per file — clojure, scheme, erlang, elixir):
 ## Execution Plan
 
 ### Step 8: TEST
-Read all four guides fresh off disk first. Create `tests/cu4c-lisp-beam-guides.test.js`
+Read all four guides fresh off disk first. Create `tests/cu4c-functional-lisp-beam-guides.test.js`
 reading the four REAL files; run it — MUST be RED now (each file has exactly 5 `## `
 sections, no Concurrency/Security/Testing sections, no dated sources).
 
@@ -330,7 +330,7 @@ are inlined in each guide's `## References`. Nothing fabricated.
 | CWE-94 title | "Improper Control of Generation of Code ('Code Injection')" | https://cwe.mitre.org/data/definitions/94.html |
 
 ### Decisions
-1. **Test filename** — the plan frontmatter names `tests/cu4c-lisp-beam-guides.test.js`,
+1. **Test filename** — the plan frontmatter names `tests/cu4c-functional-lisp-beam-guides.test.js`,
    but the execution brief mandated `tests/cu4c-functional-lisp-beam-guides.test.js`.
    Followed the brief (the operative instruction); created the latter. No collision
    with any existing test. `files:` frontmatter is a superset match either way.
