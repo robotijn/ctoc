@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:38.763Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,27 +13,27 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: "DataFrame & parallel compute (polars · dask · vaex)"
+title: "Distributed SQL query engines (trino · presto · questdb)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/data/polars.md
-  - skills/frameworks/data/dask.md
-  - skills/frameworks/data/vaex.md
-  - tests/cu4a-data-dataframe-compute-guides.test.js
+  - skills/frameworks/data/trino.md
+  - skills/frameworks/data/presto.md
+  - skills/frameworks/data/questdb.md
+  - tests/cu4a-data-query-engines-guides.test.js
 ---
 
-# CU4a s16 — DataFrame & parallel compute (polars · dask · vaex)
+# CU4a s14 — Distributed SQL query engines (trino · presto · questdb)
 
-> Slice 16 of the CU4a decomposition. De-stub the 3 thin **data** framework
-> guides (polars · dask · vaex) from the 5-section template floor into substantive correction surfaces, in
+> Slice 14 of the CU4a decomposition. De-stub the 3 thin **data** framework
+> guides (trino · presto · questdb) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: dataframe/out-of-core compute: lazy vs eager execution + query optimization, partition/chunk sizing, and memory-mapped larger-than-RAM correctness. Adds one content-contract test that reads the REAL guide
+> shared research spine: query engines: memory-per-node + spill limits, connector pushdown correctness, join distribution, and time-series ingestion ordering. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -60,56 +67,56 @@ sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatt
 `.ctoc/skills.json` trigger indexing is unaffected.
 
 Grouping rationale: these 3 are ONE research pass because the correction spine is shared —
-dataframe/out-of-core compute: lazy vs eager execution + query optimization, partition/chunk sizing, and memory-mapped larger-than-RAM correctness. They are disjoint by file from every other slice, so `depends_on: none`.
+query engines: memory-per-node + spill limits, connector pushdown correctness, join distribution, and time-series ingestion ordering. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/data/polars.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-dataframe-compute-guides.test.js
-skills/frameworks/data/dask.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-dataframe-compute-guides.test.js
-skills/frameworks/data/vaex.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-dataframe-compute-guides.test.js
+skills/frameworks/data/trino.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-query-engines-guides.test.js
+skills/frameworks/data/presto.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-query-engines-guides.test.js
+skills/frameworks/data/questdb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-query-engines-guides.test.js
 ```
 
 3 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/data/polars.md`
+#### File: `skills/frameworks/data/trino.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for polars edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Lazy footguns** — `scan_*` + `LazyFrame.collect()` vs eager, expression API over `apply` (Python UDF kills parallelism), streaming engine for larger-than-RAM, `with_columns` vs mutation
-- **Correctness** — strict typing, null vs NaN, join validation
-- **Security** — parameterized when reading SQL (CWE-89)
-- **Version** — Polars current release, dated
+**Purpose:** Trigger-loaded correction surface for trino edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Memory footguns** — `query.max-memory-per-node` + spill-to-disk, broadcast vs partitioned join, exchange, predicate/projection pushdown to connectors, dynamic filtering
+- **Correctness** — cross-catalog type coercion, `approx_distinct`
+- **Security** — access control (file/OPA), parameterized queries (CWE-89), catalog credential isolation
+- **Version** — Trino current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/dask.md`
+#### File: `skills/frameworks/data/presto.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for dask edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Partition footguns** — partition size (too many small tasks vs too few large), `persist` vs `compute`, shuffle cost on `groupby`/`merge`, task-graph blowup, worker memory spilling
-- **Correctness** — index alignment, lazy graph
-- **Security** — scheduler/dashboard exposure, cluster auth
-- **Version** — Dask current release, dated
+**Purpose:** Trigger-loaded correction surface for presto edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Memory footguns** — resource groups + memory limits, join distribution, connector pushdown, PrestoDB vs Trino divergence (do not mix docs)
+- **Correctness** — type semantics vs Trino
+- **Security** — access control, parameterized SQL (CWE-89)
+- **Version** — PrestoDB current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/vaex.md`
+#### File: `skills/frameworks/data/questdb.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for vaex edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Out-of-core footguns** — memory-mapped HDF5/Arrow (not in-RAM), virtual columns + expressions (lazy), `apply` fallback to Python, selection vs filter, string-heavy memory
-- **Correctness** — lazy evaluation caching, groupby binning
-- **Security** — file-path handling
-- **Version** — Vaex current release (note maintenance status), dated
+**Purpose:** Trigger-loaded correction surface for questdb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Time-series footguns** — designated timestamp + out-of-order (O3) ingestion cost, partition-by unit, ILP (InfluxDB line protocol) vs PGWire ingestion, dedup keys
+- **Correctness** — SAMPLE BY/ASOF join alignment
+- **Security** — ILP/PGWire auth + TLS, parameterized queries (CWE-89)
+- **Version** — QuestDB current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-data-dataframe-compute-guides.test.js`
+#### Tests: `tests/cu4a-data-query-engines-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 3 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — polars · dask · vaex):
+Content-contract test cases (per file — trino · presto · questdb):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -120,9 +127,9 @@ Content-contract test cases (per file — polars · dask · vaex):
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `polars`: `LazyFrame`, `collect`, `with_columns`
-   - `dask`: `persist`, `compute`, `partition`
-   - `vaex`: `memory-mapped`, `virtual column`, `lazy`
+   - `trino`: `max-memory-per-node`, `pushdown`, `CWE-89`
+   - `presto`: `resource group`, `pushdown`, `CWE-89`
+   - `questdb`: `designated timestamp`, `SAMPLE BY`, `ILP`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
@@ -132,7 +139,7 @@ coverage (CU2/CU3 convention for these reference-corpus slices).
 - Content-only edits to 3 Markdown guides + one test reading them; no runtime path, no user
   input surface.
 - Test uses `path.join(__dirname, '..')` + fixed relative paths — no traversal.
-- Every asserted CWE id (none required in this family) is a REAL MITRE identifier grounded in that framework's actual
+- Every asserted CWE id (CWE-89) is a REAL MITRE identifier grounded in that framework's actual
   attack surface — never invented; the guide links cwe.mitre.org for each.
 - Source URLs are public official domains (framework docs / release notes / PyPI / npm / GitHub /
   cwe.mitre.org) — no secrets.
@@ -144,13 +151,13 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 3 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-data-dataframe-compute-guides.test.js` (zero doubles — reads the 3 REAL guides off disk via `fs.readFileSync`)
+- [ ] Create `tests/cu4a-data-query-engines-guides.test.js` (zero doubles — reads the 3 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of polars · dask · vaex (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of trino · presto · questdb (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
@@ -179,11 +186,11 @@ ONE step, 3 files + the test file.
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the polars · dask · vaex triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the trino · presto · questdb triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s16") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s14") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
@@ -202,3 +209,57 @@ ONE step, 3 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review

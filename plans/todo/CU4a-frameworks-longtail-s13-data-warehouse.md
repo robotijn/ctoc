@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:38.739Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,27 +13,27 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: "Key-value & caching stores (redis · valkey · memcached)"
+title: "Data warehouses & columnar (snowflake · clickhouse · duckdb)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/data/redis.md
-  - skills/frameworks/data/valkey.md
-  - skills/frameworks/data/memcached.md
-  - tests/cu4a-data-kv-cache-guides.test.js
+  - skills/frameworks/data/snowflake.md
+  - skills/frameworks/data/clickhouse.md
+  - skills/frameworks/data/duckdb.md
+  - tests/cu4a-data-warehouse-guides.test.js
 ---
 
-# CU4a s19 — Key-value & caching stores (redis · valkey · memcached)
+# CU4a s13 — Data warehouses & columnar (snowflake · clickhouse · duckdb)
 
-> Slice 19 of the CU4a decomposition. De-stub the 3 thin **data** framework
-> guides (redis · valkey · memcached) from the 5-section template floor into substantive correction surfaces, in
+> Slice 13 of the CU4a decomposition. De-stub the 3 thin **data** framework
+> guides (snowflake · clickhouse · duckdb) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: KV/cache: eviction + memory-policy footguns, big-key/blocking-command latency, cache stampede/invalidation, and unauthenticated-exposure RCE class. Adds one content-contract test that reads the REAL guide
+> shared research spine: columnar warehouses: clustering/partition + micro-partition pruning, credit/cost blowups, MergeTree engine choice, and parameterized-SQL safety. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -60,56 +67,56 @@ sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatt
 `.ctoc/skills.json` trigger indexing is unaffected.
 
 Grouping rationale: these 3 are ONE research pass because the correction spine is shared —
-KV/cache: eviction + memory-policy footguns, big-key/blocking-command latency, cache stampede/invalidation, and unauthenticated-exposure RCE class. They are disjoint by file from every other slice, so `depends_on: none`.
+columnar warehouses: clustering/partition + micro-partition pruning, credit/cost blowups, MergeTree engine choice, and parameterized-SQL safety. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/data/redis.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-kv-cache-guides.test.js
-skills/frameworks/data/valkey.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-kv-cache-guides.test.js
-skills/frameworks/data/memcached.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-kv-cache-guides.test.js
+skills/frameworks/data/snowflake.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-warehouse-guides.test.js
+skills/frameworks/data/clickhouse.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-warehouse-guides.test.js
+skills/frameworks/data/duckdb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-warehouse-guides.test.js
 ```
 
 3 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/data/redis.md`
+#### File: `skills/frameworks/data/snowflake.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for redis edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Blocking footguns** — `KEYS`/`FLUSHALL` block the single thread (use `SCAN`), big-key + `O(N)` commands, `maxmemory-policy` eviction (noeviction = write errors), cache stampede (locking/jitter TTL), pipelining
-- **Persistence** — RDB/AOF trade-off
-- **Security** — no auth by default historically → RCE via unauthenticated exposure; require ACL/`requirepass` + protected-mode, never bind public
-- **Version** — Redis current release (license note), dated
+**Purpose:** Trigger-loaded correction surface for snowflake edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Cost footguns** — warehouse size + auto-suspend, `SELECT *` on wide tables, clustering key vs auto-clustering credits, result cache, spilling to local/remote
+- **Correctness** — micro-partition pruning, time-travel retention
+- **Security** — role hierarchy (RBAC), `IDENTIFIER()`/bind variables not string SQL (CWE-89), masking policies
+- **Version** — Snowflake current behavior, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/valkey.md`
+#### File: `skills/frameworks/data/clickhouse.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for valkey edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Blocking footguns** — same single-thread model (Redis fork): `SCAN` over `KEYS`, eviction policy, big keys; multi-threaded I/O caveats
-- **Compatibility** — Redis-API compatible fork, module differences
-- **Security** — ACL/`requirepass`, TLS, no public bind (RCE class)
-- **Version** — Valkey current release + Redis-compat level, dated
+**Purpose:** Trigger-loaded correction surface for clickhouse edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Engine footguns** — MergeTree ORDER BY = primary index (choose carefully), `ReplacingMergeTree` dedup is async (`FINAL` cost), partition-by cardinality explosion, async vs sync insert batching
+- **Correctness** — eventual merges, `SETTINGS max_memory_usage`
+- **Security** — parameterized queries (CWE-89), user quotas/RBAC
+- **Version** — ClickHouse current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/memcached.md`
+#### File: `skills/frameworks/data/duckdb.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for memcached edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Cache footguns** — slab allocator + item-size limit (default 1MB), LRU eviction (no persistence), no built-in clustering (client-side hashing), connection limits
-- **Correctness** — no atomic multi-key, `cas` for compare-and-swap
-- **Security** — UDP amplification history → disable UDP; never expose unauthenticated to internet
-- **Version** — memcached current release, dated
+**Purpose:** Trigger-loaded correction surface for duckdb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Embedded footguns** — single-writer (no concurrent write across processes), memory limit + spilling (`temp_directory`), Parquet/Arrow zero-copy, `read_parquet` glob, in-process lifecycle
+- **Correctness** — implicit casts, larger-than-memory joins
+- **Security** — parameterized queries via prepared statements (CWE-89), `httpfs`/S3 credential handling
+- **Version** — DuckDB current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-data-kv-cache-guides.test.js`
+#### Tests: `tests/cu4a-data-warehouse-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 3 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — redis · valkey · memcached):
+Content-contract test cases (per file — snowflake · clickhouse · duckdb):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -120,9 +127,9 @@ Content-contract test cases (per file — redis · valkey · memcached):
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `redis`: `SCAN`, `maxmemory-policy`, `protected-mode`
-   - `valkey`: `SCAN`, `ACL`, `eviction`
-   - `memcached`: `slab`, `LRU`, `cas`
+   - `snowflake`: `auto-suspend`, `clustering`, `CWE-89`
+   - `clickhouse`: `MergeTree`, `ORDER BY`, `ReplacingMergeTree`
+   - `duckdb`: `temp_directory`, `read_parquet`, `CWE-89`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
@@ -132,7 +139,7 @@ coverage (CU2/CU3 convention for these reference-corpus slices).
 - Content-only edits to 3 Markdown guides + one test reading them; no runtime path, no user
   input surface.
 - Test uses `path.join(__dirname, '..')` + fixed relative paths — no traversal.
-- Every asserted CWE id (none required in this family) is a REAL MITRE identifier grounded in that framework's actual
+- Every asserted CWE id (CWE-89) is a REAL MITRE identifier grounded in that framework's actual
   attack surface — never invented; the guide links cwe.mitre.org for each.
 - Source URLs are public official domains (framework docs / release notes / PyPI / npm / GitHub /
   cwe.mitre.org) — no secrets.
@@ -144,13 +151,13 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 3 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-data-kv-cache-guides.test.js` (zero doubles — reads the 3 REAL guides off disk via `fs.readFileSync`)
+- [ ] Create `tests/cu4a-data-warehouse-guides.test.js` (zero doubles — reads the 3 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of redis · valkey · memcached (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of snowflake · clickhouse · duckdb (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
@@ -179,11 +186,11 @@ ONE step, 3 files + the test file.
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the redis · valkey · memcached triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the snowflake · clickhouse · duckdb triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s19") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s13") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
@@ -202,3 +209,57 @@ ONE step, 3 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review

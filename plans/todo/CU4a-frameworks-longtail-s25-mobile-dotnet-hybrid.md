@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:39.078Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,29 +13,29 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: "AI/ML agent & RAG orchestration frameworks (llamaindex · autogen · crewai · semantic-kernel · dspy)"
+title: ".NET & hybrid mobile (maui · xamarin · ionic · capacitor · nativescript)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/ai-ml/llamaindex.md
-  - skills/frameworks/ai-ml/autogen.md
-  - skills/frameworks/ai-ml/crewai.md
-  - skills/frameworks/ai-ml/semantic-kernel.md
-  - skills/frameworks/ai-ml/dspy.md
-  - tests/cu4a-aiml-orchestration-agents-guides.test.js
+  - skills/frameworks/mobile/maui.md
+  - skills/frameworks/mobile/xamarin.md
+  - skills/frameworks/mobile/ionic.md
+  - skills/frameworks/mobile/capacitor.md
+  - skills/frameworks/mobile/nativescript.md
+  - tests/cu4a-mobile-dotnet-hybrid-guides.test.js
 ---
 
-# CU4a s5 — AI/ML agent & RAG orchestration frameworks (llamaindex · autogen · crewai · semantic-kernel · dspy)
+# CU4a s25 — .NET & hybrid mobile (maui · xamarin · ionic · capacitor · nativescript)
 
-> Slice 5 of the CU4a decomposition. De-stub the 5 thin **ai-ml** framework
-> guides (llamaindex · autogen · crewai · semantic-kernel · dspy) from the 5-section template floor into substantive correction surfaces, in
+> Slice 25 of the CU4a decomposition. De-stub the 5 thin **mobile** framework
+> guides (maui · xamarin · ionic · capacitor · nativescript) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: agent/RAG orchestration frameworks: prompt-injection + tool-execution trust boundaries (CWE-77/CWE-94), unbounded loop/cost blowups, and non-deterministic chunking/retrieval correctness. Adds one content-contract test that reads the REAL guide
+> shared research spine: .NET/WebView-hybrid mobile: migration/EOL status, native-bridge + WebView security (CWE-79/JS-bridge), and platform-permission handling. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -62,76 +69,76 @@ sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatt
 `.ctoc/skills.json` trigger indexing is unaffected.
 
 Grouping rationale: these 5 are ONE research pass because the correction spine is shared —
-agent/RAG orchestration frameworks: prompt-injection + tool-execution trust boundaries (CWE-77/CWE-94), unbounded loop/cost blowups, and non-deterministic chunking/retrieval correctness. They are disjoint by file from every other slice, so `depends_on: none`.
+.NET/WebView-hybrid mobile: migration/EOL status, native-bridge + WebView security (CWE-79/JS-bridge), and platform-permission handling. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/ai-ml/llamaindex.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-orchestration-agents-guides.test.js
-skills/frameworks/ai-ml/autogen.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-orchestration-agents-guides.test.js
-skills/frameworks/ai-ml/crewai.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-orchestration-agents-guides.test.js
-skills/frameworks/ai-ml/semantic-kernel.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-orchestration-agents-guides.test.js
-skills/frameworks/ai-ml/dspy.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-orchestration-agents-guides.test.js
+skills/frameworks/mobile/maui.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
+skills/frameworks/mobile/xamarin.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
+skills/frameworks/mobile/ionic.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
+skills/frameworks/mobile/capacitor.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
+skills/frameworks/mobile/nativescript.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
 ```
 
 5 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/ai-ml/llamaindex.md`
+#### File: `skills/frameworks/mobile/maui.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for llamaindex edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Indexing footguns** — chunk `chunk_size`/`chunk_overlap` vs retrieval quality, embedding-model mismatch on query vs index, `similarity_top_k`, node metadata bloat
-- **Cost/latency** — synchronous vs async pipelines, re-embedding on every run
-- **Security** — RAG content is untrusted → indirect prompt injection; tool/agent code-exec (`PythonREPL`-style) is CWE-94
-- **Version** — LlamaIndex current release + package split, dated
+**Purpose:** Trigger-loaded correction surface for maui edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Lifecycle footguns** — handlers vs renderers (mappers), `MainThread.BeginInvokeOnMainThread`, dependency-injection lifetime, Shell navigation, platform-specific `#if`
+- **Performance** — startup/AOT, collection virtualization
+- **Security** — SecureStorage not plaintext (CWE-312), certificate pinning
+- **Version** — .NET MAUI current .NET release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/ai-ml/autogen.md`
+#### File: `skills/frameworks/mobile/xamarin.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for autogen edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Agent-loop footguns** — `max_turns`/termination or infinite agent-to-agent loops (cost blowup), `code_executor` runs generated code — sandbox it
-- **Concurrency** — async message passing, group-chat routing
-- **Security** — code execution is the core trust boundary (CWE-94); use Docker executor, never local unsandboxed
-- **Version** — AutoGen (v0.4 API) current release, dated
+**Purpose:** Trigger-loaded correction surface for xamarin edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **EOL footguns** — Xamarin support ENDED (May 2024) → migrate to .NET MAUI; do NOT start new Xamarin projects, `MessagingCenter` deprecated, linker behavior
+- **Migration** — upgrade-assistant path
+- **Security** — SecureStorage (CWE-312), TLS
+- **Version** — Xamarin EOL + MAUI migration, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/ai-ml/crewai.md`
+#### File: `skills/frameworks/mobile/ionic.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for crewai edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Crew footguns** — task/agent role coupling, sequential vs hierarchical process, `max_iter` runaway, tool-call loops, delegation cost
-- **Determinism** — temperature + non-reproducible plans
-- **Security** — tools that exec shell/code are CWE-78/CWE-94; validate tool inputs
-- **Version** — CrewAI current release, dated
+**Purpose:** Trigger-loaded correction surface for ionic edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **WebView footguns** — DOM content in a WebView → XSS if untrusted HTML injected (CWE-79), framework choice (Angular/React/Vue), Capacitor vs legacy Cordova plugins, live-reload security
+- **Performance** — virtual scroll, lazy routes
+- **Security** — CSP, `innerHTML` sanitization (CWE-79), secure storage plugin
+- **Version** — Ionic current release + Capacitor, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/ai-ml/semantic-kernel.md`
+#### File: `skills/frameworks/mobile/capacitor.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for semantic-kernel edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Planner/plugin footguns** — function-calling plugin schemas, planner non-determinism, `KernelFunction` argument binding, token budget
-- **Concurrency** — async kernel invocation, filters/hooks
-- **Security** — plugins/native functions are code the model can invoke (CWE-94); prompt injection via memory
-- **Version** — Semantic Kernel current .NET/Python release, dated
+**Purpose:** Trigger-loaded correction surface for capacitor edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Bridge footguns** — native plugin bridge, `server.url`/live-reload must be off in prod, `allowNavigation` scope, custom-scheme, permissions in native manifests
+- **Correctness** — plugin platform parity
+- **Security** — WebView CSP/`allowNavigation` (CWE-79), Preferences plugin not secure by default (CWE-312)
+- **Version** — Capacitor current major, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/ai-ml/dspy.md`
+#### File: `skills/frameworks/mobile/nativescript.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for dspy edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Compilation footguns** — signatures vs hand-prompts, `compile`/optimizer (MIPRO/BootstrapFewShot) needs a metric + trainset, cached traces staleness, LM config coupling
-- **Cost** — optimizer runs many LM calls
-- **Security** — retrieved/optimized prompts embed untrusted content → injection
-- **Version** — DSPy current release, dated
+**Purpose:** Trigger-loaded correction surface for nativescript edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Runtime footguns** — direct native-API access marshalling, main-thread blocking, memory (native object references), plugin ecosystem staleness, flavor (Angular/Vue/Core)
+- **Performance** — UI thread work
+- **Security** — secure storage plugin (CWE-312), TLS
+- **Version** — NativeScript current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-aiml-orchestration-agents-guides.test.js`
+#### Tests: `tests/cu4a-mobile-dotnet-hybrid-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 5 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — llamaindex · autogen · crewai · semantic-kernel · dspy):
+Content-contract test cases (per file — maui · xamarin · ionic · capacitor · nativescript):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -142,11 +149,11 @@ Content-contract test cases (per file — llamaindex · autogen · crewai · sem
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `llamaindex`: `chunk_size`, `similarity_top_k`, `prompt injection`
-   - `autogen`: `code_executor`, `max_turns`, `CWE-94`
-   - `crewai`: `max_iter`, `CWE-94`, `hierarchical`
-   - `semantic-kernel`: `KernelFunction`, `CWE-94`, `plugin`
-   - `dspy`: `Signature`, `compile`, `optimizer`
+   - `maui`: `MainThread`, `SecureStorage`, `handler`
+   - `xamarin`: `EOL`, `MAUI`, `migrate`
+   - `ionic`: `WebView`, `CWE-79`, `Capacitor`
+   - `capacitor`: `allowNavigation`, `server.url`, `CWE-79`
+   - `nativescript`: `marshalling`, `main thread`, `native API`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
@@ -156,7 +163,7 @@ coverage (CU2/CU3 convention for these reference-corpus slices).
 - Content-only edits to 5 Markdown guides + one test reading them; no runtime path, no user
   input surface.
 - Test uses `path.join(__dirname, '..')` + fixed relative paths — no traversal.
-- Every asserted CWE id (CWE-94) is a REAL MITRE identifier grounded in that framework's actual
+- Every asserted CWE id (CWE-79) is a REAL MITRE identifier grounded in that framework's actual
   attack surface — never invented; the guide links cwe.mitre.org for each.
 - Source URLs are public official domains (framework docs / release notes / PyPI / npm / GitHub /
   cwe.mitre.org) — no secrets.
@@ -168,13 +175,13 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 5 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-aiml-orchestration-agents-guides.test.js` (zero doubles — reads the 5 REAL guides off disk via `fs.readFileSync`)
+- [ ] Create `tests/cu4a-mobile-dotnet-hybrid-guides.test.js` (zero doubles — reads the 5 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of llamaindex · autogen · crewai · semantic-kernel · dspy (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of maui · xamarin · ionic · capacitor · nativescript (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
@@ -203,11 +210,11 @@ ONE step, 5 files + the test file.
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the llamaindex · autogen · crewai · semantic-kernel · dspy triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the maui · xamarin · ionic · capacitor · nativescript triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s5") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s25") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
@@ -226,3 +233,57 @@ ONE step, 5 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review

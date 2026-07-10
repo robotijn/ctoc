@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:38.689Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,28 +13,28 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: "Data batch & ELT (spark · dbt · airbyte · fivetran)"
+title: "Data streaming core (kafka · flink · beam · debezium)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/data/spark.md
-  - skills/frameworks/data/dbt.md
-  - skills/frameworks/data/airbyte.md
-  - skills/frameworks/data/fivetran.md
-  - tests/cu4a-data-batch-spark-guides.test.js
+  - skills/frameworks/data/kafka.md
+  - skills/frameworks/data/flink.md
+  - skills/frameworks/data/beam.md
+  - skills/frameworks/data/debezium.md
+  - tests/cu4a-data-streaming-core-guides.test.js
 ---
 
-# CU4a s12 — Data batch & ELT (spark · dbt · airbyte · fivetran)
+# CU4a s11 — Data streaming core (kafka · flink · beam · debezium)
 
-> Slice 12 of the CU4a decomposition. De-stub the 4 thin **data** framework
-> guides (spark · dbt · airbyte · fivetran) from the 5-section template floor into substantive correction surfaces, in
+> Slice 11 of the CU4a decomposition. De-stub the 4 thin **data** framework
+> guides (kafka · flink · beam · debezium) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: batch/ELT: shuffle/skew + partition footguns (Spark), materialization + Jinja-SQL-injection safety (dbt), and connector schema-drift/sync-mode correctness. Adds one content-contract test that reads the REAL guide
+> shared research spine: event-streaming: delivery-semantics (at-least-once vs exactly-once), offset/checkpoint correctness, rebalance/backpressure, and schema-evolution safety. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -61,66 +68,66 @@ sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatt
 `.ctoc/skills.json` trigger indexing is unaffected.
 
 Grouping rationale: these 4 are ONE research pass because the correction spine is shared —
-batch/ELT: shuffle/skew + partition footguns (Spark), materialization + Jinja-SQL-injection safety (dbt), and connector schema-drift/sync-mode correctness. They are disjoint by file from every other slice, so `depends_on: none`.
+event-streaming: delivery-semantics (at-least-once vs exactly-once), offset/checkpoint correctness, rebalance/backpressure, and schema-evolution safety. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/data/spark.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-batch-spark-guides.test.js
-skills/frameworks/data/dbt.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-batch-spark-guides.test.js
-skills/frameworks/data/airbyte.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-batch-spark-guides.test.js
-skills/frameworks/data/fivetran.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-batch-spark-guides.test.js
+skills/frameworks/data/kafka.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-streaming-core-guides.test.js
+skills/frameworks/data/flink.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-streaming-core-guides.test.js
+skills/frameworks/data/beam.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-streaming-core-guides.test.js
+skills/frameworks/data/debezium.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-streaming-core-guides.test.js
 ```
 
 4 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/data/spark.md`
+#### File: `skills/frameworks/data/kafka.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for spark edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Shuffle/skew footguns** — wide transforms + skewed keys, `spark.sql.shuffle.partitions`, AQE (`adaptive.enabled`), broadcast-join threshold, cache/`persist` + eviction, `collect()` driver OOM
-- **Correctness** — lazy eval + non-deterministic UDFs, small-file problem
-- **Security** — Spark UI/master exposure, `spark.sql` string interpolation (CWE-89) → use param binding
-- **Version** — Spark 4.x current release, dated
+**Purpose:** Trigger-loaded correction surface for kafka edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Delivery footguns** — `acks=all` + `enable.idempotence` for durability, commit AFTER processing (auto-commit = data loss), `cooperative-sticky` to avoid rebalance storms, consumer-lag
+- **Ordering** — key→partition, `max.in.flight` vs ordering
+- **Security** — SASL/TLS, ACLs; schema registry compatibility to prevent breaking-change corruption
+- **Version** — Kafka current release (KRaft GA), dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/dbt.md`
+#### File: `skills/frameworks/data/flink.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for dbt edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Materialization footguns** — view vs table vs incremental (`is_incremental()` + unique_key), full-refresh cost, `ref`/`source` DAG, snapshot SCD2, test severity
-- **Correctness** — incremental late-arriving data, timezone
-- **Security** — Jinja `{{ }}` interpolating untrusted vars into SQL is injection (CWE-89); never build SQL from unquoted user input
-- **Version** — dbt-core current release, dated
+**Purpose:** Trigger-loaded correction surface for flink edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **State/checkpoint footguns** — checkpoint interval + aligned/unaligned barriers, RocksDB state backend + TTL, watermark + allowed-lateness event-time correctness, exactly-once sink (two-phase commit)
+- **Backpressure** — buffer debloating
+- **Security** — REST/web UI exposure, savepoint state as data boundary
+- **Version** — Flink current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/airbyte.md`
+#### File: `skills/frameworks/data/beam.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for airbyte edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Sync footguns** — full-refresh vs incremental + CDC, cursor field + primary key, normalization removal (raw JSON), schema-change propagation, connector-version pin
-- **Reliability** — resumable state, rate limits
-- **Security** — connector credentials in secrets store, PII in raw tables
-- **Version** — Airbyte current release, dated
+**Purpose:** Trigger-loaded correction surface for beam edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Windowing footguns** — event-time windows + triggers + allowed lateness, `GroupByKey` hot keys, side-inputs re-materialization, runner-specific semantics (Dataflow/Flink)
+- **Determinism** — non-deterministic DoFn + retries → duplicates
+- **Security** — pipeline options/creds handling
+- **Version** — Apache Beam current SDK, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/fivetran.md`
+#### File: `skills/frameworks/data/debezium.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for fivetran edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Sync footguns** — history vs soft-delete, schema drift auto-add columns, sync frequency + MAR cost, primary-key requirement, re-sync blast radius
-- **Correctness** — timezone/`_fivetran_synced`
-- **Security** — connector auth scope, column blocking/hashing for PII
-- **Version** — Fivetran connector SDK/current behavior, dated
+**Purpose:** Trigger-loaded correction surface for debezium edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **CDC footguns** — snapshot vs streaming phase, replication-slot/WAL retention blowup (disk fill), schema-change events, tombstones on delete, `snapshot.mode`
+- **Ordering** — per-table topic, exactly-once via Kafka Connect
+- **Security** — DB replication-user least privilege, connector credentials
+- **Version** — Debezium current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-data-batch-spark-guides.test.js`
+#### Tests: `tests/cu4a-data-streaming-core-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 4 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — spark · dbt · airbyte · fivetran):
+Content-contract test cases (per file — kafka · flink · beam · debezium):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -131,10 +138,10 @@ Content-contract test cases (per file — spark · dbt · airbyte · fivetran):
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `spark`: `shuffle`, `broadcast`, `CWE-89`
-   - `dbt`: `is_incremental`, `ref(`, `CWE-89`
-   - `airbyte`: `incremental`, `cursor field`, `CDC`
-   - `fivetran`: `MAR`, `soft-delete`, `schema drift`
+   - `kafka`: `enable.idempotence`, `acks=all`, `cooperative-sticky`
+   - `flink`: `checkpoint`, `watermark`, `exactly-once`
+   - `beam`: `GroupByKey`, `window`, `trigger`
+   - `debezium`: `replication slot`, `snapshot.mode`, `WAL`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
@@ -144,7 +151,7 @@ coverage (CU2/CU3 convention for these reference-corpus slices).
 - Content-only edits to 4 Markdown guides + one test reading them; no runtime path, no user
   input surface.
 - Test uses `path.join(__dirname, '..')` + fixed relative paths — no traversal.
-- Every asserted CWE id (CWE-89) is a REAL MITRE identifier grounded in that framework's actual
+- Every asserted CWE id (none required in this family) is a REAL MITRE identifier grounded in that framework's actual
   attack surface — never invented; the guide links cwe.mitre.org for each.
 - Source URLs are public official domains (framework docs / release notes / PyPI / npm / GitHub /
   cwe.mitre.org) — no secrets.
@@ -156,13 +163,13 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 4 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-data-batch-spark-guides.test.js` (zero doubles — reads the 4 REAL guides off disk via `fs.readFileSync`)
+- [ ] Create `tests/cu4a-data-streaming-core-guides.test.js` (zero doubles — reads the 4 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of spark · dbt · airbyte · fivetran (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of kafka · flink · beam · debezium (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
@@ -191,11 +198,11 @@ ONE step, 4 files + the test file.
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the spark · dbt · airbyte · fivetran triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the kafka · flink · beam · debezium triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s12") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s11") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
@@ -214,3 +221,57 @@ ONE step, 4 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review

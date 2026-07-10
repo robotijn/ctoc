@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:38.609Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,30 +13,30 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: "Config mgmt & observability (chef · puppet · saltstack · prometheus · grafana · datadog)"
+title: "AI/ML vector databases (pinecone · weaviate · qdrant · chromadb · milvus · pgvector)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/devops/chef.md
-  - skills/frameworks/devops/puppet.md
-  - skills/frameworks/devops/saltstack.md
-  - skills/frameworks/devops/prometheus.md
-  - skills/frameworks/devops/grafana.md
-  - skills/frameworks/devops/datadog.md
-  - tests/cu4a-devops-config-observ-guides.test.js
+  - skills/frameworks/ai-ml/pinecone.md
+  - skills/frameworks/ai-ml/weaviate.md
+  - skills/frameworks/ai-ml/qdrant.md
+  - skills/frameworks/ai-ml/chromadb.md
+  - skills/frameworks/ai-ml/milvus.md
+  - skills/frameworks/ai-ml/pgvector.md
+  - tests/cu4a-aiml-vectordb-guides.test.js
 ---
 
-# CU4a s30 — Config mgmt & observability (chef · puppet · saltstack · prometheus · grafana · datadog)
+# CU4a s6 — AI/ML vector databases (pinecone · weaviate · qdrant · chromadb · milvus · pgvector)
 
-> Slice 30 of the CU4a decomposition. De-stub the 6 thin **devops** framework
-> guides (chef · puppet · saltstack · prometheus · grafana · datadog) from the 5-section template floor into substantive correction surfaces, in
+> Slice 6 of the CU4a decomposition. De-stub the 6 thin **ai-ml** framework
+> guides (pinecone · weaviate · qdrant · chromadb · milvus · pgvector) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: config-management + observability: idempotent convergence, cardinality explosions, alerting correctness, and secrets/credential handling. Adds one content-contract test that reads the REAL guide
+> shared research spine: vector databases: embedding-dimension/metric mismatch, ANN index (HNSW) recall-vs-latency tuning, metadata-filter correctness, and multi-tenant isolation. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -63,84 +70,86 @@ sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatt
 `.ctoc/skills.json` trigger indexing is unaffected.
 
 Grouping rationale: these 6 are ONE research pass because the correction spine is shared —
-config-management + observability: idempotent convergence, cardinality explosions, alerting correctness, and secrets/credential handling. They are disjoint by file from every other slice, so `depends_on: none`.
+vector databases: embedding-dimension/metric mismatch, ANN index (HNSW) recall-vs-latency tuning, metadata-filter correctness, and multi-tenant isolation. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/devops/chef.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-config-observ-guides.test.js
-skills/frameworks/devops/puppet.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-config-observ-guides.test.js
-skills/frameworks/devops/saltstack.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-config-observ-guides.test.js
-skills/frameworks/devops/prometheus.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-config-observ-guides.test.js
-skills/frameworks/devops/grafana.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-config-observ-guides.test.js
-skills/frameworks/devops/datadog.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-config-observ-guides.test.js
+skills/frameworks/ai-ml/pinecone.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
+skills/frameworks/ai-ml/weaviate.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
+skills/frameworks/ai-ml/qdrant.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
+skills/frameworks/ai-ml/chromadb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
+skills/frameworks/ai-ml/milvus.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
+skills/frameworks/ai-ml/pgvector.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-vectordb-guides.test.js
 ```
 
 6 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/devops/chef.md`
+#### File: `skills/frameworks/ai-ml/pinecone.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for chef edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Convergence footguns** — resource idempotency + guards (`not_if`/`only_if`), notifications/subscriptions + `:delayed`, run-list order, `execute` non-idempotent, attribute precedence
-- **Safety** — `why-run` mode
-- **Security** — encrypted data bags/Chef Vault for secrets (CWE-312), no plaintext in cookbooks
-- **Version** — Chef Infra current release, dated
+**Purpose:** Trigger-loaded correction surface for pinecone edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Index footguns** — dimension + metric fixed at create, serverless vs pod, namespace isolation, upsert batch limits, eventual-consistency read-after-write
+- **Correctness** — metadata filter cardinality, `top_k` recall
+- **Security** — API-key scoping, namespace as tenant boundary
+- **Version** — Pinecone current SDK (v5+) + serverless API, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/devops/puppet.md`
+#### File: `skills/frameworks/ai-ml/weaviate.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for puppet edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Catalog footguns** — declarative resource ordering (`require`/`before`/`notify`), idempotent resources, `exec` needs `creates`/`unless`, class vs defined type, Hiera lookup precedence
-- **Safety** — `--noop`
-- **Security** — Hiera-eyaml for secrets (CWE-312), no plaintext
-- **Version** — Puppet current release, dated
+**Purpose:** Trigger-loaded correction surface for weaviate edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Schema footguns** — vectorizer module vs bring-your-own vectors, HNSW `ef`/`efConstruction`/`maxConnections`, class/collection schema, hybrid (BM25+vector) alpha
+- **Consistency** — replication factor, tombstone/compaction
+- **Security** — API-key/OIDC auth, multi-tenancy `tenant` isolation
+- **Version** — Weaviate current release + client v4, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/devops/saltstack.md`
+#### File: `skills/frameworks/ai-ml/qdrant.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for saltstack edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **State footguns** — idempotent states + `cmd.run` (use `unless`/`onlyif`), requisites (`require`/`watch`), pillar for data/secrets, master-minion key acceptance
-- **Security** — historical unauthenticated-RCE CVE class on exposed masters (e.g. CVE-2020-11651 auth-bypass) → patch + never expose the master publicly; pillar secrets not plaintext (CWE-312)
-- **Version** — Salt current release, dated
+**Purpose:** Trigger-loaded correction surface for qdrant edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Collection footguns** — distance metric + vector size fixed, HNSW `m`/`ef_construct`, payload index for filters, quantization (scalar/binary) recall loss
+- **Consistency** — `wait=true` on upsert, sharding/replication
+- **Security** — API-key auth, payload as tenant filter
+- **Version** — Qdrant current release + client, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/devops/prometheus.md`
+#### File: `skills/frameworks/ai-ml/chromadb.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for prometheus edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Cardinality footguns** — high-cardinality labels (user id / request id) explode series + memory, `rate()` needs counter + range window, scrape interval vs `rate` window, recording rules for expensive queries
-- **Correctness** — counter reset handling, staleness
-- **Security** — no auth by default → do not expose metrics/admin API publicly (CWE-306)
-- **Version** — Prometheus current release, dated
+**Purpose:** Trigger-loaded correction surface for chromadb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Collection footguns** — embedding-function mismatch between add and query, `hnsw:space` metric, in-memory vs persistent client, metadata `where` filter operators
+- **Scale** — single-node limits, batch add
+- **Security** — auth on server mode, tenant/database separation
+- **Version** — Chroma current release (client/server split), dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/devops/grafana.md`
+#### File: `skills/frameworks/ai-ml/milvus.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for grafana edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Dashboard footguns** — template variables + query scope, panel time-range vs query, alerting (unified) rules + no-data handling, datasource proxy vs browser, transformations
-- **Security** — datasource credentials + proxy (not browser-exposed), documented auth/SSRF advisory classes → patch + auth; API keys (CWE-798)
-- **Version** — Grafana current release, dated
+**Purpose:** Trigger-loaded correction surface for milvus edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Index footguns** — index type (HNSW/IVF_FLAT/DiskANN) + metric choice, `nlist`/`nprobe` recall-vs-latency, load collection into memory before search, partition key
+- **Consistency** — consistency level (Strong/Bounded/Eventually)
+- **Security** — RBAC/user auth, collection-level isolation
+- **Version** — Milvus current release + pymilvus, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/devops/datadog.md`
+#### File: `skills/frameworks/ai-ml/pgvector.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for datadog edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Instrumentation footguns** — custom-metric cardinality/tag explosion → cost, APM sampling rates, log-pipeline + facet indexing cost, agent config, distribution vs gauge
-- **Correctness** — monitor evaluation window + no-data
-- **Security** — API/APP keys not in code (CWE-798), PII scrubbing in logs
-- **Version** — Datadog Agent current release, dated
+**Purpose:** Trigger-loaded correction surface for pgvector edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Index footguns** — `ivfflat` `lists` vs `hnsw` `m`/`ef_search`, build index AFTER bulk load, distance operator (`<->`/`<=>`/`<#>`) must match index opclass, `maintenance_work_mem` for build
+- **Correctness** — exact vs approximate (no index = seq scan), dimension limit
+- **Security** — RLS for multi-tenant vectors (CWE-284 broken access control if omitted)
+- **Version** — pgvector current release + Postgres coupling, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-devops-config-observ-guides.test.js`
+#### Tests: `tests/cu4a-aiml-vectordb-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 6 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — chef · puppet · saltstack · prometheus · grafana · datadog):
+Content-contract test cases (per file — pinecone · weaviate · qdrant · chromadb · milvus · pgvector):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -151,12 +160,12 @@ Content-contract test cases (per file — chef · puppet · saltstack · prometh
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `chef`: `not_if`, `notifies`, `CWE-312`
-   - `puppet`: `require`, `exec`, `Hiera`
-   - `saltstack`: `unless`, `pillar`, `CVE-2020-11651`
-   - `prometheus`: `cardinality`, `rate(`, `CWE-306`
-   - `grafana`: `template variable`, `alerting`, `CWE-798`
-   - `datadog`: `cardinality`, `sampling`, `CWE-798`
+   - `pinecone`: `namespace`, `dimension`, `top_k`
+   - `weaviate`: `HNSW`, `efConstruction`, `multi-tenancy`
+   - `qdrant`: `HNSW`, `ef_construct`, `payload index`
+   - `chromadb`: `embedding_function`, `hnsw:space`, `where`
+   - `milvus`: `IVF`, `nprobe`, `consistency level`
+   - `pgvector`: `ivfflat`, `hnsw`, `ef_search`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
@@ -166,7 +175,7 @@ coverage (CU2/CU3 convention for these reference-corpus slices).
 - Content-only edits to 6 Markdown guides + one test reading them; no runtime path, no user
   input surface.
 - Test uses `path.join(__dirname, '..')` + fixed relative paths — no traversal.
-- Every asserted CWE id (CWE-312, CVE-2020-11651, CWE-306, CWE-798) is a REAL MITRE identifier grounded in that framework's actual
+- Every asserted CWE id (none required in this family) is a REAL MITRE identifier grounded in that framework's actual
   attack surface — never invented; the guide links cwe.mitre.org for each.
 - Source URLs are public official domains (framework docs / release notes / PyPI / npm / GitHub /
   cwe.mitre.org) — no secrets.
@@ -178,13 +187,13 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 6 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-devops-config-observ-guides.test.js` (zero doubles — reads the 6 REAL guides off disk via `fs.readFileSync`)
+- [ ] Create `tests/cu4a-aiml-vectordb-guides.test.js` (zero doubles — reads the 6 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of chef · puppet · saltstack · prometheus · grafana · datadog (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of pinecone · weaviate · qdrant · chromadb · milvus · pgvector (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
@@ -213,11 +222,11 @@ ONE step, 6 files + the test file.
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the chef · puppet · saltstack · prometheus · grafana · datadog triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the pinecone · weaviate · qdrant · chromadb · milvus · pgvector triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s30") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s6") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
@@ -236,3 +245,57 @@ ONE step, 6 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
