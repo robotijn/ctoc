@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:38.955Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,28 +13,28 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: "Document & graph databases (mongodb · arangodb · neo4j · dgraph)"
+title: "Wide-column & multi-model NoSQL (cassandra · scylladb · dynamodb · couchbase)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/data/mongodb.md
-  - skills/frameworks/data/arangodb.md
-  - skills/frameworks/data/neo4j.md
-  - skills/frameworks/data/dgraph.md
-  - tests/cu4a-data-document-graph-guides.test.js
+  - skills/frameworks/data/cassandra.md
+  - skills/frameworks/data/scylladb.md
+  - skills/frameworks/data/dynamodb.md
+  - skills/frameworks/data/couchbase.md
+  - tests/cu4a-data-wide-column-guides.test.js
 ---
 
-# CU4a s21 — Document & graph databases (mongodb · arangodb · neo4j · dgraph)
+# CU4a s20 — Wide-column & multi-model NoSQL (cassandra · scylladb · dynamodb · couchbase)
 
-> Slice 21 of the CU4a decomposition. De-stub the 4 thin **data** framework
-> guides (mongodb · arangodb · neo4j · dgraph) from the 5-section template floor into substantive correction surfaces, in
+> Slice 20 of the CU4a decomposition. De-stub the 4 thin **data** framework
+> guides (cassandra · scylladb · dynamodb · couchbase) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: document/graph DBs: index-supported queries + schema/embedding design, NoSQL/query injection (CWE-943), traversal depth + supernode footguns. Adds one content-contract test that reads the REAL guide
+> shared research spine: wide-column/NoSQL: partition-key design (hotspots + unbounded partitions), tunable consistency, tombstone/GC, and single-table access-pattern modeling. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -61,66 +68,66 @@ sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatt
 `.ctoc/skills.json` trigger indexing is unaffected.
 
 Grouping rationale: these 4 are ONE research pass because the correction spine is shared —
-document/graph DBs: index-supported queries + schema/embedding design, NoSQL/query injection (CWE-943), traversal depth + supernode footguns. They are disjoint by file from every other slice, so `depends_on: none`.
+wide-column/NoSQL: partition-key design (hotspots + unbounded partitions), tunable consistency, tombstone/GC, and single-table access-pattern modeling. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/data/mongodb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-document-graph-guides.test.js
-skills/frameworks/data/arangodb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-document-graph-guides.test.js
-skills/frameworks/data/neo4j.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-document-graph-guides.test.js
-skills/frameworks/data/dgraph.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-document-graph-guides.test.js
+skills/frameworks/data/cassandra.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-wide-column-guides.test.js
+skills/frameworks/data/scylladb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-wide-column-guides.test.js
+skills/frameworks/data/dynamodb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-wide-column-guides.test.js
+skills/frameworks/data/couchbase.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-wide-column-guides.test.js
 ```
 
 4 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/data/mongodb.md`
+#### File: `skills/frameworks/data/cassandra.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for mongodb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Query footguns** — missing index → COLLSCAN, `$lookup` cost, unbounded array growth (16MB doc limit), embed vs reference, write-concern/read-concern, aggregation pipeline memory
-- **Correctness** — eventual read on secondaries, transactions across shards
-- **Security** — `$where`/operator injection from untrusted input is NoSQL injection (CWE-943); validate operators, use parameterized driver calls
-- **Version** — MongoDB current release, dated
+**Purpose:** Trigger-loaded correction surface for cassandra edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Data-model footguns** — partition key drives everything (hot partitions, unbounded partition growth), query-first modeling (no ad-hoc joins), tombstone accumulation + `gc_grace_seconds` read timeouts, `ALLOW FILTERING` = full scan
+- **Consistency** — LOCAL_QUORUM tuning, lightweight transactions cost
+- **Security** — parameterized CQL (CWE-89), auth/RBAC
+- **Version** — Cassandra 5.x current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/arangodb.md`
+#### File: `skills/frameworks/data/scylladb.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for arangodb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Multi-model footguns** — AQL over documents/graphs, index (persistent/hash) required, traversal depth limits, collection vs edge collection, join cost
-- **Consistency** — write concern, smart graphs (cluster)
-- **Security** — AQL bind parameters not string concat (CWE-943), RBAC
-- **Version** — ArangoDB current release, dated
+**Purpose:** Trigger-loaded correction surface for scylladb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Data-model footguns** — same Cassandra model (shard-per-core): partition design, tombstones, `ALLOW FILTERING`; shard-aware driver for latency
+- **Consistency** — tunable consistency, LWT cost
+- **Security** — parameterized CQL (CWE-89), auth
+- **Version** — ScyllaDB current release + Cassandra-compat, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/neo4j.md`
+#### File: `skills/frameworks/data/dynamodb.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for neo4j edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Cypher footguns** — missing index/constraint → full scan, cartesian products on disconnected patterns, unbounded variable-length paths (`*`), supernode hotspots, `PROFILE`/`EXPLAIN`
-- **Correctness** — `MERGE` semantics + accidental duplicates
-- **Security** — Cypher parameters (`$param`) not string concat → Cypher injection (CWE-943)
-- **Version** — Neo4j 5.x current release, dated
+**Purpose:** Trigger-loaded correction surface for dynamodb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Modeling footguns** — single-table design + composite keys, hot-partition throttling, `Scan` vs `Query` (avoid Scan), GSI projection + eventual consistency, item-size 400KB limit
+- **Cost** — RCU/WCU vs on-demand, `BatchWrite` retries on unprocessed items
+- **Security** — IAM least-privilege, condition expressions, no injection but validate
+- **Version** — DynamoDB current behavior + SDK v3, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/data/dgraph.md`
+#### File: `skills/frameworks/data/couchbase.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for dgraph edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Graph footguns** — DQL/GraphQL± schema + predicate indexing (`@index`), reverse edges (`@reverse`), upsert blocks, transaction conflicts, expand-all cost
-- **Consistency** — best-effort vs linearizable reads
-- **Security** — parameterized DQL variables, ACL
-- **Version** — Dgraph current release, dated
+**Purpose:** Trigger-loaded correction surface for couchbase edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Modeling footguns** — scopes/collections, N1QL index required (else full scan), durability (majority) vs speed, SDK `KV` vs query, document vs sub-document ops
+- **Consistency** — `scan_consistency` (request_plus staleness)
+- **Security** — parameterized N1QL (CWE-943 NoSQL injection), RBAC
+- **Version** — Couchbase current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-data-document-graph-guides.test.js`
+#### Tests: `tests/cu4a-data-wide-column-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 4 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — mongodb · arangodb · neo4j · dgraph):
+Content-contract test cases (per file — cassandra · scylladb · dynamodb · couchbase):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -131,10 +138,10 @@ Content-contract test cases (per file — mongodb · arangodb · neo4j · dgraph
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `mongodb`: `COLLSCAN`, `$lookup`, `CWE-943`
-   - `arangodb`: `AQL`, `bind parameter`, `traversal`
-   - `neo4j`: `Cypher`, `MERGE`, `CWE-943`
-   - `dgraph`: `@index`, `upsert`, `DQL`
+   - `cassandra`: `partition key`, `tombstone`, `ALLOW FILTERING`
+   - `scylladb`: `partition key`, `shard-aware`, `tombstone`
+   - `dynamodb`: `single-table`, `GSI`, `Scan`
+   - `couchbase`: `N1QL`, `scan_consistency`, `CWE-943`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
@@ -156,13 +163,13 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 4 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-data-document-graph-guides.test.js` (zero doubles — reads the 4 REAL guides off disk via `fs.readFileSync`)
+- [ ] Create `tests/cu4a-data-wide-column-guides.test.js` (zero doubles — reads the 4 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of mongodb · arangodb · neo4j · dgraph (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of cassandra · scylladb · dynamodb · couchbase (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
@@ -191,11 +198,11 @@ ONE step, 4 files + the test file.
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the mongodb · arangodb · neo4j · dgraph triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the cassandra · scylladb · dynamodb · couchbase triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s21") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s20") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
@@ -214,3 +221,57 @@ ONE step, 4 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review

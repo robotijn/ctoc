@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:38.908Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,29 +13,29 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: ".NET & hybrid mobile (maui · xamarin · ionic · capacitor · nativescript)"
+title: "Embedded SQL, time-series & ORMs (sqlite · timescaledb · sqlalchemy · alembic · drizzle)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/mobile/maui.md
-  - skills/frameworks/mobile/xamarin.md
-  - skills/frameworks/mobile/ionic.md
-  - skills/frameworks/mobile/capacitor.md
-  - skills/frameworks/mobile/nativescript.md
-  - tests/cu4a-mobile-dotnet-hybrid-guides.test.js
+  - skills/frameworks/data/sqlite.md
+  - skills/frameworks/data/timescaledb.md
+  - skills/frameworks/data/sqlalchemy.md
+  - skills/frameworks/data/alembic.md
+  - skills/frameworks/data/drizzle.md
+  - tests/cu4a-data-sql-embedded-orm-guides.test.js
 ---
 
-# CU4a s25 — .NET & hybrid mobile (maui · xamarin · ionic · capacitor · nativescript)
+# CU4a s18 — Embedded SQL, time-series & ORMs (sqlite · timescaledb · sqlalchemy · alembic · drizzle)
 
-> Slice 25 of the CU4a decomposition. De-stub the 5 thin **mobile** framework
-> guides (maui · xamarin · ionic · capacitor · nativescript) from the 5-section template floor into substantive correction surfaces, in
+> Slice 18 of the CU4a decomposition. De-stub the 5 thin **data** framework
+> guides (sqlite · timescaledb · sqlalchemy · alembic · drizzle) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: .NET/WebView-hybrid mobile: migration/EOL status, native-bridge + WebView security (CWE-79/JS-bridge), and platform-permission handling. Adds one content-contract test that reads the REAL guide
+> shared research spine: embedded SQL / ORM / migrations: locking + WAL concurrency, hypertable chunking, N+1 + session/identity-map, and injection-safe query building. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -62,76 +69,76 @@ sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatt
 `.ctoc/skills.json` trigger indexing is unaffected.
 
 Grouping rationale: these 5 are ONE research pass because the correction spine is shared —
-.NET/WebView-hybrid mobile: migration/EOL status, native-bridge + WebView security (CWE-79/JS-bridge), and platform-permission handling. They are disjoint by file from every other slice, so `depends_on: none`.
+embedded SQL / ORM / migrations: locking + WAL concurrency, hypertable chunking, N+1 + session/identity-map, and injection-safe query building. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/mobile/maui.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
-skills/frameworks/mobile/xamarin.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
-skills/frameworks/mobile/ionic.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
-skills/frameworks/mobile/capacitor.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
-skills/frameworks/mobile/nativescript.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-mobile-dotnet-hybrid-guides.test.js
+skills/frameworks/data/sqlite.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-sql-embedded-orm-guides.test.js
+skills/frameworks/data/timescaledb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-sql-embedded-orm-guides.test.js
+skills/frameworks/data/sqlalchemy.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-sql-embedded-orm-guides.test.js
+skills/frameworks/data/alembic.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-sql-embedded-orm-guides.test.js
+skills/frameworks/data/drizzle.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-data-sql-embedded-orm-guides.test.js
 ```
 
 5 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/mobile/maui.md`
+#### File: `skills/frameworks/data/sqlite.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for maui edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Lifecycle footguns** — handlers vs renderers (mappers), `MainThread.BeginInvokeOnMainThread`, dependency-injection lifetime, Shell navigation, platform-specific `#if`
-- **Performance** — startup/AOT, collection virtualization
-- **Security** — SecureStorage not plaintext (CWE-312), certificate pinning
-- **Version** — .NET MAUI current .NET release, dated
+**Purpose:** Trigger-loaded correction surface for sqlite edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Concurrency footguns** — single-writer + `SQLITE_BUSY`, enable WAL mode + `busy_timeout`, foreign keys OFF by default (`PRAGMA foreign_keys=ON`), datatype affinity surprises
+- **Correctness** — no strict typing (unless `STRICT` table), `AUTOINCREMENT` misuse
+- **Security** — parameterized queries not string SQL (CWE-89)
+- **Version** — SQLite current release + STRICT tables, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/mobile/xamarin.md`
+#### File: `skills/frameworks/data/timescaledb.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for xamarin edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **EOL footguns** — Xamarin support ENDED (May 2024) → migrate to .NET MAUI; do NOT start new Xamarin projects, `MessagingCenter` deprecated, linker behavior
-- **Migration** — upgrade-assistant path
-- **Security** — SecureStorage (CWE-312), TLS
-- **Version** — Xamarin EOL + MAUI migration, dated
+**Purpose:** Trigger-loaded correction surface for timescaledb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Hypertable footguns** — chunk_time_interval sizing (too small = planning overhead), continuous aggregates + refresh policy, compression policy + mutability, `time_bucket` alignment, retention policy
+- **Correctness** — insert into wrong chunk, upsert on hypertable
+- **Security** — parameterized queries (CWE-89), Postgres roles
+- **Version** — TimescaleDB current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/mobile/ionic.md`
+#### File: `skills/frameworks/data/sqlalchemy.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for ionic edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **WebView footguns** — DOM content in a WebView → XSS if untrusted HTML injected (CWE-79), framework choice (Angular/React/Vue), Capacitor vs legacy Cordova plugins, live-reload security
-- **Performance** — virtual scroll, lazy routes
-- **Security** — CSP, `innerHTML` sanitization (CWE-79), secure storage plugin
-- **Version** — Ionic current release + Capacitor, dated
+**Purpose:** Trigger-loaded correction surface for sqlalchemy edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **ORM footguns** — N+1 via lazy loading → `selectinload`/`joinedload`, 1.x vs 2.0 style (`select()` + `Session.execute`), identity map + `expire_on_commit`, session lifecycle/scoping, `text()` raw SQL
+- **Correctness** — implicit autoflush, detached instances
+- **Security** — bound parameters not f-string SQL (CWE-89)
+- **Version** — SQLAlchemy 2.x current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/mobile/capacitor.md`
+#### File: `skills/frameworks/data/alembic.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for capacitor edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Bridge footguns** — native plugin bridge, `server.url`/live-reload must be off in prod, `allowNavigation` scope, custom-scheme, permissions in native manifests
-- **Correctness** — plugin platform parity
-- **Security** — WebView CSP/`allowNavigation` (CWE-79), Preferences plugin not secure by default (CWE-312)
-- **Version** — Capacitor current major, dated
+**Purpose:** Trigger-loaded correction surface for alembic edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Migration footguns** — autogenerate misses (server defaults, type changes, indexes) → review every revision, batch mode for SQLite ALTER, down_revision chain + branch merges, offline vs online
+- **Safety** — non-transactional DDL, data migrations separate
+- **Security** — no untrusted input in migration SQL (CWE-89)
+- **Version** — Alembic current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/mobile/nativescript.md`
+#### File: `skills/frameworks/data/drizzle.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for nativescript edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Runtime footguns** — direct native-API access marshalling, main-thread blocking, memory (native object references), plugin ecosystem staleness, flavor (Angular/Vue/Core)
-- **Performance** — UI thread work
-- **Security** — secure storage plugin (CWE-312), TLS
-- **Version** — NativeScript current release, dated
+**Purpose:** Trigger-loaded correction surface for drizzle edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Query footguns** — `sql` template tag is parameterized but `sql.raw` is NOT (CWE-89), relational queries vs core, prepared statements, migration via `drizzle-kit generate`/`migrate` not `push` in prod
+- **Correctness** — type inference, transaction API
+- **Security** — never `sql.raw` with user input (CWE-89)
+- **Version** — Drizzle ORM current release, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-mobile-dotnet-hybrid-guides.test.js`
+#### Tests: `tests/cu4a-data-sql-embedded-orm-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
 **Zero doubles:** reads the REAL 5 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — maui · xamarin · ionic · capacitor · nativescript):
+Content-contract test cases (per file — sqlite · timescaledb · sqlalchemy · alembic · drizzle):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -142,11 +149,11 @@ Content-contract test cases (per file — maui · xamarin · ionic · capacitor 
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `maui`: `MainThread`, `SecureStorage`, `handler`
-   - `xamarin`: `EOL`, `MAUI`, `migrate`
-   - `ionic`: `WebView`, `CWE-79`, `Capacitor`
-   - `capacitor`: `allowNavigation`, `server.url`, `CWE-79`
-   - `nativescript`: `marshalling`, `main thread`, `native API`
+   - `sqlite`: `WAL`, `SQLITE_BUSY`, `CWE-89`
+   - `timescaledb`: `hypertable`, `time_bucket`, `continuous aggregate`
+   - `sqlalchemy`: `selectinload`, `2.0`, `CWE-89`
+   - `alembic`: `autogenerate`, `down_revision`, `batch`
+   - `drizzle`: `sql.raw`, `drizzle-kit`, `CWE-89`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
@@ -156,7 +163,7 @@ coverage (CU2/CU3 convention for these reference-corpus slices).
 - Content-only edits to 5 Markdown guides + one test reading them; no runtime path, no user
   input surface.
 - Test uses `path.join(__dirname, '..')` + fixed relative paths — no traversal.
-- Every asserted CWE id (CWE-79) is a REAL MITRE identifier grounded in that framework's actual
+- Every asserted CWE id (CWE-89) is a REAL MITRE identifier grounded in that framework's actual
   attack surface — never invented; the guide links cwe.mitre.org for each.
 - Source URLs are public official domains (framework docs / release notes / PyPI / npm / GitHub /
   cwe.mitre.org) — no secrets.
@@ -168,13 +175,13 @@ Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly on
 
 ### Step 8: TEST (TDD Red)
 Read all 5 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-mobile-dotnet-hybrid-guides.test.js` (zero doubles — reads the 5 REAL guides off disk via `fs.readFileSync`)
+- [ ] Create `tests/cu4a-data-sql-embedded-orm-guides.test.js` (zero doubles — reads the 5 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of maui · xamarin · ionic · capacitor · nativescript (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of sqlite · timescaledb · sqlalchemy · alembic · drizzle (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
@@ -203,11 +210,11 @@ ONE step, 5 files + the test file.
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the maui · xamarin · ionic · capacitor · nativescript triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the sqlite · timescaledb · sqlalchemy · alembic · drizzle triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s25") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s18") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
@@ -226,3 +233,57 @@ ONE step, 5 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review

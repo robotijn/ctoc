@@ -1,4 +1,11 @@
 ---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-10T17:01:39.126Z
+gate_crossed: implementation → todo
+---
+
+---
 approved_by: human
 approved_at: 2026-07-08T20:52:40.418Z
 gate_crossed: functional → implementation
@@ -6,26 +13,27 @@ gate_crossed: functional → implementation
 
 ---
 iron_loop: true
-title: "AI/ML experiment tracking (mlflow · wandb)"
+title: "Kubernetes & manifest tooling (kubernetes · helm · kustomize)"
 type: implementation
 parent_plan: CU4a-frameworks-longtail
 depends_on: none
 priority: MEDIUM
 risk_level: MEDIUM
 files:
-  - skills/frameworks/ai-ml/mlflow.md
-  - skills/frameworks/ai-ml/wandb.md
-  - tests/cu4a-aiml-experiment-tracking-guides.test.js
+  - skills/frameworks/devops/kubernetes.md
+  - skills/frameworks/devops/helm.md
+  - skills/frameworks/devops/kustomize.md
+  - tests/cu4a-devops-k8s-family-guides.test.js
 ---
 
-# CU4a s7 — AI/ML experiment tracking (mlflow · wandb)
+# CU4a s27 — Kubernetes & manifest tooling (kubernetes · helm · kustomize)
 
-> Slice 7 of the CU4a decomposition. De-stub the 2 thin **ai-ml** framework
-> guides (mlflow · wandb) from the 5-section template floor into substantive correction surfaces, in
+> Slice 27 of the CU4a decomposition. De-stub the 3 thin **devops** framework
+> guides (kubernetes · helm · kustomize) from the 5-section template floor into substantive correction surfaces, in
 > ONE coherent research pass. Confirmed fresh 2026-07-10: each of these files has exactly the 5
 > template sections (Installation, Claude's Common Mistakes, Correct Patterns, Version Gotchas,
 > What NOT to Do) — no dated sources, no CWE identifiers, no References section. This slice's
-> shared research spine: experiment-tracking + model-registry: model-artifact deserialization trust boundaries (CWE-502), tracking-server SSRF/exposure, and run/artifact reproducibility. Adds one content-contract test that reads the REAL guide
+> shared research spine: Kubernetes + manifest tooling: deprecated-API removal, resource/probe/security-context correctness, and templating/overlay + secret-handling footguns. Adds one content-contract test that reads the REAL guide
 > files off disk with **zero doubles**. Disjoint by file from every sibling upgrade slice →
 > `depends_on: none` (parallel-safe; Gate 2 & 3 still batch per parent via `approveSubplans`).
 >
@@ -41,7 +49,7 @@ Maps to CU4a acceptance criteria: **"every audit-confirmed thin framework file i
 recorded"**, **"upgraded frameworks meet the CU3 depth standard (>5 sections; each section names a
 technology-specific identifier — version number, CWE id, or concrete API/function name; every
 version/security claim carries a dated source ≥ 2025-01-01)"**, and **"no audited-SOLID file is
-rewritten (no-churn)"** — for these 2 files.
+rewritten (no-churn)"** — for these 3 files.
 
 ## Implementation Details
 
@@ -53,52 +61,61 @@ idiomatic + current-version. Bar = depth-within-framework, objectively gated: ev
 section names a concrete identifier (version number, CWE id, or API/function name); every
 version/security claim carries an inline dated http source ≥ 2025-01-01.
 
-**No-churn (extend, never overwrite):** each of the 2 guides has exactly 5 `## ` sections today
+**No-churn (extend, never overwrite):** each of the 3 guides has exactly 5 `## ` sections today
 (confirmed by reading fresh 2026-07-10). The existing 5 sections are preserved verbatim; new
 sections are ADDED below them. The H1 `# <Framework> CTO` header + any frontmatter stay intact so
 `.ctoc/skills.json` trigger indexing is unaffected.
 
-Grouping rationale: these 2 are ONE research pass because the correction spine is shared —
-experiment-tracking + model-registry: model-artifact deserialization trust boundaries (CWE-502), tracking-server SSRF/exposure, and run/artifact reproducibility. They are disjoint by file from every other slice, so `depends_on: none`.
+Grouping rationale: these 3 are ONE research pass because the correction spine is shared —
+Kubernetes + manifest tooling: deprecated-API removal, resource/probe/security-context correctness, and templating/overlay + secret-handling footguns. They are disjoint by file from every other slice, so `depends_on: none`.
 
 ### Dependency Graph
 
 ```
-skills/frameworks/ai-ml/mlflow.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-experiment-tracking-guides.test.js
-skills/frameworks/ai-ml/wandb.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-aiml-experiment-tracking-guides.test.js
+skills/frameworks/devops/kubernetes.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-k8s-family-guides.test.js
+skills/frameworks/devops/helm.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-k8s-family-guides.test.js
+skills/frameworks/devops/kustomize.md  (MODIFY: extend 5→>5)  <--tested-by-- tests/cu4a-devops-k8s-family-guides.test.js
 ```
 
-2 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
+3 disjoint content files + one test. No inter-file code dependency. No cycle. Chain depth 1.
 
 ### File Specifications
 
-#### File: `skills/frameworks/ai-ml/mlflow.md`
+#### File: `skills/frameworks/devops/kubernetes.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for mlflow edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Model-flavor footguns** — `log_model` flavor vs load, `pyfunc` signature/`input_example`, registry stage transitions, autolog double-logging
-- **Reproducibility** — env/`conda.yaml` capture, artifact store paths
-- **Security** — `mlflow.<flavor>.load_model` deserializes pickle (CWE-502); the tracking server has documented RCE/SSRF/path-traversal advisory classes — do NOT expose unauthenticated
-- **Version** — MLflow current release, dated
+**Purpose:** Trigger-loaded correction surface for kubernetes edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **API footguns** — removed/deprecated APIs per version (pin `apiVersion`), missing resource requests/limits (OOMKill/eviction), liveness vs readiness probes, `latest` tag (use digests), PodDisruptionBudgets
+- **Security** — `runAsNonRoot`/`readOnlyRootFilesystem`/drop ALL caps, Pod Security Standards, RBAC least-privilege (CWE-284), no privileged containers
+- **Version** — current K8s stable + EOL dates, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
-#### File: `skills/frameworks/ai-ml/wandb.md`
+#### File: `skills/frameworks/devops/helm.md`
 **Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
-**Purpose:** Trigger-loaded correction surface for wandb edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
-- **Logging footguns** — `wandb.init` run resumption/`id`, step vs global-step misalignment, `wandb.log` commit semantics, artifact versioning + lineage
-- **Cost/data** — large-media logging, offline mode sync
-- **Security** — API key in code/CI (secret-leak CWE-798), team/project access scope
-- **Version** — wandb current release, dated
+**Purpose:** Trigger-loaded correction surface for helm edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Chart footguns** — `{{ }}` templating whitespace + `nindent`, `values.yaml` override precedence, `helm upgrade` vs immutable fields, hooks + weights, `lookup` at render, subchart value scoping
+- **Safety** — `--atomic`/`--wait`, release history
+- **Security** — secrets in values → plaintext in release (use SOPS/external-secrets, CWE-312), provenance/signing
+- **Version** — Helm 3.x current release, dated
+- **References** — dated source list (each URL retrieved ≥ 2025-01-01).
+
+#### File: `skills/frameworks/devops/kustomize.md`
+**Action:** MODIFY (extend from 5 sections to >5; no-churn on the existing 5)
+**Purpose:** Trigger-loaded correction surface for kustomize edits. Add these `## ` sections below the existing five (each names ≥1 concrete identifier + a dated http source ≥ 2025-01-01 for every version/security claim):
+- **Overlay footguns** — base vs overlay patch (strategic-merge vs JSON6902), `namePrefix`/`commonLabels` propagation, generator behavior (configMapGenerator hash suffix triggers rollout), `bases` deprecated → `resources`
+- **Correctness** — patch target selectors
+- **Security** — secretGenerator writes plaintext into manifests (CWE-312), no commit of rendered secrets
+- **Version** — Kustomize (kubectl-embedded) current, dated
 - **References** — dated source list (each URL retrieved ≥ 2025-01-01).
 
 ### Test Plan
 
-#### Tests: `tests/cu4a-aiml-experiment-tracking-guides.test.js`
+#### Tests: `tests/cu4a-devops-k8s-family-guides.test.js`
 **Action:** CREATE
 **Framework:** `node:test` (`describe`/`it`/`node:assert/strict`)
-**Zero doubles:** reads the REAL 2 guides off disk via `fs.readFileSync` (mirroring
+**Zero doubles:** reads the REAL 3 guides off disk via `fs.readFileSync` (mirroring
 `tests/cu3-data-guides.test.js`). No mocks, no fixtures, no fakes.
 
-Content-contract test cases (per file — mlflow · wandb):
+Content-contract test cases (per file — kubernetes · helm · kustomize):
 1. **Exceeds the floor** — `> 5` `## ` sections.
 2. **Well past the ~55-line stub floor** — `> 120` lines.
 3. **Required correction-surface sections present** (case-insensitive heading regexes) —
@@ -109,43 +126,44 @@ Content-contract test cases (per file — mlflow · wandb):
    one `https?://` URL per file.
 6. **H1 intact** — original `# <Framework> CTO` header still present (skills.json indexing).
 7. **Per-framework concrete identifiers** (proves substance, not padding):
-   - `mlflow`: `log_model`, `CWE-502`, `pyfunc`
-   - `wandb`: `wandb.init`, `artifact`, `CWE-798`
+   - `kubernetes`: `readiness`, `runAsNonRoot`, `CWE-284`
+   - `helm`: `nindent`, `values.yaml`, `CWE-312`
+   - `kustomize`: `overlay`, `configMapGenerator`, `CWE-312`
 
 **Coverage note:** content-grounding — content-contract assertions substitute for line/branch
 coverage (CU2/CU3 convention for these reference-corpus slices).
 
 ### Security Review
 
-- Content-only edits to 2 Markdown guides + one test reading them; no runtime path, no user
+- Content-only edits to 3 Markdown guides + one test reading them; no runtime path, no user
   input surface.
 - Test uses `path.join(__dirname, '..')` + fixed relative paths — no traversal.
-- Every asserted CWE id (CWE-502, CWE-798) is a REAL MITRE identifier grounded in that framework's actual
+- Every asserted CWE id (CWE-284, CWE-312) is a REAL MITRE identifier grounded in that framework's actual
   attack surface — never invented; the guide links cwe.mitre.org for each.
 - Source URLs are public official domains (framework docs / release notes / PyPI / npm / GitHub /
   cwe.mitre.org) — no secrets.
-- Only the 3 enumerated files touched.
+- Only the 4 enumerated files touched.
 
 ## Execution Plan
 
 Canonical Iron Loop Steps 8–16 (exact labels) — each step appears exactly once.
 
 ### Step 8: TEST (TDD Red)
-Read all 2 guides fresh off disk first, then WRITE the content-contract test.
-- [ ] Create `tests/cu4a-aiml-experiment-tracking-guides.test.js` (zero doubles — reads the 2 REAL guides off disk via `fs.readFileSync`)
+Read all 3 guides fresh off disk first, then WRITE the content-contract test.
+- [ ] Create `tests/cu4a-devops-k8s-family-guides.test.js` (zero doubles — reads the 3 REAL guides off disk via `fs.readFileSync`)
 - [ ] Test error conditions (below-floor sections, missing required section, missing dated source, absent CWE token)
 - [ ] Run tests — expect RED: each file has exactly 5 `## ` sections, no Security/Testing/References sections, no dated sources, no CWE tokens
 
 ### Step 9: PREPARE
 **WEB-VERIFY every version/security fact at edit time** (hard user rule).
-- [ ] Web-verify the current stable release of each of mlflow · wandb (official docs / release notes / PyPI / npm / GitHub releases)
+- [ ] Web-verify the current stable release of each of kubernetes · helm · kustomize (official docs / release notes / PyPI / npm / GitHub releases)
 - [ ] Web-verify every CWE/CVE page cited (cwe.mitre.org / nvd.nist.gov); capture each source URL + retrieval date (≥ 2025-01-01)
 - [ ] Omit-if-no-source: if a claim has no dated authoritative source, OMIT it and record the omission for Step 15
 - [ ] No new dependencies (node:test only)
 
 ### Step 10: IMPLEMENT
-Extend the 2 guides with the added sections — additive only, existing 5 sections stay verbatim.
-ONE step, 2 files + the test file.
+Extend the 3 guides with the added sections — additive only, existing 5 sections stay verbatim.
+ONE step, 3 files + the test file.
 - [ ] Extend each guide with the added `## ` sections (real footguns, idiomatic single-framework examples, dated http sources)
 - [ ] Wire in real CWE links + web-verified version tokens per the File Specifications
 - [ ] Keep H1 `# <Framework> CTO` + any frontmatter verbatim (skills.json indexing)
@@ -153,7 +171,7 @@ ONE step, 2 files + the test file.
 ### Step 11: REVIEW
 - [ ] Self-review each guide: >5 `## ` sections and >120 lines; every added section names a concrete identifier
 - [ ] Every version/security claim carries an inline dated http source ≥ 2025-01-01; versions are the web-verified current ones; CWE links resolve
-- [ ] Diff is additive on all 2 guides; H1 + frontmatter intact
+- [ ] Diff is additive on all 3 guides; H1 + frontmatter intact
 
 ### Step 12: OPTIMIZE
 - [ ] Keep additions dense and correction-focused; every bullet names a specific footgun + identifier, no padding
@@ -162,21 +180,21 @@ ONE step, 2 files + the test file.
 ### Step 13: SECURE
 - [ ] Run the Security Review checklist; confirm official source URLs; confirm each CWE id is a real MITRE identifier
 - [ ] No path traversal (`path.join(__dirname, '..')` + fixed relative paths); no secrets
-- [ ] Safe file operations — only the 3 enumerated files touched
+- [ ] Safe file operations — only the 4 enumerated files touched
 
 ### Step 14: VERIFY
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green) — `node --test tests/*.test.js` → `# fail 0`; slice test GREEN
-- [ ] Confirm `.ctoc/skills.json` still indexes the mlflow · wandb triggers (H1/frontmatter intact)
+- [ ] Confirm `.ctoc/skills.json` still indexes the kubernetes · helm · kustomize triggers (H1/frontmatter intact)
 - [ ] Coverage ≥ 80% (content-grounding substitutes per CU2/CU3 convention); 0 skipped, 0 flaky
 
 ### Step 15: DOCUMENT
-- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s7") so the completeness check (s31) has no silent omissions
+- [ ] Append per-file UPGRADED verdicts to `.ctoc/audit/corpus-audit-2026-06-15.json` (slice:"CU4a-s27") so the completeness check (s31) has no silent omissions
 - [ ] Record each web-verified fact + source URL + retrieval date, and any omitted-for-lack-of-source claims, in `## Decisions Taken Under Ambiguity`
 
 ### Step 16: FINAL-REVIEW
 - [ ] Verify Steps 8–15 completed correctly; all quality checks passed
-- [ ] Only the 3 enumerated files edited; every version/security claim sourced with a date ≥ 2025-01-01
+- [ ] Only the 4 enumerated files edited; every version/security claim sourced with a date ≥ 2025-01-01
 - [ ] Nothing fabricated (versions + CWE ids all traceable to official URLs); no cross-language BAD/SAFE examples added; tests green
 - [ ] Ready for human review
 
@@ -190,3 +208,57 @@ ONE step, 2 files + the test file.
 | Frontmatter/H1 corruption breaks skills.json indexing | Additions below H1/frontmatter; full suite + trigger check after edit | Step 11, Step 14 |
 | Padding without specificity | Objective gate — test asserts per-framework concrete identifiers, not just section count | Step 11, Step 14 |
 | Section-rewrite churn | Additive only; existing 5 sections preserved verbatim | Step 10, Step 11 |
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
