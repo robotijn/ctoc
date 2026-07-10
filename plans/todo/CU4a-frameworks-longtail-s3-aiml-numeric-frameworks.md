@@ -275,3 +275,63 @@ ONE step, 4 files + the test file.
 - [ ] All quality checks passed
 - [ ] Manual verification if needed
 - [ ] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+Executed under the BARRIER pattern: own test verified in isolation (RED→GREEN),
+left UNSTAGED for the caller to commit; plan NOT moved; full suite NOT run (a
+disjoint sibling-slice fleet is concurrently editing other ai-ml guides).
+
+### Web-verified facts (all retrieved 2026-07-10, official sources)
+| Fact | Value | Source URL |
+|------|-------|-----------|
+| JAX current stable | 0.10.2, requires_python >=3.11, uploaded 2026-06-17 | https://pypi.org/pypi/jax/json |
+| jaxlib current stable | 0.10.2 (version-locked to jax) | https://pypi.org/pypi/jaxlib/json |
+| Keras current stable | 3.15.0, requires_python >=3.11, uploaded 2026-06-24 | https://pypi.org/pypi/keras/json |
+| fastai current stable | 2.8.7, requires_python >=3.10, uploaded 2026-02-14 | https://pypi.org/pypi/fastai/json |
+| fastai torch coupling | torch<3,>=1.10; torchvision>=0.11 (requires_dist) | https://pypi.org/pypi/fastai/json |
+| scikit-learn current stable | 1.9.0, requires_python >=3.11, uploaded 2026-06-02 | https://pypi.org/pypi/scikit-learn/json |
+| CWE-502 | "Deserialization of Untrusted Data" (title confirmed) | https://cwe.mitre.org/data/definitions/502.html |
+| CVE-2025-49655 (Keras) | TorchModuleWrapper .keras arbitrary code despite safe mode; affects 3.11.0–3.11.2, fixed 3.11.3; CWE-502; published 2025-10-17 | https://nvd.nist.gov/vuln/detail/CVE-2025-49655 |
+| CVE-2026-12481 (Keras) | Lambda-layer `_raise_for_lambda_deserialization` fails to enforce safe mode when safe_mode=None → arbitrary code exec in Keras 3.14.0; CWE-502; published 2026-07-03 | https://nvd.nist.gov/vuln/detail/CVE-2026-12481 |
+| JAX gotchas/x64/PRNG/control-flow | HTTP 200 (docs verified) | https://docs.jax.dev/en/latest/notebooks/Common_Gotchas_in_JAX.html · https://docs.jax.dev/en/latest/control-flow.html |
+| Orbax checkpointing | HTTP 200 | https://orbax.readthedocs.io/en/latest/ |
+| Keras model saving / safe_mode | HTTP 200 | https://keras.io/api/models/model_saving_apis/model_saving_and_loading/ |
+| sklearn model persistence security ("arbitrary code", skops) | HTTP 200; page recommends skops for untrusted artifacts | https://scikit-learn.org/stable/model_persistence.html |
+
+### Decisions
+1. **No-churn additive extend** — the original 5 sections of each guide (incl. the
+   "Updated January 2026" subtitle and "CURRENT - January 2026" install headers)
+   were preserved VERBATIM; all new sections were appended below "What NOT to Do".
+   H1 `# <Framework> CTO` intact (skills.json indexing) — asserted GREEN.
+2. **JAX version banner conflict** — the pre-existing install/version banner still
+   claims "v0.9+ / Python 3.11". Rather than rewrite the audited-verbatim section
+   (no-churn), the new dated "Version-Specific Gotchas" section carries the
+   web-verified current 0.10.2 fact. Left the legacy banner untouched per the
+   additive rule; the dated section is the authoritative one.
+3. **`jax.random.split` fully-qualified** — the plan File Spec names
+   `jax.random.split`; the existing example used the imported `random.split`
+   alias. Added the fully-qualified call (`jax.random.split`) in the new PRNG
+   section and imported `jax` in that snippet for self-consistency.
+4. **Keras CVEs cited, not invented** — both CVE-2025-49655 and CVE-2026-12481 are
+   REAL NVD records (fetched at edit time) with genuine CWE-502 mappings; used to
+   ground the `.keras`/`safe_mode`/`Lambda` security section with dated advisories
+   rather than an unsourced "models can run code" claim.
+5. **fastai `load_learner` vs PyTorch 2.6 weights_only** — documented that
+   `load_learner` needs the FULL unpickler (it restores callables/transforms), so
+   it does NOT benefit from PyTorch 2.6's `weights_only=True` default; recommended
+   state_dict/safetensors interchange for untrusted boundaries.
+6. **sklearn `skops` alternative** — cited skops as the safe-load path per the
+   official model-persistence page; joblib framed as size/speed (NOT security)
+   over pickle — both are equally CWE-502-unsafe on untrusted input.
+7. **No omissions required** — every asserted version/CVE/CWE had a dated
+   authoritative source at edit time; nothing was dropped for lack of a source.
+8. **Single-framework examples only** — per the CU4a exemption, each guide's code
+   is idiomatic to its own framework; no 7-language BAD/SAFE cross-coverage added.
+
+### Barrier-pattern verification (this slice only)
+- RED: 32 tests / 9 pass / 23 fail (pre-implementation).
+- GREEN: 32 tests / 32 pass / 0 fail / 0 skipped (`node --test tests/cu4a-aiml-numeric-frameworks-guides.test.js`).
+- eslint tests/cu4a-aiml-numeric-frameworks-guides.test.js → exit 0.
+- Line counts (before→after): jax 83→258 · keras 62→183 · fastai 71→194 · scikit-learn 67→191.
+- Full `tests/*.test.js` NOT run (barrier); nothing staged; plan NOT moved.
