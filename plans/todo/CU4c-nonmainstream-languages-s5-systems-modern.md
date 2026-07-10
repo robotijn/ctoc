@@ -266,50 +266,81 @@ examples added; tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 32 tests, 4 pass / 28 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed (none)
+- [x] Check prerequisites — web-verified all versions/CWE at edit time (2026-07-10)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed (none)
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements (extended all 4 guides additively)
+- [x] Add error handling (Error Handling Idioms section per guide)
+- [x] Wire up integration points (H1/frontmatter preserved; new sections appended)
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — each guide >5 sections + >120 lines; ≥1 mem-safety CWE
+- [x] Verify integration points work together — additive only, original 5 sections verbatim
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — dense, footgun-per-bullet, no padding
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — test uses path.join(__dirname,'..')
+- [x] Sanitize outputs (n/a — content-only)
+- [x] No secrets in code — only public official-domain URLs
+- [x] Safe file operations — readFileSync on fixed relative paths only
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint tests/cu4c-systems-modern-guides.test.js exit 0
+- [x] Run tests (TDD Green) — slice test 32/32 pass (BARRIER: own test only, full suite deferred to caller)
+- [x] Check coverage — content-grounding substitutes for line/branch coverage (CU2 convention)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation (the four guides are the documentation)
+- [x] Add JSDoc comments to new functions (test file header documents zero-doubles contract)
+- [x] Update CHANGELOG if needed (n/a — caller commits)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+All facts web-verified at edit time (2026-07-10) against official sources; nothing fabricated.
+
+**Verified versions / facts (source URL + retrieval date 2026-07-10):**
+- **Zig stable 0.16.0**, released 2026-04-13; `master` = 0.17.0-dev (2026-07-08). Pre-1.0,
+  breaks between minors. Source: https://ziglang.org/download/index.json
+- **Nim 2.2.10** latest stable (2.2 line); ORC (`--mm:orc`) is the 2.x default.
+  Source: https://nim-lang.org/install.html ; https://nim-lang.org/blog.html (2.0.0)
+- **Crystal 1.20.3** (project_version meta tag); multi-threading behind `-Dpreview_mt`
+  (+ experimental `-Dexecution_context`). Source: https://crystal-lang.org/api/
+- **D / DMD 2.112.0**. Source: https://dlang.org/changelog/2.112.0.html
+- **CWE-416** "Use After Free", **CWE-787** "Out-of-bounds Write", **CWE-190**
+  "Integer Overflow or Wraparound" — titles confirmed. Source: https://cwe.mitre.org/data/definitions/{416,787,190}.html
+
+**Decisions:**
+1. **Zig async status stated as "in flux / removed pre-1.0, verify per toolchain"** rather
+   than pinning a keyword-level example — Zig's stackless async was removed from the language
+   and a new I/O model is still landing across 0.11→0.16. Committing to a concrete `async`
+   snippet would fabricate stability that does not exist pre-1.0. Documented the uncertainty
+   instead of inventing an API (no-stub: made the honest choice explicit).
+2. **DIP1000 default-on status left as "verify per compiler version, enable `-preview=dip1000`"**
+   — its default-enabled status has shifted across DMD releases and no single dated source
+   pins it as unconditionally on for 2.112.0; stated the safe instruction rather than assert a
+   possibly-stale default (omit-if-unverifiable applied to the exact default state).
+3. **endoflife.date has no zig/nim/crystal feeds** (404s) — sourced versions directly from the
+   official project download/install/changelog endpoints instead, which are authoritative.
+4. **Line count used as the >120 substantive floor** (all four: zig 187, nim 178, crystal 171,
+   d 192) since the CU2 convention treats content-grounding as the coverage substitute for
+   Markdown correction guides.

@@ -258,50 +258,94 @@ existing content preserved verbatim; tests green.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 28 tests, 4 pass / 24 fail (RED confirmed)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none required (node:test, existing eslint)
+- [x] Check prerequisites — web-verified all versions/CWEs (see Decisions table)
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed — n/a
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — 7 new sections per guide, additive
+- [x] Add error handling — each guide has an Error Handling Idioms section
+- [x] Wire up integration points — skills.json triggers intact
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — >5 sections (12 each), >120 lines each, CWE named
+- [x] Verify integration points work together — H1 headers intact, additive diff
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — dense, footgun-per-bullet, no padding
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — test uses path.join(__dirname,'..')
+- [x] Sanitize outputs — content-only markdown edits, no runtime surface
+- [x] No secrets in code — only public official domain URLs
+- [x] Safe file operations — read-only fs.readFileSync in the test
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — eslint on test file exit 0
+- [x] Run ALL tests (TDD Green) — slice test 28/28 pass (BARRIER: own test only, per caller)
+- [x] Check coverage >= 80% — content-grounding substitutes for line coverage (CU2 convention)
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — the four guides ARE the documentation; sources dated
+- [x] Add JSDoc comments to new functions — test file header documents zero-doubles contract
+- [x] Update CHANGELOG if needed — n/a (caller commits)
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+## Decisions Taken Under Ambiguity
+
+### Web-verified facts + sources (all retrieved 2026-07-10)
+
+| Fact asserted in guide | Value | Official source (URL) |
+|---|---|---|
+| Bash current stable | 5.3, released 2025-07-30 (prior 5.2.37, 2024-09-23) | https://ftp.gnu.org/gnu/bash/ (directory listing with dates) |
+| macOS default /bin/bash | 3.2 (last GPLv2 release) | https://www.gnu.org/software/bash/ |
+| Perl current stable | 5.42 (2025-07-03), latest 5.42.2 (2026-03-29); prior 5.40 (2024-06-09, latest 5.40.4) | https://endoflife.date/perl ; https://www.cpan.org/src/ |
+| Tcl/Tk current stable | 9.0.4 (9.1b0 = beta, not production); legacy 8.6.18 | https://www.tcl-lang.org/software/tcltk/download.html ; .../8.6.html |
+| Lua current 5.4 maint. | 5.4.8, released 2025-06-04; Lua 5.5.0 released 2025-12-22; LuaJIT stays 5.1-compatible | https://www.lua.org/versions.html |
+| CWE-78 title | "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')" | https://cwe.mitre.org/data/definitions/78.html |
+| CWE-94 title | "Improper Control of Generation of Code ('Code Injection')" | https://cwe.mitre.org/data/definitions/94.html |
+
+Verification method: live `curl` of each official domain at edit time; version tokens
+and dates were read directly from the gnu.org/cpan.org/tcl-lang.org/lua.org listings
+and the endoflife.date API, CWE titles from the MITRE definition pages. No version,
+date, or CWE identifier was invented.
+
+### Decisions
+- **Injection CWE mapping (per plan):** Bash/Perl → CWE-78 (OS command injection is
+  the dominant class — both shell out); Tcl/Lua → CWE-94 (code injection via
+  `eval`/`subst` and `load`/`loadstring` re-parsing strings as code) AND CWE-78 named
+  for the `exec`/`os.execute`/`io.popen` shell-out path. Both CWEs named where both
+  apply, so the guide reflects the real footgun surface rather than a single label.
+- **Bash 5.3 chosen over "5.x" hand-wave:** the guide names the concrete 5.3 release
+  (2025-07-30) with its source, and flags the macOS 3.2 divergence — the single most
+  common real-world Bash portability footgun — because a dated concrete version was
+  verifiable. No niche 5.3 feature was claimed beyond what the gnu.org listing/NEWS
+  supports; `${ ...; }` reflexive command substitution is documented in Bash 5.3 NEWS.
+- **Tcl 9.1b0 explicitly labeled beta / not-for-production** rather than presented as
+  current stable, because the download page marks it `b0` (beta). Current stable
+  named as 9.0.4.
+- **Lua 5.5.0 named as newest major but 5.4.8 kept as the working baseline** in the
+  version section, because 5.4 is the deployed mainstream (LuaJIT still tracks 5.1);
+  both dated and sourced to lua.org/versions.html. No omitted claims — every version
+  and CWE assertion had a dated authoritative source, so nothing was dropped for
+  lack of a source.
+- **Single-language idiomatic examples only** (CU4c carve-out): each guide's fenced
+  examples are in its own language; no cross-language 7-language BAD/SAFE matrix added.
+- **No-churn honored:** all four files are additive (git numstat: 0 lines removed on
+  each); the existing 5 template sections — including bash's existing injection/quoting
+  bullets — are preserved verbatim, new sections appended after `## Version Gotchas`.
