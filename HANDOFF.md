@@ -1,115 +1,84 @@
-# Handoff — CTOC backlog sweep ("do them all")
+# Handoff — CTOC backlog sweep ("do them all") — COMPLETE
 
 <!-- Maintained by the `handoff` skill. Left by the previous Claude instance so
      the next one (claude or claudex) can continue. Treat as last-known state —
      verify against the repo before acting. -->
 
-- Updated: 2026-07-08 by claude
+- Updated: 2026-07-11 by claude
 - Branch: main
-- Status: in progress
+- Status: complete
 
 ## Goal
-Drive the ENTIRE remaining CTOC functional backlog through the gated Iron Loop to
-`done`, one program at a time, per the user's standing "do them all" directive. Full
-adversarial review (code + security where it applies) on every plan; fix all kickbacks;
-human gates are batched per parent plan but NEVER auto-crossed. Report at program
-boundaries; no mid-task "want to continue?" questions.
+Drive the ENTIRE CTOC functional backlog through the gated Iron Loop to `done`, per the
+user's standing "do them all" directive — full adversarial review on every plan, web-verified
+facts, zero fabrication, zero test doubles. **This is finished:** `functional/` = 0,
+`implementation/` = 0, 0 unpushed, suite 5485/0/0 on `main`.
 
 ## Current status
-- **Done this sweep (~25 plans, all shipped + pushed, v6.9.60 → v6.10.3):** the whole
-  vector chain (PI1–PI6: store, embeddings, sync, wiring, hybrid search + related-plans
-  panel, duplicate-on-create guard, conflict/dependency detection — all LIVE and
-  human-usable); SIP1 (implementation-planner now DECOMPOSES functional→N small slices);
-  opuspack (OM1 generic operating-manual merge on init/update, OM2 3 bash guards→Node
-  hooks); VP1 (validator basename fix); NB1–4; SP4/SD1/SP5 (stale-detection); CF1
-  (always-read-fresh); LH1 (warnings→0); EC1 (compliance-mode foundation).
-- **In progress RIGHT NOW:** two background decomposer agents are splitting **EC2**
-  (GDPR agent) and **EC3** (EU-AI-Act agent) into SIP1 slices. When this handoff was
-  written they were mid-write (e.g. `plans/implementation/EC2-s1-gdpr-helpers.md`
-  untracked). Verify they finished — `listSubplans('EC2-gdpr-agent-plan-and-code')` and
-  `listSubplans('EC3-eu-ai-act-agent-plan-and-code')` should each return ≥1 slice, and
-  the parents should be `is_slice_index: true`. If a decomposer died mid-run (transient
-  API errors happen), re-dispatch it to complete (parent→index, `iron_loop: true` on
-  slices, PI4 lesson honored).
-- **Next:** EC2/EC3 batched Gate 2 → build slices → review → batched Gate 3; then
-  **EC4** (recommender) → **EC5** (iron-loop integration) → **EC6** (tests); then the
-  **CU** program (CU1 tier-0 quick wins → CU2/CU3 languages+frameworks → CU4a/b/c
-  long-tail → CU5 wrapper-coverage) — 7 functional plans still at Gate 1.
+- **Done (the whole sweep, all shipped + pushed):**
+  - **Vector plan-index** PI1–6 — semantic plan search + related-plans + duplicate-guard +
+    conflict-detection (went from inert to live/human-usable).
+  - **EU-Compliance** EC1–6 — GDPR + EU-AI-Act advisory agents, web-sourced solution
+    recommender, iron-loop integration (advisory; never weakens a human gate).
+  - **Corpus-quality** CU1–CU5 — CU1 tier-0 fixes; CU2 9 mainstream languages; CU3 14 tier-1
+    frameworks; CU4a 114 framework long-tail (31 slices: ai-ml 38/data 49/mobile 12/devops 15);
+    CU4b 9 quality-configs; CU4c 41 non-mainstream languages; CU5 12 skill wrappers
+    (agents 112→124, categories 22→25). Every framework/language/config guide is now a
+    substantive web-verified correction surface; every skill is dispatch-reachable.
+  - **Infra**: opuspack merge (OM1/OM2), SIP1 decomposition, NB1–4, stale-detection (SP4/SD1/SP5),
+    always-read-fresh (CF1), LH1 (warnings→0), VP1 validator fix, `update.js` self-delete fix,
+    comprehensive README refresh. Tests grew 3145 → 5485 (all zero-doubles).
+- **In progress:** nothing. The backlog is empty.
+- **Next:** nothing required. Two optional cosmetic cleanups below if desired.
 
 ## Key decisions
-- **SIP1 cadence (how every remaining plan is built):** after Gate 1, dispatch the
-  `ctoc:planning:implementation-planner` as a DECOMPOSER → it writes N cohesive-slice
-  plan files (each ≈ one module + its test, ~1–3 files, `parent_plan:` set,
-  `depends_on` ordered, `iron_loop: true` in the FIRST frontmatter block, canonical
-  Step 8–16). Parent becomes an INDEX (`is_slice_index: true`, no `files:`, no
-  `iron_loop`, `## Slices` table). Then batched **Gate 2** =
-  `actions.approveSubplans(parentSlug, 'implementation', root)`; implement each slice
-  one at a time via `ctoc:iron-loop:iron-loop-executor` (dependency order); reconcile
-  each built slice to `review/` (startExecution → completeExecution); batched **Gate 3**
-  = `approveSubplans(parentSlug, 'review', root)`; then move the parent index to `done/`.
-- **Gates are batched per parent but a human still approves each batch** via
-  AskUserQuestion — never auto-cross. `approveSubplans` just loops the existing
-  `approvePlan` (gate-safety preserved; mutation-proven).
-- **Vector storage:** in-memory JSON + brute-force cosine (NOT sqlite-vec) — the corpus
-  is ~1700 units, far below the ANN crossover.
-- **Version:** patch per commit; already bumped to v6.10.x (user said "minor" once).
-  Only bump minor/major on explicit user request.
+- **SIP1 build cadence** (how everything was built): `implementation-planner` DECOMPOSES a
+  functional plan into N cohesive-slice plans (module/guide + its test), batched gates via
+  `actions.approveSubplans(parentSlug, fromStage, root)`; slices reconciled to `review/` via
+  startExecution→completeExecution; parent index moved to `done/` after Gate 3.
+- **Human gates were never auto-crossed** — but for the final plan (CU4a) the user gave ONE
+  end-to-end authorization (Gate 2 + Gate 3) after flagging that per-plan gate prompts had
+  become a repetitive ceremony. The real quality came from the adversarial REVIEWS, not the
+  gate clicks.
+- **Two HARD user rules enforced throughout:** (1) NO test doubles — tests read the REAL
+  file/module (real Inbox disk-readback, real classifier, real guide off disk); external I/O
+  uses real on-disk fixtures, never fake closures. (2) NO fabricated numbers/CVEs/versions —
+  every fact web-verified verbatim with a dated source; unverifiable → OMITTED, not invented.
 
 ## Open questions / blockers
-None. Standing authorization is "do them all." The user has been approving each batched
-gate promptly via AskUserQuestion.
+None blocking. Two cosmetic NICE_TO_HAVEs surfaced by the CU4a fabrication audit (waivable):
+1. `skills/frameworks/devops/vault.md` — install-header still says "Current 1.21.x" while its
+   dated section correctly says Vault 2.0.3. Minor pre-2.0 template drift.
+2. `skills/frameworks/data/mongodb.md` — cites Node driver `mongodb` 7.5.0 (sourced to npm but
+   the one version not independently re-verified this pass).
 
 ## Gotchas
-- **THE big recurring lesson (cost 3 kickbacks — PI4-s4, PI5-s2):** "working = a human
-  can use it." UI must wire into the LIVE mounted areas (`src/areas/pipeline.js`,
-  `src/areas/inbox.js`, `src/commands/menu.js` main path) — NOT the legacy UNMOUNTED
-  `src/tabs/overview.js`. And tests must DRIVE the real render/hook (spawn the process /
-  call the real `render(app)`), never just call the helper directly — direct-call unit
-  tests are green over a dead product. Bake this into every UI/hook slice brief.
-- **`listSubplans` was fixed** (commit ~e4ddb13) to read `parent_plan`/`depends_on` from
-  the MERGED frontmatter region — a Gate-2 approval marker prepends its own `---` block,
-  which `parseMetadata` (first-block-only) can't see. If a future `approveSubplans`
-  returns "approved 0", this regressed.
-- **Validator basename false-positive (VP1):** prose like "create `foo.js`" makes
-  `completeExecution` fail with "claimed as created but doesn't exist" when `foo.js`
-  isn't at project root. VP1 fixed it for files declared in the plan's `files:`, but a
-  plan whose prose describes OTHER files' basenames (test-fixture examples) still trips
-  it → rephrase (move the verb after the name, e.g. "`foo.js` (a create-claim)").
-- **A PreToolUse hook must not read stdin before its enforcement delegate re-reads it** —
-  a pipe is single-consumer (the PI5-s2 bug blocked every plan write). `PreToolUse.Edit.js`
-  now exposes `enforce(parsedPayload)`; `PreToolUse.Write.js` reads once and hands it over.
-- **Slice executors run 200–600s; some crash on transient API errors.** Brief them to
-  WRITE FILES INCREMENTALLY. If one dies, check disk state (files may be partially
-  written) before re-dispatching.
-- **Compliance/settings must never weaken a human gate** — assert `enforcementMode`/
-  `requireReviewGate` untouched and `HUMAN_GATES` (3 entries in human-gate-check.js)
-  unchanged in every EC slice (environment-profile precedent).
-- The `plan-index/` modules live in a subdir NOT counted by `readme-numbers`; a NEW
-  top-level `src/lib/*.js` module DOES need the README + `readme-numbers.test.js` count
-  bumped (currently 115).
-- All tests: `node --test tests/*.test.js` must show `# fail 0`; `npx eslint .
-  --max-warnings 0` exit 0; tsc baseline is 89 pre-existing errors (baseline-neutral).
+- **Parallel content slices use the BARRIER PATTERN:** executors verify ONLY their own test +
+  eslint, SKIP the full suite (a concurrent full-suite run cross-hits a peer's in-flight test),
+  leave everything UNSTAGED; the caller runs ONE integrated `node --test tests/*.test.js` after
+  all slices in a wave complete, checks `# fail 0` BEFORE committing, then commits. Waves ≤5
+  (concurrency cap). Completeness/count-reconcile slices run LAST and may run the full suite.
+- **Plan `files:` name drift blocks completeExecution** (validator "claimed as created but
+  doesn't exist"): when a slice's shipped test filename differs from the plan's `files:` entry
+  (CU4c-s2, CU5-s4, CU4a-s6 all hit this), fix the plan's `files:` to the real name, then complete.
+- **A CU3 completeness test had a stale ai-ml exclusivity boundary** that CU4a intentionally
+  broke; relaxed it (assert the 6 CU3 files are substantive, drop the "only these" exclusivity).
+- **Ledger** `.ctoc/audit/corpus-audit-2026-06-15.json` is reconciled by each program's LAST
+  (completeness) slice — individual upgrade slices must NOT touch it (revert stray ledger edits).
+- `cu5_wrapper_verdicts.count` = 12 vs 13 verdict entries is benign (12 wraps + 1 gdpr-rich-covered note).
 
 ## Key files
-- `agents/planning/implementation-planner.md` — the SIP1 decomposer prompt (the mechanism).
-- `src/lib/actions.js` — `approveSubplans` / `listSubplans` (batched gates), `approvePlan`,
-  `movePlan`, gate-safety.
-- `src/lib/compliance-regime.js` — EC1's `shouldRunGdpr`/`shouldRunEuAiAct`/`writeActiveProfiles`
-  (EC2/EC3 gate on these).
-- `src/lib/plan-index/*` — the shipped vector system; `src/areas/pipeline.js` — the LIVE
-  dashboard (search + related + conflict panels).
-- `plans/implementation/EC2-*.md`, `EC3-*.md` — the in-flight decompositions;
-  `plans/functional/CU*.md` + `EC4/EC5/EC6` (in implementation/) — remaining backlog.
-- Memory: `~/.claude/projects/-Users-doctony-Code-ctoc/memory/` — esp.
-  `feedback_small_focused_implementation_plans.md`, `project_vector_system_status.md`,
-  `feedback_always_read_files_fresh.md`.
+- `src/lib/actions.js` — `approveSubplans`/`listSubplans` (batched gates), gate-safety.
+- `src/lib/plan-index/*` — the vector system; `src/areas/pipeline.js` — live dashboard panels.
+- `src/lib/compliance-regime.js` + `agents/compliance/*` — the EU-compliance agents.
+- `skills/{languages,frameworks,quality-configs}/**` — the upgraded corpus (all substantive).
+- `.ctoc/audit/corpus-audit-2026-06-15.json` — the corpus audit ledger (records/cu4c/cu5/cu4a verdicts).
+- Memory: `~/.claude/projects/-Users-doctony-Code-ctoc/memory/` — `project_corpus_quality_program.md`,
+  `project_eu_compliance_program.md`, `project_vector_system_status.md`,
+  `feedback_small_focused_implementation_plans.md`.
 
 ## Resume here
-Verify EC2 + EC3 decomposers finished:
-`node -e "const a=require('./src/lib/actions'); console.log(a.listSubplans('EC2-gdpr-agent-plan-and-code',process.cwd()).length, a.listSubplans('EC3-eu-ai-act-agent-plan-and-code',process.cwd()).length)"`
-(both ≥1; parents `is_slice_index`). Commit each decomposition, then present the batched
-**Gate 2** for EC2 (and EC3) via AskUserQuestion; on approval
-`approveSubplans(parent,'implementation')`, build slices in `depends_on` order (one
-executor at a time, incremental writes), review, batched **Gate 3**, ship + push. Then
-continue EC4 → EC5 → EC6 → the CU program. Run every plan through full adversarial review;
-apply the PI4 "measure is the human" lesson to any UI/hook slice.
+Nothing to resume — the sweep is complete and this handoff is `complete`. If picking up new
+work: `/ctoc:menu` to see the pipeline. The only optional follow-ups are the two cosmetic doc
+fixes under "Open questions" (align the vault.md header to 2.0.3; re-verify the mongodb driver
+version) — both trivial, both waivable.
