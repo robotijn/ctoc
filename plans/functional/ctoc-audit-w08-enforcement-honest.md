@@ -1,155 +1,416 @@
 ---
 title: "W08 — Enforcement Stays On and Honest"
 created: "2026-07-11T00:00:00Z"
-type: stub
+type: feature
 parent_vision: "vision/ctoc-self-audit-remediation.md"
 priority: MEDIUM
-status: stub
 depends_on: ctoc-audit-w01-enforcement-blocks
 ---
 
 # W08 — Enforcement Stays On and Honest
 
-## Problem
+## 1. ASSESS — Problem Understanding
 
-Even once enforcement actually blocks (W01), four defects let it quietly turn itself
-off or lie about its own state:
+### Business Context
 
-- **Self-unlocking on its own block message.** The escape-phrase check greps the
-  whole transcript tail across *all* roles. CTOC's own block message *names* the
-  escape phrases, so the very act of blocking injects a phrase into the transcript
-  that unlocks the *next* edit. A plain `Read` of `CLAUDE.md` (which also lists the
-  phrases) does the same.
-- **Self-disable from a subdirectory.** The project detector does no upward walk for
-  `.ctoc/`, so running from any subdirectory fails to find the project root and
-  enforcement silently treats the project as out of scope.
-- **Editing the maintainer's own `CLAUDE.md` every session.** `SessionStart.js`'s
-  self-repo guard compares `__dirname` instead of `pkg.name`, so it fails to
-  recognize the CTOC repo and injects operating-manual text into the maintainer's own
-  `CLAUDE.md` every session. Observed live this session: **+122 lines injected.**
-- **False self-description.** The injected SessionStart text claims enforcement is
-  "cryptographically enforced" with "no escape phrases" — neither is true; escape
-  phrases exist and are the mechanism above.
+Enforcement that *appears* active but can be tricked into disabling itself — or
+that misdescribes its own mechanism to the session — is worse than having no
+enforcement at all: it gives the exact population this layer exists to protect
+(every CTOC user running with `--dangerously-skip-permissions`, and the
+maintainer who trusts the four human gates) **false confidence**. A guardrail a
+user believes is airtight, but which quietly unlocks itself on the guardrail's
+own block message, is a silent regression to zero protection dressed as full
+protection. The same is true of a maintainer whose own hand-maintained
+`CLAUDE.md` is being rewritten every session without their knowledge: the file
+they believe they control is drifting under them. CTOC's own project `CLAUDE.md`
+(`/Users/doctony/Code/ctoc/CLAUDE.md`, "Mandatory Pipeline Use (v7)" section, item
+4) already *documents* the intended contract correctly — "Escape phrase in
+recent user messages (allow)... Case-insensitive, word-bounded" — the defects
+below are where the code fails to implement what CTOC's own documentation
+already promises.
 
-**Observability note:** these bugs are only *observable* after W01 lands. Until a
-PreToolUse deny actually blocks the tool call, the unlock-on-block-message bug cannot
-be seen to fire (nothing was blocked to unlock), which is why this workstream
-`depends_on` W01.
+### Current State
 
-## Scope
+Four defects, confirmed by direct inspection of the code as it stands today
+(2026-07-11), all independent of one another and independently unit-testable —
+see Impact and Test Strategy for what "independently testable" does and does not
+mean here:
 
-- **Escape-phrase matcher:** parse the transcript as JSONL and match an escape phrase
-  only in recent messages with `role === 'user'` (never assistant/tool/system), and
-  **drop the phrase list out of the block message** so a block cannot seed its own
-  unlock.
-- **Project detector:** walk up the directory tree to find `.ctoc/`, so enforcement
-  stays active from any subdirectory.
-- **SessionStart self-repo guard:** gate the injection on `isCtocRepo`
-  (`pkg.name === 'ctoc'`) instead of `__dirname`, so CTOC's own repo is never
-  self-edited.
-- **Injected text:** regenerate the SessionStart operating-manual text to describe
-  the *real* flow (escape phrases exist, block uses exit 2 / `permissionDecision`),
-  removing the "cryptographically enforced / no escape phrases" falsehoods.
+- **Defect 1 — the escape-phrase check greps the whole transcript tail across
+  all roles, so CTOC's own block message unlocks the next edit.**
+  `findEscapeInTranscript()` at **`src/hooks/PreToolUse.Edit.js:115-120`** does no
+  role-aware parsing at all — it takes the raw transcript file text (read by
+  `readTranscript()`, `:109-113`, from `stdinJson.transcript_path`), slices the
+  last 5000 characters (`transcript.slice(-5000)`, `:118`), and hands that raw
+  slice to `escapePhrases.matchEscapePhrase()` (`:119`) — the function's own
+  comment (`:117`) calls this "Crude: read last ~5KB and grep for any escape
+  phrase." There is no filter for `role === 'user'` vs. assistant/tool/system
+  content anywhere in this path. Compounding this: `block()`
+  (`src/hooks/PreToolUse.Edit.js:122-142`) writes, at **`:128`**, `"Use an
+  escape phrase (hotfix, trivial fix, urgent) if this is genuinely small."` —
+  three of the seven canonical phrases verbatim, directly into the stderr text
+  that becomes the harness's tool-result content shown back to the model on the
+  next turn (per the hook protocol's "show stderr to model" behavior). Once that
+  text lands in the transcript file, the next `findEscapeInTranscript()` call
+  greps it — a phrase in CTOC's own denial becomes the ticket that unlocks the
+  very next edit. A plain `Read` of CTOC's own `CLAUDE.md` does the same,
+  because that file also documents all seven phrases verbatim (Mandatory
+  Pipeline Use, item 4) and a `Read` tool result likewise lands in the
+  transcript with no role distinguishing it from something the user typed.
 
-**Does NOT touch:** the exit-code / deny mechanism itself (that is W01, the
-prerequisite), CRLF parsing or shell-outs (W07), release/metadata (W09), or the
-human-gate ledger (W02). This workstream is scoped to keeping an *already-blocking*
-enforcer honest and undismissable.
+- **Defect 2 — the project detector does no upward walk, so a subdirectory
+  silently disables enforcement.** `isCtocProject(root)` at
+  **`src/lib/ctoc-project-detector.js:29-55`** checks `.ctoc/` and `CLAUDE.md`
+  only at the exact `root` argument (`:30-31`, `path.join(root, '.ctoc')` /
+  `path.join(root, 'CLAUDE.md')`) — there is no loop or recursion toward a parent
+  directory anywhere in the function. It is called with `root = process.cwd()`
+  (`src/hooks/PreToolUse.Edit.js:177`). If `cwd` is any subdirectory that itself
+  lacks `.ctoc/` and `CLAUDE.md` (e.g. `src/lib/`), `isCtoc` is `false` and
+  `enforce()`'s step 2 (`:188-191`) returns `allow('silent-passthrough', ...)` —
+  the tool call is allowed with **no plan-coverage, no escape-phrase check, no
+  block ever considered** — not because the user typed an escape phrase, but
+  because the detector never looked past the immediate directory.
 
-## Story Map
+- **Defect 3 — `SessionStart.js`'s self-repo guard compares `__dirname`
+  instead of package identity, so it edits the maintainer's own `CLAUDE.md`
+  every session.** The guard at **`src/hooks/SessionStart.js:120-129`** computes
+  `ctocRoot = path.resolve(__dirname, '..', '..')` (`:121`) — the directory two
+  levels above wherever *this hook file itself* physically lives — and compares
+  it against `projectPath` (`:122`, `path.resolve(projectPath) !== ctocRoot`).
+  This is correct only when the hook script executing *is itself* located
+  inside the exact project tree being evaluated. When CTOC runs as an installed
+  plugin (per this repo's own `CLAUDE.md`: "CTOC is ALWAYS installed from the
+  online marketplace") while the maintainer is working inside the separately
+  cloned dev repo — both legitimately named `ctoc` by `package.json` — the
+  running hook's `__dirname` resolves to the *installed plugin's* location, not
+  the dev repo's, so `ctocRoot !== projectPath` even though `projectPath` **is**
+  the CTOC repo. The guard then proceeds to call `ensureLessonsBlock()`
+  (`:123-125`), injecting operating-lessons text into the maintainer's own
+  `CLAUDE.md`. **Observed live this session: +122 lines injected.** Notably,
+  `src/lib/ctoc-project-detector.js:42-49` already computes a correct,
+  package-identity-based `isCtocRepo` flag (`pkg.name === 'ctoc'`, read from the
+  *project's own* `package.json`) — `SessionStart.js` does not use it, and
+  reinvents an incorrect, location-based check instead.
 
-**Goal:** Enforcement cannot be tricked into disabling itself and never describes
-itself falsely to the session.
-- **Actor:** The CTOC user running with `--dangerously-skip-permissions` (for whom
-  the hook is the only guardrail) and the maintainer whose `CLAUDE.md` must not be
-  silently rewritten.
-- **Impact:** A block message, a doc read, or a subdirectory `cwd` no longer disables
-  enforcement; the session is told the truth about how enforcement works.
-- **Success metric:** Zero paths by which a non-user message unlocks an edit; zero
-  self-edits of CTOC's own `CLAUDE.md`; the injected text matches the real mechanism.
+- **Defect 4 — the injected SessionStart text falsely claims enforcement is
+  "cryptographically enforced" with "no escape phrases."** The literal sentence
+  in `generateContext()` is `"This is cryptographically enforced. There are no
+  escape phrases."` at **`src/hooks/SessionStart.js:196`** (verified by direct
+  line count — the surrounding `## MANDATORY: Edit/Write Blocked Before Step 8`
+  section header begins at `:189`, and the sentence itself is five lines below
+  that, at `:196`, not `:191`; recorded as a drift correction against the
+  originating audit citation in Decisions Taken Under Ambiguity below). Neither
+  claim is true: there is no cryptography anywhere in the enforcement path (it
+  is exit-code / stdin-JSON hook logic), and `src/lib/escape-phrases.js` defines
+  seven live, working escape phrases (`hotfix`, `trivial fix`, `trivial change`,
+  `quick fix`, `urgent`, `skip planning`, `skip iron loop`) — the exact
+  mechanism Defect 1 above shows can even be self-triggered.
 
-### Activity 1 — Only a real user can invoke an escape phrase
-- `[MVP]` As a user relying solely on PreToolUse, I want an escape phrase to count
-  only when *I* typed it, so that CTOC's own block message cannot unlock my next edit.
-  - Acceptance: given a transcript where the most recent escape phrase appears in an
-    assistant/tool block message (not a user message), the matcher returns no match
-    and the edit stays blocked.
-- As a user, I want a `Read` of `CLAUDE.md` to never unlock enforcement, so that
-  viewing the docs does not disable the guardrail.
-  - Acceptance: the block message no longer contains the phrase list; a transcript
-    whose only phrase occurrence is a doc Read yields no match.
+### Impact
 
-### Activity 2 — Enforcement stays active from any directory
-- `[MVP]` As a user working in a subdirectory, I want enforcement to find the project
-  root by walking up to `.ctoc/`, so that it does not silently treat the project as
-  out of scope.
-  - Acceptance: with `cwd` set several levels below the repo root, the detector
-    resolves the same project root as when run from the root.
+- A user who has just been blocked, or who reads `CLAUDE.md` to understand why,
+  has — through no typed intent of their own — unlocked their very next edit
+  (Defect 1). The only guardrail for `--dangerously-skip-permissions` users
+  fails silently at the moment it is most needed.
+- A user working one directory below a CTOC project root gets **zero**
+  enforcement with no message, no log entry attributable to a decision, and no
+  indication anything was skipped (Defect 2) — this is not a "hard case,"
+  it is the common case of working inside `src/`, `plans/`, or any nested path.
+- The maintainer's own hand-authored `CLAUDE.md` is silently rewritten on every
+  session start (Defect 3), corrupting content the maintainer believes they
+  fully control — the same failure class the parent vision calls out for the
+  gate-ledger problem (a source of truth the human trusts turns out to be
+  agent-writable).
+- Every session is told a categorically false story about how it is protected
+  (Defect 4), which can lead a user to trust the guardrail more than its real
+  behavior warrants, or to not bother learning the real (and legitimate) escape
+  hatch, since they are told none exists.
+- **Observability note (carried from the stub, reverified):** none of these four
+  defects can be observed *end-to-end in a live blocked session* until W01
+  (`ctoc-audit-w01-enforcement-blocks`) lands a real deny — today,
+  `block()` calls `process.exit(1)` (`PreToolUse.Edit.js:141`), which the
+  harness does not treat as a block at all, so there is currently no real block
+  for Defect 1's unlock-on-block-message bug to unlock. This is why this
+  workstream `depends_on` W01. **This is an observability dependency, not a
+  code or test dependency** — see Decisions Taken Under Ambiguity: all four
+  fixes here are independently authorable and independently unit-testable today
+  using synthetic transcripts, fixtures, and content assertions, without W01
+  having landed.
 
-### Activity 3 — SessionStart never edits CTOC's own CLAUDE.md
-- `[MVP]` As the maintainer, I want SessionStart to recognize the CTOC repo via
-  `pkg.name === 'ctoc'`, so that it never injects operating-manual text into my own
-  `CLAUDE.md`.
-  - Acceptance: running SessionStart inside the CTOC repo produces zero diff to
-    `CLAUDE.md` (the +122-line injection no longer occurs).
+## 2. ALIGN — Goals + Success Metrics
 
-### Activity 4 — The session is told the truth
-- As a user, I want the injected session text to describe the real enforcement flow,
-  so that I am not falsely told it is "cryptographically enforced" with "no escape
-  phrases."
-  - Acceptance: the regenerated text contains no "cryptographically enforced" /
-    "no escape phrases" claims and does describe exit-2/`permissionDecision` blocking
-    and the user-only escape-phrase rule.
+**Job to Be Done:** When enforcement has just blocked me, or I've read
+`CLAUDE.md`, or I'm working in a subdirectory, or a session starts, I want the
+system to neither trick itself into unlocking nor lie to me about how it works,
+so I can trust that "blocked" means blocked and that what I'm told about
+enforcement is true.
 
-## Rough acceptance criteria (Given / When / Then)
+**Impact Map:**
+- **Goal:** Enforcement cannot be tricked into disabling itself and never
+  describes itself falsely to the session — the parent vision's success
+  criterion #7.
+- **Actor:** Every CTOC user running with `--dangerously-skip-permissions` (for
+  whom the hook is the only guardrail), and the CTOC maintainer, whose
+  `CLAUDE.md` must not be silently rewritten.
+- **Impact:** A block message, a `CLAUDE.md` Read, or a subdirectory `cwd` no
+  longer disables enforcement; the session-start banner states the true
+  mechanism instead of a false one.
+- **Deliverable:** A role-scoped escape-phrase matcher, a phrase-free block
+  message, an upward-walking project detector, a package-identity self-repo
+  guard, and honest injected session text.
 
-1. **Block cannot self-unlock.** Given enforcement has just emitted a block message,
-   When the next edit is attempted, Then the escape-phrase matcher finds no phrase in
-   any `role === 'user'` message and the edit remains blocked.
-2. **Doc read cannot unlock.** Given the transcript's only escape-phrase occurrence is
-   inside a `Read` of `CLAUDE.md`, When an edit is attempted, Then the matcher returns
-   no match.
-3. **Subdirectory stays enforced.** Given `cwd` is a nested subdirectory of a CTOC
-   project, When the project detector runs, Then it walks up, finds `.ctoc/`, and
-   enforcement is active (project is in scope).
-4. **No self-edit.** Given SessionStart runs inside the CTOC repo
-   (`pkg.name === 'ctoc'`), When it completes, Then `CLAUDE.md` is unchanged.
-5. **Honest self-description.** Given SessionStart injects operating-manual text into a
-   consumer project, When the text is generated, Then it omits the
-   "cryptographically enforced / no escape phrases" claims and states the real
-   exit-2 + user-only-escape-phrase behavior.
+**Success metrics** (each a behavior a targeted unit test can drive and observe
+directly on the function under test — no subprocess/exit-code assertion is
+required for this workstream, since none of these four fixes changes the
+block/allow *signal*; they change what data feeds the decision or what text is
+shown, see Test Strategy):
 
-## Findings addressed
+- [ ] Given a transcript whose most recent escape-phrase occurrence is inside a
+  non-`user` entry, the matcher returns no match.
+- [ ] Given a transcript whose most recent escape-phrase occurrence is inside a
+  `user` entry, the matcher still returns that phrase (no regression).
+- [ ] The block message contains none of the seven canonical escape phrases.
+- [ ] Given a `cwd` several directories below a project root with `.ctoc/` and a
+  CTOC-marked `CLAUDE.md`, the detector resolves the same `{ isCtoc, isCtocRepo
+  }` result as when run from the root.
+- [ ] Given a project whose `package.json` declares `"name": "ctoc"`, SessionStart
+  never modifies that project's `CLAUDE.md`, regardless of where the running
+  hook file itself is physically located.
+- [ ] Given a project whose `package.json` name is not `ctoc`, SessionStart's
+  injection behavior is unchanged from today (regression guard).
+- [ ] The injected banner text contains neither "cryptographically enforced" nor
+  "no escape phrases," and states the real block signal and the user-only
+  escape-phrase rule.
 
-- **H4** — escape-phrase check greps all roles; the block message unlocks the next
-  edit; a `CLAUDE.md` Read unlocks too.
-- **H5** — enforcement self-disables from a subdirectory (no upward `.ctoc/` walk).
-- **H6** — SessionStart edits the maintainer's own `CLAUDE.md` (`__dirname` vs
-  `pkg.name` self-repo guard); observed +122 lines this session.
-- **L3** — injected SessionStart text falsely claims "cryptographically enforced" /
-  "no escape phrases."
+## 3. CAPTURE
 
-**Observability:** H4/H5/H6/L3 are OBSERVABLE only after W01 lands — until deny
-actually blocks a tool call, the unlock-on-block-message bug cannot be seen to fire.
+### Acceptance Criteria (BDD)
 
-## INVEST status
+- [ ] **Scenario: CTOC's own block message cannot self-unlock the next edit**
+  Given the most recent escape-phrase occurrence in the transcript tail is
+  inside a non-`user` entry (e.g. the tool/stderr content of CTOC's own prior
+  block message, which today lists "hotfix, trivial fix, urgent")
+  When the next edit to the same uncovered target is attempted
+  Then the escape-phrase check finds no match
+  And the edit is evaluated as not-escaped (still subject to block/coverage
+  logic, independent of W01's separate fix to make that block real).
 
-| Story | I | N | V | E | S | T | Notes |
-|---|---|---|---|---|---|---|---|
-| A1 MVP — user-only phrase match | Y* | Y | Y | Y | Y | Y | *Observable only after W01; logic itself is independent |
-| A1 — drop phrase list from block | Y | Y | Y | Y | Y | Y | Small; drivable by asserting message text |
-| A2 MVP — upward `.ctoc/` walk | Y | Y | Y | Y | Y | Y | Independent; drivable with nested cwd fixture |
-| A3 MVP — `isCtocRepo` guard | Y | Y | Y | Y | Y | Y | Independent; drivable by asserting zero CLAUDE.md diff |
-| A4 — honest injected text | Y | Y | Y | Y | Y | Y | Text-content assertion |
+- [ ] **Scenario: A Read of CLAUDE.md cannot unlock enforcement**
+  Given the transcript's only escape-phrase occurrence is inside a tool-result
+  entry produced by a `Read` of `CLAUDE.md` (which documents all seven canonical
+  phrases verbatim)
+  When an edit to an uncovered target is attempted
+  Then the escape-phrase check returns no match.
+
+- [ ] **Scenario: A genuinely user-typed escape phrase still unlocks**
+  Given the most recent escape-phrase occurrence is inside an entry the
+  transcript attributes to the user, who typed "hotfix"
+  When an edit to an uncovered target is attempted
+  Then the escape-phrase check returns "hotfix" and the edit is treated as
+  escaped — proving the role-scoping fix does not also break the legitimate
+  escape path.
+
+- [ ] **Scenario: The block message no longer seeds its own unlock**
+  Given enforcement produces a block message for an uncovered edit
+  When the message text is generated
+  Then it contains none of the seven canonical escape phrases verbatim.
+
+- [ ] **Scenario: Enforcement stays active from a nested subdirectory**
+  Given `cwd` is set several directories below a CTOC project root that itself
+  has both `.ctoc/` and a CTOC-marked `CLAUDE.md`
+  When the project detector runs
+  Then it resolves the same project root, and the same `isCtoc` / `isCtocRepo`
+  result, as when run directly from the root.
+
+- [ ] **Scenario: Root-level detection is unchanged**
+  Given `cwd` is exactly the project root
+  When the project detector runs
+  Then it returns the identical result it returned before the upward-walk was
+  added — no behavior change at the root itself.
+
+- [ ] **Scenario: SessionStart never edits CTOC's own CLAUDE.md, from any
+  install location**
+  Given SessionStart runs against a project whose `package.json` declares
+  `"name": "ctoc"`, regardless of whether the executing hook file's own
+  location is inside that same directory tree or an entirely separate
+  installed-plugin path
+  When SessionStart completes
+  Then that project's `CLAUDE.md` is byte-identical before and after the run.
+
+- [ ] **Scenario: SessionStart still injects into a real consumer project**
+  Given SessionStart runs against a project whose `package.json` name is not
+  `ctoc`
+  When SessionStart completes
+  Then the operating-lessons block is injected into that project's `CLAUDE.md`
+  exactly as it was before the guard change (no regression to the intended
+  consumer-project behavior).
+
+- [ ] **Scenario: The injected session banner describes enforcement honestly**
+  Given SessionStart generates its session-start banner text for a consumer
+  project
+  When the text is rendered
+  Then it contains neither "cryptographically enforced" nor "no escape
+  phrases"
+  And it states that enforcement blocks via the harness's real signal and that
+  an escape phrase counts only when the user themself supplied it.
+
+### Scope
+
+#### In Scope
+
+- Scope the escape-phrase check to `role === 'user'` transcript entries only
+  (`src/hooks/PreToolUse.Edit.js`, `readTranscript()` / `findEscapeInTranscript()`,
+  `:109-120`) — the exact transcript-entry field name/schema to key off is
+  confirmed against a live Claude Code transcript sample at Step 5 (PLAN), not
+  here (see Decisions Taken Under Ambiguity).
+- Remove the verbatim escape-phrase list from `block()`'s stderr message
+  (`src/hooks/PreToolUse.Edit.js:122-142`, specifically `:128`).
+- Add an upward directory walk to `isCtocProject()`
+  (`src/lib/ctoc-project-detector.js:29-55`) so `.ctoc/` + `CLAUDE.md` are found
+  from any subdirectory of a CTOC project, not only the exact `cwd`.
+- Replace the `__dirname`-derived self-repo guard in `SessionStart.js`
+  (`:120-129`) with a package-identity check (`pkg.name === 'ctoc'`, read from
+  the *project's* `package.json`), reusing or aligning with the `isCtocRepo`
+  flag `src/lib/ctoc-project-detector.js` already computes.
+- Rewrite the injected session banner text in `SessionStart.js`'s
+  `generateContext()` (`:189-197`, the false claim at `:196`) to drop the
+  "cryptographically enforced" / "no escape phrases" claims and state the real
+  block signal and the user-only escape-phrase rule.
+
+#### Out of Scope
+
+- The exit-code / `permissionDecision` deny mechanism itself — that is W01
+  (`ctoc-audit-w01-enforcement-blocks`), the technical prerequisite for
+  observing these fixes fire end-to-end in a live blocked session.
+- CRLF-safe frontmatter parsing and POSIX-only shell-outs — W07.
+- Release/version/license metadata truth — W09.
+- The approval-provenance ledger and multi-hop human-gate bypass prevention —
+  W02 (human-gate integrity).
+- Any change to the seven canonical phrases themselves or their word-boundary
+  matching regex in `src/lib/escape-phrases.js` — already correct, already
+  covered by `tests/escape-phrases.test.js`; this workstream only fixes what
+  text is scoped and fed into that matcher, not the matcher's own logic.
+- Any change to plan-coverage matching (`src/lib/plan-coverage.js`) — untouched
+  by this workstream.
+
+### Story Breakdown (INVEST-validated)
+
+**As a** CTOC user relying solely on PreToolUse enforcement (running with
+`--dangerously-skip-permissions`), **I want** an escape phrase to count only
+when I personally typed it, **so that** CTOC's own block message, or a `Read` of
+`CLAUDE.md`, cannot unlock my next edit.
+*(Independent — the role-scoping change and the block-message trim are one
+self-contained fix inside one file. Negotiable — describes the desired
+behavior, not the transcript-parsing implementation. Valuable — closes a
+bypass in the user's only remaining guardrail. Estimable — bounded to
+`findEscapeInTranscript()`/`readTranscript()` and `block()`'s message text.
+Small. Testable via synthetic role-tagged transcript fixtures — no live blocked
+session or W01 required to test, only to observe end-to-end. `[MVP]`.)*
+
+**As a** CTOC user working from a subdirectory of a CTOC project, **I want**
+enforcement to find the project root by walking up to `.ctoc/`, **so that**
+running a tool from `src/lib/` or any nested folder does not silently disable
+enforcement.
+*(Independent of the other three stories. Negotiable. Valuable — enforcement
+coverage no longer depends on which directory a tool happens to run from.
+Small — bounded to `isCtocProject()`. Testable with a nested-`cwd` fixture
+plus a root-level regression fixture. `[MVP]`.)*
+
+**As** the CTOC maintainer, **I want** SessionStart to recognize the CTOC repo
+by its package identity rather than by comparing the running hook file's own
+install location, **so that** my own `CLAUDE.md` is never rewritten regardless
+of whether CTOC is running as an installed plugin or I am working directly in
+the dev repo.
+*(Independent. Valuable — stops silent corruption of hand-maintained content
+the maintainer believes they fully control. Small — one guard, and the correct
+package-identity check already exists as `isCtocRepo` in
+`ctoc-project-detector.js`, so this is "reuse," not "invent." Testable via a
+zero-diff assertion plus a consumer-project regression fixture. `[MVP]`.)*
+
+**As a** CTOC user, **I want** the text SessionStart injects into my session to
+describe enforcement as it actually works, **so that** I am not told a false
+story ("cryptographically enforced," "no escape phrases") that overstates the
+guardrail or hides the one legitimate way around it from me.
+*(Independent of the other three stories. Negotiable — wording, not mechanism.
+Valuable — informed trust in the tool that is supposedly protecting the user.
+Small — text-only change to `generateContext()`. Testable via
+string-absence/presence assertions on the rendered banner.)*
+
+### Files Likely Touched
+
+- `src/hooks/PreToolUse.Edit.js` — `readTranscript()` / `findEscapeInTranscript()`
+  (`:109-120`) to scope matching to `role === 'user'` entries; `block()`'s
+  stderr text (`:122-142`, specifically the phrase list at `:128`) to drop the
+  verbatim phrase list.
+- `src/lib/ctoc-project-detector.js` — `isCtocProject()` (`:29-55`) to add an
+  upward walk toward the filesystem root looking for `.ctoc/` + `CLAUDE.md`,
+  before falling back to the current single-directory check.
+- `src/hooks/SessionStart.js` — the self-repo guard (`:120-129`) to gate on
+  package identity instead of `__dirname`; `generateContext()`'s injected banner
+  text (`:189-197`, false claim at `:196`) to describe the real mechanism.
+- `src/lib/escape-phrases.js` — already correct (word-bounded matcher, seven
+  canonical phrases, covered by `tests/escape-phrases.test.js`); likely
+  untouched. The bug this workstream fixes is in what text the caller feeds
+  into this matcher, not in the matcher itself.
+
+### Test Strategy
+
+- Every scenario above is testable **today**, independent of W01, using
+  synthetic fixtures: role-tagged transcript JSONL fixtures (for Defect 1),
+  nested-`cwd` project fixtures with and without `.ctoc/`/`CLAUDE.md` at each
+  level (for Defect 2), `package.json` fixtures with `name: "ctoc"` and
+  `name: "some-other-app"` paired with a hook `__dirname` located both inside
+  and outside the fixture tree (for Defect 3), and string assertions against
+  the rendered banner (for Defect 4). W01 landing is required only to observe
+  Defect 1's unlock-on-block-message failure mode *fire inside a real blocked
+  session* — it is not required to write or pass any test in this plan.
+- Assert on **content**, not structure: the block-message and banner-text
+  scenarios must assert the literal absence of specific phrases/claims
+  ("hotfix", "trivial fix", "urgent", "cryptographically enforced", "no escape
+  phrases"), not merely that a message or banner was produced.
+- Every regression-guard scenario (root-level detection unchanged; consumer-project
+  injection unchanged; genuine user-typed phrase still unlocks) must exist
+  alongside its corresponding fix scenario, so this workstream does not trade
+  one defect class (self-unlock / self-edit) for another (over-widened
+  detection walk, or a guard so broad it also blocks legitimate injection).
+- The exact transcript-entry schema (the field name distinguishing a
+  user-authored entry from an assistant/tool/system one, and whether historical
+  transcripts always populate it) must be confirmed against a live Claude Code
+  transcript sample at Step 5 (PLAN), immediately before implementation — see
+  Decisions Taken Under Ambiguity.
+- Because none of these four fixes changes the block/allow *signal* itself
+  (unlike W01), no subprocess/exit-code-level test is required here — direct,
+  in-process tests against the exported functions are sufficient and match the
+  granularity of the defects (a matcher's input scope, a detector's directory
+  walk, a guard's comparison basis, a string's content).
 
 ## Decisions Taken Under Ambiguity
 
 - **No Business Model Canvas.** No canvas exists at
-  `plans/canvas/ctoc-self-audit-remediation.md`. This is a technical remediation
-  vision; a BMC is N/A. Recorded here and proceeding — no kickback.
-- **`depends_on: ctoc-audit-w01-enforcement-blocks` is an observability dependency,
-  not a code-merge dependency.** The W08 code changes are independently authorable and
-  testable in isolation (unit tests on the matcher, detector, and guard drive the
-  behavior directly); W01 is required only to *observe* the end-to-end unlock-on-block
-  path. Encoded as `depends_on` per the vision's stated prerequisite so the maintainer
-  sequences it after W01 at the gate.
+  `plans/canvas/ctoc-self-audit-remediation.md`. This is a technical
+  remediation vision; a BMC is not applicable. Recorded here and proceeding —
+  no kickback.
+- **`depends_on: ctoc-audit-w01-enforcement-blocks` is an observability
+  dependency, not a code-merge dependency.** All four fixes in this workstream
+  are independently authorable and independently unit-testable in isolation
+  today (synthetic transcript, `cwd`, and `package.json` fixtures drive the
+  behavior directly, with no dependency on W01's exit-code/`permissionDecision`
+  change). W01 is required only to *observe* the end-to-end
+  unlock-on-block-message failure inside a real, live-blocked session — until a
+  PreToolUse deny actually stops a tool call, there is no real block for
+  Defect 1 to unlock. Encoded as `depends_on` per the vision's stated
+  prerequisite so the maintainer sequences it after W01 at the gate, not
+  because the code depends on W01's files.
+- **Line-citation drift found and corrected against the originating audit
+  finding (H4/H5/H6/L3, and the stub carrying them forward): the "cryptographically
+  enforced / no escape phrases" false claim was cited at
+  `SessionStart.js:191`; direct line-by-line re-verification against the file
+  as it stands today places the exact sentence at `SessionStart.js:196`** — line
+  `191` is the section's opening prose line ("The Iron Loop is enforced by
+  hooks. You CANNOT Edit or Write files until:"), five lines above the false
+  claim itself. This plan cites `:196` throughout as the verified location; the
+  underlying finding (the claim is false and must be removed/rewritten) is
+  unaffected by the citation correction. All other file:line citations carried
+  from the stub (`PreToolUse.Edit.js:115`, `ctoc-project-detector.js:29`,
+  `SessionStart.js:121`) were re-verified against the current code and are
+  accurate as originally cited.

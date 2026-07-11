@@ -1,4 +1,7 @@
 ---
+type: vision
+status: decomposed
+decomposed_at: "2026-07-11T14:40:55.935Z"
 title: "CTOC Self-Audit Remediation: Make the Gates Real"
 created: "2026-07-11T00:00:00Z"
 priority: HIGH
