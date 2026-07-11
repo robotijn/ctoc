@@ -1,172 +1,319 @@
 ---
 title: "W06 — The Test Suite Tells the Truth"
 created: "2026-07-11T00:00:00Z"
-type: stub
+type: feature
 parent_vision: "vision/ctoc-self-audit-remediation.md"
 priority: HIGH
-status: stub
 depends_on: none
 ---
 
 # W06 — The Test Suite Tells the Truth
 
-## Problem
+## 1. ASSESS
 
-The suite is 5485-green and caught **none** of the audit defects, because it asserts
-structure, not truth:
+### Business Context
 
-- **Match-anywhere frontmatter.** `architecture-invariants`'s `readFM` matches
-  frontmatter *anywhere* in a file, so the 19 agent files that place a heading before
-  their YAML — whose YAML the runtime therefore never parses — are certified green.
-  The test confirms the inert-frontmatter bug is fine.
-- **Skip-guards turn deletion into a pass.** The pattern
-  `try { require(...) } catch { null }` → `t.skip(...)` means a **deleted** module
-  produces `pass 0 / fail 0 / skip 1` — green under the `# fail 0` gate. This pattern
-  is reproduced across 55 sites; any of those modules could vanish and the suite would
-  stay green.
-- **Coverage is never measured.** Tests run under `node --test` with no coverage
-  instrumentation, so the documented "≥ 80%, 0 skipped" gate has no instrument behind
-  it — the number is unenforced and unenforceable as wired.
-- **Release test guards a duplicate.** `release.test.js` asserts against a
-  hand-copied duplicate of the production config, not the real file, so the real
-  config can drift (wrong version, wrong license) while the test stays green — which
-  is exactly how `package.json` came to self-report the wrong version and license.
+A green test suite is the CTOC maintainer's evidence that the four human gates hold —
+it is the instrument the maintainer trusts instead of re-reading every line of
+enforcement code by hand. The 2026-07-11 seven-agent audit found the suite is
+5485-green and caught **none** of the ten other workstreams' defects, because it
+asserts *structure* (a key is present, a function returned without throwing) rather
+than *truth* (a pointer resolves, two sources of truth agree, a tool call was actually
+stopped). This is the blind spot that let every other finding — exit-code enforcement,
+the Bash stdin bug, forged `approved_by: human` markers, the inert-frontmatter parse
+bug, ten dangling step agents, an unreachable Gate-3 failure path — accumulate behind a
+suite that never turned red. A suite that asserts structure instead of truth is not a
+weak witness; it is a false witness, and it is the single root cause that let the other
+nine defect classes ship undetected.
 
-The deeper defect is the blind spot itself: nothing asserts that a pointer resolves,
-that two sources of truth agree, or that a claimed count matches disk. This workstream
-fixes the instrument so the other workstreams' fixes are actually witnessed.
+### Current State (Verified)
 
-## Scope
+- **Match-anywhere frontmatter parser certifies the inert-frontmatter bug green
+  (finding C7).** `architecture-invariants`'s `readFM` matches YAML frontmatter
+  *anywhere* in a file, not anchored to the top. The 19 agent files that place a `# H1`
+  heading before their YAML block have frontmatter the runtime never parses (`cto-chief`
+  runs with all tools instead of its declared read-only set; all 5 scouts run on the
+  session model instead of `haiku`) — and the existing invariant test still passes,
+  because it finds the frontmatter "somewhere" in the file and certifies it valid.
+- **The skip-guard pattern turns deletion into a pass (finding A2).**
+  `try { require(...) } catch { null }` followed by `t.skip(...)` means a module that
+  fails to resolve — because it was deleted, renamed, or never built — produces
+  `pass 0 / fail 0 / skip 1`. That result is green under the `# fail 0` gate. The audit
+  found this exact pattern reproduced across **55 sites**; any of those 55 required
+  modules could vanish today and the suite would report success.
+- **Coverage is never measured (finding A4).** The suite runs under plain
+  `node --test`, with no coverage instrumentation wired into the test command. The
+  documented "≥ 80%, 0 skipped" gate in `docs/IRON_LOOP.md` and this project's own
+  `CLAUDE.md` has no instrument behind it — the 80% figure is asserted in prose and
+  enforced nowhere.
+- **`release.test.js` tests a duplicate, not the artifact (part of findings B1–B6).**
+  The release test asserts against a hand-copied literal object embedded in the test
+  file, not against the real `package.json`/`plugin.json`/`marketplace.json`/`LICENSE`
+  files on disk. This is exactly how `package.json` came to self-report the wrong
+  version (`6.9.49` vs. the actual `6.10.3`) and the wrong license (`Apache-2.0` vs. the
+  actual PolyForm Shield 1.0.0) with a fully green suite.
+- **No cross-file invariant exists at all.** Nothing in the current suite asserts that
+  an `operations-registry.yaml` `path:` entry resolves to a real file, that a
+  CLAUDE.md step-table agent resolves to a dispatchable file, that `VERSION` agrees
+  with the three JSON manifests, or that a documented count (agents, skills, tests)
+  matches a live count on disk. Ten dangling step agents (finding C8) and 20 dangling
+  registry paths shipped invisibly because no test class existed to catch them.
 
-Make the suite capable of going red on the defect classes it currently sleeps through.
+### Impact
 
-1. **Kill the skip-guards.** A module that is absent must **FAIL**, not skip. Replace
-   the `try/require/catch→t.skip` pattern at its 55 sites so module-absent is a hard
-   failure.
-2. **Wire coverage instrumentation** and treat `# skipped > 0` as a suite failure, so
-   the "≥ 80%, 0 skipped" gate has a real instrument and a real failure mode.
-3. **Add cross-file invariant tests** that assert truth across files:
-   - every `operations-registry.yaml` `path:` resolves to a real file;
-   - every agent named in the CLAUDE.md Iron Loop step table resolves to a real
-     dispatchable agent file;
-   - `VERSION` == `package.json` == `plugin.json` == `marketplace.json` version;
-   - `package.json.license` equals the actual `LICENSE` file's license;
-   - every documented count (agents, skills, tests, modules) self-verifies against a
-     live disk count;
-   - every installer-written hook path actually exists on disk.
+Every one of the other ten remediation workstreams ships a production fix that, today,
+has no test capable of proving it landed or of catching its regression. Until this
+workstream lands, "the suite is green" carries zero evidential weight for any of the
+audit's findings — the maintainer is flying blind on the exact defect classes the audit
+just surfaced, and a future regression in any of them (a 56th skip-guard added
+carelessly, a 21st dangling registry path, a re-introduced version drift) would again
+go undetected. This is why the vision requires W06 to land *alongside* each other
+workstream rather than as a standalone pass: a paired fix without its paired test is
+unwitnessed and, per the no-stub rule, incomplete.
 
-**Pairs with every other workstream.** Each fix ships with the test that catches its
-defect class — W06 supplies the truth-asserting test harness and the shared invariant
-patterns the other ten workstreams plug their paired tests into.
+## 2. ALIGN
 
-**Does NOT touch:** the production defects themselves (each lives in its own
-workstream — enforcement in W01, gate logic in W05, frontmatter in W03, registry in
-W04, release metadata in W09, etc.). W06 changes only tests, test infrastructure, and
-the coverage/skip gating; it does not fix a production bug, it makes the suite able to
-see one.
+### Alignment
 
-## Story Map
+- **Goal:** Restore the test suite as truthful evidence that the four human gates hold
+  and that the audit's defect classes are fixed and stay fixed (vision Success
+  Criterion 5: "The test suite goes red on every defect class... and coverage is
+  actually measured with `0 skipped` treated as failure").
+- **Actor:** The CTOC maintainer (the human CTO), named explicitly in the vision's
+  target audience as the party who "trusts the green suite as evidence the gates
+  hold."
+- **Impact:** The maintainer's `# fail 0, # skipped 0, coverage ≥ 80%` gate becomes an
+  instrument that actually distinguishes a fixed defect from a live one — a behavior
+  change from "green suite, defect present" to "suite is red exactly when, and only
+  when, a defect class from this audit (or a future regression of it) is present."
+- **Deliverable:** New and rewritten test files (`tests/architecture-invariants.test.js`
+  anchoring, 55 skip-guard conversions, `tests/registry-integrity.test.js`,
+  `tests/doc-counts.test.js`, a rewritten `tests/release.test.js`) plus coverage
+  instrumentation wired into the `npm test` command and gate.
 
-**Goal:** The suite goes red on every audit defect class — dead pointers, disagreeing
-sources of truth, deleted modules, unmeasured coverage — and stays honest afterward.
+**Job to Be Done:** When I am relying on a green test suite as proof that a fix
+landed and a defect class cannot silently return, I want every defect class this audit
+found to have a test that fails on the broken state and passes on the fixed state, so I
+can trust `# fail 0` again.
 
-- **Success metric:** Each new invariant test FAILS on the current tree (it catches a
-  real, present defect) and PASSES after that defect's paired fix lands. No test is
-  added that is green on today's broken tree.
+### Success Metrics
 
-### Activity 1 — Make absence loud
-- `[MVP]` As the CTOC maintainer, I want a module that fails to `require` to FAIL its
-  test rather than skip, so that deleting a module can never stay green.
-  - INVEST: Independent, Valuable, Small, Testable.
-- As the CTOC maintainer, I want the 55 skip-guard sites converted to hard-require, so
-  that no corner of the suite hides a deletion.
+- Every invariant test this workstream adds or rewrites **FAILS when run against
+  today's tree** (proves it catches a real, currently-present defect) — no test is
+  added that is already green on the broken tree.
+- Each of those tests **PASSES once its paired production fix has landed** in that
+  fix's own workstream, with no other invariant test regressing.
+- `# skipped > 0` anywhere in a suite run causes the gate to report FAIL, with zero
+  exceptions carved out.
+- A numeric coverage percentage is present in every `npm test` run's output, and a run
+  below 80% causes the gate to report FAIL.
+- Zero of the 55 identified skip-guard sites remain in `try/require/catch → t.skip`
+  form after this workstream lands.
 
-### Activity 2 — Make coverage real
-- `[MVP]` As the CTOC maintainer, I want coverage instrumentation wired into the test
-  run, so that the "≥ 80%" gate has a number behind it.
-  - INVEST: Independent, Valuable, Estimable, Small, Testable.
-- As the CTOC maintainer, I want `# skipped > 0` treated as a suite failure, so that a
-  skipped test can no longer masquerade as a pass under the `# fail 0` gate.
+## 3. CAPTURE
 
-### Activity 3 — Assert truth across files
-- `[MVP]` As the CTOC maintainer, I want a test that fails when any
-  `operations-registry.yaml` `path:` or step-table agent does not resolve to a real
-  file, so that dangling pointers go red.
-  - INVEST: Independent, Valuable, Small, Testable.
-- As the CTOC maintainer, I want a single-source-of-truth test that fails when
-  VERSION, `package.json`, `plugin.json`, and `marketplace.json` versions disagree, or
-  when `package.json.license` disagrees with the `LICENSE` file, so that metadata drift
-  goes red.
-- As the CTOC maintainer, I want a test that fails when a documented count (agents,
-  skills, tests, modules) disagrees with a live disk count, so that stale docs go red.
-- As the CTOC maintainer, I want a test that fails when any installer-written hook path
-  does not exist on disk, so that a broken installer path goes red.
+### Acceptance Criteria (BDD)
 
-## Rough acceptance criteria (Given/When/Then)
+- [ ] **Scenario: Deleted module fails loud, not quiet**
+  Given a module a test file requires is deleted from disk or fails to resolve
+  When the suite runs
+  Then that test file reports at least 1 failing test (not `pass 0 / fail 0 / skip 1`)
+  And the failure message names the unresolved module path
 
-- **Absence fails, not skips.** Given a required module is deleted (or unresolvable),
-  When the suite runs, Then the corresponding test FAILS (non-zero `# fail`), not
-  `skip 1`.
-- **Skip is a failure.** Given any test is skipped, When the suite runs under the
-  gate, Then the run is treated as failed (`# skipped > 0` ⇒ fail).
-- **Coverage measured.** Given the suite runs, When coverage is computed, Then a real
-  coverage figure is produced and a figure below 80% fails the gate.
-- **Dangling registry path fails.** Given an `operations-registry.yaml` `path:` that
-  points at no file, When the invariant test runs, Then it FAILS naming the dangling
-  path.
-- **Unresolvable step agent fails.** Given a CLAUDE.md step-table agent that resolves
-  to no dispatchable file, When the invariant test runs, Then it FAILS.
-- **Version disagreement fails.** Given VERSION, `package.json`, `plugin.json`,
-  `marketplace.json` do not all match, When the SSOT test runs, Then it FAILS.
-- **License disagreement fails.** Given `package.json.license` differs from the actual
-  `LICENSE` file, When the SSOT test runs, Then it FAILS.
-- **Stale count fails.** Given a documented count differs from a live disk count, When
-  the count test runs, Then it FAILS.
-- **Missing installer path fails.** Given an installer-written hook path that does not
-  exist, When the test runs, Then it FAILS.
-- **Paired-fix invariant.** For each new invariant test: Given today's tree, When it
-  runs, Then it FAILS; and Given the paired fix has landed, When it runs, Then it
-  PASSES.
+- [ ] **Scenario: Present module leaves the suite unaffected**
+  Given every module a test file requires exists and its `require()` call succeeds
+  When the suite runs
+  Then that test file reports 0 failures and 0 skips
 
-## Findings addressed
+- [ ] **Scenario: Any skip fails the gate**
+  Given a completed suite run reports one or more skipped tests (`# skipped > 0`)
+  When the test gate evaluates the run summary
+  Then the gate reports FAIL regardless of the `# fail` count
 
-- **C7** — match-anywhere frontmatter parser certifies the inert-frontmatter bug green.
-- **A2** — skip-guard pattern turns a deleted module into `pass 0 / fail 0 / skip 1`
-  (green under `# fail 0`), reproduced across 55 sites.
-- **A4** — coverage is never measured; the "≥ 80%, 0 skipped" gate has no instrument.
-- **B1–B6** — the cross-file invariant class: registry-path resolution, step-agent
-  resolution, version/license single-source-of-truth, documented-count
-  self-verification, installer-path existence (and `release.test.js` guarding a
-  hand-copied duplicate rather than the real config).
+- [ ] **Scenario: Coverage is measured and reported as a real number**
+  Given the suite runs under the wired coverage instrumentation
+  When the run completes
+  Then a numeric line-coverage percentage appears in the run output
 
-## INVEST status (per story)
+- [ ] **Scenario: Coverage below 80% fails the gate**
+  Given the measured line-coverage percentage is below 80
+  When the coverage gate check runs
+  Then it reports FAIL and prints the measured percentage next to the 80% threshold
 
-| Story | I | N | V | E | S | T |
-|---|---|---|---|---|---|---|
-| Module-absent must FAIL not skip `[MVP]` | Y | Y | Y | Y | Y | Y |
-| Convert 55 skip-guard sites to hard-require | Y | Y | Y | Y | Y | Y |
-| Wire coverage instrumentation `[MVP]` | Y | Y | Y | Y | Y | Y |
-| `# skipped > 0` treated as failure | Y | Y | Y | Y | Y | Y |
-| Registry-path + step-agent resolution test `[MVP]` | Y | Y | Y | Y | Y | Y |
-| Version/license single-source-of-truth test | Y | Y | Y | Y | Y | Y |
-| Documented-count self-verify test | Y | Y | Y | Y | Y | Y |
-| Installer-path existence test | Y | Y | Y | Y | Y | Y |
+- [ ] **Scenario: Dangling registry path fails, naming the path**
+  Given `operations-registry.yaml` contains a `path:` entry that resolves to no file on
+  disk
+  When `tests/registry-integrity.test.js` runs
+  Then it FAILS and the failure message contains the exact dangling `path:` value
 
-All stories pass INVEST. The four Activity-3 stories share a "read two sources,
-compare" harness but each fails on a distinct real defect and delivers value alone.
+- [ ] **Scenario: Unresolvable step-table agent fails, naming the step**
+  Given CLAUDE.md's Iron Loop step table names an agent for a step, and that agent's
+  path resolves to no dispatchable file on disk
+  When `tests/registry-integrity.test.js` runs
+  Then it FAILS and the failure message names both the step number and the unresolved
+  agent path
+
+- [ ] **Scenario: Version disagreement fails, naming every mismatched file**
+  Given `VERSION`, `package.json.version`, `.claude-plugin/plugin.json`'s version, and
+  `.claude-plugin/marketplace.json`'s ctoc entry version do not all match
+  When the version/license single-source-of-truth test runs
+  Then it FAILS and lists each file next to its version value
+
+- [ ] **Scenario: License disagreement fails**
+  Given `package.json.license` does not equal the license identifier read from the
+  actual `LICENSE` file
+  When the version/license single-source-of-truth test runs
+  Then it FAILS and prints both the declared and the actual license strings
+
+- [ ] **Scenario: Stale documented count fails**
+  Given a documented count (agents, skills, tests, or modules) in a markdown doc file
+  does not equal a live count taken from disk at test time
+  When `tests/doc-counts.test.js` runs
+  Then it FAILS and prints the documented value and the live disk value side by side
+
+- [ ] **Scenario: Missing installer-written path fails**
+  Given an installer script writes a hook to a documented filesystem path, and that
+  path does not exist after installation runs
+  When the installer-path invariant test runs
+  Then it FAILS naming the missing path
+
+- [ ] **Scenario: Release test guards the real artifact, not a duplicate**
+  Given `tests/release.test.js` runs
+  When it asserts a version or license value
+  Then it reads that value from the actual `package.json` file on disk via
+  `fs.readFileSync` + `JSON.parse` (not from a literal object hand-copied into the test
+  file), so a real drift in `package.json` makes the assertion fail
+
+- [ ] **Scenario: Paired-fix lifecycle holds for every invariant above**
+  Given any invariant test added by this workstream is run against today's tree, before
+  its paired production fix has landed in that fix's own workstream
+  When the test executes
+  Then it FAILS, naming a real, currently-present defect
+  And Given the paired fix has since landed
+  When the same test runs again
+  Then it PASSES, with no other invariant test in the suite regressing to failing or
+  skipped
+
+### Scope
+
+#### In Scope
+- Converting all 55 identified `try { require(...) } catch { null } → t.skip(...)`
+  sites to hard-require, so an absent module fails the test instead of skipping it
+  (test-file edits only)
+- Wiring coverage instrumentation into the `npm test` run and treating `# skipped > 0`
+  as a suite failure
+- `tests/architecture-invariants.test.js`: anchoring `readFM`'s frontmatter match to
+  the top of the file (`^---`) instead of matching anywhere
+- New `tests/registry-integrity.test.js`: every `operations-registry.yaml` `path:`
+  entry resolves to a real file; every CLAUDE.md step-table agent resolves to a real
+  dispatchable file
+- New single-source-of-truth assertions: `VERSION` == `package.json` ==
+  `plugin.json` == `marketplace.json` version; `package.json.license` == the actual
+  `LICENSE` file
+- New `tests/doc-counts.test.js`: every documented count (agents, skills, tests,
+  modules) self-verifies against a live disk count
+- An installer-path existence test: every installer-written hook path exists on disk
+  after install
+- Rewriting `tests/release.test.js` to read the real production config files instead
+  of a hand-copied duplicate
+- The shared "read two sources, compare" test harness the four cross-file invariant
+  tests are built on
+
+#### Out of Scope
+- Fixing the `readFM` match-anywhere *root cause* by moving the 19 agents' YAML to
+  line 1 — that production fix lives in **W03 (Agent contracts load at runtime)**;
+  W06 only anchors the parser and adds the test that proves the fix landed
+- Fixing the PreToolUse `exit(1)` vs. `exit(2)` enforcement bug — lives in
+  **W01 (Enforcement actually blocks)**
+- Creating the 10 missing Iron Loop step agents or regenerating
+  `operations-registry.yaml`'s content from disk — lives in
+  **W04 (Every dispatched agent resolves)**; W06 only adds the test that catches a
+  dangling entry
+- Correcting `package.json`'s actual wrong version and license values — lives in
+  **W09 (Release and metadata truth)**; W06 only adds the test that fails while they
+  are wrong and stays green once corrected
+- Implementing the Gate-3 circuit breaker or making `validateReviewToDone` return
+  `valid:false` — lives in **W05 (Gate 3 verifies real work)**
+- CRLF-safe frontmatter parsing for Windows — lives in
+  **W07 (Cross-platform correctness)**
+- Any fix to the human-gate approval-provenance ledger — lives in
+  **W02 (Human-gate integrity)**
+
+### Story Breakdown (INVEST)
+
+| Story | Actor | Story | I | N | V | E | S | T |
+|---|---|---|---|---|---|---|---|---|
+| S1 `[MVP]` | CTOC maintainer | As the maintainer, I want a module that fails to `require` to FAIL its test rather than skip, so that deleting a module can never stay green | Y | Y | Y | Y | Y | Y |
+| S2 | CTOC maintainer | As the maintainer, I want all 55 skip-guard sites converted to hard-require, so that no corner of the suite hides a deletion | Y | Y | Y | Y | Y | Y |
+| S3 `[MVP]` | CTOC maintainer | As the maintainer, I want coverage instrumentation wired into the test run, so that the "≥ 80%" gate has a real number behind it | Y | Y | Y | Y | Y | Y |
+| S4 | CTOC maintainer | As the maintainer, I want `# skipped > 0` treated as a suite failure, so that a skipped test can never masquerade as a pass under `# fail 0` | Y | Y | Y | Y | Y | Y |
+| S5 `[MVP]` | CTOC maintainer | As the maintainer, I want a test that fails when any registry `path:` or step-table agent does not resolve, so that dangling pointers go red | Y | Y | Y | Y | Y | Y |
+| S6 | CTOC maintainer | As the maintainer, I want a test that fails when VERSION/package.json/plugin.json/marketplace.json versions disagree, or when the declared license disagrees with the actual LICENSE file, so that metadata drift goes red | Y | Y | Y | Y | Y | Y |
+| S7 | CTOC maintainer | As the maintainer, I want a test that fails when a documented count disagrees with a live disk count, so that stale docs go red | Y | Y | Y | Y | Y | Y |
+| S8 | CTOC maintainer | As the maintainer, I want a test that fails when an installer-written hook path does not exist on disk, so that a broken installer path goes red | Y | Y | Y | Y | Y | Y |
+| S9 | CTOC maintainer | As the maintainer, I want `release.test.js` to assert against the real `package.json`/`plugin.json`/`marketplace.json`/`LICENSE` files instead of a hand-copied duplicate, so the test cannot stay green while the real artifact drifts | Y | Y | Y | Y | Y | Y |
+
+All nine stories pass INVEST independently. S5–S8 share a "read two sources, compare"
+harness but each fails on a distinct real defect and delivers standalone value; none
+depends on another shipping first.
+
+### Files Likely Touched
+
+- `tests/architecture-invariants.test.js` — anchor `readFM`'s frontmatter match to
+  `^---`
+- The 55 skip-guard test files (exact list to be enumerated by a repo-wide scan for the
+  `try { require(...) } catch { null }` → `t.skip` pattern at Step 5/6 planning; the
+  audit's count is the starting figure, not a hard ceiling — see Decisions below)
+- `package.json` — test script invocation and coverage configuration
+- `tests/registry-integrity.test.js` (new) — registry-path and step-table agent
+  resolution
+- `tests/doc-counts.test.js` (new) — documented-count self-verification
+- `tests/release.test.js` — rewritten to read the real production config files
+- A new installer-path existence test (file location to be decided by the
+  implementation planner; likely `tests/installer-paths.test.js` or folded into
+  `tests/registry-integrity.test.js`)
+
+### Test Strategy
+
+This workstream's deliverable **is** its tests — there is no separate application
+logic to build behind them. Every acceptance criterion above corresponds to a test (or
+test conversion) that must be demonstrably RED against today's tree before it is
+considered complete, and the story is not "done" until the paired production fix (in
+its own workstream) turns it GREEN. Because this workstream's own Step 8 (TEST) *is*
+its Step 10 (IMPLEMENT) — writing the invariant test is the implementation — the
+implementation planner should treat "write the test, confirm it fails on the current
+tree, document the specific failure output" as the acceptance evidence for each story,
+not a separate manual verification pass. The 55 skip-guard conversions are verified in
+aggregate: after conversion, temporarily deleting a sampled module (in a throwaway
+branch, never committed) must produce a failing test, not a skip, for a rotating sample
+of the converted sites.
 
 ## Decisions Taken Under Ambiguity
 
 - **No Business Model Canvas.** This is a technical remediation workstream; a BMC is
-  N/A. Proceeded without kicking back per the vision decomposition brief.
-- **W06 changes tests only.** Where an invariant test needs a production defect fixed
-  to go green, the fix belongs to that defect's own workstream; W06 owns the test that
-  witnesses it. This preserves the "pairs with every workstream" intent without W06
-  editing production code the other agents own.
-- **Coverage tool unspecified.** The vision requires coverage be "actually measured"
-  but names no tool. `node --test --experimental-test-coverage` (built-in, no new dep)
-  is the presumptive choice for the implementation planner; the acceptance criterion
-  asserts a real figure and an <80% failure, not a specific tool.
-- **55-site count taken from the audit.** The skip-guard site count is the audit's
-  figure; the acceptance criterion drives on behavior (absence fails) rather than the
-  exact number, so a small drift in count does not invalidate the tests.
+  N/A. Proceeded without kicking back, per the vision decomposition brief and the
+  CTO Chief technical-only scope (business/market questions are out of scope for this
+  chain).
+- **W06 changes tests and test infrastructure only.** Where an invariant test needs a
+  production defect fixed to go green, the fix belongs to that defect's own workstream
+  (W01–W05, W07–W11); W06 owns the test that witnesses it. This is stated explicitly in
+  Scope above so the implementation planner does not fold another workstream's
+  production fix into this plan's file list.
+- **Coverage tool: `node --experimental-test-coverage`.** The vision requires coverage
+  be "actually measured" but names no tool. Node's built-in
+  `node --test --experimental-test-coverage` is the presumptive choice for the
+  implementation planner: zero new dependency, already available in the project's
+  supported Node range. The acceptance criteria assert a real reported figure and a
+  below-80% failure, not a specific tool, so this choice does not narrow what the
+  criteria require if a different instrumentation is later preferred.
+- **Paired-fix acceptance is the operating contract with every other workstream.**
+  Because W06's invariant tests are only meaningful in the RED-before / GREEN-after
+  shape, this plan is explicitly designed to pair with W01, W03, W04, W05, and W09 (the
+  workstreams whose defects W06's new tests target). Landing W06 without any paired
+  fix having landed yet is expected and correct — the RED state on today's tree is
+  itself the acceptance evidence per Scenario "Paired-fix lifecycle holds" above.
+- **55-site count taken from the audit, not re-verified at functional-plan time.** The
+  skip-guard site count is the audit's figure. The acceptance criteria drive on
+  behavior (absence fails, not skips) rather than the exact count, so the implementation
+  planner should re-scan the repo for the current, authoritative site list rather than
+  treating 55 as a hard target; a small drift in count does not invalidate the plan.
