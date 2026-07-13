@@ -86,16 +86,51 @@ test('runClaude parses the --output-format json object from the binary', () => {
   assert.equal(res.isError, false);
 });
 
-test('runClaude builds the correct argv (-p prompt, --output-format json, --model when given)', () => {
-  const ARGV_ECHO = `'use strict';
-const args = process.argv.slice(2);
-process.stdout.write(JSON.stringify({ result: JSON.stringify(args), usage: {}, is_error: false }));
+test('runClaude argv carries flags only; the PROMPT travels on stdin (leading dashes safe)', () => {
+  // Echo BOTH the argv and the full stdin back, so one real subprocess proves
+  // (a) the prompt is not an argv element and (b) it arrives intact on stdin —
+  // including a prompt that BEGINS with "---", which as argv would be read by
+  // the command line's option parser as an unknown option (the live failure).
+  const ARGV_AND_STDIN_ECHO = `'use strict';
+const chunks = [];
+process.stdin.on('data', (c) => chunks.push(c));
+process.stdin.on('end', () => {
+  const stdin = Buffer.concat(chunks).toString('utf8');
+  const args = process.argv.slice(2);
+  process.stdout.write(JSON.stringify({ result: JSON.stringify({ args, stdin }), usage: {}, is_error: false }));
+  process.exit(0);
+});
+`;
+  const bin = writeFakeBinary(ARGV_AND_STDIN_ECHO);
+  const dashPrompt = '---\nname: starts-with-frontmatter\n---\nthe actual prompt body';
+  const res = runClaude(dashPrompt, { model: 'claude-opus-4-8', spawnImpl: nodeScriptSpawn(bin) });
+  const seen = JSON.parse(res.text);
+  assert.deepEqual(seen.args, ['-p', '--output-format', 'json', '--model', 'claude-opus-4-8']);
+  assert.equal(seen.stdin, dashPrompt);
+  assert.equal(res.isError, false);
+});
+
+test('runClaude is LOUD on a non-zero exit: isError true, never an empty success', () => {
+  const DYING_BINARY = `'use strict';
+process.stderr.write("error: unknown option");
+process.exit(1);
+`;
+  const bin = writeFakeBinary(DYING_BINARY);
+  const res = runClaude('any prompt', { spawnImpl: nodeScriptSpawn(bin) });
+  assert.equal(res.isError, true);
+  assert.equal(res.exitStatus, 1);
+  assert.match(res.stderr, /unknown option/);
+});
+
+test('runClaude is LOUD on unparseable stdout even with exit 0: isError true', () => {
+  const GARBAGE_BINARY = `'use strict';
+process.stdout.write("this is not the result json");
 process.exit(0);
 `;
-  const bin = writeFakeBinary(ARGV_ECHO);
-  const res = runClaude('the-prompt', { model: 'claude-opus-4-8', spawnImpl: nodeScriptSpawn(bin) });
-  const argv = JSON.parse(res.text);
-  assert.deepEqual(argv, ['-p', 'the-prompt', '--output-format', 'json', '--model', 'claude-opus-4-8']);
+  const bin = writeFakeBinary(GARBAGE_BINARY);
+  const res = runClaude('any prompt', { spawnImpl: nodeScriptSpawn(bin) });
+  assert.equal(res.isError, true);
+  assert.equal(res.exitStatus, 0);
 });
 
 test('runClaude omits --model when no model is given', () => {
