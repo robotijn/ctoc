@@ -10,7 +10,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 
-const SHARED_RULE = path.join(ROOT, 'agents', '_shared', 'warnings-are-critical.md');
+const SHARED_RULE = path.join(ROOT, 'skills', 'agent-fragments', 'warnings-are-critical.md');
 
 const CRITICS = [
   'quality/duplicate-code-detector',
@@ -34,7 +34,7 @@ const CRITICS = [
 
 describe('Shared warnings-are-critical rule', () => {
   it('exists', () => {
-    assert.ok(fs.existsSync(SHARED_RULE), 'agents/_shared/warnings-are-critical.md missing');
+    assert.ok(fs.existsSync(SHARED_RULE), 'skills/agent-fragments/warnings-are-critical.md missing');
   });
 
   const content = fs.existsSync(SHARED_RULE) ? fs.readFileSync(SHARED_RULE, 'utf8') : '';
