@@ -220,50 +220,52 @@ const getPlanCounts = memoize(function getPlanCountsImpl(projectPath) {
   };
 }, 'getPlanCounts');
 
-// Get agent status (lock-file aware)
-// The lock file is authoritative for liveness; agent.json is supplementary detail.
+// Get agent status (task-registry aware).
+// LIVENESS comes from the scheduler registry, not a pid lock file (the agent-lock
+// module is retired in F1-s2). The agent is "active" iff the registry holds at least
+// one RUNNING `implement` task; `.ctoc/state/agent.json` remains the human-facing
+// supplementary detail record (step/phase/task) but never decides liveness. Orphan
+// reconciliation (task-reconcile) — not a pid check — recovers a crashed session's
+// stale `running` tasks, so there is no "stale lock" state to report.
 function getAgentStatus(projectPath) {
   const root = projectPath || findProjectRoot();
-  const { readLock, isPidAlive } = require('./agent-lock');
+  const taskRegistry = require('./task-registry');
 
-  // 1. Check lock file for ground-truth liveness
-  const lock = readLock(root);
+  const registry = taskRegistry.load(root); // fail-open: a corrupt registry → empty
+  const runningImplement = registry.tasks.filter(
+    t => t.status === 'running' && t.kind === 'implement'
+  );
 
-  if (lock) {
-    if (isPidAlive(lock.pid)) {
-      // Agent is alive — read agent.json for supplementary info
-      const stateFile = path.join(root, '.ctoc', 'state', 'agent.json');
-      let step = null, phase = null, task = null;
-      try {
-        const state = JSON.parse(safeFs.readFileSync(stateFile, 'utf8'));
-        step = state.step || null;
-        phase = state.phase || null;
-        task = state.task || null;
-      } catch { /* ignore */ }
-
-      return {
-        active: true,
-        plan: lock.plan,
-        pid: lock.pid,
-        agentId: lock.agentId,
-        startedAt: lock.startedAt,
-        elapsed: timeAgo(new Date(lock.startedAt)).replace(' ago', ''),
-        step,
-        phase,
-        task
-      };
-    }
-
-    // PID is dead — stale lock
-    return {
-      active: false,
-      stale: true,
-      stalePlan: lock.plan
-    };
+  if (runningImplement.length === 0) {
+    return { active: false };
   }
 
-  // No lock file — agent is idle
-  return { active: false };
+  // Supplementary detail for the dashboard (never authoritative for liveness).
+  const stateFile = path.join(root, '.ctoc', 'state', 'agent.json');
+  let step = null, phase = null, task = null, detailStartedAt = null;
+  try {
+    const detail = JSON.parse(safeFs.readFileSync(stateFile, 'utf8'));
+    step = detail.step || null;
+    phase = detail.phase || null;
+    task = detail.task || null;
+    detailStartedAt = detail.startedAt || null;
+  } catch { /* the detail file is optional — liveness already decided by the registry */ }
+
+  const plans = runningImplement.map(t => t.plan).filter(Boolean);
+  const primary = runningImplement[0];
+  const startedAt = (primary.ts && primary.ts.started) || detailStartedAt || null;
+
+  return {
+    active: true,
+    plan: plans[0] || primary.plan || null,
+    plans,                       // every concurrently-running implement plan
+    running: runningImplement.length,
+    startedAt,
+    elapsed: startedAt ? timeAgo(new Date(startedAt)).replace(' ago', '') : null,
+    step,
+    phase,
+    task
+  };
 }
 
 /**

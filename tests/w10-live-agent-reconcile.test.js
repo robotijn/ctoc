@@ -74,7 +74,7 @@ function seedRunning(specs) {
   const reg = taskRegistry.emptyRegistry();
   const ids = [];
   for (const spec of specs) {
-    const t = taskRegistry.addTask(reg, { kind: 'implement', plan: spec.plan || 'w10-s4-demo' });
+    const t = taskRegistry.addTask(reg, { kind: 'implement', plan: spec.plan || 'w10-s4-demo', touches: ['src/' + (spec.plan || 'w10-s4-demo') + '.js'] });
     taskRegistry.updateTask(reg, t.id, {
       status: 'running',
       agentTaskId: spec.agentTaskId,
@@ -89,7 +89,7 @@ function seedRunning(specs) {
 /** Seed one queued task (no transition) and return its id. */
 function seedQueued(plan) {
   const reg = taskRegistry.emptyRegistry();
-  const t = taskRegistry.addTask(reg, { kind: 'implement', plan: plan || 'w10-s4-queued' });
+  const t = taskRegistry.addTask(reg, { kind: 'implement', plan: plan || 'w10-s4-queued', touches: ['src/' + (plan || 'w10-s4-queued') + '.js'] });
   taskRegistry.save(root, reg);
   return t.id;
 }
@@ -155,7 +155,7 @@ describe('W10-s4 (H8) — live-agent ids threaded through route → reconcile', 
 
     // A 6th queued implement task on a different plan must be blocked by the cap.
     const decision = taskRegistry.canRun(
-      { id: 't99', kind: 'implement', plan: 'p6', touches: [], blockedBy: [], gitOp: false },
+      { id: 't99', kind: 'implement', plan: 'p6', touches: ['src/p6.js'], blockedBy: [], gitOp: false },
       reg,
     );
     assert.equal(decision.run, false, 'the ≤5 cap counts the live task, so a 6th is queued');
@@ -196,7 +196,7 @@ describe('W10-s4 (H8) — menu task start records agentTaskId', () => {
 
     // A second queued task started WITHOUT --agent-id defaults agentTaskId to the task id.
     const reg = taskRegistry.load(root);
-    const t2 = taskRegistry.addTask(reg, { kind: 'implement', plan: 'p-start-2' });
+    const t2 = taskRegistry.addTask(reg, { kind: 'implement', plan: 'p-start-2', touches: ['src/p-start-2.js'] });
     taskRegistry.save(root, reg);
     const res2 = ms.route(['menu', 'task', 'start', t2.id], root);
     assert.equal(res2.ok, true);

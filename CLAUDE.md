@@ -227,7 +227,7 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               13 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-    lib/                 89 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 88 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                5 dashboard tab files (overview, vision, functional, review, tools; implementation/todo/progress removed as dead code)
     data/                Static data files

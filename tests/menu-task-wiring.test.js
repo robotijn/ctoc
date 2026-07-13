@@ -71,7 +71,7 @@ function seedDone(reg, plan, result) {
 
 describe('NB2 — task subcommands (S1–S3)', () => {
   it('S1: add persists queued + returns {taskId,decision,reason}', () => {
-    const res = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+    const res = ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/pi1.js'], root);
     assert.equal(res.ok, true);
     assert.ok(res.taskId, 'taskId is truthy');
     assert.equal(res.status, 'queued');
@@ -111,7 +111,7 @@ describe('NB2 — task subcommands (S1–S3)', () => {
 
   it('S3: list returns every task with status/label/plan', () => {
     ms.route(['menu', 'task', 'add', 'review', 'LH1'], root);
-    ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+    ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/pi1.js'], root);
     const before = taskRegistry.load(root).tasks.length;
     const res = ms.route(['menu', 'task', 'list'], root);
     assert.equal(res.ok, true);
@@ -129,12 +129,12 @@ describe('NB2 — task subcommands (S1–S3)', () => {
 describe('NB2 — TASKS dashboard section (S4–S5)', () => {
   it('S4: TASKS section shows running/queued/done + waits', () => {
     const reg = taskRegistry.emptyRegistry();
-    const a = taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1' });
+    const a = taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1', touches: ['src/pi1.js'] });
     taskRegistry.updateTask(reg, a.id, { status: 'running' });
     const b = taskRegistry.addTask(reg, { kind: 'review', plan: 'LH1' });
     taskRegistry.updateTask(reg, b.id, { status: 'running' });
     // queued task blocked on the still-running pi1 → "waits: pi1"
-    taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi2', blockedBy: [a.id] });
+    taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi2', touches: ['src/pi2.js'], blockedBy: [a.id] });
     seedDone(reg, 'd1');
     seedDone(reg, 'd2');
     seedDone(reg, 'd3');
@@ -285,7 +285,7 @@ describe('NB2 — edge cases (E1–E7)', () => {
     for (let i = 1; i <= 8; i++) running.push(T({ id: 'r' + i, kind: 'review', plan: 'p' + i, status: 'running' }));
     const reg = mkReg([
       ...running,
-      T({ id: 'q1', kind: 'implement', plan: 'pq', status: 'queued' }), // blocked by max-concurrent
+      T({ id: 'q1', kind: 'implement', plan: 'pq', status: 'queued', touches: ['src/pq.js'] }), // blocked by max-concurrent
       T({ id: 'f1', kind: 'review', plan: 'pf', status: 'failed', result: { ok: false, cancelled: true } }),
     ]);
     const s = taskView.renderTasksSection(reg);

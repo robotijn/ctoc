@@ -1,47 +1,63 @@
 /**
- * NB1 — Task Registry and Scheduler (pure model + single-file persistence).
+ * Task Registry and Scheduler (pure model + single-file persistence).
  *
  * Owns the background-task model for CTOC's non-blocking menu plane, persists it to
  * one JSON file (`.ctoc/state/tasks.json`) with Claude as the sole writer, and
- * exposes the two scheduler decisions `canRun` and `nextRunnable`. This is the
- * algorithmic heart that turns CTOC's operator-memory concurrency rules (vision
- * §3b / §6 D5) into enforced, unit-tested code.
+ * exposes the scheduler decisions `canRun` / `nextRunnable` plus the atomic
+ * `addAndClaim`. This is the algorithmic heart that turns CTOC's concurrency rules
+ * into enforced, unit-tested code.
  *
- * Design (see plans/todo/NB1-task-registry-and-scheduler.md, decisions D1–D10):
- *   • LOCK-FREE (D1). Unlike src/lib/plan-index/store.js — which takes an exclusive
- *     lock with an owner token + heartbeat + reload-under-lock because it is
- *     multi-writer — NB1 has EXACTLY ONE writer (Claude's single-threaded main
- *     loop), so writes serialize naturally and NO lock/token/heartbeat exists. This
- *     asymmetry with store.js is intentional: we mirror its atomic-write and
- *     fail-open-load patterns but deliberately omit its concurrency machinery.
- *   • DATA-ORIENTED functional API over a plain registry VALUE (no store handle):
- *     load/save read/write the value; addTask/updateTask mutate it in memory;
- *     canRun/nextRunnable are pure reads. This makes the scheduler trivially
- *     testable with in-memory literals (no disk).
- *   • FAIL-OPEN LOAD vs FAIL-LOUD SAVE (the honest asymmetry). `load` NEVER throws
- *     on a file/data problem (a corrupt registry must never brick the NAV plane):
- *     absent → empty; unparseable / wrong-shape / version-mismatch → empty + a
- *     recorded warn; a single malformed task entry → skip that entry + warn, the
- *     rest load. `save` FAILS LOUD (rethrows after cleaning its temp) — a real
- *     write failure (disk full, read-only fs) must never be silently lost.
- *   • ATOMIC WRITE: temp sibling in the same directory (same volume → atomic
- *     rename) then renameSync over the target; on any failure the temp is unlinked
- *     and the error rethrown — byte-for-byte store.js's atomicSave.
- *   • id + seq: the registry carries a persisted, never-decremented `seq`; addTask
- *     assigns `id = 't' + (++seq)`, guaranteeing unique + strictly monotonic ids
- *     with NO reuse across pruning/reload. FIFO order is the tasks array insertion
- *     order (== seq order), NOT timestamps — so scheduling is immune to clock skew.
+ * ── Serialization model (vision F1 — FILE-based, human-decided; do NOT relitigate) ─
+ *   Kind-based "plan-serial" (one `implement` task at a time) is DELETED. Two tasks
+ *   may run concurrently iff their touched files are DISJOINT — file-conflict
+ *   (Rule 4) is the serializer. This is what makes the file-disjoint wave pattern
+ *   ("1 plan per agent", ≤5 concurrent) legal instead of strangled by kind. Because
+ *   file disjointness now guards correctness, `touches` is MANDATORY for every
+ *   `implement` task: both `addTask` and `canRun` reject an empty-touches implement
+ *   LOUDLY (an undeclared implement would bypass Rule 4 and make the model unsound).
+ *
+ * ── The concurrency ladder (order is LOAD-BEARING) ──────────────────────────────
+ *   Rule 0  dependency gate (canRun only): every blockedBy id must be `done`.
+ *   Rule 1  max-concurrent: at most MAX_CONCURRENT running.
+ *   Rule 2  sync-barrier: a `sync` candidate waits while ANY task runs, and NO
+ *           candidate (even read-only) starts while a `sync` runs. A `sync` is the
+ *           wave integration boundary (integrated suite + ratchet + commit) and
+ *           must see frozen state. Stricter than, and independent of, git-exclusive.
+ *   Rule 3  git-exclusive: a gitOp candidate is blocked by any running editing-or-git
+ *           task; an editing candidate is blocked by any running gitOp.
+ *   Rule 4  file-conflict: candidate.touches OVERLAPS the union of running touches,
+ *           glob-aware via `plan-coverage.touchesOverlap` (globs on either side).
+ *
+ * ── Design invariants ───────────────────────────────────────────────────────────
+ *   • LOCK-FREE. EXACTLY ONE writer (Claude's single-threaded main loop), so writes
+ *     serialize naturally and NO lock/token/heartbeat exists. We mirror store.js's
+ *     atomic-write and fail-open-load patterns but omit its concurrency machinery.
+ *   • DATA-ORIENTED functional API over a plain registry VALUE: load/save read/write
+ *     the value; addTask/updateTask mutate it in memory; canRun/nextRunnable are
+ *     pure reads. `addAndClaim` is the one function that composes them over disk in
+ *     a single load→save cycle (closing the record-vs-start blind window).
+ *   • FAIL-OPEN LOAD vs FAIL-LOUD SAVE. `load` NEVER throws on a file/data problem
+ *     (a corrupt registry must never brick the NAV plane); `save` FAILS LOUD.
+ *   • ATOMIC WRITE: temp sibling + renameSync over the target; on failure the temp
+ *     is unlinked and the error rethrown.
+ *   • id + seq: a persisted, never-decremented `seq`; addTask assigns `id = 't'+(++seq)`
+ *     → unique, strictly monotonic, no reuse across pruning/reload. FIFO order is the
+ *     tasks-array insertion order (== seq order), NOT timestamps — clock-skew immune.
+ *   • `cancelled` is a terminal status reachable from `queued`/`running`; the registry
+ *     records the decision (killing the harness-level agent is the caller's job).
  *
  * ALL filesystem access routes through src/lib/safe-fs.js — the audited choke
- * point (LH1). There is no raw `fs` in this module, and no regex at all (numeric id
- * parsing uses Number/startsWith), so the promoted-to-error security lint rules
- * cannot fire.
+ * point (LH1); there is no raw `fs` in this module. There is NO regex in this module
+ * either: the ONLY glob→regex construction lives behind
+ * `plan-coverage.touchesOverlap` (Rule 4), so the promoted-to-error security lint
+ * rules cannot fire here.
  */
 
 'use strict';
 
 const path = require('path');
 const safeFs = require('./safe-fs');
+const { touchesOverlap } = require('./plan-coverage');
 
 // ── constants ───────────────────────────────────────────────────────────────
 
@@ -57,24 +73,33 @@ const MAX_LOG_ENTRIES = 500;
  * (defense-in-depth; NB1 never legitimately holds this many background tasks).
  */
 const MAX_TASKS = 10000;
+/**
+ * Max length of a single `touches` entry. A crafted longer string is rejected at
+ * the shape gate (defense-in-depth: `globToRegex` behind `touchesOverlap` is the
+ * only regex path, and this bounds its input length).
+ */
+const MAX_TOUCH_LENGTH = 512;
 
 /** The valid task kinds (vision §3a enumeration). */
 const KINDS = Object.freeze(new Set([
   'implement', 'plan', 'review', 'quality', 'security', 'decompose', 'discuss', 'sync'
 ]));
-/** D5: only `implement` mutates a plan and therefore serializes FIFO. */
-const PLAN_MUTATING_KINDS = Object.freeze(new Set(['implement']));
-/** All valid task statuses. */
-const STATUSES = Object.freeze(new Set(['queued', 'running', 'done', 'failed', 'orphaned']));
+/** All valid task statuses. `cancelled` is terminal (see TERMINAL). */
+const STATUSES = Object.freeze(new Set(['queued', 'running', 'done', 'failed', 'orphaned', 'cancelled']));
 /** Terminal statuses — no transition leaves them. */
-const TERMINAL = Object.freeze(new Set(['done', 'failed', 'orphaned']));
-/** Allowed status transitions (out of a terminal state: none). */
+const TERMINAL = Object.freeze(new Set(['done', 'failed', 'orphaned', 'cancelled']));
+/**
+ * Allowed status transitions (out of a terminal state: none). `cancelled` is
+ * reachable from both `queued` and `running` (a wave/plan may be cancelled before
+ * or during execution); like every terminal transition it auto-stamps `ts.done`.
+ */
 const VALID_TRANSITIONS = Object.freeze({
-  queued: new Set(['running', 'failed']),
-  running: new Set(['done', 'failed', 'orphaned']),
+  queued: new Set(['running', 'failed', 'cancelled']),
+  running: new Set(['done', 'failed', 'orphaned', 'cancelled']),
   done: new Set(),
   failed: new Set(),
-  orphaned: new Set()
+  orphaned: new Set(),
+  cancelled: new Set()
 });
 /** updateTask whitelist — id is immutable; ts is merged specially. */
 const MUTABLE_FIELDS = Object.freeze(['status', 'agentTaskId', 'result', 'label', 'touches', 'blockedBy', 'plan']);
@@ -98,6 +123,17 @@ function registryPath(root) {
  */
 function logPath(root) {
   return path.join(root, '.ctoc', 'logs', 'task-registry.json');
+}
+
+/**
+ * Absolute path to the drain-stop flag file. Its EXISTENCE means a graceful
+ * "finish the current work, then stop" has been requested. Computed inside the
+ * module so the single-file-flag invariant cannot be violated by a caller.
+ * @param {string} root
+ * @returns {string}
+ */
+function drainStopPath(root) {
+  return path.join(root, '.ctoc', 'state', 'drain-stop');
 }
 
 /**
@@ -343,11 +379,38 @@ function assertTaskShape(obj, ctx, opts = {}) {
   if (obj.touches != null && !Array.isArray(obj.touches)) {
     throw new Error(`task-registry: ${ctx} touches must be an array`);
   }
+  // Bound each touches entry so a crafted string can never drive globToRegex
+  // (behind plan-coverage.touchesOverlap, Rule 4) into pathological work.
+  if (Array.isArray(obj.touches)) {
+    for (const f of obj.touches) {
+      if (typeof f === 'string' && f.length > MAX_TOUCH_LENGTH) {
+        throw new Error(`task-registry: ${ctx} touches entry exceeds ${MAX_TOUCH_LENGTH} chars`);
+      }
+    }
+  }
   if (obj.blockedBy != null && !Array.isArray(obj.blockedBy)) {
     throw new Error(`task-registry: ${ctx} blockedBy must be an array`);
   }
   if (opts.strictGitOp && obj.gitOp != null && typeof obj.gitOp !== 'boolean') {
     throw new Error(`task-registry: ${ctx} gitOp must be a boolean`);
+  }
+}
+
+/**
+ * An `implement` task MUST declare at least one touched file: file disjointness
+ * (Rule 4) is what serializes plan-mutating work now that kind-based plan-serial is
+ * gone, so an empty-touches implement would bypass the serializer and be unsound.
+ * Enforced at BOTH entry points (`addTask` on its spec, `canRun` on its candidate)
+ * so the safety oracle can never false-safe. Non-implement kinds may declare no
+ * touches (a read-only review/plan legitimately edits nothing).
+ * @param {{kind?:string, touches?:string[]}} obj
+ * @param {string} ctx  caller name, embedded in the error message
+ * @returns {void}
+ * @throws {Error} kind === 'implement' with missing/empty touches
+ */
+function assertImplementTouches(obj, ctx) {
+  if (obj.kind === 'implement' && !(Array.isArray(obj.touches) && obj.touches.length > 0)) {
+    throw new Error(`task-registry: ${ctx} implement task requires non-empty touches`);
   }
 }
 
@@ -358,13 +421,15 @@ function assertTaskShape(obj, ctx, opts = {}) {
  * @param {{kind:string, label?:string, plan?:string|null, touches?:string[], gitOp?:boolean, blockedBy?:string[]}} spec
  * @returns {object} the created task
  * @throws {TypeError} spec is not an object
- * @throws {Error} invalid kind / non-array touches / non-array blockedBy
+ * @throws {Error} invalid kind / non-array touches / non-array blockedBy /
+ *   an implement spec with empty touches / a touches entry over the length cap
  */
 function addTask(registry, spec) {
   assertTaskShape(spec, 'addTask');
   if (typeof spec.kind !== 'string' || !KINDS.has(spec.kind)) {
     throw new Error(`task-registry: addTask invalid kind ${JSON.stringify(spec.kind)}`);
   }
+  assertImplementTouches(spec, 'addTask');
   const task = {
     id: 't' + (++registry.seq),
     kind: spec.kind,
@@ -440,11 +505,6 @@ function updateTask(registry, id, patch) {
 
 // ── scheduler (pure) ────────────────────────────────────────────────────────────
 
-/** @param {{kind:string}} task */
-function isPlanMutating(task) {
-  return PLAN_MUTATING_KINDS.has(task.kind);
-}
-
 /** @param {{touches?:string[]}} task — a task "edits" iff it declares ≥1 touched file. */
 function isEditing(task) {
   return Array.isArray(task.touches) && task.touches.length > 0;
@@ -478,10 +538,12 @@ function depsSatisfied(candidate, registry) {
 }
 
 /**
- * The D5 concurrency ladder (Rules 1–5), evaluated against an EXPLICIT running set
+ * The concurrency ladder (Rules 1–4), evaluated against an EXPLICIT running set
  * (real running for canRun; projected running for nextRunnable). The single home
  * of the rules — reused by both canRun and nextRunnable (DRY). The first failing
- * rule's reason is returned; order is load-bearing.
+ * rule's reason is returned; ORDER IS LOAD-BEARING (see the module header):
+ *   1 max-concurrent → 2 sync-barrier → 3 git-exclusive → 4 file-conflict → ok.
+ * (Kind-based plan-serial is DELETED — vision F1; Rule 4 serializes by files.)
  * @param {object} candidate
  * @param {Array<object>} running  running tasks, candidate already excluded
  * @returns {{run:boolean, reason:string}}
@@ -489,9 +551,12 @@ function depsSatisfied(candidate, registry) {
 function evaluateConcurrency(candidate, running) {
   // Rule 1 — max concurrency.
   if (running.length >= MAX_CONCURRENT) return { run: false, reason: 'max-concurrent' };
-  // Rule 2 — plan-serial (FIFO): a plan-mutating candidate waits for any running one.
-  if (isPlanMutating(candidate) && running.some(isPlanMutating)) {
-    return { run: false, reason: 'plan-serial' };
+  // Rule 2 — sync-barrier (the wave integration boundary): a `sync` candidate may
+  // not start while ANY task runs, and NO candidate (even read-only) may start while
+  // a `sync` runs. Evaluated immediately after max-concurrent; stricter than, and
+  // independent of, git-exclusive.
+  if (running.length > 0 && (candidate.kind === 'sync' || running.some(t => t.kind === 'sync'))) {
+    return { run: false, reason: 'sync-barrier' };
   }
   // Rule 3 — git-exclusive (strengthened, git-vs-git): a gitOp candidate is blocked
   // by any running editing-OR-git task; an editing candidate is blocked by any
@@ -500,16 +565,18 @@ function evaluateConcurrency(candidate, running) {
       (isEditing(candidate) && running.some(t => t.gitOp))) {
     return { run: false, reason: 'git-exclusive' };
   }
-  // Rule 4 — file conflict: candidate.touches ∩ union(running.touches) ≠ ∅.
+  // Rule 4 — file conflict (glob-aware): candidate.touches overlaps the union of
+  // running touches, tested via plan-coverage.touchesOverlap (globs on either side
+  // count). Fast path: an empty candidate touches set can never conflict.
   const candTouches = Array.isArray(candidate.touches) ? candidate.touches : [];
   if (candTouches.length > 0) {
-    const occupied = new Set();
+    const occupied = [];
     for (const t of running) {
-      if (Array.isArray(t.touches)) for (const f of t.touches) occupied.add(f);
+      if (Array.isArray(t.touches)) for (const f of t.touches) occupied.push(f);
     }
-    if (candTouches.some(f => occupied.has(f))) return { run: false, reason: 'file-conflict' };
+    if (touchesOverlap(candTouches, occupied)) return { run: false, reason: 'file-conflict' };
   }
-  // Rule 5 — otherwise runnable.
+  // Otherwise runnable.
   return { run: true, reason: 'ok' };
 }
 
@@ -520,14 +587,16 @@ function evaluateConcurrency(candidate, running) {
  * @param {{tasks:Array<object>}} registry
  * @returns {{run:boolean, reason:string}}
  * @throws {TypeError} candidate is not an object
- * @throws {Error} candidate has a non-array touches/blockedBy or a non-boolean gitOp
- *   (fail-loud, consistent with addTask — a safety oracle must never false-safe on a
- *   malformed candidate). registry.tasks are already normalized (addTask/load), so
+ * @throws {Error} candidate has a non-array touches/blockedBy, a non-boolean gitOp,
+ *   or is an implement candidate with empty touches (fail-loud, consistent with
+ *   addTask — a safety oracle must never false-safe on a malformed candidate).
+ *   registry.tasks are already normalized (addTask/load), so
  *   nextRunnable — which reads them directly, never through canRun — inherits the
  *   guarantee without re-validating.
  */
 function canRun(candidate, registry) {
   assertTaskShape(candidate, 'canRun', { strictGitOp: true });
+  assertImplementTouches(candidate, 'canRun');
   if (!depsSatisfied(candidate, registry)) return { run: false, reason: 'blocked-dep' };
   return evaluateConcurrency(candidate, runningTasks(registry, candidate.id));
 }
@@ -539,7 +608,7 @@ function canRun(candidate, registry) {
  * running, not done, so it cannot satisfy another's blockedBy this pass), while the
  * concurrency ladder is checked against the projected set (real running + already
  * accepted). Each accepted candidate is folded into `projected` before the next is
- * evaluated, so starting the whole returned set never violates ≤5 / plan-serial /
+ * evaluated, so starting the whole returned set never violates ≤5 / sync-barrier /
  * git-exclusive / file-conflict. Pure: builds its own projected array; returns
  * references to the selected queued task objects.
  * @param {{tasks:Array<object>}} registry
@@ -559,6 +628,81 @@ function nextRunnable(registry) {
   return result;
 }
 
+// ── atomic add-and-claim ─────────────────────────────────────────────────────────
+
+/**
+ * Atomically add a task and, if it may run NOW, claim it (mark running) — in ONE
+ * load→save cycle. Closes the record-vs-start blind window: there is no persisted
+ * intermediate where the task exists but its claim decision does not. On a spec
+ * that `addTask` rejects, this throws BEFORE any write, so nothing is persisted.
+ *
+ * (Single-writer holds — this is not a cross-process lock; it removes the in-process
+ * window where a crash between "record" and "start" would strand an undecided task.)
+ *
+ * @param {string} root  Project root.
+ * @param {object} spec  Same shape as {@link addTask}'s spec (never spread — reused
+ *   directly, so no prototype-pollution path).
+ * @returns {{task:object, claimed:boolean, reason:string}} the created task (running
+ *   when claimed, else queued), whether it was claimed, and the scheduler reason.
+ * @throws {TypeError} root is not a non-empty string
+ * @throws {Error} spec is rejected by addTask (nothing is persisted)
+ */
+function addAndClaim(root, spec) {
+  if (typeof root !== 'string' || root.length === 0) {
+    throw new TypeError('task-registry: addAndClaim requires a non-empty root string');
+  }
+  const registry = load(root);
+  const task = addTask(registry, spec); // throws on a bad spec BEFORE any save
+  const decision = canRun(task, registry);
+  if (decision.run) {
+    updateTask(registry, task.id, { status: 'running' });
+  }
+  save(root, registry); // ONE persist of the whole (add + claim) outcome
+  return { task, claimed: decision.run, reason: decision.reason };
+}
+
+// ── drain-stop flag (graceful "finish current, then stop") ─────────────────────────
+
+/**
+ * Request a graceful drain-stop: existing work finishes, nothing new starts. Persists
+ * by creating the flag file `.ctoc/state/drain-stop`. Idempotent.
+ * @param {string} root  Project root.
+ * @returns {void}
+ */
+function requestDrainStop(root) {
+  if (typeof root !== 'string' || root.length === 0) {
+    throw new TypeError('task-registry: requestDrainStop requires a non-empty root string');
+  }
+  const p = drainStopPath(root);
+  safeFs.mkdirSync(path.dirname(p), { recursive: true });
+  safeFs.writeFileSync(p, '');
+}
+
+/**
+ * Whether a drain-stop has been requested (the flag file exists). Never throws on a
+ * missing directory — a fresh root is simply `false`.
+ * @param {string} root  Project root.
+ * @returns {boolean}
+ */
+function isDrainStopRequested(root) {
+  if (typeof root !== 'string' || root.length === 0) {
+    throw new TypeError('task-registry: isDrainStopRequested requires a non-empty root string');
+  }
+  return safeFs.existsSync(drainStopPath(root));
+}
+
+/**
+ * Clear a drain-stop request (remove the flag file). A no-op when none exists.
+ * @param {string} root  Project root.
+ * @returns {void}
+ */
+function clearDrainStop(root) {
+  if (typeof root !== 'string' || root.length === 0) {
+    throw new TypeError('task-registry: clearDrainStop requires a non-empty root string');
+  }
+  try { safeFs.unlinkSync(drainStopPath(root)); } catch { /* absent → nothing to clear */ }
+}
+
 module.exports = {
   // persistence
   load,
@@ -572,9 +716,14 @@ module.exports = {
   // scheduler (pure)
   canRun,
   nextRunnable,
+  // atomic add-and-claim
+  addAndClaim,
+  // drain-stop flag trio
+  requestDrainStop,
+  isDrainStopRequested,
+  clearDrainStop,
   // constants
   MAX_CONCURRENT,
   REGISTRY_VERSION,
-  KINDS,
-  PLAN_MUTATING_KINDS
+  KINDS
 };

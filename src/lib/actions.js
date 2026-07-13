@@ -12,6 +12,7 @@ const { findProjectRoot } = require('./project-root');
 const { validateForReview, validateForQueue, validateReviewToDone } = require('./plan-validator');
 const { logTransition } = require('./transition-log');
 const { invalidate } = require('./cache');
+const taskRegistry = require('./task-registry');
 
 /**
  * Background Agent Types
@@ -844,57 +845,186 @@ function surfaceEscalation(escalation, planName, root) {
 }
 
 /**
- * Start the todo executor agent.
- * Acquires lock, cleans up stale in-progress plans, picks next todo plan.
+ * Extract a plan's declared `files:` globs from its frontmatter, multi-block-safe.
+ *
+ * A plan that has crossed a human gate carries a PREPENDED approval-marker block
+ * ahead of its own frontmatter, so `plan-coverage.readPlanFiles` (single-block)
+ * silently returns [] for EVERY plan in todo/. We therefore read the UNION of all
+ * leading frontmatter blocks via `stale-detector.extractFrontmatterRegion` (the
+ * same helper `state.parseMetadata` uses for exactly this reason) and walk the
+ * `files:` list from that merged region. Lazy-required to avoid any load-time cycle.
+ *
+ * @param {{content?: string}} plan  a plan object from readPlans (carries `content`)
+ * @returns {string[]}  declared file globs (repo-relative), [] when none
+ */
+function planDeclaredFiles(plan) {
+  const content = plan && typeof plan.content === 'string' ? plan.content : '';
+  if (content.length === 0) return [];
+  let region;
+  try {
+    const { extractFrontmatterRegion } = require('./stale-detector');
+    region = extractFrontmatterRegion(content);
+  } catch {
+    return [];
+  }
+  if (typeof region !== 'string' || region.length === 0) return [];
+  const idx = region.search(/^files:\s*$/m);
+  if (idx === -1) return [];
+  const lines = region.slice(idx).split('\n').slice(1);
+  const files = [];
+  for (const line of lines) {
+    const m = line.match(/^\s*-\s*["']?([^"'\n]+?)["']?\s*$/);
+    if (m) {
+      files.push(m[1]);
+    } else if (/^\S/.test(line)) {
+      break; // next top-level frontmatter key → the files: block is over
+    }
+  }
+  return files;
+}
+
+/**
+ * Parse a plan's `depends_on:` into a list of dependency slugs. The scalar
+ * frontmatter reader stores `depends_on` as a single string; a slug list may be
+ * comma- or whitespace-separated. `none`/empty resolve to no dependencies.
+ * @param {{metadata?: object}} plan
+ * @returns {string[]}
+ */
+function planDependsOn(plan) {
+  const raw = plan && plan.metadata ? plan.metadata.depends_on : null;
+  if (raw == null) return [];
+  const parts = String(raw).split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+  return parts.filter((s) => s.toLowerCase() !== 'none');
+}
+
+/**
+ * Translate a plan (as produced by `readPlans`) into a scheduler task spec.
+ *
+ * This is action-layer translation, NOT a new module. The result feeds
+ * `task-registry.addAndClaim` directly (named fields only — never a frontmatter
+ * spread). Contract:
+ *   • kind is always `implement`; the plan's own repo-relative POSIX path is added
+ *     to `touches` so two tasks on the same plan file-conflict (the per-plan
+ *     serialization that survives the retirement of kind-based serialization).
+ *   • A plan with NO `files:` declaration cannot honestly claim file-disjointness,
+ *     so this REFUSES it (throws) — s1 makes empty touches on an implement a hard
+ *     error; this is the action-layer message for it. The own-path alone is not
+ *     enough: undeclared edits are the unasked question.
+ *   • `blockedBy` resolves each `depends_on` slug against the registry: a
+ *     non-terminal task on that plan → its id is a blocker; no task but the dep
+ *     plan sits in done/ or review/ → satisfied (no blocker); no task and not
+ *     done/review → REFUSE (enqueue the dependency first).
+ *
+ * @param {{name:string, path:string, content?:string, metadata?:object}} plan
+ * @param {string} projectPath  project root
+ * @returns {{kind:'implement', label:string, plan:string, touches:string[], blockedBy:string[]}}
+ * @throws {Error} plan lacks a files: declaration, or a dependency cannot be resolved
+ */
+function taskSpecFromPlan(plan, projectPath) {
+  const root = projectPath || findProjectRoot();
+  if (!plan || typeof plan.name !== 'string' || typeof plan.path !== 'string') {
+    throw new TypeError('taskSpecFromPlan requires a plan object with name and path');
+  }
+
+  const declared = planDeclaredFiles(plan);
+  if (declared.length === 0) {
+    throw new Error(
+      `taskSpecFromPlan: plan "${plan.name}" declares no files: — an implement task ` +
+      `must declare the files it edits so the scheduler can enforce file-conflict ` +
+      `serialization. Add a files: block to the plan frontmatter and retry.`
+    );
+  }
+
+  // The plan's own path as a repo-relative POSIX string (cross-platform).
+  const ownPath = path.relative(root, plan.path).split(path.sep).join('/');
+  const touches = Array.from(new Set([...declared, ownPath]));
+
+  // Resolve dependency slugs against the live registry.
+  const registry = taskRegistry.load(root);
+  const TERMINAL = new Set(['done', 'failed', 'orphaned', 'cancelled']);
+  const blockedBy = [];
+  for (const slug of planDependsOn(plan)) {
+    const nonTerminal = registry.tasks.find((t) => t.plan === slug && !TERMINAL.has(t.status));
+    if (nonTerminal) {
+      blockedBy.push(nonTerminal.id);
+      continue;
+    }
+    const doneFile = path.join(root, 'plans', 'done', `${slug}.md`);
+    const reviewFile = path.join(root, 'plans', 'review', `${slug}.md`);
+    if (safeFs.existsSync(doneFile) || safeFs.existsSync(reviewFile)) {
+      continue; // dependency already satisfied — no scheduler blocker
+    }
+    throw new Error(
+      `taskSpecFromPlan: plan "${plan.name}" depends on "${slug}", which has no ` +
+      `registry task and is not in done/ or review/. Enqueue "${slug}" first so the ` +
+      `scheduler can order the work.`
+    );
+  }
+
+  return {
+    kind: 'implement',
+    label: plan.name,
+    plan: plan.name,
+    touches,
+    blockedBy
+  };
+}
+
+/**
+ * Start the todo executor agent (scheduler-backed, LOCK-FREE).
+ *
+ * The global agent lock is retired: the s1 scheduler is now the safety mechanism
+ * (file-based serialization, git-exclusive, sync barrier, ≤5 concurrent), so
+ * MULTIPLE plans may run concurrently when their declared files are DISJOINT —
+ * that is the point of the file-based model, not a bug. Flow: clear any drain-stop
+ * → sweep stale in-progress → pick the next todo plan (FIFO) → translate it to a
+ * task spec → `addAndClaim`. A claimed task moves its plan to in-progress and
+ * reports `started: true`; a task the scheduler cannot start yet stays QUEUED in
+ * the registry and reports `{ started: false, queued: true, reason }` — an honest
+ * "recorded, waiting on <reason>", not an error.
  *
  * @param {string} projectPath - Project root
- * @returns {{ started: boolean, error?: string, plan?: object, cleanedUp?: string[], remainingTodo?: number }}
+ * @returns {{ started: boolean, error?: string, queued?: boolean, reason?: string,
+ *   task?: object, plan?: object, cleanedUp?: string[], remainingTodo?: number }}
  */
 function startAgent(projectPath) {
   const root = projectPath || findProjectRoot();
-  const { acquireLock, clearStop, releaseLock, updateLockPlan } = require('./agent-lock');
   const { readPlans, getPlansDir, setAgentStatus } = require('./state');
 
-  // 1. Try to acquire lock
-  const lockResult = acquireLock(root, 'initializing');
-  if (!lockResult.acquired) {
-    return {
-      started: false,
-      error: lockResult.error
-    };
-  }
+  // 1. Clear any leftover drain-stop from a prior run (a fresh start un-drains).
+  taskRegistry.clearDrainStop(root);
 
-  // 2. Clear any leftover stop flag
-  clearStop(root);
-
-  // 3. Clean up stale in-progress plans (D2). cleanupStaleInProgress now returns
-  //    { cleanedUp, skipped } (invalid stale plans are gated out, not moved);
-  //    this caller surfaces the moved-name list, preserving its cleanedUp[] shape.
+  // 2. Sweep stale in-progress plans (D2). cleanupStaleInProgress returns
+  //    { cleanedUp, skipped }; surface the moved-name list, preserving cleanedUp[].
   const { cleanedUp } = cleanupStaleInProgress(root);
 
-  // 4. Get next plan from todo queue
+  // 3. Next todo plan (FIFO — already sorted by readPlans).
   const plansDir = getPlansDir(root);
   const todoPlans = readPlans(path.join(plansDir, 'todo'));
-
   if (todoPlans.length === 0) {
-    // Nothing to do — release lock
-    releaseLock(root);
-    return {
-      started: false,
-      error: 'No plans in todo queue'
-    };
+    return { started: false, error: 'No plans in todo queue', cleanedUp };
   }
-
-  // 5. Pick oldest plan (FIFO — already sorted by readPlans)
   const nextPlan = todoPlans[0];
 
-  // 6. Update lock with actual plan name
-  updateLockPlan(root, nextPlan.name);
+  // 4. Translate the plan into a task spec. A plan that cannot honestly declare
+  //    disjointness (no files:) or whose dependency is unresolvable is refused —
+  //    surfaced as a structured error, never a stub or a silent skip.
+  let spec;
+  try {
+    spec = taskSpecFromPlan(nextPlan, root);
+  } catch (err) {
+    return { started: false, error: err.message, plan: { name: nextPlan.name, path: nextPlan.path } };
+  }
 
-  // 7. Move plan to in-progress
+  // 5. Record + claim atomically (single load→save cycle in the registry).
+  const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
+  if (!claimed) {
+    // The task is recorded and queued; the plan stays in todo until a slot frees.
+    return { started: false, queued: true, reason, task };
+  }
+
+  // 6. Claimed → move the plan to in-progress and light up the dashboard status.
   const newPath = startExecution(nextPlan.path, root);
-
-  // 8. Update agent status for dashboard display
   setAgentStatus(root, {
     active: true,
     plan: nextPlan.name,
@@ -905,6 +1035,7 @@ function startAgent(projectPath) {
 
   return {
     started: true,
+    task,
     plan: { name: nextPlan.name, path: newPath },
     cleanedUp,
     remainingTodo: todoPlans.length - 1
@@ -912,65 +1043,73 @@ function startAgent(projectPath) {
 }
 
 /**
- * Request agent stop (graceful -- after current plan completes).
+ * Request a graceful agent stop (drain semantics: finish the current plan(s), then
+ * stop). Sets the s1 drain-stop flag — no lock to consult — and reports which
+ * plans are still running (the registry's running `implement` tasks).
  *
  * @param {string} projectPath - Project root
- * @returns {{ stopped: boolean, message: string }}
+ * @returns {{ stopped: boolean, message: string, running: string[] }}
  */
 function stopAgent(projectPath) {
   const root = projectPath || findProjectRoot();
-  const { isLocked, requestStop } = require('./agent-lock');
 
-  const lockStatus = isLocked(root);
-  if (!lockStatus.locked) {
-    return {
-      stopped: false,
-      message: 'No agent is currently running'
-    };
-  }
+  taskRegistry.requestDrainStop(root);
 
-  requestStop(root);
+  const running = taskRegistry.load(root).tasks
+    .filter((t) => t.status === 'running' && t.kind === 'implement')
+    .map((t) => t.plan)
+    .filter(Boolean);
 
-  return {
-    stopped: true,
-    message: `Stop requested. Agent will finish "${lockStatus.lock.plan}" then stop.`
-  };
+  const message = running.length > 0
+    ? `Stop requested. Will finish current plan(s): ${running.join(', ')}, then stop.`
+    : 'Stop requested. No plan is currently running; nothing new will start.';
+
+  return { stopped: true, message, running };
 }
 
 /**
- * Advance the agent to the next todo plan.
- * Called after current plan completes (moved to review).
+ * Advance the agent to the next todo plan. Honors the drain-stop flag (drain
+ * semantics unchanged for the human), otherwise runs the same scheduler claim flow
+ * as startAgent. Completion marking of the FINISHED task lives in the menu's WORK
+ * completion recipe + task-reconcile orphan handling — this function does not move it.
  *
  * @param {string} projectPath - Project root
- * @returns {{ next: boolean, plan?: object, stopped?: boolean, done?: boolean, remainingTodo?: number }}
+ * @returns {{ next: boolean, plan?: object, stopped?: boolean, done?: boolean,
+ *   queued?: boolean, reason?: string, task?: object, error?: string, remainingTodo?: number }}
  */
 function advanceAgent(projectPath) {
   const root = projectPath || findProjectRoot();
-  const { isStopRequested, releaseLock, updateLockPlan } = require('./agent-lock');
   const { readPlans, getPlansDir, clearAgentStatus, setAgentStatus } = require('./state');
 
-  // 1. Check stop flag
-  if (isStopRequested(root)) {
-    releaseLock(root);
+  // 1. Drain-stop → clear status and stop (no new claim).
+  if (taskRegistry.isDrainStopRequested(root)) {
     clearAgentStatus(root);
     return { next: false, stopped: true };
   }
 
-  // 2. Get next from todo
+  // 2. Next from todo.
   const plansDir = getPlansDir(root);
   const todoPlans = readPlans(path.join(plansDir, 'todo'));
-
   if (todoPlans.length === 0) {
-    releaseLock(root);
     clearAgentStatus(root);
     return { next: false, done: true };
   }
-
-  // 3. Pick oldest and move to in-progress
   const nextPlan = todoPlans[0];
-  updateLockPlan(root, nextPlan.name);
-  const newPath = startExecution(nextPlan.path, root);
 
+  // 3. Translate + claim (same contract as startAgent).
+  let spec;
+  try {
+    spec = taskSpecFromPlan(nextPlan, root);
+  } catch (err) {
+    return { next: false, error: err.message, plan: { name: nextPlan.name, path: nextPlan.path } };
+  }
+
+  const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
+  if (!claimed) {
+    return { next: false, queued: true, reason, task };
+  }
+
+  const newPath = startExecution(nextPlan.path, root);
   setAgentStatus(root, {
     active: true,
     plan: nextPlan.name,
@@ -981,9 +1120,61 @@ function advanceAgent(projectPath) {
 
   return {
     next: true,
+    task,
     plan: { name: nextPlan.name, path: newPath },
     remainingTodo: todoPlans.length - 1
   };
+}
+
+/**
+ * Cancel a background task — the live surface of the F1 `cancel` transition.
+ * Records the decision in the registry (`queued`/`running` → `cancelled`) and, when
+ * the task carries an `agentTaskId`, returns it so the CALLER (menu recipe /
+ * harness) can stop the live harness agent — killing the harness-level agent is the
+ * caller's job; the registry only records the transition.
+ *
+ * @param {string} projectPath - Project root
+ * @param {string} taskId - the task id to cancel
+ * @returns {{ cancelled: true, taskId: string, agentTaskId: string|null }}
+ * @throws {Error} unknown id, or a terminal task (done/failed/orphaned/cancelled)
+ */
+function cancelTask(projectPath, taskId) {
+  const root = projectPath || findProjectRoot();
+  const registry = taskRegistry.load(root);
+  const existing = registry.tasks.find((t) => t.id === taskId);
+  if (!existing) {
+    throw new Error(`cancelTask: unknown task id ${taskId}`);
+  }
+  const agentTaskId = existing.agentTaskId || null;
+  // updateTask enforces the transition guard: a terminal task throws (terminal is terminal).
+  taskRegistry.updateTask(registry, taskId, { status: 'cancelled' });
+  taskRegistry.save(root, registry);
+  return { cancelled: true, taskId, agentTaskId };
+}
+
+/**
+ * Enqueue a wave `sync` task — the wave integration boundary (integrated suite +
+ * ratchet reconcile + commit) as a REAL scheduled task instead of operator memory.
+ * A `sync` is `gitOp: true` with empty `touches`; the scheduler's Rule 2 sync
+ * barrier guarantees it runs ALONE once its blockers are done (no task co-runs with
+ * it). Blocked by the wave's implement task ids, so it promotes only after the wave
+ * finishes.
+ *
+ * @param {string} projectPath - Project root
+ * @param {{ blockedBy?: string[], label?: string }} [opts]
+ * @returns {{ task: object, claimed: boolean, reason: string }} addAndClaim result
+ */
+function enqueueWaveSync(projectPath, opts = {}) {
+  const root = projectPath || findProjectRoot();
+  const blockedBy = Array.isArray(opts.blockedBy) ? opts.blockedBy.slice() : [];
+  const label = typeof opts.label === 'string' && opts.label.length > 0 ? opts.label : 'wave-sync';
+  return taskRegistry.addAndClaim(root, {
+    kind: 'sync',
+    label,
+    gitOp: true,
+    touches: [],
+    blockedBy
+  });
 }
 
 /**
@@ -1375,6 +1566,10 @@ module.exports = {
   stopAgent,
   advanceAgent,
   cleanupStaleInProgress,
+  // F1-s2: plan→task translation, cancel, and wave-sync scheduler surfaces
+  taskSpecFromPlan,
+  cancelTask,
+  enqueueWaveSync,
   createCanvas,
   // SIP1: sub-plan enumeration + batched-gate approval
   listSubplans,
