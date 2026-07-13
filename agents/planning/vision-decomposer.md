@@ -644,3 +644,14 @@ Updates vision document:
 - [MVP with Story Mapping](https://www.cayenneapps.com/blog/2014/11/25/5-steps-to-building-minimum-viable-product-with-story-mapping/) -- Story map to MVP methodology
 - [AI in Requirements Engineering](https://www.frontiersin.org/journals/computer-science/articles/10.3389/fcomp.2025.1519437/full) -- LLM-assisted RE systematic review (2025)
 - [Advancing RE through GenAI](https://nzjohng.github.io/publications/papers/gaire2024.pdf) -- Assessing LLM role in requirements (2024)
+
+
+## Deterministic core — use the library, never re-implement
+
+The parsing, readiness validation, stub creation, and lifecycle moves are
+implemented and tested in `src/lib/vision-decomposer.js` (CRLF-safe
+frontmatter handling included — hand-rolled stub writing reintroduced a
+double-frontmatter bug once already). Drive them via
+`node -e "require('.../src/lib/vision-decomposer.js')..."` for every
+mechanical operation; your model judgment is for the DECOMPOSITION ITSELF
+(story mapping, slicing), never for file mechanics.

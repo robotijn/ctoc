@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.12.0-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.12.1-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-426-blue">
@@ -823,7 +823,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.12.0'
+getVersion()       // → '6.12.1'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -841,8 +841,8 @@ ctoc/
 │                    CONFIG_SOURCES.md, SECURITY_LINT.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
 ├── src/
 │   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
-│   ├── hooks/       16 Claude Code hooks (session, pre/post tool use, andon-halt)
-│   ├── lib/         130 JS modules (planning, quality, refinement, dispatcher; the
+│   ├── hooks/       13 Claude Code hooks (session, pre/post tool use, andon-halt)
+│   ├── lib/         89 JS modules (planning, quality, refinement, dispatcher; the
 │   │                EU-compliance program — regulatory-regime, compliance-regime,
 │   │                compliance-dedup, compliance-integration, iron-loop-compliance-trigger,
 │   │                gdpr-helpers, gdpr-agent-runner, eu-ai-act-helpers,
@@ -855,7 +855,7 @@ ctoc/
 │   │                duplicate-guard, conflict-detect, ollama-client, sync/reconcile)
 │   ├── areas/       5 dashboard areas (pipeline, inbox, agent, library, system)
 │   ├── tabs/        8 legacy tab modules (superseded by areas/, kept for drill-in flows)
-│   ├── scripts/     13 build/release utilities
+│   ├── scripts/     7 build/release utilities
 │   └── data/        Static data files
 ├── agents/          124 agent definitions across 25 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
@@ -892,6 +892,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.12.0** · Built by [@robotijn](https://github.com/robotijn)
+**6.12.1** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

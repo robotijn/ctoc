@@ -12,6 +12,7 @@
 const { execSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
+const { driveAppSync } = require('./app-runner');
 
 /**
  * Run Step 14 VERIFY quality checks.
@@ -28,32 +29,105 @@ function runVerify(projectPath) {
     summary: ''
   };
 
-  // Try Smart Quality Gate first
+  // Try Smart Quality Gate first.
+  let gatePassed = false;
   try {
     const gateResult = tryCommand('ctoc quality --tier=1', projectPath);
     if (gateResult.success) {
       result.method = 'ctoc-quality-gate';
-      result.passed = true;
       result.checks.qualityGate = { passed: true, output: gateResult.output };
-      result.summary = 'All quality checks passed via ctoc quality gate.';
-      return result;
+      gatePassed = true;
     }
   } catch (e) {
     // ctoc quality not available, use fallback
   }
 
-  // Fallback to direct commands
-  result.method = 'fallback-direct';
-  const fallbackResult = runFallbackChecks(projectPath);
+  // Fallback to direct commands when the quality gate is unavailable.
+  if (!gatePassed) {
+    result.method = 'fallback-direct';
+    const fallbackResult = runFallbackChecks(projectPath);
+    result.checks = fallbackResult.checks;
+    result.errors = fallbackResult.errors.slice();
+  }
 
-  result.checks = fallbackResult.checks;
-  result.errors = fallbackResult.errors;
-  result.passed = fallbackResult.errors.length === 0;
-  result.summary = result.passed
-    ? 'All fallback quality checks passed.'
-    : `${fallbackResult.errors.length} check(s) failed: ${fallbackResult.errors.join('; ')}`;
+  // THE LAST MILE: green tests are not "working" — a human must be able to open
+  // the app and get a response. For an app-shaped project, launch it and drive
+  // one real action; a non-responding app FAILS verification with a loud reason.
+  // A library/unknown project reports applicable:false and is unaffected.
+  applyAppRunCheck(result, projectPath);
 
+  result.passed = result.errors.length === 0;
+  result.summary = buildSummary(result);
   return result;
+}
+
+/**
+ * Run the "does the app actually run?" check and fold its outcome into a VERIFY
+ * result. Adds `checks.appRuns`; for an app-shaped project that fails to respond,
+ * pushes a loud, human-readable error onto `result.errors`. A library/unknown
+ * project records `applicable:false` and never contributes an error.
+ *
+ * @param {Object} result - The VERIFY result being assembled (mutated in place).
+ * @param {string} projectPath - Project root path.
+ */
+function applyAppRunCheck(result, projectPath) {
+  let app;
+  try {
+    app = driveAppSync(projectPath);
+  } catch (e) {
+    app = {
+      applicable: true,
+      launched: false,
+      responded: false,
+      evidence: {},
+      durationMs: 0,
+      errors: [`app-runner threw: ${e.message}`]
+    };
+  }
+
+  if (!app || app.applicable === false) {
+    result.checks.appRuns = {
+      applicable: false,
+      reason: (app && app.evidence && app.evidence.reason) || 'No human-facing runtime to launch.'
+    };
+    return;
+  }
+
+  result.checks.appRuns = {
+    applicable: true,
+    launched: app.launched,
+    responded: app.responded,
+    evidence: app.evidence,
+    durationMs: app.durationMs,
+    errors: app.errors
+  };
+
+  if (!app.responded) {
+    const detail = (app.errors && app.errors.length)
+      ? app.errors.join('; ')
+      : 'the launched app produced no usable response';
+    result.errors.push(`App did not run: ${detail}`);
+  }
+}
+
+/**
+ * Build a human-readable one-line summary for a VERIFY result.
+ * @param {Object} result - The assembled VERIFY result.
+ * @returns {string} Summary line.
+ */
+function buildSummary(result) {
+  if (result.passed) {
+    const appChecked = result.checks.appRuns && result.checks.appRuns.applicable && result.checks.appRuns.responded;
+    if (result.method === 'ctoc-quality-gate') {
+      return appChecked
+        ? 'All quality checks passed via ctoc quality gate, and the app launched and responded.'
+        : 'All quality checks passed via ctoc quality gate.';
+    }
+    return appChecked
+      ? 'All fallback quality checks passed, and the app launched and responded.'
+      : 'All fallback quality checks passed.';
+  }
+  return `${result.errors.length} check(s) failed: ${result.errors.join('; ')}`;
 }
 
 /**
@@ -258,6 +332,8 @@ function readVerifyEvidence(projectPath, planSlug) {
 module.exports = {
   runVerify,
   runFallbackChecks,
+  applyAppRunCheck,
+  buildSummary,
   tryCommand,
   tryCommands,
   verifyEvidencePath,

@@ -19,9 +19,25 @@ const safeFs = require('./safe-fs');
 const path = require('path');
 const durableLog = require('./durable-log');
 
-const LOG_DIR = path.join(process.cwd(), '.ctoc', 'logs');
-const VIOLATIONS_FILE = path.join(LOG_DIR, 'gate-violations.json');
-const ACK_FILE = path.join(LOG_DIR, 'last-ack.json');
+// Path helpers resolve the log directory at CALL time from an optional
+// `projectPath` (default `process.cwd()`). Previously these were module-level
+// constants captured from `process.cwd()` at REQUIRE time, which meant a live
+// caller that passed an explicit project root (e.g. `approvePlan(planPath,
+// root)` where `root !== cwd`) could not steer the writes — the module was
+// effectively cwd-locked and therefore unwireable from the pipeline (finding
+// C9). Resolving per call keeps the existing argless callers working (cwd) while
+// letting the wired caller target the project root explicitly and hermetically.
+function logDir(projectPath) {
+  return path.join(projectPath || process.cwd(), '.ctoc', 'logs');
+}
+
+function violationsFile(projectPath) {
+  return path.join(logDir(projectPath), 'gate-violations.json');
+}
+
+function ackFile(projectPath) {
+  return path.join(logDir(projectPath), 'last-ack.json');
+}
 
 function ensureDir(dir) {
   if (!safeFs.existsSync(dir)) {
@@ -36,47 +52,51 @@ function ensureDir(dir) {
  * (`saveViolations`, `markResolved`) — never by the hot `logViolation` append.
  *
  * @param {Array<object>} entries - the records to persist
+ * @param {string} [projectPath] - project root (default process.cwd())
  */
-function writeAtomicJsonl(entries) {
-  ensureDir(LOG_DIR);
-  const tmp = `${VIOLATIONS_FILE}.tmp-${process.pid}`;
+function writeAtomicJsonl(entries, projectPath) {
+  const dir = logDir(projectPath);
+  const target = violationsFile(projectPath);
+  ensureDir(dir);
+  const tmp = `${target}.tmp-${process.pid}`;
   const jsonl = entries.length === 0 ? '' : entries.map((e) => JSON.stringify(e)).join('\n') + '\n';
   safeFs.writeFileSync(tmp, jsonl, 'utf8');
-  safeFs.renameSync(tmp, VIOLATIONS_FILE);
+  safeFs.renameSync(tmp, target);
 }
 
-function loadViolations() {
-  return durableLog.readEntries(VIOLATIONS_FILE);
+function loadViolations(projectPath) {
+  return durableLog.readEntries(violationsFile(projectPath));
 }
 
-function saveViolations(violations) {
-  writeAtomicJsonl(violations);
+function saveViolations(violations, projectPath) {
+  writeAtomicJsonl(violations, projectPath);
 }
 
-function logViolation(violation) {
+function logViolation(violation, projectPath) {
   // Lossless O_APPEND; the durable-log preserves the documented last-100 cap.
-  durableLog.appendEntry(VIOLATIONS_FILE, violation, { maxEntries: 100 });
+  durableLog.appendEntry(violationsFile(projectPath), violation, { maxEntries: 100 });
 }
 
-function getLastAck() {
+function getLastAck(projectPath) {
   try {
-    if (safeFs.existsSync(ACK_FILE)) {
-      return JSON.parse(safeFs.readFileSync(ACK_FILE, 'utf8'));
+    const f = ackFile(projectPath);
+    if (safeFs.existsSync(f)) {
+      return JSON.parse(safeFs.readFileSync(f, 'utf8'));
     }
   } catch { /* ignore: best-effort, non-fatal */ }
   return { acknowledgedAt: null };
 }
 
-function acknowledge() {
-  ensureDir(LOG_DIR);
-  safeFs.writeFileSync(ACK_FILE, JSON.stringify({
+function acknowledge(projectPath) {
+  ensureDir(logDir(projectPath));
+  safeFs.writeFileSync(ackFile(projectPath), JSON.stringify({
     acknowledgedAt: new Date().toISOString()
   }));
 }
 
-function getUnacknowledgedViolations() {
-  const violations = loadViolations();
-  const lastAck = getLastAck();
+function getUnacknowledgedViolations(projectPath) {
+  const violations = loadViolations(projectPath);
+  const lastAck = getLastAck(projectPath);
 
   if (!lastAck.acknowledgedAt) {
     return violations;
@@ -87,8 +107,8 @@ function getUnacknowledgedViolations() {
   );
 }
 
-function markResolved(planName) {
-  const violations = loadViolations();
+function markResolved(planName, projectPath) {
+  const violations = loadViolations(projectPath);
   for (const v of violations) {
     if (v.plan === planName && v.status === 'pending_reapproval') {
       v.status = 'resolved';
@@ -96,7 +116,7 @@ function markResolved(planName) {
       v.resolution = 'Re-approved via menu';
     }
   }
-  saveViolations(violations);
+  saveViolations(violations, projectPath);
 }
 
 module.exports = {

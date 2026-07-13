@@ -15,7 +15,7 @@
  * It is **NOT** invoked by Claude's normal agent loading path.
  */
 
-const safeFs = require('./safe-fs');
+const safeFs = require('../../src/lib/safe-fs');
 const path = require('path');
 
 const REDIRECT_MARKER_RE = /^type:\s*wrapper$/m;

@@ -164,6 +164,22 @@ model: opus|sonnet
 # Agent Name
 ## Role
 ## Process
+
+## Wiring is part of every slice (non-negotiable)
+
+A test is a caller, so a slice that ships "module + its own test" is NOT a
+complete slice — it is dead code with a certificate. EVERY slice you emit MUST
+carry a filled-in "Wiring — the live call sites" section naming, for each new
+module, the live call site (file + function) and the root it becomes reachable
+from (a registered hook, a shipped slash command, or a sanctioned script). The
+call-site implementation belongs to the SAME slice's Step 10 — never to a
+follow-up slice.
+
+If you cannot name the call site, the context is incomplete: emit a QUESTION for
+the human instead of a guess. Unanswered questions are red flags; guessing is
+what produces plausible-but-dead machinery. CTOC is a collaboration: build
+enough context by ASKING BEFORE building, so that no guessing is required.
+
 ## Output
 ```
 

@@ -32,6 +32,13 @@
  *   4. roots declared in .ctoc/reachability-roots.json (escape hatch for genuinely
  *      new entry points; adding one is a deliberate, reviewable act).
  *
+ *   5. INSTRUCTION-SURFACE roots: any src/ file explicitly named in shipped
+ *      executable instructions — src/commands/*.md, agents' markdown, skills'
+ *      SKILL.md, or a CI workflow. In CTOC's architecture the session model
+ *      executes what those surfaces instruct (node -e requires, spawned
+ *      scripts), so a file named there is genuinely reachable by a human's
+ *      session. A file named NOWHERE — no code edge, no instruction — is dead.
+ *
  * A TEST IS NEVER A ROOT. That is the whole point.
  *
  * Cross-platform: path.join / posix normalization only; no shell.
@@ -163,6 +170,38 @@ function liveRoots(projectRoot, allFiles) {
   for (const rel of SANCTIONED_SCRIPT_ROOTS) {
     const full = path.join(projectRoot, rel);
     if (safeFs.existsSync(full)) roots.add(full);
+  }
+
+  // 4b. Instruction-surface roots: src files named in shipped executable
+  // instructions (command specs, agent markdown, skill bodies, CI workflows).
+  const surfaces = [];
+  const collectMd = (dir, exts) => {
+    if (!safeFs.existsSync(dir)) return;
+    for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) collectMd(full, exts);
+      else if (exts.some((e) => entry.name.endsWith(e))) surfaces.push(full);
+    }
+  };
+  collectMd(path.join(projectRoot, 'src', 'commands'), ['.md']);
+  collectMd(path.join(projectRoot, 'agents'), ['.md']);
+  collectMd(path.join(projectRoot, 'skills'), ['SKILL.md']);
+  collectMd(path.join(projectRoot, '.github', 'workflows'), ['.yml', '.yaml']);
+  const byRel = new Map(allFiles.map((f) => {
+    const rel = path.relative(projectRoot, f).split(path.sep).join('/');
+    return [rel, f];
+  }));
+  for (const surface of surfaces) {
+    let text = '';
+    try { text = safeFs.readFileSync(surface, 'utf8'); } catch { continue; }
+    // Match explicit src/... .js path mentions — a shipped instruction naming
+    // the file. Basename-only mentions do NOT count (too weak to be a root).
+    const mention = /src\/[A-Za-z0-9_\-/.]+\.js/g;
+    let m;
+    while ((m = mention.exec(text)) !== null) {
+      const hit = byRel.get(m[0]);
+      if (hit) roots.add(hit);
+    }
   }
 
   // 4. Declared roots — the deliberate, reviewable escape hatch.

@@ -18,7 +18,7 @@ const path = require('path');
 
 const projectRoot = path.join(__dirname, '..');
 
-const { resolveAgent, listConvertedAgents } = require('../src/lib/agent-resolver');
+const { resolveAgent, listConvertedAgents } = require('./helpers/agent-resolver');
 
 const REQUIRED_SKILL_FIELDS = ['name', 'description', 'when_to_load', 'related_skills', 'effort_level', 'model_optimized_for'];
 

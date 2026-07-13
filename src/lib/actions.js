@@ -342,6 +342,22 @@ function approvePlan(planPath, projectPath, options = {}) {
 
       // Trigger deployment pipeline after Gate 3 (review -> done)
       if (from === 'review' && to === 'done') {
+        // Close the gate-violation loop: when the human re-approves a plan across
+        // Gate 3, mark any pending gate-violation for it resolved. This is the
+        // live consumer of violation-tracker's mutation side (markResolved) —
+        // human-gate-check WRITES the violations, this READS+resolves them. Guard
+        // on the log existing so a normal approval with no prior violation writes
+        // nothing (no empty file created in fresh projects). Never breaks the gate.
+        try {
+          const violationLog = path.join(root, '.ctoc', 'logs', 'gate-violations.json');
+          if (safeFs.existsSync(violationLog)) {
+            const { markResolved } = require('./violation-tracker');
+            markResolved(path.basename(planPath), root);
+          }
+        } catch (vtErr) {
+          console.error('Gate-violation resolution failed:', vtErr.message);
+        }
+
         try {
           const { getDeploymentConfig, runDeploymentPipeline } = require('./deployment');
           const config = getDeploymentConfig(root);
@@ -406,6 +422,15 @@ function applyIronLoop(planPath) {
       content = `---\niron_loop: true\n---\n\n${content}`;
     }
     safeFs.writeFileSync(planPath, content);
+
+    // Decision 7 (docs/REFINEMENT_LOOP.md): compute whether the multi-agent
+    // refinement loop is indicated for THIS plan, at the exact moment it enters
+    // the todo queue — the point the iron-loop-integrator needs the gate result.
+    // Persisted durably (NOT into the plan body, to keep plan content stable) so
+    // the integrator/menu can read it. Advisory + fail-open: it never blocks the
+    // transition. This is the live consumer of refinement-loop's shouldRunLoop,
+    // which previously had zero callers under src/ (finding C9).
+    recordRefinementGate(planPath);
   } catch (err) {
     // Fallback to basic template if refinement fails
     console.error('Iron Loop refinement failed, using basic template:', err.message);
@@ -461,6 +486,48 @@ function applyBasicIronLoopTemplate(planPath) {
 
   content += ironLoopTemplate;
   safeFs.writeFileSync(planPath, content);
+}
+
+/**
+ * Compute and durably record the refinement-loop gate decision for a plan
+ * (docs/REFINEMENT_LOOP.md, Decision 7). Reads the plan's `files:` and `effort:`
+ * frontmatter and asks `refinement-loop.shouldRunLoop` whether the multi-agent
+ * critic loop is indicated, then writes the verdict to
+ * `<root>/.ctoc/state/refinement/<slug>.json` for the integrator/menu to read.
+ *
+ * Advisory only and fully fail-open: any error is swallowed (the refinement gate
+ * must never block a plan reaching the todo queue). Does NOT mutate the plan .md.
+ *
+ * @param {string} planPath - the plan .md path
+ */
+function recordRefinementGate(planPath) {
+  try {
+    const { shouldRunLoop } = require('./refinement-loop');
+    const content = safeFs.readFileSync(planPath, 'utf8');
+    const metadata = parseMetadata(content) || {};
+
+    // `files:` may parse as an array or a comma/newline string; normalize to globs.
+    let files = [];
+    if (Array.isArray(metadata.files)) {
+      files = metadata.files.filter((f) => typeof f === 'string');
+    } else if (typeof metadata.files === 'string') {
+      files = metadata.files.split(/[,\n]/).map((f) => f.trim()).filter(Boolean);
+    }
+    const effortLevel = typeof metadata.effort === 'string' ? metadata.effort : 'medium';
+
+    const decision = shouldRunLoop({ effortLevel, files, recentMessages: [] });
+
+    const root = findProjectRoot(path.dirname(planPath));
+    const stateDir = path.join(root, '.ctoc', 'state', 'refinement');
+    safeFs.mkdirSync(stateDir, { recursive: true });
+    const slug = path.basename(planPath, '.md');
+    safeFs.writeFileSync(
+      path.join(stateDir, `${slug}.json`),
+      JSON.stringify({ plan: slug, at: new Date().toISOString(), ...decision }, null, 2)
+    );
+  } catch {
+    /* advisory + fail-open: the refinement gate never blocks entry to todo */
+  }
 }
 
 // Reject a plan with feedback
@@ -618,12 +685,19 @@ function completeExecution(planPath, projectPath, options = {}) {
   const validation = validateForReview(planPath, root);
 
   if (!validation.valid && !options.force) {
+    // A blocked completion IS a kickback: the plan tried to advance out of
+    // execution and the pre-review gate refused it, so the executor must go back
+    // and fix the failing step. Record it against the SPECIFIC failing step so
+    // the circuit breaker can escalate (max 3 same-step / 5 total → human) and an
+    // overnight loop cannot retry forever unseen (finding C9).
+    const kickback = recordStepKickback(planPath, failingStepFrom(validation), root);
     // Return validation failure - caller must handle
     return {
       newPath: null,
       backgroundAgent: null,
       validation: validation,
       blocked: true,
+      kickback,
       message: 'Plan failed pre-review validation. Fix errors or use force with CTO-Chief approval.'
     };
   }
@@ -639,6 +713,35 @@ function completeExecution(planPath, projectPath, options = {}) {
   clearStatus(planPath);
   const newPath = movePlan(planPath, 'review', root);
 
+  // PRODUCE the VERIFY evidence Gate 3 depends on, by actually RUNNING Step 14 —
+  // never by a human hand-fabricating the artifact (finding C9). Before this
+  // wiring `persistVerifyResult` had zero live callers: a live gate with a dead
+  // producer, which trained evidence fabrication. Now every in-progress→review
+  // completion runs the real quality gate and records the real result on disk at
+  // .ctoc/state/verify/<slug>.json. `validateReviewToDone` reads it at Gate 3.
+  const planSlug = path.basename(newPath, '.md');
+  let verify = null;
+  try {
+    const { persistVerifyResult } = require('./step-13-verify');
+    verify = persistVerifyResult(root, planSlug);
+  } catch (err) {
+    // A verify RUN error must never be silently swallowed (that would let a plan
+    // reach review with no evidence and Gate 3 could not tell why). Surface it
+    // loudly; the absent artifact makes Gate 3 fail closed on its own.
+    console.error(`⚠️  Step 14 VERIFY failed to run for ${planSlug}: ${err.message}`);
+  }
+
+  // Honesty: a failing VERIFY does NOT silently pass to review as if verified.
+  // The evidence honestly records passed:false (so Gate 3 refuses it), AND the
+  // failure is a Step 14 kickback that the circuit breaker counts and escalates.
+  if (verify && verify.passed === false) {
+    console.error(
+      `⚠️  Step 14 VERIFY FAILED for ${planSlug} — moved to review with evidence ` +
+      `passed:false; Gate 3 (review→done) will refuse it. ${verify.summary || ''}`
+    );
+    recordStepKickback(newPath, 14, root);
+  }
+
   // Initialize review preparer
   initBackgroundAgent(newPath, AGENT_TYPES.REVIEW_PREPARER,
     'Preparing review summary...');
@@ -647,8 +750,97 @@ function completeExecution(planPath, projectPath, options = {}) {
     newPath,
     backgroundAgent: AGENT_TYPES.REVIEW_PREPARER,
     validation: validation,
+    verify,
     blocked: false
   };
+}
+
+/**
+ * Identify the Iron Loop step a failed pre-review validation should be kicked
+ * back to: the lowest-numbered REQUIRED step that is missing or present-but-
+ * incomplete. Falls back to 14 (VERIFY — "the quality gate") when the failure is
+ * not step-shaped (e.g. an unmet acceptance criterion), so the counter always
+ * has a concrete step key. Pure; reads only the validation result.
+ *
+ * @param {{checklist?: {steps?: Object}}} validation
+ * @returns {number} the step number to key the kickback on
+ */
+function failingStepFrom(validation) {
+  const steps = validation && validation.checklist && validation.checklist.steps;
+  if (steps && typeof steps === 'object') {
+    const nums = Object.keys(steps)
+      .map((k) => parseInt(k.replace(/^step_/, ''), 10))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+    for (const n of nums) {
+      const entry = steps[`step_${n}`];
+      if (!entry || entry.required !== true) continue;
+      const incomplete = entry.present === false ||
+        (entry.present === true && entry.completed === false && entry.skipped === false);
+      if (incomplete) return n;
+    }
+  }
+  return 14;
+}
+
+/**
+ * Record one Iron Loop kickback for a plan and SURFACE any resulting escalation
+ * to the human. Wraps the circuit breaker (finding C9): before this wiring
+ * `recordKickback`/`getEscalations` had zero live callers, so CLAUDE.md's promise
+ * — max 3 kickbacks to the same step, max 5 total, then escalate — was enforced
+ * NOWHERE and an overnight pipeline could loop forever, unseen.
+ *
+ * The circuit breaker persists the counter in the plan frontmatter and, on an
+ * escalation, appends a durable record to `<root>/.ctoc/logs/escalations.json`
+ * (read back via `circuit-breaker.getEscalations(root)`). A counter/IO error
+ * never breaks the plan transition — it is reported, not swallowed.
+ *
+ * @param {string} planPath - the plan .md path (counter lives in its frontmatter)
+ * @param {number|string} step - the Iron Loop step being kicked back to
+ * @param {string} root - project root (for the escalations log)
+ * @returns {{recorded: boolean, byStep?: number, total?: number, escalation?: Object|null, error?: string}}
+ */
+function recordStepKickback(planPath, step, root) {
+  try {
+    const { recordKickback } = require('./circuit-breaker');
+    const res = recordKickback(planPath, step, root);
+    if (res.escalation) {
+      surfaceEscalation(res.escalation, path.basename(planPath), root);
+    }
+    return res;
+  } catch (err) {
+    console.error(`⚠️  Circuit breaker failed to record a kickback for ${path.basename(planPath)}: ${err.message}`);
+    return { recorded: false, error: err.message };
+  }
+}
+
+/**
+ * Surface a circuit-breaker escalation to the human. The record is ALREADY
+ * durable in `<root>/.ctoc/logs/escalations.json` (written by the circuit breaker
+ * itself and readable via `circuit-breaker.getEscalations(root)`); this makes the
+ * automated pipeline LOUD so an overnight run is never silent about a plan that
+ * keeps failing.
+ *
+ * WHERE THE MENU MUST READ IT: the dashboard/inbox surface (src/commands/menu.js
+ * and src/areas/inbox.js — outside this change's owned file set) must render
+ * unresolved entries from `.ctoc/logs/escalations.json` via
+ * `require('./lib/circuit-breaker').getEscalations(projectRoot)`, exactly as it
+ * renders gate violations. Until that read is added, this console surface is the
+ * human-visible signal and the log is the durable record.
+ *
+ * @param {{type: string, plan: string, step?: string, count?: number, total?: number}} escalation
+ * @param {string} planName - the plan filename (for the message)
+ * @param {string} root - project root
+ */
+function surfaceEscalation(escalation, planName, root) {
+  const detail = escalation.type === 'same-step'
+    ? `Step ${escalation.step} has been kicked back ${escalation.count} times (max 3).`
+    : `plan kicked back ${escalation.total} times total (max 5).`;
+  console.warn(
+    `\n⚠️  CIRCUIT BREAKER ESCALATION — ${planName}: ${detail}\n` +
+    `   Recorded to ${path.join(root, '.ctoc', 'logs', 'escalations.json')}.\n` +
+    `   Human review required before the pipeline retries this plan again.\n`
+  );
 }
 
 /**

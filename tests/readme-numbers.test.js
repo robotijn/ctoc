@@ -128,8 +128,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 130 JS modules at top level (audit-wave added hook-deny-signal, approval-ledger, gate-order, circuit-breaker, durable-log)', () => {
-    assert.equal(countTopLevelJs('src/lib'), 130);
+  it('src/lib/: 89 JS modules at top level (dead-code fence at ZERO: 40+ unreachable modules deleted or wired, 2026-07-14)', () => {
+    assert.equal(countTopLevelJs('src/lib'), 89);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {
@@ -139,8 +139,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countSlashCommandSpecs(), 3);
   });
 
-  it('src/hooks/: 16 hook files (PostToolUse.plan-index-sync added for PI3)', () => {
-    assert.equal(countTopLevelFiles('src/hooks'), 16);
+  it('src/hooks/: 13 hook files (PrePush/PreReview/andon-halt deleted: unregistered hooks pretending to be enforcement)', () => {
+    assert.equal(countTopLevelFiles('src/hooks'), 13);
   });
 
   it('src/tabs/: 5 dashboard tab files (implementation/todo/progress removed as dead code)', () => {
@@ -249,12 +249,12 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /3 slash commands/);
   });
 
-  it('Project structure: 16 Claude Code hooks', () => {
-    assert.match(README, /16 Claude Code hooks/);
+  it('Project structure: 13 Claude Code hooks', () => {
+    assert.match(README, /13 Claude Code hooks/);
   });
 
   it('Project structure: 130 JS modules in src/lib', () => {
-    assert.match(README, /130 JS modules/);
+    assert.match(README, /89 JS modules/);
   });
 
   it('Project structure: 124 agent definitions across 25 categories', () => {

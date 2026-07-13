@@ -7,7 +7,7 @@
  * forces an honest failure report instead of blocking forever). Opt-in and
  * escapable.
  *
- * I/O convention (matches src/hooks/andon-halt.js):
+ * I/O convention (stdin JSON in, exit 2 blocks the stop):
  *   - Exit 0 = ALLOW the stop / fail-open.
  *   - Exit 2 = BLOCK the stop (keep Claude working; stderr says why).
  *   - (exit 1 blocks NOTHING for a Stop hook — never used here.)
@@ -42,7 +42,7 @@ const MAX_ATTEMPTS = 3;
 /**
  * Flat YAML extractor — reads only the `general.stopTestGate` boolean we need,
  * tracking the current top-level section. No YAML library (dependency-free, and
- * fast for a safety-critical hook), mirroring andon-halt.js's readYamlFlat.
+ * fast for a safety-critical hook).
  * @param {string} content
  * @returns {boolean} true iff `general.stopTestGate` is exactly true.
  */
@@ -58,7 +58,7 @@ function readStopTestGate(content) {
     if (!m) continue;
     const key = m[1];
     // Strip surrounding quotes from the value before the === true compare
-    // (mirrors andon-halt.js readYamlFlat).
+    // (minimal flat-YAML reader).
     const val = m[2].trim().replace(/^["']|["']$/g, '');
     if (indent === 0) {
       section = key;

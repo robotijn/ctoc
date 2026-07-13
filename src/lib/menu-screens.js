@@ -229,7 +229,8 @@ function buildDashboardTable(projectPath, opts = {}) {
   // Inbox (A3 — async-overnight surface; SP2 adds the possibly-stale stream)
   const inbox = getInboxCounts(root);
   const stale = inbox.staleCandidates || 0;
-  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale;
+  const escalations = inbox.escalations || 0;
+  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale + escalations;
   // NB2: completed background work slots into the inbox as a pull notice (D3).
   let bgLine = '';
   try { bgLine = taskView.tasksInboxLine(taskReg); } catch { bgLine = ''; }
@@ -241,6 +242,9 @@ function buildDashboardTable(projectPath, opts = {}) {
   } else {
     if (inboxTotal > 0) {
       out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}\n`;
+      if (escalations > 0) {
+        out += `  ⛔ ${escalations} circuit-breaker escalation${escalations === 1 ? '' : 's'} — a plan keeps failing and needs you\n`;
+      }
       out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review\n`;
       out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates\n`;
       // SP2: conditional — present iff > 0 (M2), absent when 0 (M3). "possibly-stale"

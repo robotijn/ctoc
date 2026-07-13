@@ -60,21 +60,6 @@ function cleanup(dir) {
  * `node -e` invocation with the given exit code. Parsed by ci-parser as an
  * "unknown but substantial" check (survives filterRelevantChecks).
  */
-function writeWorkflow(dir, exitCode) {
-  const wf = path.join(dir, '.github', 'workflows');
-  fs.mkdirSync(wf, { recursive: true });
-  // node -e "process.exit(N)" — no npm, deterministic, cross-platform.
-  const content =
-    'name: ci\n' +
-    'on: [push]\n' +
-    'jobs:\n' +
-    '  main:\n' +
-    '    runs-on: ubuntu-latest\n' +
-    '    steps:\n' +
-    '      - name: ci-check\n' +
-    `        run: node -e "process.exit(${exitCode})"\n`;
-  fs.writeFileSync(path.join(wf, 'ci.yml'), content);
-}
 
 function runHook(name, cwd, { input = '', env = {} } = {}) {
   return spawnSync(process.execPath, [HOOK(name)], {
@@ -89,86 +74,6 @@ function runHook(name, cwd, { input = '', env = {} } = {}) {
 // ---------------------------------------------------------------------------
 // PrePush.js — CI gate before push. main(): exit 0 if CI passes, exit 1 if not
 // or on error (fail-SAFE: an error blocks the push, it does not allow it).
-// ---------------------------------------------------------------------------
-describe('PrePush.js (CI gate before push)', () => {
-  let dir;
-  afterEach(() => { if (dir) { cleanup(dir); dir = null; } });
-
-  it('(success path) exits 0 when local CI passes', () => {
-    dir = tempProject();
-    writeWorkflow(dir, 0);
-    const r = runHook('PrePush.js', dir);
-    assert.equal(r.status, 0, `expected allow (exit 0), got ${r.status}\nstderr: ${r.stderr}`);
-  });
-
-  it('(block path) exits 1 when local CI fails', () => {
-    dir = tempProject();
-    writeWorkflow(dir, 1);
-    const r = runHook('PrePush.js', dir);
-    assert.equal(r.status, 1, `expected block (exit 1), got ${r.status}\nstdout: ${r.stdout}`);
-  });
-
-  it('exposes prePushGate + formatOutput on module.exports', () => {
-    const mod = require('../src/hooks/PrePush.js');
-    assert.equal(typeof mod.prePushGate, 'function');
-    assert.equal(typeof mod.formatOutput, 'function');
-  });
-
-  it('(fail-safe) prePushGate blocks (allowed:false) when CI throws, never crashes', async () => {
-    const { prePushGate } = require('../src/hooks/PrePush.js');
-    // A non-existent path makes runLocalCI's parse degrade to default checks,
-    // which run npm in a dir without package.json -> non-pass. Either way the
-    // documented contract is: errors/failures BLOCK (allowed must be false),
-    // and the call must resolve without throwing.
-    const bogus = path.join(os.tmpdir(), 'ctoc-does-not-exist-' + Date.now());
-    const res = await prePushGate(bogus);
-    assert.equal(typeof res, 'object');
-    assert.equal(res.allowed, false, 'unverifiable CI must NOT allow push (fail-safe gate)');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// PreReview.js — CI gate before moving to review. Same contract as PrePush.
-// ---------------------------------------------------------------------------
-describe('PreReview.js (CI gate before review)', () => {
-  let dir;
-  afterEach(() => { if (dir) { cleanup(dir); dir = null; } });
-
-  it('(success path) exits 0 when local CI passes', () => {
-    dir = tempProject();
-    writeWorkflow(dir, 0);
-    const r = runHook('PreReview.js', dir);
-    assert.equal(r.status, 0, `expected allow (exit 0), got ${r.status}\nstderr: ${r.stderr}`);
-  });
-
-  it('(block path) exits 1 when local CI fails', () => {
-    dir = tempProject();
-    writeWorkflow(dir, 1);
-    const r = runHook('PreReview.js', dir);
-    assert.equal(r.status, 1, `expected block (exit 1), got ${r.status}\nstdout: ${r.stdout}`);
-  });
-
-  it('exposes preReviewGate + formatOutput on module.exports', () => {
-    const mod = require('../src/hooks/PreReview.js');
-    assert.equal(typeof mod.preReviewGate, 'function');
-    assert.equal(typeof mod.formatOutput, 'function');
-  });
-
-  it('(fail-safe) preReviewGate blocks (allowed:false) when CI is unverifiable', async () => {
-    const { preReviewGate } = require('../src/hooks/PreReview.js');
-    const bogus = path.join(os.tmpdir(), 'ctoc-does-not-exist-' + Date.now());
-    const res = await preReviewGate(bogus);
-    assert.equal(typeof res, 'object');
-    assert.equal(res.allowed, false, 'unverifiable CI must NOT allow review (fail-safe gate)');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// post-commit.js — NON-BLOCKING. main() always returns (no process.exit on the
-// success path), starts a detached quality agent IF one exists. Documented
-// skip conditions: CTOC_SKIP_QUALITY=1, MERGE_HEAD present, rebase in progress.
-// shouldRun() is the documented predicate; startAgent() no-ops if the agent
-// file is missing. We assert it never throws and prints the documented lines.
 // ---------------------------------------------------------------------------
 describe('post-commit.js (non-blocking quality-agent launcher)', () => {
   let dir;

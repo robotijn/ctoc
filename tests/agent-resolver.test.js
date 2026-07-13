@@ -1,5 +1,5 @@
 /**
- * Tests for src/lib/agent-resolver.js (B2 — leaf-agent → skill conversion)
+ * Tests for tests/helpers/agent-resolver.js (B2 — leaf-agent → skill conversion)
  *
  * The resolver is SUPPLEMENTAL tooling per ADR-1: it powers Library
  * listings and discovery, but is NOT the backward-compat mechanism for
@@ -16,7 +16,7 @@ const {
   resolveAgent,
   isRedirectStub,
   listConvertedAgents,
-} = require('../src/lib/agent-resolver');
+} = require('./helpers/agent-resolver');
 
 function tempProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-resolver-'));

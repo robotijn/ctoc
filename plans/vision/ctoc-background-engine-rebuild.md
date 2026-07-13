@@ -62,6 +62,18 @@ weeks. Agent labor repriced that downside to a re-run. Two costs did NOT collaps
 Therefore: everywhere reversible, gates become flow control; at irreversibility,
 gates remain.
 
+### The flow (the human's ride)
+
+The human states a vision. The system immediately starts asking — the highest
+value question first, matrix-rendered — and AS PARTS SETTLE, they flow: enough
+answered context makes a functional plan, which (in the background) starts
+producing implementation plans, which may raise their own questions back into
+the queue; a ready implementation plan gets the full iron loop and lands in
+todo; an agent picks it up — all in the background while the human is still
+answering the next question. The human's whole experience is: answer questions,
+watch increments appear. Waiting for a menu never happens; waiting for the
+pipeline never happens; the questions ARE the interface.
+
 ### The mechanisms
 
 1. **Readiness-scored dataflow.** Artifacts advance when readiness crosses
@@ -82,7 +94,17 @@ gates remain.
    emitted only above an EVI floor, and the asker still owns the documented default
    it proceeds on — asking never sheds responsibility. Answers are idempotent
    events that no-op against killed subtrees and tell the human when moot.
-3. **Speculative execution with assumption provenance — ON BRANCHES.** Where a
+3. **Ask-first, speculate-second (human directive 2026-07-14, overrules the
+   first draft's speculation-primary design).** Unanswered questions are red
+   flags. CTOC's job is to build enough context BY ASKING that no guessing is
+   required — a model guess produces crap exactly as a careless human decision
+   does; this is a collaboration game. Therefore: a REAL fork emits a question
+   and BLOCKS ITS OWN SUBTREE until answered, while every settled part flows —
+   the pipeline keeps asking in the foreground while building the settled work
+   in the background. Speculation exists only BELOW the question floor (genuine
+   trivia covered by the no-stub documented-choice rule), and even that follows
+   the branch rule below. Speculative execution with assumption provenance — ON
+   BRANCHES. Where a
    question is open, the pipeline proceeds on the documented default, tagging every
    downstream artifact with the assumption it rests on; a contradicting answer
    triggers an invalidation cascade. CRITICAL AMENDMENT: semantic relatedness has
@@ -202,12 +224,10 @@ on harder, not less).
 
 ## Open decisions for the human (Gate 0)
 
-1. **Ship gates**: the human said "remove the human gates". This design keeps TWO
-   (git push, deploy) on irreversibility grounds, and the critic proved the
-   existing done→deploy auto-trigger would otherwise bypass them. Confirm or
-   overrule.
-2. **Sequencing**: P1 (thin engine proof) before Layer F, or F1–F5 first (they are
-   bug-fixes with standalone value and de-risk the engine substrate)?
+1. **Ship gates**: DECIDED by the human 2026-07-14 — push and deploy STAY as the
+   two human gates. Everything internal becomes question-driven flow.
+2. **Sequencing**: DECIDED by the human 2026-07-14 — foundations first (Layer F),
+   then the engine.
 3. **Scope of F6**: reckoning 94 dead files is large. Delete-by-default, or wire?
 
 ## Success criteria

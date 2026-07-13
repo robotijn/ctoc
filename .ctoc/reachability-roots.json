@@ -1,0 +1,5 @@
+[
+  "src/scripts/run-self-check.js",
+  "src/scripts/build-coverage-map.js",
+  "src/scripts/evidence-pack.js"
+]
