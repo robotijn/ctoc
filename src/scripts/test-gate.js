@@ -113,6 +113,27 @@ function resolveTestFiles(projectRoot) {
     .map((f) => path.join(testsDir, f));
 }
 
+/**
+ * Resolve the coverage threshold for a project: the committed RATCHET baseline
+ * (`.ctoc/coverage-baseline.json`, key `minPct`) when present and sane, else the
+ * aspirational default (80). The baseline is the same honest mechanism as the
+ * typecheck baseline: it records today's measured floor for a codebase that
+ * predates instrumentation, and it may only ever be RAISED (never lowered) as
+ * coverage improves — new code is still held to the 80% figure at review.
+ * @param {string} projectRoot
+ * @returns {number} the threshold percentage to enforce.
+ */
+function resolveThreshold(projectRoot) {
+  try {
+    const raw = safeFs.readFileSync(path.join(projectRoot, '.ctoc', 'coverage-baseline.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.minPct === 'number' && parsed.minPct > 0 && parsed.minPct <= 100) {
+      return parsed.minPct;
+    }
+  } catch { /* no baseline file → aspirational default */ }
+  return DEFAULT_THRESHOLD;
+}
+
 /** CLI entry point: run the suite under coverage, evaluate, print, exit. */
 function main() {
   const projectRoot = path.resolve(__dirname, '..', '..');
@@ -145,10 +166,11 @@ function main() {
     skipped: parseSkipped(output),
     coveragePct: parseCoveragePct(output),
   };
-  const verdict = evaluateSummary(summary);
+  const threshold = resolveThreshold(projectRoot);
+  const verdict = evaluateSummary(summary, { threshold });
 
   const measured = summary.coveragePct === null ? 'unmeasured' : `${summary.coveragePct}%`;
-  process.stdout.write(`\n[CTOC test-gate] coverage ${measured} (threshold ${DEFAULT_THRESHOLD}%), skipped ${summary.skipped}, failed ${summary.fail}\n`);
+  process.stdout.write(`\n[CTOC test-gate] coverage ${measured} (threshold ${threshold}%), skipped ${summary.skipped}, failed ${summary.fail}\n`);
 
   if (!verdict.ok) {
     process.stderr.write('[CTOC test-gate] FAIL:\n');
@@ -162,7 +184,7 @@ function main() {
   process.exit(0);
 }
 
-module.exports = { parseSkipped, parseFail, parseCoveragePct, evaluateSummary, resolveTestFiles };
+module.exports = { parseSkipped, parseFail, parseCoveragePct, evaluateSummary, resolveTestFiles, resolveThreshold };
 
 if (require.main === module) {
   main();

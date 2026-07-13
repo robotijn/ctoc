@@ -1,0 +1,7 @@
+{
+  "comment": "Ratcheting line-coverage floor for the CTOC test-gate (src/scripts/test-gate.js). The gate fails when measured suite coverage drops below minPct. This is a RATCHET like .ctoc/typecheck-baseline.json: it records the measured floor for a codebase that predates coverage instrumentation and may only ever be RAISED as coverage improves — NEVER lowered to make a failing run pass. New code is still held to >= 80% at review (Iron Loop Step 14).",
+  "minPct": 40,
+  "establishedAt": "2026-07-13",
+  "establishedAtVersion": "6.10.4",
+  "measuredAtEstablishment": 40.85
+}
