@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.478Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W01 — Enforcement Actually Blocks"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -408,3 +414,120 @@ crafted PreToolUse JSON payload on stdin, and asserts on:
   the Bash gate functional) + MultiEdit/NotebookEdit parity via the proven
   `PreToolUse.Write.js` `main()` pattern — the thinnest end-to-end slice that
   makes a deny observable on every surface, which is what W02 and W08 depend on.
+
+## 4. PLAN — Solution Overview
+
+*(Sections 1–3 and Decisions Taken Under Ambiguity above are the approved functional
+content, unchanged. Sections 4–6 are the SIP1 decomposition output — Iron Loop Steps
+5–7 — turning this one functional plan into three dependency-ordered implementation
+slices. Each slice is its own complete plan with its own Steps 8–16.)*
+
+**Tech stack:** inherited — this is an internal remediation of the CTOC plugin itself.
+Node.js (existing hook architecture under `src/hooks/`), `node:test` runner, no new
+runtime dependencies. No SaaS template applies (not a product build), so the
+stack-chooser / template machinery is intentionally not invoked.
+
+**Solution in one paragraph.** Introduce ONE dependency-free module,
+`src/lib/hook-deny-signal.js`, that emits the Claude Code PreToolUse deny decision
+(`hookSpecificOutput.permissionDecision:"deny"` JSON on stdout, exit 0; with a
+one-line `process.exit(HARNESS_BLOCK_EXIT_CODE=2)` fallback) — the single point of
+protocol truth. Then rewire every deny path to call it: Edit's `block()` (which Write
+already delegates to), the Bash gate's five block sites, and — via Edit's already-
+exported `enforce()` — MultiEdit and NotebookEdit through a new per-file `main()`. The
+Bash gate additionally switches its command source from the non-existent
+`process.env.CLAUDE_TOOL_INPUT` to stdin (C2), which must land with the real deny
+signal (C1) to make that gate functional at all. Every surface is proven by a
+subprocess test that asserts the deny on the real stdout channel the harness reads.
+
+### Why three slices (SIP1 cohesion)
+
+The natural fault lines are the three findings, each a module-plus-its-test unit small
+enough for one clean executor pass:
+
+| Slice | Scope (one line) | Finding | `depends_on` |
+|-------|------------------|---------|--------------|
+| **s1** `ctoc-audit-w01-s1-shared-deny-mechanism` | Create `src/lib/hook-deny-signal.js`; Edit's `block()` (and Write via delegate) emit the real deny; flip the false-green e2e assertion. | C1 (Edit/Write) | none |
+| **s2** `ctoc-audit-w01-s2-bash-stdin-gate` | Bash `getCommand()` reads stdin (not `CLAUDE_TOOL_INPUT`); all five block sites emit the shared deny; invert the C2 input-channel contract test. | C1+C2 (Bash) | s1 |
+| **s3** `ctoc-audit-w01-s3-multiedit-notebookedit-parity` | MultiEdit + NotebookEdit gain their own `main()` calling `enforce()`; capstone test asserts the uniform deny across all five surfaces. | C3 | s1, s2 |
+
+Dependency chain `s1 → s2 → s3` (depth 2, no cycles). s2 and s3 both reuse s1's
+emitter; s3 owns the five-surface uniform capstone, so it also depends on s2 (whose
+Bash surface the capstone spawns). Implementation is sequential + dependency-ordered;
+Gates 2 and 3 batch across all three via `approveSubplans("ctoc-audit-w01-
+enforcement-blocks", fromStage)` — one human decision per stage, each sibling stamped
+`approved_by: human`.
+
+## 5. DESIGN — Architecture Decision Records
+
+### ADR-1 — Deny protocol: shared emitter, JSON-on-stdout primary, exit-2 fallback
+**Context.** C1 exists because "deny" was signaled by `process.exit(1)` scattered
+across six call sites in two files, its meaning defined only by tribal knowledge. The
+harness blocks on exit 2, or on a stdout `permissionDecision:"deny"` JSON — never on
+exit 1.
+**Decision.** One module `src/lib/hook-deny-signal.js` exports `denyDecision(reason)`
+(pure) and `emitDeny(reason)` (writes the JSON to stdout, exits 0). Every deny path
+calls `emitDeny`. Primary protocol is the self-describing JSON
+(`hookSpecificOutput.permissionDecision:"deny"` + `permissionDecisionReason`), because
+it is version-forward, orthogonal to the process's own exit semantics, and asserted by
+a semantically-named field rather than an opaque numeral. `HARNESS_BLOCK_EXIT_CODE=2`
+is a documented one-line fallback inside `emitDeny` if Step 9's live-docs check finds
+the installed harness ignores the JSON channel.
+**Enabling fact (verified this decomposition).** Both surfaces write their human
+banners to **stderr** (`src/lib/ui.js:216`; `PreToolUse.Edit.js:123-128`), so stdout
+carries ONLY the decision JSON — the JSON protocol is safe with zero banner
+refactoring.
+**Consequence.** ALLOW stays exit-0-silent (no allow-JSON — an explicit allow would
+force-bypass the permission system). Exit code alone no longer distinguishes allow
+from deny, so every allow/deny test asserts on the stdout decision field, not the exit
+code (parent Test Strategy point 2). Fixed in exactly one place if the protocol must
+ever change again.
+
+### ADR-2 — C1 and C2 ship together in the Bash slice
+**Context.** Fixing C2 (read stdin) without C1 (real signal) still lets every
+dangerous command run (detected but signaled cosmetically); fixing C1 without C2 never
+sees a real command. **Decision.** Both are s2, in the one file `PreToolUse.Bash.js` —
+they are a single combined defect, not two shippable fixes. **Consequence.** s2 is one
+cohesive slice; its test inverts the existing input-channel contract test (which today
+encodes the C2 bug as correct behavior).
+
+### ADR-3 — C3 wires the existing `enforce()`, it does not create one
+**Context.** `enforce(parsed)` already exists, stdin-decoupled, exported from
+`PreToolUse.Edit.js` (built for the Write/PI5-s2 fix). The bare
+`require('./PreToolUse.Edit.js')` in the two delegates runs nothing because Edit's IIFE
+is `require.main`-guarded. **Decision.** Add a per-file `main()` (the proven
+`PreToolUse.Write.js:280-317` skeleton, minus the advisory guard) that reads stdin once
+and calls the exported `enforce()`. **Consequence.** No Edit.js change for s3;
+`getTargetFile()` already resolves `file_path` and `notebook_path`.
+
+### ADR-4 — Tests must go red on the bug, then green on the fix
+**Context.** The vision's root cause is a suite that "asserts structure, not truth."
+Three existing tests currently CERTIFY the broken state and must be flipped by the
+slice whose change breaks them: `tests/e2e-enforcement-and-gates.test.js:170`
+(`exit 1 == blocked`, flipped by s1 for Edit and s2 for the Bash region) and
+`tests/security-bash-hook.test.js` (delivers via `CLAUDE_TOOL_INPUT`, asserts stdin is
+"invisible → allowed", and checks `status === 1` — wholesale flipped by s2).
+**Decision.** Each slice both ADDS a subprocess test for its behavior AND flips the
+legacy assertions its change turns red; Step 14 full-suite VERIFY (0 skipped) surfaces
+any other test that leaned on the old protocol.
+
+## 6. SPEC — Slice Index (dependency-ordered)
+
+Each row is a complete implementation plan in `plans/implementation/`; open it for its
+File Specifications, Test Plan, Security Review, and Steps 8–16.
+
+| # | Slice file | Files touched | `depends_on` |
+|---|------------|---------------|--------------|
+| 1 | `ctoc-audit-w01-s1-shared-deny-mechanism.md` | `src/lib/hook-deny-signal.js` (new) · `tests/hook-deny-signal.test.js` (new) · `src/hooks/PreToolUse.Edit.js` · `src/hooks/PreToolUse.Write.js` (covered) · `tests/w01-edit-write-deny-protocol.test.js` (new) · `tests/e2e-enforcement-and-gates.test.js` | none |
+| 2 | `ctoc-audit-w01-s2-bash-stdin-gate.md` | `src/hooks/PreToolUse.Bash.js` · `tests/security-bash-hook.test.js` · `tests/e2e-enforcement-and-gates.test.js` (Bash region) | s1 |
+| 3 | `ctoc-audit-w01-s3-multiedit-notebookedit-parity.md` | `src/hooks/PreToolUse.MultiEdit.js` · `src/hooks/PreToolUse.NotebookEdit.js` · `tests/w01-multiedit-notebookedit-parity.test.js` (new) | s1, s2 |
+
+**Acceptance-criteria coverage** (the parent's 10 BDD scenarios → slices):
+Uncovered Edit prevented → s1. Uncovered Write via delegate → s1. Plan-covered edit
+allowed → s1 (Edit/Write), s3 (MultiEdit/NotebookEdit). Escape phrase still allows →
+s1. Bash reads real transport → s2. Bash no allow-by-default fall-through → s2.
+MultiEdit blocked like Edit → s3. NotebookEdit blocked like Edit → s3. `enforce()` from
+a sibling entry → s3. Uniform protocol across all five surfaces → s3 (capstone).
+
+**Gate note (HARD STOP — Gate 2 belongs to the human):** these three slices and this
+parent remain in `plans/implementation/`. No `approved_by` marker is written by this
+decomposition; nothing moves to `todo`; Gate 2 is not crossed.

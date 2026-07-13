@@ -157,6 +157,102 @@ nope`);
   });
 });
 
+describe('iron-loop-enforcer — gate-destination exemption for pre-Gate-2 slices (W02-s6)', () => {
+  // H7's second home: checkGateDestinationsApproved must exempt SIP1 slices that
+  // carry parent_plan: and live unmarked in implementation/ awaiting batch Gate-2
+  // approval, and must scope the approved_by marker to the frontmatter region (not a
+  // raw substring that a prose body mention satisfies). Real temp dir, real files.
+  let tmpRoot;
+
+  function makeGateProject() {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-gate-'));
+    for (const s of ['implementation', 'todo', 'done']) {
+      fs.mkdirSync(path.join(tmpRoot, 'plans', s), { recursive: true });
+    }
+    // Make findProjectRoot resolve to tmpRoot.
+    fs.mkdirSync(path.join(tmpRoot, '.ctoc'), { recursive: true });
+    return tmpRoot;
+  }
+
+  function writePlan(stage, name, content) {
+    fs.writeFileSync(path.join(tmpRoot, 'plans', stage, name), content);
+  }
+
+  function gateFinding(root) {
+    const result = checkAllInvariants({ root, mode: 'fast', scopes: ['iron-loop'] });
+    return result.findings.find(x => x.id === 'gate-destinations-approved');
+  }
+
+  afterEach(() => {
+    if (tmpRoot) {
+      try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* best-effort */ }
+      tmpRoot = null;
+    }
+  });
+
+  it('(a) does NOT flag an unmarked implementation/ slice that carries parent_plan', () => {
+    const root = makeGateProject();
+    writePlan('implementation', 'w-s1.md',
+      '---\ntitle: "slice"\ntype: feature\nparent_plan: "w-parent"\nfiles: ["src/x.js"]\n---\n\n# body\nno marker here');
+    const f = gateFinding(root);
+    assert.equal(f, undefined, 'pre-Gate-2 slice with parent_plan must be exempt');
+  });
+
+  it('(b) DOES flag an unmarked implementation/ plan with NO parent_plan (genuine gate-jump)', () => {
+    const root = makeGateProject();
+    writePlan('implementation', 'orphan.md',
+      '---\ntitle: "orphan"\ntype: feature\nfiles: ["src/x.js"]\n---\n\n# body');
+    const f = gateFinding(root);
+    assert.ok(f, 'expected gate-destinations-approved finding');
+    assert.equal(f.severity, 'block');
+    assert.ok(f.details.offenders.some(o => o.plan.endsWith('orphan.md')),
+      `orphan.md should be an offender: ${JSON.stringify(f.details.offenders)}`);
+  });
+
+  it('(c) DOES flag an unmarked todo/ or done/ plan even with a parent_plan (past Gate 2/3)', () => {
+    const root = makeGateProject();
+    writePlan('todo', 't.md',
+      '---\ntitle: "t"\ntype: feature\nparent_plan: "w-parent"\nfiles: ["src/x.js"]\n---\n\n# body');
+    writePlan('done', 'd.md',
+      '---\ntitle: "d"\ntype: feature\nparent_plan: "w-parent"\nfiles: ["src/x.js"]\n---\n\n# body');
+    const f = gateFinding(root);
+    assert.ok(f, 'expected gate-destinations-approved finding');
+    assert.equal(f.severity, 'block');
+    assert.ok(f.details.offenders.some(o => o.plan.endsWith('t.md')), 'todo slice must be flagged');
+    assert.ok(f.details.offenders.some(o => o.plan.endsWith('d.md')), 'done slice must be flagged');
+  });
+
+  it('(d) DOES flag a plan whose only approved_by: human is in the prose body (frontmatter-scoped)', () => {
+    const root = makeGateProject();
+    writePlan('done', 'body-only.md',
+      '---\ntitle: "body only"\ntype: feature\nfiles: ["src/x.js"]\n---\n\n# body\n' +
+      'This plan discusses that `approved_by: human` is self-asserted text.');
+    const f = gateFinding(root);
+    assert.ok(f, 'expected gate-destinations-approved finding');
+    assert.equal(f.severity, 'block');
+    assert.ok(f.details.offenders.some(o => o.plan.endsWith('body-only.md')),
+      'body-only marker mention must NOT count as approval');
+  });
+
+  it('does NOT flag a marked parent plan carrying a Gate-1 prepended marker block', () => {
+    const root = makeGateProject();
+    // Gate-1 stamps a separate marker block PREPENDED above the plan frontmatter.
+    writePlan('implementation', 'parent.md',
+      '---\napproved_by: human\napproved_at: 2026-07-13T00:00:00Z\ngate_crossed: functional → implementation\n---\n\n' +
+      '---\ntitle: "parent index"\ntype: feature\nfiles: ["src/x.js"]\n---\n\n# body');
+    const f = gateFinding(root);
+    assert.equal(f, undefined, 'marked parent (prepended marker block) must pass');
+  });
+
+  it('exempts a type: vision plan archived in done/ (decomposed, never crossed review→done)', () => {
+    const root = makeGateProject();
+    writePlan('done', 'vision.md',
+      '---\ntype: vision\nstatus: decomposed\ntitle: "a vision"\n---\n\n# Vision\nbody');
+    const f = gateFinding(root);
+    assert.equal(f, undefined, 'decomposed vision archive must be exempt');
+  });
+});
+
 describe('iron-loop-enforcer — fast vs thorough modes', () => {
   it('fast mode skips thorough-only checks', () => {
     const fast = checkAllInvariants({ root: projectRoot, mode: 'fast' });

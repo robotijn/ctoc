@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.555Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W03 — Agent Contracts Load At Runtime"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -392,3 +398,48 @@ loader's output, never against the source file text**, matching Finding C7's own
   walker cannot easily support a path-pattern exclusion), that is a documented reversal
   to make at Step 5 PLAN with the broken-reference cost stated explicitly — not a silent
   default back to relocation.
+
+## Slices (dependency-ordered) — SIP1 decomposition
+
+Steps 5–7 decomposed this functional-derived plan into **3 cohesive implementation
+slices**. This parent is now their INDEX; each slice is a complete plan with its own
+Steps 8–16 and is executed independently through the Iron Loop. Gates 2 & 3 batch across
+all three via `approveSubplans('ctoc-audit-w03-agent-contracts-load', <stage>)` — one
+human decision crosses every sibling. Build order follows `depends_on` (s2 after s1; s1
+and s3 are independent). Max dependency-chain depth 2; no cycles.
+
+| # | Slice file | Scope (one line) | Story / Finding | depends_on |
+|---|------------|------------------|-----------------|------------|
+| 1 | `ctoc-audit-w03-s1-frontmatter-byte0.md` | Move the `---` block to byte 0 in the 19 heading-first agent files; assert byte-0 + live contract-load (cto-chief tools, 5 scouts `model: haiku`) | A / C6 | none |
+| 2 | `ctoc-audit-w03-s2-anchor-invariants-parser.md` | Anchor `architecture-invariants.test.js`'s `readFM` to `^---` at byte 0 (drop `m` flag + match-anywhere fallback) + fixture red/green | B / C7 | s1 |
+| 3 | `ctoc-audit-w03-s3-shared-not-dispatchable.md` | Exclude `agents/_shared/**` from the dispatchable set via a `plugin.json` `agents` whitelist (no relocation) + enumeration test | C / L5 | none |
+
+**Slice `files:` coverage** (each edit is scoped to its slice's declared `files:`):
+- s1 → the 19 agent `.md` files + `tests/agent-contract-load.test.js`
+- s2 → `tests/architecture-invariants.test.js`
+- s3 → `.claude-plugin/plugin.json` + `tests/agent-shared-not-dispatchable.test.js`
+
+## Findings surfaced during decomposition (for the maintainer to schedule — not scheduled here)
+
+Reading the live tree (not the stub prose) surfaced three facts that the maintainer must
+see. None is silently absorbed into W03 or silently deferred; each is stated so the
+maintainer alone decides what/when.
+
+1. **cto-chief's declared tool set INCLUDES `Bash` (and `Task`).** The live file declares
+   `tools: Read, Grep, Glob, Task, Bash` — not the Bash-free read-only set the ALIGN
+   acceptance criterion assumed. W03 makes this *existing* declaration LOAD (in scope); it
+   does NOT re-scope it (re-scoping is explicitly out of W03 scope). But a `Bash` grant
+   means cto-chief can mutate files through a shell, which **weakens the "cannot edit"
+   safety property this plan claims to restore.** Whether to drop `Bash`/`Task` from
+   cto-chief's contract is a separate decision for the agent's owner.
+2. **Two more identical lenient frontmatter parsers exist** beyond the one Story B fixes:
+   `tests/cto-chief-toplevel.test.js:25` and `src/lib/iron-loop-enforcer.js:98` (the latter
+   is runtime self-check code, not just a test). Both are the same C7 false-green pattern
+   (`/^---\n…\n---/m` + match-anywhere fallback). s2 does NOT break them (separate local
+   functions) and after s1 they parse the real tree correctly; once s2 lands,
+   `architecture-invariants.test.js` already gives strict anchored coverage of cto-chief and
+   every scout, so no coverage GAP remains. Anchoring these two for defence-in-depth is a
+   natural fit for vision workstream 6 (truthful tests).
+3. **Story C's fix is a plugin-manifest change, not a code-walker change** — there is no
+   CTOC-side agent-discovery walker (the Claude Code harness does the walk). This is the
+   documented reversal the Decisions section above explicitly permits; detail in s3.

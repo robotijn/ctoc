@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.679Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W08 — Enforcement Stays On and Honest"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -8,6 +14,45 @@ depends_on: ctoc-audit-w01-enforcement-blocks
 ---
 
 # W08 — Enforcement Stays On and Honest
+
+> **SIP1 INDEX.** This functional-derived plan is decomposed into the
+> dependency-ordered slices below (Iron Loop Steps 5–7). Each slice is a complete,
+> independently executable implementation plan (`parent_plan:
+> ctoc-audit-w08-enforcement-honest`) carrying its own Steps 8–16 and its own
+> `files:` scope. The ASSESS / ALIGN / CAPTURE sections below are the retained
+> upstream context that every slice was authored against.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Defect / finding | Scope (one line) | `files:` touched | `depends_on` |
+|---|---|---|---|---|---|
+| 1 | [`ctoc-audit-w08-s1-escape-role-scoping.md`](./ctoc-audit-w08-s1-escape-role-scoping.md) | Defect 1 / **H4** | Escape-phrase matcher extracts only genuinely user-*typed* transcript text (JSONL parse; exclude `tool_result`/assistant) **+** drop the verbatim phrase list from `block()`'s stderr message | `src/hooks/PreToolUse.Edit.js`, `tests/pretooluse-edit-escape-role-scoping.test.js` | none |
+| 2 | [`ctoc-audit-w08-s2-detector-upward-walk.md`](./ctoc-audit-w08-s2-detector-upward-walk.md) | Defect 2 / **H5** | `isCtocProject()` walks up to the first ancestor with `.ctoc/` + `CLAUDE.md`, so a nested `cwd` keeps enforcement on; root-level result unchanged | `src/lib/ctoc-project-detector.js`, `tests/ctoc-project-detector-upward-walk.test.js` | none |
+| 3 | [`ctoc-audit-w08-s3-sessionstart-honest.md`](./ctoc-audit-w08-s3-sessionstart-honest.md) | Defect 3 + 4 / **H6 + L3** | SessionStart self-repo guard uses package identity (`isCtocRepo`, not `__dirname`) so it never rewrites CTOC's own `CLAUDE.md`; injected banner drops the false "cryptographically enforced / no escape phrases" claim | `src/hooks/SessionStart.js`, `tests/sessionstart-self-repo-and-honest-banner.test.js` | none |
+
+**Decomposition notes.**
+- **Three cohesive slices, not four.** Defects 3 and 4 both edit
+  `src/hooks/SessionStart.js`, so they are combined into slice s3 to avoid a
+  same-file collision (per the coordination note); each of the other two defects
+  is one file + its test.
+- **All three slices are mutually independent** (`depends_on: none`), matching the
+  parent's finding that the four defects are independent. The maintainer chooses
+  the build order at the gate — the empty `depends_on` imposes none.
+- **W01 is an *observability* dependency of this whole workstream, not a build/test
+  dependency of any slice.** Every slice is authorable and unit-testable **today**
+  with synthetic fixtures (role-tagged JSONL, nested temp-dir projects,
+  `package.json` identity fixtures, banner-string assertions); W01 landing is
+  required only to watch Defect 1's unlock-on-block-message fire inside a live
+  blocked session. Slice `depends_on` therefore stays `none`.
+- **Batched gates.** Gate 2 (implementation→todo) and Gate 3 (review→done) approve
+  all three siblings at once via `approveSubplans("ctoc-audit-w08-enforcement-honest",
+  fromStage)` — one human decision per stage stamps each sibling `approved_by:
+  human`. Enforcement build order stays sequential/FIFO.
+- **Transcript schema for s1 confirmed at PLAN** against a live 14,300-line Claude
+  Code transcript: user-typed = `type:"user"` with **string** content (or `text`
+  blocks); `tool_result` blocks carry `role:"user"` too and are excluded — a strict
+  refinement of the CAPTURE-stage "`role === 'user'`" shorthand. See s1's Decisions
+  Taken Under Ambiguity.
 
 ## 1. ASSESS — Problem Understanding
 

@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.529Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W02 — Human-Gate Integrity"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -370,6 +376,88 @@ truth."
   test rather than an assertion on a return value; until W01 lands it can only be
   tested at the `enforce()`-function level, not as a proof the tool call was
   actually stopped.
+
+## 4. PLAN — SIP1 decomposition (slice index)
+
+This functional-derived plan is decomposed into **5 cohesive implementation slices**
+(SIP1). Each is its own `parent_plan`-linked plan under `plans/implementation/` with a
+focused `files:` list and its own Steps 8–16. This plan is the INDEX; the slices are
+where the work and the gate approvals live. **Building is sequential + dependency-
+ordered** (a slice whose `depends_on` is unbuilt is not started). File ownership is
+partitioned so **no two slices modify the same non-test source file.**
+
+| # | Slice file | Scope (one line) | Findings | Files (src) | depends_on |
+|---|------------|------------------|----------|-------------|------------|
+| 1 | `ctoc-audit-w02-s1-approval-ledger.md` | Content-hashed approval-provenance module `.ctoc/approvals/<slug>.json` (write/read/verify) — the source of approval truth | C4 | `src/lib/approval-ledger.js` (new) | none |
+| 2 | `ctoc-audit-w02-s2-ledger-write-deny.md` | Deny-list `.ctoc/approvals/**` in `enforce()` so no Edit/Write/MultiEdit/NotebookEdit can forge a ledger entry | C4 | `src/hooks/PreToolUse.Edit.js` | none |
+| 3 | `ctoc-audit-w02-s4-multihop-gate-block.md` | Order-based gate-edge check blocks any forward multi-hop move that skips a gate; backward/non-gate moves unaffected | H2 | `src/lib/gate-order.js` (new), `src/scripts/move-plan.js` | none |
+| 4 | `ctoc-audit-w02-s3-gate-acceptance-revert.md` | Residency sweep accepts via the ledger (not in-plan marker); exempts fresh SIP1 slices; per-violation fault-isolated revert | C4, H7, C5 | `src/hooks/human-gate-check.js` | s1 |
+| 5 | `ctoc-audit-w02-s5-atomic-stamp-merged-parse.md` | Atomic ledger-first/move/stamp/rollback in `approvePlan`; merged-frontmatter `parseMetadata` | M18, M19 | `src/lib/actions.js`, `src/lib/state.js` | s1 |
+
+Dependency graph (roots → dependents, max chain depth 2, no cycles):
+```
+s1 ─┬─→ s3
+    └─→ s5
+s2  (independent)
+s4  (independent)
+```
+
+## 5. DESIGN — architecture decisions (ADRs)
+
+- **ADR-1 (ledger, s1).** Provenance lives in `.ctoc/approvals/<slug>.json` holding
+  `{ content_sha256, stage_from, stage_to, approved_at, approved_by }`. `verify` accepts
+  iff an entry exists AND `stage_to === currentStage` AND `content_sha256` matches the
+  live content. A content hash tied to an agent-write-denied path breaks the self-
+  approval attack without asymmetric-key management (out of scope).
+- **ADR-2 (deny precedence, s2).** The `.ctoc/approvals/` deny runs as Step 0 of
+  `enforce()`, BEFORE the `/^\.ctoc\//` whitelist that currently allows the whole
+  `.ctoc/` tree — otherwise the ledger would be agent-writable through the back door.
+  One guard in `enforce()` covers all four editing tools (Write delegates to it;
+  MultiEdit/NotebookEdit do too via W01).
+- **ADR-3 (folder-sensitive acceptance, s3) — forced by C4.** Because the ledger is
+  agent-write-denied, an agent editing a plan in `implementation/` cannot refresh the
+  hash. So acceptance binds to entry EXISTENCE (`stage_to==='implementation'`) there,
+  while the tamper-sensitive terminal folders `todo/` and `done/` additionally require a
+  hash match. Fresh SIP1 slices (`parent_plan` + no ledger entry) are exempt in
+  `implementation/` only.
+- **ADR-4 (order-based multi-hop, s4).** A move is blocked iff it is FORWARD and spans
+  a gate edge by stage order — covering 1-, 2-, and 3-edge multi-hops while leaving
+  backward reverts and non-gate forward moves allowed. The guard lives in the untrusted
+  `move-plan.js` CLI, never in the low-level `movePlan()` (which `approvePlan` uses to
+  cross gates legitimately).
+- **ADR-5 (atomic stamp, s5).** `approvePlan` commits approval when the ledger entry
+  lands for the destination: compute dest hash → move → write ledger + stamp → roll back
+  on failure. The marker is written ONLY at the destination, so the forbidden state
+  (marked-and-resident-in-source) is unreachable; a crash before the ledger write self-
+  heals via s3's sweep (dest plan with no entry → reverted).
+- **ADR-6 (merged parse reuse, s5).** `parseMetadata` reuses the existing CRLF-safe
+  `extractFrontmatterRegion` (already used by `listSubplans`) to parse the UNION of all
+  leading frontmatter blocks — behavior-identical for single-block plans.
+
+## 6. SPEC — cross-slice notes
+
+- **W01 is a technical prerequisite for OBSERVING W02.** Until `ctoc-audit-w01-
+  enforcement-blocks` makes a PreToolUse deny actually stop a tool call (exit 2 /
+  `permissionDecision`), s2's deny is provable only at the `enforce()`/subprocess
+  DECISION level, not as true end-to-end prevention. Every other slice (s1, s3, s4, s5)
+  is fully testable independently of W01 at the function level. Tests assert
+  BEHAVIOR — final residency or a denied/allowed outcome — never a bare return value
+  (the audit's root-cause finding: "the tests assert structure, not truth").
+- **Batched gates (SIP1).** These 5 siblings cross Gate 2 (implementation→todo) and
+  Gate 3 (review→done) together via `approveSubplans('ctoc-audit-w02-gate-integrity',
+  fromStage)` — ONE human decision per batch; each sibling is still stamped
+  `approved_by: human` by the gate-safe `approvePlan`. `listSubplans('ctoc-audit-w02-
+  gate-integrity')` enumerates the set. More slices does NOT mean more gate prompts.
+- **Migration open-decision (flagged for the human, s3).** Plans approved before the
+  ledger existed have no ledger entry; the strict `todo`/`done` acceptance would flag
+  them on first run. s3 does NOT auto-backfill and does NOT grandfather the forgeable
+  in-plan marker. Recommendation: a one-time TRUSTED maintainer-run backfill (not an
+  agent tool call) converts legacy markers into ledger entries at adoption. Whether/when
+  to backfill is the maintainer's scheduling call at Gate 2.
+- **Test strategy.** Ledger + gate-order are unit-tested as pure functions; hooks
+  (`human-gate-check.js`, `PreToolUse.Edit.js`, `move-plan.js`) are driven both by their
+  now-exported functions and by real-process `spawnSync` residency/exit assertions,
+  mirroring `e2e-enforcement-and-gates.test.js` and `stale-cleanup-human-gate.test.js`.
 
 ## Decisions Taken Under Ambiguity
 

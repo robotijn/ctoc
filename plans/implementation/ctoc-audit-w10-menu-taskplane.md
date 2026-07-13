@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.733Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W10 — Menu and Task-Plane Robustness"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -529,3 +535,96 @@ or an `agentTaskId` write with nothing reading it).
   calling context has no live-agent-id data to supply (true session restart) —
   scenario 8 above locks in that fallback as a requirement, not an oversight to
   remove.
+
+## 5. PLAN / DESIGN — Decomposition into SIP1 slices
+
+This functional-derived plan is an **INDEX**. Per SIP1, Steps 5–7 decompose it into
+**6 dependency-ordered implementation slices**, each its own complete plan in
+`plans/implementation/` with a focused `files:` list (~1–3 files, a module + its test
+kept together) and its own Steps 8–16. Each of the six confirmed defects (H3, H8, M6,
+M8, M11, M12, and the 7th — the PostToolUse index-sync no-op) maps to exactly one slice;
+M8 and M11 are one cohesive slice because both are "an untrusted plan reference reaching
+`path.join` unguarded in the same file." The `implementation-planner` emits more plans
+than the single functional plan by design — a whole-feature build would exceed one clean
+executor pass; a crash mid-build would lose all in-flight work.
+
+### Why six slices (SIP1 cohesion)
+
+- **s1 (H3)** and **s4 (H8)** are the two HIGH-severity findings — separate concerns,
+  separate slices. s4 is the single largest slice (the H8 walking skeleton + its two
+  ribs — stories 3–5 of the functional plan's INVEST breakdown — which the functional
+  plan explicitly keeps as one foundation: splitting a `liveAgentIds` plumb from its
+  `agentTaskId` producer would create an untestable horizontal slice). Stories 4 and 5
+  (concurrency-cap counts the live task; completion accepted) add **zero** production
+  code beyond s4's plumbing — they are acceptance tests that pass once the live task is
+  no longer falsely orphaned — so they ship as test cases inside s4, not as pure-test
+  slices.
+- **s2 (M6)**, **s3 (M8+M11)**, **s5 (M12)** are the independent MEDIUM fixes.
+- **s6** is the independent 7th defect (hook await-before-exit ordering).
+
+### Shared-file partitioning (ordered by `depends_on`, never parallel)
+
+Two source files are touched by more than one slice; per the parent's constraint they
+are serialized with `depends_on`, never edited concurrently:
+
+- `src/commands/menu.js` — **s2** (fix the `:539` arg re-split) then **s4** (extract
+  `--live-agent-ids`, thread `opts` through `main()`). s4 `depends_on` s2.
+- `src/lib/menu-screens.js` — **s3** (route/plan-ref crash + traversal guards) then
+  **s4** (add the `opts`/`liveAgentIds` 3rd parameter to `route`/`dashboardPipeline`/
+  `buildDashboardTable`; record `agentTaskId` at `menu task start`). s4 `depends_on` s3.
+
+Max new dependency depth is **1** (s4 on s2, s3) — well within the ≤3 circuit-breaker
+limit; no cycles. Every other slice is depth 0 (independent).
+
+### Load-bearing Step-5/6 decision the functional plan deferred
+
+- **`liveAgentIds` channel = argv `--live-agent-ids <csv>` (not a side-channel file).**
+  The functional plan fixed the hard constraint (the id list must cross the `menu.js`
+  child-process boundary via CLI input, degrading to the staleness backstop when absent)
+  but left the exact shape to the Implementation Planner. Decision: a new argv argument
+  `--live-agent-ids <csv>`, parsed in `menu.js:main()` and threaded as `opts` through
+  `route`. Rejected the JSON side-channel file: a stale file would be read as "live" and
+  keep a genuinely-dead task `running` — reintroducing the false-state bug in the
+  opposite direction and demanding TTL/cleanup logic. argv is stateless: absent ⇒
+  backstop (scenario 8), present ⇒ authoritative for that one render. Full rationale in
+  `ctoc-audit-w10-s4-live-agent-reconcile.md`'s ADR.
+- **No change to `task-reconcile.js` or `task-registry.js`.** Verified against live code:
+  `reconcile()` (`task-reconcile.js:126-206`) already honors `opts.liveAgentIds` and
+  `t.agentTaskId`, and `MUTABLE_FIELDS` (`task-registry.js:80`) already allowlists
+  `agentTaskId`. The H8 fix supplies the two inputs they already consume; it does not
+  modify their core (matching the functional plan's "only the callers that feed it
+  correct data change").
+
+## 6. SPEC — Slice Index (dependency-ordered)
+
+Each row is a complete implementation plan in `plans/implementation/`; open it for its
+File Specifications, Test Plan, Security Review, and Steps 8–16.
+
+| # | Slice file | Files touched | `depends_on` |
+|---|------------|---------------|--------------|
+| 1 | `ctoc-audit-w10-s1-push-entry-point.md` | `src/commands/push.js` (new) · `src/commands/push.md` · `src/lib/quality-agent.js` (guard+exports) · `tests/w10-push-entry-point.test.js` (new) | none |
+| 2 | `ctoc-audit-w10-s2-multiword-task-args.md` | `src/commands/menu.js` (`:539` split) · `tests/w10-task-arg-splitting.test.js` (new) | none |
+| 3 | `ctoc-audit-w10-s3-menu-route-safety.md` | `src/lib/menu-screens.js` (route/plan-ref guards) · `tests/w10-menu-route-safety.test.js` (new) | none |
+| 4 | `ctoc-audit-w10-s4-live-agent-reconcile.md` | `src/commands/menu.js` (`--live-agent-ids` + `main()` opts) · `src/lib/menu-screens.js` (`opts`/`liveAgentIds` thread + `agentTaskId`) · `tests/w10-live-agent-reconcile.test.js` (new) | s2, s3 |
+| 5 | `ctoc-audit-w10-s5-settings-keys.md` | `src/areas/system.js` (delegate to `toolsTab.handleKey`) · `tests/w10-settings-key-dispatch.test.js` (new) | none |
+| 6 | `ctoc-audit-w10-s6-plan-index-sync-await.md` | `src/hooks/PostToolUse.plan-index-sync.js` (await before exit) · `tests/w10-plan-index-sync-await.test.js` (new) | none |
+
+A valid build order is s1, s2, s3, s4, s5, s6 (s4 after its dependencies s2 and s3).
+
+**Acceptance-criteria coverage** (the parent's 17 BDD scenarios → slices):
+Push resolves/runs → s1. Push reports Tier-1 failure, no push → s1. Push documented flags
+are real → s1. Live long-running agent NOT orphaned → s4. Dead task past threshold still
+orphaned → s4. Concurrency cap counts the live task → s4. Genuine completion accepted →
+s4. True session restart falls back to staleness → s4. Multi-word `--summary` persists →
+s2. Multi-word `--next` persists → s2. Unknown stage returns the JSON contract → s3.
+Traversal rejected in `planActions` → s3. Traversal rejected in `reviewActions` → s3.
+Settings navigation key dispatches → s5. Settings toggle actually persists → s5.
+PostToolUse hook awaits the sync before exit → s6. Sync failure logged, hook still exits
+0 → s6.
+
+**Gate note (HARD STOP — Gate 2 belongs to the human):** these six slices and this parent
+INDEX all remain in `plans/implementation/`. This decomposition writes **no**
+`approved_by` marker on any slice, moves nothing to `todo`, and does not cross Gate 2.
+Gates 2 and 3 batch per parent via `approveSubplans('ctoc-audit-w10-menu-taskplane',
+fromStage)` — one human decision stamps every sibling — but that is the maintainer's
+deliberate foreground action, not this agent's.

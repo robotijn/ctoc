@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.705Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W09 — Release and Metadata Truth"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -8,6 +14,28 @@ depends_on: none
 ---
 
 # W09 — Release and Metadata Truth
+
+> **SIP1 INDEX.** This functional-derived plan is decomposed into **3 dependency-ordered
+> implementation slices** (below). Each slice is its own complete implementation plan
+> (`parent_plan: ctoc-audit-w09-release-metadata`) with a focused `files:` list and its
+> own Iron Loop Steps 8–16. Gates 2 & 3 batch-approve all three siblings at once via
+> `approveSubplans("ctoc-audit-w09-release-metadata", fromStage)`. Building stays
+> sequential + dependency-ordered. The ASSESS / ALIGN / CAPTURE / Risks context below is
+> retained as the shared source of truth for all slices.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | Findings | files: | depends_on |
+|---|------------|------------------|----------|--------|------------|
+| 1 | `ctoc-audit-w09-s1-release-sync-failloud-atomic.md` | `release.js` syncs `package.json`, exits non-zero (naming the file) on any partial sync, writes JSON atomically (temp+rename); real script made testable | M7 | `src/scripts/release.js`, `tests/release-metadata-sync.test.js` | none |
+| 2 | `ctoc-audit-w09-s2-package-license-invariant.md` | Fix `package.json` on disk (`version`→`VERSION`; `license`→`PolyForm-Shield-1.0.0`) + version/license single-source invariant test on a shared read+compare helper W06 imports | H9 | `package.json`, `tests/helpers/metadata-invariant.js`, `tests/version-license-invariant.test.js` | none |
+| 3 | `ctoc-audit-w09-s3-update-abort-not-clobber.md` | `update.js` aborts (non-zero exit, leaves the file byte-untouched) on a corrupt `installed_plugins.json` instead of clobbering the whole registry | M9 | `src/commands/update.js`, `tests/update-registry-abort.test.js` | none |
+
+All three slices are independent (max dependency-chain depth 0, no cycles), matching the
+CAPTURE INVEST table's "Independent" marking for all three stories. They may build in any
+order; each ships green on its own. **W06 coordination:** the shared version/license
+comparison helper lives once at `tests/helpers/metadata-invariant.js` (slice 2) — W06
+imports it rather than reimplementing the comparison (per both plans' Test Strategy).
 
 ## 1. ASSESS — Problem Understanding
 

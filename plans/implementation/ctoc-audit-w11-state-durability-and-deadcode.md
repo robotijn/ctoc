@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.760Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W11 — State Durability and Dead-Code Removal"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -8,6 +14,46 @@ depends_on: none
 ---
 
 # W11 — State Durability and Dead-Code Removal
+
+> **This plan is now a SIP1 INDEX.** The approved functional scope below (ASSESS / ALIGN /
+> CAPTURE) is decomposed into **9 dependency-ordered implementation slices**, each a cohesive
+> ~1–3-file unit (module + its test) with its own Iron Loop Steps 8–16. Implementation stays
+> **sequential + dependency-ordered** (a slice is not started until its `depends_on` is built).
+> Gates 2 & 3 **batch per parent** via `approveSubplans('ctoc-audit-w11-state-durability-and-deadcode', …)`
+> — ONE human decision stamps every sibling. `listSubplans(...)` enumerates the whole set.
+
+## Slices (dependency-ordered)
+
+The parent's **two clusters are kept distinct**. The one exception, **s7**, spans both because
+its H10 (queue) fix and its B2 (dead-wrapper) deletion both live in `src/lib/actions.js`, and
+the no-two-slices-edit-the-same-source-file rule forces them into one slice. **No two slices
+edit the same source file.**
+
+**Cluster A — State durability & concurrency**
+
+| # | Slice file | Scope (one line) | Findings | depends_on |
+|---|------------|------------------|----------|------------|
+| s1 | `ctoc-audit-w11-s1-durable-log.md` | NEW `durable-log.js`: atomic append-only JSONL + corrupt-file quarantine (shared primitive) | M1 | — |
+| s2 | `ctoc-audit-w11-s2-enforcement-log.md` | `enforcement-log.js` → durable-log; add `readLog` | M1/M14/M15 | s1 |
+| s3 | `ctoc-audit-w11-s3-transition-log.md` | `transition-log.js` → durable-log; `readLog` API unchanged | M14/M15 | s1 |
+| s4 | `ctoc-audit-w11-s4-gate-violations-durability.md` | `human-gate-check.js` + `violation-tracker.js` → durable-log (shared `gate-violations.json`, both writers) | M14/M15 | s1 |
+| s5 | `ctoc-audit-w11-s5-agent-lock-wx.md` | `agent-lock.js` `wx` exclusive-create + owner token; stale recovery preserved | M2 | — |
+| s6 | `ctoc-audit-w11-s6-settings-raw-roundtrip.md` | `settings.js` `setSetting` raw round-trip preserves `deployment`/`sync` | M16 | — |
+
+**Cluster B — Dead & misleading code removal** (each deletion removes the code AND its own test — paired-deletion rule)
+
+| # | Slice file | Scope (one line) | Findings | depends_on |
+|---|------------|------------------|----------|------------|
+| s7 | `ctoc-audit-w11-s7-queue-order-and-dead-exports.md` | `actions.js` real queue key (`.ctoc/state/todo-order.json`) + `state.js` `readPlans` ordering; delete 5 dead agent-init wrappers | H10 (A) + B2 (B) | — |
+| s8 | `ctoc-audit-w11-s8-legacy-tab-cleanup.md` | delete 3 dead tab modules; remove one-keystroke gate crossings in `functional.js`/`review.js`; update shared `tab-modules.test.js` | B1, B3, L7, L8 | — |
+| s9 | `ctoc-audit-w11-s9-hooks-installer-path.md` | `hooks-installer.js` post-commit path → real `src/hooks/post-commit.js` | L9 | — |
+
+**Coverage:** the 9 slices' findings union = all twelve originating findings (M1, M2, M14,
+M15, M16, H10, B1, B2, B3, L7, L8, L9). **Dependency graph:** s1 → {s2, s3, s4} (max depth 2,
+no cycles); s5, s6, s7, s8, s9 independent. **Source-file partition (verified disjoint):**
+s1 `durable-log.js`; s2 `enforcement-log.js`; s3 `transition-log.js`; s4 `human-gate-check.js` +
+`violation-tracker.js`; s5 `agent-lock.js`; s6 `settings.js`; s7 `actions.js` + `state.js`;
+s8 `tabs/{implementation,progress,todo,functional,review}.js`; s9 `hooks-installer.js`.
 
 ## 1. ASSESS
 
