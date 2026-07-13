@@ -1,0 +1,12 @@
+{
+  "id": "plan-index-storage",
+  "title": "How to store the plan-index vectors for similarity search",
+  "context": "CTOC keeps an embedding vector for every plan and skill so it can surface related work and warn about duplicates. The whole corpus is on the order of a couple of thousand vectors and grows slowly. The realistic choice is between holding the vectors in an in-memory structure that is persisted as a plain data file and scanned with an exact brute-force cosine similarity, versus standing up a dedicated vector database with an approximate nearest-neighbor index. The dedicated database scales to enormous corpora and offers approximate search, but it adds an external service that every contributor must install and run, and at this corpus size a full exact scan is already fast.",
+  "decision": "How should CTOC store and search its plan-index vectors?",
+  "constraints": [
+    "Search must return exact nearest neighbors; at this corpus size an approximate index offers no meaningful latency benefit over a full scan.",
+    "The solution must add no external service or long-running daemon that a contributor has to install, start, and keep running to use the tool.",
+    "The store must persist across process restarts as a file that lives in the repository working tree and can be read back without a running server.",
+    "The recommendation is judged on fitness for the actual corpus size, not on how gracefully it would scale to a hypothetical corpus that is orders of magnitude larger than this one."
+  ]
+}

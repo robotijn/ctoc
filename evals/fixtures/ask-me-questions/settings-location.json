@@ -1,0 +1,12 @@
+{
+  "id": "settings-location",
+  "title": "Where per-project CTOC configuration should live",
+  "context": "CTOC needs a place to store each project's configuration: the enforcement mode, the detected technology stack, and the quality-gate commands. The realistic choice is between a single shared configuration in the user's home directory that governs every project on the machine, and a per-project configuration folder that is committed alongside the repository it governs. The shared location needs no per-repository setup, but it cannot vary from one project to another. The per-project location travels with the code and can differ per repository, at the cost of existing in each repository.",
+  "decision": "Where should a project's CTOC configuration live?",
+  "constraints": [
+    "Configuration must be able to differ from one project to another; two repositories on the same machine can require different enforcement modes and different detected stacks.",
+    "Configuration should be versioned together with the code it governs, so that checking out any past commit also restores the settings that were in force at that commit.",
+    "A new contributor who clones the repository should receive the project's settings automatically, without a separate machine-level setup step.",
+    "The recommendation is judged on outcome quality, which here means correct isolation between projects and reproducibility from the repository, not on how little initial setup the option requires."
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "hook-error-behavior",
+  "title": "What the enforcement hook should do on an internal error",
+  "context": "CTOC's pre-tool enforcement hook inspects each file edit and can block edits that route around the pipeline. If the hook itself throws an unexpected internal error — a malformed settings file, an unreadable plan, a bug in its own path matching — it must decide whether to allow the edit through (fail open) or block it (fail closed). Failing closed guarantees no unpipelined edit ever slips past even when the hook is broken, but a single bug then makes every edit impossible until someone repairs the hook. Failing open keeps the human working through a hook bug, but lets edits through unchecked while the bug persists. The human approval gates are enforced by a separate mechanism and are unaffected by either choice.",
+  "decision": "When the enforcement hook hits an internal error, should it fail open or fail closed?",
+  "constraints": [
+    "A bug in the hook must never make the tool unusable by blocking every edit until a human fixes the hook; the person must be able to keep working.",
+    "The hook is an advisory guardrail, not a safety gate; the human approval gates are enforced independently and are not weakened by this decision either way.",
+    "Every fail-open decision must still be recorded to the enforcement log so the internal error is visible and can be diagnosed and repaired afterwards.",
+    "The recommendation is judged on keeping the human able to work while the real gates stay intact, not on maximizing how many edits the guardrail manages to block."
+  ]
+}
