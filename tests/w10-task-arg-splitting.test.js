@@ -45,7 +45,7 @@ afterEach(() => {
  */
 function seedRunningT1() {
   const reg = taskRegistry.emptyRegistry();
-  const t = taskRegistry.addTask(reg, { kind: 'implement', plan: 'w10-s2-demo' });
+  const t = taskRegistry.addTask(reg, { kind: 'implement', plan: 'w10-s2-demo', touches: ['src/w10-s2-demo.js'] });
   taskRegistry.updateTask(reg, t.id, { status: 'running' });
   taskRegistry.save(root, reg);
   return t.id;

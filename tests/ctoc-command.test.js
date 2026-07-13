@@ -146,18 +146,19 @@ describe('CTOC Command - renderStatic()', () => {
 
   test('getAgentStatus returns active agent info', () => {
     const { getAgentStatus } = require('../src/lib/state');
+    const taskRegistry = require('../src/lib/task-registry');
 
-    // Create lock file with current PID (so isPidAlive returns true)
-    fs.mkdirSync(path.join(tempDir, '.ctoc'), { recursive: true });
-    fs.writeFileSync(
-      path.join(tempDir, '.ctoc', 'agent.lock'),
-      JSON.stringify({
-        pid: process.pid,
-        plan: 'test-plan',
-        agentId: 'test-agent-123',
-        startedAt: new Date().toISOString()
-      })
-    );
+    // Liveness comes from the scheduler registry (F1-s2): a RUNNING implement
+    // task is what "active" means — the pid lock file is retired.
+    const registry = taskRegistry.emptyRegistry();
+    const t = taskRegistry.addTask(registry, {
+      kind: 'implement',
+      label: 'test-plan',
+      plan: 'test-plan',
+      touches: ['src/example.js']
+    });
+    taskRegistry.updateTask(registry, t.id, { status: 'running' });
+    taskRegistry.save(tempDir, registry);
 
     // Create state file with supplementary info
     fs.mkdirSync(path.join(tempDir, '.ctoc', 'state'), { recursive: true });
@@ -173,12 +174,14 @@ describe('CTOC Command - renderStatic()', () => {
     const status = getAgentStatus(tempDir);
 
     assert.strictEqual(status.active, true, 'Agent is active');
+    assert.strictEqual(status.plan, 'test-plan', 'Plan comes from the running implement task');
+    assert.strictEqual(status.running, 1, 'One running implement task counted');
     assert.strictEqual(status.step, 7, 'Step is correct');
     assert.strictEqual(status.phase, 'IMPLEMENT', 'Phase is correct');
     assert.ok(status.elapsed, 'Elapsed time is calculated');
 
-    // Clean up lock file
-    fs.unlinkSync(path.join(tempDir, '.ctoc', 'agent.lock'));
+    // Clean up the registry so later tests see an inactive agent
+    fs.unlinkSync(taskRegistry.registryPath(tempDir));
 
     console.log('  getAgentStatus returns active agent info');
   });

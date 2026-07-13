@@ -267,12 +267,15 @@ afterEach(() => {
 });
 
 describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into promote[])', () => {
-  it('B-PROMOTE-run: completing a running implement frees the plan-serial slot → the queued implement is promoted', () => {
-    const a1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+  it('B-PROMOTE-run: completing a running implement frees the file-conflict slot → the queued implement is promoted', () => {
+    // File-based contract (vision F1): two implement tasks touching the SAME file
+    // serialize by file-conflict (kind-based plan-serial is gone). Overlapping
+    // touches make pi2 queue behind pi1 so we can test promotion on completion.
+    const a1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/shared.js'], root);
     assert.equal(a1.decision, 'run', 'first implement runs on an empty registry');
     ms.route(['menu', 'task', 'start', a1.taskId], root);
-    const a2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2'], root);
-    assert.equal(a2.decision, 'queue', 'second implement queues (plan-serial)');
+    const a2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/shared.js'], root);
+    assert.equal(a2.decision, 'queue', 'second, file-OVERLAPPING implement queues (file-conflict)');
 
     const done = ms.route(['menu', 'task', 'complete', a1.taskId, '--summary', 'ok'], root);
     assert.equal(done.status, 'done');
@@ -300,9 +303,9 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
   });
 
   it('B-PROMOTE-failcancel(fail): failing a running implement promotes the queued implement', () => {
-    const f1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+    const f1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/shared.js'], root);
     ms.route(['menu', 'task', 'start', f1.taskId], root);
-    const f2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2'], root);
+    const f2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/shared.js'], root);
     const failed = ms.route(['menu', 'task', 'fail', f1.taskId], root);
     assert.equal(failed.status, 'failed');
     assert.ok(Array.isArray(failed.promote), 'fail returns a promote[] array');
@@ -310,9 +313,9 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
   });
 
   it('B-PROMOTE-failcancel(cancel): cancelling a running implement promotes the queued implement', () => {
-    const c1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+    const c1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/shared.js'], root);
     ms.route(['menu', 'task', 'start', c1.taskId], root);
-    const c2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2'], root);
+    const c2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/shared.js'], root);
     const cancelled = ms.route(['menu', 'task', 'cancel', c1.taskId], root);
     assert.equal(cancelled.cancelled, true);
     assert.ok(Array.isArray(cancelled.promote), 'cancel returns a promote[] array');
@@ -320,10 +323,10 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
   });
 
   it('B-PROMOTE-blocked: a blocked-dep task is excluded while its UNblocked sibling IS promoted (not vacuously empty)', () => {
-    const b1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+    const b1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/a.js'], root);
     ms.route(['menu', 'task', 'start', b1.taskId], root);
     const dep = ms.route(['menu', 'task', 'add', 'review', 'depplan'], root); // stays queued (never started)
-    const blocked = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--blocked', dep.taskId], root);
+    const blocked = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/b.js', '--blocked', dep.taskId], root);
     const done = ms.route(['menu', 'task', 'complete', b1.taskId, '--summary', 'ok'], root);
     assert.ok(!done.promote.some((t) => t.id === blocked.taskId), 'blocked-dep task is excluded from promote');
     // Guard against a vacuous-green "promote always empty": the unblocked sibling (the
@@ -332,7 +335,7 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
   });
 
   it('B-PROMOTE-idfilter (LOW): a crafted non-t<n> / control-char registry id is filtered out of promote (defense in depth)', () => {
-    const a1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1'], root);
+    const a1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/a.js'], root);
     ms.route(['menu', 'task', 'start', a1.taskId], root);
     // Inject a queued task with a crafted id + control-char plan straight into the store.
     const reg = taskRegistry.load(root);
@@ -385,7 +388,7 @@ describe('SPEC-B — B-ENTRY (dashboardCommands "Background tasks ▸")', () => 
 
   it('B-ENTRY-cap (HIGH): non-empty registry → EVERY dashboardCommands question ≤ 4 options; primary keeps ◀ Pipeline; board is a ride-along mapping View board ▸ → tasks', () => {
     const reg = taskRegistry.emptyRegistry();
-    taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1' });
+    taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1', touches: ['src/a.js'] });
     taskRegistry.save(root, reg);
 
     const cmds = ms.route(['menu', 'commands'], root);
@@ -407,7 +410,7 @@ describe('SPEC-B — B-ENTRY (dashboardCommands "Background tasks ▸")', () => 
 
   it('B-ENTRY-nonempty: board reachable via a ride-along question → action `tasks`, never a bare-digit key', () => {
     const reg = taskRegistry.emptyRegistry();
-    taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1' });
+    taskRegistry.addTask(reg, { kind: 'implement', plan: 'pi1', touches: ['src/a.js'] });
     taskRegistry.save(root, reg);
 
     const cmds = ms.route(['menu', 'commands'], root);

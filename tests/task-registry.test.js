@@ -100,7 +100,7 @@ describe('Task model and persistence', () => {
     const r = reg.emptyRegistry();
     reg.addTask(r, { kind: 'plan', label: 'p1' });
     reg.addTask(r, { kind: 'review', label: 'r1' });
-    reg.addTask(r, { kind: 'implement', label: 'i1' });
+    reg.addTask(r, { kind: 'implement', label: 'i1', touches: ['i1.js'] });
     reg.save(root, r);
 
     const stateDir = path.join(root, '.ctoc', 'state');
@@ -181,12 +181,20 @@ describe('Scheduler — canRun', () => {
     assert.equal(d.reason, 'max-concurrent');
   });
 
-  it('ST-07: a plan-mutating implement serializes FIFO behind a running implement', () => {
+  it('ST-07: two implement tasks with DISJOINT touches run concurrently (file-based — plan-serial GONE, vision F1)', () => {
     const r = mkReg([T({ id: 't1', kind: 'implement', touches: ['x.js'] })]);
     const cand = C({ id: 't2', kind: 'implement', touches: ['y.js'] });
     const d = reg.canRun(cand, r);
+    assert.equal(d.run, true);
+    assert.equal(d.reason, 'ok');
+  });
+
+  it('ST-07b: two implement tasks with OVERLAPPING touches serialize via file-conflict (not kind)', () => {
+    const r = mkReg([T({ id: 't1', kind: 'implement', touches: ['x.js'] })]);
+    const cand = C({ id: 't2', kind: 'implement', touches: ['x.js', 'y.js'] });
+    const d = reg.canRun(cand, r);
     assert.equal(d.run, false);
-    assert.equal(d.reason, 'plan-serial');
+    assert.equal(d.reason, 'file-conflict');
   });
 
   it('ST-08: a file-conflict on overlapping touches blocks the candidate', () => {
@@ -206,29 +214,31 @@ describe('Scheduler — canRun', () => {
   });
 
   it('ST-10: git is mutually exclusive with editing tasks (both directions)', () => {
+    // A NON-sync gitOp task isolates Rule 3 (git-exclusive) from Rule 2 (sync-barrier);
+    // sync's barrier semantics are covered separately (ST-SYNC-*).
     // running editor + gitOp candidate → blocked
     const r1 = mkReg([T({ id: 't1', kind: 'review', touches: ['a.js'] })]);
-    const d1 = reg.canRun(C({ id: 't2', kind: 'sync', gitOp: true, touches: [] }), r1);
+    const d1 = reg.canRun(C({ id: 't2', kind: 'plan', gitOp: true, touches: [] }), r1);
     assert.equal(d1.run, false);
     assert.equal(d1.reason, 'git-exclusive');
 
     // running gitOp + editing candidate → blocked (reverse direction)
-    const r2 = mkReg([T({ id: 't1', kind: 'sync', gitOp: true, touches: [] })]);
+    const r2 = mkReg([T({ id: 't1', kind: 'plan', gitOp: true, touches: [] })]);
     const d2 = reg.canRun(C({ id: 't2', kind: 'review', touches: ['a.js'] }), r2);
     assert.equal(d2.run, false);
     assert.equal(d2.reason, 'git-exclusive');
   });
 
   it('ST-14b: two git operations never run concurrently (git-vs-git blocked)', () => {
-    const r = mkReg([T({ id: 't1', kind: 'sync', gitOp: true, touches: [] })]);
-    const cand = C({ id: 't2', kind: 'sync', gitOp: true, touches: [] });
+    const r = mkReg([T({ id: 't1', kind: 'plan', gitOp: true, touches: [] })]);
+    const cand = C({ id: 't2', kind: 'plan', gitOp: true, touches: [] });
     const d = reg.canRun(cand, r);
     assert.equal(d.run, false);
     assert.equal(d.reason, 'git-exclusive');
   });
 
-  it('ST-14c: a read-only task may run alongside a git operation', () => {
-    const r = mkReg([T({ id: 't1', kind: 'sync', gitOp: true, touches: [] })]);
+  it('ST-14c: a read-only task may run alongside a (non-sync) git operation', () => {
+    const r = mkReg([T({ id: 't1', kind: 'plan', gitOp: true, touches: [] })]);
     const cand = C({ id: 't2', kind: 'review', gitOp: false, touches: [] });
     const d = reg.canRun(cand, r);
     assert.equal(d.run, true);
@@ -275,6 +285,86 @@ describe('Scheduler — canRun', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Mandatory touches for implement (safety oracle) + glob-aware file conflict
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Scheduler — mandatory implement touches + glob-aware Rule 4', () => {
+  it('ST-TOUCHES-1: addTask requires non-empty touches for implement; other kinds accept empty', () => {
+    const r = reg.emptyRegistry();
+    assert.throws(() => reg.addTask(r, { kind: 'implement' }), /implement task requires non-empty touches/);
+    assert.throws(() => reg.addTask(r, { kind: 'implement', touches: [] }), /implement task requires non-empty touches/);
+    // non-implement kinds are fine with omitted/empty touches
+    assert.doesNotThrow(() => reg.addTask(r, { kind: 'plan' }));
+    assert.doesNotThrow(() => reg.addTask(r, { kind: 'review', touches: [] }));
+    // implement WITH touches is accepted
+    const t = reg.addTask(r, { kind: 'implement', touches: ['a.js'] });
+    assert.equal(t.kind, 'implement');
+  });
+
+  it('ST-TOUCHES-2: canRun throws (fail-loud) on an implement candidate with empty touches', () => {
+    const r = reg.emptyRegistry();
+    assert.throws(
+      () => reg.canRun(C({ id: 't1', kind: 'implement', touches: [] }), r),
+      /implement task requires non-empty touches/
+    );
+  });
+
+  it('ST-GLOB: Rule 4 is glob-aware in BOTH directions; disjoint globs run concurrently', () => {
+    // running glob touch conflicts with a matching literal candidate
+    const rGlob = mkReg([T({ id: 't1', kind: 'review', touches: ['src/lib/*.js'] })]);
+    assert.equal(reg.canRun(C({ id: 't2', kind: 'review', touches: ['src/lib/actions.js'] }), rGlob).reason, 'file-conflict');
+
+    // mirrored: running literal, candidate glob
+    const rLit = mkReg([T({ id: 't1', kind: 'review', touches: ['src/lib/actions.js'] })]);
+    assert.equal(reg.canRun(C({ id: 't2', kind: 'review', touches: ['src/lib/*.js'] }), rLit).reason, 'file-conflict');
+
+    // disjoint globs run concurrently
+    const rSrc = mkReg([T({ id: 't1', kind: 'review', touches: ['src/lib/*.js'] })]);
+    const d = reg.canRun(C({ id: 't2', kind: 'review', touches: ['tests/*.js'] }), rSrc);
+    assert.equal(d.run, true);
+    assert.equal(d.reason, 'ok');
+  });
+});
+
+describe('Scheduler — sync barrier (wave integration boundary)', () => {
+  it('ST-SYNC-1: a sync candidate may not start while ANY task runs', () => {
+    const r = mkReg([T({ id: 't1', kind: 'review', touches: ['a.js'] })]);
+    const d = reg.canRun(C({ id: 't2', kind: 'sync', gitOp: true, touches: [] }), r);
+    assert.equal(d.run, false);
+    assert.equal(d.reason, 'sync-barrier');
+  });
+
+  it('ST-SYNC-2: NO candidate may start while a sync task runs (even a read-only one)', () => {
+    const r = mkReg([T({ id: 't1', kind: 'sync', gitOp: true, touches: [] })]);
+    const d = reg.canRun(C({ id: 't2', kind: 'review', touches: [] }), r);
+    assert.equal(d.run, false);
+    assert.equal(d.reason, 'sync-barrier');
+  });
+
+  it('ST-SYNC-3: a sync candidate against an empty running set is runnable', () => {
+    const d = reg.canRun(C({ id: 't1', kind: 'sync', gitOp: true, touches: [] }), reg.emptyRegistry());
+    assert.equal(d.run, true);
+    assert.equal(d.reason, 'ok');
+  });
+
+  it('ST-SYNC-4: nextRunnable never co-selects a sync with anything (sync runs alone)', () => {
+    // sync FIFO-first, empty running → only the sync starts
+    const rSyncFirst = mkReg([
+      C({ id: 'q1', kind: 'sync', gitOp: true, touches: [] }),
+      C({ id: 'q2', kind: 'review', touches: ['a.js'] })
+    ]);
+    assert.deepEqual(reg.nextRunnable(rSyncFirst).map(t => t.id), ['q1']);
+
+    // non-sync FIFO-first → the sync is blocked behind it
+    const rSyncLast = mkReg([
+      C({ id: 'q1', kind: 'review', touches: ['a.js'] }),
+      C({ id: 'q2', kind: 'sync', gitOp: true, touches: [] })
+    ]);
+    assert.deepEqual(reg.nextRunnable(rSyncLast).map(t => t.id), ['q1']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Scheduler — nextRunnable
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -306,11 +396,11 @@ describe('Scheduler — nextRunnable', () => {
     assert.equal(reg.canRun(cand, r).run, true);
   });
 
-  it('F2: nextRunnable is JOINTLY startable across every rule in one multi-rule pass', () => {
+  it('F2: nextRunnable is JOINTLY startable across every rule in one multi-rule pass (file-based)', () => {
     // One registry exercising all rules cumulatively:
     //   2 running (r1 edits a.js, r2 edits r2.js)
     //   queued FIFO: editor-on-a.js, second-editor-on-a.js, implement#1,
-    //                implement#2, gitOp, disjoint-editor-on-z.js
+    //                implement#2, sync, disjoint-editor-on-z.js
     const running = [
       T({ id: 'r1', kind: 'review', status: 'running', touches: ['a.js'] }),
       T({ id: 'r2', kind: 'review', status: 'running', touches: ['r2.js'] })
@@ -318,15 +408,15 @@ describe('Scheduler — nextRunnable', () => {
     const queued = [
       C({ id: 'q1', kind: 'review', touches: ['a.js'] }),      // file-conflict vs r1 → blocked
       C({ id: 'q2', kind: 'review', touches: ['a.js'] }),      // file-conflict vs r1 → blocked
-      C({ id: 'q3', kind: 'implement', touches: ['i1.js'] }),  // no running implement → accepted
-      C({ id: 'q4', kind: 'implement', touches: ['i2.js'] }),  // plan-serial vs accepted q3 → blocked
-      C({ id: 'q5', kind: 'sync', gitOp: true, touches: [] }), // git-exclusive vs running editors → blocked
+      C({ id: 'q3', kind: 'implement', touches: ['i1.js'] }),  // disjoint → accepted
+      C({ id: 'q4', kind: 'implement', touches: ['i2.js'] }),  // disjoint implement (plan-serial GONE) → accepted
+      C({ id: 'q5', kind: 'sync', gitOp: true, touches: [] }), // sync-barrier vs running set → blocked
       C({ id: 'q6', kind: 'review', touches: ['z.js'] })       // disjoint, slot free → accepted
     ];
     const r = mkReg([...running, ...queued]);
 
     const returned = reg.nextRunnable(r);
-    assert.deepEqual(returned.map(t => t.id), ['q3', 'q6'], 'exact FIFO-greedy subset');
+    assert.deepEqual(returned.map(t => t.id), ['q3', 'q4', 'q6'], 'exact FIFO-greedy subset');
 
     // Each returned task individually satisfies the ladder vs the REAL running set.
     for (const t of returned) {
@@ -337,11 +427,9 @@ describe('Scheduler — nextRunnable', () => {
     const union = [...running, ...returned];
     // ≤5 concurrent
     assert.ok(union.length <= reg.MAX_CONCURRENT, 'union ≤ MAX_CONCURRENT');
-    // at most one plan-mutating
-    assert.ok(
-      union.filter(t => reg.PLAN_MUTATING_KINDS.has(t.kind)).length <= 1,
-      'at most one plan-mutating in union'
-    );
+    // a sync (wave barrier) never runs alongside anything
+    const syncs = union.filter(t => t.kind === 'sync');
+    if (syncs.length > 0) assert.equal(union.length, 1, 'a sync runs alone');
     // no gitOp alongside any editing/git task
     const gitOps = union.filter(t => t.gitOp === true);
     const editing = union.filter(t => Array.isArray(t.touches) && t.touches.length > 0);
@@ -400,7 +488,7 @@ describe('Edge / boundary behavior', () => {
 
   it('ST-16: status transitions — valid ones succeed, invalid ones throw', () => {
     const r = reg.emptyRegistry();
-    const t = reg.addTask(r, { kind: 'implement' });
+    const t = reg.addTask(r, { kind: 'implement', touches: ['x.js'] });
 
     // queued → running → done
     reg.updateTask(r, t.id, { status: 'running' });
@@ -453,16 +541,19 @@ describe('Edge / boundary behavior', () => {
     assert.equal(reg.canRun(self, r2).run, true);
   });
 
-  it('ST-18: gitOp+implement precedence walks the ladder in order', () => {
+  it('ST-18: the concurrency ladder is walked in order (max → sync-barrier → git-exclusive → file-conflict)', () => {
+    // sync-barrier precedes git-exclusive: a sync candidate against a running editor
+    const rEditor = mkReg([T({ id: 't1', kind: 'review', touches: ['x.js'] })]);
+    assert.equal(reg.canRun(C({ id: 'tc', kind: 'sync', gitOp: true, touches: [] }), rEditor).reason, 'sync-barrier');
+
+    // git-exclusive precedes file-conflict: a gitOp editing candidate vs a running gitOp editor
     const both = C({ id: 'tc', kind: 'implement', gitOp: true, touches: ['z.js'] });
+    const rGitOp = mkReg([T({ id: 't1', kind: 'implement', gitOp: true, touches: ['x.js'] })]);
+    assert.equal(reg.canRun(both, rGitOp).reason, 'git-exclusive');
 
-    // running implement → plan-serial (Rule 2 before Rule 3)
-    const rImpl = mkReg([T({ id: 't1', kind: 'implement', touches: ['x.js'] })]);
-    assert.equal(reg.canRun(both, rImpl).reason, 'plan-serial');
-
-    // running non-implement editor, no running implement → git-exclusive (Rule 3)
-    const rEdit = mkReg([T({ id: 't1', kind: 'review', touches: ['x.js'] })]);
-    assert.equal(reg.canRun(both, rEdit).reason, 'git-exclusive');
+    // file-conflict when neither sync nor git applies (two non-git implements, same file)
+    const rFile = mkReg([T({ id: 't1', kind: 'implement', touches: ['z.js'] })]);
+    assert.equal(reg.canRun(C({ id: 'tc', kind: 'implement', touches: ['z.js'] }), rFile).reason, 'file-conflict');
 
     // alone → ok
     assert.equal(reg.canRun(both, reg.emptyRegistry()).reason, 'ok');
@@ -489,7 +580,7 @@ describe('Edge / boundary behavior', () => {
 
   it('ST-20: timestamps — created on add; started on →running; done on →done; created ≤ started ≤ done', () => {
     const r = reg.emptyRegistry();
-    const t = reg.addTask(r, { kind: 'implement' });
+    const t = reg.addTask(r, { kind: 'implement', touches: ['x.js'] });
     assert.ok(t.ts.created);
     assert.equal(t.ts.started, null);
     assert.equal(t.ts.done, null);
@@ -517,12 +608,19 @@ describe('Edge / boundary behavior', () => {
     ]);
     assert.deepEqual(reg.nextRunnable(rB).map(t => t.id), ['q1']);
 
-    // (c) plan-serial-cumulative: two implement → FIFO-first only.
+    // (c) file-based implement: two implement with DISJOINT touches → BOTH (plan-serial GONE).
     const rC = mkReg([
       C({ id: 'q1', kind: 'implement', touches: ['a.js'] }),
       C({ id: 'q2', kind: 'implement', touches: ['b.js'] })
     ]);
-    assert.deepEqual(reg.nextRunnable(rC).map(t => t.id), ['q1']);
+    assert.deepEqual(reg.nextRunnable(rC).map(t => t.id), ['q1', 'q2']);
+
+    // (c2) two implement with OVERLAPPING touches → FIFO-first only.
+    const rC2 = mkReg([
+      C({ id: 'q1', kind: 'implement', touches: ['a.js'] }),
+      C({ id: 'q2', kind: 'implement', touches: ['a.js'] })
+    ]);
+    assert.deepEqual(reg.nextRunnable(rC2).map(t => t.id), ['q1']);
 
     // (d) git-cumulative: editor + gitOp → FIFO-first only.
     const rD = mkReg([
@@ -713,19 +811,134 @@ describe('Edge / boundary behavior', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cancel — cancelled terminal status + transitions
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Cancel — cancelled status + transitions', () => {
+  it('ST-CANCEL-1: queued → cancelled and running → cancelled succeed and stamp ts.done', () => {
+    const r = reg.emptyRegistry();
+    const q = reg.addTask(r, { kind: 'plan' });
+    reg.updateTask(r, q.id, { status: 'cancelled' });
+    assert.equal(q.status, 'cancelled');
+    assert.ok(q.ts.done, 'cancel stamps ts.done like other terminal transitions');
+
+    const run = reg.addTask(r, { kind: 'plan' });
+    reg.updateTask(r, run.id, { status: 'running' });
+    reg.updateTask(r, run.id, { status: 'cancelled' });
+    assert.equal(run.status, 'cancelled');
+    assert.ok(run.ts.done);
+  });
+
+  it('ST-CANCEL-2: done/failed/orphaned → cancelled throw; cancelled → anything throws (terminal)', () => {
+    const r = reg.emptyRegistry();
+    const done = reg.addTask(r, { kind: 'plan' });
+    reg.updateTask(r, done.id, { status: 'running' });
+    reg.updateTask(r, done.id, { status: 'done' });
+    assert.throws(() => reg.updateTask(r, done.id, { status: 'cancelled' }), /invalid transition/);
+
+    const failed = reg.addTask(r, { kind: 'plan' });
+    reg.updateTask(r, failed.id, { status: 'running' });
+    reg.updateTask(r, failed.id, { status: 'failed' });
+    assert.throws(() => reg.updateTask(r, failed.id, { status: 'cancelled' }), /invalid transition/);
+
+    const orph = reg.addTask(r, { kind: 'plan' });
+    reg.updateTask(r, orph.id, { status: 'running' });
+    reg.updateTask(r, orph.id, { status: 'orphaned' });
+    assert.throws(() => reg.updateTask(r, orph.id, { status: 'cancelled' }), /invalid transition/);
+
+    const c = reg.addTask(r, { kind: 'plan' });
+    reg.updateTask(r, c.id, { status: 'cancelled' });
+    assert.throws(() => reg.updateTask(r, c.id, { status: 'running' }), /invalid transition/);
+    assert.throws(() => reg.updateTask(r, c.id, { status: 'done' }), /invalid transition/);
+  });
+
+  it('ST-CANCEL-3: a cancelled task neither occupies a slot nor satisfies blockedBy', () => {
+    // Not running → frees its file (does not occupy a slot).
+    const cancelledRunner = T({ id: 't1', kind: 'review', status: 'cancelled', touches: ['a.js'] });
+    const cand = C({ id: 't2', kind: 'review', touches: ['a.js'] });
+    assert.equal(reg.canRun(cand, mkReg([cancelledRunner, cand])).run, true);
+
+    // Does not satisfy a dependency (deps require done).
+    const dep = T({ id: 't1', kind: 'plan', status: 'cancelled' });
+    const dependent = C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] });
+    assert.equal(reg.canRun(dependent, mkReg([dep, dependent])).reason, 'blocked-dep');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// addAndClaim — atomic add-and-claim (one load→save cycle)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('addAndClaim — atomic add-and-claim', () => {
+  it('ST-CLAIM-1: on an empty registry returns claimed:true, persists a running task with ts.started', () => {
+    const out = reg.addAndClaim(root, { kind: 'implement', plan: 'p1', touches: ['a.js'] });
+    assert.equal(out.claimed, true);
+    assert.equal(out.reason, 'ok');
+    assert.equal(out.task.status, 'running');
+    assert.ok(out.task.ts.started, 'a claimed task is stamped started');
+
+    const back = reg.load(root);
+    assert.equal(back.tasks.length, 1, 'exactly one task on disk');
+    assert.equal(back.tasks[0].id, out.task.id);
+    assert.equal(back.tasks[0].status, 'running');
+  });
+
+  it('ST-CLAIM-2: a conflicting running task → claimed:false, reason file-conflict, persisted queued', () => {
+    reg.addAndClaim(root, { kind: 'implement', plan: 'p1', touches: ['a.js'] }); // running
+    const out = reg.addAndClaim(root, { kind: 'implement', plan: 'p2', touches: ['a.js'] });
+    assert.equal(out.claimed, false);
+    assert.equal(out.reason, 'file-conflict');
+    assert.equal(out.task.status, 'queued');
+
+    const back = reg.load(root);
+    const queued = back.tasks.filter(t => t.status === 'queued');
+    assert.equal(queued.length, 1);
+    assert.equal(queued[0].id, out.task.id);
+  });
+
+  it('ST-CLAIM-3: a malformed spec throws and persists NOTHING', () => {
+    // implement with empty touches is malformed under the mandatory-touches rule.
+    assert.throws(() => reg.addAndClaim(root, { kind: 'implement', touches: [] }));
+    const back = reg.load(root);
+    assert.deepEqual(back.tasks, [], 'no partial write survives a rejected spec');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drain-stop flag trio (graceful "finish current, then stop")
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Drain-stop flag trio', () => {
+  it('ST-DRAIN-1: request → is → clear round-trip; a fresh root is false', () => {
+    assert.equal(reg.isDrainStopRequested(root), false);
+    reg.requestDrainStop(root);
+    assert.equal(reg.isDrainStopRequested(root), true);
+    reg.clearDrainStop(root);
+    assert.equal(reg.isDrainStopRequested(root), false);
+  });
+
+  it('ST-DRAIN-2: clear on a fresh root is a no-op (does not throw)', () => {
+    assert.doesNotThrow(() => reg.clearDrainStop(root));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Exported constants
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Exported constants + surface', () => {
-  it('exposes MAX_CONCURRENT=5, REGISTRY_VERSION=1, frozen KINDS incl. only implement as plan-mutating', () => {
+  it('exposes MAX_CONCURRENT=5, REGISTRY_VERSION=1, frozen KINDS; kind-based plan-serial export is removed', () => {
     assert.equal(reg.MAX_CONCURRENT, 5);
     assert.equal(reg.REGISTRY_VERSION, 1);
     assert.ok(reg.KINDS.has('implement'));
     assert.ok(reg.KINDS.has('sync'));
-    assert.ok(reg.PLAN_MUTATING_KINDS.has('implement'));
-    assert.equal(reg.PLAN_MUTATING_KINDS.has('plan'), false);
     assert.ok(Object.isFrozen(reg.KINDS)); // frozen
-    assert.ok(Object.isFrozen(reg.PLAN_MUTATING_KINDS));
+    // Kind-based plan-serial is deleted (vision F1): the export must be gone.
+    assert.equal(reg.PLAN_MUTATING_KINDS, undefined);
+    // New exports exist and are functions.
+    for (const fn of ['addAndClaim', 'requestDrainStop', 'isDrainStopRequested', 'clearDrainStop']) {
+      assert.equal(typeof reg[fn], 'function', `exports ${fn}`);
+    }
   });
 
   it('load/save throw TypeError on a non-string root (caller bug, before any I/O)', () => {

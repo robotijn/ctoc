@@ -68,6 +68,43 @@ function globToRegex(glob) {
 }
 
 /**
+ * Whether two lists of path globs/literals OVERLAP — true iff some entry on one
+ * side matches some entry on the other. For each pair `(a, b)` they overlap when
+ * they are string-equal, OR a glob on EITHER side matches the other side treated
+ * as a literal (`globToRegex(a).test(b) || globToRegex(b).test(a)`). This is the
+ * same bidirectional predicate shipped in `src/lib/plan-index/conflict-detect.js`,
+ * built on the SAME audited `globToRegex` the enforcement hook trusts — no new
+ * copy of glob logic.
+ *
+ * Unlike conflict-detect's advisory `filesOverlap` (which fails open to "no
+ * overlap"), this predicate backs the scheduler's file-conflict safety oracle, so
+ * a `globToRegex` that throws on a pathological entry is treated CONSERVATIVELY as
+ * an overlap (block), never silently as "safe to run concurrently".
+ *
+ * @param {string[]} aList - path globs or literal paths
+ * @param {string[]} bList - path globs or literal paths
+ * @returns {boolean} true iff any (a, b) pair overlaps
+ */
+function touchesOverlap(aList, bList) {
+  if (!Array.isArray(aList) || !Array.isArray(bList)) return false;
+  if (aList.length === 0 || bList.length === 0) return false;
+  for (const a of aList) {
+    if (typeof a !== 'string' || a.length === 0) continue;
+    for (const b of bList) {
+      if (typeof b !== 'string' || b.length === 0) continue;
+      if (a === b) return true;
+      try {
+        if (globToRegex(a).test(b) || globToRegex(b).test(a)) return true;
+      } catch {
+        // A pathological glob must not false-safe a safety oracle → block.
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Read a plan's `files:` declaration as an array of globs.
  * Returns [] for plans without a `files:` block.
  *
@@ -155,4 +192,5 @@ module.exports = {
   findCoveringPlan,
   readPlanFiles,
   globToRegex,
+  touchesOverlap,
 };
