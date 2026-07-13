@@ -18,6 +18,7 @@
  */
 
 const safeFs = require('../lib/safe-fs');
+const { parseFrontmatter, FRONTMATTER_BLOCK } = require('../lib/frontmatter');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -39,13 +40,25 @@ function listFiles(dir, predicate) {
 }
 
 function stripFromFrontmatter(content) {
-  // Match a frontmatter block: ---\n...\n---
-  // Either at top of file (skill format) OR after a leading H1 (scout format).
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/) ||
-                  content.match(/\n---\n([\s\S]*?)\n---/);
-  if (!fmMatch) return { changed: false, content };
+  // Locate a frontmatter block: ---\n...\n--- — either at top of file (skill
+  // format) OR after a leading H1 (scout format). CRLF-safe via the shared
+  // reader (finding H1): the old `/^---\n/` fences matched nothing on a CRLF
+  // checkout, so the strip silently no-op'd on Windows.
+  const p = parseFrontmatter(content);
+  let fmBody, original;
+  if (p.hasFrontmatter) {
+    // Top-of-file. `p.raw` is the \r-free interior; locate the literal block in
+    // the actual content (still carrying any \r) so `content.replace` targets it.
+    fmBody = p.raw;
+    original = content.match(FRONTMATTER_BLOCK)[0].replace(/\r?\n$/, '');
+  } else {
+    // After a leading title. Keep a CRLF-safe fallback; \r-strip the body.
+    const m = content.match(/\r?\n---\r?\n([\s\S]*?)\r?\n---/);
+    if (!m) return { changed: false, content };
+    fmBody = m[1].replace(/\r/g, '');
+    original = m[0];
+  }
 
-  const fmBody = fmMatch[1];
   // Remove `max_tokens: <val>` and `max_tool_calls: <val>` lines (any indent)
   const stripped = fmBody
     .split('\n')
@@ -56,7 +69,8 @@ function stripFromFrontmatter(content) {
   if (stripped === fmBody) return { changed: false, content };
 
   // Reconstruct exactly: keep the wrapping `---` markers, replace inner body.
-  const original = fmMatch[0];
+  // `original` is the literal (possibly CRLF) block located above; the new block
+  // is emitted with LF fences so a CRLF file is normalized in the touched region.
   const isTop = original.startsWith('---');
   const newBlock = isTop ? `---\n${stripped}\n---` : `\n---\n${stripped}\n---`;
   const newContent = content.replace(original, newBlock);

@@ -30,6 +30,7 @@
 
 const safeFs = require('./safe-fs');
 const { safeRegExp } = require('./regex-utils');
+const { parseFrontmatter } = require('./frontmatter');
 const path = require('path');
 
 // ─────────────────────────────────────────────────────────────────────
@@ -196,10 +197,16 @@ function loadCompletedPlans(projectRoot) {
   return results;
 }
 
+/**
+ * Read one flat frontmatter field. CRLF-safe (finding H1): sources the `\r`-free
+ * `raw` from the shared `./frontmatter` helper so a plan checked out on Windows
+ * (CRLF) reads byte-identically to its LF twin — no trailing `\r` leaks into the
+ * value. LF input is unaffected.
+ */
 function extractFrontmatterField(content, field) {
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!fmMatch) return null;
-  return getYamlField(fmMatch[1], field);
+  const { hasFrontmatter, raw } = parseFrontmatter(content);
+  if (!hasFrontmatter) return null;
+  return getYamlField(raw, field);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -563,10 +570,17 @@ function countLinesAddedByPlan(projectRoot, plan) {
   return total;
 }
 
+/**
+ * Read the `files:` block-list declaration. CRLF-safe (finding H1): sources the
+ * `\r`-free `raw` from the shared `./frontmatter` helper so a CRLF plan yields the
+ * same declared-file set as its LF twin. Before this migration the LF-only
+ * `/^---\n/` fence failed to match a CRLF plan, returning `[]` — which silently
+ * undercounted the per-plan line-count metric to zero. LF input is unaffected.
+ */
 function extractFilesDeclaration(content) {
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!fmMatch) return [];
-  const fm = fmMatch[1];
+  const { hasFrontmatter, raw } = parseFrontmatter(content);
+  if (!hasFrontmatter) return [];
+  const fm = raw; // \r-free
   // Look for "files:" block
   const filesIdx = fm.search(/^files:\s*$/m);
   if (filesIdx === -1) return [];
@@ -615,6 +629,8 @@ module.exports = {
   loadCompletedPlans,
   countTestOpportunities,
   countLinesAddedByPlan,
+  extractFrontmatterField,
+  extractFilesDeclaration,
 
   // Constants — exposed for tuning
   CPK_USL_DEFAULT,

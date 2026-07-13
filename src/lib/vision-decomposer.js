@@ -12,6 +12,10 @@ const { clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
 // CF1: bust the in-process read cache on every count-mutating write.
 const { invalidate } = require('./cache');
+// W07-s4 (finding H1): shared CRLF-safe frontmatter reader + opening-fence regex.
+// On CRLF the old `/^---\n/` detect failed, so the marker-prepend else-branch
+// injected a SECOND `---` block (double-frontmatter bug); the shared helpers fix it.
+const { parseFrontmatter, FRONTMATTER_OPEN } = require('./frontmatter');
 
 /**
  * Get the canvas file path for a given vision slug, if a canvas exists.
@@ -43,8 +47,9 @@ function parseCanvas(canvasPath) {
   const metadata = parseMetadata(content);
   const type = metadata.canvas_type || 'lean';
 
-  // Strip frontmatter
-  const body = content.replace(/^---\n[\s\S]*?\n---\n/, '');
+  // Strip frontmatter (W07-s4: CRLF-safe via the shared reader; `body` is the
+  // \r-normalized content after the leading fenced block).
+  const { body } = parseFrontmatter(content);
 
   // Parse H2 blocks
   const blocks = {};
@@ -237,14 +242,16 @@ function completeVision(visionPath, projectPath) {
   // Add type: vision and status: decomposed to frontmatter
   const timestamp = new Date().toISOString();
 
-  if (content.match(/^---\n/)) {
-    // Add markers after the opening ---
+  if (FRONTMATTER_OPEN.test(content)) {
+    // Add markers after the opening --- (W07-s4: CRLF-safe detect + a function
+    // replacer that PRESERVES the matched fence, so a CRLF vision no longer
+    // falls through to the else-branch and prepends a duplicate frontmatter block).
     let additions = '';
     if (metadata.type !== 'vision') {
       additions += `type: vision\n`;
     }
     additions += `status: decomposed\ndecomposed_at: "${timestamp}"\n`;
-    content = content.replace(/^---\n/, `---\n${additions}`);
+    content = content.replace(FRONTMATTER_OPEN, (fence) => fence + additions);
   } else {
     content = `---\ntype: vision\nstatus: decomposed\ndecomposed_at: "${timestamp}"\n---\n\n${content}`;
   }
