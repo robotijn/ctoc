@@ -975,9 +975,23 @@ function stageBrowse(stage, projectPath) {
   // navigation by accident and every plan (including the 25th) is reachable by
   // typing its number. (Fixes the AskUserQuestion-numbering collision where the
   // first option grabbed "1" and >9 plans were unreachable.)
+  // Bulk word shortcuts (WORDS only — a number never triggers a bulk action):
+  //   • discuss  — bulk adversarial critique across every plan in the stage
+  //                (both functional and implementation). Advisory only.
+  //   • todo-all — implementation stage only: the human deliberately crossing
+  //                the implementation→todo gate for EVERY implementation plan at
+  //                once, then starting the iron loop to build them.
+  const bulkDiscuss = stage === 'functional' || stage === 'implementation';
+  const bulkAdvance = stage === 'implementation';
+
+  const bulkHints = [];
+  if (bulkDiscuss) bulkHints.push('discuss = critique every plan');
+  if (bulkAdvance) bulkHints.push('todo-all = move all to todo + run iron loop');
+  const bulkSuffix = bulkHints.length ? ` · ${bulkHints.join(' · ')}` : '';
+
   text += plans.length > 0
-    ? `\n  Reply with a plan number (1-${plans.length}) to open it · n = new ${stage} plan · b = back\n\n\n`
-    : `\n  Reply:  n = new ${stage} plan · b = back\n\n\n`;
+    ? `\n  Reply with a plan number (1-${plans.length}) to open it · n = new ${stage} plan${bulkSuffix} · b = back\n\n\n`
+    : `\n  Reply:  n = new ${stage} plan${bulkSuffix} · b = back\n\n\n`;
 
   const actions = {};
   plans.forEach((plan, i) => {
@@ -986,6 +1000,13 @@ function stageBrowse(stage, projectPath) {
   // Word-keyed navigation — NEVER numeric.
   actions['n'] = `claude:create-plan ${stage}`;
   actions['new'] = `claude:create-plan ${stage}`;
+  // Bulk word shortcuts — words only, mapped to advisory/gate-crossing actions.
+  if (bulkDiscuss) {
+    actions['discuss'] = `claude:discuss-all ${stage}`;
+  }
+  if (bulkAdvance) {
+    actions['todo-all'] = 'claude:advance-all-implementation';
+  }
   actions['b'] = '';
   actions['back'] = '';
 

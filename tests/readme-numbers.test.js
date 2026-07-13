@@ -128,8 +128,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 123 JS modules at top level (compliance-integration added for EC5-s3)', () => {
-    assert.equal(countTopLevelJs('src/lib'), 123);
+  it('src/lib/: 124 JS modules at top level (plan-numbering added for global sequential plan numbers)', () => {
+    assert.equal(countTopLevelJs('src/lib'), 124);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {

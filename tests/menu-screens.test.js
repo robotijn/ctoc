@@ -394,8 +394,11 @@ describe('Menu Screens Tests', () => {
     const browse = menuScreens.stageBrowse('functional', testDir);
     assert.strictEqual(browse.inputMode, 'plan-select');
     assert.ok(!('ask' in browse), 'plan-select screens carry no AskUserQuestion');
+    // Nav words include the bulk word shortcuts: discuss (functional +
+    // implementation) and todo-all (implementation only). Numbers still open a
+    // single plan exclusively.
     for (const key of Object.keys(browse.actions)) {
-      assert.ok(/^\d+$/.test(key) || ['n', 'new', 'b', 'back'].includes(key),
+      assert.ok(/^\d+$/.test(key) || ['n', 'new', 'b', 'back', 'discuss', 'todo-all'].includes(key),
         `browse action key "${key}" must be a number or a nav word`);
     }
     console.log('# all screens have actions mapping for every option');
