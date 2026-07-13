@@ -13,6 +13,13 @@
  * - Terminal notifications
  * - Tiered execution (Tier 1 blocking, Tier 2 warning)
  * - Pull-rebase-push on remote conflict
+ *
+ * Dual role: this file is BOTH a script and a library.
+ *  - As a script (run directly): a `require.main === module` guard runs main().
+ *  - As a library (require'd): it exports the reusable check/push building blocks
+ *    (runLint, runTypecheck, runSmartTests, runFullTests, runSecurityScan,
+ *    runTieredChecks, pushToRemote, printSummary) with NO auto-run side effect.
+ *    Consumed by src/commands/push.js.
  */
 
 const { execSync } = require('child_process');
@@ -521,9 +528,26 @@ async function main() {
   }
 }
 
-// Run
-main().catch(err => {
-  console.error('Quality agent error:', err);
-  qualityState.releaseLock();
-  process.exit(1);
-});
+// Run as a script only when invoked directly (guard the side-effect so that
+// `require('./quality-agent')` reuses the check/push blocks WITHOUT starting a
+// quality run or a real `git push`). Same proven pattern as the hooks.
+if (require.main === module) {
+  main().catch(err => {
+    console.error('Quality agent error:', err);
+    qualityState.releaseLock();
+    process.exit(1);
+  });
+}
+
+// Library surface — reusable check/push building blocks (consumed by
+// src/commands/push.js). Exporting these does not change the script path above.
+module.exports = {
+  runLint,
+  runTypecheck,
+  runSmartTests,
+  runFullTests,
+  runSecurityScan,
+  runTieredChecks,
+  pushToRemote,
+  printSummary
+};

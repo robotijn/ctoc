@@ -5,7 +5,7 @@ description: Manually trigger quality checks and push (when auto-push is disable
 Manually trigger quality checks and push to remote:
 
 ```bash
-ctoc push [options]
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" [options]
 ```
 
 ---
@@ -70,7 +70,7 @@ After committing, manually trigger push:
 ```bash
 git add .
 git commit -m "feat: add new feature"
-ctoc push
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js"
 ```
 
 ### Scenario 2: Retry After Failure
@@ -82,7 +82,7 @@ Fix issues and retry without new commit:
 # Checks failed due to lint errors
 # Fix the errors...
 
-ctoc push  # Retry with same commit
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js"  # Retry with same commit
 ```
 
 ### Scenario 3: Push with Warnings
@@ -90,7 +90,7 @@ ctoc push  # Retry with same commit
 Push despite Tier 2 warnings:
 
 ```bash
-ctoc push --force
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" --force
 ```
 
 Output:
@@ -108,7 +108,7 @@ Proceeding anyway (--force)...
 Verify quality without pushing:
 
 ```bash
-ctoc push --dry-run
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" --dry-run
 ```
 
 Output:
@@ -246,27 +246,27 @@ Or manually: git push origin main
 
 ### Basic push
 ```bash
-ctoc push
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js"
 ```
 
 ### Push with live output (verbose)
 ```bash
-ctoc push
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js"
 # Shows progress for each check
 ```
 
 ### Force push with warnings
 ```bash
-ctoc push --force
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" --force
 ```
 
 ### Quick push (skip tests)
 ```bash
-ctoc push --skip-tests
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" --skip-tests
 # Only runs lint + typecheck
 ```
 
 ### Dry run to check status
 ```bash
-ctoc push --dry-run
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" --dry-run
 ```

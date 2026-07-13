@@ -229,7 +229,7 @@ ctoc/
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use)
     lib/                 114 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
-    tabs/                8 dashboard tabs (overview, vision, functional, implementation, review, todo, progress, tools)
+    tabs/                5 dashboard tab files (overview, vision, functional, review, tools; implementation/todo/progress removed as dead code)
     data/                Static data files
   agents/                124 agent definitions across 25 categories
   skills/                421 skill files (99 Tier-2 specialist bodies + 322 reference)

@@ -232,9 +232,10 @@ try {
   VERSION = '?.?.?';
 }
 
-// CTOC v7 (A3.2): import 5 area modules. Legacy tab modules remain on disk
-// but are no longer directly mounted by the TUI — Pipeline area folds
-// overview/vision/functional/implementation/review/todo into one view.
+// CTOC v7 (A3.2): import 5 area modules. The remaining legacy tab modules on
+// disk (overview/vision/functional/review/tools) are no longer directly mounted
+// by the TUI — the Pipeline area folds them into one view. The implementation,
+// todo, and progress tab modules were removed as dead code.
 const pipelineArea = require('../areas/pipeline');
 const inboxArea = require('../areas/inbox');
 const agentArea = require('../areas/agent');

@@ -114,6 +114,75 @@ function getLatestVersion() {
   return null;
 }
 
+/**
+ * Merge the `ctoc@robotijn` entry into the Claude Code plugin registry, preserving every
+ * other plugin's registration — with an ABORT-NOT-CLOBBER guarantee (finding M9).
+ *
+ * Behavior by state of `installedFile`:
+ *   - MISSING (fresh install): starts from the `{ version: 2, plugins: {} }` default and
+ *     writes it plus the ctoc entry. This is NOT corruption.
+ *   - CORRUPT — either unparseable JSON, OR a parseable-but-wrong-shape value (null, an
+ *     array, or an object whose `plugins` is not a non-null object): THROWS immediately
+ *     and writes NOTHING, leaving the corrupt bytes exactly as found for manual repair.
+ *     This prevents overwriting the registry with an empty default, which would
+ *     deregister every other installed plugin.
+ *   - VALID: preserves all other plugin entries byte-for-byte, preserves the prior ctoc
+ *     `installedAt` if present, and writes the merged registry.
+ *
+ * @param {string} installedFile - Absolute path to installed_plugins.json (CTOC-computed
+ *   or a test fixture — never raw user input).
+ * @param {object} ctocEntry - The new ctoc@robotijn registration to merge in. Its
+ *   `installedAt` is used only when no prior ctoc entry exists.
+ * @returns {object} The `installed` registry object that was written.
+ * @throws {Error} If the existing file is corrupt (unparseable or wrong-shape) — no write.
+ */
+function updateInstalledPlugins(installedFile, ctocEntry) {
+  // Preserve existing plugins, only update ctoc. Default is used only for a fresh install.
+  let installed = { version: 2, plugins: {} };
+
+  if (safeFs.existsSync(installedFile)) {
+    const raw = safeFs.readFileSync(installedFile, 'utf8');
+    try {
+      installed = JSON.parse(raw);
+    } catch (err) {
+      // Corrupt/unparseable JSON: abort WITHOUT writing so we never clobber the
+      // registry and deregister every other plugin. The bytes are left untouched.
+      throw new Error(
+        'installed_plugins.json is corrupt (unparseable JSON); aborting to avoid ' +
+        `clobbering the plugin registry. Inspect/repair: ${installedFile}`
+      );
+    }
+
+    // A file can PARSE and still be the wrong shape (null, an array, or missing a
+    // `plugins` object). Treat that as corruption too — abort without writing rather
+    // than coerce it into a default that would drop other plugins' registrations.
+    const validShape =
+      installed !== null &&
+      typeof installed === 'object' &&
+      !Array.isArray(installed) &&
+      installed.plugins !== null &&
+      typeof installed.plugins === 'object' &&
+      !Array.isArray(installed.plugins);
+
+    if (!validShape) {
+      throw new Error(
+        'installed_plugins.json is corrupt (unexpected shape — expected an object with ' +
+        `a "plugins" object); aborting to avoid clobbering the plugin registry. ` +
+        `Inspect/repair: ${installedFile}`
+      );
+    }
+  }
+
+  // Preserve original installedAt if a prior ctoc entry exists.
+  const existingEntry = installed.plugins['ctoc@robotijn']?.[0];
+  const installedAt = existingEntry?.installedAt || ctocEntry.installedAt;
+
+  installed.plugins['ctoc@robotijn'] = [{ ...ctocEntry, installedAt }];
+
+  safeFs.writeFileSync(installedFile, JSON.stringify(installed, null, 2));
+  return installed;
+}
+
 function update() {
   const currentVersion = getCurrentVersion();
 
@@ -185,34 +254,29 @@ function update() {
   console.log(`   Installed to: ${cacheVersionDir}`);
 
   // 6. Update installed_plugins.json
+  //
+  // ABORT-NOT-CLOBBER contract (finding M9): if the existing registry is corrupt
+  // (unparseable JSON, or a parseable-but-wrong-shape value), updateInstalledPlugins
+  // THROWS without writing — so a transient corruption can never deregister every
+  // other installed plugin by overwriting the file with an empty default. A missing
+  // file (fresh install) is not corruption and writes the default normally.
   console.log('\n3. Updating plugin registry...');
 
-  // Preserve existing plugins, only update ctoc
-  let installed = { version: 2, plugins: {} };
-  if (safeFs.existsSync(INSTALLED_FILE)) {
-    try {
-      installed = JSON.parse(safeFs.readFileSync(INSTALLED_FILE, 'utf8'));
-    } catch (e) {
-      // Use default if file is corrupted
-    }
+  const ctocEntry = {
+    scope: 'user',
+    installPath: cacheVersionDir,
+    version: newVersion,
+    installedAt: new Date().toISOString(),   // used only if no prior entry exists
+    lastUpdated: new Date().toISOString(),
+    gitCommitSha: commitSha
+  };
+
+  try {
+    updateInstalledPlugins(INSTALLED_FILE, ctocEntry);
+  } catch (err) {
+    console.error(`   ${err.message}`);
+    process.exit(1);
   }
-
-  // Preserve original installedAt if exists
-  const existingEntry = installed.plugins?.['ctoc@robotijn']?.[0];
-  const installedAt = existingEntry?.installedAt || new Date().toISOString();
-
-  installed.plugins['ctoc@robotijn'] = [
-    {
-      scope: 'user',
-      installPath: cacheVersionDir,
-      version: newVersion,
-      installedAt: installedAt,
-      lastUpdated: new Date().toISOString(),
-      gitCommitSha: commitSha
-    }
-  ];
-
-  safeFs.writeFileSync(INSTALLED_FILE, JSON.stringify(installed, null, 2));
   console.log('   Registry updated');
 
   // 7. Clean old versions
@@ -247,4 +311,4 @@ if (require.main === module) {
   update();
 }
 
-module.exports = { update, refreshLocalLessons, refreshLocalManual, getCurrentVersion, getLatestVersion };
+module.exports = { update, updateInstalledPlugins, refreshLocalLessons, refreshLocalManual, getCurrentVersion, getLatestVersion };
