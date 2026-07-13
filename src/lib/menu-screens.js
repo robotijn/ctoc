@@ -1092,20 +1092,20 @@ function planActions(stage, file, projectPath) {
   const nextStage = NEXT_STAGE[stage];
   const approveLabel = nextStage ? `Approve → ${nextStage}` : 'Approve';
 
-  // Every plan menu carries the same four verbs: Create, View/Edit, Discuss,
-  // Approve. View and Edit are one action — opening a plan shows it and lets
-  // you edit it in the same step.
+  // Critique comes FIRST — it is the most important thing you can do to a plan.
+  // Then the same verbs: Create, View/Edit, Approve. View and Edit are one action
+  // — opening a plan shows it and lets you edit it in the same step.
   const options = [
+    { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.' },
     { label: 'Create new', description: `Create a new ${stage} plan` },
     { label: 'View/Edit', description: 'Show the plan, then edit it' },
-    { label: 'Discuss', description: 'Critique and refine the plan' },
     { label: approveLabel, description: `Validate and move to ${nextStage || 'next stage'}` }
   ];
 
   const actions = {
+    'Discuss': 'claude:discuss',
     'Create new': `claude:create-plan ${stage}`,
     'View/Edit': `claude:view-edit ${stage}/${file}`,
-    'Discuss': 'claude:discuss',
     [approveLabel]: `validate ${stage}/${file}`
   };
 
@@ -1197,9 +1197,10 @@ function reviewActions(stage, file, projectPath) {
 
   text += '\n\n\n';
 
-  // Review is the human gate: inspect, then approve or kick back. The four
-  // slots are View/Edit plus the three gate transitions.
+  // Critique comes FIRST even at the human gate — brutally attack the work before
+  // you approve or kick it back. Then View/Edit plus the three gate transitions.
   const options = [
+    { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.' },
     { label: 'View/Edit', description: 'Show the plan, then edit it' },
     { label: 'Approve → Done', description: 'Validate and mark as complete' },
     { label: 'Feedback → Functional', description: 'Send back to functional for requirements rework' },
@@ -1207,6 +1208,7 @@ function reviewActions(stage, file, projectPath) {
   ];
 
   const actions = {
+    'Discuss': 'claude:discuss',
     'View/Edit': `claude:view-edit review/${file}`,
     'Approve → Done': `validate review/${file}`,
     'Feedback → Functional': `claude:reject review/${file} functional`,
