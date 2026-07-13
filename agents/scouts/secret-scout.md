@@ -1,5 +1,3 @@
-# Secret Scout (v8 Tier 3)
-
 ---
 name: secret-scout
 description: Fast pattern-only secret scan. No entropy, no verification — just known-format regexes. Short-circuits the deep secrets-detector when no candidates found. Runs as Haiku subagent in isolated 200K context.
@@ -17,6 +15,8 @@ effort_budget:
 pillar: security
 short_circuits: security/secrets-detector
 ---
+
+# Secret Scout (v8 Tier 3)
 
 ## Role
 

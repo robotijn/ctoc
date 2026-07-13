@@ -10,7 +10,7 @@
  * - SpotBugs with FindSecBugs (Java)
  */
 
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
 
@@ -352,18 +352,30 @@ class SASTRunner {
    */
   async runESLintSecurity() {
     try {
-      const command = 'npx eslint --plugin security --format json . 2>/dev/null || true';
+      // M13 (cross-platform): invoke npx via an argument array with no shell, so
+      // there is no POSIX-only stderr redirect (the null device is absent on
+      // Windows) and no POSIX-only success-forcing shell operator. On Windows the
+      // npx launcher is named npx.cmd.
+      const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
-      const result = execSync(command, {
-        cwd: this.projectRoot,
-        timeout: this.options.timeout,
-        encoding: 'utf8',
-        shell: true
-      });
+      let out = '';
+      try {
+        out = execFileSync(npx, ['eslint', '--plugin', 'security', '--format', 'json', '.'], {
+          cwd: this.projectRoot,
+          timeout: this.options.timeout,
+          encoding: 'utf8',
+          // The stdio setting discards stderr without a shell redirect.
+          stdio: ['ignore', 'pipe', 'ignore']
+        });
+      } catch (e) {
+        // In place of a shell success-forcing operator: ESLint exits non-zero when
+        // it finds issues but still prints its JSON report to stdout, which the
+        // error object carries.
+        out = (e && e.stdout) ? e.stdout : '';
+      }
 
-      if (result.trim()) {
-        const data = JSON.parse(result);
-        this.parseESLintResults(data);
+      if (out && out.trim()) {
+        this.parseESLintResults(JSON.parse(out));
       }
     } catch (error) {
       // ESLint may not be configured for security - that's ok

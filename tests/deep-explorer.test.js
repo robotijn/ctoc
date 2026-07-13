@@ -4,25 +4,14 @@
  */
 
 const assert = require('assert');
-const { test, describe, beforeEach } = require('node:test');
+const { test, describe } = require('node:test');
 
-let deepExplorer;
+// Hard require: if the module is deleted/renamed, this throws at load and the whole
+// file reports a failure — never a silent skip (skip-guard integrity, finding A2).
+const deepExplorer = require('../src/lib/deep-explorer.js');
 
 describe('Deep Explorer Tests', () => {
-  beforeEach(() => {
-    delete require.cache[require.resolve('../src/lib/deep-explorer.js')];
-    try {
-      deepExplorer = require('../src/lib/deep-explorer.js');
-    } catch (e) {
-      deepExplorer = null;
-    }
-  });
-
   test('formatExploration produces valid box-drawing output', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = deepExplorer.formatExploration({
       question: 'Test decision?',
       options: [{
@@ -40,10 +29,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('formatExploration handles 2 options correctly', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = deepExplorer.formatExploration({
       question: 'A or B?',
       options: [
@@ -59,10 +44,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('formatExploration handles 3+ options correctly', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = deepExplorer.formatExploration({
       question: 'A, B, or C?',
       options: [
@@ -80,10 +61,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('deepExplore returns proper structure with all required fields', async (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = await deepExplorer.deepExplore({
       question: 'Test?',
       options: ['A', 'B'],
@@ -96,10 +73,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('generateExplorationPrompt includes all options in output', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const prompt = deepExplorer.generateExplorationPrompt(
       'Which database?',
       ['PostgreSQL', 'MongoDB'],
@@ -111,10 +84,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('RISK_LEVELS constants are correct', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     assert.ok(deepExplorer.RISK_LEVELS, 'Should export RISK_LEVELS');
     assert.ok(deepExplorer.RISK_LEVELS.LOW, 'Should have LOW');
     assert.ok(deepExplorer.RISK_LEVELS.MEDIUM, 'Should have MEDIUM');
@@ -123,10 +92,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('edge case: option with empty pros/cons arrays', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = deepExplorer.formatExploration({
       question: 'Test?',
       options: [{ name: 'A', pros: [], cons: [], risk: 'low' }],
@@ -138,10 +103,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('edge case: very long option names (>50 chars)', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const longName = 'A'.repeat(60);
     const result = deepExplorer.formatExploration({
       question: 'Test?',
@@ -154,10 +115,6 @@ describe('Deep Explorer Tests', () => {
   });
 
   test('edge case: recommendation not in options list', (t) => {
-    if (!deepExplorer) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     // This should not crash, just handle gracefully
     const result = deepExplorer.formatExploration({
       question: 'Test?',

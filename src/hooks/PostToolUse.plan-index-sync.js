@@ -2,15 +2,20 @@
 'use strict';
 
 /**
- * PI3 — PostToolUse hook: fire-and-forget plan-index sync.
+ * PI3 — PostToolUse hook: awaited (bounded) plan-index sync.
  *
  * When a Claude tool (Write/Edit/MultiEdit) writes a `plans/**\/*.md` file, this
- * hook fires `syncUnit` for JUST that plan so the semantic index reflects the change
- * within the same interaction. It is FIRE-AND-FORGET and FAIL-OPEN:
+ * hook runs `syncUnit` for JUST that plan so the semantic index reflects the change
+ * within the same interaction. It AWAITS that single-unit sync before exiting — a
+ * bare `process.exit(0)` would kill an un-awaited microtask before Node ran it, so
+ * the earlier fire-and-forget form made the sync a silent no-op. It is BOUNDED and
+ * FAIL-OPEN:
  *   • reads the hook stdin JSON (`{ tool_input: { file_path } }`);
  *   • no-ops for any non-`plans/**\/*.md` path (SY-11);
- *   • never blocks on the embed, never throws to the user, ALWAYS exits 0 (SY-10);
- *   • logs any sync error to `.ctoc/logs/` (logged, not swallowed).
+ *   • awaits the sync but races it against a finite `unref`'d timeout so a slow or
+ *     hung embedder never blocks the tool flow; never throws to the user; ALWAYS
+ *     exits 0 (SY-10);
+ *   • logs any sync error or budget overrun to `.ctoc/logs/` (logged, not swallowed).
  *
  * It does NOT construct the store/embedder itself — PI0's composition root owns the
  * singleton wiring and supplies `{ store, embedder, calibrationReady }`. Until PI0
@@ -158,16 +163,36 @@ async function main() {
     const { syncUnit } = require('../lib/plan-index/sync-unit');
     const logDir = path.join(root, '.ctoc', 'logs');
     const plansRoot = path.join(root, 'plans');
-    // Fire-and-forget: do NOT await the embed; log any rejection.
-    Promise.resolve()
-      .then(() => syncUnit(fp, {
-        store: wiring.store,
-        embedder: wiring.embedder,
-        calibrationReady: wiring.calibrationReady,
-        plansRoot,
-        logDir
-      }))
-      .catch((err) => logError(err));
+    // AWAIT the sync so the index reflects the write BEFORE we exit. A bare
+    // `process.exit(0)` kills an un-awaited microtask before Node ever runs it (the
+    // index-sync no-op defect): the process terminates before the current unit of
+    // work hands control back to the event loop, so the scheduled `.then` callback
+    // never fires. Bound the await with a timeout race so a pathologically slow or
+    // hung embedder still never blocks the tool flow; fail-open on BOTH rejection
+    // and timeout (the process ALWAYS exits 0 below).
+    const SYNC_BUDGET_MS = 2000;
+    let timer;
+    const timeout = new Promise((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), SYNC_BUDGET_MS);
+      timer.unref?.();
+    });
+    try {
+      const outcome = await Promise.race([
+        syncUnit(fp, {
+          store: wiring.store,
+          embedder: wiring.embedder,
+          calibrationReady: wiring.calibrationReady,
+          plansRoot,
+          logDir
+        }).then(() => 'synced', (err) => { logError(err); return 'error'; }),
+        timeout
+      ]);
+      if (outcome === 'timeout') {
+        logError(new Error('plan-index sync exceeded ' + SYNC_BUDGET_MS + 'ms budget; exiting fail-open'));
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   } catch (err) {
     logError(err);
   }

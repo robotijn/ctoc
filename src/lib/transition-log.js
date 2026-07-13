@@ -2,10 +2,21 @@
  * Transition Log
  * Audit trail logging for all plan state changes.
  * Logs every transition to .ctoc/logs/transitions.json
+ *
+ * Durability (W11-s3): writes are append-only JSONL via the shared `durable-log`
+ * primitive. Each transition is one line appended with a single atomic O_APPEND
+ * write, so two concurrent writers never lose each other's records (the previous
+ * read-whole → push → write-whole round trip silently dropped one of every pair
+ * of racing writes — findings M14/M15). A wholly-corrupt file is quarantined
+ * (renamed aside, bytes preserved) rather than silently reset to `[]`, and a
+ * legacy whole-file JSON array is migrated to JSONL on the first append.
+ *
+ * The on-disk format changed; the API did NOT. `readLog`, `getTransitionsForPlan`,
+ * and `getRecentTransitions` still return an Array, so every consumer is untouched.
  */
 
-const safeFs = require('./safe-fs');
 const path = require('path');
+const durableLog = require('./durable-log');
 const { findProjectRoot } = require('./project-root');
 
 /**
@@ -19,39 +30,28 @@ function getLogPath(projectPath) {
 }
 
 /**
- * Ensure the log directory and file exist
- * @param {string} logPath - Path to transitions.json
- */
-function ensureLogFile(logPath) {
-  const dir = path.dirname(logPath);
-  if (!safeFs.existsSync(dir)) {
-    safeFs.mkdirSync(dir, { recursive: true });
-  }
-  if (!safeFs.existsSync(logPath)) {
-    safeFs.writeFileSync(logPath, '[]');
-  }
-}
-
-/**
- * Read all transition log entries
+ * Read all transition log entries.
+ *
+ * Delegates to the durable-log reader, which returns an Array for a missing file
+ * (`[]`), a legacy whole-file JSON array (as-is), or a JSONL file (line by line,
+ * skipping a torn trailing line). It never throws on a corrupt file — a corrupt
+ * file reads as `[]` and is quarantined by the next `logTransition`.
+ *
  * @param {string} [projectPath] - Project root path
  * @returns {Array} Array of transition log entries
  */
 function readLog(projectPath) {
-  const logPath = getLogPath(projectPath);
-  if (!safeFs.existsSync(logPath)) {
-    return [];
-  }
-  try {
-    const content = safeFs.readFileSync(logPath, 'utf8');
-    return JSON.parse(content);
-  } catch {
-    return [];
-  }
+  return durableLog.readEntries(getLogPath(projectPath));
 }
 
 /**
- * Log a plan state transition
+ * Log a plan state transition.
+ *
+ * The entry is appended losslessly and atomically via `durable-log.appendEntry`
+ * (single O_APPEND write). The durable-log layer creates the log directory,
+ * migrates a legacy JSON array to JSONL once, and quarantines a corrupt file
+ * before appending. Transitions are uncapped (no rotation) — the full audit
+ * trail is retained, preserving the module's prior behavior.
  *
  * @param {Object} entry - Transition log entry
  * @param {string} entry.plan - Plan filename
@@ -62,13 +62,9 @@ function readLog(projectPath) {
  * @param {boolean} [entry.humanGate] - Whether this crossed a human gate
  * @param {boolean} [entry.marker] - Whether approval marker was added
  * @param {string} [projectPath] - Project root path
+ * @returns {Object} the logged entry
  */
 function logTransition(entry, projectPath) {
-  const logPath = getLogPath(projectPath);
-  ensureLogFile(logPath);
-
-  const entries = readLog(projectPath);
-
   const logEntry = {
     timestamp: new Date().toISOString(),
     plan: entry.plan,
@@ -80,8 +76,7 @@ function logTransition(entry, projectPath) {
     marker: entry.marker || false
   };
 
-  entries.push(logEntry);
-  safeFs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
+  durableLog.appendEntry(getLogPath(projectPath), logEntry);
 
   return logEntry;
 }

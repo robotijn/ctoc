@@ -7,7 +7,10 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { fork } = require('node:child_process');
 const { test, describe, beforeEach, afterEach } = require('node:test');
+
+const AGENT_LOCK_MODULE = path.resolve(__dirname, '../src/lib/agent-lock.js');
 
 const {
   acquireLock,
@@ -165,6 +168,185 @@ describe('Agent Lock Tests', () => {
     assert.strictEqual(isPidAlive(0), false, 'PID 0 should return false');
     assert.strictEqual(isPidAlive(-1), false, 'Negative PID should return false');
     assert.strictEqual(isPidAlive(null), false, 'null PID should return false');
+  });
+});
+
+/**
+ * Exclusive-create (wx) + owner-token compare-and-swap (M2, W11-s5).
+ *
+ * These prove the fix for the check-then-act (TOCTOU) hole in acquireLock:
+ * the WRITE is the point of exclusivity (an atomic O_CREAT|O_EXCL create), the
+ * agentId is the owner token, and releaseLock/updateLockPlan honor an optional
+ * owner-token compare-and-swap so a foreign/stale caller cannot mutate or drop
+ * another agent's lock. No test doubles — real lock files and real child
+ * processes racing for the same lock.
+ */
+describe('Agent Lock — exclusive-create (wx) + owner-token CAS', () => {
+  let testDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-lock-wx-'));
+    fs.mkdirSync(path.join(testDir, '.ctoc'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test('acquireLock — owner token is a non-empty UUID and a held lock is never overwritten', () => {
+    const first = acquireLock(testDir, 'plan-a');
+    assert.strictEqual(first.acquired, true, 'First acquire should succeed');
+    assert.match(
+      first.agentId,
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      'agentId should be a UUID owner token'
+    );
+
+    const tokenOnDisk = readLock(testDir).agentId;
+    assert.strictEqual(tokenOnDisk, first.agentId, 'On-disk token matches returned token');
+
+    // A second acquire while the lock is held (by this live process) must be
+    // rejected AND must not overwrite the existing owner token.
+    const second = acquireLock(testDir, 'plan-b');
+    assert.strictEqual(second.acquired, false, 'Second acquire must be rejected while held');
+    assert.strictEqual(
+      readLock(testDir).agentId,
+      first.agentId,
+      'Rejected acquire must not overwrite the held owner token'
+    );
+  });
+
+  test('acquireLock — stale lock (dead PID) is reclaimed exclusively (regression guard)', () => {
+    const lockPath = getLockPath(testDir);
+    fs.writeFileSync(
+      lockPath,
+      JSON.stringify({ pid: 999999999, agentId: 'stale', plan: 'stale', startedAt: new Date().toISOString() }, null, 2)
+    );
+
+    const result = acquireLock(testDir, 'fresh-plan');
+    assert.strictEqual(result.acquired, true, 'Stale lock must be reclaimable under wx');
+    const lock = readLock(testDir);
+    assert.strictEqual(lock.plan, 'fresh-plan', 'Reclaimed lock has the new plan');
+    assert.strictEqual(lock.pid, process.pid, 'Reclaimed lock has the current PID');
+    assert.notStrictEqual(lock.agentId, 'stale', 'Reclaimed lock has a fresh owner token');
+  });
+
+  test('releaseLock — wrong owner token does NOT remove another agent\'s lock (CAS)', () => {
+    const res = acquireLock(testDir, 'plan-a');
+    assert.strictEqual(res.acquired, true);
+    const token = res.agentId;
+
+    // Foreign caller with the wrong token must not be able to drop the lock.
+    releaseLock(testDir, 'not-the-owner-token');
+    assert.ok(
+      fs.existsSync(getLockPath(testDir)),
+      'Lock must survive a wrong-token release'
+    );
+    assert.strictEqual(
+      readLock(testDir).agentId,
+      token,
+      'Owner token must be unchanged after a rejected release'
+    );
+
+    // The rightful owner (correct token) can release.
+    releaseLock(testDir, token);
+    assert.ok(
+      !fs.existsSync(getLockPath(testDir)),
+      'Correct-token release must remove the lock'
+    );
+  });
+
+  test('releaseLock — omitted token stays backward-compatible (unconditional release)', () => {
+    acquireLock(testDir, 'plan-a');
+    requestStop(testDir);
+
+    releaseLock(testDir); // no token — legacy call sites
+
+    assert.ok(!fs.existsSync(getLockPath(testDir)), 'Lock removed with no token');
+    assert.ok(!fs.existsSync(getStopPath(testDir)), 'Stop file removed with no token');
+  });
+
+  test('updateLockPlan — wrong owner token does NOT mutate another agent\'s lock (CAS)', () => {
+    const res = acquireLock(testDir, 'plan-a');
+    const token = res.agentId;
+
+    updateLockPlan(testDir, 'plan-hijacked', 'not-the-owner-token');
+    assert.strictEqual(
+      readLock(testDir).plan,
+      'plan-a',
+      'Wrong token must not change the plan name'
+    );
+
+    updateLockPlan(testDir, 'plan-b', token);
+    assert.strictEqual(
+      readLock(testDir).plan,
+      'plan-b',
+      'Correct token updates the plan name'
+    );
+  });
+
+  test('acquireLock — exactly one of N concurrent processes acquires the lock (M2 race)', async () => {
+    const N = 5;
+    const childScript = path.join(testDir, 'race-child.js');
+    fs.writeFileSync(
+      childScript,
+      `'use strict';
+const modulePath = process.argv[2];
+const projectPath = process.argv[3];
+const { acquireLock } = require(modulePath);
+process.on('message', (msg) => {
+  if (msg === 'go') {
+    const res = acquireLock(projectPath, 'race-' + process.pid);
+    process.send({ type: 'result', acquired: res.acquired === true });
+    // Stay alive until told to exit so this PID remains valid for the
+    // other children's liveness checks — otherwise a fast winner could exit
+    // and be misread as a stale lock, letting a loser reclaim it.
+  } else if (msg === 'exit') {
+    process.exit(0);
+  }
+});
+process.send({ type: 'ready' });
+`
+    );
+
+    const children = [];
+    const readyPromises = [];
+    const resultPromises = [];
+
+    for (let i = 0; i < N; i++) {
+      const child = fork(childScript, [AGENT_LOCK_MODULE, testDir], { silent: true });
+      children.push(child);
+
+      let markReady;
+      let markResult;
+      readyPromises.push(new Promise((resolve) => { markReady = resolve; }));
+      resultPromises.push(new Promise((resolve) => { markResult = resolve; }));
+
+      child.on('message', (msg) => {
+        if (msg && msg.type === 'ready') markReady();
+        else if (msg && msg.type === 'result') markResult(msg.acquired);
+      });
+    }
+
+    // Barrier: wait until every child is ready, then release them together.
+    await Promise.all(readyPromises);
+    for (const child of children) child.send('go');
+
+    const results = await Promise.all(resultPromises);
+    const acquiredCount = results.filter(Boolean).length;
+
+    // Tear down the children only after all results are in.
+    for (const child of children) child.send('exit');
+    await Promise.all(children.map((child) => new Promise((resolve) => child.on('exit', resolve))));
+
+    assert.strictEqual(
+      acquiredCount,
+      1,
+      `Exactly one of ${N} racing processes must acquire the lock, got ${acquiredCount}`
+    );
+
+    const survivor = readLock(testDir);
+    assert.ok(survivor && survivor.agentId, 'The winning lock must remain on disk with an owner token');
   });
 });
 

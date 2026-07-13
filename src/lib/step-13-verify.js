@@ -170,9 +170,97 @@ function tryCommands(commands, cwd) {
   };
 }
 
+/**
+ * Compute the on-disk path of the persisted VERIFY evidence artifact for a plan.
+ *
+ * Pure path helper — performs no filesystem access. The artifact lives under a
+ * fixed `.ctoc/state/verify/` root inside the project, keyed by the plan's bare
+ * slug. Callers MUST pass a bare basename (no `.md` extension and no directory
+ * separators), typically `path.basename(planPath, '.md')` — the fixed root plus
+ * a bare slug keeps every write inside `.ctoc/state/verify/`. Hardening of slug
+ * provenance is slice s2 / workstream W02 scope, not this slice.
+ *
+ * @param {string} projectPath - Project root path.
+ * @param {string} planSlug - Bare plan slug (no `.md`, no directory).
+ * @returns {string} Absolute-or-relative path (mirroring projectPath) to the
+ *   artifact JSON file: `<projectPath>/.ctoc/state/verify/<planSlug>.json`.
+ */
+function verifyEvidencePath(projectPath, planSlug) {
+  return path.join(projectPath, '.ctoc', 'state', 'verify', `${planSlug}.json`);
+}
+
+/**
+ * Run VERIFY for a project and persist the result as a durable evidence
+ * artifact keyed by plan slug. This is the real caller for `runVerify` — it
+ * closes the zero-callers defect (finding C9): before this slice, nothing under
+ * `src/` invoked `runVerify` and nothing recorded its outcome.
+ *
+ * The artifact records the actual outcome of a `runVerify` execution (pass/fail,
+ * per-check detail, errors, method, summary) plus an ISO 8601 timestamp, so a
+ * later slice (s2) can make the review->done gate consult a real verification
+ * run instead of a self-reported checkbox.
+ *
+ * @param {string} projectPath - Project root path passed through to `runVerify`.
+ * @param {string} planSlug - Bare plan slug the evidence is keyed by.
+ * @returns {{planSlug: string, timestamp: string, passed: boolean,
+ *   method: (string|null), checks: Object, errors: string[], summary: string}}
+ *   The persisted artifact object (also written to disk).
+ * @throws Propagates an unrecoverable write error from `safeFs` (directory not
+ *   creatable, disk full, etc.). Does not swallow write failures.
+ */
+function persistVerifyResult(projectPath, planSlug) {
+  const verifyResult = runVerify(projectPath);
+
+  const artifact = {
+    planSlug,
+    timestamp: new Date().toISOString(),
+    passed: verifyResult.passed,
+    method: verifyResult.method,
+    checks: verifyResult.checks,
+    errors: verifyResult.errors,
+    summary: verifyResult.summary
+  };
+
+  const evidencePath = verifyEvidencePath(projectPath, planSlug);
+  safeFs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+  safeFs.writeFileSync(evidencePath, JSON.stringify(artifact, null, 2));
+
+  return artifact;
+}
+
+/**
+ * Read the persisted VERIFY evidence artifact for a plan.
+ *
+ * Absent-or-corrupt both read as "no usable evidence": a missing file or
+ * unparseable JSON returns `null` and never throws. This lets slice s2 treat a
+ * damaged artifact as a rejectable condition (fail closed) rather than crashing
+ * the gate. No error detail (stack/path) is leaked on a parse failure.
+ *
+ * @param {string} projectPath - Project root path.
+ * @param {string} planSlug - Bare plan slug the evidence is keyed by.
+ * @returns {Object|null} The parsed artifact object when present and valid JSON;
+ *   `null` when the artifact file is absent or its contents are unparseable.
+ */
+function readVerifyEvidence(projectPath, planSlug) {
+  const evidencePath = verifyEvidencePath(projectPath, planSlug);
+  if (!safeFs.existsSync(evidencePath)) {
+    return null;
+  }
+  try {
+    const raw = safeFs.readFileSync(evidencePath, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    // Corrupt/unparseable artifact reads as absent (no usable evidence).
+    return null;
+  }
+}
+
 module.exports = {
   runVerify,
   runFallbackChecks,
   tryCommand,
-  tryCommands
+  tryCommands,
+  verifyEvidencePath,
+  persistVerifyResult,
+  readVerifyEvidence
 };

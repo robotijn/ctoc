@@ -12,6 +12,12 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const {
+  readVersionSources,
+  readLicenseSources,
+  allVersionsAgree,
+} = require('./helpers/source-of-truth');
+
 // =============================================================================
 // Test Setup - Shared temp directory
 // =============================================================================
@@ -675,5 +681,114 @@ CTOC - CTO Chief v1.0.0
     assert.ok(result.includes('ctoc - cto chief v1.0.0'));
     // Uppercase should be updated
     assert.ok(result.includes('CTOC - CTO Chief v2.0.0'));
+  });
+});
+
+// =============================================================================
+// Real-artifact single source of truth (W06-s5 — findings B1–B6)
+//
+// The suites above test the release SCRIPT's sync logic against synthetic temp
+// fixtures — legitimate, but blind to a drift in the REAL shipped artifact. The
+// two assertions below read the ACTUAL on-disk VERSION / package.json /
+// plugin.json / marketplace.json / LICENSE via tests/helpers/source-of-truth.js,
+// so a real version or license drift fails the test. Paired production fix: W09
+// (corrected package.json + made release.js sync it). These are GREEN today only
+// because W09 has landed; the non-vacuity tests below prove they go RED on drift.
+// =============================================================================
+
+describe('release artifact is the single source of truth', () => {
+  test('VERSION, package.json, plugin.json, marketplace.json versions all agree', () => {
+    const sources = readVersionSources();
+    const verdict = allVersionsAgree(sources);
+    assert.ok(
+      verdict.ok,
+      'version sources disagree (or a source is missing):\n' +
+        Object.entries(verdict.values)
+          .map(([file, value]) => `  ${file}: ${value === null ? '<missing>' : value}`)
+          .join('\n'),
+    );
+  });
+
+  test('package.json license equals the actual LICENSE file', () => {
+    const lic = readLicenseSources();
+    assert.ok(lic.declared !== null, 'package.json declares no license');
+    assert.ok(lic.actual !== null, 'LICENSE file has no readable first line');
+    assert.strictEqual(
+      lic.declared,
+      lic.actual,
+      `declared license (package.json: "${lic.declaredRaw}") does not match the ` +
+        `actual LICENSE file ("${lic.actualRaw}")`,
+    );
+  });
+
+  // Non-vacuity: point the reader at a drift fixture and prove the same
+  // assertions go RED. Without this, a passing assertion on a correct tree could
+  // be a false green that never actually witnesses drift.
+  describe('goes red on drift (non-vacuity)', () => {
+    let fixtureRoot;
+
+    function writeFixture({ pkgVersion, pkgLicense }) {
+      const realRoot = path.resolve(__dirname, '..');
+      fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'source-of-truth-drift-'));
+      fs.mkdirSync(path.join(fixtureRoot, '.claude-plugin'), { recursive: true });
+
+      const pkg = JSON.parse(fs.readFileSync(path.join(realRoot, 'package.json'), 'utf8'));
+      const plugin = JSON.parse(
+        fs.readFileSync(path.join(realRoot, '.claude-plugin', 'plugin.json'), 'utf8'),
+      );
+      const marketplace = JSON.parse(
+        fs.readFileSync(path.join(realRoot, '.claude-plugin', 'marketplace.json'), 'utf8'),
+      );
+      const versionText = fs.readFileSync(path.join(realRoot, 'VERSION'), 'utf8');
+      const licenseText = fs.readFileSync(path.join(realRoot, 'LICENSE'), 'utf8');
+
+      if (pkgVersion !== undefined) pkg.version = pkgVersion;
+      if (pkgLicense !== undefined) pkg.license = pkgLicense;
+
+      fs.writeFileSync(path.join(fixtureRoot, 'VERSION'), versionText);
+      fs.writeFileSync(path.join(fixtureRoot, 'LICENSE'), licenseText);
+      fs.writeFileSync(path.join(fixtureRoot, 'package.json'), JSON.stringify(pkg, null, 2));
+      fs.writeFileSync(
+        path.join(fixtureRoot, '.claude-plugin', 'plugin.json'),
+        JSON.stringify(plugin, null, 2),
+      );
+      fs.writeFileSync(
+        path.join(fixtureRoot, '.claude-plugin', 'marketplace.json'),
+        JSON.stringify(marketplace, null, 2),
+      );
+      return fixtureRoot;
+    }
+
+    afterEach(() => {
+      if (fixtureRoot && fs.existsSync(fixtureRoot)) {
+        fs.rmSync(fixtureRoot, { recursive: true, force: true });
+      }
+      fixtureRoot = undefined;
+    });
+
+    test('a drifted package.json version fails the version agreement', () => {
+      const root = writeFixture({ pkgVersion: '6.9.49' });
+      const verdict = allVersionsAgree(readVersionSources(root));
+      assert.strictEqual(verdict.ok, false, 'a drifted version must fail agreement');
+      assert.strictEqual(verdict.values.packageJson, '6.9.49');
+    });
+
+    test('a missing source (null field) fails the version agreement', () => {
+      const root = writeFixture({});
+      fs.rmSync(path.join(root, 'package.json'));
+      const verdict = allVersionsAgree(readVersionSources(root));
+      assert.strictEqual(verdict.ok, false, 'a missing source must fail loudly');
+      assert.strictEqual(verdict.values.packageJson, null);
+    });
+
+    test('a reverted license (Apache-2.0) fails the license match', () => {
+      const root = writeFixture({ pkgLicense: 'Apache-2.0' });
+      const lic = readLicenseSources(root);
+      assert.notStrictEqual(
+        lic.declared,
+        lic.actual,
+        'Apache-2.0 must not match the PolyForm LICENSE file',
+      );
+    });
   });
 });

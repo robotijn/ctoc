@@ -4,7 +4,7 @@
 # ===============================================================================
 
 schema_version: "2.1.0"
-updated: "2026-01-29"
+updated: "2026-07-13"
 
 # ===============================================================================
 #  Core Principles
@@ -62,15 +62,6 @@ agents:
     methodology: BDD
     output_format: user_stories_with_scenarios
 
-  functional-reviewer:
-    path: agents/planning/functional-reviewer.md
-    model: opus
-    category: planning
-    description: Reviews functional plans, approves or returns for revision
-    steps: [3]
-    review_gate: true
-    on_reject: goto_step_1
-
   implementation-planner:
     path: agents/planning/implementation-planner.md
     model: opus
@@ -78,171 +69,47 @@ agents:
     description: Creates implementation plans (steps 4-6)
     steps: [4, 5, 6]
 
-  implementation-plan-reviewer:
-    path: agents/planning/implementation-plan-reviewer.md
+  # -----------------------------------------------------------------------------
+  #  IRON LOOP TRIO (Option B — the real executors that perform Steps 4-16's work)
+  # -----------------------------------------------------------------------------
+
+  iron-loop-executor:
+    path: agents/iron-loop/iron-loop-executor.md
     model: opus
-    category: planning
-    description: Reviews implementation plans
-    steps: [6]
-    review_gate: true
-    on_reject: goto_step_4
+    category: iron-loop
+    role: sub-orchestrator
+    reports_to: cto-chief
+    description: Executes Iron Loop steps 7-15 — the doing steps (TEST, PREPARE, IMPLEMENT, OPTIMIZE, VERIFY, DOCUMENT).
+    steps: [8, 9, 10, 12, 14, 15]
+
+  iron-loop-critic:
+    path: agents/iron-loop/iron-loop-critic.md
+    model: opus
+    category: iron-loop
+    role: sub-orchestrator
+    reports_to: cto-chief
+    description: Scores/reviews execution plans — the review steps (CAPTURE gate, SPEC, REVIEW, FINAL-REVIEW).
+    steps: [4, 7, 11, 16]
 
   iron-loop-integrator:
-    path: agents/planning/iron-loop-integrator.md
-    model: sonnet
-    category: planning
+    path: agents/iron-loop/iron-loop-integrator.md
+    model: opus
+    category: iron-loop
+    role: sub-orchestrator
+    reports_to: cto-chief
     description: Injects Iron Loop steps 7-15 into implementation plan
     steps: [6]
 
   # -----------------------------------------------------------------------------
-  #  IMPLEMENTATION AGENTS (Steps 7-15)
+  #  SECURITY (Step 12 SECURE)
   # -----------------------------------------------------------------------------
-
-  test-maker:
-    path: agents/implementation/test-maker.md
-    model: opus
-    category: implementation
-    description: Writes tests first (TDD Red)
-    steps: [7]
-
-  quality-checker:
-    path: agents/implementation/quality-checker.md
-    model: sonnet
-    category: implementation
-    description: Lint, format, type-check
-    steps: [8, 10]
-
-  implementer:
-    path: agents/implementation/implementer.md
-    model: sonnet
-    category: implementation
-    description: Setup + Core code + Error handling
-    steps: [9]
-    sub_tasks:
-      - setup_environment
-      - core_implementation
-      - error_handling
-
-  self-reviewer:
-    path: agents/implementation/self-reviewer.md
-    model: opus
-    category: implementation
-    description: Self-review, calls quality-checker
-    steps: [10]
-    invokes: [quality-checker]
-    tdd_loop: true  # Can loop back to step 7
-
-  optimizer:
-    path: agents/implementation/optimizer.md
-    model: sonnet
-    category: implementation
-    description: Performance improvements and code simplification
-    steps: [11]
-    gate: all_tests_must_pass
 
   security-scanner:
-    path: agents/implementation/security-scanner.md
+    path: agents/security/security-scanner.md
     model: opus
-    category: implementation
+    category: security
     description: Security vulnerability check
     steps: [12]
-
-  verifier:
-    path: agents/implementation/verifier.md
-    model: sonnet
-    category: implementation
-    description: Run ALL tests (unit + integration)
-    steps: [13]
-
-  documenter:
-    path: agents/implementation/documenter.md
-    model: sonnet
-    category: implementation
-    description: Update documentation
-    steps: [14]
-
-  implementation-reviewer:
-    path: agents/implementation/implementation-reviewer.md
-    model: opus
-    category: implementation
-    description: Final review of steps 7-14, can loop back, commits when satisfied
-    steps: [15]
-    review_gate: true
-    smart_rerun: true  # Decides which steps need re-running based on change impact
-    can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
-    highest_standards: true  # Checks all 14 quality dimensions
-
-  # -----------------------------------------------------------------------------
-  #  WRITING AGENTS (Document Creation)
-  # -----------------------------------------------------------------------------
-
-  document-planner:
-    path: agents/writing/document-planner.md
-    model: haiku
-    category: writing
-    description: Fast document structure planning for rapid iteration
-    always_available: true
-    dependencies:
-      python: []  # No deps for planning
-
-  pdf-writer:
-    path: agents/writing/pdf-writer.md
-    model: sonnet
-    category: writing
-    description: Create professional PDF documents
-    dependencies:
-      python: [fpdf2, reportlab, Pillow]
-    auto_install: true
-
-  docx-writer:
-    path: agents/writing/docx-writer.md
-    model: sonnet
-    category: writing
-    description: Create Microsoft Word documents
-    dependencies:
-      python: [python-docx, Pillow]
-    auto_install: true
-
-  pptx-writer:
-    path: agents/writing/pptx-writer.md
-    model: sonnet
-    category: writing
-    description: Create PowerPoint presentations
-    dependencies:
-      python: [python-pptx, Pillow]
-    auto_install: true
-
-  document-reader:
-    path: agents/writing/document-reader.md
-    model: sonnet
-    category: writing
-    description: Read and extract content from PDF, DOCX, PPTX files
-    dependencies:
-      python: [PyPDF2, pdfplumber, python-docx, python-pptx, Pillow]
-    auto_install: true
-
-  # -----------------------------------------------------------------------------
-  #  ADMIN AGENTS
-  # -----------------------------------------------------------------------------
-
-  dashboard:
-    path: agents/admin/dashboard.md
-    model: sonnet
-    category: admin
-    description: Terminal-based admin dashboard with kanban view
-    always_available: true
-
-  learning-applier:
-    path: agents/admin/learning-applier.md
-    model: sonnet
-    category: admin
-    description: Applies approved learnings to agent behavior
-
-  learning-suggester:
-    path: agents/admin/learning-suggester.md
-    model: sonnet
-    category: admin
-    description: Suggests new learnings based on interactions
 
   # -----------------------------------------------------------------------------
   #  INFRASTRUCTURE AGENTS
@@ -316,8 +183,9 @@ iron_loop:
     - step: 3
       name: CAPTURE
       description: Requirements as BDD specs (user stories + scenarios)
-      agents: [product-owner, functional-reviewer]
-      review_gate: functional-reviewer
+      agents: [product-owner, iron-loop-critic]
+      review_gate: true
+      review_agent: iron-loop-critic
       human_gate: true  # User must approve before Phase 2
 
   # Phase 2: Implementation Planning (Technical)
@@ -333,8 +201,9 @@ iron_loop:
     - step: 6
       name: SPEC
       description: Detailed specifications
-      agents: [implementation-planner, implementation-plan-reviewer, iron-loop-integrator]
-      review_gate: implementation-plan-reviewer
+      agents: [implementation-planner, iron-loop-critic, iron-loop-integrator]
+      review_gate: true
+      review_agent: iron-loop-critic
       human_gate: true  # User must approve before Iron Loop Ready
 
   # Phase 3: Implementation (Autonomous)
@@ -342,24 +211,24 @@ iron_loop:
     - step: 7
       name: TEST
       description: Write tests first (TDD Red)
-      agents: [test-maker]
+      agents: [iron-loop-executor]
     - step: 8
       name: QUALITY
       description: Lint, format, type-check
-      agents: [quality-checker]
+      agents: [iron-loop-executor]
     - step: 9
       name: IMPLEMENT
       description: Setup + Core code + Error handling
-      agents: [implementer]
+      agents: [iron-loop-executor]
     - step: 10
       name: REVIEW
       description: Self-review + re-run quality
-      agents: [self-reviewer, quality-checker]
+      agents: [iron-loop-critic, iron-loop-executor]
       tdd_loop: true  # Can loop back to step 7
     - step: 11
       name: OPTIMIZE
       description: Performance improvements + code simplification
-      agents: [optimizer]
+      agents: [iron-loop-executor]
     - step: 12
       name: SECURE
       description: Security vulnerability check
@@ -367,16 +236,17 @@ iron_loop:
     - step: 13
       name: VERIFY
       description: Run ALL tests (unit + integration)
-      agents: [verifier]
+      agents: [iron-loop-executor]
     - step: 14
       name: DOCUMENT
       description: Update documentation
-      agents: [documenter]
+      agents: [iron-loop-executor]
     - step: 15
       name: FINAL-REVIEW
       description: Reviews 7-14 with highest standards, can loop back, commits when satisfied
-      agents: [implementation-reviewer]
-      review_gate: implementation-reviewer
+      agents: [iron-loop-critic]
+      review_gate: true
+      review_agent: iron-loop-critic
       can_loop_to: [7, 8, 9, 10, 11, 12, 13, 14]
       human_gate: true  # User must approve commit/push
 

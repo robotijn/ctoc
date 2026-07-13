@@ -26,6 +26,65 @@ const os = require('os');
 
 const { listSubplans, approveSubplans } = require('../src/lib/actions');
 const { validateParentPlan, validateForQueue } = require('../src/lib/plan-validator');
+const { verifyEvidencePath } = require('../src/lib/step-13-verify');
+
+// A full "## Execution Plan" with every required Iron Loop step present and
+// ticked — the shape validateReviewToDone now demands before a plan may cross
+// Gate 3 (review→done). Step prose avoids file-creation verbs so the review
+// gate's contradiction scan finds nothing to flag.
+const EXEC_PLAN_COMPLETE = [
+  '## Execution Plan',
+  '',
+  '### Step 8: TEST',
+  '- [x] Tests written and run RED first',
+  '',
+  '### Step 9: PREPARE',
+  '- [x] Environment ready',
+  '',
+  '### Step 10: IMPLEMENT',
+  '- [x] Feature implemented',
+  '',
+  '### Step 11: REVIEW',
+  '- [x] Self-review done',
+  '',
+  '### Step 12: OPTIMIZE',
+  '- [x] No redundant work',
+  '',
+  '### Step 13: SECURE',
+  '- [x] Inputs validated',
+  '',
+  '### Step 14: VERIFY',
+  '- [x] All tests green, 0 skipped, 0 flaky',
+  '',
+  '### Step 15: DOCUMENT',
+  '- [x] Docs updated',
+  '',
+  '### Step 16: FINAL-REVIEW',
+  '- [x] Ready for human review',
+  '',
+].join('\n');
+
+/**
+ * Write a REAL VERIFY evidence artifact (data fixture — hand-written JSON, not a
+ * code double) at .ctoc/state/verify/<slug>.json recording a passing run whose
+ * timestamp is fresher than the plan's pinned mtime, so validateReviewToDone's
+ * evidence + staleness checks both pass.
+ */
+function writeVerifyArtifact(tmp, slug, planPath, { passed = true } = {}) {
+  const planMtimeMs = fs.statSync(planPath).mtimeMs;
+  const p = verifyEvidencePath(tmp, slug);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify({
+    planSlug: slug,
+    timestamp: new Date(planMtimeMs + 60000).toISOString(),
+    passed,
+    method: 'fallback-direct',
+    checks: {},
+    errors: [],
+    summary: 'fixture run'
+  }, null, 2));
+  return p;
+}
 
 const projectRoot = path.join(__dirname, '..');
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
@@ -195,9 +254,13 @@ describe('approveSubplans', () => {
   it('crosses Gate 3 (review→done) for all siblings', () => {
     const tmp = makeTmpProject();
     try {
-      // Review→done siblings already carry a Gate-2 human marker and have no TODO/FIXME.
-      writePlan(tmp, 'review', 'PARENT-s1', { parent: 'PARENT', dependsOn: 'none', approved: true });
-      writePlan(tmp, 'review', 'PARENT-s2', { parent: 'PARENT', dependsOn: 'PARENT-s1', approved: true });
+      // Review→done siblings carry a Gate-2 human marker, a full completed
+      // Execution Plan, and a fresh passing VERIFY evidence artifact — the shape
+      // validateReviewToDone now demands before Gate 3 may cross (W05-s2).
+      const s1 = writePlan(tmp, 'review', 'PARENT-s1', { parent: 'PARENT', dependsOn: 'none', approved: true, extra: EXEC_PLAN_COMPLETE });
+      const s2 = writePlan(tmp, 'review', 'PARENT-s2', { parent: 'PARENT', dependsOn: 'PARENT-s1', approved: true, extra: EXEC_PLAN_COMPLETE });
+      writeVerifyArtifact(tmp, 'PARENT-s1', s1);
+      writeVerifyArtifact(tmp, 'PARENT-s2', s2);
 
       const result = approveSubplans('PARENT', 'review', tmp);
 

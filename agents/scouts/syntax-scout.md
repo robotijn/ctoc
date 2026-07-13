@@ -1,5 +1,3 @@
-# Syntax Scout (v8 Tier 3)
-
 ---
 name: syntax-scout
 description: Fast AST/parser-level syntax check. Pass/flag decision in ~50ms. Short-circuits the deep readability/quality specialists when code parses cleanly. Runs as Haiku subagent in isolated 200K context.
@@ -17,6 +15,8 @@ effort_budget:
 pillar: readability
 short_circuits: quality/code-reviewer
 ---
+
+# Syntax Scout (v8 Tier 3)
 
 ## Role
 

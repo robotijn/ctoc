@@ -149,7 +149,7 @@ function getVersion(projectPath) {
  * @param {string} projectPath
  * @returns {string} Dashboard table
  */
-function buildDashboardTable(projectPath) {
+function buildDashboardTable(projectPath, opts = {}) {
   const root = getProjectPath(projectPath);
   const counts = getPlanCounts(root);
   const visionCounts = getVisionCounts(root);
@@ -200,15 +200,18 @@ function buildDashboardTable(projectPath) {
   // Fail-open: a corrupt/absent registry loads as empty → renderTasksSection === ''
   // → ZERO added output, so the dashboard is byte-for-byte unchanged for a project
   // with no background tasks (protects every dashboard substring/count regression).
-  // NB4: reconcile the registry against the live harness TaskList BEFORE rendering,
+  // NB4/H8: reconcile the registry against the live harness TaskList BEFORE rendering,
   // so a session-restart orphan (a `running` task with no live agent) stops blocking
-  // the ≤5 concurrency count and is offered for re-run. The menu.js child process has
-  // no access to the harness Task tool, so it passes liveAgentIds: null → the
-  // staleness backstop governs (conservative but correct). Fully fail-open: ANY
-  // reconcile failure falls back to the plain load so the dashboard always renders.
+  // the ≤5 concurrency count and is offered for re-run — WITHOUT falsely orphaning a
+  // genuinely-live long-running agent. The live agent-id list now flows in from the
+  // caller as `opts.liveAgentIds` (menu.js parses it from the `--live-agent-ids <csv>`
+  // argv flag the parent session appends on each on-open render). When it is absent
+  // (`undefined`/`null` — a true session restart or the TUI child with no Task access),
+  // reconcile falls back to the staleness backstop, exactly as before. Fully fail-open:
+  // ANY reconcile failure falls back to the plain load so the dashboard always renders.
   let orphanedCount = 0;
   try {
-    const { report } = taskReconcile.reconcileState(root, { liveAgentIds: null });
+    const { report } = taskReconcile.reconcileState(root, { liveAgentIds: opts.liveAgentIds });
     orphanedCount = (report && Array.isArray(report.orphaned)) ? report.orphaned.length : 0;
   } catch { /* reconcile is best-effort; a failure must never brick the dashboard */ }
   let taskReg;
@@ -275,7 +278,7 @@ function buildDashboardTable(projectPath) {
  *
  * Section selection → `section {name}` drills into the stages within.
  */
-function dashboardPipeline(projectPath) {
+function dashboardPipeline(projectPath, opts = {}) {
   const root = getProjectPath(projectPath);
   const counts = getPlanCounts(root);
   const visionCounts = getVisionCounts(root);
@@ -284,7 +287,8 @@ function dashboardPipeline(projectPath) {
   const implTotal     = counts.implementation + counts.todo;
   const execTotal     = counts.inProgress + counts.review + (counts.done || 0);
 
-  const text = buildDashboardTable(root) + '\n\n\n';
+  // H8: forward the live-agent ids into the reconcile the dashboard table runs.
+  const text = buildDashboardTable(root, opts) + '\n\n\n';
 
   const options = [
     {
@@ -1454,6 +1458,11 @@ function parseTaskArgs(subArgs) {
       case '--label': out.label = String(args[++i] == null ? '' : args[i]); break;
       case '--summary': out.summary = String(args[++i] == null ? '' : args[i]); break;
       case '--next': out.next = String(args[++i] == null ? '' : args[i]); break;
+      // H8: the harness agent id to record on the task at `menu task start`, so the
+      // on-open reconcile can match it against the live-agent-id set (never falsely
+      // orphaning a genuinely-live long-running agent). Defaults to the task id
+      // downstream when omitted.
+      case '--agent-id': out.agentId = String(args[++i] == null ? '' : args[i]); break;
       case '--gate': out.gate = args[++i]; break;
       case '--b64': out.b64 = String(args[++i] == null ? '' : args[i]); break;
       default: out.positional.push(a);
@@ -1544,7 +1553,13 @@ function taskTransition(root, rest, kind) {
     throw new Error(`task-registry: invalid transition ${task.status} → ${targetOf[kind]}`);
   }
   let patch;
-  if (kind === 'start') patch = { status: 'running' };
+  // H8: record `agentTaskId` at start so the on-open reconcile has something to
+  // match the live-agent-id set against. Use the caller-supplied `--agent-id`
+  // (the harness id the session will later report in its live TaskList), falling
+  // back to the task id when none is supplied — the wiring works before the session
+  // is taught to pass the harness id, and tightens when it is. `agentTaskId` is on
+  // task-registry's MUTABLE_FIELDS allowlist, so updateTask accepts it unchanged.
+  if (kind === 'start') patch = { status: 'running', agentTaskId: p.agentId || id };
   else if (kind === 'fail') patch = { status: 'failed', result: { ok: false, summary: p.summary || 'failed' } };
   else patch = { status: 'failed', result: { ok: false, summary: 'cancelled', cancelled: true } };
   taskRegistry.updateTask(reg, id, patch);
@@ -1661,9 +1676,9 @@ function taskDetailScreen(id, projectPath) {
  * @param {string} [projectPath] - Project root override
  * @returns {Object} Screen JSON { text, ask, actions }
  */
-function route(args, projectPath) {
+function route(args, projectPath, opts = {}) {
   if (!args || args.length === 0) {
-    return dashboardPipeline(projectPath);
+    return dashboardPipeline(projectPath, opts);
   }
 
   const cmd = args[0];
@@ -1677,7 +1692,7 @@ function route(args, projectPath) {
       if (args[1] === 'task') {
         return taskCommand(args.slice(2), projectPath);
       }
-      return dashboardPipeline(projectPath);
+      return dashboardPipeline(projectPath, opts);
 
     // NB2: distinct top-level nav commands (no collision with `menu task …`).
     case 'tasks':
@@ -1702,16 +1717,16 @@ function route(args, projectPath) {
         if (args[2] === 'override') return inboxCleanupPlanOverride(args[3], projectPath); // <slug>
         return inboxCleanupReview(projectPath); // bare 'inbox cleanup'
       }
-      return dashboardPipeline(projectPath); // unknown inbox subcommand → safe default
+      return dashboardPipeline(projectPath, opts); // unknown inbox subcommand → safe default
 
     case 'plan': {
       const ref = args[1]; // stage/file
       if (!ref) {
-        return dashboardPipeline(projectPath);
+        return dashboardPipeline(projectPath, opts);
       }
       const slashIndex = ref.indexOf('/');
       if (slashIndex === -1) {
-        return dashboardPipeline(projectPath);
+        return dashboardPipeline(projectPath, opts);
       }
       const stage = ref.substring(0, slashIndex);
       const file = ref.substring(slashIndex + 1);
@@ -1734,11 +1749,11 @@ function route(args, projectPath) {
     case 'validate': {
       const ref = args[1];
       if (!ref) {
-        return dashboardPipeline(projectPath);
+        return dashboardPipeline(projectPath, opts);
       }
       const slashIndex = ref.indexOf('/');
       if (slashIndex === -1) {
-        return dashboardPipeline(projectPath);
+        return dashboardPipeline(projectPath, opts);
       }
       const stage = ref.substring(0, slashIndex);
       const file = ref.substring(slashIndex + 1);
@@ -1746,7 +1761,7 @@ function route(args, projectPath) {
     }
 
     default:
-      return dashboardPipeline(projectPath);
+      return dashboardPipeline(projectPath, opts);
   }
 }
 

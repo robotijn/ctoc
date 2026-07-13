@@ -6,10 +6,10 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.10.3-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.10.4-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
-  <img alt="Skills" src="https://img.shields.io/badge/skills-421-blue">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-422-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
@@ -295,7 +295,7 @@ Three approvals per plan. Steps 1-7: agents ask, you decide. Steps 8-16: agents 
 - **Ideation-first workflow** — Product-owner agent explores your idea, asks questions, and shapes it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
 - **124 agents** across 25 categories — testing, security, quality, infrastructure, SaaS, product, scouts, compliance, AI quality, safety, legal, realtime, and more
-- **421 skill files** — 99 Tier-2 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
+- **422 skill files** — 100 Tier-2 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — Iterative critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) before Gate 3 — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
 - **4-tier agent architecture** — CTO Chief (Tier 0, sole dispatcher) → 16 sub-orchestrators (Tier 1) → specialists (Tier 2) → 5 Haiku scouts (Tier 3) for fast pre-screens — see [AGENT_ARCHITECTURE.md](docs/AGENT_ARCHITECTURE.md)
@@ -547,7 +547,7 @@ Agents spawn conditionally based on your project and current Iron Loop step. Sco
 
 ## Skills
 
-**421 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
+**422 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
 
 There are two kinds of skills:
 
@@ -823,7 +823,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.10.3'
+getVersion()       // → '6.10.4'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -842,7 +842,7 @@ ctoc/
 ├── src/
 │   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       16 Claude Code hooks (session, pre/post tool use, andon-halt)
-│   ├── lib/         123 JS modules (planning, quality, refinement, dispatcher; the
+│   ├── lib/         130 JS modules (planning, quality, refinement, dispatcher; the
 │   │                EU-compliance program — regulatory-regime, compliance-regime,
 │   │                compliance-dedup, compliance-integration, iron-loop-compliance-trigger,
 │   │                gdpr-helpers, gdpr-agent-runner, eu-ai-act-helpers,
@@ -860,7 +860,7 @@ ctoc/
 ├── agents/          124 agent definitions across 25 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
 │                     async-choice-protocol, no-stub-rule, warnings-are-critical)
-├── skills/          421 skill files: 99 Tier-2 specialist bodies (SKILL.md)
+├── skills/          422 skill files: 100 Tier-2 specialist bodies (SKILL.md)
 │                    + 322 reference files (50 langs, 211 frameworks,
 │                    61 quality configs). 38 unreachable refs removed in v6.9.14;
 │                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
@@ -892,6 +892,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.10.3** · Built by [@robotijn](https://github.com/robotijn)
+**6.10.4** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

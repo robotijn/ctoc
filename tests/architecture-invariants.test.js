@@ -14,11 +14,25 @@ const path = require('path');
 
 const projectRoot = path.join(__dirname, '..');
 
+// Anchored at byte 0 to match the Claude Code runtime (finding C7). The runtime
+// honours agent/skill frontmatter ONLY when it starts at byte 0; the previous
+// match-anywhere read (a `/m` `^---` plus an explicit `\n---` fallback) parsed a
+// YAML block that follows an `# H1` heading — frontmatter the runtime never reads —
+// and thereby certified inert contracts green (cto-chief running with all tools,
+// scouts on the session model). This single byte-0 regex (no `/m`, no fallback)
+// makes the test agree with the runtime: a heading-first file yields empty
+// frontmatter and its contract assertions fail loud. GREEN on today's tree because
+// W03 moved the 19 heading-first agents' YAML to line 1; if any file regresses to
+// heading-first, its frontmatter parses as empty here. Pure so the anchoring is
+// provable on an in-memory value without a fixture file (see the C7 describe below).
+function parseFrontmatter(content) {
+  const m = /^---\n([\s\S]*?)\n---/.exec(content);
+  return m ? m[1] : '';
+}
+
 function readFM(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
-  const m = content.match(/^---\n([\s\S]*?)\n---/m) ||
-            content.match(/\n---\n([\s\S]*?)\n---/);
-  return { fm: m ? m[1] : '', body: content };
+  return { fm: parseFrontmatter(content), body: content };
 }
 
 function walkSkillFiles(dir, opts = {}) {
@@ -377,5 +391,82 @@ describe('Frontmatter conformance — SKILL.md', () => {
       assert.match(fm, /^type:\s*skill\s*$/m, `${rel} must declare type: skill`);
       assert.doesNotMatch(fm, /^allowed-tools:/m, `${rel} must NOT use deprecated allowed-tools: (use tools:)`);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+//  Frontmatter anchoring — finding C7
+//
+//  The runtime honours frontmatter only when it begins at byte 0. These
+//  cases prove the anchored parser is non-vacuous: it parses a well-formed
+//  (byte-0) block and REJECTS a heading-first block — the exact loophole
+//  that let inert agent contracts certify green. The bad value is held in
+//  memory (no fixture file); the real corpus is byte-0-anchored today
+//  because W03 already moved the 19 heading-first agents' YAML to line 1,
+//  so the corpus assertions above are green while these cases guard that
+//  the anchoring itself still discriminates.
+// ─────────────────────────────────────────────────────────────────────
+
+describe('Frontmatter anchoring — parseFrontmatter (finding C7)', () => {
+  it('parses frontmatter when the content begins with --- at byte 0', () => {
+    const fm = parseFrontmatter('---\ntier: 0\nrole: top-level-coordinator\n---\n# Title\nbody\n');
+    assert.match(fm, /^tier:\s*0$/m, 'byte-0 frontmatter must parse');
+    assert.match(fm, /role:\s*top-level-coordinator/, 'byte-0 frontmatter must parse');
+  });
+
+  it('returns empty frontmatter when an # H1 heading precedes the YAML (runtime ignores it)', () => {
+    // Synthetic heading-first content, in memory only — the precise shape the
+    // Claude Code runtime never parses. The old match-anywhere read would have
+    // returned `tier: 3\nmodel: haiku`; the anchored parser must reject it.
+    const headingFirst = '# Some Agent\n\n---\ntier: 3\nmodel: haiku\n---\n';
+    assert.equal(parseFrontmatter(headingFirst), '', 'mid-file frontmatter must not parse');
+  });
+
+  it('returns empty frontmatter when any text precedes the opening --- (even one blank line)', () => {
+    assert.equal(parseFrontmatter('\n---\ntier: 2\n---\n'), '', 'a leading newline is not byte 0');
+  });
+
+  it('does not treat a mid-file --- fence as frontmatter', () => {
+    // A prose paragraph followed by a horizontal-rule fence must not be read as a contract.
+    const proseFirst = 'Some intro prose.\n\n---\nnot: frontmatter\n---\n';
+    assert.equal(parseFrontmatter(proseFirst), '', 'a mid-file fence is not byte-0 frontmatter');
+  });
+
+  // Load-bearing differential: this pins that the byte-0 anchoring is NOT a no-op.
+  // It reconstructs the pre-C7 lenient reader in memory (the removed `/m` `^---`
+  // match plus the explicit `\n---` match-anywhere fallback) and proves, on the
+  // SAME heading-first value, that the old reader ACCEPTED the misplaced YAML the
+  // runtime never reads while the shipped anchored parser REJECTS it. If a future
+  // refactor silently loosened `parseFrontmatter` back toward match-anywhere, this
+  // assertion — not just the reject cases above — turns red, because it asserts the
+  // two parsers DISAGREE on exactly the loophole finding C7 closed. The inline
+  // pre-C7 function is a reference oracle (the historical implementation), not a
+  // test double of the code under test.
+  it('anchoring is load-bearing: the pre-C7 lenient reader accepted what the anchored parser rejects', () => {
+    function parseFrontmatterLenientPreC7(content) {
+      const m = content.match(/^---\n([\s\S]*?)\n---/m) ||
+                content.match(/\n---\n([\s\S]*?)\n---/);
+      return m ? m[1] : '';
+    }
+
+    // Plan W03-s2's exact fixtures (Story B / finding C7).
+    const headingFirst = '# Title\n\n---\nname: x\n---\n';
+    const byte0 = '---\nname: x\n---\n# Title\n';
+
+    // The old reader mis-parsed the mid-file block — the false-green this fix closes.
+    assert.match(
+      parseFrontmatterLenientPreC7(headingFirst), /^name:\s*x$/m,
+      'sanity: the pre-C7 lenient reader DID accept the heading-first block (the defect)'
+    );
+    // The shipped anchored parser rejects the identical input — the fix.
+    assert.equal(
+      parseFrontmatter(headingFirst), '',
+      'anchored parser must reject the same heading-first block the old reader accepted'
+    );
+    // And it still accepts the byte-0 form (no over-rejection).
+    assert.match(
+      parseFrontmatter(byte0), /^name:\s*x$/m,
+      'anchored parser must still accept byte-0 frontmatter'
+    );
   });
 });

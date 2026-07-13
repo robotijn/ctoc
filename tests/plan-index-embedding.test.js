@@ -3,8 +3,10 @@
  *
  * TDD-first. Every Ollama HTTP call is an INJECTED mock (deps.ollamaClient /
  * deps.fetch); no live network is required in CI. EM-05 is an integration test
- * against the SHIPPED PI1 store (gate-skips loudly if PI1 is absent). EM-12 is a
- * live-Ollama smoke test that LOUD-skips (t.skip) when Ollama is unreachable.
+ * against the SHIPPED PI1 store (hard-requires it, so an absent PI1 fails loudly —
+ * skip-guard integrity, finding A2). EM-12 is a live-Ollama smoke test that
+ * LOUD-skips (t.skip) when Ollama is unreachable — a runtime-probe skip, not a
+ * require-swallow, so it stays a legitimate skip.
  *
  * Hermetic: a per-test temp dir (fs.mkdtempSync(os.tmpdir())) supplies the
  * projectPath so calibration.json never touches the real .ctoc/index/.
@@ -25,6 +27,9 @@ const hardwareProbe = require('../src/lib/plan-index/hardware-probe');
 const calibration = require('../src/lib/plan-index/calibration');
 const summaryExtract = require('../src/lib/plan-index/summary-extract');
 const stateMod = require('../src/lib/state');
+// Hard require the PI1 store: EM-05 is an integration test against it, so an absent
+// PI1 must fail at load, never skip (skip-guard integrity, finding A2).
+const { openStore } = require('../src/lib/plan-index');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -251,18 +256,7 @@ test('EM-04b loadCalibration returns null when absent (fail-open)', () => {
 
 // ── EM-05: [integration] calibration dimension → PI1 store via first upsert ────
 
-test('EM-05 [integration] first upsert of Float32Array locks store.dimension', (t) => {
-  let openStore;
-  try {
-    ({ openStore } = require('../src/lib/plan-index'));
-  } catch {
-    t.skip('PI1 store not available — integration test gated on PI1');
-    return;
-  }
-  if (typeof openStore !== 'function') {
-    t.skip('PI1 openStore not available — integration test gated on PI1');
-    return;
-  }
+test('EM-05 [integration] first upsert of Float32Array locks store.dimension', () => {
   const dir = tmpProject();
   try {
     const jsonPath = path.join(dir, '.ctoc', 'index', 'plan-index.json');

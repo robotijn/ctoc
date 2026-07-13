@@ -43,6 +43,13 @@
     three-letter short form; "user interface", not the two-letter one; "continuous
     integration", not the two-letter one). Refer to each item by its real,
     spelled-out subject, never by an internal code.
+14. **Fix the failures, not the tests.** When a test fails, the default is that
+    the code is wrong — fix the code first. Changing the test is the last resort,
+    allowed only when the test itself is plain wrong (it asserts a bug, a cosmetic
+    non-behavior, or a contract the human has explicitly replaced) — and then the
+    change must tighten the test toward the real behavior, never loosen it to make
+    red go green. Weakening an assertion, widening a range, deleting a case, or
+    whitelisting without a justified reason is green-washing, not fixing.
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2

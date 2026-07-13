@@ -13,7 +13,7 @@
  *
  * Mechanics:
  *   - The hook is run as a real child process (`spawnSync(process.execPath,...)`)
- *     so we exercise the exact code path Claude Code uses. status 1 = BLOCKED,
+ *     so we exercise the exact code path Claude Code uses. status 2 = BLOCKED,
  *     status 0 = ALLOWED. A null status (killed by signal) is a harness failure
  *     and is surfaced loudly.
  *   - Each test builds an isolated temp project that is a *real* CTOC project
@@ -103,13 +103,13 @@ function runHook(dir, target, { transcriptPath } = {}) {
   // not a meaningful BLOCK/ALLOW result. Surface it loudly.
   assert.equal(res.signal, null, `edit hook killed by signal ${res.signal}; stderr=${res.stderr}`);
   assert.ok(
-    res.status === 0 || res.status === 1,
+    res.status === 0 || res.status === 2,
     `edit hook produced a non-meaningful exit code ${res.status}; stderr=${res.stderr}`,
   );
   return res;
 }
 
-const BLOCKED = 1;
+const BLOCKED = 2;
 const ALLOWED = 0;
 
 // ---------------------------------------------------------------------------

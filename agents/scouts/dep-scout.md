@@ -1,5 +1,3 @@
-# Dependency Scout (v8 Tier 3)
-
 ---
 name: dep-scout
 description: Fast known-bad CVE lookup. No full audit, no transitive walk — just a manifest diff against a curated known-bad list. Short-circuits the deep dependency-auditor. Runs as Haiku subagent in isolated 200K context.
@@ -17,6 +15,8 @@ effort_budget:
 pillar: security
 short_circuits: security/dependency-auditor
 ---
+
+# Dependency Scout (v8 Tier 3)
 
 ## Role
 

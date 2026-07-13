@@ -263,6 +263,13 @@ describe('operations-registry — gdpr-agent LIVE wiring + gate-safety', () => {
     const humanGates = [...registrySrc.matchAll(/human_gate:\s*true/g)];
     assert.equal(humanGates.length, 3, 'exactly the three iron-loop human gates remain');
     // The additive entry did not turn the advisory registry into a blocking one.
-    assert.doesNotMatch(registrySrc, /gdpr-agent:[\s\S]*?review_gate:\s*true/, 'gdpr-agent adds no review gate');
+    // Scoped to the gdpr-agent ENTRY BLOCK (same isolation as the eu-ai-act twin
+    // test): an unbounded `gdpr-agent:[\s\S]*?review_gate: true` span would
+    // false-positive on the legitimate review_gate markers in the iron_loop
+    // section hundreds of lines later.
+    const entryRe = /^\s{2}gdpr-agent:\s*$([\s\S]*?)(?=^\s{2}[a-z#]|^[a-z#]|^\s*$)/m;
+    const entry = registrySrc.match(entryRe);
+    assert.ok(entry, 'gdpr-agent entry block isolated');
+    assert.doesNotMatch(entry[0], /review_gate:\s*true/, 'gdpr-agent adds no review gate');
   });
 });

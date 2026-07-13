@@ -1,6 +1,6 @@
 {
   "name": "ctoc",
-  "version": "6.10.3",
+  "version": "6.10.4",
   "description": "Your Virtual CTO — AI agents and expert skills with quality gates. A Claude Code plugin.",
   "license": "PolyForm-Shield-1.0.0",
   "private": true,
@@ -8,7 +8,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test tests/*.test.js",
+    "test": "node src/scripts/test-gate.js --experimental-test-coverage",
+    "test:raw": "node --test tests/*.test.js",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "typecheck": "tsc --noEmit"

@@ -4,25 +4,14 @@
  */
 
 const assert = require('assert');
-const { test, describe, beforeEach } = require('node:test');
+const { test, describe } = require('node:test');
 
-let addExplorationTemplate;
+// Hard require: if the module is deleted/renamed, this throws at load and the whole
+// file reports a failure — never a silent skip (skip-guard integrity, finding A2).
+const addExplorationTemplate = require('../src/scripts/add-exploration-template.js');
 
 describe('Add Exploration Template Tests', () => {
-  beforeEach(() => {
-    delete require.cache[require.resolve('../src/scripts/add-exploration-template.js')];
-    try {
-      addExplorationTemplate = require('../src/scripts/add-exploration-template.js');
-    } catch (e) {
-      addExplorationTemplate = null;
-    }
-  });
-
   test('hasUserInteraction returns true for agents in INTERACTIVE_AGENTS list', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const content = '# Some Agent\n\nContent here';
     const result = addExplorationTemplate.hasUserInteraction(content, 'coordinator/plan-architect.md');
     // plan-architect should be in the interactive list
@@ -31,10 +20,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('hasUserInteraction returns true for pattern matches (AskUserQuestion)', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const content = '# Agent\n\nUse the AskUserQuestion tool to gather input.';
     const result = addExplorationTemplate.hasUserInteraction(content, 'any/agent.md');
     assert.strictEqual(result, true, 'Should detect AskUserQuestion pattern');
@@ -42,10 +27,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('hasUserInteraction returns false for pure automation agents', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     // Content without any user interaction keywords
     const content = '# Automation Agent\n\nRuns automatically without any interaction.';
     const result = addExplorationTemplate.hasUserInteraction(content, 'automation/runner.md');
@@ -54,10 +35,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('hasExplorationProtocol detects existing protocol section', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const contentWith = '# Agent\n\n## Exploration Protocol\n\nExisting content';
     const contentWithout = '# Agent\n\n## Other Section\n\nContent';
 
@@ -75,10 +52,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('findInsertionPoint returns position before ## Output section', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const content = '# Agent\n\n## Role\n\nRole content\n\n## Output\n\nOutput content';
     const position = addExplorationTemplate.findInsertionPoint(content);
     assert.ok(position > 0, 'Should find a position');
@@ -87,10 +60,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('findInsertionPoint returns end of file when no markers found', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const content = '# Agent\n\nJust content, no markers.';
     const position = addExplorationTemplate.findInsertionPoint(content);
     assert.strictEqual(position, content.length, 'Should return end of file');
@@ -98,10 +67,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('processAgent returns skip for agents with existing protocol', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     // Mock file content with existing protocol
     const result = addExplorationTemplate.processAgent('/mock/agent.md', {
       mockContent: '# Agent\n\n## Exploration Protocol\n\nExists',
@@ -112,10 +77,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('processAgent returns updated for interactive agents without protocol', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = addExplorationTemplate.processAgent('/mock/coordinator/plan-architect.md', {
       mockContent: '# Plan Architect\n\nUse AskUserQuestion to gather requirements.',
       dryRun: true
@@ -125,10 +86,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('dry-run mode does not modify files', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = addExplorationTemplate.processAgent('/mock/agent.md', {
       mockContent: '# Agent\n\nContent',
       dryRun: true
@@ -138,10 +95,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('edge case: agent file with only title (no sections)', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const content = '# Minimal Agent';
     const position = addExplorationTemplate.findInsertionPoint(content);
     assert.ok(typeof position === 'number', 'Should return a number');
@@ -149,10 +102,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('edge case: agent file does not exist (graceful error)', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = addExplorationTemplate.processAgent('/nonexistent/path/agent.md', {
       dryRun: true
     });
@@ -161,10 +110,6 @@ describe('Add Exploration Template Tests', () => {
   });
 
   test('edge case: agent file is read-only (proper error message)', (t) => {
-    if (!addExplorationTemplate) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     // This test would need actual file system mocking
     // For now, just verify the function exists
     assert.ok(typeof addExplorationTemplate.processAgent === 'function');

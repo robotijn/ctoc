@@ -113,20 +113,12 @@ async function main() {
 
   // 5b. Ensure CTOC-managed operating-lessons block in CLAUDE.md (fail-open).
   //     MUST NOT throw, block, or perceptibly slow session start. Double-guarded:
-  //     ensureLessonsBlock itself never throws; this try/catch is a belt-and-braces backstop.
-  //     Self-repo guard: never auto-edit CTOC's OWN hand-maintained CLAUDE.md (the dev repo).
-  //     In a consumer project the hook runs from the installed plugin, so ctocRoot (the plugin
-  //     root) differs from projectPath and injection proceeds normally.
-  try {
-    const ctocRoot = path.resolve(__dirname, '..', '..');
-    if (path.resolve(projectPath) !== ctocRoot) {
-      const { ensureLessonsBlock } = require('../lib/claude-md-lessons');
-      const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
-      ensureLessonsBlock(claudeMdPath, ctocRoot);
-    }
-  } catch (err) {
-    console.error('[CTOC] Lessons block injection skipped:', err.message);
-  }
+  //     ensureLessonsBlock itself never throws; the try/catch inside maybeInjectLessons
+  //     is a belt-and-braces backstop. The self-repo guard now keys on PACKAGE IDENTITY
+  //     (the project's own package.json name === 'ctoc', via the detector's isCtocRepo)
+  //     rather than the running hook file's __dirname — so CTOC's own hand-maintained
+  //     CLAUDE.md is protected from ANY install location (installed plugin or dev repo).
+  maybeInjectLessons(projectPath);
 
   // 6. Check for updates (sync cache check only — no stderr output in hooks)
   const version = getVersion();
@@ -147,6 +139,59 @@ async function main() {
   // 8. Output context for Claude (to stdout for hook consumption)
   const context = generateContext(stack, state, version, updateInfo, selfCheckSummary);
   console.log(context);
+}
+
+/**
+ * Decide whether SessionStart may inject the CTOC-managed operating-lessons block
+ * into a project's CLAUDE.md.
+ *
+ * Identity is by PACKAGE, not by file location: the project is CTOC's own repo iff
+ * its own `package.json` declares `"name": "ctoc"` (the detector's `isCtocRepo`).
+ * This helper uses no `__dirname`, so the decision is independent of where the
+ * running hook file physically lives (installed plugin vs. cloned dev repo) — the
+ * exact case the old `__dirname` guard got wrong.
+ *
+ * Fail-safe direction: if identity cannot be determined at all (e.g. the detector
+ * module cannot be required), return `false` (do NOT inject) — protecting the
+ * maintainer's hand-maintained file is the headline of this fix, and this matches
+ * SessionStart's existing "any error → skip injection" behaviour. (`isCtocProject`
+ * is itself internally non-throwing, so this catch is belt-and-braces.)
+ *
+ * @param {string} projectPath - Absolute path to the target project root.
+ * @returns {boolean} true when the project is a consumer project safe to inject into.
+ */
+function shouldInjectLessons(projectPath) {
+  try {
+    return !require('../lib/ctoc-project-detector').isCtocProject(projectPath).isCtocRepo;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Inject the CTOC operating-lessons block into a project's CLAUDE.md when the
+ * package-identity guard allows it. No-op for CTOC's own repo. Never throws.
+ *
+ * `__dirname` is used here for its ONE legitimate purpose — locating the plugin's
+ * OWN operating-lessons template to pass as `ensureLessonsBlock`'s source-of-content
+ * (`ctocRoot`) fallback. That is a correct "find the plugin's own asset" use of
+ * where the code lives; it is NOT used for target-project identity (that is
+ * `shouldInjectLessons` above).
+ *
+ * @param {string} projectPath - Absolute path to the target project root.
+ * @returns {void}
+ */
+function maybeInjectLessons(projectPath) {
+  try {
+    if (!shouldInjectLessons(projectPath)) return;
+    // Template source only — locating the plugin's own lessons asset, NOT identity.
+    const ctocRoot = path.resolve(__dirname, '..', '..');
+    const { ensureLessonsBlock } = require('../lib/claude-md-lessons');
+    const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
+    ensureLessonsBlock(claudeMdPath, ctocRoot);
+  } catch (err) {
+    console.error('[CTOC] Lessons block injection skipped:', err && err.message);
+  }
 }
 
 /**
@@ -193,7 +238,10 @@ The Iron Loop is enforced by hooks. You CANNOT Edit or Write files until:
 - Steps 5-7 complete (technical plan approved)
 - Current step >= 8
 
-This is cryptographically enforced. There are no escape phrases.
+Enforcement runs as a PreToolUse hook. When no active plan covers a file and you
+have not typed an escape phrase, the hook blocks the edit. Escape phrases exist
+(see /ctoc:menu) and count ONLY when you type them yourself — the hook ignores an
+escape phrase that appears in tool output or when a file such as CLAUDE.md is read.
 
 ## Red Lines (Never Compromise)
 
@@ -213,4 +261,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, generateContext };
+module.exports = { main, generateContext, shouldInjectLessons, maybeInjectLessons };

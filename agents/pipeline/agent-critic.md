@@ -1,5 +1,3 @@
-# Agent-Critic
-
 ---
 name: agent-critic
 description: World-class agent evaluator. Scores on 8 research-grounded dimensions with calibration anchors. 10/10 requires zero flaws across all dimensions. Grounded in ISO 25010/25059, RLHF reward modeling, Constitutional AI, and the CLEAR framework. Sub-orchestrator reporting to CTO Chief.
@@ -12,6 +10,8 @@ model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---
+
+# Agent-Critic
 
 ## v7 Operating Principles
 

@@ -1,20 +1,63 @@
 #!/usr/bin/env node
+'use strict';
 /**
  * Human Gate Checker - Pre-tool hook
- * Runs before EVERY tool call to detect human gate violations
+ * Runs before EVERY tool call to detect human gate violations.
  *
- * Human gates (require approval marker):
+ * Human gates (destination folder ← source folder for revert):
  *   functional → implementation
  *   implementation → todo
  *   review → done
+ *
+ * Acceptance provenance (finding C4). A plan resident in a gate-destination
+ * folder is accepted as human-approved ONLY when the content-hashed approval
+ * ledger at `.ctoc/approvals/<slug>.json` vouches for it — NEVER by parsing the
+ * `approved_by: human` marker out of the plan's own frontmatter, which any agent
+ * can write with an ordinary tool call. The ledger directory is agent-write-
+ * denied at the enforcement layer, so it is a provenance source an agent cannot
+ * forge. Acceptance is folder-sensitive, and this is FORCED by C4: because the
+ * ledger is agent-write-denied, an agent that legitimately edits a plan in
+ * `implementation/` cannot refresh the hash, so acceptance there binds to the
+ * FACT of the Gate-1 crossing (a ledger entry whose `stage_to === 'implementation'`
+ * exists) rather than a frozen hash; the tamper-sensitive terminal folders
+ * `todo/` and `done/`, where no legitimate agent editing occurs, additionally
+ * require a live-content hash match (invalidate-on-edit).
+ *
+ * SIP1 exemption (finding H7). A freshly-authored SIP1 slice sits in
+ * `implementation/` carrying `parent_plan`, was never moved across a gate, and
+ * was never meant to carry an approval marker — so it has no ledger entry. It is
+ * exempt from the residency revert in `implementation/` only. The exemption is
+ * NOT a blanket bypass: a plan lacking `parent_plan` (or one that already has a
+ * ledger entry) is still evaluated normally, and the exemption can never be
+ * triggered from `todo/` or `done/`.
+ *
+ * Fault-isolated revert (finding C5). The revert of each violation is wrapped in
+ * its OWN try/catch (`revertAll`): a throw from one revert is recorded in a
+ * returned `failures[]` and the loop CONTINUES to the next violation, so one
+ * filesystem error can never abandon the revert of every other outstanding
+ * violation (including a Gate 3 violation). When any revert fails the sweep
+ * records an INCOMPLETE outcome rather than a silent clean pass.
+ *
+ * Migration open-decision (flagged for the maintainer, not silently resolved):
+ * plans approved before the ledger existed have no ledger entry, so on first run
+ * the strict `todo`/`done` rule would flag them. This module does NOT auto-
+ * backfill (the ledger is trusted-write-only) and does NOT grandfather the
+ * forgeable in-plan marker (that would reopen C4). The recommended path is a
+ * one-time TRUSTED maintainer-run backfill converting each legacy in-plan marker
+ * into a ledger entry at adoption — a scheduling call for the maintainer.
  */
 
 const path = require('path');
 
 const safeFs = require('../lib/safe-fs');
+const durableLog = require('../lib/durable-log');
 
-const PLANS_DIR = path.join(process.cwd(), 'plans');
 const LOG_DIR = path.join(process.cwd(), '.ctoc', 'logs');
+// The gate-violations store is an append-only JSONL file managed through the
+// shared `durable-log` primitive (W11-s4), and is SHARED with the other writer
+// `src/lib/violation-tracker.js` — both append via the identical JSONL format.
+// `logViolation` is a single lossless O_APPEND (no read-modify-write, no lost
+// updates under concurrency); a corrupt file is quarantined, never reset to `[]`.
 const VIOLATIONS_FILE = path.join(LOG_DIR, 'gate-violations.json');
 
 // Human gates: destination folder → source folder (for revert)
@@ -24,6 +67,14 @@ const HUMAN_GATES = {
   'done': 'review'
 };
 
+// Terminal gate-destination folders where no legitimate agent editing occurs, so
+// acceptance additionally requires a live-content hash match (invalidate-on-edit).
+const HASH_SENSITIVE_FOLDERS = new Set(['todo', 'done']);
+
+function plansDir(projectPath) {
+  return path.join(projectPath, 'plans');
+}
+
 function ensureDir(dir) {
   if (!safeFs.existsSync(dir)) {
     safeFs.mkdirSync(dir, { recursive: true });
@@ -31,55 +82,105 @@ function ensureDir(dir) {
 }
 
 function loadViolations() {
-  try {
-    if (safeFs.existsSync(VIOLATIONS_FILE)) {
-      return JSON.parse(safeFs.readFileSync(VIOLATIONS_FILE, 'utf8'));
-    }
-  } catch { /* ignore: best-effort, non-fatal */ }
-  return [];
-}
-
-function saveViolations(violations) {
-  ensureDir(LOG_DIR);
-  safeFs.writeFileSync(VIOLATIONS_FILE, JSON.stringify(violations, null, 2));
+  return durableLog.readEntries(VIOLATIONS_FILE);
 }
 
 function logViolation(entry) {
-  const violations = loadViolations();
-  violations.push(entry);
-  // Keep last 100 entries
-  if (violations.length > 100) {
-    violations.splice(0, violations.length - 100);
-  }
-  saveViolations(violations);
+  // Lossless O_APPEND via the shared durable-log; the "keep last 100" cap is
+  // preserved by the primitive's rotation (a rare atomic temp+rename boundary op).
+  durableLog.appendEntry(VIOLATIONS_FILE, entry, { maxEntries: 100 });
 }
 
-function hasApprovalMarker(filePath) {
+/**
+ * Read a plan's full file content, or `null` if it cannot be read. Fail-soft so
+ * a transient read error is treated as "not approved / not exempt" (a violation)
+ * rather than throwing out of the sweep.
+ *
+ * @param {string} filePath - absolute path to the plan file
+ * @returns {string|null}
+ */
+function readPlan(filePath) {
   try {
-    const content = safeFs.readFileSync(filePath, 'utf8');
-    // Approval MUST come from the YAML frontmatter block, never from arbitrary
-    // body text. A substring search (the old behaviour) let any plan forge a
-    // gate crossing by writing "approved_by: human" in a code fence, prose, or
-    // a commented-out / rejected line — and rejected a genuine approval whose
-    // value had non-canonical spacing. Parse the frontmatter and require an
-    // `approved_by` key whose value trims to exactly "human".
-    const fm = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-    if (!fm) return false;
-    for (const line of fm[1].split(/\r?\n/)) {
-      const m = line.match(/^\s*approved_by\s*:\s*(.+?)\s*$/);
-      if (m) {
-        const value = m[1].replace(/^["']|["']$/g, '').trim();
-        if (value === 'human') return true;
-      }
-    }
-    return false;
+    return safeFs.readFileSync(filePath, 'utf8');
   } catch {
-    return false;
+    return null;
   }
 }
 
-function checkFolder(folderName) {
-  const folderPath = path.join(PLANS_DIR, folderName);
+/**
+ * Is a plan in a gate-destination folder genuinely human-approved, per the
+ * agent-write-denied ledger (finding C4)? Folder-sensitive:
+ *   - `todo` / `done` (tamper-sensitive): a ledger entry exists whose `stage_to`
+ *     matches the folder AND whose `content_sha256` matches the live content
+ *     (i.e. `verify(...)` is true) — so a post-approval edit invalidates it;
+ *   - `implementation` (active editing expected): a ledger entry exists whose
+ *     `stage_to === 'implementation'` — acceptance binds to the FACT of the
+ *     Gate-1 crossing, not a frozen hash.
+ * Never trusts the plan-body `approved_by: human` marker.
+ *
+ * @param {string} filePath - absolute path to the plan file
+ * @param {string} folderName - the gate-destination folder the plan resides in
+ * @param {string} [projectPath] - project root (defaults to cwd)
+ * @param {string|null} [content] - pre-read file content, to avoid a re-read
+ * @returns {boolean} whether the plan is currently ledger-approved into `folderName`
+ */
+function hasLedgerApproval(filePath, folderName, projectPath = process.cwd(), content = null) {
+  const ledger = require('../lib/approval-ledger');
+  const slug = ledger.slugFromPlanPath(filePath);
+  if (HASH_SENSITIVE_FOLDERS.has(folderName)) {
+    const text = content != null ? content : readPlan(filePath);
+    if (text == null) return false;
+    return ledger.verify(slug, text, folderName, projectPath);
+  }
+  // `implementation` (and any other non-hash-sensitive destination): bind to the
+  // existence of a ledger entry recorded for this exact gate edge.
+  const entry = ledger.readEntry(slug, projectPath);
+  return !!entry && entry.stage_to === folderName;
+}
+
+/**
+ * Is a plan a freshly-authored SIP1 slice exempt from the residency revert
+ * (finding H7)? True iff ALL hold:
+ *   - the plan is in `implementation/`;
+ *   - its MERGED frontmatter region carries a non-empty `parent_plan` (read via
+ *     `extractFrontmatterRegion` so a stamped plan's second block is still seen,
+ *     exactly as `actions.js:listSubplans` does — independent of any
+ *     `parseMetadata` fix);
+ *   - it has NEVER appeared in the ledger (`readEntry === null`), the operational
+ *     proxy for "never resided downstream / never crossed a gate".
+ * The exemption cannot fire outside `implementation/`.
+ *
+ * @param {string} filePath - absolute path to the plan file
+ * @param {string} folderName - the folder the plan resides in
+ * @param {string} [projectPath] - project root (defaults to cwd)
+ * @param {string|null} [content] - pre-read file content, to avoid a re-read
+ * @returns {boolean} whether the plan is a fresh SIP1 slice
+ */
+function isFreshSip1Slice(filePath, folderName, projectPath = process.cwd(), content = null) {
+  if (folderName !== 'implementation') return false;
+  const text = content != null ? content : readPlan(filePath);
+  if (text == null) return false;
+  const { extractFrontmatterRegion } = require('../lib/stale-detector');
+  const region = extractFrontmatterRegion(text);
+  const m = region.match(/^\s*parent_plan\s*:\s*(.+?)\s*$/m);
+  if (!m) return false;
+  const parentPlan = m[1].replace(/^["']|["']$/g, '').trim();
+  if (parentPlan === '') return false;
+  const ledger = require('../lib/approval-ledger');
+  return ledger.readEntry(ledger.slugFromPlanPath(filePath), projectPath) === null;
+}
+
+/**
+ * Collect residency violations in one gate-destination folder. A resident plan is
+ * a violation iff it is NOT a fresh SIP1 slice AND NOT ledger-approved into the
+ * folder. Reads each file's content ONCE and reuses it across both predicates.
+ *
+ * @param {string} folderName - a gate-destination folder (`implementation`|`todo`|`done`)
+ * @param {string} [projectPath] - project root (defaults to cwd)
+ * @returns {Array<{file:string, path:string, folder:string, revertTo:string}>}
+ */
+function checkFolder(folderName, projectPath = process.cwd()) {
+  const folderPath = path.join(plansDir(projectPath), folderName);
   if (!safeFs.existsSync(folderPath)) return [];
 
   const violations = [];
@@ -87,21 +188,32 @@ function checkFolder(folderName) {
 
   for (const file of files) {
     const filePath = path.join(folderPath, file);
-    if (!hasApprovalMarker(filePath)) {
-      violations.push({
-        file,
-        path: filePath,
-        folder: folderName,
-        revertTo: HUMAN_GATES[folderName]
-      });
-    }
+    const content = readPlan(filePath); // one read per file per sweep
+    if (isFreshSip1Slice(filePath, folderName, projectPath, content)) continue;
+    if (hasLedgerApproval(filePath, folderName, projectPath, content)) continue;
+    violations.push({
+      file,
+      path: filePath,
+      folder: folderName,
+      revertTo: HUMAN_GATES[folderName]
+    });
   }
 
   return violations;
 }
 
+/**
+ * Revert one violating plan to its source folder, appending a violation note.
+ * The plans directory is derived from the violation's OWN path (its grandparent
+ * directory), so a revert is correct regardless of the process working directory
+ * — required for isolated testing and for any non-cwd project root.
+ *
+ * @param {{path:string, folder:string, revertTo:string}} violation
+ * @returns {string} the destination path the plan was reverted to
+ */
 function revertPlan(violation) {
-  const destDir = path.join(PLANS_DIR, violation.revertTo);
+  const plans = path.dirname(path.dirname(violation.path));
+  const destDir = path.join(plans, violation.revertTo);
   const destPath = path.join(destDir, path.basename(violation.path));
 
   // Read content and add violation note
@@ -117,14 +229,41 @@ function revertPlan(violation) {
   return destPath;
 }
 
+/**
+ * Revert every violation, isolating each in its OWN try/catch (finding C5). A
+ * throw from one revert is captured in `failures[]` and the loop continues, so a
+ * single filesystem error can never abandon the remaining reverts. The caller
+ * treats a non-empty `failures[]` as an INCOMPLETE outcome (never a clean pass).
+ *
+ * @param {Array<object>} violations
+ * @param {{revertPlan?: (v:object)=>string}} [deps] - injectable revert (defaults
+ *   to the real {@link revertPlan}); the injection point exists so a throwing
+ *   revert can be exercised with the REAL move for the surviving violations.
+ * @returns {{reverted: Array<{violation:object, dest:string}>, failures: Array<{violation:object, error:string}>}}
+ */
+function revertAll(violations, deps = {}) {
+  const revert = (deps && deps.revertPlan) || revertPlan;
+  const reverted = [];
+  const failures = [];
+  for (const v of violations) {
+    try {
+      const dest = revert(v);
+      reverted.push({ violation: v, dest });
+    } catch (err) {
+      failures.push({ violation: v, error: err && err.message ? err.message : String(err) });
+    }
+  }
+  return { reverted, failures };
+}
+
 function main() {
+  const projectPath = process.cwd();
   try {
     // Check all human gate destinations
     const allViolations = [];
 
     for (const folder of Object.keys(HUMAN_GATES)) {
-      const violations = checkFolder(folder);
-      allViolations.push(...violations);
+      allViolations.push(...checkFolder(folder, projectPath));
     }
 
     if (allViolations.length > 0) {
@@ -133,9 +272,14 @@ function main() {
       for (const v of allViolations) {
         console.error(`  Plan: ${v.file}`);
         console.error(`  Location: ${v.folder}/`);
-        console.error(`  Issue: Missing human approval marker`);
+        console.error(`  Issue: No ledger-verified human approval`);
+      }
 
-        // Log violation with status tracking
+      // Fault-isolated revert (C5): one throw never abandons the rest.
+      const { reverted, failures } = revertAll(allViolations);
+
+      for (const r of reverted) {
+        const v = r.violation;
         logViolation({
           id: `v-${Date.now()}`,
           timestamp: new Date().toISOString(),
@@ -145,11 +289,26 @@ function main() {
           status: 'pending_reapproval',
           resolvedAt: null
         });
+        console.error(`  Action: REVERTED ${v.file} to ${v.revertTo}/`);
+      }
 
-        // Revert to previous stage
-        revertPlan(v);
-        console.error(`  Action: REVERTED to ${v.revertTo}/`);
-        console.error('');
+      if (failures.length > 0) {
+        // Do NOT report a clean pass while a violation stands: record each failed
+        // revert as an unresolved, incomplete outcome.
+        for (const f of failures) {
+          const v = f.violation;
+          logViolation({
+            id: `v-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            plan: v.file,
+            violation: `Moved to ${v.folder}/ without approval`,
+            action: `REVERT FAILED (${f.error})`,
+            status: 'revert_failed',
+            resolvedAt: null
+          });
+          console.error(`  ⚠️ REVERT FAILED for ${v.file}: ${f.error} — violation UNRESOLVED`);
+        }
+        console.error(`⚠️  Revert sweep INCOMPLETE: ${failures.length} violation(s) remain unresolved.\n`);
       }
 
       console.error('⚠️  Plans must be approved by human via menu to cross human gates\n');
@@ -159,8 +318,25 @@ function main() {
     console.error(`Warning: Gate check error: ${err.message}`);
   }
 
-  // Exit 0 to allow tool call to proceed
+  // Exit 0 to allow tool call to proceed (fail-open on the tool call itself).
   process.exit(0);
 }
 
-main();
+module.exports = {
+  HUMAN_GATES,
+  hasLedgerApproval,
+  isFreshSip1Slice,
+  checkFolder,
+  revertPlan,
+  revertAll,
+  loadViolations,
+  logViolation,
+  main
+};
+
+// Direct invocation only: importing this module (from a sibling or a test) must
+// never run the residency sweep or call process.exit. Guarded exactly as
+// PreToolUse.Edit.js guards its enforce() entry point.
+if (require.main === module) {
+  main();
+}

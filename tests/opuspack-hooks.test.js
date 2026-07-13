@@ -6,8 +6,8 @@
  * hook behaves). Contracts, per event type (verified against the on-disk
  * siblings, NOT copied blindly from the pack's uniform exit-2):
  *
- *   PreToolUse.Bash.js (blocklist fold)  — input via env CLAUDE_TOOL_INPUT,
- *       exit 0 = ALLOW, exit 1 = BLOCK  (matches the existing Bash gate).
+ *   PreToolUse.Bash.js (blocklist fold)  — input via STDIN JSON payload (finding C2),
+ *       exit 0 = ALLOW, exit 2 = BLOCK  (shared deny emitter, HARNESS_BLOCK_EXIT_CODE).
  *   guard-files.js (PreToolUse)          — input via env CLAUDE_TOOL_INPUT AND
  *       stdin JSON, exit 0 = ALLOW, exit 1 = BLOCK, fail-OPEN (0) on error
  *       (matches PreToolUse.Edit.js).
@@ -61,9 +61,13 @@ function setState(step, feature = 'opuspack-test-feature') {
 // ── Bash blocklist harness ─────────────────────────────────────────────
 
 function runBash(command) {
+  // The Bash hook reads the command from STDIN (the harness's real transport,
+  // finding C2); the env CLAUDE_TOOL_INPUT channel was removed, so it is cleared
+  // to prove the test does not lean on it.
   return spawnSync(process.execPath, [BASH_HOOK], {
     cwd: project,
-    env: { ...process.env, CLAUDE_TOOL_INPUT: JSON.stringify({ command }) },
+    env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }),
     encoding: 'utf8',
   });
 }
@@ -71,8 +75,8 @@ function runBash(command) {
 function assertBashBlocked(command) {
   const res = runBash(command);
   assert.equal(res.signal, null, `hook crashed on ${JSON.stringify(command)}`);
-  assert.equal(res.status, 1,
-    `expected BLOCK (1) for ${JSON.stringify(command)}, got ${res.status}\n${res.stdout || ''}`);
+  assert.equal(res.status, 2,
+    `expected BLOCK (2) for ${JSON.stringify(command)}, got ${res.status}\n${res.stdout || ''}`);
 }
 
 function assertBashAllowed(command) {
@@ -154,10 +158,10 @@ beforeEach(() => { project = makeProject(); });
 afterEach(() => { cleanupProject(project); project = null; });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  BLOCKLIST (Bash fold) — exit 1 on hit, 0 on miss
+//  BLOCKLIST (Bash fold) — exit 2 on hit, 0 on miss
 // ═══════════════════════════════════════════════════════════════════════
 
-describe('OM2 blocklist fold — irreversible commands blocked (exit 1)', () => {
+describe('OM2 blocklist fold — irreversible commands blocked (exit 2)', () => {
   beforeEach(() => setState(10)); // step >= 8 so write gate never interferes
 
   it('force push (all forms)', () => {
@@ -223,7 +227,7 @@ describe('OM2 blocklist fold — irreversible commands blocked (exit 1)', () => 
 });
 
 // ── Boundary / bypass regression cases (the gap that let OM2 ship) ──────────
-describe('OM2 blocklist fold — git global-flag bypass BLOCKED (exit 1)', () => {
+describe('OM2 blocklist fold — git global-flag bypass BLOCKED (exit 2)', () => {
   beforeEach(() => setState(15)); // commits allowed, so blocklist is the sole blocker
 
   it('interposed global flags do not bypass destructive git subcommands', () => {
@@ -237,7 +241,7 @@ describe('OM2 blocklist fold — git global-flag bypass BLOCKED (exit 1)', () =>
   });
 });
 
-describe('OM2 blocklist fold — rm split/long-form BLOCKED (exit 1)', () => {
+describe('OM2 blocklist fold — rm split/long-form BLOCKED (exit 2)', () => {
   beforeEach(() => setState(15));
 
   it('recursive+force in any order/split/long form blocks', () => {
@@ -250,7 +254,7 @@ describe('OM2 blocklist fold — rm split/long-form BLOCKED (exit 1)', () => {
   });
 });
 
-describe('OM2 blocklist fold — git clean split flags BLOCKED (exit 1)', () => {
+describe('OM2 blocklist fold — git clean split flags BLOCKED (exit 2)', () => {
   beforeEach(() => setState(15));
   it('clean with -f anywhere blocks', () => {
     assertBashBlocked('git clean -d -f');
@@ -330,9 +334,9 @@ describe('OM2 blocklist fold — benign commands allowed (exit 0)', () => {
   });
 
   it('commit before step 15 is blocked by the EXISTING commit gate, not the blocklist', () => {
-    // At step 10 the existing commit gate blocks (exit 1). This proves the
+    // At step 10 the existing commit gate blocks (exit 2). This proves the
     // blocklist did not accidentally allow-through; the block comes from the
-    // step-15 gate. (Behavioral: still exit 1, but for the right reason.)
+    // step-15 gate. (Behavioral: still a block, now exit 2, but for the right reason.)
     setState(10);
     assertBashBlocked('git commit -m x');
   });

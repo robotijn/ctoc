@@ -1,5 +1,3 @@
-# Stack Chooser Agent (v8.3)
-
 ---
 name: stack-chooser
 description: Selects the tech stack for a new project based on project type. Consults .ctoc/templates/<type>/manifest.yaml and presents defaults plus override options to the user.
@@ -14,6 +12,8 @@ async_choice_protocol: enabled
 model_optimized_for: opus-4-7
 dispatch_protocol: v1
 ---
+
+# Stack Chooser Agent (v8.3)
 
 ## v7 + v8 Operating Principles
 

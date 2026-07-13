@@ -1,5 +1,3 @@
-# Agent-Tester
-
 ---
 name: agent-tester
 description: Validates agents against test cases. Ensures agents produce correct output. Sub-orchestrator reporting to CTO Chief.
@@ -12,6 +10,8 @@ model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---
+
+# Agent-Tester
 
 ## v7 Operating Principles
 

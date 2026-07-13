@@ -1,5 +1,3 @@
-# Independent Verification and Validation Chief Agent
-
 ---
 name: ivv-chief
 description: Independent Verification and Validation chief. Re-runs Steps 11 REVIEW, 13 SECURE, and 14 VERIFY using fresh subagent contexts, isolated from the CTO Chief dispatch chain. Activated only when the `independent_verification_validation` control is required by the active regulatory regime (typically ISO 26262 Automotive Safety Integrity Level D, DO-178C Design Assurance Level A, or IEC 62304 Software Safety Class C).
@@ -21,6 +19,8 @@ effort_budget:
   max_subagents: 6
 activation_control: independent_verification_validation
 ---
+
+# Independent Verification and Validation Chief Agent
 
 ## Independence Charter
 

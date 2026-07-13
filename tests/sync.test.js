@@ -8,6 +8,49 @@ const { test, describe, beforeEach, afterEach } = require('node:test');
 // We need to mock modules before requiring sync.js
 // Using Node.js test runner's mocking capabilities
 
+// A plan that PASSES validateForReview: full "## Execution Plan" with every
+// required Iron Loop step present and completed. moveToReviewAfterPush now gates
+// the rename behind validateForReview (W05-s4), so the move-mechanics tests read
+// this content back for their (mocked) plan file instead of an empty/absent one.
+const REVIEW_VALID_PLAN = `---
+title: "Valid slice"
+approved_by: human
+---
+
+# Valid slice
+
+A cohesive, finished slice.
+
+## Execution Plan
+
+### Step 8: TEST
+- [x] Tests written and run RED first
+
+### Step 9: PREPARE
+- [x] Environment ready
+
+### Step 10: IMPLEMENT
+- [x] Feature implemented
+
+### Step 11: REVIEW
+- [x] Self-review done
+
+### Step 12: OPTIMIZE
+- [x] No redundant work
+
+### Step 13: SECURE
+- [x] Inputs validated
+
+### Step 14: VERIFY
+- [x] All tests green, 0 skipped, 0 flaky
+
+### Step 15: DOCUMENT
+- [x] Docs updated
+
+### Step 16: FINAL-REVIEW
+- [x] Ready for human review
+`;
+
 describe('Sync Manager Tests', () => {
   let syncModule;
   let mockExecSync;
@@ -333,6 +376,7 @@ describe('Sync Manager Tests', () => {
     const originalExistsSync = fs.existsSync;
     const originalMkdirSync = fs.mkdirSync;
     const originalRenameSync = fs.renameSync;
+    const originalReadFileSync = fs.readFileSync;
 
     let mkdirCalls = [];
     let renameCalls = [];
@@ -344,6 +388,12 @@ describe('Sync Manager Tests', () => {
     };
     fs.mkdirSync = (p, opts) => { mkdirCalls.push({ path: p, opts }); };
     fs.renameSync = (from, to) => { renameCalls.push({ from, to }); };
+    // validateForReview reads the plan; hand it a review-valid plan so the gate
+    // passes and the move mechanics (mkdir/rename/newPath) are what is asserted.
+    fs.readFileSync = (p, opts) => {
+      if (typeof p === 'string' && p.endsWith('my-plan.md')) return REVIEW_VALID_PLAN;
+      return originalReadFileSync(p, opts);
+    };
 
     try {
       delete require.cache[require.resolve('../src/lib/sync.js')];
@@ -364,6 +414,7 @@ describe('Sync Manager Tests', () => {
       fs.existsSync = originalExistsSync;
       fs.mkdirSync = originalMkdirSync;
       fs.renameSync = originalRenameSync;
+      fs.readFileSync = originalReadFileSync;
     }
   });
 
@@ -381,6 +432,7 @@ describe('Sync Manager Tests', () => {
     const originalExistsSync = fs.existsSync;
     const originalMkdirSync = fs.mkdirSync;
     const originalRenameSync = fs.renameSync;
+    const originalReadFileSync = fs.readFileSync;
 
     let mkdirCalls = [];
     let renameCalls = [];
@@ -388,6 +440,12 @@ describe('Sync Manager Tests', () => {
     fs.existsSync = (p) => true; // Review dir exists
     fs.mkdirSync = (p, opts) => { mkdirCalls.push({ path: p, opts }); };
     fs.renameSync = (from, to) => { renameCalls.push({ from, to }); };
+    // validateForReview reads the plan; hand it a review-valid plan so the gate
+    // passes and the existing-directory mechanics are what is asserted.
+    fs.readFileSync = (p, opts) => {
+      if (typeof p === 'string' && p.endsWith('my-plan.md')) return REVIEW_VALID_PLAN;
+      return originalReadFileSync(p, opts);
+    };
 
     try {
       delete require.cache[require.resolve('../src/lib/sync.js')];
@@ -406,6 +464,7 @@ describe('Sync Manager Tests', () => {
       fs.existsSync = originalExistsSync;
       fs.mkdirSync = originalMkdirSync;
       fs.renameSync = originalRenameSync;
+      fs.readFileSync = originalReadFileSync;
     }
   });
 

@@ -7,7 +7,10 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawn } = require('child_process');
 const { test, describe, beforeEach, afterEach } = require('node:test');
+
+const MODULE_PATH = require.resolve('../src/lib/transition-log.js');
 
 describe('Transition Log Tests', () => {
   let testDir;
@@ -203,6 +206,129 @@ describe('Transition Log Tests', () => {
     const entries = transitionLog.readLog(testDir);
     assert.strictEqual(entries[0].actor, 'human', 'Should default to human');
     console.log('# logTransition defaults actor to human');
+  });
+
+  // ----------------------------------------------------------------------
+  // Durability tests (W11-s3) — behavior-level proofs that the audit trail
+  // survives concurrency and corruption. These drive the durable-log-backed
+  // append path, not the log's shape. No test doubles: real temp dirs, real
+  // appends, and real separate `node` child processes contending for the SAME
+  // transitions.json file (cross-process O_APPEND contention).
+  // ----------------------------------------------------------------------
+
+  /**
+   * Spawn a real, separate node process that logs `count` transitions tagged
+   * `tag` to the transitions.json under `projectPath`. Resolves on clean exit.
+   */
+  function spawnLogger(projectPath, count, tag) {
+    const childCode =
+      'const tl = require(process.argv[1]);' +
+      'const projectPath = process.argv[2];' +
+      'const count = Number(process.argv[3]);' +
+      'const tag = process.argv[4];' +
+      'for (let i = 0; i < count; i++) {' +
+      '  tl.logTransition({ plan: tag + "-" + i + ".md", from: "functional", to: "implementation", actor: "agent" }, projectPath);' +
+      '}';
+    return new Promise((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        ['-e', childCode, MODULE_PATH, projectPath, String(count), tag],
+        { stdio: ['ignore', 'ignore', 'pipe'] }
+      );
+      let stderr = '';
+      child.stderr.on('data', (d) => { stderr += d.toString(); });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`logger ${tag} exited ${code}: ${stderr}`));
+      });
+    });
+  }
+
+  test('concurrency: two racing processes lose no transition (M14/M15)', async () => {
+    // Seed N existing transitions in-process.
+    const N = 10;
+    for (let i = 0; i < N; i++) {
+      transitionLog.logTransition({
+        plan: `seed-${i}.md`, from: 'functional', to: 'implementation', actor: 'human'
+      }, testDir);
+    }
+    assert.strictEqual(transitionLog.readLog(testDir).length, N, 'seed count');
+
+    // Two separate processes each log 50 transitions to the SAME file, started
+    // without awaiting between them → real cross-process O_APPEND contention.
+    const perChild = 50;
+    await Promise.all([
+      spawnLogger(testDir, perChild, 'A'),
+      spawnLogger(testDir, perChild, 'B')
+    ]);
+
+    const entries = transitionLog.readLog(testDir);
+    assert.strictEqual(
+      entries.length,
+      N + perChild * 2,
+      'no transition may be lost under concurrency'
+    );
+    const aCount = entries.filter((e) => e.plan.startsWith('A-')).length;
+    const bCount = entries.filter((e) => e.plan.startsWith('B-')).length;
+    assert.strictEqual(aCount, perChild, 'all of process A survived');
+    assert.strictEqual(bCount, perChild, 'all of process B survived');
+    console.log('# concurrency: no lost transition across two processes');
+  });
+
+  test('corrupt transitions.json is quarantined, not reset (M14/M15)', () => {
+    const logPath = transitionLog.getLogPath(testDir);
+    const corruptBytes = 'nope';
+    fs.writeFileSync(logPath, corruptBytes, 'utf8');
+
+    const returned = transitionLog.logTransition({
+      plan: 'after-corrupt.md', from: 'functional', to: 'implementation', actor: 'human'
+    }, testDir);
+    assert.strictEqual(returned.plan, 'after-corrupt.md', 'returns the logged entry');
+
+    // (a) A quarantine sibling exists AND still holds the original corrupt bytes.
+    const logDir = path.dirname(logPath);
+    const siblings = fs.readdirSync(logDir).filter((f) => f.includes('.corrupt-'));
+    assert.strictEqual(siblings.length, 1, 'exactly one quarantine file was created');
+    const quarantined = fs.readFileSync(path.join(logDir, siblings[0]), 'utf8');
+    assert.strictEqual(quarantined, corruptBytes, 'corrupt bytes preserved on disk');
+    assert.ok(!siblings[0].includes(':'), 'quarantine name is Windows-safe (no colon)');
+
+    // (b) The live log is fresh — only the new transition.
+    const entries = transitionLog.readLog(testDir);
+    assert.strictEqual(entries.length, 1, 'fresh log holds only the new entry');
+    assert.strictEqual(entries[0].plan, 'after-corrupt.md', 'the fresh entry is the new one');
+    console.log('# corrupt transitions.json quarantined, not reset');
+  });
+
+  test('legacy JSON-array log is read, then migrated + appended (M14/M15)', () => {
+    const logPath = transitionLog.getLogPath(testDir);
+    // Pre-write a legacy whole-file JSON array (the pre-JSONL on-disk format).
+    const legacy = [
+      { timestamp: '2026-07-13T00:00:00.000Z', plan: 'legacy-a.md', from: 'todo', to: 'in-progress', actor: 'human', validation: null, humanGate: false, marker: false }
+    ];
+    fs.writeFileSync(logPath, JSON.stringify(legacy), 'utf8');
+
+    // readLog returns the legacy array as an Array (contract unchanged).
+    const before = transitionLog.readLog(testDir);
+    assert.ok(Array.isArray(before), 'readLog returns an Array');
+    assert.strictEqual(before.length, 1, 'legacy entry is read');
+    assert.strictEqual(before[0].plan, 'legacy-a.md', 'legacy content preserved');
+
+    // Next logTransition migrates the array to JSONL and appends (length +1).
+    transitionLog.logTransition({
+      plan: 'legacy-b.md', from: 'in-progress', to: 'review', actor: 'agent'
+    }, testDir);
+
+    const after = transitionLog.readLog(testDir);
+    assert.strictEqual(after.length, 2, 'legacy entry migrated and new entry appended');
+    assert.strictEqual(after[0].plan, 'legacy-a.md', 'legacy entry survives migration');
+    assert.strictEqual(after[1].plan, 'legacy-b.md', 'new entry appended');
+
+    // On disk the file is now JSONL, no longer a JSON array.
+    const raw = fs.readFileSync(logPath, 'utf8');
+    assert.ok(!raw.trimStart().startsWith('['), 'no longer a JSON array on disk');
+    console.log('# legacy array read + migrated + appended');
   });
 });
 

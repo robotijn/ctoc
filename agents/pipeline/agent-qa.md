@@ -1,5 +1,3 @@
-# Agent-QA
-
 ---
 name: agent-qa
 description: Final quality check on agents. Detects regressions and validates improvements. Sub-orchestrator reporting to CTO Chief.
@@ -12,6 +10,8 @@ model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---
+
+# Agent-QA
 
 ## v7 Operating Principles
 

@@ -8,6 +8,41 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { test, describe, beforeEach, afterEach } = require('node:test');
+const { verifyEvidencePath } = require('../src/lib/step-13-verify');
+
+// A full "## Execution Plan" with every required Iron Loop step present and
+// ticked — the shape validateReviewToDone now demands before Gate 3 may cross.
+const REVIEW_DONE_EXEC_PLAN = [
+  '## Execution Plan',
+  '',
+  '### Step 8: TEST',
+  '- [x] Tests written and run RED first',
+  '',
+  '### Step 9: PREPARE',
+  '- [x] Environment ready',
+  '',
+  '### Step 10: IMPLEMENT',
+  '- [x] Feature implemented',
+  '',
+  '### Step 11: REVIEW',
+  '- [x] Self-review done',
+  '',
+  '### Step 12: OPTIMIZE',
+  '- [x] No redundant work',
+  '',
+  '### Step 13: SECURE',
+  '- [x] Inputs validated',
+  '',
+  '### Step 14: VERIFY',
+  '- [x] All tests green, 0 skipped, 0 flaky',
+  '',
+  '### Step 15: DOCUMENT',
+  '- [x] Docs updated',
+  '',
+  '### Step 16: FINAL-REVIEW',
+  '- [x] Ready for human review',
+  '',
+].join('\n');
 
 describe('Plan Validator Tests', () => {
   let testDir;
@@ -324,15 +359,33 @@ Do things.
 
   // === review -> done ===
 
-  test('review->done: passes (informational only)', () => {
+  test('review->done: a compliant plan passes', () => {
+    // W05-s2 replaced the old always-valid contract: validateReviewToDone can now
+    // REJECT. A GENUINELY compliant plan — human-approval marker + a full
+    // completed Execution Plan + a fresh passing VERIFY evidence artifact — still
+    // passes. (The rejection paths are covered by ctoc-audit-w05-gate3-*.)
     const planPath = createPlan('review', 'reviewed-plan',
-      '---\napproved_by: human\n---\n\n# Reviewed Plan\n\nAll good.\n');
+      `---\napproved_by: human\n---\n\n# Reviewed Plan\n\nAll good.\n\n${REVIEW_DONE_EXEC_PLAN}`);
+
+    // Real VERIFY evidence artifact (data fixture) recording a passing run fresher
+    // than the plan's mtime, so the evidence + staleness checks both pass.
+    const planMtimeMs = fs.statSync(planPath).mtimeMs;
+    const evidencePath = verifyEvidencePath(testDir, 'reviewed-plan');
+    fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+    fs.writeFileSync(evidencePath, JSON.stringify({
+      planSlug: 'reviewed-plan',
+      timestamp: new Date(planMtimeMs + 60000).toISOString(),
+      passed: true,
+      method: 'fallback-direct',
+      checks: {},
+      errors: [],
+      summary: 'fixture run'
+    }, null, 2));
 
     const result = validator.validateTransition(planPath, 'review', 'done', testDir);
 
-    // review->done validator is informational, not blocking
-    assert.strictEqual(result.valid, true, 'Should pass');
-    console.log('# review->done: passes (informational only)');
+    assert.strictEqual(result.valid, true, `compliant plan must pass, errors: ${JSON.stringify(result.errors)}`);
+    console.log('# review->done: a compliant plan passes');
   });
 
   test('review->done: warns about TODO markers', () => {

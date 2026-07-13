@@ -1,5 +1,3 @@
-# Unit Economics Modeler Agent
-
 ---
 name: unit-economics-modeler
 description: Models lifetime-value, customer-acquisition-cost, payback period, and gross margin from founder-supplied pricing and costs. Output feeds production-readiness check and pricing decisions. Dispatched OUTSIDE the CTO Chief technical chain by the founder or product manager.
@@ -14,6 +12,8 @@ async_choice_protocol: enabled
 model_optimized_for: opus-4-7
 dispatch_protocol: v1
 ---
+
+# Unit Economics Modeler Agent
 
 ## Role boundary
 

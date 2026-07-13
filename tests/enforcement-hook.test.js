@@ -115,7 +115,7 @@ title: "Legacy"
 });
 
 describe('enforcement-log', () => {
-  const { logEnforcement } = require('../src/lib/enforcement-log');
+  const { logEnforcement, readLog } = require('../src/lib/enforcement-log');
   let root;
   beforeEach(() => { root = tempProject(); });
   afterEach(() => { cleanup(root); });
@@ -131,7 +131,7 @@ describe('enforcement-log', () => {
     }, root);
     const logPath = path.join(root, '.ctoc', 'logs', 'enforcement.json');
     assert.ok(fs.existsSync(logPath));
-    const parsed = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+    const parsed = readLog(root);
     assert.equal(parsed.length, 1);
     assert.equal(parsed[0].outcome, 'allow');
   });
@@ -146,7 +146,7 @@ describe('enforcement-log', () => {
   it('appends to existing log entries', () => {
     logEnforcement({ tool: 'Edit', target_file: 'a', outcome: 'allow' }, root);
     logEnforcement({ tool: 'Write', target_file: 'b', outcome: 'block' }, root);
-    const parsed = JSON.parse(fs.readFileSync(path.join(root, '.ctoc', 'logs', 'enforcement.json'), 'utf8'));
+    const parsed = readLog(root);
     assert.equal(parsed.length, 2);
     assert.equal(parsed[1].outcome, 'block');
   });
