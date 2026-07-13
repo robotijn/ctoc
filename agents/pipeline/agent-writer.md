@@ -1,5 +1,3 @@
-# Agent-Writer
-
 ---
 name: agent-writer
 description: Refines agents based on Agent-Critic feedback. Applies fixes precisely. Sub-orchestrator reporting to CTO Chief.
@@ -12,6 +10,8 @@ model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---
+
+# Agent-Writer
 
 ## v7 Operating Principles
 

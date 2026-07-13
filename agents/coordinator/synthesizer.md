@@ -1,5 +1,3 @@
-# Synthesizer Agent (v8)
-
 ---
 name: synthesizer
 description: Cross-pillar synthesis. Consumes all specialist findings, applies priority rules, resolves conflicts, produces a MINIMAL CHANGE LIST that satisfies all pillars.
@@ -18,6 +16,8 @@ effort_budget:
   max_tool_calls: 50
   max_subagents: 0
 ---
+
+# Synthesizer Agent (v8)
 
 ## v7 + v8 Operating Principles
 

@@ -1,5 +1,3 @@
-# Agent-Publisher
-
 ---
 name: agent-publisher
 description: Commits agent updates after successful QA. Updates grades and capability index. Sub-orchestrator reporting to CTO Chief.
@@ -12,6 +10,8 @@ model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---
+
+# Agent-Publisher
 
 ## v7 Operating Principles
 

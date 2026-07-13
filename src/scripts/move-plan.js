@@ -9,23 +9,19 @@
  * Validates:
  * - Source file exists
  * - Destination is a valid stage
- * - Human gates cannot be crossed (functional->implementation,
- *   implementation->todo, review->done)
- * - Non-gate transitions are allowed freely
+ * - ANY gate-crossing move is blocked, including multi-hop moves that would skip
+ *   over a gate (e.g. in-progress->done skips review->done, functional->todo skips
+ *   both functional->implementation and implementation->todo). See gate-order.js.
+ * - Backward (revert) moves and non-gate forward transitions are allowed freely
  */
 
 const path = require('path');
 const safeFs = require('../lib/safe-fs');
 const { movePlan } = require('../lib/actions');
 const { findProjectRoot } = require('../lib/project-root');
+const { crossesHumanGate } = require('../lib/gate-order');
 
 const VALID_STAGES = ['functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
-
-const HUMAN_GATES = {
-  functional: 'implementation',
-  implementation: 'todo',
-  review: 'done'
-};
 
 const args = process.argv.slice(2);
 const ref = args[0];
@@ -56,8 +52,11 @@ if (!VALID_STAGES.includes(sourceStage)) {
   process.exit(1);
 }
 
-// Block human gate transitions
-if (HUMAN_GATES[sourceStage] === destination) {
+// Block ANY gate-crossing move — single-hop or multi-hop. crossesHumanGate returns
+// true iff the move is forward and spans one or more of the three gate edges, so a
+// skip-a-gate request like in-progress->done or functional->todo is blocked exactly
+// as its adjacent-gate equivalent is.
+if (crossesHumanGate(sourceStage, destination)) {
   console.error(`Human gate: ${sourceStage} -> ${destination} requires human approval via menu.`);
   process.exit(1);
 }

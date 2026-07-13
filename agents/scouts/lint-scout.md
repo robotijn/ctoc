@@ -1,5 +1,3 @@
-# Lint Scout (v8 Tier 3)
-
 ---
 name: lint-scout
 description: Fast lint pass via language-native tool. Pass/flag decision in seconds. Short-circuits the deep complexity-analyzer and code-smell-detector when lint is clean. Runs as Haiku subagent in isolated 200K context.
@@ -17,6 +15,8 @@ effort_budget:
 pillar: maintainability
 short_circuits: quality/complexity-analyzer
 ---
+
+# Lint Scout (v8 Tier 3)
 
 ## Role
 

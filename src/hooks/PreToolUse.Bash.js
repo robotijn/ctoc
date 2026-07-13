@@ -3,14 +3,26 @@
  * CTOC Bash Gate Hook
  * Blocks file-writing Bash commands before Step 8
  * Blocks git commit before Step 15
+ * Blocks irreversible/destructive commands and raw plan-file moves
  *
- * Exit codes:
- * - 0: Command allowed
- * - 1: Command blocked
+ * INPUT (W01-s2, finding C2): the PreToolUse payload arrives on STDIN (fd 0) as
+ * JSON ({ tool_name, tool_input: { command } }) — the same transport
+ * PreToolUse.Edit.js reads. The hook does NOT read process.env.CLAUDE_TOOL_INPUT
+ * (the harness never sets it; reading it made the gate see an empty command and
+ * allow everything).
+ *
+ * SIGNALLING (W01-s2, finding C1): a block is emitted via the shared
+ * `../lib/hook-deny-signal` emitter — the Claude Code PreToolUse decision JSON
+ * `permissionDecision:"deny"` on stdout + exit 0 — the identical signal Edit and
+ * Write use, replacing the legacy cosmetic `process.exit(1)` the harness treated
+ * as non-blocking. Human banners stay on STDERR (writeToTerminal → process.stderr)
+ * so stdout carries ONLY the decision JSON. An allowed command exits 0 silent.
  */
 
+const fs = require('fs');
 const { loadState, STEP_NAMES } = require('../lib/state-manager');
 const { writeToTerminal, colors } = require('../lib/ui');
+const { emitDeny } = require('../lib/hook-deny-signal');
 
 const MINIMUM_STEP_FOR_WRITE = 8;
 const MINIMUM_STEP_FOR_COMMIT = 15;
@@ -263,17 +275,23 @@ function isCommitCommand(command) {
 }
 
 /**
- * Get command from tool input
+ * Read the Bash command from the PreToolUse payload on STDIN (fd 0). The pipe is
+ * single-consumer, so `main()` calls this exactly once. Fails OPEN (returns '')
+ * on any read/parse error — a broken pipe cannot crash the gate; an empty
+ * command is then allowed by `main()`'s first check.
+ * @returns {string} the command string, or '' when unreadable/absent.
  */
 function getCommand() {
-  const toolInput = process.env.CLAUDE_TOOL_INPUT || '';
-
+  let raw = '';
+  try { raw = fs.readFileSync(0, 'utf8') || ''; } catch { return ''; }
+  if (!raw) return '';
   try {
-    const parsed = JSON.parse(toolInput);
-    return parsed.command || '';
+    const parsed = JSON.parse(raw);
+    return (parsed && parsed.tool_input && parsed.tool_input.command)
+      || (parsed && parsed.command) || '';
   } catch {
-    const match = toolInput.match(/command['":\s]+["']?([^"'\n]+)/);
-    return match ? match[1] : toolInput;
+    const m = raw.match(/command['":\s]+["']?([^"'\n]+)/);
+    return m ? m[1] : '';
   }
 }
 
@@ -323,8 +341,8 @@ async function main() {
 
   // OM2: Irreversible-command blocklist — the FIRST deny layer, BEFORE the
   // plan-move / commit / write gates, so a destructive command is denied
-  // regardless of the Iron Loop step. Same input channel (CLAUDE_TOOL_INPUT)
-  // and same block signal (exit 1) as every other Bash gate.
+  // regardless of the Iron Loop step. Same input channel (stdin) and same block
+  // signal (shared permissionDecision:"deny" emitter) as every other Bash gate.
   if (isIrreversibleCommand(command)) {
     const irreversibleState = loadState(projectPath);
     writeToTerminal(formatBlocked(
@@ -333,7 +351,7 @@ async function main() {
       'Irreversible/destructive command. State the action and its blast radius to the human and get explicit confirmation; the human runs it directly (or temporarily disables this guard).',
       'IRREVERSIBLE'
     ));
-    process.exit(1);
+    emitDeny(`CTOC: irreversible/destructive command blocked: ${command}`);
   }
 
   // D4: Block raw mv/cp of plan files between stage directories
@@ -360,7 +378,7 @@ async function main() {
     output += `${c.cyan}Use the dashboard menu to approve plan transitions.${c.reset}\n`;
     output += '\n' + '='.repeat(70) + '\n';
     writeToTerminal(output);
-    process.exit(1);
+    emitDeny(`CTOC: raw mv/cp of a plan file blocked — plan moves must go through the menu (human gate): ${command}`);
   }
 
   // Load state
@@ -373,7 +391,7 @@ async function main() {
     if (currentStep < MINIMUM_STEP_FOR_COMMIT) {
       const reason = `Commit requires step ${MINIMUM_STEP_FOR_COMMIT}+ (DOCUMENT). Current: ${currentStep}`;
       writeToTerminal(formatBlocked(command, state, reason, 'COMMIT'));
-      process.exit(1);
+      emitDeny(`CTOC: commit blocked before Step ${MINIMUM_STEP_FOR_COMMIT} (DOCUMENT). Current step ${currentStep}.`);
     }
     // Commit allowed
     process.exit(0);
@@ -385,14 +403,14 @@ async function main() {
     if (!state || !state.feature) {
       const reason = 'No feature context - write commands not allowed';
       writeToTerminal(formatBlocked(command, state, reason, 'WRITE'));
-      process.exit(1);
+      emitDeny('CTOC: write command blocked — no active feature context.');
     }
 
     // Before step 7 - block
     if (currentStep < MINIMUM_STEP_FOR_WRITE) {
       const reason = `Step ${currentStep} < ${MINIMUM_STEP_FOR_WRITE} - planning not complete`;
       writeToTerminal(formatBlocked(command, state, reason, 'WRITE'));
-      process.exit(1);
+      emitDeny(`CTOC: write command blocked — planning not complete (step ${currentStep} < ${MINIMUM_STEP_FOR_WRITE}).`);
     }
   }
 

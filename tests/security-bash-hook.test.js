@@ -3,17 +3,25 @@
  *
  * Unlike tests/hooks.test.js (which re-implements the regexes inside the test
  * and therefore can never catch a real bug in the hook), this file SPAWNS the
- * actual src/hooks/PreToolUse.Bash.js process and asserts its real exit code:
+ * actual src/hooks/PreToolUse.Bash.js process and asserts the REAL deny signal
+ * the harness reads (W01-s2, findings C1+C2):
  *
- *   exit 0  -> command ALLOWED
- *   exit 1  -> command BLOCKED
+ *   deny  -> stdout carries the JSON decision
+ *            hookSpecificOutput.permissionDecision === "deny" (exit 2)
+ *   allow -> exit 0 with NO decision JSON on stdout (silent allow)
  *
- * Contract discovered from source + empirical probe (do NOT change these — they
- * are the hook's real behavior, asserted so regressions surface):
+ * Exit code alone therefore no longer distinguishes allow from deny — only the
+ * presence of the deny JSON does — so every assertion parses stdout, never
+ * res.status. This mirrors the shared emitter in src/lib/hook-deny-signal.js.
  *
- *   INPUT: the hook reads the command from the environment variable
- *          CLAUDE_TOOL_INPUT (a JSON string with a `command` field) via
- *          getCommand(). It does NOT read stdin. A missing/empty command -> 0.
+ * Contract discovered from source (do NOT change these — they are the hook's
+ * real behavior, asserted so regressions surface):
+ *
+ *   INPUT: the hook reads the command from STDIN (fd 0) as the PreToolUse JSON
+ *          payload ({ tool_name, tool_input: { command } }), the same transport
+ *          the harness actually uses and PreToolUse.Edit.js already reads. It
+ *          does NOT read process.env.CLAUDE_TOOL_INPUT (finding C2). A
+ *          missing/empty command -> allow.
  *
  *   STATE: loadState(process.cwd()) reads a *signed* state file at
  *          ~/.ctoc/state/<hash16(cwd)>.json (HMAC with the local install
@@ -31,10 +39,6 @@
  *
  * The hook does NOT export isWriteCommand/isCommitCommand (no module.exports),
  * so those helpers are exercised through the spawned process, not by require.
- *
- * Some BYPASS-SURFACE assertions are EXPECTED TO FAIL — they document real
- * security gaps in the anchored GIT_COMMIT_PATTERN. Failing here is the point:
- * a green run would mean the gap was silently accepted. See the report.
  *
  * Run with: node --test tests/security-bash-hook.test.js
  */
@@ -87,42 +91,70 @@ function setState(step, feature = 'security-test-feature') {
 }
 
 /**
- * Run the REAL hook against `command`, returning the process exit status.
- * Command is delivered via CLAUDE_TOOL_INPUT (the hook's real input channel).
+ * Run the REAL hook against `command`, delivered as the PreToolUse JSON payload
+ * on STDIN (the harness's real transport). CLAUDE_TOOL_INPUT is explicitly
+ * cleared so a passing test cannot be leaning on the removed env channel (C2).
  */
 function runHook(command) {
-  return runHookRaw(JSON.stringify({ command }));
+  return runHookRaw(JSON.stringify({ tool_name: 'Bash', tool_input: { command } }));
 }
 
-/** Run the hook with an arbitrary raw CLAUDE_TOOL_INPUT payload. */
-function runHookRaw(rawToolInput) {
+/** Run the hook with an arbitrary raw payload delivered on STDIN. */
+function runHookRaw(rawPayload) {
   const res = spawnSync(process.execPath, [HOOK], {
     cwd: project,
-    env: { ...process.env, CLAUDE_TOOL_INPUT: rawToolInput },
+    input: rawPayload,
+    env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
     encoding: 'utf8'
   });
   return res;
 }
 
-/** Assert the hook BLOCKED the command (exit 1). */
+/**
+ * Parse the deny decision emitted on stdout, or null when the run ALLOWED.
+ * A deny is `hookSpecificOutput.permissionDecision === "deny"` (shared emitter,
+ * src/lib/hook-deny-signal.js). Parses the LAST JSON object on stdout to
+ * tolerate any preceding output.
+ */
+function denyDecision(res) {
+  const s = (res.stdout ? String(res.stdout) : '').trim();
+  if (!s) return null;
+  let decision = null;
+  try { decision = JSON.parse(s); } catch { /* fall through to last-brace scan */ }
+  if (!decision) {
+    const idx = s.lastIndexOf('{');
+    if (idx === -1) return null;
+    try { decision = JSON.parse(s.slice(idx)); } catch { return null; }
+  }
+  if (decision && decision.hookSpecificOutput
+    && decision.hookSpecificOutput.permissionDecision === 'deny') {
+    return decision.hookSpecificOutput;
+  }
+  return null;
+}
+
+/** True when the run emitted the harness's real deny signal. */
+function isDenied(res) { return denyDecision(res) !== null; }
+
+/** Assert the hook BLOCKED the command (deny JSON on stdout). */
 function assertBlocked(command, msg) {
   const res = runHook(command);
   assert.equal(res.signal, null, `hook crashed (signal) on ${JSON.stringify(command)}`);
   assert.equal(
-    res.status,
-    1,
-    `${msg || 'expected BLOCK'} for ${JSON.stringify(command)} (got exit ${res.status})\n${res.stdout || ''}`
+    isDenied(res),
+    true,
+    `${msg || 'expected BLOCK'} for ${JSON.stringify(command)} — expected permissionDecision:"deny" on stdout (got exit ${res.status})\nstdout=${res.stdout || ''}\nstderr=${res.stderr || ''}`
   );
 }
 
-/** Assert the hook ALLOWED the command (exit 0). */
+/** Assert the hook ALLOWED the command (no deny JSON). */
 function assertAllowed(command, msg) {
   const res = runHook(command);
   assert.equal(res.signal, null, `hook crashed (signal) on ${JSON.stringify(command)}`);
   assert.equal(
-    res.status,
-    0,
-    `${msg || 'expected ALLOW'} for ${JSON.stringify(command)} (got exit ${res.status})\n${res.stdout || ''}`
+    isDenied(res),
+    false,
+    `${msg || 'expected ALLOW'} for ${JSON.stringify(command)} — expected no deny JSON (got exit ${res.status})\nstdout=${res.stdout || ''}\nstderr=${res.stderr || ''}`
   );
 }
 
@@ -130,24 +162,75 @@ beforeEach(() => { project = makeProject(); });
 afterEach(() => { cleanupProject(project); project = null; });
 
 // ---------------------------------------------------------------------------
-// CONTRACT 0 — input channel is CLAUDE_TOOL_INPUT, not stdin
+// CONTRACT 0 — input channel is STDIN, not CLAUDE_TOOL_INPUT (finding C2)
 // ---------------------------------------------------------------------------
 
 describe('Bash gate — input channel contract', () => {
-  it('reads the command from CLAUDE_TOOL_INPUT env (not stdin)', () => {
-    setState(5); // write phase => touch must be blocked IF the command is seen
-    // Delivered correctly via env -> blocked.
-    assertBlocked('touch evidence.txt', 'env-delivered write should be blocked at step 5');
-
-    // Same command delivered ONLY via stdin (env cleared) -> the hook never
-    // sees it and allows (exit 0). This documents that stdin is NOT a channel.
+  // BDD: "Bash gate reads the real transport" — the C2 regression guard. A
+  // dangerous command delivered ONLY on stdin, with CLAUDE_TOOL_INPUT unset,
+  // must be read and denied. Before the fix the hook read the (empty) env var,
+  // saw an empty command, and allowed everything.
+  it('reads the command from stdin (not CLAUDE_TOOL_INPUT env)', () => {
+    setState(5);
     const res = spawnSync(process.execPath, [HOOK], {
       cwd: project,
       env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
-      input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'touch evidence.txt' } }),
+      input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'rm -rf plans' } }),
       encoding: 'utf8'
     });
-    assert.equal(res.status, 0, 'stdin is not an input channel; command is invisible -> allowed');
+    assert.equal(res.signal, null, 'hook crashed (signal) reading stdin');
+    assert.equal(isDenied(res), true,
+      `stdin IS the input channel; the dangerous command must be read and denied\nstdout=${res.stdout}\nstderr=${res.stderr}`);
+  });
+
+  // BDD: the removed channel must genuinely be dead. The same dangerous command
+  // supplied ONLY via CLAUDE_TOOL_INPUT, with stdin empty, must NOT be seen —
+  // proving getCommand no longer reads the env var (zero-fallback to env).
+  it('does NOT read CLAUDE_TOOL_INPUT env (command there is invisible)', () => {
+    setState(5);
+    const res = spawnSync(process.execPath, [HOOK], {
+      cwd: project,
+      env: { ...process.env, CLAUDE_TOOL_INPUT: JSON.stringify({ command: 'rm -rf plans' }) },
+      input: '',
+      encoding: 'utf8'
+    });
+    assert.equal(res.signal, null, 'hook crashed (signal) on empty stdin');
+    assert.equal(isDenied(res), false,
+      'CLAUDE_TOOL_INPUT is no longer an input channel; a command placed only there must be invisible -> allowed');
+  });
+
+  // BDD: "Bash gate does not fall through to allow-by-default". A dangerous
+  // command on stdin with CLAUDE_TOOL_INPUT unset must deny — the test fails
+  // explicitly if the command slips through to allow.
+  it('does not fall through to allow-by-default for a dangerous command', () => {
+    setState(5);
+    const res = spawnSync(process.execPath, [HOOK], {
+      cwd: project,
+      env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
+      input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git push --force origin main' } }),
+      encoding: 'utf8'
+    });
+    assert.equal(res.signal, null, 'hook crashed (signal) on force-push payload');
+    assert.equal(isDenied(res), true,
+      `a force-push must be denied, never allowed-by-default\nstdout=${res.stdout}\nstderr=${res.stderr}`);
+  });
+
+  // BDD: "reported blocked command matches the actual command from stdin" —
+  // proves getCommand read the real stdin command rather than defaulting empty.
+  it('reports the blocked command read from stdin in the deny reason', () => {
+    setState(5);
+    const res = spawnSync(process.execPath, [HOOK], {
+      cwd: project,
+      env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
+      input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'rm -rf plans' } }),
+      encoding: 'utf8'
+    });
+    const decision = denyDecision(res);
+    assert.ok(decision, 'expected a deny decision on stdout');
+    const reasonHasCommand = /rm -rf plans/.test(decision.permissionDecisionReason || '');
+    const bannerHasCommand = /rm -rf plans/.test(res.stderr || '');
+    assert.ok(reasonHasCommand || bannerHasCommand,
+      `the actual stdin command must appear in the deny reason or the stderr banner\nreason=${decision.permissionDecisionReason}\nstderr=${res.stderr}`);
   });
 });
 
@@ -356,7 +439,8 @@ describe('Bash gate — edge cases do not crash', () => {
   it('newline-containing command -> no crash, defined exit code', () => {
     const res = runHook('echo a\nrm -rf b');
     assert.equal(res.signal, null, 'no crash on newline command');
-    assert.ok(res.status === 0 || res.status === 1, `defined exit code, got ${res.status}`);
+    // The embedded `rm -rf` is a deny -> exit 2 (HARNESS_BLOCK_EXIT_CODE); allow -> 0.
+    assert.ok(res.status === 0 || res.status === 2, `defined exit code, got ${res.status}`);
   });
 
   it('very long command (20k chars) -> no crash, defined exit code', () => {

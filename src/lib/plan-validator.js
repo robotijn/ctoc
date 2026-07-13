@@ -10,6 +10,7 @@ const path = require('path');
 const { parseMetadata } = require('./state');
 const { findProjectRoot } = require('./project-root');
 const { extractFrontmatterRegion, parseFilesField } = require('./stale-detector');
+const { readVerifyEvidence } = require('./step-13-verify');
 
 /**
  * Validation result structure
@@ -530,11 +531,39 @@ function validateFunctionalToImpl(planPath, projectPath) {
 }
 
 /**
- * Validate plan before moving from review to done
+ * Validate a plan before moving from review to done (Gate 3).
+ *
+ * Historically this validator constructed `valid:true` and never reassigned it —
+ * every check merely pushed a warning, so no input could make it fail (finding
+ * C9). It is the validator `approveSubplans` runs per sibling on the review->done
+ * batch, so an always-`true` gate meant an unfinished/unapproved/unverified plan
+ * crossed Gate 3 unconditionally. This rewrite gives it real rejection paths for
+ * the three named defect conditions, while a genuinely finished plan still passes.
+ *
+ * A plan is REJECTED (`valid:false`, with a specific `errors[]` entry) when ANY of:
+ *   1. No `approved_by: human` marker is present.
+ *   2. A required Iron Loop step is absent, OR a required step is present but has
+ *      an unchecked checkbox (notably Step 14 VERIFY) — a ticked-but-unfinished
+ *      plan cannot ship.
+ *   3. The persisted VERIFY evidence for this plan is absent, records a failing
+ *      run, or is stale (recorded before the plan's last content change). The
+ *      failure message names the SPECIFIC VERIFY failure, not a generic "not
+ *      approved."
+ *
+ * The unresolved-feedback (TODO/FIXME) check stays a WARNING — it is not one of
+ * the three named rejection conditions and promoting it would risk rejecting a
+ * compliant plan that legitimately mentions "TODO" in prose.
+ *
+ * Fails closed: an unreadable plan file, or corrupt/absent/stale evidence, all
+ * push errors and set `valid:false` rather than silently passing. This slice can
+ * only make the gate STRICTER; there is no path that turns a rejection into a pass.
+ *
+ * @param {string} planPath - Path to the plan file.
+ * @param {string} projectPath - Project root path.
+ * @returns {ValidationResult}
  */
 function validateReviewToDone(planPath, projectPath) {
-  const content = safeFs.readFileSync(planPath, 'utf8');
-  const metadata = parseMetadata(content);
+  projectPath = projectPath || findProjectRoot();
 
   const result = {
     valid: true,
@@ -543,15 +572,89 @@ function validateReviewToDone(planPath, projectPath) {
     checklist: {}
   };
 
-  // Should be human-reviewed (has approval marker or metadata)
+  // Read the plan once. An unreadable plan fails closed (cannot ship what we
+  // cannot inspect) rather than throwing out of the gate.
+  let content;
+  try {
+    content = safeFs.readFileSync(planPath, 'utf8');
+  } catch (err) {
+    result.errors.push('review→done blocked: plan file is unreadable');
+    result.valid = false;
+    result.checklist.readable = false;
+    return result;
+  }
+  const metadata = parseMetadata(content);
+
+  // 1. Human-approval marker (was a warning; now a blocking error).
   const hasApproval = /approved_by:\s*human/i.test(content) || metadata.approved_by === 'human';
   result.checklist.humanReviewed = hasApproval;
-  // Note: human gate enforcement is in actions.js, this is informational
   if (!hasApproval) {
-    result.warnings.push('No previous human approval marker found');
+    result.errors.push('review→done blocked: no "approved_by: human" marker found');
+    result.valid = false;
   }
 
-  // No unresolved feedback
+  // 2. Required-step completeness. validateStepsComplete errors only when a
+  //    required step is ABSENT; it records present-but-unchecked steps in its
+  //    checklist. Promote each present-required-but-unchecked step to an error so
+  //    an unchecked Step 14 VERIFY box blocks the transition.
+  const stepValidation = validateStepsComplete(content, planPath, projectPath);
+  result.checklist.steps = stepValidation.checklist;
+  result.warnings.push(...stepValidation.warnings);
+  if (stepValidation.errors.length > 0) {
+    result.errors.push(...stepValidation.errors);
+    result.valid = false;
+  }
+  for (const [key, entry] of Object.entries(stepValidation.checklist)) {
+    if (entry && entry.required === true && entry.present === true &&
+        entry.completed === false && entry.skipped === false) {
+      const num = key.replace(/^step_/, '');
+      result.errors.push(
+        `review→done blocked: Step ${num} (${entry.name}) has an unchecked required checkbox`
+      );
+      result.valid = false;
+    }
+  }
+
+  // 3. VERIFY evidence: must exist, record a passing run, and be fresh. A ticked
+  //    Step 14 checkbox is self-reported; the artifact is produced by an actual
+  //    runVerify execution and closes that trust gap (belt and suspenders — both
+  //    the checkbox in (2) and the artifact here must hold).
+  const planSlug = path.basename(planPath, '.md');
+  const evidence = readVerifyEvidence(projectPath, planSlug);
+  result.checklist.verifyEvidence = { present: evidence != null, passed: null, stale: null };
+  if (evidence == null) {
+    result.errors.push('review→done blocked: no VERIFY evidence recorded for this plan (run Step 14 VERIFY)');
+    result.valid = false;
+  } else if (evidence.passed === false) {
+    result.checklist.verifyEvidence.passed = false;
+    const detail = (Array.isArray(evidence.errors) && evidence.errors.length > 0)
+      ? evidence.errors.join('; ')
+      : (evidence.summary || 'no detail recorded');
+    result.errors.push(`review→done blocked: recorded VERIFY run failed: ${detail}`);
+    result.valid = false;
+  } else {
+    result.checklist.verifyEvidence.passed = true;
+    // Staleness: evidence recorded before the plan's last content change is
+    // treated as absent (it cannot vouch for the current plan). Fail closed if
+    // the plan's mtime is unreadable.
+    let planMtimeMs = null;
+    try {
+      planMtimeMs = safeFs.statSync(planPath).mtimeMs;
+    } catch (err) {
+      planMtimeMs = null;
+    }
+    const evidenceMs = evidence.timestamp ? Date.parse(evidence.timestamp) : NaN;
+    if (planMtimeMs == null || Number.isNaN(evidenceMs) || evidenceMs < planMtimeMs) {
+      result.checklist.verifyEvidence.stale = true;
+      result.errors.push('review→done blocked: VERIFY evidence is stale (recorded before the plan\'s last change)');
+      result.valid = false;
+    } else {
+      result.checklist.verifyEvidence.stale = false;
+    }
+  }
+
+  // 4. Unresolved-feedback stays a WARNING (not one of the three rejection
+  //    conditions) so a compliant plan mentioning "TODO" in prose is not blocked.
   const hasUnresolved = /unresolved/i.test(content) || /\bTODO\b/.test(content) || /\bFIXME\b/.test(content);
   result.checklist.noUnresolved = !hasUnresolved;
   if (hasUnresolved) {

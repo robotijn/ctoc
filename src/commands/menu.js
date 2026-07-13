@@ -525,6 +525,50 @@ function ensureInitialized(projectPath) {
   }
 }
 
+/**
+ * Tokenize CLI args WITHOUT corrupting already-tokenized argv (finding M6).
+ * The shell already tokenizes a multi-element argv, so only the single-combined-
+ * string convenience form (one element, e.g. `["browse functional"]`) is split
+ * on whitespace. A shell-tokenized multi-element argv is passed through
+ * untouched so a quoted value like `--summary "two words"` survives as one token
+ * instead of being re-split and truncated by parseTaskArgs.
+ * @param {string[]} cliArgs
+ * @returns {string[]}
+ */
+function splitCliArgs(cliArgs) {
+  if (!Array.isArray(cliArgs)) return [];
+  if (cliArgs.length === 1) return String(cliArgs[0]).split(/\s+/).filter(Boolean);
+  return cliArgs;
+}
+
+/**
+ * Pull `--live-agent-ids <csv>` out of argv, returning the parsed id array (or
+ * undefined when the flag is absent) and the residual args with the flag+value
+ * removed (finding H8). The id list originates in the parent Claude session's live
+ * TaskList and crosses the `menu.js` child-process boundary via argv ONLY — there
+ * is no in-memory handle to the harness here. Absent ⇒ undefined ⇒ the reconcile's
+ * staleness backstop governs (true session restart, or the TUI child with no Task
+ * access). Present ⇒ authoritative for that one render. argv is stateless: unlike a
+ * side-channel file, a stale value can never be read as "live" (no TTL/cleanup).
+ * @param {string[]} argv
+ * @returns {{ liveAgentIds: (string[]|undefined), rest: string[] }}
+ */
+function extractLiveAgentIds(argv) {
+  const rest = [];
+  let liveAgentIds;
+  const args = Array.isArray(argv) ? argv : [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--live-agent-ids') {
+      const csv = args[i + 1] == null ? '' : String(args[i + 1]);
+      liveAgentIds = csv.split(',').map((s) => s.trim()).filter(Boolean);
+      i++; // consume the value
+      continue;
+    }
+    rest.push(args[i]);
+  }
+  return { liveAgentIds, rest };
+}
+
 // Main entry point
 function main() {
   const justInitialized = ensureInitialized(app.projectPath);
@@ -533,12 +577,24 @@ function main() {
   // Usage: node menu.js [browse functional | plan stage/file | validate stage/file | menu commands]
   const cliArgs = process.argv.slice(2);
 
-  if (cliArgs.length > 0) {
-    // Non-interactive JSON mode: delegate to menu-screens state machine
-    // Split single-string args ("browse functional" → ["browse", "functional"])
+  // H8: strip `--live-agent-ids <csv>` FIRST, so the branch decision below uses the
+  // RESIDUAL args. This means an invocation carrying ONLY the flag (rest empty) still
+  // reaches the no-args dashboard branch and keeps its environment/compliance ride-
+  // alongs — the flag never diverts the live on-open render to a sub-command screen.
+  const { liveAgentIds, rest } = extractLiveAgentIds(cliArgs);
+
+  if (rest.length > 0) {
+    // Non-interactive JSON mode: delegate to menu-screens state machine.
+    // Length-aware split (M6): the shell already tokenizes a multi-element argv,
+    // so only the single-combined-string convenience form ("browse functional" →
+    // ["browse", "functional"]) is split; a quoted `--summary "two words"` in a
+    // multi-element argv survives intact instead of being re-split and truncated.
+    // H8: thread the live-agent ids so a `plan …`/`browse …` render that reconciles
+    // trusts the live set (real sub-commands never carry ride-alongs, so they are
+    // NOT duplicated into this branch).
     const { route } = require('../lib/menu-screens');
-    const splitArgs = cliArgs.flatMap(arg => arg.split(/\s+/));
-    const result = route(splitArgs, app.projectPath);
+    const splitArgs = splitCliArgs(rest);
+    const result = route(splitArgs, app.projectPath, { liveAgentIds });
     console.log(JSON.stringify(result, null, 2));
     return;
   }
@@ -564,8 +620,11 @@ function main() {
     // The dashboard (plan overview across all phases) ALWAYS renders. When the
     // environment is not yet chosen, the environment question rides along as a
     // second question — it never replaces or gates the overview.
+    // H8: the live on-open render — thread the live-agent ids so a long-running
+    // background agent is reconciled against the real live set, not a blind clock.
+    // Absent ⇒ undefined ⇒ the staleness backstop (true session restart).
     const { route } = require('../lib/menu-screens');
-    const result = route([], app.projectPath);
+    const result = route([], app.projectPath, { liveAgentIds });
     if (needsEnvironmentPrompt(app.projectPath)) {
       attachEnvironmentQuestion(result);
     }
@@ -589,6 +648,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  splitCliArgs,
+  extractLiveAgentIds,
   ensureInitialized,
   needsComplianceRegimePrompt,
   attachComplianceQuestion,

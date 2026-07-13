@@ -8,6 +8,7 @@
  */
 
 const { execSync } = require('child_process');
+const fs = require('fs');
 const safeFs = require('./safe-fs');
 const os = require('os');
 const path = require('path');
@@ -89,15 +90,12 @@ function checkRAM() {
  */
 function checkDisk(targetPath = os.homedir()) {
   try {
-    // Use df command for cross-platform compatibility
-    const output = execSync(`df -k "${targetPath}" | tail -1`, {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    const parts = output.trim().split(/\s+/);
-    const availableKB = parseInt(parts[3], 10);
-    const availableGB = Math.floor(availableKB / (1024 * 1024));
+    // M13 (cross-platform): use Node's own fs.statfsSync (available since Node
+    // 18.15; this repo runs Node v24) instead of shelling out to the POSIX
+    // disk-free/tail utilities, which are absent from a stock Windows install.
+    // bavail = blocks available to an unprivileged user; bsize = block size.
+    const st = fs.statfsSync(targetPath);
+    const availableGB = Math.floor((st.bavail * st.bsize) / (1024 ** 3));
 
     return {
       ok: availableGB >= REQUIREMENTS.MIN_DISK_GB,

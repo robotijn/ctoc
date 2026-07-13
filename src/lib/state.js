@@ -49,20 +49,93 @@ function readPlans(dirPath) {
       };
     });
 
+  // The todo stage honors an explicit, mutable ordering key
+  // (.ctoc/state/todo-order.json) so a queue reorder is genuinely observable
+  // (finding H10). applyTodoOrder is fail-safe: any error falls back to the
+  // FIFO birthtime sort, and it is a no-op when the order file is absent, so
+  // every other stage and every legacy todo dir behaves exactly as before.
+  if (path.basename(dirPath) === 'todo') {
+    return applyTodoOrder(files, dirPath);
+  }
+
   // Sort oldest first (FIFO)
   files.sort((a, b) => a.created - b.created);
 
   return files;
 }
 
-// Parse plan metadata from YAML frontmatter.
-// CRLF-safe via the shared ./frontmatter helper (finding H1): a plan checked out
-// on Windows (CRLF) parses byte-identically to its LF twin. Do NOT re-inline a
-// bare /^---\n/ here — that LF-only pattern silently locks out CRLF plans.
-function parseMetadata(content) {
-  const { hasFrontmatter, lines } = parseFrontmatter(content);
-  if (!hasFrontmatter) return {};
+// Read the ordered *.md basename list for a todo directory. Any basename listed
+// in <root>/.ctoc/state/todo-order.json comes first (in that array order, if it
+// still exists on disk), then any remaining on-disk *.md sorted by birthtime
+// (FIFO fallback, with an alphabetical name tiebreaker for deterministic order
+// under coarse birthtime granularity). The result always covers every on-disk
+// *.md exactly once. Fail-safe: any error yields pure birthtime/name order.
+// This is the SINGLE source of truth for todo ordering, shared with actions.js'
+// moveUpInQueue/moveDownInQueue so display order and swap order can never diverge.
+function readTodoQueueOrder(todoDir) {
+  const onDisk = safeFs.readdirSync(todoDir).filter(f => f.endsWith('.md'));
 
+  const birthtime = new Map();
+  onDisk.forEach(f => {
+    try {
+      birthtime.set(f, safeFs.statSync(path.join(todoDir, f)).birthtime.getTime());
+    } catch {
+      birthtime.set(f, 0);
+    }
+  });
+  const byBirth = (a, b) =>
+    (birthtime.get(a) - birthtime.get(b)) || (a < b ? -1 : a > b ? 1 : 0);
+
+  let listed = [];
+  try {
+    const orderFile = path.join(todoDir, '..', '..', '.ctoc', 'state', 'todo-order.json');
+    if (safeFs.existsSync(orderFile)) {
+      const parsed = JSON.parse(safeFs.readFileSync(orderFile, 'utf8'));
+      if (Array.isArray(parsed)) {
+        listed = parsed.filter(n => typeof n === 'string');
+      }
+    }
+  } catch {
+    listed = []; // corrupt/unreadable order file → pure birthtime order
+  }
+
+  const onDiskSet = new Set(onDisk);
+  const ordered = [];
+  const seen = new Set();
+  for (const name of listed) {
+    if (onDiskSet.has(name) && !seen.has(name)) {
+      ordered.push(name);
+      seen.add(name);
+    }
+  }
+  const remaining = onDisk.filter(f => !seen.has(f)).sort(byBirth);
+  return ordered.concat(remaining);
+}
+
+// Reorder the readPlans() result objects for a todo directory to match
+// readTodoQueueOrder(). Fail-safe: on any error, falls back to the FIFO
+// birthtime sort so readPlans never throws. Not exported.
+function applyTodoOrder(files, dirPath) {
+  try {
+    const order = readTodoQueueOrder(dirPath);
+    const rank = new Map(order.map((name, i) => [name, i]));
+    return files.slice().sort((a, b) => {
+      const ra = rank.has(path.basename(a.path)) ? rank.get(path.basename(a.path)) : Infinity;
+      const rb = rank.has(path.basename(b.path)) ? rank.get(path.basename(b.path)) : Infinity;
+      if (ra !== rb) return ra - rb;
+      return a.created - b.created;
+    });
+  } catch {
+    return files.slice().sort((a, b) => a.created - b.created);
+  }
+}
+
+// Parse the scalar `key: value` lines of a frontmatter region into an object.
+// A later duplicate key OVERRIDES an earlier one — so the plan's own frontmatter,
+// which is physically LATER in the file than a prepended approval-marker block,
+// wins on a genuine duplicate while every DISTINCT key from both is preserved.
+// Booleans and non-negative integers are coerced; surrounding quotes stripped.
+function parseFrontmatterLines(lines) {
   const metadata = {};
   lines.forEach(line => {
     const colonIndex = line.indexOf(':');
@@ -80,8 +153,45 @@ function parseMetadata(content) {
       metadata[key] = value;
     }
   });
-
   return metadata;
+}
+
+// Parse plan metadata from YAML frontmatter, MERGED across every leading
+// `---…---` block (finding M19).
+//
+// A plan that has crossed a human gate carries a PREPENDED approval-marker block
+// (`approved_by`/`approved_at`/`gate_crossed`) ahead of its own frontmatter. The
+// former single-block reader matched ONLY that first marker block and silently
+// dropped every field from the plan's own block (`title`, `type`, `status`,
+// `priority`, `parent_vision`, `depends_on`) — corrupting the parsed view of any
+// plan that had ever crossed a gate. We now parse the UNION of all leading blocks
+// via the CRLF-safe `extractFrontmatterRegion` (the same helper `listSubplans`
+// uses for this exact reason), so no original field is lost. A single-block plan
+// is behavior-identical: the region is exactly that one block.
+//
+// Robustness: `extractFrontmatterRegion` is lazy-required (there is no state ↔
+// stale-detector cycle today, but the lazy require keeps it that way for future
+// edits) and, on ANY error OR an empty region, this FALLS OPEN to the previous
+// CRLF-safe single-block reader — a parser fault can never regress below the
+// prior behavior. Do NOT re-inline a bare /^---\n/ here: that LF-only pattern
+// silently locks out CRLF plans (finding H1).
+function parseMetadata(content) {
+  let region = null;
+  try {
+    const { extractFrontmatterRegion } = require('./stale-detector');
+    region = extractFrontmatterRegion(content);
+  } catch {
+    region = null; // fail-open to the single-block reader below
+  }
+
+  if (typeof region === 'string' && region.length > 0) {
+    return parseFrontmatterLines(region.split('\n'));
+  }
+
+  // Fail-open fallback: previous CRLF-safe single-block behavior.
+  const { hasFrontmatter, lines } = parseFrontmatter(content);
+  if (!hasFrontmatter) return {};
+  return parseFrontmatterLines(lines);
 }
 
 // Calculate time ago string
@@ -408,6 +518,7 @@ function getVisionStubs(visionSlug, projectPath) {
 module.exports = {
   getPlansDir,
   readPlans,
+  readTodoQueueOrder,
   parseMetadata,
   timeAgo,
   getPlanCounts,

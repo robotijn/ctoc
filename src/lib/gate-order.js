@@ -1,0 +1,78 @@
+'use strict';
+
+/**
+ * Order-based human-gate crossing detection (finding H2, W02-s4).
+ *
+ * CTOC has six plan stages in a fixed forward order and three human gate edges.
+ * A move is a HUMAN-GATE CROSSING iff it is FORWARD along the stage order and its
+ * span covers at least one gate edge — this catches single-hop AND multi-hop moves
+ * (e.g. in-progress -> done skips the review -> done gate, functional -> todo skips
+ * both the functional -> implementation and implementation -> todo gates). Backward
+ * (revert) moves and forward moves that span no gate edge are NOT crossings.
+ *
+ * This module is the single source of truth for that rule; `move-plan.js` (the
+ * untrusted CLI executor agents invoke from Bash) consults it. It deliberately does
+ * NOT live inside the low-level `movePlan()` in actions.js, because `approvePlan()`
+ * calls `movePlan()` to cross a gate LEGITIMATELY after stamping approval.
+ */
+
+// Stage order — index === order. functional(0) < implementation(1) < todo(2) <
+// in-progress(3) < review(4) < done(5).
+const STAGE_ORDER = ['functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
+
+// The three human gate edges, each expressed as [from, to] adjacent stages.
+const GATE_EDGES = [
+  ['functional', 'implementation'],
+  ['implementation', 'todo'],
+  ['review', 'done'],
+];
+
+// Precomputed stage -> order index map, so `crossesHumanGate` allocates nothing and
+// runs in O(number of gate edges) on the hot path.
+const ORDER_INDEX = new Map(STAGE_ORDER.map((stage, index) => [stage, index]));
+
+// Gate edges precomputed to their [g0, g1] order-index pairs (all edges are known
+// stages, so no undefined can appear here).
+const GATE_EDGE_ORDERS = GATE_EDGES.map(([g0, g1]) => [ORDER_INDEX.get(g0), ORDER_INDEX.get(g1)]);
+
+/**
+ * Does moving a plan from stage `from` to stage `to` cross a human gate?
+ *
+ * A crossing requires BOTH:
+ *   1. the move is FORWARD:  order[from] < order[to]; and
+ *   2. some gate edge (g0 -> g1) is spanned:  order[from] <= order[g0]
+ *      AND order[to] >= order[g1].
+ *
+ * Worked examples:
+ *   crossesHumanGate('in-progress', 'done')  -> true  (spans review->done: 3<=4, 5>=5)
+ *   crossesHumanGate('functional', 'todo')   -> true  (spans functional->implementation)
+ *   crossesHumanGate('review', 'done')       -> true  (adjacent gate)
+ *   crossesHumanGate('todo', 'in-progress')  -> false (forward, spans no gate edge)
+ *   crossesHumanGate('review', 'functional') -> false (backward revert)
+ *
+ * Fail-open on unknown stages (returns false): `move-plan.js` validates both stages
+ * against VALID_STAGES before ever calling this, so an unknown stage never reaches a
+ * real move.
+ *
+ * @param {string} from - source stage name
+ * @param {string} to   - destination stage name
+ * @returns {boolean} true iff the move crosses one or more human gate edges
+ */
+function crossesHumanGate(from, to) {
+  const fromOrder = ORDER_INDEX.get(from);
+  const toOrder = ORDER_INDEX.get(to);
+
+  // Unknown stage, or not a forward move -> never a gate crossing.
+  if (fromOrder === undefined || toOrder === undefined || fromOrder >= toOrder) {
+    return false;
+  }
+
+  for (const [g0, g1] of GATE_EDGE_ORDERS) {
+    if (fromOrder <= g0 && toOrder >= g1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+module.exports = { STAGE_ORDER, GATE_EDGES, crossesHumanGate };

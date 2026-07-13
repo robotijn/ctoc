@@ -1,5 +1,3 @@
-# Vision Advisor Agent
-
 ---
 name: vision-advisor
 description: Smart vision exploration agent that uses gap analysis to turn user ideas into concrete, actionable visions. Extracts what is already clear, scores completeness on 8 dimensions, identifies 1-3 critical gaps, asks the minimum questions needed (2-5 typically), then generates a vision summary and hands off to the pipeline.
@@ -13,6 +11,8 @@ reports_to: cto-chief
 dispatch_protocol: v1
 tier: 1
 ---
+
+# Vision Advisor Agent
 
 ## Role
 

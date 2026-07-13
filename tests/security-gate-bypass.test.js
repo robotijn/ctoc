@@ -3,25 +3,22 @@
  *
  * CTOC's four human gates are CTOC's only hard safety boundary. A plan may not
  * land in a gate destination (implementation/, todo/, done/) without GENUINE
- * human approval. The detection of "genuine approval" lives in
- * `src/hooks/human-gate-check.js`:
+ * human approval. Since the gate-integrity hardening (finding C4), "genuine
+ * approval" is a LEDGER fact, not a text fact: every real human approval is
+ * recorded by `src/lib/approval-ledger.js` under `.ctoc/approvals/` with a
+ * content hash of the plan as approved, and the PreToolUse hooks deny any tool
+ * write into that directory. `src/hooks/human-gate-check.js` accepts a plan in
+ * a gate destination only when a matching ledger entry exists (for todo/ and
+ * done/, one whose content hash still matches the live plan bytes). Text in the
+ * plan file — frontmatter or body — is NEVER sufficient: any process can write
+ * `approved_by: human` into a file, so a text marker proves nothing about who
+ * approved (the original substring check accepted a body mention anywhere).
  *
- *     function hasApprovalMarker(filePath) {
- *       const content = fs.readFileSync(filePath, 'utf8');
- *       return content.includes('approved_by: human');   // <-- substring, anywhere
- *     }
- *
- * The string `approved_by: human` is matched ANYWHERE in the file. That is a
- * substring check, not a structural one. The CONTRACT, however, is that
- * approval is a YAML FRONTMATTER fact — the plan's `approved_by` key must equal
- * `human`. Any occurrence of that text in the BODY (a fenced example, a prose
- * sentence, a commented-out line, a "Rejected" section) is NOT approval.
- *
- * This file asserts the CONTRACT (frontmatter-based approval), not the current
+ * This file asserts the CONTRACT (ledger-backed approval), not any particular
  * implementation. Tests that fail here are REAL SECURITY BUGS: a plan reaches a
  * gate destination — including done/ (shipped) — with no human ever having
  * approved it. The bug is reported, not papered over: assertions are NOT
- * weakened to match the buggy substring behavior.
+ * weakened to match a forgeable acceptance.
  *
  * MECHANICS
  *   - The real hook is spawned as a child Node process (no mocking) against a
@@ -47,6 +44,7 @@ const REPO = path.resolve(__dirname, '..');
 const GATE_HOOK = path.join(REPO, 'src', 'hooks', 'human-gate-check.js');
 
 const { isCtocProject } = require(path.join(REPO, 'src', 'lib', 'ctoc-project-detector'));
+const ledger = require(path.join(REPO, 'src', 'lib', 'approval-ledger'));
 
 // Every plan stage directory the hook may read or revert into.
 const PLAN_STAGES = [
@@ -100,6 +98,23 @@ function writePlan(dir, stage, name, content) {
   return p;
 }
 
+/**
+ * Record a REAL ledger approval (finding C4) for a plan at a gate edge. Human-gate
+ * acceptance provenance comes from the agent-write-denied ledger at
+ * `.ctoc/approvals/`, NEVER the forgeable in-plan `approved_by: human` marker — so a
+ * genuinely-approved plan is one with a matching ledger entry, not one carrying the
+ * marker text. `content` MUST be the exact bytes written to disk: the tamper-
+ * sensitive `todo/`/`done/` folders bind acceptance to a live content-hash match.
+ */
+function approveInLedger(dir, stage, name, content, stageFrom) {
+  const slug = name.replace(/\.md$/, '');
+  ledger.writeEntry(slug, {
+    content_sha256: ledger.computeContentHash(content),
+    stage_from: stageFrom,
+    stage_to: stage,
+  }, dir);
+}
+
 function planExists(dir, stage, name) {
   return fs.existsSync(path.join(dir, 'plans', stage, name));
 }
@@ -126,7 +141,11 @@ function runGateHook(dir) {
 function readViolations(dir) {
   const f = path.join(dir, '.ctoc', 'logs', 'gate-violations.json');
   if (!fs.existsSync(f)) return [];
-  return JSON.parse(fs.readFileSync(f, 'utf8'));
+  // gate-violations.json is an append-only JSONL log (durable-log format): one
+  // JSON object per line, NOT a single JSON array.
+  const raw = fs.readFileSync(f, 'utf8').trim();
+  if (!raw) return [];
+  return raw.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 }
 
 // --- Plan fixtures ---------------------------------------------------------
@@ -250,9 +269,11 @@ describe('security: human-gate approval-marker bypass', () => {
   beforeEach(() => { dir = makeProject(); });
   afterEach(() => { cleanup(dir); dir = null; });
 
-  // 3 — TRUE POSITIVE: real frontmatter approval must survive.
-  it('keeps a done/ plan with a real frontmatter approved_by: human', () => {
-    writePlan(dir, 'done', 'real-approval.md', approvedFrontmatter());
+  // 3 — TRUE POSITIVE: a real LEDGER-backed approval must survive.
+  it('keeps a done/ plan backed by a real ledger approval', () => {
+    const content = approvedFrontmatter();
+    writePlan(dir, 'done', 'real-approval.md', content);
+    approveInLedger(dir, 'done', 'real-approval.md', content, 'review');
     runGateHook(dir);
 
     assert.equal(
@@ -339,18 +360,20 @@ describe('security: human-gate approval-marker bypass', () => {
     );
   });
 
-  // 7 — EDGE: legitimately approved with odd intra-value spacing must survive.
-  //   CONTRACT: the frontmatter key `approved_by` equals `human`; surrounding
-  //   whitespace in the value is insignificant in YAML. A genuinely approved
-  //   plan must NOT be falsely reverted just because of spacing.
-  it('keeps a done/ plan whose frontmatter marker has odd spacing', () => {
-    writePlan(dir, 'done', 'odd-spacing.md', approvedOddSpacing());
+  // 7 — EDGE: a legitimately (ledger-)approved plan must survive. Under the ledger
+  //   contract the in-plan marker's spacing is irrelevant to acceptance — a real
+  //   ledger entry is what keeps it; a genuinely approved plan must NOT be falsely
+  //   reverted.
+  it('keeps a done/ plan backed by a ledger approval (in-plan marker spacing is irrelevant)', () => {
+    const content = approvedOddSpacing();
+    writePlan(dir, 'done', 'odd-spacing.md', content);
+    approveInLedger(dir, 'done', 'odd-spacing.md', content, 'review');
     runGateHook(dir);
 
     assert.equal(
       planExists(dir, 'done', 'odd-spacing.md'), true,
-      'CONTRACT: approved_by:   human (extra spaces) is still a valid YAML '
-      + 'approval — the plan must NOT be reverted',
+      'CONTRACT: a ledger-approved plan must NOT be reverted — the in-plan marker '
+      + 'spacing is irrelevant to acceptance',
     );
     assert.equal(
       planExists(dir, 'review', 'odd-spacing.md'), false,
@@ -391,13 +414,15 @@ describe('security: human-gate approval-marker bypass', () => {
         );
       });
 
-      it(`keeps a ${destStage}/ plan with a real frontmatter approval`, () => {
-        writePlan(dir, destStage, 'ok.md', approvedFrontmatter());
+      it(`keeps a ${destStage}/ plan backed by a real ledger approval`, () => {
+        const content = approvedFrontmatter();
+        writePlan(dir, destStage, 'ok.md', content);
+        approveInLedger(dir, destStage, 'ok.md', content, srcStage);
         runGateHook(dir);
 
         assert.equal(
           planExists(dir, destStage, 'ok.md'), true,
-          `a genuinely approved plan must survive in ${destStage}/`,
+          `a genuinely (ledger-)approved plan must survive in ${destStage}/`,
         );
         assert.equal(
           planExists(dir, srcStage, 'ok.md'), false,

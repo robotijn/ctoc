@@ -5,7 +5,7 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
-const { parseMetadata, readPlans, getPlansDir } = require('./state');
+const { parseMetadata, readPlans, getPlansDir, readTodoQueueOrder } = require('./state');
 const { refineLoop, appendDeferredQuestions } = require('./iron-loop');
 const { writeStatus, clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
@@ -199,9 +199,98 @@ function addApprovalMarker(content, from, to) {
   return marker + content;
 }
 
+/**
+ * Atomically cross a human gate: stamp the approval marker ONLY at the
+ * destination, commit the approval to the content-hashed ledger, and roll back to
+ * a safe state on any failure (finding M18, ADR-5).
+ *
+ * Ordering (ledger-first commit semantics — approval "commits" when the ledger
+ * entry lands for the destination):
+ *   1. Compute `destContent = addApprovalMarker(sourceContent)` and its
+ *      `content_sha256` over the EXACT bytes that will land at the destination, so
+ *      s3's later `verify` hash matches on a residency sweep.
+ *   2. Move (rename) source → destination, then write `destContent` at the dest.
+ *   3. Write the ledger entry keyed to that hash and the EXACT gate edge.
+ *   4. If the destination write OR the ledger write throws: ROLL BACK — move the
+ *      file back to the source folder, restore the ORIGINAL unmarked content, and
+ *      remove any partial ledger entry. Final state is (a) unmarked + in source.
+ *
+ * The marker is written ONLY at the destination (step 2), never in the source
+ * folder — so the forbidden state (c) marked-and-resident-in-SOURCE is
+ * structurally unreachable. A crash AFTER the move but BEFORE the ledger write
+ * leaves a marked plan at the destination with NO ledger entry, which s3's
+ * residency sweep flags and reverts — self-healing to (a). A crash AFTER the
+ * ledger write is a full commit (b) marked + ledgered + in destination.
+ *
+ * @param {string} planPath - the plan's current (source) path
+ * @param {string} from - source stage
+ * @param {string} to - destination stage
+ * @param {string} root - resolved project root
+ * @param {{ move?: Function, writeEntry?: Function, removeEntry?: Function }} [deps]
+ *   Injectable seams (default to the real implementations) so a crash-injection
+ *   test can force step 3 to throw and assert the rollback. `move(planPath,
+ *   destStage)` returns the new path; `writeEntry(slug, entry, root)` and
+ *   `removeEntry(slug, root)` match the approval-ledger signatures.
+ * @returns {string} the destination path
+ */
+function stampAndLedger(planPath, from, to, root, deps = {}) {
+  const ledger = require('./approval-ledger');
+  const move = deps.move || ((p, destStage) => movePlan(p, destStage, root));
+  const writeEntry = deps.writeEntry || ledger.writeEntry;
+  const removeEntry = deps.removeEntry || ledger.removeEntry;
+
+  const slug = ledger.slugFromPlanPath(planPath);
+  const originalContent = safeFs.readFileSync(planPath, 'utf8');
+  const destContent = addApprovalMarker(originalContent, from, to);
+  const contentHash = ledger.computeContentHash(destContent);
+
+  // Can the content-hashed ledger KEY this slug? The ledger (slice s1) restricts a
+  // slug to a lowercase-alphanumeric-plus-hyphen token as a hard path-traversal
+  // guard, so a legacy mixed-case slug (e.g. an early `CU1-…` plan) cannot be
+  // keyed. For such a plan we cross the gate MARKER-ONLY — the exact pre-ledger
+  // behavior — rather than refuse the crossing outright (which would strand real
+  // legacy plans). `ledger.slugFromPlanPath` is the SAME derivation the residency
+  // sweep (s3) uses, so a keyable (lowercase) slug is written and verified
+  // consistently on both sides; an un-keyable one is simply un-tracked on both.
+  // `ledgerPath` is a side-effect-free probe: it only validates and joins.
+  let ledgerKeyable = true;
+  try {
+    ledger.ledgerPath(slug, root);
+  } catch {
+    ledgerKeyable = false;
+  }
+
+  // Step 2: move (rename) source → dest, then write the MARKED bytes at the dest.
+  // The marker never touches the source file, so state (c) cannot occur.
+  const newPath = move(planPath, to);
+  try {
+    safeFs.writeFileSync(newPath, destContent);
+    // Step 3: commit the approval in the ledger (the source of approval truth)
+    // whenever the slug is keyable.
+    if (ledgerKeyable) {
+      writeEntry(slug, {
+        content_sha256: contentHash,
+        stage_from: from,
+        stage_to: to,
+        approved_by: 'human'
+      }, root);
+    }
+  } catch (err) {
+    // Step 4: ROLL BACK to (a) unmarked + in source. Each step is best-effort so a
+    // secondary failure never masks the primary error that triggered the rollback.
+    try { move(newPath, from); } catch { /* best-effort: leave for s3's sweep */ }
+    try { safeFs.writeFileSync(planPath, originalContent); } catch { /* best-effort */ }
+    if (ledgerKeyable) { try { removeEntry(slug, root); } catch { /* best-effort */ } }
+    throw err;
+  }
+  return newPath;
+}
+
 // Approve a plan (move to next stage)
 // Returns { newPath, backgroundAgent, humanGate } - backgroundAgent is the type of agent to spawn
-function approvePlan(planPath, projectPath) {
+// `options.deps` (optional) is forwarded to stampAndLedger's injectable seams; the
+// return shape is unchanged for the ordinary two-argument call.
+function approvePlan(planPath, projectPath, options = {}) {
   const root = projectPath || findProjectRoot();
   const plansDir = path.join(root, 'plans');
   const relativePath = path.relative(plansDir, planPath);
@@ -218,20 +307,27 @@ function approvePlan(planPath, projectPath) {
       // Clear any existing status from previous stage
       clearStatus(planPath);
 
-      // Add human approval marker for gate crossings
       const isHumanGate = HUMAN_GATES[from] === to;
-      if (isHumanGate) {
-        let content = safeFs.readFileSync(planPath, 'utf8');
-        content = addApprovalMarker(content, from, to);
-        safeFs.writeFileSync(planPath, content);
-      }
 
-      // If moving to todo, apply Iron Loop
+      // Iron Loop refinement runs on the SOURCE file BEFORE the marker/move. It is
+      // plan CONTENT, not an approval marker, so running it in the source folder
+      // never creates the forbidden marked-in-source state — and doing it before
+      // the destination hash is computed means the ledger hash matches the FINAL
+      // committed bytes (otherwise a post-hash refinement would make s3's verify
+      // fail and revert the freshly-approved plan).
       if (to === 'todo') {
         applyIronLoop(planPath);
       }
 
-      const newPath = movePlan(planPath, to, projectPath);
+      // Cross the gate atomically: stamp at destination + ledger commit + rollback
+      // on failure (M18). All three flowMap transitions are human gates, so the
+      // else-branch is a defensive fallback for a hypothetical non-gate flow.
+      let newPath;
+      if (isHumanGate) {
+        newPath = stampAndLedger(planPath, from, to, root, options.deps || {});
+      } else {
+        newPath = movePlan(planPath, to, root);
+      }
 
       // Initialize background agent based on transition
       let backgroundAgent = null;
@@ -418,62 +514,60 @@ function deletePlan(planPath) {
   invalidate(); // CF1: removing a plan file changes counts; bust the cache
 }
 
-// Move plan up in queue
+// Persist the todo queue order as an ordered array of *.md basenames to
+// .ctoc/state/todo-order.json. Atomic: write a pid-scoped temp file, then rename
+// it over the target (rename is atomic on POSIX and a same-directory replace on
+// Windows), so a concurrent reader never sees a half-written file.
+function writeTodoOrder(todoDir, order) {
+  const stateDir = path.join(todoDir, '..', '..', '.ctoc', 'state');
+  if (!safeFs.existsSync(stateDir)) {
+    safeFs.mkdirSync(stateDir, { recursive: true });
+  }
+  const target = path.join(stateDir, 'todo-order.json');
+  const tmp = path.join(stateDir, `todo-order.json.tmp-${process.pid}`);
+  safeFs.writeFileSync(tmp, JSON.stringify(order, null, 2) + '\n', 'utf8');
+  safeFs.renameSync(tmp, target);
+}
+
+// Move plan up in queue (finding H10).
+// The order lives in the explicit, mutable key .ctoc/state/todo-order.json —
+// read through the SAME source state.js' readPlans uses (readTodoQueueOrder),
+// so display order and swap order can never diverge. The former utimes/birthtime
+// swap was a silent no-op (birthtime is not writable via fs.utimesSync).
 function moveUpInQueue(planPath, projectPath) {
   const root = projectPath || findProjectRoot();
   const plansDir = path.join(root, 'plans', 'todo');
-  const plans = safeFs.readdirSync(plansDir)
-    .filter(f => f.endsWith('.md'))
-    .map(f => ({
-      name: f,
-      path: path.join(plansDir, f),
-      stat: safeFs.statSync(path.join(plansDir, f))
-    }))
-    .sort((a, b) => a.stat.birthtime - b.stat.birthtime);
+  const order = readTodoQueueOrder(plansDir); // *.md basenames in queue order
+  const target = path.basename(planPath);
+  const index = order.indexOf(target);
 
-  const index = plans.findIndex(p => p.path === planPath);
+  // Top boundary (or not found) → a real no-op: return false WITHOUT invalidating.
   if (index <= 0) return false;
 
-  // Swap creation times by touching files
-  const prevPlan = plans[index - 1];
-  const now = new Date();
-  const earlier = new Date(now - 1000);
+  // Swap the target with its previous neighbor.
+  [order[index - 1], order[index]] = [order[index], order[index - 1]];
+  writeTodoOrder(plansDir, order);
 
-  // Touch current plan to be earlier
-  safeFs.utimesSync(planPath, earlier, earlier);
-  // Touch previous plan to be now
-  safeFs.utimesSync(prevPlan.path, now, now);
-
-  invalidate(); // CF1: FIFO reorder is a write; bust the cache for the "every write busts" invariant
+  invalidate(); // CF1: an actual reorder is a write; bust the cache.
   return true;
 }
 
-// Move plan down in queue
+// Move plan down in queue (finding H10). Mirror of moveUpInQueue.
 function moveDownInQueue(planPath, projectPath) {
   const root = projectPath || findProjectRoot();
   const plansDir = path.join(root, 'plans', 'todo');
-  const plans = safeFs.readdirSync(plansDir)
-    .filter(f => f.endsWith('.md'))
-    .map(f => ({
-      name: f,
-      path: path.join(plansDir, f),
-      stat: safeFs.statSync(path.join(plansDir, f))
-    }))
-    .sort((a, b) => a.stat.birthtime - b.stat.birthtime);
+  const order = readTodoQueueOrder(plansDir);
+  const target = path.basename(planPath);
+  const index = order.indexOf(target);
 
-  const index = plans.findIndex(p => p.path === planPath);
-  if (index >= plans.length - 1) return false;
+  // Bottom boundary (or not found) → a real no-op: return false WITHOUT invalidating.
+  if (index < 0 || index >= order.length - 1) return false;
 
-  const nextPlan = plans[index + 1];
-  const now = new Date();
-  const earlier = new Date(now - 1000);
+  // Swap the target with its next neighbor.
+  [order[index + 1], order[index]] = [order[index], order[index + 1]];
+  writeTodoOrder(plansDir, order);
 
-  // Touch next plan to be earlier
-  safeFs.utimesSync(nextPlan.path, earlier, earlier);
-  // Touch current plan to be now
-  safeFs.utimesSync(planPath, now, now);
-
-  invalidate(); // CF1: FIFO reorder is a write; bust the cache for the "every write busts" invariant
+  invalidate(); // CF1: an actual reorder is a write; bust the cache.
   return true;
 }
 
@@ -490,55 +584,11 @@ function assignDirectly(planPath, projectPath) {
   return movePlan(planPath, 'todo', root);
 }
 
-/**
- * Initialize background research for a new plan
- * @param {string} planPath - Path to the new plan file
- */
-function initResearchAgent(planPath) {
-  initBackgroundAgent(planPath, AGENT_TYPES.RESEARCH_ASSISTANT,
-    'Researching codebase for related patterns...');
-  return AGENT_TYPES.RESEARCH_ASSISTANT;
-}
-
-/**
- * Initialize background critic for discussion mode
- * @param {string} planPath - Path to the plan file
- */
-function initCriticAgent(planPath) {
-  initBackgroundAgent(planPath, AGENT_TYPES.CRITIC,
-    'Analyzing plan for gaps and risks...');
-  return AGENT_TYPES.CRITIC;
-}
-
-/**
- * Initialize vision decomposer agent for a vision
- * @param {string} visionPath - Path to the vision file
- */
-function initDecomposerAgent(visionPath) {
-  initBackgroundAgent(visionPath, AGENT_TYPES.VISION_DECOMPOSER,
-    'Decomposing vision into functional stubs...');
-  return AGENT_TYPES.VISION_DECOMPOSER;
-}
-
-/**
- * Initialize product owner agent for a stub
- * @param {string} stubPath - Path to the stub file
- */
-function initProductOwnerAgent(stubPath) {
-  initBackgroundAgent(stubPath, AGENT_TYPES.PRODUCT_OWNER,
-    'Refining stub with acceptance criteria...');
-  return AGENT_TYPES.PRODUCT_OWNER;
-}
-
-/**
- * Initialize review preparer when plan moves to review
- * @param {string} planPath - Path to the plan file
- */
-function initReviewAgent(planPath) {
-  initBackgroundAgent(planPath, AGENT_TYPES.REVIEW_PREPARER,
-    'Preparing review summary...');
-  return AGENT_TYPES.REVIEW_PREPARER;
-}
+// Note (W11-s7, finding B2): five one-line agent-init wrappers (research,
+// critic, decomposer, product-owner, review) were deleted here. They had ZERO
+// call sites; the real state-transition spawns (approvePlan, completeExecution)
+// call the generic initBackgroundAgent() directly with an inline AGENT_TYPES
+// constant. See tests/actions-dead-exports-guard.test.js for the regression guard.
 
 /**
  * Move plan to in-progress and prepare for execution
@@ -625,8 +675,10 @@ function startAgent(projectPath) {
   // 2. Clear any leftover stop flag
   clearStop(root);
 
-  // 3. Clean up stale in-progress plans (D2)
-  const cleanedUp = cleanupStaleInProgress(root);
+  // 3. Clean up stale in-progress plans (D2). cleanupStaleInProgress now returns
+  //    { cleanedUp, skipped } (invalid stale plans are gated out, not moved);
+  //    this caller surfaces the moved-name list, preserving its cleanedUp[] shape.
+  const { cleanedUp } = cleanupStaleInProgress(root);
 
   // 4. Get next plan from todo queue
   const plansDir = getPlansDir(root);
@@ -820,11 +872,23 @@ function createCanvas(visionSlug, canvasType, projectPath, options = {}) {
 
 /**
  * Clean up orphaned in-progress plans (D2).
- * If no lock is active for an in-progress plan, move it to review.
- * Logs cleanup events to .ctoc/logs/cleanup.json (keeps plan files clean).
+ *
+ * Each orphaned in-progress plan is gated through `validateForReview` BEFORE the
+ * move (finding C9): this stale-cleanup path is now validated identically to the
+ * primary manual in-progress→review action, so a plan that could never pass
+ * review is not smuggled to the Gate-3 doorstep. Behavior per plan:
+ *   - valid   → logged as `moved` (reason `orphaned`) and moved to `review`.
+ *   - invalid → NOT moved; left in `in-progress`, logged as `skipped` with the
+ *               joined validation reason, and reported in the return's
+ *               `skipped[]`. Fail-closed: a validator that THROWS is also
+ *               treated as a skip (never a move).
+ * One invalid plan never aborts the batch (async-overnight resilience).
+ * Cleanup events are logged to .ctoc/logs/cleanup.json (keeps plan files clean).
  *
  * @param {string} projectPath - Project root
- * @returns {string[]} Names of cleaned-up plans
+ * @returns {{ cleanedUp: string[], skipped: Array<{ name: string, reason: string }> }}
+ *   `cleanedUp` — names of plans moved to review;
+ *   `skipped` — plans left in place because validation failed, each with a reason.
  */
 function cleanupStaleInProgress(projectPath) {
   const root = projectPath || findProjectRoot();
@@ -833,8 +897,21 @@ function cleanupStaleInProgress(projectPath) {
   const inProgressDir = path.join(plansDir, 'in-progress');
   const plans = readPlans(inProgressDir);
   const cleanedUp = [];
+  const skipped = [];
 
   for (const plan of plans) {
+    // Gate the move behind validateForReview. Fail closed: a validation throw is
+    // treated as an invalid plan (skip-with-reason), never a move.
+    let reason = null;
+    try {
+      const validation = validateForReview(plan.path, root);
+      if (validation.valid === false) {
+        reason = validation.errors.join('; ') || 'validation failed';
+      }
+    } catch (err) {
+      reason = `validation error: ${err && err.message ? err.message : String(err)}`;
+    }
+
     // Log cleanup event to .ctoc/logs/cleanup.json
     const logDir = path.join(root, '.ctoc', 'logs');
     safeFs.mkdirSync(logDir, { recursive: true });
@@ -843,10 +920,27 @@ function cleanupStaleInProgress(projectPath) {
     try {
       log = safeFs.existsSync(logFile) ? JSON.parse(safeFs.readFileSync(logFile, 'utf8')) : [];
     } catch { /* ignore */ }
+
+    if (reason !== null) {
+      // Invalid → record the skip and leave the plan in place.
+      log.push({
+        plan: plan.name,
+        from: 'in-progress',
+        to: 'in-progress',
+        action: 'skipped',
+        reason,
+        at: new Date().toISOString()
+      });
+      safeFs.writeFileSync(logFile, JSON.stringify(log, null, 2));
+      skipped.push({ name: plan.name, reason });
+      continue;
+    }
+
     log.push({
       plan: plan.name,
       from: 'in-progress',
       to: 'review',
+      action: 'moved',
       reason: 'orphaned',
       at: new Date().toISOString()
     });
@@ -856,7 +950,7 @@ function cleanupStaleInProgress(projectPath) {
     cleanedUp.push(plan.name);
   }
 
-  return cleanedUp;
+  return { cleanedUp, skipped };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1069,6 +1163,7 @@ function approveSubplans(parentSlug, fromStage, projectPath) {
 module.exports = {
   movePlan,
   approvePlan,
+  stampAndLedger,
   applyIronLoop,
   applyBasicIronLoopTemplate,
   rejectPlan,
@@ -1081,11 +1176,6 @@ module.exports = {
   // Background agent functions
   AGENT_TYPES,
   initBackgroundAgent,
-  initResearchAgent,
-  initCriticAgent,
-  initDecomposerAgent,
-  initProductOwnerAgent,
-  initReviewAgent,
   startExecution,
   completeExecution,
   // Agent orchestration functions

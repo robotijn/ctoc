@@ -3862,5 +3862,1279 @@
     },
     "humanGate": true,
     "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.527Z",
+    "plan": "ctoc-audit-w01-enforcement-blocks.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.554Z",
+    "plan": "ctoc-audit-w02-gate-integrity.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.579Z",
+    "plan": "ctoc-audit-w03-agent-contracts-load.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.602Z",
+    "plan": "ctoc-audit-w04-agents-resolve.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.629Z",
+    "plan": "ctoc-audit-w05-gate3-verifies.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.654Z",
+    "plan": "ctoc-audit-w06-truthful-tests.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.678Z",
+    "plan": "ctoc-audit-w07-cross-platform.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.704Z",
+    "plan": "ctoc-audit-w08-enforcement-honest.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.731Z",
+    "plan": "ctoc-audit-w09-release-metadata.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.759Z",
+    "plan": "ctoc-audit-w10-menu-taskplane.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T11:01:11.785Z",
+    "plan": "ctoc-audit-w11-state-durability-and-deadcode.md",
+    "from": "functional",
+    "to": "implementation",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.622Z",
+    "plan": "ctoc-audit-w09-s1-release-sync-failloud-atomic.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.649Z",
+    "plan": "ctoc-audit-w09-s2-package-license-invariant.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.674Z",
+    "plan": "ctoc-audit-w09-s3-update-abort-not-clobber.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.700Z",
+    "plan": "ctoc-audit-w11-s6-settings-raw-roundtrip.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.726Z",
+    "plan": "ctoc-audit-w11-s8-legacy-tab-cleanup.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.749Z",
+    "plan": "ctoc-audit-w11-s9-hooks-installer-path.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.778Z",
+    "plan": "ctoc-audit-w10-s1-push-entry-point.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.802Z",
+    "plan": "ctoc-audit-w10-s3-menu-route-safety.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.830Z",
+    "plan": "ctoc-audit-w07-s1-frontmatter-helper.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.855Z",
+    "plan": "ctoc-audit-w07-s2-coverage-state.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.881Z",
+    "plan": "ctoc-audit-w07-s3-syncunit-metrics.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.906Z",
+    "plan": "ctoc-audit-w07-s4-pipeline-parsers.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.930Z",
+    "plan": "ctoc-audit-w07-s5-script-parsers.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T16:17:11.955Z",
+    "plan": "ctoc-audit-w07-s7-homedir.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.050Z",
+    "plan": "ctoc-audit-w09-s1-release-sync-failloud-atomic.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.077Z",
+    "plan": "ctoc-audit-w11-s6-settings-raw-roundtrip.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.101Z",
+    "plan": "ctoc-audit-w11-s9-hooks-installer-path.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.127Z",
+    "plan": "ctoc-audit-w10-s3-menu-route-safety.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.154Z",
+    "plan": "ctoc-audit-w07-s1-frontmatter-helper.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.178Z",
+    "plan": "ctoc-audit-w09-s2-package-license-invariant.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.202Z",
+    "plan": "ctoc-audit-w09-s3-update-abort-not-clobber.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.228Z",
+    "plan": "ctoc-audit-w11-s8-legacy-tab-cleanup.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.253Z",
+    "plan": "ctoc-audit-w10-s1-push-entry-point.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.279Z",
+    "plan": "ctoc-audit-w07-s7-homedir.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.306Z",
+    "plan": "ctoc-audit-w07-s2-coverage-state.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.332Z",
+    "plan": "ctoc-audit-w07-s3-syncunit-metrics.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.359Z",
+    "plan": "ctoc-audit-w07-s4-pipeline-parsers.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T18:37:06.385Z",
+    "plan": "ctoc-audit-w07-s5-script-parsers.md",
+    "from": "review",
+    "to": "done",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.790Z",
+    "plan": "ctoc-audit-w01-s1-shared-deny-mechanism.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.819Z",
+    "plan": "ctoc-audit-w01-s2-bash-stdin-gate.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.844Z",
+    "plan": "ctoc-audit-w01-s3-multiedit-notebookedit-parity.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.888Z",
+    "plan": "ctoc-audit-w02-s1-approval-ledger.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.913Z",
+    "plan": "ctoc-audit-w02-s2-ledger-write-deny.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.938Z",
+    "plan": "ctoc-audit-w02-s4-multihop-gate-block.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.963Z",
+    "plan": "ctoc-audit-w02-s6-enforcer-gate-exemption.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:42.991Z",
+    "plan": "ctoc-audit-w02-s3-gate-acceptance-revert.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.018Z",
+    "plan": "ctoc-audit-w02-s5-atomic-stamp-merged-parse.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.063Z",
+    "plan": "ctoc-audit-w03-s1-frontmatter-byte0.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.089Z",
+    "plan": "ctoc-audit-w03-s3-shared-not-dispatchable.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.114Z",
+    "plan": "ctoc-audit-w03-s2-anchor-invariants-parser.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.156Z",
+    "plan": "ctoc-audit-w04-s1-registry-resolves.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.182Z",
+    "plan": "ctoc-audit-w04-s3-no-peer-dispatch.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.207Z",
+    "plan": "ctoc-audit-w04-s2-steptable-coordinator.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.254Z",
+    "plan": "ctoc-audit-w05-s1-verify-evidence.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.277Z",
+    "plan": "ctoc-audit-w05-s3-cleanup-validated.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.301Z",
+    "plan": "ctoc-audit-w05-s4-sync-validated.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.326Z",
+    "plan": "ctoc-audit-w05-s5-circuit-breaker.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.350Z",
+    "plan": "ctoc-audit-w05-s2-gate3-can-fail.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.391Z",
+    "plan": "ctoc-audit-w06-s1-skip-guard-integrity.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.415Z",
+    "plan": "ctoc-audit-w06-s2-coverage-instrumentation.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.443Z",
+    "plan": "ctoc-audit-w06-s3-frontmatter-anchoring.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.469Z",
+    "plan": "ctoc-audit-w06-s4-registry-integrity.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.495Z",
+    "plan": "ctoc-audit-w06-s5-version-license-truth.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.519Z",
+    "plan": "ctoc-audit-w06-s6-doc-counts.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.543Z",
+    "plan": "ctoc-audit-w06-s7-installer-paths.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.585Z",
+    "plan": "ctoc-audit-w07-s6-portable-shellouts.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.627Z",
+    "plan": "ctoc-audit-w08-s1-escape-role-scoping.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.650Z",
+    "plan": "ctoc-audit-w08-s2-detector-upward-walk.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.677Z",
+    "plan": "ctoc-audit-w08-s3-sessionstart-honest.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.716Z",
+    "plan": "ctoc-audit-w10-s2-multiword-task-args.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.741Z",
+    "plan": "ctoc-audit-w10-s5-settings-keys.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.766Z",
+    "plan": "ctoc-audit-w10-s6-plan-index-sync-await.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.790Z",
+    "plan": "ctoc-audit-w10-s4-live-agent-reconcile.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.834Z",
+    "plan": "ctoc-audit-w11-s1-durable-log.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.857Z",
+    "plan": "ctoc-audit-w11-s5-agent-lock-wx.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.883Z",
+    "plan": "ctoc-audit-w11-s7-queue-order-and-dead-exports.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.907Z",
+    "plan": "ctoc-audit-w11-s2-enforcement-log.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.931Z",
+    "plan": "ctoc-audit-w11-s3-transition-log.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:43.956Z",
+    "plan": "ctoc-audit-w11-s4-gate-violations-durability.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.778Z",
+    "plan": "ctoc-audit-w01-enforcement-blocks.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.807Z",
+    "plan": "ctoc-audit-w02-gate-integrity.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.833Z",
+    "plan": "ctoc-audit-w03-agent-contracts-load.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.860Z",
+    "plan": "ctoc-audit-w04-agents-resolve.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.886Z",
+    "plan": "ctoc-audit-w05-gate3-verifies.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.915Z",
+    "plan": "ctoc-audit-w06-truthful-tests.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.939Z",
+    "plan": "ctoc-audit-w07-cross-platform.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.968Z",
+    "plan": "ctoc-audit-w08-enforcement-honest.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:57.993Z",
+    "plan": "ctoc-audit-w09-release-metadata.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:58.020Z",
+    "plan": "ctoc-audit-w10-menu-taskplane.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
+  },
+  {
+    "timestamp": "2026-07-13T19:14:58.046Z",
+    "plan": "ctoc-audit-w11-state-durability-and-deadcode.md",
+    "from": "implementation",
+    "to": "todo",
+    "actor": "human",
+    "validation": {
+      "passed": true,
+      "checks": 0,
+      "warnings": 0
+    },
+    "humanGate": true,
+    "marker": true
   }
 ]

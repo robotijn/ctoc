@@ -5,7 +5,7 @@
  * hooks compose), this file spawns the REAL hook processes as child Node
  * processes and asserts their observable contract:
  *
- *   - PreToolUse.Edit.js   exit 1 = BLOCKED, exit 0 = ALLOWED
+ *   - PreToolUse.Edit.js   exit 2 = BLOCKED, exit 0 = ALLOWED
  *   - human-gate-check.js  always exit 0; effect observed on the filesystem
  *                          (plans reverted, violations logged)
  *
@@ -26,6 +26,7 @@ const os = require('node:os');
 const REPO = path.resolve(__dirname, '..');
 const EDIT_HOOK = path.join(REPO, 'src', 'hooks', 'PreToolUse.Edit.js');
 const GATE_HOOK = path.join(REPO, 'src', 'hooks', 'human-gate-check.js');
+const BASH_HOOK = path.join(REPO, 'src', 'hooks', 'PreToolUse.Bash.js');
 
 const { isCtocProject } = require(path.join(REPO, 'src', 'lib', 'ctoc-project-detector'));
 
@@ -94,7 +95,7 @@ function runEditHook(projectDir, targetRel, { transcriptPath } = {}) {
   // status is null only if the process was killed by a signal — that is a
   // harness failure, surface it loudly rather than silently passing.
   assert.equal(res.signal, null, `edit hook killed by signal ${res.signal}`);
-  assert.ok(res.status === 0 || res.status === 1,
+  assert.ok(res.status === 0 || res.status === 2,
     `edit hook produced unexpected exit code ${res.status}; stderr=${res.stderr}`);
   return res;
 }
@@ -108,6 +109,25 @@ function runGateHook(projectDir) {
   });
   assert.equal(res.signal, null, `gate hook killed by signal ${res.signal}`);
   assert.equal(res.status, 0, `gate hook should always exit 0; got ${res.status}, stderr=${res.stderr}`);
+  return res;
+}
+
+/**
+ * Run the Bash gate hook (W01-s2, findings C1+C2). The command travels as the
+ * PreToolUse JSON payload on STDIN (the harness's real transport); the hook no
+ * longer reads process.env.CLAUDE_TOOL_INPUT, so it is explicitly cleared to
+ * prove the test does not lean on the removed channel. A deny is the shared
+ * `permissionDecision:"deny"` JSON on stdout with exit 0 (deniedOnStdout());
+ * an allow is exit 0 silent — exit code alone no longer distinguishes them.
+ */
+function runBashHook(projectDir, command) {
+  const res = spawnSync(process.execPath, [BASH_HOOK], {
+    cwd: projectDir,
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }),
+    env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
+    encoding: 'utf8',
+  });
+  assert.equal(res.signal, null, `bash hook killed by signal ${res.signal}`);
   return res;
 }
 
@@ -142,10 +162,37 @@ function planExists(projectDir, stage, name) {
   return fs.existsSync(path.join(projectDir, 'plans', stage, `${name}.md`));
 }
 
+/**
+ * Whether the hook emitted the harness's real deny signal on stdout.
+ *
+ * Under the W01 deny protocol (ADR-1) a deny is the JSON decision
+ * `hookSpecificOutput.permissionDecision === "deny"` printed on stdout with
+ * exit 0; an allow is exit 0 SILENT (no JSON). Exit 0 alone therefore no longer
+ * distinguishes allow from deny — only the presence of this deny JSON does.
+ * Parses the LAST JSON object on stdout to tolerate any preceding output.
+ */
+function deniedOnStdout(res) {
+  const s = (res.stdout ? String(res.stdout) : '').trim();
+  if (!s) return false;
+  let decision = null;
+  try { decision = JSON.parse(s); } catch { /* fall through to last-brace scan */ }
+  if (!decision) {
+    const idx = s.lastIndexOf('{');
+    if (idx === -1) return false;
+    try { decision = JSON.parse(s.slice(idx)); } catch { return false; }
+  }
+  return !!(decision && decision.hookSpecificOutput
+    && decision.hookSpecificOutput.permissionDecision === 'deny');
+}
+
 function readViolations(projectDir) {
   const f = path.join(projectDir, '.ctoc', 'logs', 'gate-violations.json');
   if (!fs.existsSync(f)) return null;
-  return JSON.parse(fs.readFileSync(f, 'utf8'));
+  // gate-violations.json is an append-only JSONL log (the durable-log format,
+  // W11-s4): one JSON object per line, NOT a single JSON array.
+  const raw = fs.readFileSync(f, 'utf8').trim();
+  if (!raw) return null;
+  return raw.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +214,11 @@ describe('e2e: PreToolUse.Edit.js enforcement', () => {
   it('1. blocks a non-whitelisted file with no covering plan and no escape', () => {
     dir = makeProject({ ctoc: true, strict: true });
     const res = runEditHook(dir, path.join('src', 'lib', 'x.js'));
-    assert.equal(res.status, 1, 'should BLOCK (exit 1)');
+    // C1 regression guard: assert the tool was actually PREVENTED (the harness's
+    // real deny signal on stdout), not the cosmetic exit-1 numeral that let C1
+    // ship behind a green suite.
+    assert.equal(deniedOnStdout(res), true,
+      `should BLOCK via permissionDecision:"deny" on stdout; stdout=${res.stdout} stderr=${res.stderr}`);
     assert.match(res.stderr, /BLOCKED/, 'block reason on stderr');
   });
 
@@ -213,6 +264,8 @@ describe('e2e: PreToolUse.Edit.js enforcement', () => {
     const res = runEditHook(dir, path.join('src', 'lib', 'x.js'));
     assert.equal(res.status, 0,
       `covering plan should ALLOW; stderr=${res.stderr}`);
+    assert.equal(deniedOnStdout(res), false,
+      'an allowed edit must NOT carry the deny signal on stdout');
   });
 
   it('4. allows when an escape phrase ("hotfix") is present in the transcript', () => {
@@ -224,6 +277,8 @@ describe('e2e: PreToolUse.Edit.js enforcement', () => {
       { transcriptPath: transcript });
     assert.equal(res.status, 0,
       `escape phrase should ALLOW; stderr=${res.stderr}`);
+    assert.equal(deniedOnStdout(res), false,
+      'an escape-phrase allow must NOT carry the deny signal on stdout');
   });
 
   it('5. silent-passes when the project is NOT a CTOC project', () => {
@@ -233,6 +288,8 @@ describe('e2e: PreToolUse.Edit.js enforcement', () => {
       'fixture must NOT be a CTOC project for this test to be valid');
     const res = runEditHook(dir, path.join('src', 'lib', 'x.js'));
     assert.equal(res.status, 0, 'non-CTOC project → silent passthrough ALLOW');
+    assert.equal(deniedOnStdout(res), false,
+      'a non-CTOC silent passthrough must NOT carry the deny signal on stdout');
   });
 });
 
@@ -263,22 +320,26 @@ describe('e2e: human-gate-check.js gate enforcement', () => {
     assert.match(v.action, /review/, 'violation records revert to review/');
   });
 
-  it('7. does NOT revert a done/ plan that has the approval marker', () => {
+  it('7. reverts a done/ plan whose ONLY approval is the forgeable in-plan marker (no ledger entry)', () => {
     dir = makeProject({ ctoc: true });
-    writeStagePlan(dir, 'done', 'approved', { approved: true });
+    // The in-plan `approved_by: human` marker is forgeable by any agent tool call.
+    // Under the ledger contract (finding C4) it is NO LONGER accepted as approval:
+    // with no ledger entry vouching for the plan, human-gate-check correctly
+    // reverts it out of done/ (a marker-only "approval" is worthless).
+    writeStagePlan(dir, 'done', 'marker-only', { approved: true });
 
     runGateHook(dir);
 
-    assert.equal(planExists(dir, 'done', 'approved'), true,
-      'approved plan must stay in done/');
-    assert.equal(planExists(dir, 'review', 'approved'), false,
-      'approved plan must NOT appear in review/');
+    assert.equal(planExists(dir, 'done', 'marker-only'), false,
+      'a marker-only plan (no ledger entry) must be reverted out of done/');
+    assert.equal(planExists(dir, 'review', 'marker-only'), true,
+      'a marker-only plan must be reverted to review/');
 
     const violations = readViolations(dir);
-    if (violations) {
-      assert.equal(violations.some((e) => e.plan === 'approved.md'), false,
-        'no violation should be logged for an approved plan');
-    }
+    assert.ok(
+      Array.isArray(violations) && violations.some((e) => e.plan === 'marker-only.md'),
+      'the forged-marker revert must be logged as a violation',
+    );
   });
 
   it('8a. reverts an implementation/ plan lacking the marker → functional/', () => {
@@ -325,5 +386,38 @@ describe('e2e: human-gate-check.js gate enforcement', () => {
         'no violation should be logged for in-progress plans',
       );
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ENFORCEMENT — PreToolUse.Bash.js gate (W01-s2, findings C1+C2)
+// ---------------------------------------------------------------------------
+
+describe('e2e: PreToolUse.Bash.js gate enforcement', () => {
+  let dir;
+  afterEach(() => { cleanup(dir); dir = undefined; });
+
+  it('10. denies a destructive command read from stdin (rm -rf plans)', () => {
+    dir = makeProject({ ctoc: true, strict: true });
+    const res = runBashHook(dir, 'rm -rf plans');
+    // C1+C2 regression guard: the command must be READ from stdin (C2) AND the
+    // deny must be the harness's real signal on stdout (C1), not a cosmetic
+    // exit-1 numeral that let the gate stay inert behind a green suite.
+    assert.equal(deniedOnStdout(res), true,
+      `destructive command must BLOCK via permissionDecision:"deny" on stdout; stdout=${res.stdout} stderr=${res.stderr}`);
+  });
+
+  it('11. denies a force-push read from stdin (no allow-by-default fall-through)', () => {
+    dir = makeProject({ ctoc: true, strict: true });
+    const res = runBashHook(dir, 'git push --force origin main');
+    assert.equal(deniedOnStdout(res), true,
+      `force-push must BLOCK via permissionDecision:"deny"; stdout=${res.stdout} stderr=${res.stderr}`);
+  });
+
+  it('12. allows a benign read-only command (no deny signal)', () => {
+    dir = makeProject({ ctoc: true, strict: true });
+    const res = runBashHook(dir, 'ls -la');
+    assert.equal(deniedOnStdout(res), false,
+      `a benign command must NOT carry the deny signal on stdout; stdout=${res.stdout} stderr=${res.stderr}`);
   });
 });

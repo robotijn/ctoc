@@ -4,25 +4,14 @@
  */
 
 const assert = require('assert');
-const { test, describe, beforeEach } = require('node:test');
+const { test, describe } = require('node:test');
 
-let reviewReporter;
+// Hard require: if the module is deleted/renamed, this throws at load and the whole
+// file reports a failure — never a silent skip (skip-guard integrity, finding A2).
+const reviewReporter = require('../src/lib/review-reporter.js');
 
 describe('Review Reporter Tests', () => {
-  beforeEach(() => {
-    delete require.cache[require.resolve('../src/lib/review-reporter.js')];
-    try {
-      reviewReporter = require('../src/lib/review-reporter.js');
-    } catch (e) {
-      reviewReporter = null;
-    }
-  });
-
   test('generateCombinedReport produces valid markdown', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const report = reviewReporter.generateCombinedReport({
       planName: 'test-plan',
       reviewerAssessment: {
@@ -45,10 +34,6 @@ describe('Review Reporter Tests', () => {
   });
 
   test('generateCombinedReport includes both reviewer sections', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const report = reviewReporter.generateCombinedReport({
       planName: 'test',
       reviewerAssessment: {
@@ -70,10 +55,6 @@ describe('Review Reporter Tests', () => {
   });
 
   test('determineCombinedVerdict returns REJECT if either reviewer REJECT', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result1 = reviewReporter.determineCombinedVerdict('REJECT', 'APPROVE');
     assert.strictEqual(result1, 'REJECT', 'Reviewer REJECT should result in REJECT');
 
@@ -83,20 +64,12 @@ describe('Review Reporter Tests', () => {
   });
 
   test('determineCombinedVerdict returns APPROVE only if both APPROVE', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result = reviewReporter.determineCombinedVerdict('APPROVE', 'APPROVE');
     assert.strictEqual(result, 'APPROVE', 'Both APPROVE should result in APPROVE');
     console.log('# determineCombinedVerdict returns APPROVE only if both APPROVE');
   });
 
   test('determineCombinedVerdict returns NEEDS_WORK for mixed verdicts', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const result1 = reviewReporter.determineCombinedVerdict('APPROVE', 'NEEDS_WORK');
     assert.strictEqual(result1, 'NEEDS_WORK', 'Mixed should be NEEDS_WORK');
 
@@ -106,10 +79,6 @@ describe('Review Reporter Tests', () => {
   });
 
   test('appendReportToPlan removes existing report before adding new', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const originalContent = '# Plan\n\nContent here.\n\n## Review Report\n\nOld report\n';
     const newReport = '## Review Report\n\nNew report\n';
     const result = reviewReporter.appendReportToPlan(originalContent, newReport);
@@ -119,10 +88,6 @@ describe('Review Reporter Tests', () => {
   });
 
   test('appendReportToPlan preserves plan content above report', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const originalContent = '# Plan\n\nContent here.\n';
     const newReport = '## Review Report\n\nReport content\n';
     const result = reviewReporter.appendReportToPlan(originalContent, newReport);
@@ -132,10 +97,6 @@ describe('Review Reporter Tests', () => {
   });
 
   test('VERDICT constants have correct values', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     assert.ok(reviewReporter.VERDICT, 'Should export VERDICT constants');
     assert.strictEqual(reviewReporter.VERDICT.APPROVE, 'APPROVE');
     assert.strictEqual(reviewReporter.VERDICT.REJECT, 'REJECT');
@@ -144,10 +105,6 @@ describe('Review Reporter Tests', () => {
   });
 
   test('edge case: missing criteria fields (should not crash)', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const report = reviewReporter.generateCombinedReport({
       planName: 'test',
       reviewerAssessment: {
@@ -166,10 +123,6 @@ describe('Review Reporter Tests', () => {
   });
 
   test('edge case: empty issues/concerns arrays', (t) => {
-    if (!reviewReporter) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const report = reviewReporter.generateCombinedReport({
       planName: 'test',
       reviewerAssessment: {

@@ -1,5 +1,3 @@
-# Implementation Planner Agent
-
 ---
 name: implementation-planner
 description: Analyzes the codebase and generates concrete implementation details (file paths, function signatures, integration points, data flow, dependency graph, test plan, security checklist) for plans moving from functional to implementation stage.
@@ -14,14 +12,16 @@ dispatch_protocol: v1
 tier: 1
 ---
 
+# Implementation Planner Agent
+
 ## Step 0: Template selection
 
 Before producing the implementation blueprint:
 
 1. **Read project type** from the parent functional plan (`saas-b2c`, `saas-b2b`, `mobile-app`, `cli`, `oss-library`, `internal-tool`).
 
-2. **Dispatch stack-chooser** (`agents/planning/stack-chooser.md`):
-   - The stack-chooser selects the appropriate template defaults and writes a `tech_stack:` block into the implementation plan's frontmatter.
+2. **Obtain the stack-chooser template defaults (via CTO Chief):**
+   - As a Tier-1 sub-orchestrator you do NOT dispatch a peer directly. Recommend that CTO Chief dispatch `stack-chooser` (`agents/planning/stack-chooser.md`); CTO Chief runs it, and it writes a `tech_stack:` block into the implementation plan's frontmatter. Consume that block as the template basis.
 
 3. **Consume the selected template**:
    - If the project type matches a template in `.ctoc/templates/saas/index.yaml` (or `app/*`, `cli/*`, `oss-lib/*`), read the template's `manifest.yaml`.

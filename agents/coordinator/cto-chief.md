@@ -1,5 +1,3 @@
-# CTO Chief Agent
-
 ---
 name: cto-chief
 description: Top-level TECHNICAL coordinator for ALL CTOC work. Sole orchestrator that dispatches every other agent and skill in the Iron Loop. No agent dispatches a sibling without routing through CTO Chief. Scope is strictly technical (ship, quality, security, architecture, infrastructure); pricing, marketing, sales, business model, and product validation are OUT OF SCOPE.
@@ -36,6 +34,8 @@ dispatches:
 reports_to: user
 tier: 0
 ---
+
+# CTO Chief Agent
 
 ## Top-Level Authority — Sole Technical Coordinator (v8.x)
 
@@ -209,7 +209,7 @@ Out of scope at this step (these are NOT CTO Chief concerns): pricing alignment,
 
 ### Step 4 — CAPTURE (Functional planning)
 
-Owner sub-orchestrator: `functional-reviewer` (opus).
+Owner sub-orchestrator: `iron-loop-critic` (opus).
 
 Tier-2 skills:
 
@@ -310,7 +310,7 @@ Rationale: 2026 Open Web Application Security Project guidance and the National 
 
 ### Step 7 — SPEC (Technical planning, refinement loop)
 
-Owner sub-orchestrators: `implementation-plan-reviewer` (opus), then `iron-loop-integrator` + `iron-loop-critic` running the refinement loop.
+Owner sub-orchestrators: `iron-loop-critic` (opus), then `iron-loop-integrator` + `iron-loop-critic` running the refinement loop.
 
 Tier-2 skills: none — this is the integrator-and-critic refinement loop step.
 
@@ -320,7 +320,7 @@ User outcome: Gate 2 — user approves the technical approach before implementat
 
 ### Step 8 — TEST (Implementation phase, TDD Red — write failing tests FIRST)
 
-Owner sub-orchestrator: `test-maker` (opus).
+Owner sub-orchestrator: `iron-loop-executor` (opus).
 
 Tier-2 skills:
 
@@ -331,7 +331,7 @@ Tier-2 skills:
 
 ### Step 9 — PREPARE (Implementation phase, environment + shift-left)
 
-Owner sub-orchestrator: `quality-checker` (sonnet).
+Owner sub-orchestrator: `iron-loop-executor` (opus).
 
 Tier-3 scout pre-screen (parallel, before specialists):
 
@@ -348,7 +348,7 @@ Tier-2 skills:
 
 ### Step 10 — IMPLEMENT (Implementation phase, ALL code changes in one step)
 
-Owner sub-orchestrator: `implementer` (sonnet).
+Owner sub-orchestrator: `iron-loop-executor` (opus).
 
 Tier-2 skills dispatched conditionally based on the code being written. Software-as-a-service integrations:
 
@@ -386,7 +386,7 @@ Data and machine learning:
 
 ### Step 11 — REVIEW (Implementation phase, self-review checkpoint)
 
-Owner sub-orchestrator: `self-reviewer` (opus).
+Owner sub-orchestrator: `iron-loop-critic` (opus).
 
 Tier-2 skills:
 
@@ -405,7 +405,7 @@ TDD-loop kickback: if more tests are needed, kick back to Step 8 TEST.
 
 ### Step 12 — OPTIMIZE (Implementation phase, simplification and performance)
 
-Owner sub-orchestrator: `optimizer` (sonnet).
+Owner sub-orchestrator: `iron-loop-executor` (opus).
 
 Tier-2 skills:
 
@@ -442,7 +442,7 @@ Tier-2 skills:
 
 ### Step 14 — VERIFY (Implementation phase, automated quality gate)
 
-Owner sub-orchestrator: `verifier` (sonnet).
+Owner sub-orchestrator: `iron-loop-executor` (opus).
 
 Tier-3 scouts (final pass before gate): `scouts/lint-scout`, `scouts/test-scout`.
 
@@ -472,7 +472,7 @@ Smart kickback on failure: lint or type or test failure → Step 10 IMPLEMENT; s
 
 ### Step 15 — DOCUMENT (Implementation phase, documentation update)
 
-Owner sub-orchestrator: `documenter` (sonnet).
+Owner sub-orchestrator: `iron-loop-executor` (opus).
 
 Tier-2 skills:
 
@@ -484,7 +484,7 @@ Tier-2 skills:
 
 ### Step 16 — FINAL-REVIEW (Implementation phase, human gate)
 
-Owner sub-orchestrator: `implementation-reviewer` (opus).
+Owner sub-orchestrator: `iron-loop-critic` (opus).
 
 Tier-2 skills:
 

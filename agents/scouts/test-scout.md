@@ -1,5 +1,3 @@
-# Test Scout (v8 Tier 3)
-
 ---
 name: test-scout
 description: Does the test suite currently pass? Fast smoke-level check (affected tests only when supported). Short-circuits the deep testing specialists when green. Runs as Haiku subagent in isolated 200K context.
@@ -17,6 +15,8 @@ effort_budget:
 pillar: reliability
 short_circuits: testing/smart-test-runner
 ---
+
+# Test Scout (v8 Tier 3)
 
 ## Role
 

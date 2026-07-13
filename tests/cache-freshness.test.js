@@ -51,6 +51,49 @@ function writePlan(root, stage, slug, extraFrontmatter = '') {
   return p;
 }
 
+// A full "## Execution Plan" body with every required Iron Loop step present and
+// completed — the shape validateForReview now demands before a plan may be
+// renamed into review/ (W05-s4). Step prose deliberately avoids file-creation
+// verbs (create/added/new file) so the contradiction scan finds no unsatisfied
+// claim. Used where a plan must SURVIVE the review-move gate (F1).
+const REVIEW_VALID_BODY = `## Execution Plan
+
+### Step 8: TEST
+- [x] Tests written and run RED first
+
+### Step 9: PREPARE
+- [x] Environment ready
+
+### Step 10: IMPLEMENT
+- [x] Feature implemented
+
+### Step 11: REVIEW
+- [x] Self-review done
+
+### Step 12: OPTIMIZE
+- [x] No redundant work
+
+### Step 13: SECURE
+- [x] Inputs validated
+
+### Step 14: VERIFY
+- [x] All tests green, 0 skipped, 0 flaky
+
+### Step 15: DOCUMENT
+- [x] Docs updated
+
+### Step 16: FINAL-REVIEW
+- [x] Ready for human review
+`;
+
+// Write a plan that PASSES validateForReview (full completed Execution Plan) into
+// a stage dir. Still a real *.md counted by getPlanCounts.
+function writeReviewValidPlan(root, stage, slug) {
+  const p = path.join(root, 'plans', stage, `${slug}.md`);
+  fs.writeFileSync(p, `---\ntitle: "${slug}"\napproved_by: human\n---\n\n# ${slug}\n\nA cohesive, finished slice.\n\n${REVIEW_VALID_BODY}`);
+  return p;
+}
+
 // A vision file whose Status the count reader parses.
 function writeVision(root, slug, status) {
   const p = path.join(root, 'plans', 'vision', `${slug}.md`);
@@ -302,7 +345,9 @@ describe('CF1 KICKBACK — external (non-actions) writers bust the cache', () =>
   // ── F1: sync.moveToReviewAfterPush (raw rename into review/) ──
   it('F1_moveToReviewAfterPush_busts_plan_and_inbox_counts', () => {
     // A todo plan (not a gate-source stage) so review/gatesWaiting both change.
-    const planPath = writePlan(root, 'todo', 'cf1-ext-push');
+    // It must PASS validateForReview — moveToReviewAfterPush now gates the rename
+    // (W05-s4) — so seed a full completed Execution Plan, not the minimal body.
+    const planPath = writeReviewValidPlan(root, 'todo', 'cf1-ext-push');
 
     const beforePlan = getPlanCounts(root);
     assert.equal(beforePlan.todo, 1, 'precondition: one plan in todo');
@@ -547,6 +592,11 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // so the plan-stage counts are invariant — an in-place body edit changes
     // content, not the count.
     ['iron-loop.js', 'edits an existing plan body in place (appends step sections); never creates/deletes/moves a plan file, so counts are invariant'],
+    // Records kickback counters by rewriting the plan's own frontmatter back to
+    // the SAME planPath (recordKickback: readFileSync → writeFileSync(planPath)).
+    // Never creates/deletes/moves a plan file, so the plan-stage counts are
+    // invariant — an in-place body edit changes content, not the count.
+    ['circuit-breaker.js', 'edits an existing plan body in place (rewrites kickback counters into the plan frontmatter); never creates/deletes/moves a plan file, so counts are invariant'],
     // Writes bg-status sidecar JSON in .ctoc/ keyed by plan path — not a *.md in
     // a stage dir; getPlanCounts/getInboxCounts do not count status sidecars.
     ['background.js', 'writes .ctoc/ background-status sidecar JSON, not a counted *.md plan file'],

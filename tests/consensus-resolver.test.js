@@ -4,35 +4,20 @@
  */
 
 const assert = require('assert');
-const { test, describe, beforeEach } = require('node:test');
+const { test, describe } = require('node:test');
 
-let consensusResolver;
+// Hard require: if the module is deleted/renamed, this throws at load and the whole
+// file reports a failure — never a silent skip (skip-guard integrity, finding A2).
+const consensusResolver = require('../src/lib/consensus-resolver.js');
 
 describe('Consensus Resolver Tests', () => {
-  beforeEach(() => {
-    delete require.cache[require.resolve('../src/lib/consensus-resolver.js')];
-    try {
-      consensusResolver = require('../src/lib/consensus-resolver.js');
-    } catch (e) {
-      consensusResolver = null;
-    }
-  });
-
   test('initResolution marks resolved=true when verdicts agree', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const state = consensusResolver.initResolution('APPROVE', 'APPROVE');
     assert.strictEqual(state.resolved, true, 'Should be resolved when verdicts agree');
     console.log('# initResolution marks resolved=true when verdicts agree');
   });
 
   test('initResolution starts round=1 when verdicts disagree', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const state = consensusResolver.initResolution('APPROVE', 'NEEDS_WORK');
     assert.strictEqual(state.resolved, false, 'Should not be resolved when verdicts differ');
     assert.strictEqual(state.round, 1, 'Should start at round 1');
@@ -40,10 +25,6 @@ describe('Consensus Resolver Tests', () => {
   });
 
   test('processRound detects consensus when verdicts align', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     let state = consensusResolver.initResolution('APPROVE', 'NEEDS_WORK');
     state = consensusResolver.processRound(state, {
       reviewerVerdict: 'APPROVE',
@@ -56,10 +37,6 @@ describe('Consensus Resolver Tests', () => {
   });
 
   test('processRound advances round when still disagreeing', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     let state = consensusResolver.initResolution('APPROVE', 'NEEDS_WORK');
     state = consensusResolver.processRound(state, {
       reviewerVerdict: 'APPROVE',
@@ -73,10 +50,6 @@ describe('Consensus Resolver Tests', () => {
   });
 
   test('processRound sets CTO verdict as final after round 3', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     let state = {
       reviewerVerdict: 'APPROVE',
       ctoVerdict: 'NEEDS_WORK',
@@ -96,10 +69,6 @@ describe('Consensus Resolver Tests', () => {
   });
 
   test('generateFinalRationale includes both parties arguments', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const state = {
       reviewerVerdict: 'APPROVE',
       ctoVerdict: 'NEEDS_WORK',
@@ -116,10 +85,6 @@ describe('Consensus Resolver Tests', () => {
   });
 
   test('generateRoundPrompt differs by round number', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     const state1 = { round: 1, history: [] };
     const state2 = { round: 2, history: [{ reviewerArgument: 'x', ctoArgument: 'y' }] };
 
@@ -131,19 +96,11 @@ describe('Consensus Resolver Tests', () => {
   });
 
   test('MAX_ROUNDS constant equals 3', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     assert.strictEqual(consensusResolver.MAX_ROUNDS, 3, 'MAX_ROUNDS should be 3');
     console.log('# MAX_ROUNDS constant equals 3');
   });
 
   test('edge case: same verdict in both rounds (resolved early)', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     let state = consensusResolver.initResolution('APPROVE', 'NEEDS_WORK');
     state = consensusResolver.processRound(state, {
       reviewerVerdict: 'NEEDS_WORK', // Reviewer changed mind
@@ -157,10 +114,6 @@ describe('Consensus Resolver Tests', () => {
   });
 
   test('edge case: one party changes verdict mid-resolution', (t) => {
-    if (!consensusResolver) {
-      t.skip('Module not implemented yet');
-      return;
-    }
     let state = consensusResolver.initResolution('APPROVE', 'NEEDS_WORK');
 
     // Round 1: Still disagree

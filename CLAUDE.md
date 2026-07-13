@@ -184,7 +184,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ## Test & Verify
 
 ```bash
-node --test tests/*.test.js          # Run all 109 test files (cross-platform)
+node --test tests/*.test.js          # Run all 263 test files (cross-platform)
 node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
@@ -227,13 +227,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-    lib/                 114 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 130 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                5 dashboard tab files (overview, vision, functional, review, tools; implementation/todo/progress removed as dead code)
     data/                Static data files
   agents/                124 agent definitions across 25 categories
-  skills/                421 skill files (99 Tier-2 specialist bodies + 322 reference)
-  tests/                 109 test files
+  skills/                422 skill files (100 Tier-2 specialist bodies + 322 reference)
+  tests/                 263 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
@@ -269,19 +269,19 @@ ctoc/
 | 1 | IDEATE | vision-advisor, product-owner (sonnet) | Ideation — Gate 0: User approves vision |
 | 2 | ASSESS | product-owner (sonnet) | Phase 1: Functional |
 | 3 | ALIGN | product-owner (sonnet) | |
-| 4 | CAPTURE | functional-reviewer (opus) | Gate 1: User approves plan |
+| 4 | CAPTURE | iron-loop-critic (opus) | Gate 1: User approves plan |
 | 5 | PLAN | implementation-planner (opus) | Phase 2: Technical |
 | 6 | DESIGN | implementation-planner (opus) | |
-| 7 | SPEC | implementation-plan-reviewer (opus) then integrator+critic (10 rounds) | Gate 2: User approves approach |
-| 8 | TEST | test-maker (opus) | Phase 3: Implementation |
-| 9 | PREPARE | quality-checker (sonnet) | |
-| 10 | IMPLEMENT | implementer (sonnet) | |
-| 11 | REVIEW | self-reviewer (opus) | |
-| 12 | OPTIMIZE | optimizer (sonnet) | |
+| 7 | SPEC | iron-loop-critic (opus) then iron-loop-integrator+iron-loop-critic (10 rounds) | Gate 2: User approves approach |
+| 8 | TEST | iron-loop-executor (opus) | Phase 3: Implementation |
+| 9 | PREPARE | iron-loop-executor (opus) | |
+| 10 | IMPLEMENT | iron-loop-executor (opus) | |
+| 11 | REVIEW | iron-loop-critic (opus) | |
+| 12 | OPTIMIZE | iron-loop-executor (opus) | |
 | 13 | SECURE | security-scanner (opus) | |
-| 14 | VERIFY | verifier (sonnet) | |
-| 15 | DOCUMENT | documenter (sonnet) | |
-| 16 | FINAL-REVIEW | implementation-reviewer (opus) | Gate 3: User approves result |
+| 14 | VERIFY | iron-loop-executor (opus) | |
+| 15 | DOCUMENT | iron-loop-executor (opus) | |
+| 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: User approves result |
 
 **Step labels are MANDATORY** — validated by `src/lib/plan-validator.js` (library) and enforced at runtime by `src/hooks/validate-plan-steps.js` (hook). Plans with wrong labels are REJECTED.
 

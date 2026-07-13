@@ -1,5 +1,3 @@
-# KPI Planner Agent (Product Loop DEFINE step)
-
 ---
 name: kpi-planner
 description: Selects product key-performance-indicators from the canonical library based on project type and canvas. Runs at canvas phase, dispatched OUTSIDE the CTO Chief technical chain by the founder or product manager via the Product Loop.
@@ -14,6 +12,8 @@ async_choice_protocol: enabled
 model_optimized_for: opus-4-7
 dispatch_protocol: v1
 ---
+
+# KPI Planner Agent (Product Loop DEFINE step)
 
 ## Role boundary
 

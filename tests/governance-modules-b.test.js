@@ -691,10 +691,14 @@ describe('violation-tracker', () => {
     const all = tracker.loadViolations();
     assert.equal(all.length, 1);
     assert.equal(all[0].plan, 'plan-a');
-    // Persisted to .ctoc/logs/gate-violations.json under the temp cwd.
+    // Persisted to .ctoc/logs/gate-violations.json under the temp cwd. The store
+    // is append-only JSONL (W11-s4): one JSON object per line, not a whole-file
+    // JSON array — so assert on the parsed line count, not JSON.parse(whole).
     const file = path.join(root, '.ctoc', 'logs', 'gate-violations.json');
     assert.ok(fs.existsSync(file), 'violations file persisted');
-    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).length, 1);
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim().length > 0);
+    assert.equal(lines.length, 1);
+    assert.equal(JSON.parse(lines[0]).plan, 'plan-a');
   });
 
   test('saveViolations — overwrites the full list (explicit persistence)', () => {
