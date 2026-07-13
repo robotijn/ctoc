@@ -52,6 +52,16 @@ const BODY_REFERENCED = new Map([
 
 const NEW_CATEGORIES = ['safety', 'legal', 'realtime'];
 
+// Always-available Claude Code format skills that live at the top level
+// (skills/<name>/SKILL.md) and are exposed to Claude directly as an ambient
+// skill — NOT as a Tier-2 dispatch specialist. These are intentionally not
+// reached through an agent wrapper or rich agent: Claude Code surfaces them by
+// their skill name at all times. Documented here so the coverage gate stays
+// loud for every genuine dispatch skill while acknowledging this distinct kind.
+const ALWAYS_AVAILABLE_FORMAT_SKILLS = new Set([
+  'ask-me-questions',
+]);
+
 // ── real-file walkers ──────────────────────────────────────────────────
 
 function walk(dir, predicate) {
@@ -131,7 +141,9 @@ describe('CU5-s5 — coverage completeness (real corpus)', () => {
     const skills = allSkills();
     const referenced = referencedSkills();
     const noWrap = documentedNoWrap();
-    const unwrapped = skills.filter((s) => !referenced.has(s) && !noWrap.has(s));
+    const unwrapped = skills.filter(
+      (s) => !referenced.has(s) && !noWrap.has(s) && !ALWAYS_AVAILABLE_FORMAT_SKILLS.has(s)
+    );
     assert.deepEqual(
       unwrapped,
       [],

@@ -357,12 +357,23 @@ describe('v8 Architecture — Dispatch authority', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('Frontmatter conformance — SKILL.md', () => {
+  // ask-me-questions is a verbatim mirror of .ctoc/ask-me-questions.md (the
+  // canonical decision-elicitation format, referenced by menu.md and CLAUDE.md).
+  // A test binds skills/ask-me-questions/SKILL.md byte-for-byte to that source,
+  // so its frontmatter format (`allowed-tools:`, no `type:`) is fixed by the
+  // source of truth and MUST NOT be rewritten. Exempt this single file here
+  // while keeping the invariant loud for every other SKILL.md.
+  const VERBATIM_MIRROR_SKILLS = new Set([
+    path.join('skills', 'ask-me-questions', 'SKILL.md'),
+  ]);
+
   it('every SKILL.md declares type: skill and uses tools: (never allowed-tools:)', () => {
     const skills = walkSkillFiles(path.join(projectRoot, 'skills'));
     assert.ok(skills.length > 0, 'expected to find SKILL.md files under skills/');
     for (const skill of skills) {
       const { fm } = readFM(skill);
       const rel = path.relative(projectRoot, skill);
+      if (VERBATIM_MIRROR_SKILLS.has(rel)) continue;
       assert.match(fm, /^type:\s*skill\s*$/m, `${rel} must declare type: skill`);
       assert.doesNotMatch(fm, /^allowed-tools:/m, `${rel} must NOT use deprecated allowed-tools: (use tools:)`);
     }
