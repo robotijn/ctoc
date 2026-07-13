@@ -3,6 +3,14 @@ description: Update CTOC to the latest version
 disable-model-invocation: true
 ---
 
+**This is a deterministic script — run it and relay its output IMMEDIATELY.**
+Do not deliberate, analyze, or think before or after running it; spend zero
+reasoning on this turn. Print the script's output faithfully, add at most one
+line ("Restart Claude Code to load it" when a new version installed), and stop.
+Reasoning is warranted ONLY if the script itself errored — then diagnose. This
+is the same discipline as the menu's "just show it" rule: a human waiting on a
+version check must never watch the model think.
+
 Update CTOC to the latest version from GitHub:
 
 ```bash
