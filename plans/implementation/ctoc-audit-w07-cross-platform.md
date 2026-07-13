@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.655Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W07 — Cross-Platform Correctness"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -348,6 +354,58 @@ under `os.homedir()`.)*
   (Step 8 TEST, out of scope for this functional plan) and pass after —
   matching the vision's own dogfooding requirement and the test-strategy
   convention already established by W01 in this same vision.
+
+## Slices (dependency-ordered) — SIP1 INDEX
+
+This functional-derived plan is decomposed into **7 implementation slices** (SIP1).
+This file is the INDEX; each slice below is a complete implementation plan with its
+own Steps 8–16. Build order follows `depends_on` (slices are built sequentially, FIFO;
+the maintainer chooses when). **Gates 2 & 3 batch per parent** via
+`approveSubplans("ctoc-audit-w07-cross-platform", fromStage)` — ONE human decision
+crosses every sibling (each stamped `approved_by: human`). `listSubplans(...)` enumerates
+the set.
+
+| # | Slice file | Scope (one line) | depends_on |
+|---|------------|------------------|------------|
+| 1 | `ctoc-audit-w07-s1-frontmatter-helper.md` | Shared CRLF-safe frontmatter helper — the single home for the `/^---\r?\n/` pattern | — |
+| 2 | `ctoc-audit-w07-s2-coverage-state.md` | Enforcement hot path — the actual Windows-lockout parsers (feeds every gate via `parseMetadata`) | s1 |
+| 3 | `ctoc-audit-w07-s3-syncunit-metrics.md` | Plan-index sync + metrics parsers (kills the `\r`-leak and the zero line-count) | s1 |
+| 4 | `ctoc-audit-w07-s4-pipeline-parsers.md` | Remaining runtime pipeline parsers: vision-decomposer, inbox, iron-loop-enforcer | s1 |
+| 5 | `ctoc-audit-w07-s5-script-parsers.md` | Dev-tooling script frontmatter parsers (closes the grep sweep) | s1 |
+| 6 | `ctoc-audit-w07-s6-portable-shellouts.md` | M13 — POSIX shell-outs → `execFileSync` + `fs.statfsSync` | — |
+| 7 | `ctoc-audit-w07-s7-homedir.md` | M22 — `process.env.HOME` → `os.homedir()` | — |
+
+Dependency chain max depth 2 (s1 → s{2,3,4,5}); s6, s7 independent. No cycles.
+
+### `files:` touched per slice
+- **s1** — `src/lib/frontmatter.js`, `tests/frontmatter.test.js`
+- **s2** — `src/lib/plan-coverage.js`, `src/lib/state.js`, `tests/w07-crlf-coverage-state.test.js`
+- **s3** — `src/lib/plan-index/sync-unit.js`, `src/lib/metrics-loop.js`, `tests/w07-crlf-syncunit-metrics.test.js`
+- **s4** — `src/lib/vision-decomposer.js`, `src/lib/inbox.js`, `src/lib/iron-loop-enforcer.js`, `tests/w07-crlf-pipeline-parsers.test.js`
+- **s5** — `src/scripts/v8-migrate-skills.js`, `src/scripts/strip-unenforced-budgets.js`, `tests/w07-crlf-scripts.test.js`
+- **s6** — `src/lib/sast-runner.js`, `src/lib/runner-detect.js`, `tests/w07-portable-shellouts.test.js`
+- **s7** — `src/lib/agent-critic-loop.js`, `src/lib/grading-system.js`, `tests/w07-homedir.test.js`
+
+### Step-5 grep sweep — RESOLVED (the parent mandated running it here)
+Full-repo search for `/^---\n/`-style frontmatter matches and bare `.split('\n')` on
+captured frontmatter, run against live code on decomposition. **Every fully-broken
+`/^---\n/` frontmatter parser found is assigned to a slice above:**
+
+- **Migrated (fully-broken `/^---\n/`):** `state.js` (:59,:63), `plan-coverage.js`
+  (:79,:86), `plan-index/sync-unit.js` (:59,:77), `metrics-loop.js` (:200,:567,:573),
+  `vision-decomposer.js` (:47,:240,:247), `inbox.js` (:141,:144),
+  `iron-loop-enforcer.js` (:98-99), `scripts/v8-migrate-skills.js` (:66,:123),
+  `scripts/strip-unenforced-budgets.js` (:44,:51). The already-correct references
+  (`human-gate-check.js:66`, `reconciliation.js:94`) are the pattern the helper mirrors.
+- **Excluded — assigned to a sibling workstream by this plan's own Out-of-Scope:**
+  `agent-resolver.js` (:34,:57) → W03/W04 (agent-contract / step-agent resolution);
+  `actions.js` marker/metadata prepend (:307,:360,:392) → W02 (human-gate-integrity),
+  which also avoids two workstreams editing `actions.js`.
+- **Excluded — distinct lesser bug class:** `four-eyes.js` (:48,:123) and
+  `privilege-posture.js` (:97) use the `/^---\s*\n/` tolerant variant — a partial
+  `\r`-leak, NOT the total parse-failure that causes the lockout — and are
+  gate/privilege-integrity-adjacent (W02). Recorded as a distinct finding, not silently
+  folded into W07 (same discipline the plan applies to shell-outs).
 
 ## Decisions Taken Under Ambiguity
 

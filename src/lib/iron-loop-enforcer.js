@@ -290,12 +290,52 @@ function checkActivePlanStepLabels(root) {
   return null;
 }
 
+// Extract the leading frontmatter region — the one or more consecutive `---`
+// delimited blocks at the top of a plan. Handles the Gate-1 prepended-marker-block
+// form, where the approval block (`approved_by: human`) is prepended ABOVE the plan's
+// own frontmatter, so the file opens with two consecutive `---` blocks. Implemented as
+// a linear line scan (no backtracking regex) so it is ReDoS-safe by construction.
+// Returns '' if the file has no leading frontmatter.
+function frontmatterRegion(content) {
+  const lines = content.split(/\r?\n/);
+  const region = [];
+  let i = 0;
+  while (i < lines.length && lines[i].trim() === '') region.push(lines[i++]);  // leading blanks
+  while (i < lines.length && lines[i].trim() === '---') {
+    region.push(lines[i++]);                                                    // opening ---
+    while (i < lines.length && lines[i].trim() !== '---') region.push(lines[i++]);
+    if (i < lines.length) region.push(lines[i++]);                              // closing ---
+    while (i < lines.length && lines[i].trim() === '') region.push(lines[i++]); // inter-block blanks
+  }
+  return region.join('\n');
+}
+
 function checkGateDestinationsApproved(root) {
   const offenders = [];
   for (const stage of GATE_DESTINATIONS) {
     for (const planPath of listPlans(root, stage)) {
       const content = safeFs.readFileSync(planPath, 'utf8');
-      if (!content.includes('approved_by: human') && !content.includes('approved_by_human: true')) {
+      const fm = frontmatterRegion(content);
+
+      // Pre-Gate-2 SIP1 slices live UNMARKED in implementation/ awaiting *batch*
+      // approval at Gate 2 (approveSubplans). They carry parent_plan: and are
+      // legitimately unmarked — exempt them. This is H7's second home: the loose
+      // substring check used to flag all such slices as block-severity. The REAL
+      // gate is enforced by human-gate-check.js's ledger (W02-s3); this enforcer is
+      // an ADVISORY self-check, so the exemption opens no gate hole.
+      if (stage === 'implementation' && /^parent_plan:/m.test(fm)) continue;
+
+      // Decomposed visions are archived to done/ (type: vision, status: decomposed);
+      // they cross Gate 0 in vision/, never the review→done code gate, and carry no
+      // approval marker. Exempt them so an incidental `approved_by: human` phrase in
+      // their prose body is neither required nor mistaken for an approval.
+      if (/^type:\s*vision\b/m.test(fm)) continue;
+
+      // Detect the approval marker in the FRONTMATTER region only — a raw substring
+      // scan false-passes on prose body text that merely discusses the marker.
+      const approved = /^approved_by:\s*human\b/m.test(fm) ||
+                       /^approved_by_human:\s*true\b/m.test(fm);
+      if (!approved) {
         offenders.push({ plan: path.relative(root, planPath), stage });
       }
     }

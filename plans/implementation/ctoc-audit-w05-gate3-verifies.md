@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.605Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W05 — Gate 3 Verifies Real Work"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -8,6 +14,43 @@ depends_on: none
 ---
 
 # W05 — Gate 3 Verifies Real Work
+
+> **SIP1 INDEX.** This functional-derived implementation plan has been
+> decomposed by the implementation-planner (Iron Loop Steps 5-7) into **5 small,
+> dependency-ordered implementation slices**, each a cohesive module-plus-test
+> unit with its own Steps 8-16. This file is now the INDEX of that set; the
+> ASSESS / ALIGN / CAPTURE sections below remain the shared functional context
+> every slice reads. Build the slices one at a time in `depends_on` order (plans
+> are always sequential). Gates 2 (implementation→todo) and 3 (review→done) are
+> approved for ALL siblings at once via
+> `approveSubplans('ctoc-audit-w05-gate3-verifies', <fromStage>)` in
+> `src/lib/actions.js` — ONE human decision per batch, each sibling still stamped
+> `approved_by: human`.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | Files | depends_on |
+|---|---|---|---|---|
+| s1 | `ctoc-audit-w05-s1-verify-evidence.md` | Give `runVerify` a real caller: persist + read a `.ctoc/state/verify/<slug>.json` VERIFY artifact. | `src/lib/step-13-verify.js` (+ test) | — |
+| s2 | `ctoc-audit-w05-s2-gate3-can-fail.md` | Make `validateReviewToDone` return `valid:false` on missing marker / unchecked required-step box / absent-or-failing-or-stale VERIFY evidence; `approveSubplans` inherits the skip. | `src/lib/plan-validator.js` (+ test) | s1 |
+| s3 | `ctoc-audit-w05-s3-cleanup-validated.md` | Route `cleanupStaleInProgress`'s in-progress→review move through `validateForReview`; observable, reasoned skip. | `src/lib/actions.js` (+ test) | — |
+| s4 | `ctoc-audit-w05-s4-sync-validated.md` | Route `moveToReviewAfterPush`'s in-progress→review rename through `validateForReview`; return `{ moved:false, reason }`. | `src/lib/sync.js` (+ test) | — |
+| s5 | `ctoc-audit-w05-s5-circuit-breaker.md` | New `circuit-breaker.js`: per-step (>3) + per-plan (>5) kickback counters persisted in plan frontmatter, escalating and surviving restart. | `src/lib/circuit-breaker.js` (+ test) | — |
+
+**Build order.** s1 → s2 (s2 consumes s1's `readVerifyEvidence`). s3, s4, s5 are
+independent and may be built in any order relative to each other and to s1/s2.
+Max dependency-chain depth: 2 (s1→s2). No cycles.
+
+**Acceptance-criteria coverage.** M1/M2 → s2; M3 → s2 (integration; no
+`approveSubplans` code change); M4 → s1 (evidence) + s2 (consultation); M5 → s3;
+M6 → s4; M7/M8/M9 → s5. Every parent metric maps to exactly one slice's tests.
+
+**One resolved contradiction (see s5).** The parent's same-step threshold is
+stated inconsistently (M7 + the "4th occurrence" scenario + CLAUDE.md say
+escalate on the 4th; the persistence scenario's parenthetical says the 3rd). s5
+resolves it to **escalate-on-exceed (4th same-step / 6th per-plan)** — matching
+the majority and CLAUDE.md — and rewrites the M9 persistence test to prove
+persistence under that same rule.
 
 ## 1. ASSESS
 

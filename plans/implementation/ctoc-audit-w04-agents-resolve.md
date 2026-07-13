@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.579Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W04 — Every Dispatched Agent Resolves"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -8,6 +14,31 @@ depends_on: none
 ---
 
 # W04 — Every Dispatched Agent Resolves
+
+> **This plan is now the SIP1 INDEX for its implementation slices.** Chosen strategy:
+> **Option B** (repoint to the real `iron-loop-executor` / `iron-loop-critic` /
+> `iron-loop-integrator` trio), decided by the maintainer at Gate 1 — Option A (create
+> 10 wrapper agents) is **DROPPED**. The approved functional context (ASSESS / ALIGN /
+> CAPTURE and the recorded Gate-1 decision) is preserved below the slice table.
+
+## Slices (dependency-ordered)
+
+Gates 2 & 3 batch per parent via `approveSubplans("ctoc-audit-w04-agents-resolve",
+fromStage)` — one human decision crosses every sibling (each stamped `approved_by:
+human`). Build order is sequential/FIFO honoring `depends_on`.
+
+| # | Slice file | Scope (one line) | Files touched | depends_on |
+|---|---|---|---|---|
+| 1 | `ctoc-audit-w04-s1-registry-resolves.md` | Regenerate `.ctoc/operations-registry.yaml` from disk — fix 20 dangling `path:` entries, add the missing trio, repoint every `iron_loop:` name to the trio; create the shared resolution test (registry surface). | `.ctoc/operations-registry.yaml`, `tests/agent-dispatch-resolution.test.js` | none |
+| 2 | `ctoc-audit-w04-s2-steptable-coordinator.md` | Repoint `CLAUDE.md`'s Iron Loop step table (rows 4,7,8–12,14–16) and `cto-chief.md`'s 10 "Owner sub-orchestrator" dispatch lines to the trio; extend the resolution test (step-table + coordinator surfaces + regression). | `CLAUDE.md`, `agents/coordinator/cto-chief.md`, `tests/agent-dispatch-resolution.test.js` | `s1` |
+| 3 | `ctoc-audit-w04-s3-no-peer-dispatch.md` | Remove the Tier-1→Tier-1 peer-dispatch of `stack-chooser` from `implementation-planner.md` (reach it only via CTO Chief); add the Tier-1 peer-dispatch text-invariant test. | `agents/planning/implementation-planner.md`, `tests/tier1-no-peer-dispatch.test.js` | none |
+
+Coverage of the parent's shipped stories: **s1** = MVP story *registry regeneration* +
+the registry half of the Option-B story; **s2** = the step-table+coordinator half of
+the Option-B story; **s3** = MVP story *peer-dispatch removal*. The resolution test
+(MVP story *automated resolution guard*) is born in s1 and extended in s2, walking all
+four parent surfaces (step table, registry, coordinator, peer-dispatch — the last in
+s3's dedicated invariant test). Dependency chain depth 2 (`s1→s2`); no cycles.
 
 ## 1. ASSESS
 
@@ -367,6 +398,12 @@ green suite.
   and ongoing maintenance surface with no corresponding capability gain. The
   maintainer makes the final call at Gate 1; this stub does not cross Gate 1
   or pick unilaterally.
+  - **RESOLVED at Gate 1 (2026-07-13): the maintainer chose Option B — repoint the
+    step table, `.ctoc/operations-registry.yaml`, and `cto-chief.md` to the
+    `iron-loop-executor` / `iron-loop-critic` / `iron-loop-integrator` trio. Option A
+    (create 10 wrapper agents) is DROPPED. Implementation planning slices only the
+    Option-B stories plus the two strategy-independent MVP stories (registry
+    regeneration, peer-dispatch removal).**
 - **Registry regeneration and peer-dispatch removal are strategy-independent
   and are not gated on the Option A/B decision.** Both are included as shared
   MVP stories that ship regardless of which option is later selected, so they

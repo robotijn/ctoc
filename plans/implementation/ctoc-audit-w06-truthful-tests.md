@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T11:01:11.632Z
+gate_crossed: functional → implementation
+---
+
+---
 title: "W06 — The Test Suite Tells the Truth"
 created: "2026-07-11T00:00:00Z"
 type: feature
@@ -8,6 +14,43 @@ depends_on: none
 ---
 
 # W06 — The Test Suite Tells the Truth
+
+> **This is a SIP1 INDEX.** Steps 5–7 decomposed this functional plan into **7
+> dependency-ordered implementation slices** (below). Each slice is its own
+> `parent_plan`-linked plan with its own Step 8–16 Execution Plan. Gates 2 & 3 batch
+> across all 7 via `approveSubplans('ctoc-audit-w06-truthful-tests', <fromStage>)` — one
+> human decision stamps every sibling `approved_by: human`. The ASSESS / ALIGN / CAPTURE
+> sections below are retained as the shared context for all slices.
+
+## Slices (dependency-ordered)
+
+All 7 slices are **independent** (`depends_on: none`) — max dependency-chain depth 0, no
+cycles, no shared files — so they may be built in any order the maintainer schedules and
+their gates batch cleanly. **Every slice's Step 8 test is RED on today's tree** (proven
+below); the "GREEN when" column names the paired workstream whose production fix flips it
+(W06 owns only tests + test-infra and applies **no** sibling's production fix).
+
+| # | Slice file | Scope (one line) | Stories | RED-now witness (verified 2026-07-13) | GREEN when | depends_on |
+|---|------------|------------------|---------|----------------------------------------|-----------|------------|
+| s1 | `ctoc-audit-w06-s1-skip-guard-integrity.md` | Guard test + convert the 8 `try{require}catch{null}→skip` files so an absent module FAILS, never skips | S1, S2 | 8 files carry the anti-pattern (62 `.skip(` guard sites) | **self-paired** (W06 does the conversions in-slice) | none |
+| s2 | `ctoc-audit-w06-s2-coverage-instrumentation.md` | Coverage gate script + wire `--experimental-test-coverage` into `npm test`; `# skipped>0`, `<80%`, and unmeasured coverage all FAIL | S3, S4 | `scripts.test` is `node --test tests/*.test.js` (no coverage, no gate); gate module absent | **self-paired** (W06 owns the gate + wiring) | none |
+| s3 | `ctoc-audit-w06-s3-frontmatter-anchoring.md` | Anchor `readFM` to byte-0 `^---` in `architecture-invariants.test.js` (drop match-anywhere) | C7 | `readFM` has the match-anywhere fallback; 19 H1-first agents' contracts parse-but-are-inert | **W03** (moves the 19 agents' YAML to line 1) | none |
+| s4 | `ctoc-audit-w06-s4-registry-integrity.md` | New `registry-integrity.test.js`: every registry `path:` + every step-table agent resolves | S5 | 20 dangling registry `path:` entries; 10 unresolved step-table agents | **W04** (creates the agents / repoints table + registry) | none |
+| s5 | `ctoc-audit-w06-s5-version-license-truth.md` | Shared real-artifact reader + `release.test.js` asserts VERSION/package/plugin/marketplace versions agree and license==LICENSE | S6, S9 | `package.json` 6.9.49≠6.10.3; license Apache-2.0≠PolyForm Shield 1.0.0 | **W09** (corrects `package.json`) | none |
+| s6 | `ctoc-audit-w06-s6-doc-counts.md` | New `doc-counts.test.js`: every documented count self-verifies vs a live disk count | S7 | CLAUDE.md "109 test files"≠211; "114 JS modules"≠123 | **doc correction** (nearest owner W09; W04/workstream-11 also shift counts) | none |
+| s7 | `ctoc-audit-w06-s7-installer-paths.md` | New `installer-paths.test.js`: every installer-written template/target path exists | S8 | RED anchor **pinned at build time** — Step 8 is an honesty gate: reproduce a real broken path or kick back | **workstream 11** ("fix or remove the broken hooks-installer path") | none |
+
+**Re-scan note (per the parent's instruction to re-verify the audit's "55"):** the audit's
+"55 sites" counted per-test `t.skip` guards; the 2026-07-13 re-scan finds the
+`try{require}catch{null}` mechanism concentrated in **8 files / 62 guard sites** — s1 owns
+the exact list. The behavior contract (absence must fail, not skip) is unchanged by the
+count drift.
+
+**Helper coordination:** per "one shared helper, don't duplicate assertion logic," the
+version/license reader lives in `tests/helpers/source-of-truth.js` (s5, importable by W09).
+The registry, doc-count, and installer parsers are kept **inline per slice** (short,
+single-purpose) rather than forced through one generic harness — this avoids coupling the
+independent slices through a shared file and keeps each paired-fix witness self-contained.
 
 ## 1. ASSESS
 
