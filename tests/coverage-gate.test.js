@@ -22,6 +22,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 
 // Hard require — RED-now: the module does not exist yet, so this throws and the
 // FILE FAILS to load (it does NOT skip). Obeys the s1 skip-guard discipline:
@@ -134,4 +135,35 @@ test('package.json wires coverage + the gate into the test script', () => {
     testScript.includes('test-gate.js'),
     `scripts.test must route through the gate, got: ${testScript}`
   );
+});
+
+// Ratchet baseline — the gate reads .ctoc/coverage-baseline.json (minPct) so a
+// codebase that predates instrumentation enforces its measured floor instead of
+// the aspirational default, exactly like the typecheck ratchet. The baseline may
+// only be RAISED; new code is still held to >= 80% at review.
+test('resolveThreshold: reads the committed ratchet baseline (real file)', () => {
+  const repoRoot = path.join(__dirname, '..');
+  const baseline = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, '.ctoc', 'coverage-baseline.json'), 'utf8')
+  );
+  assert.strictEqual(typeof baseline.minPct, 'number');
+  assert.ok(baseline.minPct > 0 && baseline.minPct <= 100);
+  assert.strictEqual(gate.resolveThreshold(repoRoot), baseline.minPct);
+});
+
+test('resolveThreshold: falls back to the aspirational default when no baseline exists', () => {
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-gate-'));
+  try {
+    assert.strictEqual(gate.resolveThreshold(empty), 80);
+  } finally {
+    fs.rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+test('evaluateSummary honors the resolved threshold (floor passes, below floor fails)', () => {
+  const atFloor = gate.evaluateSummary({ fail: 0, skipped: 0, coveragePct: 41 }, { threshold: 40 });
+  assert.strictEqual(atFloor.ok, true);
+  const below = gate.evaluateSummary({ fail: 0, skipped: 0, coveragePct: 39 }, { threshold: 40 });
+  assert.strictEqual(below.ok, false);
+  assert.match(below.reasons.join(' '), /39% < 40%/);
 });
