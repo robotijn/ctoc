@@ -2,6 +2,12 @@
 description: Manually trigger quality checks and push (when auto-push is disabled)
 ---
 
+**This is a deterministic script — run it and relay its output IMMEDIATELY.**
+Do not deliberate, analyze, or think before or after running it; print the
+script's output faithfully and stop. Reasoning is warranted ONLY if the script
+itself errored or reported failing checks — then diagnose. Same discipline as
+the menu's "just show it" rule.
+
 Manually trigger quality checks and push to remote:
 
 ```bash
