@@ -27,6 +27,7 @@
 
 const safeFs = require('./safe-fs');
 const { safeRegExp } = require('./regex-utils');
+const { parseFrontmatter } = require('./frontmatter');
 const path = require('path');
 
 const STAGE_PRIORITY = ['in-progress', 'todo', 'implementation'];
@@ -76,9 +77,14 @@ function globToRegex(glob) {
 function readPlanFiles(planPath) {
   let content;
   try { content = safeFs.readFileSync(planPath, 'utf8'); } catch { return []; }
-  const fm = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!fm) return [];
-  const fmBody = fm[1];
+  // CRLF-safe via the shared ./frontmatter helper (finding H1): a plan checked
+  // out on Windows (CRLF) resolves the same coverage as its LF twin. The helper's
+  // `raw` is \r-free, so the `files:` block walk below is safe on both. Do NOT
+  // re-inline a bare /^---\n/ here — that LF-only pattern silently resolves CRLF
+  // plans to EMPTY coverage, locking the Windows user out of their declared files.
+  const { hasFrontmatter, raw } = parseFrontmatter(content);
+  if (!hasFrontmatter) return [];
+  const fmBody = raw;
   // Find `files:` block then collect lines that look like `  - "..."` until next top-level key or end
   const filesIdx = fmBody.search(/^files:\s*$/m);
   if (filesIdx === -1) return [];

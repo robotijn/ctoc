@@ -27,6 +27,9 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
+// W07-s4 (finding H1): shared CRLF-safe frontmatter reader — a plan checked out
+// on Windows (CRLF) must self-check identically to its LF twin.
+const { parseFrontmatter } = require('./frontmatter');
 
 const CANONICAL_STEPS = [
   'IDEATE', 'ASSESS', 'ALIGN', 'CAPTURE',
@@ -92,12 +95,17 @@ function findProjectRoot(start = process.cwd()) {
   return start;
 }
 
+// W07-s4 (finding H1): CRLF-safe. Line-1 frontmatter goes through the shared
+// reader (which strips every \r from the interior); the heading-first case (a
+// `---` block that is not at line 1) uses a CRLF-tolerant fallback whose capture
+// is \r-normalized so a CRLF plan reads byte-identically to its LF twin.
 function readFM(filePath) {
   if (!safeFs.existsSync(filePath)) return { fm: '', body: '', missing: true };
   const content = safeFs.readFileSync(filePath, 'utf8');
-  const m = content.match(/^---\n([\s\S]*?)\n---/m) ||
-            content.match(/\n---\n([\s\S]*?)\n---/);
-  return { fm: m ? m[1] : '', body: content };
+  const parsed = parseFrontmatter(content);
+  if (parsed.hasFrontmatter) return { fm: parsed.raw, body: content };
+  const m = content.match(/\r?\n---\r?\n([\s\S]*?)\r?\n---/);
+  return { fm: m ? m[1].replace(/\r/g, '') : '', body: content };
 }
 
 function listAgents(root) {
@@ -662,6 +670,7 @@ module.exports = {
   formatReport,
   formatCompact,
   findProjectRoot,
+  readFM,
   // Constants
   CANONICAL_STEPS,
   GATE_DESTINATIONS,

@@ -19,6 +19,10 @@ const path = require('path');
 // CF1: `invalidate` busts the read cache on every count-mutating write (reuses
 // the existing cache require — no new import needed).
 const { memoize, invalidate } = require('./cache');
+// W07-s4 (finding H1): the shared CRLF-safe frontmatter reader. Aliased to avoid
+// clashing with this module's own colon-split `parseFrontmatter` below. A plan
+// checked out on Windows (CRLF) must parse byte-identically to its LF twin.
+const { parseFrontmatter: splitFm } = require('./frontmatter');
 
 // SP1 cheap stale-plan scan. Imported as a NAMESPACE (not destructured) so the
 // call site is late-bound: SP2 tests rewire staleDetector.scanCheapCandidates on
@@ -137,11 +141,14 @@ ${opts.rationale || ''}
   return { id, path: filePath };
 }
 
+// W07-s4 (finding H1): CRLF-safe via the shared reader. Delegates fence detection
+// and \r-normalization to ./frontmatter, then applies the UNCHANGED colon-split /
+// unquote logic so CRLF inbox items parse byte-identically to their LF twins.
 function parseFrontmatter(content) {
-  const m = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!m) return {};
+  const { hasFrontmatter, lines } = splitFm(content);
+  if (!hasFrontmatter) return {};
   const out = {};
-  for (const line of m[1].split('\n')) {
+  for (const line of lines) {
     const c = line.indexOf(':');
     if (c > 0) {
       const k = line.slice(0, c).trim();
@@ -264,4 +271,5 @@ module.exports = {
   createQuestion,
   createDecision,
   listRelatedForInbox,
+  parseFrontmatter,
 };

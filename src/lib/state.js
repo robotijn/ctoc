@@ -8,6 +8,7 @@ const path = require('path');
 const { readStatus, getStatusIcon } = require('./background');
 const { findProjectRoot } = require('./project-root');
 const { memoize } = require('./cache');
+const { parseFrontmatter } = require('./frontmatter');
 
 // Get plans directory (always from project root)
 function getPlansDir(projectPath) {
@@ -54,16 +55,20 @@ function readPlans(dirPath) {
   return files;
 }
 
-// Parse plan metadata from YAML frontmatter
+// Parse plan metadata from YAML frontmatter.
+// CRLF-safe via the shared ./frontmatter helper (finding H1): a plan checked out
+// on Windows (CRLF) parses byte-identically to its LF twin. Do NOT re-inline a
+// bare /^---\n/ here — that LF-only pattern silently locks out CRLF plans.
 function parseMetadata(content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return {};
+  const { hasFrontmatter, lines } = parseFrontmatter(content);
+  if (!hasFrontmatter) return {};
 
   const metadata = {};
-  match[1].split('\n').forEach(line => {
+  lines.forEach(line => {
     const colonIndex = line.indexOf(':');
     if (colonIndex > 0) {
       const key = line.slice(0, colonIndex).trim();
+      /** @type {any} */ // a frontmatter value is a string, then coerced to boolean/number below
       let value = line.slice(colonIndex + 1).trim();
       // Remove quotes
       value = value.replace(/^["']|["']$/g, '');

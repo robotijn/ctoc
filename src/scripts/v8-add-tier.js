@@ -11,6 +11,7 @@
  */
 
 const safeFs = require('../lib/safe-fs');
+const { parseFrontmatter, FRONTMATTER_BLOCK } = require('../lib/frontmatter');
 const path = require('path');
 
 const root = process.cwd();
@@ -37,17 +38,29 @@ const TIER_1_AGENTS = [
 ];
 
 function addTierField(content, tier) {
-  // Find the frontmatter block — may be at top or after a # title
-  const fmMatch = content.match(/(^|\n)(---\n[\s\S]*?\n---)/);
-  if (!fmMatch) return { changed: false, content, reason: 'no frontmatter' };
+  // Find the frontmatter block — may be at top of file OR after a # title.
+  // CRLF-safe via the shared reader (finding H1): the old `/(^|\n)(---\n.../`
+  // required an LF immediately after the opening `---`, so on a CRLF checkout it
+  // matched nothing and this migration failed completely.
+  const p = parseFrontmatter(content);
+  let fmBlock;
+  if (p.hasFrontmatter) {
+    // Top-of-file. Strip the single trailing newline the reader consumes so the
+    // located block ends at the closing `---` (as the previous match did).
+    fmBlock = content.match(FRONTMATTER_BLOCK)[0].replace(/\r?\n$/, '');
+  } else {
+    // After a leading # title.
+    const m = content.match(/(?:^|\r?\n)(---\r?\n[\s\S]*?\r?\n---)/);
+    if (!m) return { changed: false, content, reason: 'no frontmatter' };
+    fmBlock = m[1];
+  }
 
-  const fmBlock = fmMatch[2];
   // Check if tier already declared
   if (/^tier:\s*\d/m.test(fmBlock)) return { changed: false, content, reason: 'tier already present' };
 
-  // Insert `tier: N` just before the closing ---
-  const insertion = `\ntier: ${tier}`;
-  const newFm = fmBlock.replace(/\n---$/, `${insertion}\n---`);
+  // Insert `tier: N` just before the closing ---, preserving the block's own
+  // (LF or CRLF) line endings so nothing else in the file shifts.
+  const newFm = fmBlock.replace(/(\r?\n)---$/, `$1tier: ${tier}$1---`);
   const newContent = content.replace(fmBlock, newFm);
   return { changed: true, content: newContent };
 }

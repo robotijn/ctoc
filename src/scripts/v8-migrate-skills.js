@@ -18,6 +18,7 @@
 
 const safeFs = require('../lib/safe-fs');
 const { safeRegExp } = require('../lib/regex-utils');
+const { parseFrontmatter: splitFm, FRONTMATTER_BLOCK } = require('../lib/frontmatter');
 const path = require('path');
 
 const root = process.cwd();
@@ -62,10 +63,19 @@ function findSkillFiles(dir) {
   return out;
 }
 
+// CRLF-safe frontmatter parse (finding H1). Delegates to the shared reader so a
+// SKILL.md checked out on Windows (CRLF) parses byte-identically to its LF twin.
+// `end` is the block-end offset (through the closing `---`, trailing newline
+// excluded — matching the previous `m[0].length` contract) computed on the
+// LF-normalized content, so CRLF and LF twins yield the same value. `end` is not
+// used to index the raw content anywhere; the migration reconstruction below
+// rebuilds from the shared reader's normalized body.
 function parseFrontmatter(content) {
-  const m = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!m) return null;
-  return { raw: m[1], end: m[0].length };
+  const p = splitFm(content);
+  if (!p.hasFrontmatter) return null;
+  const norm = String(content).replace(/\r/g, '');
+  const bm = norm.match(FRONTMATTER_BLOCK);
+  return { raw: p.raw, end: bm[0].replace(/\r?\n$/, '').length };
 }
 
 function readField(fm, name) {
@@ -118,9 +128,13 @@ function migrate(skillPath) {
     return { path: skillPath, status: 'already-v8' };
   }
 
-  // Insert v8 fields before the closing --- of frontmatter
+  // Insert v8 fields before the closing --- of frontmatter. Reconstruct via the
+  // shared CRLF-safe reader (finding H1): the old `/^---\n.../` replace matched
+  // nothing on a CRLF checkout and silently wrote the file back unchanged. The
+  // reader's `body` is the content after the (CRLF-tolerant) closing fence, so a
+  // CRLF skill migrates to the same v8 output as its LF twin.
   const newFm = fm.raw + v8Block;
-  const newContent = content.replace(/^---\n[\s\S]*?\n---/, `---\n${newFm}\n---`);
+  const newContent = `---\n${newFm}\n---\n${splitFm(content).body}`;
 
   if (!dryRun) {
     safeFs.writeFileSync(skillPath, newContent);
@@ -160,4 +174,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { migrate, findSkillFiles };
+module.exports = { migrate, findSkillFiles, parseFrontmatter };

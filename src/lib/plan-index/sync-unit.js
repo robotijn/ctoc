@@ -22,6 +22,7 @@
 
 const path = require('path');
 const safeFs = require('../safe-fs');
+const { parseFrontmatter } = require('../frontmatter');
 const { hashUnit } = require('./content-hash');
 const { PLAN_SENTINEL } = require('./index');
 
@@ -52,13 +53,20 @@ function normalizePath(planPath, plansRoot) {
 
 /**
  * Extract the raw frontmatter block and the body from a plan's markdown.
+ *
+ * CRLF-safe (finding H1): delegates to the shared `../frontmatter` helper so a
+ * plan checked out on Windows (CRLF) parses byte-identically to its LF twin. The
+ * returned `frontmatter` is the helper's `\r`-free `raw`, so the downstream
+ * `parseFrontmatterFields` field-walk never leaks a stray `\r` into
+ * `files`/`parent_vision`/`status`. LF input is unaffected (no `\r` to strip).
+ *
  * @param {string} content
  * @returns {{ frontmatter: string, body: string }}
  */
 function splitFrontmatter(content) {
-  const m = content.match(/^---\n([\s\S]*?)\n---\n?/);
-  if (!m) return { frontmatter: '', body: content };
-  return { frontmatter: m[1], body: content.slice(m[0].length) };
+  const { hasFrontmatter, raw, body } = parseFrontmatter(content);
+  if (!hasFrontmatter) return { frontmatter: '', body: content };
+  return { frontmatter: raw, body };
 }
 
 /**
@@ -273,4 +281,4 @@ async function syncUnit(planPath, deps = {}) {
   return { changed, skipped: false };
 }
 
-module.exports = { syncUnit, normalizePath, parseUnits, parseFrontmatterFields, splitSections };
+module.exports = { syncUnit, normalizePath, parseUnits, splitFrontmatter, parseFrontmatterFields, splitSections };
