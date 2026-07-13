@@ -35,6 +35,14 @@
     the implementer would have to guess, kick back upstream.
 12. **Cross-platform always.** `path.join`, `fs.promises`, `os.homedir`,
     `process.platform`; never a shell script as an entry point.
+13. **Talk to a human like a human, not like an artificial intelligence.** Write
+    in plain words and complete sentences. Never invent an abbreviation, label,
+    code, or piece of shorthand — the reader cannot decode notation you made up,
+    so name every thing by what it actually is. Do not lean on common acronyms
+    either; spell every term out in full (write "test-driven development", not the
+    three-letter short form; "user interface", not the two-letter one; "continuous
+    integration", not the two-letter one). Refer to each item by its real,
+    spelled-out subject, never by an internal code.
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2

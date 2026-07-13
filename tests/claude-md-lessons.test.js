@@ -717,6 +717,42 @@ describe('ensureLessonsBlock — pre-Gate-3 hardening', () => {
   });
 });
 
+// ──────────────────────────────────────────────────────────────────────────
+// "Talk to a human like a human" rule ships in the injected lessons block
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('operating lessons — talk-to-a-human rule ships in the injected block', () => {
+  it('injects the plain-words rule into a project CLAUDE.md (end-to-end)', (t) => {
+    const dir = mkTmpProject(t);
+    const target = path.join(dir, 'CLAUDE.md');
+    fs.writeFileSync(target, '# Project\n\nuser prose\n');
+
+    const changed = lessons.ensureLessonsBlock(target, REPO_ROOT);
+    assert.equal(changed, true, 'block injected into a fresh CLAUDE.md');
+
+    const out = fs.readFileSync(target, 'utf8');
+    assert.ok(
+      out.includes('Talk to a human like a human'),
+      'shipped block states the rule by its opening words'
+    );
+    assert.ok(
+      out.includes('never by an internal code'),
+      'shipped block closes the rule with the spelled-out clause'
+    );
+  });
+
+  it('the canonical source itself carries the rule text (no abbreviation)', () => {
+    const block = canonicalBlock();
+    assert.ok(block.includes('Talk to a human like a human'));
+    assert.ok(block.includes('never by an internal code'));
+    // The rule models itself: spell terms out, do not lean on acronyms.
+    assert.ok(
+      block.includes('test-driven development'),
+      'the rule spells "test-driven development" out in full'
+    );
+  });
+});
+
 describe('exported constants', () => {
   it('marker constants match the v1 contract', () => {
     assert.equal(LESSONS_VERSION, 'v1');
