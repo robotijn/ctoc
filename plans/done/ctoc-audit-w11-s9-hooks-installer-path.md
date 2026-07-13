@@ -1,4 +1,17 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T18:37:06.077Z
+gate_crossed: review → done
+---
+
+---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-13T16:17:11.726Z
+gate_crossed: implementation → todo
+---
+
+---
 title: "W11-s9 — hooks-installer.js: post-commit hook points at the real src/hooks/post-commit.js"
 type: feature
 parent_plan: "ctoc-audit-w11-state-durability-and-deadcode"
