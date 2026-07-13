@@ -23,11 +23,6 @@ function load() {
   return require('../src/lib/refinement-loop');
 }
 
-function loadRenderer() {
-  const p = require.resolve('../src/lib/letter-renderer');
-  delete require.cache[p];
-  return require('../src/lib/letter-renderer');
-}
 
 let tmpDir;
 let originalCwd;
@@ -79,52 +74,6 @@ describe('refinement-loop — fingerprinting', () => {
     assert.equal(fingerprintsMatchFuzzy(a, b), true);
     const c = { critic_id: 'q/cr', file: 'a.py', finding_type: 'long-fn', line_range: [80] }; // shifted +13
     assert.equal(fingerprintsMatchFuzzy(a, c), false);
-    teardownTempProject();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────
-describe('refinement-loop — journal I/O', () => {
-  it('returns fresh journal when none exists', () => {
-    setupTempProject();
-    const { loadJournal } = load();
-    const j = loadJournal('test-plan');
-    assert.equal(j.plan, 'test-plan');
-    assert.deepEqual(j.rounds, []);
-    teardownTempProject();
-  });
-
-  it('round-trips a round entry', () => {
-    setupTempProject();
-    const { appendRound, loadJournal } = load();
-    appendRound('test-plan', {
-      round: 1,
-      phase: 'critical',
-      letter_id: '01J9X8Y2KZQ3M5N7P9R2T4V6W8',
-      critics_dispatched: ['quality/code-reviewer', 'security/sast-scanner'],
-      fingerprints: ['abc123def456', 'fed654cba321'],
-      fixes_applied: [{ file: 'src/auth.py', fixed_findings: ['cr-001'], lines_changed: 87 }],
-      tests_added: ['tests/test_auth.py'],
-      tests_result: { added: 1, passed: 1, failed: 0, total: 47, regressions: 0, warnings: 0 },
-      convergence_delta: { phase_open_before: 8, phase_open_after: 5 },
-    });
-    const j = loadJournal('test-plan');
-    assert.equal(j.rounds.length, 1);
-    assert.equal(j.rounds[0].round, 1);
-    assert.equal(j.rounds[0].phase, 'critical');
-    assert.deepEqual(j.rounds[0].fingerprints, ['abc123def456', 'fed654cba321']);
-    teardownTempProject();
-  });
-
-  it('multiple appends preserve all rounds', () => {
-    setupTempProject();
-    const { appendRound, loadJournal } = load();
-    appendRound('test-plan', { round: 1, phase: 'critical', fingerprints: ['aaa'] });
-    appendRound('test-plan', { round: 2, phase: 'critical', fingerprints: ['bbb'] });
-    appendRound('test-plan', { round: 3, phase: 'medium', fingerprints: ['ccc'] });
-    const j = loadJournal('test-plan');
-    assert.equal(j.rounds.length, 3);
-    assert.equal(j.rounds[2].phase, 'medium');
     teardownTempProject();
   });
 });
@@ -288,100 +237,6 @@ describe('refinement-loop — gating', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
-describe('refinement-loop — letter generation', () => {
-  it('builds a valid letter with required fields', () => {
-    setupTempProject();
-    const { buildLetter } = load();
-    const letter = buildLetter({
-      planSlug: 'test-plan',
-      round: 1,
-      phase: 'critical',
-      summary: 'Round 1: 3 critical issues',
-      issues: [{
-        id: 'cr-001',
-        fingerprint: 'abc123def456',
-        severity: 'critical',
-        file: 'src/auth.py',
-        line_range: [67, 132],
-        current_behaviour: 'broken',
-        expected_behaviour: 'fixed',
-        observable_test_conditions: ['Given x, when y, then z'],
-        raised_by: ['quality/code-reviewer'],
-      }],
-    });
-    assert.match(letter.letter_id, /^[0-9A-HJKMNP-TV-Z]{26}$/);
-    assert.equal(letter.phase, 'critical');
-    assert.equal(letter.issues.length, 1);
-    teardownTempProject();
-  });
-
-  it('rejects severity=warn (warnings-as-bugs principle)', () => {
-    setupTempProject();
-    const { buildLetter } = load();
-    assert.throws(() => buildLetter({
-      planSlug: 'p',
-      round: 1,
-      phase: 'critical',
-      summary: 's',
-      issues: [{
-        id: 'x', fingerprint: 'abc123', severity: 'warn', file: 'a',
-        current_behaviour: 'c', expected_behaviour: 'e',
-        observable_test_conditions: ['t'], raised_by: ['q/cr'],
-      }],
-    }), /must be critical\/medium\/low/);
-    teardownTempProject();
-  });
-
-  it('rejects issue missing observable_test_conditions', () => {
-    setupTempProject();
-    const { buildLetter } = load();
-    assert.throws(() => buildLetter({
-      planSlug: 'p',
-      round: 1,
-      phase: 'critical',
-      summary: 's',
-      issues: [{
-        id: 'x', fingerprint: 'abc123', severity: 'critical', file: 'a',
-        current_behaviour: 'c', expected_behaviour: 'e',
-        observable_test_conditions: [],
-        raised_by: ['q/cr'],
-      }],
-    }), /missing observable_test_conditions/);
-    teardownTempProject();
-  });
-
-  it('rejects unknown phase', () => {
-    setupTempProject();
-    const { buildLetter } = load();
-    assert.throws(() => buildLetter({
-      planSlug: 'p', round: 1, phase: 'wat', summary: 's', issues: [],
-    }), /phase must be one of/);
-    teardownTempProject();
-  });
-
-  it('writes letter to disk in JSON format', () => {
-    setupTempProject();
-    const { buildLetter, writeLetter } = load();
-    const letter = buildLetter({
-      planSlug: 'test-plan',
-      round: 1,
-      phase: 'critical',
-      summary: 's',
-      issues: [{
-        id: 'x', fingerprint: 'abc123', severity: 'critical', file: 'a.py',
-        current_behaviour: 'c', expected_behaviour: 'e',
-        observable_test_conditions: ['t'], raised_by: ['q/cr'],
-      }],
-    });
-    const p = writeLetter('test-plan', letter);
-    assert.ok(fs.existsSync(p));
-    const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
-    assert.equal(parsed.letter_id, letter.letter_id);
-    teardownTempProject();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────
 describe('refinement-loop — phase logic', () => {
   it('shouldEscalate fires when phase rounds exceed default cap', () => {
     setupTempProject();
@@ -413,48 +268,3 @@ describe('refinement-loop — phase logic', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
-describe('letter-renderer — JSON → Markdown', () => {
-  it('renders a letter with issues as Markdown', () => {
-    setupTempProject();
-    const { renderLetterAsMarkdown } = loadRenderer();
-    const md = renderLetterAsMarkdown({
-      letter_id: '01ABCDEFGHJKMNPQRSTVWXYZ12',
-      round: 1,
-      phase: 'critical',
-      plan: 'test-plan',
-      summary: 'Round 1 summary',
-      issues: [{
-        id: 'cr-001',
-        fingerprint: 'abc123',
-        severity: 'critical',
-        file: 'src/auth.py',
-        line_range: [67, 132],
-        current_behaviour: 'broken',
-        expected_behaviour: 'fixed',
-        observable_test_conditions: ['Given X', 'When Y', 'Then Z'],
-        raised_by: ['quality/code-reviewer'],
-      }],
-    });
-    assert.match(md, /# Letter — round 1, phase: critical/);
-    assert.match(md, /## Summary/);
-    assert.match(md, /### cr-001 — CRITICAL/);
-    assert.match(md, /Given X/);
-    assert.match(md, /quality\/code-reviewer/);
-    teardownTempProject();
-  });
-
-  it('renders escalation report with helpful guidance', () => {
-    setupTempProject();
-    const { renderEscalationReport } = loadRenderer();
-    const md = renderEscalationReport({
-      planSlug: 'test-plan',
-      phase: 'critical',
-      reason: 'persistent',
-      stuckIssues: [{ fingerprint: 'stubborn', consecutive_rounds: 4, rounds_seen: [1, 2, 3, 4] }],
-    });
-    assert.match(md, /ESCALATION/);
-    assert.match(md, /stubborn/);
-    assert.match(md, /resisted/);
-    teardownTempProject();
-  });
-});

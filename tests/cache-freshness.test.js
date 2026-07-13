@@ -600,9 +600,6 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // Writes bg-status sidecar JSON in .ctoc/ keyed by plan path — not a *.md in
     // a stage dir; getPlanCounts/getInboxCounts do not count status sidecars.
     ['background.js', 'writes .ctoc/ background-status sidecar JSON, not a counted *.md plan file'],
-    // Writes .ctoc/baselines/<version>/manifest.yaml — a release baseline, not a
-    // plan/vision/inbox file.
-    ['config-baseline.js', 'writes .ctoc/baselines/<version>/manifest.yaml (release baseline), not a counted file'],
     // Writes .ctoc/.../holds/<id>.yaml legal-hold records — not counted.
     ['legal-hold.js', 'writes .ctoc/legal-hold/<id>.yaml records, not a plan/vision/inbox file'],
     // Writes .ctoc/templates/product-kpis.yaml (KPI library) — not counted.

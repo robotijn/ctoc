@@ -569,7 +569,26 @@ const CHECKS = [
   { id: 'budget-config-exists',        scope: 'budget',       mode: 'fast', fn: checkBudgetConfigExists },
   { id: 'product-loop',                scope: 'product',      mode: 'fast', fn: checkProductLoop },
   { id: 'plan-counts',                 scope: 'info',         mode: 'fast', fn: checkPlanCounts },
+  { id: 'reachability-fence',          scope: 'architecture', mode: 'thorough', fn: checkReachabilityFence },
 ];
+
+/**
+ * Dead-code fence invariant (2026-07-14 root cause): every src file must be
+ * reachable from a live root — a test is a caller, so "module + its own test"
+ * proves nothing. The ratchet lives in tests/reachability.test.js; this check
+ * surfaces the same truth through the self-check so a human can ask for it
+ * on demand. Thorough mode only (walks the whole src tree).
+ */
+function checkReachabilityFence(root) {
+  const { analyze } = require('./reachability');
+  const result = analyze(root);
+  if (result.total === 0) return null; // not a CTOC source tree — nothing to check
+  if (result.unreachable.length === 0) return null;
+  return {
+    severity: 'block',
+    message: `${result.unreachable.length} source file(s) unreachable from every live root (dead on arrival): ${result.unreachable.join(', ')} — wire each to a live root or delete it; a module is not done when its test passes, it is done when a human can reach it`
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────
 //  Public API

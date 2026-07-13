@@ -710,6 +710,25 @@ function initProject(projectDir, options = {}) {
     }
   }
 
+  // 9. Install the background post-commit quality hook.
+  //    Without this, the hook script at src/hooks/post-commit.js is never
+  //    wired into the project's .git/hooks, so the background quality loop
+  //    never fires. Only meaningful inside a git repository; fail-open so a
+  //    hook-install failure never breaks project init.
+  if (!dryRun && safeFs.existsSync(path.join(projectDir, '.git'))) {
+    try {
+      const { installPostCommitHook } = require('./hooks-installer');
+      const res = installPostCommitHook(projectDir);
+      if (res.installed) {
+        created.push('.git/hooks/post-commit (background quality loop)');
+      } else if (res.skipped) {
+        skipped.push(`.git/hooks/post-commit (${res.reason || 'already installed'})`);
+      }
+    } catch (err) {
+      skipped.push(`.git/hooks/post-commit (${err.message})`);
+    }
+  }
+
   return { success: true, created, skipped, detected };
 }
 

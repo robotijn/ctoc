@@ -6,7 +6,7 @@
  * Asserts RESOLUTION, not string presence: every agent named by
  * `.ctoc/operations-registry.yaml` (its `path:` entries and its `iron_loop:`
  * name references) must resolve, via the project's own runtime resolver
- * (`src/lib/agent-resolver.js`), to a real dispatchable file under the REAL
+ * (`tests/helpers/agent-resolver.js`), to a real dispatchable file under the REAL
  * `agents/` tree. No fixtures, no doubles — the test reads the live tree
  * read-only so it tracks reality and catches drift on every run.
  *
@@ -21,7 +21,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const { resolveAgent } = require('../src/lib/agent-resolver');
+const { resolveAgent } = require('./helpers/agent-resolver');
 
 const ROOT = path.join(__dirname, '..');
 const REGISTRY_PATH = path.join(ROOT, '.ctoc', 'operations-registry.yaml');

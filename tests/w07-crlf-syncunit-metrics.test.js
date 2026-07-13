@@ -6,7 +6,6 @@
  * Proves the two background-pipeline frontmatter parsers read a plan checked out
  * on Windows (CRLF) byte-identically to its LF twin:
  *   - `plan-index/sync-unit.js` — `splitFrontmatter` + `parseFrontmatterFields`
- *   - `metrics-loop.js` — `extractFrontmatterField` + `extractFilesDeclaration`
  *     and the declared-file line-count metric (`countLinesAddedByPlan`), which
  *     silently returned 0 on a CRLF plan before the s1-helper migration.
  *
@@ -16,19 +15,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 
 const {
   splitFrontmatter,
   parseFrontmatterFields,
 } = require('../src/lib/plan-index/sync-unit');
-const {
-  extractFrontmatterField,
-  extractFilesDeclaration,
-  countLinesAddedByPlan,
-} = require('../src/lib/metrics-loop');
 
 // LF fixture and its exact CRLF twin.
 const LF_PLAN = [
@@ -79,61 +70,3 @@ test('sync-unit parseFrontmatterFields: CRLF files/parentVision/status equal LF 
   assert.ok(!hasCr(String(crlfFields.status)), 'status must be \\r-free');
 });
 
-// ── metrics-loop: extractFrontmatterField ──────────────────────────────────
-test('metrics extractFrontmatterField: CRLF title strictly equals LF value (no trailing \\r)', () => {
-  const lfTitle = extractFrontmatterField(LF_PLAN, 'title');
-  const crlfTitle = extractFrontmatterField(CRLF_PLAN, 'title');
-
-  assert.strictEqual(crlfTitle, lfTitle);
-  assert.strictEqual(crlfTitle, 'W07 fixture plan');
-  assert.ok(!hasCr(String(crlfTitle)), 'title value must be \\r-free');
-});
-
-// ── metrics-loop: extractFilesDeclaration ──────────────────────────────────
-test('metrics extractFilesDeclaration: CRLF files deep-equal LF and are non-empty', () => {
-  const lfFiles = extractFilesDeclaration(LF_PLAN);
-  const crlfFiles = extractFilesDeclaration(CRLF_PLAN);
-
-  assert.deepStrictEqual(crlfFiles, lfFiles);
-  assert.ok(crlfFiles.length > 0, 'declared files must be non-empty on a CRLF plan');
-  assert.deepStrictEqual(crlfFiles, ['src/lib/a.js', 'src/lib/b.js']);
-  for (const f of crlfFiles) {
-    assert.ok(!hasCr(f), `files entry must be \\r-free: ${JSON.stringify(f)}`);
-  }
-});
-
-// ── metrics-loop: line-count metric (the parent's "silent metric loss") ─────
-test('metrics countLinesAddedByPlan: CRLF plan line-count equals LF count and is not zero', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'w07-crlf-metrics-'));
-  try {
-    // One real declared file with a known line count.
-    const rel = path.join('src', 'lib', 'counted.js');
-    const abs = path.join(dir, rel);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    const declaredLines = ['line 1', 'line 2', 'line 3', 'line 4'];
-    fs.writeFileSync(abs, declaredLines.join('\n'), 'utf8');
-    const expectedCount = declaredLines.length; // split('\n').length
-
-    // A plan that declares the real file, in LF and CRLF twins.
-    const relPosix = rel.split(path.sep).join('/');
-    const lfPlan = [
-      '---',
-      'title: line-count fixture',
-      'files:',
-      `  - ${relPosix}`,
-      '---',
-      '',
-      '# Body',
-    ].join('\n');
-    const crlfPlan = lfPlan.replace(/\n/g, '\r\n');
-
-    const lfCount = countLinesAddedByPlan(dir, { content: lfPlan });
-    const crlfCount = countLinesAddedByPlan(dir, { content: crlfPlan });
-
-    assert.strictEqual(lfCount, expectedCount, 'LF plan must count the declared file');
-    assert.strictEqual(crlfCount, lfCount, 'CRLF plan must count identically to LF twin');
-    assert.notStrictEqual(crlfCount, 0, 'CRLF plan must not silently undercount to zero');
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-});

@@ -252,9 +252,28 @@ async function listRelatedForInbox(planSlug, root) {
   }
 }
 
+/**
+ * Circuit-breaker escalations awaiting the human. Fail-open: a missing or
+ * corrupt escalations store is zero, never a crash — but a REAL escalation
+ * (4th same-step kickback / 6th total on one plan) must reach the human here;
+ * this is the surface the circuit breaker writes toward.
+ * @param {string} root
+ * @returns {Array<object>}
+ */
+function listEscalations(root) {
+  try {
+    const { getEscalations } = require('./circuit-breaker');
+    const all = getEscalations(root);
+    return Array.isArray(all) ? all.filter((e) => e && !e.acknowledged) : [];
+  } catch {
+    return [];
+  }
+}
+
 const getInboxCounts = memoize(function getInboxCountsImpl(root) {
   return {
     questions: listQuestions(root).length,
+    escalations: listEscalations(root).length,
     decisions: listDecisions(root).length,
     gatesWaiting: listPlansAtGates(root).length,
     // SP2: cheap stale count. One scan per memoize window (5 s TTL) ⇒ Goal 1.
@@ -263,6 +282,7 @@ const getInboxCounts = memoize(function getInboxCountsImpl(root) {
 }, 'getInboxCounts');
 
 module.exports = {
+  listEscalations,
   getInboxCounts,
   listQuestions,
   listDecisions,

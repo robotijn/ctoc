@@ -58,6 +58,20 @@
 
 ---
 
+### Wiring — the live call sites (MANDATORY)
+
+A test is a caller, so "module + its own test" is NEVER done. For EVERY new
+module this plan creates, name the LIVE call site that will invoke it — the
+registered hook, shipped slash command, or sanctioned script it becomes
+require-reachable from, and the exact function that calls it. Wiring happens in
+the SAME plan, never a follow-up: deferred wiring is an unasked question, and
+unanswered questions are red flags. If the call site is not known yet, the plan
+is not ready — ASK the human first; do not guess.
+
+| New module | Live call site (file + function) | Reached from which root |
+|---|---|---|
+| {{module}} | {{caller}} | {{hook / slash command / sanctioned script}} |
+
 ## 6. SPEC - Technical Specification
 
 ### File Changes

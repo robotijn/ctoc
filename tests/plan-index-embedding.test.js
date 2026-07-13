@@ -25,8 +25,6 @@ const ollamaClientMod = require('../src/lib/plan-index/ollama-client');
 const inprocess = require('../src/lib/plan-index/inprocess-engine');
 const hardwareProbe = require('../src/lib/plan-index/hardware-probe');
 const calibration = require('../src/lib/plan-index/calibration');
-const summaryExtract = require('../src/lib/plan-index/summary-extract');
-const stateMod = require('../src/lib/state');
 // Hard require the PI1 store: EM-05 is an integration test against it, so an absent
 // PI1 must fail at load, never skip (skip-guard integrity, finding A2).
 const { openStore } = require('../src/lib/plan-index');
@@ -280,83 +278,6 @@ test('EM-05 [integration] first upsert of Float32Array locks store.dimension', (
 });
 
 // ── EM-06: extractSummary deterministic + calls parseMetadata ─────────────────
-
-test('EM-06 extractSummary is byte-deterministic and calls parseMetadata', () => {
-  const md = [
-    '---',
-    "title: 'PI1 — Index Store'",
-    'status: functional',
-    '---',
-    '',
-    '## Problem Statement',
-    'Body prose one.',
-    '',
-    '## Scope',
-    'Body prose two.'
-  ].join('\n');
-
-  const orig = stateMod.parseMetadata;
-  let spyCalls = 0;
-  stateMod.parseMetadata = (...args) => { spyCalls++; return orig(...args); };
-  try {
-    const r1 = summaryExtract.extractSummary(md);
-    const r2 = summaryExtract.extractSummary(md);
-    assert.equal(r1, r2, 'byte-identical output for identical input');
-    assert.ok(spyCalls >= 1, 'parseMetadata (state.js) was invoked');
-  } finally {
-    stateMod.parseMetadata = orig;
-  }
-});
-
-// ── EM-07: summary contains title + all H2/H3 headings ────────────────────────
-
-test('EM-07 extractSummary includes title and all H2/H3 headings', () => {
-  const md = [
-    '---',
-    "title: 'PI1 — Index Store'",
-    'status: functional',
-    'priority: HIGH',
-    '---',
-    '',
-    '## Problem Statement',
-    'Some prose.',
-    '',
-    '### Sub Detail',
-    'more prose',
-    '',
-    '## Scope',
-    'scope prose'
-  ].join('\n');
-  const out = summaryExtract.extractSummary(md);
-  assert.ok(out.includes('PI1 — Index Store'), 'includes YAML title via parseMetadata');
-  assert.ok(out.includes('Problem Statement'), 'includes H2 heading');
-  assert.ok(out.includes('Scope'), 'includes second H2 heading');
-  assert.ok(out.includes('Sub Detail'), 'includes H3 heading');
-});
-
-// ── EM-08: summary excludes section body prose ────────────────────────────────
-
-test('EM-08 extractSummary excludes section body paragraphs', () => {
-  const md = [
-    '---',
-    "title: 'Plan X'",
-    '---',
-    '',
-    '## Risks',
-    'THIS_IS_BODY_PROSE_UNIQUE_MARKER should not appear in the summary.'
-  ].join('\n');
-  const out = summaryExtract.extractSummary(md);
-  assert.ok(out.includes('Risks'), 'heading text present');
-  assert.ok(!out.includes('THIS_IS_BODY_PROSE_UNIQUE_MARKER'), 'body prose excluded');
-});
-
-test('EM-08b extractSummary returns empty string for non-string input (fail-soft)', () => {
-  assert.equal(summaryExtract.extractSummary(null), '');
-  assert.equal(summaryExtract.extractSummary(undefined), '');
-  assert.equal(summaryExtract.extractSummary(42), '');
-});
-
-// ── EM-09: probe /api/tags excludes absent models with a logged note ──────────
 
 test('EM-09 calibration skips models not in /api/tags with a logged note', async () => {
   const dir = tmpProject();

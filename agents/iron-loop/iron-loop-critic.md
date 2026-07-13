@@ -69,9 +69,9 @@ Before scoring other dimensions, verify step labels are correct:
 
 1. All 9 steps present (7-15)
 2. Correct labels in correct order
-3. Step 7 includes writing NEW tests (not just "identify coverage")
+3. Step 8 includes writing NEW tests (not just "identify coverage")
 4. Only ONE IMPLEMENT step (Step 9) with sub-items for multiple files
-5. Step 13 is automated VERIFY (lint, type check, ALL tests - not manual)
+5. Step 14 is automated VERIFY (lint, type check, ALL tests - not manual)
 6. Step 8 is PREPARE (not QUALITY or SETUP)
 
 If ANY label validation fails -> Score 0/5 on Completeness
@@ -82,15 +82,15 @@ Labels must START WITH the canonical label. Optional suffix allowed for context.
 
 | Step | Must start with | Valid examples |
 |------|-----------------|----------------|
-| 7 | TEST | `TEST`, `TEST (TDD Red)` |
-| 8 | PREPARE | `PREPARE`, `PREPARE (dependencies)` |
-| 9 | IMPLEMENT | `IMPLEMENT`, `IMPLEMENT (all files)` |
-| 10 | REVIEW | `REVIEW`, `REVIEW (logic only)` |
-| 11 | OPTIMIZE | `OPTIMIZE`, `OPTIMIZE (if needed)` |
-| 12 | SECURE | `SECURE`, `SECURE (input validation)` |
-| 13 | VERIFY | `VERIFY`, `VERIFY (all checks)` |
-| 14 | DOCUMENT | `DOCUMENT`, `DOCUMENT (API docs)` |
-| 15 | FINAL-REVIEW | `FINAL-REVIEW`, `FINAL-REVIEW (ready)` |
+| 8 | TEST | `TEST`, `TEST (TDD Red)` |
+| 9 | PREPARE | `PREPARE`, `PREPARE (dependencies)` |
+| 10 | IMPLEMENT | `IMPLEMENT`, `IMPLEMENT (all files)` |
+| 11 | REVIEW | `REVIEW`, `REVIEW (logic only)` |
+| 12 | OPTIMIZE | `OPTIMIZE`, `OPTIMIZE (if needed)` |
+| 13 | SECURE | `SECURE`, `SECURE (input validation)` |
+| 14 | VERIFY | `VERIFY`, `VERIFY (all checks)` |
+| 15 | DOCUMENT | `DOCUMENT`, `DOCUMENT (API docs)` |
+| 16 | FINAL-REVIEW | `FINAL-REVIEW`, `FINAL-REVIEW (ready)` |
 
 Invalid labels: `QUALITY`, `SETUP`, `COMMIT`, `TDD TEST`, `TESTING`, `CHECK`, `CODE`
 
@@ -98,7 +98,7 @@ Invalid labels: `QUALITY`, `SETUP`, `COMMIT`, `TDD TEST`, `TESTING`, `CHECK`, `C
 
 | Score | Criteria |
 |-------|----------|
-| 5 | All steps 7-15 present with correct labels, each has actions, all requirements mapped |
+| 5 | All steps 8-16 present with correct labels, each has actions, all requirements mapped |
 | 4 | All steps present with correct labels, minor gaps in actions |
 | 3 | Missing 1-2 steps or significant action gaps |
 | 2 | Missing 3+ steps or wrong step labels |
@@ -106,15 +106,16 @@ Invalid labels: `QUALITY`, `SETUP`, `COMMIT`, `TDD TEST`, `TESTING`, `CHECK`, `C
 | 0 | Step labels are wrong (BLOCKING - must fix before any other scoring) |
 
 **Check:**
-- [ ] Step 7: TEST present - must WRITE tests (not just identify coverage)
-- [ ] Step 8: PREPARE present (NOT "QUALITY") - environment preparation
-- [ ] Step 9: IMPLEMENT present with specific implementation actions (ONE step only)
-- [ ] Step 10: REVIEW present with review criteria
-- [ ] Step 11: OPTIMIZE present with optimization targets
-- [ ] Step 12: SECURE present with security checks
-- [ ] Step 13: VERIFY present - must run automated checks (lint, type, tests)
-- [ ] Step 14: DOCUMENT present with doc targets
-- [ ] Step 15: FINAL-REVIEW present (NOT "COMMIT")
+- [ ] Step 8: TEST present - must WRITE tests (not just identify coverage)
+- [ ] Step 9: PREPARE present (NOT "QUALITY") - environment preparation
+- [ ] Step 10: IMPLEMENT present with specific implementation actions (ONE step only)
+- [ ] Step 11: REVIEW present with review criteria
+- [ ] Step 12: OPTIMIZE present with optimization targets
+- [ ] Step 13: SECURE present with security checks
+- [ ] Step 14: VERIFY present - must run automated checks (lint, type, tests)
+- [ ] WIRING declared and real: the plan names the live call site for every new module (a test is a caller, so module+test alone is NEVER done); a plan that defers wiring to a follow-up slice is REJECTED — deferred wiring is an unasked question
+- [ ] Step 15: DOCUMENT present with doc targets
+- [ ] Step 16: FINAL-REVIEW present (NOT "COMMIT")
 
 ### Clarity (1-5)
 

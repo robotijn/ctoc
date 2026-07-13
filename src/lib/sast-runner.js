@@ -247,7 +247,7 @@ class SASTRunner {
       });
 
       const data = JSON.parse(result);
-      this.parseSemc(data);
+      this.parseSemgrepResults(data);
     } catch (error) {
       if (error.stdout) {
         try {

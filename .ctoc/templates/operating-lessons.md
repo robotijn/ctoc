@@ -50,6 +50,18 @@
     change must tighten the test toward the real behavior, never loosen it to make
     red go green. Weakening an assertion, widening a range, deleting a case, or
     whitelisting without a justified reason is green-washing, not fixing.
+15. **Ask before you build — an unanswered question is a red flag.** Making
+    software is a collaboration between the human and the model: build enough
+    context by asking BEFORE building so that no guessing is required. A model
+    guessing produces plausible-but-wrong outcomes exactly as surely as a human
+    deciding carelessly does. When context is missing, the correct output is a
+    question, not a guess dressed up as a decision.
+16. **A module is not done when its test passes — it is done when a human can
+    reach it.** A test is a caller, so "module + its own test" proves nothing
+    about being wired into the product. Every new module must be reachable from
+    a live entry point in the same unit of work that creates it; deferring the
+    wiring to "a follow-up" is an unasked question and produces well-tested dead
+    code. Enforce this with a reachability gate where one can exist.
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2

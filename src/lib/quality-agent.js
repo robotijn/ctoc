@@ -31,6 +31,15 @@ const toolDetector = require('./tool-detector');
 const { findChangedFiles } = require('./hash-utils');
 const { findAffectedTests } = require('./coverage-map');
 
+// The real security fleet — wired into the live quality path (push.js →
+// runSecurityScan) so Iron Loop Step 13 SECURE performs a genuine scan instead
+// of the six naive inline regexes that used to live here. Each scanner degrades
+// LOUDLY: a missing external tool is announced as a skip, never a silent pass,
+// and never a crash.
+const { SecretsScanner } = require('./secrets-scanner');
+const { DependencyAuditor } = require('./dependency-auditor');
+const { SASTRunner, TOOL_CONFIGS } = require('./sast-runner');
+
 /**
  * Parse CLI arguments
  */
@@ -304,50 +313,191 @@ async function runSmartTests(tools) {
 }
 
 /**
- * Run security scan (basic)
+ * List the files this push introduces, relative to the project root. Used to
+ * scope the secrets scan to the delta (blast-radius-safe: a push is gated on
+ * what IT adds, not on pre-existing tree content that would block everyone).
+ * Returns null when git history is unavailable so the caller falls back to a
+ * whole-project scan.
+ * @param {string} projectRoot
+ * @returns {string[]|null}
  */
-async function runSecurityScan() {
+function getPushChangedFiles(projectRoot) {
+  try {
+    const out = execSync('git diff HEAD~1 --name-only', {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+    return out.split('\n').map(f => f.trim()).filter(Boolean);
+  } catch {
+    return null; // no git / shallow / first commit → caller scans whole project
+  }
+}
+
+/**
+ * Run the real security scan (Iron Loop Step 13 SECURE).
+ *
+ * Aggregates three genuine scanners, each degrading LOUDLY:
+ *   1. Secrets  — pure-JS SecretsScanner (no external tool). Always runs.
+ *                 Scoped to the push delta by default; whole project when
+ *                 `opts.allFiles` is set or git history is unavailable.
+ *   2. Deps     — DependencyAuditor (npm/pip/go/cargo/... audit). Runs when a
+ *                 package manager + its audit tool is present; otherwise the
+ *                 absence is reported as an explicit skip.
+ *   3. SAST     — SASTRunner (semgrep/bandit/gosec/eslint-security). Runs when a
+ *                 scanner is available for a detected language; otherwise the
+ *                 absence is reported as an explicit skip.
+ *
+ * A finding at CRITICAL or HIGH severity from ANY scanner fails the gate. A
+ * missing tool or a scanner that throws becomes a loud skip — it NEVER silently
+ * passes and NEVER crashes the push.
+ *
+ * @param {Object} [_tools] detected tools (unused; scanners self-detect). Present
+ *   for signature-compatibility with the other tiered runners.
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot=process.cwd()]
+ * @param {boolean} [opts.allFiles=false] scan the whole tree, not just the delta
+ * @returns {Promise<{passed:boolean, critical:number, high:number, medium:number,
+ *   details:string, skipped:string[]}>}
+ */
+async function runSecurityScan(_tools, opts = {}) {
   console.log('\n  Running security scan...');
 
-  // Check for secrets in staged files
-  const result = runCommand('git diff HEAD~1 --name-only', { silent: true, allowFail: true });
-  const changedFiles = result.output?.split('\n').filter(f => f) || [];
+  const projectRoot = opts.projectRoot || process.cwd();
+  const skipped = [];
+  const detail = [];
+  let critical = 0;
+  let high = 0;
+  let medium = 0;
 
-  // Basic secret patterns
-  const secretPatterns = [
-    /api[_-]?key\s*[:=]\s*['"][^'"]+['"]/i,
-    /secret[_-]?key\s*[:=]\s*['"][^'"]+['"]/i,
-    /password\s*[:=]\s*['"][^'"]+['"]/i,
-    /private[_-]?key\s*[:=]\s*['"][^'"]+['"]/i,
-    /aws[_-]?access[_-]?key/i,
-    /-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----/
-  ];
+  const bump = (sev) => {
+    if (sev === 'CRITICAL') critical++;
+    else if (sev === 'HIGH') high++;
+    else medium++; // MEDIUM/MODERATE/LOW/INFO surfaced but non-blocking
+  };
 
-  for (const file of changedFiles) {
-    if (!safeFs.existsSync(file)) continue;
-    if (file.includes('node_modules') || file.includes('.git')) continue;
+  // 1. SECRETS — always runs (pure JS, no external dependency).
+  try {
+    const scanner = new SecretsScanner(projectRoot);
+    const changed = opts.allFiles ? null : getPushChangedFiles(projectRoot);
 
-    try {
-      const content = safeFs.readFileSync(file, 'utf8');
-      for (const pattern of secretPatterns) {
-        if (pattern.test(content)) {
-          console.log(`   Potential secret detected in ${file}`);
-          return {
-            passed: false,
-            critical: 1,
-            high: 0,
-            medium: 0,
-            details: `Potential secret in ${file}`
-          };
-        }
+    if (changed === null) {
+      await scanner.run(); // whole project → populates scanner.findings
+    } else {
+      for (const rel of changed) {
+        const abs = path.resolve(projectRoot, rel);
+        if (!safeFs.existsSync(abs)) continue; // deleted/renamed in the delta
+        if (!scanner.shouldScan(abs)) continue;
+        scanner.findings.push(...scanner.scanFile(abs));
+        scanner.scannedFiles++;
       }
-    } catch {
-      // Skip unreadable files
     }
+
+    const secretFindings = scanner.deduplicateFindings();
+    for (const f of secretFindings) {
+      bump(f.severity);
+      detail.push(`secret[${f.severity}] ${f.name || f.type} at ${f.file}:${f.line}`);
+    }
+    console.log(secretFindings.length
+      ? `   Secrets: ${secretFindings.length} finding(s)`
+      : '   Secrets: none');
+  } catch (err) {
+    const msg = `secrets scan skipped (error, NOT a pass): ${err.message}`;
+    skipped.push(msg);
+    console.log(`   ${msg}`);
   }
 
-  console.log('   No secrets detected');
-  return { passed: true, critical: 0, high: 0, medium: 0 };
+  // 2. DEPENDENCIES — runs when a package-manager audit tool is present.
+  try {
+    const auditor = new DependencyAuditor(projectRoot);
+    const managers = auditor.detectPackageManagers();
+    if (managers.length === 0) {
+      console.log('   Dependencies: no package manager detected — nothing to audit');
+    } else {
+      const available = managers.filter(m => auditor.isToolAvailable(m));
+      const missing = managers.filter(m => !auditor.isToolAvailable(m));
+      for (const m of missing) {
+        const msg = `dependency audit skipped: ${m} audit tool not installed`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+      }
+      if (available.length > 0) {
+        const res = await auditor.run();
+        for (const v of (res.vulnerabilities || [])) {
+          bump(v.severity === 'MODERATE' ? 'MEDIUM' : v.severity);
+          detail.push(`dependency[${v.severity}] ${v.package || v.name || 'unknown'}: ${v.title || v.advisory || ''}`.trim());
+        }
+        // Tool-level errors (e.g. registry unreachable) are loud skips, never
+        // silent passes.
+        for (const e of (res.errors || [])) {
+          const msg = `dependency audit skipped (${e.manager || 'tool'}): ${e.error}`;
+          skipped.push(msg);
+          console.log(`   ${msg}`);
+        }
+        console.log(`   Dependencies: ${(res.vulnerabilities || []).length} vulnerability(ies)`);
+      }
+    }
+  } catch (err) {
+    const msg = `dependency audit skipped (error, NOT a pass): ${err.message}`;
+    skipped.push(msg);
+    console.log(`   ${msg}`);
+  }
+
+  // 3. SAST — runs when a static-analysis scanner is available.
+  try {
+    const sast = new SASTRunner(projectRoot);
+    const languages = sast.detectLanguages();
+    if (languages.length === 0) {
+      console.log('   SAST: no supported language detected — nothing to scan');
+    } else {
+      // A language is scannable iff semgrep (universal) or its primary tool is
+      // installed. Any unscannable language is announced as a loud skip.
+      const semgrep = sast.isToolAvailable('semgrep');
+      const scannable = languages.filter(l =>
+        semgrep || (TOOL_CONFIGS[l] && sast.isToolAvailable(TOOL_CONFIGS[l].primary)));
+      const unscannable = languages.filter(l => !scannable.includes(l));
+      for (const l of unscannable) {
+        const tool = TOOL_CONFIGS[l] ? TOOL_CONFIGS[l].primary : 'a scanner';
+        const msg = `SAST skipped for ${l}: no scanner installed (need semgrep or ${tool})`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+      }
+      if (scannable.length > 0) {
+        const res = await sast.run();
+        for (const f of (res.findings || [])) {
+          bump(f.severity);
+          detail.push(`sast[${f.severity}] ${f.rule || f.check || f.title || 'finding'} at ${f.file || '?'}:${f.line || 0}`);
+        }
+        for (const e of (res.errors || [])) {
+          const msg = `SAST skipped (${e.tool || 'tool'}): ${e.error}`;
+          skipped.push(msg);
+          console.log(`   ${msg}`);
+        }
+        console.log(`   SAST: ${(res.findings || []).length} finding(s)`);
+      }
+    }
+  } catch (err) {
+    const msg = `SAST skipped (error, NOT a pass): ${err.message}`;
+    skipped.push(msg);
+    console.log(`   ${msg}`);
+  }
+
+  const passed = critical === 0 && high === 0;
+  if (skipped.length) {
+    console.log(`   Security: ${skipped.length} scanner(s) skipped (see above) — not counted as pass`);
+  }
+  console.log(passed
+    ? `   Security scan clean (${medium} non-blocking finding(s))`
+    : `   Security scan FAILED: ${critical} critical, ${high} high`);
+
+  return {
+    passed,
+    critical,
+    high,
+    medium,
+    details: detail.join('\n'),
+    skipped
+  };
 }
 
 /**
