@@ -3,7 +3,7 @@
  *
  * Verifies:
  *   - Shared snippets exist (no-stub-rule, async-choice-protocol, ancestry-read)
- *   - init-project.js declares agents/_shared in CTOC_DIRS
+ *   - init-project.js declares skills/agent-fragments in CTOC_DIRS
  *   - Each modernized orchestrator agent has v7 frontmatter fields
  *   - Each modernized orchestrator references at least one shared snippet
  */
@@ -29,11 +29,11 @@ const MODERNIZED_AGENTS_PHASE_1 = [
   'agents/planning/implementation-planner.md',
 ];
 
-describe('agents/_shared/ snippets', () => {
+describe('skills/agent-fragments/ snippets', () => {
   for (const snippet of SHARED_SNIPPETS) {
     it(`${snippet} exists`, () => {
-      const p = path.join(projectRoot, 'agents', '_shared', snippet);
-      assert.ok(fs.existsSync(p), `agents/_shared/${snippet} must exist`);
+      const p = path.join(projectRoot, 'skills', 'agent-fragments', snippet);
+      assert.ok(fs.existsSync(p), `skills/agent-fragments/${snippet} must exist`);
       const content = fs.readFileSync(p, 'utf8');
       assert.ok(content.length > 100, 'snippet has substantive content');
     });
@@ -55,11 +55,11 @@ describe('agents/_shared/ snippets', () => {
   });
 });
 
-describe('init-project.js declares agents/_shared', () => {
-  it('CTOC_DIRS includes agents/_shared', () => {
+describe('init-project.js declares skills/agent-fragments', () => {
+  it('CTOC_DIRS includes skills/agent-fragments', () => {
     const initPath = path.join(projectRoot, 'src', 'lib', 'init-project.js');
     const content = fs.readFileSync(initPath, 'utf8');
-    assert.match(content, /agents\/_shared/, 'CTOC_DIRS must include agents/_shared');
+    assert.match(content, /skills\/agent-fragments/, 'CTOC_DIRS must include skills/agent-fragments');
   });
 
   it('PLAN_DIRS includes plans/canvas (A1 stage)', () => {
@@ -93,7 +93,7 @@ describe('Phase 1 modernized agents have v7 frontmatter', () => {
       const p = path.join(projectRoot, agentPath);
       const content = fs.readFileSync(p, 'utf8');
       const referencesAny = SHARED_SNIPPETS.some(s =>
-        content.includes(`agents/_shared/${s}`) || content.includes(s.replace('.md', ''))
+        content.includes(`skills/agent-fragments/${s}`) || content.includes(s.replace('.md', ''))
       );
       assert.ok(referencesAny, `${agentPath} should reference at least one shared snippet`);
     });

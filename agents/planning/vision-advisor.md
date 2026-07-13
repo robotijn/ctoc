@@ -604,8 +604,8 @@ These techniques are embedded in the Question Formulation Rules above. This sect
 
 This agent operates under CTOC v7's four load-bearing principles. Read these before acting:
 
-- [`agents/_shared/no-stub-rule.md`](../_shared/no-stub-rule.md) — never write stubs; make documented choices and continue
-- [`agents/_shared/async-choice-protocol.md`](../_shared/async-choice-protocol.md) — defer-and-continue, never synchronously block
-- [`agents/_shared/ancestry-read.md`](../_shared/ancestry-read.md) — read vision → canvas → functional → impl before acting; use exact step labels
+- [`skills/agent-fragments/no-stub-rule.md`](../../skills/agent-fragments/no-stub-rule.md) — never write stubs; make documented choices and continue
+- [`skills/agent-fragments/async-choice-protocol.md`](../../skills/agent-fragments/async-choice-protocol.md) — defer-and-continue, never synchronously block
+- [`skills/agent-fragments/ancestry-read.md`](../../skills/agent-fragments/ancestry-read.md) — read vision → canvas → functional → impl before acting; use exact step labels
 
 These are not stylistic suggestions; they are pre-conditions for correct operation on Opus 4.7.

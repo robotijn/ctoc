@@ -148,7 +148,7 @@ const CTOC_DIRS = [
   '.ctoc/learnings/approved',
   '.ctoc/learnings/applied',
   '.ctoc/learnings/rejected',
-  'agents/_shared'
+  'skills/agent-fragments'
 ];
 
 /**
