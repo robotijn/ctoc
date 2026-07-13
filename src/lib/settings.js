@@ -228,12 +228,14 @@ function getSetting(category, key, projectPath = process.cwd()) {
   return settings[category]?.[key];
 }
 
-// Set a single setting
+// Set a single setting. Round-trips the RAW file (not the schema-merged object)
+// so non-schema top-level blocks — e.g. `deployment` and `sync` — survive the
+// write instead of being dropped. Reads still merge schema/profile/defaults.
 function setSetting(category, key, value, projectPath = process.cwd()) {
-  const settings = loadSettings(projectPath);
-  if (!settings[category]) settings[category] = {};
-  settings[category][key] = value;
-  saveSettings(settings, projectPath);
+  const raw = readRawSettings(projectPath);
+  if (!raw[category] || typeof raw[category] !== 'object') raw[category] = {};
+  raw[category][key] = value;
+  saveSettings(raw, projectPath);
 }
 
 // Get settings for a category

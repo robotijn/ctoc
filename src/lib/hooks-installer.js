@@ -476,7 +476,10 @@ function installPostCommitHook(projectRoot, options = {}) {
   const pluginRoot = options.pluginRoot || process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, '..', '..');
   const hooksDir = getGitHooksDir(projectRoot);
   const hookPath = path.join(hooksDir, 'post-commit');
-  const agentHookPath = path.join(pluginRoot, 'hooks', 'post-commit.js');
+  // The real hook script lives at src/hooks/post-commit.js under the plugin
+  // root (both the repo layout and the installed-plugin layout have src/ under
+  // the root; CLAUDE_PLUGIN_ROOT points at that same root).
+  const agentHookPath = path.join(pluginRoot, 'src', 'hooks', 'post-commit.js');
 
   // Ensure hooks directory exists
   if (!safeFs.existsSync(hooksDir)) {
