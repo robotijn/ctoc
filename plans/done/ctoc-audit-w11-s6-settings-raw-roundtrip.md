@@ -1,4 +1,17 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T18:37:06.051Z
+gate_crossed: review → done
+---
+
+---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-13T16:17:11.674Z
+gate_crossed: implementation → todo
+---
+
+---
 title: "W11-s6 — settings.js setSetting: raw round-trip preserves non-schema blocks (deployment/sync)"
 type: feature
 parent_plan: "ctoc-audit-w11-state-durability-and-deadcode"

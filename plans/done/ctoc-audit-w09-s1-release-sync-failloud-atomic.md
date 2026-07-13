@@ -1,4 +1,17 @@
 ---
+approved_by: human
+approved_at: 2026-07-13T18:37:06.004Z
+gate_crossed: review → done
+---
+
+---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-13T16:17:11.577Z
+gate_crossed: implementation → todo
+---
+
+---
 title: "W09-s1 — release.js: sync package.json, fail loud on partial sync, atomic writes"
 type: feature
 parent_plan: "ctoc-audit-w09-release-metadata"
@@ -251,3 +264,57 @@ Gate 2 batch approval (do not self-cross).
   Windows differs). A default-valued `rename` parameter (default `safeFs.renameSync`)
   is a minimal dependency-injection seam consistent with the repo's existing safe-fs
   indirection, and makes the no-truncation guarantee deterministically testable.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
