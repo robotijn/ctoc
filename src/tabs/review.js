@@ -6,7 +6,7 @@
 const path = require('path');
 const { c, line, renderList, renderActionMenu, renderInput, renderFooter } = require('../lib/tui');
 const { readPlans, getPlansDir } = require('../lib/state');
-const { approvePlan, rejectPlan } = require('../lib/actions');
+const { rejectPlan } = require('../lib/actions');
 
 const ACTIONS = [
   { key: '1', label: 'View functional plan' },
@@ -14,7 +14,6 @@ const ACTIONS = [
   { key: '3', label: 'View AI review summary' },
   { key: '4', label: 'View code changes' },
   { separator: true },
-  { key: '5', label: 'Approve → done' },
   { key: '6', label: 'Reject → provide feedback' }
 ];
 
@@ -180,11 +179,6 @@ function executeAction(actionKey, app) {
     case '4': // View code changes
       app.mode = 'view';
       app.viewType = 'code-changes';
-      return true;
-    case '5': // Approve
-      approvePlan(app.selectedPlan.path, app.projectPath);
-      app.mode = 'list';
-      app.message = `✓ ${app.selectedPlan.name} approved → done`;
       return true;
     case '6': // Reject
       app.mode = 'reject-input';

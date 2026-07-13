@@ -9,6 +9,7 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
+const os = require('os');
 
 // Simple JSON-based storage (YAML-compatible keys)
 const simpleYaml = {
@@ -29,7 +30,9 @@ const simpleYaml = {
 
 // Configuration - use functions to support dynamic HOME
 function getGradesFile() {
-  return path.join(process.env.HOME || '/tmp', '.ctoc/agents/grades.yaml');
+  // M22: use os.homedir() (not process.env.HOME, undefined on Windows) so grades
+  // resolve under the real home on every platform, never a bogus /tmp fallback.
+  return path.join(os.homedir(), '.ctoc/agents/grades.yaml');
 }
 // Keep GRADES_FILE for export compatibility
 const GRADES_FILE = getGradesFile();
@@ -432,6 +435,7 @@ module.exports = {
 
   // Utilities
   formatGrades,
+  getGradesFile,
 
   // Constants
   SCORE_MEANINGS,

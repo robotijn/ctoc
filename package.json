@@ -1,8 +1,8 @@
 {
   "name": "ctoc",
-  "version": "6.9.49",
+  "version": "6.10.3",
   "description": "Your Virtual CTO — AI agents and expert skills with quality gates. A Claude Code plugin.",
-  "license": "Apache-2.0",
+  "license": "PolyForm-Shield-1.0.0",
   "private": true,
   "engines": {
     "node": ">=18"

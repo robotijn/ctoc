@@ -1,9 +1,9 @@
 /**
  * Tab Module Tests
- * Tests for all tab modules in /tabs/
+ * Tests for the live tab modules in /tabs/
  *
- * Tests: overview.js, functional.js, implementation.js, review.js,
- *        todo.js, progress.js, tools.js
+ * Tests: overview.js, functional.js, review.js, tools.js
+ * (implementation.js, todo.js, progress.js were deleted — see B1 guard below)
  *
  * DRY: Shared fixtures for app state, grouped by operation type
  */
@@ -11,6 +11,7 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
+const fs = require('fs');
 
 // ============================================================================
 // SHARED FIXTURES
@@ -123,8 +124,6 @@ function mockActions(mocks = {}) {
     deletePlan: mocks.deletePlan || (() => {}),
     rejectPlan: mocks.rejectPlan || (() => '/test/rejected.md'),
     assignDirectly: mocks.assignDirectly || (() => '/test/assigned.md'),
-    moveUpInQueue: mocks.moveUpInQueue || (() => true),
-    moveDownInQueue: mocks.moveDownInQueue || (() => true),
     removeFromQueue: mocks.removeFromQueue || (() => '/test/removed.md')
   };
 }
@@ -363,41 +362,6 @@ describe('Tab Modules - render()', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Implementation Tab
-  // -------------------------------------------------------------------------
-  describe('implementation.render()', () => {
-    test('renders empty state', () => {
-      const implementation = loadTabWithMocks('implementation', {
-        state: { readPlans: () => [] }
-      });
-
-      const app = createMockApp();
-      const output = implementation.render(app);
-
-      assert.ok(output.includes('Implementation Plans'), 'Should show title');
-      assert.ok(output.includes('0 drafts'), 'Should show zero count');
-      assert.ok(output.includes('Plans move here after approving'), 'Should show instructions');
-    });
-
-    test('renders plan list', () => {
-      const plans = [
-        createMockPlan({ name: 'impl-plan-1' }),
-        createMockPlan({ name: 'impl-plan-2' })
-      ];
-
-      const implementation = loadTabWithMocks('implementation', {
-        state: { readPlans: () => plans }
-      });
-
-      const app = createMockApp();
-      const output = implementation.render(app);
-
-      assert.ok(output.includes('2 drafts'), 'Should show plan count');
-      assert.ok(output.includes('impl-plan-1'), 'Should list plans');
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // Review Tab
   // -------------------------------------------------------------------------
   describe('review.render()', () => {
@@ -430,112 +394,6 @@ describe('Tab Modules - render()', () => {
 
       assert.ok(output.includes('3 pending'), 'Should show pending count');
       assert.ok(output.includes('review-item-1'), 'Should list items');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Todo Tab
-  // -------------------------------------------------------------------------
-  describe('todo.render()', () => {
-    test('renders empty queue', () => {
-      const todo = loadTabWithMocks('todo', {
-        state: { readPlans: () => [] }
-      });
-
-      const app = createMockApp();
-      const output = todo.render(app);
-
-      assert.ok(output.includes('Todo Queue'), 'Should show title');
-      assert.ok(output.includes('0 queued'), 'Should show zero count');
-      assert.ok(output.includes('FIFO'), 'Should mention FIFO order');
-      assert.ok(output.includes('No plans in queue'), 'Should show empty message');
-    });
-
-    test('renders queue with items', () => {
-      const plans = [
-        createMockPlan({ name: 'todo-1' }),
-        createMockPlan({ name: 'todo-2' })
-      ];
-
-      const todo = loadTabWithMocks('todo', {
-        state: { readPlans: () => plans }
-      });
-
-      const app = createMockApp();
-      const output = todo.render(app);
-
-      assert.ok(output.includes('2 queued'), 'Should show queue count');
-      assert.ok(output.includes('todo-1'), 'Should list items');
-      assert.ok(output.includes('Agent picks oldest first'), 'Should show FIFO hint');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Progress Tab
-  // -------------------------------------------------------------------------
-  describe('progress.render()', () => {
-    test('renders idle state', () => {
-      const progress = loadTabWithMocks('progress', {
-        state: {
-          getAgentStatus: () => ({ active: false }),
-          getFinishedItems: () => [],
-          getSettings: () => ({ finishedItemsToShow: 10 })
-        }
-      });
-
-      const app = createMockApp();
-      const output = progress.render(app);
-
-      assert.ok(output.includes('In Progress'), 'Should show In Progress section');
-      assert.ok(output.includes('0 active'), 'Should show zero active');
-      assert.ok(output.includes('Idle'), 'Should show idle status');
-      assert.ok(output.includes('Finished'), 'Should show Finished section');
-    });
-
-    test('renders active agent', () => {
-      const progress = loadTabWithMocks('progress', {
-        state: {
-          getAgentStatus: () => ({
-            active: true,
-            name: 'active-agent',
-            step: 9,
-            phase: 'IMPLEMENT',
-            task: 'Building feature',
-            elapsed: '10m'
-          }),
-          getFinishedItems: () => [],
-          getSettings: () => ({ finishedItemsToShow: 10 })
-        }
-      });
-
-      const app = createMockApp();
-      const output = progress.render(app);
-
-      assert.ok(output.includes('1 active'), 'Should show one active');
-      assert.ok(output.includes('active-agent'), 'Should show agent name');
-      assert.ok(output.includes('Step 9/16'), 'Should show step');
-      assert.ok(output.includes('IMPLEMENT'), 'Should show phase');
-    });
-
-    test('renders finished items', () => {
-      const finished = [
-        createMockPlan({ name: 'done-1', ago: '1h ago' }),
-        createMockPlan({ name: 'done-2', ago: '2h ago' })
-      ];
-
-      const progress = loadTabWithMocks('progress', {
-        state: {
-          getAgentStatus: () => ({ active: false }),
-          getFinishedItems: () => finished,
-          getSettings: () => ({ finishedItemsToShow: 10 })
-        }
-      });
-
-      const app = createMockApp();
-      const output = progress.render(app);
-
-      assert.ok(output.includes('done-1'), 'Should show finished items');
-      assert.ok(output.includes('completed'), 'Should show completion status');
     });
   });
 
@@ -629,7 +487,7 @@ describe('Tab Modules - handleKey()', () => {
   // Common Navigation Patterns
   // -------------------------------------------------------------------------
   describe('List Navigation (shared pattern)', () => {
-    const listTabs = ['functional', 'implementation', 'review', 'todo'];
+    const listTabs = ['functional', 'review'];
 
     for (const tabName of listTabs) {
       test(`${tabName}: up/down navigation with plans`, () => {
@@ -728,7 +586,7 @@ describe('Tab Modules - handleKey()', () => {
   // Action Menu Navigation (shared pattern)
   // -------------------------------------------------------------------------
   describe('Action Menu Navigation (shared pattern)', () => {
-    const actionTabs = ['functional', 'implementation', 'review', 'todo'];
+    const actionTabs = ['functional', 'review'];
 
     for (const tabName of actionTabs) {
       test(`${tabName}: escape returns to list`, () => {
@@ -831,7 +689,7 @@ describe('Tab Modules - handleKey()', () => {
       assert.strictEqual(app.viewContent, 'Test content', 'Should set view content');
     });
 
-    test('action 3 approves plan', () => {
+    test('action 3 does NOT approve (Gate-1 one-keystroke crossing removed, L7)', () => {
       let approveCalled = false;
       const plan = createMockPlan();
 
@@ -841,11 +699,10 @@ describe('Tab Modules - handleKey()', () => {
       });
 
       const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-      functional.handleKey(createMockKey('3', { sequence: '3' }), app);
+      const handled = functional.handleKey(createMockKey('3', { sequence: '3' }), app);
 
-      assert.strictEqual(approveCalled, true, 'Should call approvePlan');
-      assert.strictEqual(app.mode, 'list', 'Should return to list');
-      assert.ok(app.message.includes('moved to implementation'), 'Should set success message');
+      assert.strictEqual(approveCalled, false, 'approvePlan must NOT be reachable via key 3');
+      assert.strictEqual(handled, false, 'key 3 is no longer a handled action');
     });
 
     test('action 6 shows assign confirmation', () => {
@@ -887,40 +744,6 @@ describe('Tab Modules - handleKey()', () => {
       functional.handleKey(createMockKey('2', { sequence: '2' }), app);
 
       assert.strictEqual(app.mode, 'actions', 'Should return to actions');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Implementation Tab - Specific Actions
-  // -------------------------------------------------------------------------
-  describe('implementation.handleKey() - Specific Actions', () => {
-    test('action 3 approves with Iron Loop', () => {
-      let approveCalled = false;
-      const plan = createMockPlan();
-
-      const implementation = loadTabWithMocks('implementation', {
-        state: { readPlans: () => [plan] },
-        actions: { approvePlan: () => { approveCalled = true; return '/approved'; } }
-      });
-
-      const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-      implementation.handleKey(createMockKey('3', { sequence: '3' }), app);
-
-      assert.strictEqual(approveCalled, true, 'Should call approvePlan');
-      assert.ok(app.message.includes('Iron Loop'), 'Should mention Iron Loop');
-      assert.ok(app.message.includes('todo queue'), 'Should mention todo queue');
-    });
-
-    test('action 5 sets confirm-delete mode', () => {
-      const plan = createMockPlan();
-      const implementation = loadTabWithMocks('implementation', {
-        state: { readPlans: () => [plan] }
-      });
-
-      const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-      implementation.handleKey(createMockKey('5', { sequence: '5' }), app);
-
-      assert.strictEqual(app.mode, 'confirm-delete', 'Should enter confirm-delete mode');
     });
   });
 
@@ -978,7 +801,7 @@ describe('Tab Modules - handleKey()', () => {
       assert.strictEqual(app.mode, 'list', 'Should return to list');
     });
 
-    test('action 5 approves plan', () => {
+    test('action 5 does NOT approve (Gate-3 one-keystroke crossing removed, L8)', () => {
       let approveCalled = false;
       const plan = createMockPlan();
 
@@ -988,10 +811,10 @@ describe('Tab Modules - handleKey()', () => {
       });
 
       const app = createMockApp({ mode: 'actions', selectedPlan: plan, directInput: '' });
-      review.handleKey(createMockKey('5', { sequence: '5' }), app);
+      const handled = review.handleKey(createMockKey('5', { sequence: '5' }), app);
 
-      assert.strictEqual(approveCalled, true, 'Should call approvePlan');
-      assert.ok(app.message.includes('approved'), 'Should show approval message');
+      assert.strictEqual(approveCalled, false, 'approvePlan must NOT be reachable via key 5');
+      assert.strictEqual(handled, false, 'key 5 is no longer a handled action');
     });
 
     test('action 6 enters reject-input mode', () => {
@@ -1038,161 +861,6 @@ describe('Tab Modules - handleKey()', () => {
 
       assert.strictEqual(app.mode, 'actions', 'Should return to actions');
       assert.strictEqual(app.inputValue, '', 'Should clear input');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Todo Tab - Queue Actions
-  // -------------------------------------------------------------------------
-  describe('todo.handleKey() - Queue Actions', () => {
-    test('action 2 moves plan up', () => {
-      let moveUpCalled = false;
-      const plans = [
-        createMockPlan({ name: 'plan-1' }),
-        createMockPlan({ name: 'plan-2' })
-      ];
-
-      const todo = loadTabWithMocks('todo', {
-        state: { readPlans: () => plans },
-        actions: { moveUpInQueue: () => { moveUpCalled = true; return true; } }
-      });
-
-      const app = createMockApp({
-        mode: 'actions',
-        selectedPlan: plans[1],
-        selectedIndex: 1
-      });
-      todo.handleKey(createMockKey('2', { sequence: '2' }), app);
-
-      assert.strictEqual(moveUpCalled, true, 'Should call moveUpInQueue');
-      assert.strictEqual(app.selectedIndex, 0, 'Should update selectedIndex');
-      assert.ok(app.message.includes('moved up'), 'Should show success message');
-    });
-
-    test('action 3 moves plan down', () => {
-      let moveDownCalled = false;
-      const plans = [
-        createMockPlan({ name: 'plan-1' }),
-        createMockPlan({ name: 'plan-2' })
-      ];
-
-      const todo = loadTabWithMocks('todo', {
-        state: { readPlans: () => plans },
-        actions: { moveDownInQueue: () => { moveDownCalled = true; return true; } }
-      });
-
-      const app = createMockApp({
-        mode: 'actions',
-        selectedPlan: plans[0],
-        selectedIndex: 0
-      });
-      todo.handleKey(createMockKey('3', { sequence: '3' }), app);
-
-      assert.strictEqual(moveDownCalled, true, 'Should call moveDownInQueue');
-      assert.strictEqual(app.selectedIndex, 1, 'Should update selectedIndex');
-      assert.ok(app.message.includes('moved down'), 'Should show success message');
-    });
-
-    test('action 4 removes from queue', () => {
-      let removeCalled = false;
-      const plan = createMockPlan();
-
-      const todo = loadTabWithMocks('todo', {
-        state: { readPlans: () => [plan] },
-        actions: { removeFromQueue: () => { removeCalled = true; } }
-      });
-
-      const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-      todo.handleKey(createMockKey('4', { sequence: '4' }), app);
-
-      assert.strictEqual(removeCalled, true, 'Should call removeFromQueue');
-      assert.ok(app.message.includes('removed'), 'Should show removal message');
-      assert.ok(app.message.includes('implementation draft'), 'Should mention destination');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Progress Tab - Navigation
-  // -------------------------------------------------------------------------
-  describe('progress.handleKey() - Navigation', () => {
-    test('up/down scrolls finished items', () => {
-      const finished = [
-        createMockPlan({ name: 'done-1' }),
-        createMockPlan({ name: 'done-2' }),
-        createMockPlan({ name: 'done-3' })
-      ];
-
-      const progress = loadTabWithMocks('progress', {
-        state: {
-          getAgentStatus: () => ({ active: false }),
-          getFinishedItems: () => finished,
-          getSettings: () => ({ finishedItemsToShow: 10 })
-        }
-      });
-
-      const app = createMockApp({ finishedIndex: 0 });
-
-      progress.handleKey(createMockKey('down'), app);
-      assert.strictEqual(app.finishedIndex, 1, 'Should increment finishedIndex');
-
-      progress.handleKey(createMockKey('up'), app);
-      assert.strictEqual(app.finishedIndex, 0, 'Should decrement finishedIndex');
-    });
-
-    test('enter on finished item opens view', () => {
-      const finished = [createMockPlan({ name: 'done-1', content: 'Done content' })];
-
-      const progress = loadTabWithMocks('progress', {
-        state: {
-          getAgentStatus: () => ({ active: false }),
-          getFinishedItems: () => finished,
-          getSettings: () => ({ finishedItemsToShow: 10 })
-        }
-      });
-
-      const app = createMockApp({ finishedIndex: 0 });
-      progress.handleKey(createMockKey('return'), app);
-
-      assert.strictEqual(app.mode, 'view', 'Should enter view mode');
-      assert.strictEqual(app.viewContent, 'Done content', 'Should set view content');
-    });
-
-    test('escape in view mode returns to list', () => {
-      const finished = [createMockPlan()];
-
-      const progress = loadTabWithMocks('progress', {
-        state: {
-          getAgentStatus: () => ({ active: false }),
-          getFinishedItems: () => finished,
-          getSettings: () => ({ finishedItemsToShow: 10 })
-        }
-      });
-
-      const app = createMockApp({ mode: 'view', finishedIndex: 0 });
-      progress.handleKey(createMockKey('escape'), app);
-
-      assert.strictEqual(app.mode, 'list', 'Should return to list mode');
-    });
-
-    test('number jump to finished item', () => {
-      const finished = [
-        createMockPlan({ name: 'done-1', content: 'Content 1' }),
-        createMockPlan({ name: 'done-2', content: 'Content 2' })
-      ];
-
-      const progress = loadTabWithMocks('progress', {
-        state: {
-          getAgentStatus: () => ({ active: false }),
-          getFinishedItems: () => finished,
-          getSettings: () => ({ finishedItemsToShow: 10 })
-        }
-      });
-
-      const app = createMockApp();
-      progress.handleKey(createMockKey('2', { sequence: '2' }), app);
-
-      assert.strictEqual(app.finishedIndex, 1, 'Should jump to item 2');
-      assert.strictEqual(app.mode, 'view', 'Should open view');
     });
   });
 
@@ -1408,7 +1076,7 @@ describe('Tab Modules - handleKey()', () => {
   // Unhandled Keys Return False
   // -------------------------------------------------------------------------
   describe('Unhandled keys return false', () => {
-    const allTabs = ['overview', 'functional', 'implementation', 'review', 'todo', 'progress', 'tools'];
+    const allTabs = ['overview', 'functional', 'review', 'tools'];
 
     for (const tabName of allTabs) {
       test(`${tabName}: unhandled key returns false`, () => {
@@ -1445,7 +1113,7 @@ describe('Tab Modules - Additional Renders', () => {
 
       assert.ok(output.includes('View'), 'Should show View action');
       assert.ok(output.includes('Plan'), 'Should show Plan action');
-      assert.ok(output.includes('Approve'), 'Should show Approve action');
+      assert.ok(!output.includes('Approve'), 'Approve action removed (L7 gate-crossing gone)');
       assert.ok(output.includes('Assign'), 'Should show Assign action');
     });
   });
@@ -1465,19 +1133,6 @@ describe('Tab Modules - Additional Renders', () => {
     });
   });
 
-  describe('implementation.renderActions()', () => {
-    test('renders action menu for plan', () => {
-      const implementation = loadTabWithMocks('implementation');
-      const plan = createMockPlan();
-      const app = createMockApp({ actionIndex: 0 });
-
-      const output = implementation.renderActions(app, plan);
-
-      assert.ok(output.includes('View'), 'Should show View action');
-      assert.ok(output.includes('Iron Loop'), 'Should mention Iron Loop in approve');
-    });
-  });
-
   describe('review.renderActions()', () => {
     test('renders action menu with direct input area', () => {
       const review = loadTabWithMocks('review');
@@ -1488,7 +1143,7 @@ describe('Tab Modules - Additional Renders', () => {
 
       assert.ok(output.includes('View functional'), 'Should show view functional');
       assert.ok(output.includes('View implementation'), 'Should show view implementation');
-      assert.ok(output.includes('Approve'), 'Should show approve');
+      assert.ok(!output.includes('Approve'), 'Approve action removed (L8 gate-crossing gone)');
       assert.ok(output.includes('Reject'), 'Should show reject');
       assert.ok(output.includes('feedback'), 'Should show feedback hint');
     });
@@ -1519,32 +1174,6 @@ describe('Tab Modules - Additional Renders', () => {
     });
   });
 
-  describe('todo.renderActions()', () => {
-    test('renders queue action menu', () => {
-      const todo = loadTabWithMocks('todo');
-      const plan = createMockPlan();
-      const app = createMockApp({ actionIndex: 0 });
-
-      const output = todo.renderActions(app, plan);
-
-      assert.ok(output.includes('View'), 'Should show View');
-      assert.ok(output.includes('Move up'), 'Should show Move up');
-      assert.ok(output.includes('Move down'), 'Should show Move down');
-      assert.ok(output.includes('Remove'), 'Should show Remove');
-    });
-  });
-
-  describe('progress.renderActions()', () => {
-    test('renders action menu for finished item', () => {
-      const progress = loadTabWithMocks('progress');
-      const item = createMockPlan();
-      const app = createMockApp();
-
-      const output = progress.renderActions(app, item);
-
-      assert.ok(output.includes('View'), 'Should show View action');
-    });
-  });
 });
 
 // ============================================================================
@@ -1611,27 +1240,52 @@ describe('Tab Modules - Edge Cases', () => {
 
     assert.ok(output.includes('$pecial'), 'Should render special characters');
   });
+});
 
-  test('progress tab handles scroll offset correctly', () => {
-    const finished = Array.from({ length: 10 }, (_, i) =>
-      createMockPlan({ name: `done-${i}`, content: `Content ${i}` })
-    );
+// ============================================================================
+// DEAD MODULE GUARD (B1) — legacy tab modules deleted, nothing imports them
+// ============================================================================
 
-    const progress = loadTabWithMocks('progress', {
-      state: {
-        getAgentStatus: () => ({ active: false }),
-        getFinishedItems: () => finished,
-        getSettings: () => ({ finishedItemsToShow: 10 })
+describe('Legacy tab modules removed (B1)', () => {
+  const deadModules = ['implementation', 'progress', 'todo'];
+
+  test('the three dead tab module files no longer exist', () => {
+    for (const name of deadModules) {
+      const modulePath = path.join(__dirname, '..', 'src', 'tabs', `${name}.js`);
+      assert.strictEqual(
+        fs.existsSync(modulePath), false,
+        `src/tabs/${name}.js should be deleted`
+      );
+    }
+  });
+
+  test('no source or test file requires a deleted tab module', () => {
+    // Exclude THIS guard file so its own regex literal never matches itself.
+    const selfBasename = 'tab-modules.test.js';
+    const deadRequire = /tabs\/(implementation|progress|todo)\b/;
+
+    const roots = [
+      path.join(__dirname, '..', 'src'),
+      path.join(__dirname, '..', 'tests')
+    ];
+
+    const offenders = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === 'node_modules') continue;
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (entry.name.endsWith('.js') && entry.name !== selfBasename) {
+          if (deadRequire.test(fs.readFileSync(full, 'utf8'))) offenders.push(full);
+        }
       }
-    });
+    };
+    roots.forEach(walk);
 
-    const app = createMockApp({ finishedIndex: 6, finishedOffset: 2 });
-
-    // Navigate down should update offset when needed
-    progress.handleKey(createMockKey('down'), app);
-
-    assert.strictEqual(app.finishedIndex, 7, 'Should update index');
-    // Offset should adjust when index exceeds visible window
-    assert.ok(app.finishedOffset >= 0, 'Offset should be non-negative');
+    assert.deepStrictEqual(
+      offenders, [],
+      `No file may require a deleted tab module; offenders: ${offenders.join(', ')}`
+    );
   });
 });

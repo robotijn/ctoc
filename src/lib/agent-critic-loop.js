@@ -9,6 +9,7 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
+const os = require('os');
 
 // Simple YAML-like serialization (JSON with comments stripped)
 const simpleYaml = {
@@ -41,7 +42,9 @@ const simpleYaml = {
 const MAX_ROUNDS = 10;
 const PERFECT_SCORE = 10;
 const ACCEPTANCE_THRESHOLD = 8;
-const GRADES_FILE = path.join(process.env.HOME, '.ctoc/agents/grades.yaml');
+// M22: use os.homedir() (not process.env.HOME, which is undefined on Windows)
+// so this module-level path resolves — and the module loads — on every platform.
+const GRADES_FILE = path.join(os.homedir(), '.ctoc/agents/grades.yaml');
 
 /**
  * Self-critique questions for each round of Agent-Critic bootstrap
@@ -574,5 +577,6 @@ module.exports = {
   saveGrade,
   PERFECT_SCORE,
   ACCEPTANCE_THRESHOLD,
-  MAX_ROUNDS
+  MAX_ROUNDS,
+  GRADES_FILE
 };

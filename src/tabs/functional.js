@@ -6,12 +6,11 @@
 const path = require('path');
 const { c, renderList, renderActionMenu, renderConfirm, renderFooter } = require('../lib/tui');
 const { readPlans, getPlansDir } = require('../lib/state');
-const { approvePlan, assignDirectly } = require('../lib/actions');
+const { assignDirectly } = require('../lib/actions');
 
 const ACTIONS = [
   { key: '1', label: 'View' },
   { key: '2', label: 'Plan' },
-  { key: '3', label: 'Approve → implementation draft' },
   { key: '4', label: 'Rename' },
   { key: '5', label: 'Delete' },
   { separator: true },
@@ -157,16 +156,6 @@ function executeAction(actionKey, app) {
     case '2': // Plan
       app.mode = 'edit';
       return true;
-    case '3': { // Approve
-      const result = approvePlan(app.selectedPlan.path, app.projectPath);
-      app.mode = 'list';
-      if (result.backgroundAgent) {
-        app.message = `✓ ${app.selectedPlan.name} → implementation. Spawning ${result.backgroundAgent}...`;
-      } else {
-        app.message = `✓ ${app.selectedPlan.name} moved to implementation drafts`;
-      }
-      return true;
-    }
     case '4': // Rename
       app.mode = 'rename';
       app.inputValue = app.selectedPlan.name;
