@@ -88,6 +88,22 @@ function isUnsafePlanFile(file) {
     || path.isAbsolute(file);
 }
 
+/**
+ * The canonical "invalid plan reference" JSON screen — an unknown stage (no
+ * STAGE_FOLDERS entry, so `folder` is undefined) or a traversal filename
+ * (isUnsafePlanFile). Every plan-ref screen returns THIS shape rather than
+ * throwing, so the menu's { text, ask, actions } contract holds for adversarial
+ * input (M8 unknown-stage crash / M11 traversal gap). Defined once so the
+ * refusal message is byte-identical across all call sites.
+ */
+function invalidPlanRefScreen(stage, file) {
+  return {
+    text: `Invalid plan reference: ${stage}/${file}\n${'─'.repeat(40)}\n\n  Refusing a reference that escapes the plans/ directory.\n\n\n`,
+    ask: { questions: [{ question: 'Invalid reference.', header: 'Error', options: [{ label: '◀ Back', description: 'Return to dashboard' }] }] },
+    actions: { '◀ Back': '' },
+  };
+}
+
 // Stage flow: what stage comes next after approval
 const NEXT_STAGE = {
   functional: 'implementation',
@@ -1088,6 +1104,10 @@ function planActions(stage, file, projectPath) {
   const root = getProjectPath(projectPath);
   const plansDir = getPlansDir(root);
   const folder = STAGE_FOLDERS[stage];
+  // M8/M11: an unknown stage (folder undefined) or a traversal filename must
+  // fail safe with the shared refusal screen BEFORE path.join — placed first so
+  // an unknown stage never reaches the review redirect or the file read.
+  if (!folder || isUnsafePlanFile(file)) return invalidPlanRefScreen(stage, file);
   const planPath = path.join(plansDir, folder, file);
   const planName = file.replace('.md', '');
 
@@ -1151,6 +1171,9 @@ function planActionsMore(stage, file, projectPath) {
   const root = getProjectPath(projectPath);
   const plansDir = getPlansDir(root);
   const folder = STAGE_FOLDERS[stage];
+  // M8/M11: same fail-safe guard as planActions — the identical unguarded
+  // path.join here was a known-identical latent crash/traversal.
+  if (!folder || isUnsafePlanFile(file)) return invalidPlanRefScreen(stage, file);
   const planPath = path.join(plansDir, folder, file);
   const planName = file.replace('.md', '');
 
@@ -1202,6 +1225,9 @@ function reviewActions(stage, file, projectPath) {
   const root = getProjectPath(projectPath);
   const plansDir = getPlansDir(root);
   const folder = STAGE_FOLDERS[stage] || 'review';
+  // M11: folder defaults to 'review' so it is never falsy here — the traversal
+  // check is the load-bearing guard; refuse a traversal filename before path.join.
+  if (isUnsafePlanFile(file)) return invalidPlanRefScreen(stage, file);
   const planPath = path.join(plansDir, folder, file);
   const planName = file.replace('.md', '');
 
@@ -1301,11 +1327,7 @@ function validateScreen(stage, file, projectPath) {
   // traversal attempt (e.g. "functional/../../etc/passwd") and must not be
   // resolved or read.
   if (!folder || isUnsafePlanFile(file)) {
-    return {
-      text: `Invalid plan reference: ${stage}/${file}\n${'─'.repeat(40)}\n\n  Refusing a reference that escapes the plans/ directory.\n\n\n`,
-      ask: { questions: [{ question: 'Invalid reference.', header: 'Error', options: [{ label: '◀ Back', description: 'Return to dashboard' }] }] },
-      actions: { '◀ Back': '' },
-    };
+    return invalidPlanRefScreen(stage, file);
   }
   const planPath = path.join(plansDir, folder, file);
   const nextStage = NEXT_STAGE[stage];

@@ -489,6 +489,38 @@ describe('hooks-installer', () => {
       assert.ok(content.includes('CTOC'), 'CTOC invocation appended');
     });
 
+    // Extract the path embedded in a generated hook's `node "<path>"` line.
+    function embeddedHookPath(script) {
+      const m = script.match(/node "([^"]+post-commit\.js)"/);
+      assert.ok(m, 'generated hook embeds a node "<...post-commit.js>" invocation');
+      return m[1];
+    }
+
+    it('embeds a post-commit.js path that resolves on disk (new-hook branch, L9)', () => {
+      const dir = makeGitRepo();
+      const ctocRoot = path.join(__dirname, '..');
+      const result = hooksInstaller.installPostCommitHook(dir, { pluginRoot: ctocRoot });
+      assert.equal(result.installed, true);
+      const script = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+      const target = embeddedHookPath(script);
+      assert.ok(fs.existsSync(target), `embedded hook path must exist: ${target}`);
+    });
+
+    it('embeds a post-commit.js path that resolves on disk (append branch, L9)', () => {
+      const dir = makeGitRepo();
+      const ctocRoot = path.join(__dirname, '..');
+      const hooksDir = path.join(dir, '.git', 'hooks');
+      fs.mkdirSync(hooksDir, { recursive: true });
+      const hookPath = path.join(hooksDir, 'post-commit');
+      fs.writeFileSync(hookPath, '#!/bin/sh\necho existing\n');
+
+      const result = hooksInstaller.installPostCommitHook(dir, { pluginRoot: ctocRoot });
+      assert.equal(result.appended, true);
+      const script = fs.readFileSync(hookPath, 'utf8');
+      const target = embeddedHookPath(script);
+      assert.ok(fs.existsSync(target), `embedded hook path must exist: ${target}`);
+    });
+
     it('uninstall removes a CTOC-only post-commit hook entirely', () => {
       const dir = makeGitRepo();
       hooksInstaller.installPostCommitHook(dir, { pluginRoot: dir });

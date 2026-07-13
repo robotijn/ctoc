@@ -14,6 +14,7 @@ const {
   saveSettings,
   getSetting,
   setSetting,
+  readRawSettings,
   getCategorySettings,
   toggleSetting,
   getCategorySchema,
@@ -306,6 +307,59 @@ function testSetSettingCreatesCategory() {
   console.log('# setSetting() creates category');
 }
 
+// Test setSetting preserves non-schema top-level blocks (M16 core).
+// A raw settings.json may carry blocks CTOC's schema does not know about —
+// e.g. `deployment` (read by src/lib/deployment.js) and a future `sync` block.
+// setSetting must round-trip the RAW file so these survive an unrelated change.
+function testSetSettingPreservesNonSchemaBlocks() {
+  setup();
+
+  const ctocDir = path.join(testDir, '.ctoc');
+  fs.mkdirSync(ctocDir, { recursive: true });
+  const deployment = { provider: 'vercel', domain: 'app.example.com', https: true };
+  const sync = { remote: 'origin', branch: 'main', intervalMinutes: 15 };
+  fs.writeFileSync(
+    path.join(ctocDir, 'settings.json'),
+    JSON.stringify({
+      workflow: { enforcementMode: 'strict' },
+      deployment,
+      sync
+    }, null, 2)
+  );
+
+  // Change one in-schema setting.
+  setSetting('workflow', 'enforcementMode', 'soft', testDir);
+
+  // Re-read the RAW file — non-schema blocks must be byte-for-byte intact.
+  const raw = readRawSettings(testDir);
+  assert.deepStrictEqual(raw.deployment, deployment, 'deployment block preserved');
+  assert.deepStrictEqual(raw.sync, sync, 'sync block preserved');
+  assert.strictEqual(raw.workflow.enforcementMode, 'soft', 'workflow.enforcementMode updated');
+
+  cleanup();
+  console.log('# setSetting() preserves non-schema blocks');
+}
+
+// Test setSetting on a fresh project writes no phantom keys (M16 edge).
+// No settings.json exists; a single setSetting must write ONLY the written
+// category/key — no fabricated deployment/sync, no crash.
+function testSetSettingFreshProjectNoPhantomKeys() {
+  setup();
+
+  // No settings.json on disk.
+  setSetting('general', 'timezone', 'UTC', testDir);
+
+  const raw = readRawSettings(testDir);
+  assert.deepStrictEqual(Object.keys(raw), ['general'], 'Only the written category exists');
+  assert.deepStrictEqual(Object.keys(raw.general), ['timezone'], 'Only the written key exists');
+  assert.strictEqual(raw.general.timezone, 'UTC', 'Written value stored');
+  assert.strictEqual(raw.deployment, undefined, 'No fabricated deployment block');
+  assert.strictEqual(raw.sync, undefined, 'No fabricated sync block');
+
+  cleanup();
+  console.log('# setSetting() fresh project has no phantom keys');
+}
+
 // Test getCategorySettings
 function testGetCategorySettings() {
   setup();
@@ -438,6 +492,8 @@ testSaveSettingsCreatesDirectory();
 testGetSetting();
 testSetSetting();
 testSetSettingCreatesCategory();
+testSetSettingPreservesNonSchemaBlocks();
+testSetSettingFreshProjectNoPhantomKeys();
 testGetCategorySettings();
 testToggleSetting();
 testToggleSettingNonBoolean();
