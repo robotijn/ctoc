@@ -1,0 +1,16 @@
+# Phoenix — Elixir fullstack framework. Ecto parameterization defeats SQLi, built-in
+# CSRF protection (protect_from_forgery), HEEx auto-escaping (XSS), SECRET_KEY_BASE /
+# signing-salt hygiene, and channel/socket auth are the concern areas. UNVERIFIED
+# detection: Phoenix deps live in mix.exs (not parsed) and Phoenix ships no unique
+# root marker distinct from a plain Elixir app, so registry data loads but automatic
+# detection is limited. The test command (`mix test`) is standard.
+framework: phoenix
+category: web-fullstack
+language: elixir
+deps: [phoenix]
+files: []
+security:
+  concerns: [injection, csrf, xss, session-secret, channel-auth]
+test: "mix test"
+configScaffold: [config/config.exs, .env.example]
+verified: UNVERIFIED

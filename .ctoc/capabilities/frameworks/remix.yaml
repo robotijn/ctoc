@@ -1,0 +1,14 @@
+# Remix — React fullstack framework (loaders/actions; converged into React Router v7
+# in 2025, still shipped under @remix-run/*). Security headers, environment exposure,
+# CSRF on actions, and auth inside loaders/actions are the concern areas. Detected by
+# the @remix-run/* dependencies and the legacy remix.config.js marker.
+framework: remix
+category: web-fullstack
+language: typescript
+deps: [@remix-run/react, @remix-run/node, @remix-run/server-runtime]
+files: [remix.config.js]
+security:
+  concerns: [security-headers, env-exposure, csrf, auth-loader]
+test: "vitest"
+configScaffold: [vite.config.ts, .env.example]
+verified: web-2026-07

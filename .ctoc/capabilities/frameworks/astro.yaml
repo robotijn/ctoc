@@ -1,0 +1,14 @@
+# Astro — content-first fullstack framework (islands architecture). XSS via
+# set:html, SSRF from server endpoints, and environment leaks are the concern areas.
+# Detected by the `astro` dependency and astro.config.* markers. `astro check` is the
+# type/diagnostic gate; the unit runner is vitest.
+framework: astro
+category: web-fullstack
+language: typescript
+deps: [astro]
+files: [astro.config.mjs, astro.config.ts, astro.config.js]
+security:
+  concerns: [xss, set-html, ssrf, env-exposure]
+test: "astro check && vitest"
+configScaffold: [astro.config.ts, .env.example]
+verified: web-2026-07

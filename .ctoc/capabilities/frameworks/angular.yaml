@@ -1,0 +1,14 @@
+# Angular — batteries-included frontend framework. Built-in DOM sanitization is the
+# XSS defense; bypassSecurityTrust* is the escape hatch to audit. CSRF (HttpClient
+# XSRF), and environment leaks are the concern areas. Detected by @angular/core and
+# the angular.json workspace file. Test runner is the Angular CLI (`ng test`).
+framework: angular
+category: web-frontend
+language: typescript
+deps: [@angular/core]
+files: [angular.json]
+security:
+  concerns: [xss, dom-sanitization, csrf, env-exposure]
+test: "ng test"
+configScaffold: [angular.json, .env.example]
+verified: web-2026-07

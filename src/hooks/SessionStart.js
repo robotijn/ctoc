@@ -224,6 +224,32 @@ function formatDatabasesLine(stack) {
 }
 
 /**
+ * Render the one-line frameworks summary for the session banner (FW-w1).
+ *
+ * The LIVE human-facing consumer that makes the frameworks capability data
+ * wired-is-done: detectStack's registry-enriched `frameworkCapabilities` (each carrying
+ * its framework-specific security concern areas) surface here as
+ * "Frameworks: nextjs (security-headers, auth-middleware) · django (csrf, xss)".
+ * Returns '' when no framework is detected, so the banner is unchanged for projects
+ * with no application framework — the render is purely ADDITIVE.
+ *
+ * @param {{frameworkCapabilities?: Array<{name: string, security?: {concerns?: string[]}}>}} stack
+ * @returns {string} a leading-newline line, or '' when there is nothing to show.
+ */
+function formatFrameworksLine(stack) {
+  const fws = Array.isArray(stack?.frameworkCapabilities) ? stack.frameworkCapabilities : [];
+  if (fws.length === 0) return '';
+  const parts = fws.map((fw) => {
+    const concerns = fw && fw.security && Array.isArray(fw.security.concerns) ? fw.security.concerns : [];
+    const label = String(fw.name || '');
+    // Show the top two concern areas — enough to be useful, short enough for one line.
+    const shown = concerns.slice(0, 2);
+    return shown.length ? `${label} (${shown.join(', ')})` : label;
+  });
+  return `\nFrameworks: ${parts.join(' · ')}`;
+}
+
+/**
  * Generate CTOC context instructions for Claude
  */
 function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
@@ -233,6 +259,7 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
     : '';
   const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
   const databasesLine = formatDatabasesLine(stack);
+  const frameworksLine = formatFrameworksLine(stack);
 
   // NOTE: This 16-step banner is the compact, machine-readable copy. The CANONICAL
   // operating-lessons + methodology reference live in .ctoc/templates/operating-lessons.md.
@@ -244,7 +271,7 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
 CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
 ============================================================
 Project: ${path.basename(process.cwd())}
-Stack: ${stack.languages.join('/') || 'unknown'}${databasesLine}
+Stack: ${stack.languages.join('/') || 'unknown'}${databasesLine}${frameworksLine}
 Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}${selfCheckLine}
 
 ## Iron Loop (16 Steps) - NON-NEGOTIABLE
@@ -291,4 +318,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, generateContext, formatDatabasesLine, shouldInjectLessons, maybeInjectLessons };
+module.exports = { main, generateContext, formatDatabasesLine, formatFrameworksLine, shouldInjectLessons, maybeInjectLessons };

@@ -1,0 +1,14 @@
+# Nuxt 3 — Vue fullstack framework. Server routes + middleware make security headers
+# (nuxt-security), environment exposure (runtimeConfig public vs private), SSRF from
+# server $fetch, and route middleware auth the concern areas. Detected by the `nuxt`
+# dependency and nuxt.config.* markers.
+framework: nuxt
+category: web-fullstack
+language: typescript
+deps: [nuxt]
+files: [nuxt.config.ts, nuxt.config.js]
+security:
+  concerns: [security-headers, env-exposure, ssrf, auth-middleware]
+test: "nuxi typecheck && vitest"
+configScaffold: [nuxt.config.ts, .env.example]
+verified: web-2026-07

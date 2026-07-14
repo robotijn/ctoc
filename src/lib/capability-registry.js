@@ -82,6 +82,16 @@ function projectDatabasesDir(projectRoot) {
   return path.join(projectRoot, '.ctoc', 'capabilities', 'databases');
 }
 
+/** The bundled framework seed directory (ships with the plugin). */
+function bundledFrameworksDir() {
+  return path.join(__dirname, '..', '..', '.ctoc', 'capabilities', 'frameworks');
+}
+
+/** A project-local override directory for frameworks. */
+function projectFrameworksDir(projectRoot) {
+  return path.join(projectRoot, '.ctoc', 'capabilities', 'frameworks');
+}
+
 // ── minimal, zero-dependency YAML subset parser ─────────────────────────────────
 // Handles exactly the shapes the capability files use: 2-space-indented block maps,
 // inline flow maps `{ k: v, k2: "v" }`, inline arrays `[a, b]`, quoted/bare scalars,
@@ -663,6 +673,120 @@ function databaseCapability(name, projectRoot) {
   return databases[name] || null;
 }
 
+// ── frameworks dimension (FW-w1) ─────────────────────────────────────────────────
+// A language names the toolchain; a project TYPE names the pipeline shape; a DATABASE
+// names the persistence layer; a FRAMEWORK names the application layer's category
+// (web-frontend/backend/fullstack/api), its language, its framework-specific security
+// CONCERN areas (security-headers, csrf, ssrf, auth-middleware — FW-w2 turns these
+// into real checks), a test/lint hint, and a config scaffold. Frameworks live in a
+// project's DEPENDENCIES (next, @nestjs/core, django) and/or config MARKERS
+// (manage.py, angular.json) — so ENRICHMENT is dep/marker matching in stack-detector
+// (which consumes loadFrameworks below), and this registry holds the capability DATA.
+// Same dumb-engine/smart-data contract: this loads and looks up, it never runs a
+// framework command or a test.
+
+/**
+ * A parsed framework is VALID only if it names itself and carries a category, a
+ * language, a security object with a non-empty `concerns` array, and a non-empty deps
+ * array (enrichment depends on `deps`). Anything else (a broken/hostile file) is
+ * rejected → skipped + warned, exactly like the sibling loaders.
+ * @param {*} obj
+ * @returns {boolean}
+ */
+function isValidFramework(obj) {
+  return !!obj
+    && typeof obj === 'object'
+    && typeof obj.framework === 'string'
+    && obj.framework.trim().length > 0
+    && typeof obj.category === 'string'
+    && obj.category.trim().length > 0
+    && typeof obj.language === 'string'
+    && obj.language.trim().length > 0
+    && obj.security
+    && typeof obj.security === 'object'
+    && !Array.isArray(obj.security)
+    && Array.isArray(obj.security.concerns)
+    && obj.security.concerns.length > 0
+    && Array.isArray(obj.deps)
+    && obj.deps.length > 0;
+}
+
+/**
+ * Read one frameworks directory, folding each valid entry into `frameworks` (keyed by
+ * its declared `framework`) and recording a warning per skipped file. FAIL-OPEN
+ * throughout, exactly like readCapabilityDir / readProjectTypeDir / readDatabaseDir.
+ * @param {string} dir
+ * @param {Object} frameworks accumulator (mutated) — later dirs override earlier.
+ * @param {Array} warnings accumulator (mutated)
+ */
+function readFrameworkDir(dir, frameworks, warnings) {
+  let entries;
+  try {
+    if (!safeFs.existsSync(dir)) return;
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+  } catch (err) {
+    warnings.push({ file: dir, message: `unreadable frameworks dir: ${err.message}` });
+    return;
+  }
+  if (entries.length > MAX_FILES) {
+    warnings.push({ file: dir, message: `too many framework files (${entries.length} > ${MAX_FILES}) — skipped` });
+    return;
+  }
+  for (const name of entries) {
+    const p = path.join(dir, name);
+    try {
+      const size = safeFs.statSync(p).size;
+      if (size > MAX_FILE_BYTES) {
+        warnings.push({ file: name, message: `framework file too large (${size} bytes) — skipped` });
+        continue;
+      }
+      const parsed = parseCapabilityYaml(safeFs.readFileSync(p, 'utf8'));
+      if (!isValidFramework(parsed)) {
+        warnings.push({ file: name, message: 'malformed framework entry (missing framework/category/language/security.concerns/deps) — skipped' });
+        continue;
+      }
+      frameworks[parsed.framework] = parsed; // later dir (project override) wins
+    } catch (err) {
+      warnings.push({ file: name, message: `framework parse/read failed — skipped: ${err.message}` });
+    }
+  }
+}
+
+/**
+ * Load the framework registry: the bundled seed data first, then an optional project
+ * override overlaid on top (a project's `.ctoc/capabilities/frameworks/*` replaces a
+ * bundled framework of the same name). Reads FRESH every call (the set is tiny) so
+ * on-disk truth always wins — no stale cache. FAIL-OPEN per entry.
+ *
+ * @param {string} [projectRoot] optional project root whose overrides are overlaid.
+ * @returns {{ frameworks: Object<string, Object>, warnings: Array<{file:string,message:string}> }}
+ */
+function loadFrameworks(projectRoot) {
+  const frameworks = {};
+  const warnings = [];
+  readFrameworkDir(bundledFrameworksDir(), frameworks, warnings);
+  if (typeof projectRoot === 'string' && projectRoot.length > 0) {
+    readFrameworkDir(projectFrameworksDir(projectRoot), frameworks, warnings);
+  }
+  return { frameworks, warnings };
+}
+
+/**
+ * The whole capability object for a framework (category + language + security.concerns
+ * + configScaffold + deps + files), or null when unknown. The live caller is
+ * stack-detector's `frameworkCapabilities`, which enriches each dep/marker-detected
+ * framework with this record.
+ *
+ * @param {string} name e.g. 'nextjs'
+ * @param {string} [projectRoot]
+ * @returns {Object|null}
+ */
+function frameworkCapability(name, projectRoot) {
+  if (typeof name !== 'string' || name.length === 0) return null;
+  const { frameworks } = loadFrameworks(projectRoot);
+  return frameworks[name] || null;
+}
+
 // ── lookups (the API the four surfaces will call in CR5) ─────────────────────────
 
 /**
@@ -779,5 +903,7 @@ module.exports = {
   projectTypeFor,
   pipelineFor,
   loadDatabases,
-  databaseCapability
+  databaseCapability,
+  loadFrameworks,
+  frameworkCapability
 };
