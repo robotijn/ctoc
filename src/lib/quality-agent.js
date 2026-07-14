@@ -502,11 +502,20 @@ async function runSecurityScan(_tools, opts = {}) {
     if (languages.length === 0) {
       console.log('   SAST: no supported language detected — nothing to scan');
     } else {
-      // A language is scannable iff semgrep (universal) or its primary tool is
-      // installed. Any unscannable language is announced as a loud skip.
+      // A language is scannable iff a scanner that can ACTUALLY parse its result is
+      // installed — decided by the honest router, not by raw primary-tool presence.
+      // securityRouteFor(l).native is a scanner this runner has a parser for (bandit/
+      // gosec/eslint) or null; when it is null the only real coverage is the
+      // multi-language semgrep universal pass. So a parser-less-tool language (java→
+      // spotbugs, rust→cargo-audit, php→psalm, …) is scannable ONLY when semgrep is
+      // installed — otherwise its "primary" (e.g. `mvn --version`) being present used
+      // to mark it scannable while runLanguageScanner() then scanned it with NOTHING,
+      // producing a silent scanned:true. Any unscannable language is a loud skip.
       const semgrep = sast.isToolAvailable('semgrep');
-      const scannable = languages.filter(l =>
-        semgrep || (TOOL_CONFIGS[l] && sast.isToolAvailable(TOOL_CONFIGS[l].primary)));
+      const scannable = languages.filter(l => {
+        const route = sast.securityRouteFor(l);
+        return route.native ? sast.isToolAvailable(route.native) : semgrep;
+      });
       const unscannable = languages.filter(l => !scannable.includes(l));
       for (const l of unscannable) {
         const tool = TOOL_CONFIGS[l] ? TOOL_CONFIGS[l].primary : 'a scanner';

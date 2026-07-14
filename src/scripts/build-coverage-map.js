@@ -29,6 +29,7 @@ const {
   mergeCoverageData
 } = require(path.join(libPath, 'coverage-map'));
 const { detectTools } = require(path.join(libPath, 'tool-detector'));
+const { detectStack } = require(path.join(libPath, 'stack-detector'));
 
 /**
  * Default coverage file locations by framework
@@ -350,9 +351,22 @@ async function buildCoverageMap(options = {}) {
     console.log('Running tests with coverage...');
 
     try {
+      // CR5-FIX F1: pick the coverage command for the project's PRIMARY language,
+      // resolved framework-aware by stack-detector (which prepends its own results
+      // and applies the TypeScript-over-JavaScript preference), NOT the raw registry
+      // ordering `Object.keys(tools.tools)[0]`. That old [0] let a generic marker —
+      // a root Makefile → `c` (which sorts first) — win the slot and run `lcov` on a
+      // Jest project, so the real `npx jest --coverage` never ran. Fall back to the
+      // first detected language that DOES define a coverage command; never silently
+      // run a coverage command for a language that is not the project's primary.
       const tools = detectTools(projectPath);
-      const lang = Object.keys(tools.tools)[0];
-      const coverageCmd = tools.tools[lang]?.coverage;
+      const primary = detectStack(projectPath).primary.language;
+      let coverageCmd = primary ? tools.tools[primary]?.coverage : null;
+      if (!coverageCmd) {
+        for (const langTools of Object.values(tools.tools)) {
+          if (langTools?.coverage) { coverageCmd = langTools.coverage; break; }
+        }
+      }
 
       if (coverageCmd) {
         execSync(coverageCmd, {

@@ -80,18 +80,22 @@ describe('tool-detector ← capability-registry: csharp/php now get tool command
 });
 
 describe('tool-detector ← capability-registry: JAVA build-system nuance (gradle vs maven)', () => {
-  it('a Gradle Java project (build.gradle) uses the gradle test command, NOT bare `mvn test`', () => {
+  // CR5-FIX F5: the Gradle wrapper is platform-specific — `gradlew.bat` on Windows,
+  // `./gradlew` elsewhere — so the expected command tracks process.platform.
+  const gradlew = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+
+  it('a Gradle Java project (build.gradle) uses the platform gradle wrapper, NOT bare `mvn test`', () => {
     const dir = makeProject('ctoc-td-java-gradle-');
     try {
       write(dir, 'build.gradle', "plugins { id 'java' }\n");
       const res = toolDetector.detectTools(dir);
       assert.ok(res.languages.includes('java'), 'build.gradle must detect java');
-      assert.equal(res.tools.java.test, './gradlew test',
-        'a Gradle project must use the Gradle test command');
+      assert.equal(res.tools.java.test, `${gradlew} test`,
+        'a Gradle project must use the platform Gradle test command');
       assert.notEqual(res.tools.java.test, 'mvn test',
         'a Gradle project must NOT get the bare Maven test command');
-      assert.equal(res.tools.java.coverage, './gradlew jacocoTestReport',
-        'a Gradle project must use the Gradle coverage command');
+      assert.equal(res.tools.java.coverage, `${gradlew} jacocoTestReport`,
+        'a Gradle project must use the platform Gradle coverage command');
     } finally { rm(dir); }
   });
 
@@ -148,6 +152,22 @@ describe('tool-detector ← capability-registry: REGRESSION (python/go behavior-
       assert.equal(res.tools.go.test, 'go test ./...', 'go test must stay `go test ./...`');
       assert.equal(res.tools.go.coverage, 'go test -coverprofile=coverage.out ./...',
         'go coverage must stay the registry go-cover command');
+    } finally { rm(dir); }
+  });
+});
+
+describe('tool-detector: a generic Makefile no longer mis-detects C (CR5-FIX F1)', () => {
+  it('a JS project with a root Makefile detects javascript, NOT c', () => {
+    const dir = makeProject('ctoc-td-jsmake-');
+    try {
+      write(dir, 'package.json', JSON.stringify({ name: 'x', devDependencies: { jest: '29.0.0' } }));
+      write(dir, 'Makefile', 'all:\n\techo hi\n');
+      const res = toolDetector.detectTools(dir);
+      assert.ok(res.languages.includes('javascript'), 'package.json must detect javascript');
+      assert.ok(
+        !res.languages.includes('c'),
+        'a generic root Makefile must NOT make the project detect C (it would run lcov on a Jest project)'
+      );
     } finally { rm(dir); }
   });
 });

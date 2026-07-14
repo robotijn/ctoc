@@ -218,20 +218,29 @@ function readUserConfig(projectPath = process.cwd()) {
 
 /**
  * Resolve the lint/typecheck/test/coverage commands for a language from the capability
- * registry (the single source of truth). Each command is an inert STRING returned by
- * `toolchainFor`; a phase the language does not define yields `null` (same shape the
- * old DEFAULT_TOOLS table produced). This is what extends tool coverage from the 7
- * DEFAULT_TOOLS languages to all 20 registry languages.
+ * registry (the single source of truth). Each command is an inert STRING; a phase the
+ * language does not define yields `null` (same shape the old DEFAULT_TOOLS table
+ * produced). This is what extends tool coverage from the 7 DEFAULT_TOOLS languages to
+ * all 20 registry languages.
+ *
+ * CR5-FIX F4: the registry `languages` map is loaded ONCE per `detectTools` call and
+ * passed in, instead of calling `registry.toolchainFor` four times per language (each
+ * of which re-ran a full readdir+stat+read+parse of ~20 YAMLs). This preserves the
+ * read-fresh rule — a single fresh load per invocation, never a cross-call cache — the
+ * lookup here is a pure in-memory index into that one load.
+ *
  * @param {string} lang
- * @param {string} projectPath
+ * @param {Object<string, Object>} registryLanguages the once-loaded registry map
  * @returns {{lint: (string|null), typecheck: (string|null), test: (string|null), coverage: (string|null), testFramework?: string}}
  */
-function toolsFromRegistry(lang, projectPath) {
+function toolsFromRegistry(lang, registryLanguages) {
   /** @type {{lint: (string|null), typecheck: (string|null), test: (string|null), coverage: (string|null), testFramework?: string}} */
   const tools = { lint: null, typecheck: null, test: null, coverage: null };
+  const cap = registryLanguages && registryLanguages[lang];
+  const toolchain = cap && cap.toolchain && typeof cap.toolchain === 'object' ? cap.toolchain : {};
   for (const phase of ['lint', 'typecheck', 'test', 'coverage']) {
-    const entry = registry.toolchainFor(lang, phase, projectPath);
-    tools[phase] = entry && typeof entry.cmd === 'string' ? entry.cmd : null;
+    const entry = toolchain[phase];
+    tools[phase] = entry && typeof entry === 'object' && typeof entry.cmd === 'string' ? entry.cmd : null;
   }
   return tools;
 }
@@ -257,11 +266,17 @@ function detectTools(projectPath = process.cwd()) {
   // 2. Auto-detect languages
   result.languages = detectLanguages(projectPath);
 
+  // Load the capability registry ONCE for this call (CR5-FIX F4): every language's
+  // toolchain is looked up from this single fresh load rather than re-loading ~20
+  // YAMLs four times per language. Fresh per invocation (on-disk truth wins), never
+  // cached across calls.
+  const registryLanguages = registry.load(projectPath).languages;
+
   // 3. For each language, detect/set tools — commands come from the capability
-  //    registry (toolchainFor), NOT the static DEFAULT_TOOLS table. This is what
-  //    gives ALL 20 registry languages a toolchain (csharp/php previously got none).
+  //    registry, NOT the static DEFAULT_TOOLS table. This is what gives ALL 20
+  //    registry languages a toolchain (csharp/php previously got none).
   for (const lang of result.languages) {
-    const tools = toolsFromRegistry(lang, projectPath);
+    const tools = toolsFromRegistry(lang, registryLanguages);
 
     // JAVA build-system nuance (documented decision): the registry's java commands are
     // Maven-only, but the prior DEFAULT_TOOLS used a gradle||mvn fallback. When a Gradle
@@ -270,10 +285,14 @@ function detectTools(projectPath = process.cwd()) {
     if (lang === 'java'
         && (safeFs.existsSync(path.join(projectPath, 'build.gradle'))
           || safeFs.existsSync(path.join(projectPath, 'build.gradle.kts')))) {
-      tools.lint = './gradlew checkstyleMain';
-      tools.typecheck = './gradlew compileJava';
-      tools.test = './gradlew test';
-      tools.coverage = './gradlew jacocoTestReport';
+      // CR5-FIX F5 (cross-platform): the Gradle wrapper is `gradlew.bat` on Windows
+      // and `./gradlew` on POSIX. Hardcoding `./gradlew` made every Gradle command
+      // (and its `commandExists('where ./gradlew')` probe) fail on Windows.
+      const gradlew = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+      tools.lint = `${gradlew} checkstyleMain`;
+      tools.typecheck = `${gradlew} compileJava`;
+      tools.test = `${gradlew} test`;
+      tools.coverage = `${gradlew} jacocoTestReport`;
     }
 
     // RUBY bundler nuance (documented decision): the registry drops the `bundle exec`

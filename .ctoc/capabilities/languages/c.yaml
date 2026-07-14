@@ -4,8 +4,12 @@
 # ranges (google.github.io/osv-scanner, verified 2026-07). `test` uses ctest as the
 # generic runner (Unity/Criterion/CMocka vary); the run target `./a.out` is cc's
 # default output name.
+# DETECTION (CR5-FIX F1): C is detected ONLY by its source extensions (*.c/*.h). A
+# bare `Makefile` was removed as a marker — Make is a generic build tool used by
+# C/C++/Go/Rust/assembly/anything, so it mis-asserted C on non-C projects (a root
+# Makefile in a Jest repo made `c` win the primary-language slot and run lcov).
 language: c
-detectionMarkers: [Makefile, "*.c", "*.h"]
+detectionMarkers: ["*.c", "*.h"]
 extensions: [.c, .h]
 toolchain:
   lint:      { cmd: "clang-tidy", tool: clang-tidy, verified: web-2026-07 }

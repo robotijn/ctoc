@@ -42,9 +42,12 @@ const TOP20 = [
 ];
 
 /**
- * A real, EXACT-filename marker per language that the current (glob-less) engine can
- * detect. The detection test writes this exact file into an isolated project dir.
- * These are chosen to be mutually non-colliding under the current exact-match engine.
+ * A real detection marker per language that the (now glob-aware) engine matches. The
+ * detection test writes this file into an isolated project dir. Most are exact
+ * filenames; `c` and `objectivec` use a source-file marker (`main.c` → `*.c`,
+ * `foo.m` → `*.m`) because CR5-FIX F1/F2 narrowed those languages to their source
+ * extensions — a generic `Makefile`/`Podfile` no longer asserts the language. The
+ * fixtures are chosen to be mutually non-colliding.
  */
 const DETECT_MARKER = {
   rust: 'Cargo.toml',
@@ -56,7 +59,7 @@ const DETECT_MARKER = {
   java: 'pom.xml',
   csharp: 'global.json',
   cpp: 'CMakeLists.txt',
-  c: 'Makefile',
+  c: 'main.c',
   javascript: 'package.json',
   sql: 'dbt_project.yml',
   php: 'composer.json',
@@ -65,7 +68,7 @@ const DETECT_MARKER = {
   r: 'DESCRIPTION',
   scala: 'build.sbt',
   elixir: 'mix.exs',
-  objectivec: 'Podfile',
+  objectivec: 'foo.m',
   lua: '.luacheckrc'
 };
 
@@ -180,6 +183,71 @@ describe('capability-registry TOP-20: detection via a real marker fixture', () =
       } finally { rm(dir); }
     });
   }
+});
+
+describe('capability-registry: narrowed C / Objective-C markers (CR5-FIX F1/F2)', () => {
+  it('a root Makefile ALONE does NOT detect c (Makefile is a generic build tool, not a C signal)', () => {
+    const dir = makeProject('ctoc-narrow-c-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Makefile'), 'all:\n\techo hi\n');
+      assert.ok(
+        !registry.detectLanguages(dir).includes('c'),
+        'a bare Makefile must not assert C — C is detected by its *.c/*.h source'
+      );
+    } finally { rm(dir); }
+  });
+
+  it('a *.c source file DOES detect c', () => {
+    const dir = makeProject('ctoc-narrow-c2-');
+    try {
+      fs.writeFileSync(path.join(dir, 'main.c'), 'int main(void){return 0;}\n');
+      assert.ok(registry.detectLanguages(dir).includes('c'), 'a *.c source file must detect C');
+    } finally { rm(dir); }
+  });
+
+  it('a Podfile ALONE does NOT detect objectivec (CocoaPods is shared with Swift)', () => {
+    const dir = makeProject('ctoc-narrow-objc-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Podfile'), "platform :ios, '15.0'\n");
+      assert.ok(
+        !registry.detectLanguages(dir).includes('objectivec'),
+        'a bare Podfile must not assert Objective-C — Swift uses CocoaPods too'
+      );
+    } finally { rm(dir); }
+  });
+
+  it('an *.xcodeproj ALONE does NOT detect objectivec (Xcode projects are shared with Swift)', () => {
+    const dir = makeProject('ctoc-narrow-objc-xc-');
+    try {
+      fs.mkdirSync(path.join(dir, 'App.xcodeproj'));
+      assert.ok(
+        !registry.detectLanguages(dir).includes('objectivec'),
+        'a bare *.xcodeproj must not assert Objective-C — Swift ships *.xcodeproj too'
+      );
+    } finally { rm(dir); }
+  });
+
+  it('a *.m source file DOES detect objectivec', () => {
+    const dir = makeProject('ctoc-narrow-objc2-');
+    try {
+      fs.writeFileSync(path.join(dir, 'foo.m'), '#import <Foundation/Foundation.h>\n');
+      assert.ok(
+        registry.detectLanguages(dir).includes('objectivec'),
+        'a *.m source file must detect Objective-C'
+      );
+    } finally { rm(dir); }
+  });
+
+  it('r.yaml is left UNCHANGED: a DESCRIPTION file still detects r', () => {
+    const dir = makeProject('ctoc-narrow-r-');
+    try {
+      fs.writeFileSync(path.join(dir, 'DESCRIPTION'), 'Package: x\nVersion: 1.0\n');
+      assert.ok(
+        registry.detectLanguages(dir).includes('r'),
+        'DESCRIPTION is R’s canonical package descriptor and must remain a marker'
+      );
+    } finally { rm(dir); }
+  });
 });
 
 describe('capability-registry TOP-20: SQL is honestly partial (no run)', () => {
