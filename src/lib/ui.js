@@ -152,30 +152,6 @@ Actions:
 }
 
 /**
- * Formats doctor output
- */
-function doctor(checks, version) {
-  const c = colors;
-  let output = '\n';
-
-  output += `${c.cyan}CTOC Doctor${c.reset} - Health Check\n\n`;
-
-  for (const section of checks) {
-    output += `${c.blue}[${section.name}]${c.reset}\n`;
-
-    for (const check of section.items) {
-      const icon = check.ok ? `${c.green}✓${c.reset}` : (check.warn ? `${c.yellow}⚠${c.reset}` : `${c.red}✗${c.reset}`);
-      output += `  ${icon} ${check.label}\n`;
-    }
-
-    output += '\n';
-  }
-
-  output += `${c.green}Doctor check complete${c.reset}\n\n`;
-  return output;
-}
-
-/**
  * Formats blocked output
  */
 function blocked(reason, state, tool) {
@@ -221,7 +197,6 @@ module.exports = {
   dashboard,
   progress,
   adminDashboard,
-  doctor,
   blocked,
   writeToTerminal,
   getPhase

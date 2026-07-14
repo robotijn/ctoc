@@ -1,0 +1,10 @@
+{
+  "content_sha256": "e7157a0103f3412ccbc9e3d6b81b556d6c84affdd73ca83fd7c1f7b416c1e3ab",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T08:52:38.291Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 R6 wave: coordinator-staged plan via frontmatter marker; ledger provenance backfilled (the forgery path R3 closed; WORK human-ordered).",
+  "plan_basename": "00025-r6d-security-failopen-and-crossplatform"
+}

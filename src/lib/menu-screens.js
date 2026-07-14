@@ -1677,7 +1677,13 @@ function validateScreen(stage, file, projectPath) {
     options.push({ label: 'Back', description: `Return to ${stage} list` });
     actions['Back'] = `browse ${stage}`;
     options.push({ label: 'Approve anyway', description: 'Override validation and move to the next stage (records an override)' });
-    actions['Approve anyway'] = `claude:approve ${stage}/${file}`;
+    // R6-A — the forced crossing must be AUDITABLE at the action-string surface.
+    // The `--override` token tells the menu.md claude:approve recipe to call
+    // approvePlan(path, root, { override: { reason } }) — which crosses AND records
+    // override:true + the human's reason in both the ledger entry and the plan
+    // marker. A bare claude:approve here would make the one forced crossing the one
+    // invisible one. The clean "Confirm approve" path above carries no token.
+    actions['Approve anyway'] = `claude:approve ${stage}/${file} --override`;
   }
 
   return {

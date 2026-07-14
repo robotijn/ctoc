@@ -116,11 +116,42 @@ function isHumanGate(from, to) {
   return GATE_EDGES.some(([g0, g1]) => g0 === from && g1 === to);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// R6-B: the INVERSE of the gate edges — destination → source — computed ONCE here.
+// `human-gate-check.js` (its revert map, formerly the local literal `HUMAN_GATES`)
+// and `approval-ledger.js` (a backfilled entry's `stage_from`, formerly the local
+// literal `STAGE_SOURCE`) now DERIVE from `GATE_SOURCE`, so the inverse is declared
+// exactly once — change `GATE_EDGES` and both consumers move. Two hand-kept inverse
+// copies could silently diverge from the forward edges; this closes that.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The gate SOURCE map, `destination -> source` — the exact inverse of `GATE_EDGES`:
+ * `{ implementation:'functional', todo:'implementation', done:'review' }`. Derived,
+ * never a literal, so it cannot drift from the forward edges.
+ */
+const GATE_SOURCE = Object.fromEntries(GATE_EDGES.map(([from, to]) => [to, from]));
+
+/**
+ * Source stage of the human gate whose DESTINATION is `to`, or `undefined` when `to`
+ * is not a gate destination (including the source stages themselves). The inverse
+ * counterpart of {@link destinationOf}.
+ *
+ * @param {string} to - a stage name
+ * @returns {string|undefined} the gate source, or undefined
+ */
+function sourceOf(to) {
+  const edge = GATE_EDGES.find(([, g1]) => g1 === to);
+  return edge ? edge[0] : undefined;
+}
+
 module.exports = {
   STAGE_ORDER,
   GATE_EDGES,
   GATE_DESTINATIONS,
+  GATE_SOURCE,
   crossesHumanGate,
   destinationOf,
+  sourceOf,
   isHumanGate,
 };

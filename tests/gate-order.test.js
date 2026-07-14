@@ -59,4 +59,41 @@ describe('gate-order — the single gate-edge encoding', () => {
       assert.ok(gateOrder.GATE_DESTINATIONS.includes(to));
     }
   });
+
+  // R6-B: the INVERSE of GATE_EDGES (destination → source), computed ONCE here so the
+  // two former copies (human-gate-check's HUMAN_GATES revert map, approval-ledger's
+  // STAGE_SOURCE) derive from this and can never diverge.
+  it('GATE_SOURCE is the destination→source inverse of GATE_EDGES', () => {
+    assert.deepEqual(gateOrder.GATE_SOURCE, {
+      implementation: 'functional',
+      todo: 'implementation',
+      done: 'review',
+    });
+    // Structurally the exact inverse of the LIVE GATE_EDGES — a derived surface, not a
+    // hand-kept literal: change an edge and this map moves with it.
+    assert.deepEqual(
+      gateOrder.GATE_SOURCE,
+      Object.fromEntries(gateOrder.GATE_EDGES.map(([from, to]) => [to, from])),
+    );
+  });
+
+  it('sourceOf returns the gate source for a destination, undefined otherwise', () => {
+    assert.equal(gateOrder.sourceOf('implementation'), 'functional');
+    assert.equal(gateOrder.sourceOf('todo'), 'implementation');
+    assert.equal(gateOrder.sourceOf('done'), 'review');
+    // Non-destination stages (including the SOURCES themselves) have no gate.
+    assert.equal(gateOrder.sourceOf('functional'), undefined);
+    assert.equal(gateOrder.sourceOf('review'), undefined);
+    assert.equal(gateOrder.sourceOf('in-progress'), undefined);
+    assert.equal(gateOrder.sourceOf('nonsense'), undefined);
+  });
+
+  it('GATE_SOURCE and sourceOf agree, and round-trip with destinationOf', () => {
+    for (const [from, to] of gateOrder.GATE_EDGES) {
+      assert.equal(gateOrder.GATE_SOURCE[to], from);
+      assert.equal(gateOrder.sourceOf(to), from);
+      // Full round-trip: source → destination → back to source.
+      assert.equal(gateOrder.sourceOf(gateOrder.destinationOf(from)), from);
+    }
+  });
 });

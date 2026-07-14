@@ -101,12 +101,14 @@ const LOG_DIR = path.join(process.cwd(), '.ctoc', 'logs');
 // updates under concurrency); a corrupt file is quarantined, never reset to `[]`.
 const VIOLATIONS_FILE = path.join(LOG_DIR, 'gate-violations.json');
 
-// Human gates: destination folder → source folder (for revert)
-const HUMAN_GATES = {
-  'implementation': 'functional',
-  'todo': 'implementation',
-  'done': 'review'
-};
+// Human gates: destination folder → source folder (for revert). Derived from the ONE
+// gate-edge encoding in `gate-order.js` (`GATE_SOURCE` is the inverse of `GATE_EDGES`),
+// so this revert map can never diverge from the canonical edges (R6-B). `gate-order`
+// is a pure constant module (zero requires) — no require cycle, safe and fast on the
+// hook path. The keys are the three gate destinations `implementation, todo, done`,
+// in that order (Object.keys drives the folder sweep in `main()`), byte-identical to
+// the former local literal.
+const { GATE_SOURCE: HUMAN_GATES } = require('../lib/gate-order');
 
 // Terminal gate-destination folders where no legitimate agent editing occurs, so
 // acceptance additionally requires a live-content hash match (invalidate-on-edit).

@@ -261,15 +261,14 @@ describe('compliance-regime — GATE INVARIANT (parent Success Metric 5)', () =>
   const MODULE_SRC = path.join(REPO_ROOT, 'src', 'lib', 'compliance-regime.js');
 
   it('13a. human-gate-check HUMAN_GATES map still has EXACTLY the three transitions', () => {
-    const src = fs.readFileSync(GATE_CHECK, 'utf8');
-    const block = src.match(/const HUMAN_GATES\s*=\s*\{([\s\S]*?)\};/);
-    assert.ok(block, 'HUMAN_GATES map present');
-    const keys = [...block[1].matchAll(/'([a-z]+)'\s*:/g)].map(m => m[1]);
-    assert.deepEqual(keys.sort(), ['done', 'implementation', 'todo'].sort(),
+    // Assert the REAL runtime map (stronger than grepping source text): the
+    // hook re-exports GATE_SOURCE from gate-order as HUMAN_GATES (R6-B).
+    const { HUMAN_GATES } = require(GATE_CHECK);
+    assert.deepEqual(Object.keys(HUMAN_GATES).sort(), ['done', 'implementation', 'todo'],
       'exactly the three gate destinations — compliance activation adds/removes none');
-    assert.match(block[1], /'implementation'\s*:\s*'functional'/);
-    assert.match(block[1], /'todo'\s*:\s*'implementation'/);
-    assert.match(block[1], /'done'\s*:\s*'review'/);
+    assert.equal(HUMAN_GATES.implementation, 'functional');
+    assert.equal(HUMAN_GATES.todo, 'implementation');
+    assert.equal(HUMAN_GATES.done, 'review');
   });
 
   it('13b. the module exports NO function that mutates enforcementMode or requireReviewGate', () => {

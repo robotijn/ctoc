@@ -1,0 +1,10 @@
+{
+  "content_sha256": "0c89781ec9e243ff73f11f92a1b0034d1e6cae2a2c8012dc480f014c223394be",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T08:52:38.290Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 R6 wave: coordinator-staged plan via frontmatter marker; ledger provenance backfilled (the forgery path R3 closed; WORK human-ordered).",
+  "plan_basename": "00022-r6a-override-token"
+}
