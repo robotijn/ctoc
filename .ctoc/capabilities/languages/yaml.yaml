@@ -1,0 +1,19 @@
+# YAML capability entry — web-grounded 2026 toolchain. DELIBERATELY PARTIAL, and that is
+# HONEST, not a gap. YAML is DATA, not a runnable/typed/testable program: it has no
+# compiler, no test runner, no package manager, no build step, and no universally standard
+# formatter — so format / typecheck / test / coverage / security / depsAudit / build are
+# ALL OMITTED (an absent phase is honest N/A, never a stub). lint is the one real phase:
+# `yamllint .` (yamllint — the standard 2026 YAML linter — walks the whole tree). YAML is
+# not a launchable application, so it exposes no runnable shape and run.honest is false —
+# consistent with sql and terraform. Detection is ubiquitous-but-CORRECT: a repo with YAML
+# genuinely has YAML to lint.
+language: yaml
+detectionMarkers: ["*.yaml", "*.yml"]
+extensions: [.yaml, .yml]
+toolchain:
+  lint:     { cmd: "yamllint .", tool: yamllint, verified: web-2026-07 }
+run:
+  shapes: { }
+  honest: false
+configScaffold: [.yamllint]
+verified: web-2026-07

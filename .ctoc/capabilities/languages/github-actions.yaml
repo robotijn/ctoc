@@ -1,0 +1,25 @@
+# GitHub Actions capability entry — web-grounded 2026 toolchain. DELIBERATELY PARTIAL, and
+# that is HONEST, not a gap. A workflow is DATA/CONFIG, not a runnable/typed/testable
+# program, so format / typecheck / test / coverage / security / depsAudit / build are ALL
+# OMITTED (an absent phase is honest N/A, never a stub). lint is the one real phase:
+# `actionlint` (the standard 2026 GitHub Actions workflow linter). The detection marker is
+# the `.github/workflows` DIRECTORY: a non-glob marker that existsSync matches against a
+# directory exactly as it matches a file, so a repo's workflow directory (and any nested
+# `.github/workflows/ci.yml` whose parent it is) detects github-actions. A workflow is not a
+# locally-launchable application, so it exposes no runnable shape and run.honest is false —
+# consistent with sql, terraform and yaml.
+# ADDITIVE + CORRECT: a repo with `.github/workflows/ci.yml` detects github-actions (via the
+# directory marker) AND — when it also has a root-level YAML — yaml (via the *.yml/*.yaml
+# glob; detectLanguages globs the project root only). The two never conflict: actionlint
+# lints the workflow, `yamllint .` lints every YAML in the tree. (Recursive extension
+# tree-walking for the yaml half is stack-detector's job, out of scope for the registry.)
+language: github-actions
+detectionMarkers: [.github/workflows]
+extensions: [.yml, .yaml]
+toolchain:
+  lint:     { cmd: "actionlint", tool: actionlint, verified: web-2026-07 }
+run:
+  shapes: { }
+  honest: false
+configScaffold: [.github/workflows/ci.yml]
+verified: web-2026-07

@@ -118,11 +118,17 @@ describe('capability-registry: detectLanguages() — data-driven marker detectio
     } finally { rm(dir); }
   });
 
-  it('detects dart from a pubspec.yaml', () => {
+  it('detects dart from a pubspec.yaml (and additively yaml — a pubspec IS YAML)', () => {
     const dir = makeProject('ctoc-det-dart-');
     try {
       fs.writeFileSync(path.join(dir, 'pubspec.yaml'), 'name: x\n');
-      assert.deepEqual(registry.detectLanguages(dir), ['dart']);
+      const detected = registry.detectLanguages(dir);
+      assert.ok(detected.includes('dart'), 'pubspec.yaml must detect dart');
+      // Expansion wave 5 added the config-quality `yaml` language (markers *.yaml/*.yml).
+      // A pubspec.yaml is itself YAML, so yaml is ADDITIVELY (and correctly) detected —
+      // this is the deliberate "fires widely but is right wherever it fires" case, not a
+      // mis-classification. dart stays the Dart signal; yaml means "there is YAML to lint".
+      assert.ok(detected.includes('yaml'), 'a pubspec.yaml is YAML — yaml is additively detected');
     } finally { rm(dir); }
   });
 

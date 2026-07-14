@@ -84,11 +84,12 @@ describe('config/infra languages: load clean (registry now carries 24, zero warn
     }
   });
 
-  it('the shipped seed data loads with ZERO warnings and exactly 24 languages', () => {
+  it('the shipped seed data loads with ZERO warnings and exactly 26 languages', () => {
     const reg = registry.load();
     assert.deepEqual(reg.warnings, [], 'the shipped seed data must load with zero warnings');
-    assert.equal(Object.keys(reg.languages).length, 24,
-      'the top-20 programming languages + the 3 config/infra languages + solidity = 24');
+    assert.equal(Object.keys(reg.languages).length, 26,
+      'the top-20 programming languages + the 3 config/infra languages + solidity + '
+      + 'the 2 config-quality languages (yaml, github-actions) = 26');
   });
 
   it('exactly 3 new config/infra YAML files ship on disk (shell, dockerfile, terraform)', () => {
@@ -337,6 +338,183 @@ describe('WAVE 2 FIX (F2): dockerfile markers narrowed to [Dockerfile] — no de
       fs.writeFileSync(path.join(dir, 'Dockerfile'), 'FROM alpine:3.20\n');
       assert.ok(registry.detectLanguages(dir).includes('dockerfile'),
         'an exact Dockerfile must still detect dockerfile');
+    } finally { rm(dir); }
+  });
+});
+
+/**
+ * EXPANSION WAVE 5 — config-QUALITY languages: yaml + github-actions. These complete
+ * category A. Both are ubiquitous-but-CORRECT detection: a repo with YAML genuinely has
+ * YAML to lint, and a repo with a workflow directory genuinely has a GitHub Actions
+ * workflow to lint — this is NOT a mis-classification, the detection is right wherever it
+ * fires, it just fires widely.
+ *
+ * Both are DATA/CONFIG, not runnable/typed/testable programs, so they carry exactly ONE
+ * real phase — lint — and OMIT (never stub) every other phase:
+ *
+ *   • yaml — lint `yamllint .` (yamllint, the standard 2026 YAML linter, walks the whole
+ *     tree). No compiler, no test runner, no package manager, no build, no universally
+ *     standard formatter → format/typecheck/test/coverage/security/depsAudit/build all
+ *     OMITTED. YAML is not a launchable app → run.honest === false, no run shape
+ *     (consistent with sql + terraform).
+ *   • github-actions — lint `actionlint` (the standard GitHub Actions workflow linter).
+ *     Its detection marker is the `.github/workflows` DIRECTORY: a non-glob marker that
+ *     existsSync matches against a directory exactly as it matches a file. A workflow is
+ *     not a locally-launchable app → run.honest === false, no run shape.
+ *
+ * ADDITIVE + CORRECT (engine-grounded truth, not the aspirational wording): the two
+ * languages never conflict. github-actions detects from the `.github/workflows` directory
+ * (existsSync, so a nested workflow file's parent dir is seen). yaml detects from a
+ * ROOT-level `*.yaml`/`*.yml` — detectLanguages globs the project ROOT only (recursive
+ * extension tree-walking is stack-detector's job, deliberately out of scope for the
+ * registry). So a repo that has BOTH a workflow directory AND a root-level YAML detects
+ * BOTH languages — additive and correct (actionlint lints the workflow, yamllint . lints
+ * every YAML in the tree). A workflow file nested at `.github/workflows/ci.yml` alone
+ * detects github-actions via the directory marker; the yaml half requires a root-level
+ * YAML for detectLanguages to fire (yamllint . still lints the nested file at run time).
+ *
+ * ZERO DOUBLES: every filesystem case builds a REAL project dir and reads the REAL
+ * bundled seed YAML through the real engine. Nothing is mocked.
+ */
+const CONFIG_QUALITY_LANGS = ['yaml', 'github-actions'];
+
+describe('EXPANSION WAVE 5: yaml + github-actions load clean (registry now carries 26)', () => {
+  it('both config-quality languages load from the bundled data', () => {
+    const reg = registry.load();
+    for (const lang of CONFIG_QUALITY_LANGS) {
+      assert.ok(reg.languages[lang], `bundled data must include ${lang}`);
+    }
+  });
+
+  it('both config-quality YAML files ship on disk', () => {
+    const dir = path.join(__dirname, '..', '.ctoc', 'capabilities', 'languages');
+    const files = new Set(fs.readdirSync(dir));
+    for (const lang of CONFIG_QUALITY_LANGS) {
+      assert.ok(files.has(`${lang}.yaml`), `${lang}.yaml must ship in the bundled directory`);
+    }
+  });
+
+  it('every present phase carries honest provenance; nothing is ever "guessed"', () => {
+    const reg = registry.load();
+    for (const lang of CONFIG_QUALITY_LANGS) {
+      const cap = reg.languages[lang];
+      assert.ok(cap && cap.toolchain, `${lang} must declare a toolchain`);
+      assert.notEqual(cap.verified, 'guessed', `${lang} top-level provenance must never be "guessed"`);
+      for (const [phase, entry] of Object.entries(cap.toolchain)) {
+        assert.equal(typeof entry.cmd, 'string', `${lang}.${phase}.cmd must be a string`);
+        assert.ok(entry.cmd.trim().length > 0, `${lang}.${phase}.cmd must not be empty`);
+        assert.ok(entry.tool && String(entry.tool).trim().length > 0, `${lang}.${phase}.tool must be named`);
+        assert.ok(ALLOWED_VERIFIED.has(entry.verified),
+          `${lang}.${phase}.verified must be web-2026-07 or UNVERIFIED, never "${entry.verified}"`);
+      }
+    }
+  });
+});
+
+describe('EXPANSION WAVE 5: yaml — root *.yaml/*.yml, yamllint ., honest:false', () => {
+  it('detects yaml from a root config.yml (*.yml glob marker)', () => {
+    const dir = makeProject('ctoc-cq-yaml-');
+    try {
+      fs.writeFileSync(path.join(dir, 'config.yml'), 'a: 1\n');
+      assert.ok(registry.detectLanguages(dir).includes('yaml'),
+        'a root config.yml must detect yaml via the *.yml glob marker');
+    } finally { rm(dir); }
+  });
+
+  it('detects yaml from a root config.yaml (*.yaml glob marker)', () => {
+    const dir = makeProject('ctoc-cq-yaml2-');
+    try {
+      fs.writeFileSync(path.join(dir, 'config.yaml'), 'a: 1\n');
+      assert.ok(registry.detectLanguages(dir).includes('yaml'),
+        'a root config.yaml must detect yaml via the *.yaml glob marker');
+    } finally { rm(dir); }
+  });
+
+  it('yaml lint is exactly `yamllint .` and carries web-2026-07 provenance', () => {
+    const cap = registry.capabilitiesFor('yaml');
+    assert.ok(cap && cap.toolchain && cap.toolchain.lint, 'yaml must declare a lint phase');
+    assert.equal(cap.toolchain.lint.cmd, 'yamllint .', 'yaml lint is `yamllint .`');
+    assert.equal(cap.toolchain.lint.tool, 'yamllint', 'yaml lint tool is yamllint');
+    assert.equal(cap.toolchain.lint.verified, 'web-2026-07', 'yamllint is the web-2026-07 standard YAML linter');
+  });
+
+  it('yaml OMITs every non-lint phase (YAML is data, not runnable/typed/testable)', () => {
+    const tc = registry.capabilitiesFor('yaml').toolchain;
+    for (const phase of ['format', 'typecheck', 'test', 'coverage', 'security', 'depsAudit', 'build']) {
+      assert.equal(tc[phase], undefined, `yaml must OMIT ${phase} (absent = honest N/A, never a stub)`);
+    }
+  });
+
+  it('yaml.run.honest === false and declares no runnable shape', () => {
+    const cap = registry.capabilitiesFor('yaml');
+    assert.ok(cap.run && typeof cap.run === 'object', 'yaml must carry a run block');
+    assert.equal(cap.run.honest, false, 'YAML is not a launchable app — honest must be false');
+    const shapes = cap.run.shapes && typeof cap.run.shapes === 'object' ? cap.run.shapes : {};
+    assert.equal(Object.keys(shapes).length, 0, 'yaml declares no runnable shape');
+    assert.equal(registry.runStrategyFor('yaml', 'cli'), null, 'yaml has no runnable shape');
+  });
+});
+
+describe('EXPANSION WAVE 5: github-actions — .github/workflows DIRECTORY marker, actionlint', () => {
+  it('detects github-actions from a `.github/workflows` DIRECTORY (existsSync matches a dir)', () => {
+    const dir = makeProject('ctoc-cq-gha-');
+    try {
+      fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+      assert.ok(registry.detectLanguages(dir).includes('github-actions'),
+        'a .github/workflows directory must detect github-actions (a directory marker)');
+    } finally { rm(dir); }
+  });
+
+  it('detects github-actions from a nested `.github/workflows/ci.yml` (the parent dir exists)', () => {
+    const dir = makeProject('ctoc-cq-ghaci-');
+    try {
+      fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+      fs.writeFileSync(path.join(dir, '.github', 'workflows', 'ci.yml'), 'name: ci\n');
+      assert.ok(registry.detectLanguages(dir).includes('github-actions'),
+        'a workflow file makes its .github/workflows parent directory exist → github-actions');
+    } finally { rm(dir); }
+  });
+
+  it('github-actions lint is exactly `actionlint` and carries web-2026-07 provenance', () => {
+    const cap = registry.capabilitiesFor('github-actions');
+    assert.ok(cap && cap.toolchain && cap.toolchain.lint, 'github-actions must declare a lint phase');
+    assert.equal(cap.toolchain.lint.cmd, 'actionlint', 'github-actions lint is `actionlint`');
+    assert.equal(cap.toolchain.lint.tool, 'actionlint', 'github-actions lint tool is actionlint');
+    assert.equal(cap.toolchain.lint.verified, 'web-2026-07',
+      'actionlint is the web-2026-07 standard GitHub Actions workflow linter');
+  });
+
+  it('github-actions OMITs every non-lint phase (a workflow is not runnable/typed/testable)', () => {
+    const tc = registry.capabilitiesFor('github-actions').toolchain;
+    for (const phase of ['format', 'typecheck', 'test', 'coverage', 'security', 'depsAudit', 'build']) {
+      assert.equal(tc[phase], undefined, `github-actions must OMIT ${phase} (absent = honest N/A, never a stub)`);
+    }
+  });
+
+  it('github-actions.run.honest === false and declares no runnable shape', () => {
+    const cap = registry.capabilitiesFor('github-actions');
+    assert.ok(cap.run && typeof cap.run === 'object', 'github-actions must carry a run block');
+    assert.equal(cap.run.honest, false, 'a workflow is not a locally-launchable app — honest must be false');
+    const shapes = cap.run.shapes && typeof cap.run.shapes === 'object' ? cap.run.shapes : {};
+    assert.equal(Object.keys(shapes).length, 0, 'github-actions declares no runnable shape');
+    assert.equal(registry.runStrategyFor('github-actions', 'cli'), null, 'github-actions has no runnable shape');
+  });
+});
+
+describe('EXPANSION WAVE 5: additive + correct — a repo with a workflow AND root YAML detects BOTH', () => {
+  it('a `.github/workflows/ci.yml` PLUS a root docker-compose.yml detects BOTH languages', () => {
+    const dir = makeProject('ctoc-cq-both-');
+    try {
+      // github-actions: the workflow directory (existsSync on the dir marker).
+      fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+      fs.writeFileSync(path.join(dir, '.github', 'workflows', 'ci.yml'), 'name: ci\non: push\n');
+      // yaml: a ROOT-level YAML (detectLanguages globs the project root only).
+      fs.writeFileSync(path.join(dir, 'docker-compose.yml'), 'services: {}\n');
+      const detected = registry.detectLanguages(dir);
+      assert.ok(detected.includes('github-actions'),
+        'the .github/workflows directory must detect github-actions');
+      assert.ok(detected.includes('yaml'),
+        'the root docker-compose.yml must detect yaml — additive, no conflict with github-actions');
     } finally { rm(dir); }
   });
 });
