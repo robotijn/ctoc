@@ -1,0 +1,18 @@
+# browser-extension — a WebExtension (WXT / Plasmo / web-ext). The honest last mile
+# is build-and-package: the extension does not run standalone — it is loaded into a
+# browser — so build+package is the CI-safe last mile, never a false "it ran".
+# MARKER HONESTY (the over-detection rule): wxt.config.ts is the modern, DECISIVE
+# framework marker. manifest.json is AMBIGUOUS — it is also a PWA / web-app manifest —
+# so it is included but the type is flagged verified: UNVERIFIED, and priority is set
+# LOW (15, below web-frontend's 20) so a real frontend framework (a vite.config.ts +
+# manifest.json PWA) WINS over browser-extension. The decisive wxt.config.ts still
+# wins on its own.
+projectType: browser-extension
+detectionMarkers: [wxt.config.ts, manifest.json]
+frameworks: [wxt, plasmo, web-ext]
+priority: 15
+runShape: none
+phases: { lint: recommended, typecheck: recommended, test: recommended, security: recommended, coverage: optional }
+run: { strategy: build-and-package, honest: build-is-last-mile }
+configScaffold: [manifest.json, wxt.config.ts]
+verified: UNVERIFIED

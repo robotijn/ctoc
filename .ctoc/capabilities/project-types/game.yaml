@@ -1,0 +1,20 @@
+# game — a game project (Unity / Unreal / Godot / Bevy). Games build to platform
+# binaries; a windowed runtime cannot be driven in headless CI, so build is the honest
+# last mile (build-is-last-mile), never a false "it ran".
+# MARKER HONESTY: the DECISIVE, exact markers are project.godot (Godot, a fixed
+# filename) and ProjectSettings (Unity, a fixed directory). Unreal's marker is a
+# project-named *.uproject file — a GLOB — and projectTypeFor matches EXACT names only
+# (unlike detectLanguages, it has no glob path). A glob here would be a silent dead
+# marker, so it is intentionally NOT listed; unreal (and bevy, a Cargo.toml Rust crate)
+# stay in `frameworks` as informational and are not auto-detected by a unique file.
+# Detecting Unreal/Arduino-style project-named markers would require adding glob support
+# to projectTypeFor — a separate, human-scheduled registry change.
+projectType: game
+detectionMarkers: [project.godot, ProjectSettings]
+frameworks: [unity, unreal, godot, bevy]
+priority: 72
+runShape: none
+phases: { lint: recommended, typecheck: optional, test: recommended, security: optional, coverage: optional }
+run: { strategy: build, honest: build-is-last-mile }
+configScaffold: [project.godot, .gitignore]
+verified: web-2026-07

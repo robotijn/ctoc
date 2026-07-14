@@ -1,0 +1,16 @@
+# serverless — functions/edge deployed to a managed runtime (Serverless Framework /
+# Cloudflare Workers / SST / AWS SAM). The honest last mile is a DEPLOY, not a local
+# launch (build-is-last-mile) — a `wrangler deploy` / `sam deploy` ships to the cloud;
+# there is no CI-reliable "it ran" locally.
+# Markers are the DECISIVE, framework-specific configs ONLY. vercel.json / netlify.toml
+# are deliberately EXCLUDED: they deploy ANY frontend (a plain SPA ships with a
+# vercel.json), so they are far too broad a signal to assert "serverless".
+projectType: serverless
+detectionMarkers: [serverless.yml, wrangler.toml, sst.config.ts, template.yaml]
+frameworks: [serverless-framework, cloudflare-workers, sst, aws-sam]
+priority: 35
+runShape: none
+phases: { lint: required, typecheck: required, test: required, security: required, coverage: recommended }
+run: { strategy: deploy, honest: build-is-last-mile }
+configScaffold: [serverless.yml, .env.example]
+verified: web-2026-07

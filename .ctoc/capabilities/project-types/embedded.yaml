@@ -1,0 +1,18 @@
+# embedded — firmware for a microcontroller (PlatformIO / Arduino / Zephyr / ESP-IDF /
+# embedded Rust). The toolchain cross-compiles and flashes to a device, so build-and-
+# flash is the honest last mile (build-is-last-mile) — a device boot is not CI-runnable.
+# typecheck is REQUIRED: on constrained hardware a type/compile error is a field failure.
+# MARKER HONESTY: the DECISIVE, exact markers are platformio.ini (PlatformIO),
+# west.yml (Zephyr), and sdkconfig (ESP-IDF). Arduino's sketch marker is a folder-named
+# *.ino file — a GLOB — and projectTypeFor matches EXACT names only, so a glob would be
+# a silent dead marker; arduino stays in `frameworks` (informational) and is not
+# auto-detected by a unique file. embedded-rust is a Cargo.toml crate (detected as rust).
+projectType: embedded
+detectionMarkers: [platformio.ini, west.yml, sdkconfig]
+frameworks: [platformio, arduino, zephyr, esp-idf, embedded-rust]
+priority: 71
+runShape: none
+phases: { lint: recommended, typecheck: required, test: recommended, security: recommended, coverage: optional }
+run: { strategy: build-and-flash, honest: build-is-last-mile }
+configScaffold: [platformio.ini, prj.conf]
+verified: web-2026-07
