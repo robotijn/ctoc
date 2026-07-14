@@ -211,3 +211,150 @@ test('QUALITY-AGENT WIRING: a repo with NO migrations is an informational skip, 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── DB-w2 fix (00046): the 3 confirmed heuristic defects ──────────────────────
+// F1 location hole, F2 #-comment false positive, F3 string/block-comment false
+// positives — all reproduced by execution before the fix. Real temp-dir fixtures,
+// zero mocks.
+
+test('F1: destructive DDL in an UNLISTED sql/ dir is detected (previously scanned:false → shipped GREEN)', async () => {
+  const dir = mkTemp();
+  try {
+    // `sql/` was not among the 7 hardcoded MIGRATION_LOCATIONS; a DROP here used to
+    // report scanned:false and pass the gate. It must now be a HIGH finding.
+    writeFile(dir, path.join('sql', '003_migrate.sql'), 'DROP TABLE users;\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the sql/ root is now searched');
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'the sql/ DROP TABLE is caught');
+    assert.match(high[0].file, /003_migrate\.sql$/, 'finding names the unlisted-dir file');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F1+F2: a Django <app>/migrations/*.py with embedded op.execute("DROP TABLE") is discovered AND caught', async () => {
+  const dir = mkTemp();
+  try {
+    // The dir basename `migrations` matches /migrat/i anywhere in the tree, so it is
+    // discovered; the executable DROP inside a Python string must still fire.
+    writeFile(dir, path.join('myapp', 'migrations', '0002_drop.py'),
+      'def upgrade():\n    op.execute("DROP TABLE legacy_users")\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'an *migrat* dir anywhere in the tree is discovered');
+    assert.equal(res.findings.length, 1, 'embedded executable DROP TABLE in .py is caught');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F1: a genuine no-migrations repo → scanned:false with a reason that NAMES the searched locations', async () => {
+  const dir = mkTemp();
+  try {
+    fs.writeFileSync(path.join(dir, 'README.md'), '# no migrations here\n', 'utf8');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, false, 'a genuine no-migrations repo is still an honest skip');
+    assert.match(res.reason, /search/i, 'the reason frames these as locations that WERE searched');
+    assert.match(res.reason, /sql/i, 'reason names the sql root');
+    assert.match(res.reason, /database/i, 'reason names the database root');
+    assert.match(res.reason, /migrat/i, 'reason names the *migrat* discovery rule');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F2: a `#` comment in a .py migration (`# TODO: drop table ...`) is NOT flagged', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('myapp', 'migrations', '0003_note.py'),
+      'def upgrade():\n    # TODO: drop table legacy_users later\n    op.add_column("users", "email")\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the .py migration was scanned');
+    assert.equal(res.findings.length, 0, 'a #-commented "drop table" is not executable DDL');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: a SQL string literal containing "auto-truncate" is NOT flagged (benign seed)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '004_seed.sql'),
+      "INSERT INTO settings VALUES ('auto-truncate logs nightly');\n");
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a benign seed string must not block the gate');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: a /* DROP TABLE */ single-line block comment is NOT flagged', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '005_comment.sql'),
+      '/* DROP TABLE users; */\nCREATE TABLE users (id int);\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a commented-out DROP is not executable');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: a multi-line /* ... DROP TABLE ... */ block comment is NOT flagged and line numbers survive', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '006_block.sql'),
+      '/*\n  historical note:\n  DROP TABLE users;\n*/\nDROP TABLE really_gone;\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'only the real DROP on line 5 fires');
+    assert.equal(res.findings[0].line, 5, 'multi-line block strip preserves line numbering');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: statement-anchored true positives still fire (line-start, post-;, ALTER..DROP COLUMN, TRUNCATE)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '007_true.sql'), [
+      'DROP TABLE IF EXISTS users;',                    // line 1 — line-start DROP TABLE
+      'CREATE TABLE keep (id int); DROP TABLE gone;',   // line 2 — post-`;` DROP TABLE
+      'ALTER TABLE t DROP COLUMN c;',                   // line 3 — ALTER … DROP
+      'TRUNCATE logs;'                                  // line 4 — line-start TRUNCATE
+    ].join('\n') + '\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.ok(res.findings.every(f => f.severity === SEVERITY.HIGH), 'every finding is HIGH');
+    const lines = res.findings.map(f => f.line).sort((a, b) => a - b);
+    assert.deepEqual(lines, [1, 2, 3, 4], 'every real destructive statement still fires exactly once');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
