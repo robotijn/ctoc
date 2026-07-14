@@ -2,13 +2,13 @@
 # embedded Rust). The toolchain cross-compiles and flashes to a device, so build-and-
 # flash is the honest last mile (build-is-last-mile) — a device boot is not CI-runnable.
 # typecheck is REQUIRED: on constrained hardware a type/compile error is a field failure.
-# MARKER HONESTY: the DECISIVE, exact markers are platformio.ini (PlatformIO),
-# west.yml (Zephyr), and sdkconfig (ESP-IDF). Arduino's sketch marker is a folder-named
-# *.ino file — a GLOB — and projectTypeFor matches EXACT names only, so a glob would be
-# a silent dead marker; arduino stays in `frameworks` (informational) and is not
-# auto-detected by a unique file. embedded-rust is a Cargo.toml crate (detected as rust).
+# MARKER HONESTY: the DECISIVE markers are platformio.ini (PlatformIO), west.yml
+# (Zephyr), sdkconfig (ESP-IDF), and *.ino (Arduino, a sketch-named GLOB). As of wave 4
+# projectTypeFor is glob-aware (it mirrors detectLanguages: a ReDoS-safe, anchored readdir
+# match via safeRegExp), so the *.ino glob FIRES — it is no longer a dead marker.
+# embedded-rust is a Cargo.toml crate (detected as rust).
 projectType: embedded
-detectionMarkers: [platformio.ini, west.yml, sdkconfig]
+detectionMarkers: [platformio.ini, west.yml, sdkconfig, "*.ino"]
 frameworks: [platformio, arduino, zephyr, esp-idf, embedded-rust]
 priority: 71
 runShape: none
