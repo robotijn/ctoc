@@ -40,6 +40,7 @@ const { SecretsScanner } = require('./secrets-scanner');
 const { DependencyAuditor, COVERED_LANGUAGES } = require('./dependency-auditor');
 const { SASTRunner, TOOL_CONFIGS } = require('./sast-runner');
 const { SCARunner } = require('./sca-runner');
+const { MigrationSafetyChecker } = require('./migration-safety-checker');
 
 // R3-C: the push ship gate. The quality agent runs UNATTENDED after every commit;
 // it may check, it may report, it may NOT ship. `isAutoPushEnabled` is the only
@@ -620,6 +621,38 @@ async function runSecurityScan(_tools, opts = {}) {
     }
   } catch (err) {
     const msg = `SCA skipped (error, NOT a pass): ${err.message}`;
+    skipped.push(msg);
+    console.log(`   ${msg}`);
+  }
+
+  // 5. MIGRATION SAFETY — destructive-DDL static scan (the databases-dimension
+  //    consumer). Mirrors the SCA step's honesty exactly: a repo with NO migrations
+  //    is a LOUD informational skip (scanned:false), NEVER a silent clean pass, and a
+  //    HIGH destructive finding (DROP TABLE/COLUMN, ALTER…DROP, TRUNCATE, DROP
+  //    DATABASE/SCHEMA) bumps the CRITICAL/HIGH gate tally — a migration that drops a
+  //    table blocks like any other HIGH. Static core executes nothing (reads + regex).
+  try {
+    const migration = new MigrationSafetyChecker(projectRoot);
+    const res = await migration.run();
+    if (res && res.scanned === false) {
+      const msg = `migration safety: ${res.reason || 'no migrations detected'} — informational, not a failure`;
+      skipped.push(msg);
+      console.log(`   ${msg}`);
+    } else {
+      for (const f of (res.findings || [])) {
+        bump(f.severity);
+        detail.push(`migration[${f.severity}] ${f.rule || 'destructive DDL'} at ${f.file || '?'}:${f.line || 0}`);
+      }
+      // Atlas (or file-read) errors are loud skips, never silent passes.
+      for (const e of (res.errors || [])) {
+        const msg = `migration safety skipped (${e.tool || 'tool'}): ${e.error}`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+      }
+      console.log(`   Migration safety: ${(res.findings || []).length} destructive finding(s)`);
+    }
+  } catch (err) {
+    const msg = `migration safety skipped (error, NOT a pass): ${err.message}`;
     skipped.push(msg);
     console.log(`   ${msg}`);
   }
