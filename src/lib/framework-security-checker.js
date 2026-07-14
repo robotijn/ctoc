@@ -7,15 +7,26 @@
  * migration-safety-checker turned the databases dimension's destructive-DDL concern
  * into one.
  *
- * THE CLASS OF BUG. A frontend framework exposes environment variables to the
- * BROWSER when — and only when — their name carries the framework's public prefix
- * (Next.js `NEXT_PUBLIC_`, Vite `VITE_`, CRA `REACT_APP_`, SvelteKit `PUBLIC_`,
- * Nuxt `NUXT_PUBLIC_`, Gatsby `GATSBY_`, Expo `EXPO_PUBLIC_`). The build inlines
- * such a variable's VALUE into the client bundle. So a public-prefixed variable
- * whose NAME signals a secret (`NEXT_PUBLIC_API_SECRET`, `VITE_STRIPE_SECRET_KEY`)
- * is a deliberate, shipped secret leak — a real, common, HIGH-severity class the
- * generic value-entropy secrets scanner does NOT catch (the value is a legitimate
- * assignment; the LEAK is the public prefix on a secret-named key).
+ * THE CLASS OF BUG. A frontend framework inlines an environment variable's VALUE
+ * into the BROWSER bundle when the variable's name carries the framework's public
+ * prefix (Next.js `NEXT_PUBLIC_`, Vite `VITE_`, CRA `REACT_APP_`, SvelteKit
+ * `PUBLIC_`, Nuxt `NUXT_PUBLIC_`, Gatsby `GATSBY_`, Expo `EXPO_PUBLIC_`). So a
+ * public-prefixed variable whose NAME signals a secret (`NEXT_PUBLIC_API_SECRET`,
+ * `VITE_STRIPE_SECRET_KEY`) is a deliberate, shipped secret leak — a real, common,
+ * HIGH-severity class the generic value-entropy secrets scanner does NOT catch (the
+ * value is a legitimate assignment; the LEAK is the public prefix on a secret-named
+ * key).
+ *
+ * SCOPE — PREFIX-NAMED EXPOSURES ONLY (a stated blind spot, F4). This checker
+ * detects the prefix-NAMED exposure only. It does NOT see the other, prefix-less
+ * exposure paths a framework config can open: Next.js `next.config` `env` /
+ * `publicRuntimeConfig` and Vite `define` inline ANY listed variable — with NO
+ * public prefix on its name — into the client bundle. A secret exposed that way
+ * carries no naming signal this NAME-based scan can key on, so it is a KNOWN,
+ * documented blind spot rather than a covered case. The public prefixes scanned are
+ * SCOPED to the frameworks actually detected in the repo (a Next-only repo never
+ * scans for SvelteKit's `PUBLIC_`), so cross-framework prefix pooling cannot flag a
+ * variable the detected build would never expose.
  *
  * NAME-BASED, NEVER VALUE-BASED (two reasons). First, the name alone is the signal:
  * the prefix says "ship to browser", the secret indicator says "this is a secret".
@@ -25,11 +36,25 @@
  *
  * TIGHT TO STAY LOW-FALSE-POSITIVE (the migration-heuristic lesson). A bare `KEY`
  * is NOT a secret indicator: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is a publishable
- * key that is MEANT to be public. Only the secret-ish key forms
- * (`SECRET_KEY`/`PRIVATE_KEY`/`API_KEY`/`APIKEY`) plus the unambiguous indicators
- * (`SECRET`/`TOKEN`/`PRIVATE`/`PASSWORD`/`PASSWD`/`CREDENTIAL`) flag. Each indicator
- * must fall on an underscore-delimited word boundary, so `SECRETARY` (contains
- * `SECRET`) does not match.
+ * key that is MEANT to be public. A bare `TOKEN` is likewise NOT an indicator:
+ * `NEXT_PUBLIC_TOKEN_ADDRESS` is a public web3 contract address, deliberately
+ * client-shipped. So the token forms are COMPOUND-only — `ACCESS_TOKEN`/`AUTH_TOKEN`/
+ * `API_TOKEN`/`BEARER_TOKEN`/`SESSION_TOKEN`/`REFRESH_TOKEN` — exactly the way `KEY`
+ * is compound-only (`SECRET_KEY`/`PRIVATE_KEY`/`API_KEY`/`APIKEY`). The remaining
+ * unambiguous indicators are `PRIVATE`/`PASSWORD`/`PASSWD`/`CREDENTIAL` (matched on
+ * underscore boundaries, trailing segments allowed) and `SECRET`, which is
+ * anchored TERMINAL — it flags only as the LAST name segment (`…_API_SECRET`) or via
+ * the `…_SECRET_KEY` compound, so `NEXT_PUBLIC_SECRET_SANTA_ENABLED` (a feature flag
+ * with `SECRET` mid-name) does NOT flag. Every indicator sits on an underscore
+ * boundary, so `SECRETARY` (contains `SECRET`) never matches.
+ *
+ * The prefix stays CASE-SENSITIVE (uppercase is the framework convention), but the
+ * name TAIL after a correctly-uppercased prefix is matched case-INSENSITIVELY, so
+ * `VITE_api_secret` (uppercase prefix, lowercase underscore-delimited tail) is
+ * caught. A pure camelCase-glued tail with NO underscore before the indicator
+ * (`VITE_apiSecret`) is a residual, documented FALSE-NEGATIVE: catching it requires
+ * matching `SECRET` mid-token, which reintroduces common false positives
+ * (`theSecretDoor`, `SecretAgent`) — a rare miss is not worth a common false alarm.
  *
  * HONESTY (mirrors migration-safety-checker / sast-runner / sca-runner). `run()`
  * gates on RELEVANCE: it only scans when a DETECTED framework carries the
@@ -71,92 +96,151 @@ const SEVERITY = {
 
 /**
  * The framework `security.concerns` tag this check consumes. A framework carrying
- * it (Next.js, Vite-driven Vue/Svelte/React, Nuxt, Remix, Astro, Laravel, NestJS)
- * exposes public-prefixed env vars to the client bundle.
+ * it (Next.js, Vite-driven Vue/Svelte/React, Nuxt, Remix, Astro, Laravel) ships a
+ * client bundle that can inline public-prefixed env vars. Pure backends (FastAPI,
+ * NestJS, Django) carry `sensitive-settings` instead — they have no client bundle,
+ * so this check must not consider them relevant.
  * @type {string}
  */
 const ENV_EXPOSURE_CONCERN = 'env-exposure';
 
 /**
- * Public env-var prefixes (CONSTANT). A variable whose name begins with one of
- * these is inlined into the CLIENT bundle by the framework's build:
- *   - `NEXT_PUBLIC_`  Next.js
- *   - `VITE_`         Vite (Vue/Svelte/React/Solid on Vite)
- *   - `REACT_APP_`    Create React App
- *   - `PUBLIC_`       SvelteKit (`$env/static/public`)
- *   - `NUXT_PUBLIC_`  Nuxt runtimeConfig.public
- *   - `GATSBY_`       Gatsby
- *   - `EXPO_PUBLIC_`  Expo
- * @type {string[]}
+ * Framework → its client-exposure prefixes (CONSTANT). Keyed by the capability
+ * registry's framework `name`; the value is the set of public prefixes that
+ * framework's build inlines into the CLIENT bundle:
+ *   - `NEXT_PUBLIC_`  Next.js          - `NUXT_PUBLIC_`  Nuxt runtimeConfig.public
+ *   - `VITE_`         Vite/Laravel     - `PUBLIC_`       SvelteKit / Astro
+ *   - `REACT_APP_`    Create React App - `GATSBY_`/`EXPO_PUBLIC_`  Gatsby / Expo
+ *
+ * The ACTIVE prefix set for a scan is the union of these lists over ONLY the
+ * detected env-exposure frameworks, so a prefix a repo's build would never honour is
+ * never scanned (F3.1 — kills cross-framework prefix pooling like flagging `PUBLIC_`
+ * in a Next-only repo).
+ *
+ * `react` maps to both `VITE_` and `REACT_APP_` (React ships on either Vite or CRA).
+ * `laravel` maps to `VITE_` (Laravel's front-end tooling is Vite; its client env
+ * prefix is literally `VITE_`) — added here so a real Laravel+Vite leak is not a
+ * false negative. Frameworks whose env exposure is NOT prefix-named (Angular's
+ * build-time `environment.ts` replacement, Remix's loader/`window.ENV`) intentionally
+ * have NO entry: this NAME-based, prefix-scoped scan cannot key on them, and that is
+ * the documented blind spot (see the module docstring, F4).
+ * @type {Object<string, string[]>}
  */
-const PUBLIC_PREFIXES = [
-  'NEXT_PUBLIC_',
-  'VITE_',
-  'REACT_APP_',
-  'PUBLIC_',
-  'NUXT_PUBLIC_',
-  'GATSBY_',
-  'EXPO_PUBLIC_'
-];
+const FRAMEWORK_PUBLIC_PREFIXES = {
+  nextjs: ['NEXT_PUBLIC_'],
+  nuxt: ['NUXT_PUBLIC_'],
+  vue: ['VITE_'],
+  svelte: ['VITE_', 'PUBLIC_'],
+  react: ['VITE_', 'REACT_APP_'],
+  astro: ['VITE_', 'PUBLIC_'],
+  gatsby: ['GATSBY_'],
+  expo: ['EXPO_PUBLIC_'],
+  laravel: ['VITE_']
+};
 
 /**
- * Secret indicators (CONSTANT). A public-prefixed variable whose name carries one
- * of these — on an underscore-delimited word boundary — is a shipped secret leak.
- *
- * The secret-ish KEY forms (`SECRET_KEY`/`PRIVATE_KEY`/`API_KEY`/`APIKEY`) are
- * listed BEFORE the bare indicators so the alternation prefers the longer compound,
- * and — critically — a lone `KEY` is DELIBERATELY absent: `PUBLISHABLE_KEY` is a
- * public key by design and must not flag. `SECRET_KEY`/`PRIVATE_KEY` are redundant
- * with `SECRET`/`PRIVATE` but kept explicit for readability; `API_KEY`/`APIKEY`
- * are load-bearing (neither `API` nor `KEY` is an indicator on its own).
+ * COMPOUND secret indicators (CONSTANT). Each may appear as a segment run anywhere
+ * in the name (leading and trailing segments allowed). A lone `KEY` and a lone
+ * `TOKEN` are DELIBERATELY absent — `PUBLISHABLE_KEY` and `TOKEN_ADDRESS` are public
+ * by design — so both the key and the token forms are compound-only. `SECRET_KEY`/
+ * `PRIVATE_KEY` are redundant with the bare `SECRET`/`PRIVATE` treatment but kept
+ * explicit for readability; `API_KEY`/`APIKEY` and the `*_TOKEN` auth compounds are
+ * load-bearing (neither `API`/`KEY` nor a bare `TOKEN` is an indicator on its own).
  * @type {string[]}
  */
-const SECRET_INDICATORS = [
+const COMPOUND_INDICATORS = [
   'SECRET_KEY',
   'PRIVATE_KEY',
   'API_KEY',
   'APIKEY',
-  'SECRET',
-  'TOKEN',
+  'ACCESS_TOKEN',
+  'AUTH_TOKEN',
+  'API_TOKEN',
+  'BEARER_TOKEN',
+  'SESSION_TOKEN',
+  'REFRESH_TOKEN',
   'PRIVATE',
   'PASSWORD',
   'PASSWD',
   'CREDENTIAL'
 ];
 
-/** Prefix/indicator alternations — literal tokens escaped, joined for the pattern. */
-const PREFIX_ALT = PUBLIC_PREFIXES.map(escapeRegExp).join('|');
-const INDICATOR_ALT = SECRET_INDICATORS.map(escapeRegExp).join('|');
+/**
+ * TERMINAL-anchored indicator (CONSTANT). `SECRET` flags ONLY as the final name
+ * segment (`…_API_SECRET`) — never mid-name — so `NEXT_PUBLIC_SECRET_SANTA_ENABLED`
+ * (a feature flag) does NOT flag (F3.2). The `…_SECRET_KEY` compound is covered by
+ * COMPOUND_INDICATORS above.
+ * @type {string}
+ */
+const TERMINAL_INDICATOR = 'SECRET';
 
 /**
- * The single client-exposed-secret NAME pattern (CONSTANT via safeRegExp), built
- * from the literal token lists above (each escaped, so the source is fully
- * deterministic — no user-derived input, no raw `new RegExp`).
+ * Expand an uppercase literal indicator token into a CASE-INSENSITIVE regex source
+ * WITHOUT the `i` flag — each ASCII letter becomes a two-char class (`S`→`[Ss]`),
+ * `_` and digits stay literal. This lets the name TAIL match case-insensitively
+ * while the PREFIX (a separate, escaped, un-expanded literal) stays case-sensitive
+ * (F5). Tokens are module-level constants of `[A-Z0-9_]` only — no user input, no
+ * metacharacters, so the result is fully deterministic.
+ * @param {string} token
+ * @returns {string} regex source
+ */
+function ciPattern(token) {
+  return token.replace(/[A-Za-z]/g, ch => `[${ch.toUpperCase()}${ch.toLowerCase()}]`);
+}
+
+/** Case-insensitive indicator alternations (CONSTANT sources). */
+const COMPOUND_ALT = COMPOUND_INDICATORS.map(ciPattern).join('|');
+const TERMINAL_ALT = ciPattern(TERMINAL_INDICATOR);
+
+/**
+ * Build the client-exposed-secret NAME pattern (CONSTANT via safeRegExp) for a
+ * given ACTIVE prefix set. The source is fully deterministic — the prefixes are
+ * literal constants (escaped) and the indicator groups are literal constants
+ * (ci-expanded) — no user-derived input, no raw `new RegExp`.
  *
- * Shape: `\b <PUBLIC_PREFIX> (<SEGMENT>_)* <SECRET_INDICATOR> (_<SEGMENT>)* \b`
- *   - `\b` before the prefix rejects a mid-word coincidence (`REPUBLIC_TOKEN` — the
+ * Shape: `\b <PREFIX> ( <SEG_>* <COMPOUND> <_SEG>*  |  <SEG_>* <SECRET> ) \b`
+ *   - `\b` before the prefix rejects a mid-word coincidence (`REPUBLIC_...` — the
  *     `_` before `PUBLIC` is a word char, so there is no boundary there).
- *   - `(?:[A-Z0-9]+_)*` consumes leading name segments, each delimited by an
- *     underscore. Because `_` is not in `[A-Z0-9]`, the segments partition the name
- *     uniquely — a single linear quantifier with NO overlapping ambiguity, so no
- *     catastrophic backtracking (ReDoS-safe).
- *   - the indicator must begin a segment (it follows the prefix's `_` or a segment
- *     `_`) and `(?:_[A-Z0-9]+)*` consumes trailing segments, so the indicator sits
- *     on underscore boundaries: `NEXT_PUBLIC_SECRETARY_EMAIL` does NOT match
- *     (`SECRETARY` is not `SECRET` on a boundary), while
- *     `NEXT_PUBLIC_API_SECRET_V2` does.
- *   - CASE-SENSITIVE (no `i` flag): public prefixes are uppercase by framework
- *     convention; a lowercased name is not a real public variable.
+ *   - the PREFIX alternation is escaped literal + CASE-SENSITIVE (no `i` flag):
+ *     public prefixes are uppercase by framework convention.
+ *   - `(?:[A-Za-z0-9]+_)*` consumes leading name segments, each delimited by an
+ *     underscore; `_` is not in the class, so segments partition the name uniquely —
+ *     a single linear quantifier with NO overlapping ambiguity (ReDoS-safe). The
+ *     class is case-insensitive so a lowercase/mixed tail (`VITE_api_secret`) is
+ *     caught while the uppercase prefix requirement holds (F5).
+ *   - branch 1: a COMPOUND indicator on segment boundaries, trailing segments
+ *     allowed (`VITE_STRIPE_SECRET_KEY`, `NEXT_PUBLIC_ACCESS_TOKEN`).
+ *   - branch 2: the TERMINAL `SECRET` with NO trailing segment, so it flags only as
+ *     the last segment (`NEXT_PUBLIC_API_SECRET`) and never mid-name
+ *     (`NEXT_PUBLIC_SECRET_SANTA_ENABLED`).
  *
  * The `g` flag lets one physical line be scanned for every occurrence via
  * `String.prototype.matchAll` (which clones internally — no shared `lastIndex`
- * hazard).
- * @type {RegExp}
+ * hazard). Returns `null` when the active prefix set is empty (a detected framework
+ * whose exposure is not prefix-named — see FRAMEWORK_PUBLIC_PREFIXES).
+ * @param {string[]} activePrefixes
+ * @returns {RegExp|null}
  */
-const CLIENT_SECRET_RE = safeRegExp(
-  `\\b(?:${PREFIX_ALT})(?:[A-Z0-9]+_)*(?:${INDICATOR_ALT})(?:_[A-Z0-9]+)*\\b`,
-  'g'
-);
+function buildClientSecretRe(activePrefixes) {
+  if (!Array.isArray(activePrefixes) || activePrefixes.length === 0) return null;
+  const prefixAlt = activePrefixes.map(escapeRegExp).join('|');
+  return safeRegExp(
+    `\\b(?:${prefixAlt})(?:(?:[A-Za-z0-9]+_)*(?:${COMPOUND_ALT})(?:_[A-Za-z0-9]+)*|(?:[A-Za-z0-9]+_)*(?:${TERMINAL_ALT}))\\b`,
+    'g'
+  );
+}
+
+/**
+ * Full-line comment markers (CONSTANT literals). A line whose first non-whitespace
+ * is one of these is documentation, not an assignment, so it is skipped (F2):
+ *   - `#` in `.env*` files, `//` in source files.
+ * `BLOCK_COMMENT_RE` strips `/* … *\/` blocks from source before line scanning,
+ * `NON_NEWLINE_RE` blanks a block's non-newline chars so line numbers are preserved.
+ */
+const ENV_COMMENT_RE = /^\s*#/;
+const LINE_COMMENT_RE = /^\s*\/\//;
+const BLOCK_COMMENT_RE = /\/\*[\s\S]*?\*\//g;
+const NON_NEWLINE_RE = /[^\n]/g;
 
 /**
  * Matches an environment file by name: `.env`, `.env.local`, `.env.production`,
@@ -283,19 +367,50 @@ class FrameworkSecurityChecker {
   }
 
   /**
+   * The union of client-exposure prefixes over the DETECTED env-exposure frameworks
+   * (F3.1). Scoping to detected frameworks stops cross-framework prefix pooling — a
+   * Next-only repo yields only `NEXT_PUBLIC_`, so `PUBLIC_AUTH_TOKEN` (SvelteKit's
+   * prefix) is never scanned there. A detected framework whose exposure is not
+   * prefix-named (Angular, Remix) contributes nothing.
+   * @param {Array<{name:string}>} relevant
+   * @returns {string[]} the active prefix set
+   */
+  activePublicPrefixes(relevant) {
+    const set = new Set();
+    for (const f of relevant) {
+      const prefixes = f && FRAMEWORK_PUBLIC_PREFIXES[f.name];
+      if (Array.isArray(prefixes)) for (const p of prefixes) set.add(p);
+    }
+    return Array.from(set);
+  }
+
+  /**
    * Scan a single file's content for public-prefixed secret NAMES. Each matched
    * name yields ONE HIGH finding; duplicate (file,line,varName) triples are deduped
    * by the caller. The VALUE is never read — the regex matches the name token and
    * stops at the `=` / delimiter boundary.
+   *
+   * Full-line comments are skipped and `/* … *\/` blocks stripped BEFORE scanning
+   * (F2), so a variable merely NAMED in a comment (`.env.example`'s documented var
+   * names, a `// TODO` referencing a var) is not a false finding. `.env*` files use
+   * `#`; source files use `//` and `/* … *\/`.
    * @param {string} content - file text
    * @param {string} file - absolute path of the file (for the finding)
+   * @param {RegExp|null} scanRe - the active prefix-scoped pattern (null → no scan)
    * @returns {Array<{tool:string, rule:string, file:string, line:number, varName:string, severity:string}>}
    */
-  scanContent(content, file) {
+  scanContent(content, file, scanRe) {
     const out = [];
-    const lines = content.split(/\r?\n/);
+    if (!scanRe) return out;
+    const isEnv = ENV_FILE_RE.test(path.basename(file));
+    // Strip block comments from source (preserve line count by blanking non-newlines).
+    const text = isEnv ? content : content.replace(BLOCK_COMMENT_RE, m => m.replace(NON_NEWLINE_RE, ' '));
+    const lines = text.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
-      for (const m of lines[i].matchAll(CLIENT_SECRET_RE)) {
+      const line = lines[i];
+      // A line whose first non-whitespace is a comment marker is not an assignment.
+      if (isEnv ? ENV_COMMENT_RE.test(line) : LINE_COMMENT_RE.test(line)) continue;
+      for (const m of line.matchAll(scanRe)) {
         out.push({
           tool: 'framework-security',
           rule: 'client-exposed-secret',
@@ -339,6 +454,10 @@ class FrameworkSecurityChecker {
       };
     }
 
+    // Scope the scanned prefixes to the DETECTED frameworks (F3.1), then build the
+    // one constant, ReDoS-safe pattern from that active set.
+    const scanRe = buildClientSecretRe(this.activePublicPrefixes(relevant));
+
     const files = this.collectFiles();
     let scannedCount = 0;
     for (const file of files) {
@@ -355,7 +474,7 @@ class FrameworkSecurityChecker {
         continue;
       }
       scannedCount++;
-      this.findings.push(...this.scanContent(content, file));
+      this.findings.push(...this.scanContent(content, file, scanRe));
     }
 
     const findings = this.deduplicateFindings();
@@ -423,6 +542,7 @@ class FrameworkSecurityChecker {
 module.exports = {
   FrameworkSecurityChecker,
   SEVERITY,
-  PUBLIC_PREFIXES,
-  SECRET_INDICATORS
+  FRAMEWORK_PUBLIC_PREFIXES,
+  COMPOUND_INDICATORS,
+  TERMINAL_INDICATOR
 };
