@@ -1,0 +1,19 @@
+# Go capability entry — web-grounded 2026 toolchain. lint + test match tool-detector
+# DEFAULT_TOOLS exactly (golangci-lint run / go test ./...) for CR5 parity.
+language: go
+detectionMarkers: [go.mod, go.sum]
+extensions: [.go]
+toolchain:
+  lint:      { cmd: "golangci-lint run", tool: golangci-lint, altCmd: "go vet ./...", verified: web-2026-07 }
+  format:    { cmd: "gofmt -l .", tool: gofmt, verified: web-2026-07 }
+  typecheck: { cmd: "go build ./...", tool: go, verified: web-2026-07 }
+  test:      { cmd: "go test ./...", tool: go, verified: web-2026-07 }
+  coverage:  { cmd: "go test -coverprofile=coverage.out ./...", tool: go, verified: web-2026-07 }
+  security:  { cmd: "gosec ./...", tool: gosec, verified: web-2026-07 }
+  depsAudit: { cmd: "govulncheck ./...", tool: govulncheck, verified: web-2026-07 }
+  build:     { cmd: "go build ./...", tool: go, verified: web-2026-07 }
+run:
+  shapes: { cli: "go run .", server: "go run ." }
+  honest: true
+configScaffold: [go.mod, .golangci.yml]
+verified: web-2026-07

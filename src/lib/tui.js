@@ -18,6 +18,18 @@ const c = {
   magenta: '\x1b[35m'
 };
 
+// Security (R7-A): strip C0 (0x00-0x1F) and C1 (0x7F-0x9F) control chars before
+// rendering any attacker-influenceable string. The live dashboard (menu.js →
+// src/areas/*.js + src/tabs/*.js) interpolates agent-writable fields — plan
+// title/slug, `files:` frontmatter, task description, inbox question/decision/gate
+// frontmatter — straight to the terminal. An ESC / CR / C1 byte in such a field
+// forges a clear-screen + fake gate prompt on the human's decision surface. This is
+// the shared sanitizer the area/tab render layer applies; it mirrors the local copy
+// already in menu-screens.js / task-view.js. Newline survives only where a caller
+// keeps it deliberately — this strips 0x0a too, so callers wrap per-field, never
+// whole multi-line blocks.
+const stripCtl = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+
 // Get terminal width
 function getWidth() {
   return process.stdout.columns || 80;
@@ -244,6 +256,7 @@ function cleanup() {
 
 module.exports = {
   c,
+  stripCtl,
   getWidth,
   line,
   clear,

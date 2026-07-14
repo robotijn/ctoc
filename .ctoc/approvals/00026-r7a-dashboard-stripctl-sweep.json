@@ -1,0 +1,10 @@
+{
+  "content_sha256": "b6443cbd6768b1af7ca78e4846bc4f9d60e73af70c2d6d2755011d3d73703270",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T09:36:03.853Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-15 CR1/R7-A: coordinator-staged plan; ledger provenance backfilled (work human-ordered).",
+  "plan_basename": "00026-r7a-dashboard-stripctl-sweep"
+}

@@ -1,0 +1,20 @@
+# TypeScript capability entry — web-grounded 2026 toolchain. lint + test match
+# tool-detector DEFAULT_TOOLS exactly (eslint ./npm test) so CR5's swap is behavior-
+# preserving; biome is carried as the modern alternative via altCmd.
+language: typescript
+detectionMarkers: [tsconfig.json]
+extensions: [.ts, .tsx]
+toolchain:
+  lint:      { cmd: "eslint .", tool: eslint, altCmd: "biome check .", verified: web-2026-07 }
+  format:    { cmd: "prettier --check .", tool: prettier, altCmd: "biome format .", verified: web-2026-07 }
+  typecheck: { cmd: "tsc --noEmit", tool: tsc, verified: web-2026-07 }
+  test:      { cmd: "npm test", tool: npm, altCmd: "vitest run", verified: web-2026-07 }
+  coverage:  { cmd: "c8 npm test", tool: c8, verified: web-2026-07 }
+  security:  { cmd: "semgrep --config=p/typescript", tool: semgrep, verified: web-2026-07 }
+  depsAudit: { cmd: "npm audit", tool: npm, verified: web-2026-07 }
+  build:     { cmd: "tsc --build", tool: tsc, verified: web-2026-07 }
+run:
+  shapes: { web: "npm run dev", server: "npm start" }
+  honest: true
+configScaffold: [tsconfig.json, eslint.config.js]
+verified: web-2026-07

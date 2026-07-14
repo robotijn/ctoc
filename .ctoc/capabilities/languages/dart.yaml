@@ -1,0 +1,21 @@
+# Dart/Flutter capability entry — web-grounded 2026 toolchain (vision anchors).
+# Mobile run is HONEST: build+test is the CI-safe last mile (emulator boot is not
+# CI-reliable) — never a false "it ran". Dart has no established dedicated SAST, so
+# security + deps audit use osv-scanner (OSV.dev, supports the Pub ecosystem via pubspec.lock).
+language: dart
+detectionMarkers: [pubspec.yaml]
+extensions: [.dart]
+toolchain:
+  lint:      { cmd: "flutter analyze", tool: flutter, altCmd: "dart analyze", verified: web-2026-07 }
+  format:    { cmd: "dart format --set-exit-if-changed .", tool: dart, verified: web-2026-07 }
+  typecheck: { cmd: "flutter analyze", tool: flutter, verified: web-2026-07 }
+  test:      { cmd: "flutter test", tool: flutter, verified: web-2026-07 }
+  coverage:  { cmd: "flutter test --coverage", tool: flutter, verified: web-2026-07 }
+  security:  { cmd: "osv-scanner scan --lockfile=pubspec.lock", tool: osv-scanner, verified: web-2026-07 }
+  depsAudit: { cmd: "osv-scanner scan --lockfile=pubspec.lock", tool: osv-scanner, verified: web-2026-07 }
+  build:     { cmd: "flutter build apk", tool: flutter, verified: web-2026-07 }
+run:
+  shapes: { mobile: "flutter run", web: "flutter run -d chrome" }
+  honest: build-is-last-mile
+configScaffold: [pubspec.yaml, analysis_options.yaml]
+verified: web-2026-07
