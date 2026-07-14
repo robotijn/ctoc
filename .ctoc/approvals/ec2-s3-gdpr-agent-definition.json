@@ -1,0 +1,10 @@
+{
+  "content_sha256": "72f8f35ab3260ad5062a7a6259a8f33c6c40933f4e42dbd70b606f6918f4e2d8",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.592Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC2-s3-gdpr-agent-definition"
+}

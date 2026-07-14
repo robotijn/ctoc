@@ -1,0 +1,10 @@
+{
+  "content_sha256": "da6ce8374f297bf0c2f11a327b229a9311bc0885e9f47297949a19a86c58c0c6",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.601Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "pi5-duplicate-on-create-guard-s1-duplicate-guard"
+}

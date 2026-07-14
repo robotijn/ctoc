@@ -74,7 +74,9 @@ The matrix has been shown above the call. Do not replicate it inside the questio
 
 **One question per turn. Never batch.** Even if the questions appear independent, ask them sequentially. Render one matrix in the text response, then invoke AskUserQuestion with a single question. Wait for the answer. Then render the next matrix and ask the next question.
 
-This rule is absolute and overrides the AskUserQuestion built-in batching capability. The reason is user preference: each decision deserves its own focused turn so the user can reason about it without parallel options bleeding into the choice.
+This rule governs discussion and design questions — the decisions that shape what gets built. Each deserves its own focused turn so the user can reason about it without parallel options bleeding into the choice, and it overrides the AskUserQuestion built-in batching capability for those questions.
+
+Menu ride-along questions are the one exemption: the settings ride-alongs the dashboard attaches to a normal render — the environment (development / staging / production), the European Union compliance regime, and the stale-plans prompt — may be presented together in a single AskUserQuestion call (up to four questions at once), because they are quick settings toggles that do not shape a design and the user answers or dismisses them in passing. Discussion and design questions are never batched with them or with each other.
 
 ## More than four candidate options
 

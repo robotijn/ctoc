@@ -1,0 +1,10 @@
+{
+  "content_sha256": "9cd2c3f5f076142c1953e89bd4d8432d6d712365d8f5871caa9e03675d96d534",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.600Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "pi4-semantic-search-and-related-plans-s1-fusion"
+}

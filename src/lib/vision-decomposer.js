@@ -51,7 +51,8 @@ function parseCanvas(canvasPath) {
   // \r-normalized content after the leading fenced block).
   const { body } = parseFrontmatter(content);
 
-  // Parse H2 blocks
+  // Parse H2 blocks — keyed by the heading text, so the shape is a string map.
+  /** @type {{[heading: string]: string}} */
   const blocks = {};
   const blockRegex = /^##\s+(.+?)\n([\s\S]*?)(?=^##\s+|Z|$(?![\s\S]))/gm;
   let match;

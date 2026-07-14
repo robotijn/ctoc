@@ -815,15 +815,19 @@ describe('Edge / boundary behavior', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Cancel — cancelled status + transitions', () => {
-  it('ST-CANCEL-1: queued → cancelled and running → cancelled succeed and stamp ts.done', () => {
+  it('ST-CANCEL-1: queued → cancelled is immediate; a running task cancels via running → cancelling → cancelled (C1-2 replaced contract)', () => {
     const r = reg.emptyRegistry();
     const q = reg.addTask(r, { kind: 'plan' });
     reg.updateTask(r, q.id, { status: 'cancelled' });
     assert.equal(q.status, 'cancelled');
     assert.ok(q.ts.done, 'cancel stamps ts.done like other terminal transitions');
 
+    // A running task no longer cancels DIRECTLY (that would free its files under a
+    // live agent — C1-2). It must pass through the non-terminal `cancelling` state.
     const run = reg.addTask(r, { kind: 'plan' });
     reg.updateTask(r, run.id, { status: 'running' });
+    assert.throws(() => reg.updateTask(r, run.id, { status: 'cancelled' }), /invalid transition/);
+    reg.updateTask(r, run.id, { status: 'cancelling' });
     reg.updateTask(r, run.id, { status: 'cancelled' });
     assert.equal(run.status, 'cancelled');
     assert.ok(run.ts.done);
@@ -862,6 +866,272 @@ describe('Cancel — cancelled status + transitions', () => {
     const dep = T({ id: 't1', kind: 'plan', status: 'cancelled' });
     const dependent = C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] });
     assert.equal(reg.canRun(dependent, mkReg([dep, dependent])).reason, 'blocked-dep');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settled sync barrier deps (C1-1 — kind-aware depsSatisfied)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Scheduler — settled sync barrier deps (C1-1)', () => {
+  it('C1-1a: a sync candidate is runnable when every dep is SETTLED (terminal), even one failed', () => {
+    const depsReg = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'done', touches: ['a.js'] }),
+      T({ id: 't2', kind: 'implement', status: 'failed', touches: ['b.js'] })
+    ]);
+    const cand = C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1', 't2'] });
+    const d = reg.canRun(cand, depsReg);
+    assert.equal(d.run, true, 'a barrier waits for the wave to SETTLE, not to succeed');
+    assert.equal(d.reason, 'ok');
+  });
+
+  it('C1-1a2: cancelled and orphaned deps also count as settled for a sync candidate', () => {
+    const depsReg = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'cancelled', touches: ['a.js'] }),
+      T({ id: 't2', kind: 'implement', status: 'orphaned', touches: ['b.js'] })
+    ]);
+    const cand = C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1', 't2'] });
+    assert.equal(reg.canRun(cand, depsReg).run, true);
+  });
+
+  it('C1-1b: a sync candidate is BLOCKED while any dep is still running (not yet settled)', () => {
+    const depsReg = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'done', touches: ['a.js'] }),
+      T({ id: 't2', kind: 'implement', status: 'running', touches: ['b.js'] })
+    ]);
+    const cand = C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1', 't2'] });
+    assert.equal(reg.canRun(cand, depsReg).reason, 'blocked-dep');
+  });
+
+  it('C1-1b2: a cancelling dep is not settled → a sync candidate stays blocked-dep', () => {
+    const depsReg = mkReg([T({ id: 't1', kind: 'implement', status: 'cancelling', touches: ['a.js'] })]);
+    const cand = C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1'] });
+    assert.equal(reg.canRun(cand, depsReg).reason, 'blocked-dep');
+  });
+
+  it('C1-1c: a MISSING dep id never satisfies — a sync candidate is blocked-dep', () => {
+    const cand = C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['ghost'] });
+    assert.equal(reg.canRun(cand, reg.emptyRegistry()).reason, 'blocked-dep');
+  });
+
+  it('C1-1d: a NON-sync candidate keeps done-only deps (a failed dep still blocks)', () => {
+    const depsReg = mkReg([T({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'] })]);
+    const cand = C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] });
+    assert.equal(reg.canRun(cand, depsReg).reason, 'blocked-dep');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cancelling status (C1-2 — non-terminal, occupies its slot)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Cancelling status (C1-2)', () => {
+  it('C1-2a: running → cancelling → cancelled; cancelling is non-terminal (no ts.done until cancelled)', () => {
+    const r = reg.emptyRegistry();
+    const t = reg.addTask(r, { kind: 'implement', touches: ['a.js'] });
+    reg.updateTask(r, t.id, { status: 'running' });
+    reg.updateTask(r, t.id, { status: 'cancelling' });
+    assert.equal(t.status, 'cancelling');
+    assert.equal(t.ts.done, null, 'cancelling is non-terminal → files stay locked, no ts.done yet');
+    reg.updateTask(r, t.id, { status: 'cancelled' });
+    assert.equal(t.status, 'cancelled');
+    assert.ok(t.ts.done, 'cancelled (terminal) stamps ts.done');
+  });
+
+  it('C1-2b: queued → cancelling is rejected (only a running task can enter cancelling)', () => {
+    const r = reg.emptyRegistry();
+    const q = reg.addTask(r, { kind: 'plan' });
+    assert.throws(() => reg.updateTask(r, q.id, { status: 'cancelling' }), /invalid transition/);
+  });
+
+  it('C1-2c: a cancelling task OCCUPIES its slot, touches and gitOp (canRun sees file-conflict)', () => {
+    const r = mkReg([T({ id: 't1', kind: 'implement', status: 'cancelling', touches: ['a.js'] })]);
+    const cand = C({ id: 't2', kind: 'implement', touches: ['a.js'] });
+    const d = reg.canRun(cand, r);
+    assert.equal(d.run, false, 'files stay locked until the agent is confirmed gone');
+    assert.equal(d.reason, 'file-conflict');
+  });
+
+  it('C1-2c2: a cancelling task counts toward max-concurrent and the sync barrier', () => {
+    const occ = [1, 2, 3, 4].map(i => T({ id: `t${i}`, kind: 'review' }));
+    occ.push(T({ id: 't5', kind: 'review', status: 'cancelling' }));
+    assert.equal(reg.canRun(C({ id: 't6', kind: 'review' }), mkReg(occ)).reason, 'max-concurrent');
+
+    const rSync = mkReg([T({ id: 't1', kind: 'review', status: 'cancelling', touches: ['a.js'] })]);
+    assert.equal(reg.canRun(C({ id: 's', kind: 'sync', gitOp: true, touches: [] }), rSync).reason, 'sync-barrier');
+  });
+
+  it('C1-2c3: a cancelling gitOp task blocks an editing candidate (git-exclusive still applies)', () => {
+    const r = mkReg([T({ id: 't1', kind: 'plan', status: 'cancelling', gitOp: true, touches: [] })]);
+    assert.equal(reg.canRun(C({ id: 't2', kind: 'review', touches: ['a.js'] }), r).reason, 'git-exclusive');
+  });
+
+  it('C1-2d: cancelling → done records an honest late completion, keeping the result', () => {
+    const r = reg.emptyRegistry();
+    const t = reg.addTask(r, { kind: 'implement', touches: ['a.js'] });
+    reg.updateTask(r, t.id, { status: 'running' });
+    reg.updateTask(r, t.id, { status: 'cancelling' });
+    reg.updateTask(r, t.id, { status: 'done', result: { ok: true, summary: 'finished despite cancel' } });
+    assert.equal(t.status, 'done');
+    assert.deepEqual(t.result, { ok: true, summary: 'finished despite cancel' });
+    assert.ok(t.ts.done);
+  });
+
+  it('C1-2e: cancelling → failed is allowed; queued → cancelled stays immediate', () => {
+    const r = reg.emptyRegistry();
+    const t = reg.addTask(r, { kind: 'review' });
+    reg.updateTask(r, t.id, { status: 'running' });
+    reg.updateTask(r, t.id, { status: 'cancelling' });
+    reg.updateTask(r, t.id, { status: 'failed' });
+    assert.equal(t.status, 'failed');
+
+    const q = reg.addTask(r, { kind: 'plan' });
+    reg.updateTask(r, q.id, { status: 'cancelled' });
+    assert.equal(q.status, 'cancelled');
+    assert.ok(q.ts.done);
+  });
+
+  it('C1-2f: a cancelling task neither satisfies a done-dep nor a settled-sync dep (still in flight)', () => {
+    const dep = T({ id: 't1', kind: 'plan', status: 'cancelling' });
+    const nonSync = C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] });
+    assert.equal(reg.canRun(nonSync, mkReg([dep, nonSync])).reason, 'blocked-dep');
+    const sync = C({ id: 't3', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1'] });
+    assert.equal(reg.canRun(sync, mkReg([dep, sync])).reason, 'blocked-dep');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Orphaned late completion (C1-5 — a falsely-orphaned agent that finishes is accepted)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Orphaned late completion (C1-5)', () => {
+  it('C1-5a: orphaned → done is accepted and re-stamps ts.done', () => {
+    const r = reg.emptyRegistry();
+    const t = reg.addTask(r, { kind: 'implement', touches: ['a.js'] });
+    reg.updateTask(r, t.id, { status: 'running' });
+    reg.updateTask(r, t.id, { status: 'orphaned' });
+    reg.updateTask(r, t.id, { status: 'done', result: { ok: true, summary: 'late completion' } });
+    assert.equal(t.status, 'done');
+    assert.deepEqual(t.result, { ok: true, summary: 'late completion' });
+    assert.ok(t.ts.done, 'ts.done re-stamped on the accepted completion');
+  });
+
+  it('C1-5b: orphaned → failed is accepted (a late failure is recorded honestly)', () => {
+    const r = reg.emptyRegistry();
+    const t = reg.addTask(r, { kind: 'review' });
+    reg.updateTask(r, t.id, { status: 'running' });
+    reg.updateTask(r, t.id, { status: 'orphaned' });
+    reg.updateTask(r, t.id, { status: 'failed' });
+    assert.equal(t.status, 'failed');
+  });
+
+  it('C1-5c: orphaned → running / cancelled / cancelling remain rejected (only completion escapes)', () => {
+    const r = reg.emptyRegistry();
+    const t = reg.addTask(r, { kind: 'review' });
+    reg.updateTask(r, t.id, { status: 'running' });
+    reg.updateTask(r, t.id, { status: 'orphaned' });
+    assert.throws(() => reg.updateTask(r, t.id, { status: 'running' }), /invalid transition/);
+    assert.throws(() => reg.updateTask(r, t.id, { status: 'cancelled' }), /invalid transition/);
+    assert.throws(() => reg.updateTask(r, t.id, { status: 'cancelling' }), /invalid transition/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// unsatisfiableTasks (C1-1/C1-7 — surface the permanently-wedged)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('unsatisfiableTasks (C1-1/C1-7)', () => {
+  it('U-1: a non-sync queued task with a FAILED dep is unsatisfiable (dep-failed)', () => {
+    const r = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'] }),
+      C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] })
+    ]);
+    const out = reg.unsatisfiableTasks(r);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].task.id, 't2');
+    assert.equal(out[0].reason, 'dep-failed');
+    assert.deepEqual(out[0].deps, ['t1']);
+  });
+
+  it('U-1b: orphaned and cancelled deps also make a non-sync task unsatisfiable (terminal-non-done)', () => {
+    const r = mkReg([
+      T({ id: 't1', kind: 'plan', status: 'orphaned' }),
+      T({ id: 't2', kind: 'plan', status: 'cancelled' }),
+      C({ id: 'a', kind: 'review', touches: ['a.js'], blockedBy: ['t1'] }),
+      C({ id: 'b', kind: 'review', touches: ['b.js'], blockedBy: ['t2'] })
+    ]);
+    assert.deepEqual(reg.unsatisfiableTasks(r).map(o => o.task.id).sort(), ['a', 'b']);
+  });
+
+  it('U-2: a queued task with a MISSING dep is unsatisfiable (dep-missing), sync or not', () => {
+    const r = mkReg([
+      C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['ghost'] }),
+      C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['ghost'] })
+    ]);
+    const byId = new Map(reg.unsatisfiableTasks(r).map(o => [o.task.id, o.reason]));
+    assert.equal(byId.get('t2'), 'dep-missing');
+    assert.equal(byId.get('s'), 'dep-missing');
+  });
+
+  it('U-3: a two-task blockedBy cycle marks both members dep-cycle (iterative, no hang)', () => {
+    const r = mkReg([
+      C({ id: 't1', kind: 'review', touches: ['a.js'], blockedBy: ['t2'] }),
+      C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] })
+    ]);
+    const out = reg.unsatisfiableTasks(r);
+    assert.deepEqual(out.map(o => o.task.id).sort(), ['t1', 't2']);
+    assert.ok(out.every(o => o.reason === 'dep-cycle'));
+  });
+
+  it('U-4: a self blockedBy cycle marks the task dep-cycle', () => {
+    const r = mkReg([C({ id: 't1', kind: 'review', touches: ['a.js'], blockedBy: ['t1'] })]);
+    const out = reg.unsatisfiableTasks(r);
+    assert.deepEqual(out.map(o => o.task.id), ['t1']);
+    assert.equal(out[0].reason, 'dep-cycle');
+  });
+
+  it('U-4b: a three-task cycle marks all three; a plain DAG chain marks none', () => {
+    const cyc = mkReg([
+      C({ id: 't1', kind: 'review', touches: ['a.js'], blockedBy: ['t3'] }),
+      C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] }),
+      C({ id: 't3', kind: 'review', touches: ['c.js'], blockedBy: ['t2'] })
+    ]);
+    assert.deepEqual(reg.unsatisfiableTasks(cyc).map(o => o.task.id).sort(), ['t1', 't2', 't3']);
+
+    // A pure chain t1(done) → t2 → t3 with no back edge is NOT a cycle.
+    const dag = mkReg([
+      T({ id: 't1', kind: 'plan', status: 'done' }),
+      C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] }),
+      C({ id: 't3', kind: 'review', touches: ['c.js'], blockedBy: ['t2'] })
+    ]);
+    assert.deepEqual(reg.unsatisfiableTasks(dag), []);
+  });
+
+  it('U-5: a SYNC task with merely FAILED deps is NOT unsatisfiable (settled ≠ unsatisfiable)', () => {
+    const r = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'] }),
+      C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1'] })
+    ]);
+    assert.deepEqual(reg.unsatisfiableTasks(r), []);
+  });
+
+  it('U-6: satisfiable queued tasks (done dep, running dep, no deps) are excluded', () => {
+    const r = mkReg([
+      T({ id: 't1', kind: 'plan', status: 'done' }),
+      T({ id: 't2', kind: 'plan', status: 'running' }),
+      C({ id: 'a', kind: 'review', touches: ['a.js'], blockedBy: ['t1'] }),
+      C({ id: 'b', kind: 'review', touches: ['b.js'], blockedBy: ['t2'] }),
+      C({ id: 'c', kind: 'review', touches: ['c.js'] })
+    ]);
+    assert.deepEqual(reg.unsatisfiableTasks(r), []);
+  });
+
+  it('U-7: only QUEUED tasks are considered (a running task with a failed dep is not reported)', () => {
+    const r = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'] }),
+      T({ id: 't2', kind: 'review', status: 'running', blockedBy: ['t1'] })
+    ]);
+    assert.deepEqual(reg.unsatisfiableTasks(r), []);
   });
 });
 

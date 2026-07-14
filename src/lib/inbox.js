@@ -144,9 +144,15 @@ ${opts.rationale || ''}
 // W07-s4 (finding H1): CRLF-safe via the shared reader. Delegates fence detection
 // and \r-normalization to ./frontmatter, then applies the UNCHANGED colon-split /
 // unquote logic so CRLF inbox items parse byte-identically to their LF twins.
+/**
+ * @param {string} content - the raw file content
+ * @returns {{[key: string]: string}} every frontmatter key mapped to its
+ *   (unquoted, trimmed) string value; an empty map when there is no frontmatter
+ */
 function parseFrontmatter(content) {
   const { hasFrontmatter, lines } = splitFm(content);
   if (!hasFrontmatter) return {};
+  /** @type {{[key: string]: string}} */
   const out = {};
   for (const line of lines) {
     const c = line.indexOf(':');
@@ -160,6 +166,13 @@ function parseFrontmatter(content) {
   return out;
 }
 
+/**
+ * @param {string} dir - the queue directory to scan
+ * @param {string} [statusFilter] - keep only items whose `status` frontmatter
+ *   equals this value
+ * @returns {Array<{[key: string]: string}>} one string-keyed map per `.md` item
+ *   (all frontmatter fields plus `path`)
+ */
 function listItemsInDir(dir, statusFilter) {
   if (!safeFs.existsSync(dir)) return [];
   return safeFs.readdirSync(dir)
@@ -167,7 +180,9 @@ function listItemsInDir(dir, statusFilter) {
     .map(f => {
       const filePath = path.join(dir, f);
       const meta = parseFrontmatter(safeFs.readFileSync(filePath, 'utf8'));
-      return { ...meta, path: filePath };
+      /** @type {{[key: string]: string}} */
+      const item = { ...meta, path: filePath };
+      return item;
     })
     .filter(item => !statusFilter || item.status === statusFilter);
 }
@@ -270,14 +285,36 @@ function listEscalations(root) {
   }
 }
 
+/**
+ * R2-C2 item 6: the honest possibly-stale COUNT — cheap candidates filtered to the
+ * stages the classifier can ACT on. A candidate at a NOT_STARTED stage
+ * (vision/canvas/functional) whose only issue is unbuilt declared files is benign
+ * (not-started, not abandoned) and the classifier downgrades it to inconclusive
+ * with a null action — so it must not inflate the "possibly-stale" nag. We count
+ * `.candidates` (not `.count`) so the filter is authoritative; the drill-in list
+ * (listStaleCandidates) stays UNFILTERED, showing everything the scan found.
+ * Fail-safe: an older stale-detector without the NOT_STARTED_STAGES export filters
+ * nothing (falls back to the raw candidate count).
+ * @param {string} root
+ * @returns {number}
+ */
+function countActionableStale(root) {
+  const { candidates } = staleDetector.scanCheapCandidates(root);
+  const list = Array.isArray(candidates) ? candidates : [];
+  const notStarted = staleDetector.NOT_STARTED_STAGES;
+  if (!notStarted || typeof notStarted.has !== 'function') return list.length;
+  return list.filter((c) => c && !notStarted.has(c.stage)).length;
+}
+
 const getInboxCounts = memoize(function getInboxCountsImpl(root) {
   return {
     questions: listQuestions(root).length,
     escalations: listEscalations(root).length,
     decisions: listDecisions(root).length,
     gatesWaiting: listPlansAtGates(root).length,
-    // SP2: cheap stale count. One scan per memoize window (5 s TTL) ⇒ Goal 1.
-    staleCandidates: staleDetector.scanCheapCandidates(root).count,
+    // SP2 + R2-C2 item 6: one cheap scan per memoize window (5 s TTL), counted to
+    // the actionable stages only (a functional not-started plan is not "stale").
+    staleCandidates: countActionableStale(root),
   };
 }, 'getInboxCounts');
 

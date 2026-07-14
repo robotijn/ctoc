@@ -665,7 +665,10 @@ class QualityGate {
           config[currentSection] = {};
         } else if (currentSection && trimmed.includes(':')) {
           const [key, value] = trimmed.split(':').map(s => s.trim());
-          config[currentSection][key] = isNaN(value) ? value : Number(value);
+          // `value` is a raw string; global isNaN performs the same ToNumber
+          // coercion internally, so the `any` cast keeps runtime behavior identical
+          // while satisfying isNaN's numeric parameter type.
+          config[currentSection][key] = isNaN(/** @type {any} */ (value)) ? value : Number(value);
         }
       }
 

@@ -22,6 +22,7 @@ function getStatusPath(planPath) {
  * @param {string} status.agent - Agent type (research-assistant, implementation-planner, etc.)
  * @param {string} status.status - Current status (working, complete, needs-input, timeout)
  * @param {string} [status.message] - Optional status message
+ * @param {string} [status.started] - ISO timestamp the agent began; defaults to now
  */
 function writeStatus(planPath, status) {
   const statusPath = getStatusPath(planPath);

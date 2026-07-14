@@ -1,0 +1,10 @@
+{
+  "content_sha256": "199c97673e21521bfc41c77e6c199f42da2c586e41317209e73432b8a80398bc",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.588Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s3-aiml-numeric-frameworks"
+}

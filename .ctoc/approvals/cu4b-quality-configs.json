@@ -1,0 +1,10 @@
+{
+  "content_sha256": "ebe489acd912ae49c0ab9657f17e26d6f6b9d54c6e0080de753fa10d3ba29477",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.590Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4b-quality-configs"
+}

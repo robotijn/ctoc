@@ -112,6 +112,7 @@ async function compareSkillVersions(caseObj, baselineVersion, candidateVersion, 
 
   // 4. Un-shuffle: convert the judge's "1" / "2" / "tie" into the canonical
   //    A (baseline) / B (candidate) labels.
+  /** @type {'tie'|'A'|'B'} */
   let winner;
   if (verdict.winner === 'tie') {
     winner = 'tie';

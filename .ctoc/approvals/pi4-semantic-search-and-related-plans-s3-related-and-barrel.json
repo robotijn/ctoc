@@ -1,0 +1,10 @@
+{
+  "content_sha256": "0da70f79af74feec348e28fbf6ffe2ba1a1bd233be2f88d819b1a1dfe5867411",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.600Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "pi4-semantic-search-and-related-plans-s3-related-and-barrel"
+}

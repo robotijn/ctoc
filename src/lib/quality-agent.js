@@ -651,8 +651,9 @@ async function main() {
 
     const duration = Date.now() - startTime;
 
-    // Build summary for quality state
-    const tier1 = results.tier1 || {};
+    // Build summary for quality state. `runTieredChecks` returns a dynamically
+    // shaped result whose per-tool sub-objects checkJs cannot infer — typed `any`.
+    const tier1 = /** @type {any} */ (results.tier1 || {});
     qualityState.setCompleted(results.allPassed, {
       tests: tier1.tests || { passed: true, passCount: 0, failed: 0, skipped: 0, flaky: 0 },
       coverage: 0, // TODO: implement coverage

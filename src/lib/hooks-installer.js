@@ -468,8 +468,8 @@ class NativeHooksInstaller {
  * hook system.
  *
  * @param {string} projectRoot - The project root directory
- * @param {Object} options - Installation options
- * @param {string} options.pluginRoot - CTOC plugin root directory (auto-detected if not provided)
+ * @param {Object} [options] - Installation options
+ * @param {string} [options.pluginRoot] - CTOC plugin root directory (auto-detected if not provided)
  * @returns {Object} Installation result { installed, skipped, error }
  */
 function installPostCommitHook(projectRoot, options = {}) {

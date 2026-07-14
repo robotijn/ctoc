@@ -312,14 +312,25 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
     assert.ok(failed.promote.some((t) => t.id === f2.taskId), 'queued implement promoted on fail');
   });
 
-  it('B-PROMOTE-failcancel(cancel): cancelling a running implement promotes the queued implement', () => {
+  it('B-PROMOTE-failcancel(cancel): cancelling a running implement enters `cancelling`, KEEPS its files, so a same-file queued task is NOT promoted (a non-conflicting sibling IS)', () => {
+    // R2-C honest cancel (C1-2): running → `cancelling` (NOT `failed`, NOT a direct
+    // `cancelled`). A cancelling task still OCCUPIES its slot + touches until the
+    // harness agent is confirmed gone, so the registry never frees a live agent's
+    // files early — the file-conflicting queued implement must stay queued.
     const c1 = ms.route(['menu', 'task', 'add', 'implement', 'pi1', '--touches', 'src/shared.js'], root);
     ms.route(['menu', 'task', 'start', c1.taskId], root);
-    const c2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/shared.js'], root);
+    const c2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/shared.js'], root); // conflicts on the file
+    const c3 = ms.route(['menu', 'task', 'add', 'review', 'clean'], root); // no touches → cannot conflict
     const cancelled = ms.route(['menu', 'task', 'cancel', c1.taskId], root);
+    assert.equal(cancelled.status, 'cancelling', 'running → cancelling (not failed/cancelled)');
     assert.equal(cancelled.cancelled, true);
+    // On disk the cancelling task still holds its file.
+    const t1 = taskRegistry.load(root).tasks.find((t) => t.id === c1.taskId);
+    assert.equal(t1.status, 'cancelling');
     assert.ok(Array.isArray(cancelled.promote), 'cancel returns a promote[] array');
-    assert.ok(cancelled.promote.some((t) => t.id === c2.taskId), 'queued implement promoted on cancel');
+    assert.ok(!cancelled.promote.some((t) => t.id === c2.taskId), 'same-file queued task NOT promoted (files still locked)');
+    // Non-vacuous: the non-conflicting sibling IS promoted (the slot is not fully full).
+    assert.ok(cancelled.promote.some((t) => t.id === c3.taskId), 'the non-conflicting sibling IS promoted');
   });
 
   it('B-PROMOTE-blocked: a blocked-dep task is excluded while its UNblocked sibling IS promoted (not vacuously empty)', () => {

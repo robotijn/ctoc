@@ -101,12 +101,14 @@ describe('NB2 — task subcommands (S1–S3)', () => {
     reg = taskRegistry.load(root);
     assert.equal(reg.tasks.find(t => t.id === add2.taskId).result.ok, false);
 
+    // R2-C honest cancel (C1-2): a QUEUED task cancels immediately → `cancelled`
+    // (never the old `failed`-with-a-flag). add3 was never started, so it is queued.
     const add3 = ms.route(['menu', 'task', 'add', 'review', 'LH3'], root);
     const cancelled = ms.route(['menu', 'task', 'cancel', add3.taskId], root);
-    assert.equal(cancelled.status, 'failed');
+    assert.equal(cancelled.status, 'cancelled');
     assert.equal(cancelled.cancelled, true);
     reg = taskRegistry.load(root);
-    assert.equal(reg.tasks.find(t => t.id === add3.taskId).result.cancelled, true);
+    assert.equal(reg.tasks.find(t => t.id === add3.taskId).status, 'cancelled');
   });
 
   it('S3: list returns every task with status/label/plan', () => {
@@ -198,6 +200,54 @@ describe('NB2 — task-board + task-detail screens (S6–S7, S9)', () => {
     assert.ok(vals.some(v => /^(plan|browse) /.test(v)), 'next-action is a NAV route');
     assert.ok(!vals.some(v => /^claude:/.test(v)), 'no gate-crossing mutation');
     assert.match(JSON.stringify(d), /Gate 3 ready/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R2-C2 item 7 — a `cancelling` task is VISIBLE (board + tasks section). A
+// cancelling task still OCCUPIES a concurrency slot and holds its file locks
+// until the harness agent is confirmed gone (task-registry OCCUPYING set); an
+// invisible one is a lying dashboard (it blocks other tasks with no explanation).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('R2-C2 — cancelling task is visible (item 7)', () => {
+  it('renderTasksSection surfaces a cancelling task (not dropped)', () => {
+    const reg = mkReg([
+      T({ id: 't1', kind: 'implement', plan: 'pi1', status: 'cancelling' }),
+      T({ id: 't2', kind: 'implement', plan: 'pi2', status: 'queued', touches: ['src/pi2.js'], blockedBy: ['t1'] }),
+    ]);
+    const s = taskView.renderTasksSection(reg);
+    assert.match(s, /cancelling/, 'the cancelling count/label is rendered');
+    assert.match(s, /pi1/, 'the cancelling task is named, not hidden');
+    // Its file lock is honest: the queued task waiting on it names the wait.
+    assert.match(s, /queued/, 'the blocked queued task is still shown');
+  });
+
+  it('renderTaskBoard shows a Cancelling group with a selectable id', () => {
+    const reg = mkReg([
+      T({ id: 't1', kind: 'implement', plan: 'pi1', status: 'cancelling' }),
+      T({ id: 't2', kind: 'review', plan: 'LH1', status: 'done' }),
+    ]);
+    const board = taskView.renderTaskBoard(reg);
+    assert.match(board.text, /Cancelling/, 'board renders a Cancelling group');
+    assert.match(board.text, /\[cancelling\]/, 'the row shows the cancelling status');
+    assert.equal(board.actions['t1'], 'task t1', 'the cancelling task is selectable by its id');
+    for (const k of Object.keys(board.actions)) {
+      assert.ok(!/^\d+$/.test(k), `no bare-digit action key: ${k}`);
+    }
+  });
+
+  it('a lone cancelling task still produces a TASKS section (empty-check includes it)', () => {
+    const reg = mkReg([T({ id: 't1', kind: 'implement', plan: 'pi1', status: 'cancelling' })]);
+    const s = taskView.renderTasksSection(reg);
+    assert.notEqual(s, '', 'a cancelling-only registry is NOT treated as empty');
+    assert.match(s, /TASKS/);
+  });
+
+  it('a terminal cancelled task renders too (folded into the terminal group)', () => {
+    const reg = mkReg([T({ id: 't1', kind: 'implement', plan: 'pi1', status: 'cancelled' })]);
+    const board = taskView.renderTaskBoard(reg);
+    assert.match(board.text, /\[cancelled\]/, 'a terminal cancelled task is not dropped from the board');
   });
 });
 

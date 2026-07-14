@@ -596,10 +596,10 @@ function checkReachabilityFence(root) {
 
 /**
  * Run all invariant checks against the project at `root`.
- * @param {Object} opts
- * @param {string} opts.root - Project root (auto-detected if omitted)
- * @param {'fast'|'thorough'} opts.mode - Fast skips expensive checks; thorough runs everything
- * @param {string[]} opts.scopes - Limit to scopes (e.g. ['architecture','iron-loop'])
+ * @param {Object} [opts]
+ * @param {string} [opts.root] - Project root (auto-detected if omitted)
+ * @param {'fast'|'thorough'} [opts.mode] - Fast skips expensive checks; thorough runs everything
+ * @param {string[]} [opts.scopes] - Limit to scopes (e.g. ['architecture','iron-loop'])
  * @returns {Object} { findings: [...], summary: {critical, block, warn, info, total}, mode }
  */
 function checkAllInvariants(opts = {}) {

@@ -154,8 +154,74 @@ function writeActiveProfiles(projectRoot, profileNames) {
   }
 }
 
+/**
+ * Persist a durable "None" decision (R2-C2 item 1 / R1). Answering "None" to the
+ * compliance ride-along must STOP the menu re-asking — but `writeActiveProfiles([])`
+ * is a deliberate no-op (an empty list is not the same as "the human declined"),
+ * so "None" is a SEPARATE verb: it writes a fixed-literal `declined: true` marker
+ * INSIDE the `regulatory_regime:` block. The reader of record
+ * (regulatory-regime.js loadActiveProfiles) exposes it as `.declined`, which
+ * `needsComplianceRegimePrompt` (menu.js) honors.
+ *
+ * Truth table (settings.yaml):
+ *   missing file            → { ok:false }  (never fabricate a hook-critical file)
+ *   block present, no marker → insert `  declined: true` after the header → ok
+ *   block present, marker    → set it true (idempotent) → ok
+ *   NO regulatory_regime block (legacy) → CREATE the block with the marker → ok
+ *     (a decline must persist; it does NOT fail-open like writeActiveProfiles,
+ *      whose refusal protects an ADDITIVE activation, not a human's explicit "no")
+ *
+ * SECURITY: the marker is a FIXED LITERAL (`declined: true`) — no caller value is
+ * interpolated, so there is no yaml-injection surface. It touches ONLY the
+ * regulatory_regime block, never a workflow-gate key, so it cannot weaken a human
+ * gate. Fail-open for expected inputs (bad root / fs error ⇒ { ok:false }), never
+ * throws.
+ *
+ * @param {string} projectRoot
+ * @returns {{ ok: boolean, declined?: boolean }}
+ */
+function declineComplianceRegime(projectRoot) {
+  if (typeof projectRoot !== 'string' || projectRoot.length === 0) return { ok: false };
+  const settingsPath = path.join(projectRoot, SETTINGS_REL);
+  try {
+    // Never fabricate the hook-critical settings.yaml (mirror writeActiveProfiles).
+    if (!safeFs.existsSync(settingsPath)) return { ok: false };
+
+    let content = safeFs.readFileSync(settingsPath, 'utf8');
+    // Static literal regexes only (no dynamic RegExp from any input); `m` + `\r?\n`
+    // are CRLF-tolerant for a Windows checkout.
+    const declinedRe = /^([ \t]*)declined:[ \t]*.*$/m;
+    const headerRe = /^(regulatory_regime:[ \t]*)\r?\n/m;
+
+    if (declinedRe.test(content)) {
+      // Existing marker (or a false one) → set it true. Idempotent.
+      content = content.replace(declinedRe, '$1declined: true');
+    } else if (headerRe.test(content)) {
+      // Block present, no marker → insert an indented marker right after the header.
+      content = content.replace(headerRe, (_m, header) => `${header}\n  declined: true\n`);
+    } else {
+      // Legacy project: no regulatory_regime block at all → create it. A decline is
+      // an explicit human choice and MUST persist (not fail-open). PREPEND the block
+      // (rather than append) so the reader-of-record's block regex — which needs a
+      // following top-level key to anchor its non-greedy body — can always resolve
+      // it, even when the file had no trailing block after regulatory_regime.
+      const tail = content.length === 0 ? '' : (content.startsWith('\n') ? '' : '\n') + content;
+      content = `regulatory_regime:\n  declined: true\n${tail}`;
+    }
+
+    safeFs.writeFileSync(settingsPath, content);
+
+    // Round-trip verify through the reader of record.
+    const { declined } = loadActiveProfiles(projectRoot);
+    return { ok: declined === true, declined: declined === true };
+  } catch {
+    return { ok: false };
+  }
+}
+
 module.exports = {
   shouldRunGdpr,
   shouldRunEuAiAct,
   writeActiveProfiles,
+  declineComplianceRegime,
 };

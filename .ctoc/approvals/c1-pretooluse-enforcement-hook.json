@@ -1,0 +1,10 @@
+{
+  "content_sha256": "81aa0524317e097c38948e7e933cc758ec333fc59d07e81c11c096064a1c5570",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.582Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "C1-pretooluse-enforcement-hook"
+}

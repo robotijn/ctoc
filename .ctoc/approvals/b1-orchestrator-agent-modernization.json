@@ -1,0 +1,10 @@
+{
+  "content_sha256": "e14c3f157cd182038c0768e621f4e680599c599f9cf9a7bdcd06f878e8b18665",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.582Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "B1-orchestrator-agent-modernization"
+}

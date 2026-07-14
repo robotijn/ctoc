@@ -84,7 +84,7 @@ function denyDecision(reason) {
  * code without killing the test process; production passes no `opts`.
  *
  * @param {string} reason - the deny reason (becomes `permissionDecisionReason`).
- * @param {{stream?:{write:(s:string)=>unknown}, exit?:(code:number)=>unknown}} [opts]
+ * @param {{stream?:{write:(s:string)=>unknown}, exit?:(code:number)=>void}} [opts]
  * @returns {void}
  */
 function emitDeny(reason, opts = {}) {

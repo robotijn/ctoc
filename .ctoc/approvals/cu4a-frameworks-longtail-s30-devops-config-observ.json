@@ -1,0 +1,10 @@
+{
+  "content_sha256": "24526c6794ab2721905cf2033b7c4b105f771976a677ed03a7d2f3818fbcfffe",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.589Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s30-devops-config-observ"
+}

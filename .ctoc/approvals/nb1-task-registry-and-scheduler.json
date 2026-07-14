@@ -1,0 +1,10 @@
+{
+  "content_sha256": "9d619a360dad35128a9fd893f04582a0ce646b31340f5a8f2d22a92382356246",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.594Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "NB1-task-registry-and-scheduler"
+}

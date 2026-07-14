@@ -1,0 +1,10 @@
+{
+  "content_sha256": "70044636b2260dea9264a93399bf230c414d0f53c80e7ec06cf1f5633dbc4120",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.582Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "B2-leaf-agents-to-skills-and-skill-sweep"
+}

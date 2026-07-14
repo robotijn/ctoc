@@ -60,8 +60,27 @@ describe('Menu — environment question rides along, never gates', () => {
     // Both action sets present.
     assert.ok('Business' in r.actions, 'pipeline navigation intact');
     assert.equal(r.actions['Development'], 'claude:set-environment dev');
-    // "Decide later" must NOT loop back into a prompt-gate.
-    assert.equal(r.actions['Decide later'], 'claude:env-decide-later');
+    // R2-C2 item 2: the one-turn "Decide later" skip (the F7 re-ask hell) is
+    // REPLACED by a durable "Keep defaults, stop asking" option that persists
+    // general.environment_prompt_dismissed. Option count stays 4.
+    assert.ok(!('Decide later' in r.actions), 'one-turn "Decide later" is gone');
+    assert.equal(r.actions['Keep defaults, stop asking'], 'claude:env-keep-defaults',
+      'durable dismissal replaces the one-turn skip');
+    assert.equal(r.ask.questions[1].options.length, 4, 'environment question still has 4 options');
+    // The durable option names the anytime-changeable path (System → Settings).
+    const keep = r.ask.questions[1].options.find(o => o.label === 'Keep defaults, stop asking');
+    assert.match(keep.description, /Settings/, 'description names where to set the environment later');
+  });
+
+  it('environment UNSET but DISMISSED: env question does NOT ride along', () => {
+    // The human already chose "Keep defaults, stop asking" — the durable marker
+    // makes needsEnvironmentPrompt false even though environment stays 'ask'.
+    const r = runMenu(projectWith({ general: { environment_prompt_dismissed: true } }));
+    assert.match(r.text, /▼ Business/, 'overview still visible');
+    assert.equal(r.ask.questions.length, 1, 'only the pipeline question — env ride-along suppressed');
+    assert.equal(r.ask.questions[0].header, 'Pipeline');
+    assert.ok(!('Development' in r.actions), 'no env actions once dismissed');
+    assert.ok(!('Keep defaults, stop asking' in r.actions), 'no env dismiss action once dismissed');
   });
 
   it('environment SET: plain dashboard, single question, no banner', () => {

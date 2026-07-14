@@ -43,7 +43,7 @@ const CATEGORY_PATHS = {
  *
  * @param {string} projectRoot
  * @param {string} category - one of RETENTION_CATEGORIES
- * @returns {{category, retention_days, candidates: Array<{path, age_days, mtime}>}}
+ * @returns {{category, retention_days, candidates: Array<{path, age_days, mtime}>, scanned_path: string, note?: string}}
  */
 function findOlderThanRetention(projectRoot, category) {
   if (!RETENTION_CATEGORIES.includes(category)) {

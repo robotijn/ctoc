@@ -111,7 +111,9 @@ function getPosture(planPath) {
       `Allowed values: ${VALID_POSTURES.join(', ')}.`
     );
   }
-  return raw;
+  // `raw` was just validated against VALID_POSTURES above, so it is one of the
+  // three literal postures — narrow the widened `string` back to that union.
+  return /** @type {'none'|'counsel-directed'|'client-only'} */ (raw);
 }
 
 /**

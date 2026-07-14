@@ -1,0 +1,10 @@
+{
+  "content_sha256": "999faf2b34c321d697d868e52a2b92708a811402d4f82661acc78205ea04ffca",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.595Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "SP2-stale-plans-inbox-stream"
+}

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "8944a77fafe6b61da263fc194f1e1751ac439441423854fad987fec995e88cb4",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.595Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "OM1-operating-manual-merge"
+}

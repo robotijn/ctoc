@@ -11,7 +11,7 @@
 
 AI coding assistants write code fast. Too fast. Without discipline, they produce code that solves the wrong problem, breaks existing features, ships vulnerabilities, and is unmaintainable.
 
-Iron Loop is the discipline. It forces AI to plan before coding, test before implementing, and verify before shipping. The methodology is enforced by hooks, not honor — if an agent tries to write code before planning, the hook blocks it; if it skips verification, the quality gate fails.
+Iron Loop is the discipline. It forces AI to plan before coding, test before implementing, and verify before shipping. File-edit, commit, and gate-residency enforcement ARE hooked — a PreToolUse hook blocks an Edit/Write before planning, and a plan parked at a gate without a human marker is auto-reverted. Step execution, dispatch logging, and the two-plane task protocol are instruction-level discipline the session model follows, not hook-enforced. So the methodology is enforced by hooks where a hook can enforce, and by disciplined honor where it cannot — never a claim of enforcement the code does not keep.
 
 Three checkpoints give the human final authority:
 1. **You approve what to build** (after functional planning)
@@ -123,8 +123,12 @@ crash loses one slice, not a whole feature.
 for ALL siblings of a parent AT ONCE via `approveSubplans(parentSlug, fromStage,
 projectPath)` in `src/lib/actions.js` — ONE human decision crosses every sibling, each
 stamped `approved_by: human` (the helper loops the existing gate-safe `approvePlan`; no
-new auto-cross path). So more plans does NOT mean more prompts. Build stays sequential
-+ dependency-ordered; `listSubplans(parentSlug)` enumerates a parent's set.
+new auto-cross path). The human triggers each batch by typing a WORD shortcut on the
+parent's stage list — `todo-all` on the implementation list (Gate 2) and `done-all` on
+the review list (Gate 3); **typing the word `done-all` IS the Gate-3 approval** (there
+is no auto-cross — a human types it). So more plans does NOT mean more prompts. Build
+stays sequential + dependency-ordered; `listSubplans(parentSlug)` enumerates a parent's
+set.
 
 AUTOMATED — agents execute, you review
 ═══════════════════════════════════════════════════════════════
@@ -354,7 +358,7 @@ Even trivial requests get a mini-plan with test. User can override with any esca
 
 ## Hook Enforcement
 
-The Iron Loop is enforced by hooks that run before every Edit/Write operation.
+The Iron Loop's file-edit enforcement runs as hooks before every Edit/Write operation.
 
 ### How It Works
 

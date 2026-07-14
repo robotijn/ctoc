@@ -1,0 +1,10 @@
+{
+  "content_sha256": "8ea69eab47dc46b95f7a919bbd2d9804c810b69c0dc528c22aae667c724707a4",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.587Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s12-data-batch-spark"
+}

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "cc5ba34b623332f216c2f7d76fa23d73c2eaff46ed92ed23585b9d94f1008317",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.588Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s28-devops-containers"
+}

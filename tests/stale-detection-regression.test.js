@@ -322,7 +322,7 @@ describe('SP5 — stale-detection regression', () => {
     const donePath = path.join(root, 'plans', 'done', 'recon-plan.md');
     assert.ok(fs.existsSync(donePath), 'plan landed in done/ via reconciliation');
     const moved = fs.readFileSync(donePath, 'utf8');
-    assert.match(moved, /^---\napproved_by: human\n/, 'moved file carries the approval marker in its first block');
+    assert.match(moved, /^---\nadvanced_by: pipeline\n/, 'moved file carries the PIPELINE provenance marker in its first block (R2-I: a machine never writes the human marker)');
     assert.match(moved, /gate_crossed: stale-reconciliation/, 'reconciliation gate marker is unambiguous in audit');
     assert.equal(result.to, 'done');
   });

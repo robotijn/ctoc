@@ -46,9 +46,22 @@ const taskReconcile = require('../src/lib/task-reconcile');
 
 const MENU = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
 
-// Older than DEFAULT_STALE_MS (30 min): a `running` task this old is orphaned by
-// the staleness backstop whenever a live id does NOT confirm it.
+// Older than DEFAULT_STALE_MS (30 min). A `running` task this old is orphaned
+// whenever a live set is PRESENT and does not confirm it (the definitive dead
+// signal — age is not what condemns it there).
 const PAST_STALE_MIN = 40;
+
+// R2-A made the AGE backstop kind-aware: with NO live set to consult, reconcile
+// orphans on age alone, and an `implement` task gets a 120-minute floor rather
+// than the flat 30-minute DEFAULT_STALE_MS — an implement run legitimately takes
+// hours, so a flat floor falsely orphaned live agents. These are derived from the
+// production constant, never a duplicated literal, so the fixture tracks the
+// contract if the floor ever moves.
+const IMPLEMENT_STALE_MIN = taskReconcile.DEFAULT_STALE_MS_BY_KIND.implement / 60_000; // 120
+const PAST_IMPLEMENT_STALE_MIN = IMPLEMENT_STALE_MIN + 30;  // 150 — past the floor
+// 45 sits INSIDE the implement floor but ABOVE the old flat 30-min one, so a
+// regression back to the flat floor is caught rather than silently tolerated.
+const WITHIN_IMPLEMENT_GRACE_MIN = 45;
 
 // ── isolated tmp-root harness ───────────────────────────────────────────────
 let root;
@@ -175,12 +188,29 @@ describe('W10-s4 (H8) — live-agent ids threaded through route → reconcile', 
     assert.equal(readTask(t1).status, 'done');
   });
 
-  it('5. a true session restart (no live ids) still orphans a stale task (scenario 8, backstop preserved)', () => {
-    const [t1] = seedRunning([{ agentTaskId: 'a1' }]);
+  it('5. a true session restart (no live ids) orphans an implement task past the 120-min floor but NOT one inside it (scenario 8 backstop preserved, R2-A kind-aware floor pinned)', () => {
+    // Both tasks are seeded into the SAME registry and reconciled in the SAME
+    // pass, so neither half can be satisfied by a "fix" that breaks the other:
+    //   • disable staleness entirely  → the stale task stays running → 1st fails.
+    //   • revert to the flat 30-min floor → the 45-min task is orphaned → 2nd fails.
+    const [stale, young] = seedRunning([
+      { agentTaskId: 'a1', ageMinutes: PAST_IMPLEMENT_STALE_MIN, plan: 'w10-stale' },
+      { agentTaskId: 'a2', ageMinutes: WITHIN_IMPLEMENT_GRACE_MIN, plan: 'w10-young' },
+    ]);
 
-    // No opts / no liveAgentIds → reconcile falls back to the staleness backstop.
+    // No opts / no liveAgentIds → reconcile falls back to the AGE backstop.
     ms.route(['menu'], root);
-    assert.equal(readTask(t1).status, 'orphaned', 'stale task with no live confirmation is still orphaned');
+
+    assert.equal(
+      readTask(stale).status,
+      'orphaned',
+      'backstop preserved: an implement task past the 120-min floor, with no live id confirming it, is still orphaned',
+    );
+    assert.equal(
+      readTask(young).status,
+      'running',
+      'kind-aware floor: a 45-min implement task is INSIDE the 120-min grace window and must NOT be orphaned on age alone',
+    );
   });
 });
 

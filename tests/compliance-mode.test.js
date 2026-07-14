@@ -276,11 +276,16 @@ describe('compliance-regime — GATE INVARIANT (parent Success Metric 5)', () =>
     const src = fs.readFileSync(MODULE_SRC, 'utf8');
     assert.doesNotMatch(src, /enforcementMode/, 'no enforcementMode reference');
     assert.doesNotMatch(src, /requireReviewGate/, 'no requireReviewGate reference');
-    // Exported surface is exactly the three compliance functions — nothing gate-shaped.
+    // Exported surface is exactly the compliance functions — nothing gate-shaped.
+    // R2-C2 (plans/todo/00010-r2c2-persisted-answers-unblocked.md) item 1 adds
+    // `declineComplianceRegime` — the durable "None" persist verb. It writes only a
+    // `declined:` marker inside the regulatory_regime block and, like its siblings,
+    // exposes NO enforcementMode/requireReviewGate key (asserted above). The pin is
+    // TIGHTENED (not loosened): it still asserts the EXACT export set, now of four.
     const exportKeys = Object.keys(compliance);
     assert.deepEqual(
       exportKeys.sort(),
-      ['shouldRunEuAiAct', 'shouldRunGdpr', 'writeActiveProfiles'].sort()
+      ['declineComplianceRegime', 'shouldRunEuAiAct', 'shouldRunGdpr', 'writeActiveProfiles'].sort()
     );
   });
 

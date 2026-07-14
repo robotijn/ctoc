@@ -1,0 +1,10 @@
+{
+  "content_sha256": "404b7ea3faf99a0ac27d8bf9a8ebebf898a1f91e0bff3a8edef17ee2b7d05c26",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.597Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "ctoc-audit-w07-s4-pipeline-parsers"
+}

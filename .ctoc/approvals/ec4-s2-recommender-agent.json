@@ -1,0 +1,10 @@
+{
+  "content_sha256": "865f1315882183da0c2d98d06404460b725d209f88a968e83ec8ddb9f7fcdc9b",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.593Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC4-s2-recommender-agent"
+}

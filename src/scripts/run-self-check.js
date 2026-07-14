@@ -21,7 +21,9 @@ function parseArgs() {
 }
 
 const args = parseArgs();
-const result = checkAllInvariants({ mode: args.mode, scopes: args.scopes });
+// `args.mode` is raw `--mode=` command-line text, so it is a plain string here;
+// checkAllInvariants narrows it ('fast' vs everything-else) internally.
+const result = checkAllInvariants({ mode: /** @type {any} */ (args.mode), scopes: args.scopes });
 
 if (args.json) {
   console.log(JSON.stringify(result, null, 2));

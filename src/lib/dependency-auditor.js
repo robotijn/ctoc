@@ -721,7 +721,7 @@ class DependencyAuditor {
 
   /**
    * Map pip severity to standard severity
-   * @param {string} severity - pip severity
+   * @param {number} severity - pip CVSS numeric score (compared against 9/7/4 bands)
    * @returns {string} Standard severity
    */
   mapPipSeverity(severity) {

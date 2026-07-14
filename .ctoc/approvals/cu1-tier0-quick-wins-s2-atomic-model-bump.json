@@ -1,0 +1,10 @@
+{
+  "content_sha256": "2d4c46aa412038b6534f07f98c38189840bcd0664a794b4210fc4e423b6d3155",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.585Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU1-tier0-quick-wins-s2-atomic-model-bump"
+}

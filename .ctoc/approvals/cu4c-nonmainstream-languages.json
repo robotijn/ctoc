@@ -1,0 +1,10 @@
+{
+  "content_sha256": "46dadc5ef7ee530d864a471b26aae2b3237934d97c207fbe5f828ffda56536fe",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.591Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4c-nonmainstream-languages"
+}

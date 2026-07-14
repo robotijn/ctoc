@@ -385,7 +385,7 @@ describe('CF1 KICKBACK — external (non-actions) writers bust the cache', () =>
     // Gate-safety (SP4): the stamp-before-rename ordering is untouched; the
     // stamped marker must be present in the archived file.
     const archived = fs.readFileSync(res.path, 'utf8');
-    assert.match(archived, /approved_by: human/, 'F2a: gate marker stamped (M5 ordering intact)');
+    assert.match(archived, /advanced_by: pipeline/, 'F2a: pipeline provenance stamped (M5 ordering intact; R2-I forbids machine-written human markers)');
     assert.match(archived, /gate_crossed: stale-reconciliation/, 'F2a: reconciliation marker present');
 
     assert.equal(cache._debug().size, 0, 'F2a: cache cleared by the archive rename');

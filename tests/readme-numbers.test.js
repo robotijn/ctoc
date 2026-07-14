@@ -17,6 +17,11 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const README = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+const CLAUDE_MD = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
+const IRON_LOOP = fs.readFileSync(path.join(ROOT, 'docs', 'IRON_LOOP.md'), 'utf8');
+const MENU_MD = fs.readFileSync(path.join(ROOT, 'src', 'commands', 'menu.md'), 'utf8');
+const ASK_CANONICAL = fs.readFileSync(path.join(ROOT, '.ctoc', 'ask-me-questions.md'), 'utf8');
+const ASK_SKILL = fs.readFileSync(path.join(ROOT, 'skills', 'ask-me-questions', 'SKILL.md'), 'utf8');
 
 // ─────────────────────────────────────────────────────────────────────
 // Filesystem-derived ground truth
@@ -301,4 +306,109 @@ describe('README — every major subsystem is documented', () => {
       assert.match(README, rx);
     });
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 4. R2-D — instruction surfaces tell shipped truth (no claim the code
+//    does not keep). Each pin guards a withdrawn marketing/overstated claim
+//    so a regression to it fails loudly.
+// ─────────────────────────────────────────────────────────────────────
+
+describe('R2-D — instruction-surface truth', () => {
+  // T3 — README no longer promises a perfect first pass.
+  it('README drops "on the first try" for the adversarial-review truth', () => {
+    assert.doesNotMatch(README, /on the first try/);
+    assert.match(README, /adversarial review and the four human gates catch what a first pass misses/);
+  });
+
+  // T1 — CLAUDE.md async-overnight claim withdrawn to lossless-progress truth.
+  it('CLAUDE.md drops "drains while the user sleeps" for maximal lossless progress', () => {
+    assert.doesNotMatch(CLAUDE_MD, /drains while the user sleeps/);
+    assert.match(CLAUDE_MD, /maximal lossless progress/);
+    // Real forks ask and block their subtree; only trivia gets a documented choice.
+    assert.match(CLAUDE_MD, /blocks its subtree until answered/);
+  });
+
+  // T2 — dispatch logging is instruction-level, not code-enforced today.
+  it('CLAUDE.md scopes dispatch logging to instruction-level protocol', () => {
+    assert.match(CLAUDE_MD, /Dispatch logging is an instruction-level protocol/);
+    assert.match(CLAUDE_MD, /not by an enforcement hook today/);
+  });
+  it('README scopes dispatch logging to instruction-level protocol', () => {
+    assert.match(README, /the session model follows, not a code-enforced hook today/);
+  });
+
+  // T12 — IRON_LOOP scopes the "enforced by hooks" claim to what is actually hooked.
+  it('IRON_LOOP scopes hook enforcement to file-edit/commit/gate-residency', () => {
+    assert.match(IRON_LOOP, /File-edit, commit, and gate-residency enforcement ARE hooked/);
+    assert.match(IRON_LOOP, /instruction-level discipline the session model follows/);
+  });
+
+  // T5 — after R2-C's review done-all ships, the Gate-3-batch claim is true and
+  // names the shipped shortcut + describes typing the word as the approval.
+  it('IRON_LOOP Gate-3 batch names the done-all shortcut and typing-as-approval', () => {
+    assert.match(IRON_LOOP, /done-all/);
+    assert.match(IRON_LOOP, /typing the word `?done-all`? IS the Gate-3 approval/i);
+    assert.match(IRON_LOOP, /approveSubplans/);
+  });
+
+  // W8 — menu.md Rule 11 drops the false "under a second" latency claim.
+  it('menu.md Rule 11 drops "under a second" for the honest WORK-turn phrasing', () => {
+    assert.doesNotMatch(MENU_MD, /under a second/);
+    assert.match(MENU_MD, /a short WORK turn — a few tool calls — never a foreground build/);
+  });
+
+  // C1-8 — the start-agent recipe does NOT double-enqueue (startAgent's
+  // addAndClaim already records+claims); it forces, stamps the harness id, and
+  // surfaces skipped[].
+  it('menu.md start-agent recipe is force-clear, no double menu-task-add, surfaces skipped[]', () => {
+    const startRow = MENU_MD.split('\n').find((l) => l.trimStart().startsWith('| `claude:start-agent`'));
+    assert.ok(startRow, 'start-agent action row present');
+    assert.match(startRow, /force:\s*true/);
+    assert.match(startRow, /addAndClaim/);
+    assert.match(startRow, /--agent-id/);
+    assert.match(startRow, /skipped/);
+    // The double-enqueue is explicitly forbidden in the row.
+    assert.match(startRow, /(never|not|no).{0,40}`?menu task add`?/i);
+  });
+
+  // seam b — cancel prose tells the two-phase truth, not "terminal cancelled".
+  it('menu.md cancel prose is running→cancelling (files locked), queued→cancelled', () => {
+    assert.match(MENU_MD, /running[\s\S]{0,40}cancelling/i);
+    assert.match(MENU_MD, /queued[\s\S]{0,80}terminal[\s\S]{0,10}cancelled/i);
+    assert.match(MENU_MD, /[\s\S]{0,50}locked until[\s\S]{0,40}(reconcile|gone)/i);
+  });
+
+  // seam c — the review-stage Gate-3 batch recipe exists.
+  it('menu.md has a done-all review-stage Gate-3 batch recipe via approveSubplans', () => {
+    assert.match(MENU_MD, /claude:done-all/);
+    assert.match(MENU_MD, /approveSubplans\(parentSlug, 'review'\)/);
+  });
+
+  // seam d — compliance none writes a durable declined marker, confirm only on ok.
+  it('menu.md compliance none calls declineComplianceRegime and confirms only on ok', () => {
+    assert.match(MENU_MD, /declineComplianceRegime/);
+    assert.match(MENU_MD, /durable/i);
+    assert.match(MENU_MD, /ok:\s*true/);
+  });
+
+  // T9 — the ask-me-questions pair carries the ride-along batch exemption and
+  // stays byte-identical.
+  it('ask-me-questions pair is byte-identical and carries the ride-along exemption', () => {
+    assert.equal(ASK_SKILL, ASK_CANONICAL, 'the synced pair must stay byte-identical');
+    assert.match(ASK_CANONICAL, /the one exemption/);
+    assert.match(ASK_CANONICAL, /single AskUserQuestion call/);
+    // Discussion/design questions still stay one-per-turn.
+    assert.match(ASK_CANONICAL, /One question per turn/);
+  });
+
+  // grep-zero: "plan-serial" must not appear on any instruction surface.
+  it('no "plan-serial" claim survives on any instruction surface', () => {
+    for (const [name, doc] of [
+      ['README', README], ['CLAUDE.md', CLAUDE_MD], ['IRON_LOOP', IRON_LOOP],
+      ['menu.md', MENU_MD], ['ask-me-questions', ASK_CANONICAL],
+    ]) {
+      assert.doesNotMatch(doc, /plan-serial/, `${name} must not claim plan-serial`);
+    }
+  });
 });

@@ -44,7 +44,31 @@
  * backfill (the ledger is trusted-write-only) and does NOT grandfather the
  * forgeable in-plan marker (that would reopen C4). The recommended path is a
  * one-time TRUSTED maintainer-run backfill converting each legacy in-plan marker
- * into a ledger entry at adoption — a scheduling call for the maintainer.
+ * into a ledger entry at adoption (`approval-ledger.backfillEntry`, driven by the
+ * integrator via `node -e` at the wave boundary) — a scheduling call for the
+ * maintainer.
+ *
+ * PER-PLAN FAULT ISOLATION (R2-F). Historically a single legacy uppercase-slug
+ * plan in `done/` made `ledger.verify` throw `Invalid slug`, which propagated out
+ * of `checkFolder`, was swallowed by `main()`'s outer catch, and exited 0 — so
+ * the hook enforced NOTHING. Now every per-plan classification is wrapped: an
+ * un-keyable slug or a corrupt ledger entry flags ONLY that plan (with reason
+ * `ledger-unkeyable` / `ledger-corrupt`) and the sweep CONTINUES. The fail-SAFE
+ * direction is toward FLAGGING — an unreadable provenance is never accepted, and
+ * a silent exit 0 (how the hook died) is eliminated: the outer catch keeps
+ * fail-open ONLY for genuine infrastructure errors (e.g. the filesystem down) and
+ * MUST log WHICH error it swallowed to the gate-violations log.
+ *
+ * TWO ENTRY KINDS (R2-F). `done/` residency is accepted for EITHER a human-kind
+ * entry (`writeEntry`/`backfillEntry`) OR a pipeline-kind entry
+ * (`writePipelineEntry`, `advanced_by: 'pipeline'`) that carries `evidence`; the
+ * pre-done human gate `todo/` stays human-only and rejects a pipeline entry.
+ *
+ * VISION EXEMPTION PARITY (R2-F, contradiction 1). A decomposed vision archived
+ * to `done/` (`type: vision`, status `decomposed`) crossed Gate 0 in `vision/`,
+ * never the review→done code gate, and carries no approval marker — so `done/`
+ * exempts `type: vision` plans, EXACTLY as `iron-loop-enforcer.js` does (search
+ * `type:\s*vision` there). The two acceptance semantics must agree.
  */
 
 const path = require('path');
@@ -108,34 +132,85 @@ function readPlan(filePath) {
 }
 
 /**
- * Is a plan in a gate-destination folder genuinely human-approved, per the
- * agent-write-denied ledger (finding C4)? Folder-sensitive:
- *   - `todo` / `done` (tamper-sensitive): a ledger entry exists whose `stage_to`
- *     matches the folder AND whose `content_sha256` matches the live content
- *     (i.e. `verify(...)` is true) — so a post-approval edit invalidates it;
- *   - `implementation` (active editing expected): a ledger entry exists whose
- *     `stage_to === 'implementation'` — acceptance binds to the FACT of the
- *     Gate-1 crossing, not a frozen hash.
+ * Classify a resident plan against the agent-write-denied ledger, per-plan fault-
+ * isolated (R2-F). NEVER throws: an un-keyable slug or a corrupt entry returns a
+ * NON-accepted result with the matching reason rather than propagating out and
+ * killing the sweep. Folder-sensitive, and kind-sensitive:
+ *   - `todo` / `done` (tamper-sensitive): the entry's `content_sha256` must match
+ *     the live content (invalidate-on-edit);
+ *   - `implementation` (active editing expected): acceptance binds to entry
+ *     existence for this gate edge, NOT a frozen hash;
+ *   - `done` accepts a human OR a pipeline (`advanced_by: 'pipeline'` + evidence)
+ *     entry; every pre-done gate stays human-only.
  * Never trusts the plan-body `approved_by: human` marker.
  *
  * @param {string} filePath - absolute path to the plan file
  * @param {string} folderName - the gate-destination folder the plan resides in
  * @param {string} [projectPath] - project root (defaults to cwd)
  * @param {string|null} [content] - pre-read file content, to avoid a re-read
- * @returns {boolean} whether the plan is currently ledger-approved into `folderName`
+ * @returns {{accepted: boolean, reason: (string|null)}} accepted, or a reason:
+ *   `ledger-unkeyable` | `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` |
+ *   `hash-mismatch` | `unreadable` | `pipeline-no-evidence` | `pipeline-not-allowed`
  */
-function hasLedgerApproval(filePath, folderName, projectPath = process.cwd(), content = null) {
+function classifyResidency(filePath, folderName, projectPath = process.cwd(), content = null) {
   const ledger = require('../lib/approval-ledger');
   const slug = ledger.slugFromPlanPath(filePath);
+  const res = ledger.readEntryResult(slug, projectPath);
+
+  if (res.status === 'unkeyable') return { accepted: false, reason: 'ledger-unkeyable' };
+  if (res.status === 'corrupt') return { accepted: false, reason: 'ledger-corrupt' };
+  if (res.status === 'absent') return { accepted: false, reason: 'no-ledger-entry' };
+
+  const entry = res.entry;
+  if (entry.stage_to !== folderName) return { accepted: false, reason: 'wrong-edge' };
+
   if (HASH_SENSITIVE_FOLDERS.has(folderName)) {
     const text = content != null ? content : readPlan(filePath);
-    if (text == null) return false;
-    return ledger.verify(slug, text, folderName, projectPath);
+    if (text == null) return { accepted: false, reason: 'unreadable' };
+    if (entry.content_sha256 !== ledger.computeContentHash(text)) {
+      return { accepted: false, reason: 'hash-mismatch' };
+    }
   }
-  // `implementation` (and any other non-hash-sensitive destination): bind to the
-  // existence of a ledger entry recorded for this exact gate edge.
-  const entry = ledger.readEntry(slug, projectPath);
-  return !!entry && entry.stage_to === folderName;
+
+  const kind = ledger.entryKind(entry);
+  if (kind === 'pipeline') {
+    // Pipeline provenance is accepted ONLY at the terminal `done/` gate, and only
+    // with evidence; every pre-done gate (todo) stays human-only.
+    if (folderName !== 'done') return { accepted: false, reason: 'pipeline-not-allowed' };
+    if (typeof entry.evidence !== 'string' || entry.evidence.trim() === '') {
+      return { accepted: false, reason: 'pipeline-no-evidence' };
+    }
+  }
+  return { accepted: true, reason: null };
+}
+
+/**
+ * Boolean facade over {@link classifyResidency}, preserving the historical
+ * `hasLedgerApproval` contract for any external caller.
+ *
+ * @param {string} filePath
+ * @param {string} folderName
+ * @param {string} [projectPath]
+ * @param {string|null} [content]
+ * @returns {boolean}
+ */
+function hasLedgerApproval(filePath, folderName, projectPath = process.cwd(), content = null) {
+  return classifyResidency(filePath, folderName, projectPath, content).accepted;
+}
+
+/**
+ * Is a plan in `done/` an archived decomposed vision (`type: vision`), exempt from
+ * the code-gate residency revert exactly as `iron-loop-enforcer.js` treats it?
+ * Reads the MERGED frontmatter region so a stamped second block is still seen.
+ *
+ * @param {string|null} content - the plan's full file content
+ * @returns {boolean}
+ */
+function isVisionExempt(content) {
+  if (content == null) return false;
+  const { extractFrontmatterRegion } = require('../lib/stale-detector');
+  const region = extractFrontmatterRegion(content);
+  return /^type:\s*vision\b/m.test(region);
 }
 
 /**
@@ -167,7 +242,9 @@ function isFreshSip1Slice(filePath, folderName, projectPath = process.cwd(), con
   const parentPlan = m[1].replace(/^["']|["']$/g, '').trim();
   if (parentPlan === '') return false;
   const ledger = require('../lib/approval-ledger');
-  return ledger.readEntry(ledger.slugFromPlanPath(filePath), projectPath) === null;
+  // "Never appeared in the ledger" means a TRUE absence — an un-keyable or corrupt
+  // entry must NOT be laundered into an exemption (fail SAFE toward evaluation).
+  return ledger.readEntryResult(ledger.slugFromPlanPath(filePath), projectPath).status === 'absent';
 }
 
 /**
@@ -177,7 +254,7 @@ function isFreshSip1Slice(filePath, folderName, projectPath = process.cwd(), con
  *
  * @param {string} folderName - a gate-destination folder (`implementation`|`todo`|`done`)
  * @param {string} [projectPath] - project root (defaults to cwd)
- * @returns {Array<{file:string, path:string, folder:string, revertTo:string}>}
+ * @returns {Array<{file:string, path:string, folder:string, revertTo:string, reason:(string|null)}>}
  */
 function checkFolder(folderName, projectPath = process.cwd()) {
   const folderPath = path.join(plansDir(projectPath), folderName);
@@ -190,12 +267,18 @@ function checkFolder(folderName, projectPath = process.cwd()) {
     const filePath = path.join(folderPath, file);
     const content = readPlan(filePath); // one read per file per sweep
     if (isFreshSip1Slice(filePath, folderName, projectPath, content)) continue;
-    if (hasLedgerApproval(filePath, folderName, projectPath, content)) continue;
+    // Vision exemption parity (contradiction 1): a decomposed vision archived to
+    // done/ carries no approval marker and is exempt, exactly as iron-loop-
+    // enforcer.js treats it.
+    if (folderName === 'done' && isVisionExempt(content)) continue;
+    const verdict = classifyResidency(filePath, folderName, projectPath, content);
+    if (verdict.accepted) continue;
     violations.push({
       file,
       path: filePath,
       folder: folderName,
-      revertTo: HUMAN_GATES[folderName]
+      revertTo: HUMAN_GATES[folderName],
+      reason: verdict.reason,
     });
   }
 
@@ -272,7 +355,7 @@ function main() {
       for (const v of allViolations) {
         console.error(`  Plan: ${v.file}`);
         console.error(`  Location: ${v.folder}/`);
-        console.error(`  Issue: No ledger-verified human approval`);
+        console.error(`  Issue: No ledger-verified human approval (${v.reason || 'no-ledger-entry'})`);
       }
 
       // Fault-isolated revert (C5): one throw never abandons the rest.
@@ -314,8 +397,24 @@ function main() {
       console.error('⚠️  Plans must be approved by human via menu to cross human gates\n');
     }
   } catch (err) {
-    // Fail open - log error but don't block user
-    console.error(`Warning: Gate check error: ${err.message}`);
+    // Fail open ONLY for genuine infrastructure errors (e.g. the filesystem down):
+    // per-plan faults (un-keyable slug, corrupt entry) are already isolated inside
+    // checkFolder and can never reach here. A silent exit 0 is how this hook died
+    // unnoticed, so the swallowed error is ALWAYS logged to the durable gate-
+    // violations store — never merely printed and forgotten.
+    const message = err && err.message ? err.message : String(err);
+    console.error(`Warning: Gate check infrastructure error (fail-open): ${message}`);
+    try {
+      logViolation({
+        id: `v-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        plan: null,
+        violation: `Gate sweep infrastructure error: ${message}`,
+        action: 'FAIL-OPEN (sweep did not complete)',
+        status: 'sweep_error',
+        resolvedAt: null,
+      });
+    } catch { /* durable-log itself is down; the console.error above still stands */ }
   }
 
   // Exit 0 to allow tool call to proceed (fail-open on the tool call itself).
@@ -325,6 +424,8 @@ function main() {
 module.exports = {
   HUMAN_GATES,
   hasLedgerApproval,
+  classifyResidency,
+  isVisionExempt,
   isFreshSip1Slice,
   checkFolder,
   revertPlan,

@@ -401,10 +401,14 @@ function getStatistics() {
 
   const stats = {
     sourceFiles: Object.keys(map.files).length,
-    tests: new Set(),
+    // `tests` is an accumulation Set during the loop, then repurposed to its
+    // numeric cardinality (`.size`); `avgTestsPerFile` starts numeric then holds
+    // a `.toFixed(2)` string. Both fields deliberately change shape, which
+    // checkJs cannot model — typed `any` at the point of that intent.
+    tests: /** @type {any} */ (new Set()),
     filesWithCoverage: 0,
     filesWithoutTests: 0,
-    avgTestsPerFile: 0,
+    avgTestsPerFile: /** @type {any} */ (0),
     lastRebuilt: map._meta?.rebuiltAt,
     framework: map._meta?.framework
   };

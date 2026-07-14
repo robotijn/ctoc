@@ -92,7 +92,7 @@ USER (human CTO) → CTO CHIEF (Tier 0) → SCOUTS (Tier 3, parallel)
 
 CTO Chief is the **final approver** before any plan crosses Gate 3 (review → done). It verifies the 14 quality dimensions and the human-approval marker exist before approving. When sub-orchestrator outputs conflict, the **synthesizer** produces a minimal change list using priority rules (Security > Correctness > Maintainability > Performance > Readability > Consistency); CTO Chief approves.
 
-Every dispatch is logged to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml` per the [`DISPATCH_PROTOCOL.md`](./docs/DISPATCH_PROTOCOL.md). Structural invariants are enforced by `tests/architecture-invariants.test.js`.
+Dispatch logging is an instruction-level protocol (per [`DISPATCH_PROTOCOL.md`](./docs/DISPATCH_PROTOCOL.md)) that the session model follows — each dispatch is recorded to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml` by that discipline, not by an enforcement hook today. Structural invariants (the tier and dispatch shape) ARE enforced by `tests/architecture-invariants.test.js`.
 
 ---
 
@@ -114,9 +114,9 @@ By the time work reaches `todo`, every contextual decision is locked. The implem
 
 When an agent (especially the implementer at Step 10) hits ambiguity, it MUST NOT write a stub, a TODO, or a "this needs to be filled in." It MUST make a documented reasonable choice and continue with working code. Document each choice in the plan's `## Decisions Taken Under Ambiguity` section. Wrong choices are caught at review and kicked back; stubs are not caught and rot.
 
-### 3. Async overnight (documented choices + kickback).
+### 3. Maximal lossless progress (documented choices + kickback).
 
-The pipeline drains while the user sleeps. Agents do NOT synchronously block on ambiguity — they make a documented choice, continue, and let morning review catch wrong calls. This applies to every step (Steps 1–15), not just the implementer.
+The pipeline makes maximal lossless progress while a session is alive and resumes losslessly when the user returns — it does not run unattended while the user sleeps. Agents do NOT synchronously block on trivia below the question floor: they make a documented reasonable choice, continue, and let review catch wrong calls. A REAL fork — a load-bearing decision — is different: it is surfaced as a decision awaiting review and blocks its subtree until answered, never guessed. This applies to every step (Steps 1–15), not just the implementer.
 
 ### 4. Literal interpretation (Opus 4.7).
 
@@ -184,7 +184,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ## Test & Verify
 
 ```bash
-node --test tests/*.test.js          # Run all 254 test files (cross-platform)
+node --test tests/*.test.js          # Run all 257 test files (cross-platform)
 node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
@@ -233,7 +233,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 25 categories
   skills/                426 skill files (100 Tier-2 specialist bodies + 326 reference)
-  tests/                 254 test files
+  tests/                 257 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

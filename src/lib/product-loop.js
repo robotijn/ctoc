@@ -176,6 +176,10 @@ function saveReview(date, content) {
   return p;
 }
 
+/**
+ * @param {{status?: string}} [filter] - optional status filter
+ * @returns {Array<object>}
+ */
 function listExperiments({ status } = {}) {
   if (!safeFs.existsSync(EXPERIMENTS_DIR)) return [];
   const files = safeFs.readdirSync(EXPERIMENTS_DIR).filter(f => f.endsWith('.yaml'));

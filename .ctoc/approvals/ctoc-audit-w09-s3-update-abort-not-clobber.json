@@ -1,0 +1,10 @@
+{
+  "content_sha256": "2df30c18b6f7724867b50fe76c19ea58d82ffbec897c2d9e3022c7aba7eb0986",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.597Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "ctoc-audit-w09-s3-update-abort-not-clobber"
+}

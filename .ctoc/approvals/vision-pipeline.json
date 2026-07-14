@@ -1,0 +1,10 @@
+{
+  "content_sha256": "ba402b799ceeddeb6cd95306cca42ab0cbc50f43330e4659725c58866898661b",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.602Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "vision-pipeline"
+}

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "21445b240360775f239ab3d50aac0b1c823177a713f75cc8de6a8d5393600799",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.591Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU5-tier3-wrapper-coverage-s2-security-wrappers"
+}

@@ -18,7 +18,7 @@ const safeFs = require('./safe-fs');
 const path = require('path');
 const { getPlanCounts, readPlans, getPlansDir, getAgentStatus, getVisionCounts, getVisionStubs } = require('./state');
 const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs } = require('./sections');
-const { getInboxCounts, listStaleCandidates } = require('./inbox');
+const { getInboxCounts, listStaleCandidates, listQuestions, listDecisions, listPlansAtGates } = require('./inbox');
 // Namespace import (not destructured) preserves the spy seam: a test can rewire
 // staleDetector.verifyStaleCandidate / classifyStaleCandidate at the require
 // boundary. inboxVerifyProposals is the SOLE call site of verifyStaleCandidate.
@@ -241,12 +241,16 @@ function buildDashboardTable(projectPath, opts = {}) {
     out += `  ○ Inbox clear — no async items waiting\n`;
   } else {
     if (inboxTotal > 0) {
-      out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}\n`;
+      // W1: each count names its door route (a count with no door is the defect).
+      // The hint is appended AFTER the existing line text and only when the count
+      // is > 0, so no existing substring assertion regresses and a 0-line shows no
+      // (dead) door hint.
+      out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}${inbox.questions > 0 ? ' · view: inbox questions' : ''}\n`;
       if (escalations > 0) {
         out += `  ⛔ ${escalations} circuit-breaker escalation${escalations === 1 ? '' : 's'} — a plan keeps failing and needs you\n`;
       }
-      out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review\n`;
-      out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates\n`;
+      out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review${inbox.decisions > 0 ? ' · view: inbox decisions' : ''}\n`;
+      out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates${inbox.gatesWaiting > 0 ? ' · view: inbox gates' : ''}\n`;
       // SP2: conditional — present iff > 0 (M2), absent when 0 (M3). "possibly-stale"
       // (not "stale") sets correct expectations: cheap detection is unverified (SP3).
       if (stale > 0) {
@@ -333,11 +337,18 @@ function dashboardPipeline(projectPath, opts = {}) {
       header: 'Stale plans',
       options: [
         { label: 'View stale plans', description: `Inspect the ${stale} possibly-stale plan${stale === 1 ? '' : 's'} (read-only)` },
+        // R2-C2 item 5: a DURABLE dismissal (staleDetector.dismissStale) — offered
+        // AFTER 'View stale plans', never recommended. "Not now" stays a one-turn
+        // skip (no write); "Don't ask again for these" persists across turns. The
+        // menu render stays read-only — the write happens only when the human picks
+        // this option and the session executes the claude:dismiss-stale recipe.
+        { label: "Don't ask again for these", description: 'Durably dismiss the current possibly-stale set (a changed plan re-surfaces)' },
         { label: 'Not now', description: 'Dismiss for this menu turn' },
       ],
     });
-    actions['View stale plans'] = 'inbox stale'; // label key only — NEVER a digit
-    actions['Not now'] = '';                      // no-op (driver falls through to pipeline answer)
+    actions['View stale plans'] = 'inbox stale';           // label key only — NEVER a digit
+    actions["Don't ask again for these"] = 'claude:dismiss-stale';
+    actions['Not now'] = '';                                // no-op (driver falls through to pipeline answer)
   }
 
   return { text, ask: { questions }, actions };
@@ -437,6 +448,132 @@ function sectionBrowse(sectionName, projectPath) {
   };
 }
 
+// ===========================================================================
+// W1 — Inbox doors. Every dashboard inbox COUNT (morning questions, decisions
+// awaiting review, plans at gates) gets a reachable read-only list screen. "A
+// count with no door is the defect." All three are PURE reads (no fs mutation),
+// bullet-row rendered (numbers are reserved for opening a plan — these open
+// nothing), capped at INBOX_DOOR_MAX_ROWS with a "… and N more" line, and every
+// attacker-influenceable field (a plan slug / step / path derived from a
+// filename or frontmatter) passes through stripCtl so a hostile value cannot
+// inject ANSI/control chars or forge a row (S1).
+// ===========================================================================
+
+/** Cold-path row cap for the inbox door screens (mirrors the stale drill-in). */
+const INBOX_DOOR_MAX_ROWS = 20;
+
+/**
+ * A compact best-effort relative age from an ISO timestamp. Returns '' for a
+ * missing/unparseable/future value (never throws) so a malformed frontmatter
+ * `created` degrades to no age rather than a crash.
+ * @param {string} iso
+ * @returns {string}
+ */
+function _inboxAge(iso) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const diff = Date.now() - t;
+  if (diff < 0) return '';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+/** Project-relative body path for an inbox item (stripCtl'd, never throws). */
+function _inboxRelPath(root, p) {
+  if (typeof p !== 'string' || p.length === 0) return '';
+  try { return stripCtl(path.relative(root, p)); } catch { return ''; }
+}
+
+/**
+ * Shared renderer for the three read-only inbox door screens. `rows` is already
+ * a list of pre-sanitized single-line strings (no leading bullet).
+ * @param {string} title  screen title (e.g. 'Morning questions')
+ * @param {number} total  the TRUE item count (header shows this, not the capped count)
+ * @param {string[]} rows sanitized row bodies (no bullet prefix)
+ * @param {string} emptyMsg message shown when total === 0
+ * @returns {{text:string, ask:Object, actions:Object}}
+ */
+function _inboxDoorScreen(title, total, rows, emptyMsg) {
+  let text = `Inbox ▸ ${title} (${total})\n${'─'.repeat(40)}\n\n`;
+  if (total === 0) {
+    text += `  ${emptyMsg}\n`;
+  } else {
+    for (const r of rows.slice(0, INBOX_DOOR_MAX_ROWS)) text += `  • ${r}\n`;
+    if (total > INBOX_DOOR_MAX_ROWS) text += `  … and ${total - INBOX_DOOR_MAX_ROWS} more\n`;
+  }
+  text += '\n\n\n';
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: `${title} (read-only).`,
+        header: 'Inbox',
+        options: [{ label: '◀ Back', description: 'Return to dashboard' }],
+      }],
+    },
+    actions: { '◀ Back': '' },
+  };
+}
+
+/**
+ * Inbox ▸ Morning questions — the door behind the dashboard "N morning questions"
+ * count (route `inbox questions`). Read-only.
+ * @param {string} [projectPath]
+ */
+function inboxQuestionsScreen(projectPath) {
+  const root = getProjectPath(projectPath);
+  const items = listQuestions(root);
+  const rows = items.map((it) => {
+    const who = stripCtl(it.source_plan || it.id || '(question)');
+    const step = it.source_step ? ` [step ${stripCtl(String(it.source_step))}]` : '';
+    const age = stripCtl(_inboxAge(it.created));
+    const where = _inboxRelPath(root, it.path);
+    return `${who}${step}${age ? '  ' + age : ''}${where ? '  ' + where : ''}`;
+  });
+  return _inboxDoorScreen('Morning questions', items.length, rows, 'No morning questions.');
+}
+
+/**
+ * Inbox ▸ Decisions awaiting review — the door behind the dashboard "N decisions
+ * awaiting review" count (route `inbox decisions`). Read-only.
+ * @param {string} [projectPath]
+ */
+function inboxDecisionsScreen(projectPath) {
+  const root = getProjectPath(projectPath);
+  const items = listDecisions(root);
+  const rows = items.map((it) => {
+    const who = stripCtl(it.plan || it.id || '(decision)');
+    const step = it.step ? ` [step ${stripCtl(String(it.step))}]` : '';
+    const amb = it.ambiguity ? `  ${stripCtl(String(it.ambiguity))}` : '';
+    const age = stripCtl(_inboxAge(it.created));
+    const where = _inboxRelPath(root, it.path);
+    return `${who}${step}${amb}${age ? '  ' + age : ''}${where ? '  ' + where : ''}`;
+  });
+  return _inboxDoorScreen('Decisions awaiting review', items.length, rows, 'No decisions awaiting review.');
+}
+
+/**
+ * Inbox ▸ Plans at gates — the door behind the dashboard "N plans at gates" count
+ * (route `inbox gates`). Lists plans sitting in a gate-SOURCE stage (awaiting the
+ * human's approval decision). Read-only — crossing a gate stays a separate,
+ * human-initiated action; this screen only shows what is waiting.
+ * @param {string} [projectPath]
+ */
+function inboxGatesScreen(projectPath) {
+  const root = getProjectPath(projectPath);
+  const items = listPlansAtGates(root);
+  const rows = items.map((it) => {
+    const plan = stripCtl(it.plan);
+    const stage = stripCtl(it.stage);
+    const gate = stripCtl(String(it.gate));
+    return `${plan}  [${stage}]  Gate ${gate}  plans/${stage}/${plan}.md`;
+  });
+  return _inboxDoorScreen('Plans at gates', items.length, rows, 'No plans at gates.');
+}
+
 /**
  * SP2 drill-in: read-only list of possibly-stale candidates. No file op, no plan
  * move, no inputMode. The only selectable option is ◀ Back. "Verify (SP3)" is
@@ -478,14 +615,20 @@ function inboxStalePlansDrillIn(projectPath) {
 
   // 'Verify' is a real selectable LABEL (never a digit — Rule 1), offered only
   // when there is something to verify. An empty list shows just '◀ Back'.
+  // R2-C2 item 5: a DURABLE "Don't ask again for these" (dismissStale) rides AFTER
+  // 'Verify', before Back — never recommended. This render stays read-only; the
+  // write happens only when the human picks the claude:dismiss-stale action.
   const hasCandidates = candidates.length > 0;
   const options = hasCandidates
     ? [
         { label: 'Verify', description: 'Run git-backed verification (read-only) and view proposals' },
+        { label: "Don't ask again for these", description: 'Durably dismiss these possibly-stale plans (a changed plan re-surfaces)' },
         { label: '◀ Back', description: 'Return to dashboard' },
       ]
     : [{ label: '◀ Back', description: 'Return to dashboard' }];
-  const actions = hasCandidates ? { Verify: 'inbox verify', '◀ Back': '' } : { '◀ Back': '' };
+  const actions = hasCandidates
+    ? { Verify: 'inbox verify', "Don't ask again for these": 'claude:dismiss-stale', '◀ Back': '' }
+    : { '◀ Back': '' };
 
   return {
     text,
@@ -1008,9 +1151,32 @@ function stageBrowse(stage, projectPath) {
   const bulkDiscuss = stage === 'functional' || stage === 'implementation';
   const bulkAdvance = stage === 'implementation';
 
+  // R2-C2 item 4 — review `done-all` (W3), menu-side. The human typing `done-all-
+  // <parent>` on the review list IS the Gate-3 approval for EVERY reviewed slice of
+  // that parent — symmetric to the implementation stage's `todo-all`. WORD shortcut
+  // only, never a number. One key PER DISTINCT parent (approveSubplans is per
+  // parent); a review plan with no parent_plan contributes none. The action-key
+  // recipe (approveSubplans(parent, 'review')) already lives in menu.md (same wave);
+  // this only REGISTERS the typed key. Every parent slug is control-stripped and
+  // must match a safe slug pattern before it can enter an action key/string (S1 —
+  // a hostile parent_plan can neither inject ANSI nor forge a claude: verb).
+  const doneAllParents = [];
+  if (stage === 'review') {
+    const seen = new Set();
+    for (const p of plans) {
+      const raw = p && p.metadata ? p.metadata.parent_plan : '';
+      const parent = stripCtl(typeof raw === 'string' ? raw.trim() : '');
+      if (parent && /^[A-Za-z0-9._-]+$/.test(parent) && !seen.has(parent)) {
+        seen.add(parent);
+        doneAllParents.push(parent);
+      }
+    }
+  }
+
   const bulkHints = [];
   if (bulkDiscuss) bulkHints.push('discuss = critique every plan');
   if (bulkAdvance) bulkHints.push('todo-all = move all to todo + run iron loop');
+  if (doneAllParents.length) bulkHints.push("done-all-<parent> = Gate-3 approve all of <parent>'s reviewed slices");
   const bulkSuffix = bulkHints.length ? ` · ${bulkHints.join(' · ')}` : '';
 
   text += plans.length > 0
@@ -1030,6 +1196,10 @@ function stageBrowse(stage, projectPath) {
   }
   if (bulkAdvance) {
     actions['todo-all'] = 'claude:advance-all-implementation';
+  }
+  // R2-C2 item 4: per-parent Gate-3 batch keys (words only — never a digit).
+  for (const parent of doneAllParents) {
+    actions[`done-all-${parent}`] = `claude:done-all-${parent}`;
   }
   actions['b'] = '';
   actions['back'] = '';
@@ -1365,31 +1535,40 @@ function validateScreen(stage, file, projectPath) {
 
   text += '\n\n\n';
 
-  let question;
-  if (validationResult.valid) {
-    question = validationResult.warnings.length > 0
-      ? `${validationResult.warnings.length} warning(s). Proceed with approval?`
-      : 'All checks passed. Proceed with approval?';
-  } else {
-    question = `${validationResult.errors.length} error(s) found. Fix issues or override?`;
-  }
+  // R2-C2 item 3 — one-turn approve (R6/W2). The human already chose "Approve"
+  // in planActions/reviewActions; a clean validation must NOT demand a second
+  // "Proceed?" click. `autoApprove` is the one-turn SIGNAL: on a clean validation
+  // the driver runs `claude:approve` in the SAME turn (the auto-run half lands in
+  // the menu.md instruction surface, R2-D, same wave). On a failed validation the
+  // override ("Approve anyway") is DEMOTED to the LAST option, never recommended,
+  // and labelled as recording an override. The approve→validate ROUTE and the
+  // approve ACTION strings are unchanged (their pins survive).
+  const autoApprove = validationResult.valid === true;
 
+  let question;
   const options = [];
   const actions = {};
 
-  if (validationResult.valid) {
-    options.push({ label: 'Confirm approve', description: `Move plan to ${nextStage}` });
+  if (autoApprove) {
+    // Clean: a single decisive approve, no redundant "Proceed?" and no Fix option
+    // (there is nothing to fix). The driver auto-runs this on a clean validation.
+    question = validationResult.warnings.length > 0
+      ? `All checks passed (${validationResult.warnings.length} warning(s)) — approving ${stage} → ${nextStage}.`
+      : `All checks passed — approving ${stage} → ${nextStage}.`;
+    options.push({ label: 'Confirm approve', description: `Approve now — move plan to ${nextStage}` });
     actions['Confirm approve'] = `claude:approve ${stage}/${file}`;
+    options.push({ label: 'Back', description: `Return to ${stage} list` });
+    actions['Back'] = `browse ${stage}`;
   } else {
-    options.push({ label: 'Approve anyway', description: 'Override validation and move to next stage' });
+    // Failed: fix or (buried) override. "Approve anyway" is the LAST option.
+    question = `${validationResult.errors.length} error(s) found. Fix the issues, or override?`;
+    options.push({ label: 'Fix issues', description: 'Go back and fix the issues' });
+    actions['Fix issues'] = `plan ${stage}/${file}`;
+    options.push({ label: 'Back', description: `Return to ${stage} list` });
+    actions['Back'] = `browse ${stage}`;
+    options.push({ label: 'Approve anyway', description: 'Override validation and move to the next stage (records an override)' });
     actions['Approve anyway'] = `claude:approve ${stage}/${file}`;
   }
-
-  options.push({ label: 'Fix issues', description: 'Go back and fix the issues' });
-  options.push({ label: 'Back', description: `Return to ${stage} list` });
-
-  actions['Fix issues'] = `plan ${stage}/${file}`;
-  actions['Back'] = `browse ${stage}`;
 
   return {
     text,
@@ -1401,6 +1580,8 @@ function validateScreen(stage, file, projectPath) {
       }]
     },
     actions,
+    // One-turn signal for the driver (R2-D reads it to skip the second ask).
+    autoApprove,
     validation: validationResult
   };
 }
@@ -1552,26 +1733,56 @@ function taskTransition(root, rest, kind) {
   const reg = taskRegistry.load(root);
   const task = reg.tasks.find((t) => t.id === id);
   if (!task) throw new Error('task-registry: unknown task id ' + String(id));
-  const targetOf = { start: 'running', fail: 'failed', cancel: 'failed' };
+  // The intended terminal-transition target is only cosmetic here: the throw is
+  // caught fail-soft at the taskCommand boundary. For cancel the honest target is
+  // `cancelled` (queued) or `cancelling` (running) — see below.
+  const targetOf = { start: 'running', fail: 'failed', cancel: 'cancelled' };
   if (TASK_TERMINAL.has(task.status)) {
     throw new Error(`task-registry: invalid transition ${task.status} → ${targetOf[kind]}`);
   }
   let patch;
+  // R2-C: a running-cancel transitions to the non-terminal `cancelling`, whose text
+  // states the files stay locked until the harness agent is confirmed gone.
+  let cancelling = false;
   // H8: record `agentTaskId` at start so the on-open reconcile has something to
   // match the live-agent-id set against. Use the caller-supplied `--agent-id`
   // (the harness id the session will later report in its live TaskList), falling
   // back to the task id when none is supplied — the wiring works before the session
   // is taught to pass the harness id, and tightens when it is. `agentTaskId` is on
   // task-registry's MUTABLE_FIELDS allowlist, so updateTask accepts it unchanged.
-  if (kind === 'start') patch = { status: 'running', agentTaskId: p.agentId || id };
-  else if (kind === 'fail') patch = { status: 'failed', result: { ok: false, summary: p.summary || 'failed' } };
-  else patch = { status: 'failed', result: { ok: false, summary: 'cancelled', cancelled: true } };
+  if (kind === 'start') {
+    patch = { status: 'running', agentTaskId: p.agentId || id };
+  } else if (kind === 'fail') {
+    patch = { status: 'failed', result: { ok: false, summary: p.summary || 'failed' } };
+  } else {
+    // R2-C honest cancel (C1-2): NEVER writes `failed`. A RUNNING (or already
+    // `cancelling`) task enters `cancelling` and KEEPS its slot/touches/gitOp/sync
+    // barrier until the harness agent is confirmed gone — the registry must not
+    // free a live agent's files early. A QUEUED (or any other non-terminal) task
+    // cancels immediately to `cancelled` (nothing is running, so freeing is safe).
+    if (task.status === 'running' || task.status === 'cancelling') {
+      patch = { status: 'cancelling' };
+      cancelling = true;
+    } else {
+      patch = { status: 'cancelled' };
+    }
+  }
   taskRegistry.updateTask(reg, id, patch);
   taskRegistry.save(root, reg);
-  const res = { ok: true, taskId: id, status: patch.status, text: `Task ${id} → ${patch.status}` };
+  const res = {
+    ok: true,
+    taskId: id,
+    status: patch.status,
+    text: cancelling
+      ? `Task ${id} → cancelling (files stay locked until the agent is confirmed gone)`
+      : `Task ${id} → ${patch.status}`,
+  };
   if (kind === 'cancel') res.cancelled = true;
-  // NB3: fail/cancel free a slot → surface the scheduler's newly-runnable set so the
-  // COMPLETION turn can promote them (start never frees a slot, so it omits promote).
+  // NB3/R2-C: fail and queued-cancel free a slot; a running-cancel enters
+  // `cancelling` and KEEPS its slot+files (so its file-conflicting tasks stay
+  // queued). Either way, surface the scheduler's newly-runnable set for the
+  // COMPLETION turn (computePromote is scheduler-consulted and honors the still-
+  // occupied cancelling task). `start` never frees a slot, so it omits promote.
   if (kind === 'fail' || kind === 'cancel') res.promote = computePromote(reg);
   return res;
 }
@@ -1712,6 +1923,10 @@ function route(args, projectPath, opts = {}) {
       return sectionBrowse(args[1], projectPath);
 
     case 'inbox':
+      // W1 doors: a reachable read-only list behind every dashboard inbox COUNT.
+      if (args[1] === 'questions') return inboxQuestionsScreen(projectPath);
+      if (args[1] === 'decisions') return inboxDecisionsScreen(projectPath);
+      if (args[1] === 'gates') return inboxGatesScreen(projectPath);
       if (args[1] === 'verify') return inboxVerifyProposals(projectPath);
       if (args[1] === 'stale') return inboxStalePlansDrillIn(projectPath);
       if (args[1] === 'cleanup') {
@@ -1774,6 +1989,9 @@ module.exports = {
   dashboardPipeline,
   dashboardCommands,
   sectionBrowse,
+  inboxQuestionsScreen,
+  inboxDecisionsScreen,
+  inboxGatesScreen,
   inboxStalePlansDrillIn,
   inboxVerifyProposals,
   inboxCleanupReview,

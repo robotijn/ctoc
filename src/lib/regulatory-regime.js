@@ -169,13 +169,13 @@ function coerce(v) {
  */
 function loadActiveProfiles(projectRoot) {
   const settingsPath = path.join(projectRoot, SETTINGS_PATH);
-  if (!safeFs.existsSync(settingsPath)) return { profiles: [], overrides: {} };
+  if (!safeFs.existsSync(settingsPath)) return { profiles: [], overrides: {}, declined: false };
 
   const content = safeFs.readFileSync(settingsPath, 'utf8');
 
   // Extract just the regulatory_regime block
   const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|Z)/m);
-  if (!blockMatch) return { profiles: [], overrides: {} };
+  if (!blockMatch) return { profiles: [], overrides: {}, declined: false };
 
   return parseRegimeBlock(blockMatch[1]);
 }
@@ -186,7 +186,7 @@ function loadActiveProfiles(projectRoot) {
  * regex, so ReDoS-safe); exported for direct testing.
  *
  * @param {string} blockBody - everything under the `regulatory_regime:` key
- * @returns {{ profiles: string[], overrides: Object }}
+ * @returns {{ profiles: string[], overrides: Object, declined: boolean }}
  */
 function parseRegimeBlock(blockBody) {
   // CRLF-safe split (see ci-parser): the `$`-anchored patterns below cannot
@@ -225,7 +225,18 @@ function parseRegimeBlock(blockBody) {
     break;
   }
 
-  return { profiles, overrides };
+  // declined: R2-C2 item 1's durable "None" marker. A single indented
+  // `declined: true` line inside the block means the human explicitly declined an
+  // EU compliance regime (a DIFFERENT verb from an empty active_profiles list, so
+  // the menu can stop re-asking without pretending a profile is active). Line-based
+  // scan, boolean-coerced; absent ⇒ false.
+  let declined = false;
+  for (const line of lines) {
+    const m = line.match(/^\s+declined:[ \t]*(\S+)/);
+    if (m) { declined = coerce(m[1]) === true; break; }
+  }
+
+  return { profiles, overrides, declined };
 }
 
 /**

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "adf140fa9bf9ff7d856b80dac04d6fe64d68f16d0ceee4a31910f9fbeff8805c",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.599Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "persistent-quality-agents"
+}

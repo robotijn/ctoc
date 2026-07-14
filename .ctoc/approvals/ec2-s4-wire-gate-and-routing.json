@@ -1,0 +1,10 @@
+{
+  "content_sha256": "27e8aa6e14221d5485d6f844a2e1b394e207d37860b228c094bc3613594dd5ab",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.592Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC2-s4-wire-gate-and-routing"
+}

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "f2e63791703dde028ca4da6c9a1d271279d152fc89ad7f64bd15d15db6481fb5",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.591Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU5-tier3-wrapper-coverage-s5-count-architecture-reconcile"
+}

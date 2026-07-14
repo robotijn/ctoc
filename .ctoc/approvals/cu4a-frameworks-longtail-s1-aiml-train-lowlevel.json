@@ -1,0 +1,10 @@
+{
+  "content_sha256": "2f6a8aff4354948b50f188d34d1ff4e5240debee45bc031cfed77e3656a33213",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.586Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s1-aiml-train-lowlevel"
+}

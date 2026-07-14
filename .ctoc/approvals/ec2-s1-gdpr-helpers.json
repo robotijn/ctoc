@@ -1,0 +1,10 @@
+{
+  "content_sha256": "ceec8ca8cfe7e3f89d5eeb7ac5d6bc1400ed36f1e2898ddee2b388e35e0107ab",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.592Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC2-s1-gdpr-helpers"
+}

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "0248c1e593dfac9252aa00fe055d07d8ab7d7afa10e490a4d06f018f6ff5de9c",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.602Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "test-suite-hardening-r2"
+}

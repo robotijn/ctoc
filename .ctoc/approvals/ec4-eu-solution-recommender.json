@@ -1,0 +1,10 @@
+{
+  "content_sha256": "9b05b1f1c8d866873f1046c9046849b3e3beb9ea8edf3315c55706a1cb5baa3f",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.593Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC4-eu-solution-recommender"
+}

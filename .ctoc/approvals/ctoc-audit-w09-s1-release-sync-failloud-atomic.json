@@ -1,0 +1,10 @@
+{
+  "content_sha256": "c11057d32da84b016d2ffdabb7a6665ba17d72d871231998db45b8861c6ab75a",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.597Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "ctoc-audit-w09-s1-release-sync-failloud-atomic"
+}

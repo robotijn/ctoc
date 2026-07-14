@@ -1,0 +1,10 @@
+{
+  "content_sha256": "7934e41a5d2c10b2544b396d3f3126d799756f541c52968d08a350adbf9a723a",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.582Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CF1-invalidate-read-cache-on-write"
+}

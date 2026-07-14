@@ -1,0 +1,10 @@
+{
+  "content_sha256": "09911760ce34d86a01e4c83300a4bfd62f05dad0d7e31b484c2320c68a12f7b1",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.590Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4b-quality-configs-s5-completeness"
+}

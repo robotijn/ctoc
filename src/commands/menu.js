@@ -13,6 +13,8 @@ const { startAutoSync, stopAutoSync } = require('../lib/sync');
 const { findProjectRoot } = require('../lib/project-root');
 const { needsEnvironmentPrompt } = require('../lib/settings');
 const { shouldRunGdpr, shouldRunEuAiAct } = require('../lib/compliance-regime');
+// R2-C2 item 1: the reader of record for the durable "None" decline marker.
+const { loadActiveProfiles } = require('../lib/regulatory-regime');
 
 // First-run environment question. NEVER replaces the dashboard — it is
 // attached as a SECOND question alongside the pipeline question, so the plan
@@ -32,14 +34,20 @@ function attachEnvironmentQuestion(result) {
       { label: 'Development', description: 'Soft enforcement, never auto-push — fast local iteration' },
       { label: 'Staging', description: 'Strict enforcement, manual push — rehearse production' },
       { label: 'Production', description: 'Strict enforcement, auto-push after gates — locked down' },
-      { label: 'Decide later', description: 'Keep defaults; ask again next time' }
+      // R2-C2 item 2 (R2/F7): the one-turn "Decide later" skip re-asked every menu
+      // open — the re-ask hell. Replaced by a DURABLE dismissal that persists
+      // general.environment_prompt_dismissed (needsEnvironmentPrompt honors it).
+      // The environment stays changeable anytime from System → Settings.
+      { label: 'Keep defaults, stop asking', description: 'Keep the CTOC defaults and stop asking — change the environment anytime in System → Settings' }
     ]
   });
   Object.assign(result.actions, {
     'Development': 'claude:set-environment dev',
     'Staging': 'claude:set-environment staging',
     'Production': 'claude:set-environment prod',
-    'Decide later': 'claude:env-decide-later'
+    // Recipe (persist general.environment_prompt_dismissed:true) lands in the
+    // menu.md instruction surface (R2-D, same wave) — mirrors set-environment.
+    'Keep defaults, stop asking': 'claude:env-keep-defaults'
   });
   return result;
 }
@@ -59,6 +67,10 @@ function attachEnvironmentQuestion(result) {
 // invariant, `enterSearchMode`/`activateCurrentArea` precedent).
 function needsComplianceRegimePrompt(projectRoot) {
   try {
+    // R2-C2 item 1 (R1): a durable "None" decline stops the re-ask, exactly like an
+    // active profile does. `declined` is read fresh from the reader of record
+    // (regulatory-regime.js), so a persisted decline survives across menu opens.
+    if (loadActiveProfiles(projectRoot).declined === true) return false;
     return !shouldRunGdpr(projectRoot) && !shouldRunEuAiAct(projectRoot);
   } catch {
     return false;
@@ -307,7 +319,11 @@ function render() {
 
   // Current tab content
   const currentTab = TABS[app.tabIndex];
-  const tabModule = tabModules[currentTab.id];
+  // The five area modules expose heterogeneous, optional render hooks
+  // (renderActions, render, …) that are feature-detected at runtime; a precise
+  // union type would have to enumerate every optional hook across all areas, so
+  // this dynamic module handle is typed `any`.
+  const tabModule = /** @type {any} */ (tabModules[currentTab.id]);
 
   if (app.searchMode) {
     // PI4-s4 kickback: the search sub-mode owns the content area — it shows the live
@@ -623,8 +639,11 @@ function main() {
     // H8: the live on-open render — thread the live-agent ids so a long-running
     // background agent is reconciled against the real live set, not a blind clock.
     // Absent ⇒ undefined ⇒ the staleness backstop (true session restart).
-    const { route } = require('../lib/menu-screens');
-    const result = route([], app.projectPath, { liveAgentIds });
+    // Aliased to a distinct local: tsc's checkJs treats these two CommonJS
+    // `require` destructures as re-declaring the same binding (TS2300) even
+    // though they sit in disjoint branches — the alias keeps them separate.
+    const { route: routeDashboard } = require('../lib/menu-screens');
+    const result = routeDashboard([], app.projectPath, { liveAgentIds });
     if (needsEnvironmentPrompt(app.projectPath)) {
       attachEnvironmentQuestion(result);
     }

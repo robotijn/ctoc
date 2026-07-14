@@ -422,4 +422,51 @@ describe('init-project', () => {
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // R4 — init writes the regulatory_regime block so a fresh project can persist
+  // ANY compliance answer. The reader of record is compliance-regime.js, which
+  // derives every answer from regulatory-regime.js loadActiveProfiles; the two
+  // must agree on the exact on-disk key/format. These tests drive the REAL
+  // modules, never a re-implementation of the parse.
+  // -------------------------------------------------------------------------
+  describe('regulatory_regime block (R4)', () => {
+    it('fresh init writes a regulatory_regime block with an empty active_profiles anchor', () => {
+      initProject(tempDir);
+      const settingsPath = path.join(tempDir, '.ctoc', 'settings.yaml');
+      const content = fs.readFileSync(settingsPath, 'utf8');
+      assert.ok(content.includes('regulatory_regime:'), 'regulatory_regime block must be present');
+      assert.ok(/active_profiles:\s*\[\]/.test(content), 'active_profiles: [] anchor must be present');
+
+      // The reader of record sees an empty, well-formed active-profile list.
+      const { loadActiveProfiles } = require('../src/lib/regulatory-regime');
+      assert.deepEqual(loadActiveProfiles(tempDir).profiles, []);
+    });
+
+    it('a freshly-inited project can persist a compliance answer via the real writer (round-trip)', () => {
+      initProject(tempDir);
+      const { writeActiveProfiles, shouldRunGdpr } = require('../src/lib/compliance-regime');
+
+      const res = writeActiveProfiles(tempDir, ['gdpr']);
+      assert.equal(res.ok, true, 'writeActiveProfiles must succeed against the init-written anchor');
+      assert.ok(res.profiles.includes('gdpr'));
+      assert.equal(shouldRunGdpr(tempDir), true, 'gdpr profile is active after the round-trip write');
+    });
+
+    it('a declined ("none") answer succeeds and the anchor still supports a later real write', () => {
+      initProject(tempDir);
+      const { writeActiveProfiles, shouldRunGdpr } = require('../src/lib/compliance-regime');
+
+      const declined = writeActiveProfiles(tempDir, []);
+      assert.equal(declined.ok, true, 'declining compliance is a successful no-op write');
+      assert.deepEqual(declined.profiles, []);
+
+      // The anchor must remain usable for a subsequent real activation — this is
+      // the guarantee R4 exists to provide: the line-anchored writer has its anchor
+      // from day one on a fresh project.
+      const later = writeActiveProfiles(tempDir, ['gdpr']);
+      assert.equal(later.ok, true, 'the anchor written at init must support a later activation');
+      assert.equal(shouldRunGdpr(tempDir), true);
+    });
+  });
 });

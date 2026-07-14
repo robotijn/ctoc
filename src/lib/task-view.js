@@ -95,21 +95,29 @@ function taskLabel(task) {
 }
 
 /**
- * Group a registry's tasks by status. `failed` includes `orphaned` and any
- * result.cancelled entries (rendered as "cancelled"). Defensive against a null
- * registry or malformed entries.
+ * Group a registry's tasks by status. Defensive against a null registry or
+ * malformed entries.
+ *
+ * R2-C2 item 7: `cancelling` gets its OWN bucket — it is a NON-terminal, ACTIVE
+ * state that still occupies a concurrency slot and holds its file locks until the
+ * harness agent is confirmed gone (task-registry OCCUPYING set). Dropping it made
+ * the dashboard lie: a cancelling task silently blocked other tasks with no visible
+ * cause. The terminal `cancelled` status (and `orphaned`, and any legacy
+ * `result.cancelled` flag) fold into `failed` — the terminal/settled bucket —
+ * rendered with its own status word so it is never dropped either.
  * @param {{tasks?:Array<object>}} registry
- * @returns {{running:object[], queued:object[], done:object[], failed:object[]}}
+ * @returns {{running:object[], queued:object[], cancelling:object[], done:object[], failed:object[]}}
  */
 function byStatus(registry) {
-  const out = { running: [], queued: [], done: [], failed: [] };
+  const out = { running: [], queued: [], cancelling: [], done: [], failed: [] };
   const tasks = registry && Array.isArray(registry.tasks) ? registry.tasks : [];
   for (const t of tasks) {
     if (!t || typeof t.status !== 'string') continue;
     if (t.status === 'running') out.running.push(t);
     else if (t.status === 'queued') out.queued.push(t);
+    else if (t.status === 'cancelling') out.cancelling.push(t);
     else if (t.status === 'done') out.done.push(t);
-    else if (t.status === 'failed' || t.status === 'orphaned') out.failed.push(t);
+    else if (t.status === 'failed' || t.status === 'orphaned' || t.status === 'cancelled') out.failed.push(t);
   }
   return out;
 }
@@ -156,7 +164,8 @@ function waitReason(task, registry) {
  */
 function renderTasksSection(registry) {
   const g = byStatus(registry);
-  if (!g.running.length && !g.queued.length && !g.done.length && !g.failed.length) return '';
+  // R2-C2 item 7: a cancelling-only registry must NOT read as empty.
+  if (!g.running.length && !g.queued.length && !g.cancelling.length && !g.done.length && !g.failed.length) return '';
 
   let out = 'TASKS\n';
   if (g.running.length) {
@@ -164,6 +173,14 @@ function renderTasksSection(registry) {
     let line = labels.join(' · ');
     if (g.running.length > 6) line += ` … +${g.running.length - 6}`;
     out += `  ▶ ${g.running.length} running   ${line}\n`;
+  }
+  // R2-C2 item 7: cancelling is ACTIVE (holds files) — surface it right after
+  // running so a blocked queue has a visible cause. Never silently dropped.
+  if (g.cancelling.length) {
+    const labels = g.cancelling.slice(0, 6).map(taskLabel);
+    let line = labels.join(' · ');
+    if (g.cancelling.length > 6) line += ` … +${g.cancelling.length - 6}`;
+    out += `  ⊗ ${g.cancelling.length} cancelling ${line} (holds files until the agent is gone)\n`;
   }
   if (g.queued.length) {
     const first = g.queued[0];
@@ -193,7 +210,7 @@ function renderTaskBoard(registry) {
   const actions = { b: '', back: '' };
   let text = `Background Tasks\n${'─'.repeat(40)}\n`;
 
-  const total = g.running.length + g.queued.length + g.done.length + g.failed.length;
+  const total = g.running.length + g.queued.length + g.cancelling.length + g.done.length + g.failed.length;
   if (total === 0) {
     text += '\n  No background tasks.\n\n\n';
     return {
@@ -204,8 +221,11 @@ function renderTaskBoard(registry) {
     };
   }
 
+  // R2-C2 item 7: Cancelling is its own group (active, occupies a slot), placed
+  // after Running; a cancelling row is selectable by its t<n> id like any other.
   const groups = [
     ['Running', g.running],
+    ['Cancelling', g.cancelling],
     ['Queued', g.queued],
     ['Done', g.done],
     ['Failed', g.failed],

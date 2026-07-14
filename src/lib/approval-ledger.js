@@ -28,6 +28,30 @@
  * All filesystem I/O routes through `./safe-fs` (the audited choke point) and
  * every path is composed with `path.join`, so the module is cross-platform and
  * never writes outside `.ctoc/approvals/`.
+ *
+ * TWO ENTRY KINDS (R2-F). Every entry declares its provenance:
+ *   - HUMAN kind (`writeEntry`, the default): a human crossed the gate via the
+ *     menu (`approvePlan`/`stampAndLedger`). `backfillEntry` also writes a human-
+ *     kind entry, additionally stamped `backfilled: true` + `backfill_reason`, to
+ *     ledger a plan that crossed a gate BEFORE the ledger existed (the 2026-07-14
+ *     legacy migration provenance) — hashing the plan's CURRENT on-disk content.
+ *   - PIPELINE kind (`writePipelineEntry`): the automated pipeline advanced a plan
+ *     (e.g. stale reconciliation). It carries `advanced_by: 'pipeline'` and a
+ *     MANDATORY non-empty `evidence` string; a write with no evidence is refused
+ *     loudly. `entryKind(entry)` reports the kind; `human-gate-check.js` accepts a
+ *     pipeline entry ONLY at `done/` (never at the pre-done gate `todo/`, which
+ *     stays human-only).
+ *
+ * CANONICAL LOWERCASE SLUGS (R2-F). `slugFromPlanPath` lowercases and every
+ * boundary (`ledgerPath`, and thus every read/write) canonicalizes its slug to
+ * lowercase BEFORE the `SLUG_RE` path-safety test — so a legacy mixed-case plan
+ * (e.g. `CU1-Foo.md`) keys to `cu1-foo.json` consistently on both the write side
+ * (`stampAndLedger`/`backfillEntry`) and the residency-sweep read side. `SLUG_RE`
+ * itself is UNCHANGED: lowercasing never loosens the traversal guard (a `/`, `..`,
+ * drive letter, or any non-`[a-z0-9-]` character is still rejected). Two plans
+ * whose basenames differ only by case would collide on the canonical key; the
+ * write path detects an existing entry recorded for a DIFFERENT original basename
+ * and fails loudly rather than silently overwriting.
  */
 
 const crypto = require('crypto');
@@ -45,6 +69,19 @@ const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 /** Fields a ledger entry MUST carry; a write missing any of them is rejected. */
 const REQUIRED_FIELDS = ['content_sha256', 'stage_from', 'stage_to'];
+
+/**
+ * The gate SOURCE stage a backfilled entry is recorded as having crossed FROM,
+ * keyed by the destination stage the plan now resides in. Mirrors the human-gate
+ * edges in `human-gate-check.js` (destination → source). A destination not in the
+ * map falls back to the literal `'backfill'` marker, so the record is never left
+ * with an empty required field.
+ */
+const STAGE_SOURCE = {
+  implementation: 'functional',
+  todo: 'implementation',
+  done: 'review',
+};
 
 /**
  * Absolute path to the ledger directory under a project root.
@@ -66,10 +103,15 @@ function ledgerDir(projectPath) {
  * @throws {Error} `Invalid slug` when `slug` is not a safe token
  */
 function ledgerPath(slug, projectPath) {
-  if (typeof slug !== 'string' || !SLUG_RE.test(slug)) {
+  // Canonicalize to lowercase at the boundary BEFORE the path-safety test, so a
+  // legacy mixed-case slug keys consistently. SLUG_RE is unchanged: lowercasing
+  // cannot introduce a `/`, `..`, or any other traversal character, so the guard
+  // stays exactly as tight (`../../etc/passwd` still fails).
+  const key = typeof slug === 'string' ? slug.toLowerCase() : slug;
+  if (typeof key !== 'string' || !SLUG_RE.test(key)) {
     throw new Error('Invalid slug');
   }
-  return path.join(ledgerDir(projectPath), `${slug}.json`);
+  return path.join(ledgerDir(projectPath), `${key}.json`);
 }
 
 /**
@@ -81,7 +123,11 @@ function ledgerPath(slug, projectPath) {
  * @returns {string} the slug
  */
 function slugFromPlanPath(planPath) {
-  return path.basename(planPath).replace(/\.md$/, '');
+  // Canonical lowercase (R2-F): the ledger key for a plan is ALWAYS lowercase, so
+  // a legacy mixed-case basename (e.g. `CU1-Foo.md`) keys to `cu1-foo`. The
+  // original-cased basename is recovered separately (via `path.basename`) where a
+  // human-readable form or a collision check needs it.
+  return path.basename(planPath).replace(/\.md$/i, '').toLowerCase();
 }
 
 /**
@@ -97,14 +143,34 @@ function computeContentHash(content) {
 }
 
 /**
+ * The union of all fields either entry kind may carry. Every field is optional
+ * at the type level because the required-field enforcement is a RUNTIME guard in
+ * {@link persistEntry} (which validates against `REQUIRED_FIELDS` before any
+ * write) — the type only describes the accepted shape, not the contract.
+ *
+ * @typedef {object} LedgerEntryInput
+ * @property {string} [content_sha256]
+ * @property {string} [stage_from]
+ * @property {string} [stage_to]
+ * @property {string} [approved_at]
+ * @property {string} [approved_by]
+ * @property {string} [evidence]
+ * @property {boolean} [backfilled]
+ * @property {string} [backfill_reason]
+ * @property {string} [plan_basename]
+ */
+
+/**
  * Record an approval entry for a plan. Creates the ledger directory if needed
  * and writes `{ content_sha256, stage_from, stage_to, approved_at, approved_by }`
  * as pretty-printed JSON to {@link ledgerPath}. `approved_at` defaults to the
  * current ISO timestamp when the caller omits it.
  *
  * @param {string} slug - the plan slug
- * @param {{content_sha256: string, stage_from: string, stage_to: string,
- *          approved_at?: string, approved_by?: string}} entry - the entry fields
+ * @param {LedgerEntryInput} entry - the entry fields (required fields
+ *   `content_sha256`, `stage_from`, `stage_to` are enforced at runtime); may
+ *   also carry the optional R2-F provenance fields `backfilled`,
+ *   `backfill_reason`, and `plan_basename`
  * @param {string} projectPath - the project root
  * @returns {object} the entry object as written
  * @throws {Error} `Invalid slug` for an unsafe slug; a descriptive error naming
@@ -113,13 +179,7 @@ function computeContentHash(content) {
  *   write never leaves a partial file behind.
  */
 function writeEntry(slug, entry, projectPath) {
-  const target = ledgerPath(slug, projectPath); // validates the slug first
-  const src = entry || {};
-  for (const field of REQUIRED_FIELDS) {
-    if (src[field] === undefined || src[field] === null || src[field] === '') {
-      throw new Error(`approval-ledger: missing required field "${field}"`);
-    }
-  }
+  const src = /** @type {LedgerEntryInput} */ (entry || {});
   const record = {
     content_sha256: src.content_sha256,
     stage_from: src.stage_from,
@@ -127,9 +187,168 @@ function writeEntry(slug, entry, projectPath) {
     approved_at: src.approved_at || new Date().toISOString(),
     approved_by: src.approved_by !== undefined ? src.approved_by : 'human',
   };
+  // Optional legacy-migration provenance (R2-F): a backfilled human-kind entry.
+  if (src.backfilled !== undefined) record.backfilled = src.backfilled;
+  if (src.backfill_reason !== undefined) record.backfill_reason = src.backfill_reason;
+  // Optional original-cased basename, used for the case-collision guard.
+  if (src.plan_basename !== undefined) record.plan_basename = src.plan_basename;
+  return persistEntry(slug, record, projectPath);
+}
+
+/**
+ * Record a PIPELINE-kind entry: the automated pipeline (not a human) advanced the
+ * plan. Requires the human-kind required fields PLUS a non-empty `evidence`
+ * string (e.g. `'stale-reconciliation'` or a verify-artifact path). Stamps
+ * `advanced_by: 'pipeline'` and does NOT set `approved_by: human` — so
+ * `entryKind` classifies it as `pipeline` and `human-gate-check.js` accepts it
+ * only at `done/`, never at the human-only `todo/` gate.
+ *
+ * @param {string} slug - the plan slug
+ * @param {LedgerEntryInput} entry - the entry fields; required fields
+ *   `content_sha256`, `stage_from`, `stage_to`, and a non-empty `evidence`
+ *   string are enforced at runtime
+ * @param {string} projectPath - the project root
+ * @returns {object} the entry object as written
+ * @throws {Error} `Invalid slug`; a missing-required-field error; or a
+ *   `pipeline entry requires non-empty "evidence"` error — all BEFORE any write.
+ */
+function writePipelineEntry(slug, entry, projectPath) {
+  const src = /** @type {LedgerEntryInput} */ (entry || {});
+  if (typeof src.evidence !== 'string' || src.evidence.trim() === '') {
+    throw new Error('approval-ledger: pipeline entry requires non-empty "evidence"');
+  }
+  const record = {
+    content_sha256: src.content_sha256,
+    stage_from: src.stage_from,
+    stage_to: src.stage_to,
+    approved_at: src.approved_at || new Date().toISOString(),
+    advanced_by: 'pipeline',
+    evidence: src.evidence,
+  };
+  return persistEntry(slug, record, projectPath);
+}
+
+/**
+ * Shared write path for both entry kinds: validates the slug (traversal guard),
+ * validates the REQUIRED_FIELDS, runs the case-collision guard, then writes the
+ * record atomically-enough for a pretty-printed JSON leaf. The guards all run
+ * BEFORE any filesystem write, so a rejected write never leaves a partial file.
+ *
+ * Case-collision guard: if an entry already exists at the canonical key AND both
+ * the existing and incoming records carry a `plan_basename`, a DIFFERENCE means
+ * two distinct original files (differing only by case) map to the same key — a
+ * silent overwrite would erase one plan's provenance, so this throws loudly.
+ * Re-writing the SAME original basename (idempotent re-approval) is allowed.
+ *
+ * @param {string} slug
+ * @param {object} record - a fully-built record (required fields already set)
+ * @param {string} projectPath
+ * @returns {object} the record as written
+ */
+function persistEntry(slug, record, projectPath) {
+  const target = ledgerPath(slug, projectPath); // validates + canonicalizes the slug
+  for (const field of REQUIRED_FIELDS) {
+    if (record[field] === undefined || record[field] === null || record[field] === '') {
+      throw new Error(`approval-ledger: missing required field "${field}"`);
+    }
+  }
+  if (record.plan_basename !== undefined) {
+    const existing = readEntry(slug, projectPath);
+    if (existing && existing.plan_basename !== undefined &&
+        existing.plan_basename !== record.plan_basename) {
+      throw new Error(
+        `approval-ledger: slug collision on canonical key "${slug.toLowerCase()}" — ` +
+        `existing plan_basename "${existing.plan_basename}" vs incoming "${record.plan_basename}"; ` +
+        `two plans differ only by case. Refusing to overwrite provenance.`,
+      );
+    }
+  }
   safeFs.mkdirSync(ledgerDir(projectPath), { recursive: true });
   safeFs.writeFileSync(target, JSON.stringify(record, null, 2));
   return record;
+}
+
+/**
+ * Classify a ledger entry's provenance kind.
+ *
+ * @param {object|null} entry - a parsed ledger entry
+ * @returns {('human'|'pipeline'|null)} `pipeline` when `advanced_by === 'pipeline'`,
+ *   `human` for any other real entry (the historical default), `null` for no entry.
+ */
+function entryKind(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  return entry.advanced_by === 'pipeline' ? 'pipeline' : 'human';
+}
+
+/**
+ * Read a plan's ledger entry WITH a discriminated status, so a caller (the
+ * residency sweep) can tell an un-keyable slug and a corrupt file apart from a
+ * plain absence and flag each distinctly — instead of collapsing all three to
+ * `null` the way `readEntry` does. NEVER throws.
+ *
+ * @param {string} slug - the plan slug
+ * @param {string} projectPath - the project root
+ * @returns {{status: ('unkeyable'|'absent'|'corrupt'|'ok'), entry: (object|null)}}
+ */
+function readEntryResult(slug, projectPath) {
+  let target;
+  try {
+    target = ledgerPath(slug, projectPath);
+  } catch {
+    return { status: 'unkeyable', entry: null };
+  }
+  if (!safeFs.existsSync(target)) return { status: 'absent', entry: null };
+  let raw;
+  try {
+    raw = safeFs.readFileSync(target, 'utf8');
+  } catch {
+    // The file exists (existsSync passed) but cannot be read: treat as corrupt,
+    // never as absent — flagging is the fail-SAFE direction.
+    return { status: 'corrupt', entry: null };
+  }
+  try {
+    return { status: 'ok', entry: JSON.parse(raw) };
+  } catch {
+    return { status: 'corrupt', entry: null };
+  }
+}
+
+/**
+ * Ledger an EXISTING plan file (R2-F backfill helper). Hashes the plan's CURRENT
+ * on-disk content and writes a human-kind entry stamped `backfilled: true` +
+ * `backfill_reason`, keyed to the canonical lowercase slug and carrying the
+ * original-cased basename for the collision guard. This is the ONLY sanctioned
+ * way to ledger a plan that crossed a human gate before the ledger existed; the
+ * integrator drives it via `node -e` at the wave boundary (no standalone script
+ * file, which would become dead code). It writes THROUGH the module, so the
+ * agent-write deny on `.ctoc/approvals/` (`PreToolUse.Edit.js`) stays intact.
+ *
+ * @param {string} projectPath - the project root
+ * @param {string} planPath - absolute path to the existing plan file
+ * @param {{stage_to?: string, reason?: string}} [opts] - destination stage the
+ *   plan resides in, and the human-readable backfill reason (`stage_to` is
+ *   required and enforced at runtime)
+ * @returns {object} the entry object as written
+ * @throws {Error} if the plan file cannot be read, the slug is un-keyable, or the
+ *   canonical key collides with a different original basename (loud, never silent).
+ */
+function backfillEntry(projectPath, planPath, opts = {}) {
+  const { stage_to, reason } = opts;
+  if (typeof stage_to !== 'string' || stage_to === '') {
+    throw new Error('approval-ledger: backfillEntry requires opts.stage_to');
+  }
+  const content = safeFs.readFileSync(planPath, 'utf8');
+  const slug = slugFromPlanPath(planPath);
+  const originalBasename = path.basename(planPath).replace(/\.md$/i, '');
+  return writeEntry(slug, {
+    content_sha256: computeContentHash(content),
+    stage_from: STAGE_SOURCE[stage_to] || 'backfill',
+    stage_to,
+    approved_by: 'human',
+    backfilled: true,
+    backfill_reason: reason !== undefined ? reason : '',
+    plan_basename: originalBasename,
+  }, projectPath);
 }
 
 /**
@@ -198,7 +417,11 @@ module.exports = {
   slugFromPlanPath,
   computeContentHash,
   writeEntry,
+  writePipelineEntry,
+  entryKind,
   readEntry,
+  readEntryResult,
+  backfillEntry,
   verify,
   removeEntry,
 };
