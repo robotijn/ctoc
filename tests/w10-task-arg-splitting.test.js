@@ -44,6 +44,22 @@ afterEach(() => {
  * @returns {string} the task id ("t1")
  */
 function seedRunningT1() {
+  // R3-B item 4 / C7: an implement task whose plan file is absent no longer completes with
+  // phantom success — it is refused. Seed a real, fully-checked in-progress plan so the
+  // completion runs for real and the caller's --summary/--next round-trips through the
+  // settled task (the behaviour these arg-splitting tests assert).
+  const stepBlock = ['8: TEST', '9: PREPARE', '10: IMPLEMENT', '11: REVIEW', '12: OPTIMIZE',
+    '13: SECURE', '14: VERIFY', '15: DOCUMENT', '16: FINAL-REVIEW']
+    .map((s) => `### Step ${s}\n- [x] done\n`).join('\n');
+  const content =
+    '---\napproved_by: human\ngate_crossed: implementation → todo\n---\n\n' +
+    '---\ntitle: "w10-s2-demo"\ntype: implementation\niron_loop: true\n' +
+    'files:\n  - "src/w10-s2-demo.js"\n---\n\n' +
+    '# w10-s2-demo\n\n## Execution Plan (Steps 8-16)\n\n' + stepBlock + '\n';
+  const dir = path.join(root, 'plans', 'in-progress');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'w10-s2-demo.md'), content);
+
   const reg = taskRegistry.emptyRegistry();
   const t = taskRegistry.addTask(reg, { kind: 'implement', plan: 'w10-s2-demo', touches: ['src/w10-s2-demo.js'] });
   taskRegistry.updateTask(reg, t.id, { status: 'running' });

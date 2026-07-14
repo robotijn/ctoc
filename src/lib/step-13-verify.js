@@ -7,9 +7,26 @@
  *
  * This module has NO dependency on smart-quality-gate-system.
  * When that system ships, Step 14 will automatically use it.
+ *
+ * THE FAIL-CLOSED CONTRACT (R4-A). A check that DID NOT RUN is not a check that
+ * PASSED. This module was broken in both directions and is now closed on both:
+ *
+ *   - NO verifiable toolchain (no package.json, no tests, no linter) ⇒ ZERO checks
+ *     ran ⇒ `passed:false`, error `no-verifiable-toolchain`. It NEVER returns a
+ *     vacuous "all checks passed" when nothing ran. A gate that opens on nothing
+ *     is not a gate.
+ *   - A MISSING npm script (finding C2) is `applicable:false` — recorded, not a
+ *     failing check. `npm error Missing script: "lint"` is an ABSENT script, not a
+ *     failed lint, so a normal project with tests but no lint/typecheck script
+ *     PASSES instead of being spuriously refused.
+ *
+ * VERIFY passes ONLY when: at least one substantive check actually RAN, every
+ * check that ran passed, no test was skipped (CLAUDE.md: "0 skipped"), coverage —
+ * when measurable against the project's declared floor (.ctoc/coverage-baseline
+ * .json `minPct`) — cleared it, and any app-shaped project launched and responded.
  */
 
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
 const { driveAppSync } = require('./app-runner');
@@ -56,9 +73,49 @@ function runVerify(projectPath) {
   // A library/unknown project reports applicable:false and is unaffected.
   applyAppRunCheck(result, projectPath);
 
-  result.passed = result.errors.length === 0;
-  result.summary = buildSummary(result);
+  // THE FAIL-CLOSED CONTRACT (R4-A): a check that did NOT run is not a check that
+  // passed. VERIFY passes ONLY when at least one substantive check actually RAN,
+  // every check that ran passed, no required check was skipped, and coverage —
+  // when measurable against a declared floor — cleared it. A project where
+  // NOTHING could run is NOT a pass: it fails loudly with `no-verifiable-toolchain`,
+  // naming what was looked for. This is the defect this slice closes — a gate that
+  // opened on zero checks is not a gate.
+  const substantive = countSubstantiveChecks(result);
+  if (substantive === 0) {
+    result.errors.push(
+      'no-verifiable-toolchain: looked for npm scripts (lint/typecheck/test), ' +
+      'pyproject/ruff/mypy/pytest, go.mod/go test, Cargo/cargo test, and a ' +
+      'launchable app — none could run. A verification that verified nothing ' +
+      'is NOT a pass.'
+    );
+  }
+
+  result.passed = result.errors.length === 0 && substantive > 0;
+  result.summary = buildSummary(result, substantive);
   return result;
+}
+
+/**
+ * Count the checks that ACTUALLY RAN in a VERIFY result. A "substantive" check is
+ * one that executed real work: the ctoc quality gate, a lint/typecheck/test tool
+ * that ran, or an app that was launched. `applicable:false` (no such tool/script)
+ * and never-launched apps do NOT count — they ran nothing, so they can never be
+ * the sole basis for a pass.
+ *
+ * @param {Object} result - The VERIFY result being assembled.
+ * @returns {number} How many substantive checks ran.
+ */
+function countSubstantiveChecks(result) {
+  let n = 0;
+  const c = result.checks || {};
+  if (c.qualityGate && c.qualityGate.passed) n++;
+  for (const k of ['lint', 'types', 'tests']) {
+    if (c[k] && c[k].ran === true) n++;
+  }
+  // A launched app is substantive activity regardless of whether it responded —
+  // whether it responded is the pass/fail, recorded separately as an error.
+  if (c.appRuns && c.appRuns.applicable === true && c.appRuns.launched === true) n++;
+  return n;
 }
 
 /**
@@ -111,23 +168,196 @@ function applyAppRunCheck(result, projectPath) {
 }
 
 /**
- * Build a human-readable one-line summary for a VERIFY result.
+ * Build a human-readable one-line summary for a VERIFY result. On success it names
+ * exactly what RAN and what was not applicable — it NEVER claims "all checks
+ * passed" when nothing ran (that phrasing is the fingerprint of the old vacuous
+ * pass). On failure it lists the failing checks.
+ *
  * @param {Object} result - The assembled VERIFY result.
+ * @param {number} substantive - How many substantive checks ran.
  * @returns {string} Summary line.
  */
-function buildSummary(result) {
+function buildSummary(result, substantive) {
+  const c = result.checks || {};
+  const ran = [];
+  const notApplicable = [];
+  if (c.qualityGate && c.qualityGate.passed) ran.push('ctoc quality gate');
+  for (const [key, label] of [['lint', 'lint'], ['types', 'typecheck'], ['tests', 'tests']]) {
+    if (c[key] && c[key].ran === true) ran.push(label);
+    else if (c[key]) notApplicable.push(label);
+  }
+  if (c.appRuns && c.appRuns.applicable === true) {
+    if (c.appRuns.responded) ran.push('app launch');
+    else if (c.appRuns.launched) ran.push('app launch (no response)');
+  }
+
   if (result.passed) {
-    const appChecked = result.checks.appRuns && result.checks.appRuns.applicable && result.checks.appRuns.responded;
-    if (result.method === 'ctoc-quality-gate') {
-      return appChecked
-        ? 'All quality checks passed via ctoc quality gate, and the app launched and responded.'
-        : 'All quality checks passed via ctoc quality gate.';
-    }
-    return appChecked
-      ? 'All fallback quality checks passed, and the app launched and responded.'
-      : 'All fallback quality checks passed.';
+    let s = `VERIFY passed — ran: ${ran.join(', ') || 'nothing'}`;
+    if (notApplicable.length) s += `; not applicable: ${notApplicable.join(', ')}`;
+    return s;
+  }
+  if (substantive === 0) {
+    return `VERIFY failed: no verifiable toolchain — nothing ran, so nothing was verified. ${result.errors.join('; ')}`;
   }
   return `${result.errors.length} check(s) failed: ${result.errors.join('; ')}`;
+}
+
+/**
+ * Load and parse a project's package.json. Returns null when absent/unparseable.
+ * @param {string} projectPath - Project root.
+ * @returns {Object|null}
+ */
+function loadPackageJsonSafe(projectPath) {
+  const p = path.join(projectPath, 'package.json');
+  if (!safeFs.existsSync(p)) return null;
+  try {
+    return JSON.parse(safeFs.readFileSync(p, 'utf8'));
+  } catch (e) {
+    return null;
+  }
+}
+
+/** True iff `pkg` declares a runnable npm script under `name`. */
+function npmScriptExists(pkg, name) {
+  return !!(pkg && pkg.scripts && typeof pkg.scripts[name] === 'string' && pkg.scripts[name].trim());
+}
+
+/**
+ * Probe whether an executable is runnable, by asking it for its version. A
+ * missing binary sets `error` (ENOENT); a present one exits (0 or not) with no
+ * spawn error. Used to distinguish a NOT-RUN check (tool absent) from a real
+ * failure, so an absent tool is never counted as a failing check.
+ * @param {string} bin - Executable name.
+ * @param {string} cwd - Working directory.
+ * @returns {boolean}
+ */
+function toolExists(bin, cwd) {
+  try {
+    const r = spawnSync(bin, ['--version'], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32'
+    });
+    return !r.error;
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Heuristic: does a command result read as NOT-RUN (missing tool/script)? */
+function looksNotRun(errText) {
+  return /not found|ENOENT|command not found|Missing script|is not recognized|No such file/i.test(errText || '');
+}
+
+/**
+ * Evaluate one check category (lint/typecheck/tests) from a list of candidate
+ * commands whose preconditions (script present, or tool installed) already held.
+ * Returns a THREE-state check:
+ *   - `applicable:false, ran:false`  — no candidate → NOT-RUN (never an error, never a pass)
+ *   - `ran:true, passed:true`        — a candidate ran and exited 0
+ *   - `ran:true, passed:false`       — a candidate ran and failed (pushes an error)
+ *
+ * @param {string} label - Human label ("Lint", "Type check", "Tests").
+ * @param {string[]} candidates - Pre-qualified command strings.
+ * @param {string} projectPath - Project root.
+ * @param {string[]} errors - Errors array to append a failure to.
+ * @returns {Object} The check record.
+ */
+function evalCategory(label, candidates, projectPath, errors) {
+  if (candidates.length === 0) {
+    return { ran: false, applicable: false, passed: null, reason: `no ${label.toLowerCase()} tool or script found` };
+  }
+  const r = tryCommands(candidates, projectPath);
+  if (!r.ran) {
+    return { ran: false, applicable: false, passed: null, command: null, reason: `${label} candidates were not runnable` };
+  }
+  const check = {
+    ran: true,
+    applicable: true,
+    passed: r.success === true,
+    command: r.command,
+    output: (r.output || '').slice(0, 4000),
+    error: r.error || null
+  };
+  if (!check.passed) {
+    errors.push(`${label} failed: ${r.error || 'nonzero exit'}`);
+  }
+  return check;
+}
+
+/** Read the project's coverage floor (minPct) from .ctoc/coverage-baseline.json. */
+function readCoverageFloor(projectPath) {
+  try {
+    const p = path.join(projectPath, '.ctoc', 'coverage-baseline.json');
+    if (!safeFs.existsSync(p)) return null;
+    const j = JSON.parse(safeFs.readFileSync(p, 'utf8'));
+    return typeof j.minPct === 'number' ? j.minPct : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Parse a skipped/todo test count from test-runner output. */
+function parseSkippedCount(out) {
+  let n = 0;
+  const text = out || '';
+  for (const re of [/#\s*skipped\s+(\d+)/ig, /#\s*todo\s+(\d+)/ig]) {
+    let m;
+    while ((m = re.exec(text)) !== null) n += parseInt(m[1], 10);
+  }
+  if (n === 0) {
+    const mSkip = text.match(/(\d+)\s+skipped/i);
+    if (mSkip) n += parseInt(mSkip[1], 10);
+    const mPend = text.match(/(\d+)\s+pending/i);
+    if (mPend) n += parseInt(mPend[1], 10);
+  }
+  return n;
+}
+
+/** Parse a coverage percentage from test-runner output, or null if not present. */
+function parseCoveragePct(out) {
+  const text = out || '';
+  let m = text.match(/All files\s*\|\s*([\d.]+)/);
+  if (m) return parseFloat(m[1]);
+  m = text.match(/Lines\s*:\s*([\d.]+)\s*%/i);
+  if (m) return parseFloat(m[1]);
+  m = text.match(/Statements\s*:\s*([\d.]+)\s*%/i);
+  if (m) return parseFloat(m[1]);
+  return null;
+}
+
+/**
+ * Fold the "0 skipped" and coverage-floor contracts into a test check that RAN.
+ * A skipped/todo test fails the gate (CLAUDE.md: "0 skipped"). Coverage below the
+ * declared floor fails; coverage that genuinely cannot be measured is recorded as
+ * unmeasured — NOT-RUN, not a pass (item 2). No floor declared ⇒ coverage is not
+ * gated (we do not invent a floor).
+ *
+ * @param {Object} check - The tests check (ran:true), mutated in place.
+ * @param {string} projectPath - Project root.
+ * @param {string[]} errors - Errors array to append violations to.
+ */
+function applyTestQualityContracts(check, projectPath, errors) {
+  const skipped = parseSkippedCount(check.output);
+  check.skipped = skipped;
+  if (skipped > 0) {
+    errors.push(`${skipped} skipped/todo test(s) — the contract is 0 skipped`);
+  }
+
+  const cov = parseCoveragePct(check.output);
+  const floor = readCoverageFloor(projectPath);
+  if (cov != null) {
+    check.coverage = cov;
+    check.coverageFloor = floor;
+    if (floor != null && cov < floor) {
+      errors.push(`Coverage ${cov}% is below the project floor of ${floor}%`);
+    }
+  } else {
+    // Coverage genuinely could not be measured — recorded, never treated as a pass.
+    check.coverage = null;
+  }
 }
 
 /**
@@ -142,54 +372,43 @@ function runFallbackChecks(projectPath) {
   const errors = [];
 
   // Detect project type
-  const hasPackageJson = safeFs.existsSync(path.join(projectPath, 'package.json'));
+  const pkg = loadPackageJsonSafe(projectPath);
+  const hasPackageJson = !!pkg;
   const hasPyproject = safeFs.existsSync(path.join(projectPath, 'pyproject.toml'));
   const hasGoMod = safeFs.existsSync(path.join(projectPath, 'go.mod'));
   const hasCargoToml = safeFs.existsSync(path.join(projectPath, 'Cargo.toml'));
 
+  // Each candidate is added ONLY when its precondition holds — a DEFINED npm
+  // script (finding C2: an ABSENT script is applicable:false, never a failing
+  // check) or an INSTALLED tool. This is what distinguishes NOT-RUN from FAILED.
+
   // Lint checks
   const lintCommands = [];
-  if (hasPackageJson) lintCommands.push('npm run lint');
-  if (hasPyproject) lintCommands.push('ruff check .');
-  if (hasGoMod) lintCommands.push('golangci-lint run');
-  if (hasCargoToml) lintCommands.push('cargo clippy');
-
-  if (lintCommands.length > 0) {
-    const lintResult = tryCommands(lintCommands, projectPath);
-    checks.lint = lintResult;
-    if (!lintResult.success) {
-      errors.push(`Lint failed: ${lintResult.error}`);
-    }
-  }
+  if (hasPackageJson && npmScriptExists(pkg, 'lint')) lintCommands.push('npm run lint');
+  if (hasPyproject && toolExists('ruff', projectPath)) lintCommands.push('ruff check .');
+  if (hasGoMod && toolExists('golangci-lint', projectPath)) lintCommands.push('golangci-lint run');
+  if (hasCargoToml && toolExists('cargo', projectPath)) lintCommands.push('cargo clippy');
+  checks.lint = evalCategory('Lint', lintCommands, projectPath, errors);
 
   // Type check
   const typeCommands = [];
-  if (hasPackageJson) typeCommands.push('npm run typecheck');
-  if (hasPyproject) typeCommands.push('mypy .');
-  if (hasGoMod) typeCommands.push('go vet ./...');
-
-  if (typeCommands.length > 0) {
-    const typeResult = tryCommands(typeCommands, projectPath);
-    checks.types = typeResult;
-    if (!typeResult.success) {
-      errors.push(`Type check failed: ${typeResult.error}`);
-    }
-  }
+  if (hasPackageJson && npmScriptExists(pkg, 'typecheck')) typeCommands.push('npm run typecheck');
+  if (hasPyproject && toolExists('mypy', projectPath)) typeCommands.push('mypy .');
+  if (hasGoMod && toolExists('go', projectPath)) typeCommands.push('go vet ./...');
+  checks.types = evalCategory('Type check', typeCommands, projectPath, errors);
 
   // Test suite
   const testCommands = [];
-  if (hasPackageJson) testCommands.push('npm test');
-  if (hasPyproject) testCommands.push('pytest');
-  if (hasGoMod) testCommands.push('go test ./...');
-  if (hasCargoToml) testCommands.push('cargo test');
-
-  if (testCommands.length > 0) {
-    const testResult = tryCommands(testCommands, projectPath);
-    checks.tests = testResult;
-    if (!testResult.success) {
-      errors.push(`Tests failed: ${testResult.error}`);
-    }
+  if (hasPackageJson && npmScriptExists(pkg, 'test')) testCommands.push('npm test');
+  if (hasPyproject && toolExists('pytest', projectPath)) testCommands.push('pytest');
+  if (hasGoMod && toolExists('go', projectPath)) testCommands.push('go test ./...');
+  if (hasCargoToml && toolExists('cargo', projectPath)) testCommands.push('cargo test');
+  const testCheck = evalCategory('Tests', testCommands, projectPath, errors);
+  // When tests actually RAN, fold in the "0 skipped" and coverage-floor contracts.
+  if (testCheck.ran) {
+    applyTestQualityContracts(testCheck, projectPath, errors);
   }
+  checks.tests = testCheck;
 
   return { checks, errors };
 }
@@ -220,25 +439,42 @@ function tryCommand(command, cwd) {
 }
 
 /**
- * Try multiple commands in order, returning the result of the first one that exists.
- * Falls through to the next command if the current one is not found.
+ * Try multiple commands in order, returning the result of the first one that
+ * actually RAN (whether it passed or failed). A command whose executable/script
+ * is missing is skipped and the next candidate tried.
  *
- * @param {string[]} commands - Commands to try in order
- * @param {string} cwd - Working directory
- * @returns {Object} Result with success, output, command, and error
+ * THREE-state contract (R4-A): a check that could not run is NOT a check that
+ * passed. When EVERY candidate is missing, this returns `{ ran:false,
+ * success:false, applicable:false, command:null }` — never the old
+ * `{ success:true, output:'...skipped' }` sentinel that let a gate open on
+ * nothing. The old detector also keyed only off the literal "not found", so an
+ * npm "Missing script" (finding C2) was miscounted as a real failure; the
+ * `looksNotRun` heuristic now recognizes that and every common missing-tool
+ * message.
+ *
+ * @param {string[]} commands - Commands to try in order.
+ * @param {string} cwd - Working directory.
+ * @returns {Object} `{ ran, success, output, command, error }`.
  */
 function tryCommands(commands, cwd) {
   for (const cmd of commands) {
     const result = tryCommand(cmd, cwd);
-    // If command was found (even if it failed), return this result
-    if (result.success || !result.error.includes('not found')) {
-      return { ...result, command: cmd };
+    if (result.success) {
+      return { ...result, command: cmd, ran: true };
     }
+    if (looksNotRun(result.error)) {
+      continue; // executable/script missing → NOT this check; try the next candidate
+    }
+    // The command ran and failed for a real reason.
+    return { ...result, command: cmd, ran: true };
   }
 
+  // Nothing ran. This is NOT a pass — the caller records it as applicable:false.
   return {
-    success: true,
-    output: 'No applicable tool found - skipped',
+    ran: false,
+    success: false,
+    applicable: false,
+    output: '',
     command: null,
     error: null
   };

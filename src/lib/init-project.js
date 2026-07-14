@@ -532,11 +532,12 @@ function generateSettings(languages, frameworks) {
     'research:',
     '  enabled: true',
     '  auto_steps: [1, 2, 5, 12]',
-    '',
-    'push:',
-    '  auto_push: true',
-    '  allow_warnings: false',
     ''
+    // R4-B: the `push:` block (`auto_push`, `allow_warnings`) was DELETED. Nothing
+    // read either key — the canonical push gate is `git.autoPushEnabled` in
+    // settings.json (default false), read ONLY via settings.isAutoPushEnabled().
+    // A visible off-switch wired to a key no code consults is a placebo that lies
+    // to the human. CTOC never pushes unless the human opens git.autoPushEnabled.
   ].join('\n');
 }
 

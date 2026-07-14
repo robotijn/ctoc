@@ -125,6 +125,12 @@ function makeProject() {
 function writePlan(dir, name, body) {
   const p = path.join(dir, `${name}.md`);
   fs.writeFileSync(p, body);
+  // R3-B item 6: cleanupStaleInProgress now also has an AGE backstop (it must not race a
+  // plan out from under an executor about to complete it), so only a genuinely IDLE plan is
+  // eligible for the sweep. These fixtures test the validateForReview GATE, so backdate the
+  // mtime past the age floor to isolate that gate from the age guard (a real orphaned plan).
+  const old = new Date(Date.now() - 200 * 60_000);
+  fs.utimesSync(p, old, old);
   return p;
 }
 

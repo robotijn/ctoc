@@ -25,7 +25,6 @@ const os = require('os');
 const cache = require('../src/lib/cache');
 const actions = require('../src/lib/actions');
 const { getPlanCounts, getVisionCounts } = require('../src/lib/state');
-const sync = require('../src/lib/sync');
 const staleCleanup = require('../src/lib/stale-cleanup');
 const visionDecomposer = require('../src/lib/vision-decomposer');
 const inbox = require('../src/lib/inbox');
@@ -48,49 +47,6 @@ function writePlan(root, stage, slug, extraFrontmatter = '') {
   const p = path.join(root, 'plans', stage, `${slug}.md`);
   const fm = extraFrontmatter ? `\n${extraFrontmatter}` : '';
   fs.writeFileSync(p, `---\ntitle: "${slug}"${fm}\n---\n\n# ${slug}\n\nBody.\n`);
-  return p;
-}
-
-// A full "## Execution Plan" body with every required Iron Loop step present and
-// completed — the shape validateForReview now demands before a plan may be
-// renamed into review/ (W05-s4). Step prose deliberately avoids file-creation
-// verbs (create/added/new file) so the contradiction scan finds no unsatisfied
-// claim. Used where a plan must SURVIVE the review-move gate (F1).
-const REVIEW_VALID_BODY = `## Execution Plan
-
-### Step 8: TEST
-- [x] Tests written and run RED first
-
-### Step 9: PREPARE
-- [x] Environment ready
-
-### Step 10: IMPLEMENT
-- [x] Feature implemented
-
-### Step 11: REVIEW
-- [x] Self-review done
-
-### Step 12: OPTIMIZE
-- [x] No redundant work
-
-### Step 13: SECURE
-- [x] Inputs validated
-
-### Step 14: VERIFY
-- [x] All tests green, 0 skipped, 0 flaky
-
-### Step 15: DOCUMENT
-- [x] Docs updated
-
-### Step 16: FINAL-REVIEW
-- [x] Ready for human review
-`;
-
-// Write a plan that PASSES validateForReview (full completed Execution Plan) into
-// a stage dir. Still a real *.md counted by getPlanCounts.
-function writeReviewValidPlan(root, stage, slug) {
-  const p = path.join(root, 'plans', stage, `${slug}.md`);
-  fs.writeFileSync(p, `---\ntitle: "${slug}"\napproved_by: human\n---\n\n# ${slug}\n\nA cohesive, finished slice.\n\n${REVIEW_VALID_BODY}`);
   return p;
 }
 
@@ -321,8 +277,7 @@ describe('CF1 — read cache is busted on every state write', () => {
 // CF1 KICKBACK — count-mutating writes OUTSIDE actions.js must also bust cache.
 //
 // The actions.js slice wires movePlan/deletePlan/queue-reorder/createCanvas.
-// But four other modules perform raw plan-file writes that bypass actions.js:
-//   - sync.moveToReviewAfterPush        (raw renameSync into review/)
+// But other modules perform raw plan-file writes that bypass actions.js:
 //   - stale-cleanup archivePlan/deletePlan (rename into done/ ; unlinkSync)
 //   - vision-decomposer createStub/removeStub/mergeStubs (functional/*.md writes)
 //   - inbox createQuestion/createDecision (.ctoc/inbox writes → getInboxCounts)
@@ -342,32 +297,10 @@ describe('CF1 KICKBACK — external (non-actions) writers bust the cache', () =>
     cache.invalidate();
   });
 
-  // ── F1: sync.moveToReviewAfterPush (raw rename into review/) ──
-  it('F1_moveToReviewAfterPush_busts_plan_and_inbox_counts', () => {
-    // A todo plan (not a gate-source stage) so review/gatesWaiting both change.
-    // It must PASS validateForReview — moveToReviewAfterPush now gates the rename
-    // (W05-s4) — so seed a full completed Execution Plan, not the minimal body.
-    const planPath = writeReviewValidPlan(root, 'todo', 'cf1-ext-push');
-
-    const beforePlan = getPlanCounts(root);
-    assert.equal(beforePlan.todo, 1, 'precondition: one plan in todo');
-    assert.equal(beforePlan.review, 0, 'precondition: none in review');
-    const beforeInbox = getInboxCounts(root);
-    assert.equal(beforeInbox.gatesWaiting, 0, 'precondition: none waiting at a gate');
-    assert.ok(cache._debug().size > 0, 'precondition: cache populated');
-
-    const res = sync.moveToReviewAfterPush(planPath, root);
-    assert.equal(res.moved, true, 'precondition: the plan was moved to review');
-
-    // Clear-all empties the store immediately after the successful rename.
-    assert.equal(cache._debug().size, 0, 'F1: cache cleared by the raw rename');
-
-    const afterPlan = getPlanCounts(root);
-    assert.equal(afterPlan.todo, 0, 'F1: todo recomputes to 0 (not stale 1)');
-    assert.equal(afterPlan.review, 1, 'F1: review recomputes to 1');
-    const afterInbox = getInboxCounts(root);
-    assert.equal(afterInbox.gatesWaiting, 1, 'F1: gatesWaiting recomputes to 1 (review is a gate source)');
-  });
+  // NOTE (R4-B): the former F1 case exercised sync.moveToReviewAfterPush — a raw,
+  // evidence-less renameSync into review/. That function was DELETED (a plan reaches
+  // review only via the evidence-minting completion path), so the case is gone with
+  // it. The remaining external-writer cache-bust invariants (F2a…) stand unchanged.
 
   // ── F2a: stale-cleanup archivePlan (stamp + rename into done/) ──
   it('F2a_archivePlan_busts_plan_counts', () => {
@@ -581,6 +514,10 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // The fs wrapper itself — owns NO count path; it writes whatever a caller
     // passes. Detecting it would be detecting the primitive, not a count writer.
     ['safe-fs.js', 'the safeFs wrapper — writes only what callers pass; owns no count path of its own'],
+    // R4-B: after moveToReviewAfterPush was deleted, sync.js writes only the
+    // .ctoc/last-sync timestamp; the `plans` tokens are git CLI args (git add
+    // plans/), not fs writes to a counted *.md. No plan/vision/inbox file is written.
+    ['sync.js', 'writes only .ctoc/last-sync timestamp; the `plans` tokens are git CLI args (git add plans/), never an fs write to a counted plan/vision/inbox file'],
     // Reads plan counts but its WRITES target .ctoc/state/agent.json and
     // .ctoc/settings.json — neither is counted by any memoized read.
     ['state.js', 'writes .ctoc/state/agent.json + .ctoc/settings.json only; reads counts but never writes a plan/vision/inbox file'],
@@ -627,7 +564,11 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
   // The known count-mutating writers already wired (CF1 + its kickback). These
   // are the regression pins: they MUST be detected AND MUST pass the safety
   // predicate. If a refactor drops the wiring from any of these, this fails.
-  const KNOWN_WIRED_WRITERS = ['actions.js', 'sync.js', 'stale-cleanup.js', 'vision-decomposer.js', 'inbox.js'];
+  // R4-B: sync.js dropped off this list — its only real count-writer
+  // (moveToReviewAfterPush, a renameSync into review/) was DELETED. Its sole fs
+  // write is now the .ctoc/last-sync timestamp, and the `plans` tokens are git CLI
+  // args (git add plans/), so it is a broad-flag false positive → WHITELIST below.
+  const KNOWN_WIRED_WRITERS = ['actions.js', 'stale-cleanup.js', 'vision-decomposer.js', 'inbox.js'];
 
   // Enumerate real src/lib source files fresh from disk.
   function libFiles() {

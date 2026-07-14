@@ -48,6 +48,15 @@ function makeProject(prefix) {
     fs.mkdirSync(path.join(root, 'plans', stage), { recursive: true });
   }
   fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+  // R4-A: a REAL project — a package.json whose test script actually runs and
+  // passes — so "the clean project passes VERIFY" MEANS something verified. An
+  // empty project is NO LONGER a pass (no-verifiable-toolchain fails loudly); the
+  // intent here ("a clean project passes and the machinery writes evidence") is
+  // preserved with a project that genuinely has a passing check.
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
+    name: 'clean-fixture', version: '1.0.0', main: 'index.js',
+    scripts: { test: 'node -e "process.exit(0)"' }
+  }, null, 2));
   return root;
 }
 

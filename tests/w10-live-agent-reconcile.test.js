@@ -83,10 +83,32 @@ function minutesAgoIso(minutesAgo) {
  * @param {Array<{agentTaskId?:string, ageMinutes?:number, plan?:string}>} specs
  * @returns {string[]} the assigned task ids, in seed order
  */
+/**
+ * Seed a real in-progress plan file for a slug (R3-B item 4 / C7: an implement task whose
+ * plan file is absent no longer completes with phantom success — it is refused). A
+ * fully-checked Step 8–16 block lets validateForReview pass so `menu task complete` runs the
+ * genuine completion and `running → done` succeeds (the behaviour these tests assert).
+ */
+function seedInProgressPlan(slug, files) {
+  const stepBlock = ['8: TEST', '9: PREPARE', '10: IMPLEMENT', '11: REVIEW', '12: OPTIMIZE',
+    '13: SECURE', '14: VERIFY', '15: DOCUMENT', '16: FINAL-REVIEW']
+    .map((s) => `### Step ${s}\n- [x] done\n`).join('\n');
+  const filesBlock = 'files:\n' + files.map((f) => `  - "${f}"`).join('\n') + '\n';
+  const content =
+    '---\napproved_by: human\ngate_crossed: implementation → todo\n---\n\n' +
+    `---\ntitle: "${slug}"\ntype: implementation\niron_loop: true\n${filesBlock}---\n\n` +
+    `# ${slug}\n\n## Execution Plan (Steps 8-16)\n\n${stepBlock}\n`;
+  const dir = path.join(root, 'plans', 'in-progress');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${slug}.md`), content);
+}
+
 function seedRunning(specs) {
   const reg = taskRegistry.emptyRegistry();
   const ids = [];
   for (const spec of specs) {
+    const slug = spec.plan || 'w10-s4-demo';
+    seedInProgressPlan(slug, ['src/' + slug + '.js']);
     const t = taskRegistry.addTask(reg, { kind: 'implement', plan: spec.plan || 'w10-s4-demo', touches: ['src/' + (spec.plan || 'w10-s4-demo') + '.js'] });
     taskRegistry.updateTask(reg, t.id, {
       status: 'running',
@@ -125,9 +147,13 @@ describe('W10-s4 (H8) — extractLiveAgentIds argv parser', () => {
     assert.deepEqual(out.rest, ['menu', 'task', 'list']);
   });
 
-  it('7c. flag with a missing value → empty id list, flag consumed', () => {
+  it('7c. flag with a missing value → UNAVAILABLE (undefined), flag consumed (R3-B item 5)', () => {
+    // Live-list HONESTY: a present-but-valueless flag is NOT an authoritative "zero agents
+    // alive" — it is the SAME as the flag being absent (the list is unavailable). Mapping it
+    // to `[]` made the reconcile read "no agent matches anything" and mass-orphan every live
+    // agent, refilling their slots in the same render. An empty parse is therefore undefined.
     const out = extractLiveAgentIds(['--live-agent-ids']);
-    assert.deepEqual(out.liveAgentIds, []);
+    assert.equal(out.liveAgentIds, undefined);
     assert.deepEqual(out.rest, []);
   });
 });

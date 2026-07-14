@@ -388,21 +388,28 @@ describe('step-13-verify.js', () => {
     assert.equal(res.success, false);
   });
 
-  test('tryCommands — all not-found falls through to skipped sentinel', () => {
+  test('tryCommands — all missing means NOT-RUN, never a silent pass (loud-failure contract)', () => {
     const res = verify.tryCommands(
       ['ctoc-nonexistent-binary-xyz --version', 'another-missing-binary-abc'],
       projectDir
     );
-    // Documented fall-through: success true, command null, "skipped" output.
-    assert.equal(res.success, true);
+    // R4-A: a check that could not run is NOT a check that passed. The old
+    // sentinel returned success:true here — the exact fail-open this slice kills.
+    assert.equal(res.ran, false, 'nothing ran → ran:false');
+    assert.notEqual(res.success, true, 'a NOT-RUN result must never report success:true');
     assert.equal(res.command, null);
-    assert.ok(res.output.includes('skipped'));
   });
 
-  test('runFallbackChecks — no toolchain markers means no checks, no errors', () => {
-    const res = verify.runFallbackChecks(projectDir);
-    assert.deepEqual(res.errors, []);
-    assert.deepEqual(res.checks, {});
+  test('runVerify — no toolchain markers FAILS LOUDLY (a gate on nothing is not a gate)', () => {
+    // R4-A: an empty project runs ZERO checks. It must NOT pass — it must fail
+    // with a named reason, and the summary must not claim checks passed.
+    const res = verify.runVerify(projectDir);
+    assert.equal(res.passed, false, 'no verifiable toolchain must never pass');
+    assert.ok(
+      res.errors.some((e) => /no-verifiable-toolchain/i.test(e)),
+      `the failure must name what was looked for; errors: ${JSON.stringify(res.errors)}`
+    );
+    assert.ok(!/all .*checks passed/i.test(res.summary), `summary must not claim a pass; got: ${res.summary}`);
   });
 
   test('runFallbackChecks — package.json triggers lint/type/test checks', () => {
@@ -434,9 +441,13 @@ describe('step-13-verify.js', () => {
     assert.ok(res.errors.some(e => /Lint failed/.test(e)));
   });
 
-  test('runVerify — falls back when ctoc quality gate is unavailable', () => {
-    // No ctoc binary on a clean temp dir; runVerify must use the fallback path
-    // and, with no toolchain markers, pass with zero errors. Never throws.
+  test('runVerify — falls back when ctoc quality gate is unavailable, and a REAL passing project passes', () => {
+    // No ctoc binary on a clean temp dir; runVerify must use the fallback path.
+    // A project with a REAL passing test script verifies something real and passes.
+    // (An empty project would fail loudly — pinned in its own test above.)
+    writeFile(projectDir, 'package.json', JSON.stringify({
+      name: 'tmp', version: '1.0.0', scripts: { test: 'node -e "process.exit(0)"' }
+    }));
     const res = verify.runVerify(projectDir);
     assert.equal(res.method, 'fallback-direct');
     assert.equal(res.passed, true);

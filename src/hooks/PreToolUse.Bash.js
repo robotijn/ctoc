@@ -4,6 +4,47 @@
  * Blocks file-writing Bash commands before Step 8
  * Blocks git commit before Step 15
  * Blocks irreversible/destructive commands and raw plan-file moves
+ * Blocks LEDGER FORGERY through the Bash channel (R3-A) — see below
+ *
+ * LEDGER PARITY (R3-A, the reason this hook was rewritten). The approval ledger
+ * (`.ctoc/approvals/`) is CTOC's only source of human-approval truth, and
+ * `PreToolUse.Edit.js` denies every Edit/Write/MultiEdit/NotebookEdit call that
+ * targets it. Until this slice the Bash channel had NO such deny: this file never
+ * mentioned `.ctoc/approvals`, and its `ALWAYS_ALLOWED` list matched
+ * `/^\s*node\s+/` FIRST — so
+ *   node -e "require('./src/lib/approval-ledger').writeEntry(…)"
+ * minted a human-kind approval entry and forged Gate 2 or Gate 3, and
+ *   cat > .ctoc/approvals/x.json
+ * forged one with no node at all. `isLedgerForgery()` now runs as the FIRST deny
+ * layer in `main()` — before `ALWAYS_ALLOWED`, before the irreversible net, before
+ * the step gates — so no allowlist can short-circuit past it.
+ *
+ * WHAT IT DENIES (exactly, and no more — a false positive that breaks a menu
+ * recipe is a CRITICAL regression, so the deny is narrow BY DESIGN):
+ *   1. any command that TOUCHES `.ctoc/approvals` in a non-read-only way (redirect,
+ *      append, tee, cp, mv, rm, touch, sed -i, install, an interpreter, …);
+ *   2. INLINE-EVAL commands (`node -e`/`--eval`/`-p`/`--print`, a script piped or
+ *      heredoc'd into `node`) whose text references the ledger module, the ledger
+ *      directory, or a gate-crossing/ledger-writing function name;
+ *   3. INLINE-EVAL commands that cannot be statically cleared at all — a command
+ *      substitution (`$(…)`/backticks) inside the payload, a non-literal
+ *      `require(…)` argument (string concatenation / template / variable), or a
+ *      base64/xxd/openssl decode piped into an interpreter.
+ *
+ * WHAT IT STILL ALLOWS: `node -e` in general (every `src/commands/menu.md` recipe —
+ * compliance write, cleanup exec, plan numbering, environment, dismiss-stale —
+ * keeps working; asserted verbatim against the live menu.md by
+ * tests/ledger-forgery-closed.test.js), read-only inspection of the ledger
+ * (`cat`/`ls`/`grep`), and the ONE sanctioned ledger writer:
+ * `node src/scripts/ledger-backfill.js` (argv-driven, no eval, reviewable).
+ *
+ * HONEST LIMITS (this is a static string gate, not a sandbox — do not read it as
+ * more than it is): a determined agent can still reach the ledger through a
+ * NON-eval path this gate cannot statically see — writing an arbitrary .js file
+ * under a plan-covered path and running `node that-file.js`, or driving another
+ * module that legitimately writes a pipeline entry (`stale-cleanup`). Those paths
+ * are reviewable artifacts (a checked-in file, a stale-cleanup log entry), which is
+ * exactly the difference from the un-auditable one-liner this deny closes.
  *
  * INPUT (W01-s2, finding C2): the PreToolUse payload arrives on STDIN (fd 0) as
  * JSON ({ tool_name, tool_input: { command } }) — the same transport
@@ -64,6 +105,164 @@ const ALWAYS_ALLOWED = [
   /^\s*cd\s+/,
   /^\s*echo\s+[^>]+$/
 ];
+
+// ---------------------------------------------------------------------------
+// LEDGER FORGERY GATE (R3-A). The FIRST deny layer in main(). Every regex below
+// is a LITERAL, linear-time pattern (no nested quantifiers, no data-derived
+// RegExp) so the hook stays a pure string check: no filesystem walk, no state
+// read, sub-millisecond on any realistic command.
+// ---------------------------------------------------------------------------
+
+/** The sanctioned ledger writer, named in every deny message. */
+const SANCTIONED_WRITER = 'src/scripts/ledger-backfill.js';
+
+/**
+ * Normalize a command for PATH matching: drop quote characters (so `.ctoc"/"approvals`
+ * and `'.ctoc/approvals'` both reduce to the bare path), unify Windows separators,
+ * and collapse whitespace runs. Used ONLY for matching — never for execution.
+ * @param {string} command
+ * @returns {string}
+ */
+function normalizeForMatch(command) {
+  return String(command)
+    .replace(/['"`\\]/g, (ch) => (ch === '\\' ? '/' : ''))
+    .replace(/\s+/g, ' ');
+}
+
+/** The ledger directory, as it appears inside a command string (post-normalize). */
+const LEDGER_PATH_RE = /\.ctoc\/+approvals/i;
+
+/**
+ * Tokens that make an INLINE-EVAL command a ledger/gate write. The module name and
+ * the ledger directory are the direct routes; the function names are the indirect
+ * ones (`approvePlan`/`approveSubplans` cross a human gate and stamp the ledger
+ * themselves, so an inline eval of them forges the gate just as effectively).
+ */
+const LEDGER_EVAL_TOKENS = [
+  /approval[-_]ledger/i,
+  LEDGER_PATH_RE,
+  /\bwriteEntry\b/,
+  /\bwritePipelineEntry\b/,
+  /\bwriteVisionArchiveEntry\b/,
+  /\bbackfillEntry\b/,
+  /\bpersistEntry\b/,
+  /\bremoveEntry\b/,
+  /\bstampAndLedger\b/,
+  /\bapprovePlan\b/,
+  /\bapproveSubplans\b/,
+];
+
+/**
+ * A JS-runtime invocation carrying an inline-evaluation flag. Covers `node` and the
+ * other JavaScript/TypeScript runtimes that can `require`/`import` a CommonJS module
+ * and thus reach `approval-ledger` inline: `deno eval`/`deno run -`, `bun -e`/
+ * `bun eval`, `ts-node -e`, `tsx -e`. Limiting this to `node` alone left a residual
+ * (`deno eval "…approval-ledger…"`) that the re-attack in Step 13 found.
+ */
+const NODE_EVAL_FLAG_RE = /\b(node[0-9.]*|deno|bun|ts-node|tsx)\b[^;&|]*?\s-{1,2}(e|eval|p|print|pe|ep|input-type)\b/i;
+/** `deno eval "<code>"` — deno spells its inline-eval as a subcommand, not a flag. */
+const DENO_EVAL_RE = /\bdeno\s+eval\b/i;
+/** `bun eval "<code>"` — bun's subcommand form. */
+const BUN_EVAL_RE = /\bbun\s+eval\b/i;
+/** A script fed into a JS runtime through stdin: a pipe, a heredoc, or the `-` operand. */
+const NODE_STDIN_RE = /(\|\s*(node[0-9.]*|deno|bun)\b)|(\b(node[0-9.]*|deno|bun)[0-9.]*\s*<)|(\b(node[0-9.]*|deno\s+run|bun)\s+-\s*$)/i;
+/** An opaque decoder feeding an interpreter — payload unknowable to a static gate. */
+const OPAQUE_DECODE_RE = /\b(base64|xxd|uudecode|openssl\s+enc)\b[^\n]*\|\s*(node[0-9.]*|sh|bash|zsh|python[0-9.]*)\b/i;
+/** A command substitution anywhere in the command (`$(…)` or backticks). */
+const COMMAND_SUBSTITUTION_RE = /\$\(|`/;
+/** Every `require(<arg>)` occurrence, so the argument can be checked for literalness. */
+const REQUIRE_ARG_RE = /require\s*\(\s*([^)]*)\)/gi;
+/** A require argument that is a SINGLE quoted literal (no concat, no template, no variable). */
+const LITERAL_REQUIRE_ARG_RE = /^(['"])[^'"+`]*\1$/;
+
+/**
+ * Does this command evaluate code inline (rather than running a checked-in file)?
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isInlineEval(command) {
+  if (!command) return false;
+  return NODE_EVAL_FLAG_RE.test(command) || DENO_EVAL_RE.test(command)
+    || BUN_EVAL_RE.test(command) || NODE_STDIN_RE.test(command);
+}
+
+/**
+ * Is this command a PURE READ of the ledger directory (`cat`/`ls`/`grep` …)? Reading
+ * provenance is legitimate and stays allowed; anything else that names the ledger
+ * path is denied. Fail-CLOSED: an unrecognized command shape touching the ledger is
+ * NOT a read.
+ * @param {string} command - the raw command
+ * @returns {boolean}
+ */
+function isReadOnlyLedgerCommand(command) {
+  const READ_CMD = /^\s*(cat|ls|head|tail|grep|egrep|rg|find|wc|stat|file|jq|diff|cmp|shasum|sha256sum|md5sum|tree|du|less|more)\b/i;
+  const WRITEISH = /(>)|(\btee\b)|(\bcp\b)|(\bmv\b)|(\brm\b)|(\bsed\b)|(\bawk\b)|(\bperl\b)|(\bpython[0-9.]*\b)|(\bnode[0-9.]*\b)|(\b(ba|z)?sh\b)|(\bdd\b)|(\binstall\b)|(\btouch\b)|(\btruncate\b)|(\bchmod\b)|(\bln\b)|(\bcurl\b)|(\bwget\b)|(\bmkdir\b)|(\bpatch\b)/i;
+  return READ_CMD.test(command) && !WRITEISH.test(command);
+}
+
+/**
+ * The ledger-forgery decision. PURE (no I/O), so it is directly testable and runs
+ * before any state load.
+ *
+ * @param {string} command - the raw Bash command from the PreToolUse payload
+ * @returns {{deny: boolean, reason: (string|null)}}
+ */
+function isLedgerForgery(command) {
+  if (!command) return { deny: false, reason: null };
+  const norm = normalizeForMatch(command);
+
+  // 1. Anything that TOUCHES the ledger directory and is not a pure read.
+  if (LEDGER_PATH_RE.test(norm) && !isReadOnlyLedgerCommand(command)) {
+    return {
+      deny: true,
+      reason: `writes to the approval ledger (.ctoc/approvals/) are DENIED on the Bash channel — the ledger is human-approval provenance. Cross the gate through /ctoc:menu; the ONLY sanctioned ledger writer is \`node ${SANCTIONED_WRITER}\` (argv-driven, reviewable).`,
+    };
+  }
+
+  if (!isInlineEval(command)) return { deny: false, reason: null };
+
+  // 2. Inline evaluation that reaches the ledger module / directory / gate verbs.
+  for (const token of LEDGER_EVAL_TOKENS) {
+    if (token.test(norm)) {
+      return {
+        deny: true,
+        reason: `inline evaluation (node -e / --eval / -p / stdin) that touches the approval ledger or a gate-crossing verb is DENIED — that one-liner forges a human approval. Use the menu to cross a gate, or the sanctioned \`node ${SANCTIONED_WRITER}\` for a migration.`,
+      };
+    }
+  }
+
+  // 3. Inline evaluation that cannot be statically cleared: a command substitution
+  //    in the payload, or a require() whose argument is not a plain literal — both
+  //    hide the real payload from this gate, so they are refused rather than guessed.
+  if (COMMAND_SUBSTITUTION_RE.test(command)) {
+    return {
+      deny: true,
+      reason: `inline evaluation whose payload comes from a command substitution cannot be statically cleared, so it is DENIED (it can smuggle an approval-ledger write). Put the code in a checked-in script and run that file instead.`,
+    };
+  }
+  REQUIRE_ARG_RE.lastIndex = 0;
+  let m;
+  while ((m = REQUIRE_ARG_RE.exec(command)) !== null) {
+    if (!LITERAL_REQUIRE_ARG_RE.test(m[1].trim())) {
+      return {
+        deny: true,
+        reason: `inline evaluation with a non-literal require() argument cannot be statically cleared, so it is DENIED (string concatenation hides an approval-ledger require). Use a literal module path, or a checked-in script.`,
+      };
+    }
+  }
+
+  return { deny: false, reason: null };
+}
+
+/**
+ * An opaque decoder piped into an interpreter (`base64 -d | node`, `xxd -r | bash`):
+ * the payload is unknowable to a static gate, so it is refused outright.
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isOpaqueDecodedExecution(command) {
+  return !!command && OPAQUE_DECODE_RE.test(command);
+}
 
 // Irreversible / destructive commands — always blocked regardless of the Iron
 // Loop step. Ported from the opus-pack guard-bash.sh blocklist and hardened
@@ -339,6 +538,21 @@ async function main() {
     process.exit(0);
   }
 
+  // R3-A: LEDGER FORGERY — the FIRST deny layer of all, ahead of ALWAYS_ALLOWED
+  // (which matches /^\s*node\s+/ and would otherwise wave the forging one-liner
+  // straight through) and ahead of every step gate, so no allowlist and no Iron
+  // Loop step can short-circuit past it. Pure string check: no state read, no fs.
+  const forgery = isLedgerForgery(command);
+  const opaque = isOpaqueDecodedExecution(command);
+  if (forgery.deny || opaque) {
+    const reason = forgery.deny
+      ? forgery.reason
+      : 'a base64/xxd/openssl-decoded payload piped into an interpreter cannot be statically cleared, so it is DENIED (it can smuggle an approval-ledger write).';
+    const ledgerState = loadState(projectPath);
+    writeToTerminal(formatBlocked(command, ledgerState.state, reason, 'LEDGER'));
+    emitDeny(`CTOC: approval-ledger forgery blocked — ${reason}`);
+  }
+
   // OM2: Irreversible-command blocklist — the FIRST deny layer, BEFORE the
   // plan-move / commit / write gates, so a destructive command is denied
   // regardless of the Iron Loop step. Same input channel (stdin) and same block
@@ -418,6 +632,12 @@ async function main() {
   process.exit(0);
 }
 
+// This hook is invoked ONLY as a subprocess (the registered PreToolUse.Bash
+// command; the security + forgery tests SPAWN it as the harness does). It exports
+// NOTHING on purpose: the ledger-forgery decision (`isLedgerForgery`) is exercised
+// through the real spawned process — the strongest possible test — so there is no
+// live in-process caller for a module export, and adding one would be a dead export
+// (the reachability fence's "a test is not a caller" rule).
 main().catch(err => {
   console.error('[CTOC] Bash gate error:', err.message);
   process.exit(1);

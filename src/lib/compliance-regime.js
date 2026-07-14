@@ -44,6 +44,19 @@ const GDPR_PROFILE = 'gdpr';
 const EU_AI_ACT_PROFILE = 'eu-ai-act-high-risk';
 
 /**
+ * The profile-name charset, CODE-ENFORCED (R3-A item 6). `writeActiveProfiles`
+ * interpolates each name into a YAML line (`active_profiles: [a, b]`), so the
+ * "closed enum, never free text" rule was a PROSE invariant enforced only by the
+ * menu recipe's discipline. A caller that passed
+ * `'x]\nenforcement:\n  mode: off'` would have injected a real YAML block and
+ * disabled enforcement. The charset is now a runtime gate: a name that is not
+ * lowercase-alphanumeric-plus-hyphen (starting alphanumeric) is REFUSED with
+ * `{ok:false, error}` and NOTHING is written — settings.yaml stays byte-identical.
+ * A newline, a bracket, a quote, or a colon can therefore never reach the file.
+ */
+const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
  * Read the active profile list, never throwing.
  *
  * `loadActiveProfiles` already returns `{ profiles: [] }` for an absent
@@ -100,9 +113,15 @@ function shouldRunEuAiAct(projectRoot) {
  * Fail-open: missing file, no `active_profiles:` line, wrong root, or any fs
  * error returns `{ ok: false }` without corrupting the file.
  *
+ * CHARSET GATE (R3-A item 6): every requested name must match
+ * {@link PROFILE_NAME_RE}. A name that does not is REFUSED — `{ok:false, error}`,
+ * no write at all — so the YAML-injection surface (`x]\nenforcement:\n  mode: off`)
+ * is closed in code, not merely in prose. The check runs BEFORE any filesystem
+ * write, so a rejected call leaves settings.yaml byte-identical.
+ *
  * @param {string} projectRoot
  * @param {string[]} profileNames - profile name(s) to union into active_profiles
- * @returns {{ ok: boolean, profiles: string[] }}
+ * @returns {{ ok: boolean, profiles: string[], error?: string }}
  */
 function writeActiveProfiles(projectRoot, profileNames) {
   if (typeof projectRoot !== 'string' || projectRoot.length === 0) {
@@ -111,6 +130,17 @@ function writeActiveProfiles(projectRoot, profileNames) {
   const requested = Array.isArray(profileNames)
     ? profileNames.filter(p => typeof p === 'string' && p.trim().length > 0).map(p => p.trim())
     : [];
+
+  // Charset gate — BEFORE any read or write. One bad name refuses the WHOLE call:
+  // a partial activation from a half-trusted list is never the safer outcome.
+  const invalid = requested.filter(p => !PROFILE_NAME_RE.test(p));
+  if (invalid.length > 0) {
+    return {
+      ok: false,
+      profiles: [],
+      error: `invalid profile name(s) ${JSON.stringify(invalid)} — a profile name must match ${PROFILE_NAME_RE} (closed enum, never free text). Nothing was written.`,
+    };
+  }
 
   const settingsPath = path.join(projectRoot, SETTINGS_REL);
 
@@ -155,6 +185,29 @@ function writeActiveProfiles(projectRoot, profileNames) {
 }
 
 /**
+ * Locate the `regulatory_regime:` block's BODY inside a settings.yaml text (R3-A
+ * item 6). The body runs from just after the header line to the next TOP-LEVEL key
+ * (a line beginning with a non-space, non-`#` character) or end of file — the same
+ * YAML shape the reader of record parses. Pure: no I/O, no dynamic RegExp.
+ *
+ * @param {string} content - the settings.yaml text
+ * @returns {{start: number, end: number, body: string}|null} the body's character
+ *   range within `content`, or `null` when the block is absent.
+ */
+function regulatoryRegimeRegion(content) {
+  const headerRe = /^regulatory_regime:[ \t]*\r?\n/m;
+  const m = headerRe.exec(content);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  // The next top-level key ends the block. `[^\s#]` = a non-indented, non-comment
+  // line start; anchored per-line with `m`, searched from `start` on the remainder.
+  const rest = content.slice(start);
+  const nextTop = /^[^\s#][^\n]*$/m.exec(rest);
+  const end = nextTop ? start + nextTop.index : content.length;
+  return { start, end, body: content.slice(start, end) };
+}
+
+/**
  * Persist a durable "None" decision (R2-C2 item 1 / R1). Answering "None" to the
  * compliance ride-along must STOP the menu re-asking — but `writeActiveProfiles([])`
  * is a deliberate no-op (an empty list is not the same as "the human declined"),
@@ -193,9 +246,18 @@ function declineComplianceRegime(projectRoot) {
     const declinedRe = /^([ \t]*)declined:[ \t]*.*$/m;
     const headerRe = /^(regulatory_regime:[ \t]*)\r?\n/m;
 
-    if (declinedRe.test(content)) {
-      // Existing marker (or a false one) → set it true. Idempotent.
-      content = content.replace(declinedRe, '$1declined: true');
+    // BLOCK-SCOPED marker (R3-A item 6). The `declined:` regex used to run over the
+    // WHOLE file and rewrite the FIRST `declined:` line anywhere — so an unrelated
+    // `declined:` key in another block (e.g. `operations:`) was silently flipped to
+    // true and the compliance decline was recorded in the wrong block (where the
+    // reader of record never looks). The search is now confined to the
+    // `regulatory_regime:` block region: from its header line to the next TOP-LEVEL
+    // key (a line starting with a non-space, non-comment character) or end of file.
+    const region = regulatoryRegimeRegion(content);
+    if (region && declinedRe.test(region.body)) {
+      // Existing marker (or a false one) INSIDE the block → set it true. Idempotent.
+      const newBody = region.body.replace(declinedRe, '$1declined: true');
+      content = content.slice(0, region.start) + newBody + content.slice(region.end);
     } else if (headerRe.test(content)) {
       // Block present, no marker → insert an indented marker right after the header.
       content = content.replace(headerRe, (_m, header) => `${header}\n  declined: true\n`);

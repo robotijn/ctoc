@@ -31,10 +31,13 @@ const taskView = require('./task-view');
 // NB4: on-open reconciliation of the registry against the live harness TaskList.
 const taskReconcile = require('./task-reconcile');
 
-// NB2: terminal task statuses (mirror of NB1's frozen set — not exported by NB1).
-// A mutation subcommand targeting a terminal task is an illegal transition and is
-// rejected fail-soft at the CLI boundary before touching updateTask.
-const TASK_TERMINAL = new Set(['done', 'failed', 'orphaned']);
+// R3-B item 4: the terminal set is IMPORTED from the registry — there is exactly ONE
+// encoding. The former local mirror (`['done','failed','orphaned']`) was STALE in both
+// directions: it included `orphaned`, so `menu task complete` on an orphaned task threw
+// BEFORE updateTask and R2-A's orphaned→done late-completion contract was dead code; and
+// it omitted `cancelled`, so a cancelled task looked mutable at the CLI boundary. Legality
+// is now asked of the registry itself (`canTransition`), never re-encoded here.
+const TASK_TERMINAL = taskRegistry.TERMINAL;
 
 // Security (S1): strip C0 (0x00-0x1F) and C1 (0x7F-0x9F) control chars before
 // rendering any attacker-influenceable string (e.g. a plan slug derived from a
@@ -42,6 +45,9 @@ const TASK_TERMINAL = new Set(['done', 'failed', 'orphaned']);
 // or forge menu rows (ANSI clear-screen, cursor moves, mid-row line breaks).
 // Defined once at module scope so any future slug renderer reuses one sanitizer.
 const stripCtl = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+
+/** Current instant as an ISO-8601 string (R3-B item 10: the cancel-deadline clock). */
+const nowIso = () => new Date().toISOString();
 
 // SP4 cleanup: single source of truth mapping a category to its execution action
 // and human-facing verb. Mirrors the stale-cleanup.js dispatcher action names.
@@ -1744,6 +1750,9 @@ function parseTaskArgs(subArgs) {
       case '--blocked': out.blocked = String(args[++i] == null ? '' : args[i]).split(',').filter(Boolean); break;
       case '--gitop': out.gitop = true; break;
       case '--fail': out.fail = true; break;
+      // R3-B item 1: the HUMAN override of a scheduler refusal (`start`) or of the
+      // two-phase cancel wait (`cancel`). Never the default; always logged + flagged.
+      case '--force': out.force = true; break;
       case '--label': out.label = String(args[++i] == null ? '' : args[i]); break;
       case '--summary': out.summary = String(args[++i] == null ? '' : args[i]); break;
       case '--next': out.next = String(args[++i] == null ? '' : args[i]); break;
@@ -1787,22 +1796,49 @@ function buildAddSpec(p) {
   return spec;
 }
 
-/** `menu task add` — persist a queued task + report a scheduler decision. */
+/**
+ * `menu task add` — persist a queued task + report a scheduler decision.
+ *
+ * R3-B item 2 — ONE non-terminal implement task per plan. If a live (non-terminal)
+ * implement task already exists for this plan, the EXISTING task is returned
+ * (`existing: true`) and NOTHING is added. A duplicate would shadow the running task at
+ * completion time (`findActivePlanTask`/`completeExecution` used to take the EARLIEST
+ * non-terminal match), leaving the real task running forever — a dead file lock until the
+ * 120-minute orphan sweep, after which the duplicate re-ran a plan already in review.
+ *
+ * R3-B item 7 — the load→save cycle runs inside the compare-and-swap helper.
+ */
 function taskAdd(root, rest) {
   const p = parseTaskArgs(rest);
   const spec = buildAddSpec(p);
-  const reg = taskRegistry.load(root);
-  const task = taskRegistry.addTask(reg, spec);
-  const decision = taskRegistry.canRun(task, reg);
-  taskRegistry.save(root, reg);
-  return {
-    ok: true,
-    taskId: task.id,
-    decision: decision.run ? 'run' : 'queue',
-    reason: decision.reason,
-    status: 'queued',
-    text: `Task ${task.id} queued (${task.kind}${task.plan ? ' ' + stripCtl(task.plan) : ''}) — ${decision.run ? 'run' : 'queue'}: ${decision.reason}`,
-  };
+  return taskRegistry.withRegistry(root, (reg, ctx) => {
+    if (spec.kind === 'implement' && spec.plan != null) {
+      const existing = taskRegistry.findActivePlanTask(reg, spec.plan, 'implement');
+      if (existing) {
+        ctx.abort(); // a refusal writes NOTHING
+        return {
+          ok: true,
+          existing: true,
+          taskId: existing.id,
+          decision: existing.status === 'running' ? 'run' : 'queue',
+          reason: 'already-queued',
+          status: existing.status,
+          text: `Task ${existing.id} already covers plan ${stripCtl(String(spec.plan))} ` +
+            `(${existing.status}) — not duplicating it.`,
+        };
+      }
+    }
+    const task = taskRegistry.addTask(reg, spec); // throws on a bad spec BEFORE any save
+    const decision = taskRegistry.canRun(task, reg);
+    return {
+      ok: true,
+      taskId: task.id,
+      decision: decision.run ? 'run' : 'queue',
+      reason: decision.reason,
+      status: 'queued',
+      text: `Task ${task.id} queued (${task.kind}${task.plan ? ' ' + stripCtl(task.plan) : ''}) — ${decision.run ? 'run' : 'queue'}: ${decision.reason}`,
+    };
+  });
 }
 
 /**
@@ -1830,65 +1866,129 @@ function computePromote(reg) {
     }));
 }
 
-/** `menu task start|fail|cancel` — a single-status transition on a non-terminal task. */
+/**
+ * `menu task start|fail|cancel` — a single-status transition on a non-terminal task.
+ *
+ * R3-B item 1 — THE ENFORCEMENT POINT. `start` is where the concurrency ladder is
+ * CHECKED, not merely defined: it calls `taskRegistry.canRun` and REFUSES (registry
+ * byte-unchanged) when the ladder says no (deps / ≤5 / sync-barrier / git-exclusive /
+ * file-conflict). `--force` is the human override — allowed, but recorded in the warn log
+ * (`forced_start`) and SHOUTED in the result text, never silent. The whole cycle runs
+ * inside the compare-and-swap helper (item 7), and a refusal `ctx.abort()`s so no write
+ * (and no generation bump) happens.
+ */
 function taskTransition(root, rest, kind) {
   const p = parseTaskArgs(rest);
   const id = p.positional[0];
-  const reg = taskRegistry.load(root);
-  const task = reg.tasks.find((t) => t.id === id);
-  if (!task) throw new Error('task-registry: unknown task id ' + String(id));
-  // The intended terminal-transition target is only cosmetic here: the throw is
-  // caught fail-soft at the taskCommand boundary. For cancel the honest target is
-  // `cancelled` (queued) or `cancelling` (running) — see below.
-  const targetOf = { start: 'running', fail: 'failed', cancel: 'cancelled' };
-  if (TASK_TERMINAL.has(task.status)) {
-    throw new Error(`task-registry: invalid transition ${task.status} → ${targetOf[kind]}`);
-  }
-  let patch;
-  // R2-C: a running-cancel transitions to the non-terminal `cancelling`, whose text
-  // states the files stay locked until the harness agent is confirmed gone.
-  let cancelling = false;
-  // H8: record `agentTaskId` at start so the on-open reconcile has something to
-  // match the live-agent-id set against. Use the caller-supplied `--agent-id`
-  // (the harness id the session will later report in its live TaskList), falling
-  // back to the task id when none is supplied — the wiring works before the session
-  // is taught to pass the harness id, and tightens when it is. `agentTaskId` is on
-  // task-registry's MUTABLE_FIELDS allowlist, so updateTask accepts it unchanged.
-  if (kind === 'start') {
-    patch = { status: 'running', agentTaskId: p.agentId || id };
-  } else if (kind === 'fail') {
-    patch = { status: 'failed', result: { ok: false, summary: p.summary || 'failed' } };
-  } else {
-    // R2-C honest cancel (C1-2): NEVER writes `failed`. A RUNNING (or already
-    // `cancelling`) task enters `cancelling` and KEEPS its slot/touches/gitOp/sync
-    // barrier until the harness agent is confirmed gone — the registry must not
-    // free a live agent's files early. A QUEUED (or any other non-terminal) task
-    // cancels immediately to `cancelled` (nothing is running, so freeing is safe).
-    if (task.status === 'running' || task.status === 'cancelling') {
-      patch = { status: 'cancelling' };
+  return taskRegistry.withRegistry(root, (reg, ctx) => {
+    const task = reg.tasks.find((t) => t.id === id);
+    if (!task) throw new Error('task-registry: unknown task id ' + String(id));
+
+    // Legality is asked of the registry's ONE lifecycle encoding (item 4) — no local
+    // mirror. `start`/`fail` have a fixed target, so the guard is `canTransition`
+    // (which correctly PERMITS, e.g., orphaned → failed). `cancel`'s effective target
+    // varies with the current status (running → cancelling, queued → cancelled), so its
+    // guard is "not terminal" — a terminal task cannot be cancelled.
+    if (kind === 'start' && !taskRegistry.canTransition(task.status, 'running')) {
+      throw new Error(`task-registry: invalid transition ${task.status} → running`);
+    }
+    if (kind === 'fail' && !taskRegistry.canTransition(task.status, 'failed')) {
+      throw new Error(`task-registry: invalid transition ${task.status} → failed`);
+    }
+    if (kind === 'cancel' && TASK_TERMINAL.has(task.status)) {
+      throw new Error(`task-registry: invalid transition ${task.status} → cancelled`);
+    }
+
+    // ── item 1: guarded start ────────────────────────────────────────────────────
+    if (kind === 'start') {
+      const decision = taskRegistry.canRun(task, reg);
+      if (!decision.run && p.force !== true) {
+        ctx.abort(); // REFUSED — the registry is provably unchanged (no write, no gen bump)
+        return {
+          ok: false,
+          refused: true,
+          taskId: id,
+          reason: decision.reason,
+          text: `Task ${id} NOT started — the scheduler refuses it (${decision.reason}). ` +
+            `Wait for the blocker to clear, or override with --force (human decision, logged).`,
+        };
+      }
+      const forced = !decision.run && p.force === true;
+      if (forced) {
+        // A human overrode a real ladder refusal — this must never be silent. Record it
+        // durably in the warn log and SHOUT it in the returned text.
+        taskRegistry.warnLog(root, 'forced_start', { id, reason: decision.reason });
+      }
+      // H8: record `agentTaskId` at start so the on-open reconcile can match it against
+      // the live-agent-id set. Caller-supplied `--agent-id` (the harness id) wins; falls
+      // back to the task id so the wiring works before the session passes the harness id.
+      taskRegistry.updateTask(reg, id, { status: 'running', agentTaskId: p.agentId || id });
+      const res = {
+        ok: true,
+        taskId: id,
+        status: 'running',
+        text: forced
+          ? `Task ${id} → running — ⚠ FORCED past the scheduler (${decision.reason}); ` +
+            `a human overrode the ladder. Recorded in the task warn log.`
+          : `Task ${id} → running`,
+      };
+      if (forced) { res.forced = true; res.reason = decision.reason; }
+      return res; // start never frees a slot → no promote
+    }
+
+    // ── fail ─────────────────────────────────────────────────────────────────────
+    if (kind === 'fail') {
+      taskRegistry.updateTask(reg, id, { status: 'failed', result: { ok: false, summary: p.summary || 'failed' } });
+      return {
+        ok: true,
+        taskId: id,
+        status: 'failed',
+        text: `Task ${id} → failed`,
+        promote: computePromote(reg),
+      };
+    }
+
+    // ── cancel (item 10: stamp the deadline clock; --force skips the two-phase wait) ─
+    // R2-C honest cancel (C1-2): a RUNNING/`cancelling` task enters `cancelling` and KEEPS
+    // its slot/touches/gitOp/sync barrier until the harness agent is confirmed gone — the
+    // registry must not free a live agent's files early. A QUEUED task cancels immediately.
+    // `--force` is the human tie-breaker: free a running task NOW (running→cancelling→
+    // cancelled in one call), logged + shouted.
+    const running = task.status === 'running' || task.status === 'cancelling';
+    let cancelling = false;
+    let forcedCancel = false;
+    if (running && p.force === true) {
+      // Two-step through the legal path: running → cancelling → cancelled.
+      if (task.status === 'running') {
+        taskRegistry.updateTask(reg, id, { status: 'cancelling', ts: { cancelRequested: nowIso() } });
+      }
+      taskRegistry.updateTask(reg, id, { status: 'cancelled' });
+      forcedCancel = true;
+      taskRegistry.warnLog(root, 'forced_cancel', { id, from: task.status });
+    } else if (running) {
+      // Stamp ts.cancelRequested so reconcile's cancel deadline (item 10) has a clock.
+      taskRegistry.updateTask(reg, id, { status: 'cancelling', ts: { cancelRequested: nowIso() } });
       cancelling = true;
     } else {
-      patch = { status: 'cancelled' };
+      taskRegistry.updateTask(reg, id, { status: 'cancelled' });
     }
-  }
-  taskRegistry.updateTask(reg, id, patch);
-  taskRegistry.save(root, reg);
-  const res = {
-    ok: true,
-    taskId: id,
-    status: patch.status,
-    text: cancelling
-      ? `Task ${id} → cancelling (files stay locked until the agent is confirmed gone)`
-      : `Task ${id} → ${patch.status}`,
-  };
-  if (kind === 'cancel') res.cancelled = true;
-  // NB3/R2-C: fail and queued-cancel free a slot; a running-cancel enters
-  // `cancelling` and KEEPS its slot+files (so its file-conflicting tasks stay
-  // queued). Either way, surface the scheduler's newly-runnable set for the
-  // COMPLETION turn (computePromote is scheduler-consulted and honors the still-
-  // occupied cancelling task). `start` never frees a slot, so it omits promote.
-  if (kind === 'fail' || kind === 'cancel') res.promote = computePromote(reg);
-  return res;
+    const settled = reg.tasks.find((t) => t.id === id);
+    const res = {
+      ok: true,
+      taskId: id,
+      status: settled.status,
+      cancelled: true,
+      text: forcedCancel
+        ? `Task ${id} → cancelled — ⚠ FORCED (the human freed a live agent's files past the ` +
+          `two-phase wait). Recorded in the task warn log.`
+        : cancelling
+          ? `Task ${id} → cancelling (files stay locked until the agent is confirmed gone)`
+          : `Task ${id} → ${settled.status}`,
+    };
+    if (forcedCancel) res.forced = true;
+    res.promote = computePromote(reg);
+    return res;
+  });
 }
 
 /**
@@ -1918,7 +2018,13 @@ function taskComplete(root, rest) {
   const reg = taskRegistry.load(root);
   const task = reg.tasks.find((t) => t.id === id);
   if (!task) throw new Error('task-registry: unknown task id ' + String(id));
-  if (TASK_TERMINAL.has(task.status)) {
+  // C3 (CRITICAL): legality is asked of the registry's ONE lifecycle encoding, not a
+  // local mirror. The registry PERMITS `orphaned → done` (a falsely-orphaned agent's
+  // late completion is ACCEPTED, not dropped). The old mirror listed `orphaned` as
+  // terminal, so `menu task complete` on a reconciler-orphaned (i.e. crashed) executor's
+  // task was refused — stranding a FINISHED plan in in-progress/ with no evidence and no
+  // route in all of CTOC that could ever mint it, except the Gate-3 human override.
+  if (!taskRegistry.canTransition(task.status, 'done')) {
     throw new Error(`task-registry: invalid transition ${task.status} → done`);
   }
   const extra = p.b64 ? decodeB64(p.b64) : null;
@@ -1973,15 +2079,43 @@ function taskComplete(root, rest) {
           `and stays in in-progress (this is a kickback, recorded by the circuit breaker): ${detail}`,
       };
     }
+    // C7 (HIGH): an implement task that names a real plan MUST produce evidence to
+    // complete. `ran: false` means the completion never ran (the plan file is nowhere in
+    // in-progress/ or review/) — a hand-moved or mis-slugged plan. Settling the task DONE
+    // here would report ok:true with ZERO evidence: the executor agent keys off
+    // ok:true/verify.passed, so it would record a clean completion for a plan the gate can
+    // never pass. REFUSE (task stays as it is); `ran:false` remains a soft report only for
+    // kinds whose `plan` field names a NON-plan (review/decompose — excluded above).
+    if (completion.ran === false) {
+      return {
+        ok: false,
+        taskId: id,
+        blocked: true,
+        error: 'no plan file — completion produced no evidence',
+        completion,
+        text:
+          `Task ${id} NOT completed — ${completion.reason ? stripCtl(String(completion.reason)) : 'the plan file was not found'}. ` +
+          `An implement task must produce Gate-3 evidence; the task is left unsettled ` +
+          `(check the plan slug / that the plan is in in-progress/ or review/).`,
+      };
+    }
   }
 
-  taskRegistry.updateTask(reg, id, { status: 'done', result });
-  taskRegistry.save(root, reg);
-
-  // The completion may have run its OWN registry write (the task/plan coupling in
-  // completeExecution). Reload so `promote` is computed from the settled truth on
-  // disk, never from the pre-completion snapshot in memory.
-  const settled = completion && completion.ran ? taskRegistry.load(root) : reg;
+  // Settle the task through the compare-and-swap helper on a FRESH load — the completion
+  // above may have run its OWN registry write (the task/plan coupling in completeExecution,
+  // which now bumps the generation), so the pre-completion `reg` snapshot is stale and a
+  // blind save of it would be (correctly) refused as a stale write. withRegistry reloads and
+  // re-applies; the coupling may already have settled this task done → done→done is a no-op.
+  const settled = taskRegistry.withRegistry(root, (fresh) => {
+    const t = fresh.tasks.find((x) => x.id === id);
+    if (t && t.status !== 'done') {
+      taskRegistry.updateTask(fresh, id, { status: 'done', result });
+    } else if (t) {
+      // Already settled by the coupling — still record the caller's result payload.
+      taskRegistry.updateTask(fresh, id, { result });
+    }
+    return fresh;
+  });
 
   let text = `Task ${id} → done`;
   if (completion && completion.ran && completion.newPath) {

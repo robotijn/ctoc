@@ -56,6 +56,22 @@ function mkProject(r) {
   fs.mkdirSync(path.join(r, '.ctoc', 'state'), { recursive: true });
   fs.mkdirSync(path.join(r, 'src'), { recursive: true });
   fs.writeFileSync(path.join(r, 'src', 'thing.js'), 'module.exports = 1;\n');
+  // R4-A: a REAL project — a package.json whose test script actually runs and
+  // passes — so "verify passed" MEANS something verified. `main` makes it a
+  // library (no app to launch), keeping the app-run last-mile out of the way so
+  // the signal under test is the real quality gate.
+  fs.writeFileSync(path.join(r, 'package.json'), JSON.stringify({
+    name: 'a-real-slice', version: '1.0.0', main: 'src/thing.js',
+    scripts: { test: 'node -e "process.exit(0)"' }
+  }, null, 2));
+}
+
+/** A bare project with NO toolchain at all — nothing verify could run. */
+function mkBareProject(r) {
+  for (const s of STAGES) fs.mkdirSync(path.join(r, 'plans', s), { recursive: true });
+  fs.mkdirSync(path.join(r, '.ctoc', 'state'), { recursive: true });
+  fs.mkdirSync(path.join(r, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(r, 'src', 'thing.js'), 'module.exports = 1;\n');
 }
 
 /**
@@ -295,7 +311,7 @@ describe('THE LAST MILE — `menu task complete` runs the real completion', () =
     );
   });
 
-  it('J5: a non-implement task and an implement task with no plan file on disk keep their old behavior (no regression)', () => {
+  it('J5: a non-implement task completes registry-only; an implement task with NO plan file is REFUSED (C7 — no evidence-less success)', () => {
     mkProject(root);
 
     // A review-kind task: completion is registry-only; it must not run a plan completion.
@@ -304,20 +320,23 @@ describe('THE LAST MILE — `menu task complete` runs the real completion', () =
     taskRegistry.updateTask(reg, r1.id, { status: 'running' });
     taskRegistry.save(root, reg);
     const rRes = ms.route(['menu', 'task', 'complete', r1.id, '--summary', 'ok'], root);
-    assert.equal(rRes.ok, true);
+    assert.equal(rRes.ok, true, 'a non-implement task still completes registry-only (its plan field names a non-plan)');
     assert.equal(taskOf(root, r1.id).status, 'done');
     assert.equal(readVerifyEvidence(root, 'whatever'), null, 'a review task produces no plan evidence');
 
-    // An implement task whose plan file does not exist anywhere: report, never throw,
-    // never wedge (this is the shape every pre-existing scheduler test uses).
+    // C7 (corrected contract): an IMPLEMENT task whose plan file is nowhere on disk is a
+    // mis-slugged or hand-moved plan. Settling it done with ZERO evidence used to report
+    // ok:true — the "dead-producer defect wearing a success message". It is now REFUSED and
+    // the task is left UNSETTLED so a human notices, instead of a clean-looking non-completion.
     const id = seedRunningImplement(root, 'ghost-plan');
     const gRes = ms.route(['menu', 'task', 'complete', id, '--summary', 'ok'], root);
-    assert.equal(gRes.ok, true, 'a task whose plan file is absent still completes (fail-open, reported)');
-    assert.equal(taskOf(root, id).status, 'done');
-    assert.ok(Array.isArray(gRes.promote), 'the scheduler promote[] contract survives');
+    assert.equal(gRes.ok, false, 'an implement task with no plan file no longer reports a phantom success');
+    assert.equal(gRes.blocked, true, 'it is a kickback shape, not a completion');
+    assert.match(String(gRes.error), /no plan file|evidence/i);
+    assert.equal(taskOf(root, id).status, 'running', 'the task stays running (unsettled) — not falsely done');
   });
 
-  it('J6: a hostile task.plan cannot escape plans/ (no path traversal in the completion path)', () => {
+  it('J6: a hostile task.plan cannot escape plans/ — and an implement task with an unresolvable plan is REFUSED (C7), not falsely done', () => {
     mkProject(root);
     const reg = taskRegistry.load(root);
     const t = taskRegistry.addTask(reg, { kind: 'implement', plan: '../../etc/passwd', touches: ['src/thing.js'] });
@@ -325,11 +344,40 @@ describe('THE LAST MILE — `menu task complete` runs the real completion', () =
     taskRegistry.save(root, reg);
 
     const res = ms.route(['menu', 'task', 'complete', t.id, '--summary', 'ok'], root);
-    assert.equal(res.ok, true, 'the completion degrades safely rather than throwing');
-    assert.equal(taskOf(root, t.id).status, 'done');
-    // Nothing was written outside .ctoc/state/verify for a legitimate slug.
+    // The traversal slug is refused BEFORE any path.join (completeTaskPlan's slug guard), so
+    // completion never runs → ran:false → C7 refuses the whole complete. The task stays
+    // running; NO evidence artifact is minted for a hostile slug.
+    assert.equal(res.ok, false, 'a traversal slug degrades safely AND does not report a phantom success');
+    assert.equal(taskOf(root, t.id).status, 'running', 'the task is left unsettled, never falsely done');
     const verifyDir = path.join(root, '.ctoc', 'state', 'verify');
     const written = fs.existsSync(verifyDir) ? fs.readdirSync(verifyDir) : [];
     assert.deepEqual(written, [], 'a traversal slug must produce NO evidence artifact at all');
+  });
+
+  it('J7: a project with NO verifiable toolchain produces passed:false evidence and Gate 3 REFUSES it', () => {
+    // The vacuity complement to J1. A completion on a project where NOTHING could
+    // run must NOT mint a passing artifact — it records passed:false with the
+    // no-verifiable-toolchain reason, and Gate 3 correctly refuses. This is the
+    // exact fail-open R4-A closes: no manifest used to yield {passed:true}.
+    mkBareProject(root);
+    const slug = 'no-toolchain-slice';
+    seedPlan(root, 'in-progress', slug);
+    const id = seedRunningImplement(root, slug);
+
+    const res = ms.route(['menu', 'task', 'complete', id, '--summary', 'nothing to verify'], root);
+    assert.equal(res.ok, true, 'the completion still runs and records honest evidence');
+
+    const evidence = readVerifyEvidence(root, slug);
+    assert.ok(evidence, 'evidence must exist even when nothing could be verified');
+    assert.equal(evidence.passed, false, 'no verifiable toolchain must record passed:false — never a vacuous pass');
+    assert.ok(
+      evidence.errors.some((e) => /no-verifiable-toolchain/i.test(e)),
+      `the evidence must name the vacuity; saw: ${JSON.stringify(evidence.errors)}`
+    );
+
+    const reviewPath = path.join(root, 'plans', 'review', `${slug}.md`);
+    assert.ok(fs.existsSync(reviewPath));
+    const gate3 = validateReviewToDone(reviewPath, root);
+    assert.equal(gate3.valid, false, 'Gate 3 must REFUSE a plan whose VERIFY verified nothing');
   });
 });

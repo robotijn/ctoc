@@ -299,19 +299,40 @@ function analyze(projectRoot) {
 // ─────────────────────────────────────────────────────────────────────────────
 // THE EXPORT FENCE — dead exports inside live files.
 //
+// WHAT COUNTS AS A CALLER (exactly four things; anything else does NOT):
+//   1. a code reference to the name in ANOTHER live module (cross-module use);
+//   2. an intra-module reference — the name appears ≥2× in its own file's
+//      comment- and export-declaration-stripped code (its definition plus at least
+//      one real internal call). This is the `completeExecution` edge: menu-screens
+//      calls the externally-visible `completeTaskPlan`, which calls
+//      `completeExecution` inside `actions.js`. Delete that internal call and the
+//      count drops to 1 → the export goes DEAD → the fence re-catches its own
+//      motivating bug;
+//   3. a CALL in a shipped instruction surface — the name invoked as `name(` or
+//      referenced as `require('./x').name` (the session runs it, e.g.
+//      `approveSubplans(parentSlug, 'review')` at menu.md:46, the Gate-3 gate).
+//      CTOC's recipes use INLINE code, so the signal is CALL SYNTAX, not whether
+//      the recipe sits in a fenced block;
+//   4. a declared export root in .ctoc/reachability-roots.json.
+//
+// WHAT IS NOT A CALLER: bare markdown PROSE — including a backtick code-span that
+// merely NAMES a function (`` `completeExecution` ``) or a sentence naming a
+// `src/**.js` path — because a citation is not an invocation; a COMMENT (stripped,
+// with a real regex-aware lexer so a quote inside a regex cannot disarm it); a TEST
+// (tests/ is never in the live set).
+//
 // HONEST LIMITS (no AST, by design — zero new dependencies, O(files)):
 //   • Export detection is regex over the three CommonJS forms this codebase uses:
-//     `module.exports = { a, b }`, `module.exports.a = …`, `exports.a = …`.
-//     A lazily-defined export (e.g. Object.defineProperties on `exports`) is not
-//     detected and therefore never accused — a MISS, never a false alarm.
-//   • Usage detection is name-based: an export is LIVE when its name appears as an
-//     identifier token in ANOTHER live module, or in a shipped instruction surface.
-//     So a common name shared with an unrelated identifier (e.g. `load`, `analyze`)
-//     reads as live even if this particular one is not called.
+//     `module.exports = { a, b }`, `module.exports.a = …`, `exports.a = …`. A
+//     lazily-defined export is not detected and therefore never accused.
+//   • Usage is name-based, so a common name shared with an unrelated identifier
+//     reads as live. Intra-file usage (rule 2) is coarse: it credits an internal
+//     call without proving the caller is itself reachable, so a dead internal
+//     cluster inside a live file can read as live.
 //
-// Both limits bias the SAME way: the fence under-reports, never over-reports. It
-// cannot cry wolf, and everything it does catch is genuinely uncalled. That is the
-// right bias for a gate that fails a build.
+// Every limit biases the SAME way: the fence UNDER-reports, never over-reports. It
+// cannot cry wolf, and a true zero-caller export (the bug class this exists for) is
+// always caught. That is the right bias for a gate that fails a build.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Identifier tokens in a blob of source (used for both usage and surface scans). */
@@ -326,9 +347,16 @@ const IDENT_RE = /[A-Za-z_$][A-Za-z0-9_$]*/g;
  * that single mention was enough to make the analyzer report it live. A fence a
  * comment can disarm is not a fence.
  *
- * A small state machine (code / line-comment / block-comment / '…' / "…" / `…`)
- * with escape handling. Regex literals need no state of their own: a comment can
- * only start with `//` or `/*`, and no valid regex literal starts with `/` or `*`.
+ * A state machine (code / line-comment / block-comment / '…' / "…" / `…` / regex)
+ * with escape handling. Regex literals DO need their own state, and the reason is
+ * the exact defect this fence was born to prevent: a regex that contains a quote —
+ * `/['"]\/\//g` — used to flip a quote-less lexer into string state, which it never
+ * left, so every comment after it survived stripping and could resurrect a dead
+ * export. A `/` opens a regex only in expression position (see `regexAllowed`); in
+ * value position it is division. Inside a regex, quotes are literal and a `[…]`
+ * char-class hides `/`. Single/double-quoted strings cannot span a raw newline, so
+ * a stray newline in `'`/`"` state resets to code — belt-and-suspenders against an
+ * unterminated string running away. A fence a comment can disarm is not a fence.
  *
  * @param {string} src
  * @returns {string} the source with comment bodies replaced by spaces
@@ -338,14 +366,17 @@ function stripComments(src) {
   let i = 0;
   const n = src.length;
   let state = 'code';
+  let lastCode = '';   // last non-whitespace char emitted in code state
+  let inClass = false; // inside a regex [...] char class
   while (i < n) {
     const c = src[i];
     const next = i + 1 < n ? src[i + 1] : '';
     if (state === 'code') {
       if (c === '/' && next === '/') { state = 'line'; i += 2; continue; }
       if (c === '/' && next === '*') { state = 'block'; i += 2; continue; }
-      if (c === "'" || c === '"' || c === '`') { state = c; out += c; i++; continue; }
-      out += c; i++; continue;
+      if (c === '/' && regexAllowed(lastCode)) { state = 'regex'; inClass = false; out += c; lastCode = '/'; i++; continue; }
+      if (c === "'" || c === '"' || c === '`') { state = c; out += c; lastCode = c; i++; continue; }
+      out += c; if (!/\s/.test(c)) lastCode = c; i++; continue;
     }
     if (state === 'line') {
       if (c === '\n') { state = 'code'; out += '\n'; }
@@ -356,12 +387,103 @@ function stripComments(src) {
       if (c === '\n') out += '\n'; // keep line structure
       i++; continue;
     }
+    if (state === 'regex') {
+      if (c === '\\') { out += c + next; i += 2; continue; }   // escaped char (incl. \/)
+      if (c === '[') { inClass = true; out += c; i++; continue; }
+      if (c === ']') { inClass = false; out += c; i++; continue; }
+      if (c === '/' && !inClass) { state = 'code'; out += c; lastCode = '/'; i++; continue; }
+      if (c === '\n') { state = 'code'; out += '\n'; i++; continue; } // regex can't span newline
+      out += c; i++; continue;
+    }
     // inside a string/template: copy through, honoring escapes
     if (c === '\\') { out += c + next; i += 2; continue; }
-    if (c === state) { state = 'code'; out += c; i++; continue; }
+    if (c === state) { state = 'code'; out += c; lastCode = c; i++; continue; }
+    if (c === '\n' && (state === "'" || state === '"')) { state = 'code'; out += '\n'; i++; continue; }
     out += c; i++;
   }
   return out;
+}
+
+/**
+ * A `/` begins a regex literal only in EXPRESSION position — after an operator or
+ * an opening punctuator, or at the start of input. After a value (identifier char,
+ * closing `)`/`]`, a `.`, or a digit) it is the division operator. Erring toward
+ * "division" would risk swallowing a real identifier token (a false alarm — the one
+ * direction this fence forbids), so the test rejects only clear value-enders and
+ * treats everything else as regex-position.
+ *
+ * @param {string} prev - last significant code character
+ * @returns {boolean}
+ */
+function regexAllowed(prev) {
+  if (!prev) return true;
+  return !/[A-Za-z0-9_$)\].]/.test(prev);
+}
+
+/** A surface CALL: an identifier immediately followed by optional whitespace and
+ * `(` — an invocation the session runs (`approveSubplans(parentSlug, 'review')`).
+ * Disjoint char classes + a literal `(` sentinel → linear, ReDoS-safe. */
+const SURFACE_CALL_RE = /([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/g;
+/** A resolved property reference off a relative require — `require('./x').name`
+ * or `require('./x')['name']` — a caller even without an immediate paren (the
+ * recipe assigns the function then invokes it). Quote-delimited, bounded, linear. */
+const SURFACE_REQUIRE_DOT_RE = /require\s*\(\s*['"][^'"]*['"]\s*\)\s*\.\s*([A-Za-z_$][A-Za-z0-9_$]*)/g;
+const SURFACE_REQUIRE_IDX_RE = /require\s*\(\s*['"][^'"]*['"]\s*\)\s*\[\s*['"]([^'"]+)['"]\s*\]/g;
+
+/**
+ * The names a shipped instruction surface actually CALLS — the ONLY surface
+ * references the EXPORT fence honors. The distinguishing signal is CALL SYNTAX,
+ * not markdown formatting: CTOC's recipes invoke library functions with INLINE
+ * code (`approveSubplans(parentSlug, 'review')` at menu.md:46 — the Gate-3
+ * done-all gate), not fenced blocks. So a name is credited iff it appears as
+ * `name(` (an invocation) OR inside `require('…').name` / `require('…')['name']`
+ * (a resolved reference the recipe then runs). A BARE TOKEN in prose — even a
+ * backtick code-span that merely names the function, e.g. the sentence
+ * `` `completeTaskPlan` → `completeExecution` (`src/lib/actions.js`) `` — is NOT
+ * a caller: the backtick between the name and the paren means it is a citation,
+ * not a call. This is the exact completeExecution distinction: it is named only
+ * as a bare token, so it stays credited by its intra-file code edge alone and
+ * dies the instant that edge is cut.
+ *
+ * (R4-B credited "any identifier inside a fenced block", which buried 24
+ * genuinely-reachable inline-recipe exports as DEAD, including the Gate-3 gate.
+ * R4-C replaces fenced-block membership with call syntax.)
+ *
+ * @param {string} projectRoot
+ * @returns {Set<string>} names invoked (or require-referenced) by a surface
+ */
+function surfaceCalledNames(projectRoot) {
+  const surfaceFiles = collectSurfaceFiles(projectRoot);
+  const names = new Set();
+  const scan = (text, re, group) => {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) names.add(m[group]);
+  };
+  for (const surface of surfaceFiles) {
+    let text = '';
+    try { text = safeFs.readFileSync(surface, 'utf8'); } catch { continue; }
+    scan(text, SURFACE_CALL_RE, 1);
+    scan(text, SURFACE_REQUIRE_DOT_RE, 1);
+    scan(text, SURFACE_REQUIRE_IDX_RE, 1);
+  }
+  return names;
+}
+
+/**
+ * The comment-stripped source with its `module.exports` DECLARATIONS removed, so
+ * an export name's remaining occurrences are its real definition and its real
+ * intra-module CALL sites — never the plumbing that lists it for export. Used to
+ * decide intra-file liveness: an export named ≥2× here (its definition plus at
+ * least one internal call) is genuinely used inside its own live module.
+ *
+ * @param {string} code - already comment-stripped source
+ * @returns {string}
+ */
+function stripExportDecls(code) {
+  let s = code.replace(/module\.exports\s*=\s*\{[\s\S]*?\}\s*;?/, ' ');
+  s = s.replace(/(?:module\.)?exports\.[A-Za-z_$][A-Za-z0-9_$]*\s*=/g, ' = ');
+  return s;
 }
 
 /**
@@ -439,20 +561,35 @@ function analyzeExports(projectRoot) {
   const rel2abs = (r) => path.join(projectRoot, ...r.split('/'));
   const liveFiles = reachable.map(rel2abs);
 
-  // 1. Read every live module once: its exported names + its identifier tokens.
-  //    Tokens come from the COMMENT-STRIPPED source — a comment is not a caller.
-  const exportsByFile = new Map(); // abs → string[]
-  const tokensByFile = new Map();  // abs → Set<string>
+  // 1. Read every live module once: its exported names, its identifier tokens, and
+  //    the set of its OWN exports it calls internally. Tokens and counts come from
+  //    the COMMENT-STRIPPED source — a comment is not a caller.
+  const exportsByFile = new Map();     // abs → string[]
+  const tokensByFile = new Map();      // abs → Set<string>
+  const internalUseByFile = new Map(); // abs → Set<string> (exports called inside their own file)
   for (const file of liveFiles) {
     let content = '';
     try { content = safeFs.readFileSync(file, 'utf8'); } catch { content = ''; }
-    exportsByFile.set(file, exportedNames(content));
+    const names = exportedNames(content);
+    exportsByFile.set(file, names);
     const code = stripComments(content);
     const toks = new Set();
     let m;
     IDENT_RE.lastIndex = 0;
     while ((m = IDENT_RE.exec(code)) !== null) toks.add(m[0]);
     tokensByFile.set(file, toks);
+    // Intra-file usage: count occurrences in the export-declaration-stripped code.
+    // An export named ≥2× (its definition + ≥1 real internal call) is used inside
+    // its own live module — the completeExecution edge: menu-screens calls the
+    // externally-visible completeTaskPlan, which calls completeExecution here.
+    const body = stripExportDecls(code);
+    const counts = new Map();
+    IDENT_RE.lastIndex = 0;
+    let bm;
+    while ((bm = IDENT_RE.exec(body)) !== null) counts.set(bm[0], (counts.get(bm[0]) || 0) + 1);
+    const iu = new Set();
+    for (const name of names) if ((counts.get(name) || 0) >= 2) iu.add(name);
+    internalUseByFile.set(file, iu);
   }
 
   // 2. name → the set of live modules that MENTION it (the usage index).
@@ -466,34 +603,33 @@ function analyzeExports(projectRoot) {
   }
 
   // 3. Instruction surfaces: a name a shipped instruction tells the session to call
-  //    is reachable by a human's session (same rule the file fence honors).
+  //    is reachable — but ONLY when the surface CALLS it (`name(` or
+  //    require('…').name), never when it merely names it in prose. A backtick
+  //    code-span that just cites the function is documentation, not a caller.
+  //    This credits CTOC's inline-code recipes while still burying prose-only
+  //    tokens like completeExecution (see surfaceCalledNames).
+  const surfaceTokens = surfaceCalledNames(projectRoot);
   const surfaceFiles = collectSurfaceFiles(projectRoot);
-  const surfaceTokens = new Set();
-  for (const surface of surfaceFiles) {
-    let text = '';
-    try { text = safeFs.readFileSync(surface, 'utf8'); } catch { continue; }
-    let m;
-    IDENT_RE.lastIndex = 0;
-    while ((m = IDENT_RE.exec(text)) !== null) surfaceTokens.add(m[0]);
-  }
 
   const declared = declaredExportRoots(projectRoot);
 
-  // 4. Classify. A name is live iff another LIVE module mentions it, an instruction
-  //    surface mentions it, or it is a declared export root. Self-mention never
-  //    counts (a module calling its own function is not a caller from outside), and
-  //    tests are not in `liveFiles` at all.
+  // 4. Classify. A name is LIVE iff any of: another LIVE module names it in code;
+  //    it is called INSIDE its own live module (definition + ≥1 real call); a
+  //    FENCED instruction-surface recipe invokes it; or it is a declared export
+  //    root. Tests are not in `liveFiles` at all — a test is never a caller.
   const live = [];
   const dead = [];
   let totalExports = 0;
   for (const file of liveFiles) {
     const rel = path.relative(projectRoot, file).split(path.sep).join('/');
+    const internal = internalUseByFile.get(file) || new Set();
     for (const name of exportsByFile.get(file) || []) {
       totalExports++;
       const key = `${rel}#${name}`;
       const others = mentionedIn.get(name);
       const usedElsewhere = others != null && [...others].some((f) => f !== file);
-      if (usedElsewhere || surfaceTokens.has(name) || declared.has(key)) live.push(key);
+      const usedInternally = internal.has(name);
+      if (usedElsewhere || usedInternally || surfaceTokens.has(name) || declared.has(key)) live.push(key);
       else dead.push(key);
     }
   }

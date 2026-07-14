@@ -1,0 +1,10 @@
+{
+  "content_sha256": "5b4ab8eb5a30f6798ce63afdc0ad027a1ee37331a55d22d7b251c3665f20d560",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T07:46:23.551Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: coordinator wrote approved_by:human into R4 plan frontmatter directly instead of crossing Gate 2 via approvePlan (forged marker). WORK ordered by the human; provenance path was wrong. Recorded as backfilled.",
+  "plan_basename": "ctoc-v7-mandatory-pipeline-enforcement"
+}

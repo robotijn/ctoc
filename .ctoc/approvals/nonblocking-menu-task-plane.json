@@ -1,0 +1,10 @@
+{
+  "content_sha256": "f17b4c84d854ae31660273f54e43da721cda7a99bc6d4b11b559fdaa71e0fdac",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T07:46:23.551Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: coordinator wrote approved_by:human into R4 plan frontmatter directly instead of crossing Gate 2 via approvePlan (forged marker). WORK ordered by the human; provenance path was wrong. Recorded as backfilled.",
+  "plan_basename": "nonblocking-menu-task-plane"
+}

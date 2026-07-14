@@ -419,11 +419,28 @@ describe('reconcile — cancelling liveness (C1-2)', () => {
     return { ...running(over), status: 'cancelling' };
   }
 
-  it('a cancelling task with a live agent stays cancelling (files stay locked)', () => {
+  it('a cancelling task with a live agent stays cancelling (files stay locked) — until its cancel deadline', () => {
+    // R3-B item 10: liveness protects a cancelling task only INSIDE its cancel deadline
+    // (default 30 min from ts.cancelRequested). The cancel here was requested 1 minute
+    // ago, so the live agent still holds its files — the original C1-2 contract. Past the
+    // deadline a hung-but-live agent is forced to `cancelled` (see the deadline tests).
     const r = mkReg([cancelling({ id: 't1', kind: 'review', agentTaskId: 'live', started: ago(31 * MIN) })]);
+    r.tasks[0].ts.cancelRequested = new Date(NOW - 1 * MIN).toISOString();
     const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: new Set(['live']) });
     assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'cancelling');
     assert.deepEqual(report.cancelled, []);
+  });
+
+  it('R3-B item 10: a cancelling task PAST its deadline is forced to cancelled even though its agent is still LIVE', () => {
+    // The tie-breaker. Without it a hung-but-live agent holds its files, a concurrency
+    // slot, AND (via the sync barrier) blocks every wave integration globally, forever.
+    const r = mkReg([cancelling({ id: 't1', kind: 'review', agentTaskId: 'live', started: ago(90 * MIN) })]);
+    r.tasks[0].ts.cancelRequested = new Date(NOW - 45 * MIN).toISOString();
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: new Set(['live']) });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'cancelled');
+    assert.deepEqual(report.cancelled, ['t1']);
+    assert.equal(report.stalenessCancelled.length, 1, 'the forced cancel is loud');
+    assert.equal(report.stalenessCancelled[0].wasLive, true, 'it names the fact that the agent still looked alive');
   });
 
   it('a cancelling task confirmed absent → cancelled (agent gone), ts.done stamped', () => {

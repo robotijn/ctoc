@@ -59,7 +59,10 @@ function parsePushArgs(argv = []) {
 
 /**
  * Run the check-then-push flow.
- * @param {{ force?: boolean, skipTests?: boolean, dryRun?: boolean }} opts
+ * @param {{ force?: boolean, skipTests?: boolean, dryRun?: boolean,
+ *   projectRoot?: string }} opts - `projectRoot` scopes the security scan to the
+ *   right tree (defaults to process.cwd() in main()); without it the scan ran
+ *   against whatever cwd happened to be, not the repo being pushed.
  * @param {object} deps injectable seam; each defaults to the real function.
  * @returns {Promise<{ ok: boolean, pushed: boolean, blockedBy: string[],
  *   tier: (1|2|null), dryRun: boolean, text: string }>}
@@ -99,7 +102,8 @@ async function run(opts = {}, deps = {}) {
     if (!tests.passed) blockedBy.push('tests');
   }
 
-  const security = await d.runSecurityScan(tools);
+  // Scope the security scan to the repo being pushed (its LIVE default delta path).
+  const security = await d.runSecurityScan(tools, opts.projectRoot ? { projectRoot: opts.projectRoot } : {});
   if (!security.passed) blockedBy.push('security');
 
   // Tier-1 failure ALWAYS blocks — `--force` affects Tier-2 warnings only and
@@ -160,7 +164,8 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const result = await run(opts);
+  // The live /ctoc:push scopes every check to the repo it is invoked in.
+  const result = await run({ ...opts, projectRoot: process.cwd() });
   process.exitCode = result.ok ? 0 : 1;
   return result;
 }

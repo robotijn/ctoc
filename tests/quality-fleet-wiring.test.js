@@ -42,34 +42,98 @@ function rm(dir) {
 const PLANTED_AWS_KEY = 'AKIAJKQR7MNPZ2WXVBDF';
 const PLANTED_PRIVATE_KEY = '-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAK\n-----END RSA PRIVATE KEY-----';
 
-describe('the security fleet is wired into the LIVE push path', () => {
-  it('push.js delegates security scanning to quality-agent.runSecurityScan (same function)', () => {
-    // The live binding: push.js run() defaults deps.runSecurityScan to the
-    // quality-agent export. If this identity ever breaks, the gate is dead.
-    assert.equal(
-      typeof qualityAgent.runSecurityScan,
-      'function',
-      'quality-agent must export runSecurityScan'
-    );
-    // push.js references qualityAgent.runSecurityScan as its default dep; prove
-    // the module wiring by driving push with the REAL security runner and fakes
-    // for everything else, and confirming security actually ran.
-    return (async () => {
-      let securityRan = false;
-      const res = await push.run({ dryRun: true, skipTests: true }, {
+/**
+ * Run a git command in a repo, returning trimmed stdout. Deterministic identity
+ * so commits do not depend on the host's git config.
+ */
+function git(args, cwd) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'ctoc-test', GIT_AUTHOR_EMAIL: 'ctoc@test.invalid',
+      GIT_COMMITTER_NAME: 'ctoc-test', GIT_COMMITTER_EMAIL: 'ctoc@test.invalid'
+    }
+  }).trim();
+}
+
+describe('the security fleet is wired into the LIVE push path (DEFAULT binding, real delta)', () => {
+  it('push.run with NO injected security dep BLOCKS on a secret committed two commits back', async () => {
+    // R4-A item 4+5: the OLD scope was `git diff HEAD~1` — the last commit only —
+    // so a secret two commits back and not yet pushed was NEVER scanned, and the
+    // wiring test injected its own wrapper (the gate could be replaced by
+    // `async () => ({passed:true})` and the test would still pass). This drives
+    // the DEFAULT binding (real quality-agent.runSecurityScan) against a real git
+    // repo whose push delta (@{upstream}..HEAD) contains a planted secret two
+    // commits back — and asserts push is BLOCKED.
+    assert.equal(typeof qualityAgent.runSecurityScan, 'function', 'quality-agent must export runSecurityScan');
+
+    const work = mkTmp('ctoc-pushdelta-');
+    const upstream = mkTmp('ctoc-upstream-');
+    try {
+      git(['init', '--bare'], upstream);
+      git(['init'], work);
+      git(['remote', 'add', 'origin', upstream], work);
+
+      // c1: benign, pushed → establishes the upstream baseline.
+      fs.writeFileSync(path.join(work, 'readme.md'), '# ok\n');
+      git(['add', '-A'], work);
+      git(['commit', '-m', 'c1 baseline'], work);
+      git(['push', '-u', 'origin', 'HEAD'], work);
+
+      // c2: the SECRET, two commits back from HEAD, NOT yet pushed.
+      fs.writeFileSync(path.join(work, 'config.js'), `const awsKey = "${PLANTED_AWS_KEY}";\nmodule.exports = { awsKey };\n`);
+      git(['add', '-A'], work);
+      git(['commit', '-m', 'c2 add config'], work);
+
+      // c3: benign HEAD. `git diff HEAD~1` would see ONLY this — missing the secret.
+      fs.writeFileSync(path.join(work, 'notes.md'), 'notes\n');
+      git(['add', '-A'], work);
+      git(['commit', '-m', 'c3 notes'], work);
+
+      // The REAL default security scanner runs (NOT injected). Only the
+      // toolchain detection and skipTests isolate it so security is the variable.
+      const res = await push.run({ dryRun: true, skipTests: true, projectRoot: work }, {
         detect: () => ({ tools: {} }),
         runLint: async () => ({ passed: true }),
         runTypecheck: async () => ({ passed: true }),
-        runSecurityScan: async (t, o) => {
-          securityRan = true;
-          return qualityAgent.runSecurityScan(t, o);
-        },
         pushToRemote: () => true,
         logger: { log() {} }
       });
-      assert.ok(securityRan, 'push must invoke the security scanner');
-      assert.equal(res.ok, true);
-    })();
+      assert.equal(res.ok, false, 'a secret in the push delta must BLOCK the push');
+      assert.ok(res.blockedBy.includes('security'), `security must be the blocker; got: ${JSON.stringify(res.blockedBy)}`);
+    } finally {
+      rm(work);
+      rm(upstream);
+    }
+  });
+
+  it('the DEFAULT security scanner catches the two-commits-back secret via the real delta scope', async () => {
+    // Directly drive runSecurityScan with its LIVE default (allFiles NOT set), the
+    // exact mode production uses, against the same real-git two-commits-back layout.
+    const work = mkTmp('ctoc-delta-');
+    const upstream = mkTmp('ctoc-delta-up-');
+    try {
+      git(['init', '--bare'], upstream);
+      git(['init'], work);
+      git(['remote', 'add', 'origin', upstream], work);
+      fs.writeFileSync(path.join(work, 'readme.md'), '# ok\n');
+      git(['add', '-A'], work); git(['commit', '-m', 'c1'], work); git(['push', '-u', 'origin', 'HEAD'], work);
+      fs.writeFileSync(path.join(work, 'config.js'), `const awsKey = "${PLANTED_AWS_KEY}";\n`);
+      git(['add', '-A'], work); git(['commit', '-m', 'c2 secret'], work);
+      fs.writeFileSync(path.join(work, 'notes.md'), 'x\n');
+      git(['add', '-A'], work); git(['commit', '-m', 'c3'], work);
+
+      // LIVE default path: no allFiles, no explicit file list — scopes to the delta.
+      const res = await qualityAgent.runSecurityScan(null, { projectRoot: work });
+      assert.ok(res.critical >= 1, `the delta scan must catch the secret two commits back; got critical=${res.critical}`);
+      assert.equal(res.passed, false, 'a critical secret in the push delta must fail the gate');
+    } finally {
+      rm(work);
+      rm(upstream);
+    }
   });
 });
 

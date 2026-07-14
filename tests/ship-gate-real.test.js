@@ -328,10 +328,43 @@ test('ship-gate: CTOC_SKIP_QUALITY stays a SKIP — it can never enable a push',
   }
 });
 
+// R4-A item 11 — the fence must catch EVERY git-push idiom, not just the
+// `execSync('git push')` string form. This codebase prefers the argv-array idiom
+// (spawn('git', ['push', ...]) / execFile / runFile('git', ['push'])), which the
+// old shallow regex silently missed. `hasUngatedPush` is the widened matcher.
+//
+// @param {string} text - file source
+// @returns {boolean} true iff the file reaches `git push` without consulting the gate
+function hasUngatedPush(text) {
+  // (a) the shell-string form: execSync('git push ...') / runCommand('git push')
+  const stringForm = /(?:execSync|execFileSync|exec|runCommand)\s*\(\s*[`'"]git\s+push/;
+  // (b) the argv-array form: <spawner>('git', [ ... 'push' ... ]) — any spawner,
+  //     any element order. Matches spawn/spawnSync/execFile/execFileSync/runFile/
+  //     runCommand where the command is 'git' and an argv element is 'push'.
+  const argvForm = /(?:spawn|spawnSync|execFile|execFileSync|runFile|runCommand)\s*\(\s*[`'"]git[`'"]\s*,\s*\[[^\]]*[`'"]push[`'"]/;
+  const reachesPush = stringForm.test(text) || argvForm.test(text);
+  return reachesPush && !/isAutoPushEnabled/.test(text);
+}
+
+test('ship-gate: hasUngatedPush catches the argv-array idiom the old fence missed', () => {
+  // The argv-array forms this codebase actually uses — all ungated, all must flag.
+  assert.ok(hasUngatedPush("spawn('git', ['push', 'origin', 'main'])"), 'spawn argv form');
+  assert.ok(hasUngatedPush("spawnSync('git', ['push'])"), 'spawnSync argv form');
+  assert.ok(hasUngatedPush("execFile('git', ['push', '--force'])"), 'execFile argv form');
+  assert.ok(hasUngatedPush("runFile('git', ['push', 'origin', 'HEAD'])"), 'runFile argv form');
+  // The old string form must still flag.
+  assert.ok(hasUngatedPush("execSync('git push origin main')"), 'legacy string form');
+  // Gated call sites (consult isAutoPushEnabled) do NOT flag.
+  assert.ok(!hasUngatedPush("if (isAutoPushEnabled(root)) spawn('git', ['push'])"), 'gated argv form is fine');
+  // Non-push git calls do NOT flag.
+  assert.ok(!hasUngatedPush("spawn('git', ['status'])"), 'a non-push git call is fine');
+  assert.ok(!hasUngatedPush("spawn('git', ['diff', '--name-only'])"), 'git diff is fine');
+});
+
 test('ship-gate: no source file hardcodes an ungated push', () => {
-  // Every `git push` string in src/ must sit in a file that also consults the
-  // canonical gate — or be the human's own sanctioned command (/ctoc:push) or a
-  // deploy path (guarded by its own ship_gate_confirmed flag).
+  // Every `git push` in src/ must sit in a file that also consults the canonical
+  // gate — or be the human's own sanctioned command (/ctoc:push) or a deploy path
+  // (guarded by its own ship_gate_confirmed flag).
   const SANCTIONED = new Set([
     path.join('src', 'commands', 'push.js'),      // the human ship gate itself
     path.join('src', 'lib', 'deployment.js'),     // deploy gate: ship_gate_confirmed
@@ -346,8 +379,7 @@ test('ship-gate: no source file hardcodes an ungated push', () => {
       const rel = path.relative(ROOT, p);
       if (SANCTIONED.has(rel)) continue;
       const t = fs.readFileSync(p, 'utf8');
-      if (/execSync\(\s*[`'"]git push|runCommand\(\s*['"]git push/.test(t) &&
-          !/isAutoPushEnabled/.test(t)) {
+      if (hasUngatedPush(t)) {
         offenders.push(rel);
       }
     }

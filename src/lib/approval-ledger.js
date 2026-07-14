@@ -18,29 +18,48 @@
  *   - `stage_to` differs         ⇒ NOT approved (an entry recorded for one gate
  *                                   edge cannot be replayed to justify another).
  *
- * The ledger directory is agent-write-denied at the enforcement layer (slice
- * s2, `PreToolUse.Edit.js`): no Edit/Write/MultiEdit/NotebookEdit tool call may
- * create or modify anything under `.ctoc/approvals/`. Entries are written ONLY
- * by the trusted, non-tool-call `approvePlan()` code path (slice s5). This
- * leaf module has no dependency on any other W02 file; both `human-gate-check.js`
- * (s3) and `actions.js` (s5) build on it.
+ * WHERE THE DENY ACTUALLY LIVES (R3-A — the previous version of this header made
+ * a promise the code did not keep, so read this one literally):
+ *   - EDIT CHANNEL: `PreToolUse.Edit.js` denies every Edit/Write/MultiEdit/
+ *     NotebookEdit tool call targeting `.ctoc/approvals/` (`isProtectedLedgerPath`).
+ *   - BASH CHANNEL: `PreToolUse.Bash.js` (`isLedgerForgery`) denies, as its FIRST
+ *     layer, any command that writes the ledger directory (redirect/tee/cp/mv/…),
+ *     any INLINE EVAL (`node -e`/`--eval`/`-p`/stdin) referencing this module, the
+ *     ledger directory, or a gate/ledger verb, and any inline eval that cannot be
+ *     statically cleared. Until R3-A this deny did NOT exist and the header's
+ *     "agent writes are denied" claim was FALSE: `node -e "require('./src/lib/
+ *     approval-ledger').writeEntry(…)"` minted a human-kind entry at will.
+ *   - NOT COVERED (stated honestly, because a false guarantee is worse than none):
+ *     a checked-in `.js` file executed with `node file.js` is not an inline eval and
+ *     is not string-matchable — it is a REVIEWABLE artifact, which is the point.
+ *     `src/scripts/ledger-backfill.js` is the ONE sanctioned writer of that shape.
+ *
+ * Entries are otherwise written only by the trusted, non-tool-call `approvePlan()`
+ * code path (`stampAndLedger`), by `stale-cleanup.js` (pipeline kind), and by the
+ * sanctioned backfill script. This leaf module has no dependency on any other W02
+ * file; `human-gate-check.js` and `actions.js` build on it.
  *
  * All filesystem I/O routes through `./safe-fs` (the audited choke point) and
  * every path is composed with `path.join`, so the module is cross-platform and
  * never writes outside `.ctoc/approvals/`.
  *
- * TWO ENTRY KINDS (R2-F). Every entry declares its provenance:
+ * THREE ENTRY KINDS (R2-F, extended by R3-A item 5). Every entry declares its
+ * provenance, and `entryKind(entry)` reports it HONESTLY:
  *   - HUMAN kind (`writeEntry`, the default): a human crossed the gate via the
- *     menu (`approvePlan`/`stampAndLedger`). `backfillEntry` also writes a human-
- *     kind entry, additionally stamped `backfilled: true` + `backfill_reason`, to
- *     ledger a plan that crossed a gate BEFORE the ledger existed (the 2026-07-14
- *     legacy migration provenance) — hashing the plan's CURRENT on-disk content.
- *   - PIPELINE kind (`writePipelineEntry`): the automated pipeline advanced a plan
- *     (e.g. stale reconciliation). It carries `advanced_by: 'pipeline'` and a
- *     MANDATORY non-empty `evidence` string; a write with no evidence is refused
- *     loudly. `entryKind(entry)` reports the kind; `human-gate-check.js` accepts a
- *     pipeline entry ONLY at `done/` (never at the pre-done gate `todo/`, which
- *     stays human-only).
+ *     menu (`approvePlan`/`stampAndLedger`).
+ *   - BACKFILLED kind (`backfillEntry`): a human-authorized MIGRATION of a plan that
+ *     crossed a gate BEFORE the ledger existed — a human-kind record additionally
+ *     stamped `backfilled: true` + `backfill_reason`, hashing the plan's CURRENT
+ *     on-disk content. The gate ACCEPTS it (the human ordered the migration) but
+ *     `entryKind` returns `'backfilled'`, never `'human'`, so an audit can always
+ *     tell a migrated entry from a live human approval. Acceptance is not weakened;
+ *     the classification is truthful.
+ *   - PIPELINE kind (`writePipelineEntry`, `writeVisionArchiveEntry`): the automated
+ *     pipeline advanced a plan (stale reconciliation; a decomposed vision archived to
+ *     `done/`). It carries `advanced_by: 'pipeline'` and a MANDATORY non-empty
+ *     `evidence` string; a write with no evidence is refused loudly.
+ *     `human-gate-check.js` accepts a pipeline entry ONLY at `done/` (never at the
+ *     pre-done gate `todo/`, which stays human-only).
  *
  * CANONICAL LOWERCASE SLUGS (R2-F). `slugFromPlanPath` lowercases and every
  * boundary (`ledgerPath`, and thus every read/write) canonicalizes its slug to
@@ -225,7 +244,49 @@ function writePipelineEntry(slug, entry, projectPath) {
     advanced_by: 'pipeline',
     evidence: src.evidence,
   };
+  // R3-A: the case-collision guard is available on the pipeline path too — a vision
+  // archive and a code plan whose basenames differ only by case must never silently
+  // overwrite each other's provenance.
+  if (src.plan_basename !== undefined) record.plan_basename = src.plan_basename;
   return persistEntry(slug, record, projectPath);
+}
+
+/**
+ * Ledger a DECOMPOSED VISION archived to `plans/done/` as a PIPELINE-kind entry
+ * (R3-A item 3). A vision crossed Gate 0 in `vision/`, never the review→done code
+ * gate, and carries no approval marker — which is why `human-gate-check.js` used to
+ * EXEMPT `type: vision` plans from the residency sweep. That exemption was a hole:
+ * `plans/**.md` is Edit-whitelisted, so any agent could squat `done/` with a single
+ * `type: vision` frontmatter line and no provenance at all. The exemption is gone;
+ * `done/` residency is now UNIFORMLY ledger-driven, and a vision archive earns its
+ * residency with this entry — `advanced_by: 'pipeline'`, `evidence:
+ * 'vision-decomposed'`, `stage_from: 'vision'`, `stage_to: 'done'` — hashing the
+ * archive's CURRENT on-disk bytes (so a later edit to the archived vision invalidates
+ * it exactly as it does for any other done/ resident).
+ *
+ * Callers: `src/scripts/ledger-backfill.js --vision` (the migration for archives that
+ * predate this slice, and the sanctioned writer the menu points at). The live archive
+ * path, `vision-decomposer.completeVision`, must call this immediately BEFORE its
+ * `movePlan(visionPath, 'done')` — see the R3-A report; that file was out of this
+ * slice's file scope.
+ *
+ * @param {string} projectPath - the project root
+ * @param {string} planPath - path to the vision file (in `plans/done/`, or the source
+ *   path whose CONTENT is about to be moved there byte-identically)
+ * @returns {object} the entry object as written
+ * @throws {Error} when the plan cannot be read, the slug is un-keyable, or the
+ *   canonical key collides with a different original basename (loud, never silent).
+ */
+function writeVisionArchiveEntry(projectPath, planPath) {
+  const content = safeFs.readFileSync(planPath, 'utf8');
+  const slug = slugFromPlanPath(planPath);
+  return writePipelineEntry(slug, {
+    content_sha256: computeContentHash(content),
+    stage_from: 'vision',
+    stage_to: 'done',
+    evidence: 'vision-decomposed',
+    plan_basename: path.basename(planPath).replace(/\.md$/i, ''),
+  }, projectPath);
 }
 
 /**
@@ -269,15 +330,23 @@ function persistEntry(slug, record, projectPath) {
 }
 
 /**
- * Classify a ledger entry's provenance kind.
+ * Classify a ledger entry's provenance kind — HONESTLY (R3-A item 5).
+ *
+ * `'backfilled'` is a THIRD kind, not a flavour of `'human'`: the gate accepts it
+ * (the human ordered the migration), but a migrated entry and a live human approval
+ * are different facts and an audit must be able to tell them apart. Acceptance is
+ * unchanged; only the classification became truthful.
  *
  * @param {object|null} entry - a parsed ledger entry
- * @returns {('human'|'pipeline'|null)} `pipeline` when `advanced_by === 'pipeline'`,
- *   `human` for any other real entry (the historical default), `null` for no entry.
+ * @returns {('human'|'backfilled'|'pipeline'|null)} `pipeline` when
+ *   `advanced_by === 'pipeline'`; `backfilled` when the entry carries
+ *   `backfilled: true`; `human` for any other real entry; `null` for no entry.
  */
 function entryKind(entry) {
   if (!entry || typeof entry !== 'object') return null;
-  return entry.advanced_by === 'pipeline' ? 'pipeline' : 'human';
+  if (entry.advanced_by === 'pipeline') return 'pipeline';
+  if (entry.backfilled === true) return 'backfilled';
+  return 'human';
 }
 
 /**
@@ -318,10 +387,13 @@ function readEntryResult(slug, projectPath) {
  * on-disk content and writes a human-kind entry stamped `backfilled: true` +
  * `backfill_reason`, keyed to the canonical lowercase slug and carrying the
  * original-cased basename for the collision guard. This is the ONLY sanctioned
- * way to ledger a plan that crossed a human gate before the ledger existed; the
- * integrator drives it via `node -e` at the wave boundary (no standalone script
- * file, which would become dead code). It writes THROUGH the module, so the
- * agent-write deny on `.ctoc/approvals/` (`PreToolUse.Edit.js`) stays intact.
+ * way to ledger a plan that crossed a human gate before the ledger existed.
+ *
+ * R3-A CORRECTION: it is driven by the checked-in, argv-driven
+ * `src/scripts/ledger-backfill.js` — NOT by `node -e`, which the Bash hook now
+ * DENIES (an inline eval referencing this module is exactly the forgery the deny
+ * closes; the old "integrator drives it via node -e" instruction was the hole).
+ * The entry it writes classifies as `'backfilled'`, never `'human'`.
  *
  * @param {string} projectPath - the project root
  * @param {string} planPath - absolute path to the existing plan file
@@ -418,6 +490,7 @@ module.exports = {
   computeContentHash,
   writeEntry,
   writePipelineEntry,
+  writeVisionArchiveEntry,
   entryKind,
   readEntry,
   readEntryResult,

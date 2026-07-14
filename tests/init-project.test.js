@@ -273,6 +273,18 @@ describe('init-project', () => {
       assert.ok(content.includes('mode: strict'));
     });
 
+    it('settings.yaml contains NO push: placebo block (auto_push / allow_warnings deleted)', () => {
+      // R4-B: init used to write `push:\n  auto_push: true\n  allow_warnings: false`.
+      // Nothing reads those keys — the canonical push gate is git.autoPushEnabled in
+      // settings.json, read only via isAutoPushEnabled(). A visible off-switch wired
+      // to a key no code consults is a placebo that lies to the human who sets it.
+      initProject(tempDir);
+      const content = fs.readFileSync(path.join(tempDir, '.ctoc', 'settings.yaml'), 'utf8');
+      assert.ok(!/^\s*push:\s*$/m.test(content), 'no `push:` block may be written');
+      assert.ok(!content.includes('auto_push'), 'the placebo key auto_push must be gone');
+      assert.ok(!content.includes('allow_warnings'), 'the placebo key allow_warnings must be gone');
+    });
+
     it('creates iron-loop state', () => {
       initProject(tempDir);
 

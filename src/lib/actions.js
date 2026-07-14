@@ -273,7 +273,14 @@ function stampAndLedger(planPath, from, to, root, deps = {}) {
         content_sha256: contentHash,
         stage_from: from,
         stage_to: to,
-        approved_by: 'human'
+        approved_by: 'human',
+        // Handover (a): the case-collision guard in approval-ledger.persistEntry only fires
+        // when BOTH the existing and incoming records carry `plan_basename`. The live human-
+        // approval path omitted it, so two case-differing plans (e.g. `case-plan.md` and
+        // `Case-Plan.md`) silently overwrote each other's provenance on the shared canonical
+        // key — and the first plan then FAILED its content-hash verify and got reverted out
+        // of its gate destination. Recording the original-cased basename arms the guard.
+        plan_basename: path.basename(planPath).replace(/\.md$/i, '')
       }, root);
     }
   } catch (err) {
@@ -281,7 +288,12 @@ function stampAndLedger(planPath, from, to, root, deps = {}) {
     // secondary failure never masks the primary error that triggered the rollback.
     try { move(newPath, from); } catch { /* best-effort: leave for s3's sweep */ }
     try { safeFs.writeFileSync(planPath, originalContent); } catch { /* best-effort */ }
-    if (ledgerKeyable) { try { removeEntry(slug, root); } catch { /* best-effort */ } }
+    // A case-collision refusal (handover a) means the ledger entry at this slug belongs to
+    // a DIFFERENT plan (one differing only by case). writeEntry threw BEFORE writing, so
+    // there is nothing OUR crossing added to remove — and removing it would erase the very
+    // provenance the collision guard exists to protect. Skip removeEntry in that case.
+    const isCollision = /collision/i.test(String(err && err.message));
+    if (ledgerKeyable && !isCollision) { try { removeEntry(slug, root); } catch { /* best-effort */ } }
     throw err;
   }
   return newPath;
@@ -739,23 +751,48 @@ function completeExecution(planPath, projectPath, options = {}) {
   // Fail-open: no registry, no matching task, or any registry error is logged and
   // NEVER breaks the transition (the plan has already moved to review).
   try {
-    const registry = taskRegistry.load(root);
-    const TERMINAL = new Set(['done', 'failed', 'orphaned', 'cancelled']);
-    const taskForPlan = registry.tasks.find(
-      (t) => t.kind === 'implement' && t.plan === planSlug && !TERMINAL.has(t.status)
-    );
-    if (taskForPlan && taskForPlan.status === 'running') {
-      taskRegistry.updateTask(registry, taskForPlan.id, {
-        status: 'done',
-        result: { ok: true, summary: 'plan reached review' }
-      });
-      taskRegistry.save(root, registry);
-    } else if (taskForPlan && taskForPlan.status === 'cancelling') {
-      taskRegistry.updateTask(registry, taskForPlan.id, {
-        result: { ok: true, summary: 'plan reached review during cancellation' }
-      });
-      taskRegistry.save(root, registry);
-    }
+    taskRegistry.withRegistry(root, (registry, ctx) => {
+      // C2 (R3-B item 2): settle THE RUNNING task, never an earlier queued duplicate.
+      // `findActivePlanTask` prefers the running/cancelling task over a queued one, so a
+      // queued duplicate can no longer SHADOW the running task (the old `find()` returned
+      // the EARLIEST non-terminal match → the running task was never marked done → a dead
+      // file lock until the 120-min orphan sweep, after which the duplicate re-ran a plan
+      // already in review).
+      const taskForPlan = taskRegistry.findActivePlanTask(registry, planSlug, 'implement');
+      if (!taskForPlan) {
+        // Item 11: the no-match path is no longer SILENT. A running task used to occupy a
+        // slot for two hours with zero trace linking it to the completed plan.
+        ctx.abort();
+        taskRegistry.warnLog(root, 'plan_task_coupling_missing', {
+          plan: planSlug,
+          detail: 'plan reached review but no non-terminal implement task was found to settle'
+        });
+        return;
+      }
+      if (taskForPlan.status === 'running') {
+        taskRegistry.updateTask(registry, taskForPlan.id, {
+          status: 'done',
+          result: { ok: true, summary: 'plan reached review' }
+        });
+      } else if (taskForPlan.status === 'cancelling') {
+        taskRegistry.updateTask(registry, taskForPlan.id, {
+          result: { ok: true, summary: 'plan reached review during cancellation' }
+        });
+      }
+      // Item 2: retire any SHADOW duplicates for this plan so they cannot re-run a plan
+      // already in review. Each is a queued implement task for the same plan other than
+      // the one we just settled; cancel it (queued → cancelled is immediate + safe).
+      for (const dup of registry.tasks) {
+        if (dup.kind === 'implement' && dup.plan === planSlug &&
+            dup.id !== taskForPlan.id && dup.status === 'queued') {
+          taskRegistry.updateTask(registry, dup.id, {
+            status: 'cancelled',
+            result: { ok: false, summary: 'superseded duplicate — the plan already reached review' }
+          });
+          taskRegistry.warnLog(root, 'duplicate_plan_task_retired', { plan: planSlug, id: dup.id });
+        }
+      }
+    });
   } catch (couplingErr) {
     console.error(`Task/plan coupling failed for ${planSlug}: ${couplingErr.message}`);
   }
@@ -1007,7 +1044,13 @@ function recordDeployReadyNotice(planPath, root) {
         'auto-deploy on Gate 3, or deploy manually.'
     });
     if (log.length > 500) log = log.slice(-500);
-    safeFs.writeFileSync(logFile, JSON.stringify(log, null, 2));
+    // Handover (b): write ATOMICALLY (temp sibling + rename), mirroring stale-cleanup's
+    // pattern, so a crash mid-write never leaves a half-written deploy-ready.json that the
+    // menu's reader (readDeployReady) would then treat as zero notices — dropping a plan's
+    // ship-gate signal. rename is atomic on POSIX and a same-dir replace on Windows.
+    const tmpFile = `${logFile}.tmp-${Date.now()}-${process.pid}`;
+    safeFs.writeFileSync(tmpFile, JSON.stringify(log, null, 2));
+    safeFs.renameSync(tmpFile, logFile);
   } catch (err) {
     console.error('Deploy-ready notice failed:', err && err.message ? err.message : String(err));
   }
@@ -1169,7 +1212,8 @@ function taskSpecFromPlan(plan, projectPath) {
  *   is honored.
  * @returns {{ started: boolean, error?: string, queued?: boolean, reason?: string,
  *   task?: object, plan?: object, cleanedUp?: string[], drainStopped?: boolean,
- *   skipped?: Array<{plan:string, reason:string}>, remainingTodo?: number }}
+ *   skipped?: Array<{plan:string, reason:string}>,
+ *   queuedTasks?: Array<{plan:string, taskId:string, reason:string}>, remainingTodo?: number }}
  */
 function startAgent(projectPath, options = {}) {
   const root = projectPath || findProjectRoot();
@@ -1196,52 +1240,66 @@ function startAgent(projectPath, options = {}) {
     return { started: false, error: 'No plans in todo queue', cleanedUp, skipped: [] };
   }
 
-  // 4. Walk the FIFO queue for the first plan with a valid task spec. A plan that
-  //    cannot honestly declare disjointness (no files:) or whose dependency is
-  //    unresolvable is recorded in skipped[] and NEVER stalls the plans behind it
-  //    (C1-4) — the refusal is surfaced, not fatal.
+  // 4. Walk the FIFO queue and CLAIM the first plan the scheduler lets start. Two ways a
+  //    plan yields to the next (C1-4 + R3-B items 2/3):
+  //      • SPEC REFUSAL — no files:, or an unresolvable dependency → recorded in skipped[].
+  //      • LADDER REFUSAL — a disjoint plan behind a file-conflicted / max-concurrent head
+  //        must still start. The refused head KEEPS its SINGLE queued task (item 2: a
+  //        non-terminal task already covering the plan is NOT duplicated) and is recorded
+  //        in queued[]; the walk continues to the next plan.
+  //    Only a CLAIMED plan is moved to in-progress and returns started:true.
   const skipped = [];
-  let nextPlan = null;
-  let spec = null;
-  for (const plan of todoPlans) {
+  const queuedTasks = [];
+  let claimIndex = -1;
+  for (let i = 0; i < todoPlans.length; i++) {
+    const plan = todoPlans[i];
+    let spec;
     try {
       spec = taskSpecFromPlan(plan, root);
-      nextPlan = plan;
-      break;
     } catch (err) {
       skipped.push({ plan: plan.name, reason: err.message });
+      continue;
     }
-  }
-  if (!nextPlan) {
-    // Every todo plan was unclaimable — surface them all; none stalled the others.
-    return { started: false, error: 'No claimable plan in todo queue', cleanedUp, skipped };
+    // item 2: do NOT enqueue a second implement task for a plan that already has a live one.
+    const existing = taskRegistry.findActivePlanTask(taskRegistry.load(root), plan.name, 'implement');
+    if (existing) {
+      queuedTasks.push({ plan: plan.name, taskId: existing.id, reason: 'already-queued' });
+      continue;
+    }
+    const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
+    if (!claimed) {
+      // item 3: the ladder refused this head; keep its single queued task and try the next.
+      queuedTasks.push({ plan: plan.name, taskId: task.id, reason });
+      continue;
+    }
+    // 5. Claimed → move the plan to in-progress and light up the dashboard status.
+    claimIndex = i;
+    const newPath = startExecution(plan.path, root);
+    setAgentStatus(root, {
+      active: true,
+      plan: plan.name,
+      step: 8,
+      phase: 'TEST',
+      task: 'Starting implementation'
+    });
+    return {
+      started: true,
+      task,
+      plan: { name: plan.name, path: newPath },
+      cleanedUp,
+      skipped,
+      queuedTasks,
+      remainingTodo: todoPlans.length - 1
+    };
   }
 
-  // 5. Record + claim atomically (single load→save cycle in the registry).
-  const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
-  if (!claimed) {
-    // The task is recorded and queued; the plan stays in todo until a slot frees.
-    return { started: false, queued: true, reason, task, cleanedUp, skipped };
+  // 6. Nothing was claimable this pass. A ladder-refused head reports queued:true (its
+  //    task IS recorded, waiting on a slot); a pure spec-refusal queue reports the error.
+  void claimIndex;
+  if (queuedTasks.length > 0) {
+    return { started: false, queued: true, reason: queuedTasks[0].reason, cleanedUp, skipped, queuedTasks };
   }
-
-  // 6. Claimed → move the plan to in-progress and light up the dashboard status.
-  const newPath = startExecution(nextPlan.path, root);
-  setAgentStatus(root, {
-    active: true,
-    plan: nextPlan.name,
-    step: 8,
-    phase: 'TEST',
-    task: 'Starting implementation'
-  });
-
-  return {
-    started: true,
-    task,
-    plan: { name: nextPlan.name, path: newPath },
-    cleanedUp,
-    skipped,
-    remainingTodo: todoPlans.length - 1
-  };
+  return { started: false, error: 'No claimable plan in todo queue', cleanedUp, skipped, queuedTasks };
 }
 
 /**
@@ -1282,7 +1340,8 @@ function stopAgent(projectPath) {
  * @param {string} projectPath - Project root
  * @returns {{ next: boolean, plan?: object, stopped?: boolean, done?: boolean,
  *   queued?: boolean, reason?: string, task?: object, error?: string,
- *   skipped?: Array<{plan:string, reason:string}>, remainingTodo?: number }}
+ *   skipped?: Array<{plan:string, reason:string}>,
+ *   queuedTasks?: Array<{plan:string, taskId:string, reason:string}>, remainingTodo?: number }}
  */
 function advanceAgent(projectPath) {
   const root = projectPath || findProjectRoot();
@@ -1302,45 +1361,51 @@ function advanceAgent(projectPath) {
     return { next: false, done: true };
   }
 
-  // 3. Walk the FIFO queue for the first plan with a valid task spec; a refusal is
-  //    recorded in skipped[] and never stalls the plans behind it (C1-4).
+  // 3. Walk the FIFO queue and claim the first plan the scheduler lets start. A spec
+  //    refusal goes to skipped[]; a ladder refusal keeps the head's SINGLE queued task
+  //    (item 2 — no duplicate) and continues to the next plan (item 3). Mirrors startAgent.
   const skipped = [];
-  let nextPlan = null;
-  let spec = null;
+  const queuedTasks = [];
   for (const plan of todoPlans) {
+    let spec;
     try {
       spec = taskSpecFromPlan(plan, root);
-      nextPlan = plan;
-      break;
     } catch (err) {
       skipped.push({ plan: plan.name, reason: err.message });
+      continue;
     }
-  }
-  if (!nextPlan) {
-    return { next: false, error: 'No claimable plan in todo queue', skipped };
+    const existing = taskRegistry.findActivePlanTask(taskRegistry.load(root), plan.name, 'implement');
+    if (existing) {
+      queuedTasks.push({ plan: plan.name, taskId: existing.id, reason: 'already-queued' });
+      continue;
+    }
+    const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
+    if (!claimed) {
+      queuedTasks.push({ plan: plan.name, taskId: task.id, reason });
+      continue;
+    }
+    const newPath = startExecution(plan.path, root);
+    setAgentStatus(root, {
+      active: true,
+      plan: plan.name,
+      step: 8,
+      phase: 'TEST',
+      task: 'Starting implementation'
+    });
+    return {
+      next: true,
+      task,
+      plan: { name: plan.name, path: newPath },
+      skipped,
+      queuedTasks,
+      remainingTodo: todoPlans.length - 1
+    };
   }
 
-  const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
-  if (!claimed) {
-    return { next: false, queued: true, reason, task, skipped };
+  if (queuedTasks.length > 0) {
+    return { next: false, queued: true, reason: queuedTasks[0].reason, skipped, queuedTasks };
   }
-
-  const newPath = startExecution(nextPlan.path, root);
-  setAgentStatus(root, {
-    active: true,
-    plan: nextPlan.name,
-    step: 8,
-    phase: 'TEST',
-    task: 'Starting implementation'
-  });
-
-  return {
-    next: true,
-    task,
-    plan: { name: nextPlan.name, path: newPath },
-    skipped,
-    remainingTodo: todoPlans.length - 1
-  };
+  return { next: false, error: 'No claimable plan in todo queue', skipped, queuedTasks };
 }
 
 /**
@@ -1368,29 +1433,41 @@ function advanceAgent(projectPath) {
  */
 function cancelTask(projectPath, taskId) {
   const root = projectPath || findProjectRoot();
-  const registry = taskRegistry.load(root);
-  const existing = registry.tasks.find((t) => t.id === taskId);
-  if (!existing) {
-    throw new Error(`cancelTask: unknown task id ${taskId}`);
-  }
-  const agentTaskId = existing.agentTaskId || null;
+  // R3-B item 7: the load→save cycle runs inside the compare-and-swap helper so a concurrent
+  // writer cannot lose the cancel. A running-cancel stamps ts.cancelRequested so reconcile's
+  // cancel deadline (item 10) has a clock.
+  return taskRegistry.withRegistry(root, (registry) => {
+    const existing = registry.tasks.find((t) => t.id === taskId);
+    if (!existing) {
+      throw new Error(`cancelTask: unknown task id ${taskId}`);
+    }
+    const agentTaskId = existing.agentTaskId || null;
 
-  let nextStatus;
-  if (existing.status === 'running') {
-    nextStatus = 'cancelling'; // two-phase: keep files locked until reconcile confirms death
-  } else if (existing.status === 'queued') {
-    nextStatus = 'cancelled'; // nothing running → free immediately
-  } else if (existing.status === 'cancelling') {
-    throw new Error(`cancelTask: task ${taskId} is already cancelling`);
-  } else {
-    // Terminal (done/failed/orphaned/cancelled): updateTask's guard throws below.
-    nextStatus = 'cancelled';
-  }
+    let nextStatus;
+    let patch;
+    if (existing.status === 'running') {
+      nextStatus = 'cancelling'; // two-phase: keep files locked until reconcile confirms death
+      patch = { status: nextStatus, ts: { cancelRequested: nowIsoActions() } };
+    } else if (existing.status === 'queued') {
+      nextStatus = 'cancelled'; // nothing running → free immediately
+      patch = { status: nextStatus };
+    } else if (existing.status === 'cancelling') {
+      throw new Error(`cancelTask: task ${taskId} is already cancelling`);
+    } else {
+      // Terminal (done/failed/orphaned/cancelled): updateTask's guard throws below.
+      nextStatus = 'cancelled';
+      patch = { status: nextStatus };
+    }
 
-  // updateTask enforces the transition guard (a terminal task throws).
-  const task = taskRegistry.updateTask(registry, taskId, { status: nextStatus });
-  taskRegistry.save(root, registry);
-  return { task, agentTaskId };
+    // updateTask enforces the transition guard (a terminal task throws).
+    const task = taskRegistry.updateTask(registry, taskId, patch);
+    return { task, agentTaskId };
+  });
+}
+
+/** Current instant as an ISO-8601 string (R3-B item 10: the cancel-deadline clock). */
+function nowIsoActions() {
+  return new Date().toISOString();
 }
 
 /**
@@ -1535,7 +1612,47 @@ function cleanupStaleInProgress(projectPath) {
   const cleanedUp = [];
   const skipped = [];
 
+  // R3-B item 6: the sweep now has BOTH a liveness criterion and an age criterion. Under
+  // the file-based wave model `startAgent` is called once per wave member WHILE its
+  // siblings are mid-flight, and the old sweep had NEITHER guard — so it would move a
+  // plan whose executor had finished its edits (and so passes validateForReview) but had
+  // not yet called completeExecution, out from under its own live agent.
+  //   • LIVENESS: skip any in-progress plan that still has a NON-TERMINAL implement task
+  //     in the registry (its agent is alive/queued — never sweep it).
+  //   • AGE backstop: only sweep a plan whose file has been idle longer than
+  //     STALE_IN_PROGRESS_MS (a genuinely orphaned plan), so a just-finished plan inside
+  //     the grace window is not raced out from under an executor about to complete it.
+  const STALE_IN_PROGRESS_MS = 120 * 60_000; // matches the reconciler's implement floor
+  let liveTaskPlans = new Set();
+  try {
+    const registry = taskRegistry.load(root);
+    liveTaskPlans = new Set(
+      registry.tasks
+        .filter((t) => t.kind === 'implement' && t.plan != null && !taskRegistry.TERMINAL.has(t.status))
+        .map((t) => t.plan)
+    );
+  } catch { /* registry unreadable → fail-open: no liveness veto, the age backstop still guards */ }
+
+  const now = Date.now();
   for (const plan of plans) {
+    // Liveness veto (item 6): a plan whose implement task is still live is NEVER swept —
+    // its agent may be mid-flight or about to call completeExecution.
+    if (liveTaskPlans.has(plan.name)) {
+      skipped.push({ name: plan.name, reason: 'live registry task (implement not terminal) — agent still owns this plan' });
+      continue;
+    }
+    // Age backstop: a young plan is inside the grace window (an executor may be seconds
+    // from completeExecution). Only genuinely idle plans are eligible to be reconciled.
+    let ageMs = Infinity;
+    try {
+      const st = safeFs.statSync(plan.path);
+      if (st && Number.isFinite(st.mtimeMs)) ageMs = now - st.mtimeMs;
+    } catch { /* stat failure → treat as very old (Infinity), fail toward the backstop */ }
+    if (ageMs < STALE_IN_PROGRESS_MS) {
+      skipped.push({ name: plan.name, reason: `young in-progress plan (idle ${Math.round(ageMs / 60000)}m < ${STALE_IN_PROGRESS_MS / 60000}m grace) — not orphaned yet` });
+      continue;
+    }
+
     // Gate the move behind validateForReview. Fail closed: a validation throw is
     // treated as an invalid plan (skip-with-reason), never a move.
     let reason = null;

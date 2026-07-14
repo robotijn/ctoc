@@ -576,7 +576,14 @@ function extractLiveAgentIds(argv) {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--live-agent-ids') {
       const csv = args[i + 1] == null ? '' : String(args[i + 1]);
-      liveAgentIds = csv.split(',').map((s) => s.trim()).filter(Boolean);
+      const ids = csv.split(',').map((s) => s.trim()).filter(Boolean);
+      // R3-B item 5 — live-list HONESTY. A PRESENT-but-empty flag (`--live-agent-ids ""`,
+      // or all-blank) is NOT an authoritative "zero agents alive"; it is the SAME as the
+      // flag being absent — the live list is UNAVAILABLE. Mapping it to `[]` made reconcile
+      // read "no agent matches anything" and mass-orphan EVERY live agent, refilling their
+      // slots in the very same render. An empty parse therefore leaves `liveAgentIds`
+      // undefined so the staleness backstop governs; only a NON-empty list is authoritative.
+      if (ids.length > 0) liveAgentIds = ids;
       i++; // consume the value
       continue;
     }
