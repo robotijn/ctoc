@@ -4,8 +4,10 @@
 # and format use sqlfluff (the standard SQL linter/formatter). test is UNVERIFIED
 # (dbt/pgtap vary — no single CI-standard) and security is UNVERIFIED (SQL SAST is not
 # a standard tool; sqlfluff dialect rules are style, not security).
+# `migrations` is NOT a marker: every Django/Rails/Node project has a migrations/ dir,
+# so it spuriously flags SQL everywhere — dbt_project.yml is the real SQL-project signal.
 language: sql
-detectionMarkers: [dbt_project.yml, "*.sql", migrations]
+detectionMarkers: [dbt_project.yml, "*.sql"]
 extensions: [.sql]
 toolchain:
   lint:     { cmd: "sqlfluff lint", tool: sqlfluff, verified: web-2026-07 }

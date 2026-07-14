@@ -193,6 +193,109 @@ describe('capability-registry: WIRED into app-runner (the new engine functions a
   });
 });
 
+// ── detection + honesty fixes (CR3-FIX) ──────────────────────────────────────────
+// An adversarial review found 7 real detection/honesty defects, each reproduced by
+// direct execution against disk. These tests assert the CORRECT post-fix behavior.
+// Every case builds a REAL on-disk fixture — zero doubles.
+describe('detection + honesty fixes (CR3-FIX)', () => {
+  const appRunner = require('../src/lib/app-runner');
+
+  it('F1: a dev compose file no longer mis-marks an SPA as a microservice', () => {
+    const dir = makeProject('ctoc-fix-f1-spa-');
+    try {
+      fs.writeFileSync(path.join(dir, 'vite.config.ts'), 'export default {};\n');
+      fs.writeFileSync(path.join(dir, 'docker-compose.yml'), 'services: {}\n');
+      assert.equal(registry.projectTypeFor(dir), 'web-frontend',
+        'an SPA with a dev docker-compose file is a web-frontend, NOT a microservice');
+    } finally { rm(dir); }
+  });
+
+  it('F1: a genuine skaffold.yaml still detects microservice', () => {
+    const dir = makeProject('ctoc-fix-f1-micro-');
+    try {
+      fs.writeFileSync(path.join(dir, 'skaffold.yaml'), 'apiVersion: skaffold/v4\n');
+      assert.equal(registry.projectTypeFor(dir), 'microservice',
+        'skaffold.yaml is genuine microservice orchestration');
+    } finally { rm(dir); }
+  });
+
+  it('F2: a generic Conda environment.yml no longer downgrades an ml-service to data-science', () => {
+    const dir = makeProject('ctoc-fix-f2-');
+    try {
+      fs.writeFileSync(path.join(dir, 'model_config.yaml'), 'model: x\n');
+      fs.writeFileSync(path.join(dir, 'environment.yml'), 'name: env\n');
+      assert.equal(registry.projectTypeFor(dir), 'ml-service',
+        'a generic Conda env file must not outrank the ml-service marker');
+    } finally { rm(dir); }
+  });
+
+  it('F3: pipelineFor surfaces depsAudit at the same relevance as security when the toolchain defines it', () => {
+    const p = registry.pipelineFor('go', 'microservice');
+    assert.ok(p, 'the go/microservice merge must produce a pipeline');
+    assert.ok(p.phases.security, 'microservice must declare a security phase');
+    assert.ok(p.phases.depsAudit, 'depsAudit must be reachable through pipelineFor (SCA is the other half of security)');
+    assert.equal(p.phases.depsAudit.relevance, p.phases.security.relevance,
+      'depsAudit relevance must equal security relevance');
+    assert.equal(p.phases.depsAudit.cmd, 'govulncheck ./...',
+      "the depsAudit cmd is pulled from go's toolchain");
+  });
+
+  it('F3: no depsAudit is injected when the language toolchain does not define one', () => {
+    // sql's toolchain has NO depsAudit; web-backend has security:required. The injection
+    // is data-driven — it fires only when the toolchain actually defines depsAudit.
+    const p = registry.pipelineFor('sql', 'web-backend');
+    assert.ok(p, 'sql/web-backend must merge');
+    assert.ok(p.phases.security, 'web-backend declares a security phase');
+    assert.ok(!p.phases.depsAudit, 'sql defines no depsAudit → nothing to inject');
+  });
+
+  it('F4: desktop run is honestly null (build-is-last-mile), not a dangling shape', () => {
+    const p = registry.pipelineFor('rust', 'desktop');
+    assert.ok(p, 'rust/desktop must merge');
+    assert.deepEqual(p.run, {
+      strategy: 'build-and-test',
+      honest: 'build-is-last-mile',
+      command: null,
+      shape: null
+    }, 'a null runShape is the honest signal: the language layer cannot supply a desktop run command');
+  });
+
+  it('F6: a bare Package.swift (generic SPM) no longer mis-marks a mobile-native-ios build', () => {
+    const dir = makeProject('ctoc-fix-f6-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Package.swift'), '// swift-tools-version:5.9\n');
+      assert.notEqual(registry.projectTypeFor(dir), 'mobile-native-ios',
+        'a generic SPM manifest (used by servers/libraries) is not an iOS build');
+    } finally { rm(dir); }
+  });
+
+  it('F7: a bare migrations directory no longer spuriously detects sql', () => {
+    const dir = makeProject('ctoc-fix-f7-');
+    try {
+      fs.mkdirSync(path.join(dir, 'migrations'));
+      assert.ok(!registry.detectLanguages(dir).includes('sql'),
+        'every Django/Rails/Node app has a migrations dir — it must not mark sql');
+    } finally { rm(dir); }
+  });
+
+  it('F9: detectRunTarget surfaces the taxonomy honest flag as authoritative over the language shape', () => {
+    // A Rust Tauri app: the rust `cli` shape is honest:true, but the desktop taxonomy
+    // is build-is-last-mile. The taxonomy wins in the surfaced honest flag.
+    const dir = makeProject('ctoc-fix-f9-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "x"\n');
+      fs.writeFileSync(path.join(dir, 'tauri.conf.json'), '{}\n');
+      const target = appRunner.detectRunTarget(dir);
+      assert.ok(target, 'a Cargo.toml + tauri.conf.json project is a native run target');
+      assert.equal(target.taxonomy, 'desktop', 'the taxonomy is desktop (tauri.conf.json)');
+      assert.equal(target.strategy.honest, true, 'the rust cli language shape is honest:true');
+      assert.equal(target.pipeline.run.honest, 'build-is-last-mile', 'the desktop taxonomy is build-is-last-mile');
+      assert.equal(target.honest, 'build-is-last-mile',
+        'the surfaced honest flag prefers the taxonomy over the disagreeing language shape');
+    } finally { rm(dir); }
+  });
+});
+
 // ── fail-open + null-path robustness (CR2/CR3 boundary) ──────────────────────────
 // The registry is fail-OPEN: a malformed or oversized override file is skipped with a
 // warning, never a throw; an unknown language or project type yields null, never a

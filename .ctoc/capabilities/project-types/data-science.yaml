@@ -1,8 +1,11 @@
 # data-science — notebooks + pipelines. lint/test are RECOMMENDED (exploratory
 # code), typecheck OPTIONAL. The honest run is executing the notebook end-to-end
 # (`jupyter nbconvert --execute`), flagged honest:notebook-executes.
+# Markers are the data-science-specific ones (dvc.yaml, papermill.yaml): a generic
+# Conda environment.yml is NOT a marker — it appears in ml-service/general Python
+# projects and would wrongly outrank the ml-service type (downgrading test:required).
 projectType: data-science
-detectionMarkers: [dvc.yaml, environment.yml, papermill.yaml]
+detectionMarkers: [dvc.yaml, papermill.yaml]
 frameworks: [jupyter, pandas, dvc, papermill]
 priority: 75
 runShape: none

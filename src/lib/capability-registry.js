@@ -476,6 +476,26 @@ function pipelineFor(language, projectType, projectRoot) {
     };
   }
 
+  // SAST and SCA are the two halves of security: static analysis of the code, and a
+  // dependency-CVE audit of what it pulls in. A project type's phase list is a
+  // whitelist and no type declares depsAudit, so dependency auditing was silently
+  // dropped from every pipeline even when security is required. When the type treats
+  // security as relevant AND the language toolchain actually defines a depsAudit,
+  // surface it at the SAME relevance as security. Data-driven: keyed only off the
+  // toolchain and the security phase — no hardcoded project-type names — and it never
+  // overrides a depsAudit a project type declared for itself.
+  if (phases.security && !phases.depsAudit) {
+    const dep = toolchain.depsAudit && typeof toolchain.depsAudit === 'object' ? toolchain.depsAudit : null;
+    if (dep) {
+      phases.depsAudit = {
+        relevance: phases.security.relevance,
+        cmd: typeof dep.cmd === 'string' ? dep.cmd : null,
+        tool: dep.tool != null ? dep.tool : null,
+        verified: dep.verified != null ? dep.verified : null
+      };
+    }
+  }
+
   const runShape = typeof type.runShape === 'string' ? type.runShape : null;
   const shapes = cap.run && cap.run.shapes && typeof cap.run.shapes === 'object' ? cap.run.shapes : {};
   const runCommand = runShape && typeof shapes[runShape] === 'string' ? shapes[runShape] : null;

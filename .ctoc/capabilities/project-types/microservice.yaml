@@ -1,8 +1,11 @@
 # microservice — a networked service (one of many). Runs and answers a per-service
 # health probe (honest:true). Security REQUIRED (it faces the network). Ships a
 # Dockerfile + k8s manifest + OpenAPI.
+# Marker is skaffold.yaml ONLY: a docker-compose file co-exists with almost every
+# project type (an SPA/library/CLI often ships a dev compose), so it is far too broad
+# a signal — skaffold.yaml is genuine microservice orchestration.
 projectType: microservice
-detectionMarkers: [docker-compose.yml, compose.yaml, skaffold.yaml]
+detectionMarkers: [skaffold.yaml]
 frameworks: [express, fastify, spring-boot, gin, fastapi]
 priority: 50
 runShape: server

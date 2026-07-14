@@ -1,10 +1,12 @@
 # desktop — Tauri / Electron / Qt / .NET MAUI. A windowed GUI cannot be driven in
 # headless CI, so build+test is the honest last mile (build-is-last-mile).
+# NO runShape: desktop run is framework-specific and build-is-last-mile, so the
+# language layer cannot honestly supply a run command. A null runShape (→ run.command
+# null) is the honest signal for that, not a dangling shape no language declares.
 projectType: desktop
 detectionMarkers: [tauri.conf.json, forge.config.js, electron-builder.yml]
 frameworks: [tauri, electron, qt, maui]
 priority: 60
-runShape: desktop
 phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
 run: { strategy: build-and-test, honest: build-is-last-mile }
 configScaffold: [tauri.conf.json, Cargo.toml, .gitignore]
