@@ -208,6 +208,118 @@ test('parseCargoAuditResults: a cargo audit --json fixture parses correctly', ()
   assert.equal(f.advisory, 'RUSTSEC-2020-0159');
 });
 
+// ── F1: CVSS VECTOR severities must NOT silently downgrade to non-blocking MEDIUM ──
+
+test('F1: an OSV vuln with ONLY a CVSS_V3 VECTOR (no label) bands CRITICAL, never MEDIUM', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  // OSV emits the score as a CVSS VECTOR string — parseFloat() of it is NaN. Before
+  // F1 this silently returned MEDIUM (non-blocking); the CVE shipped green.
+  const osv = {
+    results: [{
+      source: { path: '/proj/go.mod', type: 'lockfile' },
+      packages: [{
+        package: { name: 'github.com/evil/pkg', ecosystem: 'Go', version: '1.0.0' },
+        vulnerabilities: [{
+          id: 'GHSA-crit-vector',
+          summary: 'Remote code execution',
+          severity: [{ type: 'CVSS_V3', score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H' }]
+          // NB: no database_specific.severity — the ONLY signal is the vector.
+        }]
+      }]
+    }]
+  };
+  r.parseOSVResults(osv);
+  assert.equal(r.findings.length, 1);
+  assert.equal(
+    r.findings[0].severity, 'CRITICAL',
+    'a CVSS-vector 9.8 must map to CRITICAL and BLOCK — never a downgraded MEDIUM'
+  );
+});
+
+test('F1: a cargo advisory whose cvss is a VECTOR string bands CRITICAL, never MEDIUM', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const cargo = {
+    vulnerabilities: {
+      found: true,
+      count: 1,
+      list: [{
+        advisory: {
+          id: 'RUSTSEC-2026-0001',
+          title: 'RCE in some-crate',
+          cvss: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'
+        },
+        package: { name: 'some-crate', version: '0.1.0' }
+      }]
+    }
+  };
+  r.parseCargoAuditResults(cargo);
+  assert.equal(r.findings.length, 1);
+  assert.equal(
+    r.findings[0].severity, 'CRITICAL',
+    'a RustSec CVSS-vector 9.8 must map to CRITICAL, never MEDIUM'
+  );
+});
+
+// ── F3: an npm audit ERROR envelope must never read as a clean scan ───────────────
+
+test('F3: parseNpmAuditResults treats {error:EAUDITNOLOCK} as a loud skip, never clean', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  // A JS project with no lockfile: npm audit exits 1 and prints this envelope.
+  r.parseNpmAuditResults({ error: { code: 'EAUDITNOLOCK', summary: 'This command requires an existing lockfile.' } });
+  assert.equal(r.findings.length, 0, 'nothing was audited → no findings');
+  assert.ok(r.errors.length >= 1, 'the error envelope must be recorded as a loud error, never silence');
+  assert.ok(
+    /EAUDITNOLOCK/.test(r.errors[0].error),
+    `the recorded error must name the npm failure; got ${JSON.stringify(r.errors)}`
+  );
+});
+
+// ── F4: an unrated pip-audit finding fails SECURE (HIGH), never a non-blocking MEDIUM ──
+
+test('F4: a pip-audit finding with no severity defaults to HIGH (fail-secure), never MEDIUM', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const pip = {
+    dependencies: [{
+      name: 'flask',
+      version: '0.5',
+      vulns: [{ id: 'PYSEC-2019-179', description: 'DoS', aliases: ['CVE-2019-1010083'] }]
+    }]
+  };
+  r.parsePipAuditResults(pip);
+  assert.equal(r.findings.length, 1);
+  assert.equal(
+    r.findings[0].severity, 'HIGH',
+    'a real pip advisory with no stated severity must default HIGH — a Python dep RCE must not ship green'
+  );
+});
+
+// ── F5: npm v6 `advisories`-shape reports are parsed, not silently empty ──────────
+
+test('F5: parseNpmAuditResults parses the npm v6 `advisories` shape', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const npmV6 = {
+    advisories: {
+      1065: {
+        id: 1065,
+        module_name: 'lodash',
+        severity: 'high',
+        title: 'Prototype Pollution',
+        url: 'https://npmjs.com/advisories/1065',
+        cwe: 'CWE-1321'
+      }
+    }
+  };
+  r.parseNpmAuditResults(npmV6);
+  assert.equal(r.findings.length, 1, 'an npm v6 report must not be silently empty');
+  assert.equal(r.findings[0].package, 'lodash');
+  assert.equal(r.findings[0].severity, 'HIGH');
+});
+
 test('dedupe: the same (package, advisory-id) reported twice collapses to one finding', () => {
   const { SCARunner } = require(SCA_PATH);
   const r = new SCARunner('/x');

@@ -25,6 +25,7 @@
 
 const { execFileSync } = require('child_process');
 const registry = require('./capability-registry');
+const { severityFromCvss } = require('./cvss');
 
 /**
  * Severity levels aligned with CVSS (same shape as sast-runner's SEVERITY).
@@ -157,14 +158,26 @@ class SCARunner {
    */
   async run() {
     const startTime = Date.now();
-    const languages = this.detectLanguages();
+    const detected = this.detectLanguages();
+
+    // F2 partition: DependencyAuditor already audits its covered ecosystems (js/ts,
+    // python, go, rust, java, ruby, php). Running SCA for them too double-counts the
+    // SAME CVE into the human-facing tally and runs the tool twice. When the caller
+    // passes `excludeLanguages` (quality-agent passes DependencyAuditor.COVERED_
+    // LANGUAGES), SCA scans ONLY the long-tail ecosystems — no overlap, no double-run.
+    const excluded = this.options.excludeLanguages instanceof Set
+      ? this.options.excludeLanguages
+      : new Set(this.options.excludeLanguages || []);
+    const languages = detected.filter((l) => !excluded.has(l));
 
     if (languages.length === 0) {
       return {
         success: true,
         findings: [],
-        summary: this.generateSummary([], [], 0),
-        message: 'No supported languages detected in project — no dependencies to audit'
+        summary: this.generateSummary([], languages, 0),
+        message: detected.length === 0
+          ? 'No supported languages detected in project — no dependencies to audit'
+          : 'All detected ecosystems are audited by DependencyAuditor — nothing further for SCA to audit'
       };
     }
 
@@ -403,14 +416,54 @@ class SCARunner {
   }
 
   /**
-   * Parse `npm audit --json` (auditReportVersion 2) output. Shape:
-   * `{ vulnerabilities: { <name>: { name, severity, via: [ {source, title, url,
-   * severity, cwe:[…]} | <string> ] } } }`. Only object `via` entries are real
+   * Parse `npm audit --json` output. Handles the npm v7+ `vulnerabilities` map, the
+   * npm v6 `advisories` map (F5), and — critically — the ERROR ENVELOPE (F3).
+   *
+   * F3 (honesty contract): a JS project with no lockfile makes `npm audit --json`
+   * exit 1 and print `{"error":{"code":"EAUDITNOLOCK",…}}` — NOTHING was audited. The
+   * old parser saw no `vulnerabilities` key and returned silently, so the run read as
+   * a clean scan though it verified nothing. We now detect the envelope and record a
+   * LOUD error, never silence.
+   *
+   * v7+ shape: `{ vulnerabilities: { <name>: { name, severity, via: [ {source, title,
+   * url, severity, cwe:[…]} | <string> ] } } }`. Only object `via` entries are real
    * advisories; string entries are references to other packages and are skipped.
+   * v6 shape: `{ advisories: { <id>: { module_name, severity, title, url, cwe } } }`.
    * @param {Object} data - npm audit JSON results
    */
   parseNpmAuditResults(data) {
-    if (!data || !data.vulnerabilities || typeof data.vulnerabilities !== 'object') return;
+    if (!data || typeof data !== 'object') return;
+
+    // F3: the npm audit error envelope (no lockfile → EAUDITNOLOCK, registry error,
+    // …). npm exited non-zero and printed an error, not a report — nothing was
+    // audited. Record it as a loud skip; NEVER read as a clean scan.
+    if (data.error && typeof data.error === 'object') {
+      const code = data.error.code || 'unknown';
+      const summary = data.error.summary ? `: ${data.error.summary}` : '';
+      this.errors.push({ tool: 'npm-audit', error: `npm audit did not run (${code})${summary}` });
+      return;
+    }
+
+    // npm v6: the flat `advisories` map (mirrors dependency-auditor's v1 handling).
+    if (data.advisories && typeof data.advisories === 'object') {
+      for (const adv of Object.values(data.advisories)) {
+        if (!adv || typeof adv !== 'object') continue;
+        this.findings.push({
+          tool: 'npm-audit',
+          package: adv.module_name || 'unknown',
+          version: null,
+          advisory: adv.id != null ? String(adv.id) : (adv.url || null),
+          title: adv.title || `Vulnerable dependency ${adv.module_name || 'unknown'}`,
+          severity: this.mapNamedSeverity(adv.severity),
+          cwe: Array.isArray(adv.cwe) ? adv.cwe[0] : (adv.cwe || (Array.isArray(adv.cwes) ? adv.cwes[0] : null)),
+          url: adv.url || null,
+          fixAvailable: null,
+          file: 'package-lock.json'
+        });
+      }
+    }
+
+    if (!data.vulnerabilities || typeof data.vulnerabilities !== 'object') return;
 
     for (const [name, entry] of Object.entries(data.vulnerabilities)) {
       if (!entry || typeof entry !== 'object') continue;
@@ -455,8 +508,11 @@ class SCARunner {
    * Parse `pip-audit --format json` output. Newer pip-audit emits
    * `{ dependencies: [ {name, version, vulns:[ {id, fix_versions, description,
    * aliases} ]} ] }`; older versions emit the bare dependencies array. Both are
-   * handled. pip-audit does not report a severity, so an honest default is used —
-   * a fabricated severity would be dishonest.
+   * handled. pip-audit's `--format json` usually OMITS a severity; when it does, we
+   * fail SECURE (F4): an unrated finding is a real, known advisory the human must
+   * review, so it defaults to HIGH — never a non-blocking MEDIUM that lets a Python
+   * dependency RCE ship green. We never fabricate a precise score; when pip-audit DOES
+   * carry a severity we honor it verbatim via the shared scorer.
    * @param {Object|Array} data - pip-audit JSON results
    */
   parsePipAuditResults(data) {
@@ -473,7 +529,9 @@ class SCARunner {
           version: dep.version || null,
           advisory: vuln.id || null,
           title: vuln.description ? String(vuln.description).slice(0, 120) : (vuln.id || 'vulnerability'),
-          severity: SEVERITY.MEDIUM, // pip-audit omits severity — never fabricate one
+          // F4 fail-secure: honor an explicit severity if present, else HIGH (never
+          // a fabricated precise score, never a non-blocking default).
+          severity: vuln.severity != null ? severityFromCvss(vuln.severity, SEVERITY) : SEVERITY.HIGH,
           aliases: Array.isArray(vuln.aliases) ? vuln.aliases : [],
           fixVersions: Array.isArray(vuln.fix_versions) ? vuln.fix_versions : [],
           file: 'requirements.txt'
@@ -512,8 +570,14 @@ class SCARunner {
 
   /**
    * Map an OSV vulnerability to a standard severity: prefer the GitHub-advisory
-   * `database_specific.severity` string; else derive from a CVSS_V3 score in the
+   * `database_specific.severity` string; else derive from the CVSS entries in the
    * `severity` array; else default to MEDIUM (never fabricate a precise level).
+   *
+   * F1: OSV emits `severity[].score` as a CVSS **vector** string
+   * (`CVSS:3.1/AV:N/...`), NOT a bare number — `parseFloat` of it is NaN, which used
+   * to silently downgrade a CVSS-vector CRITICAL to a non-blocking MEDIUM. All scores
+   * (vector OR numeric) now route through the shared `severityFromCvss`, taking the
+   * MAX across multiple CVSS entries so a CRITICAL is never buried.
    * @param {Object} vuln - a single OSV vulnerability object
    * @returns {string} standard severity
    */
@@ -522,11 +586,10 @@ class SCARunner {
       return this.mapNamedSeverity(vuln.database_specific.severity);
     }
     if (vuln && Array.isArray(vuln.severity)) {
-      for (const s of vuln.severity) {
-        const score = s && (s.score || s.value);
-        const num = typeof score === 'string' ? parseFloat(score) : score;
-        if (typeof num === 'number' && !Number.isNaN(num)) return this.mapCvssScore(num);
-      }
+      const scores = vuln.severity
+        .map((s) => s && (s.score || s.value))
+        .filter((x) => x != null);
+      if (scores.length) return severityFromCvss(scores, SEVERITY);
     }
     return SEVERITY.MEDIUM;
   }
@@ -551,28 +614,17 @@ class SCARunner {
   }
 
   /**
-   * Map a CVSS vector or numeric score to a standard severity.
+   * Map a CVSS vector OR numeric score to a standard severity, via the shared
+   * single-source scorer. F1: RustSec `advisory.cvss` is a CVSS **vector** string
+   * (`CVSS:3.1/AV:N/...`); `parseFloat` of it is NaN, which used to downgrade a
+   * CVSS-vector CRITICAL to a non-blocking MEDIUM. `severityFromCvss` base-scores the
+   * vector and bands it correctly (an unparseable vector bands HIGH, never MEDIUM).
    * @param {string|number|null} cvss
    * @returns {string} standard severity
    */
   mapCvssSeverity(cvss) {
     if (cvss == null) return SEVERITY.MEDIUM;
-    const num = typeof cvss === 'number' ? cvss : parseFloat(cvss);
-    if (!Number.isNaN(num) && Number.isFinite(num)) return this.mapCvssScore(num);
-    return SEVERITY.MEDIUM;
-  }
-
-  /**
-   * Map a numeric CVSS base score to a standard severity (CVSS v3 bands).
-   * @param {number} score
-   * @returns {string} standard severity
-   */
-  mapCvssScore(score) {
-    if (score >= 9.0) return SEVERITY.CRITICAL;
-    if (score >= 7.0) return SEVERITY.HIGH;
-    if (score >= 4.0) return SEVERITY.MEDIUM;
-    if (score > 0.0) return SEVERITY.LOW;
-    return SEVERITY.INFO;
+    return severityFromCvss(cvss, SEVERITY);
   }
 
   /**

@@ -37,7 +37,7 @@ const { findAffectedTests } = require('./coverage-map');
 // LOUDLY: a missing external tool is announced as a skip, never a silent pass,
 // and never a crash.
 const { SecretsScanner } = require('./secrets-scanner');
-const { DependencyAuditor } = require('./dependency-auditor');
+const { DependencyAuditor, COVERED_LANGUAGES } = require('./dependency-auditor');
 const { SASTRunner, TOOL_CONFIGS } = require('./sast-runner');
 const { SCARunner } = require('./sca-runner');
 
@@ -562,10 +562,23 @@ async function runSecurityScan(_tools, opts = {}) {
   //    only when this runner actually has one, otherwise to osv-scanner. A language
   //    with neither installed is a LOUD per-language skip, never a silent pass.
   try {
-    const sca = new SCARunner(projectRoot);
-    const languages = sca.detectLanguages();
-    if (languages.length === 0) {
+    // F2 partition: DependencyAuditor (step 2 above) already audits its covered
+    // ecosystems (js/ts, python, go, rust, java, ruby, php). Handing SCA the same
+    // languages would count the SAME CVE twice into the human-facing critical/high
+    // tally and run the audit twice. SCA is therefore the osv-universal EXTENDER for
+    // the long-tail ecosystems ONLY — it defers every DependencyAuditor-covered
+    // language. The exclusion set is read from DependencyAuditor, never hardcoded.
+    const sca = new SCARunner(projectRoot, { excludeLanguages: COVERED_LANGUAGES });
+    const detected = sca.detectLanguages();
+    const deferred = detected.filter((l) => COVERED_LANGUAGES.has(l));
+    const languages = detected.filter((l) => !COVERED_LANGUAGES.has(l));
+    if (deferred.length) {
+      console.log(`   SCA: ${deferred.join(', ')} deferred to DependencyAuditor above (no double-count)`);
+    }
+    if (detected.length === 0) {
       console.log('   SCA: no supported language detected — no dependencies to audit');
+    } else if (languages.length === 0) {
+      console.log('   SCA: all detected ecosystems covered by DependencyAuditor — nothing further to audit');
     } else {
       // A language is scannable iff a scanner that can ACTUALLY parse its result is
       // installed — decided by the honest router. A native-routed language needs its

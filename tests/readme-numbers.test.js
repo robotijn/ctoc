@@ -133,8 +133,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 90 JS modules at top level (sca-runner added by expansion wave 3, 2026-07-14)', () => {
-    assert.equal(countTopLevelJs('src/lib'), 90);
+  it('src/lib/: 91 JS modules at top level (cvss added by wave-3 fix 00042, 2026-07-14)', () => {
+    assert.equal(countTopLevelJs('src/lib'), 91);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {
@@ -258,8 +258,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /13 Claude Code hooks/);
   });
 
-  it('Project structure: 90 JS modules in src/lib', () => {
-    assert.match(README, /90 JS modules/);
+  it('Project structure: 91 JS modules in src/lib', () => {
+    assert.match(README, /91 JS modules/);
   });
 
   it('Project structure: 124 agent definitions across 25 categories', () => {
