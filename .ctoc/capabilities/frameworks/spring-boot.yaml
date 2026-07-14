@@ -1,0 +1,16 @@
+# Spring Boot — Java backend framework. Injection (JPA/JDBC), CSRF (Spring Security),
+# security headers, the auth filter chain (SecurityFilterChain), and Actuator endpoint
+# exposure are the concern areas. UNVERIFIED: the build tool and thus the test command
+# vary (Maven `./mvnw test` vs Gradle `./gradlew test`), and Spring Boot deps live in
+# pom.xml/build.gradle which CTOC does not currently parse — so detection is limited
+# and the test hint is not a CI guarantee.
+framework: spring-boot
+category: web-backend
+language: java
+deps: [spring-boot-starter, spring-boot-starter-web]
+files: [src/main/resources/application.yml, src/main/resources/application.properties]
+security:
+  concerns: [injection, csrf, security-headers, auth-filter-chain, actuator-exposure]
+test: "./mvnw test"
+configScaffold: [application.yml, .env.example]
+verified: UNVERIFIED

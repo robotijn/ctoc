@@ -1,0 +1,13 @@
+# Vue 3 — progressive frontend framework. XSS via v-html, template injection, and
+# environment leaks in client bundles are the concern areas. Detected by the `vue`
+# dependency (vue.config.js is a non-required legacy marker).
+framework: vue
+category: web-frontend
+language: typescript
+deps: [vue]
+files: [vue.config.js]
+security:
+  concerns: [xss, v-html, env-exposure, template-injection]
+test: "vitest"
+configScaffold: [vite.config.ts, .env.example]
+verified: web-2026-07

@@ -1,0 +1,14 @@
+# Flask — Python micro backend framework. Injection (raw SQL / Jinja), CSRF (via
+# Flask-WTF, not built in), XSS (Jinja auto-escaping only for .html), SECRET_KEY /
+# session hygiene, and DEBUG-mode-in-production are the concern areas. Detected by the
+# `flask` requirement. Tests run under pytest.
+framework: flask
+category: web-backend
+language: python
+deps: [flask, Flask]
+files: []
+security:
+  concerns: [injection, csrf, xss, session-secret, debug-mode]
+test: "pytest"
+configScaffold: [.env.example]
+verified: web-2026-07

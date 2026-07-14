@@ -147,6 +147,66 @@ honest:true, security required) · `monorepo` (per-workspace) · `infra` (plan-o
 `pipelineFor` to attach the detected `taxonomy` and the merged `pipeline` to a native
 run target — the CR3 engine functions are wired to a real caller, never test-only.
 
+## One framework entry (FW-w1)
+
+A language names the toolchain; a project type names the pipeline shape; a database
+names the persistence layer; a **framework** names the *application layer*: its
+category (frontend/backend/fullstack/api), its language, its framework-specific
+security **concern areas**, a test/lint hint, and a config scaffold. Frameworks live
+in a project's **dependencies** (`next`, `@nestjs/core`, `django`) and/or config
+**markers** (`manage.py`, `angular.json`, `artisan`) — so *enrichment* is dep/marker
+matching in stack-detector (which consumes `loadFrameworks`), and this registry holds
+the capability data. Each `.ctoc/capabilities/frameworks/<framework>.yaml` declares:
+
+```yaml
+framework: nextjs                 # REQUIRED — the key this entry registers under
+category: web-fullstack           # web-frontend | web-backend | web-fullstack | api | test
+language: typescript              # the framework's primary language
+deps: [next]                      # detection dep names (node package.json + python requirements.txt)
+files: [next.config.js, next.config.mjs, next.config.ts]   # config markers (existsSync)
+security:
+  concerns: [security-headers, env-exposure, ssrf, auth-middleware]  # framework-specific areas
+test: "next build && vitest"      # the conventional test/lint hint
+configScaffold: [next.config.ts, .env.example, middleware.ts]
+verified: web-2026-07             # provenance, or UNVERIFIED
+```
+
+### Framework field reference
+
+| Field | Meaning |
+|---|---|
+| `framework` | The registry key. REQUIRED — a file with no `framework` is skipped + warned. |
+| `category` | `web-frontend` \| `web-backend` \| `web-fullstack` \| `api` \| `test`. REQUIRED. |
+| `language` | The framework's primary language. REQUIRED. |
+| `deps` | Detection dep names (node package.json + python requirements.txt). REQUIRED, non-empty — enrichment depends on it. |
+| `files` | Framework-specific config markers matched by `existsSync` (may be empty when the framework ships no unique root marker). |
+| `security.concerns` | The framework-specific security areas. REQUIRED, non-empty. **FW-w2 turns these into real checks; wave 1 records them honestly.** |
+| `test` | The conventional test/lint hint (an inert string). |
+| `configScaffold` | Config files a scaffolder would create for the framework. |
+| `verified` | Provenance. `web-2026-07` or `UNVERIFIED` (e.g. a framework whose canonical test runner varies, or whose deps live in an un-parsed build file). **Never `guessed`.** |
+
+### The 18 shipped frameworks (FW-w1)
+
+Frontend/fullstack: `nextjs` · `react` (UNVERIFIED — runner varies) · `vue` ·
+`angular` · `svelte` · `astro` · `nuxt` · `remix`. Node backend: `express`
+(UNVERIFIED) · `nestjs` · `fastify` (UNVERIFIED). Python: `django` · `fastapi` ·
+`flask`. Ruby: `rails`. PHP: `laravel`. Java: `spring-boot` (UNVERIFIED — Maven/Gradle
+test command varies, deps in un-parsed pom.xml/build.gradle). Elixir: `phoenix`
+(UNVERIFIED — deps in un-parsed mix.exs, no unique root marker → detection limited).
+
+### The framework engine API
+
+- `loadFrameworks(projectRoot?)` → `{ frameworks, warnings }`. Bundled seed data, then a
+  project's `.ctoc/capabilities/frameworks/*` overlaid. Fail-open per entry.
+- `frameworkCapability(name, projectRoot?)` → the whole capability object, or null.
+
+**Live consumer:** stack-detector's `frameworkCapabilities(projectPath)` matches each
+registry framework's `deps`/`files` against the project and returns the enriched
+records; `detectStack` attaches them as an additive `frameworkCapabilities` field
+(the legacy `frameworks: string[]` is unchanged), and SessionStart renders each
+detected framework's security concerns — the FW-w1 engine functions are wired to a
+real caller, never test-only. FW-w2 turns `security.concerns` into real checks.
+
 ## Seed languages (CR1)
 
 Six web-grounded 2026 toolchains: **dart** (Flutter), **kotlin** (Android),

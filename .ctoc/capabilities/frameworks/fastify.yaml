@@ -1,0 +1,15 @@
+# Fastify — high-performance Node backend framework. Injection, JSON-schema request
+# validation, rate limiting (@fastify/rate-limit), CORS, and security headers
+# (@fastify/helmet) are the concern areas. UNVERIFIED: Fastify bundles no config file
+# or canonical test runner (varies tap/vitest/node:test), so the test hint is not a
+# CI guarantee.
+framework: fastify
+category: web-backend
+language: javascript
+deps: [fastify]
+files: []
+security:
+  concerns: [injection, schema-validation, rate-limiting, cors, security-headers]
+test: "vitest"
+configScaffold: [.env.example]
+verified: UNVERIFIED

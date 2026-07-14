@@ -1,0 +1,14 @@
+# Laravel — PHP fullstack framework. Eloquent parameterization defeats SQLi, built-in
+# CSRF middleware, Blade auto-escaping (XSS), $fillable/$guarded for mass assignment,
+# and APP_KEY / .env exposure are the concern areas. Detected by the artisan console
+# marker (the laravel/framework package lives in composer.json, not parsed for deps).
+framework: laravel
+category: web-fullstack
+language: php
+deps: [laravel/framework]
+files: [artisan]
+security:
+  concerns: [injection, csrf, xss, mass-assignment, env-exposure]
+test: "php artisan test"
+configScaffold: [artisan, .env.example]
+verified: web-2026-07

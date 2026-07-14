@@ -324,6 +324,72 @@ function detectDatabases(projectPath) {
 }
 
 /**
+ * Enriches a project's frameworks with their capability records (FW-w1).
+ *
+ * MIRRORS `detectDatabases`. The legacy `detectFrameworks` returns bare NAMES from the
+ * local FRAMEWORK_PATTERNS table (and uses a display name like `next.js`); this function
+ * instead drives off the capability REGISTRY — the single source of truth for framework
+ * capability data — so all 18 registry frameworks are reachable and there is no
+ * `next.js`↔`nextjs` name-collision to reconcile. For each registry framework it matches
+ * the project against that framework's `deps` (node package.json + python
+ * requirements.txt, exactly like detectDatabases) OR its `files` config markers
+ * (existsSync, framework-specific: manage.py, angular.json, artisan …). A matched
+ * framework is returned ENRICHED with its category, language and security posture so the
+ * caller (detectStack → SessionStart) can render "Next.js (security-headers,
+ * auth-middleware)" without re-reading the registry.
+ *
+ * Fail-open: an unreadable project or an empty registry simply yields `[]`. The output
+ * is an array of `{ name, category, language, security }` records, in registry
+ * (declaration) order, each framework at most once. This is ADDITIVE — it does not
+ * touch the legacy `detectFrameworks` string[] path.
+ *
+ * @param {string} projectPath project root to scan.
+ * @returns {Array<{name: string, category: string, language: string, security: Object}>}
+ */
+function frameworkCapabilities(projectPath) {
+  projectPath = projectPath || process.cwd();
+  const nodeDeps = readPackageDeps(projectPath);
+  const pythonDeps = readPythonDeps(projectPath);
+
+  // loadFrameworks enumerates the registry (which frameworks exist + their `deps`/`files`);
+  // frameworkCapability resolves the full record for a matched name. Both registry
+  // functions thus have a live caller here — no dead exports.
+  const { frameworks } = capabilityRegistry.loadFrameworks(projectPath);
+  const detected = [];
+
+  for (const [name, entry] of Object.entries(frameworks)) {
+    let found = false;
+
+    const deps = Array.isArray(entry.deps) ? entry.deps : [];
+    for (const dep of deps) {
+      if (typeof dep !== 'string') continue;
+      if (nodeDeps[dep] || pythonDeps.includes(dep)) { found = true; break; }
+    }
+
+    // Config markers (framework-specific files: manage.py, angular.json, artisan …).
+    if (!found && Array.isArray(entry.files)) {
+      for (const file of entry.files) {
+        if (typeof file !== 'string' || file.length === 0) continue;
+        try {
+          if (safeFs.existsSync(path.join(projectPath, file))) { found = true; break; }
+        } catch (e) { /* unreadable → not detected via this marker */ }
+      }
+    }
+
+    if (!found) continue;
+    const cap = capabilityRegistry.frameworkCapability(name, projectPath) || entry;
+    detected.push({
+      name,
+      category: cap.category,
+      language: cap.language,
+      security: cap.security || {}
+    });
+  }
+
+  return detected;
+}
+
+/**
  * Detects full stack
  */
 function detectStack(projectPath) {
@@ -332,12 +398,16 @@ function detectStack(projectPath) {
   const frameworks = detectFrameworks(projectPath, languages);
   // Additive (DB-w1): the persistence layer. languages/frameworks/primary are UNCHANGED.
   const databases = detectDatabases(projectPath);
+  // Additive (FW-w1): framework capability enrichment. The legacy `frameworks` string[]
+  // above is UNCHANGED — this is a separate, registry-driven field.
+  const frameworkCaps = frameworkCapabilities(projectPath);
 
   return {
     project: projectPath,
     languages,
     frameworks,
     databases,
+    frameworkCapabilities: frameworkCaps,
     primary: {
       language: languages[0] || null,
       framework: frameworks[0] || null
@@ -351,6 +421,7 @@ module.exports = {
   detectLanguages,
   detectFrameworks,
   detectDatabases,
+  frameworkCapabilities,
   detectStack,
   matchGlob
 };

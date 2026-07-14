@@ -1,0 +1,14 @@
+# React — client-side UI library. XSS via dangerouslySetInnerHTML, environment
+# leaks in bundled client code, and supply-chain risk in the dependency tree are the
+# concern areas. UNVERIFIED: React bundles no canonical config file or test runner —
+# the runner varies (vitest vs jest), so the entry's test hint is not a CI guarantee.
+framework: react
+category: web-frontend
+language: typescript
+deps: [react]
+files: []
+security:
+  concerns: [xss, dangerously-set-inner-html, env-exposure, dependency-supply-chain]
+test: "vitest"
+configScaffold: [.env.example]
+verified: UNVERIFIED

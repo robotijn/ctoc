@@ -1,0 +1,14 @@
+# FastAPI — Python async API framework. Injection (SQL/NoSQL in handlers), auth via
+# dependency injection (OAuth2/JWT), CORS (CORSMiddleware), Pydantic input validation,
+# and environment exposure are the concern areas. Detected by the `fastapi`
+# requirement. Tests run under pytest (with httpx/TestClient).
+framework: fastapi
+category: api
+language: python
+deps: [fastapi]
+files: []
+security:
+  concerns: [injection, auth-dependency, cors, input-validation, env-exposure]
+test: "pytest"
+configScaffold: [.env.example]
+verified: web-2026-07

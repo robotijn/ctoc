@@ -1,0 +1,14 @@
+# Django — Python fullstack framework (batteries included). ORM parameterization
+# defeats SQLi, built-in CSRF middleware, template auto-escaping (XSS), SECRET_KEY /
+# DEBUG settings hygiene, and the auth middleware stack are the concern areas.
+# Detected by the `django` requirement and the manage.py marker.
+framework: django
+category: web-fullstack
+language: python
+deps: [django, Django]
+files: [manage.py]
+security:
+  concerns: [injection, csrf, xss, sensitive-settings, auth-middleware]
+test: "python manage.py test"
+configScaffold: [manage.py, .env.example]
+verified: web-2026-07

@@ -1,0 +1,14 @@
+# Next.js — React fullstack (App Router). Server components + middleware make
+# security headers, environment-variable exposure (NEXT_PUBLIC_ leaks), SSRF from
+# server fetches, and auth in middleware the framework-specific concern areas.
+# Detected by the `next` dependency and next.config.* markers.
+framework: nextjs
+category: web-fullstack
+language: typescript
+deps: [next]
+files: [next.config.js, next.config.mjs, next.config.ts]
+security:
+  concerns: [security-headers, env-exposure, ssrf, auth-middleware]
+test: "next build && vitest"
+configScaffold: [next.config.ts, .env.example, middleware.ts]
+verified: web-2026-07

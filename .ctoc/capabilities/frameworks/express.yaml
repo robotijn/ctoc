@@ -1,0 +1,14 @@
+# Express — minimal Node HTTP framework. Injection (query builders), security headers
+# (helmet), rate limiting, CORS config, and auth middleware are the concern areas.
+# UNVERIFIED: Express bundles no config file or test runner — the runner varies
+# (vitest/jest/supertest), so the test hint is not a CI guarantee.
+framework: express
+category: web-backend
+language: javascript
+deps: [express]
+files: []
+security:
+  concerns: [injection, security-headers, rate-limiting, cors, auth-middleware]
+test: "vitest"
+configScaffold: [.env.example]
+verified: UNVERIFIED

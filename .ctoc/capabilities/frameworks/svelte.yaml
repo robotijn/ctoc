@@ -1,0 +1,13 @@
+# Svelte / SvelteKit — compiled frontend framework. XSS via {@html}, CSRF on form
+# actions, and environment leaks (PUBLIC_ vs private modules) are the concern areas.
+# Detected by the `svelte` dependency and svelte.config.js.
+framework: svelte
+category: web-frontend
+language: typescript
+deps: [svelte]
+files: [svelte.config.js]
+security:
+  concerns: [xss, at-html, csrf, env-exposure]
+test: "vitest"
+configScaffold: [svelte.config.js, .env.example]
+verified: web-2026-07

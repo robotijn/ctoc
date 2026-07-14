@@ -1,0 +1,14 @@
+# NestJS — structured Node backend framework. Injection, auth guards, the global
+# ValidationPipe (whitelist + class-validator), CORS, and environment exposure are the
+# concern areas. Detected by @nestjs/core and nest-cli.json. Nest scaffolds jest by
+# default (`nest build` compiles, `jest` runs unit specs).
+framework: nestjs
+category: web-backend
+language: typescript
+deps: [@nestjs/core]
+files: [nest-cli.json]
+security:
+  concerns: [injection, auth-guards, validation-pipe, cors, env-exposure]
+test: "nest build && jest"
+configScaffold: [nest-cli.json, .env.example]
+verified: web-2026-07

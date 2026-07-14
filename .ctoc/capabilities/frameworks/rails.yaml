@@ -1,0 +1,15 @@
+# Ruby on Rails — Ruby fullstack framework. ActiveRecord parameterization defeats
+# SQLi, built-in CSRF protection, strong-parameters guard mass assignment, ERB
+# auto-escaping (XSS), and encrypted credentials (config/master.key) are the concern
+# areas. Detected by the config/routes.rb and bin/rails markers (the `rails` gem lives
+# in the Gemfile, which CTOC does not currently parse for deps).
+framework: rails
+category: web-fullstack
+language: ruby
+deps: [rails]
+files: [config/routes.rb, bin/rails, config/application.rb]
+security:
+  concerns: [injection, csrf, mass-assignment, xss, credentials-encryption]
+test: "bin/rails test"
+configScaffold: [config/routes.rb, config/master.key, .env.example]
+verified: web-2026-07
