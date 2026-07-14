@@ -11,8 +11,7 @@
  */
 
 const { execSync, execFileSync } = require('child_process');
-const safeFs = require('./safe-fs');
-const path = require('path');
+const registry = require('./capability-registry');
 
 /**
  * Severity levels aligned with CVSS
@@ -59,19 +58,18 @@ const CWE_SEVERITY_MAP = {
 };
 
 /**
- * Language detection based on file presence
- * @type {Object}
+ * The native tools this runner has a REAL result parser for. Language detection is
+ * now the capability registry's job (20 languages, glob-aware), but PARSING stays
+ * here — and we only have parsers for these four. A detected language is scanned by
+ * its native tool ONLY when TOOL_CONFIGS maps it to one of these; every other
+ * language (rust→cargo-audit, php→psalm, ruby→brakeman, java→spotbugs, c→cppcheck,
+ * sql→sqlfluff, …) is covered by the multi-language semgrep UNIVERSAL config, which
+ * we parse. We NEVER invoke a scanner whose output we cannot parse — that would
+ * fabricate findings or silently drop them. `semgrep` is the universal fallback, not
+ * a per-language primary, so it is not in this native-primary set.
+ * @type {Set<string>}
  */
-const LANGUAGE_MARKERS = {
-  python: ['pyproject.toml', 'setup.py', 'requirements.txt', 'Pipfile'],
-  javascript: ['package.json'],
-  typescript: ['tsconfig.json'],
-  go: ['go.mod'],
-  java: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
-  rust: ['Cargo.toml'],
-  ruby: ['Gemfile'],
-  php: ['composer.json']
-};
+const PARSEABLE_NATIVE_TOOLS = new Set(['bandit', 'gosec', 'eslint']);
 
 /**
  * SAST Tool configurations per language
@@ -132,25 +130,46 @@ class SASTRunner {
   }
 
   /**
-   * Detect languages used in the project
+   * Detect languages used in the project.
+   *
+   * Delegates to the single, glob-aware capability registry
+   * (`.ctoc/capabilities/languages/*.yaml`) — the one detection table the four
+   * surfaces share — instead of a local, drifting, exact-filename-only copy. This
+   * widens detection from the legacy eight to the full registry set (e.g. C via a
+   * Makefile or `*.c`, C# via `*.csproj`, Elixir, Swift, Kotlin, SQL, …) while
+   * keeping the return shape (a string[] of language names) the rest of this class
+   * consumes. The registry read is fail-soft: an unreadable project root simply
+   * yields no detections.
+   *
    * @returns {string[]} Array of detected languages
    */
   detectLanguages() {
-    const detected = [];
+    return registry.detectLanguages(this.projectRoot);
+  }
 
-    for (const [lang, markers] of Object.entries(LANGUAGE_MARKERS)) {
-      for (const marker of markers) {
-        const markerPath = path.join(this.projectRoot, marker);
-        if (safeFs.existsSync(markerPath)) {
-          if (!detected.includes(lang)) {
-            detected.push(lang);
-          }
-          break;
-        }
-      }
+  /**
+   * Decide HOW a detected language's security scan is performed, honestly. Returns
+   * `{ native, semgrepUniversal }` where `native` is the name of a scanner this
+   * runner can actually PARSE (one of bandit / gosec / eslint) or `null`, and
+   * `semgrepUniversal` is true exactly when there is no native parser — in which case
+   * the multi-language semgrep universal config (which we parse) is the coverage.
+   *
+   * This is the HONESTY boundary: a language is routed to a native scanner ONLY when
+   * TOOL_CONFIGS maps it to a tool we can parse. Every other language — whose registry
+   * `security` tool is something we cannot parse (cargo-audit, psalm, brakeman,
+   * spotbugs, cppcheck, sqlfluff, detekt, oclint, …) — is routed to semgrep universal,
+   * NEVER to a fabricated parser. `native` is therefore never a parser-less tool.
+   *
+   * @param {string} lang detected language name
+   * @returns {{ native: (string|null), semgrepUniversal: boolean }}
+   */
+  securityRouteFor(lang) {
+    const config = TOOL_CONFIGS[lang];
+    const primary = config && config.primary;
+    if (primary && PARSEABLE_NATIVE_TOOLS.has(primary)) {
+      return { native: primary, semgrepUniversal: false };
     }
-
-    return detected;
+    return { native: null, semgrepUniversal: true };
   }
 
   /**
@@ -290,16 +309,18 @@ class SASTRunner {
    * @returns {Promise<boolean>} true iff a scanner was available and ran
    */
   async runLanguageScanner(lang) {
-    const config = TOOL_CONFIGS[lang];
-    if (!config) return false;
-
-    const tool = config.primary;
-    if (!this.isToolAvailable(tool)) {
+    // Honest routing: only run a NATIVE scanner we can parse. A language with no
+    // native parser (route.native === null) is covered by the semgrep universal
+    // pass in run(); returning false here means "no native scanner ran", never a
+    // fabricated finding from an unparsed tool.
+    const { native } = this.securityRouteFor(lang);
+    if (!native) return false;
+    if (!this.isToolAvailable(native)) {
       return false;
     }
 
     try {
-      switch (tool) {
+      switch (native) {
         case 'bandit':
           await this.runBandit();
           break;
@@ -310,10 +331,12 @@ class SASTRunner {
           await this.runESLintSecurity();
           break;
         default:
+          // Unreachable: PARSEABLE_NATIVE_TOOLS gates route.native to exactly these
+          // three. Fail-closed anyway — never run a tool we cannot parse.
           return false;
       }
     } catch (error) {
-      this.errors.push({ tool, language: lang, error: error.message });
+      this.errors.push({ tool: native, language: lang, error: error.message });
     }
     return true;
   }
