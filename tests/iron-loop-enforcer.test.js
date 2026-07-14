@@ -294,12 +294,36 @@ describe('iron-loop-enforcer — gate-destination exemption for pre-Gate-2 slice
       'the forged plan must be named as an offender');
   });
 
-  it('exempts a type: vision plan archived in done/ (decomposed, never crossed review→done)', () => {
+  // R5-B: the DUPLICATE `type: vision` exemption is GONE from the enforcer — it
+  // mirrored the forgery hole the runtime hook already closed (R3-A). A `type: vision`
+  // frontmatter line is forgeable; residency is now UNIFORMLY ledger-driven for both
+  // systems. A decomposed vision archive earns done/ residency with a PIPELINE-kind
+  // ledger entry, not a self-asserted frontmatter line.
+  it('FLAGS a type: vision plan in done/ with NO ledger entry (the old exemption was a forgery hole)', () => {
     const root = makeGateProject();
     writePlan('done', 'vision.md',
       '---\ntype: vision\nstatus: decomposed\ntitle: "a vision"\n---\n\n# Vision\nbody');
     const f = gateFinding(root);
-    assert.equal(f, undefined, 'decomposed vision archive must be exempt');
+    assert.ok(f, 'an un-ledgered vision archive is no longer exempt');
+    assert.equal(f.severity, 'block');
+    assert.ok(f.details.offenders.some(o => o.plan.endsWith('vision.md')),
+      'the un-ledgered vision must be named as an offender');
+  });
+
+  it('does NOT flag a decomposed vision archived in done/ that has a PIPELINE ledger entry', () => {
+    const root = makeGateProject();
+    const planPath = path.join(root, 'plans', 'done', 'vision.md');
+    fs.writeFileSync(planPath,
+      '---\ntype: vision\nstatus: decomposed\ntitle: "a vision"\n---\n\n# Vision\nbody');
+
+    // Earn residency the sanctioned way: the vision-archive pipeline entry
+    // (advanced_by: pipeline, evidence: 'vision-decomposed'), the SAME acceptance the
+    // runtime hook uses — enforcer and hook now agree.
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeVisionArchiveEntry(root, planPath);
+
+    const f = gateFinding(root);
+    assert.equal(f, undefined, 'a ledger-backed vision archive is clean');
   });
 });
 

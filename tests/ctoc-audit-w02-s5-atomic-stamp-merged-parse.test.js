@@ -135,7 +135,10 @@ test('[M18] approvePlan review→done stamps at destination and commits a verifi
   const body = '---\ntitle: "Happy"\ntype: feature\n---\n\n# Happy\n\nBody.\n';
   fs.writeFileSync(planPath, body);
 
-  const res = approvePlan(planPath, root);
+  // R5-B: approvePlan now VALIDATES review→done (which requires on-disk VERIFY
+  // evidence). This test's subject is the ATOMIC STAMP + ledger commit, not the
+  // validation gate, so it crosses via an explicit, audited override.
+  const res = approvePlan(planPath, root, { override: { reason: 'M18 atomic-stamp — validation not under test' } });
 
   // Resident in the destination, gone from the source.
   const donePath = path.join(root, 'plans', 'done', slug + '.md');
@@ -174,6 +177,9 @@ test('[M18] a crash between move and ledger rolls back to (a) unmarked + in sour
   // ledger and ignores deps, so nothing throws — this assertion is RED today.
   assert.throws(
     () => approvePlan(planPath, root, {
+      // R5-B: override past the review→done validation (not the subject) so the
+      // crossing reaches the ledger-write step this test forces to throw.
+      override: { reason: 'M18 rollback — validation not under test' },
       deps: { writeEntry: () => { throw new Error('injected crash between move and ledger'); } },
     }),
     /injected crash between move and ledger/,

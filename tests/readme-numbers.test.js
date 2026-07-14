@@ -148,8 +148,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countTopLevelFiles('src/hooks'), 13);
   });
 
-  it('src/tabs/: 5 dashboard tab files (implementation/todo/progress removed as dead code)', () => {
-    assert.equal(countTopLevelJs('src/tabs'), 5);
+  it('src/tabs/: 4 dashboard tab files (functional removed with assignDirectly in R5-B/C — dead after the assign path was deleted)', () => {
+    assert.equal(countTopLevelJs('src/tabs'), 4);
   });
 
   it('tests/: >=65 test files (grows with the project)', () => {

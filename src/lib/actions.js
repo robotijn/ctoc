@@ -1,6 +1,21 @@
 /**
  * Plan Actions
  * Handle plan operations: approve, reject, move, etc.
+ *
+ * R5-B — approvePlan VALIDATES and records overrides:
+ *   - `approvePlan` runs `plan-validator.validateTransition(from → to)` before every
+ *     crossing. A FAILING validation REFUSES by default (`{ ok:false, refused:true }`)
+ *     — no move, no marker, no ledger entry. The human's explicit
+ *     `approvePlan(p, root, { override:{ reason } })` crosses anyway and RECORDS the
+ *     override in both the ledger entry (`override:true`, `override_reason`) and the
+ *     plan marker, so a forced crossing is never indistinguishable from a clean one.
+ *   - The three human gate edges are the ONE encoding in `gate-order.js`
+ *     (`GATE_EDGES` / `destinationOf` / `isHumanGate` / `GATE_DESTINATIONS`); the
+ *     former private `flowMap` and `HUMAN_GATES` literals were duplicate encodings
+ *     and are gone.
+ *   - `assignDirectly` was DELETED — it inserted a plan into todo/ with no marker and
+ *     no ledger entry (the gate hook reverted it). Reaching todo crosses Gate 2 via
+ *     `approvePlan` only.
  */
 
 const safeFs = require('./safe-fs');
@@ -9,7 +24,8 @@ const { parseMetadata, readPlans, getPlansDir, readTodoQueueOrder } = require('.
 const { refineLoop, appendDeferredQuestions } = require('./iron-loop');
 const { writeStatus, clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
-const { validateForReview, validateForQueue, validateReviewToDone } = require('./plan-validator');
+const { validateForReview, validateTransition } = require('./plan-validator');
+const gateOrder = require('./gate-order');
 const { logTransition } = require('./transition-log');
 const { invalidate } = require('./cache');
 const taskRegistry = require('./task-registry');
@@ -187,16 +203,23 @@ function logPlanIndexError(root, source, err) {
   }
 }
 
-// Human gates: transitions that require human approval marker
-const HUMAN_GATES = {
-  'functional': 'implementation',
-  'implementation': 'todo',
-  'review': 'done'
-};
+// Human gates are the ONE encoding in gate-order (R5-B): the former local
+// `HUMAN_GATES` and `flowMap` literals were the SAME three edges declared twice,
+// 108 lines apart. approvePlan now reads them via `gateOrder.GATE_EDGES` /
+// `gateOrder.isHumanGate` / `gateOrder.destinationOf`, so changing an edge in
+// gate-order moves every consumer and they can never diverge.
 
-// Add approval marker to plan content for human gate crossings
-function addApprovalMarker(content, from, to) {
-  const marker = `---\napproved_by: human\napproved_at: ${new Date().toISOString()}\ngate_crossed: ${from} → ${to}\n---\n\n`;
+// Add approval marker to plan content for human gate crossings. When `override` is
+// present (the human's "Approve anyway" past a failing validation), the marker also
+// records `override: true` and the reason, so a forced crossing is auditable in the
+// plan body itself — never silently indistinguishable from a clean one (R5-B).
+function addApprovalMarker(content, from, to, override = null) {
+  let marker = `---\napproved_by: human\napproved_at: ${new Date().toISOString()}\ngate_crossed: ${from} → ${to}\n`;
+  if (override) {
+    const reason = String((override && override.reason) || '').replace(/[\r\n]+/g, ' ').trim();
+    marker += `override: true\noverride_reason: ${reason}\n`;
+  }
+  marker += `---\n\n`;
   return marker + content;
 }
 
@@ -234,7 +257,7 @@ function addApprovalMarker(content, from, to) {
  *   `removeEntry(slug, root)` match the approval-ledger signatures.
  * @returns {string} the destination path
  */
-function stampAndLedger(planPath, from, to, root, deps = {}) {
+function stampAndLedger(planPath, from, to, root, deps = {}, override = null) {
   const ledger = require('./approval-ledger');
   const move = deps.move || ((p, destStage) => movePlan(p, destStage, root));
   const writeEntry = deps.writeEntry || ledger.writeEntry;
@@ -242,7 +265,7 @@ function stampAndLedger(planPath, from, to, root, deps = {}) {
 
   const slug = ledger.slugFromPlanPath(planPath);
   const originalContent = safeFs.readFileSync(planPath, 'utf8');
-  const destContent = addApprovalMarker(originalContent, from, to);
+  const destContent = addApprovalMarker(originalContent, from, to, override);
   const contentHash = ledger.computeContentHash(destContent);
 
   // Can the content-hashed ledger KEY this slug? The ledger (slice s1) restricts a
@@ -282,6 +305,24 @@ function stampAndLedger(planPath, from, to, root, deps = {}) {
         // of its gate destination. Recording the original-cased basename arms the guard.
         plan_basename: path.basename(planPath).replace(/\.md$/i, '')
       }, root);
+
+      // R5-B: record the override PROVENANCE in the ledger entry. A silent override
+      // — a forced crossing indistinguishable from a clean one — is the defect. The
+      // approval ledger (READ-ONLY here) only persists its whitelisted fields, so the
+      // override flag is merged into the persisted record via the ledger's OWN
+      // ledgerPath, AFTER writeEntry, so the collision + required-field guards still
+      // run first. Any failure here throws into the rollback below (never a partial,
+      // provenance-less forced crossing).
+      if (override) {
+        const entryPath = ledger.ledgerPath(slug, root);
+        if (safeFs.existsSync(entryPath)) {
+          const persisted = JSON.parse(safeFs.readFileSync(entryPath, 'utf8'));
+          persisted.override = true;
+          persisted.override_reason =
+            String((override && override.reason) || '').replace(/[\r\n]+/g, ' ').trim();
+          safeFs.writeFileSync(entryPath, JSON.stringify(persisted, null, 2));
+        }
+      }
     }
   } catch (err) {
     // Step 4: ROLL BACK to (a) unmarked + in source. Each step is best-effort so a
@@ -299,28 +340,55 @@ function stampAndLedger(planPath, from, to, root, deps = {}) {
   return newPath;
 }
 
-// Approve a plan (move to next stage)
-// Returns { newPath, backgroundAgent, humanGate } - backgroundAgent is the type of agent to spawn
-// `options.deps` (optional) is forwarded to stampAndLedger's injectable seams; the
-// return shape is unchanged for the ordinary two-argument call.
+// Approve a plan (move to next stage).
+//
+// R5-B — a gate that validates nothing is a rubber stamp. Before crossing, every
+// transition is run through `plan-validator.validateTransition(from → to)`. A
+// FAILING validation REFUSES by default: the plan is NOT moved, NO marker is
+// stamped, NO ledger entry is written, and the return is
+// `{ ok:false, refused:true, reason, failures, validation }`. The human's explicit
+// "Approve anyway" passes `options.override = { reason }`, which crosses ANYWAY and
+// RECORDS the override in both the ledger entry and the plan marker — a forced
+// crossing is never indistinguishable from a clean one.
+//
+// The gate edges come from gate-order (`GATE_EDGES` / `isHumanGate`) — the ONE
+// encoding; the former private `flowMap`/`HUMAN_GATES` literals are gone.
+//
+// On success returns { newPath, backgroundAgent, humanGate } (plus `overridden:true`
+// on a forced crossing). `options.deps` is forwarded to stampAndLedger's seams.
 function approvePlan(planPath, projectPath, options = {}) {
   const root = projectPath || findProjectRoot();
   const plansDir = path.join(root, 'plans');
   const relativePath = path.relative(plansDir, planPath);
 
-  const flowMap = {
-    'functional': 'implementation',
-    'implementation': 'todo',
-    'review': 'done'
-  };
-
-  // Find matching flow
-  for (const [from, to] of Object.entries(flowMap)) {
+  // Find matching flow (single gate-edge encoding — gate-order.GATE_EDGES). The
+  // destination is resolved through gate-order.destinationOf(from), so the edge is
+  // read from the ONE encoding, never re-declared here.
+  for (const [from] of gateOrder.GATE_EDGES) {
     if (relativePath.startsWith(from)) {
+      const to = gateOrder.destinationOf(from);
+      const isHumanGate = gateOrder.isHumanGate(from, to); // true for every GATE_EDGE
+
+      // VALIDATE before any mutation (R5-B). A refusal returns BEFORE clearStatus,
+      // applyIronLoop, the marker/move, and the ledger write — so a refused plan is
+      // left byte-identical and in place.
+      const override = options.override && typeof options.override === 'object'
+        ? options.override
+        : null;
+      const validation = validateTransition(planPath, from, to, root);
+      if (validation && validation.valid === false && !override) {
+        const failures = Array.isArray(validation.errors) ? validation.errors : [];
+        return {
+          ok: false,
+          refused: true,
+          reason: `${from}→${to} refused: ${failures.join('; ') || 'failed validation'}`,
+          failures,
+          validation
+        };
+      }
+
       // Clear any existing status from previous stage
       clearStatus(planPath);
-
-      const isHumanGate = HUMAN_GATES[from] === to;
 
       // Iron Loop refinement runs on the SOURCE file BEFORE the marker/move. It is
       // plan CONTENT, not an approval marker, so running it in the source folder
@@ -333,11 +401,12 @@ function approvePlan(planPath, projectPath, options = {}) {
       }
 
       // Cross the gate atomically: stamp at destination + ledger commit + rollback
-      // on failure (M18). All three flowMap transitions are human gates, so the
-      // else-branch is a defensive fallback for a hypothetical non-gate flow.
+      // on failure (M18). All three GATE_EDGES are human gates, so the else-branch
+      // is a defensive fallback for a hypothetical non-gate flow. A recorded
+      // `override` threads through to the marker and ledger provenance.
       let newPath;
       if (isHumanGate) {
-        newPath = stampAndLedger(planPath, from, to, root, options.deps || {});
+        newPath = stampAndLedger(planPath, from, to, root, options.deps || {}, override);
       } else {
         newPath = movePlan(planPath, to, root);
       }
@@ -394,23 +463,31 @@ function approvePlan(planPath, projectPath, options = {}) {
         }
       }
 
-      // Log transition to audit trail
+      // Log transition to audit trail. Honestly record the validation outcome and
+      // whether this crossing was a recorded override.
       try {
         logTransition({
           plan: path.basename(planPath),
           from,
           to,
           actor: 'human',
-          validation: { passed: true, checks: 0, warnings: 0 },
+          validation: {
+            passed: validation ? validation.valid !== false : true,
+            checks: 0,
+            warnings: (validation && Array.isArray(validation.warnings)) ? validation.warnings.length : 0
+          },
           humanGate: isHumanGate,
-          marker: isHumanGate
+          marker: isHumanGate,
+          override: !!override
         }, root);
       } catch (logErr) {
         // Don't fail the transition if logging fails
         console.error('Transition logging failed:', logErr.message);
       }
 
-      return { newPath, backgroundAgent, humanGate: isHumanGate };
+      const result = { newPath, backgroundAgent, humanGate: isHumanGate };
+      if (override) result.overridden = true;
+      return result;
     }
   }
 
@@ -666,12 +743,13 @@ function removeFromQueue(planPath, projectPath) {
   return movePlan(planPath, 'implementation', root);
 }
 
-// Assign directly to todo (dangerous - skips impl planning)
-function assignDirectly(planPath, projectPath) {
-  const root = projectPath || findProjectRoot();
-  applyIronLoop(planPath);
-  return movePlan(planPath, 'todo', root);
-}
+// Note (R5-B): `assignDirectly` was DELETED. It inserted a plan into todo/ with NO
+// approval marker and NO ledger entry — the revived gate hook classified that as
+// `no-ledger-entry` and reverted it right after the tab UI printed "✓ added to todo
+// queue". A plan reaching the todo queue crosses Gate 2 (implementation → todo),
+// which is a human gate: the only sanctioned path is `approvePlan` (stamps + ledgers
+// properly). The functional tab's dangerous "Assign (skips impl planning)" action was
+// removed with it.
 
 // Note (W11-s7, finding B2): five one-line agent-init wrappers (research,
 // critic, decomposer, product-owner, review) were deleted here. They had ZERO
@@ -1872,8 +1950,6 @@ function approveSubplans(parentSlug, fromStage, projectPath) {
   }
   const root = projectPath || findProjectRoot();
 
-  const validator = fromStage === 'implementation' ? validateForQueue : validateReviewToDone;
-
   const batch = topoOrderByDependsOn(
     listSubplans(parentSlug, root).filter(s => s.stage === fromStage)
   );
@@ -1883,27 +1959,18 @@ function approveSubplans(parentSlug, fromStage, projectPath) {
   const results = [];
 
   for (const sub of batch) {
-    // Per-sibling validate. A failed validation is reported, never silently skipped.
-    let validation;
+    // R5-B: `approvePlan` now VALIDATES the transition itself and REFUSES a failing
+    // one (one validation per crossing — no double-validate). A refused sibling is
+    // REPORTED in `skipped` with its reason and left in place; the batch CONTINUES.
+    // No silent skips.
     try {
-      validation = validator(sub.path, root);
-    } catch (err) {
-      skipped.push({ slug: sub.slug, reason: `validation error: ${err.message}` });
-      continue;
-    }
-    if (validation && validation.valid === false) {
-      const reason = (validation.errors && validation.errors.length > 0)
-        ? validation.errors.join('; ')
-        : 'failed validation';
-      skipped.push({ slug: sub.slug, reason });
-      continue;
-    }
-
-    // Cross the gate via the EXISTING gate-safe approvePlan (human marker + move).
-    try {
-      const { newPath, humanGate } = approvePlan(sub.path, root);
+      const res = approvePlan(sub.path, root);
+      if (res && res.refused) {
+        skipped.push({ slug: sub.slug, reason: res.reason || 'failed validation' });
+        continue;
+      }
       approved.push(sub.slug);
-      results.push({ slug: sub.slug, newPath, humanGate });
+      results.push({ slug: sub.slug, newPath: res.newPath, humanGate: res.humanGate });
     } catch (err) {
       // One bad sibling never aborts the batch (async-overnight resilience).
       skipped.push({ slug: sub.slug, reason: err.message });
@@ -1925,7 +1992,6 @@ module.exports = {
   moveUpInQueue,
   moveDownInQueue,
   removeFromQueue,
-  assignDirectly,
   // Background agent functions
   AGENT_TYPES,
   initBackgroundAgent,

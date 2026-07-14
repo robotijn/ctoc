@@ -2,7 +2,10 @@
  * Tab Module Tests
  * Tests for the live tab modules in /tabs/
  *
- * Tests: overview.js, functional.js, review.js, tools.js
+ * Tests: overview.js, review.js, tools.js
+ * (functional.js was deleted — R5-C; it was dead after R5-B removed its only
+ *  live caller. The assignDirectly-GONE require-time guard was relocated to a
+ *  surviving top-level block below.)
  * (implementation.js, todo.js, progress.js were deleted — see B1 guard below)
  *
  * DRY: Shared fixtures for app state, grouped by operation type
@@ -123,7 +126,6 @@ function mockActions(mocks = {}) {
     renamePlan: mocks.renamePlan || (() => '/test/renamed.md'),
     deletePlan: mocks.deletePlan || (() => {}),
     rejectPlan: mocks.rejectPlan || (() => '/test/rejected.md'),
-    assignDirectly: mocks.assignDirectly || (() => '/test/assigned.md'),
     removeFromQueue: mocks.removeFromQueue || (() => '/test/removed.md')
   };
 }
@@ -325,43 +327,6 @@ describe('Tab Modules - render()', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Functional Tab
-  // -------------------------------------------------------------------------
-  describe('functional.render()', () => {
-    test('renders empty state with instructions', () => {
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => [] }
-      });
-
-      const app = createMockApp();
-      const output = functional.render(app);
-
-      assert.ok(output.includes('Functional Plans'), 'Should show title');
-      assert.ok(output.includes('0 drafts'), 'Should show zero count');
-      assert.ok(output.includes('No functional plans'), 'Should show empty message');
-      assert.ok(output.includes('n') && output.includes('new'), 'Should show new plan hint');
-    });
-
-    test('renders plan list with selection', () => {
-      const plans = [
-        createMockPlan({ name: 'plan-a', ago: '2h ago' }),
-        createMockPlan({ name: 'plan-b', ago: '1d ago' })
-      ];
-
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => plans }
-      });
-
-      const app = createMockApp({ selectedIndex: 1 });
-      const output = functional.render(app);
-
-      assert.ok(output.includes('2 drafts'), 'Should show plan count');
-      assert.ok(output.includes('plan-a'), 'Should list first plan');
-      assert.ok(output.includes('plan-b'), 'Should list second plan');
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // Review Tab
   // -------------------------------------------------------------------------
   describe('review.render()', () => {
@@ -487,7 +452,8 @@ describe('Tab Modules - handleKey()', () => {
   // Common Navigation Patterns
   // -------------------------------------------------------------------------
   describe('List Navigation (shared pattern)', () => {
-    const listTabs = ['functional', 'review'];
+    // 'functional' removed (R5-C — tab deleted); 'review' still exercises the pattern
+    const listTabs = ['review'];
 
     for (const tabName of listTabs) {
       test(`${tabName}: up/down navigation with plans`, () => {
@@ -574,10 +540,8 @@ describe('Tab Modules - handleKey()', () => {
         const app = createMockApp();
         const handled = tab.handleKey(createMockKey('down'), app);
 
-        // Most tabs return false when empty (functional handles 'n' key)
-        if (tabName !== 'functional') {
-          assert.strictEqual(handled, false, 'Should not handle when empty');
-        }
+        // review returns false when the list is empty
+        assert.strictEqual(handled, false, 'Should not handle when empty');
       });
     }
   });
@@ -586,7 +550,8 @@ describe('Tab Modules - handleKey()', () => {
   // Action Menu Navigation (shared pattern)
   // -------------------------------------------------------------------------
   describe('Action Menu Navigation (shared pattern)', () => {
-    const actionTabs = ['functional', 'review'];
+    // 'functional' removed (R5-C — tab deleted); 'review' still exercises the pattern
+    const actionTabs = ['review'];
 
     for (const tabName of actionTabs) {
       test(`${tabName}: escape returns to list`, () => {
@@ -656,94 +621,6 @@ describe('Tab Modules - handleKey()', () => {
 
       // Should not throw
       assert.doesNotThrow(() => overview.reset());
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Functional Tab - Specific Actions
-  // -------------------------------------------------------------------------
-  describe('functional.handleKey() - Specific Actions', () => {
-    test('n key creates new plan', () => {
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => [] }
-      });
-
-      const app = createMockApp();
-      const handled = functional.handleKey(createMockKey('n'), app);
-
-      assert.strictEqual(handled, true, 'Should handle n key');
-      assert.strictEqual(app.mode, 'new-plan', 'Should enter new-plan mode');
-      assert.strictEqual(app.planType, 'functional', 'Should set plan type');
-    });
-
-    test('action 1 opens view mode', () => {
-      const plan = createMockPlan({ content: 'Test content' });
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => [plan] }
-      });
-
-      const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-      functional.handleKey(createMockKey('1', { sequence: '1' }), app);
-
-      assert.strictEqual(app.mode, 'view', 'Should enter view mode');
-      assert.strictEqual(app.viewContent, 'Test content', 'Should set view content');
-    });
-
-    test('action 3 does NOT approve (Gate-1 one-keystroke crossing removed, L7)', () => {
-      let approveCalled = false;
-      const plan = createMockPlan();
-
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => [plan] },
-        actions: { approvePlan: () => { approveCalled = true; return '/approved'; } }
-      });
-
-      const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-      const handled = functional.handleKey(createMockKey('3', { sequence: '3' }), app);
-
-      assert.strictEqual(approveCalled, false, 'approvePlan must NOT be reachable via key 3');
-      assert.strictEqual(handled, false, 'key 3 is no longer a handled action');
-    });
-
-    test('action 6 shows assign confirmation', () => {
-      const plan = createMockPlan();
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => [plan] }
-      });
-
-      const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-      functional.handleKey(createMockKey('6', { sequence: '6' }), app);
-
-      assert.strictEqual(app.mode, 'confirm-assign', 'Should enter confirm-assign mode');
-    });
-
-    test('confirm-assign: 1 assigns directly', () => {
-      let assignCalled = false;
-      const plan = createMockPlan();
-
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => [plan] },
-        actions: { assignDirectly: () => { assignCalled = true; } }
-      });
-
-      const app = createMockApp({ mode: 'confirm-assign', selectedPlan: plan });
-      functional.handleKey(createMockKey('1', { sequence: '1' }), app);
-
-      assert.strictEqual(assignCalled, true, 'Should call assignDirectly');
-      assert.strictEqual(app.mode, 'list', 'Should return to list');
-      assert.ok(app.message.includes('todo queue'), 'Should set success message');
-    });
-
-    test('confirm-assign: 2 cancels', () => {
-      const plan = createMockPlan();
-      const functional = loadTabWithMocks('functional', {
-        state: { readPlans: () => [plan] }
-      });
-
-      const app = createMockApp({ mode: 'confirm-assign', selectedPlan: plan });
-      functional.handleKey(createMockKey('2', { sequence: '2' }), app);
-
-      assert.strictEqual(app.mode, 'actions', 'Should return to actions');
     });
   });
 
@@ -1076,7 +953,8 @@ describe('Tab Modules - handleKey()', () => {
   // Unhandled Keys Return False
   // -------------------------------------------------------------------------
   describe('Unhandled keys return false', () => {
-    const allTabs = ['overview', 'functional', 'review', 'tools'];
+    // 'functional' removed (R5-C — tab deleted)
+    const allTabs = ['overview', 'review', 'tools'];
 
     for (const tabName of allTabs) {
       test(`${tabName}: unhandled key returns false`, () => {
@@ -1088,7 +966,7 @@ describe('Tab Modules - handleKey()', () => {
         const handled = tab.handleKey(createMockKey('z', { sequence: 'z' }), app);
 
         // In list mode with no items, most keys should not be handled
-        // (except specific keys like 'n' for functional)
+        // (overview and tools have their own always-on keybindings)
         if (tabName !== 'overview' && tabName !== 'tools') {
           assert.strictEqual(handled, false, 'Should not handle unknown key');
         }
@@ -1102,36 +980,6 @@ describe('Tab Modules - handleKey()', () => {
 // ============================================================================
 
 describe('Tab Modules - Additional Renders', () => {
-
-  describe('functional.renderActions()', () => {
-    test('renders action menu for plan', () => {
-      const functional = loadTabWithMocks('functional');
-      const plan = createMockPlan();
-      const app = createMockApp({ actionIndex: 0 });
-
-      const output = functional.renderActions(app, plan);
-
-      assert.ok(output.includes('View'), 'Should show View action');
-      assert.ok(output.includes('Plan'), 'Should show Plan action');
-      assert.ok(!output.includes('Approve'), 'Approve action removed (L7 gate-crossing gone)');
-      assert.ok(output.includes('Assign'), 'Should show Assign action');
-    });
-  });
-
-  describe('functional.renderAssignConfirm()', () => {
-    test('renders assign confirmation dialog', () => {
-      const functional = loadTabWithMocks('functional');
-      const plan = createMockPlan();
-
-      const output = functional.renderAssignConfirm(plan);
-
-      assert.ok(output.includes('Assign directly'), 'Should show assign title');
-      assert.ok(output.includes('skips implementation'), 'Should explain skip');
-      assert.ok(output.includes('Iron Loop'), 'Should mention Iron Loop');
-      assert.ok(output.includes('Yes'), 'Should show confirm option');
-      assert.ok(output.includes('No'), 'Should show cancel option');
-    });
-  });
 
   describe('review.renderActions()', () => {
     test('renders action menu with direct input area', () => {
@@ -1200,45 +1048,28 @@ describe('Tab Modules - Edge Cases', () => {
     assert.strictEqual(minimalApp.toolIndex, 1, 'Should initialize and increment toolIndex');
   });
 
-  test('handles very long plan names', () => {
-    const longName = 'a'.repeat(200);
-    const plans = [createMockPlan({ name: longName })];
+  // R5-C: the three render/handleKey robustness edge cases (long names, empty
+  // content, special characters) exercised the now-deleted functional tab and
+  // were carved with it.
+});
 
-    const functional = loadTabWithMocks('functional', {
-      state: { readPlans: () => plans }
-    });
+// ============================================================================
+// ASSIGN-DIRECTLY REMOVED (R5-B) — require-time guard, RELOCATED here from the
+// deleted `functional.handleKey() - Specific Actions` block (R5-C) so the
+// permanent proof still runs. It requires only ../src/lib/actions and never
+// loads a tab module, so it is unaffected by the functional-tab deletion.
+// ============================================================================
 
-    const app = createMockApp();
-
-    assert.doesNotThrow(() => {
-      functional.render(app);
-    });
-  });
-
-  test('handles empty plan content', () => {
-    const plan = createMockPlan({ content: '' });
-
-    const functional = loadTabWithMocks('functional', {
-      state: { readPlans: () => [plan] }
-    });
-
-    const app = createMockApp({ mode: 'actions', selectedPlan: plan });
-    functional.handleKey(createMockKey('1', { sequence: '1' }), app);
-
-    assert.strictEqual(app.viewContent, '', 'Should handle empty content');
-  });
-
-  test('handles special characters in plan name', () => {
-    const plan = createMockPlan({ name: 'test-plan-with-$pecial_chars!' });
-
-    const functional = loadTabWithMocks('functional', {
-      state: { readPlans: () => [plan] }
-    });
-
-    const app = createMockApp();
-    const output = functional.render(app);
-
-    assert.ok(output.includes('$pecial'), 'Should render special characters');
+describe('assignDirectly removed (R5-B) — no stamp-less todo insertion path', () => {
+  // The dangerous "Assign (skips impl planning)" action and its
+  // `actions.assignDirectly` backing were DELETED — the old confirm-assign flow
+  // inserted a plan into todo/ with no marker and no ledger entry, and the
+  // revived gate hook reverted it right after the UI said "✓ added to todo
+  // queue". This asserts the removal at the source: the export is GONE.
+  test('actions.assignDirectly is GONE (require-time) — no stamp-less todo insertion path', () => {
+    const actions = require('../src/lib/actions');
+    assert.strictEqual(actions.assignDirectly, undefined,
+      'assignDirectly must not be exported — reaching todo crosses Gate 2 (approvePlan only)');
   });
 });
 

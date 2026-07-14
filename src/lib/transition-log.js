@@ -61,6 +61,7 @@ function readLog(projectPath) {
  * @param {Object} [entry.validation] - Validation result summary
  * @param {boolean} [entry.humanGate] - Whether this crossed a human gate
  * @param {boolean} [entry.marker] - Whether approval marker was added
+ * @param {boolean} [entry.override] - Whether this crossing was a recorded human override of a failed validation (R5-B)
  * @param {string} [projectPath] - Project root path
  * @returns {Object} the logged entry
  */

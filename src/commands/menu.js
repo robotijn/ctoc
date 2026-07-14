@@ -254,11 +254,11 @@ const agentArea = require('../areas/agent');
 const libraryArea = require('../areas/library');
 const systemArea = require('../areas/system');
 
-// Legacy tab modules retained so functional/review/etc. drill-in flows that
-// reference `functionalTab.renderActions`, `reviewTab.renderRejectInput`
-// continue to work during A3.2 transition.
+// Legacy tab modules retained so review/etc. drill-in flows that
+// reference `reviewTab.renderRejectInput` continue to work during A3.2
+// transition. (The functional confirm-assign path was removed with
+// assignDirectly in R5-B, so functionalTab is no longer referenced here.)
 const overviewTab = require('../tabs/overview');
-const functionalTab = require('../tabs/functional');
 const reviewTab = require('../tabs/review');
 const toolsTab = require('../tabs/tools');
 
@@ -336,8 +336,6 @@ function render() {
     if (tabModule.renderActions) {
       output += tabModule.renderActions(app, app.selectedPlan);
     }
-  } else if (app.mode === 'confirm-assign' && functionalTab.renderAssignConfirm) {
-    output += functionalTab.renderAssignConfirm(app.selectedPlan);
   } else if (app.mode === 'reject-input' && reviewTab.renderRejectInput) {
     output += reviewTab.renderRejectInput(app);
   } else if (currentTab.id === 'system' && app.toolMode) {
