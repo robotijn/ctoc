@@ -133,10 +133,18 @@ function defaultShapeFor(language, projectPath) {
  * dead engine reachable only by its test. It DESCRIBES the run (returns command
  * strings); it never executes a build/run here (that is CR6).
  *
+ * CR3 enriches the evidence with the PROJECT-TYPE dimension: `projectTypeFor`
+ * detects the taxonomy (a Flutter app is `mobile-crossplatform`, not merely "a dart
+ * mobile shape"), and `pipelineFor` merges the language toolchain with that type's
+ * phase-relevance + honest run strategy + config scaffold. This is the LIVE consumer
+ * of CR3's new engine functions — they would otherwise be a dead engine reachable
+ * only by a test. It still DESCRIBES the run; it never executes a build/run here.
+ *
  * @param {string} projectPath - project root.
  * @returns {{applicable: true, language: string, projectType: string,
  *   strategy: {command: string, honest: (boolean|string), shape: string},
- *   lastMile: {build: (string|null), test: (string|null)}}|null} the native run
+ *   lastMile: {build: (string|null), test: (string|null)},
+ *   taxonomy: (string|null), pipeline: (Object|null)}|null} the native run
  *   target, or null for a JS-shaped or unrecognized project.
  */
 function detectRunTarget(projectPath) {
@@ -149,6 +157,10 @@ function detectRunTarget(projectPath) {
     if (!strategy) continue;
     const build = capabilityRegistry.toolchainFor(language, 'build', projectPath);
     const test = capabilityRegistry.toolchainFor(language, 'test', projectPath);
+    // CR3 live edge: consult the project-type taxonomy for richer run evidence, and
+    // merge the full language+type pipeline when a taxonomy is detected.
+    const taxonomy = capabilityRegistry.projectTypeFor(projectPath);
+    const pipeline = taxonomy ? capabilityRegistry.pipelineFor(language, taxonomy, projectPath) : null;
     return {
       applicable: true,
       language,
@@ -157,7 +169,9 @@ function detectRunTarget(projectPath) {
       lastMile: {
         build: build && typeof build.cmd === 'string' ? build.cmd : null,
         test: test && typeof test.cmd === 'string' ? test.cmd : null
-      }
+      },
+      taxonomy,
+      pipeline
     };
   }
   return null;
@@ -184,13 +198,14 @@ function nativeNotApplicableResult(target, started) {
       shape: 'native',
       language: target.language,
       projectType: target.projectType,
+      projectTypeTaxonomy: target.taxonomy || null,
       runCommand: s.command,
       honest: s.honest,
       buildCommand: target.lastMile.build,
       testCommand: target.lastMile.test,
       reason:
-        `Detected a ${target.language} ${target.projectType} project via the capability ` +
-        `registry. Its honest run last mile is build+test (build: ${target.lastMile.build || 'n/a'}; ` +
+        `Detected a ${target.language} ${target.taxonomy || target.projectType} project via the ` +
+        `capability registry. Its honest run last mile is build+test (build: ${target.lastMile.build || 'n/a'}; ` +
         `test: ${target.lastMile.test || 'n/a'}; run: ${s.command}); executing it is CR6. ` +
         'Not launched here.'
     },

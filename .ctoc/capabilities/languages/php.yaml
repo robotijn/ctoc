@@ -1,0 +1,21 @@
+# PHP capability entry — web-grounded 2026 toolchain. PHPStan for static analysis /
+# type checking, PHP-CS-Fixer for formatting, PHPUnit for tests, Psalm taint analysis
+# for security, Composer's built-in audit for dependencies. Run uses the generic PHP
+# built-in server (Laravel's `php artisan serve` is the framework-specific variant).
+language: php
+detectionMarkers: [composer.json]
+extensions: [.php]
+toolchain:
+  lint:      { cmd: "phpstan analyse", tool: phpstan, altCmd: "php-cs-fixer fix --dry-run", verified: web-2026-07 }
+  format:    { cmd: "php-cs-fixer fix --dry-run --diff", tool: php-cs-fixer, verified: web-2026-07 }
+  typecheck: { cmd: "phpstan analyse", tool: phpstan, altCmd: "psalm", verified: web-2026-07 }
+  test:      { cmd: "phpunit", tool: phpunit, altCmd: "pest", verified: web-2026-07 }
+  coverage:  { cmd: "phpunit --coverage-clover coverage.xml", tool: phpunit, verified: web-2026-07 }
+  security:  { cmd: "psalm --taint-analysis", tool: psalm, altCmd: "phpstan analyse", verified: web-2026-07 }
+  depsAudit: { cmd: "composer audit", tool: composer, verified: web-2026-07 }
+  build:     { cmd: "composer install --no-dev", tool: composer, verified: web-2026-07 }
+run:
+  shapes: { server: "php -S localhost:8000" }
+  honest: true
+configScaffold: [composer.json, phpstan.neon]
+verified: web-2026-07

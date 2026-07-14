@@ -1,0 +1,10 @@
+{
+  "content_sha256": "6e1359cafe4af6dd6642c4acfe6967ad076c299ab974441bae52f65493ded48a",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T12:51:52.175Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 CR2: sibling slice of the human-authorized capability-registry program (parent ctoc-capability-registry; the human approved the program via \"combine 1 and 3\" then \"go\"). Mirrors CR1 (00027) backfilled review entry. Forgeable hand-stamped frontmatter marker removed; ledger is the sole approval record. Work human-ordered; awaiting human Gate 3.",
+  "plan_basename": "00028-cr2-top20-language-data"
+}

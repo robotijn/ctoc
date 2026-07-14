@@ -1,0 +1,11 @@
+# mobile-native-ios — Swift/Objective-C iOS. Build via xcodebuild; a simulator boot
+# is not CI-reliable, so build+test is the honest last mile (build-is-last-mile).
+projectType: mobile-native-ios
+detectionMarkers: [Podfile, project.pbxproj, Package.swift]
+frameworks: [swiftui, uikit, cocoapods, swift-package-manager]
+priority: 68
+runShape: mobile
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
+run: { strategy: build-and-test, honest: build-is-last-mile }
+configScaffold: [Package.swift, Podfile, .swiftlint.yml]
+verified: web-2026-07

@@ -1,0 +1,11 @@
+# desktop — Tauri / Electron / Qt / .NET MAUI. A windowed GUI cannot be driven in
+# headless CI, so build+test is the honest last mile (build-is-last-mile).
+projectType: desktop
+detectionMarkers: [tauri.conf.json, forge.config.js, electron-builder.yml]
+frameworks: [tauri, electron, qt, maui]
+priority: 60
+runShape: desktop
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
+run: { strategy: build-and-test, honest: build-is-last-mile }
+configScaffold: [tauri.conf.json, Cargo.toml, .gitignore]
+verified: web-2026-07

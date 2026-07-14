@@ -1,0 +1,20 @@
+# Lua capability entry — web-grounded 2026 toolchain (luacheck + stylua + busted +
+# luacov). typecheck is OMITTED (N/A — Lua is dynamically typed; Luau's luau-analyze is
+# a separate dialect, not standard Lua). build is OMITTED (N/A — Lua is interpreted).
+# security and depsAudit are UNVERIFIED (no standard Lua SAST; LuaRocks has no standard
+# audit command). The cli run entry point uses `main.lua` as the conventional entry.
+language: lua
+detectionMarkers: [.luacheckrc, "*.lua", "*.rockspec"]
+extensions: [.lua]
+toolchain:
+  lint:      { cmd: "luacheck .", tool: luacheck, verified: web-2026-07 }
+  format:    { cmd: "stylua --check .", tool: stylua, verified: web-2026-07 }
+  test:      { cmd: "busted", tool: busted, verified: web-2026-07 }
+  coverage:  { cmd: "luacov", tool: luacov, verified: web-2026-07 }
+  security:  { cmd: "luacheck .", tool: luacheck, verified: UNVERIFIED }
+  depsAudit: { cmd: "luarocks list --outdated", tool: luarocks, verified: UNVERIFIED }
+run:
+  shapes: { cli: "lua main.lua" }
+  honest: true
+configScaffold: [.luacheckrc, .stylua.toml]
+verified: web-2026-07

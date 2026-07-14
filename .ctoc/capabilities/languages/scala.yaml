@@ -1,0 +1,22 @@
+# Scala capability entry — web-grounded 2026 toolchain (sbt + scalafix/scalafmt/
+# scoverage). security is UNVERIFIED (no free canonical Scala SAST — DerScanner and
+# Checkmarx are commercial). depsAudit uses `sbt dependencyCheck` via the OWASP
+# dependency-check sbt plugin (the standard Scala SCA path, verified 2026-07); it
+# downloads the NVD database on first run, so it is slow but authoritative.
+language: scala
+detectionMarkers: [build.sbt, build.sc]
+extensions: [.scala, .sc]
+toolchain:
+  lint:      { cmd: "scalafix --check", tool: scalafix, altCmd: "sbt wartremoverWarnings", verified: web-2026-07 }
+  format:    { cmd: "scalafmt --test", tool: scalafmt, verified: web-2026-07 }
+  typecheck: { cmd: "sbt compile", tool: sbt, verified: web-2026-07 }
+  test:      { cmd: "sbt test", tool: sbt, verified: web-2026-07 }
+  coverage:  { cmd: "sbt coverage test coverageReport", tool: scoverage, verified: web-2026-07 }
+  security:  { cmd: "scalafix --check", tool: scalafix, verified: UNVERIFIED }
+  depsAudit: { cmd: "sbt dependencyCheck", tool: dependency-check, verified: web-2026-07 }
+  build:     { cmd: "sbt package", tool: sbt, verified: web-2026-07 }
+run:
+  shapes: { server: "sbt run", cli: "sbt run" }
+  honest: true
+configScaffold: [build.sbt, .scalafmt.conf]
+verified: web-2026-07

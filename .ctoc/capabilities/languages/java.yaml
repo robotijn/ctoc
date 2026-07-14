@@ -1,0 +1,20 @@
+# Java capability entry — web-grounded 2026 toolchain (Maven-first; Gradle via altCmd).
+# build.gradle.kts is deliberately NOT a marker here (that is Kotlin's, to avoid a
+# collision) — Java uses pom.xml / build.gradle (Groovy DSL).
+language: java
+detectionMarkers: [pom.xml, build.gradle]
+extensions: [.java]
+toolchain:
+  lint:      { cmd: "mvn checkstyle:check", tool: checkstyle, verified: web-2026-07 }
+  format:    { cmd: "mvn spotless:check", tool: spotless, altCmd: "google-java-format --dry-run", verified: web-2026-07 }
+  typecheck: { cmd: "mvn -q compile", tool: maven, verified: web-2026-07 }
+  test:      { cmd: "mvn test", tool: maven, altCmd: "gradle test", verified: web-2026-07 }
+  coverage:  { cmd: "mvn jacoco:report", tool: jacoco, verified: web-2026-07 }
+  security:  { cmd: "mvn com.github.spotbugs:spotbugs-maven-plugin:check", tool: spotbugs, verified: web-2026-07 }
+  depsAudit: { cmd: "mvn org.owasp:dependency-check-maven:check", tool: dependency-check, altCmd: "osv-scanner -r .", verified: web-2026-07 }
+  build:     { cmd: "mvn package", tool: maven, verified: web-2026-07 }
+run:
+  shapes: { server: "mvn spring-boot:run", cli: "java -jar target/*.jar" }
+  honest: true
+configScaffold: [pom.xml, checkstyle.xml]
+verified: web-2026-07

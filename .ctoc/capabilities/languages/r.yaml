@@ -1,0 +1,20 @@
+# R capability entry — web-grounded 2026 toolchain (lintr, styler, testthat, covr).
+# typecheck is OMITTED (N/A — R is dynamically typed, no static type checker). security
+# and depsAudit are UNVERIFIED (R has no standard SAST or dependency-audit tool). The
+# cli run entry point (`Rscript`) is completed with a script path by the caller.
+language: r
+detectionMarkers: [DESCRIPTION, "*.Rproj"]
+extensions: [.R, .r]
+toolchain:
+  lint:      { cmd: "Rscript -e \"lintr::lint_dir()\"", tool: lintr, verified: web-2026-07 }
+  format:    { cmd: "Rscript -e \"styler::style_dir()\"", tool: styler, verified: web-2026-07 }
+  test:      { cmd: "Rscript -e \"testthat::test_dir('tests')\"", tool: testthat, verified: web-2026-07 }
+  coverage:  { cmd: "Rscript -e \"covr::package_coverage()\"", tool: covr, verified: web-2026-07 }
+  security:  { cmd: "Rscript -e \"lintr::lint_dir()\"", tool: lintr, verified: UNVERIFIED }
+  depsAudit: { cmd: "Rscript -e \"remotes::dev_package_deps()\"", tool: remotes, verified: UNVERIFIED }
+  build:     { cmd: "R CMD build .", tool: R, verified: web-2026-07 }
+run:
+  shapes: { cli: "Rscript" }
+  honest: true
+configScaffold: [DESCRIPTION, .lintr]
+verified: web-2026-07

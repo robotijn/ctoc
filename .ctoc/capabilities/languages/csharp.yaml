@@ -1,0 +1,21 @@
+# C# / .NET capability entry — web-grounded 2026 toolchain. `dotnet format` is both
+# lint and format. Detection uses real exact-filename markers the current engine
+# supports (global.json, nuget.config); the *.csproj/*.sln extension globs are carried
+# for the glob-aware detector (CR3).
+language: csharp
+detectionMarkers: [global.json, nuget.config, "*.csproj", "*.sln"]
+extensions: [.cs, .csproj, .sln]
+toolchain:
+  lint:      { cmd: "dotnet format --verify-no-changes", tool: dotnet-format, verified: web-2026-07 }
+  format:    { cmd: "dotnet format --verify-no-changes", tool: dotnet-format, verified: web-2026-07 }
+  typecheck: { cmd: "dotnet build", tool: dotnet, verified: web-2026-07 }
+  test:      { cmd: "dotnet test", tool: dotnet, verified: web-2026-07 }
+  coverage:  { cmd: "dotnet test --collect:\"XPlat Code Coverage\"", tool: dotnet, verified: web-2026-07 }
+  security:  { cmd: "dotnet list package --vulnerable", tool: dotnet, altCmd: "security-code-scan", verified: web-2026-07 }
+  depsAudit: { cmd: "dotnet list package --vulnerable --include-transitive", tool: dotnet, verified: web-2026-07 }
+  build:     { cmd: "dotnet build -c Release", tool: dotnet, verified: web-2026-07 }
+run:
+  shapes: { server: "dotnet run", cli: "dotnet run" }
+  honest: true
+configScaffold: [global.json, .editorconfig]
+verified: web-2026-07

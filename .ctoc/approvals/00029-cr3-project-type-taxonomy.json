@@ -1,0 +1,10 @@
+{
+  "content_sha256": "ea192d58b3da99049df53ed244b5f5afd8f528a15f40a4bebac1f58c1cf7ead5",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T12:51:52.176Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 CR3: sibling slice of the human-authorized capability-registry program. Dispatcher mis-staged into todo/; corrected to review/ beside CR1/CR2. Forged frontmatter marker (fabricated 2026-07-15 date) removed by coordinator; ledger is the sole approval record. Work human-ordered; awaiting human Gate 3.",
+  "plan_basename": "00029-cr3-project-type-taxonomy"
+}

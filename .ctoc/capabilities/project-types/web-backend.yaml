@@ -1,0 +1,11 @@
+# web-backend — an HTTP API/server. Runs and answers a health probe (honest:true).
+# Security is REQUIRED (it faces the network); it ships a Dockerfile + OpenAPI + migrations.
+projectType: web-backend
+detectionMarkers: [nest-cli.json, Procfile, fastify.config.js]
+frameworks: [express, fastify, nestjs, django, fastapi, spring-boot, gin]
+priority: 30
+runShape: server
+phases: { lint: required, typecheck: required, test: required, security: required, coverage: recommended }
+run: { strategy: server-probe, honest: true }
+configScaffold: [package.json, tsconfig.json, Dockerfile, openapi.yaml, migrations]
+verified: web-2026-07

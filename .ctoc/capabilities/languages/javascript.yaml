@@ -1,0 +1,21 @@
+# JavaScript capability entry — web-grounded 2026 toolchain. Distinct from TypeScript:
+# the marker is package.json WITHOUT tsconfig.json (TypeScript owns tsconfig.json).
+# typecheck is UNVERIFIED: JavaScript has NO native type checker — `tsc --checkJs` is
+# an opt-in TypeScript tool applied to JS, not a standard JS-native invocation.
+language: javascript
+detectionMarkers: [package.json]
+extensions: [.js, .mjs, .cjs, .jsx]
+toolchain:
+  lint:      { cmd: "eslint .", tool: eslint, altCmd: "biome check .", verified: web-2026-07 }
+  format:    { cmd: "prettier --check .", tool: prettier, altCmd: "biome format .", verified: web-2026-07 }
+  typecheck: { cmd: "tsc --noEmit --allowJs --checkJs", tool: tsc, verified: UNVERIFIED }
+  test:      { cmd: "npm test", tool: npm, altCmd: "vitest run", verified: web-2026-07 }
+  coverage:  { cmd: "c8 npm test", tool: c8, verified: web-2026-07 }
+  security:  { cmd: "semgrep --config=p/javascript", tool: semgrep, verified: web-2026-07 }
+  depsAudit: { cmd: "npm audit", tool: npm, verified: web-2026-07 }
+  build:     { cmd: "npm run build", tool: npm, verified: web-2026-07 }
+run:
+  shapes: { web: "npm run dev", server: "npm start" }
+  honest: true
+configScaffold: [package.json, eslint.config.js]
+verified: web-2026-07

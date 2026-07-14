@@ -61,6 +61,16 @@ function projectDir(projectRoot) {
   return path.join(projectRoot, '.ctoc', 'capabilities', 'languages');
 }
 
+/** The bundled project-type seed directory (ships with the plugin). */
+function bundledProjectTypesDir() {
+  return path.join(__dirname, '..', '..', '.ctoc', 'capabilities', 'project-types');
+}
+
+/** A project-local override directory for project types. */
+function projectProjectTypesDir(projectRoot) {
+  return path.join(projectRoot, '.ctoc', 'capabilities', 'project-types');
+}
+
 // ── minimal, zero-dependency YAML subset parser ─────────────────────────────────
 // Handles exactly the shapes the capability files use: 2-space-indented block maps,
 // inline flow maps `{ k: v, k2: "v" }`, inline arrays `[a, b]`, quoted/bare scalars,
@@ -312,6 +322,186 @@ function load(projectRoot) {
   return { languages, warnings };
 }
 
+// ── project-type dimension (CR3) ────────────────────────────────────────────────
+// A language names the toolchain; a project TYPE names which phases matter, the run
+// strategy, and the config scaffold — so a Flutter app, a Rust CLI, a data-science
+// notebook and a microservice monorepo get different pipelines in the same language.
+// Same dumb-engine/smart-data contract as the language table: this loads and looks
+// up, it never runs anything.
+
+/**
+ * A parsed project type is VALID only if it names itself and carries the three
+ * pipeline-shaping fields: a phase-relevance map, a run strategy, and a config
+ * scaffold list. Anything else (a broken/hostile file) is rejected → skipped + warned.
+ * @param {*} obj
+ * @returns {boolean}
+ */
+function isValidProjectType(obj) {
+  return !!obj
+    && typeof obj === 'object'
+    && typeof obj.projectType === 'string'
+    && obj.projectType.trim().length > 0
+    && obj.phases
+    && typeof obj.phases === 'object'
+    && !Array.isArray(obj.phases)
+    && obj.run
+    && typeof obj.run === 'object'
+    && Array.isArray(obj.configScaffold)
+    && obj.configScaffold.length > 0;
+}
+
+/**
+ * Read one project-types directory, folding each valid entry into `projectTypes`
+ * (keyed by its declared `projectType`) and recording a warning per skipped file.
+ * FAIL-OPEN throughout, exactly like readCapabilityDir.
+ * @param {string} dir
+ * @param {Object} projectTypes accumulator (mutated) — later dirs override earlier.
+ * @param {Array} warnings accumulator (mutated)
+ */
+function readProjectTypeDir(dir, projectTypes, warnings) {
+  let entries;
+  try {
+    if (!safeFs.existsSync(dir)) return;
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+  } catch (err) {
+    warnings.push({ file: dir, message: `unreadable project-types dir: ${err.message}` });
+    return;
+  }
+  if (entries.length > MAX_FILES) {
+    warnings.push({ file: dir, message: `too many project-type files (${entries.length} > ${MAX_FILES}) — skipped` });
+    return;
+  }
+  for (const name of entries) {
+    const p = path.join(dir, name);
+    try {
+      const size = safeFs.statSync(p).size;
+      if (size > MAX_FILE_BYTES) {
+        warnings.push({ file: name, message: `project-type file too large (${size} bytes) — skipped` });
+        continue;
+      }
+      const parsed = parseCapabilityYaml(safeFs.readFileSync(p, 'utf8'));
+      if (!isValidProjectType(parsed)) {
+        warnings.push({ file: name, message: 'malformed project-type entry (missing projectType/phases/run/configScaffold) — skipped' });
+        continue;
+      }
+      projectTypes[parsed.projectType] = parsed; // later dir (project override) wins
+    } catch (err) {
+      warnings.push({ file: name, message: `project-type parse/read failed — skipped: ${err.message}` });
+    }
+  }
+}
+
+/**
+ * Load the project-type registry: the bundled seed data first, then an optional
+ * project override overlaid on top. Reads FRESH every call (the set is tiny) so
+ * on-disk truth always wins — no stale cache. FAIL-OPEN per entry.
+ *
+ * @param {string} [projectRoot] optional project root whose overrides are overlaid.
+ * @returns {{ projectTypes: Object<string, Object>, warnings: Array<{file:string,message:string}> }}
+ */
+function loadProjectTypes(projectRoot) {
+  const projectTypes = {};
+  const warnings = [];
+  readProjectTypeDir(bundledProjectTypesDir(), projectTypes, warnings);
+  if (typeof projectRoot === 'string' && projectRoot.length > 0) {
+    readProjectTypeDir(projectProjectTypesDir(projectRoot), projectTypes, warnings);
+  }
+  return { projectTypes, warnings };
+}
+
+/**
+ * Detect the project type of a project from its declared detectionMarkers, resolving
+ * overlaps by the `priority` field (higher wins) so a decisive marker (turbo.json →
+ * monorepo, main.tf → infra) beats a generic one. Exact-filename/dirname markers only
+ * (safe: no regex, no ReDoS). Returns the winning project-type name, or null.
+ *
+ * @param {string} projectRoot project root to scan.
+ * @returns {string|null} the detected project-type name, or null when none matches.
+ */
+function projectTypeFor(projectRoot) {
+  if (typeof projectRoot !== 'string' || projectRoot.length === 0) return null;
+  const { projectTypes } = loadProjectTypes(projectRoot);
+  let best = null;
+  let bestPriority = -Infinity;
+  for (const [name, t] of Object.entries(projectTypes)) {
+    const markers = Array.isArray(t.detectionMarkers) ? t.detectionMarkers : [];
+    let matched = false;
+    for (const marker of markers) {
+      if (typeof marker !== 'string') continue;
+      try {
+        if (safeFs.existsSync(path.join(projectRoot, marker))) { matched = true; break; }
+      } catch { /* unreadable → not detected via this marker */ }
+    }
+    if (!matched) continue;
+    const priority = typeof t.priority === 'number' ? t.priority : 0;
+    if (priority > bestPriority) { best = name; bestPriority = priority; }
+  }
+  return best;
+}
+
+/**
+ * MERGE a language's toolchain with a project type's pipeline shape: for every phase
+ * the project type declares relevant, attach that relevance PLUS the language's
+ * command for that phase; carry the type's run strategy + honest flag enriched with
+ * the language's run command (via the type's `runShape`); union the two config
+ * scaffolds. Returns null when either the language or the project type is unknown.
+ *
+ * The engine merges DATA; it never runs a command. The `cmd` values are inert strings.
+ *
+ * @param {string} language e.g. 'dart'
+ * @param {string} projectType e.g. 'mobile-crossplatform'
+ * @param {string} [projectRoot]
+ * @returns {{ language: string, projectType: string,
+ *   phases: Object<string, {relevance: string, cmd: (string|null), tool: (string|null), verified: (string|null)}>,
+ *   run: { strategy: (string|null), honest: (boolean|string), command: (string|null), shape: (string|null) },
+ *   configScaffold: string[] }|null}
+ */
+function pipelineFor(language, projectType, projectRoot) {
+  const cap = capabilitiesFor(language, projectRoot);
+  if (!cap) return null;
+  const { projectTypes } = loadProjectTypes(projectRoot);
+  const type = projectTypes[projectType];
+  if (!type) return null;
+
+  const toolchain = cap.toolchain && typeof cap.toolchain === 'object' ? cap.toolchain : {};
+  /** @type {Object<string, {relevance: string, cmd: (string|null), tool: (string|null), verified: (string|null)}>} */
+  const phases = {};
+  for (const [phase, relevance] of Object.entries(type.phases)) {
+    const entry = toolchain[phase] && typeof toolchain[phase] === 'object' ? toolchain[phase] : null;
+    phases[phase] = {
+      relevance,
+      cmd: entry && typeof entry.cmd === 'string' ? entry.cmd : null,
+      tool: entry && entry.tool != null ? entry.tool : null,
+      verified: entry && entry.verified != null ? entry.verified : null
+    };
+  }
+
+  const runShape = typeof type.runShape === 'string' ? type.runShape : null;
+  const shapes = cap.run && cap.run.shapes && typeof cap.run.shapes === 'object' ? cap.run.shapes : {};
+  const runCommand = runShape && typeof shapes[runShape] === 'string' ? shapes[runShape] : null;
+
+  // Union the two scaffolds, preserving first-seen order and de-duplicating.
+  const langScaffold = Array.isArray(cap.configScaffold) ? cap.configScaffold : [];
+  const typeScaffold = Array.isArray(type.configScaffold) ? type.configScaffold : [];
+  const configScaffold = [];
+  for (const f of [...langScaffold, ...typeScaffold]) {
+    if (typeof f === 'string' && !configScaffold.includes(f)) configScaffold.push(f);
+  }
+
+  return {
+    language,
+    projectType,
+    phases,
+    run: {
+      strategy: type.run && type.run.strategy != null ? type.run.strategy : null,
+      honest: type.run ? type.run.honest : null,
+      command: runCommand,
+      shape: runShape
+    },
+    configScaffold
+  };
+}
+
 // ── lookups (the API the four surfaces will call in CR5) ─────────────────────────
 
 /**
@@ -391,5 +581,8 @@ module.exports = {
   detectLanguages,
   capabilitiesFor,
   toolchainFor,
-  runStrategyFor
+  runStrategyFor,
+  loadProjectTypes,
+  projectTypeFor,
+  pipelineFor
 };

@@ -1,0 +1,20 @@
+# Elixir capability entry — web-grounded 2026 toolchain (mix + credo/dialyzer/sobelow).
+# Sobelow is a real Phoenix-focused SAST (web-verified). mix_audit provides the
+# dependency audit. All phases are web-grounded.
+language: elixir
+detectionMarkers: [mix.exs]
+extensions: [.ex, .exs]
+toolchain:
+  lint:      { cmd: "mix credo --strict", tool: credo, verified: web-2026-07 }
+  format:    { cmd: "mix format --check-formatted", tool: mix, verified: web-2026-07 }
+  typecheck: { cmd: "mix dialyzer", tool: dialyzer, verified: web-2026-07 }
+  test:      { cmd: "mix test", tool: mix, verified: web-2026-07 }
+  coverage:  { cmd: "mix test --cover", tool: mix, altCmd: "mix coveralls", verified: web-2026-07 }
+  security:  { cmd: "mix sobelow", tool: sobelow, verified: web-2026-07 }
+  depsAudit: { cmd: "mix deps.audit", tool: mix_audit, altCmd: "mix hex.audit", verified: web-2026-07 }
+  build:     { cmd: "mix compile", tool: mix, verified: web-2026-07 }
+run:
+  shapes: { server: "mix phx.server", cli: "iex -S mix" }
+  honest: true
+configScaffold: [mix.exs, .credo.exs]
+verified: web-2026-07
