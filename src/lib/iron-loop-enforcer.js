@@ -38,7 +38,10 @@ const CANONICAL_STEPS = [
   'REVIEW', 'OPTIMIZE', 'SECURE', 'VERIFY', 'DOCUMENT', 'FINAL-REVIEW',
 ];
 
-const GATE_DESTINATIONS = ['implementation', 'todo', 'done'];
+// R5-B: the gate destinations derive from gate-order (the ONE gate-edge encoding),
+// so this and actions.js can never diverge from GATE_EDGES. Equals
+// ['implementation', 'todo', 'done'] — the `to` side of each human gate edge.
+const { GATE_DESTINATIONS } = require('./gate-order');
 
 const TIER_1_AGENTS = [
   'agents/coordinator/synthesizer.md',
@@ -345,11 +348,15 @@ function checkGateDestinationsApproved(root) {
       // an ADVISORY self-check, so the exemption opens no gate hole.
       if (stage === 'implementation' && /^parent_plan:/m.test(fm)) continue;
 
-      // Decomposed visions are archived to done/ (type: vision, status: decomposed);
-      // they cross Gate 0 in vision/, never the review→done code gate, and carry no
-      // approval marker. Exempt them so an incidental `approved_by: human` phrase in
-      // their prose body is neither required nor mistaken for an approval.
-      if (/^type:\s*vision\b/m.test(fm)) continue;
+      // R5-B: the DUPLICATE `type: vision` exemption is GONE — it mirrored the hole
+      // the runtime hook (human-gate-check.js) already closed in R3-A. A `type: vision`
+      // frontmatter line is FORGEABLE (plans/**.md is Edit-whitelisted), so exempting
+      // it let any agent squat done/ with one line and zero provenance. Residency is
+      // now UNIFORMLY ledger-driven for BOTH systems: a decomposed vision archived to
+      // done/ earns its residency with a PIPELINE-kind ledger entry
+      // (approval-ledger.writeVisionArchiveEntry, evidence: 'vision-decomposed'),
+      // accepted below by the SAME `hasLedgerApproval` the hook uses. The two systems
+      // now agree on "is the repo clean."
 
       // R3-C: the enforcer no longer trusts the plan's own frontmatter. A marker in
       // a file is FORGEABLE — anything that can write the plan can write

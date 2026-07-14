@@ -625,7 +625,9 @@ describe('R3-B handover (b) — the deploy-ready notice is written atomically', 
     // A plan in review/ that approvePlan will cross review → done (Gate 3).
     const reviewPath = writePlan('review', 'deployed', { files: ['src/d.js'] });
 
-    actions.approvePlan(reviewPath, root);
+    // R5-B: approvePlan now VALIDATES review→done. The subject is the atomic
+    // deploy-ready notice write, not the validation gate, so cross via an audited override.
+    actions.approvePlan(reviewPath, root, { override: { reason: 'deploy-ready atomic-write test — validation not under test' } });
 
     const logDir = path.join(root, '.ctoc', 'logs');
     const parsed = JSON.parse(fs.readFileSync(path.join(logDir, 'deploy-ready.json'), 'utf8'));

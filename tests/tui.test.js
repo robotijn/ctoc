@@ -253,24 +253,12 @@ function testRenderActionMenuSelection() {
   console.log('  - renderActionMenu selection indicator');
 }
 
-// Test renderConfirm
-function testRenderConfirm() {
-  const options = [
-    { label: 'Keep it' },
-    { label: 'Delete it', danger: true }
-  ];
-
-  const output = tui.renderConfirm('Are you sure?', 'This will delete the plan.', options);
-
-  assert.ok(output.includes('Are you sure?'), 'Contains title');
-  assert.ok(output.includes('This will delete the plan.'), 'Contains message');
-  assert.ok(output.includes('1. Keep it'), 'Contains option 1');
-  assert.ok(output.includes('2. Delete it'), 'Contains option 2');
-  assert.ok(output.includes('\x1b[31m'), 'Danger option in red');
-  assert.ok(output.includes('Enter 1-2'), 'Shows input hint');
-
-  console.log('  - renderConfirm');
-}
+// R5-B: renderConfirm was DELETED from tui.js. Its ONLY live caller was the
+// functional tab's "Assign (skips impl planning)" confirmation, removed with
+// actions.assignDirectly (a stamp-less todo insertion the gate hook reverted).
+// Removing the assign feature orphaned renderConfirm; the reachability ratchet
+// (a test is not a caller) required it be wired or deleted — deleted, so its test
+// goes with it.
 
 // Test renderInput
 function testRenderInput() {
@@ -334,7 +322,6 @@ testRenderActionMenuDanger();
 testRenderActionMenuSelection();
 
 console.log('\nOther render functions:');
-testRenderConfirm();
 testRenderInput();
 testRenderBreadcrumb();
 testRenderFooter();

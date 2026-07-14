@@ -75,4 +75,52 @@ function crossesHumanGate(from, to) {
   return false;
 }
 
-module.exports = { STAGE_ORDER, GATE_EDGES, crossesHumanGate };
+// ─────────────────────────────────────────────────────────────────────────────
+// R5-B: the ONE gate-edge encoding. `actions.js` (approvePlan's flow lookup and its
+// human-gate map) and `iron-loop-enforcer.js` (its GATE_DESTINATIONS) derive from
+// the surfaces below, so the three edges are declared ONCE — change GATE_EDGES and
+// every consumer moves. Previously the same three edges were duplicated as
+// actions.js:`HUMAN_GATES`, actions.js:`flowMap`, and the enforcer's literal
+// GATE_DESTINATIONS; duplicate encodings can silently diverge.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The gate DESTINATION stages (the `to` side of each edge):
+ * `['implementation', 'todo', 'done']`. `iron-loop-enforcer.js` derives its
+ * GATE_DESTINATIONS from this.
+ */
+const GATE_DESTINATIONS = GATE_EDGES.map(([, to]) => to);
+
+/**
+ * Destination stage of the human gate whose SOURCE is `from`, or `undefined` when
+ * `from` is not a gate source (including the destination stages themselves).
+ *
+ * @param {string} from - a stage name
+ * @returns {string|undefined} the gate destination, or undefined
+ */
+function destinationOf(from) {
+  const edge = GATE_EDGES.find(([g0]) => g0 === from);
+  return edge ? edge[1] : undefined;
+}
+
+/**
+ * Is `[from, to]` exactly one of the three human gate edges? (Adjacent single-edge
+ * membership — NOT the span-based `crossesHumanGate`, which also catches multi-hop
+ * skips. `approvePlan` uses THIS to flag a single legitimate crossing.)
+ *
+ * @param {string} from - source stage name
+ * @param {string} to - destination stage name
+ * @returns {boolean}
+ */
+function isHumanGate(from, to) {
+  return GATE_EDGES.some(([g0, g1]) => g0 === from && g1 === to);
+}
+
+module.exports = {
+  STAGE_ORDER,
+  GATE_EDGES,
+  GATE_DESTINATIONS,
+  crossesHumanGate,
+  destinationOf,
+  isHumanGate,
+};

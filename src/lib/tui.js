@@ -187,26 +187,11 @@ function renderActionMenu(title, actions, selectedIndex = 0) {
   return output;
 }
 
-// Render confirmation dialog
-function renderConfirm(title, message, options) {
-  let output = '\n';
-  output += `${c.yellow}${c.bold}${title}${c.reset}\n`;
-  output += line() + '\n\n';
-  output += message + '\n\n';
-  output += line() + '\n';
-
-  options.forEach((opt, i) => {
-    if (opt.danger) {
-      output += `${c.red}${c.bold}${i + 1}. ${opt.label}${c.reset}\n`;
-    } else {
-      output += `${i + 1}. ${opt.label}\n`;
-    }
-  });
-
-  output += `\n${c.dim}Enter 1-${options.length} · Esc cancel${c.reset}\n`;
-
-  return output;
-}
+// R5-B: renderConfirm was DELETED. Its ONLY live caller was the functional tab's
+// "Assign (skips impl planning)" confirmation (renderAssignConfirm), removed with
+// actions.assignDirectly — a plan reaching todo/ with no marker/ledger. Removing the
+// assign feature orphaned this helper; the reachability ratchet (a test is not a
+// caller) requires it be wired or deleted, not left dead. Deleted, ratchet held.
 
 // Render text input prompt
 function renderInput(prompt, value = '') {
@@ -268,7 +253,6 @@ module.exports = {
   renderTabIndicator,
   renderList,
   renderActionMenu,
-  renderConfirm,
   renderInput,
   renderFooter,
   renderBreadcrumb,

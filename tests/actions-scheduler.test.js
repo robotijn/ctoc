@@ -485,7 +485,9 @@ describe('approvePlan review→done — deploy is behind the ship gate (G4)', ()
     writeDeploySettings({}); // no ship_gate_confirmed
     const planPath = writePlan('review', 'ship-off', { files: ['src/ship1.js'] });
 
-    actions.approvePlan(planPath, root);
+    // R5-B: approvePlan now VALIDATES review→done. The subject is deploy GATING (G4),
+    // not the review validation, so the Gate-3 crossing is forced via an audited override.
+    actions.approvePlan(planPath, root, { override: { reason: 'G4 deploy-gate test — validation not under test' } });
 
     const noticePath = path.join(root, '.ctoc', 'logs', 'deploy-ready.json');
     assert.ok(fs.existsSync(noticePath), 'a deploy-ready notice is written for the human ship gate');
@@ -500,7 +502,8 @@ describe('approvePlan review→done — deploy is behind the ship gate (G4)', ()
     writeDeploySettings({ ship_gate_confirmed: true, environments: [] }); // confirmed; no envs → pipeline no-ops
     const planPath = writePlan('review', 'ship-on', { files: ['src/ship2.js'] });
 
-    actions.approvePlan(planPath, root);
+    // R5-B: override past the review→done validation (deploy trigger path is the subject).
+    actions.approvePlan(planPath, root, { override: { reason: 'G4 deploy-gate test — validation not under test' } });
 
     const noticePath = path.join(root, '.ctoc', 'logs', 'deploy-ready.json');
     assert.ok(!fs.existsSync(noticePath), 'with the ship gate confirmed, NO notice is recorded — the trigger path was taken');

@@ -104,7 +104,10 @@ describe('CF1 — read cache is busted on every state write', () => {
       assert.equal(before.implementation, 0);
       assert.ok(cache._debug().size > 0, 'precondition: cache populated');
 
-      actions.approvePlan(planPath, root);
+      // R5-B: approvePlan now VALIDATES functional→implementation. The subject here
+      // is CACHE INVALIDATION on the crossing write, not the validation gate, so the
+      // crossing is forced via an explicit, audited override.
+      actions.approvePlan(planPath, root, { override: { reason: 'cache-freshness — the crossing IS the write under test' } });
 
       // Clear-all empties the store immediately.
       assert.equal(cache._debug().size, 0, 'AC2/approve: cache cleared by the write');
