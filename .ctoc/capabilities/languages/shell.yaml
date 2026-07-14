@@ -1,0 +1,20 @@
+# Shell capability entry — web-grounded 2026 toolchain. DELIBERATELY PARTIAL, and that
+# is HONEST, not a gap. Shell is untyped and has no standard test runner, package
+# manager, or build step, so typecheck / test / coverage / depsAudit / build are OMITTED
+# (an absent phase is honest N/A — never a stub). lint + format are the real toolchain:
+# shellcheck (the standard shell linter) and shfmt (the standard formatter). SECURITY
+# reuses shellcheck and is honestly UNVERIFIED — shellcheck catches SOME injection
+# patterns but is a linter, not a dedicated SAST, matching the peer languages that reuse
+# their linter for the security phase. A shell script genuinely runs (honest: true).
+language: shell
+detectionMarkers: ["*.sh", "*.bash"]
+extensions: [.sh, .bash]
+toolchain:
+  lint:     { cmd: "shellcheck", tool: shellcheck, verified: web-2026-07 }
+  format:   { cmd: "shfmt -d .", tool: shfmt, verified: web-2026-07 }
+  security: { cmd: "shellcheck", tool: shellcheck, verified: UNVERIFIED }
+run:
+  shapes: { cli: "bash" }
+  honest: true
+configScaffold: [.shellcheckrc, .editorconfig]
+verified: web-2026-07

@@ -1,0 +1,24 @@
+# Terraform/HCL capability entry — web-grounded 2026 toolchain. lint is tflint (a LINTER,
+# not a security scanner). format is `terraform fmt` and typecheck is `terraform validate`
+# (the closest static check HCL has). test is the NATIVE `terraform test` (native since
+# Terraform 1.6). SECURITY is `trivy config` — the SUCCESSOR to the deprecated tfsec
+# (folded into Trivy in 2023; never tfsec) — with checkov as the alternative. build is
+# `terraform plan` (the dry-run "build"). coverage / depsAudit are OMITTED (absent =
+# honest N/A, never a stub). RUN is honestly false: `terraform plan` is a DRY RUN, not a
+# launched application — consistent with the infra project-type's honest:false — so it
+# exposes no runnable shape.
+language: terraform
+detectionMarkers: ["*.tf", main.tf]
+extensions: [.tf, .tfvars]
+toolchain:
+  lint:      { cmd: "tflint", tool: tflint, verified: web-2026-07 }
+  format:    { cmd: "terraform fmt -check -recursive", tool: terraform, verified: web-2026-07 }
+  typecheck: { cmd: "terraform validate", tool: terraform, verified: web-2026-07 }
+  test:      { cmd: "terraform test", tool: terraform, verified: web-2026-07 }
+  security:  { cmd: "trivy config .", tool: trivy, altCmd: "checkov -d .", verified: web-2026-07 }
+  build:     { cmd: "terraform plan", tool: terraform, verified: web-2026-07 }
+run:
+  shapes: { }
+  honest: false
+configScaffold: [.tflint.hcl, versions.tf, .terraform.lock.hcl]
+verified: web-2026-07
