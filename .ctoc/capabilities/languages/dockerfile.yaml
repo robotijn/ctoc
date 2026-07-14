@@ -1,0 +1,22 @@
+# Dockerfile capability entry — web-grounded 2026 toolchain. DELIBERATELY PARTIAL, and
+# that is HONEST, not a gap. A Dockerfile has no standard formatter, no test runner, and
+# no coverage; its image dependency scan (`trivy image`) is a DIFFERENT runtime target
+# (a built image, not the Dockerfile source) — so format / typecheck / test / coverage /
+# depsAudit are OMITTED (absent = honest N/A, never a stub). lint is hadolint (the
+# standard Dockerfile linter). SECURITY is `trivy config` — Trivy scans Dockerfiles/IaC
+# for misconfiguration (tfsec was folded into Trivy in 2023 and is deprecated; never
+# tfsec) — with hadolint as the alternative. build is `docker build`. RUN is honestly
+# build-is-last-mile: an image is BUILT, not launched — building the image is the
+# CI-safe last mile, never a false "it ran", so it exposes no runnable shape.
+language: dockerfile
+detectionMarkers: [Dockerfile, "*.dockerfile", Containerfile]
+extensions: [.dockerfile]
+toolchain:
+  lint:     { cmd: "hadolint Dockerfile", tool: hadolint, verified: web-2026-07 }
+  security: { cmd: "trivy config .", tool: trivy, altCmd: "hadolint Dockerfile", verified: web-2026-07 }
+  build:    { cmd: "docker build .", tool: docker, verified: web-2026-07 }
+run:
+  shapes: { }
+  honest: build-is-last-mile
+configScaffold: [.dockerignore, .hadolint.yaml]
+verified: web-2026-07

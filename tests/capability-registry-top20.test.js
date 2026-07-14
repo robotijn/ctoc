@@ -113,9 +113,19 @@ describe('capability-registry TOP-20: completeness', () => {
     }
   });
 
-  it('exactly 20 language YAML files ship in the bundled directory', () => {
+  it('every bundled language file loads as exactly one valid language (no junk/dupes), at least the top-20', () => {
+    // The registry grows beyond the top-20 (config/infra languages: shell, dockerfile,
+    // terraform, …), so a fixed count is wrong. The real invariant: every bundled .yaml
+    // is exactly one loadable language — a junk file warns (and adds none) and a dupe
+    // overwrites, so either makes file-count exceed loaded-language-count. Floor stays 20.
     const files = fs.readdirSync(BUNDLED_DIR).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
-    assert.equal(files.length, 20, `expected exactly 20 bundled language files, found ${files.length}: ${files.join(', ')}`);
+    const reg = registry.load();
+    assert.deepEqual(reg.warnings, [], 'no bundled language file may be junk (a warning means an invalid/dupe file)');
+    assert.equal(
+      files.length, Object.keys(reg.languages).length,
+      `every bundled file must load as exactly one language; ${files.length} files vs ${Object.keys(reg.languages).length} loaded: ${files.join(', ')}`
+    );
+    assert.ok(files.length >= 20, `at least the top-20 languages must ship, found ${files.length}`);
   });
 
   it('every top-20 language has its own YAML file on disk', () => {
