@@ -1,0 +1,10 @@
+{
+  "content_sha256": "d2cbe05da4316a7594cea2de11f14576d507e96b8154b2e8ba122a89df0477f5",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.585Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU1-tier0-quick-wins-s4-regulatory-citations"
+}

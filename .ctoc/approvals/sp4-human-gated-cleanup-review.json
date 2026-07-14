@@ -1,0 +1,10 @@
+{
+  "content_sha256": "ceb1836e2235b0f4dcddc99c5ff592780d821a78f9e5b89c2afebe6c1b0d7ed4",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.596Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "SP4-human-gated-cleanup-review"
+}

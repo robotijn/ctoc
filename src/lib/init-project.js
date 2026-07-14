@@ -505,6 +505,17 @@ function generateSettings(languages, frameworks) {
     'enforcement:',
     '  mode: strict  # strict | soft | off',
     '',
+    // Regulatory-regime anchor (R4). Written EMPTY by default so CTOC stays lean,
+    // but the `active_profiles:` line must exist from day one: it is the anchor the
+    // line-targeted writer in src/lib/compliance-regime.js (writeActiveProfiles)
+    // replaces to persist a compliance answer. Without this block a fresh project
+    // cannot record ANY answer (including a declined "none"), so the compliance
+    // question rides forever. Key/format match the reader of record exactly:
+    // src/lib/regulatory-regime.js loadActiveProfiles parses the `regulatory_regime:`
+    // block and its `active_profiles:` list (inline `[]` here ⇒ profiles: []).
+    'regulatory_regime:',
+    '  active_profiles: []  # opt-in industry profiles (e.g. gdpr); none by default',
+    '',
     'detected:',
     `  languages: [${languages.join(', ')}]`,
     `  frameworks: [${frameworks.join(', ')}]`,
@@ -548,9 +559,9 @@ function generateInitialState() {
 /**
  * Initialize a project with CTOC
  * @param {string} projectDir - Project root directory
- * @param {object} options - Initialization options
- * @param {boolean} options.force - Overwrite existing files
- * @param {boolean} options.dryRun - Show what would be created without creating
+ * @param {object} [options] - Initialization options
+ * @param {boolean} [options.force] - Overwrite existing files
+ * @param {boolean} [options.dryRun] - Show what would be created without creating
  * @returns {{ success: boolean, created: string[], skipped: string[], detected: object }}
  */
 function initProject(projectDir, options = {}) {

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "07655d83f2b80350f695bed69eee59a56ee141976fdb6de59679eb3f8b371c78",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.588Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s24-mobile-native-declarative"
+}

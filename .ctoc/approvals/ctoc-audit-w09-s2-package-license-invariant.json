@@ -1,0 +1,10 @@
+{
+  "content_sha256": "384ee18344672ee4217d222548d76d254c78c146b888f0eaca5da80fe9913bbe",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.597Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "ctoc-audit-w09-s2-package-license-invariant"
+}

@@ -244,29 +244,34 @@ describe('stopAgent + advanceAgent (drain-stop)', () => {
 // 5. cancelTask
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('cancelTask', () => {
-  it('cancels a queued task → status cancelled persisted', () => {
+describe('cancelTask (two-phase C1-2)', () => {
+  it('queued task → cancelled immediately (nothing is running, freeing is safe)', () => {
     const reg = taskRegistry.emptyRegistry();
-    taskRegistry.addTask(reg, { kind: 'implement', plan: 'run', touches: ['src/r.js'] });
+    const running = taskRegistry.addTask(reg, { kind: 'implement', plan: 'run', touches: ['src/r.js'] });
     const q = taskRegistry.addTask(reg, { kind: 'implement', plan: 'wait', touches: ['src/r.js'] });
-    taskRegistry.updateTask(reg, reg.tasks[0].id, { status: 'running' });
+    taskRegistry.updateTask(reg, running.id, { status: 'running' });
     taskRegistry.save(root, reg);
 
     const res = actions.cancelTask(root, q.id);
-    assert.equal(res.cancelled, true);
-    assert.equal(loadReg().tasks.find((t) => t.id === q.id).status, 'cancelled');
+    assert.equal(res.task.status, 'cancelled', 'a queued task cancels straight to cancelled');
+    assert.equal(loadReg().tasks.find((t) => t.id === q.id).status, 'cancelled', 'persisted');
   });
 
-  it('cancels a running task and returns its agentTaskId so the caller can stop the live agent', () => {
+  it('running task → cancelling (NOT cancelled): files stay locked, agentTaskId returned to kill the harness', () => {
     const reg = taskRegistry.emptyRegistry();
     const t = taskRegistry.addTask(reg, { kind: 'implement', plan: 'live', touches: ['src/l.js'] });
     taskRegistry.updateTask(reg, t.id, { status: 'running', agentTaskId: 'agent-xyz' });
     taskRegistry.save(root, reg);
 
     const res = actions.cancelTask(root, t.id);
-    assert.equal(res.cancelled, true);
-    assert.equal(res.agentTaskId, 'agent-xyz', 'agentTaskId returned for a live cancel');
-    assert.equal(loadReg().tasks.find((x) => x.id === t.id).status, 'cancelled');
+    assert.equal(res.task.status, 'cancelling', 'a running task enters cancelling, not cancelled (two-phase)');
+    assert.equal(res.agentTaskId, 'agent-xyz', 'agentTaskId is returned so the caller can kill the harness agent');
+    assert.equal(loadReg().tasks.find((x) => x.id === t.id).status, 'cancelling', 'persisted as cancelling');
+
+    // A cancelling task STILL occupies its files: a new task on the same file conflicts.
+    const decision = taskRegistry.canRun({ kind: 'implement', touches: ['src/l.js'] }, loadReg());
+    assert.equal(decision.run, false, 'the cancelling task keeps its files locked until reconcile confirms death');
+    assert.equal(decision.reason, 'file-conflict');
   });
 
   it('cancelling a terminal (done) task throws — terminal is terminal', () => {
@@ -345,5 +350,160 @@ describe('getAgentStatus (registry liveness, agent-lock retired)', () => {
       /Cannot find module/,
       'the agent-lock module must be gone'
     );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R2-B / 1. completeExecution couples the task state machine to the plan (C1-3)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('completeExecution — task/plan coupling (C1-3)', () => {
+  it('marks the matching running implement task done (disk-verified) when the plan reaches review', () => {
+    const planPath = writePlan('in-progress', 'couple-run', { files: ['src/cr.js'] });
+    const claim = taskRegistry.addAndClaim(root, { kind: 'implement', plan: 'couple-run', touches: ['src/cr.js'] });
+    assert.equal(claim.claimed, true, 'the implement task is running before completion');
+
+    const res = actions.completeExecution(planPath, root, { force: true });
+    assert.equal(res.blocked, false, 'forced completion moves to review');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'review', 'couple-run.md')), 'plan moved to review');
+
+    const task = loadReg().tasks.find((t) => t.id === claim.task.id);
+    assert.equal(task.status, 'done', 'the running implement task is settled done on disk');
+    assert.ok(task.result && task.result.ok === true, 'the completion result is recorded honestly');
+  });
+
+  it('leaves a cancelling task\'s status alone but records its result (must not read as clean success)', () => {
+    const planPath = writePlan('in-progress', 'couple-cancel', { files: ['src/cc.js'] });
+    const claim = taskRegistry.addAndClaim(root, { kind: 'implement', plan: 'couple-cancel', touches: ['src/cc.js'] });
+    const reg = loadReg();
+    taskRegistry.updateTask(reg, claim.task.id, { status: 'cancelling' });
+    taskRegistry.save(root, reg);
+
+    actions.completeExecution(planPath, root, { force: true });
+
+    const task = loadReg().tasks.find((t) => t.id === claim.task.id);
+    assert.equal(task.status, 'cancelling', 'a cancelling task keeps its R2-A status path for reconcile');
+    assert.ok(task.result, 'but the completion result is recorded, so it does not read as a clean success');
+  });
+
+  it('no registry / no matching task → completion does not throw and still reaches review (fail-open)', () => {
+    const planPath = writePlan('in-progress', 'couple-none', { files: ['src/cn.js'] });
+    assert.doesNotThrow(() => actions.completeExecution(planPath, root, { force: true }));
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'review', 'couple-none.md')), 'plan still reaches review with no registry match');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R2-B / 2. drain never stalls at the head — skip-and-surface (C1-4)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('startAgent / advanceAgent skip-and-surface (C1-4)', () => {
+  it('startAgent: an unclaimable head (no files:) is surfaced in skipped[], the next valid plan is claimed', () => {
+    writePlan('todo', 'a1-nofiles', { files: null });      // head, unclaimable
+    writePlan('todo', 'a2-good', { files: ['src/a2.js'] }); // behind it, valid
+
+    const r = actions.startAgent(root);
+    assert.equal(r.started, true, 'the plan behind the bad head is claimed — the head never stalls it');
+    assert.equal(r.plan.name, 'a2-good');
+    assert.ok(Array.isArray(r.skipped), 'skipped[] is present');
+    const s = r.skipped.find((x) => x.plan === 'a1-nofiles');
+    assert.ok(s, 'the unclaimable head is surfaced in skipped[]');
+    assert.match(s.reason, /files:/, 'with its refusal reason');
+  });
+
+  it('advanceAgent: same skip-and-surface — a bad head does not stall the plans behind it', () => {
+    writePlan('todo', 'b1-nofiles', { files: null });
+    writePlan('todo', 'b2-good', { files: ['src/b2.js'] });
+
+    const r = actions.advanceAgent(root);
+    assert.equal(r.next, true);
+    assert.equal(r.plan.name, 'b2-good');
+    assert.ok(Array.isArray(r.skipped), 'skipped[] is present');
+    const s = r.skipped.find((x) => x.plan === 'b1-nofiles');
+    assert.ok(s, 'the bad head is surfaced');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R2-B / 3. enqueueWaveSync refuses an empty wave (C1-6)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('enqueueWaveSync refuses an empty wave (C1-6)', () => {
+  it('throws when blockedBy is empty', () => {
+    assert.throws(() => actions.enqueueWaveSync(root, { blockedBy: [] }), /blockedBy|empty|wave|integrate/i);
+  });
+  it('throws when blockedBy is missing', () => {
+    assert.throws(() => actions.enqueueWaveSync(root, {}), /blockedBy|empty|wave|integrate/i);
+    assert.throws(() => actions.enqueueWaveSync(root), /blockedBy|empty|wave|integrate/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R2-B / 4. drain-stop protected (C1-10)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('startAgent drain-stop protection (C1-10)', () => {
+  it('without force, a drain-stopped root refuses to start and leaves the flag intact', () => {
+    writePlan('todo', 'ds-a', { files: ['src/ds.js'] });
+    taskRegistry.requestDrainStop(root);
+
+    const r = actions.startAgent(root);
+    assert.equal(r.started, false);
+    assert.equal(r.drainStopped, true, 'reports the drain-stop');
+    assert.equal(taskRegistry.isDrainStopRequested(root), true, 'the flag is NOT cleared without force');
+    assert.equal(loadReg().tasks.length, 0, 'nothing new was claimed while drained');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'todo', 'ds-a.md')), 'the plan stays in todo');
+  });
+
+  it('with { force: true }, a human-initiated start clears the drain-stop and proceeds', () => {
+    writePlan('todo', 'ds-b', { files: ['src/dsb.js'] });
+    taskRegistry.requestDrainStop(root);
+
+    const r = actions.startAgent(root, { force: true });
+    assert.equal(r.started, true, 'a forced start overrides the drain-stop');
+    assert.equal(taskRegistry.isDrainStopRequested(root), false, 'the flag is cleared by the forced start');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R2-B / 6. deploy trigger behind the human ship gate (G4)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('approvePlan review→done — deploy is behind the ship gate (G4)', () => {
+  function writeDeploySettings(extra) {
+    const settings = {
+      deployment: Object.assign({
+        enabled: true,
+        environments: [{ name: 'staging', enabled: true, strategy: 'git-branch', branch: 'deploy/staging' }],
+        approval: { staging: 'auto' }
+      }, extra)
+    };
+    fs.writeFileSync(path.join(root, '.ctoc', 'settings.json'), JSON.stringify(settings, null, 2));
+  }
+
+  it('deployment enabled but ship_gate_confirmed unset → NO deploy invocation; a deploy-ready notice is recorded', () => {
+    writeDeploySettings({}); // no ship_gate_confirmed
+    const planPath = writePlan('review', 'ship-off', { files: ['src/ship1.js'] });
+
+    actions.approvePlan(planPath, root);
+
+    const noticePath = path.join(root, '.ctoc', 'logs', 'deploy-ready.json');
+    assert.ok(fs.existsSync(noticePath), 'a deploy-ready notice is written for the human ship gate');
+    const notices = JSON.parse(fs.readFileSync(noticePath, 'utf8'));
+    assert.ok(notices.some((n) => n.plan === 'ship-off.md'), 'the notice names the approved plan');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'done', 'ship-off.md')), 'the plan still crosses Gate 3 to done');
+    // The pipeline was NOT invoked → no deployment status artifact written.
+    assert.ok(!fs.existsSync(path.join(root, '.ctoc', 'deployments', 'latest.json')), 'deploy pipeline never ran');
+  });
+
+  it('ship_gate_confirmed:true → the trigger path is taken (no deploy-ready notice recorded)', () => {
+    writeDeploySettings({ ship_gate_confirmed: true, environments: [] }); // confirmed; no envs → pipeline no-ops
+    const planPath = writePlan('review', 'ship-on', { files: ['src/ship2.js'] });
+
+    actions.approvePlan(planPath, root);
+
+    const noticePath = path.join(root, '.ctoc', 'logs', 'deploy-ready.json');
+    assert.ok(!fs.existsSync(noticePath), 'with the ship gate confirmed, NO notice is recorded — the trigger path was taken');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'done', 'ship-on.md')), 'the plan crosses to done');
   });
 });

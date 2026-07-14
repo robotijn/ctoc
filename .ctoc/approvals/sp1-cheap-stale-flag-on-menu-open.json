@@ -1,0 +1,10 @@
+{
+  "content_sha256": "5ff6038caa5ffb709c26308a44bd46498f008ce412b778177d967babb39a9d16",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.595Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "SP1-cheap-stale-flag-on-menu-open"
+}

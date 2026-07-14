@@ -1,0 +1,10 @@
+{
+  "content_sha256": "5b463734f1096b205246522ae326fb7e1ee33e48b735b03f5765e62b028cb736",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.589Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s7-aiml-experiment-tracking"
+}

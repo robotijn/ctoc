@@ -1,0 +1,10 @@
+{
+  "content_sha256": "da2c88719abe99221ce3e10fedd9c32149b72886103296b8af679da47d8ac5be",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.587Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s11-data-streaming-core"
+}

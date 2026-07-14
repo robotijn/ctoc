@@ -1,0 +1,10 @@
+{
+  "content_sha256": "e0fc875b2cb3b648b84f9a2547bafc777448c2135b23477c9ba3e187527205da",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.595Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "SIP1-small-focused-implementation-plans"
+}

@@ -6,17 +6,30 @@
  * The SOLE module that mutates plan files for stale cleanup. It executes a
  * human-approved cleanup action through one of three primitives:
  *
- *   - archive / reconcile → a DEDICATED reconciliation path that stamps the
- *     gate marker into the frontmatter and moves the plan forward to plans/done/
- *     WITHOUT calling actions.approvePlan(). This deliberately bypasses the live
- *     Gate-3 crossing so months-old stale cleanup never re-fires the deployment
- *     pipeline nor pollutes the live transition audit trail (ADR §5). The marker
- *     carries `gate_crossed: stale-reconciliation <ISO>` so the move is
- *     unambiguous in any audit, and is written to the source file BEFORE the
- *     rename so the unmodified gate auto-revert hook (src/hooks/human-gate-check.js)
- *     accepts the moved file (stamp-before-rename, M5).
+ *   - archive / reconcile → a DEDICATED reconciliation path that stamps a
+ *     PIPELINE-provenance block into the frontmatter and moves the plan forward to
+ *     plans/done/ WITHOUT calling actions.approvePlan(). This deliberately bypasses
+ *     the live Gate-3 crossing so months-old stale cleanup never re-fires the
+ *     deployment pipeline nor pollutes the live transition audit trail (ADR §5).
+ *
+ *     PROVENANCE MODEL (R2-I). A machine NEVER writes the human's name. The stamped
+ *     block is `advanced_by: pipeline` + `advanced_at` + `gate_crossed:
+ *     stale-reconciliation <ISO>` — never the human `approved_by` marker. The machine's actual
+ *     authority to occupy done/ is a PIPELINE-kind approval-ledger entry
+ *     (`writePipelineEntry`, `advanced_by: 'pipeline'` + a mandatory non-empty
+ *     `evidence` string) written BEFORE the rename, with a `content_sha256` bound to
+ *     the exact archived bytes. The revived gate hook (src/hooks/human-gate-check.js)
+ *     reads that ledger — NOT the plan-body marker, which any agent can forge — and
+ *     accepts a pipeline entry at done/ (never at the pre-done human-only gate). The
+ *     stamp is still written to the source file BEFORE the rename (stamp-before-
+ *     rename, M5) so the archived file carries legible provenance.
  *   - revert → move the plan back ONE stage (reversible; the dead-on-arrival
  *     default). No marker is stamped — a revert is not a gate crossing.
+ *
+ *     REVERT INVARIANT (R2-I, contradiction 8). A revert may never land a plan in a
+ *     gate-destination stage whose ledger entry cannot vouch for that residency —
+ *     which is why `REVERT_MAP.review` is `todo` (the stage the Gate-2 entry vouches
+ *     for), not `implementation`. See REVERT_MAP for the full rationale.
  *   - delete → only when explicitlyRejected === true; refused by construction at
  *     two layers (M6/D4). Deletion is irreversible.
  *
@@ -24,10 +37,12 @@
  * actions.js — `approvePlan` is deliberately NOT imported, so the module is
  * physically incapable of crossing a live Gate 3 or firing the deployment
  * pipeline. It also imports `listStaleCandidates` from inbox.js to RE-DERIVE a
- * plan's current stage at execution time (D1/D8); inbox.js exports no
- * `approvePlan`, so that import does not widen the gate-safety surface, and it
- * introduces no require cycle (inbox → {cache, stale-detector}; neither re-enters
- * this module; actions never imports inbox).
+ * plan's current stage at execution time (D1/D8), and the approval-ledger to write
+ * a PIPELINE-kind provenance entry (`writePipelineEntry` only). NONE of these
+ * exports `approvePlan`, so no import widens the gate-safety surface; none
+ * introduces a require cycle (inbox → {cache, stale-detector}; approval-ledger →
+ * {crypto, path, safe-fs}; neither re-enters this module; actions never imports
+ * inbox).
  */
 
 const safeFs = require('./safe-fs');
@@ -40,11 +55,29 @@ const { movePlan } = require('./actions');
 const { invalidate } = require('./cache');
 // listStaleCandidates ONLY — RE-DERIVE a plan's current stage at exec time (D1/D8).
 const { listStaleCandidates } = require('./inbox');
+// R2-I: the approval ledger — the SINGLE approval-truth source. Used ONLY to write
+// a PIPELINE-kind entry (`writePipelineEntry`, `advanced_by: pipeline` + evidence)
+// so the revived gate hook (which reads the ledger, NEVER the plan-body marker)
+// accepts a done/ residency this module creates. It exports NO `approvePlan`, so
+// this import does NOT widen the structural gate-safety surface (D2 preserved): the
+// module still cannot cross a live Gate 3 nor fire the deployment pipeline. It is a
+// leaf (crypto/path/safe-fs only) → no require cycle.
+const ledger = require('./approval-ledger');
 
 // Backward revert map (inverse of the forward gate flow). Only the three
 // gate-source stages the detector scans are valid inputs.
+//
+// REVERT INVARIANT (R2-I, contradiction 8): a revert may NEVER move a plan to a
+// gate-destination stage whose ledger entry cannot vouch for that residency. A plan
+// that legitimately reached `review/` crossed Gate 2 (implementation→todo) and so
+// carries a ledger entry with `stage_to: 'todo'`. Reverting it review→`todo` leaves
+// it hook-consistent: the gate hook accepts `todo/` residency on that very entry (a
+// byte-identical rename preserves the hash it verifies). Reverting past the gate to
+// `implementation/` instead produced a plan the hook read as `wrong-edge` (its entry
+// says `todo`, not `implementation`) and chain-reverted a SECOND time. `todo` is the
+// ledger-vouched stage, so `todo` is where a review revert lands.
 const REVERT_MAP = Object.freeze({
-  review: 'implementation',
+  review: 'todo',
   implementation: 'functional',
   functional: 'vision',
 });
@@ -53,17 +86,23 @@ const REVERT_MAP = Object.freeze({
 const CLEANUP_LOG = ['.ctoc', 'logs', 'stale-cleanup.json'];
 
 /**
- * Prepend a separate leading approval block — identical two-block shape to
- * actions.addApprovalMarker, with an unquoted `gate_crossed` value (D6). The
- * first block satisfies human-gate-check.hasApprovalMarker; the original
- * frontmatter (with `files:`) remains intact as the second block.
+ * Prepend a separate leading PIPELINE-provenance block. A machine advance is
+ * `advanced_by: pipeline` + `advanced_at` + `gate_crossed: <reason>` — it NEVER
+ * writes the human `approved_by` marker (R2-I). Forging the human's marker was the exact
+ * self-approval the ledger model closes: only the human, through the menu, may
+ * author a human-kind approval, and the gate hook no longer trusts the plan-body
+ * marker at all — it reads the agent-write-denied ledger. This leading block is
+ * therefore human-readable provenance in the archived file; the machine's ACTUAL
+ * authority to occupy done/ comes from the pipeline-kind ledger entry written in
+ * `_stampAndArchive`. The original frontmatter (with `files:`) remains intact as
+ * the second block.
  * @param {string} content original file content
  * @param {string} reason  e.g. 'stale-reconciliation <ISO>'
  * @returns {string}
  */
 function _stampMarker(content, reason) {
   const iso = new Date().toISOString();
-  return `---\napproved_by: human\napproved_at: ${iso}\ngate_crossed: ${reason}\n---\n\n` + content;
+  return `---\nadvanced_by: pipeline\nadvanced_at: ${iso}\ngate_crossed: ${reason}\n---\n\n` + content;
 }
 
 /**
@@ -165,6 +204,20 @@ function _stampAndArchive(planPath, root, action) {
   const from = _stageFromPath(planPath);
   const content = safeFs.readFileSync(planPath, 'utf8');
   const stamped = _stampMarker(content, 'stale-reconciliation ' + iso);
+  // R2-I: ledger the machine advance as a PIPELINE-kind entry BEFORE the plan
+  // appears in done/, so there is never a window where a done/ resident exists
+  // without provenance for the revived gate hook to accept. `content_sha256` binds
+  // to the EXACT bytes that will occupy done/ (`stamped`, byte-identical across the
+  // rename), so the hook's invalidate-on-edit hash check on done/ passes. The
+  // ledger slug is the canonical lowercase form `slugFromPlanPath` derives — the
+  // same key the hook reads. The evidence string is mandatory and non-empty.
+  const ledgerSlug = ledger.slugFromPlanPath(planPath);
+  ledger.writePipelineEntry(ledgerSlug, {
+    content_sha256: ledger.computeContentHash(stamped),
+    stage_from: from,
+    stage_to: 'done',
+    evidence: 'stale-reconciliation: ' + action + ' ' + iso,
+  }, root);
   safeFs.writeFileSync(planPath, stamped); // WRITE strictly BEFORE rename (M5)
   safeFs.mkdirSync(doneDir, { recursive: true });
   safeFs.renameSync(planPath, dest);

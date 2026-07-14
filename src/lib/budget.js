@@ -326,7 +326,9 @@ function enforce(root, sessionId) {
 
   const action = result.config.halt_action || 'ask_user';
   if (action === 'ask_user') {
-    const err = new Error(`Budget exceeded: ${result.exceeded.map(e => `${e.kind}=${e.current}/${e.limit}`).join(', ')}`);
+    const err = /** @type {Error & {code?: string, details?: object}} */ (
+      new Error(`Budget exceeded: ${result.exceeded.map(e => `${e.kind}=${e.current}/${e.limit}`).join(', ')}`)
+    );
     err.code = 'BUDGET_EXCEEDED';
     err.details = { exceeded: result.exceeded, usage: result.usage, config: result.config };
     throw err;

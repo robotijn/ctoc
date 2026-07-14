@@ -1,0 +1,10 @@
+{
+  "content_sha256": "f0e8eb53a1792d3b51176822d20441d09e658b77a5eb2f0a0ac484d0b995938d",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.587Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s18-data-sql-embedded-orm"
+}

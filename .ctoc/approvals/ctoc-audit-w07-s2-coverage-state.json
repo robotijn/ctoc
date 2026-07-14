@@ -1,0 +1,10 @@
+{
+  "content_sha256": "02494b6cafd57ddeb649dca2f2424bf0b460b0079239002b5a52fbec65af49bc",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.596Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "ctoc-audit-w07-s2-coverage-state"
+}

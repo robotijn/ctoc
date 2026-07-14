@@ -1,0 +1,10 @@
+{
+  "content_sha256": "5e1bda39101dd8aca145db22f2918621277dbaa1c2a508ba097b0802c24be3dc",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.601Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "smart-quality-gate-system"
+}

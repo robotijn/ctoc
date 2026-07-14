@@ -1,0 +1,10 @@
+{
+  "content_sha256": "58fda22a49d624b80d7bbc6457a4424fb6d0c5c2b8e2e53233d418a44b6261fe",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.593Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC5-iron-loop-integration"
+}

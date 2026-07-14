@@ -35,7 +35,9 @@ const SECTION_LABELS = Object.freeze({
  */
 function getSectionForStage(stage) {
   for (const [section, stages] of Object.entries(SECTIONS)) {
-    if (stages.includes(stage)) return section;
+    // Object.entries widens the key to `string`; SECTIONS is frozen, so the key
+    // is necessarily one of the three section names — narrow it back.
+    if (stages.includes(stage)) return /** @type {'business'|'implementation'|'execution'} */ (section);
   }
   return null;
 }

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "50eb1b3d5e1403e87c9c9648c95ca098b5c44bb2b17ce1c0829a3351042dc9a5",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.586Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU3-tier1-frameworks-s2-ai-ml-llm-sdk"
+}

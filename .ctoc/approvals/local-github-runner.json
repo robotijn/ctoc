@@ -1,0 +1,10 @@
+{
+  "content_sha256": "6bd86eca9d0a933ec4233367a18b7b70e2795ef2109f63602be6c6460422adc3",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.599Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "local-github-runner"
+}

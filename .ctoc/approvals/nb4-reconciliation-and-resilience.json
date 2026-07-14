@@ -1,0 +1,10 @@
+{
+  "content_sha256": "7c449978d5e9152a0ac9c3414af42ad0f031f1df79345e77025ea862cb8a91ba",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.594Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "NB4-reconciliation-and-resilience"
+}

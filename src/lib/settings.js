@@ -183,9 +183,25 @@ function getEnvironmentProfile(env) {
   return out;
 }
 
-// True when the user has not yet chosen an environment — the plugin should ask.
+// True when the user has not yet chosen an environment AND has not durably
+// dismissed the prompt — the plugin should ask.
+//
+// Truth table (raw settings.json):
+//   general.environment ∈ {dev,staging,prod}      → false  (a real choice was made)
+//   general.environment 'ask'/absent, NOT dismissed → true   (ride the question along)
+//   general.environment 'ask'/absent, dismissed     → false  (R2-C2 item 2 durable stop)
+//
+// R2-C2 item 2 (R2/F7): the old ride-along "Decide later" was a one-turn skip that
+// re-asked every menu open — the re-ask hell. It is replaced by "Keep defaults,
+// stop asking", which persists `general.environment_prompt_dismissed: true` (via
+// setSetting). This predicate honors that marker so the environment stays 'ask'
+// (defaults apply) yet the question no longer nags. The environment is still
+// changeable anytime from System → Settings (the `general.environment` schema key).
 function needsEnvironmentPrompt(projectPath = process.cwd()) {
-  return getEnvironment(projectPath) === 'ask';
+  if (getEnvironment(projectPath) !== 'ask') return false;
+  const raw = readRawSettings(projectPath);
+  if (raw.general && raw.general.environment_prompt_dismissed === true) return false;
+  return true;
 }
 
 // Load settings, resolving each value as: explicit user setting > environment

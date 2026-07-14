@@ -1,0 +1,10 @@
+{
+  "content_sha256": "2af84df6a56b48cfea5077eb141bb5fb496b373d24e97dcb294c2ee6dc03e18f",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.589Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s5-aiml-orchestration-agents"
+}

@@ -323,8 +323,8 @@ describe('e2e: menu state machine via real process', () => {
     // Pipeline navigation survives alongside the environment actions.
     assert.ok('Business' in json.actions, 'pipeline navigation intact');
     assert.equal(json.actions['Development'], 'claude:set-environment dev');
-    assert.equal(json.actions['Decide later'], 'claude:env-decide-later',
-      '"Decide later" must not loop back into a prompt-gate');
+    assert.equal(json.actions['Keep defaults, stop asking'], 'claude:env-keep-defaults',
+      'the environment ride-along offers the durable stop (R2-C2: one-turn skips were the re-ask defect)');
   });
 
   it('6b. env SET → plain dashboard, single question, no environment banner', () => {

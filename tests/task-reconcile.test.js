@@ -123,8 +123,9 @@ describe('reconcile — orphan detection', () => {
   });
 
   it('staleness-backstop-when-no-TaskList: old running orphaned, young running left alone', () => {
-    const old = running({ id: 't-old', agentTaskId: 'a1', started: ago(STALE + MIN) });
-    const young = running({ id: 't-young', agentTaskId: 'a2', started: ago(STALE - 5 * MIN) });
+    // kind 'review' keeps the 30-min floor (implement/sync get 120 min — C1-5).
+    const old = running({ id: 't-old', kind: 'review', agentTaskId: 'a1', started: ago(STALE + MIN) });
+    const young = running({ id: 't-young', kind: 'review', agentTaskId: 'a2', started: ago(STALE - 5 * MIN) });
     const { tasks, report } = rec.reconcile(mkReg([old, young]), { ...OPTS, liveAgentIds: null });
     const gotOld = tasks.tasks.find(x => x.id === 't-old');
     const gotYoung = tasks.tasks.find(x => x.id === 't-young');
@@ -242,7 +243,7 @@ describe('reconcile — terminal sweep', () => {
   });
 
   it('freshly-orphaned task is not swept the same pass (offered for re-run)', () => {
-    const stale = running({ id: 'ghost', agentTaskId: 'g', started: ago(STALE + MIN) });
+    const stale = running({ id: 'ghost', kind: 'review', agentTaskId: 'g', started: ago(STALE + MIN) });
     const { tasks, report } = rec.reconcile(mkReg([stale]), { ...OPTS, liveAgentIds: null });
     assert.deepEqual(report.orphaned, ['ghost']);
     assert.deepEqual(report.swept, [], 'fresh orphan (ts.done≈now) survives retention this pass');
@@ -291,7 +292,7 @@ describe('sweepTempArtifacts', () => {
 describe('reconcile — purity', () => {
   it('pure-reconcile-does-not-mutate-input', () => {
     const input = mkReg([
-      running({ id: 't1', agentTaskId: 'ghost', started: ago(STALE + MIN) }),
+      running({ id: 't1', kind: 'review', agentTaskId: 'ghost', started: ago(STALE + MIN) }),
       task({ id: 'd1', status: 'done', done: ago(RETENTION + MIN) })
     ]);
     const snapshot = JSON.parse(JSON.stringify(input));
@@ -327,7 +328,7 @@ describe('reconcileState', () => {
   });
 
   it('reconcileState-save-failure-does-not-throw: fault-injected rename → report.saveFailed, no throw', () => {
-    const seed = mkReg([running({ id: 'ghost', agentTaskId: 'g', started: ago(STALE + MIN) })]);
+    const seed = mkReg([running({ id: 'ghost', kind: 'review', agentTaskId: 'g', started: ago(STALE + MIN) })]);
     reg.save(root, seed);
 
     const orig = safeFs.renameSync;
@@ -351,5 +352,162 @@ describe('reconcileState', () => {
     // load() fails open to empty → nothing to orphan/promote, menu never bricks.
     assert.deepEqual(out.promote, []);
     assert.deepEqual(out.report.orphaned, []);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Kind-aware staleness backstop (C1-5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('reconcile — kind-aware staleness backstop (C1-5)', () => {
+  it('implement task 45 min old with no TaskList is NOT orphaned (120-min floor)', () => {
+    const r = mkReg([running({ id: 't1', kind: 'implement', agentTaskId: 'g', touches: ['a.js'], started: ago(45 * MIN) })]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'running', 'under the 120-min floor → left alone');
+    assert.deepEqual(report.orphaned, []);
+    assert.deepEqual(report.stalenessOrphaned, []);
+  });
+
+  it('implement task 130 min old with no TaskList IS orphaned + stalenessOrphaned detail carries age', () => {
+    const r = mkReg([running({ id: 't1', kind: 'implement', agentTaskId: 'g', touches: ['a.js'], started: ago(130 * MIN) })]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'orphaned');
+    assert.deepEqual(report.orphaned, ['t1']);
+    assert.equal(report.stalenessOrphaned.length, 1);
+    assert.equal(report.stalenessOrphaned[0].id, 't1');
+    assert.ok(report.stalenessOrphaned[0].ageMs >= 130 * MIN, 'age recorded so the inbox can say "may still be alive"');
+  });
+
+  it('sync kind also gets the 120-min floor (90 min → not orphaned)', () => {
+    const r = mkReg([running({ id: 't1', kind: 'sync', gitOp: true, agentTaskId: 'g', started: ago(90 * MIN) })]);
+    const { tasks } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'running');
+  });
+
+  it('a non-implement/sync kind keeps the 30-min staleness floor', () => {
+    const r = mkReg([running({ id: 't1', kind: 'review', agentTaskId: 'g', started: ago(31 * MIN) })]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'orphaned');
+    assert.deepEqual(report.orphaned, ['t1']);
+    assert.equal(report.stalenessOrphaned.length, 1);
+  });
+
+  it('a per-kind override via staleThresholdMsByKind is honored', () => {
+    const r = mkReg([running({ id: 't1', kind: 'implement', agentTaskId: 'g', touches: ['a.js'], started: ago(20 * MIN) })]);
+    const { tasks } = rec.reconcile(r, {
+      now: NOW, graceMs: GRACE, liveAgentIds: null,
+      staleThresholdMsByKind: { implement: 10 * MIN }
+    });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'orphaned', '20 min > 10-min override → orphaned');
+  });
+
+  it('a confirmed-absent orphan (TaskList present, no match) is NOT a stalenessOrphaned', () => {
+    const r = mkReg([running({ id: 't1', kind: 'implement', agentTaskId: 'gone', touches: ['a.js'], started: ago(5 * MIN) })]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: new Set(['other']) });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'orphaned', 'confirmed absent → orphaned regardless of age');
+    assert.deepEqual(report.orphaned, ['t1']);
+    assert.deepEqual(report.stalenessOrphaned, [], 'not staleness-based — TaskList confirmed the agent gone');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cancelling liveness (C1-2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('reconcile — cancelling liveness (C1-2)', () => {
+  function cancelling(over = {}) {
+    return { ...running(over), status: 'cancelling' };
+  }
+
+  it('a cancelling task with a live agent stays cancelling (files stay locked)', () => {
+    const r = mkReg([cancelling({ id: 't1', kind: 'review', agentTaskId: 'live', started: ago(31 * MIN) })]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: new Set(['live']) });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'cancelling');
+    assert.deepEqual(report.cancelled, []);
+  });
+
+  it('a cancelling task confirmed absent → cancelled (agent gone), ts.done stamped', () => {
+    const r = mkReg([cancelling({ id: 't1', kind: 'review', agentTaskId: 'ghost', started: ago(31 * MIN) })]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: new Set(['other']) });
+    const t = tasks.tasks.find(x => x.id === 't1');
+    assert.equal(t.status, 'cancelled');
+    assert.equal(t.ts.done, new Date(NOW).toISOString());
+    assert.deepEqual(report.cancelled, ['t1']);
+  });
+
+  it('a young cancelling task inside grace is left alone (just-dispatched cancel race)', () => {
+    const r = mkReg([cancelling({ id: 't1', kind: 'review', agentTaskId: 'ghost', started: ago(GRACE - 10_000) })]);
+    const { tasks } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: new Set() });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'cancelling');
+  });
+
+  it('a stale cancelling task with no TaskList → cancelled via the staleness backstop', () => {
+    const r = mkReg([cancelling({ id: 't1', kind: 'review', agentTaskId: 'ghost', started: ago(31 * MIN) })]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'cancelled');
+    assert.deepEqual(report.cancelled, ['t1']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unsatisfiable queued surfacing (C1-1/C1-7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('reconcile — unsatisfiable queued surfacing (C1-1/C1-7)', () => {
+  it('a queued task with a failed dep is marked failed + surfaced (never silent-forever)', () => {
+    const r = mkReg([
+      task({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'], done: ago(0) }),
+      task({ id: 't2', kind: 'review', status: 'queued', touches: ['b.js'], blockedBy: ['t1'], done: undefined })
+    ]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    const t2 = tasks.tasks.find(x => x.id === 't2');
+    assert.equal(t2.status, 'failed', 'the wedged task is failed, not left queued forever');
+    assert.equal(t2.result.ok, false);
+    assert.match(String(t2.result.summary), /dep-failed/);
+    assert.match(String(t2.result.summary), /t1/);
+    assert.ok(report.unsatisfiable.some(u => u.id === 't2' && u.reason === 'dep-failed'));
+    assert.equal(t2.ts.done, new Date(NOW).toISOString(), 'failed marking stamps ts.done = now → survives retention');
+  });
+
+  it('a blockedBy cycle among queued tasks is surfaced as dep-cycle', () => {
+    const r = mkReg([
+      task({ id: 't1', kind: 'review', status: 'queued', touches: ['a.js'], blockedBy: ['t2'], done: undefined }),
+      task({ id: 't2', kind: 'review', status: 'queued', touches: ['b.js'], blockedBy: ['t1'], done: undefined })
+    ]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't1').status, 'failed');
+    assert.equal(tasks.tasks.find(x => x.id === 't2').status, 'failed');
+    assert.deepEqual(report.unsatisfiable.map(u => u.reason), ['dep-cycle', 'dep-cycle']);
+  });
+
+  it('a missing dep on a queued task is surfaced as dep-missing', () => {
+    const r = mkReg([
+      task({ id: 't2', kind: 'review', status: 'queued', touches: ['b.js'], blockedBy: ['ghost'], done: undefined })
+    ]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't2').status, 'failed');
+    assert.ok(report.unsatisfiable.some(u => u.id === 't2' && u.reason === 'dep-missing'));
+  });
+
+  it('a satisfiable queued task is left queued (not falsely failed)', () => {
+    const r = mkReg([
+      task({ id: 't1', kind: 'plan', status: 'done', done: ago(0) }),
+      task({ id: 't2', kind: 'review', status: 'queued', touches: ['b.js'], blockedBy: ['t1'], done: undefined })
+    ]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 't2').status, 'queued');
+    assert.deepEqual(report.unsatisfiable, []);
+  });
+
+  it('reconcileState persists the unsatisfiable-failed marking to disk', () => {
+    const seed = mkReg([
+      task({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'], done: ago(0) }),
+      task({ id: 't2', kind: 'review', status: 'queued', touches: ['b.js'], blockedBy: ['t1'], done: undefined })
+    ]);
+    reg.save(root, seed);
+    const { report } = rec.reconcileState(root, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.ok(report.unsatisfiable.some(u => u.id === 't2'));
+    const reloaded = reg.load(root);
+    assert.equal(reloaded.tasks.find(t => t.id === 't2').status, 'failed', 'wedge persisted, not lost on reload');
   });
 });

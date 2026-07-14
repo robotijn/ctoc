@@ -1,0 +1,10 @@
+{
+  "content_sha256": "f50a9eb5db55929dcdcc3ce840ec73178440b1bb07f9c266ed686f6eb8ebaa78",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.593Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC5-s2-compliance-dedup"
+}

@@ -836,3 +836,95 @@ describe('FIX 6 / shape — a real candidate has exactly the 4 locked keys', () 
     assert.deepEqual(Object.keys(cand).sort(), ['actionable', 'plan', 'signals', 'stage']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// R3 — durable dismissal store: a dismissed candidate stays dismissed across
+// scans (so "Don't ask again" is durable, not a one-turn skip), keyed by a
+// content signature (plan path + mtime) so a plan CHANGED since dismissal
+// re-surfaces. The store read is fail-open. dismissStale is the export R2-C's
+// menu route calls; the filter it feeds is already live via inbox.js →
+// scanCheapCandidates (the hot-path count and the drill-in list).
+// ---------------------------------------------------------------------------
+
+describe('R3 — durable dismissal store', () => {
+  const { dismissStale } = require('../src/lib/stale-detector.js');
+  const STORE_REL = ['.ctoc', 'state', 'stale-dismissals.json'];
+
+  it('dismissing a candidate filters it from a subsequent scan (durable, not one-turn)', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'review', 'p-dismiss', { filesSyntax: 'inline', files: ['src/lib/gone.js'] });
+
+    const before = scanCheapCandidates(sb);
+    const cand = findCandidate(before, 'p-dismiss');
+    assert.ok(cand, 'plan must be a candidate before dismissal');
+
+    const res = dismissStale(sb, [cand]);
+    assert.equal(res.ok, true, 'dismissStale reports success');
+
+    const after = scanCheapCandidates(sb);
+    assert.equal(findCandidate(after, 'p-dismiss'), undefined, 'dismissed plan is filtered from the scan');
+    assert.equal(after.count, before.count - 1, 'the nag count drops by exactly one');
+  });
+
+  it('a plan CHANGED since dismissal re-surfaces (mtime signature no longer matches)', () => {
+    const sb = makeSandbox();
+    const fp = writePlan(sb, 'review', 'p-change', { filesSyntax: 'inline', files: ['src/lib/gone.js'] });
+
+    const cand = findCandidate(scanCheapCandidates(sb), 'p-change');
+    dismissStale(sb, [cand]);
+    assert.equal(findCandidate(scanCheapCandidates(sb), 'p-change'), undefined, 'dismissed first');
+
+    // Deterministically bump the plan mtime (no reliance on wall-clock granularity)
+    // so the stored signature no longer matches — a changed plan MAY re-surface.
+    const bumped = new Date(mtimeOf(fp) + 60000);
+    fs.utimesSync(fp, bumped, bumped);
+
+    const after = scanCheapCandidates(sb);
+    assert.ok(findCandidate(after, 'p-change'), 'a plan changed since dismissal must re-surface');
+  });
+
+  it('a corrupt dismissal store fails open — no candidate is suppressed', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'review', 'p-open', { filesSyntax: 'inline', files: ['src/lib/gone.js'] });
+    const storeDir = path.join(sb, STORE_REL[0], STORE_REL[1]);
+    fs.mkdirSync(storeDir, { recursive: true });
+    fs.writeFileSync(path.join(storeDir, STORE_REL[2]), '{ this is : not json ][');
+
+    let res;
+    assert.doesNotThrow(() => { res = scanCheapCandidates(sb); });
+    assert.ok(findCandidate(res, 'p-open'), 'a corrupt store must never suppress candidates (fail-open)');
+  });
+
+  it('dismissing one plan does not filter an unrelated plan', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'review', 'keep', { filesSyntax: 'inline', files: ['src/lib/a.js'] });
+    writePlan(sb, 'review', 'drop', { filesSyntax: 'inline', files: ['src/lib/b.js'] });
+
+    const dropCand = findCandidate(scanCheapCandidates(sb), 'drop');
+    dismissStale(sb, [dropCand]);
+
+    const after = scanCheapCandidates(sb);
+    assert.equal(findCandidate(after, 'drop'), undefined, 'the dismissed plan is filtered');
+    assert.ok(findCandidate(after, 'keep'), 'an unrelated plan remains a candidate');
+  });
+
+  it('candidate shape is unchanged (exactly 4 keys) even with a dismissal store present', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'review', 'shape-a', { filesSyntax: 'inline', files: ['src/lib/a.js'] });
+    writePlan(sb, 'review', 'shape-b', { filesSyntax: 'inline', files: ['src/lib/b.js'] });
+
+    const a = findCandidate(scanCheapCandidates(sb), 'shape-a');
+    dismissStale(sb, [a]);
+    const b = findCandidate(scanCheapCandidates(sb), 'shape-b');
+    assert.deepEqual(Object.keys(b).sort(), ['actionable', 'plan', 'signals', 'stage']);
+  });
+
+  it('dismissStale is fail-open on misuse (bad root, non-array candidates)', () => {
+    assert.deepEqual(dismissStale('', []), { ok: false, count: 0 }, 'empty root ⇒ fail-open, no throw');
+    const sb = makeSandbox();
+    let r;
+    assert.doesNotThrow(() => { r = dismissStale(sb, null); });
+    assert.equal(r.ok, true, 'no candidates ⇒ empty write is still a success');
+    assert.equal(r.count, 0);
+  });
+});

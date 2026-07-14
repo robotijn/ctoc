@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.12.2-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.12.3-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-426-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **124 agents** across **25 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **426-file skill library** (100 Tier-2 specialist bodies + 326 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. A **local semantic plan-index** gives you meaning-based search, related-plan surfacing, duplicate-guarding, and conflict detection over your plan corpus, and an **advisory EU-compliance program** (GDPR + EU AI Act) flags regulatory exposure as you build — always advising, never overriding a human gate. The result: AI that writes production-quality code on the first try.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **124 agents** across **25 categories** route through a **4-tier architecture** (CTO Chief → sub-orchestrators → specialists → Haiku scouts), with **4 mandatory human gates**. The **426-file skill library** (100 Tier-2 specialist bodies + 326 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. A **local semantic plan-index** gives you meaning-based search, related-plan surfacing, duplicate-guarding, and conflict detection over your plan corpus, and an **advisory EU-compliance program** (GDPR + EU AI Act) flags regulatory exposure as you build — always advising, never overriding a human gate. The result: production-quality code — held to that standard not by a perfect first pass, but because adversarial review and the four human gates catch what a first pass misses.
 
 ## Install
 
@@ -360,7 +360,7 @@ CTO Chief is the only top-level dispatcher. All other agents are dispatched by C
 | **Tier 2** | Specialists | 99 | Opus / Sonnet | Domain experts — single-purpose, structured findings output, cannot dispatch other agents |
 | **Tier 3** | Scouts | 5 | Haiku 4.5 | Fast pass/flag pre-screens in isolated 200K context: syntax · lint · test · dep · secret. Short-circuit Tier 2 when clean. ~10–50× cheaper than the specialists they replace on the happy path. |
 
-Cross-pillar conflicts (security vs. performance, etc.) are resolved by the **synthesizer** using a fixed priority: Security > Correctness > Maintainability > Performance > Readability > Consistency. Every dispatch is logged to `.ctoc/audit/dispatches/YYYY-MM-DD/<id>.yaml` per the [Dispatch Protocol](docs/DISPATCH_PROTOCOL.md).
+Cross-pillar conflicts (security vs. performance, etc.) are resolved by the **synthesizer** using a fixed priority: Security > Correctness > Maintainability > Performance > Readability > Consistency. Each dispatch is recorded to `.ctoc/audit/dispatches/YYYY-MM-DD/<id>.yaml` — an instruction-level [Dispatch Protocol](docs/DISPATCH_PROTOCOL.md) the session model follows, not a code-enforced hook today.
 
 ---
 
@@ -823,7 +823,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.12.2'
+getVersion()       // → '6.12.3'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -892,6 +892,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.12.2** · Built by [@robotijn](https://github.com/robotijn)
+**6.12.3** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

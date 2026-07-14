@@ -1,0 +1,10 @@
+{
+  "content_sha256": "fafa1a0f20caa97260069d28351fea34c4498f28ba9c4fb9d1a8c10d47b8b497",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.594Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC6-tests-and-fixtures-s2-recommender-integration"
+}

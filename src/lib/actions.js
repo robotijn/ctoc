@@ -363,10 +363,19 @@ function approvePlan(planPath, projectPath, options = {}) {
           const { getDeploymentConfig, runDeploymentPipeline } = require('./deployment');
           const config = getDeploymentConfig(root);
           if (config.enabled) {
-            // Run asynchronously — don't block the plan transition
-            runDeploymentPipeline(newPath, root).catch(err => {
-              console.error('Deployment pipeline failed:', err.message);
-            });
+            if (config.ship_gate_confirmed === true) {
+              // The human confirmed, per-project, that Gate 3 approval may cross into
+              // deploy. Only then does the pipeline fire. Run asynchronously — don't
+              // block the plan transition.
+              runDeploymentPipeline(newPath, root).catch(err => {
+                console.error('Deployment pipeline failed:', err.message);
+              });
+            } else {
+              // G4 (2026-07-14): Gate 3 approval must NEVER auto-cross into a live
+              // deploy — deploy is a SEPARATE human ship gate. Record a deploy-ready
+              // notice for the human instead of triggering; do not deploy.
+              recordDeployReadyNotice(newPath, root);
+            }
           }
         } catch (deployErr) {
           console.error('Deployment trigger failed:', deployErr.message);
@@ -675,9 +684,13 @@ function startExecution(planPath, projectPath) {
  *
  * @param {string} planPath - Path to the plan in in-progress
  * @param {string} projectPath - Project root
- * @param {Object} options - Options
- * @param {boolean} options.force - Skip validation (requires CTO-Chief approval)
- * @returns {{ newPath: string, backgroundAgent: string, validation: Object }}
+ * @param {Object} [options] - Options
+ * @param {boolean} [options.force] - Skip validation (requires CTO-Chief approval)
+ * @returns {{ newPath: (string|null), backgroundAgent: (string|null),
+ *   validation: Object, blocked: boolean, kickback?: Object, message?: string,
+ *   verify?: Object }} the review-transition result; on a blocked completion
+ *   `newPath`/`backgroundAgent` are null and `kickback`/`message` are present,
+ *   otherwise `verify` carries the Step 14 evidence
  */
 function completeExecution(planPath, projectPath, options = {}) {
   const root = projectPath || findProjectRoot();
@@ -713,6 +726,39 @@ function completeExecution(planPath, projectPath, options = {}) {
 
   clearStatus(planPath);
   const newPath = movePlan(planPath, 'review', root);
+  const planSlug = path.basename(newPath, '.md');
+
+  // Couple the TASK state machine to the PLAN state machine (C1-3). The same
+  // completion that moves the plan in-progress → review settles the plan's
+  // non-terminal implement task in the registry, in ONE load→save:
+  //   • a RUNNING task → done (the plan reached review = the implement work
+  //     succeeded), recording result { ok: true, summary: 'plan reached review' };
+  //   • a CANCELLING task keeps its R2-A status path (reconcile confirms death) but
+  //     records a result so a cancelled plan's completion never reads as a clean
+  //     success.
+  // Fail-open: no registry, no matching task, or any registry error is logged and
+  // NEVER breaks the transition (the plan has already moved to review).
+  try {
+    const registry = taskRegistry.load(root);
+    const TERMINAL = new Set(['done', 'failed', 'orphaned', 'cancelled']);
+    const taskForPlan = registry.tasks.find(
+      (t) => t.kind === 'implement' && t.plan === planSlug && !TERMINAL.has(t.status)
+    );
+    if (taskForPlan && taskForPlan.status === 'running') {
+      taskRegistry.updateTask(registry, taskForPlan.id, {
+        status: 'done',
+        result: { ok: true, summary: 'plan reached review' }
+      });
+      taskRegistry.save(root, registry);
+    } else if (taskForPlan && taskForPlan.status === 'cancelling') {
+      taskRegistry.updateTask(registry, taskForPlan.id, {
+        result: { ok: true, summary: 'plan reached review during cancellation' }
+      });
+      taskRegistry.save(root, registry);
+    }
+  } catch (couplingErr) {
+    console.error(`Task/plan coupling failed for ${planSlug}: ${couplingErr.message}`);
+  }
 
   // PRODUCE the VERIFY evidence Gate 3 depends on, by actually RUNNING Step 14 —
   // never by a human hand-fabricating the artifact (finding C9). Before this
@@ -720,7 +766,6 @@ function completeExecution(planPath, projectPath, options = {}) {
   // producer, which trained evidence fabrication. Now every in-progress→review
   // completion runs the real quality gate and records the real result on disk at
   // .ctoc/state/verify/<slug>.json. `validateReviewToDone` reads it at Gate 3.
-  const planSlug = path.basename(newPath, '.md');
   let verify = null;
   try {
     const { persistVerifyResult } = require('./step-13-verify');
@@ -842,6 +887,48 @@ function surfaceEscalation(escalation, planName, root) {
     `   Recorded to ${path.join(root, '.ctoc', 'logs', 'escalations.json')}.\n` +
     `   Human review required before the pipeline retries this plan again.\n`
   );
+}
+
+/**
+ * Record a "deploy-ready" notice for the human ship gate (G4). Crossing Gate 3
+ * (review → done) makes a plan DEPLOY-READY, but it must NEVER auto-cross into a
+ * live deploy — the human decided push and deploy are the two separate ship gates
+ * (2026-07-14). When deployment is enabled but `deployment.ship_gate_confirmed` is
+ * not `true`, this writes a durable notice to `<root>/.ctoc/logs/deploy-ready.json`
+ * (the same append+rotate pattern the other action logs use) INSTEAD of triggering
+ * the pipeline. The menu/inbox surface reads this log to tell the human a plan is
+ * awaiting the deploy ship gate.
+ *
+ * Fail-open: a notice-write error is logged and NEVER breaks the Gate 3 transition
+ * (the plan has already crossed to done).
+ *
+ * @param {string} planPath - the approved plan's (done-stage) path
+ * @param {string} root - project root
+ */
+function recordDeployReadyNotice(planPath, root) {
+  try {
+    const logDir = path.join(root, '.ctoc', 'logs');
+    if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true });
+    const logFile = path.join(logDir, 'deploy-ready.json');
+    let log = [];
+    if (safeFs.existsSync(logFile)) {
+      try { log = JSON.parse(safeFs.readFileSync(logFile, 'utf8')); } catch { log = []; }
+    }
+    if (!Array.isArray(log)) log = [];
+    log.push({
+      plan: path.basename(planPath),
+      at: new Date().toISOString(),
+      status: 'deploy-ready',
+      message:
+        'Plan approved at Gate 3 (review → done) and is DEPLOY-READY. Deploy is a ' +
+        'separate human ship gate; set deployment.ship_gate_confirmed: true to enable ' +
+        'auto-deploy on Gate 3, or deploy manually.'
+    });
+    if (log.length > 500) log = log.slice(-500);
+    safeFs.writeFileSync(logFile, JSON.stringify(log, null, 2));
+  } catch (err) {
+    console.error('Deploy-ready notice failed:', err && err.message ? err.message : String(err));
+  }
 }
 
 /**
@@ -983,44 +1070,76 @@ function taskSpecFromPlan(plan, projectPath) {
  * the registry and reports `{ started: false, queued: true, reason }` — an honest
  * "recorded, waiting on <reason>", not an error.
  *
+ * Drain-stop is PROTECTED (C1-10): a graceful stop is only overridden by an
+ * explicit human-initiated start — `startAgent(root, { force: true })`, which the
+ * menu's start recipe passes (slice R2-D). Without `force`, a drain-stopped root
+ * refuses to start new work and returns `{ started: false, drainStopped: true }`
+ * with the flag left intact.
+ *
+ * The FIFO drain never stalls at the head (C1-4): a plan whose spec cannot be built
+ * (no `files:`, or an unresolvable dependency) is recorded in `skipped[]` and the
+ * NEXT plan is tried; the first plan with a valid spec wins. A single refusal never
+ * blocks the plans queued behind it.
+ *
  * @param {string} projectPath - Project root
+ * @param {{ force?: boolean }} [options] - `force: true` clears a drain-stop and
+ *   starts anyway (the human-initiated menu start). Without it a drain-stopped root
+ *   is honored.
  * @returns {{ started: boolean, error?: string, queued?: boolean, reason?: string,
- *   task?: object, plan?: object, cleanedUp?: string[], remainingTodo?: number }}
+ *   task?: object, plan?: object, cleanedUp?: string[], drainStopped?: boolean,
+ *   skipped?: Array<{plan:string, reason:string}>, remainingTodo?: number }}
  */
-function startAgent(projectPath) {
+function startAgent(projectPath, options = {}) {
   const root = projectPath || findProjectRoot();
   const { readPlans, getPlansDir, setAgentStatus } = require('./state');
 
-  // 1. Clear any leftover drain-stop from a prior run (a fresh start un-drains).
-  taskRegistry.clearDrainStop(root);
+  // 1. Drain-stop protection (C1-10). A forced (human-initiated) start un-drains
+  //    and proceeds; an unforced start honors the drain-stop and starts nothing.
+  if (taskRegistry.isDrainStopRequested(root)) {
+    if (options.force === true) {
+      taskRegistry.clearDrainStop(root);
+    } else {
+      return { started: false, drainStopped: true };
+    }
+  }
 
   // 2. Sweep stale in-progress plans (D2). cleanupStaleInProgress returns
   //    { cleanedUp, skipped }; surface the moved-name list, preserving cleanedUp[].
   const { cleanedUp } = cleanupStaleInProgress(root);
 
-  // 3. Next todo plan (FIFO — already sorted by readPlans).
+  // 3. FIFO todo queue (already sorted by readPlans).
   const plansDir = getPlansDir(root);
   const todoPlans = readPlans(path.join(plansDir, 'todo'));
   if (todoPlans.length === 0) {
-    return { started: false, error: 'No plans in todo queue', cleanedUp };
+    return { started: false, error: 'No plans in todo queue', cleanedUp, skipped: [] };
   }
-  const nextPlan = todoPlans[0];
 
-  // 4. Translate the plan into a task spec. A plan that cannot honestly declare
-  //    disjointness (no files:) or whose dependency is unresolvable is refused —
-  //    surfaced as a structured error, never a stub or a silent skip.
-  let spec;
-  try {
-    spec = taskSpecFromPlan(nextPlan, root);
-  } catch (err) {
-    return { started: false, error: err.message, plan: { name: nextPlan.name, path: nextPlan.path } };
+  // 4. Walk the FIFO queue for the first plan with a valid task spec. A plan that
+  //    cannot honestly declare disjointness (no files:) or whose dependency is
+  //    unresolvable is recorded in skipped[] and NEVER stalls the plans behind it
+  //    (C1-4) — the refusal is surfaced, not fatal.
+  const skipped = [];
+  let nextPlan = null;
+  let spec = null;
+  for (const plan of todoPlans) {
+    try {
+      spec = taskSpecFromPlan(plan, root);
+      nextPlan = plan;
+      break;
+    } catch (err) {
+      skipped.push({ plan: plan.name, reason: err.message });
+    }
+  }
+  if (!nextPlan) {
+    // Every todo plan was unclaimable — surface them all; none stalled the others.
+    return { started: false, error: 'No claimable plan in todo queue', cleanedUp, skipped };
   }
 
   // 5. Record + claim atomically (single load→save cycle in the registry).
   const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
   if (!claimed) {
     // The task is recorded and queued; the plan stays in todo until a slot frees.
-    return { started: false, queued: true, reason, task };
+    return { started: false, queued: true, reason, task, cleanedUp, skipped };
   }
 
   // 6. Claimed → move the plan to in-progress and light up the dashboard status.
@@ -1038,6 +1157,7 @@ function startAgent(projectPath) {
     task,
     plan: { name: nextPlan.name, path: newPath },
     cleanedUp,
+    skipped,
     remainingTodo: todoPlans.length - 1
   };
 }
@@ -1073,9 +1193,14 @@ function stopAgent(projectPath) {
  * as startAgent. Completion marking of the FINISHED task lives in the menu's WORK
  * completion recipe + task-reconcile orphan handling — this function does not move it.
  *
+ * The FIFO drain never stalls at the head (C1-4): a plan whose spec cannot be built
+ * is recorded in `skipped[]` and the NEXT plan is tried; the first plan with a valid
+ * spec wins. A single refusal never blocks the plans queued behind it.
+ *
  * @param {string} projectPath - Project root
  * @returns {{ next: boolean, plan?: object, stopped?: boolean, done?: boolean,
- *   queued?: boolean, reason?: string, task?: object, error?: string, remainingTodo?: number }}
+ *   queued?: boolean, reason?: string, task?: object, error?: string,
+ *   skipped?: Array<{plan:string, reason:string}>, remainingTodo?: number }}
  */
 function advanceAgent(projectPath) {
   const root = projectPath || findProjectRoot();
@@ -1094,19 +1219,28 @@ function advanceAgent(projectPath) {
     clearAgentStatus(root);
     return { next: false, done: true };
   }
-  const nextPlan = todoPlans[0];
 
-  // 3. Translate + claim (same contract as startAgent).
-  let spec;
-  try {
-    spec = taskSpecFromPlan(nextPlan, root);
-  } catch (err) {
-    return { next: false, error: err.message, plan: { name: nextPlan.name, path: nextPlan.path } };
+  // 3. Walk the FIFO queue for the first plan with a valid task spec; a refusal is
+  //    recorded in skipped[] and never stalls the plans behind it (C1-4).
+  const skipped = [];
+  let nextPlan = null;
+  let spec = null;
+  for (const plan of todoPlans) {
+    try {
+      spec = taskSpecFromPlan(plan, root);
+      nextPlan = plan;
+      break;
+    } catch (err) {
+      skipped.push({ plan: plan.name, reason: err.message });
+    }
+  }
+  if (!nextPlan) {
+    return { next: false, error: 'No claimable plan in todo queue', skipped };
   }
 
   const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
   if (!claimed) {
-    return { next: false, queued: true, reason, task };
+    return { next: false, queued: true, reason, task, skipped };
   }
 
   const newPath = startExecution(nextPlan.path, root);
@@ -1122,21 +1256,33 @@ function advanceAgent(projectPath) {
     next: true,
     task,
     plan: { name: nextPlan.name, path: newPath },
+    skipped,
     remainingTodo: todoPlans.length - 1
   };
 }
 
 /**
- * Cancel a background task — the live surface of the F1 `cancel` transition.
- * Records the decision in the registry (`queued`/`running` → `cancelled`) and, when
- * the task carries an `agentTaskId`, returns it so the CALLER (menu recipe /
- * harness) can stop the live harness agent — killing the harness-level agent is the
- * caller's job; the registry only records the transition.
+ * Cancel a background task — the live surface of the two-phase `cancel` transition
+ * (C1-2). The registry only records the transition; killing the harness-level agent
+ * is the CALLER's job, so the task's `agentTaskId` is returned for it.
+ *
+ *   • A QUEUED task → `cancelled` immediately: nothing is running, so freeing its
+ *     files/slot at once is safe.
+ *   • A RUNNING task → `cancelling` (NOT `cancelled`): the task keeps occupying its
+ *     files, slot, gitOp and the sync barrier until `task-reconcile` confirms the
+ *     harness agent is dead. Per R2-A a direct running→cancelled would free a live
+ *     agent's files early and is forbidden by the transition guard. Files stay
+ *     locked until reconcile confirms death.
+ *   • An already-`cancelling` task → refused (a second cancel is not meaningful).
+ *   • A terminal task (done/failed/orphaned/cancelled) → the transition guard in
+ *     `updateTask` throws (terminal is terminal).
  *
  * @param {string} projectPath - Project root
  * @param {string} taskId - the task id to cancel
- * @returns {{ cancelled: true, taskId: string, agentTaskId: string|null }}
- * @throws {Error} unknown id, or a terminal task (done/failed/orphaned/cancelled)
+ * @returns {{ task: object, agentTaskId: string|null }} the updated task (status
+ *   `cancelling` for a running task, `cancelled` for a queued one) and its
+ *   agentTaskId so the caller can stop the live harness agent.
+ * @throws {Error} unknown id, an already-cancelling task, or a terminal task
  */
 function cancelTask(projectPath, taskId) {
   const root = projectPath || findProjectRoot();
@@ -1146,10 +1292,23 @@ function cancelTask(projectPath, taskId) {
     throw new Error(`cancelTask: unknown task id ${taskId}`);
   }
   const agentTaskId = existing.agentTaskId || null;
-  // updateTask enforces the transition guard: a terminal task throws (terminal is terminal).
-  taskRegistry.updateTask(registry, taskId, { status: 'cancelled' });
+
+  let nextStatus;
+  if (existing.status === 'running') {
+    nextStatus = 'cancelling'; // two-phase: keep files locked until reconcile confirms death
+  } else if (existing.status === 'queued') {
+    nextStatus = 'cancelled'; // nothing running → free immediately
+  } else if (existing.status === 'cancelling') {
+    throw new Error(`cancelTask: task ${taskId} is already cancelling`);
+  } else {
+    // Terminal (done/failed/orphaned/cancelled): updateTask's guard throws below.
+    nextStatus = 'cancelled';
+  }
+
+  // updateTask enforces the transition guard (a terminal task throws).
+  const task = taskRegistry.updateTask(registry, taskId, { status: nextStatus });
   taskRegistry.save(root, registry);
-  return { cancelled: true, taskId, agentTaskId };
+  return { task, agentTaskId };
 }
 
 /**
@@ -1160,13 +1319,25 @@ function cancelTask(projectPath, taskId) {
  * it). Blocked by the wave's implement task ids, so it promotes only after the wave
  * finishes.
  *
+ * Refuses an EMPTY wave (C1-6): a `sync` barrier with no `blockedBy` has nothing to
+ * integrate and, with no blockers, would claim immediately against a live wave —
+ * that is a caller bug, so a missing/empty `blockedBy` throws loudly.
+ *
  * @param {string} projectPath - Project root
  * @param {{ blockedBy?: string[], label?: string }} [opts]
  * @returns {{ task: object, claimed: boolean, reason: string }} addAndClaim result
+ * @throws {Error} blockedBy is missing or empty (an empty barrier is a caller bug)
  */
 function enqueueWaveSync(projectPath, opts = {}) {
   const root = projectPath || findProjectRoot();
   const blockedBy = Array.isArray(opts.blockedBy) ? opts.blockedBy.slice() : [];
+  if (blockedBy.length === 0) {
+    throw new Error(
+      'enqueueWaveSync: a wave sync must declare blockedBy — the wave\'s implement ' +
+      'task ids it integrates. An empty barrier has nothing to integrate and would ' +
+      'run immediately against a live wave (C1-6).'
+    );
+  }
   const label = typeof opts.label === 'string' && opts.label.length > 0 ? opts.label : 'wave-sync';
   return taskRegistry.addAndClaim(root, {
     kind: 'sync',

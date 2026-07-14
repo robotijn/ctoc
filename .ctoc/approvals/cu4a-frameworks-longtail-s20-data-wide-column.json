@@ -1,0 +1,10 @@
+{
+  "content_sha256": "a54d8ed529437f9ad8b810c76168b4e494b72a6f64e88c347ead920d0980ceb7",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.588Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s20-data-wide-column"
+}

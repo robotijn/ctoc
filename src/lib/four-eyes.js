@@ -47,7 +47,9 @@ const ROLES_PATH = path.join('.ctoc', 'roles.yaml');
 function parseRolesYaml(content) {
   const lines = content.split('\n');
   const roles = [];
-  let current = null;
+  // Built up key-by-key from arbitrary YAML scalars; its concrete shape is the
+  // parsed role map, which checkJs cannot infer field-by-field — typed `any`.
+  let current = /** @type {any} */ (null);
 
   for (const raw of lines) {
     // Strip comments and skip blank lines.

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "0aa30591e6d4c7f9b300545eaad79754fd7af25a46caf6b39473e6ed98cd8ede",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.597Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "ctoc-audit-w11-s9-hooks-installer-path"
+}

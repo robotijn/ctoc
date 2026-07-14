@@ -202,8 +202,9 @@ function readVisions(visionDir) {
       };
     });
 
-  // Sort by modified date, newest first
-  files.sort((a, b) => b.modified - a.modified);
+  // Sort by modified date, newest first. `modified` is a Date; Date−Date coerces
+  // via valueOf() at runtime — the `any` casts preserve that under checkJs.
+  files.sort((a, b) => /** @type {any} */ (b.modified) - /** @type {any} */ (a.modified));
 
   return files;
 }

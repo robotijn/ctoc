@@ -1,0 +1,10 @@
+{
+  "content_sha256": "b85f58498699bcad4d137ed343868863bb58e835639914fdd100417b95feb41e",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.581Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "A1-canvas-layer-impl"
+}

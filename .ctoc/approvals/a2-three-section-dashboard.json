@@ -1,0 +1,10 @@
+{
+  "content_sha256": "9517496d35e76d485bc7d5af2f9db0fc2e264157286af4f1e02d3611977da8f2",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.582Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "A2-three-section-dashboard"
+}

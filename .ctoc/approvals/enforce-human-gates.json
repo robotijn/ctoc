@@ -1,0 +1,10 @@
+{
+  "content_sha256": "804319ac9f7f0a7a53fcb983b6e7772d5f19911ab0aa43bdc8712337770b6f5e",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.598Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "enforce-human-gates"
+}

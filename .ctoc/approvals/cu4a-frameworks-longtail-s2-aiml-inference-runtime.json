@@ -1,0 +1,10 @@
+{
+  "content_sha256": "a2e51b02e443662e92492f98187bbfcd080ddee96ecf92ffd14a07d3d4e1eb3d",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.587Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s2-aiml-inference-runtime"
+}

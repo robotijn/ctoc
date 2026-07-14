@@ -1,0 +1,10 @@
+{
+  "content_sha256": "0254a3ac4ab2cf3d56f647ef44201ab0f595d7957c0596b565c77480bef30deb",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.589Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s4-aiml-finetune-peft"
+}

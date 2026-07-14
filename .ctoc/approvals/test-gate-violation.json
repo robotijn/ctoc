@@ -1,0 +1,10 @@
+{
+  "content_sha256": "caa8b728d1178031d4b6edbac7837f685e74e95b1d4703c1ba0ef34f3cdf6359",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.602Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "test-gate-violation"
+}

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "5cce7d1e04760066da51e8d8263e1626d0d331d79d11c85cc9b70084be594c9a",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.595Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "SD1-stage-aware-doa-classifier"
+}

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "4979761b8bb42d8102d647605aefb5de2f51901398fc7531e1b8d74e5ea57fc2",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.597Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "ctoc-audit-w07-s7-homedir"
+}

@@ -22,6 +22,26 @@
  * discriminating power at the gate-source stages (every review plan has it from
  * crossing Gate 2; functional plans never have it), so it is not read at all (F1).
  *
+ * DURABLE DISMISSAL (R3): `scanCheapCandidates` filters out candidates the human
+ * has dismissed via `dismissStale`, keyed by a content signature (plan path +
+ * mtime) persisted in `.ctoc/state/stale-dismissals.json`. The store read is
+ * FAIL-OPEN (a missing/corrupt store filters nothing), and a dismissed plan that
+ * has since CHANGED (its mtime moved) no longer matches its signature and
+ * re-surfaces — so a dismissal can never permanently mask a touched plan. This
+ * makes the menu's "Don't ask again for these" durable across turns; the menu's
+ * "Not now" remains a one-turn skip (no store write).
+ *
+ * STAGE POLARITY LIVES IN THE CLASSIFIER, BY DESIGN — NOT in this cheap pass. The
+ * cheap pass is deliberately BROAD: it emits `missing-files` for a declared path
+ * that is absent at ANY gate-source stage (including functional), acting as a wide
+ * candidate GENERATOR. The not-started polarity — a pre-implementation plan whose
+ * files are simply unbuilt is benign, not stale — is applied downstream in
+ * `classifyStaleCandidate` via NOT_STARTED_STAGES, which downgrades such a
+ * candidate to `inconclusive` with a null action so no cleanup path ever acts on
+ * it ("cheap-actionable but classifier-benign", locked by the SP5 regression T3b).
+ * This split is intentional and correct; the cheap pass is NOT the place to gate
+ * on stage.
+ *
  * @typedef {('functional'|'implementation'|'review')} GateSourceStage
  *
  * @typedef {('missing-files'|'advisory:age')} StaleSignal
@@ -45,6 +65,7 @@
 
 const safeFs = require('./safe-fs');
 const { safeRegExp, escapeRegExp } = require('./regex-utils');
+const { invalidate } = require('./cache');
 const path = require('path');
 
 /** 14-day advisory age threshold, in milliseconds. */
@@ -630,6 +651,115 @@ function classifyStaleCandidate(candidate, evidence) {
 }
 
 /**
+ * Path segments (under project root) of the durable stale-dismissal store.
+ * A human's "Don't ask again for these" choice in the menu ride-along is
+ * recorded here so it survives across menu turns — WITHOUT this store a
+ * dismissal would last exactly one turn (the R3 defect). Lives under
+ * .ctoc/state/ (already git-ignored by init) so it never pollutes a commit.
+ * @type {ReadonlyArray<string>}
+ */
+const DISMISSAL_STORE = Object.freeze(['.ctoc', 'state', 'stale-dismissals.json']);
+
+/**
+ * Content signature for a dismissal: `<stage>/<slug>.md` → mtime (rounded ms).
+ * Keying on plan PATH + mtime is deliberate — a dismissed plan that is later
+ * CHANGED (rewritten, so its mtime moves) no longer matches its stored signature
+ * and MAY re-surface, so a dismissal can never permanently mask a plan that has
+ * since been touched. `Math.round` normalizes the sub-millisecond float that some
+ * filesystems report so the scan-time and dismiss-time reads compare exactly.
+ * @param {number} mtimeMs
+ * @returns {number}
+ */
+function _sigMtime(mtimeMs) {
+  return Math.round(mtimeMs);
+}
+
+/**
+ * Read the dismissal store, FAIL-OPEN: a missing, unreadable, or corrupt store
+ * yields an empty map so a data fault can NEVER suppress a real candidate (the
+ * safe direction is to under-filter, i.e. keep nagging, never to hide). Returns a
+ * plain `{ '<stage>/<slug>.md': mtimeMs }` map. No subprocess, no throw.
+ * @param {string} root
+ * @returns {Object<string, number>}
+ */
+function _loadDismissals(root) {
+  try {
+    const p = path.join(root, ...DISMISSAL_STORE);
+    if (!safeFs.existsSync(p)) return {};
+    const parsed = JSON.parse(safeFs.readFileSync(p, 'utf8'));
+    const d = parsed && typeof parsed === 'object' ? parsed.dismissed : null;
+    return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
+  } catch {
+    return {}; // fail-open: corrupt/unreadable store ⇒ no filtering
+  }
+}
+
+/**
+ * Record the given candidates as dismissed in the durable store. This is the
+ * export the menu ride-along route (R2-C's file) calls when the human picks
+ * "Don't ask again for these"; the filter it feeds is already live on the hot
+ * path via inbox.js → scanCheapCandidates (both the nag count and the drill-in
+ * list flow from the same scan). "Not now" remains a one-turn skip handled by the
+ * menu (no store write).
+ *
+ * The signature is re-derived HERE from the plan file on disk (never trusted from
+ * the caller) so the stored mtime is authoritative. Fail-open/degrade-never-throw
+ * for expected inputs (bad root ⇒ `{ ok:false }`; a vanished plan file is simply
+ * skipped). The write is atomic (temp + rename) so a crash mid-write cannot leave
+ * a half-written store. Security: the store PATH is a fixed constant under root,
+ * and each key is rebuilt from a FROZEN gate-source stage plus `path.basename` of
+ * the slug — no caller-controlled path segment reaches the filesystem.
+ *
+ * @param {string} root project root (directory containing plans/).
+ * @param {Array<{plan?: string, stage?: string}>} candidates cheap-scan candidates to dismiss.
+ * @returns {{ ok: boolean, count: number }} count = signatures written this call.
+ */
+function dismissStale(root, candidates) {
+  if (typeof root !== 'string' || root.length === 0) return { ok: false, count: 0 };
+  const list = Array.isArray(candidates) ? candidates : [];
+  try {
+    const store = _loadDismissals(root); // union onto any existing dismissals
+    let added = 0;
+    for (const c of list) {
+      if (!c || typeof c !== 'object') continue;
+      const stage = c.stage;
+      // Only the frozen gate-source stages are valid keys; a slug is reduced to a
+      // basename so no `../` or nested segment can escape plans/<stage>/.
+      const slug = typeof c.plan === 'string' ? path.basename(c.plan) : '';
+      // `stage` is an UNVALIDATED string off a caller-supplied candidate — this
+      // `includes` IS the validation, so the cast only lets the membership test
+      // accept the untrusted value it exists to check.
+      if (!GATE_SOURCE_STAGES.includes(/** @type {any} */ (stage)) || slug.length === 0) continue;
+      const filePath = path.join(root, 'plans', stage, slug + '.md');
+      let st;
+      try {
+        st = safeFs.lstatSync(filePath);
+      } catch {
+        continue; // plan vanished between scan and dismiss — skip
+      }
+      if (!st.isFile()) continue;
+      store[stage + '/' + slug + '.md'] = _sigMtime(st.mtimeMs);
+      added += 1;
+    }
+    const dir = path.join(root, ...DISMISSAL_STORE.slice(0, -1));
+    safeFs.mkdirSync(dir, { recursive: true });
+    const target = path.join(root, ...DISMISSAL_STORE);
+    const tmp = target + '.tmp-' + Date.now() + '-' + process.pid;
+    safeFs.writeFileSync(tmp, JSON.stringify({ dismissed: store }, null, 2));
+    safeFs.renameSync(tmp, target); // atomic publish
+    // R2-C2 item 5/6: the dismissal store feeds the memoized getInboxCounts stale
+    // count (scanCheapCandidates filters dismissed candidates). Bust the read cache
+    // AFTER the successful write so a live "Don't ask again for these" drops the
+    // possibly-stale count immediately, not on the next 5 s TTL expiry — a menu that
+    // dismisses but keeps nagging is "grinding with no feedback". (CF1 invariant.)
+    invalidate();
+    return { ok: true, count: added };
+  } catch {
+    return { ok: false, count: 0 };
+  }
+}
+
+/**
  * Cheap, filesystem-only scan of plans/functional, plans/implementation,
  * plans/review for stale-plan candidates. NEVER invokes git or any subprocess.
  *
@@ -658,6 +788,13 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
   if (!safeFs.existsSync(plansDir)) {
     return { candidates, count: 0 };
   }
+
+  // R3: load the durable dismissal store ONCE per scan (O(1), fail-open ⇒ {}).
+  // A candidate whose signature (path + unchanged mtime) is dismissed is omitted,
+  // so a "Don't ask again" choice survives across menu turns and the nag count
+  // drops accordingly. A dismissed plan that has since CHANGED (mtime moved) no
+  // longer matches and re-surfaces.
+  const dismissed = _loadDismissals(root);
 
   for (const stage of GATE_SOURCE_STAGES) {
     const stageDir = path.join(plansDir, stage);
@@ -721,6 +858,16 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
 
       if (signals.length === 0) continue;
 
+      // R3 durable-dismissal filter: skip a candidate the human dismissed whose
+      // content signature is unchanged. Keyed by path + mtime so a changed plan
+      // re-surfaces. Signature is computed from the SAME lstat used above (no
+      // extra syscall); the candidate shape stays the 4 locked keys (no leak).
+      const dismissKey = stage + '/' + slug + '.md';
+      if (Object.prototype.hasOwnProperty.call(dismissed, dismissKey) &&
+          dismissed[dismissKey] === _sigMtime(mtimeMs)) {
+        continue;
+      }
+
       candidates.push({
         plan: slug,
         stage,
@@ -737,9 +884,16 @@ module.exports = {
   scanCheapCandidates,
   verifyStaleCandidate,
   classifyStaleCandidate,
+  dismissStale,
   extractFrontmatterRegion,
   parseFilesField,
   GATE_SOURCE_STAGES,
+  // R2-C2 item 6: exported (additive) so inbox.js can filter the dashboard stale
+  // COUNT to the stages the classifier can act on — a candidate whose ONLY issue
+  // is unbuilt files at a not-started stage is benign, so it must not inflate the
+  // "possibly-stale" nag. Kept as the single source of truth; the classifier's
+  // NOT-STARTED rule reads the same const.
+  NOT_STARTED_STAGES,
   AGE_THRESHOLD_MS,
   MAX_PLAN_BYTES,
 };

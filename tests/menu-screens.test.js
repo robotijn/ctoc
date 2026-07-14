@@ -346,6 +346,44 @@ describe('Menu Screens Tests', () => {
     console.log('# validateScreen shows fix option on validation failure');
   });
 
+  // R2-C2 item 3 — one-turn approve (R6/W2). The approve→validate ROUTE stays
+  // (the planActions/reviewActions pins above survive), but the confirm screen's
+  // SHAPE changes: a clean validation carries an `autoApprove` signal and a single
+  // decisive approve action (no redundant "Proceed?" second ask, no Fix option —
+  // there is nothing to fix); a failed validation demotes "Approve anyway" to the
+  // LAST option and records that it is an override.
+  test('validateScreen (clean) signals one-turn approve: autoApprove + Confirm approve, no Fix', () => {
+    createPlan('functional', 'clean-plan',
+      '---\ntitle: Clean\ntype: functional\nfiles:\n  - src/x.js\n---\n\n' +
+      '# Clean\n\n## Problem Statement\nReal problem.\n\n## Scope\nThe thing.\n\n## Acceptance Criteria\n- It works.\n');
+
+    const result = menuScreens.validateScreen('functional', 'clean-plan.md', testDir);
+    assert.strictEqual(result.validation.valid, true, 'fixture passes validation');
+    assert.strictEqual(result.autoApprove, true, 'clean validation signals one-turn auto-approve');
+    // The approve action is present and unchanged (route pins survive).
+    assert.strictEqual(result.actions['Confirm approve'], 'claude:approve functional/clean-plan.md');
+    const labels = result.ask.questions[0].options.map(o => o.label);
+    assert.ok(!labels.includes('Fix issues'), 'no Fix option on a clean validation (nothing to fix)');
+    console.log('# validateScreen clean signals one-turn approve');
+  });
+
+  test('validateScreen (failed) demotes "Approve anyway" to the LAST option, records override', () => {
+    createPlan('functional', 'broken-plan', '# Just a Title\n\nNo structure.\n');
+
+    const result = menuScreens.validateScreen('functional', 'broken-plan.md', testDir);
+    assert.strictEqual(result.validation.valid, false, 'fixture fails validation');
+    assert.strictEqual(result.autoApprove, false, 'failed validation never auto-approves');
+    const labels = result.ask.questions[0].options.map(o => o.label);
+    // "Approve anyway" is the LAST option — never first, never recommended.
+    assert.strictEqual(labels[labels.length - 1], 'Approve anyway', 'override is the last option');
+    assert.ok(labels.includes('Fix issues'), 'Fix issues offered on failure');
+    // The override is recorded as such (description names it an override).
+    const anyway = result.ask.questions[0].options.find(o => o.label === 'Approve anyway');
+    assert.match(anyway.description, /override/i, 'Approve anyway records an override');
+    assert.strictEqual(result.actions['Approve anyway'], 'claude:approve functional/broken-plan.md');
+    console.log('# validateScreen failed demotes Approve anyway to last');
+  });
+
   test('all text fields end with triple newline', () => {
     createPlan('functional', 'plan-a');
 
@@ -402,6 +440,43 @@ describe('Menu Screens Tests', () => {
         `browse action key "${key}" must be a number or a nav word`);
     }
     console.log('# all screens have actions mapping for every option');
+  });
+
+  // R2-C2 item 4 — review `done-all` (W3), menu-side. stageBrowse on the review
+  // stage registers a WORD shortcut `done-all-<parent>` per distinct parent among
+  // the review plans, mapping to the action key `claude:done-all-<parent>` whose
+  // recipe (approveSubplans(parent, 'review')) already lives in menu.md (same wave).
+  // Never a numbered option; the session model executes the recipe.
+  test('stageBrowse(review) registers a done-all-<parent> word key per parent', () => {
+    createPlan('review', 'featx-s1-alpha',
+      '---\ntitle: A\ntype: implementation\nparent_plan: featx\n---\n\n# A\n');
+    createPlan('review', 'featx-s2-beta',
+      '---\ntitle: B\ntype: implementation\nparent_plan: featx\n---\n\n# B\n');
+    createPlan('review', 'featy-s1-gamma',
+      '---\ntitle: C\ntype: implementation\nparent_plan: featy\n---\n\n# C\n');
+
+    const result = menuScreens.stageBrowse('review', testDir);
+
+    // Per-parent action keys, never a bare number.
+    assert.strictEqual(result.actions['done-all-featx'], 'claude:done-all-featx',
+      'done-all key for parent featx maps to its approveSubplans recipe');
+    assert.strictEqual(result.actions['done-all-featy'], 'claude:done-all-featy',
+      'done-all key for parent featy maps to its approveSubplans recipe');
+    // No numeric key ever triggers a done-all (numbers open a single plan).
+    for (const [k, v] of Object.entries(result.actions)) {
+      if (/^\d+$/.test(k)) assert.ok(!/done-all/.test(v), `numeric key ${k} must not be a done-all`);
+    }
+    // The list hint names the done-all shortcut so it is discoverable.
+    assert.match(result.text, /done-all/, 'review list hint names the done-all shortcut');
+    console.log('# stageBrowse(review) registers done-all-<parent> keys');
+  });
+
+  test('stageBrowse(review) emits no done-all key when no plan declares a parent', () => {
+    createPlan('review', 'orphan-plan', '---\ntitle: O\ntype: implementation\n---\n\n# O\n');
+    const result = menuScreens.stageBrowse('review', testDir);
+    const doneAllKeys = Object.keys(result.actions).filter(k => k.startsWith('done-all'));
+    assert.deepStrictEqual(doneAllKeys, [], 'no parent → no done-all shortcut (approveSubplans needs a parent)');
+    console.log('# stageBrowse(review) no done-all without a parent');
   });
 
   test('route function dispatches correctly', () => {

@@ -118,6 +118,7 @@ function renderRelatedPanel(app) {
 // Release mode state
 let releaseMode = false;
 let releaseTypeIndex = 0;
+/** @type {Array<'patch'|'minor'|'major'>} */
 const RELEASE_TYPES = ['patch', 'minor', 'major'];
 
 function render(app) {

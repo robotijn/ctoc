@@ -29,6 +29,14 @@ const cleanup = require('../src/lib/stale-cleanup.js');
 const menuScreens = require('../src/lib/menu-screens.js');
 const actions = require('../src/lib/actions.js'); // referenced for negative assertions only
 const staleDetector = require('../src/lib/stale-detector.js');
+// R2-I: the provenance model. A machine advance is a PIPELINE-kind ledger entry
+// (`advanced_by: pipeline` + evidence), NEVER the human's `approved_by: human`
+// marker. These two are imported READ-ONLY (another slice owns them): the ledger
+// is the single approval-truth source, and the gate hook is the acceptor whose
+// verdict the new pins assert against — closing the loop that a real done/ resident
+// produced by stale reconciliation is accepted by the very hook that guards done/.
+const ledger = require('../src/lib/approval-ledger.js');
+const gateHook = require('../src/hooks/human-gate-check.js');
 
 // ---------------------------------------------------------------------------
 // Sandbox harness
@@ -180,11 +188,14 @@ const ALL_ACTION_KEYS_NONDIGIT = (screen) => {
 };
 
 // ===========================================================================
-// T1 (M2 + re-derivation) — shipped-but-early: re-derives stage, stamp-before-move, no approvePlan
+// T1 (R2-I provenance + M2 + re-derivation) — shipped-but-early: re-derives
+// stage, stamps a PIPELINE marker (never the human's) before move, writes a
+// pipeline-kind ledger entry, the revived gate hook ACCEPTS the done/ resident,
+// and approvePlan is never called.
 // ===========================================================================
 
-describe('T1 — shipped-but-early archive: re-derives stage, stamps before move, no approvePlan', () => {
-  it('writes marker to plans/functional/foo.md BEFORE rename to done/, approvePlan never called', () => {
+describe('T1 — shipped-but-early archive: pipeline provenance, ledger entry, hook-accepted, no approvePlan', () => {
+  it('stamps advanced_by: pipeline (NO approved_by: human) before rename, ledgers a pipeline entry the hook accepts', () => {
     const sb = makeSandbox();
     writePlan(sb, 'functional', 'foo', { files: ['src/missing-x.js'] }); // declared file ABSENT ⇒ candidate
     const spy = spyFs();
@@ -197,14 +208,16 @@ describe('T1 — shipped-but-early archive: re-derives stage, stamps before move
       spy.restore();
     }
 
+    // A machine advance is a PIPELINE marker, never the human's. The stamped
+    // source write must carry advanced_by: pipeline + the reconciliation reason.
     const writeIdx = spy.calls.findIndex(
       (c) => c.op === 'writeFileSync' && endsWithPlan(c.path, 'functional', 'foo') &&
-        /approved_by:\s*human/.test(c.content || '') && /stale-reconciliation/.test(c.content || '')
+        /advanced_by:\s*pipeline/.test(c.content || '') && /stale-reconciliation/.test(c.content || '')
     );
     const renameIdx = spy.calls.findIndex(
       (c) => c.op === 'renameSync' && endsWithPlan(c.path, 'functional', 'foo')
     );
-    assert.ok(writeIdx >= 0, 'a stamped writeFileSync to plans/functional/foo.md must occur (stage re-derived to functional)');
+    assert.ok(writeIdx >= 0, 'a pipeline-stamped writeFileSync to plans/functional/foo.md must occur (stage re-derived to functional)');
     assert.ok(renameIdx >= 0, 'a renameSync of plans/functional/foo.md must occur');
     assert.ok(writeIdx < renameIdx, 'WRITE must precede RENAME (gate-hook window, M5)');
 
@@ -214,8 +227,23 @@ describe('T1 — shipped-but-early archive: re-derives stage, stamps before move
     const donePath = path.join(sb, 'plans', 'done', 'foo.md');
     assert.ok(fs.existsSync(donePath), 'final file lands in plans/done/foo.md');
     const content = fs.readFileSync(donePath, 'utf8');
-    assert.match(content, /^---[\s\S]*approved_by:\s*human/, 'moved file carries approved_by: human in a leading block');
+    assert.match(content, /^---[\s\S]*advanced_by:\s*pipeline/, 'moved file carries advanced_by: pipeline in a leading block');
     assert.ok(content.includes('gate_crossed: stale-reconciliation'), 'gate_crossed marks a stale-reconciliation move');
+    // THE central R2-I pin: the machine NEVER forges the human's name — zero
+    // approved_by: human anywhere in the archived content.
+    assert.ok(!/approved_by:\s*human/.test(content), 'archived content contains NO approved_by: human (machine never forges the human marker)');
+
+    // A pipeline-kind ledger entry vouches for the done/ residency.
+    const entry = ledger.readEntry('foo', sb);
+    assert.ok(entry, 'a ledger entry was written for the archived plan');
+    assert.equal(ledger.entryKind(entry), 'pipeline', 'entry is pipeline-kind (advanced_by: pipeline)');
+    assert.equal(entry.stage_to, 'done', 'entry records the done/ edge');
+    assert.ok(typeof entry.evidence === 'string' && entry.evidence.trim() !== '', 'pipeline entry carries non-empty evidence');
+    assert.equal(entry.content_sha256, ledger.computeContentHash(content), 'entry hash binds to the EXACT archived bytes (hook-verifiable)');
+
+    // The revived gate hook (imported read-only) ACCEPTS the done/ resident it created.
+    const violations = gateHook.checkFolder('done', sb);
+    assert.equal(violations.length, 0, 'the gate hook accepts the archived done/ resident (no violation)');
 
     assert.equal(approveSpy.calls.length, 0, 'approvePlan must NOT be called (M2)');
   });
@@ -225,10 +253,13 @@ describe('T1 — shipped-but-early archive: re-derives stage, stamps before move
 // T2 (M3 + re-derivation) — approved-but-stranded: reconciliation, no approvePlan, no actions.movePlan
 // ===========================================================================
 
-describe('T2 — approved-but-stranded reconcile: re-derives stage, no approvePlan, no movePlan', () => {
-  it('lands in done/ with stale-reconciliation markers; neither approvePlan nor movePlan called', () => {
+describe('T2 — approved-but-stranded reconcile: pipeline provenance, ledger entry, hook-accepted, no approvePlan/movePlan', () => {
+  it('lands in done/ with a pipeline marker (never approved_by: human); ledger + hook agree; neither approvePlan nor movePlan called', () => {
     const sb = makeSandbox();
-    writePlan(sb, 'review', 'bar', { files: ['src/missing-y.js'], approved: true });
+    // NOTE: no `approved: true` — the plan body must be clean of the human marker so
+    // the zero-approved_by-human pin proves the MACHINE never wrote it (not that a
+    // legacy body happened to lack it).
+    writePlan(sb, 'review', 'bar', { files: ['src/missing-y.js'] });
     const spy = spyFs();
     const approveSpy = makeSpy();
     const moveSpy = makeSpy();
@@ -243,7 +274,16 @@ describe('T2 — approved-but-stranded reconcile: re-derives stage, no approvePl
     assert.ok(fs.existsSync(donePath), 'stage re-derived to review ⇒ lands in done/bar.md');
     const content = fs.readFileSync(donePath, 'utf8');
     assert.ok(content.includes('gate_crossed: stale-reconciliation'), 'gate_crossed: stale-reconciliation present');
-    assert.match(content, /approved_by:\s*human/, 'approved_by: human present');
+    assert.match(content, /advanced_by:\s*pipeline/, 'advanced_by: pipeline present');
+    assert.ok(!/approved_by:\s*human/.test(content), 'archived content contains NO approved_by: human');
+
+    // Pipeline-kind ledger entry + gate-hook acceptance close the loop.
+    const entry = ledger.readEntry('bar', sb);
+    assert.equal(ledger.entryKind(entry), 'pipeline', 'entry is pipeline-kind');
+    assert.equal(entry.stage_to, 'done', 'entry records the done/ edge');
+    assert.ok(entry.evidence && entry.evidence.trim() !== '', 'pipeline entry carries evidence');
+    assert.equal(entry.content_sha256, ledger.computeContentHash(content), 'entry hash binds to the archived bytes');
+    assert.equal(gateHook.checkFolder('done', sb).length, 0, 'gate hook accepts the reconciled done/ resident');
 
     const writeIdx = spy.calls.findIndex((c) => c.op === 'writeFileSync' && endsWithPlan(c.path, 'review', 'bar'));
     const renameIdx = spy.calls.findIndex((c) => c.op === 'renameSync' && endsWithPlan(c.path, 'review', 'bar'));
@@ -551,7 +591,7 @@ describe('T10 — idempotent: re-running on an already-cleaned plan is a fail-cl
 // ===========================================================================
 
 describe('T11 — claude:cleanup-exec string → re-derive → move (end-to-end)', () => {
-  it('(a) archive string with no stage re-derives functional and lands in done/', () => {
+  it('(a) archive string with no stage re-derives functional and lands in done/ with pipeline provenance', () => {
     const sb = makeSandbox();
     writePlan(sb, 'functional', 'foo', { files: ['src/missing.js'] });
     const p = parseCleanupExec('claude:cleanup-exec plan foo archive-to-done');
@@ -559,8 +599,11 @@ describe('T11 — claude:cleanup-exec string → re-derive → move (end-to-end)
     cleanup.executeCleanup(p, sb);
     assert.ok(fs.existsSync(path.join(sb, 'plans', 'done', 'foo.md')), 'archived to done/');
     const content = fs.readFileSync(path.join(sb, 'plans', 'done', 'foo.md'), 'utf8');
-    assert.match(content, /approved_by:\s*human/);
+    assert.match(content, /advanced_by:\s*pipeline/);
+    assert.ok(!/approved_by:\s*human/.test(content), 'no forged human marker in the end-to-end archive');
     assert.ok(content.includes('gate_crossed: stale-reconciliation'));
+    assert.equal(ledger.entryKind(ledger.readEntry('foo', sb)), 'pipeline', 'end-to-end archive ledgers a pipeline entry');
+    assert.equal(gateHook.checkFolder('done', sb).length, 0, 'hook accepts the end-to-end archived resident');
     assert.ok(!fs.existsSync(path.join(sb, 'plans', 'functional', 'foo.md')), 'source removed');
   });
 
@@ -797,5 +840,55 @@ describe('T18 (security) — archive refuses a non-regular-file source', () => {
       (c) => c.op === 'writeFileSync' && endsWithPlan(c.path, 'functional', 'foo')
     );
     assert.equal(writeThrough.length, 0, 'no write-through to a non-regular-file path');
+  });
+});
+
+// ===========================================================================
+// T19 (R2-I contradiction 8) — a review-stage revert lands in todo/, NOT
+// implementation/. The revert invariant: a revert may never move a plan to a
+// gate-destination stage its ledger cannot vouch for. A plan that legitimately
+// crossed Gate 2 (implementation→todo) has a ledger entry with stage_to 'todo',
+// so reverting review→todo leaves it hook-consistent (the hook accepts todo/);
+// reverting past the gate to implementation/ produced a 'wrong-edge' entry the
+// hook chain-reverted a SECOND time.
+// ===========================================================================
+
+describe('T19 (contradiction 8) — review revert lands in todo/ (ledger-consistent), hook accepts todo residency', () => {
+  it('REVERT_MAP.review is todo; the reverted plan lands in todo/ and the gate hook accepts it via its Gate-2 entry', () => {
+    assert.equal(cleanup.REVERT_MAP.review, 'todo', 'REVERT_MAP.review reverts to todo (the ledger-vouched stage), not implementation');
+
+    const sb = makeSandbox();
+    const src = writePlan(sb, 'review', 'strand', { files: ['src/missing.js'] });
+    // The pre-existing Gate-2 provenance: a HUMAN-kind ledger entry recorded for the
+    // implementation→todo crossing, hashing the plan's CURRENT content. movePlan is a
+    // byte-identical rename, so this hash still matches once the file lands in todo/.
+    const content = fs.readFileSync(src, 'utf8');
+    ledger.writeEntry('strand', {
+      content_sha256: ledger.computeContentHash(content),
+      stage_from: 'implementation',
+      stage_to: 'todo',
+    }, sb);
+    // Sanity: the hook would REJECT this plan sitting in implementation/ (wrong-edge),
+    // which is exactly why reverting there chain-reverts a second time.
+    assert.equal(
+      gateHook.classifyResidency(src, 'implementation', sb, content).accepted,
+      false,
+      'the Gate-2 (stage_to: todo) entry does NOT vouch for implementation/ residency (wrong-edge)'
+    );
+
+    // Re-derive the stage from an injected scan (review) and use the REAL mover so the
+    // file physically lands in todo/.
+    const injScan = () => [{ plan: 'strand', stage: 'review' }];
+    const r = cleanup.executeCleanup({ plan: 'strand', proposedAction: 'revert' }, sb, { listStaleCandidates: injScan });
+
+    assert.equal(r.from, 'review', 'reverted from review');
+    assert.equal(r.to, 'todo', 'reverted to todo (ledger-consistent), NOT implementation');
+    const todoPath = path.join(sb, 'plans', 'todo', 'strand.md');
+    assert.ok(fs.existsSync(todoPath), 'plan physically lands in todo/');
+    assert.ok(!fs.existsSync(src), 'source review copy removed');
+
+    // The revived gate hook accepts the todo/ resident: its Gate-2 entry vouches for
+    // the todo edge AND the byte-identical rename keeps the hash matching.
+    assert.equal(gateHook.checkFolder('todo', sb).length, 0, 'hook accepts the reverted todo/ resident (ledger-consistent revert)');
   });
 });

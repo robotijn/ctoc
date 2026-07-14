@@ -1,0 +1,10 @@
+{
+  "content_sha256": "cbdb5f3aab2ca1bf3876369b357050f2ccfb6b9f3c1c66f76d464c8269d13df4",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.586Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU3-tier1-frameworks-s4-data"
+}

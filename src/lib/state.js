@@ -58,8 +58,9 @@ function readPlans(dirPath) {
     return applyTodoOrder(files, dirPath);
   }
 
-  // Sort oldest first (FIFO)
-  files.sort((a, b) => a.created - b.created);
+  // Sort oldest first (FIFO). `created` is a Date; Date−Date coerces via valueOf()
+  // at runtime — the `any` casts preserve that while satisfying checkJs.
+  files.sort((a, b) => /** @type {any} */ (a.created) - /** @type {any} */ (b.created));
 
   return files;
 }
@@ -195,8 +196,11 @@ function parseMetadata(content) {
 }
 
 // Calculate time ago string
+/** @param {Date} date */
 function timeAgo(date) {
-  const seconds = Math.floor((new Date() - date) / 1000);
+  // Date−Date coerces via valueOf() at runtime; the `any` casts keep that
+  // behavior while satisfying checkJs's numeric-operand requirement.
+  const seconds = Math.floor((/** @type {any} */ (new Date()) - /** @type {any} */ (date)) / 1000);
 
   if (seconds < 60) return 'just now';
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
@@ -278,6 +282,7 @@ function getAgentStatus(projectPath) {
  * @param {number} status.step - Current Iron Loop step (7-15)
  * @param {string} status.phase - Current phase name
  * @param {string} status.task - Current task description
+ * @param {string} [status.startedAt] - ISO timestamp the agent began; defaults to now
  */
 function setAgentStatus(projectPath, status) {
   const stateDir = path.join(projectPath, '.ctoc', 'state');

@@ -293,7 +293,9 @@ function saveUpdateCache(latestVersion) {
 
 /**
  * Check for updates (uses cache, fetches if stale)
- * @returns {Promise<{updateAvailable: boolean, currentVersion: string, latestVersion: string|null}>}
+ * @returns {Promise<{updateAvailable: boolean, currentVersion: string, latestVersion: string|null, cached: boolean}>}
+ *   `cached` is true when the answer came from the on-disk update cache rather
+ *   than a live fetch.
  *
  * @example
  * const result = await checkForUpdates();

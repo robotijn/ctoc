@@ -1,0 +1,10 @@
+{
+  "content_sha256": "dd0864404ce10c2b82dad0eb4b7335ab2f746bc0cde21cc6fdaabe01df123330",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.593Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC5-s4-iron-loop-trigger"
+}

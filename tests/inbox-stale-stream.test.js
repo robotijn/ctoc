@@ -54,6 +54,17 @@ function mockScan(result) {
   };
 }
 
+// R2-C2 item 6: the dashboard stale COUNT filters cheap candidates to the stages
+// the classifier can act on — NOT_STARTED_STAGES (vision/canvas/functional) are
+// pre-implementation and their missing-files signal is benign, so they are
+// excluded. Build N ACTIONABLE-stage (review) candidates so the filtered count
+// equals N and the dashboard rendering assertions below stay meaningful.
+function actionable(n, stage = 'review') {
+  return Array.from({ length: n }, (_, i) => ({
+    plan: `p${i}`, stage, signals: ['missing-files'], actionable: true,
+  }));
+}
+
 beforeEach(() => {
   root = tempProject(); // mkdir during setup happens BEFORE spies install ⇒ uncounted
   calls = [];
@@ -87,9 +98,11 @@ afterEach(() => {
 });
 
 describe('SP2 — getInboxCounts staleCandidates (M1 / Scenario 1)', () => {
-  it('returns staleCandidates from scanCheapCandidates(root).count and preserves existing keys', () => {
+  it('returns the ACTIONABLE-stage cheap-candidate count and preserves existing keys', () => {
+    // R2-C2 item 6: the count is now the FILTERED truth — a review-stage candidate
+    // (a stage the classifier can act on) is counted; a functional one is not.
     mockScan({
-      candidates: [{ plan: 'foo', stage: 'functional', signals: ['missing-files'], actionable: true }],
+      candidates: [{ plan: 'foo', stage: 'review', signals: ['missing-files'], actionable: true }],
       count: 1,
     });
     const counts = getInboxCounts(root);
@@ -105,6 +118,21 @@ describe('SP2 — getInboxCounts staleCandidates (M1 / Scenario 1)', () => {
     // boundary receives the project root
     assert.ok(calls.length >= 1, 'scanCheapCandidates must be called');
     assert.equal(calls[0].r, root);
+  });
+
+  it('R2-C2 item 6: a functional-stage candidate is counted 0; a non-not-started one is counted', () => {
+    // functional ∈ NOT_STARTED_STAGES (benign, not-started) → excluded from the nag
+    // count; a todo-stage candidate (a stage the classifier can act on) is counted.
+    // Uses the REAL NOT_STARTED_STAGES export — only scanCheapCandidates is rewired.
+    mockScan({
+      candidates: [
+        { plan: 'unbuilt', stage: 'functional', signals: ['missing-files'], actionable: true },
+        { plan: 'stranded', stage: 'todo', signals: ['missing-files'], actionable: true },
+      ],
+      count: 2, // raw count is 2, but the honest actionable count is 1
+    });
+    assert.equal(getInboxCounts(root).staleCandidates, 1,
+      'functional filtered out, todo counted — count reflects what the classifier can act on');
   });
 
   it('rewires the REAL stale-detector module, not a stub (M6)', () => {
@@ -130,22 +158,28 @@ describe('SP2 — getInboxCounts staleCandidates (M1 / Scenario 1)', () => {
 
 describe('SP2 — buildDashboardTable + dashboardPipeline (M2 / Scenario 3)', () => {
   it('renders the possibly-stale line and attaches the ride-along stale question when count > 0', () => {
-    mockScan({ candidates: [], count: 3 });
+    mockScan({ candidates: actionable(3), count: 3 });
     const text = buildDashboardTable(root);
     assert.ok(text.includes('3 possibly-stale plans'), 'INBOX block must show "3 possibly-stale plans"');
 
     invalidate('getInboxCounts'); // fresh read for the pipeline call
-    mockScan({ candidates: [], count: 3 });
+    mockScan({ candidates: actionable(3), count: 3 });
     const pipeline = dashboardPipeline(root);
     assert.equal(pipeline.ask.questions.length, 2);
     const q2 = pipeline.ask.questions[1];
     assert.equal(q2.header, 'Stale plans');
-    assert.deepEqual(q2.options.map((o) => o.label), ['View stale plans', 'Not now']);
+    // R2-C2 item 5: a durable "Don't ask again for these" (dismissStale) rides
+    // AFTER 'View stale plans' and BEFORE 'Not now' — never recommended (first).
+    assert.deepEqual(q2.options.map((o) => o.label),
+      ['View stale plans', "Don't ask again for these", 'Not now']);
     assert.equal(pipeline.actions['View stale plans'], 'inbox stale');
+    assert.equal(pipeline.actions["Don't ask again for these"], 'claude:dismiss-stale');
     assert.equal(pipeline.actions['Not now'], '');
     // first (pipeline) question unchanged: 4 options
     assert.equal(pipeline.ask.questions[0].header, 'Pipeline');
     assert.equal(pipeline.ask.questions[0].options.length, 4);
+    // ride-along stays within the AskUserQuestion ≤4-option cap
+    assert.ok(q2.options.length <= 4, 'stale ride-along ≤ 4 options');
   });
 });
 
@@ -199,7 +233,11 @@ describe('SP2 — inboxStalePlansDrillIn (M4 / Scenario 4)', () => {
     // SP3 (Decision F2-A) promotes 'Verify' from a text-only "coming soon"
     // affordance to a real selectable label routing to 'inbox verify' whenever
     // candidates exist. 'Verify' is a LABEL, never a digit (Rule 1).
-    assert.deepEqual(screen.actions, { Verify: 'inbox verify', '◀ Back': '' });
+    // R2-C2 item 5: a durable "Don't ask again for these" (dismissStale) rides
+    // AFTER 'Verify', before Back — never recommended. The render stays read-only
+    // (the write happens only when the human picks the claude:dismiss-stale action).
+    assert.deepEqual(screen.actions,
+      { Verify: 'inbox verify', "Don't ask again for these": 'claude:dismiss-stale', '◀ Back': '' });
     assert.equal(wroteCount - before, 0, 'drill-in render must perform no writes');
   });
 
@@ -277,8 +315,10 @@ describe('SP2 — route dispatch (M5)', () => {
     });
     const screen = route(['inbox', 'stale'], root);
     assert.equal(screen.ask.questions[0].header, 'Stale plans');
-    // SP3 (Decision F2-A): drill-in with ≥1 candidate now offers Verify + Back.
-    assert.deepEqual(screen.actions, { Verify: 'inbox verify', '◀ Back': '' });
+    // SP3 (Decision F2-A): drill-in with ≥1 candidate offers Verify + Back;
+    // R2-C2 item 5 adds the durable dismiss between them.
+    assert.deepEqual(screen.actions,
+      { Verify: 'inbox verify', "Don't ask again for these": 'claude:dismiss-stale', '◀ Back': '' });
   });
 
   it('route(["inbox","bogus"]) falls back to the dashboard pipeline', () => {
@@ -311,7 +351,7 @@ describe('SP2 — read-only candidate-render path (Scenario 5, F5-scoped delta)'
 
 describe('SP2 — menu discipline (Scenario 6, both screens)', () => {
   it('no digit-only actions key maps to a stale route; only "View stale plans" routes to inbox stale', () => {
-    mockScan({ candidates: [], count: 3 });
+    mockScan({ candidates: actionable(3), count: 3 });
     const pipeline = dashboardPipeline(root);
     const digitKeys = Object.keys(pipeline.actions).filter((k) => /^\d+$/.test(k));
     assert.equal(digitKeys.length, 0, 'no digit-only key in dashboardPipeline actions');
@@ -334,13 +374,13 @@ describe('SP2 — menu discipline (Scenario 6, both screens)', () => {
 
 describe('SP2 — pluralization edge (count === 1)', () => {
   it('renders singular "1 possibly-stale plan" and a singular ride-along prompt', () => {
-    mockScan({ candidates: [], count: 1 });
+    mockScan({ candidates: actionable(1), count: 1 });
     const text = buildDashboardTable(root);
     assert.ok(text.includes('1 possibly-stale plan'));
     assert.ok(!text.includes('1 possibly-stale plans'), 'no trailing s on singular count');
 
     invalidate('getInboxCounts');
-    mockScan({ candidates: [], count: 1 });
+    mockScan({ candidates: actionable(1), count: 1 });
     const pipeline = dashboardPipeline(root);
     assert.equal(
       pipeline.ask.questions[1].question,

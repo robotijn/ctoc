@@ -1,0 +1,10 @@
+{
+  "content_sha256": "fe196bfb1987be939ca6f53fbbb97749899f3d816cdd54b37515c401530b7c8e",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.596Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "SP3-scout-verify-classify-propose"
+}

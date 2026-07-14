@@ -1,0 +1,10 @@
+{
+  "content_sha256": "cdc56b53ed22386828d9e34f062cc6a42775afc46d9e0de3abbd29ba059155f7",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.593Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC3-eu-ai-act-agent-plan-and-code"
+}

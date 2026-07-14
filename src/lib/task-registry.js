@@ -17,8 +17,14 @@
  *   LOUDLY (an undeclared implement would bypass Rule 4 and make the model unsound).
  *
  * ── The concurrency ladder (order is LOAD-BEARING) ──────────────────────────────
- *   Rule 0  dependency gate (canRun only): every blockedBy id must be `done`.
- *   Rule 1  max-concurrent: at most MAX_CONCURRENT running.
+ *   Rule 0  dependency gate (canRun only), KIND-AWARE (C1-1): for a `sync` candidate a
+ *           dep satisfies once it is SETTLED (terminal — done/failed/orphaned/cancelled),
+ *           so a barrier waits for the wave to settle rather than deadlocking on a
+ *           failure it is meant to report; every OTHER kind keeps done-only. A missing
+ *           dep never satisfies. `unsatisfiableTasks` surfaces the queued tasks a dead
+ *           dep or a blockedBy cycle would otherwise wedge silently forever (C1-7).
+ *   Rule 1  max-concurrent: at most MAX_CONCURRENT occupying a slot. `running` AND
+ *           `cancelling` occupy (C1-2 — a cancelling task keeps its slot until gone).
  *   Rule 2  sync-barrier: a `sync` candidate waits while ANY task runs, and NO
  *           candidate (even read-only) starts while a `sync` runs. A `sync` is the
  *           wave integration boundary (integrated suite + ratchet + commit) and
@@ -43,8 +49,14 @@
  *   • id + seq: a persisted, never-decremented `seq`; addTask assigns `id = 't'+(++seq)`
  *     → unique, strictly monotonic, no reuse across pruning/reload. FIFO order is the
  *     tasks-array insertion order (== seq order), NOT timestamps — clock-skew immune.
- *   • `cancelled` is a terminal status reachable from `queued`/`running`; the registry
- *     records the decision (killing the harness-level agent is the caller's job).
+ *   • CANCEL lifecycle (C1-2): `queued → cancelled` is immediate; a running task cancels
+ *     via `running → cancelling → cancelled`. `cancelling` is a NON-terminal state that
+ *     still OCCUPIES its slot/touches/gitOp/sync-barrier, so the registry never frees a
+ *     live agent's files early; it resolves to done/failed if a completion arrives during
+ *     cancellation. Killing the harness-level agent is the caller's job.
+ *   • ORPHANED is a SOFT terminal (C1-5): a falsely-orphaned agent that later finishes may
+ *     transition `orphaned → done | failed` (a late completion is accepted, not dropped).
+ *     done/failed/cancelled remain HARD terminals with no exit.
  *
  * ALL filesystem access routes through src/lib/safe-fs.js — the audited choke
  * point (LH1); there is no raw `fs` in this module. There is NO regex in this module
@@ -84,21 +96,39 @@ const MAX_TOUCH_LENGTH = 512;
 const KINDS = Object.freeze(new Set([
   'implement', 'plan', 'review', 'quality', 'security', 'decompose', 'discuss', 'sync'
 ]));
-/** All valid task statuses. `cancelled` is terminal (see TERMINAL). */
-const STATUSES = Object.freeze(new Set(['queued', 'running', 'done', 'failed', 'orphaned', 'cancelled']));
-/** Terminal statuses — no transition leaves them. */
+/**
+ * All valid task statuses. `cancelling` is a NON-terminal in-flight state (C1-2):
+ * a running task ordered to cancel enters `cancelling` and keeps occupying its slot,
+ * touches, gitOp and the sync barrier until the agent is confirmed gone. The genuine
+ * terminals are done/failed/orphaned/cancelled (see TERMINAL).
+ */
+const STATUSES = Object.freeze(new Set(['queued', 'running', 'cancelling', 'done', 'failed', 'orphaned', 'cancelled']));
+/**
+ * Terminal statuses for the purpose of ts.done auto-stamping. `orphaned` is a SOFT
+ * terminal (C1-5): entering it stamps ts.done, but a falsely-orphaned agent that
+ * later finishes may still transition orphaned→done / orphaned→failed (a late
+ * completion is accepted, not dropped). done/failed/cancelled are HARD terminals —
+ * no transition leaves them. `cancelling` is NOT terminal (it is an active state).
+ */
 const TERMINAL = Object.freeze(new Set(['done', 'failed', 'orphaned', 'cancelled']));
 /**
- * Allowed status transitions (out of a terminal state: none). `cancelled` is
- * reachable from both `queued` and `running` (a wave/plan may be cancelled before
- * or during execution); like every terminal transition it auto-stamps `ts.done`.
+ * Allowed status transitions.
+ *   • `queued → cancelled` is IMMEDIATE (nothing is running, so freeing is safe).
+ *   • A running task cancels via `running → cancelling → cancelled` (C1-2): direct
+ *     running→cancelled is FORBIDDEN because it would free the task's files/slot while
+ *     the harness agent may still be alive. `cancelling` may also resolve to done/failed
+ *     if a completion/failure arrives during cancellation (recorded honestly).
+ *   • `orphaned → done | failed` exist so a falsely-orphaned agent's late completion is
+ *     ACCEPTED (C1-5). No other escape from orphaned (→running/→cancelled stay illegal).
+ * Every transition INTO a terminal auto-stamps `ts.done` (re-stamps on orphaned→done).
  */
 const VALID_TRANSITIONS = Object.freeze({
   queued: new Set(['running', 'failed', 'cancelled']),
-  running: new Set(['done', 'failed', 'orphaned', 'cancelled']),
+  running: new Set(['done', 'failed', 'orphaned', 'cancelling']),
+  cancelling: new Set(['cancelled', 'done', 'failed']),
   done: new Set(),
   failed: new Set(),
-  orphaned: new Set(),
+  orphaned: new Set(['done', 'failed']),
   cancelled: new Set()
 });
 /** updateTask whitelist — id is immutable; ts is merged specially. */
@@ -505,35 +535,55 @@ function updateTask(registry, id, patch) {
 
 // ── scheduler (pure) ────────────────────────────────────────────────────────────
 
+/**
+ * Statuses that OCCUPY a concurrency slot. `cancelling` counts as running (C1-2): a
+ * task ordered to cancel still holds its slot, touches, gitOp and the sync barrier
+ * until the harness agent is confirmed gone, so it must not be scheduled around.
+ */
+const OCCUPYING = Object.freeze(new Set(['running', 'cancelling']));
+
+/** @param {{status?:string}} task — occupies a concurrency slot (running or cancelling). */
+function isOccupying(task) {
+  return OCCUPYING.has(task.status);
+}
+
 /** @param {{touches?:string[]}} task — a task "edits" iff it declares ≥1 touched file. */
 function isEditing(task) {
   return Array.isArray(task.touches) && task.touches.length > 0;
 }
 
 /**
- * Tasks currently running, excluding the candidate by id (self-exclusion → canRun
- * is idempotent whether or not the candidate already lives in the registry).
+ * Tasks currently occupying a slot (running OR cancelling — C1-2), excluding the
+ * candidate by id (self-exclusion → canRun is idempotent whether or not the candidate
+ * already lives in the registry).
  * @param {{tasks:Array<object>}} registry
  * @param {string} excludeId
  * @returns {Array<object>}
  */
 function runningTasks(registry, excludeId) {
-  return registry.tasks.filter(t => t.status === 'running' && t.id !== excludeId);
+  return registry.tasks.filter(t => isOccupying(t) && t.id !== excludeId);
 }
 
 /**
- * Rule 0 (dependency gate). Every id in candidate.blockedBy must resolve to a task
- * with status === 'done'. A dep that is failed/orphaned/queued/running/missing does
- * NOT satisfy (safety-first — repair of dead refs is NB4's job).
- * @param {{blockedBy?:string[]}} candidate
+ * Rule 0 (dependency gate), KIND-AWARE (C1-1). A dep satisfies when:
+ *   • the candidate is a `sync` (wave integration boundary) and the dep is SETTLED —
+ *     i.e. its status is TERMINAL (done/failed/orphaned/cancelled). A barrier waits
+ *     for the wave to SETTLE, not to succeed; reporting the failures is the sync run's
+ *     own job, so a failed/cancelled dep must not deadlock the barrier forever.
+ *   • the candidate is any OTHER kind and the dep is `done` (done-only, unchanged).
+ * A MISSING dep id NEVER satisfies either kind (safety-first). An in-flight dep
+ * (queued/running/cancelling) never satisfies — it has not settled.
+ * @param {{kind?:string, blockedBy?:string[]}} candidate
  * @param {{tasks:Array<object>}} registry
  * @returns {boolean}
  */
 function depsSatisfied(candidate, registry) {
   const deps = Array.isArray(candidate.blockedBy) ? candidate.blockedBy : [];
+  const isSync = candidate.kind === 'sync';
   return deps.every(depId => {
     const dep = registry.tasks.find(t => t.id === depId);
-    return !!dep && dep.status === 'done';
+    if (!dep) return false; // missing never satisfies
+    return isSync ? TERMINAL.has(dep.status) : dep.status === 'done';
   });
 }
 
@@ -615,7 +665,7 @@ function canRun(candidate, registry) {
  * @returns {Array<object>}
  */
 function nextRunnable(registry) {
-  const projected = registry.tasks.filter(t => t.status === 'running').slice();
+  const projected = registry.tasks.filter(isOccupying).slice();
   const result = [];
   for (const cand of registry.tasks.filter(t => t.status === 'queued')) {
     if (!depsSatisfied(cand, registry)) continue; // deps vs REAL statuses (done-only)
@@ -626,6 +676,139 @@ function nextRunnable(registry) {
     }
   }
   return result;
+}
+
+// ── unsatisfiable detection (C1-1 / C1-7 — surface the permanently-wedged) ──────────
+
+/**
+ * The set of task ids that lie ON a directed cycle in the blockedBy graph, computed
+ * with ITERATIVE Tarjan strongly-connected-components (no recursion; O(V+E)). Edges
+ * run task → dep for every dep id that EXISTS in the registry (a missing dep is not an
+ * edge — it is the dep-missing case, handled separately). A node is on a cycle iff it
+ * belongs to an SCC of size > 1, or is a singleton with a self-loop.
+ * @param {Array<object>} tasks
+ * @param {Map<string, object>} byId
+ * @returns {Set<string>}  ids that are on at least one cycle.
+ */
+function cycleNodeIds(tasks, byId) {
+  const adj = new Map();
+  for (const t of tasks) {
+    if (!t || typeof t.id !== 'string') continue;
+    const deps = Array.isArray(t.blockedBy) ? t.blockedBy : [];
+    adj.set(t.id, deps.filter(d => byId.has(d)));
+  }
+
+  const index = new Map();
+  const low = new Map();
+  const onStack = new Set();
+  const sccStack = [];
+  const result = new Set();
+  let counter = 0;
+
+  for (const startId of adj.keys()) {
+    if (index.has(startId)) continue;
+    // Explicit work stack of frames { id, i } replaces the recursion.
+    const work = [{ id: startId, i: 0 }];
+    while (work.length > 0) {
+      const frame = work[work.length - 1];
+      const v = frame.id;
+      if (frame.i === 0) {
+        index.set(v, counter);
+        low.set(v, counter);
+        counter++;
+        sccStack.push(v);
+        onStack.add(v);
+      }
+      const neighbors = adj.get(v) || [];
+      if (frame.i < neighbors.length) {
+        const w = neighbors[frame.i];
+        frame.i++;
+        if (!index.has(w)) {
+          work.push({ id: w, i: 0 }); // tree edge → descend
+        } else if (onStack.has(w)) {
+          low.set(v, Math.min(low.get(v), index.get(w))); // back edge
+        }
+      } else {
+        // Finished v: if it roots an SCC, pop the component.
+        if (low.get(v) === index.get(v)) {
+          const comp = [];
+          let w;
+          do {
+            w = sccStack.pop();
+            onStack.delete(w);
+            comp.push(w);
+          } while (w !== v);
+          if (comp.length > 1) {
+            for (const c of comp) result.add(c);
+          } else {
+            const only = comp[0];
+            if ((adj.get(only) || []).includes(only)) result.add(only); // self-loop
+          }
+        }
+        work.pop();
+        if (work.length > 0) {
+          const parent = work[work.length - 1].id;
+          low.set(parent, Math.min(low.get(parent), low.get(v))); // propagate to parent
+        }
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * QUEUED tasks that can NEVER run, with the reason each is wedged (C1-1 / C1-7).
+ * Silent-forever is the defect this surfaces: `task-reconcile.reconcile` consumes the
+ * result, marks each such task `failed`, and pushes a loud report entry to the inbox.
+ * A task is unsatisfiable when, per KIND-AWARE dependency semantics:
+ *   • `dep-missing`  — a blockedBy id names no task in the registry (never satisfies,
+ *     any kind). Highest precedence.
+ *   • `dep-failed`   — a NON-sync task has a dep that is terminal-non-done
+ *     (failed/orphaned/cancelled): it can never become `done`. A `sync` task is
+ *     EXCLUDED here — a settled (terminal) dep satisfies its barrier (C1-1), so a
+ *     merely-failed dep is not unsatisfiable for a sync.
+ *   • `dep-cycle`    — the task lies on a blockedBy cycle (self or multi-node); no
+ *     member can ever be `done` first, so all are permanently wedged.
+ * Only QUEUED tasks are considered (a running/terminal task is not "wedged"). Pure:
+ * no I/O, no mutation — returns references to the wedged task objects.
+ * @param {{tasks:Array<object>}} registry
+ * @returns {Array<{task:object, reason:'dep-missing'|'dep-failed'|'dep-cycle', deps:string[]}>}
+ */
+function unsatisfiableTasks(registry) {
+  const tasks = registry && Array.isArray(registry.tasks) ? registry.tasks : [];
+  const byId = new Map();
+  for (const t of tasks) {
+    if (t && typeof t.id === 'string') byId.set(t.id, t);
+  }
+  const onCycle = cycleNodeIds(tasks, byId);
+
+  /** @type {Array<{task: object, reason: 'dep-missing'|'dep-failed'|'dep-cycle', deps: string[]}>} */
+  const out = [];
+  for (const task of tasks) {
+    if (!task || task.status !== 'queued') continue;
+    const deps = Array.isArray(task.blockedBy) ? task.blockedBy : [];
+    const isSync = task.kind === 'sync';
+
+    const missing = deps.filter(depId => !byId.has(depId));
+    if (missing.length > 0) {
+      out.push({ task, reason: 'dep-missing', deps: missing });
+      continue;
+    }
+    if (!isSync) {
+      const dead = deps.filter(depId => {
+        const dep = byId.get(depId);
+        return dep && TERMINAL.has(dep.status) && dep.status !== 'done';
+      });
+      if (dead.length > 0) {
+        out.push({ task, reason: 'dep-failed', deps: dead });
+        continue;
+      }
+    }
+    if (onCycle.has(task.id)) {
+      out.push({ task, reason: 'dep-cycle', deps: deps.filter(d => onCycle.has(d)) });
+    }
+  }
+  return out;
 }
 
 // ── atomic add-and-claim ─────────────────────────────────────────────────────────
@@ -716,6 +899,7 @@ module.exports = {
   // scheduler (pure)
   canRun,
   nextRunnable,
+  unsatisfiableTasks,
   // atomic add-and-claim
   addAndClaim,
   // drain-stop flag trio

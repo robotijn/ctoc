@@ -1,0 +1,10 @@
+{
+  "content_sha256": "6d6fa5b26d49ef98f913f9346089196cf07c4d2fb78b68a0877b7273f7dbcaaf",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.592Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "EC1-s2-compliance-regime-resolver"
+}

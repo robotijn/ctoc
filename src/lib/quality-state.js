@@ -229,7 +229,9 @@ function setCompleted(passed, summary) {
   const status = getStatus();
   const startedAt = status.lastRun?.startedAt ? new Date(status.lastRun.startedAt) : new Date();
   const completedAt = new Date();
-  const duration = completedAt - startedAt;
+  // Date−Date subtraction coerces via valueOf() at runtime; the `any` casts keep
+  // that behavior while satisfying checkJs's numeric-operand requirement.
+  const duration = /** @type {any} */ (completedAt) - /** @type {any} */ (startedAt);
 
   return updateStatus({
     overallStatus: passed ? 'pass' : 'fail',

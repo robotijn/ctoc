@@ -1,0 +1,10 @@
+{
+  "content_sha256": "0c7b160289e36503c1325fa35c5cd91a4e2ff46e9e25a4763c02024494a924e8",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T01:28:01.589Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14 legacy pre-ledger migration (R2-F wave boundary, ordered by the human)",
+  "plan_basename": "CU4a-frameworks-longtail-s8-aiml-serving-compute"
+}
