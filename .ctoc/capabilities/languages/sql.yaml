@@ -1,0 +1,19 @@
+# SQL capability entry — DELIBERATELY PARTIAL, and that is HONEST, not a gap. SQL is
+# not a runnable application (honest:false, no run shape), and most pipeline phases do
+# not apply: typecheck, coverage, depsAudit and build are OMITTED (N/A for SQL). lint
+# and format use sqlfluff (the standard SQL linter/formatter). test is UNVERIFIED
+# (dbt/pgtap vary — no single CI-standard) and security is UNVERIFIED (SQL SAST is not
+# a standard tool; sqlfluff dialect rules are style, not security).
+language: sql
+detectionMarkers: [dbt_project.yml, "*.sql", migrations]
+extensions: [.sql]
+toolchain:
+  lint:     { cmd: "sqlfluff lint", tool: sqlfluff, verified: web-2026-07 }
+  format:   { cmd: "sqlfluff format", tool: sqlfluff, verified: web-2026-07 }
+  test:     { cmd: "dbt test", tool: dbt, altCmd: "pg_prove", verified: UNVERIFIED }
+  security: { cmd: "sqlfluff lint", tool: sqlfluff, verified: UNVERIFIED }
+run:
+  shapes: { }
+  honest: false
+configScaffold: [.sqlfluff]
+verified: web-2026-07

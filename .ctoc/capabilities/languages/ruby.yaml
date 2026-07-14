@@ -1,0 +1,22 @@
+# Ruby capability entry — web-grounded 2026 toolchain. RuboCop for lint+format, RSpec
+# for tests, Brakeman (Rails SAST) for security, bundler-audit for dependencies.
+# typecheck is UNVERIFIED: Sorbet (`srb tc`) is optional and not universal in Ruby.
+# coverage is UNVERIFIED: SimpleCov has no standalone CLI — it is required into the
+# spec helper and writes coverage as a side effect of the test run.
+language: ruby
+detectionMarkers: [Gemfile, "*.gemspec"]
+extensions: [.rb]
+toolchain:
+  lint:      { cmd: "rubocop", tool: rubocop, altCmd: "standardrb", verified: web-2026-07 }
+  format:    { cmd: "rubocop --autocorrect", tool: rubocop, verified: web-2026-07 }
+  typecheck: { cmd: "srb tc", tool: sorbet, verified: UNVERIFIED }
+  test:      { cmd: "rspec", tool: rspec, altCmd: "rake test", verified: web-2026-07 }
+  coverage:  { cmd: "rspec", tool: simplecov, verified: UNVERIFIED }
+  security:  { cmd: "brakeman", tool: brakeman, verified: web-2026-07 }
+  depsAudit: { cmd: "bundler-audit check", tool: bundler-audit, verified: web-2026-07 }
+  build:     { cmd: "bundle install", tool: bundler, verified: web-2026-07 }
+run:
+  shapes: { server: "rails server", cli: "ruby" }
+  honest: true
+configScaffold: [Gemfile, .rubocop.yml]
+verified: web-2026-07

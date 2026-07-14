@@ -1,0 +1,13 @@
+# infra — Infrastructure-as-Code (Terraform / Kubernetes / Helm). There is no app
+# to run in the human-facing sense, so run is honest:false (a `terraform plan` is a
+# dry run, not a launched app). Security is REQUIRED (checkov/tfsec); test/coverage
+# do not apply (skip). Highest detection priority — a main.tf/Chart.yaml is decisive.
+projectType: infra
+detectionMarkers: [main.tf, terraform.tf, Chart.yaml, kustomization.yaml]
+frameworks: [terraform, kubernetes, helm, kustomize, pulumi]
+priority: 90
+runShape: none
+phases: { lint: required, typecheck: skip, test: skip, security: required, coverage: skip }
+run: { strategy: plan-only, honest: false }
+configScaffold: [main.tf, .terraform, k8s]
+verified: web-2026-07

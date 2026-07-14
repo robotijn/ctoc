@@ -1,0 +1,13 @@
+# cli — a command-line tool / single binary. The honest run is `--help` exit-0 with
+# output (honest:true — it really executes). Detection by marker is weak (a CLI is
+# usually a package.json `bin`, detected by app-runner, not by a unique file), so the
+# marker set is honestly flagged UNVERIFIED.
+projectType: cli
+detectionMarkers: [.goreleaser.yaml, oclif.manifest.json]
+frameworks: [commander, oclif, clap, cobra, click]
+priority: 10
+runShape: cli
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
+run: { strategy: help-exit-0, honest: true }
+configScaffold: [package.json, tsconfig.json]
+verified: UNVERIFIED

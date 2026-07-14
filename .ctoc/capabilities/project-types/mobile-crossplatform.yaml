@@ -1,0 +1,12 @@
+# mobile-crossplatform — Flutter / React Native / Expo. An emulator boot is NOT
+# CI-reliable, so the honest last mile is build+test (build-is-last-mile), never
+# a false "it ran".
+projectType: mobile-crossplatform
+detectionMarkers: [pubspec.yaml, app.json, expo.json]
+frameworks: [flutter, react-native, expo]
+priority: 70
+runShape: mobile
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
+run: { strategy: build-and-test, honest: build-is-last-mile }
+configScaffold: [pubspec.yaml, analysis_options.yaml, .gitignore]
+verified: web-2026-07

@@ -83,6 +83,70 @@ registry for the non-JS run last mile in CR1):
 - `runStrategyFor(language, projectType, projectRoot?)` →
   `{ command, honest, shape }`, or null. `honest` is `true` or `build-is-last-mile`.
 
+## One project-type entry (CR3)
+
+A language names the toolchain; a **project type** names *which phases matter*, the
+*run strategy*, and the *config scaffold* — so a Flutter app, a Rust CLI, a
+data-science notebook and a microservice monorepo get different pipelines even in
+the same language. Each `.ctoc/capabilities/project-types/<type>.yaml` declares:
+
+```yaml
+projectType: mobile-crossplatform        # REQUIRED — the key this entry registers under
+detectionMarkers: [pubspec.yaml, app.json]  # exact filenames/dirnames whose presence detects the type
+frameworks: [flutter, react-native, expo]   # informational: frameworks that map to this type
+priority: 70                             # detection tie-break: higher wins (turbo.json→monorepo beats a plain package.json)
+runShape: mobile                         # which of the LANGUAGE's run.shapes keys this type maps to (cli|server|web|mobile|desktop|none)
+phases: { lint: required, typecheck: required, test: required,
+          security: recommended, coverage: recommended }   # REQUIRED — phase relevance
+run: { strategy: build-and-test, honest: build-is-last-mile }  # REQUIRED — run strategy + honest flag
+configScaffold: [pubspec.yaml, analysis_options.yaml, .gitignore]  # REQUIRED — non-empty
+verified: web-2026-07                    # provenance, or UNVERIFIED
+```
+
+### Project-type field reference
+
+| Field | Meaning |
+|---|---|
+| `projectType` | The registry key. REQUIRED — a file with no `projectType` is skipped + warned. |
+| `detectionMarkers` | Exact filenames/dirnames; if any exists in a project, the type matches. No globs (no ReDoS). |
+| `frameworks` | Frameworks that map to this type (informational). |
+| `priority` | Detection tie-break — the highest-priority matching type wins (default 0). |
+| `runShape` | The `run.shapes` key of the matched LANGUAGE that `pipelineFor` reads the run command from. `none` when the type has no runtime. |
+| `phases.<phase>` | The relevance of a phase for this type: `required` \| `recommended` \| `optional` \| `skip`. REQUIRED object. |
+| `run.strategy` | How the type is run (e.g. `dev-server`, `server-probe`, `build-and-test`, `help-exit-0`, `notebook-execute`, `plan-only`, `none`). |
+| `run.honest` | `true` (a genuinely runnable/pollable runtime), `false` (no human-facing runtime — a library/infra), `build-is-last-mile` (mobile/desktop), or a descriptor like `notebook-executes` / `per-workspace`. **Never a false "it ran".** |
+| `configScaffold` | Config files/dirs a scaffolder would create for this type. REQUIRED, non-empty. |
+| `verified` | Provenance. `web-2026-07` or `UNVERIFIED`. **Never `guessed`.** |
+
+Recognized phase-relevance tokens: `required`, `recommended`, `optional`, `skip`.
+
+### The 13 shipped project types (CR3)
+
+`web-frontend` (dev-server, honest:true) · `web-backend` (server-probe, honest:true,
+security required) · `mobile-crossplatform` (build-is-last-mile) ·
+`mobile-native-android` (build-is-last-mile) · `mobile-native-ios`
+(build-is-last-mile) · `desktop` (build-is-last-mile) · `cli` (help-exit-0,
+honest:true) · `library` (**honest:false — no runtime**, coverage required) ·
+`data-science` (notebook-execute, honest:notebook-executes) · `ml-service`
+(serve-probe, honest:true, test required) · `microservice` (server-probe,
+honest:true, security required) · `monorepo` (per-workspace) · `infra` (plan-only,
+**honest:false**, test/typecheck/coverage `skip`, security required).
+
+### The project-type engine API
+
+- `loadProjectTypes(projectRoot?)` → `{ projectTypes, warnings }`. Bundled seed data,
+  then a project's `.ctoc/capabilities/project-types/*` overlaid. Fail-open per entry.
+- `projectTypeFor(projectRoot)` → the detected project-type name (by `detectionMarkers`,
+  resolved with `priority`), or null.
+- `pipelineFor(language, projectType, projectRoot?)` → the MERGE: each phase's
+  relevance (from the type) + command (from the language toolchain); the run strategy
+  + honest flag (from the type) enriched with the language's run command (via
+  `runShape`); the UNION of both config scaffolds. Null when either is unknown.
+
+**Live consumer:** app-runner's `detectRunTarget` calls `projectTypeFor` +
+`pipelineFor` to attach the detected `taxonomy` and the merged `pipeline` to a native
+run target — the CR3 engine functions are wired to a real caller, never test-only.
+
 ## Seed languages (CR1)
 
 Six web-grounded 2026 toolchains: **dart** (Flutter), **kotlin** (Android),

@@ -1,0 +1,11 @@
+# mobile-native-android — Kotlin/Java Android. Build via Gradle; emulator boot is
+# not CI-reliable, so build+test is the honest last mile (build-is-last-mile).
+projectType: mobile-native-android
+detectionMarkers: [AndroidManifest.xml, settings.gradle.kts, proguard-rules.pro]
+frameworks: [android-sdk, jetpack-compose]
+priority: 66
+runShape: mobile
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
+run: { strategy: build-and-test, honest: build-is-last-mile }
+configScaffold: [build.gradle.kts, detekt.yml, AndroidManifest.xml]
+verified: web-2026-07

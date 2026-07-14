@@ -1,0 +1,25 @@
+# Swift capability entry — web-grounded 2026 toolchain (SwiftPM + Xcode). Mobile run
+# is HONEST: build+test is the CI-safe last mile (a simulator boot is not CI-reliable)
+# — never a false "it ran". security is UNVERIFIED (no standard Swift SAST — SwiftLint
+# is style, not security). depsAudit uses OWASP dependency-check's SwiftPM analyzer on
+# Package.resolved (dependency-check.github.io/DependencyCheck/analyzers/swift.html,
+# verified 2026-07) — the analyzer is flagged experimental upstream, so --enableExperimental
+# is required. Podfile is deliberately NOT a marker here (assigned to Objective-C to keep
+# the current exact-match detector unambiguous); Swift is detected via Package.swift.
+language: swift
+detectionMarkers: [Package.swift, "*.xcodeproj"]
+extensions: [.swift]
+toolchain:
+  lint:      { cmd: "swiftlint", tool: swiftlint, verified: web-2026-07 }
+  format:    { cmd: "swift-format lint", tool: swift-format, altCmd: "swiftformat --lint", verified: web-2026-07 }
+  typecheck: { cmd: "swift build", tool: swift, altCmd: "xcodebuild build", verified: web-2026-07 }
+  test:      { cmd: "swift test", tool: swift, altCmd: "xcodebuild test", verified: web-2026-07 }
+  coverage:  { cmd: "swift test --enable-code-coverage", tool: swift, verified: web-2026-07 }
+  security:  { cmd: "swiftlint", tool: swiftlint, verified: UNVERIFIED }
+  depsAudit: { cmd: "dependency-check --enableExperimental --scan Package.resolved", tool: dependency-check, verified: web-2026-07 }
+  build:     { cmd: "swift build -c release", tool: swift, altCmd: "xcodebuild build", verified: web-2026-07 }
+run:
+  shapes: { cli: "swift run", mobile: "xcodebuild build" }
+  honest: build-is-last-mile
+configScaffold: [Package.swift, .swiftlint.yml]
+verified: web-2026-07

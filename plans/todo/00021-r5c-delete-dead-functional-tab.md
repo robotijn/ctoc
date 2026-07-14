@@ -1,19 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T23:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's standing 2026-07-14 orders. Boundary cleanup:
-  R5-B deleted assignDirectly + the functional tab's assign action +
-  renderAssignConfirm; the coordinator removed the now-dead confirm-assign
-  branch in menu.js, which orphaned src/tabs/functional.js (its only live tie).
-  Verified: tabModules resolves to AREAS, not tabs/; functional.js render/
-  renderActions/handleKey were never called by the live menu. It is dead —
-  rewire or delete, no third state, no baselining.
----
-
----
 title: "R5-C — Delete the dead functional tab module and carve its tests cleanly"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

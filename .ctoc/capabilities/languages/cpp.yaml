@@ -1,0 +1,23 @@
+# C++ capability entry — web-grounded 2026 toolchain (CMake + clang tooling).
+# depsAudit uses osv-scanner: C++ has no centralized package manager (conan/vcpkg
+# vary), so OSV-Scanner matches vendored deps against OSV.dev commit-level ranges and
+# also scans Conan/vcpkg SBOMs (google.github.io/osv-scanner, verified 2026-07). The
+# two-step CMake build (configure + build) is split so the returned build cmd is a
+# SINGLE argv-safe command; `cmake -S . -B build` is the documented configure prerequisite.
+language: cpp
+detectionMarkers: [CMakeLists.txt, "*.cpp", "*.hpp"]
+extensions: [.cpp, .hpp, .cc, .cxx]
+toolchain:
+  lint:      { cmd: "clang-tidy", tool: clang-tidy, verified: web-2026-07 }
+  format:    { cmd: "clang-format --dry-run --Werror", tool: clang-format, verified: web-2026-07 }
+  typecheck: { cmd: "cmake --build build", tool: cmake, verified: web-2026-07 }
+  test:      { cmd: "ctest --test-dir build", tool: ctest, verified: web-2026-07 }
+  coverage:  { cmd: "lcov --capture --directory build --output-file coverage.info", tool: lcov, verified: web-2026-07 }
+  security:  { cmd: "cppcheck --enable=all", tool: cppcheck, altCmd: "flawfinder .", verified: web-2026-07 }
+  depsAudit: { cmd: "osv-scanner -r .", tool: osv-scanner, verified: web-2026-07 }
+  build:     { cmd: "cmake --build build", tool: cmake, verified: web-2026-07 }
+run:
+  shapes: { cli: "./build/app" }
+  honest: true
+configScaffold: [CMakeLists.txt, .clang-format]
+verified: web-2026-07

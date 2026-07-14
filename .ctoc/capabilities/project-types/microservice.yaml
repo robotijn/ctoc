@@ -1,0 +1,12 @@
+# microservice — a networked service (one of many). Runs and answers a per-service
+# health probe (honest:true). Security REQUIRED (it faces the network). Ships a
+# Dockerfile + k8s manifest + OpenAPI.
+projectType: microservice
+detectionMarkers: [docker-compose.yml, compose.yaml, skaffold.yaml]
+frameworks: [express, fastify, spring-boot, gin, fastapi]
+priority: 50
+runShape: server
+phases: { lint: required, typecheck: required, test: required, security: required, coverage: recommended }
+run: { strategy: server-probe, honest: true }
+configScaffold: [Dockerfile, openapi.yaml, k8s]
+verified: web-2026-07

@@ -1,0 +1,12 @@
+# data-science — notebooks + pipelines. lint/test are RECOMMENDED (exploratory
+# code), typecheck OPTIONAL. The honest run is executing the notebook end-to-end
+# (`jupyter nbconvert --execute`), flagged honest:notebook-executes.
+projectType: data-science
+detectionMarkers: [dvc.yaml, environment.yml, papermill.yaml]
+frameworks: [jupyter, pandas, dvc, papermill]
+priority: 75
+runShape: none
+phases: { lint: recommended, typecheck: optional, test: recommended, security: optional, coverage: optional }
+run: { strategy: notebook-execute, honest: notebook-executes }
+configScaffold: [requirements.txt, pyproject.toml, dvc.yaml, .gitignore]
+verified: web-2026-07

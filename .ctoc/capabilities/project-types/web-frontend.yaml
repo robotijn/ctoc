@@ -1,0 +1,11 @@
+# web-frontend — a browser SPA/SSR app (React/Vue/Svelte/Angular, Vite/Next).
+# Runs a real dev server that answers HTTP, so run is genuinely honest:true.
+projectType: web-frontend
+detectionMarkers: [vite.config.ts, vite.config.js, next.config.js, next.config.mjs, angular.json, svelte.config.js]
+frameworks: [react, vue, svelte, angular, next, vite]
+priority: 20
+runShape: web
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
+run: { strategy: dev-server, honest: true }
+configScaffold: [package.json, tsconfig.json, eslint.config.js, .env.example, vite.config.ts]
+verified: web-2026-07

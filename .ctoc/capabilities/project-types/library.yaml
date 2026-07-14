@@ -1,0 +1,12 @@
+# library — a published package with NO human-facing runtime. run is honest:false
+# (there is nothing to launch); coverage is REQUIRED (a library's contract is its
+# API surface). Detected by a publish/build config, not by a run entry.
+projectType: library
+detectionMarkers: [tsup.config.ts, rollup.config.js, rollup.config.mjs, .changeset, api-extractor.json]
+frameworks: [tsup, rollup, changesets, semantic-release]
+priority: 40
+runShape: none
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: required }
+run: { strategy: none, honest: false }
+configScaffold: [package.json, tsconfig.json, .changeset]
+verified: web-2026-07

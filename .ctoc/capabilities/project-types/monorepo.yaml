@@ -1,0 +1,13 @@
+# monorepo — many workspaces under one root (Turborepo / Nx / pnpm workspaces).
+# There is no single app to launch; each workspace runs on its own, so run is honest
+# as per-workspace (the root itself does not "run"). High detection priority: a
+# turbo.json/nx.json beats a plain package.json.
+projectType: monorepo
+detectionMarkers: [turbo.json, nx.json, pnpm-workspace.yaml, lerna.json]
+frameworks: [turborepo, nx, pnpm-workspaces, lerna]
+priority: 80
+runShape: none
+phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }
+run: { strategy: per-workspace, honest: per-workspace }
+configScaffold: [turbo.json, package.json, pnpm-workspace.yaml]
+verified: web-2026-07

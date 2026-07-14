@@ -1,0 +1,12 @@
+# ml-service — model training / serving. test is REQUIRED (a model contract is
+# testable), security RECOMMENDED. The honest run is a serving probe (honest:true).
+# Detection markers are project-convention, not a universal standard → UNVERIFIED.
+projectType: ml-service
+detectionMarkers: [model_config.yaml, serving.yaml, vllm.yaml]
+frameworks: [vllm, triton, torchserve, bentoml, ray-serve]
+priority: 55
+runShape: server
+phases: { lint: recommended, typecheck: recommended, test: required, security: recommended, coverage: recommended }
+run: { strategy: serve-probe, honest: true }
+configScaffold: [Dockerfile, pyproject.toml, model-registry.yaml]
+verified: UNVERIFIED

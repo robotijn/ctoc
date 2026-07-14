@@ -1,0 +1,23 @@
+# C capability entry — web-grounded 2026 toolchain (Make + clang tooling).
+# depsAudit uses osv-scanner: C has no centralized package manager, so OSV-Scanner
+# matches vendored/submoduled sources against OSV.dev's commit-level vulnerability
+# ranges (google.github.io/osv-scanner, verified 2026-07). `test` uses ctest as the
+# generic runner (Unity/Criterion/CMocka vary); the run target `./a.out` is cc's
+# default output name.
+language: c
+detectionMarkers: [Makefile, "*.c", "*.h"]
+extensions: [.c, .h]
+toolchain:
+  lint:      { cmd: "clang-tidy", tool: clang-tidy, verified: web-2026-07 }
+  format:    { cmd: "clang-format --dry-run --Werror", tool: clang-format, verified: web-2026-07 }
+  typecheck: { cmd: "make", tool: make, verified: web-2026-07 }
+  test:      { cmd: "ctest", tool: ctest, verified: web-2026-07 }
+  coverage:  { cmd: "lcov --capture --directory . --output-file coverage.info", tool: lcov, verified: web-2026-07 }
+  security:  { cmd: "cppcheck --enable=all", tool: cppcheck, altCmd: "flawfinder .", verified: web-2026-07 }
+  depsAudit: { cmd: "osv-scanner -r .", tool: osv-scanner, verified: web-2026-07 }
+  build:     { cmd: "make", tool: make, verified: web-2026-07 }
+run:
+  shapes: { cli: "./a.out" }
+  honest: true
+configScaffold: [Makefile, .clang-format]
+verified: web-2026-07
