@@ -164,6 +164,99 @@ describe('FrameworkSecurityChecker: source files are scanned too, fail-soft', ()
   });
 });
 
+describe('FrameworkSecurityChecker: FW-w2-fix matcher-precision guards', () => {
+  /** Run the checker against a one-file fixture and return its findings. */
+  async function findingsFor({ nodeDeps, pyReq, envName, envBody, srcName, srcBody }) {
+    const dir = mkTmp('ctoc-fwsec-fix-');
+    try {
+      if (nodeDeps) writePkg(dir, nodeDeps);
+      if (pyReq) fs.writeFileSync(path.join(dir, 'requirements.txt'), pyReq, 'utf8');
+      if (envName) fs.writeFileSync(path.join(dir, envName), envBody, 'utf8');
+      if (srcName) {
+        fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+        fs.writeFileSync(path.join(dir, 'src', srcName), srcBody, 'utf8');
+      }
+      const res = await new FrameworkSecurityChecker(dir).run();
+      return res;
+    } finally { rm(dir); }
+  }
+
+  // F1 — bare TOKEN dropped; a public web3/search address token must NOT flag.
+  it('F1: NEXT_PUBLIC_TOKEN_ADDRESS does NOT flag (bare TOKEN dropped)', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_TOKEN_ADDRESS=0xabc\n' });
+    assert.equal(res.findings.length, 0, `bare TOKEN must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  // F1 — the AUTH-token compound still flags.
+  it('F1: NEXT_PUBLIC_ACCESS_TOKEN flags HIGH (auth-token compound kept)', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_ACCESS_TOKEN=abc\n' });
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, `ACCESS_TOKEN is a secret; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_ACCESS_TOKEN');
+  });
+
+  // F2 — a var NAMED inside a .env comment line must NOT flag.
+  it('F2: a #-comment line in .env.example naming NEXT_PUBLIC_API_SECRET does NOT flag', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, envName: '.env.example', envBody: '# never expose NEXT_PUBLIC_API_SECRET here\nNEXT_PUBLIC_SAFE=ok\n' });
+    assert.equal(res.findings.length, 0, `commented var name must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  // F2 — a //-comment line in source must NOT flag.
+  it('F2: a //-comment source line naming NEXT_PUBLIC_API_SECRET does NOT flag', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, srcName: 'a.js', srcBody: '// do not ship process.env.NEXT_PUBLIC_API_SECRET\nexport const x = 1;\n' });
+    assert.equal(res.findings.length, 0, `commented source line must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  // F2 — a /* block */ comment in source must NOT flag.
+  it('F2: a /* block */ comment naming NEXT_PUBLIC_API_SECRET does NOT flag', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, srcName: 'b.js', srcBody: '/* legacy: NEXT_PUBLIC_API_SECRET was here */\nexport const y = 2;\n' });
+    assert.equal(res.findings.length, 0, `block-commented var name must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  // F3.1 — PUBLIC_ is not Next's prefix; a Next-only repo must NOT flag PUBLIC_AUTH_TOKEN.
+  it('F3.1: PUBLIC_AUTH_TOKEN in a Next-only repo does NOT flag (prefix scoped to detected frameworks)', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'PUBLIC_AUTH_TOKEN=abc\n' });
+    assert.equal(res.findings.length, 0, `PUBLIC_ is not Next's prefix; got ${JSON.stringify(res.findings)}`);
+  });
+
+  // F3.1 — in a SvelteKit repo PUBLIC_ IS the prefix, so it MUST flag.
+  it('F3.1: PUBLIC_AUTH_TOKEN in a SvelteKit repo flags HIGH (PUBLIC_ is Svelte/Astro prefix)', async () => {
+    const res = await findingsFor({ nodeDeps: { svelte: '4.2.0' }, envName: '.env', envBody: 'PUBLIC_AUTH_TOKEN=abc\n' });
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, `PUBLIC_ is a real Svelte prefix; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'PUBLIC_AUTH_TOKEN');
+  });
+
+  // F3.2 — SECRET mid-name (a feature flag) must NOT flag.
+  it('F3.2: NEXT_PUBLIC_SECRET_SANTA_ENABLED does NOT flag (SECRET is mid-name, not terminal)', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_SECRET_SANTA_ENABLED=true\n' });
+    assert.equal(res.findings.length, 0, `SECRET_SANTA is a feature flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  // Control — the true positive still fires.
+  it('control: NEXT_PUBLIC_API_SECRET still flags HIGH', async () => {
+    const res = await findingsFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_API_SECRET=leak\n' });
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, `terminal SECRET is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_API_SECRET');
+  });
+
+  // F5 — case-insensitive indicator after a correctly-uppercased prefix (underscore-delimited tail).
+  it('F5: VITE_api_secret (uppercase prefix, lowercase underscore-delimited tail) flags HIGH', async () => {
+    const res = await findingsFor({ nodeDeps: { vue: '3.4.0' }, envName: '.env', envBody: 'VITE_api_secret=zzz\n' });
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, `case-insensitive tail after an uppercase prefix must flag; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'VITE_api_secret');
+  });
+
+  // F6 — a pure backend (FastAPI) has no client bundle → the check is not relevant.
+  it('F6: a FastAPI-only repo reports scanned:false (env-exposure removed from backend yaml)', async () => {
+    const res = await findingsFor({ pyReq: 'fastapi==0.115.0\n', envName: '.env', envBody: 'NEXT_PUBLIC_API_SECRET=leak\n' });
+    assert.equal(res.scanned, false, 'a pure backend has no client bundle → honest skip, not a scan');
+    assert.equal(res.findings.length, 0);
+  });
+});
+
 describe('quality-agent integration: a NEXT_PUBLIC_*_SECRET bumps the HIGH tally', () => {
   let dir;
   before(() => {
