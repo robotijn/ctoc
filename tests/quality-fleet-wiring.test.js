@@ -241,6 +241,45 @@ describe('MISSING TOOL: an absent SAST scanner skips LOUDLY, never a silent pass
   });
 });
 
+describe('SAST HONESTY: a parser-less-tool language skips when semgrep is absent (CR5-FIX F3)', () => {
+  let dir;
+  before(() => {
+    dir = mkTmp('ctoc-java-sast-');
+    // A Java project. Java's SAST "primary" is spotbugs — which this runner has NO
+    // parser for — so a Java scan is only real via the multi-language semgrep pass.
+    fs.writeFileSync(path.join(dir, 'pom.xml'), '<project></project>\n', 'utf8');
+    fs.writeFileSync(path.join(dir, 'Main.java'), 'class Main {}\n', 'utf8');
+  });
+  after(() => rm(dir));
+
+  it('java + mvn-present + semgrep-absent yields an honest per-language skip, never a silent scanned:true', async () => {
+    // Reproduce the EXACT defective environment: the old scannable filter used
+    // isToolAvailable(TOOL_CONFIGS.java.primary) === isToolAvailable('spotbugs')
+    // (which shells `mvn --version`). With Maven installed but semgrep absent, java
+    // was marked scannable, yet runLanguageScanner('java') returns false (spotbugs
+    // has no parser) and semgrep is gone — so java was scanned by NOTHING with no
+    // per-language skip printed. Mock isToolAvailable (an EXTERNAL host probe) to
+    // force that environment deterministically on any host.
+    const orig = SASTRunner.prototype.isToolAvailable;
+    SASTRunner.prototype.isToolAvailable = function (tool) {
+      if (tool === 'semgrep') return false;   // the only tool that can PARSE a java scan — absent
+      if (tool === 'spotbugs') return true;   // `mvn --version` succeeds (Maven installed)
+      return false;
+    };
+    try {
+      const res = await qualityAgent.runSecurityScan(null, { projectRoot: dir, allFiles: true });
+      assert.ok(
+        res.skipped.some(s => /SAST skipped for java/i.test(s)),
+        `java with no semgrep must skip LOUDLY per-language, got skipped=${JSON.stringify(res.skipped)}`
+      );
+      // An honest skip is not a finding — the gate must not falsely block.
+      assert.equal(res.passed, true, 'a missing scanner must not block the push');
+    } finally {
+      SASTRunner.prototype.isToolAvailable = orig;
+    }
+  });
+});
+
 describe('the scan degrades gracefully — clean project, no crash, no false block', () => {
   let dir;
   before(() => {

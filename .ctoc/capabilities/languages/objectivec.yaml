@@ -1,12 +1,13 @@
 # Objective-C capability entry — web-grounded 2026 toolchain (OCLint + clang-format +
 # xcodebuild/XCTest). Mobile run is HONEST: build+test is the CI-safe last mile — never
 # a false "it ran". security is UNVERIFIED (no standard Objective-C SAST) and depsAudit
-# is UNVERIFIED (CocoaPods/SwiftPM have no standard audit command). Podfile is the
-# testable exact marker (Swift uses Package.swift, so the current exact-match detector
-# stays unambiguous); the *.m / *.xcodeproj globs are carried for the glob-aware
-# detector (CR3).
+# is UNVERIFIED (CocoaPods/SwiftPM have no standard audit command).
+# DETECTION (CR5-FIX F2): Objective-C is detected ONLY by its source extension (*.m). A
+# bare `Podfile` (CocoaPods — used by Swift too) and `*.xcodeproj` (shared with Swift)
+# were removed as markers because they do not distinguish Objective-C from Swift; `*.m`
+# is the Objective-C source extension and the best available disambiguating signal.
 language: objectivec
-detectionMarkers: [Podfile, "*.m", "*.xcodeproj"]
+detectionMarkers: ["*.m"]
 extensions: [.m, .mm, .h]
 toolchain:
   lint:      { cmd: "oclint", tool: oclint, verified: web-2026-07 }
