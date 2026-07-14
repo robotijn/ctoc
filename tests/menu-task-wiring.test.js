@@ -417,7 +417,11 @@ describe('NB2 — edge cases (E1–E7)', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'menu-screens.js'), 'utf8');
     assert.doesNotMatch(src, /tasks\.json/, 'menu-screens never hardcodes the registry file');
     assert.match(src, /taskRegistry\.load/, 'registry reads go through task-registry.load');
-    assert.match(src, /taskRegistry\.save/, 'registry writes go through task-registry.save');
+    // R3-B item 7: mutating writes now go through task-registry's COMPARE-AND-SWAP choke
+    // point (`withRegistry`, which wraps load+save with a generation check) — a strictly
+    // stronger guarantee than a bare `.save`. The invariant under test ("writes go through
+    // task-registry, never raw fs") holds via either entry point.
+    assert.match(src, /taskRegistry\.(save|withRegistry)\b/, 'registry writes go through task-registry (save / withRegistry)');
   });
 });
 

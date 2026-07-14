@@ -58,7 +58,10 @@ const SETTINGS_SCHEMA = {
     settings: [
       { key: 'enforcementMode', label: 'Enforcement mode', type: 'select', options: ['strict', 'soft', 'off'], default: 'strict' },
       { key: 'requireReviewGate', label: 'Require review gate', type: 'toggle', default: true },
-      { key: 'autoMoveToReview', label: 'Auto-move to review after push', type: 'toggle', default: true },
+      // R4-B: `autoMoveToReview` was DELETED — it drove sync.moveToReviewAfterPush,
+      // a raw evidence-less rename into review/. A visible toggle wired to a landmine
+      // (both now gone). A plan reaches review ONLY via the evidence-minting
+      // completion path. There is exactly one door into review/.
       { key: 'escapePhrases', label: 'Escape phrases', type: 'list', default: ['skip planning', 'quick fix', 'trivial fix', 'hotfix'] }
     ]
   },
@@ -150,7 +153,7 @@ const ENVIRONMENT_PROFILES = {
 
   // Rehearse production. Strict enforcement; push stays the human's.
   staging: {
-    workflow: { enforcementMode: 'strict', autoMoveToReview: true }
+    workflow: { enforcementMode: 'strict' }
   },
 
   // Locked down. Strict enforcement, minimal noise, top model. Push stays the

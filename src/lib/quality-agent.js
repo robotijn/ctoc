@@ -327,24 +327,44 @@ async function runSmartTests(tools) {
 }
 
 /**
- * List the files this push introduces, relative to the project root. Used to
- * scope the secrets scan to the delta (blast-radius-safe: a push is gated on
- * what IT adds, not on pre-existing tree content that would block everyone).
- * Returns null when git history is unavailable so the caller falls back to a
- * whole-project scan.
+ * List the files THIS PUSH introduces, relative to the project root — the real
+ * push delta, scoped to what has NOT yet reached the upstream branch.
+ *
+ * R4-A finding: the old scope was `git diff HEAD~1` — the LAST COMMIT only. A
+ * secret committed two commits back and not yet pushed was NEVER scanned, and the
+ * gate was effectively blind to everything but the tip commit. The correct delta
+ * is `@{upstream}..HEAD` (every commit on HEAD the remote does not yet have). When
+ * there is no upstream (a brand-new branch with nothing to diff against), the
+ * whole push is new, so ALL tracked files are the delta. Returns null only when
+ * git itself is unavailable, so the caller falls back to a whole-project scan.
+ *
  * @param {string} projectRoot
  * @returns {string[]|null}
  */
 function getPushChangedFiles(projectRoot) {
+  const gitOut = (args) => execSync(args, { cwd: projectRoot, encoding: 'utf8', stdio: 'pipe' });
   try {
-    const out = execSync('git diff HEAD~1 --name-only', {
-      cwd: projectRoot,
-      encoding: 'utf8',
-      stdio: 'pipe'
-    });
-    return out.split('\n').map(f => f.trim()).filter(Boolean);
+    // An upstream must exist for @{upstream} to resolve; probe it explicitly so
+    // "no upstream" is handled deterministically rather than via a diff error.
+    let hasUpstream = false;
+    try {
+      gitOut('git rev-parse --abbrev-ref --symbolic-full-name @{upstream}');
+      hasUpstream = true;
+    } catch {
+      hasUpstream = false;
+    }
+
+    if (hasUpstream) {
+      const out = gitOut('git diff @{upstream}..HEAD --name-only');
+      return out.split('\n').map(f => f.trim()).filter(Boolean);
+    }
+
+    // No upstream → the entire branch is unpushed; every tracked file is new to
+    // the remote. Scan them all rather than diffing against a nonexistent base.
+    const tracked = gitOut('git ls-files');
+    return tracked.split('\n').map(f => f.trim()).filter(Boolean);
   } catch {
-    return null; // no git / shallow / first commit → caller scans whole project
+    return null; // no git at all → caller scans the whole project directory
   }
 }
 

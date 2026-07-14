@@ -39,8 +39,19 @@ const safeFs = require('./safe-fs');
 const { FrameworkDetector } = require('./framework-detector');
 const { setupPlaywright } = require('./playwright-scaffolder');
 
-/** Default wall-clock budget for launching and driving an app (ms). */
-const DEFAULT_TIME_BUDGET_MS = 15000;
+/**
+ * Default wall-clock budget for launching and driving an app (ms).
+ *
+ * R4-A item 9: 15s was below a cold Next.js/Vite first compile, so a CORRECT app
+ * could fail the gate purely on start-up latency. Raised to 60s and made
+ * overridable per call (`opts.timeBudgetMs`) or per environment
+ * (`CTOC_APP_TIME_BUDGET_MS`), so a slow-but-correct app is not failed for being
+ * slow while a genuinely dead app still fails fast (the poll breaks on `exited`).
+ */
+const DEFAULT_TIME_BUDGET_MS = (() => {
+  const env = parseInt(process.env.CTOC_APP_TIME_BUDGET_MS || '', 10);
+  return Number.isFinite(env) && env > 0 ? env : 60000;
+})();
 
 /** How often to re-probe a starting server (ms). */
 const POLL_INTERVAL_MS = 250;
@@ -303,9 +314,14 @@ async function driveServer(projectPath, opts, result) {
   }
 
   const scriptStr = scripts[scriptName];
-  const detector = new FrameworkDetector(projectPath);
-  const framework = detector.detect();
-  const port = opts.port || (framework && framework.defaultPort) || (await getFreePort());
+  // R4-A item 9: NEVER trust a framework's DEFAULT port. If the human already has
+  // a dev server on 3000 (Next.js) or 5173 (Vite), our spawned child fails to bind
+  // and dies, but a probe against the default port would hit the OTHER process and
+  // falsely attest "responded" — the Gate-3 artifact would then claim an app CTOC
+  // never launched answered. Always allocate a FREE port and export it via PORT,
+  // so the app under test is the only thing that could answer on it. An explicit
+  // `opts.port` (tests) still wins.
+  const port = opts.port || (await getFreePort());
   const budget = opts.timeBudgetMs || DEFAULT_TIME_BUDGET_MS;
 
   const { command, args, shell } = resolveScriptCommand(scriptStr);
@@ -351,16 +367,20 @@ async function driveServer(projectPath, opts, result) {
   result.evidence.stdout = stdout.slice(0, 800);
   result.evidence.stderr = stderr.slice(0, 800);
 
-  if (probe.ok) {
-    result.responded = true;
-    result.evidence.httpStatus = probe.statusCode;
-    result.evidence.bodyExcerpt = (probe.body || '').slice(0, 200);
-  } else if (exited) {
+  // R4-A item 9: check `exited` BEFORE trusting a probe. Combined with the free
+  // port above, this guarantees a "responded" verdict can only come from the app
+  // WE launched — a child that died is reported as a failure even if something
+  // else answers on the (now guaranteed private) port.
+  if (exited && !probe.ok) {
     const detail = exitInfo && exitInfo.error ? exitInfo.error : `code ${exitInfo && exitInfo.code}, signal ${exitInfo && exitInfo.signal}`;
     result.errors.push(
       `Dev server exited before responding (${detail}). ` +
       `Stderr: ${stderr.slice(0, 400).trim() || '(none)'}`
     );
+  } else if (probe.ok) {
+    result.responded = true;
+    result.evidence.httpStatus = probe.statusCode;
+    result.evidence.bodyExcerpt = (probe.body || '').slice(0, 200);
   } else {
     result.errors.push(
       `Dev server did not respond on port ${port} within ${budget}ms. ` +

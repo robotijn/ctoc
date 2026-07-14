@@ -480,6 +480,30 @@ function testListDefaults() {
 // Run all tests
 console.log('\nSettings Management Tests\n');
 
+// R4-B: autoMoveToReview was deleted from the workflow schema (and the staging
+// profile). It drove sync.moveToReviewAfterPush, a raw evidence-less rename into
+// review/ — both gone. A visible toggle wired to a landmine is a placebo.
+function testWorkflowNoAutoMoveToReview() {
+  const workflow = SETTINGS_SCHEMA.workflow;
+  assert.ok(workflow && Array.isArray(workflow.settings), 'workflow category exists');
+  const keys = workflow.settings.map(s => s.key);
+  assert.ok(
+    !keys.includes('autoMoveToReview'),
+    'autoMoveToReview must be GONE from the workflow schema — it was a placebo toggle for a deleted landmine'
+  );
+  // The default-merged settings must not surface the key either.
+  const merged = loadSettings(testDir);
+  assert.strictEqual(
+    merged.workflow.autoMoveToReview,
+    undefined,
+    'a fresh project must not resolve any autoMoveToReview value'
+  );
+  console.log('# workflow schema has no autoMoveToReview (deleted placebo)');
+}
+
+setup();
+try { testWorkflowNoAutoMoveToReview(); } finally { cleanup(); }
+
 testSettingsTabs();
 testSettingsSchema();
 testGetSettingsTabs();

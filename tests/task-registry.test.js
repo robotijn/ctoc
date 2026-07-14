@@ -502,7 +502,8 @@ describe('Edge / boundary behavior', () => {
     assert.equal(t2.status, 'failed');
 
     // fresh task: running → orphaned
-    const t3 = reg.addTask(r, { kind: 'sync' });
+    // R3-B item 12: a sync barrier MUST declare what it integrates (addTask now enforces it).
+    const t3 = reg.addTask(r, { kind: 'sync', blockedBy: [t2.id] });
     reg.updateTask(r, t3.id, { status: 'running' });
     reg.updateTask(r, t3.id, { status: 'orphaned' });
     assert.equal(t3.status, 'orphaned');
@@ -675,7 +676,7 @@ describe('Edge / boundary behavior', () => {
     // gitOp strict-coerced to a real boolean.
     const t = reg.addTask(r, { kind: 'plan', gitOp: 'yes' });
     assert.equal(t.gitOp, false);
-    const t2 = reg.addTask(r, { kind: 'sync', gitOp: true });
+    const t2 = reg.addTask(r, { kind: 'sync', gitOp: true, blockedBy: [t.id] });
     assert.equal(t2.gitOp, true);
 
     // defaults
@@ -787,7 +788,7 @@ describe('Edge / boundary behavior', () => {
     reg.updateTask(r, tf.id, { status: 'failed' });
     assert.throws(() => reg.updateTask(r, tf.id, { status: 'running' }), /invalid transition/);
 
-    const to = reg.addTask(r, { kind: 'sync' });
+    const to = reg.addTask(r, { kind: 'sync', blockedBy: [tf.id] });
     reg.updateTask(r, to.id, { status: 'running' });
     reg.updateTask(r, to.id, { status: 'orphaned' });
     assert.throws(() => reg.updateTask(r, to.id, { status: 'running' }), /invalid transition/);

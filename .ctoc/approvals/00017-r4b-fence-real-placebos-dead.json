@@ -1,0 +1,10 @@
+{
+  "content_sha256": "107486dbec9c517c9a160eb2978a70097597da5545f1940f50d5440ea022f603",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T07:46:23.533Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: coordinator wrote approved_by:human into R4 plan frontmatter directly instead of crossing Gate 2 via approvePlan (forged marker). WORK ordered by the human; provenance path was wrong. Recorded as backfilled.",
+  "plan_basename": "00017-r4b-fence-real-placebos-dead"
+}

@@ -34,10 +34,38 @@
  *   Rule 4  file-conflict: candidate.touches OVERLAPS the union of running touches,
  *           glob-aware via `plan-coverage.touchesOverlap` (globs on either side).
  *
+ * ── WHERE THE LADDER IS ENFORCED (R3-B — read this before adding a writer) ──────
+ *   Defining the rules is not enforcing them. `canRun` is the ONLY oracle, and every
+ *   path that can set `status: 'running'` MUST consult it:
+ *     • `addAndClaim`            — consults canRun before claiming (here).
+ *     • `menu task start`        — menu-screens.taskTransition('start') calls canRun and
+ *                                  REFUSES on a false decision; `--force` is a human
+ *                                  override that is LOGGED (`forced_start`), never silent.
+ *     • `nextRunnable`           — the promote projection; the only sanctioned promotion set.
+ *   `updateTask` deliberately does NOT consult the ladder: it is the low-level model
+ *   mutator (reconcile, coupling, and force-overrides legitimately drive it). A NEW
+ *   caller that writes `running` MUST go through canRun first or document why it is exempt.
+ *
+ * ── CROSS-PROCESS SAFETY: COMPARE-AND-SWAP (R3-B item 7) ────────────────────────
+ *   The old "EXACTLY ONE writer" invariant was an ASSUMPTION enforced nowhere, and
+ *   concurrent writers demonstrably exist (the TUI's 5-minute autosync process alongside
+ *   session child processes running `menu task …`). Every mutation was an unlocked
+ *   load→mutate→save, so the second writer silently clobbered the first (lost update).
+ *   The registry now carries a `generation` counter:
+ *     • `load`  stamps the on-disk generation onto the value (absent ⇒ 0 — backward
+ *       compatible with every pre-R3-B tasks.json).
+ *     • `save`  re-reads the on-disk generation and REFUSES with a `StaleRegistryError`
+ *       when it moved since the value was loaded; on success it writes generation + 1.
+ *     • `withRegistry(root, mutator)` is the retry helper every load→save caller uses:
+ *       load → mutate → save → on conflict RELOAD and re-apply (bounded, 5 attempts,
+ *       no sleep/busy-wait). A mutator must therefore be safe to re-run.
+ *   A value with NO `generation` field (a hand-built literal, e.g. `emptyRegistry()` or a
+ *   test fixture) is an UNVERSIONED write: it skips the check and overwrites. That is the
+ *   deliberate seeding path; production mutators load first and are therefore always checked.
+ *
  * ── Design invariants ───────────────────────────────────────────────────────────
- *   • LOCK-FREE. EXACTLY ONE writer (Claude's single-threaded main loop), so writes
- *     serialize naturally and NO lock/token/heartbeat exists. We mirror store.js's
- *     atomic-write and fail-open-load patterns but omit its concurrency machinery.
+ *   • ATOMIC + COMPARE-AND-SWAP. Writes are atomic (temp + rename) and generation-checked
+ *     (above), so two live processes can no longer lose each other's updates.
  *   • DATA-ORIENTED functional API over a plain registry VALUE: load/save read/write
  *     the value; addTask/updateTask mutate it in memory; canRun/nextRunnable are
  *     pure reads. `addAndClaim` is the one function that composes them over disk in
@@ -75,6 +103,8 @@ const { touchesOverlap } = require('./plan-coverage');
 
 /** On-disk schema version. A mismatch fails open (empty + warn) — see load(). */
 const REGISTRY_VERSION = 1;
+/** Bounded compare-and-swap retries in `withRegistry` (no sleep, no busy-wait). */
+const WITH_REGISTRY_ATTEMPTS = 5;
 /** D5: at most this many operations run concurrently. */
 const MAX_CONCURRENT = 5;
 /** Warn-log rotation cap (mirrors store.js). */
@@ -211,7 +241,26 @@ function readWarnLog(root) {
 // ── persistence ────────────────────────────────────────────────────────────────
 
 /**
- * A fresh, empty registry value.
+ * A stale-write refusal (R3-B item 7): the on-disk `generation` moved between the
+ * caller's `load` and its `save`, so persisting would clobber another process's
+ * committed mutation. Thrown by `save`; caught (and retried) by `withRegistry`.
+ */
+class StaleRegistryError extends Error {
+  /**
+   * @param {string} message
+   * @param {{expected?:number, actual?:number}} [detail]
+   */
+  constructor(message, detail = {}) {
+    super(message);
+    this.name = 'StaleRegistryError';
+    this.expected = detail.expected;
+    this.actual = detail.actual;
+  }
+}
+
+/**
+ * A fresh, empty registry value. It carries NO `generation` — it is not a loaded
+ * value, so a `save` of it is an unversioned (seeding) write, not a compare-and-swap.
  * @returns {{version:number, seq:number, tasks:Array<object>}}
  */
 function emptyRegistry() {
@@ -270,9 +319,31 @@ function normalizeLoadedTask(t) {
     ts: {
       created: typeof ts.created === 'string' ? ts.created : nowIso(),
       started: typeof ts.started === 'string' ? ts.started : null,
+      // R3-B item 10: the cancel-deadline clock. It MUST survive a load — dropping it
+      // (the pre-R3-B normalizer did) would restart the deadline on every menu open and
+      // a hung `cancelling` task would hold its files + the sync barrier forever.
+      cancelRequested: typeof ts.cancelRequested === 'string' ? ts.cancelRequested : null,
       done: typeof ts.done === 'string' ? ts.done : null
     }
   };
+}
+
+/**
+ * The registry `generation` as recorded on disk (R3-B item 7). Fail-open: an absent,
+ * unparseable, or non-integer generation reads as 0, so every pre-R3-B tasks.json is a
+ * valid generation-0 registry and no migration is required.
+ * @param {string} root
+ * @returns {number}
+ */
+function diskGeneration(root) {
+  const p = registryPath(root);
+  try {
+    if (!safeFs.existsSync(p)) return 0;
+    const data = JSON.parse(safeFs.readFileSync(p, 'utf8'));
+    return (data && Number.isSafeInteger(data.generation) && data.generation >= 0) ? data.generation : 0;
+  } catch {
+    return 0; // a corrupt file has no committed generation to protect
+  }
 }
 
 /**
@@ -283,30 +354,34 @@ function normalizeLoadedTask(t) {
  * Duplicate ids → last wins + `task_id_collision` warn. `seq` is repaired so it can
  * never collide with an existing id.
  * @param {string} root  Project root (a non-empty string).
- * @returns {{version:number, seq:number, tasks:Array<object>}}
+ * @returns {{version:number, generation:number, seq:number, tasks:Array<object>}}
  */
 function load(root) {
   if (typeof root !== 'string' || root.length === 0) {
     throw new TypeError('task-registry: load requires a non-empty root string');
   }
   const p = registryPath(root);
-  if (!safeFs.existsSync(p)) return emptyRegistry();
+  // R3-B item 7: a LOADED value ALWAYS carries a `generation` (absent/corrupt on disk ⇒ 0),
+  // so a subsequent save via `withRegistry` is a real compare-and-swap. `emptyRegistry()`
+  // stays generation-less on purpose — it is the SEED literal, an unversioned write.
+  const loadedEmpty = () => ({ version: REGISTRY_VERSION, generation: diskGeneration(root), seq: 0, tasks: [] });
+  if (!safeFs.existsSync(p)) return loadedEmpty();
 
   let data;
   try {
     data = JSON.parse(safeFs.readFileSync(p, 'utf8'));
   } catch (err) {
     warnLog(root, 'registry_load_failed', { message: err && err.message ? err.message : String(err) });
-    return emptyRegistry();
+    return loadedEmpty();
   }
   if (!data || typeof data !== 'object' || !Array.isArray(data.tasks) || data.version !== REGISTRY_VERSION) {
     warnLog(root, 'registry_load_failed', { message: 'registry file has an unexpected shape or version' });
-    return emptyRegistry();
+    return loadedEmpty();
   }
   if (data.tasks.length > MAX_TASKS) {
     // A giant crafted registry is untrusted → fail open to empty + warn.
     warnLog(root, 'registry_too_large', { count: data.tasks.length, max: MAX_TASKS });
-    return emptyRegistry();
+    return loadedEmpty();
   }
 
   const byId = new Map();
@@ -336,17 +411,33 @@ function load(root) {
     warnLog(root, 'registry_seq_clamped', { seq: String(data.seq) });
   }
   const seq = Math.max(fileSeq, highestIdSuffix(tasks));
-  return { version: REGISTRY_VERSION, seq, tasks };
+  // R3-B item 7: stamp the generation this value was loaded at, so `save` can
+  // compare-and-swap against it. Absent on disk ⇒ 0 (backward compatible).
+  const generation = (Number.isSafeInteger(data.generation) && data.generation >= 0) ? data.generation : 0;
+  return { version: REGISTRY_VERSION, generation, seq, tasks };
 }
 
 /**
- * Persist the registry value atomically (temp sibling + rename). FAIL-LOUD — on
- * any write failure the temp is unlinked, a `registry_save_failed` warn is
- * recorded, and the error is RETHROWN so a real write failure is never silently
- * lost. Creates `.ctoc/state` first.
+ * Persist the registry value atomically (temp sibling + rename) under a COMPARE-AND-SWAP
+ * on `generation` (R3-B item 7). FAIL-LOUD in both directions:
+ *   • CONFLICT — the value carries a `generation` (i.e. it came from `load`) and the
+ *     on-disk generation has MOVED since: throw `StaleRegistryError` and write NOTHING.
+ *     Another process committed in between; blindly writing would lose its update.
+ *     `withRegistry` is the sanctioned retry (reload → re-apply → save).
+ *   • WRITE FAILURE — the temp is unlinked, a `registry_save_failed` warn is recorded,
+ *     and the error is RETHROWN so a real write failure is never silently lost.
+ * On success the committed generation is `diskGeneration + 1` and is written back onto
+ * the in-memory value, so a caller may save the SAME value again (sequential mutations)
+ * without a false conflict.
+ *
+ * A value with NO `generation` field (a hand-built literal / `emptyRegistry()`) is an
+ * UNVERSIONED write: the compare is skipped (seeding path). Every production mutator
+ * loads first, so every production write IS checked.
+ *
  * @param {string} root
- * @param {{version:number, seq:number, tasks:Array<object>}} registry
+ * @param {{version?:number, generation?:number, seq:number, tasks:Array<object>}} registry
  * @returns {void}
+ * @throws {StaleRegistryError} the on-disk generation moved since this value was loaded
  */
 function save(root, registry) {
   if (typeof root !== 'string' || root.length === 0) {
@@ -355,11 +446,27 @@ function save(root, registry) {
   if (!registry || typeof registry !== 'object') {
     throw new TypeError('task-registry: save requires a registry object');
   }
+  const onDisk = diskGeneration(root);
+  const loadedAt = Number.isSafeInteger(registry.generation) && registry.generation >= 0
+    ? registry.generation
+    : null; // unversioned (hand-built) value → no compare
+  if (loadedAt !== null && onDisk !== loadedAt) {
+    warnLog(root, 'registry_stale_write_refused', { expected: loadedAt, actual: onDisk });
+    throw new StaleRegistryError(
+      `task-registry: stale write refused — the registry moved from generation ${loadedAt} ` +
+      `to ${onDisk} while this value was held (another process committed). Reload and re-apply ` +
+      `(see withRegistry).`,
+      { expected: loadedAt, actual: onDisk }
+    );
+  }
+  const nextGeneration = onDisk + 1;
+
   const target = registryPath(root);
   const dir = path.dirname(target);
   const tmp = `${target}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const payload = JSON.stringify({
     version: REGISTRY_VERSION,
+    generation: nextGeneration,
     seq: Number.isSafeInteger(registry.seq) && registry.seq >= 0 ? registry.seq : 0,
     tasks: Array.isArray(registry.tasks) ? registry.tasks : []
   }, null, 2);
@@ -372,6 +479,64 @@ function save(root, registry) {
     warnLog(root, 'registry_save_failed', { message: err && err.message ? err.message : String(err) });
     throw err;
   }
+  // Advance the in-memory value so a second sequential save of the SAME object does
+  // not self-conflict (it is now the committed generation).
+  registry.generation = nextGeneration;
+}
+
+/**
+ * THE load→save choke point (R3-B item 7). Load the registry, hand it to `mutator`,
+ * persist it under the compare-and-swap, and RETRY the whole cycle on a
+ * `StaleRegistryError` (another process committed in between) — bounded, with NO sleep
+ * and no busy-wait: the retry is an immediate reload, which is exactly the work needed
+ * to re-decide against the fresh state.
+ *
+ * The mutator MUST be safe to re-run (it may execute up to `attempts` times against a
+ * FRESH registry each time), so it must not carry out I/O or side effects outside the
+ * registry value. Side-effecting work (moving a plan file, running VERIFY) belongs
+ * OUTSIDE the mutator, before or after the call.
+ *
+ * A mutator that decides NOT to write (a refusal — e.g. the ladder says no) calls
+ * `ctx.abort()`: `withRegistry` then returns the mutator's value WITHOUT saving, so a
+ * refusal provably leaves the registry byte-unchanged.
+ *
+ * @template T
+ * @param {string} root  Project root.
+ * @param {(registry: {generation:number, seq:number, tasks:Array<object>}, ctx: {attempt:number, abort:() => void}) => T} mutator
+ * @param {{attempts?:number}} [opts]  bounded retry count (default 5).
+ * @returns {T} whatever the mutator returned.
+ * @throws {StaleRegistryError} the retries were exhausted (persistent contention).
+ * @throws {Error} anything the mutator or the save throws (nothing is persisted).
+ */
+function withRegistry(root, mutator, opts = {}) {
+  if (typeof mutator !== 'function') {
+    throw new TypeError('task-registry: withRegistry requires a mutator function');
+  }
+  const attempts = Number.isSafeInteger(opts.attempts) && opts.attempts > 0
+    ? opts.attempts
+    : WITH_REGISTRY_ATTEMPTS;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const registry = load(root);
+    let aborted = false;
+    const ctx = { attempt, abort: () => { aborted = true; } };
+    const value = mutator(registry, ctx); // a throw propagates — nothing is persisted
+    if (aborted) return value;            // refusal → provably no write
+    try {
+      save(root, registry);
+      return value;
+    } catch (err) {
+      if (err instanceof StaleRegistryError) {
+        lastErr = err;
+        continue; // reload + re-apply against the winner's state
+      }
+      throw err;
+    }
+  }
+  warnLog(root, 'registry_cas_exhausted', { attempts });
+  throw lastErr || new StaleRegistryError(
+    `task-registry: withRegistry gave up after ${attempts} compare-and-swap attempts`
+  );
 }
 
 // ── model mutators ─────────────────────────────────────────────────────────────
@@ -445,6 +610,66 @@ function assertImplementTouches(obj, ctx) {
 }
 
 /**
+ * A `sync` task MUST declare a non-empty `blockedBy` (R3-B item 12). A sync is the wave
+ * INTEGRATION BOUNDARY: with no blockers it has nothing to integrate and, being unblocked,
+ * would claim immediately against a live wave — freezing every other task behind Rule 2's
+ * barrier for nothing. The refusal used to live only in `actions.enqueueWaveSync`, so
+ * `menu task add sync` walked straight past it. It now lives at the CHOKE POINT (addTask),
+ * where every caller must pass.
+ * @param {{kind?:string, blockedBy?:string[]}} obj
+ * @param {string} ctx  caller name, embedded in the error message
+ * @returns {void}
+ * @throws {Error} kind === 'sync' with a missing/empty blockedBy
+ */
+function assertSyncBlockedBy(obj, ctx) {
+  if (obj.kind === 'sync' && !(Array.isArray(obj.blockedBy) && obj.blockedBy.length > 0)) {
+    throw new Error(
+      `task-registry: ${ctx} sync task requires a non-empty blockedBy — a wave barrier ` +
+      `with nothing to integrate would run immediately against a live wave`
+    );
+  }
+}
+
+/**
+ * Whether a status transition is legal (the SINGLE encoding of the lifecycle, exported so
+ * no caller has to mirror VALID_TRANSITIONS — the stale mirror in menu-screens.js was
+ * exactly the bug that made R2-A's `orphaned → done` late-completion contract dead code).
+ * A same-status "transition" is NOT a transition (an idempotent no-op patch); callers that
+ * care about it check `from === to` themselves.
+ * @param {string} from
+ * @param {string} to
+ * @returns {boolean}
+ */
+function canTransition(from, to) {
+  if (!Object.prototype.hasOwnProperty.call(VALID_TRANSITIONS, from)) return false;
+  return VALID_TRANSITIONS[from].has(to);
+}
+
+/**
+ * The single non-terminal task of a given kind for a plan, if any (R3-B item 2). A PURE
+ * read: the plan-uniqueness POLICY ("do not enqueue a second implement task for a plan
+ * that already has a live one") lives at the action/CLI layer; this is the lookup both
+ * layers share so they cannot drift.
+ *
+ * Prefers an OCCUPYING task (running/cancelling) over a queued one, so a caller that
+ * settles "the task for this plan" can never pick a queued duplicate that SHADOWS the
+ * running task (the C2 defect: the running task was then never marked done → dead file
+ * locks for two hours, after which the duplicate re-ran a plan already in review).
+ *
+ * @param {{tasks:Array<object>}} registry
+ * @param {string} plan  the plan slug
+ * @param {string} [kind='implement']
+ * @returns {object|undefined}
+ */
+function findActivePlanTask(registry, plan, kind = 'implement') {
+  const tasks = (registry && Array.isArray(registry.tasks)) ? registry.tasks : [];
+  const live = tasks.filter((t) => t.kind === kind && t.plan === plan && !TERMINAL.has(t.status));
+  return live.find((t) => t.status === 'running')
+    || live.find((t) => t.status === 'cancelling')
+    || live[0];
+}
+
+/**
  * Append a new queued task. Assigns a monotonic id from `seq` (no reuse). Builds
  * the task from NAMED fields (never spreads `spec` → no prototype pollution).
  * @param {{seq:number, tasks:Array<object>}} registry
@@ -460,6 +685,7 @@ function addTask(registry, spec) {
     throw new Error(`task-registry: addTask invalid kind ${JSON.stringify(spec.kind)}`);
   }
   assertImplementTouches(spec, 'addTask');
+  assertSyncBlockedBy(spec, 'addTask');
   const task = {
     id: 't' + (++registry.seq),
     kind: spec.kind,
@@ -471,7 +697,7 @@ function addTask(registry, spec) {
     gitOp: spec.gitOp === true,
     blockedBy: Array.isArray(spec.blockedBy) ? spec.blockedBy.slice() : [],
     result: null,
-    ts: { created: nowIso(), started: null, done: null }
+    ts: { created: nowIso(), started: null, cancelRequested: null, done: null }
   };
   registry.tasks.push(task);
   return task;
@@ -822,26 +1048,37 @@ function unsatisfiableTasks(registry) {
  * (Single-writer holds — this is not a cross-process lock; it removes the in-process
  * window where a crash between "record" and "start" would strand an undecided task.)
  *
+ * Routed through {@link withRegistry}, so a concurrent writer (the TUI autosync process)
+ * committing between our load and our save causes a RELOAD and a re-decision against the
+ * winner's state — never a lost update and never a claim decided on stale occupancy.
+ *
  * @param {string} root  Project root.
  * @param {object} spec  Same shape as {@link addTask}'s spec (never spread — reused
  *   directly, so no prototype-pollution path).
+ * @param {{agentTaskId?:string}} [opts]  R3-B item 5: record the harness agent id AT BIRTH
+ *   when the caller knows it, so the on-open reconcile can match the task against the live
+ *   agent list immediately — closing the window between the claim (which used to record
+ *   `agentTaskId: null`) and the later `menu task start --agent-id` patch.
  * @returns {{task:object, claimed:boolean, reason:string}} the created task (running
  *   when claimed, else queued), whether it was claimed, and the scheduler reason.
  * @throws {TypeError} root is not a non-empty string
  * @throws {Error} spec is rejected by addTask (nothing is persisted)
  */
-function addAndClaim(root, spec) {
+function addAndClaim(root, spec, opts = {}) {
   if (typeof root !== 'string' || root.length === 0) {
     throw new TypeError('task-registry: addAndClaim requires a non-empty root string');
   }
-  const registry = load(root);
-  const task = addTask(registry, spec); // throws on a bad spec BEFORE any save
-  const decision = canRun(task, registry);
-  if (decision.run) {
-    updateTask(registry, task.id, { status: 'running' });
-  }
-  save(root, registry); // ONE persist of the whole (add + claim) outcome
-  return { task, claimed: decision.run, reason: decision.reason };
+  const agentTaskId = typeof opts.agentTaskId === 'string' && opts.agentTaskId.length > 0
+    ? opts.agentTaskId
+    : null;
+  return withRegistry(root, (registry) => {
+    const task = addTask(registry, spec); // throws on a bad spec BEFORE any save
+    const decision = canRun(task, registry);
+    if (decision.run) {
+      updateTask(registry, task.id, { status: 'running', agentTaskId });
+    }
+    return { task, claimed: decision.run, reason: decision.reason };
+  });
 }
 
 // ── drain-stop flag (graceful "finish current, then stop") ─────────────────────────
@@ -887,17 +1124,21 @@ function clearDrainStop(root) {
 }
 
 module.exports = {
-  // persistence
+  // persistence (+ the compare-and-swap choke point)
   load,
   save,
+  withRegistry,
   emptyRegistry,
   registryPath,
   readWarnLog,
+  warnLog,
   // model mutators
   addTask,
   updateTask,
   // scheduler (pure)
   canRun,
+  canTransition,
+  findActivePlanTask,
   nextRunnable,
   unsatisfiableTasks,
   // atomic add-and-claim
@@ -909,5 +1150,9 @@ module.exports = {
   // constants
   MAX_CONCURRENT,
   REGISTRY_VERSION,
-  KINDS
+  KINDS,
+  // R3-B item 4: the ONE encoding of terminal. menu-screens imports THIS instead of
+  // mirroring it (the stale mirror included `orphaned` and omitted `cancelled`, which
+  // made the orphaned→done late-completion contract dead code).
+  TERMINAL
 };

@@ -18,11 +18,6 @@ const path = require('path');
 // commit plan state freely — committing is local and reversible — but it never
 // ships. The human ships via /ctoc:push.
 const { getSetting, isAutoPushEnabled } = require('./settings');
-// CF1: bust the in-process read cache on every count-mutating write.
-const { invalidate } = require('./cache');
-// C9/W05-s4: the post-push sync path must validate identically to the manual
-// in-progress→review action before it renames a plan into review/.
-const { validateForReview } = require('./plan-validator');
 
 let syncInterval = null;
 let lastSync = null;
@@ -138,62 +133,14 @@ function manualSync(projectPath = process.cwd()) {
   return syncPlans(projectPath);
 }
 
-/**
- * Move a plan into review after a push (called on agent completion).
- *
- * C9/W05-s4: this post-push sync path is gated by `validateForReview`, the same
- * validator the manual in-progress→review action runs — an unfinished or
- * unverifiable plan is NEVER renamed into review by the sync path. The gate fails
- * closed: if validation reports `valid:false`, or if validation itself throws
- * (e.g. the plan cannot be read), the rename does not run and the caller receives
- * an observable `{ moved:false, reason }` result naming the reason. This mirrors
- * the existing `{ moved:false, reason:'auto-move disabled' }` early return.
- *
- * @param {string} planPath - Path to the in-progress plan file.
- * @param {string} projectPath - Project root.
- * @returns {{moved:boolean, newPath?:string, reason?:string}}
- */
-function moveToReviewAfterPush(planPath, projectPath = process.cwd()) {
-  const autoMove = getSetting('workflow', 'autoMoveToReview', projectPath);
-
-  if (!autoMove) {
-    return { moved: false, reason: 'auto-move disabled' };
-  }
-
-  const plansDir = path.join(projectPath, 'plans');
-  const reviewDir = path.join(plansDir, 'review');
-
-  if (!safeFs.existsSync(reviewDir)) {
-    safeFs.mkdirSync(reviewDir, { recursive: true });
-  }
-
-  const fileName = path.basename(planPath);
-  const newPath = path.join(reviewDir, fileName);
-
-  // Gate the rename behind validateForReview. Fail closed on both an invalid
-  // plan and a validation throw — the rename below only runs when valid.
-  let validation;
-  try {
-    validation = validateForReview(planPath, projectPath);
-  } catch (err) {
-    return { moved: false, reason: `validation error: ${err.message}` };
-  }
-  if (validation && validation.valid === false) {
-    return {
-      moved: false,
-      reason: (validation.errors && validation.errors.length)
-        ? validation.errors.join('; ')
-        : 'failed validateForReview'
-    };
-  }
-
-  safeFs.renameSync(planPath, newPath);
-  // CF1: a raw rename into review/ changes getPlanCounts().review +
-  // getInboxCounts().gatesWaiting; bust the cache AFTER the successful move.
-  invalidate();
-
-  return { moved: true, newPath };
-}
+// R4-B: `moveToReviewAfterPush` (a raw renameSync into plans/review/ gated only by
+// the auto-move-to-review workflow toggle) was DELETED. It had ZERO callers, was
+// default-ON via a visible switch, and offered a second, evidence-LESS door into
+// review/ — the exact
+// residency the wave exists to abolish. A plan reaches review in exactly ONE place:
+// the completion path (actions.completeTaskPlan → completeExecution) that MINTS the
+// Step-14 VERIFY evidence Gate 3 reads. Sync commits plan state; it never renames a
+// plan into review.
 
 // Get sync configuration (with defaults)
 function getSyncConfig(projectPath = process.cwd()) {
@@ -576,7 +523,6 @@ module.exports = {
   syncPlans,
   getLastSync,
   manualSync,
-  moveToReviewAfterPush,
   // New event-triggered sync exports
   getSyncConfig,
   getLastSyncTimestamp,

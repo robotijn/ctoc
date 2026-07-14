@@ -44,9 +44,10 @@
  * backfill (the ledger is trusted-write-only) and does NOT grandfather the
  * forgeable in-plan marker (that would reopen C4). The recommended path is a
  * one-time TRUSTED maintainer-run backfill converting each legacy in-plan marker
- * into a ledger entry at adoption (`approval-ledger.backfillEntry`, driven by the
- * integrator via `node -e` at the wave boundary) — a scheduling call for the
- * maintainer.
+ * into a ledger entry at adoption — run through the sanctioned, checked-in
+ * `node src/scripts/ledger-backfill.js` (R3-A; the old "`node -e` at the wave
+ * boundary" instruction is now DENIED by the Bash hook, because that one-liner
+ * shape WAS the forgery) — a scheduling call for the maintainer.
  *
  * PER-PLAN FAULT ISOLATION (R2-F). Historically a single legacy uppercase-slug
  * plan in `done/` made `ledger.verify` throw `Invalid slug`, which propagated out
@@ -59,16 +60,32 @@
  * fail-open ONLY for genuine infrastructure errors (e.g. the filesystem down) and
  * MUST log WHICH error it swallowed to the gate-violations log.
  *
- * TWO ENTRY KINDS (R2-F). `done/` residency is accepted for EITHER a human-kind
- * entry (`writeEntry`/`backfillEntry`) OR a pipeline-kind entry
- * (`writePipelineEntry`, `advanced_by: 'pipeline'`) that carries `evidence`; the
- * pre-done human gate `todo/` stays human-only and rejects a pipeline entry.
+ * THREE ENTRY KINDS (R2-F, extended by R3-A). `done/` residency is accepted for a
+ * human-kind entry (`writeEntry`), a BACKFILLED entry (`backfillEntry` — the
+ * human-ordered legacy migration; accepted, but `classifyResidency` reports its real
+ * kind `'backfilled'` so an audit can never mistake it for a live human approval),
+ * or a pipeline-kind entry (`writePipelineEntry`, `advanced_by: 'pipeline'`) that
+ * carries `evidence`. The pre-done human gate `todo/` stays human-only and rejects a
+ * pipeline entry.
  *
- * VISION EXEMPTION PARITY (R2-F, contradiction 1). A decomposed vision archived
- * to `done/` (`type: vision`, status `decomposed`) crossed Gate 0 in `vision/`,
- * never the review→done code gate, and carries no approval marker — so `done/`
- * exempts `type: vision` plans, EXACTLY as `iron-loop-enforcer.js` does (search
- * `type:\s*vision` there). The two acceptance semantics must agree.
+ * UNIFORM LEDGER ACCEPTANCE — THE VISION EXEMPTION IS GONE (R3-A item 3). This hook
+ * used to EXEMPT any `done/` plan whose frontmatter said `type: vision`, on the
+ * theory that a decomposed vision crossed Gate 0 and carries no approval marker. The
+ * exemption was a forgery hole, not a nicety: `plans/**.md` is Edit-whitelisted, so
+ * ANY agent could write `plans/done/anything.md` containing the single line
+ * `type: vision` and squat the terminal folder with zero provenance — and the
+ * predicate tested only `type: vision`, not the `status: decomposed` its own header
+ * claimed. There is now NO exemption and NO special case: EVERY resident of a
+ * gate-destination folder must be vouched for by the agent-write-denied ledger.
+ * A legitimately decomposed vision earns its `done/` residency with a PIPELINE-kind
+ * entry (`approval-ledger.writeVisionArchiveEntry`, `evidence: 'vision-decomposed'`),
+ * written by the archiving code path; archives that predate this slice are migrated
+ * by `node src/scripts/ledger-backfill.js --vision`.
+ *
+ * (`iron-loop-enforcer.js` still carries its OWN duplicate `type: vision` check — a
+ * separate module, out of this slice's file scope. It is a DIFFERENT enforcement
+ * surface, not this sweep's acceptance path; removing that duplicate is tracked as
+ * the R3-A follow-up.)
  */
 
 const path = require('path');
@@ -144,44 +161,53 @@ function readPlan(filePath) {
  *     entry; every pre-done gate stays human-only.
  * Never trusts the plan-body `approved_by: human` marker.
  *
+ * HONEST KIND (R3-A item 5). Every verdict — accepted or not — carries the entry's
+ * REAL `kind` (`human` | `backfilled` | `pipeline` | `null`). A backfilled entry is
+ * still ACCEPTED (the human ordered the migration): acceptance is not weakened. But
+ * it is reported as `'backfilled'`, never laundered into `'human'`, so a later audit
+ * can always separate a migrated record from a live human approval.
+ *
  * @param {string} filePath - absolute path to the plan file
  * @param {string} folderName - the gate-destination folder the plan resides in
  * @param {string} [projectPath] - project root (defaults to cwd)
  * @param {string|null} [content] - pre-read file content, to avoid a re-read
- * @returns {{accepted: boolean, reason: (string|null)}} accepted, or a reason:
- *   `ledger-unkeyable` | `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` |
- *   `hash-mismatch` | `unreadable` | `pipeline-no-evidence` | `pipeline-not-allowed`
+ * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|null)}}
+ *   accepted (with the entry's real kind), or a reason: `ledger-unkeyable` |
+ *   `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` | `hash-mismatch` |
+ *   `unreadable` | `pipeline-no-evidence` | `pipeline-not-allowed`
  */
 function classifyResidency(filePath, folderName, projectPath = process.cwd(), content = null) {
   const ledger = require('../lib/approval-ledger');
   const slug = ledger.slugFromPlanPath(filePath);
   const res = ledger.readEntryResult(slug, projectPath);
 
-  if (res.status === 'unkeyable') return { accepted: false, reason: 'ledger-unkeyable' };
-  if (res.status === 'corrupt') return { accepted: false, reason: 'ledger-corrupt' };
-  if (res.status === 'absent') return { accepted: false, reason: 'no-ledger-entry' };
+  if (res.status === 'unkeyable') return { accepted: false, reason: 'ledger-unkeyable', kind: null };
+  if (res.status === 'corrupt') return { accepted: false, reason: 'ledger-corrupt', kind: null };
+  if (res.status === 'absent') return { accepted: false, reason: 'no-ledger-entry', kind: null };
 
   const entry = res.entry;
-  if (entry.stage_to !== folderName) return { accepted: false, reason: 'wrong-edge' };
+  const kind = ledger.entryKind(entry);
+  if (entry.stage_to !== folderName) return { accepted: false, reason: 'wrong-edge', kind };
 
   if (HASH_SENSITIVE_FOLDERS.has(folderName)) {
     const text = content != null ? content : readPlan(filePath);
-    if (text == null) return { accepted: false, reason: 'unreadable' };
+    if (text == null) return { accepted: false, reason: 'unreadable', kind };
     if (entry.content_sha256 !== ledger.computeContentHash(text)) {
-      return { accepted: false, reason: 'hash-mismatch' };
+      return { accepted: false, reason: 'hash-mismatch', kind };
     }
   }
 
-  const kind = ledger.entryKind(entry);
   if (kind === 'pipeline') {
     // Pipeline provenance is accepted ONLY at the terminal `done/` gate, and only
-    // with evidence; every pre-done gate (todo) stays human-only.
-    if (folderName !== 'done') return { accepted: false, reason: 'pipeline-not-allowed' };
+    // with evidence; every pre-done gate (todo) stays human-only. A decomposed
+    // vision archived to done/ arrives on exactly this path (evidence:
+    // 'vision-decomposed') — there is no longer any `type: vision` exemption.
+    if (folderName !== 'done') return { accepted: false, reason: 'pipeline-not-allowed', kind };
     if (typeof entry.evidence !== 'string' || entry.evidence.trim() === '') {
-      return { accepted: false, reason: 'pipeline-no-evidence' };
+      return { accepted: false, reason: 'pipeline-no-evidence', kind };
     }
   }
-  return { accepted: true, reason: null };
+  return { accepted: true, reason: null, kind };
 }
 
 /**
@@ -196,21 +222,6 @@ function classifyResidency(filePath, folderName, projectPath = process.cwd(), co
  */
 function hasLedgerApproval(filePath, folderName, projectPath = process.cwd(), content = null) {
   return classifyResidency(filePath, folderName, projectPath, content).accepted;
-}
-
-/**
- * Is a plan in `done/` an archived decomposed vision (`type: vision`), exempt from
- * the code-gate residency revert exactly as `iron-loop-enforcer.js` treats it?
- * Reads the MERGED frontmatter region so a stamped second block is still seen.
- *
- * @param {string|null} content - the plan's full file content
- * @returns {boolean}
- */
-function isVisionExempt(content) {
-  if (content == null) return false;
-  const { extractFrontmatterRegion } = require('../lib/stale-detector');
-  const region = extractFrontmatterRegion(content);
-  return /^type:\s*vision\b/m.test(region);
 }
 
 /**
@@ -267,10 +278,10 @@ function checkFolder(folderName, projectPath = process.cwd()) {
     const filePath = path.join(folderPath, file);
     const content = readPlan(filePath); // one read per file per sweep
     if (isFreshSip1Slice(filePath, folderName, projectPath, content)) continue;
-    // Vision exemption parity (contradiction 1): a decomposed vision archived to
-    // done/ carries no approval marker and is exempt, exactly as iron-loop-
-    // enforcer.js treats it.
-    if (folderName === 'done' && isVisionExempt(content)) continue;
+    // R3-A: NO vision exemption. `done/` residency is uniformly ledger-driven — a
+    // decomposed vision is accepted only on its PIPELINE-kind ledger entry
+    // (evidence: 'vision-decomposed'), exactly like every other resident. The old
+    // `type: vision` bypass let any agent squat done/ with one frontmatter line.
     const verdict = classifyResidency(filePath, folderName, projectPath, content);
     if (verdict.accepted) continue;
     violations.push({
@@ -425,7 +436,6 @@ module.exports = {
   HUMAN_GATES,
   hasLedgerApproval,
   classifyResidency,
-  isVisionExempt,
   isFreshSip1Slice,
   checkFolder,
   revertPlan,

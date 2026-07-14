@@ -35,10 +35,16 @@ describe('W05-s1 VERIFY evidence: persist and read', () => {
   let tempRoot;
 
   before(() => {
-    // A real, empty project directory. No toolchain manifest files are
-    // created, so runVerify's fallback path finds nothing to run and returns
-    // passed:true deterministically without shelling out to any real tool.
+    // A real project with a REAL passing test script. R4-A closed the vacuous
+    // pass: an EMPTY project now fails loudly (no-verifiable-toolchain), so the
+    // persist/round-trip cases need a project that genuinely verifies something.
+    // `main` keeps it a library (no app to launch); the test script runs and
+    // passes deterministically without any network or external tool.
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-w05-s1-'));
+    fs.writeFileSync(path.join(tempRoot, 'package.json'), JSON.stringify({
+      name: 'w05-fixture', version: '1.0.0', main: 'index.js',
+      scripts: { test: 'node -e "process.exit(0)"' }
+    }, null, 2));
   });
 
   after(() => {
@@ -60,7 +66,7 @@ describe('W05-s1 VERIFY evidence: persist and read', () => {
   it('persistVerifyResult writes a passing, timestamped artifact that round-trips', () => {
     const artifact = persistVerifyResult(tempRoot, 'plan-a');
 
-    assert.strictEqual(artifact.passed, true, 'empty project should pass via fallback');
+    assert.strictEqual(artifact.passed, true, 'a real project with a passing test script passes VERIFY');
     assert.strictEqual(artifact.planSlug, 'plan-a');
     assert.ok(typeof artifact.timestamp === 'string', 'timestamp should be a string');
     // ISO 8601 round-trips through Date without becoming Invalid Date.

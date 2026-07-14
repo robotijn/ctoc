@@ -99,3 +99,42 @@ test('mapGoSeverity: string labels are honored too (same class of bug)', () => {
   assert.strictEqual(a.mapGoSeverity('critical'), SEVERITY.CRITICAL);
   assert.strictEqual(a.mapGoSeverity(undefined), SEVERITY.MODERATE);
 });
+
+// ── R4-A item 10 — residual under-report: CVSS vectors, mixed strings, shapes ──
+// The Go path reads osv.severity[0].score, which for CVSS_V3 is a VECTOR STRING
+// (e.g. "CVSS:3.1/AV:N/..."). Number("CVSS:3.1/...") is NaN, so every govulncheck
+// CRITICAL was banded MODERATE — a security under-report in the push-blocking path.
+test('mapCvssOrLabel: a CVSS:3.1 VECTOR string bands by its computed base score, never MODERATE', () => {
+  const a = auditor();
+  // Base score 9.8 (CRITICAL) — the canonical worst-case network RCE vector.
+  assert.strictEqual(
+    a.mapCvssOrLabel('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'),
+    SEVERITY.CRITICAL,
+    'a 9.8 CVSS vector must band CRITICAL, not MODERATE'
+  );
+  // Base score 7.5 (HIGH): confidentiality-only, network.
+  assert.strictEqual(
+    a.mapCvssOrLabel('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N'),
+    SEVERITY.HIGH
+  );
+  // A vector we cannot fully parse must still NEVER under-report to MODERATE.
+  const banded = a.mapCvssOrLabel('CVSS:3.1/AV:N/GARBAGE');
+  assert.notStrictEqual(banded, SEVERITY.MODERATE, 'an unparseable CVSS vector bands HIGH, never MODERATE');
+  assert.notStrictEqual(banded, SEVERITY.LOW);
+});
+
+test('mapCvssOrLabel: a MIXED "7.5 HIGH" string takes the MAX of the numeric and label tokens', () => {
+  const a = auditor();
+  assert.strictEqual(a.mapCvssOrLabel('7.5 HIGH'), SEVERITY.HIGH);
+  assert.strictEqual(a.mapCvssOrLabel('9.8 CRITICAL'), SEVERITY.CRITICAL);
+  // The label says HIGH but the score says CRITICAL — take the greater.
+  assert.strictEqual(a.mapCvssOrLabel('9.9 HIGH'), SEVERITY.CRITICAL);
+});
+
+test('mapCvssOrLabel: array and object score shapes are handled, taking the MAX', () => {
+  const a = auditor();
+  assert.strictEqual(a.mapCvssOrLabel(['LOW', 'CRITICAL', 'MODERATE']), SEVERITY.CRITICAL);
+  assert.strictEqual(a.mapCvssOrLabel({ baseScore: 9.8 }), SEVERITY.CRITICAL);
+  assert.strictEqual(a.mapCvssOrLabel({ score: '7.5' }), SEVERITY.HIGH);
+  assert.strictEqual(a.mapCvssOrLabel([{ score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H' }]), SEVERITY.CRITICAL);
+});

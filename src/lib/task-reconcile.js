@@ -39,14 +39,33 @@
  *     live agent keeps it cancelling; a confirmed-gone / aged-out one resolves to
  *     `cancelled` (report.cancelled), never orphaned — files stay locked until the agent
  *     is confirmed gone.
+ *   • CANCELLING HAS A DEADLINE (R3-B item 10). A `cancelling` task whose agent is STILL
+ *     LIVE but has not died within `cancelDeadlineMs` (default 30 min, kind-aware) is
+ *     FORCED to `cancelled` with a loud `report.stalenessCancelled` entry. Without a
+ *     tie-breaker a hung-but-live agent holds its files, a concurrency slot, AND — via
+ *     Rule 2's sync barrier — blocks EVERY wave integration globally, forever.
+ *   • A NULL agentTaskId IS NOT EVIDENCE OF DEATH (R3-B item 5). A `running` task with no
+ *     RECORDED agent id can never match the live list, so "live list present + no match"
+ *     would orphan it instantly. Absence of a recorded id is missing information, not a
+ *     dead agent: such a task falls to the staleness backstop even when a live list IS
+ *     present. This closes the window between a claim and the `--agent-id` patch.
+ *   • STALENESS-FREED FILES ARE QUARANTINED FOR ONE PASS (R3-B item 8). A task orphaned on
+ *     AGE ALONE (no live confirmation) may still be alive, so its `touches` must NOT be
+ *     handed to a conflicting queued task in the SAME pass: `reconcileState` excludes such
+ *     candidates from `promote` and reports them in `report.quarantined`.
+ *   • RETENTION NEVER SEVERS A LIVE EDGE (R3-B item 9). A terminal task still referenced by
+ *     a surviving task's `blockedBy` is NOT swept, however old: sweeping it would make the
+ *     next pass fail its dependent as `dep-missing` even though the dependency SUCCEEDED.
  *   • UNSATISFIABLE SURFACING (C1-1/C1-7). A queued task that can NEVER run — a dead dep
  *     (failed/orphaned/cancelled/missing) or a blockedBy cycle, per
  *     task-registry.unsatisfiableTasks — is marked `failed` with a loud result and pushed
  *     to report.unsatisfiable, so a permanent wedge is a visible event, not silent-forever.
  *
  * ALL filesystem access routes through src/lib/safe-fs.js (the audited choke point,
- * LH1). There is no raw `fs` here and no regex at all — the temp-artifact match uses
- * literal `startsWith`, so the promoted-to-error security lint rules cannot fire.
+ * LH1). There is no raw `fs` here and no regex LITERAL — the temp-artifact match uses
+ * literal `startsWith`, and the only glob→regex construction (Rule 4's overlap test) stays
+ * behind `plan-coverage.touchesOverlap`, so the promoted-to-error security lint rules
+ * cannot fire in this file.
  */
 
 'use strict';
@@ -54,6 +73,9 @@
 const path = require('path');
 const safeFs = require('./safe-fs');
 const taskRegistry = require('./task-registry');
+// R3-B item 8: the quarantine needs the SAME glob-aware overlap test the scheduler's Rule 4
+// uses — one encoding of "these two tasks touch the same files", never a second one.
+const { touchesOverlap } = require('./plan-coverage');
 
 // ── constants (D-NB4-1: reasonable defaults, ALL injectable via opts) ────────────
 
@@ -74,6 +96,13 @@ const DEFAULT_STALE_MS_BY_KIND = Object.freeze({
 });
 /** 7 days: terminal (done/failed/orphaned) tasks older than this leave the active view. */
 const DEFAULT_RETENTION_MS = 7 * 24 * 3600_000;
+/**
+ * 30 min: a `cancelling` task must be GONE within this window of `ts.cancelRequested`.
+ * Past it, reconcile FORCES `cancelling → cancelled` even when the harness still reports
+ * the agent as live (R3-B item 10) — a hung-but-live agent otherwise holds its files, its
+ * slot, and the global sync barrier forever, with no tie-breaker.
+ */
+const DEFAULT_CANCEL_DEADLINE_MS = 30 * 60_000;
 /** 1 h: orphaned atomic-write temp artifacts older than this are swept. */
 const DEFAULT_TEMP_TTL_MS = 60 * 60_000;
 
@@ -96,6 +125,13 @@ const TEMP_PREFIX = 'tasks.json.tmp-';
  *   subset of `orphaned`; confirmed-absent orphanings (TaskList present, no match) are NOT here.
  * @property {string[]} cancelled  ids transitioned cancelling→cancelled this pass (C1-2 —
  *   the agent for a cancelling task was confirmed gone / aged out).
+ * @property {Array<{id:string, kind:string, ageMs:number, deadlineMs:number, wasLive:boolean}>} stalenessCancelled
+ *   detail for cancellations FORCED by the cancel deadline (R3-B item 10) — a subset of
+ *   `cancelled`. `wasLive: true` means the harness still reported the agent as alive when
+ *   the deadline fired: the files/slot/sync-barrier were reclaimed from a hung agent.
+ * @property {Array<{id:string, reason:string, summary:string}>} [quarantined]  set by
+ *   reconcileState — queued tasks EXCLUDED from `promote` this pass because their files
+ *   were freed by an age-only orphaning (R3-B item 8).
  * @property {Array<{id:string, reason:string, deps:string[], summary:string}>} unsatisfiable
  *   queued tasks marked `failed` this pass because they can NEVER run (dead dep / cycle —
  *   C1-1/C1-7). Surfaced so a permanent wedge is a loud event, never silent-forever.
@@ -159,7 +195,12 @@ function cloneTask(t) {
  *   (C1-5), overriding the built-in defaults (implement/sync = 120 min). Kinds absent from
  *   both this map and DEFAULT_STALE_MS_BY_KIND fall back to staleThresholdMs.
  * @param {number} [opts.retentionMs]  terminal retention. Default DEFAULT_RETENTION_MS.
- * @returns {{tasks:{version:number, seq:number, tasks:Array<object>}, report:ReconcileReport}}
+ * @param {number} [opts.cancelDeadlineMs]  R3-B item 10: a `cancelling` task past this many
+ *   ms from ts.cancelRequested is FORCED to cancelled even if its agent still looks live.
+ *   Default DEFAULT_CANCEL_DEADLINE_MS (30 min).
+ * @param {Object<string,number>} [opts.cancelDeadlineMsByKind]  per-kind cancel-deadline
+ *   overrides (R3-B item 10). Kinds absent fall back to cancelDeadlineMs.
+ * @returns {{tasks:{version:number, generation?:number, seq:number, tasks:Array<object>}, report:ReconcileReport}}
  */
 function reconcile(tasks, opts = {}) {
   const now = Number.isFinite(opts.now) ? opts.now : Date.now();
@@ -168,6 +209,15 @@ function reconcile(tasks, opts = {}) {
   const retentionMs = Number.isFinite(opts.retentionMs) ? opts.retentionMs : DEFAULT_RETENTION_MS;
   const staleByKind = (opts.staleThresholdMsByKind && typeof opts.staleThresholdMsByKind === 'object')
     ? opts.staleThresholdMsByKind : null;
+  const cancelDeadlineMs = Number.isFinite(opts.cancelDeadlineMs)
+    ? opts.cancelDeadlineMs : DEFAULT_CANCEL_DEADLINE_MS;
+  const cancelByKind = (opts.cancelDeadlineMsByKind && typeof opts.cancelDeadlineMsByKind === 'object')
+    ? opts.cancelDeadlineMsByKind : null;
+  /** Kind-aware cancel deadline (R3-B item 10): per-kind override > flat default. */
+  const cancelDeadlineFor = (kind) => {
+    if (cancelByKind && Number.isFinite(cancelByKind[kind])) return cancelByKind[kind];
+    return cancelDeadlineMs;
+  };
 
   // Kind-aware staleness floor (C1-5): explicit per-kind override > built-in kind default
   // (implement/sync = 120 min) > flat staleThresholdMs (30 min).
@@ -179,20 +229,28 @@ function reconcile(tasks, opts = {}) {
 
   /** @type {ReconcileReport} */
   const report = {
-    orphaned: [], stalenessOrphaned: [], cancelled: [], unsatisfiable: [],
-    failed: [], swept: [], corrupt: null
+    orphaned: [], stalenessOrphaned: [], cancelled: [], stalenessCancelled: [],
+    unsatisfiable: [], failed: [], swept: [], corrupt: null
   };
 
   const version = (tasks && typeof tasks === 'object' && Number.isSafeInteger(tasks.version))
     ? tasks.version : taskRegistry.REGISTRY_VERSION;
   const seq = (tasks && typeof tasks === 'object' && Number.isSafeInteger(tasks.seq) && tasks.seq >= 0)
     ? tasks.seq : 0;
+  // Carry the loaded GENERATION through (R3-B item 7) so `reconcileState`'s save is a real
+  // compare-and-swap against the value it loaded, not an unversioned clobber.
+  const generation = (tasks && typeof tasks === 'object' && Number.isSafeInteger(tasks.generation) && tasks.generation >= 0)
+    ? tasks.generation : undefined;
+  /** Build the returned registry value, including `generation` only when the input had one. */
+  const outValue = (list) => (generation === undefined
+    ? { version, seq, tasks: list }
+    : { version, generation, seq, tasks: list });
 
   const arr = toTaskArray(tasks);
   if (arr === null) {
     // Not a registry value at all → fail open to empty, surface the corruption.
     report.corrupt = { reason: 'not-a-registry-value' };
-    return { tasks: { version, seq, tasks: [] }, report };
+    return { tasks: outValue([]), report };
   }
 
   // Normalize live ids to a Set of strings once (null ⇒ TaskList unavailable).
@@ -212,22 +270,52 @@ function reconcile(tasks, opts = {}) {
       // until the agent is confirmed gone. The only difference is the terminal it resolves
       // to — a confirmed-gone/aged-out cancelling task becomes `cancelled`, not `orphaned`.
       const wasCancelling = t.status === 'cancelling';
-      const hasLive = live !== null && t.agentTaskId != null && live.has(String(t.agentTaskId));
+      // A RECORDED agent id is the precondition for the live list to say anything at all
+      // about this task (R3-B item 5). With no recorded id, "not in the live list" is
+      // MISSING INFORMATION, not evidence of death — so such a task falls to the staleness
+      // backstop even when a live list IS present.
+      const hasRecordedId = t.agentTaskId != null;
+      const hasLive = live !== null && hasRecordedId && live.has(String(t.agentTaskId));
       const startedMs = parseTs(t.ts && t.ts.started);
       const ageMs = now - startedMs;
       const young = Number.isFinite(startedMs) && ageMs < graceMs;
       const kindThreshold = staleThresholdFor(t.kind);
 
-      let terminate = false;
+      // R3-B item 10 — the cancel deadline. Evaluated FIRST for a `cancelling` task and it
+      // OVERRIDES liveness: a hung-but-live agent that will not die still has to release
+      // the files, the slot, and the global sync barrier at some point.
+      let deadlineForced = false;
+      if (wasCancelling) {
+        const requestedMs = parseTs(t.ts && t.ts.cancelRequested);
+        const deadline = cancelDeadlineFor(t.kind);
+        // A missing cancelRequested (a pre-R3-B task already in `cancelling`) falls back to
+        // ts.started, so a legacy hung cancel is not immortal.
+        const clock = Number.isFinite(requestedMs) ? requestedMs : startedMs;
+        if (Number.isFinite(clock) && (now - clock) >= deadline) {
+          deadlineForced = true;
+          report.stalenessCancelled.push({
+            id: t.id,
+            kind: t.kind,
+            ageMs: now - clock,
+            deadlineMs: deadline,
+            wasLive: hasLive
+          });
+        }
+      }
+
+      let terminate = deadlineForced;
       let stalenessBased = false;
-      if (hasLive) {
+      if (deadlineForced) {
+        terminate = true;                     // the deadline beats liveness (see above)
+      } else if (hasLive) {
         terminate = false;                    // live agent confirmed → leave as-is
       } else if (young) {
         terminate = false;                    // just-dispatched race → grace window
-      } else if (live !== null) {
-        terminate = true;                     // TaskList present, no match, not young
+      } else if (live !== null && hasRecordedId) {
+        terminate = true;                     // TaskList present, id recorded, no match, not young
       } else {
-        // TaskList unavailable → kind-aware staleness backstop (NaN age ⇒ very old).
+        // TaskList unavailable (or no recorded id to match) → kind-aware staleness backstop
+        // (NaN age ⇒ very old).
         terminate = !Number.isFinite(startedMs) || ageMs >= kindThreshold;
         stalenessBased = terminate;
       }
@@ -276,12 +364,24 @@ function reconcile(tasks, opts = {}) {
     report.unsatisfiable.push({ id: entry.task.id, reason: entry.reason, deps: entry.deps, summary });
   }
 
+  // R3-B item 9 — RETENTION NEVER SEVERS A LIVE EDGE. Every dep id referenced by a
+  // SURVIVING non-terminal task's blockedBy is protected from the sweep: dropping a
+  // terminal task that a queued task still depends on would make the very next pass mark
+  // that dependent `dep-missing` (a missing dep NEVER satisfies) and fail it — even though
+  // its dependency SUCCEEDED. The edge outlives the retention window.
+  const referencedDeps = new Set();
+  for (const t of kept) {
+    if (TERMINAL.has(t.status)) continue; // only a LIVE task's edges are load-bearing
+    const deps = Array.isArray(t.blockedBy) ? t.blockedBy : [];
+    for (const d of deps) referencedDeps.add(d);
+  }
+
   // Terminal-retention sweep: drop terminal tasks older than retentionMs from the
   // ACTIVE view. queued/running are NEVER swept (guarded by the TERMINAL check).
   // A freshly-orphaned task carries ts.done ≈ now → age ≈ 0 → survives this pass.
   const active = [];
   for (const t of kept) {
-    if (TERMINAL.has(t.status)) {
+    if (TERMINAL.has(t.status) && !referencedDeps.has(t.id)) {
       const doneMs = parseTs(t.ts && (t.ts.done || t.ts.created));
       const stale = !Number.isFinite(doneMs) || (now - doneMs) >= retentionMs;
       if (stale) { report.swept.push(t.id); continue; }
@@ -289,7 +389,7 @@ function reconcile(tasks, opts = {}) {
     active.push(t);
   }
 
-  return { tasks: { version, seq, tasks: active }, report };
+  return { tasks: outValue(active), report };
 }
 
 // ── temp-artifact sweep (best-effort, cross-platform) ────────────────────────────
@@ -342,30 +442,45 @@ function sweepTempArtifacts(root, now = Date.now(), ttlMs = DEFAULT_TEMP_TTL_MS)
  *   `nextRunnable` set (queued tasks freed by orphan-vacated slots).
  */
 function reconcileState(root, opts = {}) {
-  let loaded;
+  /** @type {any} */
+  let reconciled = null;
+  /** @type {any} */
+  let report = null;
+
   try {
-    loaded = taskRegistry.load(root);
+    // R3-B item 7: the load→save cycle runs INSIDE the compare-and-swap helper, so a
+    // concurrent writer (a session child process running `menu task …`) that commits
+    // between our load and our save causes a RELOAD and a re-reconcile against the fresh
+    // state — never a clobber of the winner's mutation. `reconcile` is PURE, so re-running
+    // it on retry is safe by construction.
+    taskRegistry.withRegistry(root, (registry, ctx) => {
+      const out = reconcile(registry, opts);
+      reconciled = out.tasks;
+      report = out.report;
+      const changed = report.orphaned.length > 0 || report.swept.length > 0 ||
+        report.cancelled.length > 0 || report.unsatisfiable.length > 0;
+      if (!changed) {
+        ctx.abort(); // nothing to persist — a pure read must not bump the generation
+        return;
+      }
+      // Publish the reconciled task list onto the loaded value so withRegistry saves IT
+      // (the value it compare-and-swaps is the one it loaded).
+      registry.tasks = reconciled.tasks;
+      registry.seq = reconciled.seq;
+    });
   } catch (err) {
-    // load is fail-open by contract, but a bad `root` throws — never brick the menu.
-    /** @type {ReconcileReport} */
-    const failReport = {
-      orphaned: [], stalenessOrphaned: [], cancelled: [], unsatisfiable: [],
-      failed: [], swept: [], corrupt: { reason: 'load-failed' }
-    };
-    return { report: failReport, promote: [] };
-  }
-
-  const { tasks: reconciled, report } = reconcile(loaded, opts);
-
-  const changed = report.orphaned.length > 0 || report.swept.length > 0 ||
-    report.cancelled.length > 0 || report.unsatisfiable.length > 0;
-  if (changed) {
-    try {
-      taskRegistry.save(root, reconciled);
-    } catch (err) {
-      // save is fail-LOUD in task-registry; catch here so the menu still renders.
-      report.saveFailed = msgOf(err);
+    if (report === null) {
+      // The load itself failed (a bad `root`) — never brick the menu.
+      /** @type {ReconcileReport} */
+      const failReport = {
+        orphaned: [], stalenessOrphaned: [], cancelled: [], stalenessCancelled: [],
+        unsatisfiable: [], failed: [], swept: [], corrupt: { reason: 'load-failed' }
+      };
+      return { report: failReport, promote: [] };
     }
+    // The reconcile ran but the SAVE failed (fail-LOUD in task-registry, including a
+    // contention exhaustion) — record it and still render.
+    report.saveFailed = msgOf(err);
   }
 
   const now = Number.isFinite(opts.now) ? opts.now : Date.now();
@@ -375,12 +490,42 @@ function reconcileState(root, opts = {}) {
     report.tempSwept = []; // sweepTempArtifacts is already best-effort; belt-and-suspenders
   }
 
-  // Compute the newly-runnable set from the reconciled value (freed slots).
+  // Compute the newly-runnable set from the reconciled value (freed slots), then QUARANTINE
+  // (R3-B item 8): a task orphaned on AGE ALONE was never confirmed dead, so its files may
+  // still be under a live agent's hands. Handing them to a conflicting queued task in the
+  // SAME pass would put two agents on one file. Such candidates wait one pass; the exclusion
+  // is REPORTED, never silent.
   let promote = [];
   try {
     promote = taskRegistry.nextRunnable(reconciled);
   } catch {
     promote = [];
+  }
+  report.quarantined = [];
+  try {
+    const byId = new Map((reconciled.tasks || []).map((t) => [t.id, t]));
+    const quarantinedTouches = [];
+    for (const entry of report.stalenessOrphaned || []) {
+      const t = byId.get(entry.id);
+      if (t && Array.isArray(t.touches)) quarantinedTouches.push(...t.touches);
+    }
+    if (quarantinedTouches.length > 0) {
+      promote = promote.filter((cand) => {
+        const touches = Array.isArray(cand.touches) ? cand.touches : [];
+        if (touches.length > 0 && touchesOverlap(touches, quarantinedTouches)) {
+          report.quarantined.push({
+            id: cand.id,
+            reason: 'staleness-orphan-quarantine',
+            summary: 'held one pass — its files were freed by an AGE-ONLY orphaning ' +
+              '(the previous holder was never confirmed dead and may still be editing them)'
+          });
+          return false;
+        }
+        return true;
+      });
+    }
+  } catch {
+    /* the quarantine is defensive; a fault must never break the render (promote stands) */
   }
 
   return { report, promote };

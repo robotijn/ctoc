@@ -266,6 +266,26 @@ afterEach(() => {
   try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* best-effort */ }
 });
 
+/**
+ * Seed a real in-progress plan file so `menu task complete` on an IMPLEMENT task runs the
+ * genuine completion (R3-B item 4 / C7: an implement task whose plan file is absent is now
+ * REFUSED — it must produce evidence). A fully-checked Step 8–16 block passes
+ * validateForReview so the completion reaches review and the promote assertions still hold.
+ */
+function seedInProgressPlan(slug, files) {
+  const stepBlock = ['8: TEST', '9: PREPARE', '10: IMPLEMENT', '11: REVIEW', '12: OPTIMIZE',
+    '13: SECURE', '14: VERIFY', '15: DOCUMENT', '16: FINAL-REVIEW']
+    .map((s) => `### Step ${s}\n- [x] done\n`).join('\n');
+  const filesBlock = 'files:\n' + files.map((f) => `  - "${f}"`).join('\n') + '\n';
+  const content =
+    '---\napproved_by: human\ngate_crossed: implementation → todo\n---\n\n' +
+    `---\ntitle: "${slug}"\ntype: implementation\niron_loop: true\n${filesBlock}---\n\n` +
+    `# ${slug}\n\n## Execution Plan (Steps 8-16)\n\n${stepBlock}\n`;
+  const dir = path.join(root, 'plans', 'in-progress');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${slug}.md`), content);
+}
+
 describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into promote[])', () => {
   it('B-PROMOTE-run: completing a running implement frees the file-conflict slot → the queued implement is promoted', () => {
     // File-based contract (vision F1): two implement tasks touching the SAME file
@@ -277,6 +297,7 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
     const a2 = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/shared.js'], root);
     assert.equal(a2.decision, 'queue', 'second, file-OVERLAPPING implement queues (file-conflict)');
 
+    seedInProgressPlan('pi1', ['src/shared.js']); // C7: an implement completion must produce evidence
     const done = ms.route(['menu', 'task', 'complete', a1.taskId, '--summary', 'ok'], root);
     assert.equal(done.status, 'done');
     assert.ok(Array.isArray(done.promote), 'complete returns a promote[] array');
@@ -338,6 +359,7 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
     ms.route(['menu', 'task', 'start', b1.taskId], root);
     const dep = ms.route(['menu', 'task', 'add', 'review', 'depplan'], root); // stays queued (never started)
     const blocked = ms.route(['menu', 'task', 'add', 'implement', 'pi2', '--touches', 'src/b.js', '--blocked', dep.taskId], root);
+    seedInProgressPlan('pi1', ['src/a.js']); // C7: an implement completion must produce evidence
     const done = ms.route(['menu', 'task', 'complete', b1.taskId, '--summary', 'ok'], root);
     assert.ok(!done.promote.some((t) => t.id === blocked.taskId), 'blocked-dep task is excluded from promote');
     // Guard against a vacuous-green "promote always empty": the unblocked sibling (the
@@ -357,6 +379,7 @@ describe('SPEC-B — B-PROMOTE (complete/fail/cancel fold nextRunnable into prom
     taskRegistry.save(root, reg);
     // A legit queued task (canonical id) proves promote is not vacuously empty.
     const ok2 = ms.route(['menu', 'task', 'add', 'review', 'clean'], root);
+    seedInProgressPlan('pi1', ['src/a.js']); // C7: an implement completion must produce evidence
     const done = ms.route(['menu', 'task', 'complete', a1.taskId, '--summary', 'ok'], root);
     assert.ok(!done.promote.some((t) => /evil/.test(t.id)), 'crafted non-t<n> id excluded from promote');
     assert.ok(done.promote.some((t) => t.id === ok2.taskId), 'the legit canonical-id task IS promoted (not vacuously empty)');

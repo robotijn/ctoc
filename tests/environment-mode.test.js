@@ -111,7 +111,8 @@ describe('Environment mode — resolution order', () => {
   it('staging and prod profiles resolve as specified', () => {
     const stg = loadSettings(mk({ general: { environment: 'staging' } }));
     assert.equal(stg.workflow.enforcementMode, 'strict');
-    assert.equal(stg.workflow.autoMoveToReview, true);
+    // R4-B: staging no longer sets workflow.autoMoveToReview — that setting and the
+    // sync.moveToReviewAfterPush landmine it drove were both deleted.
     assert.equal(stg.git.autoPushEnabled, false);
 
     const prod = loadSettings(mk({ general: { environment: 'prod' } }));

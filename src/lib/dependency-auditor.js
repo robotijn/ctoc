@@ -738,38 +738,127 @@ class DependencyAuditor {
    *     documented unknown default — never LOW. When we do not understand a
    *     severity, we OVER-report, never under-report.
    *
-   * @param {number|string|null|undefined} severity - CVSS score or severity label
+   * @param {number|string|Array<any>|Record<string,any>|null|undefined} severity
+   *   - a CVSS score, a severity label, or a list/object of either (feeds vary)
    * @returns {string} one of SEVERITY.*
    */
   mapCvssOrLabel(severity) {
-    // Labels first — "9.8" is a score, but "HIGH" is a label and must never be
-    // compared numerically (every comparison against NaN is false ⇒ LOW).
+    // Arrays/objects (R4-A item 10): several advisory feeds emit a LIST of scores
+    // or a scored OBJECT (e.g. { baseScore, score }). Take the MAX severity across
+    // them so a CRITICAL entry is never buried under a LOW sibling.
+    if (Array.isArray(severity)) {
+      let worst = SEVERITY.INFO;
+      for (const s of severity) worst = this._maxSeverity(worst, this.mapCvssOrLabel(s));
+      return severity.length ? worst : SEVERITY.MODERATE;
+    }
+    if (severity && typeof severity === 'object') {
+      const candidate = severity.baseScore ?? severity.score ?? severity.severity ?? severity.cvss ?? severity.vector;
+      return candidate == null ? SEVERITY.MODERATE : this.mapCvssOrLabel(candidate);
+    }
+
     if (typeof severity === 'string') {
-      const label = severity.trim().toLowerCase();
-      if (label === '') return SEVERITY.MODERATE;
+      const raw = severity.trim();
+      if (raw === '') return SEVERITY.MODERATE;
 
-      const LABELS = {
-        critical: SEVERITY.CRITICAL,
-        high: SEVERITY.HIGH,
-        moderate: SEVERITY.MODERATE,
-        medium: SEVERITY.MODERATE,
-        low: SEVERITY.LOW,
-        info: SEVERITY.INFO,
-        informational: SEVERITY.INFO,
-        none: SEVERITY.INFO
-      };
-      if (label in LABELS) return LABELS[label];
+      // A CVSS vector string ("CVSS:3.1/AV:N/...") — exactly what the Go path reads
+      // at osv.severity[0].score — is NOT a bare number, so Number() is NaN. Compute
+      // its base score; if the vector cannot be fully parsed, band HIGH (a security
+      // advisory carrying a CVSS vector is never MODERATE, never LOW).
+      if (/CVSS:|\bAV:[NALP]\b/i.test(raw)) {
+        const score = this._cvssVectorBaseScore(raw);
+        return score != null ? this.bandCvss(score) : SEVERITY.HIGH;
+      }
 
-      const parsed = Number(label);
-      if (!Number.isFinite(parsed)) return SEVERITY.MODERATE; // unknown ⇒ over-report
-      return this.bandCvss(parsed);
+      // A MIXED string ("7.5 HIGH", "9.8 CRITICAL"): scan for BOTH a label token and
+      // a numeric token and take the MAX of what each implies — never under-report.
+      const labelSev = this._labelToSeverity(raw);
+      const numMatch = raw.match(/[\d.]+/);
+      const numSev = (numMatch && Number.isFinite(parseFloat(numMatch[0]))) ? this.bandCvss(parseFloat(numMatch[0])) : null;
+      if (labelSev && numSev) return this._maxSeverity(labelSev, numSev);
+      if (labelSev) return labelSev;
+      if (numSev) return numSev;
+      return SEVERITY.MODERATE; // unrecognised ⇒ over-report, never LOW
     }
 
     if (typeof severity === 'number' && Number.isFinite(severity)) {
       return this.bandCvss(severity);
     }
 
-    return SEVERITY.MODERATE; // null / undefined / object / NaN ⇒ unknown, not LOW
+    return SEVERITY.MODERATE; // null / undefined / NaN ⇒ unknown, not LOW
+  }
+
+  /**
+   * Map a bare severity LABEL (case-insensitive) to a SEVERITY, or null when the
+   * token is not a known label.
+   * @param {string} raw
+   * @returns {string|null}
+   */
+  _labelToSeverity(raw) {
+    const LABELS = {
+      critical: SEVERITY.CRITICAL,
+      high: SEVERITY.HIGH,
+      moderate: SEVERITY.MODERATE,
+      medium: SEVERITY.MODERATE,
+      low: SEVERITY.LOW,
+      info: SEVERITY.INFO,
+      informational: SEVERITY.INFO,
+      none: SEVERITY.INFO
+    };
+    const m = String(raw).toLowerCase().match(/critical|high|moderate|medium|low|informational|info|none/);
+    return m ? LABELS[m[0]] : null;
+  }
+
+  /** Rank a SEVERITY for MAX comparison (higher = worse). */
+  _severityRank(sev) {
+    return { INFO: 0, LOW: 1, MODERATE: 2, HIGH: 3, CRITICAL: 4 }[sev] ?? 2;
+  }
+
+  /** Return the worse (higher-ranked) of two severities. */
+  _maxSeverity(a, b) {
+    return this._severityRank(a) >= this._severityRank(b) ? a : b;
+  }
+
+  /**
+   * Compute a CVSS v3.0/3.1 base score from a vector string. Returns null when a
+   * required metric is missing/unparseable (the caller then bands HIGH rather than
+   * under-reporting). Implements the standard CVSS v3 base-score formula.
+   * @param {string} vector - e.g. "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+   * @returns {number|null} Base score 0.0–10.0, or null if not computable.
+   */
+  _cvssVectorBaseScore(vector) {
+    const parts = {};
+    for (const seg of String(vector).split('/')) {
+      const [k, v] = seg.split(':');
+      if (k && v) parts[k.trim().toUpperCase()] = v.trim().toUpperCase();
+    }
+    const scope = parts.S; // U (unchanged) or C (changed)
+    const AV = { N: 0.85, A: 0.62, L: 0.55, P: 0.2 }[parts.AV];
+    const AC = { L: 0.77, H: 0.44 }[parts.AC];
+    const UI = { N: 0.85, R: 0.62 }[parts.UI];
+    const PR = scope === 'C'
+      ? { N: 0.85, L: 0.68, H: 0.5 }[parts.PR]
+      : { N: 0.85, L: 0.62, H: 0.27 }[parts.PR];
+    const impactVal = { H: 0.56, L: 0.22, N: 0 };
+    const C = impactVal[parts.C];
+    const I = impactVal[parts.I];
+    const A = impactVal[parts.A];
+
+    if ([AV, AC, UI, PR, C, I, A].some((x) => x == null) || (scope !== 'U' && scope !== 'C')) {
+      return null; // incomplete/garbage vector ⇒ caller bands HIGH, never MODERATE
+    }
+
+    const iss = 1 - (1 - C) * (1 - I) * (1 - A);
+    const impact = scope === 'C'
+      ? 7.52 * (iss - 0.029) - 3.25 * Math.pow(iss - 0.02, 15)
+      : 6.42 * iss;
+    const exploitability = 8.22 * AV * AC * PR * UI;
+
+    if (impact <= 0) return 0;
+    const roundup = (x) => Math.ceil(x * 10) / 10;
+    const raw = scope === 'C'
+      ? Math.min(1.08 * (impact + exploitability), 10)
+      : Math.min(impact + exploitability, 10);
+    return roundup(raw);
   }
 
   /**

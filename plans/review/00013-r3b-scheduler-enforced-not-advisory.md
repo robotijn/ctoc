@@ -176,4 +176,72 @@ is CHECKED, not just defined) and the single-writer assumption's replacement.
 ### Step 16: FINAL-REVIEW — report; name any bypass you did NOT close.
 
 ## Decisions Taken Under Ambiguity
-(Executor fills in.)
+
+1. **Guarded start lives in `taskTransition('start')`, not a new gate.** `canRun` is called
+   inside the existing `menu task start` route (wrapped in `withRegistry`); a false decision
+   `ctx.abort()`s so the registry is provably byte-unchanged. `--force` overrides but writes a
+   `forced_start` warn-log entry and SHOUTS "FORCED" in the result text. `updateTask` stays the
+   low-level model mutator (reconcile/coupling/force legitimately drive it) — the ladder is
+   enforced at every `status:'running'` WRITER, not inside `updateTask`.
+
+2. **Plan-uniqueness enforced at the action + CLI layer, with a shared registry lookup.** Added
+   `taskRegistry.findActivePlanTask(reg, plan, kind)` (prefers running/cancelling over queued) and
+   routed `menu task add`, `startAgent`, and `advanceAgent` through it. `addTask` stays
+   plan-agnostic (registry-level, as the plan directed). `completeExecution` now settles the task
+   `findActivePlanTask` returns (the RUNNING one, never a shadowing queued duplicate) and CANCELS
+   any leftover queued duplicates for the plan so they cannot re-run a plan already in review.
+
+3. **ONE terminal encoding.** Exported `TERMINAL` + `canTransition(from,to)` from task-registry;
+   menu-screens imports them and deleted its stale local mirror. `menu task complete` legality is
+   now `canTransition(status,'done')`, so `orphaned → done` (late completion) is ACCEPTED — the
+   C3 fix that un-strands a crashed/falsely-orphaned executor's finished plan.
+
+4. **C7: an implement task with no plan file is REFUSED, not phantom-succeeded.** `completeTaskPlan`
+   returning `ran:false` for an `implement` task with a non-null plan now yields a blocked/kickback
+   shape and leaves the task running; `ran:false` stays a soft report only for non-plan kinds
+   (review/decompose). Six pre-existing tests across menu-protocol / w10 / last-mile encoded the old
+   evidence-less-success behaviour; I tightened them (seed a real in-progress plan, or assert the
+   refusal) — never weakened an assertion.
+
+5. **Compare-and-swap via a `generation` counter + `withRegistry(root, mutator)`.** `load` always
+   stamps a generation (absent on disk ⇒ 0, backward compatible); `save` refuses a moved-generation
+   write with a `StaleRegistryError`; `withRegistry` reloads-and-re-applies on conflict (bounded to
+   5 attempts, NO sleep/busy-wait). Every load→save caller in my files (addAndClaim, taskAdd,
+   taskTransition, taskComplete's settle, completeExecution's coupling, reconcileState) routes
+   through it. `StaleRegistryError` is NOT exported (the reachability fence forbids a test-only
+   export; its `name` is asserted instead). A hand-built literal (`emptyRegistry()`, a test fixture)
+   carries no generation and is an intentional unversioned seeding write.
+
+6. **Live-list honesty.** `extractLiveAgentIds` maps a present-but-empty `--live-agent-ids` to
+   `undefined` (UNAVAILABLE), never `[]` (authoritative empty). `reconcile` treats a running task
+   with `agentTaskId == null` as unmatchable → staleness backstop, even when a live list is present.
+   `addAndClaim` accepts an `agentTaskId` to record it at BIRTH, closing the claim→patch window.
+
+7. **Cancel deadline (item 10)** stamps `ts.cancelRequested` (now preserved across a load — the
+   normalizer used to drop it), and reconcile forces `cancelling → cancelled` past 30 min even when
+   the agent still looks live (`report.stalenessCancelled`). `menu task cancel --force` frees a
+   running task immediately, logged (`forced_cancel`) and shouted.
+
+8. **Quarantine (item 8)** excludes THIS-pass age-only `stalenessOrphaned` touches from the
+   `promote` projection (glob-aware `touchesOverlap`), reported in `report.quarantined`.
+   **Retention (item 9)** protects any terminal task still referenced by a surviving task's
+   `blockedBy` from the 7-day sweep. **Sync-barrier integrity (item 12):** `assertSyncBlockedBy`
+   moved the empty-barrier refusal into `addTask` (the choke point `menu task add sync` also passes).
+
+9. **Stale-sweep liveness (item 6):** `cleanupStaleInProgress` skips any in-progress plan with a
+   non-terminal implement task AND any plan idle < 120 min (mtime backstop), so a wave sibling
+   mid-flight (or seconds from `completeExecution`) is never moved out from under its own agent.
+
+10. **Handovers.** (a) `stampAndLedger` now passes `plan_basename` into `writeEntry` so the ledger's
+    case-collision guard fires; the rollback skips `removeEntry` on a collision (that entry belongs
+    to the OTHER plan). (b) `recordDeployReadyNotice` writes `deploy-ready.json` atomically
+    (temp + rename), mirroring stale-cleanup.
+
+### Bypasses I could NOT close (out of my file scope)
+- `menu.md` documents `claude:ledger-backfill` with no emitter (PARITY-reverse / R3-D recipe test):
+  the concurrent ledger executor owns `menu.md`.
+- Full-suite failures in `sync.js` (moveToReviewAfterPush removed), `dependency-auditor.js`
+  (5 tsc errors), `compliance-regime`/environment-mode, the reachability baseline (488→127, a
+  wave-level accounting), and the documented test-file counts (new test files added by multiple
+  executors) are all outside my five source files — concurrent-executor / wave-level, to be
+  reconciled by the integrator at commit.

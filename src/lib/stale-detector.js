@@ -675,8 +675,20 @@ function _sigMtime(mtimeMs) {
 }
 
 /**
- * Read the dismissal store, FAIL-OPEN: a missing, unreadable, or corrupt store
- * yields an empty map so a data fault can NEVER suppress a real candidate (the
+ * Size ceiling for the dismissal store (R3-A item 7). The store is read on the HOT
+ * path — every cheap scan, i.e. every menu open — and it is a plain JSON file on
+ * disk that nothing bounds. A pathological or corrupted store (a runaway writer, a
+ * hostile blob) would be slurped whole into memory and JSON-parsed on every render.
+ * The read now mirrors the plan-file guard (`MAX_PLAN_BYTES`): an oversized store is
+ * SKIPPED, which fails open in the safe direction — no filtering, so CTOC keeps
+ * nagging about genuinely stale plans rather than silently hiding them.
+ * @type {number}
+ */
+const MAX_DISMISSAL_BYTES = MAX_PLAN_BYTES; // 1 MiB — same ceiling as a plan file
+
+/**
+ * Read the dismissal store, FAIL-OPEN: a missing, unreadable, corrupt, or OVERSIZED
+ * store yields an empty map so a data fault can NEVER suppress a real candidate (the
  * safe direction is to under-filter, i.e. keep nagging, never to hide). Returns a
  * plain `{ '<stage>/<slug>.md': mtimeMs }` map. No subprocess, no throw.
  * @param {string} root
@@ -686,6 +698,11 @@ function _loadDismissals(root) {
   try {
     const p = path.join(root, ...DISMISSAL_STORE);
     if (!safeFs.existsSync(p)) return {};
+    // Size-gate BEFORE the read: never pull an unbounded file into memory on the
+    // hot path (R3-A item 7). lstat (not stat) so a symlinked store cannot mask its
+    // real size behind a small link.
+    const st = safeFs.lstatSync(p);
+    if (!st.isFile() || st.size > MAX_DISMISSAL_BYTES) return {};
     const parsed = JSON.parse(safeFs.readFileSync(p, 'utf8'));
     const d = parsed && typeof parsed === 'object' ? parsed.dismissed : null;
     return d && typeof d === 'object' && !Array.isArray(d) ? d : {};

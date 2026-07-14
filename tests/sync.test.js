@@ -8,49 +8,6 @@ const { test, describe, beforeEach, afterEach } = require('node:test');
 // We need to mock modules before requiring sync.js
 // Using Node.js test runner's mocking capabilities
 
-// A plan that PASSES validateForReview: full "## Execution Plan" with every
-// required Iron Loop step present and completed. moveToReviewAfterPush now gates
-// the rename behind validateForReview (W05-s4), so the move-mechanics tests read
-// this content back for their (mocked) plan file instead of an empty/absent one.
-const REVIEW_VALID_PLAN = `---
-title: "Valid slice"
-approved_by: human
----
-
-# Valid slice
-
-A cohesive, finished slice.
-
-## Execution Plan
-
-### Step 8: TEST
-- [x] Tests written and run RED first
-
-### Step 9: PREPARE
-- [x] Environment ready
-
-### Step 10: IMPLEMENT
-- [x] Feature implemented
-
-### Step 11: REVIEW
-- [x] Self-review done
-
-### Step 12: OPTIMIZE
-- [x] No redundant work
-
-### Step 13: SECURE
-- [x] Inputs validated
-
-### Step 14: VERIFY
-- [x] All tests green, 0 skipped, 0 flaky
-
-### Step 15: DOCUMENT
-- [x] Docs updated
-
-### Step 16: FINAL-REVIEW
-- [x] Ready for human review
-`;
-
 describe('Sync Manager Tests', () => {
   let syncModule;
   let mockExecSync;
@@ -375,138 +332,33 @@ describe('Sync Manager Tests', () => {
     }
   });
 
-  test('moveToReviewAfterPush returns disabled when autoMove is off', (t) => {
-    const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
-
-    const settings = require('../src/lib/settings.js');
-    const originalGetSetting = settings.getSetting;
-
-    // Disable auto-move
-    settingsStore.workflow.autoMoveToReview = false;
-    settings.getSetting = mockGetSetting;
-
-    try {
-      delete require.cache[require.resolve('../src/lib/sync.js')];
-      syncModule = require('../src/lib/sync.js');
-
-      const result = syncModule.moveToReviewAfterPush('/test/plan.md', '/test/project');
-
-      assert.strictEqual(result.moved, false, 'Should not move');
-      assert.strictEqual(result.reason, 'auto-move disabled', 'Should indicate disabled');
-
-      console.log('# moveToReviewAfterPush returns disabled when autoMove is off');
-    } finally {
-      childProcess.execSync = originalExecSync;
-      settings.getSetting = originalGetSetting;
-    }
+  // R4-B: `moveToReviewAfterPush` was DELETED — a raw, evidence-less renameSync into
+  // plans/review/, default-ON via workflow.autoMoveToReview, with ZERO callers. A
+  // plan reaches review in exactly ONE place: the completion path that mints Step-14
+  // VERIFY evidence. These require-time + source assertions are the ratchet that the
+  // second, evidence-less door stays shut.
+  test('moveToReviewAfterPush is GONE from the sync module (no second door into review)', () => {
+    delete require.cache[require.resolve('../src/lib/sync.js')];
+    const fresh = require('../src/lib/sync.js');
+    assert.strictEqual(
+      fresh.moveToReviewAfterPush,
+      undefined,
+      'moveToReviewAfterPush must NOT be exported — it was deleted, not hidden'
+    );
   });
 
-  test('moveToReviewAfterPush moves file to review directory', (t) => {
-    const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
-
-    const settings = require('../src/lib/settings.js');
-    const originalGetSetting = settings.getSetting;
-    settings.getSetting = mockGetSetting;
-
-    // Mock fs operations
+  test('sync.js contains no raw rename into plans/review/', () => {
     const fs = require('fs');
-    const originalExistsSync = fs.existsSync;
-    const originalMkdirSync = fs.mkdirSync;
-    const originalRenameSync = fs.renameSync;
-    const originalReadFileSync = fs.readFileSync;
-
-    let mkdirCalls = [];
-    let renameCalls = [];
-
-    fs.existsSync = (p) => {
-      // Review dir doesn't exist yet
-      if (p.includes('review')) return false;
-      return true;
-    };
-    fs.mkdirSync = (p, opts) => { mkdirCalls.push({ path: p, opts }); };
-    fs.renameSync = (from, to) => { renameCalls.push({ from, to }); };
-    // validateForReview reads the plan; hand it a review-valid plan so the gate
-    // passes and the move mechanics (mkdir/rename/newPath) are what is asserted.
-    fs.readFileSync = (p, opts) => {
-      if (typeof p === 'string' && p.endsWith('my-plan.md')) return REVIEW_VALID_PLAN;
-      return originalReadFileSync(p, opts);
-    };
-
-    try {
-      delete require.cache[require.resolve('../src/lib/sync.js')];
-      syncModule = require('../src/lib/sync.js');
-
-      const result = syncModule.moveToReviewAfterPush('/test/project/plans/draft/my-plan.md', '/test/project');
-
-      assert.strictEqual(result.moved, true, 'Should move file');
-      assert.ok(result.newPath.includes('review'), 'New path should be in review');
-      assert.ok(mkdirCalls.length > 0, 'Should create review directory');
-      assert.ok(renameCalls.length > 0, 'Should rename file');
-      assert.strictEqual(renameCalls[0].to, result.newPath, 'Should rename to new path');
-
-      console.log('# moveToReviewAfterPush moves file to review directory');
-    } finally {
-      childProcess.execSync = originalExecSync;
-      settings.getSetting = originalGetSetting;
-      fs.existsSync = originalExistsSync;
-      fs.mkdirSync = originalMkdirSync;
-      fs.renameSync = originalRenameSync;
-      fs.readFileSync = originalReadFileSync;
-    }
-  });
-
-  test('moveToReviewAfterPush uses existing review directory', (t) => {
-    const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
-
-    const settings = require('../src/lib/settings.js');
-    const originalGetSetting = settings.getSetting;
-    settings.getSetting = mockGetSetting;
-
-    // Mock fs operations
-    const fs = require('fs');
-    const originalExistsSync = fs.existsSync;
-    const originalMkdirSync = fs.mkdirSync;
-    const originalRenameSync = fs.renameSync;
-    const originalReadFileSync = fs.readFileSync;
-
-    let mkdirCalls = [];
-    let renameCalls = [];
-
-    fs.existsSync = (p) => true; // Review dir exists
-    fs.mkdirSync = (p, opts) => { mkdirCalls.push({ path: p, opts }); };
-    fs.renameSync = (from, to) => { renameCalls.push({ from, to }); };
-    // validateForReview reads the plan; hand it a review-valid plan so the gate
-    // passes and the existing-directory mechanics are what is asserted.
-    fs.readFileSync = (p, opts) => {
-      if (typeof p === 'string' && p.endsWith('my-plan.md')) return REVIEW_VALID_PLAN;
-      return originalReadFileSync(p, opts);
-    };
-
-    try {
-      delete require.cache[require.resolve('../src/lib/sync.js')];
-      syncModule = require('../src/lib/sync.js');
-
-      const result = syncModule.moveToReviewAfterPush('/test/project/plans/draft/my-plan.md', '/test/project');
-
-      assert.strictEqual(result.moved, true, 'Should move file');
-      assert.strictEqual(mkdirCalls.length, 0, 'Should not create directory if exists');
-      assert.ok(renameCalls.length > 0, 'Should rename file');
-
-      console.log('# moveToReviewAfterPush uses existing review directory');
-    } finally {
-      childProcess.execSync = originalExecSync;
-      settings.getSetting = originalGetSetting;
-      fs.existsSync = originalExistsSync;
-      fs.mkdirSync = originalMkdirSync;
-      fs.renameSync = originalRenameSync;
-      fs.readFileSync = originalReadFileSync;
-    }
+    const path = require('path');
+    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'sync.js'), 'utf8');
+    assert.ok(
+      !/renameSync\s*\([^)]*review/i.test(src),
+      'sync.js must never rename a plan into review/ — that path belongs to the evidence-minting completion path alone'
+    );
+    assert.ok(
+      !/autoMoveToReview/.test(src),
+      'the autoMoveToReview setting is deleted; sync.js must not read it'
+    );
   });
 
   test('syncPlans uses correct project path', (t) => {

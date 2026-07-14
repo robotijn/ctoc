@@ -67,7 +67,9 @@
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2
 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT**
 (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all
-tests, coverage ≥ 80%, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** —
+tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json`
+`minPct`, **40** today, ratchet-up only; 80 is the new-code target at review — 0
+skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
 `/ctoc:menu`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.
 

@@ -182,16 +182,32 @@ test('an un-keyable slug flags THAT plan (ledger-unkeyable) and the sweep contin
   assert.ok(!result.some((v) => v.slug === 'valid-slug'), 'the valid neighbour is still accepted');
 });
 
-// --- vision exemption parity -------------------------------------------------
+// --- vision residency is LEDGER-DRIVEN (R3-A: the exemption is gone) ----------
+//
+// SUPERSEDED by R3-A. This used to assert that a bare `type: vision` plan in done/
+// was EXEMPT from the residency sweep. That exemption WAS the forgery hole: because
+// plans/**.md is Edit-whitelisted, any agent could write plans/done/x.md containing
+// the single line `type: vision` and squat the terminal folder with zero provenance.
+// The exemption is deleted; done/ residency is now UNIFORMLY ledger-driven. The
+// assertions are TIGHTENED toward the real, safer behavior — a vision archive is
+// accepted only when a pipeline-kind ledger entry vouches for it.
 
-test('a type: vision plan in done/ is EXEMPT (parity with iron-loop-enforcer)', () => {
-  writePlan('done', 'decomposed-vision', { title: 'Vision', type: 'vision' });
-  assert.ok(!flaggedNames('done').includes('decomposed-vision'),
-    'a decomposed vision archived to done/ carries no approval marker and must be exempt');
+test('a bare type: vision plan in done/ is FLAGGED (the exemption is gone, R3-A)', () => {
+  writePlan('done', 'squatted-vision', { title: 'Vision', type: 'vision' });
+  assert.ok(flaggedNames('done').includes('squatted-vision'),
+    'a type: vision plan with no ledger entry can no longer squat done/ — it must be flagged');
 
-  // The exemption is scoped to type: vision — a normal bare plan is still flagged.
+  // A normal bare plan is flagged too — there is nothing special about type: vision.
   writePlan('done', 'normal-bare', { title: 'Normal' });
   assert.ok(flaggedNames('done').includes('normal-bare'), 'a non-vision bare plan is still flagged');
+});
+
+test('a decomposed vision archive WITH a pipeline ledger entry is ACCEPTED (R3-A)', () => {
+  const v = writePlan('done', 'ledgered-vision', { title: 'Vision', type: 'vision' });
+  ledger.writeVisionArchiveEntry(projectDir, v.filePath);
+  assert.ok(!flaggedNames('done').includes('ledgered-vision'),
+    'a vision archive vouched for by a pipeline-kind entry (evidence: vision-decomposed) occupies done/ legitimately');
+  assert.equal(ledger.entryKind(ledger.readEntry('ledgered-vision', projectDir)), 'pipeline');
 });
 
 // --- case collision on backfill: loud failure --------------------------------

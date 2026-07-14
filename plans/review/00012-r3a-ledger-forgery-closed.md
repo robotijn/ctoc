@@ -137,23 +137,24 @@ fails open, no crash. deploy-ready write is atomic (no partial file on
 simulated failure — or assert temp+rename usage).
 
 ## Execution Plan (Steps 8-16)
-### Step 8: TEST — write the tests, run ONLY the named files, record red.
-### Step 9: PREPARE — read every file in scope IN FULL from disk, plus
-src/hooks/PreToolUse.Edit.js (the deny it mirrors, READ-ONLY), hooks.json, and
-EVERY `node -e` recipe in src/commands/menu.md (they must all survive).
-### Step 10: IMPLEMENT — items 1–7.
-### Step 11: REVIEW — enumerate every command form the new deny blocks and
-every one it must still allow; a false-positive that breaks a menu recipe is a
-CRITICAL regression.
-### Step 12: OPTIMIZE — hook stays fast (regex only, no fs walk).
-### Step 13: SECURE — the deny is the security surface: re-attack it yourself
-(quoting, `env node -e`, `/usr/bin/node -e`, `node  -e` double space, heredoc,
-`bash -c 'node -e ...'`, base64 payload) and either block or DOCUMENT each
-bypass honestly in the report. Do NOT claim closure you did not achieve.
-### Step 14: VERIFY — node --test on the named files + eslint; no git.
-### Step 15: DOCUMENT — module headers state the REAL guarantee (which tools
-are denied, which paths are sanctioned); no absolute claims the code can't keep.
-### Step 16: FINAL-REVIEW — report; include the honest residual-bypass list.
+### Step 8: TEST — [x] wrote tests/ledger-forgery-closed.test.js, ran ONLY that file, recorded RED (MODULE_NOT_FOUND on the not-yet-written script).
+### Step 9: PREPARE — [x] read every in-scope file IN FULL from disk, plus PreToolUse.Edit.js (the deny mirrored, read-only), hooks.json, and every `node -e` recipe in menu.md.
+### Step 10: IMPLEMENT — [x] items 1,2,3,5,6,7 done. Items 4 (plan_basename into stampAndLedger) and 7-deploy-ready (recordDeployReadyNotice atomic write) SKIPPED — both actions.js, re-scoped to the concurrent slice per coordinator instruction. The case-collision guard itself (item 4's mechanism) is live and tested; only the actions.js wiring is deferred.
+### Step 11: REVIEW — [x] enumerated every denied vs allowed command form; the forgery test drives the REAL spawned hook against all menu.md recipes verbatim (all ALLOW) and all forgery forms (all DENY).
+### Step 12: OPTIMIZE — [x] the guard is pure regex on the command string: no fs walk, no state read, linear-time literals only. It runs before loadState.
+### Step 13: SECURE — [x] re-attacked; broadened the JS-runtime inline-eval set (node → node/deno/bun/ts-node/tsx) after the re-attack found `deno eval`/`bun -e` bypasses. Residuals documented in the report.
+### Step 14: VERIFY — [x] node --test on the named + adjacent files (386 pass, 0 fail); eslint clean on all touched files; no git.
+### Step 15: DOCUMENT — [x] module headers rewritten to state the REAL guarantee and its honest limits (approval-ledger, PreToolUse.Bash, human-gate-check, ledger-backfill).
+### Step 16: FINAL-REVIEW — [x] report returned with the honest residual-bypass list.
 
 ## Decisions Taken Under Ambiguity
-(Executor fills in.)
+
+- **Items 4 & 7-deploy-ready SKIPPED (actions.js is owned by a concurrent executor).** Item 4's `plan_basename` into `stampAndLedger` and item 7's `recordDeployReadyNotice` atomic write both live in `src/lib/actions.js`, which the coordinator re-scoped to the concurrent slice. The case-collision GUARD (persistEntry) and `plan_basename` support on `writePipelineEntry` are live and tested here; only the actions.js call-site wiring is deferred. Follow-up for the actions.js slice: pass `plan_basename: path.basename(planPath).replace(/\.md$/,'')` into the `writeEntry` call inside `stampAndLedger`, and make `recordDeployReadyNotice` write temp+rename.
+
+- **The ledger deny is a NARROW static gate, not a sandbox (item 1).** It denies (a) any non-read command whose text names `.ctoc/approvals`, and (b) INLINE EVAL (`node`/`deno`/`bun`/`ts-node`/`tsx` with `-e`/`--eval`/`-p`/eval-subcommand/stdin) that names the ledger module, the ledger dir, a gate/ledger verb, contains a command substitution, or a non-literal `require()` arg. It deliberately does NOT deny `node file.js` (a checked-in, reviewable artifact) — that is the point of the sanctioned `ledger-backfill.js`. Broadening to all `node -e` would break every menu recipe (a CRITICAL regression), so the deny is intentionally scoped.
+
+- **Vision archives get a PIPELINE-kind entry, not an exemption (item 3).** `writeVisionArchiveEntry` (evidence `vision-decomposed`, stage vision→done) is the earned residency. The archiving call site `vision-decomposer.completeVision` (NOT in this slice's files) must call it immediately before `movePlan(visionPath,'done')`; until then, `ledger-backfill.js --vision` (menu-referenced, idempotent) ledgers archives. FOLLOW-UP for the vision-decomposer slice: add that one call. The duplicate `type: vision` exemption in `iron-loop-enforcer.js:349` is a separate ADVISORY self-check (out of scope) — flagged for Round 6, unchanged here.
+
+- **entryKind gained a third kind `'backfilled'` (item 5).** A backfilled entry is ACCEPTED at the gate (the human ordered the migration) but classified honestly as `'backfilled'`, never `'human'`, so an audit distinguishes a migration from a live approval. `classifyResidency` now returns `kind` on every verdict.
+
+- **Pre-existing reader limitation surfaced (item 6, NOT fixed — out of scope).** `regulatory-regime.js:177` anchors the regulatory_regime block body on a FOLLOWING top-level key, so a settings.yaml whose regulatory_regime block is LAST cannot be parsed by the reader of record. `declineComplianceRegime`'s scoped-region fix is correct for real settings files (other blocks always follow); documented in the test.

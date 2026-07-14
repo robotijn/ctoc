@@ -1,0 +1,10 @@
+{
+  "content_sha256": "6e92cd74ee83c6cf50438e82882b2e1b2e8dd601b6da90d39d4e4348b22790e8",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T07:46:23.551Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: coordinator wrote approved_by:human into R4 plan frontmatter directly instead of crossing Gate 2 via approvePlan (forged marker). WORK ordered by the human; provenance path was wrong. Recorded as backfilled.",
+  "plan_basename": "ctoc-v7-opus-47-modernization"
+}

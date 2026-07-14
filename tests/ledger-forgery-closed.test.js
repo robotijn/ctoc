@@ -1,0 +1,504 @@
+'use strict';
+
+/**
+ * R3-A — THE FORGERY TEST.
+ *
+ * The approval ledger's header claims agent writes to `.ctoc/approvals/` are
+ * DENIED. Before this slice that claim was FALSE: the deny lived only in
+ * PreToolUse.Edit.js, while PreToolUse.Bash.js never mentioned `.ctoc/approvals`
+ * and its ALWAYS_ALLOWED list matched /^\s*node\s+/ FIRST — so
+ *
+ *     node -e "require('./src/lib/approval-ledger').writeEntry(...)"
+ *
+ * minted a human-kind approval entry for any plan and forged Gate 2 or Gate 3.
+ * A `cat > .ctoc/approvals/x.json` did the same with no node at all.
+ *
+ * These tests SPAWN THE REAL HOOK PROCESS (never a re-implemented regex) and
+ * assert the REAL harness deny signal (`hookSpecificOutput.permissionDecision`
+ * === "deny" on stdout, exit 2 — src/lib/hook-deny-signal.js). The counterpart
+ * assertion is just as load-bearing: EVERY `node -e` recipe extracted VERBATIM
+ * from src/commands/menu.md must still be ALLOWED — a false positive that breaks
+ * a menu recipe is a CRITICAL regression, so the recipes are parsed out of the
+ * live file rather than copied into the test (they cannot drift apart).
+ *
+ * State is planted at step 10 with a feature, so the write/commit gates would
+ * ALLOW every command here: any deny observed is the ledger guard, nothing else.
+ */
+
+const { test, describe, beforeEach, afterEach } = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
+
+const REPO = path.resolve(__dirname, '..');
+const HOOK = path.join(REPO, 'src', 'hooks', 'PreToolUse.Bash.js');
+const MENU_MD = path.join(REPO, 'src', 'commands', 'menu.md');
+const stateManager = require(path.join(REPO, 'src', 'lib', 'state-manager'));
+
+const ledger = require('../src/lib/approval-ledger');
+const gate = require('../src/hooks/human-gate-check.js');
+const compliance = require('../src/lib/compliance-regime');
+const staleDetector = require('../src/lib/stale-detector');
+const backfill = require('../src/scripts/ledger-backfill.js');
+
+// --- hermetic project + signed state ----------------------------------------
+
+let project;
+
+function makeProject() {
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-r3a-')));
+  fs.mkdirSync(path.join(dir, '.ctoc', 'approvals'), { recursive: true });
+  fs.mkdirSync(path.join(dir, '.ctoc', 'state'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# CTOC Project Instructions\n');
+  for (const stage of ['vision', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done']) {
+    fs.mkdirSync(path.join(dir, 'plans', stage), { recursive: true });
+  }
+  return dir;
+}
+
+function cleanupProject(dir) {
+  if (!dir) return;
+  try { fs.rmSync(stateManager.getStatePath(dir), { force: true }); } catch { /* none */ }
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+/** Plant valid signed state: step 10, feature set ⇒ write + commit gates allow. */
+function setState(step = 10, feature = 'r3a-forgery-test') {
+  const state = stateManager.createState(project, feature, 'javascript', null);
+  state.currentStep = step;
+  stateManager.saveState(project, state);
+}
+
+/** Run the REAL hook with `command` on STDIN (the harness's real transport). */
+function runHook(command) {
+  return spawnSync(process.execPath, [HOOK], {
+    cwd: project,
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }),
+    env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
+    encoding: 'utf8',
+  });
+}
+
+/**
+ * The deny decision on stdout, or null when the hook ALLOWED the command.
+ * The hook writes its human banner to STDERR and ONLY the decision JSON to STDOUT
+ * (src/lib/hook-deny-signal.js), so stdout is parsed from its FIRST `{` — an allow
+ * is exit-0-silent with no JSON at all.
+ */
+function denyOf(res) {
+  const out = String(res.stdout || '');
+  const start = out.indexOf('{');
+  if (start === -1) return null;
+  try {
+    const parsed = JSON.parse(out.slice(start));
+    const d = parsed && parsed.hookSpecificOutput;
+    return d && d.permissionDecision === 'deny' ? d : null;
+  } catch { return null; }
+}
+
+const assertDenied = (command, why) => {
+  const d = denyOf(runHook(command));
+  assert.ok(d, `FORGERY NOT BLOCKED (${why}): ${command}`);
+  return d;
+};
+
+const assertAllowed = (command, why) => {
+  const res = runHook(command);
+  const d = denyOf(res);
+  assert.equal(d, null,
+    `FALSE POSITIVE — legitimate command denied (${why}): ${command}\n  reason: ${d && d.permissionDecisionReason}`);
+};
+
+/** Every `node -e "…"` recipe VERBATIM from menu.md (parsed from the live file). */
+function menuRecipes() {
+  const md = fs.readFileSync(MENU_MD, 'utf8');
+  const out = [];
+  const re = /`(node\s+-e\s+"[^`]*")`/g;
+  let m;
+  while ((m = re.exec(md)) !== null) out.push(m[1]);
+  return out;
+}
+
+beforeEach(() => { project = makeProject(); setState(10); });
+afterEach(() => { cleanupProject(project); project = null; });
+
+// =============================================================================
+// 1. THE FORGERY — inline evaluation that reaches the ledger
+// =============================================================================
+
+describe('R3-A item 1 — Bash parity: the ledger forgery is DENIED', () => {
+  const FORGE = `node -e "require('./src/lib/approval-ledger').writeEntry('x',{content_sha256:'a',stage_from:'review',stage_to:'done'},process.cwd())"`;
+
+  test('the exact forging command is denied, and the deny names the sanctioned path', () => {
+    const d = assertDenied(FORGE, 'canonical node -e ledger write');
+    assert.match(d.permissionDecisionReason, /ledger-backfill/,
+      'the deny message must name the sanctioned writer (src/scripts/ledger-backfill.js)');
+  });
+
+  test('every inline-eval variant of the forgery is denied', () => {
+    const variants = [
+      `node --eval "require('./src/lib/approval-ledger').writeEntry('x',{},'.')"`,
+      `node -p "require('./src/lib/approval-ledger').writeEntry('x',{},'.')"`,
+      `node --print "require('./src/lib/approval-ledger').backfillEntry('.','plans/done/x.md',{stage_to:'done'})"`,
+      `node  -e  "require('./src/lib/approval-ledger').writeEntry('x',{},'.')"`,   // double space
+      `env node -e "require('./src/lib/approval-ledger').writeEntry('x',{},'.')"`,
+      `/usr/bin/node -e "require('./src/lib/approval-ledger').writeEntry('x',{},'.')"`,
+      `bash -c "node -e \\"require('./src/lib/approval-ledger').writeEntry('x',{},'.')\\""`,
+      `echo "require('./src/lib/approval-ledger').writeEntry('x',{},'.')" | node`,
+      `node <<'EOF'\nrequire('./src/lib/approval-ledger').writeEntry('x',{},'.')\nEOF`,
+      `cd /tmp && node -e "require('./src/lib/approval-ledger').writeEntry('x',{},'.')"`,
+      `node -e 'require("./src/lib/approval-ledger").writeEntry("x",{},".")'`,       // single-quoted
+      `node -e "require('./src/lib/approval-ledger.js').writeEntry('x',{},'.')"`,    // .js suffix
+      `node -e "require('${'$'}{PWD}/src/lib/approval-ledger').writeEntry('x',{},'.')"`,
+    ];
+    for (const v of variants) assertDenied(v, 'inline-eval forgery variant');
+  });
+
+  test('inline eval that writes the ledger directory directly is denied', () => {
+    assertDenied(
+      `node -e "require('fs').writeFileSync('.ctoc/approvals/x.json','{}')"`,
+      'inline eval writing the ledger path with fs',
+    );
+  });
+
+  test('inline eval that crosses a gate through actions is denied', () => {
+    assertDenied(
+      `node -e "require('./src/lib/actions').approvePlan('todo/x.md', process.cwd())"`,
+      'node -e approvePlan forges the gate crossing itself',
+    );
+    assertDenied(
+      `node -e "require('./src/lib/actions').approveSubplans('p','review')"`,
+      'node -e approveSubplans batch-crosses Gate 3',
+    );
+  });
+
+  test('inline eval that cannot be statically cleared is denied (obfuscation)', () => {
+    const opaque = [
+      `node -e "$(cat /tmp/payload.js)"`,                         // command substitution
+      'node -e "`cat /tmp/payload.js`"',                          // backtick substitution
+      `node -e "require('./src/lib/approval-' + 'ledger').writeEntry('x',{},'.')"`, // split token
+      `echo cmVxdWlyZQ== | base64 -d | node`,                     // base64 into node
+      `echo cmVxdWlyZQ== | base64 --decode | bash`,               // base64 into bash
+    ];
+    for (const c of opaque) assertDenied(c, 'unstatically-clearable inline eval');
+  });
+});
+
+// =============================================================================
+// 2. Raw file writes to the ledger directory
+// =============================================================================
+
+describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
+  test('redirect / tee / cp / mv / sed / python forgeries are denied', () => {
+    const writes = [
+      `cat > .ctoc/approvals/x.json`,
+      `echo '{"approved_by":"human"}' > .ctoc/approvals/x.json`,
+      `echo '{}' >> .ctoc/approvals/x.json`,
+      `echo '{}' | tee .ctoc/approvals/x.json`,
+      `cp /tmp/forged.json .ctoc/approvals/x.json`,
+      `mv /tmp/forged.json .ctoc/approvals/x.json`,
+      `sed -i s/a/b/ .ctoc/approvals/x.json`,
+      `python3 -c "open('.ctoc/approvals/x.json','w').write('{}')"`,
+      `touch .ctoc/approvals/x.json`,
+      `rm .ctoc/approvals/x.json`,
+      `printf '{}' > "./.ctoc/approvals/x.json"`,                 // quoted + ./ prefix
+      `echo '{}' > .ctoc"/"approvals/x.json`,                     // quote-split path
+      `install -m 644 /tmp/f.json .ctoc/approvals/x.json`,
+      `mkdir -p .ctoc/approvals && cp /tmp/f.json .ctoc/approvals/`,
+    ];
+    for (const w of writes) assertDenied(w, 'raw ledger write');
+  });
+
+  test('read-only inspection of the ledger stays ALLOWED', () => {
+    fs.writeFileSync(path.join(project, '.ctoc', 'approvals', 'x.json'), '{}');
+    assertAllowed('cat .ctoc/approvals/x.json', 'reading a ledger entry is not forgery');
+    assertAllowed('ls .ctoc/approvals', 'listing the ledger is not forgery');
+    assertAllowed('grep -rn stage_to .ctoc/approvals', 'grepping the ledger is not forgery');
+  });
+});
+
+// =============================================================================
+// 3. NO COLLATERAL DAMAGE — every real menu.md recipe still works
+// =============================================================================
+
+describe('R3-A item 1 — no false positives (menu.md recipes must survive)', () => {
+  test('menu.md contains node -e recipes to check (the guard-rail is real)', () => {
+    assert.ok(menuRecipes().length >= 5,
+      'expected the menu.md node -e recipes to be parsed; a zero count would make this suite vacuous');
+  });
+
+  test('EVERY node -e recipe in menu.md is ALLOWED, verbatim', () => {
+    for (const recipe of menuRecipes()) assertAllowed(recipe, 'menu.md recipe');
+  });
+
+  test('the sanctioned backfill script is ALLOWED', () => {
+    assertAllowed('node src/scripts/ledger-backfill.js --vision', 'sanctioned ledger writer');
+    assertAllowed('node "${CLAUDE_PLUGIN_ROOT}/src/scripts/ledger-backfill.js" --plan plans/done/x.md --stage done --reason legacy',
+      'sanctioned ledger writer, plugin-root form');
+  });
+
+  test('ordinary development commands are ALLOWED', () => {
+    assertAllowed('node --test tests/approval-ledger.test.js', 'a test file named after the ledger is not a forgery');
+    assertAllowed('node src/commands/menu.js', 'the menu itself');
+    assertAllowed('npm test', 'npm');
+    assertAllowed('git status', 'git status');
+  });
+});
+
+// =============================================================================
+// 4. item 3 — the vision exemption is GONE; done/ residency is ledger-driven
+// =============================================================================
+
+describe('R3-A item 3 — vision exemption killed', () => {
+  const visionPlan = (slug) => {
+    const p = path.join(project, 'plans', 'done', `${slug}.md`);
+    fs.writeFileSync(p, `---\ntype: vision\nstatus: decomposed\n---\n\n# ${slug}\n`);
+    return p;
+  };
+
+  test('a type: vision plan squatting in done/ with NO ledger entry is FLAGGED', () => {
+    visionPlan('squatted-vision');
+    const flagged = gate.checkFolder('done', project).map(v => v.file);
+    assert.ok(flagged.includes('squatted-vision.md'),
+      'the vision exemption let any agent squat done/ with one frontmatter line — it must be gone');
+  });
+
+  test('the isVisionExempt escape hatch no longer exists on the module', () => {
+    assert.equal(typeof gate.isVisionExempt, 'undefined',
+      'isVisionExempt must be removed from the acceptance path entirely');
+  });
+
+  test('a decomposed vision WITH a pipeline entry is ACCEPTED', () => {
+    const p = visionPlan('ledgered-vision');
+    ledger.writeVisionArchiveEntry(project, p);
+    const flagged = gate.checkFolder('done', project).map(v => v.file);
+    assert.ok(!flagged.includes('ledgered-vision.md'),
+      'a vision archive vouched for by a pipeline-kind ledger entry occupies done/ legitimately');
+  });
+
+  test('the vision archive entry is pipeline-kind and carries vision-decomposed evidence', () => {
+    const p = visionPlan('evidence-vision');
+    const entry = ledger.writeVisionArchiveEntry(project, p);
+    assert.equal(entry.advanced_by, 'pipeline');
+    assert.equal(entry.evidence, 'vision-decomposed');
+    assert.equal(entry.stage_from, 'vision');
+    assert.equal(entry.stage_to, 'done');
+    assert.equal(ledger.entryKind(entry), 'pipeline');
+  });
+
+  test('an EDITED vision archive is flagged again (invalidate-on-edit still holds)', () => {
+    const p = visionPlan('edited-vision');
+    ledger.writeVisionArchiveEntry(project, p);
+    fs.appendFileSync(p, '\nforged extra line\n');
+    const flagged = gate.checkFolder('done', project).map(v => v.file);
+    assert.ok(flagged.includes('edited-vision.md'), 'done/ stays hash-sensitive for vision archives too');
+  });
+});
+
+// =============================================================================
+// 5. item 2 — the sanctioned backfill script (argv-driven, no eval)
+// =============================================================================
+
+describe('R3-A item 2 — ledger-backfill.js', () => {
+  test('--vision ledgers every un-ledgered decomposed vision archive in done/', () => {
+    fs.writeFileSync(path.join(project, 'plans', 'done', 'v1.md'), '---\ntype: vision\nstatus: decomposed\n---\n\nbody\n');
+    fs.writeFileSync(path.join(project, 'plans', 'done', 'v2.md'), '---\ntype: vision\n---\n\nbody\n');
+    fs.writeFileSync(path.join(project, 'plans', 'done', 'code.md'), '---\ntype: implementation\n---\n\nbody\n');
+
+    const res = backfill.run(['--vision', '--root', project]);
+    assert.equal(res.ok, true);
+    assert.deepEqual(res.ledgered.sort(), ['v1', 'v2'], 'only type: vision archives are ledgered');
+
+    assert.equal(ledger.entryKind(ledger.readEntry('v1', project)), 'pipeline');
+    assert.equal(ledger.readEntry('code', project), null, 'a code plan is never auto-ledgered');
+
+    const flagged = gate.checkFolder('done', project).map(v => v.file);
+    assert.ok(!flagged.includes('v1.md') && !flagged.includes('v2.md'), 'the migrated archives are accepted');
+    assert.ok(flagged.includes('code.md'), 'a bare code plan in done/ is still a violation');
+  });
+
+  test('--vision is idempotent (a re-run does not clobber or throw)', () => {
+    fs.writeFileSync(path.join(project, 'plans', 'done', 'v1.md'), '---\ntype: vision\n---\n\nbody\n');
+    backfill.run(['--vision', '--root', project]);
+    const first = ledger.readEntry('v1', project);
+    const res = backfill.run(['--vision', '--root', project]);
+    assert.equal(res.ok, true);
+    assert.deepEqual(res.ledgered, [], 'an already-ledgered archive is skipped');
+    assert.deepEqual(ledger.readEntry('v1', project), first, 'the existing entry is untouched');
+  });
+
+  test('--plan/--stage backfills one legacy plan as a human-kind BACKFILLED entry', () => {
+    const p = path.join(project, 'plans', 'done', 'legacy.md');
+    fs.writeFileSync(p, '---\ntype: implementation\n---\n\nbody\n');
+    const res = backfill.run(['--plan', p, '--stage', 'done', '--reason', '2026-07-14 legacy migration', '--root', project]);
+    assert.equal(res.ok, true);
+    const entry = ledger.readEntry('legacy', project);
+    assert.equal(entry.backfilled, true);
+    assert.equal(entry.backfill_reason, '2026-07-14 legacy migration');
+    assert.ok(!gate.checkFolder('done', project).map(v => v.file).includes('legacy.md'));
+  });
+
+  test('bad argv fails LOUDLY (never a silent no-op)', () => {
+    const res = backfill.run(['--plan', path.join(project, 'plans', 'done', 'nope.md'), '--stage', 'done', '--root', project]);
+    assert.equal(res.ok, false);
+    assert.match(res.error, /nope\.md|ENOENT|not found/i);
+
+    const noMode = backfill.run(['--root', project]);
+    assert.equal(noMode.ok, false, 'no mode selected must be an error, not a silent success');
+  });
+
+  test('the script contains NO eval surface', () => {
+    const src = fs.readFileSync(path.join(REPO, 'src', 'scripts', 'ledger-backfill.js'), 'utf8');
+    assert.ok(!/\beval\s*\(|new Function\s*\(/.test(src), 'the sanctioned writer must be argv-driven, never eval-driven');
+  });
+
+  test('menu.md references the script (instruction-surface reachability root)', () => {
+    const md = fs.readFileSync(MENU_MD, 'utf8');
+    assert.match(md, /src\/scripts\/ledger-backfill\.js/, 'the sanctioned writer must be reachable from the menu');
+  });
+});
+
+// =============================================================================
+// 6. item 5 — backfilled ≠ human at the gate (honest classification)
+// =============================================================================
+
+describe('R3-A item 5 — the backfilled kind is honest', () => {
+  test('entryKind reports backfilled, pipeline, human distinctly', () => {
+    assert.equal(ledger.entryKind({ approved_by: 'human' }), 'human');
+    assert.equal(ledger.entryKind({ approved_by: 'human', backfilled: true }), 'backfilled');
+    assert.equal(ledger.entryKind({ advanced_by: 'pipeline', evidence: 'x' }), 'pipeline');
+    assert.equal(ledger.entryKind(null), null);
+  });
+
+  test('classifyResidency accepts a backfilled entry but REPORTS its real kind', () => {
+    const p = path.join(project, 'plans', 'done', 'migrated.md');
+    fs.writeFileSync(p, '---\ntype: implementation\n---\n\nbody\n');
+    ledger.backfillEntry(project, p, { stage_to: 'done', reason: 'legacy' });
+
+    const verdict = gate.classifyResidency(p, 'done', project);
+    assert.equal(verdict.accepted, true, 'the human ordered the migration — acceptance is not weakened');
+    assert.equal(verdict.kind, 'backfilled', 'but an audit can tell a migrated entry from a live human approval');
+  });
+
+  test('a live human approval classifies as human, not backfilled', () => {
+    const p = path.join(project, 'plans', 'todo', 'live.md');
+    const content = '---\ntype: implementation\n---\n\nbody\n';
+    fs.writeFileSync(p, content);
+    ledger.writeEntry('live', {
+      content_sha256: ledger.computeContentHash(content),
+      stage_from: 'implementation',
+      stage_to: 'todo',
+    }, project);
+    const verdict = gate.classifyResidency(p, 'todo', project);
+    assert.equal(verdict.accepted, true);
+    assert.equal(verdict.kind, 'human');
+  });
+});
+
+// =============================================================================
+// 7. item 4 (partial) — the case-collision guard fires on the write path
+// =============================================================================
+
+describe('R3-A item 4 — case-collision guard', () => {
+  test('two case-differing plans collide on the canonical key and the write THROWS', () => {
+    const a = path.join(project, 'plans', 'done', 'Collide-Me.md');
+    const b = path.join(project, 'plans', 'done', 'collide-me.md');
+    fs.writeFileSync(a, 'a\n');
+    ledger.backfillEntry(project, a, { stage_to: 'done', reason: 'legacy' });
+    fs.writeFileSync(b, 'b\n');
+    assert.throws(() => ledger.backfillEntry(project, b, { stage_to: 'done', reason: 'legacy' }),
+      /slug collision/i, 'a silent overwrite would erase one plan’s provenance');
+  });
+
+  test('a pipeline entry carrying plan_basename is collision-guarded too', () => {
+    ledger.writePipelineEntry('dup', {
+      content_sha256: 'a'.repeat(64), stage_from: 'vision', stage_to: 'done',
+      evidence: 'vision-decomposed', plan_basename: 'Dup',
+    }, project);
+    assert.throws(() => ledger.writePipelineEntry('dup', {
+      content_sha256: 'b'.repeat(64), stage_from: 'vision', stage_to: 'done',
+      evidence: 'vision-decomposed', plan_basename: 'dup',
+    }, project), /slug collision/i);
+  });
+});
+
+// =============================================================================
+// 8. item 6 — compliance charset gate + scoped declined regex
+// =============================================================================
+
+describe('R3-A item 6 — compliance profile hardening', () => {
+  const SETTINGS = `general:\n  environment: dev\nenforcement:\n  mode: strict\nregulatory_regime:\n  active_profiles: []\noperations:\n  x: 1\n`;
+  const settingsPath = () => path.join(project, '.ctoc', 'settings.yaml');
+
+  test('a profile name outside the closed charset is REFUSED and nothing is written', () => {
+    fs.writeFileSync(settingsPath(), SETTINGS);
+    const before = fs.readFileSync(settingsPath(), 'utf8');
+
+    const res = compliance.writeActiveProfiles(project, ['x]\nenforcement:\n  mode: off']);
+    assert.equal(res.ok, false, 'a YAML-injecting profile name must be refused');
+    assert.ok(res.error, 'the refusal names the offending value');
+    assert.equal(fs.readFileSync(settingsPath(), 'utf8'), before,
+      'settings.yaml must be byte-identical on disk — the injection never lands');
+  });
+
+  test('other invalid charsets are refused; the real profiles still write', () => {
+    fs.writeFileSync(settingsPath(), SETTINGS);
+    for (const bad of ['GDPR', 'gdpr profile', '-leading', 'a_b', '../x', 'a,b']) {
+      assert.equal(compliance.writeActiveProfiles(project, [bad]).ok, false, `must refuse ${JSON.stringify(bad)}`);
+    }
+    const ok = compliance.writeActiveProfiles(project, ['gdpr', 'eu-ai-act-high-risk']);
+    assert.equal(ok.ok, true);
+    assert.deepEqual(ok.profiles, ['gdpr', 'eu-ai-act-high-risk']);
+  });
+
+  test('declineComplianceRegime scopes its declined: regex to the regulatory_regime block', () => {
+    // NOTE the trailing `enforcement:` block: the reader of record
+    // (src/lib/regulatory-regime.js:177) anchors its non-greedy block body on a
+    // FOLLOWING top-level key, so a settings.yaml whose regulatory_regime block is
+    // LAST cannot be parsed by it at all. That is a pre-existing limitation of a
+    // file outside this slice's scope (reported, not silently worked around); the
+    // fixture mirrors a real settings.yaml, where other blocks always follow.
+    const withOtherDeclined = `operations:\n  declined: false\nregulatory_regime:\n  active_profiles: []\nenforcement:\n  mode: strict\n`;
+    fs.writeFileSync(settingsPath(), withOtherDeclined);
+
+    const res = compliance.declineComplianceRegime(project);
+    assert.equal(res.ok, true, 'the decline must persist');
+
+    const after = fs.readFileSync(settingsPath(), 'utf8');
+    assert.match(after, /operations:\n {2}declined: false/, 'an unrelated declined: line in another block is UNTOUCHED');
+    assert.match(after, /regulatory_regime:\n(?:.*\n)*?\s*declined: true/, 'the marker lands inside regulatory_regime');
+  });
+
+  test('an existing declined marker inside the block is set true (idempotent)', () => {
+    fs.writeFileSync(settingsPath(), `regulatory_regime:\n  declined: false\n  active_profiles: []\noperations:\n  x: 1\n`);
+    assert.equal(compliance.declineComplianceRegime(project).ok, true);
+    assert.equal(compliance.declineComplianceRegime(project).ok, true, 'idempotent');
+  });
+});
+
+// =============================================================================
+// 9. item 7 — store hardening: the dismissal read is size-gated
+// =============================================================================
+
+describe('R3-A item 7 — oversized dismissal store fails open', () => {
+  test('an oversized store is skipped: no crash, no filtering, the scan still returns candidates', () => {
+    const storePath = path.join(project, '.ctoc', 'state', 'stale-dismissals.json');
+    // > 1 MiB of valid JSON: a size gate must refuse to read it into memory.
+    const dismissed = {};
+    for (let i = 0; i < 60000; i++) dismissed[`review/plan-${i}.md`] = 1234567890123;
+    fs.writeFileSync(storePath, JSON.stringify({ dismissed }));
+    assert.ok(fs.statSync(storePath).size > (1 << 20), 'the fixture must actually be oversized');
+
+    const old = new Date(Date.now() - 90 * 24 * 3600 * 1000);
+    const p = path.join(project, 'plans', 'review', 'ancient.md');
+    fs.writeFileSync(p, '---\ntype: implementation\n---\n\nbody\n');
+    fs.utimesSync(p, old, old);
+
+    let out;
+    assert.doesNotThrow(() => { out = staleDetector.scanCheapCandidates(project); },
+      'an oversized store must never crash the scan');
+    assert.ok(Array.isArray(out.candidates), 'the scan still returns candidates (fail-open = keep nagging)');
+  });
+});

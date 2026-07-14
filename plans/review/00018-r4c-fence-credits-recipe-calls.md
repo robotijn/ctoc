@@ -1,0 +1,157 @@
+---
+iron_loop: true
+approved_by: human
+approved_at: 2026-07-14T21:30:00.000Z
+gate_crossed: implementation → todo
+approval_note: >
+  Gate 2 crossed by the human's standing 2026-07-14 orders ("fix them all",
+  "fix everything", "keep fixing the code"). Integrator finding: R4-B's fence
+  tightening (fenced-code-block-only) over-corrected — it baselined 24 exports
+  as DEAD that are invoked as REAL function calls in menu.md recipes
+  (approveSubplans(parentSlug,'review') — the Gate 3 done-all gate;
+  declineComplianceRegime(); dismissStale(); completeVision()). CTOC recipes use
+  INLINE code, not fenced blocks, so fenced-only misses them. Verified on disk
+  by the coordinator: `approveSubplans(` appears as a call at menu.md:45,46;
+  `completeExecution` appears only as a bare prose name (no paren).
+---
+
+---
+title: "R4-C — The fence credits a CALL, not a fenced block: recipe invocations are live, prose is not"
+type: implementation
+parent_plan: ctoc-background-engine-rebuild
+depends_on: none
+priority: CRITICAL
+program: ctoc-repair-loop
+iron_loop: true
+files:
+  - "src/lib/reachability.js"
+  - ".ctoc/export-reachability-baseline.json"
+  - "tests/export-reachability.test.js"
+  - "tests/reachability.test.js"
+---
+
+# R4-C — A recipe call is a caller; a prose mention is not
+
+R4-B fixed the prose-disarms-the-fence hole by requiring surface mentions to
+be in FENCED code blocks. That over-corrected: CTOC's instruction surfaces
+invoke library functions with INLINE code, not fenced blocks. Verified on disk:
+
+- `approveSubplans(parentSlug, 'review')` — the Gate 3 `done-all` gate, menu.md:46
+- `declineComplianceRegime(process.cwd())` — compliance decline, menu.md:65
+- `dismissStale(process.cwd(), candidates)` — a real `node -e`, menu.md:64
+- `completeVision(visionPath)` — Gate 0 archive, vision-decomposer.md:470
+
+R4-B baselined all four (and 20 siblings) as DEAD. They are NOT dead — they
+are reachable by the documented mechanism (the session model reads the recipe
+and calls the function). A baseline that calls the Gate 3 gate "dead" hides
+exactly the kind of gate-deletion the fence exists to catch.
+
+The distinguishing signal is call syntax, not formatting:
+- LIVE-via-recipe: `name(` (an invocation) or `require('…').name` — the model runs it.
+- NOT a caller: a bare `name` token in prose (`completeTaskPlan → completeExecution`).
+
+`completeExecution` is named in surfaces ONLY as a bare token (never
+`completeExecution(`), so under the correct rule it is STILL credited only by
+its code edge — the R4-B re-catch survives: delete the
+menu-screens→completeTaskPlan→completeExecution code edge and it goes dead even
+though prose names it.
+
+## Implementation Details
+
+1. **Surface credit = invocation, not block.** In `reachability.js`, the
+   instruction-surface usage rule changes from "name appears in a fenced code
+   block" to "name appears as a CALL": a regex match of the export identifier
+   immediately followed by optional whitespace and `(`, OR inside a
+   `require(<string>).<name>` / `require(<string>)[<'name'>]` expression. A bare
+   identifier token (word boundary, not followed by `(`) does NOT count — that
+   is the prose case R4-B correctly rejected. Keep the comment-lexer fix and the
+   file-path/basename rules R4-B added; this changes ONLY the surface-usage
+   predicate for exported NAMES.
+2. **Re-run and re-seed.** After the change, re-run `analyzeExports` and DIFF.
+   The 24 recipe-invoked exports must move OUT of the dead set (they are now
+   credited by their `name(` call). `completeExecution` must STAY live via its
+   code edge (assert it). Any export that is STILL dead (bare-prose-only or no
+   caller at all) stays baselined. Lower `maxDead` to the new true count and
+   record the diff in the baseline provenance.
+3. **The re-catch must survive — prove it.** A test fixture: an export named in
+   a surface as a bare token (no paren) AND with no code caller → DEAD; the same
+   export invoked as `name(` in a surface → LIVE. This is the exact
+   completeExecution-vs-prose distinction; if it does not hold, the rule is
+   wrong.
+
+### Wiring — the live call sites (MANDATORY)
+`analyzeExports` is already consumed by `tests/export-reachability.test.js` (the
+ratchet) and `iron-loop-enforcer.js checkDeadExportFence` (READ-ONLY here — do
+not edit it). No new export.
+
+### Test Plan (TDD-Red first)
+export-reachability.test.js / reachability.test.js:
+- A prose-only bare-token mention → DEAD (unchanged from R4-B; must stay).
+- A `name(` call in an INLINE-code recipe (single backticks, not fenced) → LIVE
+  (fails today under fenced-only).
+- A `require('./x').name` reference in a recipe → LIVE.
+- `completeExecution`: live via code edge; delete the intra-file call in the
+  fixture + leave the prose bare mention → DEAD (re-catch preserved).
+- The real repo: `approveSubplans`, `declineComplianceRegime`, `dismissStale`,
+  `completeVision` are all LIVE (not in the baseline). Assert by name — a
+  regression that re-buries the Gate 3 gate as dead must fail this test.
+- Baseline count moved only DOWN vs R4-B's 126; the ratchet stays honest.
+
+## Execution Plan (Steps 8-16)
+### Step 8: TEST — write the tests, run ONLY the two named files, record red.
+### Step 9: PREPARE — read reachability.js in full (R4-B's current version on
+disk), and grep menu.md/agents for the call-syntax vs prose forms so the regex
+matches reality, not a guess.
+### Step 10: IMPLEMENT — item 1; re-seed the baseline (item 2).
+### Step 11: REVIEW — DIFF the dead set before/after; every export that left
+the dead set must have a real `name(` or `require().name` in a surface or code
+(list them); every export that stayed must be genuinely caller-less.
+### Step 12: OPTIMIZE — one pass over surfaces; regex only.
+### Step 13: SECURE — the regex must not be ReDoS-prone (bounded, no nested
+quantifier over untrusted-length input); surfaces are repo files but keep it
+linear.
+### Step 14: VERIFY — node --test on the two files + eslint; no git.
+### Step 15: DOCUMENT — reachability.js header states the rule precisely: a
+surface CALL (`name(` / `require().name`) is a caller; a bare prose token is
+not; a test is never a caller.
+### Step 16: FINAL-REVIEW — report: the before/after dead diff, the four gate
+exports proven live, the re-catch fixture proving completeExecution still dies
+when its code edge is cut.
+
+## Decisions Taken Under Ambiguity
+
+1. **Full-text surface scan, no fenced/inline gating.** The new predicate scans
+   the entire surface text for call syntax rather than restricting to code spans.
+   Rationale: over-crediting a name as live is the fence's SAFE bias (it never
+   cries wolf; the forbidden direction is a false DEAD). A prose sentence that
+   happens to contain `name (` reads as a caller — acceptable. The one name that
+   MUST stay dead, `completeExecution`, is safe regardless: its surface mentions
+   are `` `completeExecution` (`src/lib/actions.js`) `` — a backtick sits between
+   the identifier and the paren, so `name\s*\(` does not match. Verified.
+2. **`src/lib/ui.js#doctor` revealed as pre-existing dead → baselined as debt.**
+   R4-B falsely credited `doctor` LIVE via unrelated fenced tokens (`clinic
+   doctor`, `mix doctor` in skill docs). Under call syntax that false credit is
+   gone, exposing `doctor` (a UI formatter with zero callers — `doctor(` is only
+   its own definition; `app.doctorInput` is an unrelated input buffer). It is
+   genuine pre-existing debt, not a regression I introduced. Wiring/deleting it
+   would touch `ui.js`/`menu.js`, outside this plan's touch-scope, so it is
+   recorded in the baseline with provenance and FLAGGED TO THE HUMAN for wiring
+   or deletion. Net count still drops 126 → 104 (ratchet honored).
+3. **Separate require-property regex from the call regex.** `require('./x').name`
+   without an immediate paren (`const f = require('./x').name; f()`) is a real
+   reference the recipe runs; the `name(` regex alone would miss it, so a
+   dedicated `require('…').name` / `require('…')['name']` pattern credits it.
+4. **23 exports left the dead set, not the plan's estimated "24".** The estimate
+   was pre-count; the true set credited by call syntax is 23 (each with a verified
+   surface `name(` or `require().name` site). Plus `doctor` revealed → 104.
+
+## Execution Status (Steps 8–16) — COMPLETE
+- [x] Step 8 TEST — 5 R4-C tests written; ran red (INLINE call, require().name, RE-CATCH call-half, REAL REPO failed; BARE-prose→DEAD passed as designed).
+- [x] Step 9 PREPARE — read reachability.js in full; grepped surfaces for real call forms (`approveSubplans(`, `s.dismissStale(`, `require('…').writeActiveProfiles(`, bare `` `completeExecution` ``).
+- [x] Step 10 IMPLEMENT — replaced `surfaceExecutableTokens` (fenced-block membership) with `surfaceCalledNames` (call syntax: `name(` + require-property); re-seeded baseline 126 → 104.
+- [x] Step 11 REVIEW — diffed dead set; 23 left (all with verified surface call sites), 1 (`doctor`) genuinely dead & baselined; completeExecution re-catch preserved.
+- [x] Step 12 OPTIMIZE — single pass per surface file, three precompiled global regexes.
+- [x] Step 13 SECURE — regexes bounded/linear (disjoint char classes, quote-delimited strings, no nested quantifiers) → ReDoS-safe.
+- [x] Step 14 VERIFY — `node --test` both named files: 21 pass, 0 fail, 0 skipped; eslint clean; consumers (iron-loop-enforcer, actions-dead-exports-guard) 27 pass.
+- [x] Step 15 DOCUMENT — header "WHAT COUNTS AS A CALLER" rule 3 + `surfaceCalledNames` doc state the call-vs-citation rule precisely.
+- [x] Step 16 FINAL-REVIEW — before/after diff, four gate exports proven live by name, completeExecution re-catch proven, in the executor report.

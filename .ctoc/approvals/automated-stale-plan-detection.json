@@ -1,0 +1,10 @@
+{
+  "content_sha256": "7ec38ce07b8124c45fc28de096d9c8dfe05567d077fbafba389c2d7f76117965",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-14T07:46:23.550Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: coordinator wrote approved_by:human into R4 plan frontmatter directly instead of crossing Gate 2 via approvePlan (forged marker). WORK ordered by the human; provenance path was wrong. Recorded as backfilled.",
+  "plan_basename": "automated-stale-plan-detection"
+}

@@ -169,26 +169,27 @@ When `ctoc push` is run:
 
 ## Configuration
 
-Control push behavior in `.ctoc/quality-config.yaml`:
+Pushing is a **human ship gate**. CTOC NEVER pushes on its own unless you
+explicitly open the gate. There is exactly ONE key that controls it, read only via
+`settings.isAutoPushEnabled()`:
 
-```yaml
-push:
-  # Auto-push after successful quality checks
-  autoPush: true  # Set to false for manual-only
-
-  # Remote to push to
-  remote: origin
-
-  # Branch to push (null = current branch)
-  branch: null
-
-  # Allow push with Tier 2 warnings
-  allowWarnings: false
-
-  # Retry on transient failures
-  retryCount: 2
-  retryDelay: 5000  # ms
+```json
+// .ctoc/settings.json
+{
+  "git": {
+    "autoPushEnabled": false   // default. CTOC commits locally but never pushes.
+  }
+}
 ```
+
+- **`git.autoPushEnabled: false` (default)** — CTOC commits plan state locally
+  (reversible) but NEVER pushes. You ship with `/ctoc:push`.
+- **`git.autoPushEnabled: true`** — you have opted in; the machine push paths
+  (post-commit hook, sync timer, dashboard sync) may push.
+
+No environment profile (`dev`/`staging`/`prod`) may set this to `true` — opening a
+ship gate is the human's act alone. There is no `push.autoPush` key: earlier docs
+described one, but no code ever read it (it was a placebo). Ignore any such key.
 
 ---
 

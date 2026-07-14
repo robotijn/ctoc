@@ -1,0 +1,10 @@
+{
+  "content_sha256": "8e57d8a0d37aac291adb4b123928ab848a33cd5067a2ab50c17e0dc8c3e37cc2",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T07:46:23.533Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: coordinator wrote approved_by:human into R4 plan frontmatter directly instead of crossing Gate 2 via approvePlan (forged marker). WORK ordered by the human; provenance path was wrong. Recorded as backfilled.",
+  "plan_basename": "00018-r4c-fence-credits-recipe-calls"
+}
