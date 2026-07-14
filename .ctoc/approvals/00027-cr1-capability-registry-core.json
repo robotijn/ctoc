@@ -1,0 +1,10 @@
+{
+  "content_sha256": "c948f0c2f22f43c53f7155b458073533020b34f1d5d4e04f1bf428a28e76b6f7",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T09:36:03.854Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-15 CR1/R7-A: coordinator-staged plan; ledger provenance backfilled (work human-ordered).",
+  "plan_basename": "00027-cr1-capability-registry-core"
+}

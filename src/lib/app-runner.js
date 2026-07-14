@@ -38,6 +38,7 @@ const path = require('path');
 const safeFs = require('./safe-fs');
 const { FrameworkDetector } = require('./framework-detector');
 const { setupPlaywright } = require('./playwright-scaffolder');
+const capabilityRegistry = require('./capability-registry');
 
 /**
  * Default wall-clock budget for launching and driving an app (ms).
@@ -99,6 +100,103 @@ function detectAppShape(projectPath) {
   if (scripts.dev || scripts.start) return 'server';
   if (pkg.main || pkg.exports || pkg.module) return 'library';
   return 'unknown';
+}
+
+/**
+ * Choose the default run shape for a registry language: prefer a genuinely runnable
+ * shape (cli/server), fall back to the honest build-is-last-mile shapes
+ * (mobile/web), else the first shape the language declares.
+ *
+ * @param {string} language - registry language key.
+ * @param {string} projectPath - project root (for a project-local override).
+ * @returns {string|null} the chosen shape, or null when the language declares none.
+ */
+function defaultShapeFor(language, projectPath) {
+  const cap = capabilityRegistry.capabilitiesFor(language, projectPath);
+  const shapes = cap && cap.run && cap.run.shapes && typeof cap.run.shapes === 'object'
+    ? Object.keys(cap.run.shapes)
+    : [];
+  for (const pref of ['cli', 'server', 'mobile', 'web']) {
+    if (shapes.includes(pref)) return pref;
+  }
+  return shapes[0] || null;
+}
+
+/**
+ * Registry-backed detection of a NON-JS run target — the exact gap app-runner's
+ * package.json logic leaves open (a Flutter/Android/Rust project has no
+ * package.json, so `detectAppShape` returns 'unknown'). When the shape is 'unknown',
+ * consult the Capability Registry: if the project matches a language that declares a
+ * run strategy, return that strategy plus the honest build+test last mile.
+ *
+ * This is CR1's LIVE consumer of the registry — the keystone would otherwise be a
+ * dead engine reachable only by its test. It DESCRIBES the run (returns command
+ * strings); it never executes a build/run here (that is CR6).
+ *
+ * @param {string} projectPath - project root.
+ * @returns {{applicable: true, language: string, projectType: string,
+ *   strategy: {command: string, honest: (boolean|string), shape: string},
+ *   lastMile: {build: (string|null), test: (string|null)}}|null} the native run
+ *   target, or null for a JS-shaped or unrecognized project.
+ */
+function detectRunTarget(projectPath) {
+  if (detectAppShape(projectPath) !== 'unknown') return null;
+  const langs = capabilityRegistry.detectLanguages(projectPath);
+  for (const language of langs) {
+    const projectType = defaultShapeFor(language, projectPath);
+    if (!projectType) continue;
+    const strategy = capabilityRegistry.runStrategyFor(language, projectType, projectPath);
+    if (!strategy) continue;
+    const build = capabilityRegistry.toolchainFor(language, 'build', projectPath);
+    const test = capabilityRegistry.toolchainFor(language, 'test', projectPath);
+    return {
+      applicable: true,
+      language,
+      projectType,
+      strategy,
+      lastMile: {
+        build: build && typeof build.cmd === 'string' ? build.cmd : null,
+        test: test && typeof test.cmd === 'string' ? test.cmd : null
+      }
+    };
+  }
+  return null;
+}
+
+/**
+ * Build the HONEST not-applicable result for a registry-detected native/mobile
+ * project. `applicable:false` so it never fails the Step-14 gate (there is no HTTP
+ * endpoint to probe here), but the evidence names the stack and the build-is-last-
+ * mile run strategy — more honest than the old bare "shape could not be determined".
+ * It NEVER claims the app ran.
+ *
+ * @param {ReturnType<typeof detectRunTarget>} target - a non-null run target.
+ * @param {number} [started] - optional start timestamp for durationMs.
+ * @returns {Object} an app-run result with applicable:false and rich evidence.
+ */
+function nativeNotApplicableResult(target, started) {
+  const s = target.strategy;
+  return {
+    applicable: false,
+    launched: false,
+    responded: false,
+    evidence: {
+      shape: 'native',
+      language: target.language,
+      projectType: target.projectType,
+      runCommand: s.command,
+      honest: s.honest,
+      buildCommand: target.lastMile.build,
+      testCommand: target.lastMile.test,
+      reason:
+        `Detected a ${target.language} ${target.projectType} project via the capability ` +
+        `registry. Its honest run last mile is build+test (build: ${target.lastMile.build || 'n/a'}; ` +
+        `test: ${target.lastMile.test || 'n/a'}; run: ${s.command}); executing it is CR6. ` +
+        'Not launched here.'
+    },
+    durationMs: typeof started === 'number' ? Date.now() - started : 0,
+    errors: []
+  };
 }
 
 /**
@@ -407,6 +505,10 @@ async function driveApp(projectPath, opts = {}) {
   const shape = detectAppShape(projectPath);
 
   if (shape === 'library' || shape === 'unknown') {
+    if (shape === 'unknown') {
+      const target = detectRunTarget(projectPath);
+      if (target) return nativeNotApplicableResult(target, started);
+    }
     return {
       applicable: false,
       launched: false,
@@ -448,6 +550,10 @@ function driveAppSync(projectPath, opts = {}) {
   const shape = detectAppShape(projectPath);
 
   if (shape === 'library' || shape === 'unknown') {
+    if (shape === 'unknown') {
+      const target = detectRunTarget(projectPath);
+      if (target) return nativeNotApplicableResult(target);
+    }
     return {
       applicable: false,
       launched: false,
@@ -567,6 +673,7 @@ if (require.main === module && process.argv[2] === '--drive') {
 
 module.exports = {
   detectAppShape,
+  detectRunTarget,
   driveApp,
   driveAppSync,
   scaffoldPlaywright,

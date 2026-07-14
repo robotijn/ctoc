@@ -1,0 +1,395 @@
+'use strict';
+
+/**
+ * THE CAPABILITY REGISTRY — CTOC's single, data-driven source of truth for how to
+ * detect, lint, type-check, test, secure, build and RUN a given language.
+ *
+ * WHY THIS EXISTS. Four detection surfaces (stack-detector, tool-detector,
+ * sast-runner, app-runner) each carried a different, partial, drifting language
+ * table, so "vision → working app" (detect → lint → typecheck → test → security →
+ * run) was real only for the JS/Python slice. This registry is the keystone: ONE
+ * table keyed by language, loaded from `.ctoc/capabilities/languages/*.yaml`, that
+ * all four surfaces will consume (CR5) instead of their local copies. Adding a
+ * language becomes a one-file change.
+ *
+ * THE ENGINE IS DUMB, THE DATA IS SMART. There is NO hardcoded language logic here
+ * — every command lives in the YAML data. This module only loads, detects, and
+ * looks up.
+ *
+ * SECURITY — IT RETURNS COMMANDS, IT NEVER RUNS THEM. A hostile or malformed
+ * `.ctoc/capabilities` file must never be remote code execution. Therefore:
+ *   • every read routes through safe-fs (the audited choke point);
+ *   • this module performs NO dynamic code execution and spawns NO process of any
+ *     kind — a `cmd` from a capability file is an inert STRING the caller may
+ *     choose to run under its own controls, never something this module executes;
+ *   • load() is FAIL-OPEN: a malformed/oversized/hostile entry is SKIPPED and a
+ *     warning is recorded, exactly like task-registry's per-entry fail-open; the
+ *     rest of the registry still loads.
+ *
+ * PROVENANCE. Every seed command is web-grounded (the vision's 2026 anchors) and
+ * carries `verified: web-2026-07`, or is honestly flagged `verified: UNVERIFIED`.
+ * Nothing is ever "guessed".
+ *
+ * MOBILE/DESKTOP RUN IS HONEST. `runStrategyFor` reports `honest: true` for a
+ * genuinely runnable/pollable runtime (a Rust binary, a Go server) and
+ * `honest: 'build-is-last-mile'` for mobile/desktop, where "build succeeds + tests
+ * pass" is the CI-safe last mile and an emulator boot is not CI-reliable — never a
+ * false "it ran".
+ *
+ * Cross-platform: path.join only; safe-fs for all I/O; no shell, no regex-driven
+ * command construction.
+ */
+
+const path = require('path');
+const safeFs = require('./safe-fs');
+
+/**
+ * Defense-in-depth caps on untrusted capability files (a project may drop hostile
+ * files under its own `.ctoc/capabilities`). A file above the size cap, or a
+ * directory with more than the file cap, is treated as untrusted → skipped + warn.
+ */
+const MAX_FILE_BYTES = 64 * 1024;
+const MAX_FILES = 500;
+
+/** The bundled seed data directory, resolved relative to this module (ships with the plugin). */
+function bundledDir() {
+  return path.join(__dirname, '..', '..', '.ctoc', 'capabilities', 'languages');
+}
+
+/** A project-local override directory (a project may add/override languages). */
+function projectDir(projectRoot) {
+  return path.join(projectRoot, '.ctoc', 'capabilities', 'languages');
+}
+
+// ── minimal, zero-dependency YAML subset parser ─────────────────────────────────
+// Handles exactly the shapes the capability files use: 2-space-indented block maps,
+// inline flow maps `{ k: v, k2: "v" }`, inline arrays `[a, b]`, quoted/bare scalars,
+// and `#` comments. It is PURE STRING PARSING — no eval, no code execution — so a
+// hostile file can at worst produce a wrong object (which validation then rejects),
+// never run anything. Mirrors the per-module parsers already in budget.js /
+// regulatory-regime.js (the codebase deliberately ships no runtime YAML library).
+
+/**
+ * Split a string on a delimiter at bracket-depth 0 and outside quotes.
+ * @param {string} str
+ * @param {string} delim single-character delimiter
+ * @returns {string[]}
+ */
+function splitTopLevel(str, delim) {
+  const out = [];
+  let depth = 0;
+  let quote = null;
+  let cur = '';
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (quote) {
+      if (c === '\\' && i + 1 < str.length) { cur += c + str[i + 1]; i++; continue; }
+      if (c === quote) quote = null;
+      cur += c;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; cur += c; continue; }
+    if (c === '[' || c === '{') { depth++; cur += c; continue; }
+    if (c === ']' || c === '}') { depth--; cur += c; continue; }
+    if (c === delim && depth === 0) { out.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+/**
+ * Strip a trailing `#` comment from a line, honoring quotes (a `#` inside a quoted
+ * string is data, not a comment). A `#` only opens a comment at line start or after
+ * whitespace.
+ * @param {string} line
+ * @returns {string}
+ */
+function stripLineComment(line) {
+  let quote = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; continue; }
+    if (c === '#' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
+  }
+  return line;
+}
+
+/**
+ * Index of the first `:` at bracket-depth 0 and outside quotes (the key/value split
+ * point). Returns -1 when there is none.
+ * @param {string} s
+ * @returns {number}
+ */
+function topLevelColon(s) {
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; continue; }
+    if (c === '[' || c === '{') { depth++; continue; }
+    if (c === ']' || c === '}') { depth--; continue; }
+    if (c === ':' && depth === 0) return i;
+  }
+  return -1;
+}
+
+/**
+ * Parse a scalar / inline-array / inline-flow-map value.
+ * @param {string} raw
+ * @returns {*}
+ */
+function parseValue(raw) {
+  const v = raw.trim();
+  if (v === '' || v === 'null' || v === '~') return null;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  if (v.startsWith('{') && v.endsWith('}')) return parseFlowMap(v.slice(1, -1));
+  if (v.startsWith('[') && v.endsWith(']')) return parseFlowArray(v.slice(1, -1));
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    const inner = v.slice(1, -1);
+    if (v[0] === '"') { try { return JSON.parse(v); } catch { return inner; } }
+    return inner;
+  }
+  if (/^-?\d+$/.test(v) || /^-?\d+\.\d+$/.test(v)) return Number(v);
+  return v; // bareword string (e.g. clippy, web-2026-07, Cargo.toml, build-is-last-mile)
+}
+
+/**
+ * Parse the body (no braces) of an inline flow map into an object.
+ * @param {string} body
+ * @returns {Object}
+ */
+function parseFlowMap(body) {
+  const obj = {};
+  const trimmed = body.trim();
+  if (trimmed === '') return obj;
+  for (const piece of splitTopLevel(trimmed, ',')) {
+    const seg = piece.trim();
+    if (seg === '') continue;
+    const ci = topLevelColon(seg);
+    if (ci === -1) continue;
+    const key = seg.slice(0, ci).trim().replace(/^["']|["']$/g, '');
+    obj[key] = parseValue(seg.slice(ci + 1).trim());
+  }
+  return obj;
+}
+
+/**
+ * Parse the body (no brackets) of an inline array into an array.
+ * @param {string} body
+ * @returns {Array}
+ */
+function parseFlowArray(body) {
+  const trimmed = body.trim();
+  if (trimmed === '') return [];
+  return splitTopLevel(trimmed, ',').map((s) => parseValue(s.trim()));
+}
+
+/**
+ * Parse the capability-YAML subset into a plain object. Never executes anything.
+ * @param {string} text
+ * @returns {Object}
+ */
+function parseCapabilityYaml(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map(stripLineComment)
+    .map((l) => l.replace(/\s+$/, ''))
+    .filter((l) => l.trim().length > 0);
+
+  const root = {};
+  const stack = [{ obj: root, indent: -1 }];
+
+  for (const rawLine of lines) {
+    const indent = rawLine.match(/^ */)[0].length;
+    const trimmed = rawLine.trim();
+    const ci = topLevelColon(trimmed);
+    if (ci === -1) continue; // not a key: value line (unsupported shape) → skip
+
+    while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
+    const current = stack[stack.length - 1].obj;
+
+    const key = trimmed.slice(0, ci).trim().replace(/^["']|["']$/g, '');
+    const rawValue = trimmed.slice(ci + 1).trim();
+
+    if (rawValue === '') {
+      const child = {};
+      current[key] = child;
+      stack.push({ obj: child, indent });
+    } else {
+      current[key] = parseValue(rawValue);
+    }
+  }
+  return root;
+}
+
+// ── loading (fail-open, per-entry) ──────────────────────────────────────────────
+
+/**
+ * A parsed capability is VALID only if it names its language and carries a toolchain
+ * object. Anything else (a broken/hostile file) is rejected so load() skips + warns.
+ * @param {*} obj
+ * @returns {boolean}
+ */
+function isValidCapability(obj) {
+  return !!obj
+    && typeof obj === 'object'
+    && typeof obj.language === 'string'
+    && obj.language.trim().length > 0
+    && obj.toolchain
+    && typeof obj.toolchain === 'object';
+}
+
+/**
+ * Read one capabilities directory, folding each valid entry into `languages` (keyed
+ * by its declared language) and recording a warning for each skipped file. FAIL-OPEN
+ * throughout: a missing dir, an unreadable/oversized/malformed/invalid file, or a
+ * directory over the file cap never throws — it degrades to a warning.
+ * @param {string} dir
+ * @param {Object} languages accumulator (mutated) — later dirs override earlier.
+ * @param {Array} warnings accumulator (mutated)
+ */
+function readCapabilityDir(dir, languages, warnings) {
+  let entries;
+  try {
+    if (!safeFs.existsSync(dir)) return;
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+  } catch (err) {
+    warnings.push({ file: dir, message: `unreadable capabilities dir: ${err.message}` });
+    return;
+  }
+  if (entries.length > MAX_FILES) {
+    warnings.push({ file: dir, message: `too many capability files (${entries.length} > ${MAX_FILES}) — skipped` });
+    return;
+  }
+  for (const name of entries) {
+    const p = path.join(dir, name);
+    try {
+      const size = safeFs.statSync(p).size;
+      if (size > MAX_FILE_BYTES) {
+        warnings.push({ file: name, message: `capability file too large (${size} bytes) — skipped` });
+        continue;
+      }
+      const parsed = parseCapabilityYaml(safeFs.readFileSync(p, 'utf8'));
+      if (!isValidCapability(parsed)) {
+        warnings.push({ file: name, message: 'malformed capability entry (missing language/toolchain) — skipped' });
+        continue;
+      }
+      languages[parsed.language] = parsed; // later dir (project override) wins
+    } catch (err) {
+      warnings.push({ file: name, message: `capability parse/read failed — skipped: ${err.message}` });
+    }
+  }
+}
+
+/**
+ * Load the capability registry: the bundled seed data first, then an optional
+ * project override overlaid on top (a project's `.ctoc/capabilities/languages/*`
+ * replaces a bundled language of the same name). Reads FRESH every call (the file
+ * set is tiny) so on-disk truth always wins — no stale cache.
+ *
+ * @param {string} [projectRoot] optional project root whose overrides are overlaid.
+ * @returns {{ languages: Object<string, Object>, warnings: Array<{file:string,message:string}> }}
+ */
+function load(projectRoot) {
+  const languages = {};
+  const warnings = [];
+  readCapabilityDir(bundledDir(), languages, warnings);
+  if (typeof projectRoot === 'string' && projectRoot.length > 0) {
+    readCapabilityDir(projectDir(projectRoot), languages, warnings);
+  }
+  return { languages, warnings };
+}
+
+// ── lookups (the API the four surfaces will call in CR5) ─────────────────────────
+
+/**
+ * The languages whose detectionMarkers exist in the project. Replaces the four
+ * duplicate marker tables in CR5. Exact-filename markers only (safe: no regex, no
+ * ReDoS); the six seed languages need no globs.
+ *
+ * @param {string} projectRoot project root to scan.
+ * @returns {string[]} detected language names (declaration order).
+ */
+function detectLanguages(projectRoot) {
+  if (typeof projectRoot !== 'string' || projectRoot.length === 0) return [];
+  const { languages } = load(projectRoot);
+  const detected = [];
+  for (const [lang, cap] of Object.entries(languages)) {
+    const markers = Array.isArray(cap.detectionMarkers) ? cap.detectionMarkers : [];
+    for (const marker of markers) {
+      if (typeof marker !== 'string') continue;
+      try {
+        if (safeFs.existsSync(path.join(projectRoot, marker))) { detected.push(lang); break; }
+      } catch { /* unreadable → not detected via this marker */ }
+    }
+  }
+  return detected;
+}
+
+/**
+ * The whole capability object for a language, or null if unknown.
+ * @param {string} language
+ * @param {string} [projectRoot]
+ * @returns {Object|null}
+ */
+function capabilitiesFor(language, projectRoot) {
+  const { languages } = load(projectRoot);
+  return languages[language] || null;
+}
+
+/**
+ * The toolchain entry for a (language, phase) — `{ cmd, tool, verified, ... }` — or
+ * null when the language or phase is unknown. The `cmd` is an inert STRING; the
+ * caller runs it under its own controls, this module never does.
+ *
+ * @param {string} language e.g. 'rust'
+ * @param {string} phase    e.g. 'lint' | 'format' | 'typecheck' | 'test' | 'coverage' | 'security' | 'depsAudit' | 'build'
+ * @param {string} [projectRoot]
+ * @returns {Object|null}
+ */
+function toolchainFor(language, phase, projectRoot) {
+  const cap = capabilitiesFor(language, projectRoot);
+  if (!cap || !cap.toolchain || typeof cap.toolchain !== 'object') return null;
+  const entry = cap.toolchain[phase];
+  return entry && typeof entry === 'object' ? entry : null;
+}
+
+/**
+ * The run strategy for a (language, projectType/shape): the run command and the
+ * HONEST flag. `honest: true` is a genuinely runnable/pollable runtime; `honest:
+ * 'build-is-last-mile'` means build+test is the CI-safe last mile (mobile/desktop)
+ * — never a false "it ran". Returns null when the language defines no such shape.
+ *
+ * @param {string} language e.g. 'dart'
+ * @param {string} projectType e.g. 'mobile' | 'web' | 'cli' | 'server'
+ * @param {string} [projectRoot]
+ * @returns {{ command: string, honest: (boolean|string), shape: string }|null}
+ */
+function runStrategyFor(language, projectType, projectRoot) {
+  const cap = capabilitiesFor(language, projectRoot);
+  if (!cap || !cap.run || typeof cap.run !== 'object') return null;
+  const shapes = cap.run.shapes && typeof cap.run.shapes === 'object' ? cap.run.shapes : {};
+  const command = shapes[projectType];
+  if (typeof command !== 'string' || command.length === 0) return null;
+  return { command, honest: cap.run.honest, shape: projectType };
+}
+
+module.exports = {
+  load,
+  detectLanguages,
+  capabilitiesFor,
+  toolchainFor,
+  runStrategyFor
+};

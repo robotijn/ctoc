@@ -4,7 +4,7 @@
  */
 
 const path = require('path');
-const { c, line, renderList, renderActionMenu, renderInput, renderFooter } = require('../lib/tui');
+const { c, line, renderList, renderActionMenu, renderInput, renderFooter, stripCtl } = require('../lib/tui');
 const { readPlans, getPlansDir } = require('../lib/state');
 const { rejectPlan } = require('../lib/actions');
 
@@ -42,7 +42,9 @@ function render(app) {
 }
 
 function renderActions(app, plan) {
-  let output = renderActionMenu(plan.name, ACTIONS, app.actionIndex);
+  // R7-A: the plan name (title/slug) is agent-writable — sanitize before it becomes
+  // the action-menu heading.
+  let output = renderActionMenu(stripCtl(plan.name), ACTIONS, app.actionIndex);
   output += `\n${c.dim}or type feedback directly: ${c.reset}`;
   if (app.directInput) {
     output += app.directInput + '_';
@@ -53,8 +55,10 @@ function renderActions(app, plan) {
 }
 
 function renderRejectInput(app) {
+  // R7-A: the plan name is an agent-writable field (plan title/slug) — sanitize
+  // before rendering it onto the reject prompt.
   return renderInput(
-    `${c.bold}Reject: ${app.selectedPlan.name}${c.reset}\n${line()}\n\nWhat needs to be fixed?`,
+    `${c.bold}Reject: ${stripCtl(app.selectedPlan.name)}${c.reset}\n${line()}\n\nWhat needs to be fixed?`,
     app.inputValue || ''
   );
 }
@@ -115,7 +119,7 @@ function handleKey(key, app) {
         // Direct feedback = reject
         rejectPlan(app.selectedPlan.path, app.directInput, app.projectPath);
         app.mode = 'list';
-        app.message = `✓ ${app.selectedPlan.name} rejected → moved to functional drafts`;
+        app.message = `✓ ${stripCtl(app.selectedPlan.name)} rejected → moved to functional drafts`;
         app.directInput = '';
         return true;
       }
@@ -145,7 +149,7 @@ function handleKey(key, app) {
     if (key.name === 'return' && app.inputValue) {
       rejectPlan(app.selectedPlan.path, app.inputValue, app.projectPath);
       app.mode = 'list';
-      app.message = `✓ ${app.selectedPlan.name} rejected → moved to functional drafts`;
+      app.message = `✓ ${stripCtl(app.selectedPlan.name)} rejected → moved to functional drafts`;
       app.inputValue = '';
       return true;
     }

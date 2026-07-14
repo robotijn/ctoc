@@ -9,7 +9,7 @@
  */
 
 const path = require('path');
-const { c, line, renderFooter } = require('../lib/tui');
+const { c, line, renderFooter, stripCtl } = require('../lib/tui');
 const { getPlanCounts, getAgentStatus, getVisionCounts, readPlans, getPlansDir } = require('../lib/state');
 const { SECTIONS, getSectionLabel, getStagesInSection, loadDashboardPrefs, saveDashboardPrefs } = require('../lib/sections');
 // PI4-s4 kickback: the semantic Related-Plans panel lives on the LIVE pipeline
@@ -45,11 +45,13 @@ function renderConflictPanel(app) {
     if (conflicts.length === 0) return ''; // no conflicts → omit the panel entirely
     let out = `${c.bold}Potential conflicts${c.reset}\n`;
     for (const row of conflicts.slice(0, 5)) {
-      const plan = (row && row.conflictingPlan) || '?';
+      // R7-A: plan slug + overlapping `files:` globs are agent-writable (plan
+      // frontmatter) — sanitize before rendering. severity is a fixed enum — left raw.
+      const plan = stripCtl((row && row.conflictingPlan) || '?');
       const severity = (row && row.severity) || 'potential conflict or dependency';
       const files = Array.isArray(row && row.overlappingFiles) ? row.overlappingFiles : [];
       out += `  ${c.yellow}${plan}${c.reset} ${c.dim}[${severity}]${c.reset}\n`;
-      out += `    ${c.dim}files: ${files.join(', ')}${c.reset}\n`;
+      out += `    ${c.dim}files: ${files.map(stripCtl).join(', ')}${c.reset}\n`;
     }
     out += `  ${c.dim}Review before both plans enter implementation simultaneously.${c.reset}\n`;
     out += '\n';
@@ -143,7 +145,7 @@ function render(app) {
 
   out += line() + '\n';
   if (agent.active) {
-    out += `${c.green}●${c.reset} Agent: ${c.bold}${agent.plan || 'unknown'}${c.reset}`;
+    out += `${c.green}●${c.reset} Agent: ${c.bold}${stripCtl(agent.plan || 'unknown')}${c.reset}`;
     if (agent.step) out += ` ${c.dim}(step ${agent.step})${c.reset}`;
     out += '\n';
   } else {

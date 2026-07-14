@@ -7,7 +7,7 @@
  *   - Plans waiting at human gates (1 / 2 / 3)
  */
 
-const { c, line, renderFooter } = require('../lib/tui');
+const { c, line, renderFooter, stripCtl } = require('../lib/tui');
 const { getInboxCounts, listQuestions, listDecisions, listPlansAtGates, listRelatedForInbox } = require('../lib/inbox');
 
 function render(app) {
@@ -32,21 +32,21 @@ function render(app) {
     if (counts.questions > 0) {
       out += `${c.bold}Open questions${c.reset}\n`;
       for (const q of listQuestions(root).slice(0, 5)) {
-        out += `  ${c.dim}${q.source_plan || '?'}/${q.source_step || '?'}${c.reset} ${q.id || ''}\n`;
+        out += `  ${c.dim}${stripCtl(q.source_plan || '?')}/${stripCtl(q.source_step || '?')}${c.reset} ${stripCtl(q.id || '')}\n`;
       }
       out += '\n';
     }
     if (counts.decisions > 0) {
       out += `${c.bold}Pending decisions${c.reset}\n`;
       for (const d of listDecisions(root).slice(0, 5)) {
-        out += `  ${c.dim}${d.plan || '?'}/${d.step || '?'}${c.reset} ${d.id || ''}\n`;
+        out += `  ${c.dim}${stripCtl(d.plan || '?')}/${stripCtl(d.step || '?')}${c.reset} ${stripCtl(d.id || '')}\n`;
       }
       out += '\n';
     }
     if (counts.gatesWaiting > 0) {
       out += `${c.bold}Plans at gates${c.reset}\n`;
       for (const p of listPlansAtGates(root).slice(0, 10)) {
-        out += `  ${c.dim}Gate ${p.gate}${c.reset} ${c.cyan}${p.plan}${c.reset} ${c.dim}(${p.stage})${c.reset}\n`;
+        out += `  ${c.dim}Gate ${p.gate}${c.reset} ${c.cyan}${stripCtl(p.plan)}${c.reset} ${c.dim}(${stripCtl(p.stage)})${c.reset}\n`;
       }
       out += '\n';
     }
@@ -76,7 +76,9 @@ function renderInboxRelated(app) {
     if (related.length === 0) return '';
     let out = `${c.bold}Related plans${c.reset}\n`;
     for (const r of related.slice(0, 5)) {
-      const id = (r && (r.planPath || r.planSlug || r.plan)) || '?';
+      // R7-A: the related-plan id is an agent-writable slug/path — sanitize before
+      // rendering (same trust class as overview.renderRelatedPanel's id).
+      const id = stripCtl((r && (r.planPath || r.planSlug || r.plan)) || '?');
       const score = (r && typeof r.score === 'number') ? ` ${c.dim}${r.score.toFixed(2)}${c.reset}` : '';
       out += `  ${c.cyan}${id}${c.reset}${score}\n`;
     }

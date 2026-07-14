@@ -4,7 +4,7 @@
  */
 
 const path = require('path');
-const { c, line, renderFooter } = require('../lib/tui');
+const { c, line, renderFooter, stripCtl } = require('../lib/tui');
 const { getPlanCounts, getAgentStatus } = require('../lib/state');
 const { getVersion, bump } = require('../lib/version');
 const { getVisionCounts } = require('./vision');
@@ -104,7 +104,9 @@ function renderRelatedPanel(app) {
     if (related.length === 0) return ''; // no related plans → omit the panel entirely
     let out = `${c.bold}Related Plans${c.reset}\n`;
     for (const r of related.slice(0, 5)) {
-      const id = (r && (r.planPath || r.planSlug || r.plan)) || '?';
+      // R7-A: the related-plan id is an agent-writable slug/path from the index —
+      // sanitize before rendering. score is a formatted number — left raw.
+      const id = stripCtl((r && (r.planPath || r.planSlug || r.plan)) || '?');
       const score = (r && typeof r.score === 'number') ? ` ${c.dim}${r.score.toFixed(2)}${c.reset}` : '';
       out += `  ${c.cyan}${id}${c.reset}${score}\n`;
     }
@@ -166,10 +168,10 @@ function render(app) {
 
   output += `${c.bold}Agent Status${c.reset}\n`;
   if (agent.active) {
-    output += `  ${c.green}●${c.reset} Running       ${c.bold}${agent.name}${c.reset}\n`;
+    output += `  ${c.green}●${c.reset} Running       ${c.bold}${stripCtl(agent.name)}${c.reset}\n`;
     output += `                  Step ${agent.step}/16 ${c.cyan}${agent.phase}${c.reset}\n`;
     if (agent.task) {
-      output += `                  Task: ${agent.task}\n`;
+      output += `                  Task: ${stripCtl(agent.task)}\n`;
     }
     if (agent.elapsed) {
       output += `                  Elapsed: ${c.dim}${agent.elapsed}${c.reset}\n`;

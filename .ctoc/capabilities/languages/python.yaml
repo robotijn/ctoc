@@ -1,0 +1,19 @@
+# Python capability entry — web-grounded 2026 toolchain (ruff replaced flake8/black/
+# isort). lint + test match tool-detector DEFAULT_TOOLS exactly (parity for CR5).
+language: python
+detectionMarkers: [pyproject.toml, setup.py, requirements.txt, Pipfile]
+extensions: [.py]
+toolchain:
+  lint:      { cmd: "ruff check .", tool: ruff, verified: web-2026-07 }
+  format:    { cmd: "ruff format --check .", tool: ruff, verified: web-2026-07 }
+  typecheck: { cmd: "mypy .", tool: mypy, verified: web-2026-07 }
+  test:      { cmd: "pytest", tool: pytest, verified: web-2026-07 }
+  coverage:  { cmd: "pytest --cov --cov-report=json", tool: pytest-cov, verified: web-2026-07 }
+  security:  { cmd: "bandit -r .", tool: bandit, verified: web-2026-07 }
+  depsAudit: { cmd: "pip-audit", tool: pip-audit, verified: web-2026-07 }
+  build:     { cmd: "python -m build", tool: build, verified: web-2026-07 }
+run:
+  shapes: { server: "uvicorn main:app", cli: "python -m app" }
+  honest: true
+configScaffold: [pyproject.toml, ruff.toml]
+verified: web-2026-07

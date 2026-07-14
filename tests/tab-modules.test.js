@@ -193,7 +193,8 @@ function mockTui() {
     renderConfirm: realTui.renderConfirm,
     renderInput: realTui.renderInput,
     renderFooter: realTui.renderFooter,
-    renderTabs: realTui.renderTabs
+    renderTabs: realTui.renderTabs,
+    stripCtl: realTui.stripCtl
   };
 }
 

@@ -1,0 +1,18 @@
+# Rust capability entry — web-grounded 2026 toolchain (vision anchors).
+language: rust
+detectionMarkers: [Cargo.toml]
+extensions: [.rs]
+toolchain:
+  lint:      { cmd: "cargo clippy -- -D warnings", tool: clippy, verified: web-2026-07 }
+  format:    { cmd: "cargo fmt --check", tool: rustfmt, verified: web-2026-07 }
+  typecheck: { cmd: "cargo check", tool: cargo, verified: web-2026-07 }
+  test:      { cmd: "cargo test", tool: cargo, altCmd: "cargo nextest run", verified: web-2026-07 }
+  coverage:  { cmd: "cargo tarpaulin --out Json", tool: tarpaulin, verified: web-2026-07 }
+  security:  { cmd: "cargo audit", tool: cargo-audit, verified: web-2026-07 }
+  depsAudit: { cmd: "cargo audit", tool: cargo-audit, verified: web-2026-07 }
+  build:     { cmd: "cargo build --release", tool: cargo, verified: web-2026-07 }
+run:
+  shapes: { cli: "cargo run", server: "cargo run" }
+  honest: true
+configScaffold: [Cargo.toml, rustfmt.toml]
+verified: web-2026-07
