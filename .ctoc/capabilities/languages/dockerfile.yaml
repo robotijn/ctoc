@@ -8,8 +8,15 @@
 # tfsec) — with hadolint as the alternative. build is `docker build`. RUN is honestly
 # build-is-last-mile: an image is BUILT, not launched — building the image is the
 # CI-safe last mile, never a false "it ran", so it exposes no runnable shape.
+# MARKER HONESTY (wave-2 fix): detectionMarkers is narrowed to [Dockerfile] ONLY. The
+# lint/build commands hardcode the literal `Dockerfile` filename (the registry stores a
+# static string and cannot compute the detected filename), so accepting `*.dockerfile`
+# or `Containerfile` used to detect dockerfile and then FAIL when `hadolint Dockerfile`
+# found no Dockerfile. Honest under-detection of the rare Podman-Containerfile /
+# multi-dockerfile repo beats detect-then-fail; the command now always matches what was
+# detected.
 language: dockerfile
-detectionMarkers: [Dockerfile, "*.dockerfile", Containerfile]
+detectionMarkers: [Dockerfile]
 extensions: [.dockerfile]
 toolchain:
   lint:     { cmd: "hadolint Dockerfile", tool: hadolint, verified: web-2026-07 }

@@ -1,0 +1,32 @@
+# Solidity capability entry — web-grounded 2026 smart-contract toolchain. Added in wave 2
+# because the `blockchain` project type ships `security: required` but had no solidity
+# language, so its security phase resolved to a TypeScript SAST (semgrep) that cannot read
+# `.sol` files. SECURITY is `slither .` — Slither (Trail of Bits, 90+ detectors) is THE
+# Solidity static-application-security-testing tool, a GENUINE SAST (not a linter reused as
+# security), so `verified: web-2026-07` is honest here — unlike the shell entry whose
+# shellcheck-as-security is honestly UNVERIFIED. altCmd is `myth analyze` (Mythril symbolic
+# execution). lint is solhint (the standard Solidity linter), the argv-safe standard glob
+# form `solhint 'contracts/**/*.sol'` (single-quoted glob stays within one argv token; the
+# schema's argv-safety rule forbids only `; & | backtick $ < > newline`, not quotes or `*`).
+# format/typecheck/test/coverage/build are Foundry (forge): `forge build` IS the static
+# check (a contract that will not compile is the type error). depsAudit is OMITTED — Foundry
+# manages dependencies via git submodules (`forge install`), with no standard audit command;
+# absent is honest N/A, never a stub. RUN is build-is-last-mile: a contract deploys to a
+# chain, so locally the CI-safe last mile is compile + test — never a false "it ran" — and
+# it exposes no runnable shape.
+language: solidity
+detectionMarkers: ["*.sol", foundry.toml]
+extensions: [.sol]
+toolchain:
+  lint:      { cmd: "solhint 'contracts/**/*.sol'", tool: solhint, verified: web-2026-07 }
+  format:    { cmd: "forge fmt --check", tool: forge, verified: web-2026-07 }
+  typecheck: { cmd: "forge build", tool: forge, verified: web-2026-07 }
+  test:      { cmd: "forge test", tool: forge, verified: web-2026-07 }
+  coverage:  { cmd: "forge coverage", tool: forge, verified: web-2026-07 }
+  security:  { cmd: "slither .", tool: slither, altCmd: "myth analyze", verified: web-2026-07 }
+  build:     { cmd: "forge build", tool: forge, verified: web-2026-07 }
+run:
+  shapes: { }
+  honest: build-is-last-mile
+configScaffold: [foundry.toml, .solhint.json, remappings.txt]
+verified: web-2026-07

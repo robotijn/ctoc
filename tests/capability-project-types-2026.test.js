@@ -185,3 +185,25 @@ describe('expansion wave 2: THE OVER-DETECTION GUARD — a shared/absent marker 
       'dbt_project.yml is the SQL language marker — it must not be a data-pipeline detection marker');
   });
 });
+
+/**
+ * WAVE 2 FIX (F1) — the blockchain project type's `security: required` must resolve to
+ * a REAL Solidity SAST once the solidity language exists. Before the fix,
+ * pipelineFor('solidity','blockchain') was null (no solidity), and the only other
+ * language pairing resolved security to semgrep (a TypeScript SAST that cannot read
+ * .sol). After the fix, the decisive security command is `slither .` — never semgrep.
+ */
+describe('WAVE 2 FIX (F1): pipelineFor(solidity, blockchain) resolves security to slither, not semgrep', () => {
+  it('the merged blockchain security phase invokes slither and is web-grounded', () => {
+    const pipeline = registry.pipelineFor('solidity', 'blockchain');
+    assert.ok(pipeline, 'pipelineFor(solidity, blockchain) must resolve once solidity ships');
+    assert.equal(pipeline.phases.security.relevance, 'required',
+      'blockchain treats security as required (on-chain exploits)');
+    assert.match(pipeline.phases.security.cmd, /slither/,
+      'the blockchain security command must invoke the real Solidity SAST (slither)');
+    assert.doesNotMatch(pipeline.phases.security.cmd, /semgrep/,
+      'a TypeScript SAST (semgrep) can not read .sol files — it must never be the blockchain security tool');
+    assert.equal(pipeline.phases.security.verified, 'web-2026-07',
+      'slither is a genuine SAST — its provenance is web-grounded, not UNVERIFIED');
+  });
+});
