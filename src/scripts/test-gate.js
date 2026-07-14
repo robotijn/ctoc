@@ -147,9 +147,15 @@ function main() {
   // Always run WITH coverage — the flag is hardcoded here so coverage can never
   // be silently dropped from the pipeline, and is also declared in the npm
   // `test` script string (asserted by tests/coverage-gate.test.js).
+  //
+  // Coverage is SCOPED to `src/**`. Without this, node's --experimental-test-coverage
+  // reports an "all files" aggregate whose denominator is inflated by every file the
+  // 277-file test run transitively loads, so the number bears no relation to actual
+  // source coverage (it read ~40% while real src line coverage was ~91%). Scoping to
+  // src makes the gate measure the thing it claims to gate.
   const result = spawnSync(
     process.execPath,
-    ['--test', '--experimental-test-coverage', ...files],
+    ['--test', '--experimental-test-coverage', '--test-coverage-include=src/**', ...files],
     { cwd: projectRoot, shell: false, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
   );
 
