@@ -151,14 +151,19 @@ describe('Sync Manager Tests', () => {
     }
   });
 
-  test('syncPlans commits and pushes when there are changes', (t) => {
+  // R3-C SHIP GATE: this test used to assert that the 5-minute sync timer PUSHED.
+  // That was the defect, asserted as a feature: a machine crossing the human's push
+  // ship gate on a clock. The timer may commit (local, reversible); it may not ship.
+  test('syncPlans commits but does NOT push when the ship gate is closed (default)', (t) => {
     const childProcess = require('child_process');
     const originalExecSync = childProcess.execSync;
     childProcess.execSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
+    const originalIsAutoPush = settings.isAutoPushEnabled;
     settings.getSetting = mockGetSetting;
+    settings.isAutoPushEnabled = () => false; // the default: no human opt-in
 
     fileSystem.gitStatus = 'M plans/test-plan.md'; // Has changes
 
@@ -169,19 +174,55 @@ describe('Sync Manager Tests', () => {
       const result = syncModule.syncPlans('/test/project');
 
       assert.strictEqual(result.synced, true, 'Should sync');
+      assert.strictEqual(result.pushed, false, 'Must NOT push with the ship gate closed');
       assert.ok(result.timestamp instanceof Date, 'Should have timestamp');
 
-      // Verify git commands were called
       const commands = execSyncCalls.map(c => c.cmd);
       assert.ok(commands.some(c => c.includes('git status --porcelain')), 'Should check status');
       assert.ok(commands.some(c => c.includes('git add plans/')), 'Should add plans');
       assert.ok(commands.some(c => c.includes('git commit')), 'Should commit');
-      assert.ok(commands.some(c => c.includes('git push')), 'Should push');
+      assert.ok(!commands.some(c => c.includes('git push')), 'Must NOT push');
+      assert.ok(!commands.some(c => c.includes('pull --rebase')),
+        'Must NOT rewrite history unattended');
 
-      console.log('# syncPlans commits and pushes when there are changes');
+      console.log('# syncPlans commits but does not push with the ship gate closed');
     } finally {
       childProcess.execSync = originalExecSync;
       settings.getSetting = originalGetSetting;
+      settings.isAutoPushEnabled = originalIsAutoPush;
+    }
+  });
+
+  test('syncPlans pushes ONLY when the human opened the ship gate', (t) => {
+    const childProcess = require('child_process');
+    const originalExecSync = childProcess.execSync;
+    childProcess.execSync = mockExecSync;
+
+    const settings = require('../src/lib/settings.js');
+    const originalGetSetting = settings.getSetting;
+    const originalIsAutoPush = settings.isAutoPushEnabled;
+    settings.getSetting = mockGetSetting;
+    settings.isAutoPushEnabled = () => true; // explicit human opt-in
+
+    fileSystem.gitStatus = 'M plans/test-plan.md';
+
+    try {
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
+
+      const result = syncModule.syncPlans('/test/project');
+
+      assert.strictEqual(result.synced, true, 'Should sync');
+      assert.strictEqual(result.pushed, true, 'Should push once the human opted in');
+
+      const commands = execSyncCalls.map(c => c.cmd);
+      assert.ok(commands.some(c => c.includes('git push')), 'Should push');
+
+      console.log('# syncPlans pushes only when the human opened the ship gate');
+    } finally {
+      childProcess.execSync = originalExecSync;
+      settings.getSetting = originalGetSetting;
+      settings.isAutoPushEnabled = originalIsAutoPush;
     }
   });
 
@@ -554,7 +595,10 @@ describe('Sync Manager Tests', () => {
     }
   });
 
-  test('syncPlans handles pull rebase failure gracefully', (t) => {
+  // The pre-push rebase now lives on the OPTED-IN path only (R3-C: no unattended
+  // history rewrite behind a closed ship gate). With the gate open it must still
+  // degrade gracefully when there is no upstream.
+  test('syncPlans handles pull rebase failure gracefully (ship gate open)', (t) => {
     const childProcess = require('child_process');
     const originalExecSync = childProcess.execSync;
 
@@ -573,7 +617,9 @@ describe('Sync Manager Tests', () => {
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
+    const originalIsAutoPush = settings.isAutoPushEnabled;
     settings.getSetting = mockGetSetting;
+    settings.isAutoPushEnabled = () => true;
 
     try {
       delete require.cache[require.resolve('../src/lib/sync.js')];
@@ -581,13 +627,45 @@ describe('Sync Manager Tests', () => {
 
       const result = syncModule.syncPlans('/test/project');
 
-      assert.ok(pullFailed, 'Pull should have been attempted');
+      assert.ok(pullFailed, 'Pull should have been attempted on the opted-in path');
       assert.strictEqual(result.synced, true, 'Should still sync despite pull failure');
 
       console.log('# syncPlans handles pull rebase failure gracefully');
     } finally {
       childProcess.execSync = originalExecSync;
       settings.getSetting = originalGetSetting;
+      settings.isAutoPushEnabled = originalIsAutoPush;
+    }
+  });
+
+  test('syncPlans NEVER rebases when the ship gate is closed', (t) => {
+    const childProcess = require('child_process');
+    const originalExecSync = childProcess.execSync;
+    childProcess.execSync = mockExecSync;
+
+    const settings = require('../src/lib/settings.js');
+    const originalGetSetting = settings.getSetting;
+    const originalIsAutoPush = settings.isAutoPushEnabled;
+    settings.getSetting = mockGetSetting;
+    settings.isAutoPushEnabled = () => false;
+
+    fileSystem.gitStatus = 'M plans/test.md';
+
+    try {
+      delete require.cache[require.resolve('../src/lib/sync.js')];
+      syncModule = require('../src/lib/sync.js');
+
+      syncModule.syncPlans('/test/project');
+
+      const commands = execSyncCalls.map(c => c.cmd);
+      assert.ok(!commands.some(c => c.includes('pull --rebase')),
+        'a background timer must never rewrite the human history');
+
+      console.log('# syncPlans never rebases behind a closed ship gate');
+    } finally {
+      childProcess.execSync = originalExecSync;
+      settings.getSetting = originalGetSetting;
+      settings.isAutoPushEnabled = originalIsAutoPush;
     }
   });
 

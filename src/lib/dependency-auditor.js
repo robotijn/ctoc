@@ -720,29 +720,87 @@ class DependencyAuditor {
   }
 
   /**
-   * Map pip severity to standard severity
-   * @param {number} severity - pip CVSS numeric score (compared against 9/7/4 bands)
-   * @returns {string} Standard severity
+   * Map a CVSS score OR a severity label to a standard severity — NEVER under-report.
+   *
+   * The bug this replaces (found by the boundary typecheck, fixed in R3-C): the pip
+   * and Go mappers were annotated as taking a number and banded numerically
+   * (>= 9.0 / 7.0 / 4.0). But `pip-audit`'s `vulns[].severity` and govulncheck's
+   * advisory severity are NOT guaranteed numeric — advisory feeds also emit string
+   * labels ("CRITICAL", "high"). Against the string "HIGH" every band comparison is
+   * `NaN`-false, so the function fell through and returned LOW: a CRITICAL advisory
+   * silently reported as LOW, in the security path that decides whether a push is
+   * blocked. A blocking finding became a non-blocking one, with zero test coverage.
+   *
+   * Rules:
+   *   - a number (or a numeric string like "9.8") bands as a CVSS v3 score;
+   *   - a known label maps to itself (case-insensitive; "medium" ⇒ MODERATE);
+   *   - anything unrecognised (absent, empty, an object, NaN) ⇒ MODERATE, the
+   *     documented unknown default — never LOW. When we do not understand a
+   *     severity, we OVER-report, never under-report.
+   *
+   * @param {number|string|null|undefined} severity - CVSS score or severity label
+   * @returns {string} one of SEVERITY.*
    */
-  mapPipSeverity(severity) {
-    if (!severity) return SEVERITY.MODERATE;
-    if (severity >= 9.0) return SEVERITY.CRITICAL;
-    if (severity >= 7.0) return SEVERITY.HIGH;
-    if (severity >= 4.0) return SEVERITY.MODERATE;
-    return SEVERITY.LOW;
+  mapCvssOrLabel(severity) {
+    // Labels first — "9.8" is a score, but "HIGH" is a label and must never be
+    // compared numerically (every comparison against NaN is false ⇒ LOW).
+    if (typeof severity === 'string') {
+      const label = severity.trim().toLowerCase();
+      if (label === '') return SEVERITY.MODERATE;
+
+      const LABELS = {
+        critical: SEVERITY.CRITICAL,
+        high: SEVERITY.HIGH,
+        moderate: SEVERITY.MODERATE,
+        medium: SEVERITY.MODERATE,
+        low: SEVERITY.LOW,
+        info: SEVERITY.INFO,
+        informational: SEVERITY.INFO,
+        none: SEVERITY.INFO
+      };
+      if (label in LABELS) return LABELS[label];
+
+      const parsed = Number(label);
+      if (!Number.isFinite(parsed)) return SEVERITY.MODERATE; // unknown ⇒ over-report
+      return this.bandCvss(parsed);
+    }
+
+    if (typeof severity === 'number' && Number.isFinite(severity)) {
+      return this.bandCvss(severity);
+    }
+
+    return SEVERITY.MODERATE; // null / undefined / object / NaN ⇒ unknown, not LOW
   }
 
   /**
-   * Map Go CVSS score to standard severity
-   * @param {number} score - CVSS score
-   * @returns {string} Standard severity
+   * Band a finite CVSS v3 base score. Only ever called with a real number.
+   * @param {number} score - CVSS v3 base score (0.0–10.0)
+   * @returns {string} one of SEVERITY.*
    */
-  mapGoSeverity(score) {
-    if (!score) return SEVERITY.MODERATE;
+  bandCvss(score) {
     if (score >= 9.0) return SEVERITY.CRITICAL;
     if (score >= 7.0) return SEVERITY.HIGH;
     if (score >= 4.0) return SEVERITY.MODERATE;
-    return SEVERITY.LOW;
+    if (score > 0) return SEVERITY.LOW;
+    return SEVERITY.MODERATE; // 0 / negative: not a real score ⇒ unknown
+  }
+
+  /**
+   * Map pip-audit severity (CVSS score or label) to standard severity.
+   * @param {number|string|null|undefined} severity
+   * @returns {string} Standard severity
+   */
+  mapPipSeverity(severity) {
+    return this.mapCvssOrLabel(severity);
+  }
+
+  /**
+   * Map govulncheck severity (CVSS score or label) to standard severity.
+   * @param {number|string|null|undefined} score
+   * @returns {string} Standard severity
+   */
+  mapGoSeverity(score) {
+    return this.mapCvssOrLabel(score);
   }
 
   /**

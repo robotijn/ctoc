@@ -40,17 +40,31 @@ const { SecretsScanner } = require('./secrets-scanner');
 const { DependencyAuditor } = require('./dependency-auditor');
 const { SASTRunner, TOOL_CONFIGS } = require('./sast-runner');
 
+// R3-C: the push ship gate. The quality agent runs UNATTENDED after every commit;
+// it may check, it may report, it may NOT ship. `isAutoPushEnabled` is the only
+// authority for a machine push and is false unless the human opted in.
+const { isAutoPushEnabled } = require('./settings');
+
 /**
- * Parse CLI arguments
+ * Parse CLI arguments.
+ *
+ * SHIP GATE (R3-C): `onSuccess` now defaults to 'none', never 'push'. A machine
+ * that pushes because nobody passed a flag is a machine crossing a human ship gate
+ * by default. Even an explicit `--on-success=push` is not sufficient — the argv
+ * only expresses INTENT; `maybePushOnSuccess` consults the canonical setting
+ * (`git.autoPushEnabled`) for AUTHORITY.
+ *
+ * @param {string[]} [argv=process.argv.slice(2)] - argument vector (injectable for tests)
+ * @returns {{triggeredBy: string, onSuccess: string, verbose: boolean}}
  */
-function parseArgs() {
+function parseArgs(argv = process.argv.slice(2)) {
   const args = {
     triggeredBy: 'manual',
-    onSuccess: 'push',
+    onSuccess: 'none',
     verbose: false
   };
 
-  for (const arg of process.argv.slice(2)) {
+  for (const arg of argv) {
     if (arg.startsWith('--triggered-by=')) {
       args.triggeredBy = arg.split('=')[1];
     } else if (arg.startsWith('--on-success=')) {
@@ -536,7 +550,19 @@ async function runTieredChecks(tools) {
 }
 
 /**
- * Push to remote with pull-rebase conflict handling (Decision 15)
+ * Push to remote.
+ *
+ * This is the MECHANISM, not the gate. Its only sanctioned automatic caller is
+ * {@link maybePushOnSuccess}, which asks the ship gate first. Its other caller is
+ * `src/commands/push.js` — the human's own `/ctoc:push`, where the keypress IS the
+ * gate decision.
+ *
+ * R3-C removed the pull-rebase-retry (old "Decision 15"). On a rejected push the
+ * agent used to run `git pull --rebase` and push again — a machine rewriting the
+ * human's history unattended, in the background, after a commit hook. It now fails
+ * LOUDLY and hands the branch back to the human, who decides how to reconcile.
+ *
+ * @returns {boolean} true iff the push succeeded
  */
 function pushToRemote() {
   console.log('\n  Pushing to remote...');
@@ -549,22 +575,48 @@ function pushToRemote() {
     const errMsg = (err.message || err.error || '').toLowerCase();
 
     if (errMsg.includes('rejected') || errMsg.includes('non-fast-forward') || errMsg.includes('failed to push')) {
-      console.log('   Remote ahead, rebasing...');
-      try {
-        runCommand('git pull --rebase', { silent: false });
-        // Push again after rebase
-        runCommand('git push', { silent: false });
-        console.log('   Pushed successfully after rebase!');
-        return true;
-      } catch (rebaseErr) {
-        console.log('   Conflict during rebase. Run `ctoc sync` to resolve.');
-        return false;
-      }
+      console.log('   PUSH REJECTED: the remote is ahead of your branch.');
+      console.log('   CTOC will NOT rebase your history unattended. Reconcile yourself:');
+      console.log('     git pull --rebase    (then re-run /ctoc:push)');
+      return false;
     }
 
     console.log('   Push failed:', err.message || err);
     return false;
   }
+}
+
+/**
+ * THE PUSH SHIP GATE, at the one place the quality agent could ship (R3-C).
+ *
+ * The agent runs unattended in the background after every commit. Before this
+ * function existed it pushed whenever the checks were green and argv said 'push' —
+ * and the post-commit hook hardcoded exactly that argv, so a machine crossed the
+ * human's ship gate on every green commit. Push is now authorized by ONE key
+ * (`git.autoPushEnabled`, default false) and by nothing else: not argv, not an
+ * environment variable, not an environment profile.
+ *
+ * @param {{onSuccess?: string}} args - parsed CLI args (intent)
+ * @param {string} [projectPath] - project root (authority is read from here)
+ * @returns {{pushed: boolean, reason: string}}
+ */
+function maybePushOnSuccess(args, projectPath = process.cwd()) {
+  if (!args || args.onSuccess !== 'push') {
+    return { pushed: false, reason: 'on-success is not push' };
+  }
+
+  if (!isAutoPushEnabled(projectPath)) {
+    console.log('\n  Checks green. NOT pushing: push is a human ship gate.');
+    console.log('   Ship it yourself with /ctoc:push, or opt a machine push in via');
+    console.log('   Settings → Git → "Let CTOC push" (git.autoPushEnabled).');
+    return {
+      pushed: false,
+      reason: 'auto-push disabled (ship gate) — the human ships via /ctoc:push'
+    };
+  }
+
+  const ok = pushToRemote();
+  return { pushed: ok, reason: ok ? 'auto-push enabled by the human' : 'push failed' };
 }
 
 /**
@@ -665,11 +717,9 @@ async function main() {
     // Print summary
     printSummary(results, duration);
 
-    // Handle success/failure
+    // Handle success/failure. The push decision is the ship gate's, not argv's.
     if (results.allPassed) {
-      if (args.onSuccess === 'push') {
-        pushToRemote();
-      }
+      maybePushOnSuccess(args, process.cwd());
     } else {
       console.log('\n  Fix the issues above and commit again to retry.');
     }
@@ -693,6 +743,7 @@ if (require.main === module) {
 // Library surface — reusable check/push building blocks (consumed by
 // src/commands/push.js). Exporting these does not change the script path above.
 module.exports = {
+  parseArgs,
   runLint,
   runTypecheck,
   runSmartTests,
@@ -700,5 +751,6 @@ module.exports = {
   runSecurityScan,
   runTieredChecks,
   pushToRemote,
+  maybePushOnSuccess,
   printSummary
 };

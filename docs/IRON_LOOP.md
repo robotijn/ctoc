@@ -497,8 +497,15 @@ When max rounds (10) is reached and some dimensions still score < 5, unresolved 
 |---------|---------|-------------|
 | `integration.max_rounds` | 10 | Maximum refinement rounds |
 | `integration.quality_threshold` | 5 | All dimensions must meet this |
-| `integration.auto_approve_after_max` | true | Auto-approve after max rounds |
 | `integration.defer_unresolved` | true | Store unresolved as Deferred Questions |
+
+**The refinement loop approves nothing.** `refineLoop()` returns `score-passed`
+(the critic's own scores cleared the bar) or `max-rounds` (they did not — here are
+the deferred questions). Neither is an approval. Approvals are human, are recorded
+in the approval ledger, and are checked at the four gates. There is no
+"auto-approve after max rounds" — that setting was documented but had zero code
+consumers, which is worse than a wrong default: it described a machine crossing a
+gate that no machine actually crosses.
 
 ### Implementation
 
@@ -513,7 +520,37 @@ Implemented in `src/lib/iron-loop.js`. Triggered automatically when an implement
 | Gate 0 | Vision -> Functional | "Approve idea to explore?" |
 | Gate 1 | Functional -> Implementation | "Approve functional plan?" |
 | Gate 2 | Implementation -> Todo | "Approve technical approach?" |
-| Gate 3 | Final Review -> Done | "Commit/push or send back?" |
+| Gate 3 | Final Review -> Done | "Commit or send back?" |
+
+---
+
+## 2 Human Ship Gates: push and deploy
+
+The four gates above govern the PLAN. Two further gates govern the WORLD — the two
+acts that leave the machine and are hard to take back:
+
+| Ship gate | Crossed by | Guard | Default |
+|---|---|---|---|
+| **push** | the human, via `/ctoc:push` | `git.autoPushEnabled` (settings.json) | **OFF** |
+| **deploy** | the human, via the deployment pipeline | `deployment.ship_gate_confirmed` | **OFF** |
+
+**CTOC never pushes on its own.** With `git.autoPushEnabled` false — the default, in
+every environment profile, including prod — no CTOC code path reaches `git push`:
+not the post-commit quality agent on a green run, not the background sync timer, not
+a plan create/edit/approve, not the dashboard's full sync. They commit (local,
+reversible); they do not ship. The human ships with `/ctoc:push`. A user who wants a
+machine push must opt in explicitly (Settings → Git → "Let CTOC push"), and even then
+CTOC will never rebase the human's history unattended: a rejected push fails loudly
+and hands the branch back.
+
+**A Gate 3 approval is not a deploy.** "The code is good" and "ship it to production"
+are two decisions. `src/lib/actions.js` triggers the deployment pipeline on a Gate 3
+approval only when the human has answered the deploy ship-gate question
+(`deployment.ship_gate_confirmed: true`, written by the `deployment-setup` agent).
+Until then, Gate 3 records a deploy-ready notice and deploys nothing.
+
+Both are fenced by `tests/ship-gate-real.test.js`: with default settings, ZERO push
+invocations across every automatic path.
 
 ---
 

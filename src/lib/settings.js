@@ -77,7 +77,16 @@ const SETTINGS_SCHEMA = {
       { key: 'coAuthor', label: 'Co-author', type: 'string', default: 'Claude Opus 4.5 <noreply@anthropic.com>' },
       { key: 'autoSync', label: 'Auto-sync git', type: 'toggle', default: true },
       { key: 'forceWithLease', label: 'Safe force push', type: 'toggle', default: true },
-      { key: 'commitAndPush', label: 'Auto-push after commit', type: 'toggle', default: true }
+      // R3-C — THE PUSH SHIP GATE. Push is one of the two human ship gates (the
+      // other is deploy). This is the ONE canonical key that gates EVERY machine
+      // push path in CTOC: the quality agent's on-success push, the post-commit
+      // hook's argv, the sync timer, the plan-operation auto-push and the
+      // dashboard's full pipeline sync. It defaults to FALSE — with it closed, CTOC
+      // may commit but NEVER pushes; the human ships via /ctoc:push.
+      // It replaces two placebos: `git.commitAndPush` (a toggle nothing read) and
+      // the `sync.auto_push` / init's `push.auto_push` mismatch (a visible switch
+      // wired to a key no code consulted). Read it ONLY via isAutoPushEnabled().
+      { key: 'autoPushEnabled', label: 'Let CTOC push (human ship gate — OFF by default)', type: 'toggle', default: false }
     ]
   },
   privacy: {
@@ -120,33 +129,35 @@ const SETTINGS_SCHEMA = {
 //
 //  Resolution order (highest wins):  explicit user setting  >  env profile  >  schema default
 //
-//  SAFETY INVARIANT (enforced by tests/environment-mode.test.js):
+//  SAFETY INVARIANT (enforced by tests/environment-mode.test.js + tests/ship-gate-real.test.js):
 //  No profile may weaken a human gate. `workflow.requireReviewGate` is never set
-//  to false and `workflow.enforcementMode` is never set to 'off' by any profile —
-//  the four human gates are mandatory in every environment (see CLAUDE.md).
+//  to false, `workflow.enforcementMode` is never set to 'off', and NO profile may
+//  set `git.autoPushEnabled: true` — push is a human ship gate, so no environment
+//  (not even prod) may open it on the human's behalf. The four human gates plus the
+//  two ship gates are mandatory in every environment (see CLAUDE.md).
 //  'ask' is intentionally empty: it changes nothing and tells the menu to prompt.
 // ─────────────────────────────────────────────────────────────────────────────
 const ENVIRONMENT_PROFILES = {
   // Not chosen yet — apply nothing, prompt the user.
   ask: {},
 
-  // Fast local iteration. Edits warn instead of block; never auto-push; cost shown.
+  // Fast local iteration. Edits warn instead of block; cost shown.
   dev: {
     workflow: { enforcementMode: 'soft' },
-    git: { commitAndPush: false, autoSync: false },
+    git: { autoSync: false },
     privacy: { showCostEstimates: true }
   },
 
-  // Rehearse production. Strict enforcement, but push stays manual.
+  // Rehearse production. Strict enforcement; push stays the human's.
   staging: {
-    workflow: { enforcementMode: 'strict', autoMoveToReview: true },
-    git: { commitAndPush: false }
+    workflow: { enforcementMode: 'strict', autoMoveToReview: true }
   },
 
-  // Locked down. Strict enforcement, auto-push after gates, minimal noise, top model.
+  // Locked down. Strict enforcement, minimal noise, top model. Push stays the
+  // human's here too: prod used to set the (unread) `git.commitAndPush: true`,
+  // which — had anything read it — would have made a machine cross a ship gate.
   prod: {
     workflow: { enforcementMode: 'strict' },
-    git: { commitAndPush: true },
     agents: { defaultModel: 'opus' },
     privacy: { showCostEstimates: false }
   }
@@ -254,6 +265,30 @@ function setSetting(category, key, value, projectPath = process.cwd()) {
   saveSettings(raw, projectPath);
 }
 
+/**
+ * THE PUSH SHIP GATE (R3-C). The single source of truth for "may a machine push?".
+ *
+ * Every automatic push path in CTOC asks this and only this — the quality agent's
+ * on-success push, the post-commit hook's argv, the sync timer, the plan-operation
+ * auto-push, and the dashboard's full pipeline sync. It is TRUE only when the human
+ * explicitly set `git.autoPushEnabled: true`; it is FALSE for a fresh project, for
+ * every environment profile (no profile may open a ship gate), and on any read
+ * error. No environment variable can flip it: CTOC_SKIP_QUALITY is a SKIP, never
+ * an enable.
+ *
+ * The human's own `/ctoc:push` is NOT gated by this — the keypress IS the gate.
+ *
+ * @param {string} [projectPath] - project root
+ * @returns {boolean} whether the human opted a machine push in
+ */
+function isAutoPushEnabled(projectPath = process.cwd()) {
+  try {
+    return getSetting('git', 'autoPushEnabled', projectPath) === true;
+  } catch {
+    return false; // fail CLOSED: an unreadable setting never opens a ship gate
+  }
+}
+
 // Get settings for a category
 function getCategorySettings(category, projectPath = process.cwd()) {
   const settings = loadSettings(projectPath);
@@ -285,6 +320,7 @@ module.exports = {
   saveSettings,
   getSetting,
   setSetting,
+  isAutoPushEnabled,
   getCategorySettings,
   toggleSetting,
   getCategorySchema,

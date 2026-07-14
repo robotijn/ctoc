@@ -802,6 +802,88 @@ function completeExecution(planPath, projectPath, options = {}) {
 }
 
 /**
+ * THE KEY FOR THE LOCK (R3-D). Run the REAL completion for a scheduler task's plan.
+ *
+ * Before this, `completeExecution` — the ONLY producer of the Gate-3 VERIFY
+ * evidence, the app-launch last-mile check, and the task/plan coupling — had ZERO
+ * callers: the executor agent moved its plan to review/ with a raw file move, so no
+ * evidence was ever produced and Gate 3 (correctly fail-closed on evidence) could
+ * only be crossed with "Approve anyway". This is the live call site the menu's
+ * `menu task complete` route uses for an `implement` task.
+ *
+ * Behavior (all outcomes REPORTED, never thrown — a completion must never wedge):
+ *   • plan in `in-progress/` → the normal path: validate, move to review, run Step
+ *     14 VERIFY, persist the evidence, settle the registry task.
+ *   • plan already in `review/` (an agent moved it itself, or a re-run) → IDEMPOTENT:
+ *     the completion still runs and still produces the evidence. A plan that moved
+ *     itself must not be left evidence-less and un-shippable.
+ *   • plan file nowhere on disk → `{ ran: false, reason }`. Not every task's `plan`
+ *     field names a real plan file (a review/decompose task may name a vision slug),
+ *     so this is a report, not an error.
+ *   • pre-review validation fails → `{ ran: true, blocked: true, ... }`. The plan is
+ *     NOT moved and NO evidence is written: a plan that cannot pass review does not
+ *     get an evidence artifact minted for it. `completeExecution` records the
+ *     kickback against the failing step (circuit breaker).
+ *
+ * Security: `planSlug` comes from the task registry, which is on disk and therefore
+ * attacker-influenceable. Only a bare, safe slug is ever joined into a path — a
+ * value with a separator, a `..`, a NUL, or an extension is REFUSED before any
+ * filesystem access, so a crafted `plan` field can never escape `plans/`.
+ *
+ * @param {string} projectPath - project root
+ * @param {string} planSlug - the task's `plan` field (a bare plan slug)
+ * @returns {{ran: boolean, reason?: string, blocked?: boolean, stage?: string,
+ *   newPath?: (string|null), verify?: Object|null, errors?: string[]}}
+ */
+function completeTaskPlan(projectPath, planSlug) {
+  const root = projectPath || findProjectRoot();
+
+  if (typeof planSlug !== 'string' || planSlug.length === 0) {
+    return { ran: false, reason: 'task carries no plan' };
+  }
+  // A plan slug is a bare filename token. Anything else is refused BEFORE path.join.
+  const slug = planSlug.replace(/\.md$/i, '');
+  if (!/^[A-Za-z0-9._-]+$/.test(slug) || slug === '.' || slug === '..' || slug.includes('..')) {
+    return { ran: false, reason: `unsafe plan slug refused: ${slug.slice(0, 40)}` };
+  }
+
+  // Resolve the plan: in-progress is the expected home; review means it already moved.
+  const plansDir = getPlansDir(root);
+  const inProgress = path.join(plansDir, 'in-progress', `${slug}.md`);
+  const inReview = path.join(plansDir, 'review', `${slug}.md`);
+  let planPath = null;
+  let stage = null;
+  if (safeFs.existsSync(inProgress)) {
+    planPath = inProgress;
+    stage = 'in-progress';
+  } else if (safeFs.existsSync(inReview)) {
+    planPath = inReview;
+    stage = 'review';
+  } else {
+    return { ran: false, reason: `no plan file for "${slug}" in in-progress/ or review/` };
+  }
+
+  const result = completeExecution(planPath, root);
+  if (result.blocked) {
+    return {
+      ran: true,
+      blocked: true,
+      stage,
+      newPath: null,
+      errors: (result.validation && result.validation.errors) || [],
+      reason: result.message
+    };
+  }
+  return {
+    ran: true,
+    blocked: false,
+    stage,
+    newPath: result.newPath,
+    verify: result.verify || null
+  };
+}
+
+/**
  * Identify the Iron Loop step a failed pre-review validation should be kicked
  * back to: the lowest-numbered REQUIRED step that is missing or present-but-
  * incomplete. Falls back to 14 (VERIFY — "the quality gate") when the failure is
@@ -1732,6 +1814,8 @@ module.exports = {
   initBackgroundAgent,
   startExecution,
   completeExecution,
+  // R3-D: the live call site of completeExecution (menu `task complete` route)
+  completeTaskPlan,
   // Agent orchestration functions
   startAgent,
   stopAgent,

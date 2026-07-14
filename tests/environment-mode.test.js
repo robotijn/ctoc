@@ -69,7 +69,8 @@ describe('Environment mode — resolution order', () => {
     const s = loadSettings(d);
     assert.equal(s.general.environment, 'ask');
     assert.equal(s.workflow.enforcementMode, 'strict');
-    assert.equal(s.git.commitAndPush, true);
+    // R3-C: push is a human ship gate — CLOSED by default in every environment.
+    assert.equal(s.git.autoPushEnabled, false);
     assert.equal(needsEnvironmentPrompt(d), true);
   });
 
@@ -77,7 +78,7 @@ describe('Environment mode — resolution order', () => {
     const d = mk({ general: { timezone: 'Europe/Berlin' }, agents: { defaultModel: 'sonnet' } });
     const s = loadSettings(d);
     assert.equal(s.workflow.enforcementMode, 'strict'); // unchanged
-    assert.equal(s.git.commitAndPush, true);            // unchanged
+    assert.equal(s.git.autoPushEnabled, false);         // unchanged: ship gate closed
     assert.equal(s.general.timezone, 'Europe/Berlin');  // explicit kept
     assert.equal(s.agents.defaultModel, 'sonnet');      // explicit kept
   });
@@ -86,7 +87,7 @@ describe('Environment mode — resolution order', () => {
     const d = mk({ general: { environment: 'dev' } });
     const s = loadSettings(d);
     assert.equal(s.workflow.enforcementMode, 'soft');
-    assert.equal(s.git.commitAndPush, false);
+    assert.equal(s.git.autoPushEnabled, false);
     assert.equal(s.git.autoSync, false);
   });
 
@@ -98,21 +99,38 @@ describe('Environment mode — resolution order', () => {
   });
 
   it('an explicit `false` is honored over a profile (nullish, not falsy, merge)', () => {
-    // prod sets commitAndPush true; an explicit false must survive.
-    const d = mk({ general: { environment: 'prod' }, git: { commitAndPush: false } });
-    assert.equal(loadSettings(d).git.commitAndPush, false);
+    // dev sets git.autoSync false; an explicit true must survive the merge, and a
+    // profile value must never overwrite an explicit false elsewhere.
+    const d = mk({ general: { environment: 'dev' }, git: { autoSync: true } });
+    assert.equal(loadSettings(d).git.autoSync, true);
+
+    const e = mk({ general: { environment: 'prod' }, privacy: { showCostEstimates: true } });
+    assert.equal(loadSettings(e).privacy.showCostEstimates, true);
   });
 
   it('staging and prod profiles resolve as specified', () => {
     const stg = loadSettings(mk({ general: { environment: 'staging' } }));
     assert.equal(stg.workflow.enforcementMode, 'strict');
-    assert.equal(stg.git.commitAndPush, false);
     assert.equal(stg.workflow.autoMoveToReview, true);
+    assert.equal(stg.git.autoPushEnabled, false);
 
     const prod = loadSettings(mk({ general: { environment: 'prod' } }));
-    assert.equal(prod.git.commitAndPush, true);
     assert.equal(prod.privacy.showCostEstimates, false);
     assert.equal(prod.agents.defaultModel, 'opus');
+    // R3-C: prod used to set the (unread) git.commitAndPush = true. No profile —
+    // not even prod — may open a human ship gate on the human's behalf.
+    assert.equal(prod.git.autoPushEnabled, false);
+  });
+
+  it('NO profile may open the push ship gate (git.autoPushEnabled)', () => {
+    for (const env of Object.keys(ENVIRONMENT_PROFILES)) {
+      const s = loadSettings(mk({ general: { environment: env } }));
+      assert.equal(s.git.autoPushEnabled, false,
+        `environment '${env}' must leave the push ship gate closed`);
+    }
+    // Only an explicit human opt-in opens it.
+    const opted = mk({ general: { environment: 'prod' }, git: { autoPushEnabled: true } });
+    assert.equal(loadSettings(opted).git.autoPushEnabled, true);
   });
 
   it('an unknown environment value falls back to ask (no profile)', () => {

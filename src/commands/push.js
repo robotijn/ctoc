@@ -17,7 +17,10 @@
  * happens. Each dep defaults to the real quality-agent / tool-detector function.
  *
  * Cross-platform: no bash. The only process spawn lives in the reused
- * pushToRemote() (`git push` / `git pull --rebase`), which interpolates no flag.
+ * pushToRemote() (`git push`), which interpolates no flag. The silent
+ * pull-rebase-retry it used to perform on rejection is GONE (R3-C): a machine
+ * never rewrites the human's history unattended. This command IS the human's
+ * push ship gate — the one sanctioned, ungated push path in CTOC.
  */
 
 const qualityAgent = require('../lib/quality-agent');
