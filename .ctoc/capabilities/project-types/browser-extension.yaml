@@ -7,6 +7,9 @@
 # LOW (15, below web-frontend's 20) so a real frontend framework (a vite.config.ts +
 # manifest.json PWA) WINS over browser-extension. The decisive wxt.config.ts still
 # wins on its own.
+# KNOWN RESIDUAL (accepted, wave-2): a build-tool-less PWA with a bare root manifest.json
+# and no higher-priority frontend marker still mis-detects as browser-extension; content-
+# based manifest_version disambiguation is a future enhancement, not shipped here.
 projectType: browser-extension
 detectionMarkers: [wxt.config.ts, manifest.json]
 frameworks: [wxt, plasmo, web-ext]

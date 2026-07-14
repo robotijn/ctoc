@@ -13,8 +13,9 @@
  * These tests assert the DATA is present, honest, and web-grounded, and that the three
  * new languages detect from their real markers through the REAL engine:
  *
- *   • LOAD CLEAN — all three load; the registry now carries 23 languages with ZERO
- *     warnings (the shipped seed data must never warn).
+ *   • LOAD CLEAN — all three load; the registry now carries 24 languages with ZERO
+ *     warnings (the shipped seed data must never warn — the top-20 programming
+ *     languages + shell/dockerfile/terraform + solidity = 24).
  *   • DETECTABLE — detectLanguages finds shell from deploy.sh (glob *.sh), dockerfile
  *     from Dockerfile (exact), terraform from main.tf (exact + glob *.tf), via a real
  *     on-disk fixture.
@@ -75,7 +76,7 @@ function allCommandsFor(cap) {
   return cmds;
 }
 
-describe('config/infra languages: load clean (registry now carries 23, zero warnings)', () => {
+describe('config/infra languages: load clean (registry now carries 24, zero warnings)', () => {
   it('all three new languages load from the bundled data', () => {
     const reg = registry.load();
     for (const lang of NEW_LANGS) {
@@ -83,11 +84,11 @@ describe('config/infra languages: load clean (registry now carries 23, zero warn
     }
   });
 
-  it('the shipped seed data loads with ZERO warnings and exactly 23 languages', () => {
+  it('the shipped seed data loads with ZERO warnings and exactly 24 languages', () => {
     const reg = registry.load();
     assert.deepEqual(reg.warnings, [], 'the shipped seed data must load with zero warnings');
-    assert.equal(Object.keys(reg.languages).length, 23,
-      'the top-20 programming languages + the 3 config/infra languages = 23');
+    assert.equal(Object.keys(reg.languages).length, 24,
+      'the top-20 programming languages + the 3 config/infra languages + solidity = 24');
   });
 
   it('exactly 3 new config/infra YAML files ship on disk (shell, dockerfile, terraform)', () => {
@@ -243,6 +244,99 @@ describe('config/infra languages: NO regression to stack-detector primary langua
         'package.json must remain the primary language even when a Dockerfile is present');
       assert.ok(stack.languages.includes('dockerfile'),
         'dockerfile must be detected as an ADDITIONAL language, never the primary');
+    } finally { rm(dir); }
+  });
+});
+
+/**
+ * WAVE 2 FIX (F1) — solidity language. blockchain shipped as a project TYPE with
+ * `security: required`, but no solidity language existed, so its security phase
+ * resolved to a TypeScript SAST (semgrep) that cannot read `.sol` files, or to null.
+ * solidity adds the real contract toolchain: solhint (lint), forge fmt/build/test/
+ * coverage (Foundry), and — decisively — `slither .` for security. slither (Trail of
+ * Bits, 90+ detectors) is a REAL Solidity SAST, not a linter, so its `verified:
+ * web-2026-07` is honest (unlike the linters-as-security peers such as shell). Foundry
+ * uses git-submodule dependencies (`forge install`), so depsAudit is honestly OMITTED.
+ */
+describe('WAVE 2 FIX (F1): solidity language — real contract toolchain, slither SAST', () => {
+  it('solidity loads from the bundled data with ZERO warnings', () => {
+    const reg = registry.load();
+    assert.deepEqual(reg.warnings, [], 'adding solidity must not introduce any warning');
+    assert.ok(reg.languages.solidity, 'bundled data must include solidity');
+  });
+
+  it('solidity.yaml ships on disk in the bundled languages directory', () => {
+    const dir = path.join(__dirname, '..', '.ctoc', 'capabilities', 'languages');
+    const files = new Set(fs.readdirSync(dir));
+    assert.ok(files.has('solidity.yaml'), 'solidity.yaml must ship in the bundled directory');
+  });
+
+  it('detects solidity from a main.sol (glob *.sol marker)', () => {
+    const dir = makeProject('ctoc-sol-');
+    try {
+      fs.writeFileSync(path.join(dir, 'main.sol'), '// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n');
+      assert.ok(registry.detectLanguages(dir).includes('solidity'),
+        'a main.sol must detect solidity via the *.sol glob marker');
+    } finally { rm(dir); }
+  });
+
+  it('detects solidity from a foundry.toml (exact marker)', () => {
+    const dir = makeProject('ctoc-sol-foundry-');
+    try {
+      fs.writeFileSync(path.join(dir, 'foundry.toml'), '[profile.default]\n');
+      assert.ok(registry.detectLanguages(dir).includes('solidity'),
+        'a foundry.toml must detect solidity via the exact marker');
+    } finally { rm(dir); }
+  });
+
+  it('solidity security is a REAL SAST — cmd references slither and verified is web-2026-07', () => {
+    const cap = registry.capabilitiesFor('solidity');
+    assert.ok(cap && cap.toolchain, 'solidity must declare a toolchain');
+    const sec = cap.toolchain.security;
+    assert.ok(sec, 'solidity must declare a security phase');
+    assert.match(sec.cmd, /slither/, 'solidity security must invoke slither (the Trail of Bits Solidity SAST)');
+    assert.equal(sec.verified, 'web-2026-07',
+      'slither is a genuine SAST (not a linter reused as security), so web-2026-07 is honest here');
+  });
+
+  it('solidity honestly OMITs depsAudit (Foundry uses git-submodule deps, no standard audit)', () => {
+    const cap = registry.capabilitiesFor('solidity');
+    assert.equal(cap.toolchain.depsAudit, undefined,
+      'solidity must omit depsAudit — Foundry manages deps via git submodules (forge install)');
+  });
+
+  it('solidity run is build-is-last-mile (contracts deploy to chain; local = compile + test)', () => {
+    const cap = registry.capabilitiesFor('solidity');
+    assert.ok(cap.run && typeof cap.run === 'object', 'solidity must carry a run block');
+    assert.equal(cap.run.honest, 'build-is-last-mile',
+      'a contract is compiled + tested locally and deployed to a chain — build is the last mile');
+  });
+});
+
+/**
+ * WAVE 2 FIX (F2) — dockerfile detection markers narrowed to [Dockerfile] only. The
+ * lint/build commands hardcode the literal `Dockerfile` filename, so a Containerfile-
+ * only or *.dockerfile-only repo used to detect dockerfile and then FAIL when
+ * `hadolint Dockerfile` found no Dockerfile. Honest under-detection of the rare
+ * Podman-Containerfile repo beats detect-then-fail: a Containerfile alone must NOT
+ * detect dockerfile now.
+ */
+describe('WAVE 2 FIX (F2): dockerfile markers narrowed to [Dockerfile] — no detect-then-fail', () => {
+  it('a Containerfile-only repo does NOT detect dockerfile (marker narrowed to Dockerfile)', () => {
+    const dir = makeProject('ctoc-containerfile-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Containerfile'), 'FROM alpine:3.20\n');
+      assert.ok(!registry.detectLanguages(dir).includes('dockerfile'),
+        'a Containerfile alone must NOT detect dockerfile — the command hardcodes Dockerfile');
+    } finally { rm(dir); }
+  });
+
+  it('an exact Dockerfile still detects dockerfile (the narrowed marker still matches)', () => {
+    const dir = makeProject('ctoc-docker-narrowed-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Dockerfile'), 'FROM alpine:3.20\n');
+      assert.ok(registry.detectLanguages(dir).includes('dockerfile'),
+        'an exact Dockerfile must still detect dockerfile');
     } finally { rm(dir); }
   });
 });
