@@ -272,17 +272,72 @@ function detectFrameworks(projectPath, languages) {
 }
 
 /**
+ * Detects databases in a project (DB-w1).
+ *
+ * Databases live in a project's DEPENDENCIES (node `pg`, `mongoose`, `redis`; python
+ * `psycopg2`, `pymongo`), NOT in marker files — so detection is dep-parsing, mirroring
+ * `detectFrameworks`. Each database's `deps` list comes from the capability registry
+ * (`capabilityRegistry.loadDatabases`), the single source of truth for database
+ * capability data; a matched database is returned ENRICHED with its category and
+ * security posture so the caller (detectStack → SessionStart) can render "PostgreSQL
+ * (RLS supported, TLS required)" without re-reading the registry.
+ *
+ * Fail-open: an unreadable project or an empty registry simply yields `[]`. The output
+ * is an array of `{ name, category, security, migration }` records, in registry
+ * (declaration) order, each database at most once.
+ *
+ * @param {string} projectPath project root to scan.
+ * @returns {Array<{name: string, category: string, security: Object, migration: Object}>}
+ */
+function detectDatabases(projectPath) {
+  projectPath = projectPath || process.cwd();
+  const nodeDeps = readPackageDeps(projectPath);
+  const pythonDeps = readPythonDeps(projectPath);
+
+  // loadDatabases enumerates the registry (which databases exist + their `deps`);
+  // databaseCapability resolves the full record for a matched name. Both registry
+  // functions thus have a live caller here — no dead exports.
+  const { databases } = capabilityRegistry.loadDatabases(projectPath);
+  const detected = [];
+
+  for (const [name, entry] of Object.entries(databases)) {
+    const deps = Array.isArray(entry.deps) ? entry.deps : [];
+    let found = false;
+    for (const dep of deps) {
+      if (typeof dep !== 'string') continue;
+      if (nodeDeps[dep] || pythonDeps.includes(dep)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) continue;
+    const cap = capabilityRegistry.databaseCapability(name, projectPath) || entry;
+    detected.push({
+      name,
+      category: cap.category,
+      security: cap.security || {},
+      migration: cap.migration || {}
+    });
+  }
+
+  return detected;
+}
+
+/**
  * Detects full stack
  */
 function detectStack(projectPath) {
   projectPath = projectPath || process.cwd();
   const languages = detectLanguages(projectPath);
   const frameworks = detectFrameworks(projectPath, languages);
+  // Additive (DB-w1): the persistence layer. languages/frameworks/primary are UNCHANGED.
+  const databases = detectDatabases(projectPath);
 
   return {
     project: projectPath,
     languages,
     frameworks,
+    databases,
     primary: {
       language: languages[0] || null,
       framework: frameworks[0] || null
@@ -295,6 +350,7 @@ module.exports = {
   FRAMEWORK_PATTERNS,
   detectLanguages,
   detectFrameworks,
+  detectDatabases,
   detectStack,
   matchGlob
 };

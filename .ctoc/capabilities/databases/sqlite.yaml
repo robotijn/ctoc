@@ -1,0 +1,17 @@
+# SQLite — embedded relational. Row-level security is NOT applicable (a single
+# file, no roles/policies); isolation is filesystem permissions on the .db file.
+# No network connection — access is file-local, so TLS is not a concern.
+# Parameterized queries still defeat SQLi.
+database: sqlite
+category: relational
+deps: [sqlite3, better-sqlite3, aiosqlite]
+security:
+  injection: parameterized-queries
+  rls: not-applicable
+  connection: file-local
+  leastPrivilege: file-permissions
+migration:
+  tools: [prisma, drizzle, alembic, atlas]
+  safetyLint: "atlas migrate lint"
+configScaffold: [migrations/, .env.example]
+verified: web-2026-07

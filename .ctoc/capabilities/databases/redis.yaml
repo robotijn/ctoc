@@ -1,0 +1,17 @@
+# Redis — key/value store. Row-level security is NOT applicable (no tabular data);
+# authorization is per-command via ACLs (Redis 6+). The injection concern is command
+# injection through unsanitized input into EVAL/Lua or CRLF in keys. TLS supported
+# since Redis 6. No schema, hence no schema migrations.
+database: redis
+category: keyvalue
+deps: [redis, ioredis]
+security:
+  injection: command-injection
+  rls: not-applicable
+  connection: tls-required
+  leastPrivilege: acl-per-command
+migration:
+  tools: []
+  safetyLint: none
+configScaffold: [.env.example]
+verified: web-2026-07

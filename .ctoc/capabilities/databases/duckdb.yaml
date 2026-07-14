@@ -1,0 +1,17 @@
+# DuckDB — embedded analytical (OLAP) engine. Row-level security is NOT applicable
+# (in-process, no roles/policies); isolation is filesystem permissions on the .duckdb
+# file. No network connection — access is file-local, TLS is not a concern.
+# Parameterized queries still defeat SQLi.
+database: duckdb
+category: analytics
+deps: [duckdb, "@duckdb/node-api"]
+security:
+  injection: parameterized-queries
+  rls: not-applicable
+  connection: file-local
+  leastPrivilege: file-permissions
+migration:
+  tools: [dbt]
+  safetyLint: none
+configScaffold: [.env.example]
+verified: web-2026-07

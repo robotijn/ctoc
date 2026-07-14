@@ -1,0 +1,17 @@
+# MongoDB — document store. Row-level security is NOT applicable (no rows/roles in
+# the relational sense); access control is collection/field-level via role-based
+# SCRAM. The real injection concern is NoSQL operator injection ($where/$gt from
+# unsanitized input). TLS is the 2026 baseline.
+database: mongodb
+category: document
+deps: [mongodb, mongoose, pymongo, motor, mongoengine]
+security:
+  injection: nosql-operator-injection
+  rls: not-applicable
+  connection: tls-required
+  leastPrivilege: role-based-scram
+migration:
+  tools: [migrate-mongo, mongock]
+  safetyLint: none
+configScaffold: [migrations/, .env.example]
+verified: web-2026-07
