@@ -3,7 +3,11 @@
  * Post-commit Hook - Triggers Background Quality Agent
  *
  * This hook is NON-BLOCKING - commit always succeeds instantly.
- * Starts the quality agent in background to run checks and auto-push.
+ * Starts the quality agent in background to run the quality checks.
+ *
+ * It does NOT ship. Push is a human ship gate (R3-C): the agent is only told to
+ * push when the human has explicitly set `git.autoPushEnabled`. Otherwise CTOC
+ * checks and reports, and the human ships with /ctoc:push.
  */
 
 const { spawn } = require('child_process');
@@ -38,6 +42,26 @@ function shouldRun() {
 }
 
 /**
+ * Build the quality agent's argument vector.
+ *
+ * SHIP GATE (R3-C): this hook is auto-installed into every fresh CTOC project and
+ * used to hardcode `--on-success=push` — so a machine pushed on every green commit,
+ * with no human in the loop and no setting that could stop it. The push flag is now
+ * emitted ONLY when the human opened the gate (`git.autoPushEnabled`, default
+ * false); otherwise the argv says `--on-success=none`, explicitly.
+ *
+ * (The agent re-checks the same gate itself, so a stale argv cannot ship either.)
+ *
+ * @param {string} [projectPath] - project root (defaults to the committing repo)
+ * @returns {string[]} the argv passed to quality-agent.js
+ */
+function buildAgentArgs(projectPath = process.cwd()) {
+  const { isAutoPushEnabled } = require('../lib/settings');
+  const onSuccess = isAutoPushEnabled(projectPath) ? 'push' : 'none';
+  return ['--triggered-by=post-commit', `--on-success=${onSuccess}`];
+}
+
+/**
  * Start background quality agent
  */
 function startAgent() {
@@ -52,8 +76,7 @@ function startAgent() {
   // Start agent in detached mode
   const agent = spawn('node', [
     agentPath,
-    '--triggered-by=post-commit',
-    '--on-success=push'
+    ...buildAgentArgs(process.cwd())
   ], {
     detached: true,
     stdio: 'ignore',
@@ -86,4 +109,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, shouldRun, startAgent };
+module.exports = { main, shouldRun, startAgent, buildAgentArgs };

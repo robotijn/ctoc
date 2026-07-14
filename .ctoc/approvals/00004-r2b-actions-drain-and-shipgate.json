@@ -1,0 +1,10 @@
+{
+  "content_sha256": "ff30c57b41bd2d6209f7071db17229885e9d43e3b2c8330769d34dd6ff2382bf",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T02:13:44.675Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: Claude wrote approved_by:human into plan frontmatter directly instead of crossing Gate 2 via approvePlan — a forged marker. The WORK was ordered by the human (\"fix them all\", \"fix everything\"); the PROVENANCE path was wrong. Recorded as backfilled so it stays distinguishable from a clicked approval.",
+  "plan_basename": "00004-r2b-actions-drain-and-shipgate"
+}

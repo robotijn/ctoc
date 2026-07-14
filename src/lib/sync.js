@@ -13,7 +13,11 @@
 const { execSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
-const { getSetting } = require('./settings');
+// R3-C: the push ship gate. `isAutoPushEnabled` is the ONE key every push path in
+// this file consults; it is FALSE unless the human explicitly opted in. Sync may
+// commit plan state freely — committing is local and reversible — but it never
+// ships. The human ships via /ctoc:push.
+const { getSetting, isAutoPushEnabled } = require('./settings');
 // CF1: bust the in-process read cache on every count-mutating write.
 const { invalidate } = require('./cache');
 // C9/W05-s4: the post-push sync path must validate identically to the manual
@@ -27,8 +31,8 @@ let lastSync = null;
 const DEFAULT_SYNC_CONFIG = {
   enabled: true,
   check_interval: 60,      // Minimum seconds between remote checks
-  auto_commit: true,       // Auto-commit plan changes
-  auto_push: true,         // Push after commit
+  auto_commit: true,       // Auto-commit plan changes (local, reversible)
+  auto_push: false,        // SHIP GATE: never push unless the human opted in
   auto_pull: 'prompt',     // prompt | always | never
   branch: 'main'           // Branch to sync
 };
@@ -87,24 +91,37 @@ function syncPlans(projectPath = process.cwd()) {
       return { synced: false, reason: 'no changes' };
     }
 
-    // Add, commit, push
+    // Add + commit. Committing is local and reversible — it is NOT a ship gate.
     execSync('git add plans/', { cwd: projectPath });
 
     const commitMsg = `chore: auto-sync plans [${new Date().toISOString()}]`;
     execSync(`git commit -m "${commitMsg}"`, { cwd: projectPath });
 
-    // Pull first to avoid conflicts
+    // SHIP GATE (R3-C). This timer fires every 5 minutes from a menu open. It used
+    // to rebase and push `origin main` unattended — a machine crossing a human ship
+    // gate, on a clock. Both the rebase (history rewrite) and the push now happen
+    // ONLY when the human explicitly opted in.
+    if (!isAutoPushEnabled(projectPath)) {
+      lastSync = new Date();
+      return {
+        synced: true,
+        pushed: false,
+        timestamp: lastSync,
+        reason: 'auto-push disabled (ship gate) — commit only; push with /ctoc:push'
+      };
+    }
+
+    // Pull first to avoid conflicts (only on the opted-in path).
     try {
       execSync('git pull --rebase origin main', { cwd: projectPath, stdio: 'pipe' });
     } catch (e) {
       // May fail if no upstream, continue anyway
     }
 
-    // Push
     execSync('git push origin main', { cwd: projectPath, stdio: 'pipe' });
 
     lastSync = new Date();
-    return { synced: true, timestamp: lastSync };
+    return { synced: true, pushed: true, timestamp: lastSync };
 
   } catch (error) {
     return { synced: false, error: error.message };
@@ -192,8 +209,11 @@ function getSyncConfig(projectPath = process.cwd()) {
   const autoCommit = getSetting('sync', 'auto_commit', projectPath);
   if (autoCommit !== undefined) config.auto_commit = autoCommit;
 
-  const autoPush = getSetting('sync', 'auto_push', projectPath);
-  if (autoPush !== undefined) config.auto_push = autoPush;
+  // SHIP GATE (R3-C): auto_push is NOT a sync-local setting. It comes from the ONE
+  // canonical key `git.autoPushEnabled` (default false). This used to read the
+  // sync-category auto_push key while init wrote a push-category one — two different
+  // keys, so the visible off-switch was a PLACEBO and the machine pushed regardless.
+  config.auto_push = isAutoPushEnabled(projectPath);
 
   const autoPull = getSetting('sync', 'auto_pull', projectPath);
   if (autoPull !== undefined) config.auto_pull = autoPull;
@@ -363,12 +383,13 @@ function autoCommitPlan(action, planName, projectPath = process.cwd(), opts = {}
   }
 }
 
-// Auto-push to remote
+// Auto-push to remote. SHIP GATE (R3-C): `config.auto_push` is `git.autoPushEnabled`
+// and is FALSE unless the human opted in, so this is a no-op by default.
 function autoPush(projectPath = process.cwd()) {
   const config = getSyncConfig(projectPath);
 
   if (!config.auto_push) {
-    return { pushed: false, reason: 'auto-push disabled' };
+    return { pushed: false, reason: 'auto-push disabled (ship gate) — push with /ctoc:push' };
   }
 
   try {
@@ -441,7 +462,10 @@ function onPlanOperation(action, planName, projectPath = process.cwd(), opts = {
  * 1. git pull --rebase origin {current-branch}
  * 2. git add plans/
  * 3. git commit -m "plans: sync pipeline state" (if changes)
- * 4. git push origin {current-branch}
+ * 4. git push origin {current-branch} — ONLY when the human opened the ship gate
+ *    (`git.autoPushEnabled`). With the gate closed (the default) this function
+ *    pulls and commits, and reports `pushed: false` with the reason. Shipping is
+ *    the human's act: /ctoc:push.
  *
  * @param {string} projectPath - Project root
  * @returns {Object} Sync result with details
@@ -489,7 +513,13 @@ function fullPlansSync(projectPath = process.cwd()) {
     result.errors.push(`Commit: ${e.message}`);
   }
 
-  // 4. Push
+  // 4. Push — SHIP GATE (R3-C).
+  if (!config.auto_push) {
+    result.pushed = false;
+    result.pushSkipped = 'auto-push disabled (ship gate) — push with /ctoc:push';
+    return result;
+  }
+
   try {
     const branch = getCurrentBranch(projectPath) || config.branch;
     execSync(`git push origin ${branch}`, {

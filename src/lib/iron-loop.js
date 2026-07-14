@@ -497,9 +497,16 @@ function scoreSecurity(execPlan) {
 /**
  * Run the Integrator + Critic refinement loop.
  *
+ * APPROVES NOTHING (R3-C). Its terminal statuses are `score-passed` (the critic's
+ * own scores cleared the bar) and `max-rounds` (they did not, here are the deferred
+ * questions). Neither is an approval: approvals are human, are recorded in the
+ * approval ledger, and are checked at the gates. A self-scored "approved" status is
+ * a machine grading its own homework and stamping it.
+ *
  * @param {string} planPath - Path to the plan file
  * @param {number} maxRounds - Maximum refinement rounds (default: 10)
- * @returns {Object} Result with status, rounds, and optionally deferredQuestions
+ * @returns {Object} Result with status ('score-passed' | 'max-rounds'), rounds, and
+ *   optionally deferredQuestions
  */
 function refineLoop(planPath, maxRounds = 10) {
   if (!safeFs.existsSync(planPath)) {
@@ -526,11 +533,17 @@ function refineLoop(planPath, maxRounds = 10) {
     lastCritique = critique(planPath);
     const { scores } = lastCritique;
 
-    // Check if all scores are 5
+    // Check if all scores are 5.
+    // R3-C: the status is `score-passed`, NEVER `approved`. This loop scores a plan
+    // with its own critic; calling that result an "approval" is Goodhart's law with
+    // a gate attached — the machine grading itself and then labelling the grade a
+    // human decision. Only a human approves (the four gates), and only the ledger
+    // records it. The single consumer (applyIronLoop) ignores this status anyway;
+    // the label must not imply an approval nobody gave.
     const allPerfect = Object.values(scores).every(s => s === 5);
     if (allPerfect) {
       return {
-        status: 'approved',
+        status: 'score-passed',
         rounds,
         scores
       };
@@ -544,10 +557,10 @@ function refineLoop(planPath, maxRounds = 10) {
     const avgScore = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
     if (avgScore >= 4) {
       return {
-        status: 'approved',
+        status: 'score-passed',
         rounds,
         scores,
-        note: 'Approved with average score >= 4'
+        note: 'Critic score >= 4 average. This is a SCORE, not an approval — a human still holds the gate.'
       };
     }
   }

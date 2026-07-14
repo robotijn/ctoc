@@ -30,6 +30,10 @@ The command outputs JSON: `{ text, ask, actions }`.
 | `plan {stage}/{file} discuss` | Discussion menu |
 | `stubs {slug}` | Vision stubs browse (human checkpoint) |
 | `validate {stage}/{file}` | Pre-transition validation |
+| `inbox questions` · `inbox decisions` · `inbox gates` | Read-only inbox doors |
+| `inbox escalations` | Circuit-breaker escalations + deploy-ready notices (read-only) — the door behind the dashboard's ⛔ count |
+| `inbox stale` · `inbox verify` · `inbox cleanup` | Possibly-stale plans: list → verify → human-gated cleanup |
+| `tasks` · `task {id}` | Background task board / task detail |
 
 ### Claude Actions (handle in conversation)
 
@@ -39,7 +43,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 | `claude:discuss` | **WORK (interactive-async). The FIRST and MOST IMPORTANT plan action.** Dispatch a background `discuss` agent (never foreground) to deliver a MAXIMALLY HARSH, no-holds-barred **adversarial critique** — nothing held back. It attacks the plan without mercy: surface EVERY weak assumption, failure mode, unstated dependency, weak or missing justification, and missing edge case. NO praise, NO hedging, NO "this is good but" — only what is wrong and what could break. It makes documented reasonable choices; open questions surface as inbox "decisions awaiting review" — the `${CLAUDE_PLUGIN_ROOT}/.ctoc/ask-me-questions.md` Unicode-box decision-matrix (Option / Pros / Cons / Recommendation) is the FRAMING for those decisions, not a synchronous prompt. Strictly **advisory**: it NEVER edits the plan and NEVER crosses a gate. See the Two-Plane Protocol (WORK dispatch). |
 | `claude:discuss-all {stage}` | **WORK (bulk critique). The bulk form of `claude:discuss`.** A WORD shortcut on the stage plan list (`browse functional` / `browse implementation`) — never a number; numbers open a single plan. Dispatch the brutal, nothing-held-back **adversarial critique across EVERY plan in `{stage}`** — one critique per plan, or one per parent-plan group — and surface each result. Same maximally-harsh contract as `claude:discuss`: attack every plan without mercy (weak assumptions, failure modes, unstated dependencies, weak/missing justification, missing edge cases), no praise, no hedging. Strictly **advisory**: it NEVER edits a plan and NEVER crosses a gate. See the Two-Plane Protocol (WORK dispatch). |
 | `claude:advance-all-implementation` | **The human deliberately crossing Gate 2 (implementation → todo) for EVERY implementation plan at once — the person selecting this option IS the approval.** A WORD shortcut (`todo-all`) on the implementation stage plan list only — never a number. Batch-approve each parent's slices via `approveSubplans(parentSlug, 'implementation')` (each stamped `approved_by: human`), moving all implementation plans to todo, then start the iron loop to build them by calling `startAgent()` and dispatching the next todo plan as a background `implement` task (per `claude:start-agent`) — file-disjoint slices run concurrently, same-file slices serialize. After enqueuing the wave's implement tasks, call `enqueueWaveSync(root, { blockedBy: <their task ids> })` so the integrated suite + baseline reconcile + commit run as a scheduled `sync` barrier once the wave finishes. It NEVER crosses the gate unless the human chooses it. |
-| `claude:done-all-<parent>` | **The human deliberately crossing Gate 3 (review → done) for EVERY reviewed slice of `<parent>` at once — the human typing the word `done-all` on a parent's review list IS the approval.** A WORD shortcut (`done-all`) on the review stage plan list only — never a number; numbers open a single plan. Call `approveSubplans(parentSlug, 'review')` (`src/lib/actions.js`) — it topo-orders the parent's review siblings, per-sibling runs `validateReviewToDone`, and crosses each via the gate-safe `approvePlan` (each stamped `approved_by: human`, `gate_crossed: review → done`); a sibling that fails validation is REPORTED in `skipped[]` and left in review, never silently dropped, and the batch continues. Surface `{approved, skipped}` to the human. It NEVER crosses the gate unless the human types the word. (The menu-side key registration that recognises the typed `done-all` on a review list lands in slice R2-C2 in this same wave.) |
+| `claude:done-all-<parent>` | **The human deliberately crossing Gate 3 (review → done) for EVERY reviewed slice of `<parent>` at once — the human typing the word `done-all` on a parent's review list IS the approval.** A WORD shortcut (`done-all`) on the review stage plan list only — never a number; numbers open a single plan. Call `approveSubplans(parentSlug, 'review')` (`src/lib/actions.js`) — it topo-orders the parent's review siblings, per-sibling runs `validateReviewToDone`, and crosses each via the gate-safe `approvePlan` (each stamped `approved_by: human`, `gate_crossed: review → done`); a sibling that fails validation is REPORTED in `skipped[]` and left in review, never silently dropped, and the batch continues. Surface `{approved, skipped}` to the human. It NEVER crosses the gate unless the human types the word. Gate 3 reads the VERIFY evidence the COMPLETION produced (see the completion recipe) — a slice whose recorded verify run FAILED is refused here, and that refusal is the system working. |
 | `claude:edit` | Help user edit the plan (used by the discussion menu's Apply edits) |
 | `claude:approve {ref}` | Run approvePlan(), show result, return to stage list |
 | `claude:create-plan {stage}` | Create new plan in stage, enter discussion. For the implementation stage, derive the global zero-padded number FIRST: `node -e "console.log(require('{{CTOC_ROOT}}/src/lib/plan-numbering').nextImplementationPlanNumber(process.cwd()))"` and name the file `<number>-<slug>.md` (src/lib/plan-numbering.js is the single numbering source — never hand-count) |
@@ -55,8 +59,9 @@ The command outputs JSON: `{ text, ask, actions }`.
 | `claude:stop-agent` | Call stopAgent(). Shows confirmation message. Agent will finish current plan then stop. |
 | `claude:sync` | Run fullPlansSync(), show result |
 | `claude:set-environment {env}` | Persist the chosen CTOC environment: run `node -e "require('${CLAUDE_PLUGIN_ROOT}/src/lib/settings').setSetting('general','environment','{env}')"`, confirm the choice to the user, then continue with the user's pipeline-section choice (or re-open the dashboard if none) — **or, when a 'Stale plans' answer maps to `inbox stale`, navigate there first per Rule 10 (stale-first precedence)**. |
-| `claude:env-decide-later` | **Keep defaults, stop asking (durable).** Persist a durable "keep environment defaults" marker so the environment question stops riding along on future opens, then continue with the user's pipeline-section choice. Confirm the choice ONLY when the durable write reports success; if it fails, report the failure and do not claim it stuck. (The durable-marker write and the renamed **Keep defaults, stop asking** option land in slice R2-C2 in this same wave; until then the write is the R2-C2 function, not a code path on disk here.) |
-| `claude:set-compliance-regime {profile}` | Persist the chosen EU compliance regime. Map `{profile}` to a profile array: `gdpr`→`['gdpr']`; `eu-ai-act`→`['eu-ai-act-high-risk']`; `both`→`['gdpr','eu-ai-act-high-risk']` — run `node -e "require('${CLAUDE_PLUGIN_ROOT}/src/lib/compliance-regime').writeActiveProfiles(process.cwd(), ARR)"` with the mapped array (a fixed literal from the closed enum — never free-text). For `none`, call `declineComplianceRegime(process.cwd())` — it WRITES a durable "declined" marker (no profile activated, but the choice is recorded so the compliance question stops riding along); confirm the choice ONLY when it returns `ok: true`, otherwise report the failure and never claim success. Only writes `regulatory_regime.active_profiles` (or the declined marker); **never weakens a human gate**. (`declineComplianceRegime` lands in slice R2-C2 in this same wave.) |
+| `claude:env-keep-defaults` | **Keep defaults, stop asking (durable).** Run `node -e "require('${CLAUDE_PLUGIN_ROOT}/src/lib/settings').setSetting('general','environment_prompt_dismissed',true,process.cwd())"`. That is the exact marker `settings.needsEnvironmentPrompt()` reads, so the environment question stops riding along on future opens while the environment stays `ask` (defaults apply; it is still changeable any time from System → Settings). Then continue with the user's pipeline-section choice. Confirm the choice ONLY when the write reports success; if it throws, report the failure and do NOT claim it stuck. |
+| `claude:dismiss-stale` | **Don't ask again for these (durable).** The possibly-stale set is dismissed by SIGNATURE, so a plan that later CHANGES re-surfaces. The driver must obtain the candidates first — the same cheap scan the nag count comes from — then dismiss exactly those: `node -e "const s=require('${CLAUDE_PLUGIN_ROOT}/src/lib/stale-detector');const {candidates}=s.scanCheapCandidates(process.cwd());console.log(JSON.stringify(s.dismissStale(process.cwd(), candidates)))"` → `{ok, count}`. Report the `count` dismissed; on `ok:false` report the failure and never claim it stuck. This is the ONLY durable dismissal — "Not now" is a one-turn skip that writes nothing. It dismisses a NAG, never a gate. |
+| `claude:set-compliance-regime {profile}` | Persist the chosen EU compliance regime. Map `{profile}` to a profile array: `gdpr`→`['gdpr']`; `eu-ai-act`→`['eu-ai-act-high-risk']`; `both`→`['gdpr','eu-ai-act-high-risk']` — run `node -e "require('${CLAUDE_PLUGIN_ROOT}/src/lib/compliance-regime').writeActiveProfiles(process.cwd(), ARR)"` with the mapped array (a fixed literal from the closed enum — never free-text). For `none`, call `declineComplianceRegime(process.cwd())` — it WRITES a durable "declined" marker (no profile activated, but the choice is recorded so the compliance question stops riding along); confirm the choice ONLY when it returns `ok: true`, otherwise report the failure and never claim success. Only writes `regulatory_regime.active_profiles` (or the declined marker); **never weakens a human gate**. |
 
 ## Two-Plane Protocol — NAV vs WORK
 
@@ -75,10 +80,10 @@ Resolve the user's reply to an action string `A`, then classify:
    screen synchronously, record no task, minimal reasoning.
 2. `A` is a **NAV-claude** action (`view-edit`, `approve`, `reject`, `delete`,
    `edit`, `edit-stubs`, `add-stub`, `cleanup-exec`, `sync`, `set-environment`,
-   `env-decide-later`, `stop-agent`, `vision`) → run it in the **foreground**, then
-   render. EXCEPTION: a gate-approve on a functional plan (Gate 1) with an autonomous
-   follow-on runs the foreground approve, then dispatches `implementation-planner` as
-   **WORK**.
+   `env-keep-defaults`, `dismiss-stale`, `set-compliance-regime`, `stop-agent`,
+   `vision`) → run it in the **foreground**, then render. EXCEPTION: a gate-approve on
+   a functional plan (Gate 1) with an autonomous follow-on runs the foreground approve,
+   then dispatches `implementation-planner` as **WORK**.
 3. `A` is a **WORK-claude** action (`start-agent` → `implement`, `decompose`,
    `discuss`, `approve-stubs` → `plan`, a `create-plan` discussion → `discuss`) →
    the **WORK dispatch** recipe below. WORK is **never** run in the foreground.
@@ -110,13 +115,47 @@ When a background task fires its task-notification:
 2. Emit **ONE** compact, pull-based inbox notice. **Do not** change or hijack the user's current screen — completions pull, they never push.
 3. **Promote.** For each task in the response's `promote[]` (the scheduler's `nextRunnable` set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
 
+**`menu task complete` on an `implement` task IS the plan completion.** It calls
+`completeTaskPlan` → `completeExecution` (`src/lib/actions.js`): the plan is validated,
+moved in-progress → review, **Step 14 VERIFY is actually RUN** (quality checks plus the
+app-launch last-mile check), and the result is persisted to
+`.ctoc/state/verify/<slug>.json` — **the evidence Gate 3 reads**. Nobody moves a plan file
+by hand; an agent that does leaves a plan with no evidence, and Gate 3 (correctly)
+refuses it. Read the response:
+
+- `{ ok: true, completion: { ran: true, newPath, verify } }` → the plan is in review with
+  its evidence. Say so, and say whether the verify **passed**. A `verify.passed === false`
+  is HONEST and expected sometimes: the plan still reaches review, the evidence records
+  the failure, Gate 3 will refuse it, and the circuit breaker counts a Step-14 kickback.
+  Never re-run or overwrite the evidence to make it green.
+- `{ ok: false, blocked: true, errors }` → the plan **failed pre-review validation**. This
+  is a KICKBACK, not a completion: the task stays `running`, the plan stays in
+  in-progress, and **no evidence is minted**. Surface the errors, fix the named step, and
+  complete again (or `menu task fail <id>` if the work is genuinely abandoned).
+- `{ ok: true, completion: { ran: false, reason } }` → the task's `plan` names no plan
+  file on disk (a review/decompose task, say). Registry-only completion; report the reason.
+
 ### ON-OPEN RECONCILE (NB4)
 
 On menu open (a NAV render), the dashboard reconciles the task registry against the
 live harness **`TaskList`** before rendering. When the Task tool is available, the
 main loop **MUST** pass the live harness agent-id list into the render as
-`liveAgentIds` so a `running` task with a matching live agent is left alone and one
-with no matching live agent is marked `orphaned` precisely. This is load-bearing: it
+`liveAgentIds`, using the flag `menu.js` parses:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js" --live-agent-ids <id1>,<id2>,<id3>
+```
+
+Comma-separated harness agent ids, no spaces (the same ids stamped at
+`menu task start <taskId> --agent-id <harness id>`). **Honesty rule (R3-B): pass the flag
+only when you genuinely queried the live agent list. An EMPTY list means "I could not
+determine liveness" — NOT "nobody is alive".** Omit the flag entirely when the Task tool
+is unavailable, and reconcile falls back to the staleness backstop. Never pass
+`--live-agent-ids` with an empty value to mean "no agents are running": that would falsely
+orphan every live agent.
+
+Passing the real list is load-bearing: a `running` task with a matching live agent is left
+alone and one with no matching live agent is marked `orphaned` precisely. This is
 is the only thing that prevents a legitimately long-running background agent (e.g. an
 `implement` task running past the staleness threshold) from being falsely orphaned
 and offered for a duplicate re-run. Only when that list genuinely cannot be obtained
@@ -173,10 +212,10 @@ yet. Cancelling never crosses a human gate.
 2. Auto-discuss when creating new plans — ask every discussion question via the `.ctoc/ask-me-questions.md` matrix format: one question per turn, the Unicode-box matrix first, then AskUserQuestion
 3. Dashboard pipeline shows the 3 v7 sections: Business, Implementation, Execution, More (counts in descriptions, labels are stable)
 4. **Four human gates** (Gate 0–3, per CLAUDE.md's "4 Mandatory Approval Points"): vision->functional (Gate 0), functional->implementation (Gate 1), implementation->todo (Gate 2), review->done (Gate 3). Each is foreground and human-only; no background task ever crosses one.
-5. Pre-validate before every approve (run `validate` command first)
+5. **Pre-validate before every approve, and CONSUME the `autoApprove` signal.** Run the `validate {stage}/{file}` screen first. It returns `autoApprove: true` on a CLEAN validation — that is a one-turn signal, not decoration: when it is `true`, run the screen's `claude:approve {ref}` action **in the SAME turn** (the human already chose "Approve"; a second "Proceed?" click is a redundant nag). When it is `false`, the screen lists the errors and buries "Approve anyway" as the LAST option — never recommend it. Do NOT auto-run an approve when `autoApprove` is `false`: an override is always the human's explicit, deliberate act. The human still crosses every gate; `autoApprove` only removes the second click on a clean plan.
 6. Menu rendering and all CTOC slash commands inherit the user's chosen session model; no model pin is set in command frontmatter (removed in v6.9.28 to avoid forced context compaction in long sessions)
 7. The menu auto-initializes CTOC on first run: if the project has no `.ctoc/` directory, `menu.js` runs `initProject()` before rendering (creates `.ctoc/`, `plans/`, `CLAUDE.md` if absent). There is no separate init command — opening the menu is the trigger.
-8. Environment question rides along, never gates: when the CTOC environment is unset (`general.environment: ask`), `menu.js` renders the **normal dashboard** (plan overview across all phases) and attaches the environment question as a **second** question in `ask`. Present both questions in one AskUserQuestion call. Handle the answers in this order: if the environment answer is Development/Staging/Production, run `claude:set-environment {env}` first; then follow the pipeline-section action (when a 'Stale plans' question is also present, navigation defers to Rule 10's stale-first precedence). "Keep defaults, stop asking" durably records the keep-defaults choice so the environment question stops riding along (the durable write lands in R2-C2). The dashboard must NEVER be replaced by the environment question. The environment (dev/staging/prod) only tunes CTOC's own behavior — it never weakens the four human gates.
+8. Environment question rides along, never gates: when the CTOC environment is unset (`general.environment: ask`), `menu.js` renders the **normal dashboard** (plan overview across all phases) and attaches the environment question as a **second** question in `ask`. Present both questions in one AskUserQuestion call. Handle the answers in this order: if the environment answer is Development/Staging/Production, run `claude:set-environment {env}` first; then follow the pipeline-section action (when a 'Stale plans' question is also present, navigation defers to Rule 10's stale-first precedence). "Keep defaults, stop asking" maps to `claude:env-keep-defaults`, which durably records the choice (`general.environment_prompt_dismissed: true`) so the environment question stops riding along. The dashboard must NEVER be replaced by the environment question. The environment (dev/staging/prod) only tunes CTOC's own behavior — it never weakens the four human gates.
 
 9. **Reasoning depth, not model switching.** Menu turns use MINIMAL reasoning — the menu is a deterministic script; run it and show the output immediately, with no deliberation before the menu. Plan review, gate, and quality steps dispatch subagents at HIGH/MAX effort (deep thinking, isolated context). Modulate reasoning *effort*, never the session *model* — switching the model mid-session breaks context (see CLAUDE.md).
 

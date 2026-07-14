@@ -580,3 +580,212 @@ describe('NB2 — bounded inputs + pagination (LOW)', () => {
     assert.match(list, /\+30 more/, 'overflow line present');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R3-D — KEY/RECIPE PARITY (a PERMANENT fence).
+//
+// A `claude:*` action key the menu EMITS but menu.md carries no recipe for is a
+// DEAD BUTTON: the human picks it and the session has no instruction for what to
+// do. Two shipped buttons were exactly that (`claude:dismiss-stale`,
+// `claude:env-keep-defaults`) while menu.md documented a name nothing emits.
+// This fence fails the moment anyone adds a key without a recipe.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SRC = path.join(__dirname, '..', 'src');
+
+/** Every `claude:<key>` token that appears in a menu-EMITTING source file. */
+function emittedActionKeys() {
+  const files = [
+    path.join(SRC, 'lib', 'menu-screens.js'),
+    path.join(SRC, 'commands', 'menu.js'),
+  ];
+  const keys = new Set();
+  for (const f of files) {
+    const text = fs.readFileSync(f, 'utf8');
+    const re = /claude:([a-z][a-z0-9-]*)/g;
+    let m;
+    while ((m = re.exec(text)) !== null) keys.add(m[1]);
+  }
+  return keys;
+}
+
+/** Every `claude:<key>` documented as a recipe row in src/commands/menu.md. */
+function documentedActionKeys() {
+  const text = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+  const keys = new Set();
+  const re = /^\|\s*`claude:([a-z][a-z0-9-]*)/gm;
+  let m;
+  while ((m = re.exec(text)) !== null) keys.add(m[1]);
+  return keys;
+}
+
+describe('R3-D — every emitted claude: action key has a recipe in menu.md', () => {
+  it('PARITY: no dead buttons — every key the menu emits is documented', () => {
+    const emitted = emittedActionKeys();
+    const documented = documentedActionKeys();
+    // Non-vacuity: if either side reads as empty the fence is broken, not passing.
+    assert.ok(emitted.size >= 15, `expected the real emitted-key set, saw ${emitted.size}`);
+    assert.ok(documented.size >= 15, `expected the real documented-key set, saw ${documented.size}`);
+
+    const missing = [...emitted].filter((k) => !documented.has(k)).sort();
+    assert.deepEqual(
+      missing,
+      [],
+      'These action keys are EMITTED by the menu but have NO recipe in src/commands/menu.md — ' +
+      'a human can pick them and the session has no instruction for what to do:\n  ' +
+      missing.map((k) => `claude:${k}`).join('\n  ')
+    );
+  });
+
+  it('PARITY(reverse): menu.md documents no recipe for a key nothing emits (a lie in the other direction)', () => {
+    const emitted = emittedActionKeys();
+    const documented = documentedActionKeys();
+    const orphaned = [...documented].filter((k) => !emitted.has(k)).sort();
+    assert.deepEqual(
+      orphaned,
+      [],
+      'menu.md documents recipes for keys the menu never emits (stale instructions):\n  ' +
+      orphaned.map((k) => `claude:${k}`).join('\n  ')
+    );
+  });
+
+  it('the two dead durable-stop buttons now have recipes naming their real functions', () => {
+    const md = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+    assert.match(md, /claude:dismiss-stale/, 'dismiss-stale recipe present');
+    assert.match(md, /dismissStale/, 'the dismiss-stale recipe names the real function');
+    assert.match(md, /scanCheapCandidates/, 'the recipe shows how the driver obtains the candidates');
+    assert.match(md, /claude:env-keep-defaults/, 'env-keep-defaults recipe present');
+    assert.match(md, /environment_prompt_dismissed/, 'the env recipe names the real durable key');
+    assert.ok(
+      !/lands in slice R2-C2 in this same wave/i.test(md),
+      'menu.md must not deny code that now exists on disk'
+    );
+    assert.ok(
+      !/is not a code path on disk here/i.test(md),
+      'menu.md must not claim a shipped code path does not exist'
+    );
+  });
+
+  it('menu.md documents --live-agent-ids (the flag the ON-OPEN RECONCILE depends on)', () => {
+    const md = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+    assert.match(md, /--live-agent-ids/, 'the flag syntax is documented');
+    assert.match(md, /EMPTY list/i, 'an EMPTY list means unavailable, not "nobody is alive" — stated honestly');
+  });
+
+  it('menu.md consumes the autoApprove signal (the one-turn approve is real, not a lie)', () => {
+    const md = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+    assert.match(md, /autoApprove/, 'the driver instruction reads the autoApprove signal');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R3-D — the escalations door (a count with no door is the defect) + the
+// deploy-ready reader (no claim without a reader).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('R3-D — inbox escalations door', () => {
+  function seedEscalation(r, plan) {
+    const dir = path.join(r, '.ctoc', 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'escalations.json'), JSON.stringify([
+      { type: 'same-step', plan, step: '14', count: 4, at: '2026-07-14T09:00:00.000Z' },
+    ], null, 2));
+  }
+
+  it('D1: the escalations count has a DOOR — `inbox escalations` lists the seeded escalation', () => {
+    seedEscalation(root, 'stuck-plan.md');
+    const screen = ms.route(['inbox', 'escalations'], root);
+    assert.match(screen.text, /stuck-plan/, 'the escalated plan is listed');
+    assert.match(screen.text, /Escalation/i, 'the screen names itself');
+    assert.ok(screen.actions['◀ Back'] != null, 'Back is always reachable');
+  });
+
+  it('D2: the dashboard escalation line names its door route', () => {
+    seedEscalation(root, 'stuck-plan.md');
+    const dash = ms.buildDashboardTable(root);
+    assert.match(dash, /circuit-breaker escalation/, 'the count is rendered');
+    assert.match(dash, /inbox escalations/, 'the count names its door (a count with no door is the defect)');
+  });
+
+  it('D3: a deploy-ready notice is READ and surfaced (no claim without a reader)', () => {
+    const dir = path.join(root, '.ctoc', 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'deploy-ready.json'), JSON.stringify([
+      { plan: 'shipme.md', at: '2026-07-14T09:00:00.000Z', status: 'deploy-ready', message: 'awaiting the deploy ship gate' },
+    ], null, 2));
+    const dash = ms.buildDashboardTable(root);
+    assert.match(dash, /deploy-ready/i, 'the dashboard surfaces the deploy-ready notice');
+    const screen = ms.route(['inbox', 'escalations'], root);
+    assert.match(screen.text, /shipme/, 'the door lists the deploy-ready plan');
+  });
+
+  it('D4: a project with NO escalations and NO deploy notices adds ZERO output (no regression)', () => {
+    const dash = ms.buildDashboardTable(root);
+    assert.ok(!/escalation/i.test(dash), 'no escalation line when there are none');
+    assert.ok(!/deploy-ready/i.test(dash), 'no deploy line when there are none');
+    assert.match(dash, /Inbox clear/, 'a fresh project still reads "Inbox clear"');
+  });
+
+  it('D5: a hostile plan name in the escalations log cannot inject control chars (stripCtl)', () => {
+    seedEscalation(root, 'evil\u001b[2Jplan\nforged-row');
+    const screen = ms.route(['inbox', 'escalations'], root);
+    // Newlines are the render's own row separators; what must NEVER survive is a
+    // control char smuggled in from the DATA (ESC/CR/BS…), nor a data newline that
+    // forges its own row.
+    assert.ok(!/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/.test(screen.text), 'no smuggled C0/C1 control char reaches the render');
+    assert.ok(!/^\s*forged-row/m.test(screen.text), 'the embedded newline cannot forge its own row');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R3-D — the `stubs` route is unblocked (the natural next hop after a decompose
+// completion was the ONE route gate-safety forbade).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('R3-D — isNavRoute allowlist covers every real NAV route', () => {
+  it('N1: `stubs <slug>` and `menu commands` are accepted (they are NAV routes in menu.md)', () => {
+    assert.equal(taskView.isNavRoute('stubs my-vision'), true, 'stubs is a NAV route');
+    assert.equal(taskView.isNavRoute('menu commands'), true, 'menu is a NAV route');
+  });
+
+  it('N2: the allowlist is still an ALLOWLIST — gate-crossers and junk stay rejected', () => {
+    assert.equal(taskView.isNavRoute('claude:approve review/x.md'), false);
+    assert.equal(taskView.isNavRoute('claude:done-all-parent'), false);
+    assert.equal(taskView.isNavRoute('rm -rf plans/'), false);
+    assert.equal(taskView.isNavRoute('stubsomething'), false, 'word-boundary is enforced, not a prefix match');
+  });
+
+  it('N3: a decompose completion recording `--next "stubs <slug>"` is ACCEPTED and renders', () => {
+    const add = ms.route(['menu', 'task', 'add', 'decompose', 'my-vision'], root);
+    ms.route(['menu', 'task', 'start', add.taskId], root);
+    const res = ms.route(['menu', 'task', 'complete', add.taskId, '--gate', '0', '--next', 'stubs my-vision'], root);
+    assert.equal(res.ok, true, 'the natural next hop after decomposition must not be rejected wholesale');
+    const t = taskRegistry.load(root).tasks.find((x) => x.id === add.taskId);
+    assert.equal(t.result.nextAction, 'stubs my-vision');
+    const detail = taskView.renderTaskDetail(taskRegistry.load(root), add.taskId);
+    assert.ok(Object.values(detail.actions).includes('stubs my-vision'), 'the detail screen offers the stubs hop');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R3-D — the executor agent stops fighting the scheduler and never moves a plan.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('R3-D — the iron-loop-executor definition', () => {
+  const EXECUTOR = path.join(__dirname, '..', 'agents', 'iron-loop', 'iron-loop-executor.md');
+  const def = fs.readFileSync(EXECUTOR, 'utf8');
+
+  it('X1: it no longer moves a plan file itself — completion goes through the menu route', () => {
+    assert.ok(!/MOVE plan: in-progress/i.test(def), 'no raw in-progress → review move');
+    assert.ok(!/mv plans\//i.test(def), 'no shell plan move');
+    assert.match(def, /menu task complete/, 'completion runs the real completion route');
+    assert.match(def, /completeExecution/, 'the definition names the real completion function');
+  });
+
+  it('X2: it no longer counts, claims, or yanks sibling plans (the scheduler owns concurrency)', () => {
+    assert.ok(!/ONE PLAN AT A TIME/i.test(def), 'the one-plan-at-a-time rule is gone');
+    assert.ok(!/move extras back to todo/i.test(def), 'it never yanks a live sibling back to todo');
+    assert.ok(!/ls -t plans\/todo/i.test(def), 'it does not self-select a plan from the queue');
+    assert.match(def, /ONLY on the plan named in your brief/i, 'it operates only on the plan it was given');
+  });
+});

@@ -1,0 +1,10 @@
+{
+  "content_sha256": "7cca66fdb134c1e2051063a195fd10e83faa921cea856f0ba5f620ba346f20f6",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T02:13:44.675Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: Claude wrote approved_by:human into plan frontmatter directly instead of crossing Gate 2 via approvePlan — a forged marker. The WORK was ordered by the human (\"fix them all\", \"fix everything\"); the PROVENANCE path was wrong. Recorded as backfilled so it stays distinguishable from a clicked approval.",
+  "plan_basename": "00009-r2i-stale-cleanup-provenance"
+}

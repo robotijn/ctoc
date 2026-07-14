@@ -230,7 +230,11 @@ function buildDashboardTable(projectPath, opts = {}) {
   const inbox = getInboxCounts(root);
   const stale = inbox.staleCandidates || 0;
   const escalations = inbox.escalations || 0;
-  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale + escalations;
+  // R3-D: the deploy-ready log finally has a READER (a claim without a reader is a
+  // lie). Counted into the inbox total so a deploy-ready plan cannot sit invisible
+  // behind "Inbox clear"; zero notices add zero output (no dashboard regression).
+  const deployReady = readDeployReady(root).length;
+  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale + escalations + deployReady;
   // NB2: completed background work slots into the inbox as a pull notice (D3).
   let bgLine = '';
   try { bgLine = taskView.tasksInboxLine(taskReg); } catch { bgLine = ''; }
@@ -247,7 +251,13 @@ function buildDashboardTable(projectPath, opts = {}) {
       // (dead) door hint.
       out += `  ⊙ ${inbox.questions} morning question${inbox.questions === 1 ? '' : 's'}${inbox.questions > 0 ? ' · view: inbox questions' : ''}\n`;
       if (escalations > 0) {
-        out += `  ⛔ ${escalations} circuit-breaker escalation${escalations === 1 ? '' : 's'} — a plan keeps failing and needs you\n`;
+        // R3-D: the most urgent signal in the system now NAMES ITS DOOR. It was the
+        // one count rendered with no route — the exact "a count with no door is the
+        // defect" bug W1 closed for the other three.
+        out += `  ⛔ ${escalations} circuit-breaker escalation${escalations === 1 ? '' : 's'} — a plan keeps failing and needs you · view: inbox escalations\n`;
+      }
+      if (deployReady > 0) {
+        out += `  ⊙ ${deployReady} plan${deployReady === 1 ? '' : 's'} deploy-ready — deploy is a separate ship gate · view: inbox escalations\n`;
       }
       out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review${inbox.decisions > 0 ? ' · view: inbox decisions' : ''}\n`;
       out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates${inbox.gatesWaiting > 0 ? ' · view: inbox gates' : ''}\n`;
@@ -553,6 +563,100 @@ function inboxDecisionsScreen(projectPath) {
     return `${who}${step}${amb}${age ? '  ' + age : ''}${where ? '  ' + where : ''}`;
   });
   return _inboxDoorScreen('Decisions awaiting review', items.length, rows, 'No decisions awaiting review.');
+}
+
+/**
+ * Read the deploy-ready notices written by `actions.recordDeployReadyNotice` at
+ * Gate 3 (a plan approved review → done is DEPLOY-READY, but deploy is a SEPARATE
+ * human ship gate, so the pipeline records a notice instead of deploying).
+ *
+ * R3-D: that writer claimed "the menu/inbox surface reads this log" and NO reader
+ * existed — a claim with no reader is a lie. This is the reader. Fail-open: a
+ * missing or corrupt log is zero notices, never a crash.
+ *
+ * @param {string} root
+ * @returns {Array<{plan:string, at:string, message:string}>}
+ */
+function readDeployReady(root) {
+  try {
+    const file = path.join(root, '.ctoc', 'logs', 'deploy-ready.json');
+    if (!safeFs.existsSync(file)) return [];
+    const parsed = JSON.parse(safeFs.readFileSync(file, 'utf8'));
+    return Array.isArray(parsed) ? parsed.filter((e) => e && typeof e === 'object') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Inbox ▸ Escalations & deploy-ready — the door behind the dashboard's
+ * "⛔ N circuit-breaker escalations" count (route `inbox escalations`), and the
+ * reader for the deploy-ready notices.
+ *
+ * R3-D: the escalation count is the MOST URGENT signal in the system — a plan that
+ * keeps failing and needs a human — and it was rendered with NO route to open it.
+ * Same "a count with no door is the defect" bug W1 fixed for the other three counts.
+ * Read-only: this screen opens nothing and crosses nothing; every attacker-
+ * influenceable field (a plan slug or step out of the log) passes through stripCtl.
+ *
+ * @param {string} [projectPath]
+ */
+function inboxEscalationsScreen(projectPath) {
+  const root = getProjectPath(projectPath);
+
+  let escalations = [];
+  try {
+    const { listEscalations } = require('./inbox');
+    escalations = listEscalations(root) || [];
+  } catch {
+    escalations = []; // fail-open: the door still opens
+  }
+  const deploys = readDeployReady(root);
+
+  const total = escalations.length + deploys.length;
+  let text = `Inbox ▸ Escalations & deploy-ready (${total})\n${'─'.repeat(40)}\n\n`;
+
+  if (escalations.length === 0) {
+    text += '  No circuit-breaker escalations.\n';
+  } else {
+    text += `  Circuit-breaker escalations (${escalations.length}) — a plan keeps failing and needs you\n`;
+    for (const e of escalations.slice(0, INBOX_DOOR_MAX_ROWS)) {
+      const plan = stripCtl(String(e.plan || '(unknown plan)'));
+      const detail = e.type === 'same-step'
+        ? `Step ${stripCtl(String(e.step))} kicked back ${stripCtl(String(e.count))}× (max 3)`
+        : `${stripCtl(String(e.total))} kickbacks total (max 5)`;
+      const age = stripCtl(_inboxAge(e.at));
+      text += `  • ${plan}  ${detail}${age ? '  ' + age : ''}\n`;
+    }
+    if (escalations.length > INBOX_DOOR_MAX_ROWS) {
+      text += `  … and ${escalations.length - INBOX_DOOR_MAX_ROWS} more\n`;
+    }
+  }
+
+  if (deploys.length > 0) {
+    text += `\n  Deploy-ready (${deploys.length}) — approved at Gate 3; deploy is a SEPARATE human ship gate\n`;
+    for (const d of deploys.slice(0, INBOX_DOOR_MAX_ROWS)) {
+      const plan = stripCtl(String(d.plan || '(unknown plan)'));
+      const age = stripCtl(_inboxAge(d.at));
+      text += `  • ${plan}${age ? '  ' + age : ''}\n`;
+    }
+    if (deploys.length > INBOX_DOOR_MAX_ROWS) {
+      text += `  … and ${deploys.length - INBOX_DOOR_MAX_ROWS} more\n`;
+    }
+  }
+  text += '\n\n\n';
+
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: 'Escalations & deploy-ready notices (read-only).',
+        header: 'Inbox',
+        options: [{ label: '◀ Back', description: 'Return to dashboard' }],
+      }],
+    },
+    actions: { '◀ Back': '' },
+  };
 }
 
 /**
@@ -1787,7 +1891,27 @@ function taskTransition(root, rest, kind) {
   return res;
 }
 
-/** `menu task complete` — running → done, storing an optional result payload. */
+/**
+ * `menu task complete` — running → done, storing an optional result payload.
+ *
+ * R3-D — THE LAST MILE. For an `implement` task this is no longer a registry-only
+ * status flip: it runs the REAL completion (`actions.completeTaskPlan` →
+ * `completeExecution`), which validates the plan, moves it in-progress → review,
+ * RUNS Step 14 VERIFY (including the app-launch last-mile check), and persists the
+ * evidence artifact Gate 3 demands. Before this wiring `completeExecution` had ZERO
+ * callers: no evidence was ever produced, and Gate 3 — correctly fail-closed on
+ * missing evidence — was un-passable except by clicking "Approve anyway".
+ *
+ * A BLOCKED completion (the plan cannot pass pre-review validation) REFUSES the
+ * whole complete: the task stays running, the plan stays in in-progress, and NO
+ * evidence is minted. That is a kickback, not a completion — the completion path
+ * must never fabricate the very evidence the gate exists to demand.
+ *
+ * Every other outcome completes as before: a non-implement task, or an implement
+ * task whose plan file is not on disk, is a registry-only completion (reported via
+ * `completion`, never thrown) so a scheduler task can never be wedged by a missing
+ * plan file.
+ */
 function taskComplete(root, rest) {
   const p = parseTaskArgs(rest);
   const id = p.positional[0];
@@ -1817,11 +1941,66 @@ function taskComplete(root, rest) {
   if (summary != null) result.summary = summary;
   if (nextAction != null) result.nextAction = nextAction;
   if (gate != null) result.gate = gate;
+
+  // R3-D: run the REAL plan completion for an implement task BEFORE settling the
+  // task, so a refusal (failed pre-review validation) can still stop the completion.
+  // Lazy-required: actions.js is a heavier module and the NAV plane must stay thin.
+  let completion = null;
+  if (task.kind === 'implement' && !p.fail && task.plan != null) {
+    try {
+      const { completeTaskPlan } = require('./actions');
+      completion = completeTaskPlan(root, task.plan);
+    } catch (err) {
+      // A completion ERROR is never swallowed (that is how evidence-less plans used
+      // to reach review). Surface it and refuse — the task stays running.
+      return {
+        ok: false,
+        taskId: id,
+        error: `plan completion failed: ${err && err.message ? err.message : String(err)}`,
+        text: `Task ${id} NOT completed — the plan completion threw: ${stripCtl(String(err && err.message))}`,
+      };
+    }
+    if (completion.blocked === true) {
+      const detail = (completion.errors || []).map(stripCtl).join('; ');
+      return {
+        ok: false,
+        taskId: id,
+        blocked: true,
+        error: 'plan failed pre-review validation',
+        errors: completion.errors || [],
+        text:
+          `Task ${id} NOT completed — ${stripCtl(task.plan)} failed pre-review validation ` +
+          `and stays in in-progress (this is a kickback, recorded by the circuit breaker): ${detail}`,
+      };
+    }
+  }
+
   taskRegistry.updateTask(reg, id, { status: 'done', result });
   taskRegistry.save(root, reg);
+
+  // The completion may have run its OWN registry write (the task/plan coupling in
+  // completeExecution). Reload so `promote` is computed from the settled truth on
+  // disk, never from the pre-completion snapshot in memory.
+  const settled = completion && completion.ran ? taskRegistry.load(root) : reg;
+
+  let text = `Task ${id} → done`;
+  if (completion && completion.ran && completion.newPath) {
+    const verified = completion.verify ? (completion.verify.passed ? 'VERIFY passed' : 'VERIFY FAILED') : 'no verify';
+    text += ` · plan → review (${verified}; evidence recorded for Gate 3)`;
+  } else if (completion && completion.ran === false) {
+    text += ` · ${stripCtl(String(completion.reason))}`;
+  }
+
   // NB3: a completion frees a slot → surface the scheduler's newly-runnable set for
   // the COMPLETION turn to promote (scheduler-consulted every completion, Decision 4).
-  return { ok: true, taskId: id, status: 'done', text: `Task ${id} → done`, promote: computePromote(reg) };
+  return {
+    ok: true,
+    taskId: id,
+    status: 'done',
+    text,
+    completion,
+    promote: computePromote(settled),
+  };
 }
 
 /** `menu task list` — a pure read of the registry for rendering. */
@@ -1927,6 +2106,7 @@ function route(args, projectPath, opts = {}) {
       if (args[1] === 'questions') return inboxQuestionsScreen(projectPath);
       if (args[1] === 'decisions') return inboxDecisionsScreen(projectPath);
       if (args[1] === 'gates') return inboxGatesScreen(projectPath);
+      if (args[1] === 'escalations') return inboxEscalationsScreen(projectPath);
       if (args[1] === 'verify') return inboxVerifyProposals(projectPath);
       if (args[1] === 'stale') return inboxStalePlansDrillIn(projectPath);
       if (args[1] === 'cleanup') {
@@ -1992,6 +2172,10 @@ module.exports = {
   inboxQuestionsScreen,
   inboxDecisionsScreen,
   inboxGatesScreen,
+  // NOTE: inboxEscalationsScreen is deliberately NOT exported. It is reached the way a
+  // human reaches it — through `route(['inbox','escalations'])` — and exporting it
+  // solely so a test could call it directly would add a dead export on the very day
+  // the dead-export fence shipped. Tests drive it through the router, like the user.
   inboxStalePlansDrillIn,
   inboxVerifyProposals,
   inboxCleanupReview,

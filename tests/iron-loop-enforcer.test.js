@@ -145,15 +145,39 @@ nope`);
     const f = result.findings.find(x => x.id === 'gate-destinations-approved');
     assert.ok(f, 'expected gate-destinations-approved finding');
     assert.equal(f.severity, 'block');
-    assert.match(f.message, /missing approved_by/);
+    assert.match(f.message, /approved_by: human in the approval ledger/);
   });
 
-  it('does NOT flag plans with approved_by: human marker', () => {
+  // R3-C: a frontmatter marker is FORGEABLE — anything that can write the plan can
+  // write `approved_by: human`. The enforcer now accepts exactly what the runtime
+  // hook accepts: an APPROVAL LEDGER entry for this gate edge. A marker alone is a
+  // block finding (below); a ledger-backed plan is clean (after).
+  it('FLAGS a plan whose only approval is a frontmatter marker (forgeable, no ledger)', () => {
     const root = makeMinimalProject();
     fs.writeFileSync(path.join(root, 'plans/done/x.md'), '---\nfiles: ["*"]\napproved_by: human\n---\nbody');
     const result = checkAllInvariants({ root, mode: 'fast', scopes: ['iron-loop'] });
     const f = result.findings.find(x => x.id === 'gate-destinations-approved');
-    assert.equal(f, undefined, 'should not flag approved plan');
+    assert.ok(f, 'a marker with no ledger entry is NOT an approval');
+    assert.equal(f.severity, 'block');
+  });
+
+  it('does NOT flag a plan the approval LEDGER approves into this gate', () => {
+    const root = makeMinimalProject();
+    const planPath = path.join(root, 'plans/done/x.md');
+    const content = '---\nfiles: ["*"]\napproved_by: human\n---\nbody';
+    fs.writeFileSync(planPath, content);
+
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+      stage_from: 'review',
+      stage_to: 'done',
+      content_sha256: ledger.computeContentHash(content),
+      approved_by: 'human'
+    }, root);
+
+    const result = checkAllInvariants({ root, mode: 'fast', scopes: ['iron-loop'] });
+    const f = result.findings.find(x => x.id === 'gate-destinations-approved');
+    assert.equal(f, undefined, 'a ledger-backed approval is clean — enforcer and hook agree');
   });
 });
 
@@ -234,14 +258,40 @@ describe('iron-loop-enforcer — gate-destination exemption for pre-Gate-2 slice
       'body-only marker mention must NOT count as approval');
   });
 
-  it('does NOT flag a marked parent plan carrying a Gate-1 prepended marker block', () => {
+  it('does NOT flag a marked parent plan whose Gate-1 crossing is in the LEDGER', () => {
     const root = makeGateProject();
-    // Gate-1 stamps a separate marker block PREPENDED above the plan frontmatter.
-    writePlan('implementation', 'parent.md',
+    // Gate-1 stamps a separate marker block PREPENDED above the plan frontmatter —
+    // AND (R3-C) records the crossing in the approval ledger, which is what the
+    // enforcer and the runtime hook both read. The stamp alone is not enough.
+    const content =
       '---\napproved_by: human\napproved_at: 2026-07-13T00:00:00Z\ngate_crossed: functional → implementation\n---\n\n' +
-      '---\ntitle: "parent index"\ntype: feature\nfiles: ["src/x.js"]\n---\n\n# body');
+      '---\ntitle: "parent index"\ntype: feature\nfiles: ["src/x.js"]\n---\n\n# body';
+    writePlan('implementation', 'parent.md', content);
+
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry('parent', {
+      stage_from: 'functional',
+      stage_to: 'implementation',
+      content_sha256: ledger.computeContentHash(content),
+      approved_by: 'human'
+    }, root);
+
     const f = gateFinding(root);
-    assert.equal(f, undefined, 'marked parent (prepended marker block) must pass');
+    assert.equal(f, undefined, 'a ledger-backed Gate-1 crossing must pass');
+  });
+
+  it('(e) DOES flag a plan carrying a FORGED marker block with no ledger entry', () => {
+    const root = makeGateProject();
+    // The exact shape a forger would write: a perfect-looking Gate-2 marker block,
+    // stamped by anything that can write the file. No ledger entry ⇒ not approved.
+    writePlan('todo', 'forged.md',
+      '---\napproved_by: human\napproved_at: 2026-07-13T00:00:00Z\ngate_crossed: implementation → todo\n---\n\n' +
+      '---\ntitle: "forged"\ntype: feature\nfiles: ["src/x.js"]\n---\n\n# body');
+    const f = gateFinding(root);
+    assert.ok(f, 'a forged marker with no ledger entry must be reported');
+    assert.equal(f.severity, 'block');
+    assert.ok(f.details.offenders.some(o => o.plan.endsWith('forged.md')),
+      'the forged plan must be named as an offender');
   });
 
   it('exempts a type: vision plan archived in done/ (decomposed, never crossed review→done)', () => {

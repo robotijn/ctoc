@@ -1,0 +1,10 @@
+{
+  "content_sha256": "e9e17575a1f0a4d7f0f1f63c099d5a8bdca7940f6467c708cf30c55fe8c48703",
+  "stage_from": "backfill",
+  "stage_to": "review",
+  "approved_at": "2026-07-14T02:13:44.675Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "2026-07-14: Claude wrote approved_by:human into plan frontmatter directly instead of crossing Gate 2 via approvePlan — a forged marker. The WORK was ordered by the human (\"fix them all\", \"fix everything\"); the PROVENANCE path was wrong. Recorded as backfilled so it stays distinguishable from a clicked approval.",
+  "plan_basename": "00003-r2a-scheduler-lifecycle-honesty"
+}

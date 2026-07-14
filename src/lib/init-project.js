@@ -134,7 +134,12 @@ const PLAN_DIRS = [
 ];
 
 /**
- * CTOC config directory structure
+ * CTOC config directory structure.
+ *
+ * Everything here is state the USER's project genuinely owns. `skills/agent-fragments`
+ * was removed (R3-D): it is CTOC-INTERNAL plumbing, and scaffolding it into a user's
+ * repo dropped an empty, unexplained `skills/` tree into projects that have no skills —
+ * CTOC's own furniture in someone else's house.
  */
 const CTOC_DIRS = [
   '.ctoc',
@@ -147,8 +152,7 @@ const CTOC_DIRS = [
   '.ctoc/learnings/pending',
   '.ctoc/learnings/approved',
   '.ctoc/learnings/applied',
-  '.ctoc/learnings/rejected',
-  'skills/agent-fragments'
+  '.ctoc/learnings/rejected'
 ];
 
 /**
@@ -800,7 +804,10 @@ function formatInitResult(result) {
   lines.push('');
   lines.push('Next steps:');
   lines.push('  1. Review the generated CLAUDE.md');
-  lines.push('  2. Run: ctoc plan new "your first feature"');
+  // `ctoc plan new` is NOT a command — no such CLI exists, and telling a brand-new
+  // user to run it was the first thing CTOC ever said to them. CTOC ships exactly
+  // three slash commands (menu, push, update); every workflow goes through the menu.
+  lines.push('  2. Run /ctoc:menu — create your first plan from the dashboard');
   lines.push('  3. Follow the Iron Loop!');
 
   return lines.join('\n');

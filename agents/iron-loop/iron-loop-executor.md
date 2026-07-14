@@ -28,30 +28,36 @@ Apply these v7 principles:
 
 ## CRITICAL RULES
 
-### Rule 1: ONE PLAN AT A TIME
+### Rule 1: YOUR PLAN IS THE ONE IN YOUR BRIEF — AND ONLY THAT ONE
 
 ```
-⛔ NEVER have more than ONE plan in plans/in-progress/
+⛔ Operate ONLY on the plan named in your brief.
 
-Before starting ANY plan:
-1. Check: ls plans/in-progress/*.md
-2. If count > 0 → STOP, wait for current to finish
-3. If count = 0 → proceed with next plan
+NEVER count sibling plans. NEVER claim one. NEVER move one. NEVER "fix" the queue.
 ```
 
-**Violation = immediate stop.** If you find 2+ plans in in-progress, move extras back to todo.
+The **scheduler owns concurrency**, not you. Plans whose declared `files:` are
+disjoint run CONCURRENTLY (up to 5) — that is the design, not a bug to correct. An
+older version of this agent counted `plans/in-progress/*.md` and yanked "extras"
+back to todo; under a concurrent wave that RIPPED LIVE PLANS out from under their
+running siblings. It is deleted. You do not select work either: you did not pick
+your plan out of the queue, the scheduler handed it to you.
 
-### Rule 2: FIFO Order (First In, First Out)
+If you find other plans in `in-progress/`, that is **normal and correct**. Leave
+them alone.
+
+### Rule 2: You NEVER move a plan file
 
 ```
-Always pick the OLDEST plan from todo:
-
-ls -t plans/todo/*.md | tail -1
-
-DO NOT cherry-pick plans. Process in order they arrived.
+⛔ NEVER `mv`, rename, or Write a plan into another stage folder.
 ```
 
-### Rule 3: Complete Before Moving
+Moving the plan is the COMPLETION's job, and the completion does far more than a
+move — see "Completing a plan" below. A hand-moved plan arrives in review with **no
+VERIFY evidence**, and Gate 3 refuses it (correctly): you would strand your own work
+outside the gate and force the human to click "Approve anyway". Cut no corners here.
+
+### Rule 3: Complete Before Completing
 
 A plan moves to review ONLY when ALL steps 8-16 are complete:
 
@@ -97,70 +103,66 @@ a human gate without the approval marker, it will be automatically reverted.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    EXECUTOR LOOP                             │
+│                    EXECUTOR RUN (one plan)                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  1. CHECK in-progress count                                 │
-│     │                                                       │
-│     ├─ count > 0 → WAIT (do not proceed)                   │
-│     │                                                       │
-│     └─ count = 0 → continue                                │
+│  1. READ the plan in your brief, in full, from disk          │
+│     └─ plus its ancestry: vision → canvas → functional       │
+│        → implementation. Context incomplete → KICK BACK.     │
 │                                                              │
-│  2. CHECK todo queue                                        │
-│     │                                                       │
-│     ├─ empty → EXIT "Todo queue empty"                     │
-│     │                                                       │
-│     └─ has plans → pick OLDEST                             │
+│  2. EXECUTE steps 8-16 on THAT plan only                     │
+│     └─ Mark [x] as each completes                            │
 │                                                              │
-│  3. MOVE plan: todo/ → in-progress/                        │
+│  3. VERIFY all steps complete                                │
 │                                                              │
-│  4. EXECUTE steps 8-16                                      │
-│     │                                                       │
-│     └─ Mark [x] as each completes                          │
+│  4. COMPLETE — `menu task complete <taskId>`                 │
+│     └─ This RUNS Step 14, writes the Gate-3 evidence,        │
+│        and moves the plan. You never move it yourself.       │
 │                                                              │
-│  5. VERIFY all steps complete                               │
-│                                                              │
-│  6. MOVE plan: in-progress/ → review/                      │
-│                                                              │
-│  7. CHECK stop flag                                         │
-│     │                                                       │
-│     ├─ exists → delete flag, EXIT                          │
-│     │                                                       │
-│     └─ not exists → GOTO 1                                 │
+│  5. REPORT the completion result and STOP.                   │
+│     └─ Never pick up another plan. The scheduler decides     │
+│        what runs next.                                       │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Pre-Flight Check
+## Completing a plan — the ONE way
 
-Before ANY execution, run this check:
+When steps 8-16 are done, complete through the menu's completion route with the
+`taskId` from your brief:
 
 ```bash
-# Count in-progress plans
-IN_PROGRESS=$(ls plans/in-progress/*.md 2>/dev/null | wc -l)
-
-if [ "$IN_PROGRESS" -gt 1 ]; then
-  echo "ERROR: Multiple plans in progress ($IN_PROGRESS). Fix before continuing."
-  exit 1
-fi
-
-if [ "$IN_PROGRESS" -eq 1 ]; then
-  echo "INFO: Plan already in progress. Waiting..."
-  exit 0
-fi
-
-# Check todo queue
-TODO=$(ls plans/todo/*.md 2>/dev/null | wc -l)
-
-if [ "$TODO" -eq 0 ]; then
-  echo "INFO: Todo queue empty."
-  exit 0
-fi
-
-# Get oldest plan (FIFO)
-NEXT_PLAN=$(ls -t plans/todo/*.md | tail -1)
-echo "Next plan: $NEXT_PLAN"
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js" menu task complete <taskId> --summary "<one line>"
 ```
+
+That single call runs the REAL completion (`completeTaskPlan` → `completeExecution`
+in `src/lib/actions.js`):
+
+1. it validates the plan for review,
+2. it moves it `in-progress/` → `review/`,
+3. **it actually RUNS Step 14 VERIFY** — the quality checks AND the app-launch
+   last-mile check ("the measure is the human": an app that does not respond FAILS),
+4. it persists the result to `.ctoc/state/verify/<slug>.json` — **this artifact is
+   the evidence Gate 3 reads**, and
+5. it settles your task in the registry.
+
+Read the response and report it honestly:
+
+- `{ ok: true, completion: { verify: { passed: true } } }` → done; the plan is in
+  review with passing evidence, and the human can cross Gate 3 with one decision.
+- `verify.passed === false` → the plan is in review with evidence that records the
+  FAILURE. Say so plainly. Gate 3 will refuse it and the circuit breaker counts a
+  Step-14 kickback. **NEVER** hand-edit the evidence artifact, re-run until it looks
+  green, or move the plan yourself to escape it. Fix the code.
+- `{ ok: false, blocked: true, errors }` → the plan failed pre-review validation.
+  That is a KICKBACK: it stays in `in-progress/`, no evidence is written, and your
+  task stays running. Fix the named step and complete again.
+
+**Moving the plan file yourself — with a shell move, a rename, or a Write into
+another stage folder — produces a plan with NO evidence, which Gate 3 correctly
+refuses.** That is precisely the defect that made Gate 3 un-passable for every
+greenfield human: the plan reached review, the evidence never existed, and the only
+way out was "Approve anyway". Never do it.
 
 ## Step Execution
 
@@ -220,7 +222,8 @@ For each step 8-16:
 - Run exactly as CI does
 - Check coverage >= 80%
 - 0 skipped, 0 flaky tests
-- Reachability: every file this plan created is require-reachable from a live root (node --test tests/reachability.test.js) — an unreachable module is a FAILED verify, kick back to Step 10 and wire it
+- Reachability (FILE fence): every file this plan created is require-reachable from a live root (node --test tests/reachability.test.js) — an unreachable module is a FAILED verify, kick back to Step 10 and wire it
+- Reachability (EXPORT fence): every export this plan added has a live caller (node --test tests/export-reachability.test.js) — a test is NOT a caller, so a "module + its own test" export with no live call site is a FAILED verify. Wire it, or delete it.
 - If ANY check fails -> kickback to relevant step
 
 ### Step 15: DOCUMENT
@@ -232,19 +235,8 @@ For each step 8-16:
 - All previous steps complete
 - All quality checks passed
 - Manual verification if needed
+- Complete via `menu task complete <taskId>` (see "Completing a plan" above) — this is what moves the plan and writes the Gate-3 evidence
 - Ready for human review
-
-## Stop Flag
-
-Check after each plan completion:
-
-```bash
-if [ -f "plans/.stop-after-current" ]; then
-  rm plans/.stop-after-current
-  echo "Stopped as requested."
-  exit 0
-fi
-```
 
 ## Error Handling
 
@@ -252,16 +244,18 @@ If a step fails:
 1. Note the error in the plan file
 2. Continue to next step if possible
 3. Mark step as incomplete with error note
-4. Do NOT move to review if critical steps failed
+4. Do NOT complete the plan if critical steps failed — a blocked completion is a
+   kickback, and the completion route will refuse it anyway
 
 ## Output
 
-After each plan:
+At the end of your run, report exactly one plan:
 ```
 Completed: {plan-name}
   Steps: 9/9 complete
   Tests: 24 passed, 0 failed
-  Moving to: review/
-
-Checking for more plans...
+  Completion: menu task complete t7 → plan in review, VERIFY passed, evidence recorded
+  Gate 3 is ready for the human.
 ```
+
+Then STOP. Do not look for more work — the scheduler promotes the next plan.

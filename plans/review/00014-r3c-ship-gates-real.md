@@ -168,4 +168,61 @@ behavior: CTOC never pushes unless the human opted in; /ctoc:push is the gate.
 report any key you deleted and any consumer you could not convert.
 
 ## Decisions Taken Under Ambiguity
-(Executor fills in.)
+
+1. **Canonical key = `git.autoPushEnabled`** (not `general.autoPushEnabled`). The
+   Git settings tab already existed and already carried a (dead) `commitAndPush`
+   toggle labelled "Auto-push after commit" — so the Git tab is where a human looks
+   for this. `general` is also index-sensitive (`tests/w10-settings-key-dispatch`
+   pins `syncEnabled` at index 3), so appending there is fragile. Deleted
+   `git.commitAndPush` outright (zero readers, and its name lied: it never
+   committed). Exposed ONE reader, `settings.isAutoPushEnabled(projectPath)`, and
+   every push path calls it — no second encoding.
+2. **`fullPlansSync` (the dashboard "Sync plans" command) is gated too.** It is
+   human-invoked, so it was arguable. Gated anyway: the ship-gate rule is "no code
+   path reaches `git push` by default", and a menu item whose label says "sync" is
+   not informed consent to publish. It pulls and commits, and reports
+   `pushed:false, pushSkipped:'…use /ctoc:push'`.
+3. **The pull-rebase-retry is DELETED, not gated** (`quality-agent.pushToRemote`,
+   old "Decision 15"). A background agent rewriting the human's history after a
+   rejected push is not something a boolean should be able to buy. On rejection it
+   now fails loudly and prints the command the human can run. The pre-push rebase
+   inside `sync.syncPlans` is kept but moved onto the opted-in path only (it is only
+   meaningful immediately before a push).
+4. **`quality-agent.parseArgs` takes an injectable argv** and defaults `onSuccess`
+   to `'none'`. Argv now expresses INTENT; the setting holds AUTHORITY — a stale
+   hook, a stray flag, or a hand-run `--on-success=push` cannot ship.
+5. **Enforcer acceptance delegates to the hook's own predicate**
+   (`human-gate-check.hasLedgerApproval`) rather than re-implementing ledger reads.
+   One definition of "approved", two callers. This surfaced a REAL live-repo finding
+   (see Step 16 report): 4 plans in `plans/todo/` carry `approved_by: human` in
+   frontmatter with NO ledger entry — the runtime hook already classifies them
+   `no-ledger-entry` and would revert them. Not fixed here: writing an approval
+   record is a gate act and belongs to the human, never to the executor.
+6. **`mapPipSeverity` / `mapGoSeverity` unified into `mapCvssOrLabel` + `bandCvss`.**
+   Unknown severities map to MODERATE, never LOW. In a security path we over-report,
+   never under-report.
+7. **Skipped by explicit coordinator instruction** (file-disjointness with the
+   concurrently-running plan 00015, which owns `actions.js`, `menu-screens.js`,
+   `menu.md`, `reachability.js`, `iron-loop-executor.md`, `init-project.js`): items
+   4 (approvePlan validation + override ledger), 5 (single gate-order encoding), 6
+   (kill `assignDirectly`), 10 (CLAUDE.md doc truth), and the init-project.js half of
+   item 2. Re-scoped to a follow-up slice; see the report for the exact init line.
+
+## Execution Record (Steps 8-16)
+- [x] Step 8 TEST — `tests/ship-gate-real.test.js` (new, 23 cases) +
+      `tests/dependency-auditor-severity.test.js` (new, 6 cases) written FIRST and
+      run RED: 26 failing / 3 passing before any source change.
+- [x] Step 9 PREPARE — every push call site grepped and mapped before editing.
+- [x] Step 10 IMPLEMENT — items 1, 2 (settings half), 3, 7, 8, 9 + dependency-auditor.
+- [x] Step 11 REVIEW — re-grepped: 5 machine push sites, all gated; 1 human site
+      (`/ctoc:push`) intentionally ungated; deploy paths on their own gate.
+- [x] Step 12 OPTIMIZE — n/a (no hot path touched).
+- [x] Step 13 SECURE — no environment variable can open the gate; `CTOC_SKIP_QUALITY`
+      stays a SKIP (test asserts it cannot enable a push). Severity under-report closed.
+- [x] Step 14 VERIFY — eslint clean, `tsc --noEmit` clean on all touched files,
+      422 tests across 27 affected suites: 420 pass, 2 fail — both are the live-repo
+      self-check assertions failing HONESTLY on pre-existing un-ledgered plans.
+- [x] Step 15 DOCUMENT — docs/IRON_LOOP.md: new "2 Human Ship Gates" section;
+      `auto_approve_after_max` removed; deployment-setup agent gained Step 4b.
+- [x] Step 16 FINAL-REVIEW — reported to the coordinator, including the blocking
+      live-repo finding the executor must NOT fix itself.

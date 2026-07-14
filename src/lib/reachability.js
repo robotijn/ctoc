@@ -1,7 +1,22 @@
 'use strict';
 
 /**
- * Reachability analysis over src/ — the dead-code fence.
+ * Reachability analysis over src/ — the dead-code fence. TWO fences live here:
+ *
+ *   • THE FILE FENCE (`analyze`)      — can a human reach this FILE?
+ *   • THE EXPORT FENCE (`analyzeExports`) — can a human reach this EXPORT?
+ *
+ * Both answer the same question at different granularity, and BOTH are needed.
+ * The file fence cannot see a dead export inside a live file — which is exactly
+ * how the worst defect of the 2026-07-14 wave shipped: `completeExecution` lived
+ * in `src/lib/actions.js` (a thoroughly live file), was the ONLY producer of the
+ * Gate-3 VERIFY evidence, and had ZERO callers. The file fence stayed green while
+ * Gate 3 was un-passable for every human except by clicking "Approve anyway".
+ *
+ * IN BOTH FENCES, A TEST IS NEVER A CALLER. That is the whole point. A slice ships
+ * "a module plus its own test", and a test IS a caller — so every module and every
+ * export has always had a caller by construction, and the suite certified dead code
+ * as healthy. Neither fence ever looks at tests/.
  *
  * WHY THIS EXISTS (root cause, 2026-07-14). An adversarial audit found roughly
  * half of src/ unreachable from every live execution root, despite four human
@@ -141,6 +156,35 @@ function edgesFrom(file, allFiles) {
 }
 
 /**
+ * Collect the shipped INSTRUCTION SURFACES — the markdown/CI files the session
+ * model actually executes: command specs (`src/commands/*.md`), agent definitions,
+ * skill bodies, and CI workflows. Both fences honor the same surfaces: a file (or
+ * an export) named in a shipped instruction is genuinely reachable by a human's
+ * session, because the session does what those files say.
+ *
+ * `tests/` is deliberately NOT a surface. A test is never a caller.
+ *
+ * @param {string} projectRoot - absolute project root
+ * @returns {string[]} absolute paths of every instruction-surface file
+ */
+function collectSurfaceFiles(projectRoot) {
+  const surfaces = [];
+  const walk = (dir, exts) => {
+    if (!safeFs.existsSync(dir)) return;
+    for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full, exts);
+      else if (exts.some((e) => entry.name.endsWith(e))) surfaces.push(full);
+    }
+  };
+  walk(path.join(projectRoot, 'src', 'commands'), ['.md']);
+  walk(path.join(projectRoot, 'agents'), ['.md']);
+  walk(path.join(projectRoot, 'skills'), ['SKILL.md']);
+  walk(path.join(projectRoot, '.github', 'workflows'), ['.yml', '.yaml']);
+  return surfaces;
+}
+
+/**
  * Resolve the live roots for a project.
  *
  * @param {string} projectRoot - absolute project root
@@ -174,19 +218,7 @@ function liveRoots(projectRoot, allFiles) {
 
   // 4b. Instruction-surface roots: src files named in shipped executable
   // instructions (command specs, agent markdown, skill bodies, CI workflows).
-  const surfaces = [];
-  const collectMd = (dir, exts) => {
-    if (!safeFs.existsSync(dir)) return;
-    for (const entry of safeFs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) collectMd(full, exts);
-      else if (exts.some((e) => entry.name.endsWith(e))) surfaces.push(full);
-    }
-  };
-  collectMd(path.join(projectRoot, 'src', 'commands'), ['.md']);
-  collectMd(path.join(projectRoot, 'agents'), ['.md']);
-  collectMd(path.join(projectRoot, 'skills'), ['SKILL.md']);
-  collectMd(path.join(projectRoot, '.github', 'workflows'), ['.yml', '.yaml']);
+  const surfaces = collectSurfaceFiles(projectRoot);
   const byRel = new Map(allFiles.map((f) => {
     const rel = path.relative(projectRoot, f).split(path.sep).join('/');
     return [rel, f];
@@ -264,4 +296,230 @@ function analyze(projectRoot) {
   };
 }
 
-module.exports = { analyze, liveRoots, edgesFrom, resolveRequire, collectJsFiles, SANCTIONED_SCRIPT_ROOTS, ROOTS_FILE };
+// ─────────────────────────────────────────────────────────────────────────────
+// THE EXPORT FENCE — dead exports inside live files.
+//
+// HONEST LIMITS (no AST, by design — zero new dependencies, O(files)):
+//   • Export detection is regex over the three CommonJS forms this codebase uses:
+//     `module.exports = { a, b }`, `module.exports.a = …`, `exports.a = …`.
+//     A lazily-defined export (e.g. Object.defineProperties on `exports`) is not
+//     detected and therefore never accused — a MISS, never a false alarm.
+//   • Usage detection is name-based: an export is LIVE when its name appears as an
+//     identifier token in ANOTHER live module, or in a shipped instruction surface.
+//     So a common name shared with an unrelated identifier (e.g. `load`, `analyze`)
+//     reads as live even if this particular one is not called.
+//
+// Both limits bias the SAME way: the fence under-reports, never over-reports. It
+// cannot cry wolf, and everything it does catch is genuinely uncalled. That is the
+// right bias for a gate that fails a build.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Identifier tokens in a blob of source (used for both usage and surface scans). */
+const IDENT_RE = /[A-Za-z_$][A-Za-z0-9_$]*/g;
+
+/**
+ * Strip JavaScript comments, preserving string/template contents.
+ *
+ * A COMMENT IS NOT A CALLER. Without this, a module that merely *mentions* a name
+ * in a comment resurrects it — and that is not hypothetical: this file's own
+ * header names `completeExecution` (the dead export that motivated the fence), and
+ * that single mention was enough to make the analyzer report it live. A fence a
+ * comment can disarm is not a fence.
+ *
+ * A small state machine (code / line-comment / block-comment / '…' / "…" / `…`)
+ * with escape handling. Regex literals need no state of their own: a comment can
+ * only start with `//` or `/*`, and no valid regex literal starts with `/` or `*`.
+ *
+ * @param {string} src
+ * @returns {string} the source with comment bodies replaced by spaces
+ */
+function stripComments(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  let state = 'code';
+  while (i < n) {
+    const c = src[i];
+    const next = i + 1 < n ? src[i + 1] : '';
+    if (state === 'code') {
+      if (c === '/' && next === '/') { state = 'line'; i += 2; continue; }
+      if (c === '/' && next === '*') { state = 'block'; i += 2; continue; }
+      if (c === "'" || c === '"' || c === '`') { state = c; out += c; i++; continue; }
+      out += c; i++; continue;
+    }
+    if (state === 'line') {
+      if (c === '\n') { state = 'code'; out += '\n'; }
+      i++; continue;
+    }
+    if (state === 'block') {
+      if (c === '*' && next === '/') { state = 'code'; i += 2; continue; }
+      if (c === '\n') out += '\n'; // keep line structure
+      i++; continue;
+    }
+    // inside a string/template: copy through, honoring escapes
+    if (c === '\\') { out += c + next; i += 2; continue; }
+    if (c === state) { state = 'code'; out += c; i++; continue; }
+    out += c; i++;
+  }
+  return out;
+}
+
+/**
+ * The names a module exports, per the three CommonJS forms in this codebase.
+ *
+ * Parses the COMMENT-STRIPPED source: a documented EXAMPLE of an export
+ * (`module.exports = { a, b }` in a header comment) is not an export, and reading
+ * it as one hid every real export of the file behind a phantom `a`.
+ *
+ * @param {string} source - the module source (comments included; stripped here)
+ * @returns {string[]} exported names (deduped, source order)
+ */
+function exportedNames(source) {
+  const content = stripComments(source);
+  const names = new Set();
+
+  // Form 1: module.exports = { a, b: impl, c };
+  // BOTH shapes must parse: the multi-line block AND the single-line
+  // `module.exports = { a, b };`. Matching only the multi-line form made the fence
+  // silently blind to every single-line-exporting module (it reported zero exports
+  // for them — a false green, the exact failure mode this file exists to kill).
+  const objMatch = content.match(/module\.exports\s*=\s*\{([\s\S]*?)\}\s*;?/);
+  if (objMatch) {
+    // Split on newlines AND commas so a single-line list yields one entry per name.
+    for (const rawEntry of objMatch[1].split(/[\n,]/)) {
+      const entry = rawEntry.trim();
+      if (entry.length === 0) continue;
+      const m = entry.match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s*(?::|$)/);
+      if (m) names.add(m[1]);
+    }
+  }
+
+  // Forms 2 + 3: module.exports.a = … / exports.a = …
+  const propRe = /(?:module\.)?exports\.([A-Za-z_$][A-Za-z0-9_$]*)\s*=/g;
+  let m;
+  while ((m = propRe.exec(content)) !== null) names.add(m[1]);
+
+  return [...names];
+}
+
+/**
+ * Exports explicitly DECLARED as entry points in `.ctoc/reachability-roots.json`
+ * (`{"exports": ["src/lib/x.js#name", …]}`) — the deliberate, reviewable escape
+ * hatch, mirroring the file fence's declared roots.
+ *
+ * @param {string} projectRoot
+ * @returns {Set<string>} declared `rel#name` keys
+ */
+function declaredExportRoots(projectRoot) {
+  const out = new Set();
+  const rootsFile = path.join(projectRoot, ROOTS_FILE);
+  if (!safeFs.existsSync(rootsFile)) return out;
+  try {
+    const parsed = JSON.parse(safeFs.readFileSync(rootsFile, 'utf8'));
+    const list = (parsed && Array.isArray(parsed.exports)) ? parsed.exports : [];
+    for (const e of list) if (typeof e === 'string') out.add(e);
+  } catch { /* malformed → no declared export roots; the ratchet still holds */ }
+  return out;
+}
+
+/**
+ * Compute dead exports: exported names, inside LIVE (file-reachable) modules, that
+ * no other live module and no instruction surface ever names.
+ *
+ * A dead export inside an ALREADY-DEAD file is not reported here — that file is the
+ * file fence's business, and reporting both would double-count the same defect.
+ *
+ * @param {string} projectRoot - absolute project root
+ * @returns {{ totalModules: number, totalExports: number, live: string[],
+ *   dead: string[], sources: string[] }} `live`/`dead` are `src/rel/path.js#name`
+ *   keys (sorted); `sources` are the project-relative usage sources consulted.
+ */
+function analyzeExports(projectRoot) {
+  const { reachable } = analyze(projectRoot);
+  const rel2abs = (r) => path.join(projectRoot, ...r.split('/'));
+  const liveFiles = reachable.map(rel2abs);
+
+  // 1. Read every live module once: its exported names + its identifier tokens.
+  //    Tokens come from the COMMENT-STRIPPED source — a comment is not a caller.
+  const exportsByFile = new Map(); // abs → string[]
+  const tokensByFile = new Map();  // abs → Set<string>
+  for (const file of liveFiles) {
+    let content = '';
+    try { content = safeFs.readFileSync(file, 'utf8'); } catch { content = ''; }
+    exportsByFile.set(file, exportedNames(content));
+    const code = stripComments(content);
+    const toks = new Set();
+    let m;
+    IDENT_RE.lastIndex = 0;
+    while ((m = IDENT_RE.exec(code)) !== null) toks.add(m[0]);
+    tokensByFile.set(file, toks);
+  }
+
+  // 2. name → the set of live modules that MENTION it (the usage index).
+  const mentionedIn = new Map(); // name → Set<abs>
+  for (const [file, toks] of tokensByFile) {
+    for (const t of toks) {
+      let set = mentionedIn.get(t);
+      if (!set) { set = new Set(); mentionedIn.set(t, set); }
+      set.add(file);
+    }
+  }
+
+  // 3. Instruction surfaces: a name a shipped instruction tells the session to call
+  //    is reachable by a human's session (same rule the file fence honors).
+  const surfaceFiles = collectSurfaceFiles(projectRoot);
+  const surfaceTokens = new Set();
+  for (const surface of surfaceFiles) {
+    let text = '';
+    try { text = safeFs.readFileSync(surface, 'utf8'); } catch { continue; }
+    let m;
+    IDENT_RE.lastIndex = 0;
+    while ((m = IDENT_RE.exec(text)) !== null) surfaceTokens.add(m[0]);
+  }
+
+  const declared = declaredExportRoots(projectRoot);
+
+  // 4. Classify. A name is live iff another LIVE module mentions it, an instruction
+  //    surface mentions it, or it is a declared export root. Self-mention never
+  //    counts (a module calling its own function is not a caller from outside), and
+  //    tests are not in `liveFiles` at all.
+  const live = [];
+  const dead = [];
+  let totalExports = 0;
+  for (const file of liveFiles) {
+    const rel = path.relative(projectRoot, file).split(path.sep).join('/');
+    for (const name of exportsByFile.get(file) || []) {
+      totalExports++;
+      const key = `${rel}#${name}`;
+      const others = mentionedIn.get(name);
+      const usedElsewhere = others != null && [...others].some((f) => f !== file);
+      if (usedElsewhere || surfaceTokens.has(name) || declared.has(key)) live.push(key);
+      else dead.push(key);
+    }
+  }
+
+  const relOf = (f) => path.relative(projectRoot, f).split(path.sep).join('/');
+  return {
+    totalModules: liveFiles.length,
+    totalExports,
+    live: live.sort(),
+    dead: dead.sort(),
+    sources: [...liveFiles.map(relOf), ...surfaceFiles.map(relOf)].sort()
+  };
+}
+
+// `exportedNames`, `collectSurfaceFiles` and `stripComments` are deliberately NOT
+// exported: they are internals of the two fences, and exporting them "so a test can
+// unit-test them" would mint dead exports on the very day the dead-export fence
+// shipped. They are exercised through `analyze` / `analyzeExports`, the way a caller
+// reaches them.
+module.exports = {
+  analyze,
+  analyzeExports,
+  liveRoots,
+  edgesFrom,
+  resolveRequire,
+  collectJsFiles,
+  SANCTIONED_SCRIPT_ROOTS,
+  ROOTS_FILE
+};

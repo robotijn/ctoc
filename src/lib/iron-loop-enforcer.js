@@ -318,6 +318,18 @@ function frontmatterRegion(content) {
   return region.join('\n');
 }
 
+/**
+ * Are all plans resident in a gate destination actually approved into it?
+ *
+ * "Approved" means the APPROVAL LEDGER says so — identical acceptance to the runtime
+ * hook (`human-gate-check.hasLedgerApproval`), never the plan's own forgeable
+ * frontmatter marker (R3-C). Exported so the invariant is directly testable against
+ * a temp root.
+ *
+ * @param {string} root - project root
+ * @returns {{severity: string, message: string, details: object}|null} a block-severity
+ *   finding, or null when every gate-destination plan is ledger-approved
+ */
 function checkGateDestinationsApproved(root) {
   const offenders = [];
   for (const stage of GATE_DESTINATIONS) {
@@ -339,11 +351,18 @@ function checkGateDestinationsApproved(root) {
       // their prose body is neither required nor mistaken for an approval.
       if (/^type:\s*vision\b/m.test(fm)) continue;
 
-      // Detect the approval marker in the FRONTMATTER region only — a raw substring
-      // scan false-passes on prose body text that merely discusses the marker.
-      const approved = /^approved_by:\s*human\b/m.test(fm) ||
-                       /^approved_by_human:\s*true\b/m.test(fm);
-      if (!approved) {
+      // R3-C: the enforcer no longer trusts the plan's own frontmatter. A marker in
+      // a file is FORGEABLE — anything that can write the plan can write
+      // `approved_by: human`, and the old check also accepted `approved_by_human:
+      // true`, a form NO writer in the codebase produces. Meanwhile the runtime hook
+      // (human-gate-check.js) decides residency from the APPROVAL LEDGER. Two systems
+      // disagreeing about whether the repo is clean is worse than either being wrong:
+      // the self-check would report OK on plans the hook was about to revert.
+      //
+      // Acceptance is now the hook's own predicate — one definition of "approved",
+      // used by both. The stage/vision/SIP1 exemptions above still apply.
+      const { hasLedgerApproval } = require('../hooks/human-gate-check');
+      if (!hasLedgerApproval(planPath, stage, root, content)) {
         offenders.push({ plan: path.relative(root, planPath), stage });
       }
     }
@@ -351,7 +370,8 @@ function checkGateDestinationsApproved(root) {
   if (offenders.length > 0) {
     return {
       severity: 'block',
-      message: `${offenders.length} plans in gate destinations missing approved_by: human marker`,
+      message: `${offenders.length} plans in gate destinations are missing approved_by: human in the approval ledger ` +
+               `(a frontmatter marker is not an approval — the runtime hook will revert these)`,
       details: { offenders: offenders.slice(0, 5) },
     };
   }
@@ -570,7 +590,49 @@ const CHECKS = [
   { id: 'product-loop',                scope: 'product',      mode: 'fast', fn: checkProductLoop },
   { id: 'plan-counts',                 scope: 'info',         mode: 'fast', fn: checkPlanCounts },
   { id: 'reachability-fence',          scope: 'architecture', mode: 'thorough', fn: checkReachabilityFence },
+  { id: 'dead-export-fence',           scope: 'architecture', mode: 'thorough', fn: checkDeadExportFence },
 ];
+
+/**
+ * Dead-EXPORT fence invariant (2026-07-14, the deeper root cause). The file-level
+ * fence below cannot see a dead export inside a LIVE file: `actions.js` is
+ * reachable, so `completeExecution` — the sole producer of the Gate-3 verify
+ * evidence — sat there with zero callers while the suite stayed green and Gate 3
+ * became un-passable. This check compares the live dead-export set against the
+ * committed baseline (`.ctoc/export-reachability-baseline.json`); anything NOT in
+ * that baseline is a NEW dead export and blocks. The ratchet itself lives in
+ * tests/export-reachability.test.js — this surfaces the same truth on demand.
+ * Thorough mode only.
+ *
+ * @param {string} root - Project root
+ * @returns {{severity: string, message: string}|null}
+ */
+function checkDeadExportFence(root) {
+  const { analyzeExports } = require('./reachability');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  const result = analyzeExports(root);
+  if (!result || result.totalExports === 0) return null; // not a CTOC source tree
+
+  const baselineFile = path.join(root, '.ctoc', 'export-reachability-baseline.json');
+  /** @type {Set<string>} */
+  const baselined = new Set();
+  if (safeFs.existsSync(baselineFile)) {
+    try {
+      const parsed = JSON.parse(safeFs.readFileSync(baselineFile, 'utf8'));
+      const list = Array.isArray(parsed) ? parsed : (parsed && parsed.dead) || [];
+      for (const name of list) if (typeof name === 'string') baselined.add(name);
+    } catch { /* malformed baseline → nothing is excused; every dead export blocks */ }
+  }
+
+  const fresh = result.dead.filter((name) => !baselined.has(name));
+  if (fresh.length === 0) return null;
+  return {
+    severity: 'block',
+    message: `${fresh.length} NEW dead export(s) — defined and exported, called by nothing live: ${fresh.slice(0, 10).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — wire each to a live call site or delete it; a test is not a caller`
+  };
+}
 
 /**
  * Dead-code fence invariant (2026-07-14 root cause): every src file must be
@@ -686,6 +748,7 @@ function formatCompact({ findings, summary }) {
 
 module.exports = {
   checkAllInvariants,
+  checkGateDestinationsApproved,
   formatReport,
   formatCompact,
   findProjectRoot,
