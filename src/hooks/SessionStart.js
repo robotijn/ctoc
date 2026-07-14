@@ -195,6 +195,35 @@ function maybeInjectLessons(projectPath) {
 }
 
 /**
+ * Render the one-line databases summary for the session banner (DB-w1).
+ *
+ * This is the LIVE human-facing consumer that makes the databases capability data
+ * wired-is-done: detectStack's dep-detected `databases` (each enriched from the
+ * registry) surface here as "Databases: PostgreSQL (RLS supported, TLS required)".
+ * Returns '' when no database is detected, so the banner is unchanged for projects
+ * with no persistence layer — the render is purely ADDITIVE.
+ *
+ * @param {{databases?: Array<{name: string, security?: Object}>}} stack
+ * @returns {string} a leading-newline line, or '' when there is nothing to show.
+ */
+function formatDatabasesLine(stack) {
+  const dbs = Array.isArray(stack?.databases) ? stack.databases : [];
+  if (dbs.length === 0) return '';
+  const parts = dbs.map((db) => {
+    const sec = db && db.security ? db.security : {};
+    const posture = [];
+    if (sec.rls === 'supported') posture.push('RLS supported');
+    else if (sec.rls === 'not-applicable') posture.push('RLS n/a');
+    else if (sec.rls === 'not-native') posture.push('RLS not native');
+    if (sec.connection === 'tls-required') posture.push('TLS required');
+    else if (sec.connection === 'file-local') posture.push('file-local');
+    const label = String(db.name || '');
+    return posture.length ? `${label} (${posture.join(', ')})` : label;
+  });
+  return `\nDatabases: ${parts.join(' · ')}`;
+}
+
+/**
  * Generate CTOC context instructions for Claude
  */
 function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
@@ -203,6 +232,7 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
     ? `\nUpdate available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion} (run: git pull origin main)`
     : '';
   const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
+  const databasesLine = formatDatabasesLine(stack);
 
   // NOTE: This 16-step banner is the compact, machine-readable copy. The CANONICAL
   // operating-lessons + methodology reference live in .ctoc/templates/operating-lessons.md.
@@ -214,7 +244,7 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
 CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
 ============================================================
 Project: ${path.basename(process.cwd())}
-Stack: ${stack.languages.join('/') || 'unknown'}
+Stack: ${stack.languages.join('/') || 'unknown'}${databasesLine}
 Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}${selfCheckLine}
 
 ## Iron Loop (16 Steps) - NON-NEGOTIABLE
@@ -261,4 +291,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, generateContext, shouldInjectLessons, maybeInjectLessons };
+module.exports = { main, generateContext, formatDatabasesLine, shouldInjectLessons, maybeInjectLessons };

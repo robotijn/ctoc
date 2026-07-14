@@ -1,0 +1,17 @@
+# MySQL — relational. NOTE: MySQL has NO native row-level security. RLS is only
+# emulated via DEFINER views or enforced in the application layer, so it is flagged
+# `not-native` and the whole entry is `verified: UNVERIFIED` — the RLS posture is
+# not a native 2026 guarantee. Parameterized queries and TLS remain real.
+database: mysql
+category: relational
+deps: [mysql, mysql2, mysqlclient, PyMySQL, pymysql, aiomysql]
+security:
+  injection: parameterized-queries
+  rls: not-native
+  connection: tls-required
+  leastPrivilege: separate-app-migration-analytics-identities
+migration:
+  tools: [flyway, liquibase, atlas, prisma, alembic, drizzle]
+  safetyLint: "atlas migrate lint"
+configScaffold: [migrations/, .env.example]
+verified: UNVERIFIED

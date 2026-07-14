@@ -1,0 +1,17 @@
+# pgvector — vector search as a PostgreSQL extension. Inherits Postgres' security
+# posture: native row-level security (RLS via CREATE POLICY), TLS transport, and
+# parameterized queries. Detected by the dedicated `pgvector` client dep (a project
+# that also has `pg` will additionally detect postgresql — correct: it IS Postgres).
+database: pgvector
+category: vector
+deps: [pgvector]
+security:
+  injection: parameterized-queries
+  rls: supported
+  connection: tls-required
+  leastPrivilege: separate-app-migration-analytics-identities
+migration:
+  tools: [prisma, drizzle, alembic, atlas]
+  safetyLint: "atlas migrate lint"
+configScaffold: [migrations/, .env.example]
+verified: web-2026-07

@@ -1,0 +1,16 @@
+# Microsoft SQL Server — relational. Native row-level security via security policies
+# and predicate functions (since SQL Server 2016). Modern drivers default to
+# Encrypt=true (TLS). Parameterized queries / bind variables defeat SQLi.
+database: sqlserver
+category: relational
+deps: [mssql, tedious, pyodbc, pymssql]
+security:
+  injection: parameterized-queries
+  rls: supported
+  connection: tls-required
+  leastPrivilege: separate-app-migration-analytics-identities
+migration:
+  tools: [flyway, liquibase, dbup, atlas]
+  safetyLint: "atlas migrate lint"
+configScaffold: [migrations/, .env.example]
+verified: web-2026-07

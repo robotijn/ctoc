@@ -1,0 +1,17 @@
+# ClickHouse — columnar analytics. Row-level security via row policies
+# (CREATE ROW POLICY). TLS supported on the native and HTTP interfaces.
+# Parameterized queries defeat SQLi. NOTE: no established destructive-migration
+# linter for ClickHouse in 2026, so safetyLint is `none` (DB-w2 selects one).
+database: clickhouse
+category: analytics
+deps: ["@clickhouse/client", clickhouse, clickhouse-driver, clickhouse-connect]
+security:
+  injection: parameterized-queries
+  rls: supported
+  connection: tls-required
+  leastPrivilege: separate-app-analytics-identities
+migration:
+  tools: [golang-migrate, clickhouse-migrations]
+  safetyLint: none
+configScaffold: [migrations/, .env.example]
+verified: web-2026-07

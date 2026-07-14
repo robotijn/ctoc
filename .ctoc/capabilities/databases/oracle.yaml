@@ -1,0 +1,17 @@
+# Oracle Database — relational. Native row-level security via Virtual Private
+# Database (VPD) and Oracle Label Security. Encrypted transport over TCPS (TLS).
+# Bind variables defeat SQLi. NOTE: the Atlas migration linter does not robustly
+# cover Oracle in 2026, so safetyLint is left `none` (DB-w2 selects a linter).
+database: oracle
+category: relational
+deps: [oracledb, cx_Oracle, cx-Oracle]
+security:
+  injection: parameterized-queries
+  rls: supported
+  connection: tls-required
+  leastPrivilege: separate-app-migration-analytics-identities
+migration:
+  tools: [flyway, liquibase]
+  safetyLint: none
+configScaffold: [migrations/, .env.example]
+verified: web-2026-07

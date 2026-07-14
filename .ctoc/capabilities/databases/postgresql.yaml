@@ -1,0 +1,16 @@
+# PostgreSQL — relational. Native row-level security (RLS via CREATE POLICY,
+# available since 9.5), TLS the 2026 baseline, parameterized queries defeat SQLi.
+# Detected by its client deps (node pg/postgres, python psycopg2/asyncpg).
+database: postgresql
+category: relational
+deps: [pg, postgres, pg-promise, psycopg2, psycopg2-binary, psycopg, asyncpg]
+security:
+  injection: parameterized-queries
+  rls: supported
+  connection: tls-required
+  leastPrivilege: separate-app-migration-analytics-identities
+migration:
+  tools: [prisma, atlas, flyway, liquibase, sqitch, alembic, drizzle]
+  safetyLint: "atlas migrate lint"
+configScaffold: [migrations/, .env.example]
+verified: web-2026-07

@@ -72,6 +72,16 @@ function projectProjectTypesDir(projectRoot) {
   return path.join(projectRoot, '.ctoc', 'capabilities', 'project-types');
 }
 
+/** The bundled database seed directory (ships with the plugin). */
+function bundledDatabasesDir() {
+  return path.join(__dirname, '..', '..', '.ctoc', 'capabilities', 'databases');
+}
+
+/** A project-local override directory for databases. */
+function projectDatabasesDir(projectRoot) {
+  return path.join(projectRoot, '.ctoc', 'capabilities', 'databases');
+}
+
 // ── minimal, zero-dependency YAML subset parser ─────────────────────────────────
 // Handles exactly the shapes the capability files use: 2-space-indented block maps,
 // inline flow maps `{ k: v, k2: "v" }`, inline arrays `[a, b]`, quoted/bare scalars,
@@ -548,6 +558,111 @@ function pipelineFor(language, projectType, projectRoot) {
   };
 }
 
+// ── databases dimension (DB-w1) ──────────────────────────────────────────────────
+// A language names the toolchain; a project TYPE names the pipeline shape; a DATABASE
+// names the persistence layer's security posture (injection concern, row-level-security
+// support, transport, least-privilege) and migration story. Databases live in a
+// project's DEPENDENCIES (pg, mongoose, redis), not in marker files — so DETECTION is
+// dep-parsing in stack-detector (which consumes loadDatabases below), and this registry
+// holds the capability DATA. Same dumb-engine/smart-data contract: this loads and looks
+// up, it never opens a connection or runs a query.
+
+/**
+ * A parsed database is VALID only if it names itself and carries a category, a security
+ * object, and a non-empty deps array (detection depends on `deps`). Anything else (a
+ * broken/hostile file) is rejected → skipped + warned, exactly like the sibling loaders.
+ * @param {*} obj
+ * @returns {boolean}
+ */
+function isValidDatabase(obj) {
+  return !!obj
+    && typeof obj === 'object'
+    && typeof obj.database === 'string'
+    && obj.database.trim().length > 0
+    && typeof obj.category === 'string'
+    && obj.category.trim().length > 0
+    && obj.security
+    && typeof obj.security === 'object'
+    && !Array.isArray(obj.security)
+    && Array.isArray(obj.deps)
+    && obj.deps.length > 0;
+}
+
+/**
+ * Read one databases directory, folding each valid entry into `databases` (keyed by its
+ * declared `database`) and recording a warning per skipped file. FAIL-OPEN throughout,
+ * exactly like readCapabilityDir / readProjectTypeDir.
+ * @param {string} dir
+ * @param {Object} databases accumulator (mutated) — later dirs override earlier.
+ * @param {Array} warnings accumulator (mutated)
+ */
+function readDatabaseDir(dir, databases, warnings) {
+  let entries;
+  try {
+    if (!safeFs.existsSync(dir)) return;
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+  } catch (err) {
+    warnings.push({ file: dir, message: `unreadable databases dir: ${err.message}` });
+    return;
+  }
+  if (entries.length > MAX_FILES) {
+    warnings.push({ file: dir, message: `too many database files (${entries.length} > ${MAX_FILES}) — skipped` });
+    return;
+  }
+  for (const name of entries) {
+    const p = path.join(dir, name);
+    try {
+      const size = safeFs.statSync(p).size;
+      if (size > MAX_FILE_BYTES) {
+        warnings.push({ file: name, message: `database file too large (${size} bytes) — skipped` });
+        continue;
+      }
+      const parsed = parseCapabilityYaml(safeFs.readFileSync(p, 'utf8'));
+      if (!isValidDatabase(parsed)) {
+        warnings.push({ file: name, message: 'malformed database entry (missing database/category/security/deps) — skipped' });
+        continue;
+      }
+      databases[parsed.database] = parsed; // later dir (project override) wins
+    } catch (err) {
+      warnings.push({ file: name, message: `database parse/read failed — skipped: ${err.message}` });
+    }
+  }
+}
+
+/**
+ * Load the database registry: the bundled seed data first, then an optional project
+ * override overlaid on top (a project's `.ctoc/capabilities/databases/*` replaces a
+ * bundled database of the same name). Reads FRESH every call (the set is tiny) so
+ * on-disk truth always wins — no stale cache. FAIL-OPEN per entry.
+ *
+ * @param {string} [projectRoot] optional project root whose overrides are overlaid.
+ * @returns {{ databases: Object<string, Object>, warnings: Array<{file:string,message:string}> }}
+ */
+function loadDatabases(projectRoot) {
+  const databases = {};
+  const warnings = [];
+  readDatabaseDir(bundledDatabasesDir(), databases, warnings);
+  if (typeof projectRoot === 'string' && projectRoot.length > 0) {
+    readDatabaseDir(projectDatabasesDir(projectRoot), databases, warnings);
+  }
+  return { databases, warnings };
+}
+
+/**
+ * The whole capability object for a database (category + security + migration + deps),
+ * or null when unknown. The live caller is stack-detector's `detectDatabases`, which
+ * enriches each dep-detected database with this record.
+ *
+ * @param {string} name e.g. 'postgresql'
+ * @param {string} [projectRoot]
+ * @returns {Object|null}
+ */
+function databaseCapability(name, projectRoot) {
+  if (typeof name !== 'string' || name.length === 0) return null;
+  const { databases } = loadDatabases(projectRoot);
+  return databases[name] || null;
+}
+
 // ── lookups (the API the four surfaces will call in CR5) ─────────────────────────
 
 /**
@@ -662,5 +777,7 @@ module.exports = {
   runStrategyFor,
   loadProjectTypes,
   projectTypeFor,
-  pipelineFor
+  pipelineFor,
+  loadDatabases,
+  databaseCapability
 };
