@@ -2,9 +2,9 @@
 
 <!-- Maintained by the handoff skill. Last-known state — verify against the repo before acting. -->
 
-- Updated: 2026-07-14 23:30 by claude
+- Updated: 2026-07-15 01:30 by claude
 - Branch: main
-- Status: in progress (multi-round adversarial critique→fix loop; ~10 rounds done)
+- Status: in progress (multi-round adversarial critique→fix loop; ~12 rounds done, 7 waves committed)
 
 ## Goal
 Tijn's standing order (2026-07-14, repeated): "fix them all, do 50 rounds of hard
@@ -33,8 +33,15 @@ reports. Ship gates (git push, deploy) stay human. NEVER push unless Tijn says.
   encoding (gate-order.js), greenfield journey test (walks init→gates→build→
   verify→done; 4 negative controls catch this session's 4 shipped-then-caught
   defects at named lines), assignDirectly deleted, dead functional tab deleted.
-- Suite 5714/5714, 0 skipped; eslint clean; typecheck 0; file fence 0/138;
-  export fence 104 (ratcheting down).
+- v6.12.7 (f153861): R6 — SECURITY FAILS CLOSED (sast-runner runGosec/runBandit/
+  runESLintSecurity swallowed a scanner CRASH as a clean pass — fail-open in the
+  push gate; now records the error + surfaces a loud skip; run() honest when zero
+  scanners ran); cross-platform (hasCommand `where` on win32, runCommand timeout,
+  go path slashes, os.homedir); single gate encoding FINISHED (last 2 inverse
+  copies → gate-order); override auditable (--override token); ui.js#doctor
+  deleted; 6 false-green source-grep compliance tests → value assertions.
+- Suite 5730/5730, 0 skipped; eslint clean; typecheck 0; file fence 0/138;
+  export fence 103 (ratcheting down).
 
 ## Key decisions (Tijn's — do not relitigate)
 - Ship gates push + deploy stay human; internal gates dissolve into question flow.
@@ -63,20 +70,21 @@ reports. Ship gates (git push, deploy) stay human. NEVER push unless Tijn says.
 - Loop scratch ledger (ephemeral): /private/tmp/.../scratchpad/repair-loop-ledger.md.
 
 ## Open items (next rounds) — ranked
-1. R5-B flagged follow-ups (small): (a) menu-screens.js:1680 "Approve anyway" must
-   emit `claude:approve <ref> --override "<reason>"` (approvePlan + menu.md recipe
-   already accept it); (b) converge two inverse gate-edge maps onto gate-order —
-   human-gate-check.js:105 HUMAN_GATES + approval-ledger.js:99 STAGE_SOURCE.
-2. ui.js#doctor — genuine dead export (in the 104 baseline): wire into System tools
-   or delete.
-3. vision-decomposer.completeVision must write the pipeline ledger entry before its
+1. DONE R5-B/R6: override token (R6-A), inverse gate maps converged (R6-B),
+   ui.js#doctor deleted (R6-C), security fail-closed + cross-platform (R6-D).
+2. vision-decomposer.completeVision must write the pipeline ledger entry before its
    movePlan(done) (R3-A follow-up; ledger-backfill --vision covers it meanwhile).
-4. HUMAN DECISION (do not self-pick): coverage floor is 40 (.ctoc/coverage-
-   baseline.json); CLAUDE.md's Step-14 aspiration is 80. Reconcile or state both.
-5. Keep launching fresh critic lenses each round (security, concurrency,
-   cross-platform, felt-ride, docs-truth, error-paths) — the loop is not done at
-   50 nominal; it is done when 3 consecutive DIFFERENT-lens critic rounds find
-   zero confirmed defects.
+3. HUMAN DECISION for Tijn (do not self-pick): coverage floor is 40 (.ctoc/
+   coverage-baseline.json); CLAUDE.md Step-14 aspiration is 80. Reconcile or state
+   both — surface this to Tijn, don't decide it.
+4. detectLanguages (sast-runner) only scans DETECTED languages — a project whose
+   language it doesn't detect gets "No supported languages → success:true". Honest
+   message, but worth a critic pass: is language detection itself fail-open?
+5. Keep launching fresh critic lenses each round (DONE so far: greenfield-journey,
+   false-green, security, concurrency, gate-machinery, cross-platform, error-paths;
+   NOT YET: performance/scale, injection/ANSI-in-render, felt-ride re-audit of the
+   NOW-fixed pipeline, docs-vs-code truth re-audit). Loop is done when 3 consecutive
+   DIFFERENT-lens rounds find zero confirmed defects — NOT there yet.
 
 ## Key files
 - src/lib/reachability.js (both fences), src/lib/step-13-verify.js (VERIFY),
