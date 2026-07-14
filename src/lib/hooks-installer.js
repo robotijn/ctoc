@@ -44,11 +44,27 @@ const TEMPLATE_DIR = path.join(__dirname, '..', '..', '.ctoc', 'templates', 'hoo
 // ==============================================================================
 
 /**
- * Check if a command exists
+ * Check if a command exists.
+ *
+ * Cross-platform: `command -v` is a POSIX shell builtin that does not exist on
+ * Windows (cmd.exe), so the old probe ALWAYS reported false on Windows — CTOC then
+ * concluded pre-commit/pip/pipx were absent even when installed. On win32 the
+ * equivalent is the `where` executable. The tool name is a CTOC-internal literal
+ * (never user input); it is still validated to a safe shell token so no metacharacter
+ * can ride the probe into the shell.
+ *
+ * @param {string} cmd - command name to probe
+ * @returns {boolean} true iff the command resolves on PATH
  */
 function hasCommand(cmd) {
+  // Reject anything that is not a plain command token — defends the shell-invoked
+  // probe against injection regardless of caller.
+  if (typeof cmd !== 'string' || !/^[A-Za-z0-9._+-]+$/.test(cmd)) {
+    return false;
+  }
+  const probe = process.platform === 'win32' ? `where ${cmd}` : `command -v ${cmd}`;
   try {
-    execSync(`command -v ${cmd}`, { stdio: 'ignore' });
+    execSync(probe, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -658,6 +674,7 @@ module.exports = {
   NativeHooksInstaller,
   installPostCommitHook,
   uninstallPostCommitHook,
+  hasCommand,
   SYSTEMS,
   HOOK_TYPES
 };

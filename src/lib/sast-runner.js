@@ -200,14 +200,35 @@ class SASTRunner {
       };
     }
 
+    // Track whether ANY scanner actually ran. A run in which zero scanners were
+    // available is NOT a clean scan — it verified nothing. Reporting success there
+    // would be fail-open at the module boundary (an exported class whose "success"
+    // silently means "checked nothing").
+    let scannersRun = 0;
+
     // Try Semgrep first (universal scanner)
     if (this.isToolAvailable('semgrep')) {
+      scannersRun++;
       await this.runSemgrep();
     }
 
     // Run language-specific scanners
     for (const lang of languages) {
-      await this.runLanguageScanner(lang);
+      if (await this.runLanguageScanner(lang)) {
+        scannersRun++;
+      }
+    }
+
+    if (scannersRun === 0) {
+      return {
+        success: false,
+        scanned: false,
+        findings: [],
+        errors: this.errors,
+        reason: 'no security scanner available',
+        summary: this.generateSummary([], languages, Date.now() - startTime),
+        message: 'No security scanner available for the detected language(s) — nothing was scanned'
+      };
     }
 
     // Deduplicate findings
@@ -224,6 +245,7 @@ class SASTRunner {
 
     return {
       success: true,
+      scanned: true,
       findings: uniqueFindings,
       errors: this.errors,
       summary,
@@ -265,14 +287,15 @@ class SASTRunner {
   /**
    * Run language-specific scanner
    * @param {string} lang - Language to scan
+   * @returns {Promise<boolean>} true iff a scanner was available and ran
    */
   async runLanguageScanner(lang) {
     const config = TOOL_CONFIGS[lang];
-    if (!config) return;
+    if (!config) return false;
 
     const tool = config.primary;
     if (!this.isToolAvailable(tool)) {
-      return;
+      return false;
     }
 
     try {
@@ -286,10 +309,13 @@ class SASTRunner {
         case 'eslint':
           await this.runESLintSecurity();
           break;
+        default:
+          return false;
       }
     } catch (error) {
       this.errors.push({ tool, language: lang, error: error.message });
     }
+    return true;
   }
 
   /**
@@ -309,13 +335,20 @@ class SASTRunner {
       const data = JSON.parse(result);
       this.parseBanditResults(data);
     } catch (error) {
+      // Bandit exits non-zero when findings exist AND when it crashes. The two are
+      // told apart by the stdout: valid findings JSON → parse; anything else (a
+      // traceback / config error) is a scanner that RAN and produced garbage — an
+      // error the consumer surfaces as a loud skip, never silence. Mirrors
+      // runSemgrep exactly (fail-closed).
       if (error.stdout) {
         try {
           const data = JSON.parse(error.stdout);
           this.parseBanditResults(data);
         } catch (e) {
-          // Bandit exits with non-zero when findings exist
+          this.errors.push({ tool: 'bandit', error: error.message });
         }
+      } else {
+        this.errors.push({ tool: 'bandit', error: error.message });
       }
     }
   }
@@ -336,13 +369,18 @@ class SASTRunner {
       const data = JSON.parse(result);
       this.parseGosecResults(data);
     } catch (error) {
+      // gosec exits non-zero both on findings and on a crash. Valid findings JSON →
+      // parse; a panic/traceback/config error on stdout, or no stdout at all, is a
+      // scanner failure that must surface (fail-closed, mirroring runSemgrep).
       if (error.stdout) {
         try {
           const data = JSON.parse(error.stdout);
           this.parseGosecResults(data);
         } catch (e) {
-          // gosec exits with non-zero when findings exist
+          this.errors.push({ tool: 'gosec', error: error.message });
         }
+      } else {
+        this.errors.push({ tool: 'gosec', error: error.message });
       }
     }
   }
@@ -351,34 +389,46 @@ class SASTRunner {
    * Run ESLint with security plugins
    */
   async runESLintSecurity() {
+    // M13 (cross-platform): invoke npx via an argument array with no shell, so
+    // there is no POSIX-only stderr redirect (the null device is absent on
+    // Windows) and no POSIX-only success-forcing shell operator. On Windows the
+    // npx launcher is named npx.cmd.
+    const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+    const args = ['eslint', '--plugin', 'security', '--format', 'json', '.'];
+
+    let out = '';
     try {
-      // M13 (cross-platform): invoke npx via an argument array with no shell, so
-      // there is no POSIX-only stderr redirect (the null device is absent on
-      // Windows) and no POSIX-only success-forcing shell operator. On Windows the
-      // npx launcher is named npx.cmd.
-      const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-
-      let out = '';
-      try {
-        out = execFileSync(npx, ['eslint', '--plugin', 'security', '--format', 'json', '.'], {
-          cwd: this.projectRoot,
-          timeout: this.options.timeout,
-          encoding: 'utf8',
-          // The stdio setting discards stderr without a shell redirect.
-          stdio: ['ignore', 'pipe', 'ignore']
-        });
-      } catch (e) {
-        // In place of a shell success-forcing operator: ESLint exits non-zero when
-        // it finds issues but still prints its JSON report to stdout, which the
-        // error object carries.
-        out = (e && e.stdout) ? e.stdout : '';
-      }
-
-      if (out && out.trim()) {
-        this.parseESLintResults(JSON.parse(out));
-      }
+      out = execFileSync(npx, args, {
+        cwd: this.projectRoot,
+        timeout: this.options.timeout,
+        encoding: 'utf8',
+        // The stdio setting discards stderr without a shell redirect.
+        stdio: ['ignore', 'pipe', 'ignore']
+      });
     } catch (error) {
-      // ESLint may not be configured for security - that's ok
+      // ESLint exits non-zero when it finds issues but still prints its JSON report
+      // to stdout, which the error object carries. If there is no stdout, ESLint
+      // ran but produced nothing usable (a crash / config error to stderr) — that
+      // is a scanner failure, recorded loudly (this method is only reached after
+      // isToolAvailable('eslint') already confirmed ESLint is installed). Mirrors
+      // runSemgrep's fail-closed shape.
+      out = (error && error.stdout) ? String(error.stdout) : '';
+      if (!(out && out.trim())) {
+        this.errors.push({ tool: 'eslint-security', error: error.message });
+        return;
+      }
+    }
+
+    if (out && out.trim()) {
+      try {
+        this.parseESLintResults(JSON.parse(out));
+      } catch (e) {
+        // Ran and emitted NON-JSON (a crash / config error printed to stdout).
+        // A crashed scanner must never read as a clean scan.
+        this.errors.push({ tool: 'eslint-security', error: e.message });
+      }
+    } else {
+      this.errors.push({ tool: 'eslint-security', error: 'eslint-security produced no output' });
     }
   }
 

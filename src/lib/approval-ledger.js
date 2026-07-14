@@ -36,8 +36,10 @@
  *
  * Entries are otherwise written only by the trusted, non-tool-call `approvePlan()`
  * code path (`stampAndLedger`), by `stale-cleanup.js` (pipeline kind), and by the
- * sanctioned backfill script. This leaf module has no dependency on any other W02
- * file; `human-gate-check.js` and `actions.js` build on it.
+ * sanctioned backfill script. Its ONLY intra-project dependency is the pure-constant
+ * `gate-order.js` (the ONE gate-edge encoding, R6-B), which requires nothing — so
+ * there is no require cycle and this module stays side-effect-free and fast on the
+ * Bash-hook path. `human-gate-check.js` and `actions.js` build on it.
  *
  * All filesystem I/O routes through `./safe-fs` (the audited choke point) and
  * every path is composed with `path.join`, so the module is cross-platform and
@@ -76,6 +78,12 @@
 const crypto = require('crypto');
 const path = require('path');
 const safeFs = require('./safe-fs');
+// The ONE gate-edge encoding (R6-B). `sourceOf(to)` returns the gate SOURCE stage for
+// a destination — the destination→source inverse of gate-order's forward `GATE_EDGES`
+// — so a backfilled entry's `stage_from` (see `backfillEntry`) derives from that single
+// encoding and can never diverge. gate-order is a pure constant module (zero requires)
+// — no require cycle, no cost, side-effect-free on the Bash-hook path.
+const { sourceOf } = require('./gate-order');
 
 /**
  * A plan slug is a lowercase-alphanumeric-plus-hyphen token that must start
@@ -88,19 +96,6 @@ const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 /** Fields a ledger entry MUST carry; a write missing any of them is rejected. */
 const REQUIRED_FIELDS = ['content_sha256', 'stage_from', 'stage_to'];
-
-/**
- * The gate SOURCE stage a backfilled entry is recorded as having crossed FROM,
- * keyed by the destination stage the plan now resides in. Mirrors the human-gate
- * edges in `human-gate-check.js` (destination → source). A destination not in the
- * map falls back to the literal `'backfill'` marker, so the record is never left
- * with an empty required field.
- */
-const STAGE_SOURCE = {
-  implementation: 'functional',
-  todo: 'implementation',
-  done: 'review',
-};
 
 /**
  * Absolute path to the ledger directory under a project root.
@@ -414,7 +409,10 @@ function backfillEntry(projectPath, planPath, opts = {}) {
   const originalBasename = path.basename(planPath).replace(/\.md$/i, '');
   return writeEntry(slug, {
     content_sha256: computeContentHash(content),
-    stage_from: STAGE_SOURCE[stage_to] || 'backfill',
+    // The gate SOURCE for this destination, from the ONE encoding (R6-B). A stage
+    // that is not a gate destination has no source → fall back to the 'backfill'
+    // marker so the required field is never left empty.
+    stage_from: sourceOf(stage_to) || 'backfill',
     stage_to,
     approved_by: 'human',
     backfilled: true,

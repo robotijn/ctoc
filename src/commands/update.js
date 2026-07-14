@@ -8,9 +8,13 @@
 
 const safeFs = require('../lib/safe-fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 
-const HOME = process.env.HOME || process.env.USERPROFILE;
+// os.homedir() always resolves the home directory (from the OS, not just env
+// vars), so `path.join(HOME, ...)` below can never receive undefined and throw at
+// module load when HOME/USERPROFILE happen to be unset.
+const HOME = os.homedir();
 const PLUGINS_DIR = path.join(HOME, '.claude', 'plugins');
 const MARKETPLACE_DIR = path.join(PLUGINS_DIR, 'marketplaces', 'robotijn');
 const CACHE_DIR = path.join(PLUGINS_DIR, 'cache', 'robotijn', 'ctoc');

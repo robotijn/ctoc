@@ -81,19 +81,30 @@ function parseArgs(argv = process.argv.slice(2)) {
  * Run a shell command and capture output
  */
 function runCommand(cmd, options = {}) {
-  const { silent = false, allowFail = false } = options;
+  // A quality check must never hang the gate forever. Every subprocess is bounded;
+  // 300000ms (5 min) matches the SAST default. A command that a caller expects to
+  // watch/tail/wait-on-stdin would otherwise pin the gate indefinitely.
+  const { silent = false, allowFail = false, timeout = 300000 } = options;
 
   try {
     const output = execSync(cmd, {
       encoding: 'utf8',
       stdio: silent ? 'pipe' : 'inherit',
-      maxBuffer: 10 * 1024 * 1024 // 10MB
+      maxBuffer: 10 * 1024 * 1024, // 10MB
+      timeout
     });
     return { success: true, output: output?.trim() || '' };
   } catch (err) {
+    // A timeout (execSync sets err.killed / err.signal='SIGTERM', or code ETIMEDOUT)
+    // is a LOUD failure, never a swallow.
+    const timedOut = Boolean(err.killed) || err.signal === 'SIGTERM' || err.code === 'ETIMEDOUT';
     if (allowFail) {
-      return { success: false, output: err.stdout || '', error: err.message };
+      const result = { success: false, output: err.stdout || '', error: err.message };
+      if (timedOut) result.timedOut = true;
+      return result;
     }
+    // Non-allowFail callers (e.g. pushToRemote's `git push`) rely on throw-to-fail;
+    // returning here would let them mistake a timeout for success. Re-throw loudly.
     throw err;
   }
 }
@@ -166,8 +177,15 @@ function runSpecificTests(tools, testFiles) {
     } else if (langTools.testFramework === 'pytest') {
       cmd = `pytest ${testFiles.join(' ')}`;
     } else if (langTools.testFramework === 'go') {
-      // For Go, convert file paths to package paths
-      const packages = [...new Set(testFiles.map(f => './' + path.dirname(f) + '/...'))];
+      // For Go, convert file paths to package paths. Go import paths are ALWAYS
+      // forward-slashed, so normalize both separators to '/' FIRST (a Windows
+      // coverage map yields backslash paths) and take the directory with posix
+      // semantics — deterministic and identical on every platform. Using the
+      // platform path.dirname here would emit `./pkg\sub/...` on Windows.
+      const packages = [...new Set(testFiles.map(f => {
+        const unix = f.split(/[\\/]+/).join('/');
+        return './' + path.posix.dirname(unix) + '/...';
+      }))];
       cmd = `go test ${packages.join(' ')}`;
     } else {
       // Fallback: run full suite
@@ -498,6 +516,13 @@ async function runSecurityScan(_tools, opts = {}) {
       }
       if (scannable.length > 0) {
         const res = await sast.run();
+        // Belt-and-suspenders over the scannable filter above: if the runner itself
+        // reports that no scanner actually ran, that is a loud skip, never a pass.
+        if (res && res.scanned === false) {
+          const msg = `SAST skipped: ${res.reason || 'no scanner ran'}`;
+          skipped.push(msg);
+          console.log(`   ${msg}`);
+        }
         for (const f of (res.findings || [])) {
           bump(f.severity);
           detail.push(`sast[${f.severity}] ${f.rule || f.check || f.title || 'finding'} at ${f.file || '?'}:${f.line || 0}`);
@@ -764,8 +789,10 @@ if (require.main === module) {
 // src/commands/push.js). Exporting these does not change the script path above.
 module.exports = {
   parseArgs,
+  runCommand,
   runLint,
   runTypecheck,
+  runSpecificTests,
   runSmartTests,
   runFullTests,
   runSecurityScan,

@@ -380,8 +380,39 @@ describe('Menu Screens Tests', () => {
     // The override is recorded as such (description names it an override).
     const anyway = result.ask.questions[0].options.find(o => o.label === 'Approve anyway');
     assert.match(anyway.description, /override/i, 'Approve anyway records an override');
-    assert.strictEqual(result.actions['Approve anyway'], 'claude:approve functional/broken-plan.md');
+    assert.strictEqual(result.actions['Approve anyway'], 'claude:approve functional/broken-plan.md --override');
     console.log('# validateScreen failed demotes Approve anyway to last');
+  });
+
+  // R6-A — the forced crossing must be AUDITABLE at the action-string surface.
+  // "Approve anyway" is the one place a human overrides a failed gate; it must
+  // carry the `--override` token so the menu.md claude:approve recipe records
+  // override:true + reason via approvePlan. A bare claude:approve makes the
+  // override invisible at the menu surface.
+  test('validateScreen (failed) "Approve anyway" carries the --override token', () => {
+    createPlan('functional', 'override-plan', '# Just a Title\n\nNo structure.\n');
+
+    const result = menuScreens.validateScreen('functional', 'override-plan.md', testDir);
+    assert.strictEqual(result.autoApprove, false, 'failed validation never auto-approves');
+    const anyway = result.actions['Approve anyway'];
+    assert.strictEqual(anyway, 'claude:approve functional/override-plan.md --override',
+      'forced crossing carries the --override token so it is auditable');
+    assert.ok(anyway.includes('--override'), 'override token present on the forced crossing');
+    console.log('# validateScreen failed Approve anyway carries --override');
+  });
+
+  test('validateScreen (clean) "Confirm approve" carries NO override token', () => {
+    createPlan('functional', 'clean-noverride',
+      '---\ntitle: Clean\ntype: functional\nfiles:\n  - src/x.js\n---\n\n' +
+      '# Clean\n\n## Problem Statement\nReal problem.\n\n## Scope\nThe thing.\n\n## Acceptance Criteria\n- It works.\n');
+
+    const result = menuScreens.validateScreen('functional', 'clean-noverride.md', testDir);
+    assert.strictEqual(result.autoApprove, true, 'clean validation auto-approves');
+    const confirm = result.actions['Confirm approve'];
+    assert.strictEqual(confirm, 'claude:approve functional/clean-noverride.md',
+      'the clean approve path is unchanged — no override');
+    assert.ok(!confirm.includes('--override'), 'clean approve never carries an override token');
+    console.log('# validateScreen clean Confirm approve has no override');
   });
 
   test('all text fields end with triple newline', () => {

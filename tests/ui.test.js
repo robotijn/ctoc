@@ -131,41 +131,6 @@ const fixtures = {
     gate2_approval: { timestamp: '2024-01-01T07:00:00Z', user_confirmed: true }
   },
 
-  // Doctor check configurations
-  healthyChecks: [
-    {
-      name: 'Environment',
-      items: [
-        { ok: true, label: 'Node.js version 20+' },
-        { ok: true, label: 'Git installed' }
-      ]
-    },
-    {
-      name: 'Configuration',
-      items: [
-        { ok: true, label: 'CLAUDE.md exists' },
-        { ok: true, label: 'Settings valid' }
-      ]
-    }
-  ],
-
-  mixedChecks: [
-    {
-      name: 'Environment',
-      items: [
-        { ok: true, label: 'Node.js version 20+' },
-        { ok: false, label: 'Git not installed' }
-      ]
-    },
-    {
-      name: 'Configuration',
-      items: [
-        { ok: true, label: 'CLAUDE.md exists' },
-        { ok: false, warn: true, label: 'Settings incomplete' }
-      ]
-    }
-  ],
-
   // Kanban counts
   emptyKanban: {
     backlog: 0,
@@ -647,85 +612,18 @@ describe('adminDashboard', () => {
 });
 
 // ============================================================================
-// Test: doctor function
+// Test: doctor formatter REMOVED (R6-C)
 // ============================================================================
+// ui.js#doctor was a dead export (a section-shaped formatter nothing rendered).
+// The live doctor screen is src/tabs/tools.js#renderDoctor, which uses a
+// different flat {label,pass} model and carries strictly more (sync, menu,
+// input, footer). doctor() carried no logic renderDoctor lacked, so it was
+// deleted. It must no longer exist on the ui module.
 
-describe('doctor', () => {
-  const version = '5.0.0';
-
-  describe('structure', () => {
-    it('displays CTOC Doctor header', () => {
-      const output = ui.doctor(fixtures.healthyChecks, version);
-      const plain = stripAnsi(output);
-
-      assert.ok(plain.includes('CTOC Doctor'));
-      assert.ok(plain.includes('Health Check'));
-    });
-
-    it('displays completion message', () => {
-      const output = ui.doctor(fixtures.healthyChecks, version);
-      const plain = stripAnsi(output);
-
-      assert.ok(plain.includes('Doctor check complete'));
-    });
-  });
-
-  describe('section rendering', () => {
-    it('displays section names in brackets', () => {
-      const output = ui.doctor(fixtures.healthyChecks, version);
-      const plain = stripAnsi(output);
-
-      assert.ok(plain.includes('[Environment]'));
-      assert.ok(plain.includes('[Configuration]'));
-    });
-
-    it('displays all check items', () => {
-      const output = ui.doctor(fixtures.healthyChecks, version);
-      const plain = stripAnsi(output);
-
-      assert.ok(plain.includes('Node.js version 20+'));
-      assert.ok(plain.includes('Git installed'));
-      assert.ok(plain.includes('CLAUDE.md exists'));
-      assert.ok(plain.includes('Settings valid'));
-    });
-  });
-
-  describe('status indicators', () => {
-    it('shows green check for passing items', () => {
-      const output = ui.doctor(fixtures.healthyChecks, version);
-
-      assert.ok(containsAnsi(output, ui.colors.green));
-    });
-
-    it('shows red X for failing items', () => {
-      const output = ui.doctor(fixtures.mixedChecks, version);
-
-      assert.ok(containsAnsi(output, ui.colors.red));
-    });
-
-    it('shows yellow warning for warn items', () => {
-      const output = ui.doctor(fixtures.mixedChecks, version);
-
-      assert.ok(containsAnsi(output, ui.colors.yellow));
-    });
-  });
-
-  describe('empty checks', () => {
-    it('handles empty sections array', () => {
-      const output = ui.doctor([], version);
-      const plain = stripAnsi(output);
-
-      assert.ok(plain.includes('CTOC Doctor'));
-      assert.ok(plain.includes('Doctor check complete'));
-    });
-
-    it('handles section with no items', () => {
-      const emptySection = [{ name: 'Empty', items: [] }];
-      const output = ui.doctor(emptySection, version);
-      const plain = stripAnsi(output);
-
-      assert.ok(plain.includes('[Empty]'));
-    });
+describe('doctor formatter removed', () => {
+  it('ui.doctor is undefined — the dead export was deleted, not baselined', () => {
+    assert.strictEqual(ui.doctor, undefined);
+    assert.ok(!('doctor' in ui), 'doctor must not be exported by ui.js');
   });
 });
 
@@ -886,7 +784,6 @@ describe('module exports', () => {
       'dashboard',
       'progress',
       'adminDashboard',
-      'doctor',
       'blocked',
       'writeToTerminal',
       'getPhase'
@@ -902,7 +799,7 @@ describe('module exports', () => {
   });
 
   it('all functions are callable', () => {
-    const functionNames = ['dashboard', 'progress', 'adminDashboard', 'doctor', 'blocked', 'writeToTerminal', 'getPhase'];
+    const functionNames = ['dashboard', 'progress', 'adminDashboard', 'blocked', 'writeToTerminal', 'getPhase'];
 
     for (const name of functionNames) {
       assert.strictEqual(typeof ui[name], 'function', `${name} should be a function`);

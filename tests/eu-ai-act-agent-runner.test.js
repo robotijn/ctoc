@@ -253,15 +253,16 @@ describe('runEuAiActFindings — fail-open on bad input', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('runEuAiActFindings — gate invariant (no human gate added/weakened)', () => {
-  const gateHookSrc = fs.readFileSync(GATE_HOOK_PATH, 'utf8');
   const runnerSrc = fs.readFileSync(RUNNER_SRC_PATH, 'utf8');
 
   it('9a. HUMAN_GATES still has exactly the 3 destination keys (4-gate topology intact)', () => {
-    // Parse the HUMAN_GATES object literal from the hook source and assert its keys.
-    const m = /const HUMAN_GATES\s*=\s*\{([\s\S]*?)\};/.exec(gateHookSrc);
-    assert.ok(m, 'HUMAN_GATES object literal present in the hook');
-    const keys = [...m[1].matchAll(/'([a-z-]+)'\s*:/g)].map(k => k[1]);
-    assert.deepEqual(keys.sort(), ['done', 'implementation', 'todo'], 'exactly the three gate destinations');
+    // Assert the REAL runtime map (stronger than grepping source text): the
+    // hook re-exports GATE_SOURCE from gate-order as HUMAN_GATES (R6-B).
+    const { HUMAN_GATES } = require(GATE_HOOK_PATH);
+    assert.deepEqual(Object.keys(HUMAN_GATES).sort(), ['done', 'implementation', 'todo'], 'exactly the three gate destinations');
+    assert.equal(HUMAN_GATES.implementation, 'functional');
+    assert.equal(HUMAN_GATES.todo, 'implementation');
+    assert.equal(HUMAN_GATES.done, 'review');
   });
 
   it('9b. the runner source names NO gate/enforcement key', () => {

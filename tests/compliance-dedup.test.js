@@ -229,19 +229,19 @@ describe('dedupKey — unit', () => {
 
 describe('GATE-INVARIANT (load-bearing)', () => {
   it('case 10: human-gate-check keeps exactly 3 destination keys and dedup names no gate key', () => {
-    const gateSrc = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'hooks', 'human-gate-check.js'),
-      'utf8'
+    // Assert the REAL runtime map (stronger than grepping source text): the
+    // hook re-exports GATE_SOURCE from gate-order as HUMAN_GATES (R6-B).
+    const { HUMAN_GATES } = require(
+      path.join(__dirname, '..', 'src', 'hooks', 'human-gate-check.js')
     );
-    // Parse the HUMAN_GATES object literal destination keys.
-    const block = gateSrc.match(/const HUMAN_GATES\s*=\s*\{([\s\S]*?)\};/);
-    assert.ok(block, 'HUMAN_GATES literal present');
-    const keys = [...block[1].matchAll(/'([a-z-]+)'\s*:/g)].map((m) => m[1]);
     assert.deepEqual(
-      keys.sort(),
+      Object.keys(HUMAN_GATES).sort(),
       ['done', 'implementation', 'todo'],
       'exactly 3 gate destination keys'
     );
+    assert.equal(HUMAN_GATES.implementation, 'functional');
+    assert.equal(HUMAN_GATES.todo, 'implementation');
+    assert.equal(HUMAN_GATES.done, 'review');
 
     const dedupSrc = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'lib', 'compliance-dedup.js'),

@@ -240,14 +240,15 @@ describe('NO-DISPATCH invariant (load-bearing)', () => {
 
 describe('GATE-INVARIANT (load-bearing)', () => {
   it('human-gate-check HUMAN_GATES still has exactly the 3 destination keys', () => {
-    delete require.cache[require.resolve('../src/hooks/human-gate-check.js')];
-    // The hook runs main() at module load and calls process.exit — do NOT
-    // require it. Assert against its source directly.
-    const hookSrc = fs.readFileSync(GATE_HOOK_PATH, 'utf8');
-    const block = hookSrc.match(/const HUMAN_GATES\s*=\s*\{([\s\S]*?)\};/);
-    assert.ok(block, 'HUMAN_GATES object literal present');
-    const keys = [...block[1].matchAll(/'([a-z]+)'\s*:/g)].map(m => m[1]);
-    assert.deepEqual(keys.sort(), ['done', 'implementation', 'todo']);
+    // The hook's residency sweep is guarded by `require.main === module`, so
+    // requiring it here runs no main() and calls no process.exit. Assert the
+    // REAL runtime map (stronger than grepping source text): the hook re-exports
+    // GATE_SOURCE from gate-order as HUMAN_GATES (R6-B).
+    const { HUMAN_GATES } = require(GATE_HOOK_PATH);
+    assert.deepEqual(Object.keys(HUMAN_GATES).sort(), ['done', 'implementation', 'todo']);
+    assert.equal(HUMAN_GATES.implementation, 'functional');
+    assert.equal(HUMAN_GATES.todo, 'implementation');
+    assert.equal(HUMAN_GATES.done, 'review');
   });
 
   it('trigger module names no gate key and imports no hook', () => {

@@ -278,7 +278,8 @@ describe('e2e: menu state machine via real process', () => {
 
     // When invalid, the screen offers an override path and a fix path.
     assert.ok('Approve anyway' in json.actions, 'override action offered for invalid plan');
-    assert.equal(json.actions['Approve anyway'], 'claude:approve functional/needs-criteria.md');
+    // R6-A: the forced-crossing action carries the --override token so the override is auditable.
+    assert.equal(json.actions['Approve anyway'], 'claude:approve functional/needs-criteria.md --override');
     assert.equal(json.actions['Fix issues'], 'plan functional/needs-criteria.md');
   });
 
