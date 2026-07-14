@@ -41,6 +41,7 @@ const { DependencyAuditor, COVERED_LANGUAGES } = require('./dependency-auditor')
 const { SASTRunner, TOOL_CONFIGS } = require('./sast-runner');
 const { SCARunner } = require('./sca-runner');
 const { MigrationSafetyChecker } = require('./migration-safety-checker');
+const { FrameworkSecurityChecker } = require('./framework-security-checker');
 
 // R3-C: the push ship gate. The quality agent runs UNATTENDED after every commit;
 // it may check, it may report, it may NOT ship. `isAutoPushEnabled` is the only
@@ -653,6 +654,40 @@ async function runSecurityScan(_tools, opts = {}) {
     }
   } catch (err) {
     const msg = `migration safety skipped (error, NOT a pass): ${err.message}`;
+    skipped.push(msg);
+    console.log(`   ${msg}`);
+  }
+
+  // 6. FRAMEWORK SECURITY — client-exposed-secret static scan (the frameworks-
+  //    dimension consumer, "concerns → checks"). Mirrors the migration-safety step's
+  //    honesty exactly: a repo with NO env-exposure framework is a LOUD informational
+  //    skip (scanned:false), NEVER a silent clean pass, and a HIGH client-exposed
+  //    secret (a public-prefixed env var whose NAME signals a secret — e.g.
+  //    NEXT_PUBLIC_API_SECRET, inlined into the browser bundle) bumps the CRITICAL/
+  //    HIGH gate tally: it blocks like any other HIGH. It reads NAMES only and never
+  //    inspects or logs a value; executes nothing (reads + regex).
+  try {
+    const frameworkSec = new FrameworkSecurityChecker(projectRoot);
+    const res = await frameworkSec.run();
+    if (res && res.scanned === false) {
+      const msg = `framework security: ${res.reason || 'no env-exposure framework detected'} — informational, not a failure`;
+      skipped.push(msg);
+      console.log(`   ${msg}`);
+    } else {
+      for (const f of (res.findings || [])) {
+        bump(f.severity);
+        detail.push(`framework-security[${f.severity}] ${f.varName || 'client-exposed secret'} at ${f.file || '?'}:${f.line || 0}`);
+      }
+      // File-read errors are loud skips, never silent passes.
+      for (const e of (res.errors || [])) {
+        const msg = `framework security skipped (${e.tool || 'tool'}): ${e.error}`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+      }
+      console.log(`   Framework security: ${(res.findings || []).length} client-exposed secret(s)`);
+    }
+  } catch (err) {
+    const msg = `framework security skipped (error, NOT a pass): ${err.message}`;
     skipped.push(msg);
     console.log(`   ${msg}`);
   }
