@@ -39,6 +39,7 @@ const { findAffectedTests } = require('./coverage-map');
 const { SecretsScanner } = require('./secrets-scanner');
 const { DependencyAuditor } = require('./dependency-auditor');
 const { SASTRunner, TOOL_CONFIGS } = require('./sast-runner');
+const { SCARunner } = require('./sca-runner');
 
 // R3-C: the push ship gate. The quality agent runs UNATTENDED after every commit;
 // it may check, it may report, it may NOT ship. `isAutoPushEnabled` is the only
@@ -389,7 +390,7 @@ function getPushChangedFiles(projectRoot) {
 /**
  * Run the real security scan (Iron Loop Step 13 SECURE).
  *
- * Aggregates three genuine scanners, each degrading LOUDLY:
+ * Aggregates four genuine scanners, each degrading LOUDLY:
  *   1. Secrets  — pure-JS SecretsScanner (no external tool). Always runs.
  *                 Scoped to the push delta by default; whole project when
  *                 `opts.allFiles` is set or git history is unavailable.
@@ -399,6 +400,10 @@ function getPushChangedFiles(projectRoot) {
  *   3. SAST     — SASTRunner (semgrep/bandit/gosec/eslint-security). Runs when a
  *                 scanner is available for a detected language; otherwise the
  *                 absence is reported as an explicit skip.
+ *   4. SCA      — SCARunner (registry-driven dependency-CVE audit). npm audit /
+ *                 pip-audit / cargo audit are parsed natively; every other
+ *                 ecosystem routes to the osv-scanner universal pass. Runs when a
+ *                 parseable scanner is available; otherwise a per-language skip.
  *
  * A finding at CRITICAL or HIGH severity from ANY scanner fails the gate. A
  * missing tool or a scanner that throws becomes a loud skip — it NEVER silently
@@ -546,6 +551,62 @@ async function runSecurityScan(_tools, opts = {}) {
     }
   } catch (err) {
     const msg = `SAST skipped (error, NOT a pass): ${err.message}`;
+    skipped.push(msg);
+    console.log(`   ${msg}`);
+  }
+
+  // 4. SCA — dependency-CVE audit (the composition half of security). Runs when a
+  //    parseable SCA scanner is available for a detected language, mirroring the
+  //    SAST step's honest routing exactly. osv-scanner is the universal engine; a
+  //    language routes to a native parser (npm audit / pip-audit / cargo audit)
+  //    only when this runner actually has one, otherwise to osv-scanner. A language
+  //    with neither installed is a LOUD per-language skip, never a silent pass.
+  try {
+    const sca = new SCARunner(projectRoot);
+    const languages = sca.detectLanguages();
+    if (languages.length === 0) {
+      console.log('   SCA: no supported language detected — no dependencies to audit');
+    } else {
+      // A language is scannable iff a scanner that can ACTUALLY parse its result is
+      // installed — decided by the honest router. A native-routed language needs its
+      // native tool; an osv-routed language needs osv-scanner. Never mark a language
+      // scannable on the strength of a tool this runner cannot parse.
+      const osvAvailable = sca.isToolAvailable('osv-scanner');
+      const scannable = languages.filter((l) => {
+        const route = sca.scaRouteFor(l);
+        return route.native ? sca.isToolAvailable(route.native) : osvAvailable;
+      });
+      const unscannable = languages.filter((l) => !scannable.includes(l));
+      for (const l of unscannable) {
+        const route = sca.scaRouteFor(l);
+        const need = route.native ? `${route.native} or osv-scanner` : 'osv-scanner';
+        const msg = `SCA skipped for ${l}: no dependency scanner installed (need ${need})`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+      }
+      if (scannable.length > 0) {
+        const res = await sca.run();
+        // Belt-and-suspenders over the scannable filter: if the runner itself reports
+        // that no scanner actually ran, that is a loud skip, never a pass.
+        if (res && res.scanned === false) {
+          const msg = `SCA skipped: ${res.reason || 'no scanner ran'}`;
+          skipped.push(msg);
+          console.log(`   ${msg}`);
+        }
+        for (const f of (res.findings || [])) {
+          bump(f.severity);
+          detail.push(`sca[${f.severity}] ${f.package || 'dependency'}${f.advisory ? ` (${f.advisory})` : ''}: ${f.title || ''}`.trim());
+        }
+        for (const e of (res.errors || [])) {
+          const msg = `SCA skipped (${e.tool || 'tool'}): ${e.error}`;
+          skipped.push(msg);
+          console.log(`   ${msg}`);
+        }
+        console.log(`   SCA: ${(res.findings || []).length} dependency finding(s)`);
+      }
+    }
+  } catch (err) {
+    const msg = `SCA skipped (error, NOT a pass): ${err.message}`;
     skipped.push(msg);
     console.log(`   ${msg}`);
   }

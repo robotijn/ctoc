@@ -1,0 +1,284 @@
+'use strict';
+
+/**
+ * SCA RUNNER — software-composition analysis (dependency-CVE audit).
+ *
+ * Mirrors sast-runner-failclosed.test.js: real temp-dir fixtures, and the ONLY
+ * external thing mocked is tool-availability (cp.execSync / cp.execFileSync), never
+ * the core parsing logic. The honesty rule under test is the SCA analog of
+ * sast-runner's securityRouteFor: osv-scanner is the UNIVERSAL engine; a language
+ * routes to a NATIVE parser only when this runner actually has one (npm audit,
+ * pip-audit, cargo audit). Every other language routes to osv-scanner (parsed) —
+ * NEVER to a tool we cannot parse. A language with no available scanner yields
+ * scanned:false with a reason, never a silent clean pass.
+ */
+
+const { test } = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const cp = require('node:child_process');
+
+const SCA_PATH = require.resolve('../src/lib/sca-runner');
+
+const REAL_EXEC = cp.execSync;
+const REAL_EXECFILE = cp.execFileSync;
+
+/** Reload sca-runner AFTER installing the current cp fakes (the module destructures
+ *  execSync/execFileSync at load time, exactly like sast-runner). */
+function freshSCA() {
+  delete require.cache[SCA_PATH];
+  return require(SCA_PATH);
+}
+
+function restore() {
+  cp.execSync = REAL_EXEC;
+  cp.execFileSync = REAL_EXECFILE;
+  delete require.cache[SCA_PATH];
+}
+
+function mkTmp(prefix) {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+// ── ROUTING (pure predicate — no tool needed) ────────────────────────────────────
+
+test('scaRouteFor: JS/TS route to the npm-audit NATIVE parser', () => {
+  const { SCARunner, PARSEABLE_NATIVE_TOOLS } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  for (const lang of ['javascript', 'typescript']) {
+    const route = r.scaRouteFor(lang);
+    assert.equal(route.osvUniversal, false, `${lang} has a native parser`);
+    assert.equal(route.native, 'npm-audit');
+    assert.ok(PARSEABLE_NATIVE_TOOLS.has(route.native), 'native must be a parseable tool');
+  }
+});
+
+test('scaRouteFor: Python routes to the pip-audit NATIVE parser', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const route = new SCARunner('/x').scaRouteFor('python');
+  assert.equal(route.native, 'pip-audit');
+  assert.equal(route.osvUniversal, false);
+});
+
+test('scaRouteFor: Rust routes to the cargo-audit NATIVE parser', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const route = new SCARunner('/x').scaRouteFor('rust');
+  assert.equal(route.native, 'cargo-audit');
+  assert.equal(route.osvUniversal, false);
+});
+
+test('scaRouteFor: Go/PHP/Ruby (no native parser here) route to osv-scanner UNIVERSAL', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  for (const lang of ['go', 'php', 'ruby', 'java', 'elixir', 'dart']) {
+    const route = r.scaRouteFor(lang);
+    assert.equal(route.native, null, `${lang} has NO native parser and must not claim one`);
+    assert.equal(route.osvUniversal, true, `${lang} must route to osv universal`);
+  }
+});
+
+test('HONESTY: no language ever routes to a parser-less tool', () => {
+  const { SCARunner, PARSEABLE_NATIVE_TOOLS, SCA_TOOL_CONFIGS } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  // Every configured language, plus a broad sample of registry languages that route
+  // to the universal engine, must satisfy: native is either null or a tool we parse.
+  const langs = new Set([
+    ...Object.keys(SCA_TOOL_CONFIGS),
+    'go', 'php', 'ruby', 'java', 'csharp', 'kotlin', 'scala', 'swift', 'c', 'cpp',
+    'elixir', 'dart', 'r', 'lua', 'sql', 'shell', 'terraform', 'dockerfile', 'solidity'
+  ]);
+  for (const lang of langs) {
+    const route = r.scaRouteFor(lang);
+    assert.ok(
+      route.native === null || PARSEABLE_NATIVE_TOOLS.has(route.native),
+      `${lang} must NEVER route to a tool without a parser (got native=${route.native})`
+    );
+  }
+});
+
+// ── PARSERS (core logic — never mocked) ──────────────────────────────────────────
+
+test('parseOSVResults: an OSV JSON fixture parses into a finding with package + severity', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const osv = {
+    results: [{
+      source: { path: '/proj/go.mod', type: 'lockfile' },
+      packages: [{
+        package: { name: 'golang.org/x/text', ecosystem: 'Go', version: '0.3.0' },
+        vulnerabilities: [{
+          id: 'GHSA-ppp9-7jff-5vj2',
+          summary: 'Out-of-range panic in golang.org/x/text',
+          aliases: ['CVE-2020-14040'],
+          database_specific: { severity: 'HIGH' }
+        }]
+      }]
+    }]
+  };
+  r.parseOSVResults(osv);
+  assert.equal(r.findings.length, 1, 'exactly one vulnerability parsed');
+  const f = r.findings[0];
+  assert.equal(f.tool, 'osv-scanner');
+  assert.equal(f.package, 'golang.org/x/text');
+  assert.equal(f.version, '0.3.0');
+  assert.equal(f.advisory, 'GHSA-ppp9-7jff-5vj2');
+  assert.equal(f.severity, 'HIGH');
+});
+
+test('parseNpmAuditResults: an npm audit --json fixture parses correctly', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const npm = {
+    auditReportVersion: 2,
+    vulnerabilities: {
+      lodash: {
+        name: 'lodash',
+        severity: 'high',
+        via: [{
+          source: 1065,
+          name: 'lodash',
+          dependency: 'lodash',
+          title: 'Prototype Pollution in lodash',
+          url: 'https://github.com/advisories/GHSA-jf85-cpcp-j695',
+          severity: 'high',
+          cwe: ['CWE-1321'],
+          range: '<4.17.12'
+        }],
+        range: '<4.17.12',
+        fixAvailable: true
+      }
+    }
+  };
+  r.parseNpmAuditResults(npm);
+  assert.equal(r.findings.length, 1);
+  const f = r.findings[0];
+  assert.equal(f.tool, 'npm-audit');
+  assert.equal(f.package, 'lodash');
+  assert.equal(f.severity, 'HIGH');
+  assert.equal(f.title, 'Prototype Pollution in lodash');
+  assert.equal(f.cwe, 'CWE-1321');
+});
+
+test('parsePipAuditResults: a pip-audit --format json fixture parses correctly', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const pip = {
+    dependencies: [{
+      name: 'flask',
+      version: '0.5',
+      vulns: [{
+        id: 'PYSEC-2019-179',
+        fix_versions: ['0.12.3'],
+        description: 'Flask before 0.12.3 has a denial of service.',
+        aliases: ['CVE-2019-1010083']
+      }]
+    }]
+  };
+  r.parsePipAuditResults(pip);
+  assert.equal(r.findings.length, 1);
+  const f = r.findings[0];
+  assert.equal(f.tool, 'pip-audit');
+  assert.equal(f.package, 'flask');
+  assert.equal(f.version, '0.5');
+  assert.equal(f.advisory, 'PYSEC-2019-179');
+  assert.ok(f.severity, 'a severity is always assigned (default when the tool omits one)');
+});
+
+test('parseCargoAuditResults: a cargo audit --json fixture parses correctly', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const cargo = {
+    vulnerabilities: {
+      found: true,
+      count: 1,
+      list: [{
+        advisory: { id: 'RUSTSEC-2020-0159', title: 'Potential segfault in localtime_r', url: 'https://rustsec.org/advisories/RUSTSEC-2020-0159' },
+        package: { name: 'chrono', version: '0.4.10' }
+      }]
+    }
+  };
+  r.parseCargoAuditResults(cargo);
+  assert.equal(r.findings.length, 1);
+  const f = r.findings[0];
+  assert.equal(f.tool, 'cargo-audit');
+  assert.equal(f.package, 'chrono');
+  assert.equal(f.version, '0.4.10');
+  assert.equal(f.advisory, 'RUSTSEC-2020-0159');
+});
+
+test('dedupe: the same (package, advisory-id) reported twice collapses to one finding', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  const osv = {
+    results: [{
+      source: { path: 'a', type: 'lockfile' },
+      packages: [{
+        package: { name: 'left-pad', ecosystem: 'npm', version: '1.0.0' },
+        vulnerabilities: [{ id: 'GHSA-xxxx', database_specific: { severity: 'LOW' } }]
+      }]
+    }, {
+      source: { path: 'b', type: 'lockfile' },
+      packages: [{
+        package: { name: 'left-pad', ecosystem: 'npm', version: '1.0.0' },
+        vulnerabilities: [{ id: 'GHSA-xxxx', database_specific: { severity: 'LOW' } }]
+      }]
+    }]
+  };
+  r.parseOSVResults(osv);
+  const unique = r.deduplicateFindings();
+  assert.equal(unique.length, 1, 'duplicate (package, advisory) must collapse');
+});
+
+// ── FAIL-CLOSED run() (tool-availability mocked, exactly like sast fail-closed) ───
+
+test('run(): a language with NO available scanner yields scanned:false, never a silent pass', async () => {
+  // Every tool probe fails → neither a native tool nor osv-scanner is available.
+  cp.execSync = () => { throw new Error('command not found'); };
+  cp.execFileSync = () => { throw new Error('command not found'); };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-noscanner-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'go.mod'), 'module x\n'); // detectable, routes to osv
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, false, 'run() must report that nothing was scanned');
+    assert.equal(res.success, false, 'no scanner ran → not a success');
+    assert.ok(/no.*scanner/i.test(res.reason || ''), `reason must name the missing-scanner cause; got ${res.reason}`);
+    assert.deepEqual(res.findings, [], 'no findings when nothing scanned');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('run(): no detected language is a clean no-op (nothing to scan, not a failure)', async () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-empty-');
+  try {
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.success, true, 'no dependencies to audit is not a failure');
+    assert.deepEqual(res.findings, []);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('checkThreshold: a HIGH finding fails a HIGH threshold', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  r.parseOSVResults({
+    results: [{
+      source: { path: 'a', type: 'lockfile' },
+      packages: [{
+        package: { name: 'p', ecosystem: 'npm', version: '1.0.0' },
+        vulnerabilities: [{ id: 'GHSA-y', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  });
+  const res = r.checkThreshold('HIGH');
+  assert.equal(res.pass, false);
+  assert.equal(res.failing, 1);
+});
