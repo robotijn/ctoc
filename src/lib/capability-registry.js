@@ -419,11 +419,12 @@ function loadProjectTypes(projectRoot) {
  *   • EXACT filename/dirname (e.g. `project.godot`, or the Unity `ProjectSettings`
  *     DIRECTORY) — `existsSync`, unchanged; it matches a file OR a directory.
  *   • GLOB (e.g. `*.uproject` for Unreal, `*.ino` for Arduino) — a `readdir` of the
- *     project ROOT matched with a ReDoS-safe, ANCHORED regex built identically to
+ *     project ROOT matched with an ANCHORED regex built identically to
  *     `detectLanguages` (escape every metachar via `escapeRegExp`, then `\*` → `.*`,
- *     wrapped in `^…$`). NO raw `new RegExp` — the pattern goes through `safeRegExp`,
- *     the single audited choke point, so a data-derived glob can never be a ReDoS or
- *     injection vector.
+ *     wrapped in `^…$`). NO raw `new RegExp` — the pattern is escaped and constructed
+ *     through `safeRegExp`, the single audited choke point. `safeRegExp` centralizes
+ *     construction but does not itself cap backtracking; the only shipped glob markers
+ *     are single-`*` patterns, which compile to linear-time `.*` regexes.
  *
  * Priority resolution is UNCHANGED. Returns the winning project-type name, or null.
  *

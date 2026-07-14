@@ -15,6 +15,7 @@
 const { execSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
+const { cvssVectorBaseScore, severityFromCvss } = require('./cvss');
 
 /**
  * Vulnerability severity levels
@@ -94,6 +95,38 @@ const PACKAGE_MANAGERS = {
     command: 'composer audit --format=json'
   }
 };
+
+/**
+ * The capability-registry LANGUAGE names each package manager's ecosystem covers.
+ * Keyed to PACKAGE_MANAGERS above (npm/yarn/pnpm → the JS/TS ecosystem, pip/pipenv/
+ * poetry → Python, and so on). This is the single source SCARunner consults so it
+ * scans ONLY the long-tail ecosystems DependencyAuditor does NOT audit — a CVE is
+ * never counted by both scanners into the human-facing tally (F2). Kept in sync with
+ * PACKAGE_MANAGERS by `tests/dependency-auditor-severity.test.js`-adjacent coverage.
+ * @type {Object<string, string[]>}
+ */
+const MANAGER_LANGUAGES = {
+  npm: ['javascript', 'typescript'],
+  yarn: ['javascript', 'typescript'],
+  pnpm: ['javascript', 'typescript'],
+  pip: ['python'],
+  pipenv: ['python'],
+  poetry: ['python'],
+  go: ['go'],
+  cargo: ['rust'],
+  maven: ['java'],
+  gradle: ['java'],
+  bundler: ['ruby'],
+  composer: ['php']
+};
+
+/**
+ * The set of capability-registry language names DependencyAuditor covers — the union
+ * of MANAGER_LANGUAGES. SCARunner defers exactly these ecosystems to DependencyAuditor
+ * so the two never double-count the same CVE (F2 partition).
+ * @type {Set<string>}
+ */
+const COVERED_LANGUAGES = new Set(Object.values(MANAGER_LANGUAGES).flat());
 
 /**
  * Dependency Auditor class
@@ -720,158 +753,37 @@ class DependencyAuditor {
   }
 
   /**
-   * Map a CVSS score OR a severity label to a standard severity — NEVER under-report.
+   * Map a CVSS score OR a severity label OR a CVSS vector to a standard severity —
+   * NEVER under-report. Delegates to the single-source `src/lib/cvss.js`
+   * (`severityFromCvss`), passing THIS module's SEVERITY vocabulary (mid-band key
+   * MODERATE) so the extraction is behavior-preserving.
    *
-   * The bug this replaces (found by the boundary typecheck, fixed in R3-C): the pip
-   * and Go mappers were annotated as taking a number and banded numerically
-   * (>= 9.0 / 7.0 / 4.0). But `pip-audit`'s `vulns[].severity` and govulncheck's
-   * advisory severity are NOT guaranteed numeric — advisory feeds also emit string
-   * labels ("CRITICAL", "high"). Against the string "HIGH" every band comparison is
-   * `NaN`-false, so the function fell through and returned LOW: a CRITICAL advisory
-   * silently reported as LOW, in the security path that decides whether a push is
-   * blocked. A blocking finding became a non-blocking one, with zero test coverage.
-   *
-   * Rules:
-   *   - a number (or a numeric string like "9.8") bands as a CVSS v3 score;
-   *   - a known label maps to itself (case-insensitive; "medium" ⇒ MODERATE);
-   *   - anything unrecognised (absent, empty, an object, NaN) ⇒ MODERATE, the
-   *     documented unknown default — never LOW. When we do not understand a
-   *     severity, we OVER-report, never under-report.
+   * The bug this fences (found by the boundary typecheck, fixed in R3-C, and the
+   * exact class of F1 in the SCA runner): pip-audit's `vulns[].severity` and
+   * govulncheck's advisory severity are NOT guaranteed numeric — feeds emit string
+   * labels ("CRITICAL", "high") and CVSS VECTOR strings ("CVSS:3.1/AV:N/..."), on
+   * which `Number()` is NaN. Every band comparison against NaN is false, so a
+   * CRITICAL advisory silently reported LOW/MODERATE in the push-blocking path. The
+   * shared scorer over-reports on the unknown, never under-reports.
    *
    * @param {number|string|Array<any>|Record<string,any>|null|undefined} severity
-   *   - a CVSS score, a severity label, or a list/object of either (feeds vary)
+   *   - a CVSS score, a severity label, a CVSS vector, or a list/object of any (feeds vary)
    * @returns {string} one of SEVERITY.*
    */
   mapCvssOrLabel(severity) {
-    // Arrays/objects (R4-A item 10): several advisory feeds emit a LIST of scores
-    // or a scored OBJECT (e.g. { baseScore, score }). Take the MAX severity across
-    // them so a CRITICAL entry is never buried under a LOW sibling.
-    if (Array.isArray(severity)) {
-      let worst = SEVERITY.INFO;
-      for (const s of severity) worst = this._maxSeverity(worst, this.mapCvssOrLabel(s));
-      return severity.length ? worst : SEVERITY.MODERATE;
-    }
-    if (severity && typeof severity === 'object') {
-      const candidate = severity.baseScore ?? severity.score ?? severity.severity ?? severity.cvss ?? severity.vector;
-      return candidate == null ? SEVERITY.MODERATE : this.mapCvssOrLabel(candidate);
-    }
-
-    if (typeof severity === 'string') {
-      const raw = severity.trim();
-      if (raw === '') return SEVERITY.MODERATE;
-
-      // A CVSS vector string ("CVSS:3.1/AV:N/...") — exactly what the Go path reads
-      // at osv.severity[0].score — is NOT a bare number, so Number() is NaN. Compute
-      // its base score; if the vector cannot be fully parsed, band HIGH (a security
-      // advisory carrying a CVSS vector is never MODERATE, never LOW).
-      if (/CVSS:|\bAV:[NALP]\b/i.test(raw)) {
-        const score = this._cvssVectorBaseScore(raw);
-        return score != null ? this.bandCvss(score) : SEVERITY.HIGH;
-      }
-
-      // A MIXED string ("7.5 HIGH", "9.8 CRITICAL"): scan for BOTH a label token and
-      // a numeric token and take the MAX of what each implies — never under-report.
-      const labelSev = this._labelToSeverity(raw);
-      const numMatch = raw.match(/[\d.]+/);
-      const numSev = (numMatch && Number.isFinite(parseFloat(numMatch[0]))) ? this.bandCvss(parseFloat(numMatch[0])) : null;
-      if (labelSev && numSev) return this._maxSeverity(labelSev, numSev);
-      if (labelSev) return labelSev;
-      if (numSev) return numSev;
-      return SEVERITY.MODERATE; // unrecognised ⇒ over-report, never LOW
-    }
-
-    if (typeof severity === 'number' && Number.isFinite(severity)) {
-      return this.bandCvss(severity);
-    }
-
-    return SEVERITY.MODERATE; // null / undefined / NaN ⇒ unknown, not LOW
+    return severityFromCvss(severity, SEVERITY);
   }
 
   /**
-   * Map a bare severity LABEL (case-insensitive) to a SEVERITY, or null when the
-   * token is not a known label.
-   * @param {string} raw
-   * @returns {string|null}
-   */
-  _labelToSeverity(raw) {
-    const LABELS = {
-      critical: SEVERITY.CRITICAL,
-      high: SEVERITY.HIGH,
-      moderate: SEVERITY.MODERATE,
-      medium: SEVERITY.MODERATE,
-      low: SEVERITY.LOW,
-      info: SEVERITY.INFO,
-      informational: SEVERITY.INFO,
-      none: SEVERITY.INFO
-    };
-    const m = String(raw).toLowerCase().match(/critical|high|moderate|medium|low|informational|info|none/);
-    return m ? LABELS[m[0]] : null;
-  }
-
-  /** Rank a SEVERITY for MAX comparison (higher = worse). */
-  _severityRank(sev) {
-    return { INFO: 0, LOW: 1, MODERATE: 2, HIGH: 3, CRITICAL: 4 }[sev] ?? 2;
-  }
-
-  /** Return the worse (higher-ranked) of two severities. */
-  _maxSeverity(a, b) {
-    return this._severityRank(a) >= this._severityRank(b) ? a : b;
-  }
-
-  /**
-   * Compute a CVSS v3.0/3.1 base score from a vector string. Returns null when a
-   * required metric is missing/unparseable (the caller then bands HIGH rather than
-   * under-reporting). Implements the standard CVSS v3 base-score formula.
+   * Compute a CVSS v3.0/3.1 base score from a vector string, delegating to the
+   * single-source `src/lib/cvss.js`. Returns null when a required metric is
+   * missing/unparseable. Retained as the live in-module caller of
+   * `cvssVectorBaseScore` (and its documented public-ish surface).
    * @param {string} vector - e.g. "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
    * @returns {number|null} Base score 0.0–10.0, or null if not computable.
    */
   _cvssVectorBaseScore(vector) {
-    const parts = {};
-    for (const seg of String(vector).split('/')) {
-      const [k, v] = seg.split(':');
-      if (k && v) parts[k.trim().toUpperCase()] = v.trim().toUpperCase();
-    }
-    const scope = parts.S; // U (unchanged) or C (changed)
-    const AV = { N: 0.85, A: 0.62, L: 0.55, P: 0.2 }[parts.AV];
-    const AC = { L: 0.77, H: 0.44 }[parts.AC];
-    const UI = { N: 0.85, R: 0.62 }[parts.UI];
-    const PR = scope === 'C'
-      ? { N: 0.85, L: 0.68, H: 0.5 }[parts.PR]
-      : { N: 0.85, L: 0.62, H: 0.27 }[parts.PR];
-    const impactVal = { H: 0.56, L: 0.22, N: 0 };
-    const C = impactVal[parts.C];
-    const I = impactVal[parts.I];
-    const A = impactVal[parts.A];
-
-    if ([AV, AC, UI, PR, C, I, A].some((x) => x == null) || (scope !== 'U' && scope !== 'C')) {
-      return null; // incomplete/garbage vector ⇒ caller bands HIGH, never MODERATE
-    }
-
-    const iss = 1 - (1 - C) * (1 - I) * (1 - A);
-    const impact = scope === 'C'
-      ? 7.52 * (iss - 0.029) - 3.25 * Math.pow(iss - 0.02, 15)
-      : 6.42 * iss;
-    const exploitability = 8.22 * AV * AC * PR * UI;
-
-    if (impact <= 0) return 0;
-    const roundup = (x) => Math.ceil(x * 10) / 10;
-    const raw = scope === 'C'
-      ? Math.min(1.08 * (impact + exploitability), 10)
-      : Math.min(impact + exploitability, 10);
-    return roundup(raw);
-  }
-
-  /**
-   * Band a finite CVSS v3 base score. Only ever called with a real number.
-   * @param {number} score - CVSS v3 base score (0.0–10.0)
-   * @returns {string} one of SEVERITY.*
-   */
-  bandCvss(score) {
-    if (score >= 9.0) return SEVERITY.CRITICAL;
-    if (score >= 7.0) return SEVERITY.HIGH;
-    if (score >= 4.0) return SEVERITY.MODERATE;
-    if (score > 0) return SEVERITY.LOW;
-    return SEVERITY.MODERATE; // 0 / negative: not a real score ⇒ unknown
+    return cvssVectorBaseScore(vector);
   }
 
   /**
@@ -1076,5 +988,7 @@ class DependencyAuditor {
 module.exports = {
   DependencyAuditor,
   SEVERITY,
-  PACKAGE_MANAGERS
+  PACKAGE_MANAGERS,
+  MANAGER_LANGUAGES,
+  COVERED_LANGUAGES
 };
