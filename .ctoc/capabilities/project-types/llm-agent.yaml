@@ -1,0 +1,19 @@
+# llm-agent — an LLM agent / orchestration app (LangChain / LangGraph / CrewAI /
+# LlamaIndex / AutoGen / Pydantic-AI / Claude Agent SDK). It genuinely runs — either
+# it serves (a LangGraph dev server) or it runs an eval suite — so run is honest:true
+# (serve-or-eval). Security is REQUIRED: an agent is an untrusted-input surface
+# (prompt injection) with tool/file access.
+# HONEST PROVENANCE: there is NO universal decisive marker for an agent — most are a
+# plain Python/TS app whose only signal is a framework dependency, which the registry
+# does not parse. langgraph.json is the one config file that exists, but it covers only
+# the LangGraph slice. The type is therefore flagged verified: UNVERIFIED rather than
+# fabricate a decisive marker; the broader framework set lives in `frameworks`.
+projectType: llm-agent
+detectionMarkers: [langgraph.json]
+frameworks: [langchain, langgraph, crewai, llama-index, autogen, pydantic-ai, claude-agent-sdk]
+priority: 56
+runShape: server
+phases: { lint: recommended, typecheck: recommended, test: required, security: required, coverage: recommended }
+run: { strategy: serve-or-eval, honest: true }
+configScaffold: [langgraph.json, .env.example, evals, prompts]
+verified: UNVERIFIED

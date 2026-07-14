@@ -1,0 +1,18 @@
+# data-pipeline — an orchestrated data workflow (Airflow / Dagster / Prefect / dbt /
+# Spark). A pipeline is launched by a SCHEDULER, not by CI, so run is honest:false — a
+# `dag validate` is a static check, not a live run, and there is no human-facing
+# runtime to probe. test is REQUIRED: pipeline correctness (schemas, transforms) is
+# directly testable.
+# MARKER HONESTY: the DECISIVE markers are the orchestrator configs airflow.cfg,
+# dagster.yaml, prefect.yaml. dbt_project.yml is deliberately EXCLUDED — it is already
+# the SQL language marker, so using it here would double-detect and mis-rank a dbt
+# project; dbt stays in `frameworks` (informational).
+projectType: data-pipeline
+detectionMarkers: [airflow.cfg, dagster.yaml, prefect.yaml]
+frameworks: [airflow, dagster, prefect, dbt, spark]
+priority: 45
+runShape: none
+phases: { lint: recommended, typecheck: recommended, test: required, security: recommended, coverage: recommended }
+run: { strategy: validate, honest: false }
+configScaffold: [dags, airflow.cfg]
+verified: web-2026-07

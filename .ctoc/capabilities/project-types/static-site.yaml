@@ -1,0 +1,17 @@
+# static-site — a statically-generated site (Astro / Hugo / Eleventy / Gatsby /
+# Docusaurus / MkDocs). An SSG dev server runs locally and serves HTTP, so run is
+# genuinely honest:true (build-and-preview).
+# Markers are the SSG-SPECIFIC config files ONLY — each is decisive. A bare
+# _config.yml (Jekyll) is intentionally OMITTED as a marker: it is too generic (it
+# collides with many YAML-config tools); jekyll stays in `frameworks` (informational).
+# priority 25 sits ABOVE web-frontend (20): a real SSG config beats a bare package.json,
+# but a plain Vite SPA (no SSG marker) still resolves to web-frontend.
+projectType: static-site
+detectionMarkers: [astro.config.mjs, hugo.toml, .eleventy.js, gatsby-config.js, docusaurus.config.js, mkdocs.yml]
+frameworks: [astro, hugo, eleventy, jekyll, gatsby, docusaurus, mkdocs]
+priority: 25
+runShape: web
+phases: { lint: recommended, typecheck: optional, test: recommended, security: recommended, coverage: optional }
+run: { strategy: build-and-preview, honest: true }
+configScaffold: [astro.config.mjs, package.json, .gitignore]
+verified: web-2026-07

@@ -1,0 +1,15 @@
+# blockchain — smart contracts (Hardhat / Foundry / Truffle / Solidity). Contracts
+# DEPLOY to a chain; the CI-safe last mile is compile+test against a local node, not a
+# live launch (build-is-last-mile). security is REQUIRED — a contract bug is an
+# on-chain exploit (slither / mythril) — and coverage is REQUIRED, because contract
+# branch coverage is a direct measure of un-audited value-at-risk.
+# All four markers are DECISIVE, framework-specific config files.
+projectType: blockchain
+detectionMarkers: [hardhat.config.js, hardhat.config.ts, foundry.toml, truffle-config.js]
+frameworks: [hardhat, foundry, truffle, solidity]
+priority: 73
+runShape: none
+phases: { lint: required, typecheck: required, test: required, security: required, coverage: required }
+run: { strategy: compile-and-test, honest: build-is-last-mile }
+configScaffold: [hardhat.config.ts, foundry.toml, contracts, test]
+verified: web-2026-07
