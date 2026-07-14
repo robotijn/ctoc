@@ -1,6 +1,9 @@
 # Java capability entry — web-grounded 2026 toolchain (Maven-first; Gradle via altCmd).
 # build.gradle.kts is deliberately NOT a marker here (that is Kotlin's, to avoid a
 # collision) — Java uses pom.xml / build.gradle (Groovy DSL).
+# SECURITY is honestly UNVERIFIED: plain SpotBugs is a bug-pattern finder, NOT a SAST
+# without the find-sec-bugs plugin, so its security claim is flagged UNVERIFIED rather
+# than dressed up as a security scan. Deps audit (OWASP dependency-check) is verified.
 language: java
 detectionMarkers: [pom.xml, build.gradle]
 extensions: [.java]
@@ -10,7 +13,7 @@ toolchain:
   typecheck: { cmd: "mvn -q compile", tool: maven, verified: web-2026-07 }
   test:      { cmd: "mvn test", tool: maven, altCmd: "gradle test", verified: web-2026-07 }
   coverage:  { cmd: "mvn jacoco:report", tool: jacoco, verified: web-2026-07 }
-  security:  { cmd: "mvn com.github.spotbugs:spotbugs-maven-plugin:check", tool: spotbugs, verified: web-2026-07 }
+  security:  { cmd: "mvn com.github.spotbugs:spotbugs-maven-plugin:check", tool: spotbugs, verified: UNVERIFIED }
   depsAudit: { cmd: "mvn org.owasp:dependency-check-maven:check", tool: dependency-check, altCmd: "osv-scanner -r .", verified: web-2026-07 }
   build:     { cmd: "mvn package", tool: maven, verified: web-2026-07 }
 run:

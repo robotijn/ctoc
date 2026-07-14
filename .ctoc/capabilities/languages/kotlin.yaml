@@ -1,8 +1,9 @@
 # Kotlin/Android capability entry — web-grounded 2026 toolchain (vision anchors).
 # Mobile run is HONEST: build+test is the CI-safe last mile (installDebug needs a
-# device/emulator) — never a false "it ran". detekt is the security-ish static
-# coverage via Kover (JetBrains standard); deps audit via osv-scanner (OSV.dev,
-# scans the gradle lockfile) — both web-verified 2026-07.
+# device/emulator) — never a false "it ran". SECURITY is honestly UNVERIFIED: detekt
+# is a code-smell/style linter, NOT a SAST, and no free canonical Kotlin SAST is
+# confirmed — so its security claim is flagged UNVERIFIED, not dressed up as a scan.
+# Deps audit via osv-scanner (OSV.dev, scans the gradle lockfile) is web-verified.
 language: kotlin
 detectionMarkers: [build.gradle.kts]
 extensions: [.kt, .kts]
@@ -12,7 +13,7 @@ toolchain:
   typecheck: { cmd: "./gradlew compileKotlin", tool: gradle, verified: web-2026-07 }
   test:      { cmd: "./gradlew test", tool: gradle, verified: web-2026-07 }
   coverage:  { cmd: "./gradlew koverXmlReport", tool: kover, verified: web-2026-07 }
-  security:  { cmd: "./gradlew detekt", tool: detekt, verified: web-2026-07 }
+  security:  { cmd: "./gradlew detekt", tool: detekt, verified: UNVERIFIED }
   depsAudit: { cmd: "osv-scanner scan --lockfile=gradle.lockfile", tool: osv-scanner, verified: web-2026-07 }
   build:     { cmd: "./gradlew build", tool: gradle, verified: web-2026-07 }
 run:

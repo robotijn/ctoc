@@ -145,6 +145,17 @@ describe('capability-registry TOP-20: honest provenance (no empty/guessed/fabric
     });
   }
 
+  it('F5: kotlin + java security are honestly flagged UNVERIFIED (detekt/SpotBugs are not a confirmed SAST)', () => {
+    const kotlin = reg.languages.kotlin;
+    const java = reg.languages.java;
+    assert.ok(kotlin && kotlin.toolchain.security, 'kotlin must declare a security phase');
+    assert.ok(java && java.toolchain.security, 'java must declare a security phase');
+    assert.equal(kotlin.toolchain.security.verified, 'UNVERIFIED',
+      'detekt is a code-smell linter, not a SAST — its security claim must be UNVERIFIED');
+    assert.equal(java.toolchain.security.verified, 'UNVERIFIED',
+      'plain SpotBugs is a bug-pattern finder (no find-sec-bugs) — its security claim must be UNVERIFIED');
+  });
+
   it('no entry anywhere (toolchain or top-level) is flagged "guessed"', () => {
     for (const lang of TOP20) {
       const cap = reg.languages[lang];

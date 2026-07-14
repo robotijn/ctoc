@@ -144,8 +144,10 @@ function defaultShapeFor(language, projectPath) {
  * @returns {{applicable: true, language: string, projectType: string,
  *   strategy: {command: string, honest: (boolean|string), shape: string},
  *   lastMile: {build: (string|null), test: (string|null)},
- *   taxonomy: (string|null), pipeline: (Object|null)}|null} the native run
- *   target, or null for a JS-shaped or unrecognized project.
+ *   taxonomy: (string|null), pipeline: (Object|null),
+ *   honest: (boolean|string)}|null} the native run target, or null for a JS-shaped
+ *   or unrecognized project. `honest` is the authoritative honest flag: the taxonomy
+ *   pipeline's when a taxonomy is detected, else the language shape's.
  */
 function detectRunTarget(projectPath) {
   if (detectAppShape(projectPath) !== 'unknown') return null;
@@ -161,6 +163,14 @@ function detectRunTarget(projectPath) {
     // merge the full language+type pipeline when a taxonomy is detected.
     const taxonomy = capabilityRegistry.projectTypeFor(projectPath);
     const pipeline = taxonomy ? capabilityRegistry.pipelineFor(language, taxonomy, projectPath) : null;
+    // F9: the language shape's honest flag (strategy.honest) and the taxonomy's honest
+    // flag (pipeline.run.honest) can disagree — a Rust Tauri app is a `cli` shape
+    // (honest:true) but the desktop taxonomy is build-is-last-mile. When a taxonomy
+    // pipeline is present it is the authoritative source of truth about how honestly
+    // this thing can be "run"; prefer it over the bare language shape.
+    const honest = pipeline && pipeline.run && pipeline.run.honest != null
+      ? pipeline.run.honest
+      : strategy.honest;
     return {
       applicable: true,
       language,
@@ -171,7 +181,8 @@ function detectRunTarget(projectPath) {
         test: test && typeof test.cmd === 'string' ? test.cmd : null
       },
       taxonomy,
-      pipeline
+      pipeline,
+      honest
     };
   }
   return null;
@@ -200,7 +211,10 @@ function nativeNotApplicableResult(target, started) {
       projectType: target.projectType,
       projectTypeTaxonomy: target.taxonomy || null,
       runCommand: s.command,
-      honest: s.honest,
+      // F9: prefer the taxonomy's authoritative honest flag (target.honest) over the
+      // bare language shape, so the evidence never claims a Tauri desktop app "runs"
+      // when its honest last mile is build+test.
+      honest: target.honest != null ? target.honest : s.honest,
       buildCommand: target.lastMile.build,
       testCommand: target.lastMile.test,
       reason:

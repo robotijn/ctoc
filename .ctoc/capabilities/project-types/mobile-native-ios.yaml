@@ -1,7 +1,9 @@
 # mobile-native-ios — Swift/Objective-C iOS. Build via xcodebuild; a simulator boot
 # is not CI-reliable, so build+test is the honest last mile (build-is-last-mile).
+# Markers are Podfile + project.pbxproj ONLY: Package.swift is generic Swift Package
+# Manager (used by servers and libraries — e.g. a Vapor server) and must not mark iOS.
 projectType: mobile-native-ios
-detectionMarkers: [Podfile, project.pbxproj, Package.swift]
+detectionMarkers: [Podfile, project.pbxproj]
 frameworks: [swiftui, uikit, cocoapods, swift-package-manager]
 priority: 68
 runShape: mobile
