@@ -193,6 +193,48 @@ describe('expansion wave 2: THE OVER-DETECTION GUARD — a shared/absent marker 
  * language pairing resolved security to semgrep (a TypeScript SAST that cannot read
  * .sol). After the fix, the decisive security command is `slither .` — never semgrep.
  */
+/**
+ * WAVE 4 — projectTypeFor becomes glob-aware, closing the asymmetry with detectLanguages.
+ * Before this change projectTypeFor matched EXACT filenames only, so Unreal's *.uproject
+ * and Arduino's *.ino markers were kept out of game/embedded to avoid silent dead markers.
+ * These fixtures prove the glob path now fires, the exact-DIR marker (ProjectSettings) is
+ * preserved, and there is no over-detection (a language/engine-specific extension must not
+ * hijack a plain web-frontend).
+ */
+describe('WAVE 4: projectTypeFor is glob-aware — *.uproject and *.ino fire', () => {
+  it('a project-named *.uproject (Unreal) detects game', () => {
+    withMarkers('ctoc-w4-unreal-', { 'MyGame.uproject': '{"FileVersion":3}\n' }, (dir) => {
+      assert.equal(registry.projectTypeFor(dir), 'game',
+        '*.uproject is Unreal\'s project-named marker — the glob must resolve to game');
+    });
+  });
+
+  it('a *.ino sketch (Arduino) detects embedded', () => {
+    withMarkers('ctoc-w4-arduino-', { 'sketch.ino': 'void setup(){}\nvoid loop(){}\n' }, (dir) => {
+      assert.equal(registry.projectTypeFor(dir), 'embedded',
+        '*.ino is Arduino\'s sketch marker — the glob must resolve to embedded');
+    });
+  });
+
+  it('the exact-DIR marker is preserved: a directory named ProjectSettings still detects game', () => {
+    const dir = makeProject('ctoc-w4-unity-');
+    try {
+      fs.mkdirSync(path.join(dir, 'ProjectSettings'));
+      assert.equal(registry.projectTypeFor(dir), 'game',
+        'ProjectSettings is Unity\'s exact-DIRECTORY marker — existsSync must still match it (not just files)');
+    } finally { rm(dir); }
+  });
+
+  it('OVER-DETECTION GUARD: a plain web-frontend (vite.config.ts only) is web-frontend, NOT game/embedded', () => {
+    withMarkers('ctoc-w4-overdetect-', { 'vite.config.ts': 'export default {};\n' }, (dir) => {
+      const detected = registry.projectTypeFor(dir);
+      assert.equal(detected, 'web-frontend', 'a bare Vite SPA must remain web-frontend');
+      assert.notEqual(detected, 'game', 'no *.uproject present → must not mis-detect game');
+      assert.notEqual(detected, 'embedded', 'no *.ino present → must not mis-detect embedded');
+    });
+  });
+});
+
 describe('WAVE 2 FIX (F1): pipelineFor(solidity, blockchain) resolves security to slither, not semgrep', () => {
   it('the merged blockchain security phase invokes slither and is web-grounded', () => {
     const pipeline = registry.pipelineFor('solidity', 'blockchain');

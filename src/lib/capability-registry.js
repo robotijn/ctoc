@@ -413,8 +413,19 @@ function loadProjectTypes(projectRoot) {
 /**
  * Detect the project type of a project from its declared detectionMarkers, resolving
  * overlaps by the `priority` field (higher wins) so a decisive marker (turbo.json →
- * monorepo, main.tf → infra) beats a generic one. Exact-filename/dirname markers only
- * (safe: no regex, no ReDoS). Returns the winning project-type name, or null.
+ * monorepo, main.tf → infra) beats a generic one. Matches BOTH marker kinds, exactly
+ * like `detectLanguages`:
+ *
+ *   • EXACT filename/dirname (e.g. `project.godot`, or the Unity `ProjectSettings`
+ *     DIRECTORY) — `existsSync`, unchanged; it matches a file OR a directory.
+ *   • GLOB (e.g. `*.uproject` for Unreal, `*.ino` for Arduino) — a `readdir` of the
+ *     project ROOT matched with a ReDoS-safe, ANCHORED regex built identically to
+ *     `detectLanguages` (escape every metachar via `escapeRegExp`, then `\*` → `.*`,
+ *     wrapped in `^…$`). NO raw `new RegExp` — the pattern goes through `safeRegExp`,
+ *     the single audited choke point, so a data-derived glob can never be a ReDoS or
+ *     injection vector.
+ *
+ * Priority resolution is UNCHANGED. Returns the winning project-type name, or null.
  *
  * @param {string} projectRoot project root to scan.
  * @returns {string|null} the detected project-type name, or null when none matches.
@@ -422,6 +433,12 @@ function loadProjectTypes(projectRoot) {
 function projectTypeFor(projectRoot) {
   if (typeof projectRoot !== 'string' || projectRoot.length === 0) return null;
   const { projectTypes } = loadProjectTypes(projectRoot);
+  // Read the project root ONCE for glob markers; fail-soft to [] (an unreadable root
+  // simply yields no glob evidence — exact markers still work via existsSync).
+  let rootFiles = [];
+  try {
+    rootFiles = safeFs.readdirSync(projectRoot);
+  } catch { rootFiles = []; }
   let best = null;
   let bestPriority = -Infinity;
   for (const [name, t] of Object.entries(projectTypes)) {
@@ -429,9 +446,16 @@ function projectTypeFor(projectRoot) {
     let matched = false;
     for (const marker of markers) {
       if (typeof marker !== 'string') continue;
-      try {
-        if (safeFs.existsSync(path.join(projectRoot, marker))) { matched = true; break; }
-      } catch { /* unreadable → not detected via this marker */ }
+      if (marker.includes('*')) {
+        // Glob marker: ReDoS-safe, anchored whole-filename match (see JSDoc above).
+        const pattern = safeRegExp('^' + escapeRegExp(marker).replace(/\\\*/g, '.*') + '$');
+        if (rootFiles.some((f) => pattern.test(f))) { matched = true; break; }
+      } else {
+        // Exact filename/dirname marker: unchanged existsSync (matches a file OR a dir).
+        try {
+          if (safeFs.existsSync(path.join(projectRoot, marker))) { matched = true; break; }
+        } catch { /* unreadable → not detected via this marker */ }
+      }
     }
     if (!matched) continue;
     const priority = typeof t.priority === 'number' ? t.priority : 0;
