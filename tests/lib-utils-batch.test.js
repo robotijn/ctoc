@@ -24,6 +24,7 @@ const os = require('os');
 const path = require('path');
 
 const toolDetector = require('../src/lib/tool-detector');
+const registry = require('../src/lib/capability-registry');
 
 // ---------------------------------------------------------------------------
 // Shared temp-dir helpers (hermetic; realpath resolves macOS /var -> /private)
@@ -61,9 +62,13 @@ describe('tool-detector', () => {
   });
 
   describe('constants', () => {
-    it('exposes DEFAULT_TOOLS and LANGUAGE_MARKERS', () => {
-      assert.equal(toolDetector.DEFAULT_TOOLS.javascript.lint, 'eslint .');
-      assert.equal(toolDetector.DEFAULT_TOOLS.typescript.typecheck, 'tsc --noEmit');
+    it('resolves canonical commands via the registry and exposes LANGUAGE_MARKERS', () => {
+      // CR5-s2: DEFAULT_TOOLS was removed — commands now come from the capability
+      // registry (the single source of truth). Assert the same canonical values
+      // behaviorally through the registry instead of the retired static table.
+      assert.equal(registry.toolchainFor('javascript', 'lint').cmd, 'eslint .');
+      assert.equal(registry.toolchainFor('typescript', 'typecheck').cmd, 'tsc --noEmit');
+      // LANGUAGE_MARKERS is still a live export (union detectLanguages reads it).
       assert.deepEqual(toolDetector.LANGUAGE_MARKERS.go, ['go.mod', 'go.sum']);
     });
   });

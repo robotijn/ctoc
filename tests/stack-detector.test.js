@@ -243,6 +243,84 @@ function testDetectLanguagesNonExistentDir() {
   console.log('# detectLanguages - non-existent directory');
 }
 
+// ── CR5-s4: additive UNION with the capability registry ──────────────────────
+// stack-detector now UNIONs in capability-registry.detectLanguages so it sees the
+// registry-only languages (c, cpp, sql, r, scala, lua, objectivec) it never had —
+// additively, without losing anything it already detected.
+
+function testDetectLanguagesCViaRegistry() {
+  setupTempDir();
+  // A C project: Makefile marker + a .c source. stack-detector alone never had `c`;
+  // the registry (c.yaml → [Makefile, *.c, *.h]) supplies it via the union.
+  createTempFile('Makefile', 'all:\n\tcc main.c -o main\n');
+  createTempFile('main.c', 'int main(void){return 0;}\n');
+
+  const langs = detectLanguages(tempDir);
+  assert.ok(langs.includes('c'), 'Unions in C from the capability registry');
+
+  cleanupTempDir();
+  console.log('# detectLanguages - C via registry union (additive)');
+}
+
+function testDetectLanguagesSqlViaRegistry() {
+  setupTempDir();
+  // A dbt project: dbt_project.yml → sql.yaml marker. New language via the union.
+  createTempFile('dbt_project.yml', 'name: analytics\nversion: "1.0.0"\n');
+
+  const langs = detectLanguages(tempDir);
+  assert.ok(langs.includes('sql'), 'Unions in SQL from the capability registry (dbt)');
+
+  cleanupTempDir();
+  console.log('# detectLanguages - SQL via registry union (dbt_project.yml)');
+}
+
+function testDetectLanguagesZigSurvivesUnion() {
+  setupTempDir();
+  // REGRESSION: the registry has NO zig entry — zig exists ONLY in stack-detector's
+  // LANGUAGE_PATTERNS (build.zig file marker). The union must not drop it.
+  createTempFile('build.zig', 'const std = @import("std");\n');
+
+  const langs = detectLanguages(tempDir);
+  assert.ok(langs.includes('zig'), 'zig (stack-detector-only) survives the registry union');
+
+  cleanupTempDir();
+  console.log('# detectLanguages - zig survives union (registry lacks zig)');
+}
+
+function testDetectLanguagesTsOverJsPreservedAfterUnion() {
+  setupTempDir();
+  // REGRESSION: the registry returns BOTH javascript and typescript for a
+  // package.json + tsconfig.json project (it has no preference logic). The union must
+  // NOT re-introduce javascript — the TypeScript-over-JavaScript preference still holds.
+  createTempFile('package.json', '{"name": "test"}');
+  createTempFile('tsconfig.json', '{}');
+
+  const langs = detectLanguages(tempDir);
+  assert.ok(langs.includes('typescript'), 'TypeScript detected');
+  assert.ok(!langs.includes('javascript'), 'JavaScript still removed when TypeScript present, even after union');
+
+  cleanupTempDir();
+  console.log('# detectLanguages - TS-over-JS preference preserved after union');
+}
+
+function testDetectLanguagesExtensionOnlyPythonUnchanged() {
+  setupTempDir();
+  // TRUTH GUARD: stack-detector's `detectLanguages` iterates only LANGUAGE_PATTERNS
+  // `files` — the `extensions` arrays are inert data, never scanned. A lone `foo.py`
+  // with NO marker file is therefore detected by NEITHER stack-detector NOR the
+  // registry (which has no `*.py` marker). The additive union must not change that.
+  // (The plan's claim of "extension-scan" detection here does not match the code;
+  //  wiring extension-tree-walking is a separate, out-of-scope slice.)
+  createTempFile('foo.py', 'print("hi")\n');
+
+  const langs = detectLanguages(tempDir);
+  assert.ok(Array.isArray(langs), 'Returns array');
+  assert.ok(!langs.includes('python'), 'extension-only .py is not detected (no marker; extensions are inert) — union does not change this');
+
+  cleanupTempDir();
+  console.log('# detectLanguages - extension-only python unchanged by union');
+}
+
 // ============================================
 // detectFrameworks Tests
 // ============================================
@@ -614,6 +692,11 @@ testDetectLanguagesCSharp();
 testDetectLanguagesMultiple();
 testDetectLanguagesEmptyDir();
 testDetectLanguagesNonExistentDir();
+testDetectLanguagesCViaRegistry();
+testDetectLanguagesSqlViaRegistry();
+testDetectLanguagesZigSurvivesUnion();
+testDetectLanguagesTsOverJsPreservedAfterUnion();
+testDetectLanguagesExtensionOnlyPythonUnchanged();
 
 // detectFrameworks tests
 console.log('\n## detectFrameworks\n');

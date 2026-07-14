@@ -26,7 +26,6 @@ const os = require('node:os');
 const path = require('node:path');
 
 const registry = require('../src/lib/capability-registry');
-const { DEFAULT_TOOLS } = require('../src/lib/tool-detector');
 
 const SEED_LANGS = ['dart', 'kotlin', 'rust', 'python', 'typescript', 'go'];
 const ALLOWED_VERIFIED = new Set(['web-2026-07', 'UNVERIFIED']);
@@ -143,6 +142,72 @@ describe('capability-registry: detectLanguages() — data-driven marker detectio
   });
 });
 
+describe('capability-registry: detectLanguages() — GLOB markers (CR5-s1, parity with tool-detector)', () => {
+  it('detects csharp from a *.csproj file (glob, not exact filename)', () => {
+    const dir = makeProject('ctoc-glob-csproj-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Foo.csproj'), '<Project Sdk="Microsoft.NET.Sdk" />\n');
+      assert.ok(registry.detectLanguages(dir).includes('csharp'),
+        'a *.csproj file must detect csharp via the glob marker');
+    } finally { rm(dir); }
+  });
+
+  it('detects ruby from a *.gemspec file (glob, not exact filename)', () => {
+    const dir = makeProject('ctoc-glob-gemspec-');
+    try {
+      fs.writeFileSync(path.join(dir, 'lib.gemspec'), 'Gem::Specification.new\n');
+      assert.ok(registry.detectLanguages(dir).includes('ruby'),
+        'a *.gemspec file must detect ruby via the glob marker');
+    } finally { rm(dir); }
+  });
+
+  it('a C project (main.c + util.h) detects c and NOT cpp', () => {
+    const dir = makeProject('ctoc-glob-c-');
+    try {
+      fs.writeFileSync(path.join(dir, 'main.c'), 'int main(void){return 0;}\n');
+      fs.writeFileSync(path.join(dir, 'util.h'), '#pragma once\n');
+      const langs = registry.detectLanguages(dir);
+      assert.ok(langs.includes('c'), 'main.c/util.h must detect c');
+      assert.ok(!langs.includes('cpp'),
+        'a *.c/*.h project must NOT detect cpp — the anchored glob keeps *.c out of *.cpp');
+    } finally { rm(dir); }
+  });
+
+  it('a C++ project (app.cpp) detects cpp and NOT c', () => {
+    const dir = makeProject('ctoc-glob-cpp-');
+    try {
+      fs.writeFileSync(path.join(dir, 'app.cpp'), 'int main(){return 0;}\n');
+      const langs = registry.detectLanguages(dir);
+      assert.ok(langs.includes('cpp'), 'app.cpp must detect cpp');
+      assert.ok(!langs.includes('c'),
+        'app.cpp must NOT match *.c — anchoring ^…$ is what prevents app.cpp matching *.c');
+    } finally { rm(dir); }
+  });
+
+  it('a mixed project (main.c AND app.cpp) detects BOTH c and cpp', () => {
+    const dir = makeProject('ctoc-glob-both-');
+    try {
+      fs.writeFileSync(path.join(dir, 'main.c'), 'int main(void){return 0;}\n');
+      fs.writeFileSync(path.join(dir, 'app.cpp'), 'int f(){return 0;}\n');
+      const langs = registry.detectLanguages(dir);
+      assert.ok(langs.includes('c'), 'the .c file must detect c');
+      assert.ok(langs.includes('cpp'), 'the .cpp file must detect cpp');
+    } finally { rm(dir); }
+  });
+
+  it('REGRESSION: an exact-marker project stays stable — Cargo.toml only returns ["rust"], [0] unchanged', () => {
+    const dir = makeProject('ctoc-glob-reg-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "x"\n');
+      const langs = registry.detectLanguages(dir);
+      assert.deepEqual(langs, ['rust'],
+        'adding glob detection must not add a false positive for a Cargo.toml-only dir');
+      assert.equal(langs[0], 'rust',
+        'app-runner consumes detectLanguages[0]; it must stay rust for a rust project');
+    } finally { rm(dir); }
+  });
+});
+
 describe('capability-registry: toolchainFor() / capabilitiesFor()', () => {
   it("toolchainFor('rust','test') returns the cargo test command", () => {
     const tc = registry.toolchainFor('rust', 'test');
@@ -226,18 +291,26 @@ describe('capability-registry: SEED DATA integrity (no fabricated/empty/guessed 
   });
 });
 
-describe('capability-registry: PARITY with tool-detector DEFAULT_TOOLS (CR5 swap is behavior-preserving)', () => {
+describe('capability-registry: PARITY with the canonical tool-detector commands (CR5 swap is behavior-preserving)', () => {
+  // CR5-s2 retired tool-detector's DEFAULT_TOOLS table (superseded by the registry).
+  // The parity anchor lives here as a FROZEN local fixture holding the known-good
+  // python/typescript/go lint+test commands the retired table defined; the registry
+  // must still match them exactly, proving the swap was behavior-preserving.
+  const CANONICAL = Object.freeze({
+    python: Object.freeze({ lint: 'ruff check .', test: 'pytest' }),
+    typescript: Object.freeze({ lint: 'eslint .', test: 'npm test' }),
+    go: Object.freeze({ lint: 'golangci-lint run', test: 'go test ./...' })
+  });
   for (const lang of ['python', 'typescript', 'go']) {
-    it(`${lang}: registry lint+test commands match tool-detector.DEFAULT_TOOLS`, () => {
-      const expected = DEFAULT_TOOLS[lang];
-      assert.ok(expected, `tool-detector must define DEFAULT_TOOLS.${lang}`);
+    it(`${lang}: registry lint+test commands match the canonical tool-detector commands`, () => {
+      const expected = CANONICAL[lang];
       assert.equal(
         registry.toolchainFor(lang, 'lint').cmd, expected.lint,
-        `${lang} lint must match tool-detector exactly (${expected.lint})`
+        `${lang} lint must match the canonical command exactly (${expected.lint})`
       );
       assert.equal(
         registry.toolchainFor(lang, 'test').cmd, expected.test,
-        `${lang} test must match tool-detector exactly (${expected.test})`
+        `${lang} test must match the canonical command exactly (${expected.test})`
       );
     });
   }

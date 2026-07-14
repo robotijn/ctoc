@@ -42,6 +42,7 @@
 
 const path = require('path');
 const safeFs = require('./safe-fs');
+const { safeRegExp, escapeRegExp } = require('./regex-utils');
 
 /**
  * Defense-in-depth caps on untrusted capability files (a project may drop hostile
@@ -526,8 +527,27 @@ function pipelineFor(language, projectType, projectRoot) {
 
 /**
  * The languages whose detectionMarkers exist in the project. Replaces the four
- * duplicate marker tables in CR5. Exact-filename markers only (safe: no regex, no
- * ReDoS); the six seed languages need no globs.
+ * duplicate marker tables in CR5, and matches BOTH kinds of marker the surfaces use:
+ *
+ *   • EXACT filename (e.g. `Cargo.toml`, `go.mod`) — `existsSync`, unchanged.
+ *   • GLOB (e.g. `*.csproj`, `*.gemspec`, `*.c`) — a `readdir` of the project ROOT
+ *     matched with a ReDoS-safe, ANCHORED regex built exactly like
+ *     `tool-detector.js:88-92` (escape every metachar, then `\*` → `.*`), wrapped in
+ *     `^…$` so the pattern matches the WHOLE filename. The anchoring is load-bearing:
+ *     without it `app.cpp` would match `*.c` (`.*\.c` occurs inside "app.cpp"); with
+ *     it, C-vs-C++ disambiguation falls out naturally per-marker (`main.c`→c,
+ *     `app.cpp`→cpp) with NO special-case code.
+ *
+ * NO raw `new RegExp` — the pattern goes through `safeRegExp`/`escapeRegExp` (the
+ * single audited choke point) so a data-derived glob can never be a ReDoS or
+ * injection vector. This is root-level glob + exact matching only — the same
+ * detection power as `tool-detector`; file-extension tree-walking stays in
+ * stack-detector (CR5-s4), out of scope here.
+ *
+ * DECLARATION ORDER is preserved: languages are still iterated in load() order and
+ * each language is pushed at most once (first matching marker wins), so
+ * `detectLanguages(root)[0]` — which app-runner consumes — never shifts for a
+ * project that already detected.
  *
  * @param {string} projectRoot project root to scan.
  * @returns {string[]} detected language names (declaration order).
@@ -535,14 +555,27 @@ function pipelineFor(language, projectType, projectRoot) {
 function detectLanguages(projectRoot) {
   if (typeof projectRoot !== 'string' || projectRoot.length === 0) return [];
   const { languages } = load(projectRoot);
+  // Read the project root ONCE for glob markers; fail-soft to [] (an unreadable root
+  // simply yields no glob evidence — exact-filename markers still work via existsSync).
+  let rootFiles = [];
+  try {
+    rootFiles = safeFs.readdirSync(projectRoot);
+  } catch { rootFiles = []; }
   const detected = [];
   for (const [lang, cap] of Object.entries(languages)) {
     const markers = Array.isArray(cap.detectionMarkers) ? cap.detectionMarkers : [];
     for (const marker of markers) {
       if (typeof marker !== 'string') continue;
-      try {
-        if (safeFs.existsSync(path.join(projectRoot, marker))) { detected.push(lang); break; }
-      } catch { /* unreadable → not detected via this marker */ }
+      if (marker.includes('*')) {
+        // Glob marker: ReDoS-safe, anchored whole-filename match (see JSDoc above).
+        const pattern = safeRegExp('^' + escapeRegExp(marker).replace(/\\\*/g, '.*') + '$');
+        if (rootFiles.some((f) => pattern.test(f))) { detected.push(lang); break; }
+      } else {
+        // Exact-filename marker: unchanged existsSync behavior.
+        try {
+          if (safeFs.existsSync(path.join(projectRoot, marker))) { detected.push(lang); break; }
+        } catch { /* unreadable → not detected via this marker */ }
+      }
     }
   }
   return detected;

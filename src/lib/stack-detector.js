@@ -6,6 +6,7 @@
 const safeFs = require('./safe-fs');
 const { safeRegExp } = require('./regex-utils');
 const path = require('path');
+const capabilityRegistry = require('./capability-registry');
 
 const LANGUAGE_PATTERNS = {
   python: {
@@ -124,7 +125,26 @@ function matchGlob(str, pattern) {
 }
 
 /**
- * Detects languages in a project
+ * Detects languages in a project.
+ *
+ * Two detection layers, UNIONed (CR5-s4):
+ *   1. stack-detector's own LANGUAGE_PATTERNS file/glob markers — unchanged. This is
+ *      the ONLY layer that carries `zig` (the registry has no zig entry), and its
+ *      exact-file + root-glob marker set is preserved verbatim.
+ *   2. the capability registry (`capability-registry.detectLanguages`) — adds the
+ *      registry-only languages stack-detector never had (c, cpp, sql, r, scala, lua,
+ *      objectivec) via the SAME kind of root-level exact/glob markers.
+ *
+ * The union is conservative and additive: every language layer 1 already found keeps
+ * its position and order; registry-only languages are appended after; duplicates are
+ * dropped. The output shape is unchanged (a `string[]`) — SessionStart (the sole
+ * consumer) sees only a wider set, never a different shape.
+ *
+ * NOTE ON EXTENSIONS: `LANGUAGE_PATTERNS[*].extensions` is descriptive metadata; this
+ * function detects by marker FILES only (exact name or root-level glob), exactly as it
+ * always has. Neither layer walks the file tree by extension, so a source file with no
+ * marker (e.g. a lone `foo.py`) is not, by itself, a detection signal. Extension-tree
+ * walking is deliberately out of scope for this slice.
  */
 function detectLanguages(projectPath) {
   projectPath = projectPath || process.cwd();
@@ -151,6 +171,18 @@ function detectLanguages(projectPath) {
     }
 
     if (found) {
+      detected.push(language);
+    }
+  }
+
+  // UNION in the capability-registry languages (glob-aware, fail-open — an unreadable
+  // root or empty registry simply contributes nothing). Preserve stack-detector's
+  // ordering for languages it already found; append registry-only languages after,
+  // de-duplicated. Must run BEFORE the TypeScript-over-JavaScript preference below,
+  // because the registry returns BOTH javascript and typescript (it has no preference
+  // logic) and the preference block must still remove javascript in that case.
+  for (const language of capabilityRegistry.detectLanguages(projectPath)) {
+    if (!detected.includes(language)) {
       detected.push(language);
     }
   }
