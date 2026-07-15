@@ -940,8 +940,11 @@ class SecretsScanner {
       }
     }
 
-    // Deduplicate again after adding external tool results
-    results.findings = this.deduplicateFindings();
+    // Deduplicate again over the COMBINED set (internal scan + external tools).
+    // deduplicateFindings() default-reads this.findings, which never received the
+    // external results — so dedup the results.findings array we just augmented,
+    // otherwise every TruffleHog / detect-secrets finding is silently dropped.
+    results.findings = this.deduplicateFindings(results.findings);
     results.summary = this.generateSummary(results.findings, results.summary.duration);
     results.message = this.generateReport(results.findings, results.summary);
 
@@ -1048,13 +1051,16 @@ class SecretsScanner {
   }
 
   /**
-   * Deduplicate findings
+   * Deduplicate findings, preferring verified over unverified on a collision.
+   * @param {Array} [findings=this.findings] findings to dedup. Defaults to the
+   *   internal scan set; callers that have ALSO gathered external-tool findings
+   *   (runWithExternalTools) pass the combined array so those are not dropped.
    * @returns {Array} Unique findings
    */
-  deduplicateFindings() {
+  deduplicateFindings(findings = this.findings) {
     const seen = new Map();
 
-    for (const finding of this.findings) {
+    for (const finding of findings) {
       const key = `${finding.file}:${finding.line}:${finding.type}`;
 
       if (!seen.has(key)) {
