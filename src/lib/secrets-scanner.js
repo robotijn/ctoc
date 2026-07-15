@@ -809,7 +809,7 @@ class SecretsScanner {
     const findings = [];
     // Key = identifier, value = unquoted run ending on a real boundary.
     const pattern = /(?:^|[\s;])([A-Za-z_][A-Za-z0-9_.-]*)\s*[:=]\s*([^\s'"#]+)(?=[\s#]|$)/g;
-    const secretishKey = /secret|api[_-]?key|access[_-]?key|token|password|passwd|pwd|credential|auth|key/i;
+    const secretishKey = /secret|api[_-]?key|access[_-]?key|token|password|passwd|pwd|credential|auth|session|signature|key/i;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -834,14 +834,29 @@ class SecretsScanner {
         // Do not double-report a value a specific provider pattern already caught.
         if (existingFindings.some(f => f.line === i + 1)) continue;
 
+        // An UNQUOTED, entropy-only assignment hit is STRICTLY WEAKER evidence
+        // than a QUOTED one: the same `pk_live_...`-style public value, quoted,
+        // fires HIGH_ENTROPY/LOW (non-blocking) via detectHighEntropyStrings, so
+        // the unquoted form must not be MORE severe. Typing it GENERIC_SECRET at
+        // HIGH (Round-11) BLOCKED the gate on values that are PUBLIC BY DESIGN —
+        // the SaaS stack CTOC's own templates ship: a Stripe publishable key
+        // (STRIPE_PUBLISHABLE_KEY), a NEXT_PUBLIC_* PostHog key, a cache /
+        // integrity / SRI key. That contradicts both the Stripe rule (`pk_` is
+        // public and must not be flagged) and this file's stated principle that
+        // an entropy-only hit must NOT block the gate (HIGH_ENTROPY is LOW on
+        // purpose). So it is typed HIGH_ENTROPY/LOW: still SURFACED (the human
+        // sees it) but non-blocking. A genuine unquoted secret is still detected
+        // here; a REAL provider secret (e.g. an unquoted AWS_SECRET_ACCESS_KEY)
+        // is caught earlier at its own CRITICAL severity by SECRET_PATTERNS and
+        // is deduped out above, so this reclassification never weakens it.
         findings.push({
-          type: 'GENERIC_SECRET',
-          name: SECRET_TYPES.GENERIC_SECRET.name,
-          severity: SECRET_TYPES.GENERIC_SECRET.severity,
+          type: 'HIGH_ENTROPY',
+          name: SECRET_TYPES.HIGH_ENTROPY.name,
+          severity: SECRET_TYPES.HIGH_ENTROPY.severity,
           file: relativePath,
           line: i + 1,
           match: this.redactSecret(value),
-          description: 'Unquoted secret assigned to a secret-named identifier',
+          description: `Unquoted high-entropy value (${entropy.toFixed(2)}) on a secret-named identifier - potential secret`,
           verified: false,
           entropy
         });

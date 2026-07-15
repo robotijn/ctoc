@@ -345,3 +345,796 @@ test('SCA3: DependencyAuditor.runPipAudit iterates -r for EACH detected requirem
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COVERAGE EXTENSION — the audit-run / parse / map / report surface.
+//
+// Seam control: ONLY the child_process invocation (execSync/execFileSync) is faked,
+// exactly as the existing SCA3 tests do — parse/route/dedup/map logic is never mocked.
+// Parser, mapper, dedup, summary, report and threshold methods are pure over their
+// input and are exercised by direct calls on a real DependencyAuditor instance with
+// realistic tool-output payloads.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SEVERITY = require(DA_PATH).SEVERITY;
+
+/** A throwaway auditor for pure method calls — projectRoot is never touched by the
+ *  parse/map/dedup/summary/report/threshold methods under test. */
+function pureAuditor(opts) {
+  return new DependencyAuditor('x', opts);
+}
+
+// ── isToolAvailable — the execSync availability probe ────────────────────────
+
+test('isToolAvailable: returns true when the version probe succeeds, false when it throws', () => {
+  cp.execSync = (cmd) => {
+    if (cmd === 'npm --version') return '10.0.0';
+    throw new Error('command not found');
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    assert.equal(a.isToolAvailable('npm'), true, 'npm probe succeeded → available');
+    assert.equal(a.isToolAvailable('cargo'), false, 'cargo probe threw → unavailable');
+  } finally {
+    restoreDA();
+  }
+});
+
+test('isToolAvailable: an unknown manager has no probe command and is reported unavailable', () => {
+  // No execSync fake needed — the guard returns before any child process runs.
+  const a = pureAuditor();
+  assert.equal(a.isToolAvailable('this-manager-does-not-exist'), false);
+});
+
+// ── run() — orchestration end to end ─────────────────────────────────────────
+
+test('run: with no supported package managers returns a clean, explicit no-op result', async () => {
+  const dir = mkTmp('da-run-empty-');
+  try {
+    const a = new DependencyAuditor(dir);
+    const result = await a.run();
+    assert.equal(result.success, true);
+    assert.deepEqual(result.vulnerabilities, []);
+    assert.equal(result.summary.total, 0);
+    assert.match(result.message, /No supported package managers detected/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('run: an npm project audits, dedups, summarizes and reports one HIGH vulnerability', async () => {
+  cp.execSync = (cmd) => {
+    if (cmd.includes('--version')) return '10.0.0';            // isToolAvailable('npm')
+    if (cmd === 'npm audit --json') {
+      return JSON.stringify({
+        vulnerabilities: {
+          lodash: {
+            name: 'lodash',
+            range: '<4.17.21',
+            severity: 'high',
+            isDirect: true,
+            via: [{
+              title: 'Prototype Pollution',
+              severity: 'high',
+              url: 'https://example.test/advisory',
+              cve: 'CVE-2020-8203',
+              cwe: ['CWE-1321'],
+              overview: 'Prototype pollution in lodash',
+              fixAvailable: { version: '4.17.21' }
+            }]
+          }
+        }
+      });
+    }
+    throw new Error(`unexpected exec ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-run-npm-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'package-lock.json', '{}');
+    const result = await new DA(dir).run();
+    assert.equal(result.success, true);
+    assert.equal(result.vulnerabilities.length, 1, 'exactly one vulnerability after dedup');
+    assert.equal(result.vulnerabilities[0].severity, SEVERITY.HIGH);
+    assert.equal(result.summary.total, 1);
+    assert.equal(result.summary.bySeverity.HIGH, 1);
+    assert.match(result.message, /Dependency Audit Report/);
+    assert.match(result.message, /lodash/);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── runAudit — routing, fallback, unimplemented default, error capture ───────
+
+test('runAudit: an unavailable non-JS tool records a loud "tool not available" error', async () => {
+  cp.execSync = () => { throw new Error('not installed'); };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runAudit('cargo');
+    assert.equal(a.errors.length, 1);
+    assert.match(a.errors[0].error, /cargo audit tool not available/);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runAudit: an unavailable yarn falls back to npm audit when npm is available', async () => {
+  cp.execSync = (cmd) => {
+    if (cmd === 'yarn --version') throw new Error('no yarn');
+    if (cmd === 'npm --version') return '10.0.0';
+    if (cmd === 'npm audit --json') {
+      return JSON.stringify({
+        vulnerabilities: {
+          minimist: {
+            range: '<1.2.6', severity: 'moderate',
+            via: [{ title: 'Prototype Pollution', severity: 'moderate', url: 'https://example.test/m' }]
+          }
+        }
+      });
+    }
+    throw new Error(`unexpected exec ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runAudit('yarn');
+    assert.equal(a.vulnerabilities.length, 1, 'the npm-audit fallback ran and produced a vulnerability');
+    assert.equal(a.vulnerabilities[0].manager, 'npm', 'the fallback records under the npm manager');
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runAudit: an available-but-unimplemented manager (maven) hits the default "not implemented" arm', async () => {
+  cp.execSync = (cmd) => {
+    if (cmd === 'mvn --version') return 'Apache Maven 3.9';  // isToolAvailable('maven') → true
+    throw new Error(`unexpected exec ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runAudit('maven');
+    assert.equal(a.errors.length, 1);
+    assert.match(a.errors[0].error, /Audit not implemented for maven/);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runAudit: a sub-audit that throws is caught at the route and recorded, never propagated', async () => {
+  // Defensive branch (runAudit try/catch): every runXxxAudit swallows its own errors, so
+  // this route-level catch only fires if a sub-audit throws. A real subclass whose
+  // runNpmAudit throws proves the route records the failure instead of crashing the run.
+  class ThrowingAuditor extends DependencyAuditor {
+    isToolAvailable() { return true; }
+    async runNpmAudit() { throw new Error('boom in sub-audit'); }
+  }
+  const a = new ThrowingAuditor('x');
+  await a.runAudit('npm');
+  assert.equal(a.errors.length, 1);
+  assert.match(a.errors[0].error, /boom in sub-audit/);
+});
+
+// ── runNpmAudit — command selection + non-zero-exit + malformed-JSON paths ────
+
+test('runNpmAudit: omits dev dependencies in the command when includeDevDependencies is false', async () => {
+  let seenCommand = null;
+  cp.execSync = (cmd) => { seenCommand = cmd; return JSON.stringify({ vulnerabilities: {} }); };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x', { includeDevDependencies: false });
+    await a.runNpmAudit();
+    assert.equal(seenCommand, 'npm audit --json --omit=dev');
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runNpmAudit: parses results from error.stdout when npm audit exits non-zero (vulns found)', async () => {
+  cp.execSync = () => {
+    const err = new Error('npm audit found issues');
+    err.stdout = JSON.stringify({
+      vulnerabilities: {
+        axios: { range: '<0.21.1', severity: 'critical', via: [{ title: 'SSRF', severity: 'critical', url: 'https://example.test/a' }] }
+      }
+    });
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runNpmAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].severity, SEVERITY.CRITICAL);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runNpmAudit: records a loud parse error when error.stdout is not valid JSON', async () => {
+  cp.execSync = () => { const err = new Error('crashed'); err.stdout = 'not-json <<<'; throw err; };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runNpmAudit();
+    assert.equal(a.errors.length, 1);
+    assert.match(a.errors[0].error, /Failed to parse audit results/);
+  } finally {
+    restoreDA();
+  }
+});
+
+// ── runYarnAudit — NDJSON success + non-zero-exit paths ──────────────────────
+
+test('runYarnAudit: parses auditAdvisory NDJSON lines and skips non-advisory / non-JSON lines', async () => {
+  const advisory = {
+    type: 'auditAdvisory',
+    data: {
+      advisory: {
+        module_name: 'handlebars', vulnerable_versions: '<4.7.7', severity: 'high',
+        title: 'RCE', overview: 'template RCE', cves: ['CVE-2021-23369'],
+        url: 'https://example.test/h', patched_versions: '>=4.7.7'
+      },
+      resolution: { isDirect: true }
+    }
+  };
+  cp.execSync = () => [
+    JSON.stringify({ type: 'auditSummary', data: {} }),  // non-advisory → skipped
+    'this is not json',                                   // non-JSON → skipped
+    JSON.stringify(advisory)
+  ].join('\n');
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runYarnAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].manager, 'yarn');
+    assert.equal(a.vulnerabilities[0].isDirect, true);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runYarnAudit: parses advisories from error.stdout when yarn audit exits non-zero', async () => {
+  cp.execSync = () => {
+    const err = new Error('vulns found');
+    err.stdout = [
+      'not-json-in-the-error-stream',   // exercises the non-JSON skip inside the error branch
+      JSON.stringify({
+        type: 'auditAdvisory',
+        data: { advisory: { module_name: 'lodash', vulnerable_versions: '<4.17.21', severity: 'moderate', title: 'Proto', url: 'https://example.test/l' } }
+      })
+    ].join('\n');
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runYarnAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].manager, 'yarn');
+  } finally {
+    restoreDA();
+  }
+});
+
+// ── runPnpmAudit — success + malformed-stdout paths ──────────────────────────
+
+test('runPnpmAudit: parses npm-shaped JSON on success', async () => {
+  cp.execSync = () => JSON.stringify({
+    vulnerabilities: { glob: { range: '<7.2.0', severity: 'low', via: [{ title: 'ReDoS', severity: 'low', url: 'https://example.test/g' }] } }
+  });
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runPnpmAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].severity, SEVERITY.LOW);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runPnpmAudit: records a loud parse error when error.stdout is malformed JSON', async () => {
+  cp.execSync = () => { const err = new Error('crashed'); err.stdout = '{bad'; throw err; };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runPnpmAudit();
+    assert.equal(a.errors.length, 1);
+    assert.equal(a.errors[0].manager, 'pnpm');
+    assert.match(a.errors[0].error, /Failed to parse audit results/);
+  } finally {
+    restoreDA();
+  }
+});
+
+// ── runPipAudit — non-zero-exit parse + malformed paths (execFileSync seam) ───
+
+test('runPipAudit: parses results from error.stdout when pip-audit exits non-zero', async () => {
+  cp.execFileSync = () => {
+    const err = new Error('vulns found');
+    err.stdout = JSON.stringify([
+      { name: 'flask', version: '0.5', vulns: [{ id: 'PYSEC-2019-1', severity: 'high', description: 'XSS', aliases: ['CVE-2019-1010083'], link: 'https://example.test/f', fix_versions: ['1.0'] }] }
+    ]);
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-pip-nonzero-');
+  try {
+    write(dir, 'requirements.txt', 'flask==0.5\n');
+    const a = new DA(dir);
+    await a.runPipAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].cve, 'CVE-2019-1010083');
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runPipAudit: records a loud parse error when error.stdout is malformed JSON', async () => {
+  cp.execFileSync = () => { const err = new Error('crashed'); err.stdout = 'not json'; throw err; };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-pip-bad-');
+  try {
+    write(dir, 'requirements.txt', 'flask==0.5\n');
+    const a = new DA(dir);
+    await a.runPipAudit();
+    assert.equal(a.errors.length, 1);
+    assert.match(a.errors[0].error, /Failed to parse audit results/);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── runGoVulncheck / runCargoAudit / runBundlerAudit / runComposerAudit ──────
+
+test('runGoVulncheck: parses NDJSON on success and again from error.stdout on non-zero exit', async () => {
+  const osvLine = JSON.stringify({
+    osv: {
+      id: 'GO-2022-0001',
+      summary: 'stdlib bug',
+      details: 'details here',
+      aliases: ['CVE-2022-1111'],
+      affected: [{ package: { name: 'net/http' }, ranges: [{ events: [{ introduced: '0' }, { fixed: '1.18.1' }] }] }],
+      severity: [{ score: 7.5 }]
+    }
+  });
+  cp.execSync = () => osvLine + '\nnot-json-line';
+  let { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runGoVulncheck();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].manager, 'go');
+    assert.equal(a.vulnerabilities[0].fixedIn, '1.18.1');
+  } finally {
+    restoreDA();
+  }
+
+  cp.execSync = () => { const err = new Error('go crashed'); err.stdout = osvLine; throw err; };
+  ({ DependencyAuditor: DA } = freshDA());
+  try {
+    const a = new DA('x');
+    await a.runGoVulncheck();
+    assert.equal(a.vulnerabilities.length, 1, 'error.stdout NDJSON is still parsed');
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runCargoAudit: parses JSON on success and records a parse error on malformed error.stdout', async () => {
+  cp.execSync = () => JSON.stringify({
+    vulnerabilities: { list: [{
+      package: { name: 'time', version: '0.1.0' },
+      advisory: { title: 'Segfault', description: 'unsound', aliases: ['CVE-2020-26235'], url: 'https://example.test/t', severity: 'high' },
+      versions: { patched: ['>=0.2.23'] }
+    }] }
+  });
+  let { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runCargoAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].fixedIn, '>=0.2.23');
+  } finally {
+    restoreDA();
+  }
+
+  cp.execSync = () => { const err = new Error('cargo crashed'); err.stdout = '{nope'; throw err; };
+  ({ DependencyAuditor: DA } = freshDA());
+  try {
+    const a = new DA('x');
+    await a.runCargoAudit();
+    assert.equal(a.errors.length, 1);
+    assert.equal(a.errors[0].manager, 'cargo');
+    assert.match(a.errors[0].error, /Failed to parse audit results/);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runBundlerAudit: parses results on success and again from error.stdout on non-zero exit', async () => {
+  const payload = JSON.stringify({
+    results: [{
+      gem: { name: 'rails', version: '5.0.0' },
+      advisory: { title: 'CSRF', description: 'csrf', criticality: 'high', cve: 'CVE-2020-8166', url: 'https://example.test/r', patched_versions: ['>=5.2.4.3'] }
+    }]
+  });
+  cp.execSync = () => payload;
+  let { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runBundlerAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].severity, SEVERITY.HIGH);
+  } finally {
+    restoreDA();
+  }
+
+  cp.execSync = () => { const err = new Error('bundle crashed'); err.stdout = payload; throw err; };
+  ({ DependencyAuditor: DA } = freshDA());
+  try {
+    const a = new DA('x');
+    await a.runBundlerAudit();
+    assert.equal(a.vulnerabilities.length, 1, 'error.stdout results are parsed');
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runComposerAudit: parses advisories on success and records a parse error on malformed error.stdout', async () => {
+  cp.execSync = () => JSON.stringify({
+    advisories: {
+      'symfony/http-kernel': [{ title: 'Header injection', description: 'inj', severity: 'medium', cve: 'CVE-2019-18888', link: 'https://example.test/s', affectedVersions: '<4.3.8' }]
+    }
+  });
+  let { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runComposerAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].package, 'symfony/http-kernel');
+    assert.equal(a.vulnerabilities[0].severity, SEVERITY.MODERATE);
+  } finally {
+    restoreDA();
+  }
+
+  cp.execSync = () => { const err = new Error('composer crashed'); err.stdout = 'oops'; throw err; };
+  ({ DependencyAuditor: DA } = freshDA());
+  try {
+    const a = new DA('x');
+    await a.runComposerAudit();
+    assert.equal(a.errors.length, 1);
+    assert.equal(a.errors[0].manager, 'composer');
+    assert.match(a.errors[0].error, /Failed to parse audit results/);
+  } finally {
+    restoreDA();
+  }
+});
+
+// ── parseNpmAuditResults — v1/v2 shapes and guard branches ───────────────────
+
+test('parseNpmAuditResults: a null or non-object payload is ignored, recording nothing', () => {
+  const a = pureAuditor();
+  a.parseNpmAuditResults(null);
+  a.parseNpmAuditResults('a string');
+  assert.equal(a.vulnerabilities.length, 0);
+  assert.equal(a.errors.length, 0);
+});
+
+test('parseNpmAuditResults: v2 records object advisories and skips string via entries', () => {
+  const a = pureAuditor();
+  a.parseNpmAuditResults({
+    vulnerabilities: {
+      good: { range: '<1.0.0', severity: 'high', isDirect: true, via: [{ title: 'Bug', severity: 'high', url: 'https://example.test/g', cve: 'CVE-2021-0001', cwe: ['CWE-79'], overview: 'ov', fixAvailable: { version: '1.0.0' } }] },
+      indirect: { range: '<2.0.0', severity: 'low', via: ['just-a-string-ref'] }  // string via → skipped
+    }
+  });
+  assert.equal(a.vulnerabilities.length, 1, 'only the object-advisory entry is recorded');
+  assert.equal(a.vulnerabilities[0].package, 'good');
+  assert.equal(a.vulnerabilities[0].fixedIn, '1.0.0');
+});
+
+test('parseNpmAuditResults: v1 advisories shape is recorded with first CVE and patched range', () => {
+  const a = pureAuditor();
+  a.parseNpmAuditResults({
+    advisories: {
+      1234: { module_name: 'legacy', vulnerable_versions: '<3.0.0', severity: 'critical', title: 'Old bug', overview: 'ov', cves: ['CVE-2018-0001', 'CVE-2018-0002'], cwe: 'CWE-89', url: 'https://example.test/legacy', patched_versions: '>=3.0.0' }
+    }
+  });
+  assert.equal(a.vulnerabilities.length, 1);
+  assert.equal(a.vulnerabilities[0].cve, 'CVE-2018-0001');
+  assert.equal(a.vulnerabilities[0].severity, SEVERITY.CRITICAL);
+});
+
+// ── parseYarnAdvisory / parsePipAuditResults ─────────────────────────────────
+
+test('parseYarnAdvisory: falls back to isDirect=false when resolution is absent', () => {
+  const a = pureAuditor();
+  a.parseYarnAdvisory({ advisory: { module_name: 'y', vulnerable_versions: '<1', severity: 'moderate', title: 'T', url: 'https://example.test/y' } });
+  assert.equal(a.vulnerabilities.length, 1);
+  assert.equal(a.vulnerabilities[0].isDirect, false);
+});
+
+test('parsePipAuditResults: ignores a non-array payload and records nothing', () => {
+  const a = pureAuditor();
+  a.parsePipAuditResults({ not: 'an array' });
+  assert.equal(a.vulnerabilities.length, 0);
+});
+
+test('parsePipAuditResults: a vuln with no vulns detail falls back to placeholder fields', () => {
+  const a = pureAuditor();
+  a.parsePipAuditResults([{ name: 'lonely', version: '0.0.1' }]);
+  assert.equal(a.vulnerabilities.length, 1);
+  assert.equal(a.vulnerabilities[0].title, 'Unknown vulnerability');
+  assert.equal(a.vulnerabilities[0].cve, null);
+  assert.equal(a.vulnerabilities[0].severity, SEVERITY.MODERATE, 'unknown severity over-reports to the mid band');
+});
+
+// ── parseGovulncheckResults — dedup by osv id, skip non-osv/non-json ─────────
+
+test('parseGovulncheckResults: dedupes repeated osv ids and skips non-osv and non-JSON lines', () => {
+  const a = pureAuditor();
+  const line = JSON.stringify({ osv: { id: 'GO-1', summary: 's', affected: [{ package: { name: 'p' }, ranges: [{ events: [{ introduced: '0' }] }] }] } });
+  const data = [line, line, JSON.stringify({ progress: 'scanning' }), 'garbage'].join('\n');
+  a.parseGovulncheckResults(data);
+  assert.equal(a.vulnerabilities.length, 1, 'the same osv id is recorded exactly once');
+  assert.equal(a.vulnerabilities[0].package, 'p');
+});
+
+// ── parseCargoAudit / parseBundler / parseComposer guard branches ────────────
+
+test('parseCargoAuditResults: a payload without vulnerabilities.list records nothing', () => {
+  const a = pureAuditor();
+  a.parseCargoAuditResults({ vulnerabilities: {} });
+  assert.equal(a.vulnerabilities.length, 0);
+});
+
+test('parseCargoAuditResults: missing package/advisory fields fall back to "unknown"/placeholder', () => {
+  const a = pureAuditor();
+  a.parseCargoAuditResults({ vulnerabilities: { list: [{}] } });
+  assert.equal(a.vulnerabilities.length, 1);
+  assert.equal(a.vulnerabilities[0].package, 'unknown');
+  assert.equal(a.vulnerabilities[0].title, 'Unknown vulnerability');
+});
+
+test('parseBundlerAuditResults: a payload without results records nothing', () => {
+  const a = pureAuditor();
+  a.parseBundlerAuditResults({});
+  assert.equal(a.vulnerabilities.length, 0);
+});
+
+test('parseBundlerAuditResults: missing gem/advisory fields fall back to "unknown"/placeholder', () => {
+  const a = pureAuditor();
+  a.parseBundlerAuditResults({ results: [{}] });
+  assert.equal(a.vulnerabilities.length, 1);
+  assert.equal(a.vulnerabilities[0].package, 'unknown');
+  assert.equal(a.vulnerabilities[0].severity, SEVERITY.MODERATE, 'absent criticality over-reports to the mid band');
+});
+
+test('parseComposerAuditResults: a payload without advisories records nothing', () => {
+  const a = pureAuditor();
+  a.parseComposerAuditResults({});
+  assert.equal(a.vulnerabilities.length, 0);
+});
+
+// ── severity mappers ─────────────────────────────────────────────────────────
+
+test('mapNpmSeverity: maps known labels and defaults unknown/absent to the mid band', () => {
+  const a = pureAuditor();
+  assert.equal(a.mapNpmSeverity('critical'), SEVERITY.CRITICAL);
+  assert.equal(a.mapNpmSeverity('HIGH'), SEVERITY.HIGH);
+  assert.equal(a.mapNpmSeverity('moderate'), SEVERITY.MODERATE);
+  assert.equal(a.mapNpmSeverity('low'), SEVERITY.LOW);
+  assert.equal(a.mapNpmSeverity('info'), SEVERITY.INFO);
+  assert.equal(a.mapNpmSeverity('nonsense'), SEVERITY.MODERATE);
+  assert.equal(a.mapNpmSeverity(undefined), SEVERITY.MODERATE);
+});
+
+test('mapRustAdvisorySeverity: maps known labels and defaults unknown to the mid band', () => {
+  const a = pureAuditor();
+  assert.equal(a.mapRustAdvisorySeverity('critical'), SEVERITY.CRITICAL);
+  assert.equal(a.mapRustAdvisorySeverity('medium'), SEVERITY.MODERATE);
+  assert.equal(a.mapRustAdvisorySeverity('informational'), SEVERITY.INFO);
+  assert.equal(a.mapRustAdvisorySeverity(undefined), SEVERITY.MODERATE);
+});
+
+test('mapBundlerSeverity: maps criticality labels and defaults unknown to the mid band', () => {
+  const a = pureAuditor();
+  assert.equal(a.mapBundlerSeverity('critical'), SEVERITY.CRITICAL);
+  assert.equal(a.mapBundlerSeverity('medium'), SEVERITY.MODERATE);
+  assert.equal(a.mapBundlerSeverity('unknown'), SEVERITY.MODERATE);
+  assert.equal(a.mapBundlerSeverity('not-a-level'), SEVERITY.MODERATE);
+});
+
+test('mapComposerSeverity: maps known labels and defaults unknown to the mid band', () => {
+  const a = pureAuditor();
+  assert.equal(a.mapComposerSeverity('critical'), SEVERITY.CRITICAL);
+  assert.equal(a.mapComposerSeverity('low'), SEVERITY.LOW);
+  assert.equal(a.mapComposerSeverity(undefined), SEVERITY.MODERATE);
+});
+
+test('mapPipSeverity / mapGoSeverity: band a numeric CVSS score, a label, and a CVSS vector; unknown → mid band', () => {
+  const a = pureAuditor();
+  assert.equal(a.mapPipSeverity(9.8), SEVERITY.CRITICAL);
+  assert.equal(a.mapPipSeverity(7.5), SEVERITY.HIGH);
+  assert.equal(a.mapPipSeverity(5.0), SEVERITY.MODERATE);
+  assert.equal(a.mapPipSeverity(2.0), SEVERITY.LOW);
+  assert.equal(a.mapGoSeverity('critical'), SEVERITY.CRITICAL);
+  assert.equal(a.mapGoSeverity('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'), SEVERITY.CRITICAL,
+    'a CVSS vector is base-scored (9.8) and banded CRITICAL — never under-reported');
+  assert.equal(a.mapPipSeverity(undefined), SEVERITY.MODERATE, 'unknown severity over-reports to the mid band');
+});
+
+test('_cvssVectorBaseScore: computes 9.8 for a fully-critical vector and null for a garbage vector', () => {
+  const a = pureAuditor();
+  assert.equal(a._cvssVectorBaseScore('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'), 9.8);
+  assert.equal(a._cvssVectorBaseScore('not-a-vector'), null);
+});
+
+// ── deduplicateVulnerabilities ───────────────────────────────────────────────
+
+test('deduplicateVulnerabilities: collapses same package+cve, keeps distinct keys', () => {
+  const a = pureAuditor();
+  a.vulnerabilities = [
+    { package: 'x', cve: 'CVE-1', severity: SEVERITY.HIGH, title: 'a' },
+    { package: 'x', cve: 'CVE-1', severity: SEVERITY.HIGH, title: 'dup' },   // duplicate key → dropped
+    { package: 'y', cve: null, title: 'by-title', severity: SEVERITY.LOW }   // keyed by title when no cve
+  ];
+  const unique = a.deduplicateVulnerabilities();
+  assert.equal(unique.length, 2);
+  assert.equal(unique[0].title, 'a', 'the first occurrence of a duplicate key wins');
+});
+
+// ── generateSummary / generateReport ─────────────────────────────────────────
+
+test('generateSummary: totals and per-severity / per-manager tallies are correct', () => {
+  const a = pureAuditor();
+  const vulns = [
+    { severity: SEVERITY.CRITICAL, manager: 'npm' },
+    { severity: SEVERITY.HIGH, manager: 'npm' },
+    { severity: SEVERITY.HIGH, manager: 'cargo' }
+  ];
+  const summary = a.generateSummary(vulns, ['npm', 'cargo'], 3000);
+  assert.equal(summary.total, 3);
+  assert.equal(summary.bySeverity.HIGH, 2);
+  assert.equal(summary.bySeverity.CRITICAL, 1);
+  assert.equal(summary.byPackageManager.npm, 2);
+  assert.equal(summary.duration, 3, 'duration is reported in whole seconds');
+});
+
+test('generateReport: renders severity groups, the "and N more" overflow, CVE/fix lines, and audit errors', () => {
+  const a = pureAuditor();
+  const vulns = [];
+  for (let i = 0; i < 12; i++) {
+    vulns.push({ package: `pkg${i}`, version: '1.0.0', severity: SEVERITY.HIGH, title: `High issue ${i}`, cve: `CVE-2021-00${i}`, fixedIn: '2.0.0' });
+  }
+  vulns.push({ package: 'critpkg', version: '0.1.0', severity: SEVERITY.CRITICAL, title: 'Critical issue', cve: null, fixedIn: null });
+  a.errors = [{ manager: 'npm', error: 'registry timeout' }];
+  const summary = a.generateSummary(vulns, ['npm'], 1000);
+  const report = a.generateReport(vulns, summary);
+
+  assert.match(report, /Total Vulnerabilities: 13/);
+  assert.match(report, /CRITICAL Vulnerabilities \(1\)/);
+  assert.match(report, /HIGH Vulnerabilities \(12\)/);
+  assert.match(report, /and 2 more HIGH vulnerabilities/, 'only the first 10 of a group are listed, the rest summarised');
+  assert.match(report, /CVE: CVE-2021-000/);
+  assert.match(report, /Fix: Upgrade to 2\.0\.0/);
+  assert.match(report, /\[npm\] registry timeout/, 'audit errors are surfaced in the report');
+});
+
+// ── checkThreshold ───────────────────────────────────────────────────────────
+
+test('checkThreshold: fails when a vulnerability meets/exceeds the threshold, passes otherwise', () => {
+  const a = pureAuditor();
+  a.vulnerabilities = [{ severity: SEVERITY.HIGH }, { severity: SEVERITY.LOW }];
+  const failing = a.checkThreshold(SEVERITY.HIGH);
+  assert.equal(failing.pass, false);
+  assert.equal(failing.failing, 1, 'only the HIGH vuln is at or above the HIGH threshold');
+  assert.match(failing.message, /FAIL/);
+});
+
+test('checkThreshold: passes with no vulnerabilities and defaults the threshold to HIGH', () => {
+  const a = pureAuditor();
+  a.vulnerabilities = [{ severity: SEVERITY.LOW }];
+  const result = a.checkThreshold();  // default threshold HIGH
+  assert.equal(result.pass, true);
+  assert.equal(result.threshold, SEVERITY.HIGH);
+  assert.match(result.message, /PASS/);
+});
+
+// ── auditedLanguagesFor — fail-soft catch when detection itself throws ────────
+
+test('auditedLanguagesFor: fails soft to an empty set when the filesystem probe throws', () => {
+  // Controlling the filesystem boundary (safe-fs.existsSync) — not the auditor's logic.
+  // detectPackageManagers calls existsSync outside a try; a throw must be caught by
+  // auditedLanguagesFor's fail-soft guard so nothing is (wrongly) deferred.
+  const safeFs = require('../src/lib/safe-fs');
+  const orig = safeFs.existsSync;
+  safeFs.existsSync = () => { throw new Error('fs probe exploded'); };
+  try {
+    const covered = auditedLanguagesFor(os.tmpdir());
+    assert.equal(covered.size, 0, 'a detection error defers NOTHING (SCA scans everything)');
+  } finally {
+    safeFs.existsSync = orig;
+  }
+});
+
+// ── Remaining switch-arm routing, sort comparator, and one more error path ────
+
+test('runAudit: every implemented manager routes to its own audit arm (no default, no error)', async () => {
+  cp.execSync = (cmd) => {
+    if (/version/.test(cmd)) return 'ok';                     // isToolAvailable probes
+    if (cmd.startsWith('yarn audit')) return '';              // empty NDJSON
+    if (cmd.startsWith('pnpm audit')) return JSON.stringify({});
+    if (cmd.startsWith('govulncheck')) return '';
+    if (cmd.startsWith('cargo audit')) return JSON.stringify({});
+    if (cmd.startsWith('bundle audit')) return JSON.stringify({});
+    if (cmd.startsWith('composer audit')) return JSON.stringify({});
+    if (cmd.startsWith('npm audit')) return JSON.stringify({ vulnerabilities: {} });
+    return 'ok';
+  };
+  cp.execFileSync = () => JSON.stringify([]);                 // pip-audit
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    for (const m of ['yarn', 'pnpm', 'pip', 'go', 'cargo', 'bundler', 'composer']) {
+      const a = new DA('x');
+      await a.runAudit(m);
+      assert.equal(a.errors.length, 0,
+        `${m} must route to its implemented switch arm with no error; got ${JSON.stringify(a.errors)}`);
+    }
+  } finally {
+    restoreDA();
+  }
+});
+
+test('run: sorts multiple vulnerabilities by descending severity (CRITICAL before HIGH)', async () => {
+  cp.execSync = (cmd) => {
+    if (cmd.includes('--version')) return '10.0.0';
+    if (cmd === 'npm audit --json') {
+      return JSON.stringify({
+        vulnerabilities: {
+          lowpkg: { range: '<1', severity: 'high', via: [{ title: 'H', severity: 'high', url: 'https://example.test/h', cve: 'CVE-2021-1' }] },
+          toppkg: { range: '<1', severity: 'critical', via: [{ title: 'C', severity: 'critical', url: 'https://example.test/c', cve: 'CVE-2021-2' }] }
+        }
+      });
+    }
+    throw new Error(`unexpected exec ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-run-sort-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'package-lock.json', '{}');
+    const result = await new DA(dir).run();
+    assert.equal(result.vulnerabilities.length, 2);
+    assert.equal(result.vulnerabilities[0].severity, SEVERITY.CRITICAL,
+      'the sort comparator orders CRITICAL ahead of HIGH');
+    assert.equal(result.vulnerabilities[1].severity, SEVERITY.HIGH);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runBundlerAudit: records a loud parse error when error.stdout is malformed JSON', async () => {
+  cp.execSync = () => { const err = new Error('bundle crashed'); err.stdout = '{not-valid'; throw err; };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runBundlerAudit();
+    assert.equal(a.errors.length, 1);
+    assert.equal(a.errors[0].manager, 'bundler');
+    assert.match(a.errors[0].error, /Failed to parse audit results/);
+  } finally {
+    restoreDA();
+  }
+});

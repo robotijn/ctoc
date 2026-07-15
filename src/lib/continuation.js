@@ -30,6 +30,12 @@ const safeFs = require('./safe-fs');
 
 const STATE_REL = path.join('.ctoc', 'state', 'continuation.json');
 
+// Absolute ceiling on the block-budget: no matter how large `total` is (a typo or a
+// bad count feeding startBatch), a stuck batch must stand down within bounded human-wait
+// time. WEDGE-3: without this, total=1e15 → maxBlocks=4e15 → an effectively permanent
+// wedge. A few hundred blocks is far more than any real batch needs.
+const HARD_CEILING = 500;
+
 /** @param {string} root @returns {string} */
 function statePath(root) {
   return path.join(root, STATE_REL);
@@ -87,9 +93,10 @@ function clear(root) {
  */
 function startBatch(root, opts = {}) {
   const total = Number.isInteger(opts.total) && opts.total > 0 ? opts.total : 1;
-  const maxBlocks = Number.isInteger(opts.maxBlocks) && opts.maxBlocks > 0
-    ? opts.maxBlocks
-    : total * 4 + 20; // generous slack over one block-per-unit; bounds a runaway
+  const maxBlocks = Math.min(
+    Number.isInteger(opts.maxBlocks) && opts.maxBlocks > 0 ? opts.maxBlocks : total * 4 + 20,
+    HARD_CEILING // WEDGE-3: cap regardless of `total` so a stuck batch always stands down
+  );
   const state = {
     active: true,
     label: String(opts.label || 'batch'),
@@ -169,19 +176,29 @@ function status(root) {
 function shouldContinue(root) {
   const state = read(root);
   if (!state) return { continue: false, reason: 'no active batch' };
-  // A finished batch is "complete" (its record may linger until complete()/clear()).
-  if ((state.remaining || 0) <= 0) return { continue: false, reason: 'batch complete' };
+  // Coerce numerics defensively — a gate that cannot TRUST its own counters must fall
+  // toward ALLOWING the stop, never toward blocking (a safety gate fails OPEN).
+  const remaining = Number(state.remaining);
+  // A finished batch (or a non-finite/negative remaining) is "complete" — allow the stop.
+  if (!Number.isFinite(remaining) || remaining <= 0) return { continue: false, reason: 'batch complete' };
   if (state.forkPending) {
     return { continue: false, reason: `fork pending — ${state.forkReason || 'human decision required'}`, fork: true };
   }
   if (!state.active) return { continue: false, reason: 'batch inactive' };
-  if ((state.blocks || 0) >= (state.maxBlocks || Infinity)) {
+  // WEDGE-2: a non-positive / non-integer maxBlocks means the loop cannot be bounded.
+  // `|| Infinity` was exactly backwards — treat an untrustworthy bound as "stand down".
+  const maxBlocks = Number(state.maxBlocks);
+  if (!Number.isInteger(maxBlocks) || maxBlocks <= 0) {
+    return { continue: false, reason: 'continuation bound is invalid — standing down', exhausted: true };
+  }
+  const blocks = Number.isFinite(Number(state.blocks)) ? Number(state.blocks) : 0;
+  if (blocks >= maxBlocks) {
     return { continue: false, reason: 'continuation block-budget exhausted — standing down', exhausted: true };
   }
   return {
     continue: true,
-    reason: `${state.remaining} of ${state.total} unit(s) remaining in "${state.label}"`,
-    remaining: state.remaining,
+    reason: `${remaining} of ${state.total} unit(s) remaining in "${state.label}"`,
+    remaining,
     total: state.total,
   };
 }
@@ -193,10 +210,12 @@ function shouldContinue(root) {
  */
 function recordBlock(root) {
   const state = read(root);
-  if (!state) return null;
-  state.blocks = (state.blocks || 0) + 1;
-  write(root, state);
-  return state;
+  if (!state) return false;
+  state.blocks = (Number(state.blocks) || 0) + 1;
+  // WEDGE-1: return the PERSIST result. If the write failed (unwritable state file,
+  // full disk), the block was NOT recorded — the bound cannot advance, so the caller
+  // MUST fail open (allow the stop) rather than block forever on a frozen counter.
+  return write(root, state);
 }
 
 module.exports = {

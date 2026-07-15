@@ -25,12 +25,11 @@
  * parallelize plan implementation"). The plan currently executing is the sole
  * writer of its own counter, so no locking is required here.
  *
- * DEFERRED LIVE CALL SITE (scope note): this slice ships the module only. Wiring
- * `recordKickback` into the executor's step-failure/retry path (the natural call
- * site is the kickback branch in src/lib/iron-loop.js / the iron-loop executor)
- * is a separate integration outside this slice's declared files and is
- * intentionally NOT implemented here. The acceptance criteria are written against
- * this module's behavior directly (via simulated recordKickback calls).
+ * LIVE CALL SITE: `recordKickback` is wired into the executor's step-failure path
+ * via actions.completeExecution → actions.recordStepKickback (a blocked pre-review
+ * completion, and a failing Step 14 VERIFY, each record a kickback against the
+ * failing step). Covered end-to-end by tests/circuit-breaker-wiring.test.js, which
+ * drives the real completeExecution path — not a simulation.
  *
  * Cross-platform: path.join, safe-fs, and a `\r?\n`-tolerant frontmatter regex.
  *
@@ -169,7 +168,26 @@ function writeCountsIntoText(raw, counts) {
     return `---\n${block}---\n${raw}`;
   }
 
-  const fmObject = yaml.load(fmText) || {};
+  // The WRITE path must tolerate EXACTLY what the READ path (readKickbackCounts /
+  // recordKickback's read) already tolerates: malformed YAML (unterminated quote →
+  // yaml.load THROWS) and valid-but-scalar frontmatter (a bare string → assigning
+  // `.kickback_counts` throws "Cannot create property on string" in strict mode).
+  // If either happens we DISCARD the unparseable/non-object frontmatter and rebuild
+  // a minimal valid block carrying only the counter. Tradeoff (deliberate): a
+  // tripping circuit breaker OUTRANKS preserving a user's already-broken YAML — the
+  // breaker keeps counting so an overnight loop can still escalate to the human,
+  // instead of throwing here (which froze the counter at 0 and suppressed every
+  // escalation forever). Preserving broken frontmatter is worthless if it costs the
+  // safety mechanism.
+  let fmObject;
+  try {
+    const parsed = yaml.load(fmText);
+    fmObject = (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+      ? parsed
+      : { kickback_counts: cleanCounts };
+  } catch {
+    fmObject = { kickback_counts: cleanCounts };
+  }
   fmObject.kickback_counts = cleanCounts;
   // yaml.dump throws before we write, so a serialize failure never leaves a
   // half-written plan on disk.
@@ -280,6 +298,33 @@ function recordKickback(planPath, step, projectPath) {
 }
 
 /**
+ * Record a HARD escalation for a breaker that could not record its own count.
+ * When `recordKickback` itself fails (e.g. the plan file cannot be read), the
+ * counter cannot advance — so the loop could retry forever, unseen. That failure
+ * must ITSELF reach the human: this appends a durable `breaker-failure` entry to
+ * the same escalations log the menu/inbox reads, so a breaker that cannot count
+ * escalates rather than silently continuing.
+ *
+ * Never throws — a logging failure here must not mask the original error.
+ *
+ * @param {string} projectPath - project root
+ * @param {{plan: string, step?: (string|number), error?: string}} info
+ */
+function recordBreakerFailure(projectPath, info) {
+  try {
+    appendEscalation(projectPath, {
+      type: 'breaker-failure',
+      plan: info && info.plan,
+      step: info && info.step !== undefined ? String(info.step) : undefined,
+      error: info && info.error,
+      at: new Date().toISOString()
+    });
+  } catch {
+    // best-effort: the caller already surfaces the original error to the console.
+  }
+}
+
+/**
  * Read the human-facing escalation records for a project.
  *
  * @param {string} projectPath - project root
@@ -299,6 +344,7 @@ function getEscalations(projectPath) {
 module.exports = {
   readKickbackCounts,
   recordKickback,
+  recordBreakerFailure,
   getEscalations,
   // Exposed thresholds for callers/tests that want the documented maxima.
   SAME_STEP_MAX,

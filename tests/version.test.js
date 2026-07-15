@@ -3,11 +3,100 @@
  * Tests for lib/version.js
  */
 
-const { test, describe } = require('node:test');
+const { test, describe, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert');
+const os = require('node:os');
+const path = require('node:path');
+const fs = require('node:fs');
+const https = require('node:https');
+const { EventEmitter } = require('node:events');
 
 // Import the module under test
 const version = require('../src/lib/version');
+
+// The module captures these constants at load time from ~/.ctoc.
+// Reconstruct the same on-disk cache path so failure-path tests can drive
+// loadUpdateCache / saveUpdateCache / checkForUpdates through the real seam
+// (the on-disk cache) rather than by mocking the module's own logic.
+const CTOC_HOME = path.join(os.homedir(), '.ctoc');
+const UPDATE_CACHE_FILE = path.join(CTOC_HOME, '.update-cache.json');
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+// --- Real external boundary: a fake https.get -------------------------------
+// version.js does `const https = require('https')` at load; require() returns
+// the cached module object, so overriding https.get here replaces exactly the
+// network boundary the module calls. This is the system boundary (network) —
+// the only thing the skill permits stubbing — not the module's own logic.
+const realHttpsGet = https.get;
+
+/** Stub https.get to yield a 200 response streaming `body`, then 'end'. */
+function stubHttpsSuccess(body) {
+  https.get = (_url, cb) => {
+    const res = new EventEmitter();
+    res.statusCode = 200;
+    // cb registers res.on('data'/'end') synchronously; emit after on next tick.
+    process.nextTick(() => {
+      cb(res);
+      res.emit('data', Buffer.from(body));
+      res.emit('end');
+    });
+    return new EventEmitter(); // the returned req; .on('error', ...) chains onto it
+  };
+}
+
+/** Stub https.get to yield a non-200 status code. */
+function stubHttpsStatus(statusCode) {
+  https.get = (_url, cb) => {
+    const res = new EventEmitter();
+    res.statusCode = statusCode;
+    process.nextTick(() => cb(res));
+    return new EventEmitter();
+  };
+}
+
+/** Stub https.get so the request emits an 'error' (connection failure). */
+function stubHttpsError() {
+  https.get = (_url, _cb) => {
+    const req = new EventEmitter();
+    process.nextTick(() => req.emit('error', new Error('ENOTFOUND')));
+    return req;
+  };
+}
+
+/** Stub https.get so nothing ever fires (drives the 5s timeout branch). */
+function stubHttpsHang() {
+  https.get = (_url, _cb) => new EventEmitter();
+}
+
+function restoreHttps() {
+  https.get = realHttpsGet;
+}
+
+// --- Real cache-file fixture -------------------------------------------------
+let savedCacheExisted = false;
+let savedCacheBytes = null;
+
+function backupCache() {
+  savedCacheExisted = fs.existsSync(UPDATE_CACHE_FILE);
+  savedCacheBytes = savedCacheExisted ? fs.readFileSync(UPDATE_CACHE_FILE) : null;
+}
+
+function restoreCache() {
+  if (savedCacheExisted) {
+    fs.writeFileSync(UPDATE_CACHE_FILE, savedCacheBytes);
+  } else if (fs.existsSync(UPDATE_CACHE_FILE)) {
+    fs.rmSync(UPDATE_CACHE_FILE);
+  }
+}
+
+function removeCache() {
+  if (fs.existsSync(UPDATE_CACHE_FILE)) fs.rmSync(UPDATE_CACHE_FILE);
+}
+
+function writeCache(obj) {
+  if (!fs.existsSync(CTOC_HOME)) fs.mkdirSync(CTOC_HOME, { recursive: true });
+  fs.writeFileSync(UPDATE_CACHE_FILE, JSON.stringify(obj));
+}
 
 // =============================================================================
 // parseVersion Tests
@@ -414,5 +503,241 @@ describe('Edge Cases', () => {
       v = version.bump(v, 'major');
     }
     assert.strictEqual(v, '2.0.0');
+  });
+});
+
+// =============================================================================
+// fetchLatestVersion — network boundary (https.get stubbed)
+// =============================================================================
+
+describe('fetchLatestVersion', () => {
+  after(restoreHttps);
+
+  test('resolves trimmed version when GitHub returns 200 with a body', async () => {
+    // Arrange
+    stubHttpsSuccess('  7.8.9\n');
+
+    // Act
+    const latest = await version.fetchLatestVersion();
+
+    // Assert
+    assert.strictEqual(latest, '7.8.9');
+  });
+
+  test('resolves null when GitHub returns a non-200 status code', async () => {
+    // Arrange
+    stubHttpsStatus(404);
+
+    // Act
+    const latest = await version.fetchLatestVersion();
+
+    // Assert
+    assert.strictEqual(latest, null);
+  });
+
+  test('resolves null when the request emits a connection error', async () => {
+    // Arrange
+    stubHttpsError();
+
+    // Act
+    const latest = await version.fetchLatestVersion();
+
+    // Assert
+    assert.strictEqual(latest, null);
+  });
+
+  test('resolves null when the request hangs past the 5s timeout', async (t) => {
+    // Arrange — fake timers so the 5s guard fires without a real wait
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    stubHttpsHang();
+
+    // Act
+    const pending = version.fetchLatestVersion();
+    t.mock.timers.tick(5000);
+    const latest = await pending;
+
+    // Assert
+    assert.strictEqual(latest, null);
+  });
+});
+
+// =============================================================================
+// Update cache + checkForUpdates / checkForUpdatesSync — on-disk cache seam
+// =============================================================================
+
+describe('update cache and checkForUpdates', () => {
+  before(backupCache);
+  after(() => { restoreHttps(); restoreCache(); });
+  beforeEach(restoreHttps);
+
+  test('checkForUpdatesSync reports an update when a fresh cache holds a higher version', () => {
+    // Arrange
+    const current = version.getVersion();
+    const higher = version.bump(current, 'major');
+    writeCache({ latestVersion: higher, checkedAt: Date.now() });
+
+    // Act
+    const result = version.checkForUpdatesSync();
+
+    // Assert
+    assert.strictEqual(result.updateAvailable, true);
+    assert.strictEqual(result.latestVersion, higher);
+    assert.strictEqual(result.currentVersion, current);
+  });
+
+  test('checkForUpdatesSync reports no update when a fresh cache holds the current version', () => {
+    // Arrange
+    const current = version.getVersion();
+    writeCache({ latestVersion: current, checkedAt: Date.now() });
+
+    // Act
+    const result = version.checkForUpdatesSync();
+
+    // Assert
+    assert.strictEqual(result.updateAvailable, false);
+    assert.strictEqual(result.latestVersion, current);
+  });
+
+  test('checkForUpdatesSync falls back to null when no cache file exists', () => {
+    // Arrange
+    removeCache();
+
+    // Act
+    const result = version.checkForUpdatesSync();
+
+    // Assert
+    assert.strictEqual(result.updateAvailable, false);
+    assert.strictEqual(result.latestVersion, null);
+    assert.strictEqual(result.currentVersion, version.getVersion());
+  });
+
+  test('a stale cache is ignored (treated as no cache)', () => {
+    // Arrange — checkedAt older than the 24h TTL
+    writeCache({ latestVersion: '999.0.0', checkedAt: Date.now() - (CACHE_TTL_MS + 60_000) });
+
+    // Act
+    const result = version.checkForUpdatesSync();
+
+    // Assert — stale cache does not surface its 999.0.0 latestVersion
+    assert.strictEqual(result.latestVersion, null);
+    assert.strictEqual(result.updateAvailable, false);
+  });
+
+  test('a malformed cache file is swallowed and treated as no cache', () => {
+    // Arrange — invalid JSON on disk triggers the JSON.parse catch branch
+    if (!fs.existsSync(CTOC_HOME)) fs.mkdirSync(CTOC_HOME, { recursive: true });
+    fs.writeFileSync(UPDATE_CACHE_FILE, '{ this is not valid json ');
+
+    // Act
+    const result = version.checkForUpdatesSync();
+
+    // Assert
+    assert.strictEqual(result.latestVersion, null);
+    assert.strictEqual(result.updateAvailable, false);
+  });
+
+  test('checkForUpdates returns the cached answer without fetching when cache is fresh', async () => {
+    // Arrange
+    const current = version.getVersion();
+    const higher = version.bump(current, 'minor');
+    writeCache({ latestVersion: higher, checkedAt: Date.now() });
+    // Make any network attempt fail loudly-visible: if it fetched, latestVersion would be '3.3.3'
+    stubHttpsSuccess('3.3.3');
+
+    // Act
+    const result = await version.checkForUpdates();
+
+    // Assert — answer came from cache, not the network
+    assert.strictEqual(result.cached, true);
+    assert.strictEqual(result.latestVersion, higher);
+    assert.strictEqual(result.updateAvailable, true);
+  });
+
+  test('checkForUpdates fetches, caches, and reports when no cache exists', async () => {
+    // Arrange
+    removeCache();
+    const current = version.getVersion();
+    const higher = version.bump(current, 'major');
+    stubHttpsSuccess(higher + '\n');
+
+    // Act
+    const result = await version.checkForUpdates();
+
+    // Assert — fresh fetch, update detected, and the fetched value was persisted
+    assert.strictEqual(result.cached, false);
+    assert.strictEqual(result.latestVersion, higher);
+    assert.strictEqual(result.updateAvailable, true);
+
+    const persisted = JSON.parse(fs.readFileSync(UPDATE_CACHE_FILE, 'utf8'));
+    assert.strictEqual(persisted.latestVersion, higher);
+    assert.strictEqual(typeof persisted.checkedAt, 'number');
+  });
+
+  test('checkForUpdates reports no update info when the fetch fails and no cache exists', async () => {
+    // Arrange
+    removeCache();
+    stubHttpsError();
+
+    // Act
+    const result = await version.checkForUpdates();
+
+    // Assert — network error path: no update claimed, no version, not cached
+    assert.strictEqual(result.updateAvailable, false);
+    assert.strictEqual(result.latestVersion, null);
+    assert.strictEqual(result.cached, false);
+    assert.strictEqual(result.currentVersion, version.getVersion());
+  });
+});
+
+// =============================================================================
+// release — mutates VERSION + synced files, restored verbatim afterwards
+// =============================================================================
+
+describe('release', () => {
+  const root = path.dirname(__dirname); // repo root (tests/ is one level down)
+  const files = [
+    path.join(root, 'VERSION'),
+    path.join(root, '.claude-plugin', 'marketplace.json'),
+    path.join(root, 'README.md')
+  ];
+  let saved;
+
+  before(() => {
+    // Capture exact bytes of every file release() may rewrite, to restore verbatim.
+    saved = files.map(f => (fs.existsSync(f) ? fs.readFileSync(f) : null));
+  });
+
+  after(() => {
+    files.forEach((f, i) => { if (saved[i] !== null) fs.writeFileSync(f, saved[i]); });
+  });
+
+  test('bumps the on-disk version and returns old/new/synced', () => {
+    // Arrange
+    const original = version.getVersion();
+
+    // Act
+    const result = version.release('patch');
+
+    // Assert
+    assert.strictEqual(result.oldVersion, original);
+    assert.strictEqual(result.newVersion, version.bump(original, 'patch'));
+    assert.strictEqual(version.getVersion(), result.newVersion);
+    assert.strictEqual(version.compareVersions(result.newVersion, result.oldVersion), 1);
+    assert.strictEqual(typeof result.synced, 'object');
+    assert.ok('marketplace' in result.synced);
+    assert.ok('plugin' in result.synced);
+    assert.ok('readme' in result.synced);
+  });
+
+  test('minor release resets the patch component', () => {
+    // Arrange
+    const original = version.getVersion();
+
+    // Act
+    const result = version.release('minor');
+
+    // Assert
+    assert.strictEqual(result.newVersion, version.bump(original, 'minor'));
+    assert.match(result.newVersion, /^\d+\.\d+\.0$/);
   });
 });

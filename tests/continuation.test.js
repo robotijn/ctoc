@@ -158,3 +158,84 @@ test('hook: a pending fork -> exit 0 (allows the stop so the human decides)', ()
     assert.equal(runHook(dir).status, 0);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ── HARD edge cases — the WEDGE vectors a safety gate MUST fail open on ──────────
+
+test('WEDGE-1: recordBlock returns FALSE when the persist fails (unwritable state file)', () => {
+  const dir = mkProject();
+  try {
+    c.startBatch(dir, { label: 'x', total: 1, maxBlocks: 3 });
+    fs.chmodSync(c.statePath(dir), 0o444); // readable but not writable
+    // The write cannot land, so the block is NOT persisted — recordBlock must say so.
+    const persisted = c.recordBlock(dir);
+    assert.equal(persisted, false, 'recordBlock must report a failed persist, not a truthy in-memory lie');
+    fs.chmodSync(c.statePath(dir), 0o644);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('WEDGE-1: the hook FAILS OPEN (exit 0) when the block cannot be persisted — no forever-wedge', function () {
+  const dir = mkProject();
+  try {
+    c.startBatch(dir, { label: 'x', total: 1, maxBlocks: 3 });
+    fs.chmodSync(c.statePath(dir), 0o444);
+    // Root/privileged CI may ignore 0444 (write still succeeds); guard so the assertion
+    // only fires where the OS actually denies the write (the real wedge condition).
+    let denied = true;
+    try { fs.writeFileSync(c.statePath(dir), fs.readFileSync(c.statePath(dir))); denied = false; } catch { /* denied, good */ }
+    if (denied) {
+      assert.equal(runHook(dir).status, 0, 'an un-persistable block cannot bound the loop → the hook MUST allow the stop');
+    }
+    fs.chmodSync(c.statePath(dir), 0o644);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('WEDGE-2: a non-positive / non-integer maxBlocks stands down (never an infinite budget)', () => {
+  const dir = mkProject();
+  try {
+    fs.mkdirSync(path.join(dir, '.ctoc', 'state'), { recursive: true });
+    for (const bad of [0, -5, undefined, null, 'x', 1.5, NaN]) {
+      fs.writeFileSync(c.statePath(dir), JSON.stringify({ active: true, remaining: 5, total: 5, blocks: 999, maxBlocks: bad, label: 'x' }));
+      const d = c.shouldContinue(dir);
+      assert.equal(d.continue, false, `maxBlocks=${bad} must NOT resolve to an infinite budget`);
+      assert.ok(d.exhausted, `maxBlocks=${bad} must stand down as an untrustworthy bound`);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('WEDGE-3: startBatch caps maxBlocks at the hard ceiling regardless of a huge total', () => {
+  const dir = mkProject();
+  try {
+    const st = c.startBatch(dir, { label: 'x', total: 1e15 });
+    assert.ok(st.maxBlocks <= 500, `maxBlocks must be capped (<=500), got ${st.maxBlocks}`);
+    assert.ok(st.maxBlocks > 0);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('EDGE: string/NaN numeric fields never block — remaining="0"/NaN/-3 all allow the stop', () => {
+  const dir = mkProject();
+  try {
+    fs.mkdirSync(path.join(dir, '.ctoc', 'state'), { recursive: true });
+    for (const bad of ['0', 0, -3, NaN, 'notanumber']) {
+      fs.writeFileSync(c.statePath(dir), JSON.stringify({ active: true, remaining: bad, total: 5, blocks: 0, maxBlocks: 20 }));
+      assert.equal(c.shouldContinue(dir).continue, false, `remaining=${bad} must allow the stop (never block on an untrustworthy count)`);
+    }
+    // a valid string remaining still drives the batch (coerced), never crashes
+    fs.writeFileSync(c.statePath(dir), JSON.stringify({ active: true, remaining: '5', total: 5, blocks: 0, maxBlocks: 20, label: 'x' }));
+    assert.equal(c.shouldContinue(dir).continue, true);
+    assert.equal(c.shouldContinue(dir).remaining, 5);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('EDGE: the designed bound terminates in exactly maxBlocks blocks (writable file)', () => {
+  const dir = mkProject();
+  try {
+    c.startBatch(dir, { label: 'x', total: 1, maxBlocks: 4 });
+    let i = 0;
+    for (; i < 100; i++) {
+      if (!c.shouldContinue(dir).continue) break;
+      assert.equal(c.recordBlock(dir), true, 'each block persists on a writable file');
+    }
+    assert.equal(i, 4, `must stand down in exactly maxBlocks=4 iterations, took ${i}`);
+    assert.ok(c.shouldContinue(dir).exhausted);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

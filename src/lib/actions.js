@@ -1044,15 +1044,25 @@ function failingStepFrom(validation) {
  * @returns {{recorded: boolean, byStep?: number, total?: number, escalation?: Object|null, error?: string}}
  */
 function recordStepKickback(planPath, step, root) {
+  const cb = require('./circuit-breaker');
+  const slug = path.basename(planPath, '.md');
   try {
-    const { recordKickback } = require('./circuit-breaker');
-    const res = recordKickback(planPath, step, root);
+    const res = cb.recordKickback(planPath, step, root);
     if (res.escalation) {
       surfaceEscalation(res.escalation, path.basename(planPath), root);
     }
     return res;
   } catch (err) {
-    console.error(`⚠️  Circuit breaker failed to record a kickback for ${path.basename(planPath)}: ${err.message}`);
+    // A breaker that cannot record its own count is ITSELF a hard escalation: the
+    // counter is frozen, so the plan could be kicked back FOREVER unseen. Never
+    // silently continue — surface it durably (via the same escalations log the
+    // menu/inbox reads) AND loudly, so an overnight loop cannot hide here.
+    console.error(`⚠️  CIRCUIT BREAKER FAILURE — ${path.basename(planPath)}: could not record a kickback (${err.message}). Human review required; the counter is NOT advancing.`);
+    try {
+      cb.recordBreakerFailure(root, { plan: slug, step, error: err.message });
+    } catch (logErr) {
+      console.error(`⚠️  Failed to persist the breaker-failure escalation for ${slug}: ${logErr.message}`);
+    }
     return { recorded: false, error: err.message };
   }
 }
@@ -1064,12 +1074,12 @@ function recordStepKickback(planPath, step, root) {
  * automated pipeline LOUD so an overnight run is never silent about a plan that
  * keeps failing.
  *
- * WHERE THE MENU MUST READ IT: the dashboard/inbox surface (src/commands/menu.js
- * and src/areas/inbox.js — outside this change's owned file set) must render
- * unresolved entries from `.ctoc/logs/escalations.json` via
- * `require('./lib/circuit-breaker').getEscalations(projectRoot)`, exactly as it
- * renders gate violations. Until that read is added, this console surface is the
- * human-visible signal and the log is the durable record.
+ * WHERE THE MENU READS IT: the inbox surface reads unresolved entries from
+ * `.ctoc/logs/escalations.json` via `inbox.listEscalations(root)` (src/lib/inbox.js),
+ * which wraps `circuit-breaker.getEscalations(root)` and filters out acknowledged
+ * entries; the dashboard renders them (src/lib/menu-screens.js). This console
+ * surface is the additional loud signal; the log is the durable, human-reachable
+ * record.
  *
  * @param {{type: string, plan: string, step?: string, count?: number, total?: number}} escalation
  * @param {string} planName - the plan filename (for the message)
@@ -1999,6 +2009,8 @@ module.exports = {
   completeExecution,
   // R3-D: the live call site of completeExecution (menu `task complete` route)
   completeTaskPlan,
+  // Finding C9 wiring: record + hard-escalate an Iron Loop kickback
+  recordStepKickback,
   // Agent orchestration functions
   startAgent,
   stopAgent,

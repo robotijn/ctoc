@@ -15,6 +15,17 @@ const safeFs = require('./safe-fs');
 const path = require('path');
 
 /**
+ * Directories the monorepo walk must NOT descend into: installed dependencies and
+ * build/output/cache dirs are never workspace members. Excluding them avoids a
+ * per-installed-package detector (a cost) and a false-positive "member" surfaced
+ * from a config file inside an installed package or a build artifact.
+ * @type {Set<string>}
+ */
+const EXCLUDED_MEMBER_DIRS = new Set([
+  'node_modules', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache'
+]);
+
+/**
  * Framework definitions with detection markers
  * @type {Object.<string, Object>}
  */
@@ -100,7 +111,9 @@ const FRAMEWORKS = {
     // modern Remix app carries vite.config.* and @remix-run/dev and NO
     // remix.config.js. The server packages (@remix-run/dev / node / serve) are the
     // authoritative Remix signal; detect() additionally overrides a generic
-    // react-vite match when any @remix-run/* package is present (see FINDING 1).
+    // react-vite match when any of the four recognized @remix-run packages
+    // (@remix-run/dev, /react, /node, /serve — the packageDeps whitelist below) is
+    // present (see FINDING 1).
     configFiles: ['remix.config.js'],
     packageDeps: ['@remix-run/react', '@remix-run/dev', '@remix-run/node', '@remix-run/serve'],
     packageDevDeps: ['@remix-run/dev'],
@@ -289,8 +302,10 @@ class FrameworkDetector {
     // FINDING 1: Remix moved to Vite in v2, so a Remix app scores as a generic
     // react-vite SPA (vite.config + react + vite devDep = 100) while remix scored
     // only 40. But a Remix app has a full server surface (loaders, actions, session
-    // cookies, CSRF) that a client-only React profile would skip. If ANY @remix-run
-    // package is present, this is Remix — override the generic react-vite match.
+    // cookies, CSRF) that a client-only React profile would skip. If any of the
+    // four recognized @remix-run packages (dev / react / node / serve — see
+    // hasRemixSignal) is present, this is Remix — override the generic react-vite
+    // match.
     if (bestMatch && bestMatch.id === 'react-vite' && this.hasRemixSignal()) {
       return { id: 'remix', ...FRAMEWORKS.remix, confidence: highestConfidence };
     }
@@ -357,7 +372,15 @@ class FrameworkDetector {
         try {
           const entries = safeFs.readdirSync(locationPath, { withFileTypes: true });
           for (const entry of entries) {
-            if (entry.isDirectory()) {
+            // Skip node_modules and other non-source dirs: instantiating a detector
+            // per installed package is a needless cost, and an installed package that
+            // itself carries a framework config would be surfaced as a bogus
+            // "workspace member" (a latent false positive).
+            if (
+              entry.isDirectory() &&
+              !EXCLUDED_MEMBER_DIRS.has(entry.name) &&
+              !entry.name.startsWith('.')
+            ) {
               const subPath = path.join(location, entry.name);
               const subDetector = new FrameworkDetector(
                 path.join(this.projectRoot, subPath)
