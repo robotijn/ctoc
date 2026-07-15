@@ -23,7 +23,8 @@ const os = require('node:os');
 
 const {
   FrameworkSecurityChecker,
-  SEVERITY
+  SEVERITY,
+  FRAMEWORK_PUBLIC_PREFIXES
 } = require('../src/lib/framework-security-checker');
 const qualityAgent = require('../src/lib/quality-agent');
 
@@ -254,6 +255,94 @@ describe('FrameworkSecurityChecker: FW-w2-fix matcher-precision guards', () => {
     const res = await findingsFor({ pyReq: 'fastapi==0.115.0\n', envName: '.env', envBody: 'NEXT_PUBLIC_API_SECRET=leak\n' });
     assert.equal(res.scanned, false, 'a pure backend has no client bundle → honest skip, not a scan');
     assert.equal(res.findings.length, 0);
+  });
+});
+
+describe('FrameworkSecurityChecker: adversarial-review fixes (F1 honesty, F2 FP, F3 dead-config)', () => {
+  /** Run the checker against a one-file fixture and return its result. */
+  async function resultFor({ nodeDeps, envName, envBody }) {
+    const dir = mkTmp('ctoc-fwsec-adv-');
+    try {
+      if (nodeDeps) writePkg(dir, nodeDeps);
+      if (envName) fs.writeFileSync(path.join(dir, envName), envBody, 'utf8');
+      return await new FrameworkSecurityChecker(dir).run();
+    } finally { rm(dir); }
+  }
+
+  // ── F1 — an env-exposure framework with NO prefix mapping must NOT report a clean pass ──
+  it('F1: an angular-only repo with a planted NEXT_PUBLIC secret reports scanned:false, not a clean pass', async () => {
+    const res = await resultFor({
+      nodeDeps: { '@angular/core': '18.0.0' },
+      envName: '.env',
+      envBody: 'NEXT_PUBLIC_API_SECRET=leak\n'
+    });
+    assert.equal(res.scanned, false, 'angular exposes env via non-prefix-named paths → NAME-scan cannot run → honest skip, NOT a clean pass');
+    assert.equal(res.findings.length, 0);
+    assert.ok(typeof res.reason === 'string' && res.reason.length > 0, 'the skip carries an honest reason');
+    assert.match(res.reason, /angular/i, 'the reason names the offending framework(s)');
+  });
+
+  it('F1: a nextjs repo still scans normally (regression guard for the F1 gate)', async () => {
+    const res = await resultFor({
+      nodeDeps: { next: '15.0.0' },
+      envName: '.env',
+      envBody: 'NEXT_PUBLIC_API_SECRET=leak\n'
+    });
+    assert.equal(res.scanned, true, 'a prefix-mapped framework must still take the scan path');
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, JSON.stringify(res.findings));
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_API_SECRET');
+  });
+
+  // ── F2 — password/private POLICY-style config flags are public config, not secrets ──
+  it('F2: NEXT_PUBLIC_PASSWORD_MIN_LENGTH does NOT flag (password-policy UI config)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_PASSWORD_MIN_LENGTH=8\n' });
+    assert.equal(res.findings.length, 0, `password-policy config is client-shipped; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('F2: NEXT_PUBLIC_PASSWORD_POLICY_URL does NOT flag (password-policy UI config)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_PASSWORD_POLICY_URL=/policy\n' });
+    assert.equal(res.findings.length, 0, `got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('F2: PUBLIC_PRIVATE_BETA does NOT flag (private-beta feature flag)', async () => {
+    const res = await resultFor({ nodeDeps: { svelte: '4.2.0' }, envName: '.env', envBody: 'PUBLIC_PRIVATE_BETA=true\n' });
+    assert.equal(res.findings.length, 0, `private-beta flag is a legitimate client flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('F2: PUBLIC_PRIVATE_LABEL_MODE does NOT flag (white-label feature flag)', async () => {
+    const res = await resultFor({ nodeDeps: { svelte: '4.2.0' }, envName: '.env', envBody: 'PUBLIC_PRIVATE_LABEL_MODE=on\n' });
+    assert.equal(res.findings.length, 0, `got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('F2: NEXT_PUBLIC_DB_PASSWORD STILL flags HIGH (terminal PASSWORD is a real leak)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_DB_PASSWORD=hunter2\n' });
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, `a raw shipped DB password is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_DB_PASSWORD');
+  });
+
+  it('F2: a raw NEXT_PUBLIC_PASSWORD STILL flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_PASSWORD=hunter2\n' });
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, `got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_PASSWORD');
+  });
+
+  it('F2: NEXT_PUBLIC_PRIVATE_KEY STILL flags HIGH (explicit compound kept)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_PRIVATE_KEY=abc\n' });
+    const highs = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(highs.length, 1, `PRIVATE_KEY is an explicit secret compound; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_PRIVATE_KEY');
+  });
+
+  // ── F3 — gatsby/expo prefix sets are unreachable dead config (no yaml keys them) ──
+  it('F3: FRAMEWORK_PUBLIC_PREFIXES no longer contains the unreachable gatsby/expo entries', () => {
+    assert.ok(!Object.prototype.hasOwnProperty.call(FRAMEWORK_PUBLIC_PREFIXES, 'gatsby'), 'gatsby is dead config (no gatsby.yaml) — must be removed');
+    assert.ok(!Object.prototype.hasOwnProperty.call(FRAMEWORK_PUBLIC_PREFIXES, 'expo'), 'expo is dead config (no expo.yaml) — must be removed');
+    // The reachable, yaml-backed prefixes stay.
+    assert.deepEqual(FRAMEWORK_PUBLIC_PREFIXES.nextjs, ['NEXT_PUBLIC_']);
+    assert.deepEqual(FRAMEWORK_PUBLIC_PREFIXES.react, ['VITE_', 'REACT_APP_']);
   });
 });
 

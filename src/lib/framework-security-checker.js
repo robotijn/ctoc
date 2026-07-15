@@ -41,12 +41,14 @@
  * client-shipped. So the token forms are COMPOUND-only — `ACCESS_TOKEN`/`AUTH_TOKEN`/
  * `API_TOKEN`/`BEARER_TOKEN`/`SESSION_TOKEN`/`REFRESH_TOKEN` — exactly the way `KEY`
  * is compound-only (`SECRET_KEY`/`PRIVATE_KEY`/`API_KEY`/`APIKEY`). The remaining
- * unambiguous indicators are `PRIVATE`/`PASSWORD`/`PASSWD`/`CREDENTIAL` (matched on
- * underscore boundaries, trailing segments allowed) and `SECRET`, which is
- * anchored TERMINAL — it flags only as the LAST name segment (`…_API_SECRET`) or via
- * the `…_SECRET_KEY` compound, so `NEXT_PUBLIC_SECRET_SANTA_ENABLED` (a feature flag
- * with `SECRET` mid-name) does NOT flag. Every indicator sits on an underscore
- * boundary, so `SECRETARY` (contains `SECRET`) never matches.
+ * unambiguous indicators — `SECRET`/`PASSWORD`/`PASSWD`/`PRIVATE`/`CREDENTIAL` — are
+ * all anchored TERMINAL: each flags only as the LAST name segment (`…_API_SECRET`,
+ * `…_DB_PASSWORD`) or via an explicit `…_SECRET_KEY`/`…_PRIVATE_KEY` compound, so a
+ * word that merely appears mid-name does NOT flag — `NEXT_PUBLIC_SECRET_SANTA_ENABLED`
+ * (feature flag), `NEXT_PUBLIC_PASSWORD_MIN_LENGTH` / `NEXT_PUBLIC_PASSWORD_POLICY_URL`
+ * (password-policy UI config), `PUBLIC_PRIVATE_BETA` / `PUBLIC_PRIVATE_LABEL_MODE`
+ * (private-beta / white-label flags) all stay silent. Every indicator sits on an
+ * underscore boundary, so `SECRETARY` (contains `SECRET`) never matches.
  *
  * The prefix stays CASE-SENSITIVE (uppercase is the framework convention), but the
  * name TAIL after a correctly-uppercased prefix is matched case-INSENSITIVELY, so
@@ -110,7 +112,14 @@ const ENV_EXPOSURE_CONCERN = 'env-exposure';
  * framework's build inlines into the CLIENT bundle:
  *   - `NEXT_PUBLIC_`  Next.js          - `NUXT_PUBLIC_`  Nuxt runtimeConfig.public
  *   - `VITE_`         Vite/Laravel     - `PUBLIC_`       SvelteKit / Astro
- *   - `REACT_APP_`    Create React App - `GATSBY_`/`EXPO_PUBLIC_`  Gatsby / Expo
+ *   - `REACT_APP_`    Create React App
+ *
+ * Only frameworks that have a capability yaml under `.ctoc/capabilities/frameworks/`
+ * appear here — `detectStack` keys a framework `name` off the yaml basename, so a key
+ * with no backing yaml can never be matched and is unreachable dead config. Gatsby's
+ * `GATSBY_` and Expo's `EXPO_PUBLIC_` prefixes were REMOVED for exactly this reason
+ * (no gatsby.yaml / expo.yaml exists): wired-is-done — a mapping nothing can reach is
+ * not a feature. Add the entry back in the SAME change that adds its capability yaml.
  *
  * The ACTIVE prefix set for a scan is the union of these lists over ONLY the
  * detected env-exposure frameworks, so a prefix a repo's build would never honour is
@@ -133,18 +142,17 @@ const FRAMEWORK_PUBLIC_PREFIXES = {
   svelte: ['VITE_', 'PUBLIC_'],
   react: ['VITE_', 'REACT_APP_'],
   astro: ['VITE_', 'PUBLIC_'],
-  gatsby: ['GATSBY_'],
-  expo: ['EXPO_PUBLIC_'],
   laravel: ['VITE_']
 };
 
 /**
- * COMPOUND secret indicators (CONSTANT). Each may appear as a segment run anywhere
- * in the name (leading and trailing segments allowed). A lone `KEY` and a lone
- * `TOKEN` are DELIBERATELY absent — `PUBLISHABLE_KEY` and `TOKEN_ADDRESS` are public
- * by design — so both the key and the token forms are compound-only. `SECRET_KEY`/
- * `PRIVATE_KEY` are redundant with the bare `SECRET`/`PRIVATE` treatment but kept
- * explicit for readability; `API_KEY`/`APIKEY` and the `*_TOKEN` auth compounds are
+ * COMPOUND secret indicators (CONSTANT). Each may appear as a segment run with
+ * trailing segments allowed. A lone `KEY` and a lone `TOKEN` are DELIBERATELY absent —
+ * `PUBLISHABLE_KEY` and `TOKEN_ADDRESS` are public by design — so both the key and the
+ * token forms are compound-only. `SECRET_KEY`/`PRIVATE_KEY` are the EXPLICIT compound
+ * forms of the terminal `SECRET`/`PRIVATE` indicators and are kept here so they fire
+ * even though the bare terminal treatment would not (they are not the final segment
+ * once `_KEY` follows); `API_KEY`/`APIKEY` and the `*_TOKEN` auth compounds are
  * load-bearing (neither `API`/`KEY` nor a bare `TOKEN` is an indicator on its own).
  * @type {string[]}
  */
@@ -158,21 +166,34 @@ const COMPOUND_INDICATORS = [
   'API_TOKEN',
   'BEARER_TOKEN',
   'SESSION_TOKEN',
-  'REFRESH_TOKEN',
-  'PRIVATE',
-  'PASSWORD',
-  'PASSWD',
-  'CREDENTIAL'
+  'REFRESH_TOKEN'
 ];
 
 /**
- * TERMINAL-anchored indicator (CONSTANT). `SECRET` flags ONLY as the final name
- * segment (`…_API_SECRET`) — never mid-name — so `NEXT_PUBLIC_SECRET_SANTA_ENABLED`
- * (a feature flag) does NOT flag (F3.2). The `…_SECRET_KEY` compound is covered by
+ * TERMINAL-anchored indicators (CONSTANT). Each flags ONLY as the FINAL name segment
+ * (`…_API_SECRET`, `…_DB_PASSWORD`) — never with a trailing segment — so public
+ * policy/feature config that merely CONTAINS the word mid-name does NOT flag:
+ * `NEXT_PUBLIC_SECRET_SANTA_ENABLED` (feature flag), `NEXT_PUBLIC_PASSWORD_MIN_LENGTH`
+ * / `NEXT_PUBLIC_PASSWORD_POLICY_URL` (password-policy UI config), `PUBLIC_PRIVATE_BETA`
+ * / `PUBLIC_PRIVATE_LABEL_MODE` (private-beta / white-label flags) are all legitimately
+ * client-shipped and must stay silent (F2). `PASSWORD`/`PASSWD`/`PRIVATE`/`CREDENTIAL`
+ * were moved here from COMPOUND_INDICATORS (which allowed trailing segments) precisely
+ * to close that symmetric false positive — matching the terminal-anchoring `SECRET`
+ * already had. A raw `…_PASSWORD` / `…_DB_PASSWORD` / `…_SECRET` STILL flags; the
+ * explicit `…_SECRET_KEY` / `…_PRIVATE_KEY` compounds STILL flag via
  * COMPOUND_INDICATORS above.
- * @type {string}
+ *
+ * ## Decisions Taken Under Ambiguity
+ * Residual FALSE NEGATIVE: a secret whose real name puts a trailing segment AFTER the
+ * indicator — e.g. `NEXT_PUBLIC_PASSWORD_HASH` — will NOT flag, because it is
+ * indistinguishable by NAME alone from `NEXT_PUBLIC_PASSWORD_MIN_LENGTH` (policy
+ * config). We accept the rare miss over the common false alarm: shipping a password
+ * HASH to the client is far less common than shipping password-policy UI config, and a
+ * name-only scan cannot tell them apart. The generic value-entropy secrets scanner is
+ * the backstop for a high-entropy hash value.
+ * @type {string[]}
  */
-const TERMINAL_INDICATOR = 'SECRET';
+const TERMINAL_INDICATORS = ['SECRET', 'PASSWORD', 'PASSWD', 'PRIVATE', 'CREDENTIAL'];
 
 /**
  * Expand an uppercase literal indicator token into a CASE-INSENSITIVE regex source
@@ -190,7 +211,7 @@ function ciPattern(token) {
 
 /** Case-insensitive indicator alternations (CONSTANT sources). */
 const COMPOUND_ALT = COMPOUND_INDICATORS.map(ciPattern).join('|');
-const TERMINAL_ALT = ciPattern(TERMINAL_INDICATOR);
+const TERMINAL_ALT = TERMINAL_INDICATORS.map(ciPattern).join('|');
 
 /**
  * Build the client-exposed-secret NAME pattern (CONSTANT via safeRegExp) for a
@@ -456,7 +477,33 @@ class FrameworkSecurityChecker {
 
     // Scope the scanned prefixes to the DETECTED frameworks (F3.1), then build the
     // one constant, ReDoS-safe pattern from that active set.
-    const scanRe = buildClientSecretRe(this.activePublicPrefixes(relevant));
+    const activePrefixes = this.activePublicPrefixes(relevant);
+
+    // HONESTY (F1). A framework can carry the `env-exposure` concern yet expose env
+    // via NON-prefix-named paths (Angular's build-time `environment.ts` replacement,
+    // Remix's loader / `window.ENV`) — for which FRAMEWORK_PUBLIC_PREFIXES has no
+    // entry. In that case the active prefix set is empty, `buildClientSecretRe`
+    // returns null, and the scan pattern LITERALLY never runs. Reporting that as a
+    // clean pass is the exact honesty hole this module's docstring claims to have
+    // closed — a relevant-but-unscannable repo would be told "scanned, no secrets
+    // found" when no pattern scan happened. So we skip HONESTLY: scanned:false with a
+    // reason naming the offending framework(s).
+    if (activePrefixes.length === 0) {
+      const names = relevant.map(f => f && f.name).filter(Boolean).join(', ');
+      const reason =
+        `detected framework(s) [${names}] expose env via non-prefix-named paths ` +
+        '(Angular environment.ts / Remix window.ENV) that this NAME-based scan cannot key on';
+      return {
+        scanned: false,
+        findings: [],
+        errors: this.errors,
+        reason,
+        summary: this.generateSummary([], 0),
+        message: `Framework security: ${reason}; nothing was scanned (not a clean pass)`
+      };
+    }
+
+    const scanRe = buildClientSecretRe(activePrefixes);
 
     const files = this.collectFiles();
     let scannedCount = 0;
@@ -544,5 +591,5 @@ module.exports = {
   SEVERITY,
   FRAMEWORK_PUBLIC_PREFIXES,
   COMPOUND_INDICATORS,
-  TERMINAL_INDICATOR
+  TERMINAL_INDICATORS
 };

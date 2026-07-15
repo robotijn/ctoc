@@ -192,7 +192,16 @@ function parseValue(raw) {
     if (v[0] === '"') { try { return JSON.parse(v); } catch { return inner; } }
     return inner;
   }
-  if (/^-?\d+$/.test(v) || /^-?\d+\.\d+$/.test(v)) return Number(v);
+  if (/^-?\d+$/.test(v) || /^-?\d+\.\d+$/.test(v)) {
+    // Coerce to Number ONLY when the value round-trips losslessly (String(Number(v)) === v).
+    // This preserves version-like strings a consumer treats as opaque: `1.0` (a trailing-.0
+    // provenance/version tag) and `007` (a leading-zero id) do NOT round-trip, so they stay
+    // strings, while genuine numbers `1`, `2`, `3.5` still coerce. Without this guard
+    // `verified: 1.0` silently became Number 1 and `007` became 7.
+    const n = Number(v);
+    if (String(n) === v) return n;
+    return v;
+  }
   return v; // bareword string (e.g. clippy, web-2026-07, Cargo.toml, build-is-last-mile)
 }
 
@@ -268,8 +277,16 @@ function parseCapabilityYaml(text) {
 // ── loading (fail-open, per-entry) ──────────────────────────────────────────────
 
 /**
- * A parsed capability is VALID only if it names its language and carries a toolchain
- * object. Anything else (a broken/hostile file) is rejected so load() skips + warns.
+ * A parsed capability is VALID only if it names its language, carries a NON-EMPTY
+ * detectionMarkers ARRAY, and a NON-EMPTY toolchain object. The array + non-empty checks
+ * are load-bearing: two idiomatic-but-unsupported YAML shapes otherwise pass and then
+ * misbehave silently — a BLOCK-sequence `detectionMarkers:` renders as `{}` (the flow-only
+ * parser has no block-list support) so the language never detects with no warning; a
+ * tab-mangled or empty `toolchain:` renders as `{}` so every toolchainFor lookup returns
+ * null silently. Rejecting them here upholds the module's skip-and-warn / fail-loud
+ * contract: a structurally-broken override is SKIPPED with a warning, never silently
+ * accepted. (We do NOT add block-sequence/tab parsing — out of scope; the parser stays
+ * flow-only and the validator rejects what it cannot faithfully represent.)
  * @param {*} obj
  * @returns {boolean}
  */
@@ -278,8 +295,12 @@ function isValidCapability(obj) {
     && typeof obj === 'object'
     && typeof obj.language === 'string'
     && obj.language.trim().length > 0
+    && Array.isArray(obj.detectionMarkers)
+    && obj.detectionMarkers.length > 0
     && obj.toolchain
-    && typeof obj.toolchain === 'object';
+    && typeof obj.toolchain === 'object'
+    && !Array.isArray(obj.toolchain)
+    && Object.keys(obj.toolchain).length > 0;
 }
 
 /**
@@ -295,7 +316,11 @@ function readCapabilityDir(dir, languages, warnings) {
   let entries;
   try {
     if (!safeFs.existsSync(dir)) return;
-    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+    // .sort() makes iteration DETERMINISTIC and identical on every platform: fs.readdirSync
+    // order is filesystem-dependent (alphabetical-ish on APFS, hash order on ext4/xfs), so
+    // without this the primary-language pick (detectLanguages[0], the run target) could differ
+    // between Linux CI and a macOS laptop for the same repo — a cross-platform correctness bug.
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml')).sort();
   } catch (err) {
     warnings.push({ file: dir, message: `unreadable capabilities dir: ${err.message}` });
     return;
@@ -314,7 +339,7 @@ function readCapabilityDir(dir, languages, warnings) {
       }
       const parsed = parseCapabilityYaml(safeFs.readFileSync(p, 'utf8'));
       if (!isValidCapability(parsed)) {
-        warnings.push({ file: name, message: 'malformed capability entry (missing language/toolchain) — skipped' });
+        warnings.push({ file: name, message: 'malformed capability entry (missing/empty language, detectionMarkers array, or toolchain) — skipped' });
         continue;
       }
       languages[parsed.language] = parsed; // later dir (project override) wins
@@ -351,9 +376,13 @@ function load(projectRoot) {
 // up, it never runs anything.
 
 /**
- * A parsed project type is VALID only if it names itself and carries the three
- * pipeline-shaping fields: a phase-relevance map, a run strategy, and a config
- * scaffold list. Anything else (a broken/hostile file) is rejected → skipped + warned.
+ * A parsed project type is VALID only if it names itself, carries a NON-EMPTY
+ * detectionMarkers ARRAY (the field projectTypeFor reads to detect the type), and the
+ * three pipeline-shaping fields: a phase-relevance map, a run strategy, and a config
+ * scaffold list. The detectionMarkers array check mirrors isValidCapability's F2 fix — a
+ * BLOCK-sequence `detectionMarkers:` renders as `{}` under the flow-only parser, which would
+ * otherwise pass validation and then never detect the type with no warning. Anything else
+ * (a broken/hostile file) is rejected → skipped + warned.
  * @param {*} obj
  * @returns {boolean}
  */
@@ -362,6 +391,8 @@ function isValidProjectType(obj) {
     && typeof obj === 'object'
     && typeof obj.projectType === 'string'
     && obj.projectType.trim().length > 0
+    && Array.isArray(obj.detectionMarkers)
+    && obj.detectionMarkers.length > 0
     && obj.phases
     && typeof obj.phases === 'object'
     && !Array.isArray(obj.phases)
@@ -383,7 +414,11 @@ function readProjectTypeDir(dir, projectTypes, warnings) {
   let entries;
   try {
     if (!safeFs.existsSync(dir)) return;
-    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+    // .sort() makes iteration DETERMINISTIC and identical on every platform: fs.readdirSync
+    // order is filesystem-dependent (alphabetical-ish on APFS, hash order on ext4/xfs), so
+    // without this the primary-language pick (detectLanguages[0], the run target) could differ
+    // between Linux CI and a macOS laptop for the same repo — a cross-platform correctness bug.
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml')).sort();
   } catch (err) {
     warnings.push({ file: dir, message: `unreadable project-types dir: ${err.message}` });
     return;
@@ -402,7 +437,7 @@ function readProjectTypeDir(dir, projectTypes, warnings) {
       }
       const parsed = parseCapabilityYaml(safeFs.readFileSync(p, 'utf8'));
       if (!isValidProjectType(parsed)) {
-        warnings.push({ file: name, message: 'malformed project-type entry (missing projectType/phases/run/configScaffold) — skipped' });
+        warnings.push({ file: name, message: 'malformed project-type entry (missing projectType/detectionMarkers/phases/run/configScaffold) — skipped' });
         continue;
       }
       projectTypes[parsed.projectType] = parsed; // later dir (project override) wins
@@ -610,7 +645,11 @@ function readDatabaseDir(dir, databases, warnings) {
   let entries;
   try {
     if (!safeFs.existsSync(dir)) return;
-    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+    // .sort() makes iteration DETERMINISTIC and identical on every platform: fs.readdirSync
+    // order is filesystem-dependent (alphabetical-ish on APFS, hash order on ext4/xfs), so
+    // without this the primary-language pick (detectLanguages[0], the run target) could differ
+    // between Linux CI and a macOS laptop for the same repo — a cross-platform correctness bug.
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml')).sort();
   } catch (err) {
     warnings.push({ file: dir, message: `unreadable databases dir: ${err.message}` });
     return;
@@ -723,7 +762,11 @@ function readFrameworkDir(dir, frameworks, warnings) {
   let entries;
   try {
     if (!safeFs.existsSync(dir)) return;
-    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+    // .sort() makes iteration DETERMINISTIC and identical on every platform: fs.readdirSync
+    // order is filesystem-dependent (alphabetical-ish on APFS, hash order on ext4/xfs), so
+    // without this the primary-language pick (detectLanguages[0], the run target) could differ
+    // between Linux CI and a macOS laptop for the same repo — a cross-platform correctness bug.
+    entries = safeFs.readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml')).sort();
   } catch (err) {
     warnings.push({ file: dir, message: `unreadable frameworks dir: ${err.message}` });
     return;
@@ -808,13 +851,18 @@ function frameworkCapability(name, projectRoot) {
  * detection power as `tool-detector`; file-extension tree-walking stays in
  * stack-detector (CR5-s4), out of scope here.
  *
- * DECLARATION ORDER is preserved: languages are still iterated in load() order and
- * each language is pushed at most once (first matching marker wins), so
- * `detectLanguages(root)[0]` — which app-runner consumes — never shifts for a
- * project that already detected.
+ * ORDER IS DETERMINISTIC AND CROSS-PLATFORM STABLE (F1). Languages are iterated in
+ * load() order, which is the SORTED capability-filename order — each read*Dir loader
+ * `.sort()`s its directory listing, so iteration does NOT depend on fs.readdirSync order
+ * (alphabetical-ish on APFS, hash order on ext4/xfs). Each language is pushed at most once
+ * (first matching marker wins). Therefore `detectLanguages(root)[0]` — the run target
+ * app-runner consumes — is identical on every platform for the same repo and never shifts
+ * between loads. (For a project whose overrides ADD a new language, the bundled languages
+ * keep their sorted positions and the new key appends in the override dir's sorted order —
+ * still fully deterministic.)
  *
  * @param {string} projectRoot project root to scan.
- * @returns {string[]} detected language names (declaration order).
+ * @returns {string[]} detected language names, in deterministic sorted-capability-filename order.
  */
 function detectLanguages(projectRoot) {
   if (typeof projectRoot !== 'string' || projectRoot.length === 0) return [];

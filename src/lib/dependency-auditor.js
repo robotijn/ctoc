@@ -121,12 +121,40 @@ const MANAGER_LANGUAGES = {
 };
 
 /**
- * The set of capability-registry language names DependencyAuditor covers — the union
- * of MANAGER_LANGUAGES. SCARunner defers exactly these ecosystems to DependencyAuditor
- * so the two never double-count the same CVE (F2 partition).
+ * The package managers `runAudit`'s switch ACTUALLY implements — i.e. every switch
+ * arm that is NOT the `default` "Audit not implemented" arm (yarn/pnpm are included:
+ * they fall back to `runNpmAudit`). This is the SINGLE source of truth for what
+ * DependencyAuditor can really audit; maven/gradle/poetry/pipenv are DELIBERATELY
+ * absent because their audit is unimplemented and hits the `default` arm.
+ *
+ * F1 (coverage hole): the old partition keyed deferral on the NOMINAL language union
+ * (MANAGER_LANGUAGES over ALL managers), so java (maven/gradle) and python-via-
+ * poetry/pipenv read as "covered" though DependencyAuditor audits neither — SCARunner
+ * then EXCLUDED those ecosystems and they were scanned by NEITHER runner. Deferral
+ * must key on what is genuinely audited: IMPLEMENTED_MANAGERS, not the union. Kept in
+ * exact sync with the runAudit switch by `tests/dependency-auditor.test.js`.
  * @type {Set<string>}
  */
-const COVERED_LANGUAGES = new Set(Object.values(MANAGER_LANGUAGES).flat());
+const IMPLEMENTED_MANAGERS = new Set([
+  'npm', 'yarn', 'pnpm', 'pip', 'go', 'cargo', 'bundler', 'composer'
+]);
+
+/**
+ * The capability-registry language names DependencyAuditor genuinely covers — the
+ * union of MANAGER_LANGUAGES restricted to IMPLEMENTED_MANAGERS. This is the STATIC,
+ * responsibility-level partition (quality-agent reads it to decide which ecosystems
+ * to defer). It deliberately EXCLUDES java, whose only managers (maven/gradle) are
+ * unimplemented — so java now flows to SCA/osv-scanner instead of being scanned by
+ * neither runner. python REMAINS covered because `pip` is implemented; the finer
+ * python-via-poetry/pipenv distinction (a static set cannot express it) is handled
+ * per-project by `auditedLanguagesFor`.
+ * @type {Set<string>}
+ */
+const COVERED_LANGUAGES = new Set(
+  Object.entries(MANAGER_LANGUAGES)
+    .filter(([manager]) => IMPLEMENTED_MANAGERS.has(manager))
+    .flatMap(([, langs]) => langs)
+);
 
 /**
  * Dependency Auditor class
@@ -985,10 +1013,44 @@ class DependencyAuditor {
   }
 }
 
+/**
+ * The languages DependencyAuditor genuinely audits FOR A SPECIFIC PROJECT — the
+ * languages of the managers it both DETECTS in that project AND actually implements.
+ *
+ * This is the honest, per-project partition SCARunner defers on (F1). A static set
+ * cannot express it: `pyproject.toml` maps python via `pip` (implemented) but a
+ * poetry.lock-/Pipfile-only project maps python via `poetry`/`pipenv` (unimplemented),
+ * so whether python is "covered" depends on the detected manager, not the language.
+ * When DependencyAuditor detects a manager it cannot audit (maven/gradle/poetry/
+ * pipenv), that language is OMITTED here so SCA/osv-scanner covers it — never scanned
+ * by neither runner. Fail-soft: any detection error defers nothing (SCA scans all).
+ *
+ * @param {string} projectRoot - Root directory of the project
+ * @returns {Set<string>} capability-registry language names DependencyAuditor audits here
+ */
+function auditedLanguagesFor(projectRoot) {
+  const covered = new Set();
+  try {
+    const auditor = new DependencyAuditor(projectRoot);
+    for (const manager of auditor.detectPackageManagers()) {
+      if (!IMPLEMENTED_MANAGERS.has(manager)) continue;
+      for (const lang of (MANAGER_LANGUAGES[manager] || [])) {
+        covered.add(lang);
+      }
+    }
+  } catch {
+    // Fail-soft: on any detection error defer NOTHING, so SCA scans everything —
+    // safer to double-check an ecosystem than to leave it scanned by neither runner.
+  }
+  return covered;
+}
+
 module.exports = {
   DependencyAuditor,
   SEVERITY,
   PACKAGE_MANAGERS,
   MANAGER_LANGUAGES,
-  COVERED_LANGUAGES
+  IMPLEMENTED_MANAGERS,
+  COVERED_LANGUAGES,
+  auditedLanguagesFor
 };
