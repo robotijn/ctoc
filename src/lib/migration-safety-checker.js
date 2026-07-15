@@ -106,6 +106,37 @@
  *   (`\s+` | `\s*\(\s*`) so whitespace cannot be split ambiguously — verified linear at
  *   200k chars. Fixed because a ReDoS in a security scanner is a data-loss/DoS bug, not
  *   a style nit; no assertion was weakened and every existing execute-form test passes.
+ *
+ * DB-w6 REPAIR — one confirmed regression + one pre-existing false negative, both
+ * rooted in the DB-w5 FN5 `stripSqlLineComment` tracking ONLY single-quote spans.
+ * Decisions taken under ambiguity:
+ * - REGRESSION (false positive, non-negotiable "additive migrations must pass"): a
+ *   LONE apostrophe inside a Postgres dollar-quoted string (`$$don't$$`) made the
+ *   single-quote count ODD, so the stripper believed it was still inside a string at
+ *   the trailing `--`, declined to strip the comment, and the leaked comment text
+ *   matched the position-agnostic EXEC_ANCHOR / EXEC_TSQL_ANCHOR — firing on a benign
+ *   additive migration. FIX: `stripSqlLineComment` is now dollar-quote-aware — it
+ *   recognises `$$…$$` and `$tag$…$tag$` (matchDollarTag) and skips the whole span, so
+ *   an apostrophe inside a dollar-quote is DATA and the trailing `--` after a balanced
+ *   dollar span is correctly stripped. Chosen over the alternative (reject an execute
+ *   match preceded by `--` on the same line) because the dollar-quote-aware stripper
+ *   ALSO fixes the false negative below with one root-cause change.
+ * - PRE-EXISTING false negative (same root cause): a `--` inside a double-quoted
+ *   IDENTIFIER (`ALTER TABLE "we--ird" DROP COLUMN x;`) truncated the line at the `--`,
+ *   discarding the real `DROP COLUMN`. FIX: the stripper now treats `"…"` (with `""`
+ *   escape, the SQL-standard doubled-quote) as a data span too, so a `--` inside an
+ *   identifier no longer truncates a real trailing DROP.
+ * - DESIGN CHOICE (dollar-quoted BODY containing a real keyword): a DROP that is the
+ *   VALUE of a dollar-quoted string (`INSERT INTO t VALUES ($body$DROP TABLE x$body$)`)
+ *   is string DATA, not an executed statement. It is correctly NOT flagged — it is not
+ *   statement-anchored (preceded by `$body$`, not `^`/`;`) and carries no execute call,
+ *   exactly consistent with the existing "a string value beginning with a keyword is
+ *   not executable DDL" rule (STMT_ANCHOR / EXEC_ANCHOR do the gating; the stripper only
+ *   decides where the `--` comment boundary is, never the content handed to the regex).
+ * - ReDoS: the scan stays a single linear left-to-right pass. Each string span is
+ *   consumed by advancing the cursor past its close (dollar spans via ONE forward
+ *   indexOf of the identical close tag), so no region is rescanned; an unterminated
+ *   span returns the whole line. Verified linear on long `$`-runs and long lines.
  */
 
 'use strict';
@@ -576,26 +607,86 @@ function stripLineComment(line, ext) {
 }
 
 /**
- * String-literal-aware SQL `--` line-comment strip (DB-w5 FN5). Returns the code before
- * the first `--` that is NOT inside a single-quoted string literal. A doubled `''`
- * inside a literal is the SQL escaped-quote and keeps the string open. A linear
- * character scan (no regex) — ReDoS-trivial by construction.
+ * Recognise a Postgres dollar-quote OPENING tag at position `i` (where `line[i]` is
+ * `$`). Matches bare `$$` and tagged `$tag$`, where `tag` is a Postgres identifier
+ * token (`[A-Za-z_][A-Za-z0-9_]*`). Returns the full opening tag string (e.g. `$$` or
+ * `$body$`) so the caller can locate the identical CLOSING tag, or `null` when this
+ * `$` is NOT a dollar-quote open (e.g. a `$1` positional parameter or a lone `$`).
+ * A single forward scan of the tag identifier — no backtracking, ReDoS-trivial.
+ * @param {string} line
+ * @param {number} i - index of the `$`
+ * @returns {string|null}
+ */
+function matchDollarTag(line, i) {
+  let j = i + 1;
+  // Optional identifier tag: first char a letter/underscore, rest letters/digits/_.
+  const first = line[j];
+  if (first !== undefined && (first === '_' || (first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z'))) {
+    j++;
+    for (;;) {
+      const c = line[j];
+      if (c !== undefined && (c === '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))) {
+        j++;
+      } else {
+        break;
+      }
+    }
+  }
+  return line[j] === '$' ? line.slice(i, j + 1) : null;
+}
+
+/**
+ * String-literal-aware SQL `--` line-comment strip (DB-w5 FN5, hardened DB-w6).
+ * Returns the code before the first `--` that is NOT inside a string. Recognises all
+ * three SQL string spans so their content is treated as DATA, not code:
+ *   - single-quoted literal `'…'`  — a doubled `''` is the SQL escaped quote;
+ *   - double-quoted identifier `"…"` — a doubled `""` is the escaped quote (SQL
+ *     standard); a `--` inside such an identifier is DATA, so it must not truncate a
+ *     real trailing DROP (DB-w6 pre-existing false negative);
+ *   - Postgres dollar-quoted string `$$…$$` / `$tag$…$tag$` — its body may contain a
+ *     LONE apostrophe (`$$don't$$`) that the single-quote-only scanner mis-read as an
+ *     unbalanced open quote, leaving the trailing `--` un-stripped and leaking comment
+ *     text into the position-agnostic execute anchors (DB-w6 regression).
+ * A linear left-to-right scan; each string span is consumed by advancing `i` past its
+ * close (dollar spans via a single forward indexOf of the identical close tag), so no
+ * region is rescanned — ReDoS-safe on long `$`-runs and long lines. An UNTERMINATED
+ * span (no matching close on this physical line) means the rest of the line is string
+ * data with no comment, so the whole line is returned.
  * @param {string} line
  * @returns {string}
  */
 function stripSqlLineComment(line) {
-  let inStr = false;
-  for (let i = 0; i < line.length; i++) {
+  const n = line.length;
+  let i = 0;
+  while (i < n) {
     const c = line[i];
-    if (inStr) {
-      if (c === '\'') {
-        if (line[i + 1] === '\'') { i++; continue; } // escaped quote — stays in string
-        inStr = false;
+    // Postgres dollar-quoted string: $$…$$ or $tag$…$tag$.
+    if (c === '$') {
+      const tag = matchDollarTag(line, i);
+      if (tag !== null) {
+        const close = line.indexOf(tag, i + tag.length);
+        if (close === -1) return line; // unterminated dollar-quote → no comment on this line
+        i = close + tag.length;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    // Single-quoted literal ('…', '' escapes) or double-quoted identifier ("…", "" escapes).
+    if (c === '\'' || c === '"') {
+      i++;
+      while (i < n) {
+        if (line[i] === c) {
+          if (line[i + 1] === c) { i += 2; continue; } // doubled quote — escaped, stays in span
+          i++;
+          break;
+        }
+        i++;
       }
       continue;
     }
-    if (c === '\'') { inStr = true; continue; }
     if (c === '-' && line[i + 1] === '-') return line.slice(0, i);
+    i++;
   }
   return line;
 }

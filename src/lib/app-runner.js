@@ -275,6 +275,70 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Shell metacharacters that turn a script into a compound/piped command. */
+const SHELL_OPERATOR_CHARS = new Set(['&', '|', ';']);
+
+/**
+ * Quote-aware, ReDoS-safe tokenizer for an npm script string.
+ *
+ * A single linear scan (no backtracking regex) honours single and double quotes
+ * so a spaced quoted argument (`--hostname "my host"`) stays ONE token — the old
+ * `.split(/\s+/)` shattered it and made a correct dev script fail to launch on
+ * POSIX. Any UNQUOTED shell operator (`&&`, `||`, `|`, `;`, `&`) sets
+ * `hasShellOperators`; an operator that appears inside quotes is literal data and
+ * is NOT flagged.
+ *
+ * @param {string} scriptStr - The raw script command.
+ * @returns {{tokens: string[], hasShellOperators: boolean}} Tokens and an operator flag.
+ */
+function tokenizeScript(scriptStr) {
+  const s = String(scriptStr);
+  const tokens = [];
+  let cur = '';
+  let hasToken = false;
+  let inSingle = false;
+  let inDouble = false;
+  let hasShellOperators = false;
+
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+
+    if (inSingle) {
+      if (c === "'") inSingle = false;
+      else cur += c;
+      hasToken = true;
+      continue;
+    }
+    if (inDouble) {
+      if (c === '"') {
+        inDouble = false;
+      } else if (c === '\\' && i + 1 < s.length && (s[i + 1] === '"' || s[i + 1] === '\\')) {
+        cur += s[++i];
+      } else {
+        cur += c;
+      }
+      hasToken = true;
+      continue;
+    }
+
+    if (c === "'") { inSingle = true; hasToken = true; continue; }
+    if (c === '"') { inDouble = true; hasToken = true; continue; }
+    if (c === '\\' && i + 1 < s.length) { cur += s[++i]; hasToken = true; continue; }
+
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') {
+      if (hasToken) { tokens.push(cur); cur = ''; hasToken = false; }
+      continue;
+    }
+
+    if (SHELL_OPERATOR_CHARS.has(c)) hasShellOperators = true;
+    cur += c;
+    hasToken = true;
+  }
+  if (hasToken) tokens.push(cur);
+
+  return { tokens, hasShellOperators };
+}
+
 /**
  * Resolve an npm script string into a concrete (command, args, shell) launch.
  *
@@ -283,11 +347,35 @@ function sleep(ms) {
  * `next dev`) are spawned with `shell:false` on POSIX; on Windows they need the
  * shell to resolve a `.cmd` shim, which is the one narrow, documented exception.
  *
+ * A script that contains an unquoted shell operator (`&&`, `||`, `|`, `;`, `&`)
+ * is NOT launchable by this direct-spawn path: handing shell metacharacters from
+ * a semi-trusted package.json to a shell (cmd.exe on Windows) is a command-
+ * injection surface, and mis-tokenizing them into a bare `spawn` would launch the
+ * WRONG command. Such a script is returned as `{ unsupported: true, reason }` so
+ * `driveServer` surfaces a clear, honest error instead of silently mis-launching.
+ *
  * @param {string} scriptStr - The raw script command (e.g. "node server.js").
- * @returns {{command: string, args: string[], shell: boolean}} Launch spec.
+ * @returns {{command: (string|null), args: string[], shell: boolean,
+ *   unsupported?: boolean, reason?: string}} Launch spec, or an unsupported marker.
  */
 function resolveScriptCommand(scriptStr) {
-  const tokens = String(scriptStr).trim().split(/\s+/);
+  const { tokens, hasShellOperators } = tokenizeScript(scriptStr);
+
+  if (hasShellOperators) {
+    return {
+      command: null,
+      args: [],
+      shell: false,
+      unsupported: true,
+      reason:
+        `Dev script contains a shell operator (&&, ||, |, ;, or &): "${String(scriptStr).trim()}". ` +
+        'The last-mile runner launches a single command with shell:false so it never hands shell ' +
+        'metacharacters from package.json to a shell (a command-injection surface on Windows cmd.exe). ' +
+        'Reduce the dev script to a single command (e.g. "node server.js" or "next dev") so the app ' +
+        'can be launched directly, or move the compound steps into a separate build script.'
+    };
+  }
+
   const cmd = tokens[0];
   const args = tokens.slice(1);
   if (cmd === 'node') {
@@ -420,6 +508,68 @@ function driveCli(projectPath, opts, result) {
 }
 
 /**
+ * Decide the honest drive outcome from the terminal state of a launched dev
+ * server. Pure and synchronous so the decision is deterministically testable —
+ * it is the SAME code `driveServer` runs, not a test double.
+ *
+ * The precedence encodes two honesty rules:
+ *  1. `exited` is DECISIVE. If the child WE launched has exited, that is a
+ *     failure regardless of who answers the port. A foreign process squatting on
+ *     the (supposedly private) port — e.g. after an EADDRINUSE crash in the port
+ *     time-of-check/time-of-use gap — must never let us attest "responded".
+ *  2. A 5xx response is a FAILURE. A server that answers '/' with HTTP 500 shows
+ *     the human an error page — that is NOT "working"; the status is surfaced.
+ *     A 2xx/3xx/4xx response means the server is up (an API-only server may
+ *     legitimately 404 on '/'), so those remain `responded:true`.
+ *
+ * @param {Object} state
+ * @param {boolean} state.exited - Whether the launched child has exited.
+ * @param {{code:(number|null),signal:(string|null),error?:string}|null} state.exitInfo
+ * @param {{ok:boolean, statusCode?:number, body?:string}} state.probe - Last HTTP probe.
+ * @param {number} state.port - Port the child was told to bind.
+ * @param {number} state.budget - Wall-clock budget (ms) for the timeout message.
+ * @param {string} state.stderr - Captured child stderr (for the failure detail).
+ * @returns {{responded: boolean, httpStatus: (number|undefined),
+ *   bodyExcerpt: (string|undefined), errors: string[]}} The decided outcome.
+ */
+function classifyServerOutcome(state) {
+  const { exited, exitInfo, probe, port, budget, stderr } = state;
+  const out = { responded: false, httpStatus: undefined, bodyExcerpt: undefined, errors: [] };
+  const stderrTail = (stderr || '').slice(0, 400).trim() || '(none)';
+
+  // Rule 1: a dead child is a failure, whoever answers the port.
+  if (exited) {
+    const detail = exitInfo && exitInfo.error
+      ? exitInfo.error
+      : `code ${exitInfo && exitInfo.code}, signal ${exitInfo && exitInfo.signal}`;
+    out.errors.push(
+      `Dev server exited before responding (${detail}). Stderr: ${stderrTail}`
+    );
+    return out;
+  }
+
+  if (probe && probe.ok) {
+    out.httpStatus = probe.statusCode;
+    // Rule 2: a 5xx means the app booted but ERRORS on load — not working.
+    if (typeof probe.statusCode === 'number' && probe.statusCode >= 500) {
+      out.errors.push(
+        `Dev server booted but returned HTTP ${probe.statusCode} on / — the app errors on load. ` +
+        `Stderr: ${stderrTail}`
+      );
+      return out;
+    }
+    out.responded = true;
+    out.bodyExcerpt = (probe.body || '').slice(0, 200);
+    return out;
+  }
+
+  out.errors.push(
+    `Dev server did not respond on port ${port} within ${budget}ms. Stderr: ${stderrTail}`
+  );
+  return out;
+}
+
+/**
  * Drive a web app / server: start its dev (or start) script, poll '/' until it
  * answers or the time budget expires, assert a real HTTP response, then tear the
  * process down. The chosen port is exported to the child via the `PORT`
@@ -451,9 +601,17 @@ async function driveServer(projectPath, opts, result) {
   const port = opts.port || (await getFreePort());
   const budget = opts.timeBudgetMs || DEFAULT_TIME_BUDGET_MS;
 
-  const { command, args, shell } = resolveScriptCommand(scriptStr);
+  const spec = resolveScriptCommand(scriptStr);
   result.evidence.command = scriptStr;
   result.evidence.port = port;
+
+  // A compound/piped script cannot be launched by the direct-spawn path; surface
+  // an honest error rather than silently mis-launching a wrong command (Defect 3).
+  if (spec.unsupported) {
+    result.errors.push(spec.reason);
+    return result;
+  }
+  const { command, args, shell } = spec;
 
   let child;
   try {
@@ -494,26 +652,15 @@ async function driveServer(projectPath, opts, result) {
   result.evidence.stdout = stdout.slice(0, 800);
   result.evidence.stderr = stderr.slice(0, 800);
 
-  // R4-A item 9: check `exited` BEFORE trusting a probe. Combined with the free
-  // port above, this guarantees a "responded" verdict can only come from the app
-  // WE launched — a child that died is reported as a failure even if something
-  // else answers on the (now guaranteed private) port.
-  if (exited && !probe.ok) {
-    const detail = exitInfo && exitInfo.error ? exitInfo.error : `code ${exitInfo && exitInfo.code}, signal ${exitInfo && exitInfo.signal}`;
-    result.errors.push(
-      `Dev server exited before responding (${detail}). ` +
-      `Stderr: ${stderr.slice(0, 400).trim() || '(none)'}`
-    );
-  } else if (probe.ok) {
-    result.responded = true;
-    result.evidence.httpStatus = probe.statusCode;
-    result.evidence.bodyExcerpt = (probe.body || '').slice(0, 200);
-  } else {
-    result.errors.push(
-      `Dev server did not respond on port ${port} within ${budget}ms. ` +
-      `Stderr: ${stderr.slice(0, 400).trim() || '(none)'}`
-    );
-  }
+  // The decision is delegated to the pure `classifyServerOutcome`: `exited` is
+  // DECISIVE over any probe (a dead child never attests "responded", even if a
+  // foreign process answers the port — Defect 2), and a 5xx response is a failure
+  // rather than a false pass (Defect 1). See that function for the honesty rules.
+  const outcome = classifyServerOutcome({ exited, exitInfo, probe, port, budget, stderr });
+  result.responded = outcome.responded;
+  if (outcome.httpStatus !== undefined) result.evidence.httpStatus = outcome.httpStatus;
+  if (outcome.bodyExcerpt !== undefined) result.evidence.bodyExcerpt = outcome.bodyExcerpt;
+  for (const e of outcome.errors) result.errors.push(e);
 
   await teardown(child);
   return result;
@@ -707,6 +854,8 @@ module.exports = {
   driveAppSync,
   scaffoldPlaywright,
   probeHttp,
+  resolveScriptCommand,
+  classifyServerOutcome,
   getFreePort,
   DEFAULT_TIME_BUDGET_MS
 };

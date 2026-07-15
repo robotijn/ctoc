@@ -312,6 +312,29 @@ const KEY_FILENAMES = [
 ];
 
 /**
+ * Extensions NOT in the scannable set that can nonetheless carry a real
+ * credential in plain text — Terraform state/vars (connection strings, IAM
+ * keys, provider secrets) and SQL dumps (embedded connection strings). A skip
+ * of one of these IS a genuine coverage gap, so it is recorded in this.errors
+ * (the "N files unscanned" honesty signal). Every OTHER unknown/binary/media
+ * extension (.png, .ico, .woff2, .jpg, .pdf, .gif, .svg, ...) cannot hold a
+ * text secret this scanner detects, so its skip is SILENT — ledgering it floods
+ * the honesty signal and buries genuine read failures behind benign notices.
+ * (`.conf`/`.cfg`/`.ini`/`.properties`/`.env*` are already scannable, so they
+ * are scanned outright and never reach the skip branch.)
+ * @type {Array}
+ */
+const SECRET_DENSE_UNSCANNED_EXTENSIONS = ['.tf', '.tfvars', '.tfstate', '.sql'];
+
+/**
+ * Secret-dense files whose whole name is significant rather than the extension
+ * — dotfiles have no `path.extname` (`.npmrc` → ''), and Dockerfile is
+ * extensionless. Same ledger-on-skip rationale as the extensions above.
+ * @type {Array}
+ */
+const SECRET_DENSE_UNSCANNED_FILENAMES = ['.npmrc', '.netrc', '.pgpass', 'Dockerfile'];
+
+/**
  * Secrets Scanner class
  */
 class SecretsScanner {
@@ -369,15 +392,26 @@ class SecretsScanner {
     // OpenSSH key would never be scanned.
     const isKeyFilename = KEY_FILENAMES.includes(basename);
     if (!this.options.extensions.includes(ext) && !isKeyFilename) {
-      // An unscannable extension is NOT silently dropped. Secret-dense types
-      // (.tf, .tfvars, .tfstate, .npmrc, .netrc, .pgpass, Dockerfile, ...) would
-      // otherwise produce a false all-clear. Record the skip (one cheap entry,
-      // naming the extension) so the caller can surface "N files unscanned"
-      // instead of a silent clean pass — mirroring the oversized-file branch.
-      this.errors.push({
-        file: filePath,
-        error: `Skipped: extension '${ext || '(none)'}' not in scannable set (unscanned)`
-      });
+      // Only SECRET-DENSE unscanned types are ledgered — files that CAN hold a
+      // text credential but are not in the scannable set (Terraform state/vars,
+      // SQL dumps, .npmrc/.netrc/.pgpass, Dockerfile). Recording those lets the
+      // caller surface "N files unscanned" for types that actually matter,
+      // instead of a silent false all-clear. Every OTHER unknown/binary/media
+      // extension (.png, .ico, .woff2, .jpg, .pdf, .gif, .svg, ...) is skipped
+      // SILENTLY: it cannot hold a text secret this scanner detects, and
+      // ledgering it floods the honesty signal — 50 benign .png skips shoved a
+      // genuine EACCES read error out of generateReport's window. Silence on
+      // assets, honesty on secret-dense types: that preserves the signal.
+      const isSecretDense =
+        SECRET_DENSE_UNSCANNED_EXTENSIONS.includes(ext) ||
+        SECRET_DENSE_UNSCANNED_FILENAMES.includes(basename);
+      if (isSecretDense) {
+        this.errors.push({
+          file: filePath,
+          kind: 'skip',
+          error: `Skipped: secret-dense type '${ext || basename}' not in scannable set (unscanned)`
+        });
+      }
       return false;
     }
 
@@ -389,6 +423,7 @@ class SecretsScanner {
       if (stats.size > this.options.maxFileSize) {
         this.errors.push({
           file: filePath,
+          kind: 'skip',
           error: `Skipped: file size ${stats.size} exceeds maxFileSize ${this.options.maxFileSize} bytes (unscanned)`
         });
         return false;
@@ -428,7 +463,7 @@ class SecretsScanner {
           }
         }
       } catch (e) {
-        this.errors.push({ path: dir, error: e.message });
+        this.errors.push({ path: dir, kind: 'error', error: e.message });
       }
     };
 
@@ -651,7 +686,7 @@ class SecretsScanner {
       }
 
     } catch (e) {
-      this.errors.push({ file: filePath, error: e.message });
+      this.errors.push({ file: filePath, kind: 'error', error: e.message });
     }
 
     return findings;
@@ -767,7 +802,7 @@ class SecretsScanner {
         const truffleResults = await this.runTruffleHog();
         results.findings.push(...truffleResults);
       } catch (e) {
-        this.errors.push({ tool: 'trufflehog', error: e.message });
+        this.errors.push({ tool: 'trufflehog', kind: 'error', error: e.message });
       }
     }
 
@@ -777,7 +812,7 @@ class SecretsScanner {
         const detectResults = await this.runDetectSecrets();
         results.findings.push(...detectResults);
       } catch (e) {
-        this.errors.push({ tool: 'detect-secrets', error: e.message });
+        this.errors.push({ tool: 'detect-secrets', kind: 'error', error: e.message });
       }
     }
 
@@ -1011,8 +1046,23 @@ class SecretsScanner {
       lines.push('');
       lines.push('Scan Errors');
       lines.push('-'.repeat(30));
-      for (const error of this.errors.slice(0, 5)) {
-        lines.push(`  ${error.file || error.tool}: ${error.error}`);
+      // Genuine failures (read/permission/directory/external-tool errors) are
+      // surfaced PREFERENTIALLY and IN FULL — a real failure must never be
+      // hidden behind benign skip notices (the regression this fixes: a real
+      // EACCES read error was buried behind 50 benign .png skips in a 5-line
+      // window). Skip notices (secret-dense unscanned files) follow, capped,
+      // purely as a coverage hint.
+      const label = (e) => e.file || e.tool || e.path || '(unknown)';
+      const genuine = this.errors.filter(e => e.kind !== 'skip');
+      const skips = this.errors.filter(e => e.kind === 'skip');
+      for (const error of genuine) {
+        lines.push(`  ${label(error)}: ${error.error}`);
+      }
+      for (const notice of skips.slice(0, 5)) {
+        lines.push(`  ${label(notice)}: ${notice.error}`);
+      }
+      if (skips.length > 5) {
+        lines.push(`  ... and ${skips.length - 5} more skip notice(s)`);
       }
     }
 
@@ -1051,5 +1101,7 @@ module.exports = {
   SECRET_PATTERNS,
   DEFAULT_EXCLUDES,
   SCANNABLE_EXTENSIONS,
-  KEY_FILENAMES
+  KEY_FILENAMES,
+  SECRET_DENSE_UNSCANNED_EXTENSIONS,
+  SECRET_DENSE_UNSCANNED_FILENAMES
 };

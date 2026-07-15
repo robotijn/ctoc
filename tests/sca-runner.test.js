@@ -1010,6 +1010,75 @@ test('SCA6: a falsy/non-string projectRoot is normalized to null and never leaks
   }
 });
 
+// ── SCA7 (honesty): scannersRun must count osv ONLY when its scan actually RAN. osv was ──
+// counted on tool AVAILABILITY, before the scan; a crashed osv (non-zero / empty stdout /
+// throw) that is the SOLE scanner for the ecosystem then read as scanned:true/findings:[] —
+// a crashed scanner reading as a clean pass, exactly what the module promises never happens.
+
+test('SCA7: a java/maven project whose SOLE scanner (osv) CRASHES reports failure, never scanned:true/findings:[]', async () => {
+  // Maven/Gradle is NOT an implemented DependencyAuditor manager, so a pom.xml java project
+  // is NOT deferred and osv-scanner is its ONLY coverage. osv is AVAILABLE (--version ok) but
+  // its scan crashes (e.g. "no package sources found") with empty stdout → nothing was audited.
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return ''; // osv IS available
+    if (cmd === 'osv-scanner') {
+      const e = new Error('osv-scanner: no package sources found');
+      e.status = 128;
+      e.stdout = '';
+      throw e;
+    }
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-osv-crash-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'pom.xml'), '<project></project>\n'); // java, sole coverage = osv
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.notEqual(res.scanned, true,
+      'a crashed SOLE scanner must NOT read as scanned:true — a crashed scanner is not a clean pass');
+    assert.notEqual(res.success, true, 'a crashed SOLE scanner is not a success');
+    assert.ok(
+      (res.errors || []).some((e) => e.tool === 'osv-scanner'),
+      `the osv crash must be surfaced in errors[]; got ${JSON.stringify(res.errors)}`
+    );
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('SCA7 regression: osv AVAILABLE and its scan SUCCEEDS is counted as scanned, findings surfaced', async () => {
+  const osv = {
+    results: [{
+      source: { path: '/proj/pom.xml', type: 'lockfile' },
+      packages: [{
+        package: { name: 'org.apache.commons:commons-text', ecosystem: 'Maven', version: '1.9' },
+        vulnerabilities: [{ id: 'GHSA-ok', summary: 'RCE in commons-text', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-osv-ok-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'pom.xml'), '<project></project>\n');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'a healthy osv scan must count as scanned');
+    assert.equal(res.findings.length, 1, 'the Maven CVE must surface');
+    assert.equal(res.findings[0].package, 'org.apache.commons:commons-text');
+    assert.equal(res.findings[0].severity, 'CRITICAL');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 // ── SCA4 (subsumed by SCA1): once osv always runs, a NESTED poetry.lock CVE is covered ──
 // by the whole-repo osv net even though DependencyAuditor's root-only detection misses it.
 

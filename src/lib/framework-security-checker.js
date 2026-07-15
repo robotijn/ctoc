@@ -225,6 +225,26 @@ const TERMINAL_INDICATORS = ['SECRET', 'PASSWORD', 'PASSWD', 'PRIVATE', 'CREDENT
 const BENIGN_COMPOUND_SUFFIXES = ['HEADER', 'URL', 'ID', 'NAME', 'STORAGE_KEY', 'PATH', 'PREFIX', 'ENDPOINT'];
 
 /**
+ * EXPLICIT-secret compounds (CONSTANT) — the subset of COMPOUND_INDICATORS whose name
+ * IS the secret itself (`SECRET_KEY`, and the bare terminal `SECRET`), for which the
+ * benign-suffix escape must NOT apply. A public var literally named `…_SECRET_KEY_ID`
+ * or `…_SECRET_KEY_PATH` deserves a human glance — a benign trailing suffix is far more
+ * likely mislabelling than a genuinely-safe metadata pointer, because SECRET_KEY names
+ * the secret VALUE, not metadata about one. Contrast the design's motivating benign
+ * cases, which stay under suppression: `PRIVATE_KEY_ID` (a JWKS `kid`, genuinely public
+ * key metadata) and `API_KEY_HEADER` (an HTTP header name) correctly STAY silent.
+ *
+ * So the compound branch is split: an EXPLICIT-secret sub-branch that fires regardless
+ * of a trailing benign suffix, and an OTHER-compound sub-branch that keeps the
+ * benign-suffix negative lookahead (`PRIVATE_KEY`, `API_KEY`, `ACCESS_TOKEN`, …). Bare
+ * `SECRET` is a TERMINAL indicator (it only matches as the final segment), so it is
+ * already immune to a trailing suffix — it is listed here only to name the full
+ * explicit-secret set; the terminal branch carries no suppression to begin with.
+ * @type {string[]}
+ */
+const EXPLICIT_SECRET_COMPOUNDS = ['SECRET_KEY'];
+
+/**
  * Expand an uppercase literal indicator token into a CASE-INSENSITIVE regex source
  * WITHOUT the `i` flag — each ASCII letter becomes a two-char class (`S`→`[Ss]`),
  * `_` and digits stay literal. This lets the name TAIL match case-insensitively
@@ -238,8 +258,16 @@ function ciPattern(token) {
   return token.replace(/[A-Za-z]/g, ch => `[${ch.toUpperCase()}${ch.toLowerCase()}]`);
 }
 
-/** Case-insensitive indicator alternations (CONSTANT sources). */
-const COMPOUND_ALT = COMPOUND_INDICATORS.map(ciPattern).join('|');
+/**
+ * Split the compound alternation into the EXPLICIT-secret set (fires even when a
+ * benign suffix follows) and the REST (benign suffix suppresses). Both are CONSTANT
+ * sources derived from module-level literal lists.
+ */
+const EXPLICIT_SECRET_ALT = EXPLICIT_SECRET_COMPOUNDS.map(ciPattern).join('|');
+const OTHER_COMPOUND_ALT = COMPOUND_INDICATORS
+  .filter(c => !EXPLICIT_SECRET_COMPOUNDS.includes(c))
+  .map(ciPattern)
+  .join('|');
 const TERMINAL_ALT = TERMINAL_INDICATORS.map(ciPattern).join('|');
 /** Benign metadata-suffix alternation, each anchored by a leading `_` (CONSTANT source). */
 const BENIGN_SUFFIX_ALT = BENIGN_COMPOUND_SUFFIXES.map(s => `_${ciPattern(s)}`).join('|');
@@ -260,13 +288,21 @@ const BENIGN_SUFFIX_ALT = BENIGN_COMPOUND_SUFFIXES.map(s => `_${ciPattern(s)}`).
  *     a single linear quantifier with NO overlapping ambiguity (ReDoS-safe). The
  *     class is case-insensitive so a lowercase/mixed tail (`VITE_api_secret`) is
  *     caught while the uppercase prefix requirement holds (F5).
- *   - branch 1: a COMPOUND indicator on segment boundaries. A negative lookahead
+ *   - branch 1a: an EXPLICIT-secret compound (`SECRET_KEY`) on segment boundaries,
+ *     with NO benign-suffix escape — a trailing suffix can never silence it, so
+ *     `NEXT_PUBLIC_STRIPE_SECRET_KEY_ID` / `…_SECRET_KEY_PATH` STILL fire (a var
+ *     literally named for a secret KEY deserves a human glance even with a benign
+ *     tail). `SECRET_KEY` names the secret VALUE, not metadata about one.
+ *   - branch 1b: any OTHER compound indicator (`API_KEY`, `PRIVATE_KEY`,
+ *     `ACCESS_TOKEN`, …) on segment boundaries. A negative lookahead
  *     `(?!<benign-suffix>\b)` rejects a trailing METADATA suffix (`_HEADER`, `_URL`,
  *     `_ID`, `_NAME`, `_STORAGE_KEY`, `_PATH`, `_PREFIX`, `_ENDPOINT`) so
- *     `NEXT_PUBLIC_API_KEY_HEADER` (a header name) does NOT fire, while a bare compound
- *     (`NEXT_PUBLIC_ACCESS_TOKEN`) and a secret-ish trailing suffix
- *     (`…_SECRET_KEY_BASE`) still do. This anchors branch 1 symmetrically with the
- *     terminal branch 2, closing the open-ended-suffix false positive.
+ *     `NEXT_PUBLIC_API_KEY_HEADER` (a header name) and `NEXT_PUBLIC_PRIVATE_KEY_ID`
+ *     (a JWKS `kid`) do NOT fire, while a bare compound (`NEXT_PUBLIC_ACCESS_TOKEN`)
+ *     and a secret-ish trailing suffix (`…_SECRET_KEY_BASE`, via branch 1a) still do.
+ *     This anchors the compound branch symmetrically with the terminal branch 2,
+ *     closing the open-ended-suffix false positive WITHOUT over-suppressing an
+ *     explicit-secret compound.
  *   - branch 2: the TERMINAL `SECRET` with NO trailing segment, so it flags only as
  *     the last segment (`NEXT_PUBLIC_API_SECRET`) and never mid-name
  *     (`NEXT_PUBLIC_SECRET_SANTA_ENABLED`).
@@ -282,7 +318,14 @@ function buildClientSecretRe(activePrefixes) {
   if (!Array.isArray(activePrefixes) || activePrefixes.length === 0) return null;
   const prefixAlt = activePrefixes.map(escapeRegExp).join('|');
   return safeRegExp(
-    `\\b(?:${prefixAlt})(?:(?:[A-Za-z0-9]+_)*(?:${COMPOUND_ALT})(?!(?:${BENIGN_SUFFIX_ALT})\\b)(?:_[A-Za-z0-9]+)*|(?:[A-Za-z0-9]+_)*(?:${TERMINAL_ALT}))\\b`,
+    `\\b(?:${prefixAlt})(?:` +
+      // branch 1a — EXPLICIT-secret compound: fires even with a trailing benign suffix.
+      `(?:[A-Za-z0-9]+_)*(?:${EXPLICIT_SECRET_ALT})(?:_[A-Za-z0-9]+)*` +
+      // branch 1b — other compounds: a trailing benign metadata suffix suppresses.
+      `|(?:[A-Za-z0-9]+_)*(?:${OTHER_COMPOUND_ALT})(?!(?:${BENIGN_SUFFIX_ALT})\\b)(?:_[A-Za-z0-9]+)*` +
+      // branch 2 — terminal indicator as the final segment only.
+      `|(?:[A-Za-z0-9]+_)*(?:${TERMINAL_ALT})` +
+    `)\\b`,
     'g'
   );
 }
