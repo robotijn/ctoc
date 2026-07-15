@@ -165,6 +165,55 @@ describe('SECRETS: a real planted secret surfaces through the live path', () => 
   });
 });
 
+describe('SECRETS SKIP HONESTY: a file too large to scan is surfaced in skipped[], never a silent clean pass', () => {
+  it('an oversized file (> maxFileSize) appears by name in the security result skipped[]', async () => {
+    // The SecretsScanner records an oversized file in scanner.errors (shouldScan
+    // pushes {file, error} when stats.size > maxFileSize) but runSecurityScan used
+    // to read ONLY deduplicateFindings() and DISCARD scanner.errors — so a file too
+    // large to scan counted as a silent clean pass. Plant a > 1MB (default
+    // maxFileSize) scannable file with NO secret in it: it must show up in skipped[]
+    // (it was NOT scanned), and it must NOT block the gate (a skip is not a finding).
+    const dir = mkTmp('ctoc-oversized-');
+    try {
+      // 1.5MB of benign, secret-free content in a scannable (.js) file.
+      const big = 'const x = 1;\n'.repeat(Math.ceil((1.5 * 1024 * 1024) / 13));
+      fs.writeFileSync(path.join(dir, 'huge.js'), big, 'utf8');
+
+      const res = await qualityAgent.runSecurityScan(null, { projectRoot: dir, allFiles: true });
+
+      assert.ok(Array.isArray(res.skipped), 'skipped must be an array');
+      assert.ok(
+        res.skipped.some((s) => /huge\.js/.test(s) && /(size|large|maxFileSize|unscanned|not scanned)/i.test(s)),
+        `the oversized file must be surfaced in skipped[]; got skipped=${JSON.stringify(res.skipped)}`
+      );
+      // A skipped file is not a finding — it must not block the gate.
+      assert.equal(res.passed, true, 'a skipped oversized file must NOT block the gate');
+      assert.equal(res.critical, 0, 'no critical finding from a skipped file');
+    } finally {
+      rm(dir);
+    }
+  });
+
+  it('a normal small clean project produces NO spurious secrets-skip entry', async () => {
+    // The mirror: a clean project with only small, readable files must not emit any
+    // secrets file-skip line — the skip surfacing is precise, not noisy.
+    const dir = mkTmp('ctoc-small-clean-');
+    try {
+      fs.writeFileSync(path.join(dir, 'ok.js'), 'module.exports = () => 7;\n', 'utf8');
+
+      const res = await qualityAgent.runSecurityScan(null, { projectRoot: dir, allFiles: true });
+
+      assert.ok(
+        !res.skipped.some((s) => /secrets scan skipped file/i.test(s)),
+        `a clean small project must emit no secrets file-skip; got skipped=${JSON.stringify(res.skipped)}`
+      );
+      assert.equal(res.passed, true);
+    } finally {
+      rm(dir);
+    }
+  });
+});
+
 describe('DEPENDENCIES: a real vulnerable manifest produces a real signal (never a silent pass)', () => {
   let dir;
   before(() => {

@@ -281,6 +281,37 @@ function isWithinRoot(root, target) {
 }
 
 /**
+ * True when `target` is contained in `root` after resolving symlinks (F1-symlink).
+ *
+ * The lexical `isWithinRoot` resolves paths PURELY textually (path.resolve does not
+ * follow symlinks), so a workspace directory that is a SYMLINK pointing OUTSIDE the
+ * project root passes the lexical gate and a package.json outside the root gets read.
+ * This closes that escape: the lexical gate runs first (still rejecting `../evil`,
+ * absolute paths, and `packages/../../evil` — including for paths that do not exist on
+ * disk), then BOTH sides are resolved with realpathSync and re-checked, so a workspace
+ * whose REAL path escapes the root is dropped.
+ *
+ * Fail-soft (SessionStart runs this every session — it must never throw): if realpath
+ * fails (broken symlink, missing target, permission error) the target cannot be read
+ * anyway, so we fall back to the lexical verdict (which already passed) — the downstream
+ * read is itself fail-soft and a no-op for a nonexistent path. Both roots are realpath'd
+ * so a project living under a symlinked temp dir (e.g. macOS /tmp → /private/tmp) does
+ * not yield a spurious mismatch.
+ */
+function isWithinRootReal(root, target) {
+  if (!isWithinRoot(root, target)) return false;
+  try {
+    const realRoot = safeFs.realpathSync(root);
+    const realTarget = safeFs.realpathSync(target);
+    return isWithinRoot(realRoot, realTarget);
+  } catch (e) {
+    // Target unresolvable (broken/missing): keep the lexical pass; the read is a
+    // fail-soft no-op for a path that does not exist.
+    return true;
+  }
+}
+
+/**
  * Collects `baseDir` and every descendant directory, bounded by depth and count
  * (F4-defect recursive `**`). Fail-soft: an unreadable directory contributes
  * nothing and never throws. Symlinks are followed via statSync but the count/depth
@@ -353,8 +384,9 @@ function resolveWorkspaceDirs(projectPath, patterns) {
       currentDirs = next.slice(0, MAX_WORKSPACE_DIRS);
     }
     for (const dir of currentDirs) {
-      // Containment (F3-defect): never read a package.json outside the project root.
-      if (!isWithinRoot(projectPath, dir)) continue;
+      // Containment (F3-defect + F1-symlink): never read a package.json outside the
+      // project root — lexically OR via a symlink whose real path escapes the root.
+      if (!isWithinRootReal(projectPath, dir)) continue;
       resolved.push(dir);
       if (resolved.length >= MAX_WORKSPACE_DIRS) return resolved;
     }
@@ -447,9 +479,38 @@ function stripQuotedSpans(str) {
   return String(str).replace(/"[^"]*"|'[^']*'/g, '');
 }
 
-/** True when a line contains an array-closing `]` OUTSIDE any quoted value (F1). */
+/**
+ * Removes a trailing TOML `#` comment from a line (F2-comment). A `#` that is OUTSIDE
+ * any quoted span begins a comment and everything after it is dropped; a `#` INSIDE a
+ * quoted value (e.g. an environment marker `"pkg ; extra=='x#y'"`) is part of the value
+ * and is preserved. Scans char-by-char tracking quote state — same quote handling as
+ * `stripQuotedSpans`/`collectQuotedRequirements` (no escape handling; TOML basic-string
+ * escapes are out of scope for this hand-rolled parser and absent from real dep strings).
+ */
+function stripLineComment(str) {
+  const s = String(str);
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quote) {
+      if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === '#') {
+      return s.slice(0, i);
+    }
+  }
+  return s;
+}
+
+/**
+ * True when a line contains an array-closing `]` OUTSIDE any quoted value (F1). A `]`
+ * living only inside a trailing `#` comment does NOT count (F2-comment): the comment is
+ * stripped (quote-aware) before the structural scan, so a commented `]` cannot terminate
+ * the array and drop later dependencies.
+ */
 function hasUnquotedCloseBracket(str) {
-  return stripQuotedSpans(str).includes(']');
+  return stripQuotedSpans(stripLineComment(str)).includes(']');
 }
 
 // Bound on parsed dependency names from a single TOML-ish file (crash-proofing).

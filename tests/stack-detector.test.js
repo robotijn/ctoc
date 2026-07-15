@@ -1002,6 +1002,124 @@ function testWorkspaceRecursiveGlob() {
 }
 
 // ============================================
+// F1(symlink-defect) — workspace containment survives a SYMLINK escape
+// A workspace dir that is a SYMLINK whose REAL path is outside the project root
+// must NOT be read (lexical containment alone is bypassable by a symlink).
+// ============================================
+
+function testWorkspaceSymlinkOutsideRootNotRead() {
+  setupTempDir();
+  // Real target OUTSIDE the project root, holding a package.json with react.
+  const outsideDir = path.join(tempDir, '..', 'evil-symlink-target');
+  fs.mkdirSync(outsideDir, { recursive: true });
+  fs.writeFileSync(path.join(outsideDir, 'package.json'), JSON.stringify({
+    name: 'evil', dependencies: { react: '^18.0.0' }
+  }));
+
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: ['packages/*']
+  }));
+  createTempFile('tsconfig.json', '{}');
+  // packages/link is a SYMLINK pointing at the outside target directory. It is
+  // LEXICALLY inside root (packages/link) but its REAL path escapes the root.
+  fs.mkdirSync(path.join(tempDir, 'packages'), { recursive: true });
+  const linkPath = path.join(tempDir, 'packages', 'link');
+  let symlinkOk = true;
+  try {
+    fs.symlinkSync(outsideDir, linkPath, 'dir');
+  } catch (e) {
+    symlinkOk = false; // Windows without privilege, or unsupported FS.
+  }
+  if (!symlinkOk) {
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+    cleanupTempDir();
+    console.log('# F1(symlink) - SKIPPED (symlink creation not permitted here)');
+    return;
+  }
+
+  const stack = detectStack(tempDir);
+  // Clean the outside dir before asserting so a failure never leaks it.
+  fs.rmSync(outsideDir, { recursive: true, force: true });
+
+  assert.ok(!stack.frameworks.includes('react'),
+    'react from a SYMLINKED-outside workspace is NOT read (realpath containment)');
+
+  cleanupTempDir();
+  console.log('# F1(symlink) - symlinked workspace whose real path escapes root is not read');
+}
+
+function testWorkspaceRealNestedInsideStillRead() {
+  setupTempDir();
+  // CONTROL: a legit REAL (non-symlink) nested package inside the root still read
+  // after the realpath-aware containment is added.
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: ['packages/*']
+  }));
+  createTempFile('tsconfig.json', '{}');
+  createTempFile('packages/a/package.json', JSON.stringify({
+    name: 'a', dependencies: { react: '^18.0.0' }
+  }));
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('react'),
+    'react from a real nested packages/a still detected under realpath containment');
+
+  cleanupTempDir();
+  console.log('# F1(symlink) - control: real nested workspace still read');
+}
+
+// ============================================
+// F2(comment-defect) — a `#` comment must not terminate a multiline array
+// A `]` living ONLY inside a trailing `#` comment must NOT close the dependencies
+// array (which would drop every dep after it).
+// ============================================
+
+function testPyprojectCommentBracketKeepsLaterDeps() {
+  setupTempDir();
+  // The `[123]` lives inside a trailing `#` comment; fastapi follows on next line.
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = [\n  "flask",  # note fixes [123]\n  "fastapi"\n]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'flask (before comment) present');
+  assert.ok(stack.frameworks.includes('fastapi'),
+    'fastapi (after a `#`-commented `]`) NOT dropped — comment `]` does not close the array');
+
+  cleanupTempDir();
+  console.log('# F2(comment) - `]` inside a `#` comment does not terminate the array');
+}
+
+function testPyprojectHashInsideQuotedValueNotComment() {
+  setupTempDir();
+  // GUARD: a `#` inside a quoted marker/value is part of the VALUE, not a comment.
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = [\n  "flask ; extra==\'x#y\'",\n  "fastapi"\n]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'flask parsed; `#` inside quotes is not a comment');
+  assert.ok(stack.frameworks.includes('fastapi'), 'fastapi still parsed after quoted-`#` line');
+
+  cleanupTempDir();
+  console.log('# F2(comment) - `#` inside a quoted value is not treated as a comment');
+}
+
+function testPyprojectClosedArrayDoesNotLeakLaterKeys() {
+  setupTempDir();
+  // CONTROL: a real trailing `]` still closes the array — a later table's quoted
+  // value ("fastapi" under [tool.other]) must NOT be collected as a dependency.
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = [\n  "flask"\n]\n\n[tool.other]\nvalue = "fastapi"\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'flask parsed from the closed array');
+  assert.ok(!stack.frameworks.includes('fastapi'),
+    'a real `]` closed the array — "fastapi" under [tool.other] is not leaked in');
+
+  cleanupTempDir();
+  console.log('# F2(comment) - a real trailing `]` still closes the array');
+}
+
+// ============================================
 // F5 — null-prototype deps object (no prototype landmine)
 // ============================================
 
@@ -1169,6 +1287,17 @@ testWorkspaceInsideStillWorksWithContainment();
 // F4(defect) — recursive `**` workspace glob
 console.log('\n## F4(defect) - recursive workspace glob\n');
 testWorkspaceRecursiveGlob();
+
+// F1(symlink-defect) — symlink escape of workspace containment
+console.log('\n## F1(symlink-defect) - workspace symlink containment\n');
+testWorkspaceSymlinkOutsideRootNotRead();
+testWorkspaceRealNestedInsideStillRead();
+
+// F2(comment-defect) — `#` comment must not terminate a multiline array
+console.log('\n## F2(comment-defect) - `#` comment array terminator\n');
+testPyprojectCommentBracketKeepsLaterDeps();
+testPyprojectHashInsideQuotedValueNotComment();
+testPyprojectClosedArrayDoesNotLeakLaterKeys();
 
 // F5 — null-prototype deps object
 console.log('\n## F5 - null-prototype deps\n');

@@ -14,9 +14,15 @@
 # web-backend) — enriched with the language's `server` run shape (typescript → npm start).
 # NOTE: astro.config.mjs is intentionally NOT a marker here — Astro can be static OR SSR
 # and the config filename cannot distinguish them, so Astro stays on static-site (see the
-# documented limitation in static-site.yaml).
+# documented limitation in static-site.yaml). svelte.config.js is NOT a marker here for the
+# same reason: the official Vite Svelte SPA template (create-vite --template svelte) ships a
+# root svelte.config.js (for vitePreprocess) with NO SvelteKit and no server, so routing on
+# that filename mis-classifies a plain SPA as fullstack and drives a broken `npm start`
+# (no such script) while reporting honest:true. SvelteKit is fullstack, but its reliable
+# signal is the `@sveltejs/kit` dependency (framework-detector), not the shared config file —
+# dep-based fullstack routing for SvelteKit is a follow-up (projectTypeFor is marker-only).
 projectType: web-fullstack
-detectionMarkers: [next.config.js, next.config.mjs, next.config.ts, nuxt.config.ts, nuxt.config.js, remix.config.js, svelte.config.js]
+detectionMarkers: [next.config.js, next.config.mjs, next.config.ts, nuxt.config.ts, nuxt.config.js, remix.config.js]
 frameworks: [next, nuxt, remix, sveltekit]
 priority: 28
 runShape: server

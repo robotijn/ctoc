@@ -467,6 +467,93 @@ describe('Secrets Scanner — real synthetic secret detection', () => {
       'an oversized-file skip must be recorded, not silently dropped');
   });
 
+  // -- Round-4 FALSE-POSITIVE fixes ---------------------------------------
+  // The Round-3 hardening over-corrected and began BLOCKING the gate on
+  // ubiquitous benign inputs. These tests kill those false positives while
+  // proving the real-secret detection (above) still fires.
+
+  // F1: an OpenAI-doc-style MASKED key in a .env.example must be recognized as
+  // a placeholder (embedded mask run), not flagged HIGH and block the gate.
+  it('F1 masked sk-xxxx...32x in .env.example -> 0 findings (placeholder)', () => {
+    const { findings } = scan('.env.example', 'OPENAI_API_KEY=sk-' + 'x'.repeat(32) + '\n');
+    assert.strictEqual(findings.length, 0, 'a fully-masked example key must not block the gate');
+  });
+
+  it('F1 isPlaceholder recognizes embedded / dominant masks but not substrings', () => {
+    const scanner = new SecretsScanner(SCAN_DIR);
+    assert.strictEqual(scanner.isPlaceholder('sk-' + 'x'.repeat(32)), true, 'x-mask run is a placeholder');
+    assert.strictEqual(scanner.isPlaceholder('sk-' + 'X'.repeat(16)), true, 'X-mask run is a placeholder');
+    assert.strictEqual(scanner.isPlaceholder('your-key-here'), true);
+    // A REAL secret that merely CONTAINS a placeholder word (no mask RUN) must
+    // still be detected — the Round-3 anti-substring-swallow fix is preserved.
+    assert.strictEqual(scanner.isPlaceholder('AKIAnoneFODNN7Q9WZ2XY'), false, 'contains "none" but real entropy');
+    assert.strictEqual(scanner.isPlaceholder('sk-proj-Ab12Cd34Ef56Gh78Ij90KlMn'), false, 'a real mixed key is not a mask');
+  });
+
+  it('F1 a REAL sk-proj key is still HIGH even though masked examples are ignored', () => {
+    const key = 'sk-proj-' + 'Ab12Cd34Ef56Gh78Ij90KlMn';
+    const { findings } = scan('real-openai.env', 'OPENAI_API_KEY=' + key + '\n');
+    assert.ok(findings.some(f => f.type === 'OPENAI_API_KEY' && f.severity === 'HIGH'));
+  });
+
+  // F2: the PUBLIC jwt.io demo token appears in countless SDK tests/fixtures.
+  // It must NOT block the gate — detection stays, but at a non-blocking severity.
+  it('F2 public jwt.io demo token does NOT block the gate (non-blocking severity)', () => {
+    const demo = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
+      '.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ' +
+      '.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    const { findings } = scan('jwt-demo.js', 'const t = "' + demo + '";\n');
+    const jwt = findings.find(f => f.type === 'JWT_TOKEN');
+    assert.ok(jwt, 'a JWT is still surfaced');
+    assert.ok(jwt.severity !== 'CRITICAL' && jwt.severity !== 'HIGH',
+      'a JWT (public example) must not block the gate at CRITICAL/HIGH');
+    // The gate blocks at HIGH+; a lone JWT finding must therefore pass.
+    const gateScanner = new SecretsScanner(SCAN_DIR);
+    gateScanner.findings = findings;
+    assert.strictEqual(gateScanner.checkThreshold('HIGH').pass, true,
+      'a file whose only finding is a public JWT must pass the HIGH gate');
+  });
+
+  // F3: a benign `sk-`-prefixed lowercase slug (CSS class, URL) must not be
+  // mistaken for an OpenAI key.
+  it('F3 benign sk- lowercase slug -> 0 OpenAI findings', () => {
+    const { findings } = scan('slug.jsx', 'const cls = "sk-buttonprimarywrapperelementxl";\n');
+    assert.ok(!findings.some(f => f.type === 'OPENAI_API_KEY'),
+      'a lowercase-alpha sk- slug is not an OpenAI key');
+  });
+
+  it('F3 a real mixed-alphanumeric sk- key is still HIGH', () => {
+    const key = 'sk-' + 'Abc123Def456Ghi789Jkl';
+    const { findings } = scan('real-sk.js', 'const k = "' + key + '";\n');
+    assert.ok(findings.some(f => f.type === 'OPENAI_API_KEY' && f.severity === 'HIGH'));
+  });
+
+  // F4: a canonical UUID assigned to a token/secret-named var is not a secret.
+  it('F4 a canonical UUID assigned to token -> 0 GENERIC_SECRET findings', () => {
+    const { findings } = scan('uuid.js', 'const token = "550e8400-e29b-41d4-a716-446655440000";\n');
+    assert.ok(!findings.some(f => f.type === 'GENERIC_SECRET'),
+      'a canonical UUID is essentially never a secret');
+  });
+
+  it('F4 a real high-entropy assigned secret is still HIGH (UUID exclusion is narrow)', () => {
+    const { findings } = scan('gen2.js', 'const apiSecret = "aB3dE6gH9jK2mN5pQ8rT1uV4wX7yZ0aC";\n');
+    assert.ok(findings.some(f => f.type === 'GENERIC_SECRET' && f.severity === 'HIGH'));
+  });
+
+  // F5: the PEM comment-exemption must apply ONLY to real PEM labels, not to an
+  // arbitrary `-----BEGIN <anything>` SQL comment line.
+  it('F5 a SQL comment line beginning -----BEGIN AKIA... is treated as a comment', () => {
+    const { findings } = scan('q.sql', '-----BEGIN AKIAIOSFODNN7EXAMPLE this is a sql comment\n');
+    assert.ok(!findings.some(f => f.type === 'AWS_ACCESS_KEY'),
+      'a non-PEM -----BEGIN line is a SQL comment, not a private-key boundary');
+  });
+
+  it('F5 a real PEM header in a .sql file is still scanned (not comment-swallowed)', () => {
+    const { findings } = scan('key.sql', SYNTH_RSA_KEY);
+    assert.ok(findings.some(f => f.type === 'PRIVATE_KEY' && f.severity === 'CRITICAL'),
+      'a genuine -----BEGIN RSA PRIVATE KEY----- boundary must still be detected');
+  });
+
   // -- ReDoS safety -------------------------------------------------------
   it('all patterns are ReDoS-safe against a 100k adversarial string', () => {
     const adversarial =
