@@ -645,7 +645,12 @@ async function driveServer(projectPath, opts, result) {
   while (Date.now() < deadline) {
     if (exited) break; // crashed before it ever answered
     probe = await probeHttp(port);
-    if (probe.ok) break;
+    // A warming-up server commonly answers '/' with a TRANSIENT 5xx (DB pool
+    // coming up, first compile, a migration running) before its steady 2xx.
+    // Keep polling THROUGH a 5xx until a non-5xx response or the deadline, then
+    // classify on the LAST probe: a transient 5xx-then-200 recovers, while a
+    // persistent 5xx still fails (the last probe at the deadline is the 5xx).
+    if (probe.ok && !(typeof probe.statusCode === 'number' && probe.statusCode >= 500)) break;
     await sleep(POLL_INTERVAL_MS);
   }
 

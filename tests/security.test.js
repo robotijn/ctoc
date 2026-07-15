@@ -590,6 +590,52 @@ describe('Secrets Scanner — real synthetic secret detection', () => {
       'an extension-based skip of a secret-dense file must be recorded, not a silent clean pass');
   });
 
+  // -- S2b: Dockerfile is a FAMILY, matched case-insensitively -------------
+  // Regression: the filename check compared the RAW (un-lowercased) basename
+  // by exact match against ['Dockerfile', ...], so ONLY the bare exact-case
+  // 'Dockerfile' was recorded. Every common variant (multi-stage / per-env
+  // Dockerfile.prod, Dockerfile.dev; case variants dockerfile, DOCKERFILE)
+  // and case-variant secret-dense dotfiles (.npmRC) were SILENTLY DROPPED —
+  // breaking the exact honesty signal the ledger exists for.
+  const dockerFamily = ['Dockerfile', 'Dockerfile.prod', 'Dockerfile.dev', 'dockerfile', 'DOCKERFILE'];
+  for (const name of dockerFamily) {
+    it(`S2b a Dockerfile-family file (${name}) skip is RECORDED, not silent`, () => {
+      const dir = path.join(os.tmpdir(), 'ctoc-s2b-' + name.replace(/\W/g, '_') + '-' + Date.now());
+      fs.mkdirSync(dir, { recursive: true });
+      const f = path.join(dir, name);
+      fs.writeFileSync(f, 'FROM node:20\nENV AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY\n');
+      const scanner = new SecretsScanner(dir);
+      assert.strictEqual(scanner.shouldScan(f), false, `${name} is not in the scannable set`);
+      assert.ok(scanner.errors.some(e => (e.file || '').endsWith(name)),
+        `a secret-dense ${name} skip must be RECORDED, not silently dropped`);
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+  }
+
+  it('S2b a case-variant secret-dense dotfile (.npmRC) skip is RECORDED', () => {
+    const dir = path.join(os.tmpdir(), 'ctoc-s2b-npmrc-' + Date.now());
+    fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, '.npmRC');
+    fs.writeFileSync(f, '//registry.npmjs.org/:_authToken=npm_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8\n');
+    const scanner = new SecretsScanner(dir);
+    assert.strictEqual(scanner.shouldScan(f), false, '.npmRC is not in the scannable set');
+    assert.ok(scanner.errors.some(e => (e.file || '').endsWith('.npmRC')),
+      'a case-variant .npmRC skip must be RECORDED (secret-dense filenames match case-insensitively)');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('S2b a plain binary asset (.png) still produces NO ledger entry', () => {
+    const dir = path.join(os.tmpdir(), 'ctoc-s2b-png-' + Date.now());
+    fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, 'logo.png');
+    fs.writeFileSync(f, 'PNGBINARYDATA');
+    const scanner = new SecretsScanner(dir);
+    assert.strictEqual(scanner.shouldScan(f), false, '.png is not scannable');
+    assert.strictEqual(scanner.errors.length, 0,
+      'a binary asset skip must stay SILENT — no ledger entry, no honesty-signal flood');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   // -- S3: npm access token detection -------------------------------------
   it('S3 a real npm token (npm_ + 36 base62) -> detected', () => {
     const tok = 'npm_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'; // 36 base62 chars

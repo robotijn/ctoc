@@ -390,6 +390,34 @@ function getPushChangedFiles(projectRoot) {
 }
 
 /**
+ * Classify a scanner-reported severity into the gate bucket that decides blocking:
+ * CRITICAL and HIGH block the push; MEDIUM (and below) are surfaced but non-blocking.
+ *
+ * F-3 (fail-secure): the match is normalized (`String(...).toUpperCase().trim()`) so a
+ * non-canonical label a scanner might emit ('Critical', 'high') is still classified
+ * correctly, and — crucially — an UNRECOGNIZED or MISSING severity is treated as a
+ * blocking HIGH, never a silent non-blocking medium. The previous exact-case `else →
+ * medium` failed OPEN: any label that was not the literal 'CRITICAL'/'HIGH' (including
+ * undefined) counted as a non-blocking medium and shipped green. All six current
+ * scanners emit canonical uppercase, so this is defense-in-depth, not a live exploit —
+ * but a mislabeled finding must fail the gate, not slip through it.
+ *
+ * @param {*} sev - a scanner-reported severity (string, or missing)
+ * @returns {'CRITICAL'|'HIGH'|'MEDIUM'} the gate bucket
+ */
+function classifySeverity(sev) {
+  const s = String(sev == null ? '' : sev).toUpperCase().trim();
+  if (s === 'CRITICAL') return 'CRITICAL';
+  if (s === 'HIGH') return 'HIGH';
+  // Recognized non-blocking severities any current scanner may emit.
+  if (s === 'MEDIUM' || s === 'MODERATE' || s === 'LOW' || s === 'INFO' || s === 'INFORMATIONAL') {
+    return 'MEDIUM';
+  }
+  // F-3 fail-secure: an unrecognized or missing severity blocks (HIGH), never a silent medium.
+  return 'HIGH';
+}
+
+/**
  * Run the real security scan (Iron Loop Step 13 SECURE).
  *
  * Aggregates four genuine scanners, each degrading LOUDLY:
@@ -430,8 +458,9 @@ async function runSecurityScan(_tools, opts = {}) {
   let medium = 0;
 
   const bump = (sev) => {
-    if (sev === 'CRITICAL') critical++;
-    else if (sev === 'HIGH') high++;
+    const bucket = classifySeverity(sev);
+    if (bucket === 'CRITICAL') critical++;
+    else if (bucket === 'HIGH') high++;
     else medium++; // MEDIUM/MODERATE/LOW/INFO surfaced but non-blocking
   };
 
@@ -447,8 +476,20 @@ async function runSecurityScan(_tools, opts = {}) {
         const abs = path.resolve(projectRoot, rel);
         if (!safeFs.existsSync(abs)) continue; // deleted/renamed in the delta
         if (!scanner.shouldScan(abs)) continue;
-        scanner.findings.push(...scanner.scanFile(abs));
-        scanner.scannedFiles++;
+        // F-4: scan each delta file in ITS OWN try/catch. A single unreadable/renamed
+        // file that throws must be recorded as a per-file skip and the rest of the delta
+        // must still be scanned — the old step-wide try/catch abandoned EVERY remaining
+        // file (and never ran deduplicateFindings, discarding already-found secrets) on
+        // the first throw, understating coverage loss and reading as a silent pass.
+        try {
+          scanner.findings.push(...scanner.scanFile(abs));
+          scanner.scannedFiles++;
+        } catch (fileErr) {
+          const loc = path.relative(projectRoot, abs) || abs;
+          const msg = `secrets scan skipped file (NOT scanned): ${loc} — ${fileErr.message}`;
+          skipped.push(msg);
+          console.log(`   ${msg}`);
+        }
       }
     }
 
@@ -490,8 +531,17 @@ async function runSecurityScan(_tools, opts = {}) {
     if (managers.length === 0) {
       console.log('   Dependencies: no package manager detected — nothing to audit');
     } else {
-      const available = managers.filter(m => auditor.isToolAvailable(m));
-      const missing = managers.filter(m => !auditor.isToolAvailable(m));
+      // F-2: let DependencyAuditor decide, don't require the EXACT detected manager's own
+      // tool. yarn/pnpm audit through a built-in npm-audit fallback (dependency-auditor's
+      // runAudit), so a yarn-only or pnpm-only repo on an npm-only machine is genuinely
+      // auditable — the old `filter(isToolAvailable)` marked it unavailable and never ran
+      // auditor.run(), losing reachable coverage. A manager is runnable when its own tool
+      // is present OR it is a JS manager that can fall back to npm and npm is present.
+      const JS_NPM_FALLBACK = new Set(['yarn', 'pnpm']);
+      const npmAvailable = auditor.isToolAvailable('npm');
+      const runnable = (m) => auditor.isToolAvailable(m) || (JS_NPM_FALLBACK.has(m) && npmAvailable);
+      const available = managers.filter(runnable);
+      const missing = managers.filter(m => !runnable(m));
       for (const m of missing) {
         const msg = `dependency audit skipped: ${m} audit tool not installed`;
         skipped.push(msg);
@@ -609,13 +659,12 @@ async function runSecurityScan(_tools, opts = {}) {
     }
     if (detected.length === 0) {
       console.log('   SCA: no supported language detected — no dependencies to audit');
-    } else if (languages.length === 0) {
-      console.log('   SCA: all detected ecosystems covered by DependencyAuditor — nothing further to audit');
     } else {
-      // A language is scannable iff a scanner that can ACTUALLY parse its result is
-      // installed — decided by the honest router. A native-routed language needs its
-      // native tool; an osv-routed language needs osv-scanner. Never mark a language
-      // scannable on the strength of a tool this runner cannot parse.
+      // Per-language honesty for the NON-DEFERRED languages: a language whose route has
+      // no installed scanner is a LOUD skip. A native-routed language needs its native
+      // tool; an osv-routed language needs osv-scanner. Deferred languages are handled by
+      // sca.run() internally (and announced in the deferral line above); they are not
+      // re-skipped here.
       const osvAvailable = sca.isToolAvailable('osv-scanner');
       const scannable = languages.filter((l) => {
         const route = sca.scaRouteFor(l);
@@ -629,26 +678,33 @@ async function runSecurityScan(_tools, opts = {}) {
         skipped.push(msg);
         console.log(`   ${msg}`);
       }
-      if (scannable.length > 0) {
-        const res = await sca.run();
-        // Belt-and-suspenders over the scannable filter: if the runner itself reports
-        // that no scanner actually ran, that is a loud skip, never a pass.
-        if (res && res.scanned === false) {
-          const msg = `SCA skipped: ${res.reason || 'no scanner ran'}`;
-          skipped.push(msg);
-          console.log(`   ${msg}`);
-        }
-        for (const f of (res.findings || [])) {
-          bump(f.severity);
-          detail.push(`sca[${f.severity}] ${f.package || 'dependency'}${f.advisory ? ` (${f.advisory})` : ''}: ${f.title || ''}`.trim());
-        }
-        for (const e of (res.errors || [])) {
-          const msg = `SCA skipped (${e.tool || 'tool'}): ${e.error}`;
-          skipped.push(msg);
-          console.log(`   ${msg}`);
-        }
-        console.log(`   SCA: ${(res.findings || []).length} dependency finding(s)`);
+      // F-1 (whole-repo net): sca.run() runs whenever ANY dependency manifest exists
+      // (detected.length > 0), DECOUPLED from whether a non-deferred language routes to a
+      // scanner. sca-runner runs osv-scanner as a WHOLE-REPO net (SCA1) that catches a
+      // nested, independently-installed lockfile (packages/api/package-lock.json) that
+      // DependencyAuditor (root-only) misses; it dedups deferred ROOT manifests internally
+      // (no double-count) and returns an honest scanned:false / clean no-op. The old
+      // `else if (languages.length === 0)` short-circuit NEVER called sca.run() for an
+      // all-deferred repo, disguising the nested miss as "covered" — a false clean pass.
+      const res = await sca.run();
+      // Belt-and-suspenders over the scannable filter: if the runner itself reports that
+      // no scanner actually ran (a missing scanner, or a crashed sole-osv whole-repo net),
+      // that is a loud skip, never a pass.
+      if (res && res.scanned === false) {
+        const msg = `SCA skipped: ${res.reason || 'no scanner ran'}`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
       }
+      for (const f of (res.findings || [])) {
+        bump(f.severity);
+        detail.push(`sca[${f.severity}] ${f.package || 'dependency'}${f.advisory ? ` (${f.advisory})` : ''}: ${f.title || ''}`.trim());
+      }
+      for (const e of (res.errors || [])) {
+        const msg = `SCA skipped (${e.tool || 'tool'}): ${e.error}`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+      }
+      console.log(`   SCA: ${(res.findings || []).length} dependency finding(s)`);
     }
   } catch (err) {
     const msg = `SCA skipped (error, NOT a pass): ${err.message}`;
@@ -980,6 +1036,7 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   runCommand,
+  classifySeverity,
   runLint,
   runTypecheck,
   runSpecificTests,

@@ -402,9 +402,22 @@ class SecretsScanner {
       // ledgering it floods the honesty signal — 50 benign .png skips shoved a
       // genuine EACCES read error out of generateReport's window. Silence on
       // assets, honesty on secret-dense types: that preserves the signal.
+      // Mirror the ext handling: compare a LOWERCASED basename so case
+      // variants (dockerfile / DOCKERFILE / .npmRC) are matched, not silently
+      // dropped. Dockerfile is a FAMILY — multi-stage / per-environment
+      // Dockerfile.prod, Dockerfile.dev, Dockerfile.staging are the COMMON
+      // form and carry `ENV AWS_SECRET_ACCESS_KEY=...`. (service.dockerfile is
+      // already caught via the '.dockerfile' extension path below.) The other
+      // secret-dense filenames (.npmrc/.netrc/.pgpass) match case-insensitively.
+      const lowerBasename = basename.toLowerCase();
+      const isDockerfileFamily =
+        lowerBasename === 'dockerfile' || lowerBasename.startsWith('dockerfile.');
       const isSecretDense =
         SECRET_DENSE_UNSCANNED_EXTENSIONS.includes(ext) ||
-        SECRET_DENSE_UNSCANNED_FILENAMES.includes(basename);
+        isDockerfileFamily ||
+        SECRET_DENSE_UNSCANNED_FILENAMES.some(
+          (name) => name.toLowerCase() === lowerBasename
+        );
       if (isSecretDense) {
         this.errors.push({
           file: filePath,
