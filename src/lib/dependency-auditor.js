@@ -12,7 +12,7 @@
  * - composer (PHP)
  */
 
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
 const { cvssVectorBaseScore, severityFromCvss } = require('./cvss');
@@ -445,16 +445,44 @@ class DependencyAuditor {
   }
 
   /**
-   * Run pip-audit
+   * The requirements files present at the project root, in a fixed candidate order
+   * (matching the `pip` manager's lockFiles). SCA3: pip-audit must be pointed at these
+   * with `-r` so it audits the PINNED dependencies rather than the ambient interpreter's
+   * installed packages. Returns basenames (the audit runs with cwd=projectRoot). Fail-soft.
+   * @returns {string[]} basenames of the requirements files present at the root
+   */
+  _detectRequirementFiles() {
+    const root = this.projectRoot;
+    if (!root || typeof root !== 'string') return [];
+    const found = [];
+    for (const name of ['requirements.txt', 'requirements-dev.txt']) {
+      try {
+        if (safeFs.existsSync(path.join(root, name))) found.push(name);
+      } catch { /* unreadable → skip */ }
+    }
+    return found;
+  }
+
+  /**
+   * Run pip-audit.
+   *
+   * SCA3: `pip-audit --format=json` with NO -r audits the AMBIENT interpreter's installed
+   * packages, NOT the project's pinned requirements — so a requirements-file project whose
+   * dependencies are not installed (typical CI) reads as clean though nothing was audited.
+   * When a requirements file exists, point pip-audit at each with `-r <file>`. Invoked
+   * argv-safe via execFileSync (a fixed argument vector, no shell string interpolation).
    */
   async runPipAudit() {
+    const args = ['--format=json'];
+    for (const reqFile of this._detectRequirementFiles()) {
+      args.push('-r', reqFile);
+    }
     try {
-      const command = 'pip-audit --format=json';
-
-      const result = execSync(command, {
+      const result = execFileSync('pip-audit', args, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
-        encoding: 'utf8'
+        encoding: 'utf8',
+        maxBuffer: 50 * 1024 * 1024
       });
 
       this.parsePipAuditResults(JSON.parse(result));

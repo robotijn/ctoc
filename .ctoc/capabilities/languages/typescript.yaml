@@ -1,7 +1,15 @@
 # TypeScript capability entry — web-grounded 2026 toolchain. lint + test match
 # tool-detector DEFAULT_TOOLS exactly (eslint ./npm test) so CR5's swap is behavior-
 # preserving; biome is carried as the modern alternative via altCmd.
+# PRECEDENCE (F-tsrank): typescript's SOLE detection marker is tsconfig.json, so typescript
+# is detected IFF a tsconfig.json exists — which means a repo where BOTH javascript and
+# typescript detect is, by construction, a TypeScript repo (package.json + tsconfig.json).
+# `outranks: [javascript]` is a data-driven pairwise precedence: whenever both are present,
+# typescript ranks ahead of javascript, so the run target is typescript (tsc --noEmit) not
+# javascript (the UNVERIFIED tsc --allowJs --checkJs). javascript is NOT deleted — a mixed
+# repo legitimately has both; only the relative order changes.
 language: typescript
+outranks: [javascript]
 detectionMarkers: [tsconfig.json]
 extensions: [.ts, .tsx]
 toolchain:

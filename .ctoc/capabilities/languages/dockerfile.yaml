@@ -15,7 +15,14 @@
 # found no Dockerfile. Honest under-detection of the rare Podman-Containerfile /
 # multi-dockerfile repo beats detect-then-fail; the command now always matches what was
 # detected.
+# ROLE (F-ancillary): a Dockerfile is CROSS-CUTTING infrastructure config, not the
+# application's own language. It is detected by an EXACT marker (Dockerfile), which would
+# otherwise place it in the decisive manifest tier and — sorting early by filename — AHEAD
+# of the real app language, making it detectLanguages[0] (the run target) for almost every
+# real repo. role:ancillary keeps it DETECTED/reported but sorted into a lower tier than any
+# real application language, so it can never take the primary slot.
 language: dockerfile
+role: ancillary
 detectionMarkers: [Dockerfile]
 extensions: [.dockerfile]
 toolchain:

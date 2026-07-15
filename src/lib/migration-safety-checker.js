@@ -78,6 +78,34 @@
  *   RESIDUAL: full C# lexing (verbatim `@"…"` escape rules, interpolation) is not
  *   implemented; the scanner treats any `//` inside a `"…"`/`'…'` span as non-comment,
  *   which is correct for the DDL-detection goal.
+ *
+ * DB-w5 ADVERSARIAL REPAIR — five false-negatives + one false-positive, plus a ReDoS
+ * discovered while fixing them. Decisions taken under ambiguity:
+ * - FN1 EF `.Sql(@"…")`/`.Sql($"…")`: the C# string-prefix set matched is `@`, `$`,
+ *   `@$`, `$@` (the four legal verbatim/interpolated/interpolated-verbatim prefixes).
+ *   No other prefix exists, so the optional group is complete, not a partial guess.
+ * - FN2 YAML `sql:` raw SQL: mirrors the XML `<sql>` unwrap — the `sql:` key is blanked
+ *   and a `;` injected so the inner statement is anchored and scanned by the SQL
+ *   DESTRUCTIVE_PATTERNS. Chosen for parity (the XML path already did this); a full YAML
+ *   parser is out of scope. A `sql:` VALUE that is quoted (`sql: "DROP …"`) is not
+ *   anchored — same residual as the XML `<sql>"…"` case, accepted (unquoted is the
+ *   dominant Liquibase form). rollback stripping runs BEFORE the unwrap, so a `sql:`
+ *   DROP inside a rollback is already blanked and correctly yields nothing.
+ * - FN4 T-SQL `EXEC sp_executesql N'…'`: a dedicated anchor keyed on `sp_executesql`
+ *   with an optional `N` national-string prefix and optional call paren; a benign
+ *   `EXEC some_proc @id` (no `sp_executesql`, no quoted DDL) never matches.
+ * - FN5 `--` inside a string literal: the `.sql` `--` stripper is now string-literal-
+ *   aware (single-quote spans, `''` escaped-quote), consistent with the `.cs` `//`
+ *   treatment; a linear character scan, ReDoS-trivial by construction.
+ * - FP-A constraint-relaxing `ALTER … DROP {DEFAULT|NOT NULL|IDENTITY|EXPRESSION}`:
+ *   EXCLUDED via a bounded negative lookahead — these lose no data. `DROP COLUMN` /
+ *   `DROP CONSTRAINT` (and any other `DROP <x>`) stay flagged.
+ * - ReDoS (discovered, pre-existing, same file, same class): the DB-w4 EXEC_ANCHOR
+ *   separator `\s*\(?\s*` backtracked O(n²) on a long space run (measured quadratic).
+ *   Both EXEC_ANCHOR and the new EXEC_TSQL_ANCHOR use TWO DISJOINT branches
+ *   (`\s+` | `\s*\(\s*`) so whitespace cannot be split ambiguously — verified linear at
+ *   200k chars. Fixed because a ReDoS in a security scanner is a data-loss/DoS bug, not
+ *   a style nit; no assertion was weakened and every existing execute-form test passes.
  */
 
 'use strict';
@@ -226,9 +254,34 @@ const STMT_ANCHOR = '(?:^|;)\\s*';
  * word) never matches — executability, not string position. Every metacharacter is a
  * single linear quantifier and the wrapping group appears at most once — ReDoS-safe.
  * `\bexecute\b` covers `op.execute`, `connection.execute`, and bare `execute`.
+ *
+ * DB-w5 ReDoS fix: the separator after `execute` was `\s*\(?\s*` — two `\s*` runs around
+ * an OPTIONAL paren, which lets a long run of spaces be split ambiguously and backtracks
+ * O(n²) on a pathological `execute <many spaces>'x` (measured quadratic: 18/68/263ms at
+ * n=2000/4000/8000). It is now TWO DISJOINT branches — `\s+` (Rails no-paren
+ * `execute "…"`) OR `\s*\(\s*` (paren call `execute("…")`) — with no adjacent `\s*`
+ * around an optional token, so the whitespace cannot be split ambiguously. Linear again.
  * @type {string}
  */
-const EXEC_ANCHOR = '\\bexecute\\b\\s*\\(?\\s*(?:[A-Za-z_.]*text\\s*\\(\\s*)?["\']\\s*';
+const EXEC_ANCHOR = '\\bexecute\\b(?:\\s+|\\s*\\(\\s*)(?:[A-Za-z_.]*text\\s*\\(\\s*)?["\']\\s*';
+
+/**
+ * T-SQL dynamic-DDL anchor (DB-w5 FN4). SQL Server executes generated DDL through
+ * `EXEC sp_executesql N'…'` (or `EXECUTE sp_executesql(N'…')`). That form carries no
+ * `\bexecute\b`+immediate-quote shape EXEC_ANCHOR needs — the `sp_executesql` token and
+ * the `N` national-string prefix sit BETWEEN the verb and the quote — so a
+ * `EXEC sp_executesql N'DROP TABLE Users'` shipped GREEN. This anchor matches
+ * `EXEC`/`EXECUTE`, then `sp_executesql`, an OPTIONAL open paren, an OPTIONAL `N`
+ * prefix, then the opening quote; the destructive keyword must still be the FIRST token
+ * of the string. A benign `EXEC some_proc @id` (no `sp_executesql`, no quoted DDL) never
+ * matches — executability, not string position. Single linear quantifiers only, the
+ * wrapping paren appears at most once. The whitespace/paren separator is TWO DISJOINT
+ * branches (`\s+` for `sp_executesql N'…'` OR `\s*\(\s*` for `sp_executesql(N'…')`) with
+ * NO two adjacent `\s*` around an optional token, so a long run of spaces cannot be
+ * split ambiguously — ReDoS-safe (verified linear on a 100k-space pathological input).
+ * @type {string}
+ */
+const EXEC_TSQL_ANCHOR = '\\bexec(?:ute)?\\b\\s+sp_executesql(?:\\s+|\\s*\\(\\s*)N?["\']\\s*';
 
 /**
  * The DROP family this checker advertises (DB-w3 fix F4). ONE alternation covering
@@ -238,8 +291,18 @@ const EXEC_ANCHOR = '\\bexecute\\b\\s*\\(?\\s*(?:[A-Za-z_.]*text\\s*\\(\\s*)?["\
  * @type {string}
  */
 const DROP_BODY = 'DROP\\s+(?:TABLE|DATABASE|SCHEMA|COLUMN|INDEX|VIEW|SEQUENCE|TYPE|MATERIALIZED\\s+VIEW)\\b';
-/** `ALTER TABLE t … DROP …` form — `[^;]*` is a single linear quantifier (ReDoS-safe). */
-const ALTER_DROP_BODY = 'ALTER\\s+TABLE\\b[^;]*\\bDROP\\b';
+/**
+ * `ALTER TABLE t … DROP …` form — `[^;]*` is a single linear quantifier (ReDoS-safe).
+ *
+ * DB-w5 FP-A: a constraint-RELAXING sub-clause — `DROP DEFAULT`, `DROP NOT NULL`,
+ * `DROP IDENTITY`, `DROP EXPRESSION` — loses NO data (it removes a column property, not
+ * the column or its rows), so it MUST NOT be flagged HIGH; flagging it blocked ordinary
+ * safe migrations. A negative lookahead excludes those four sub-clauses while STILL
+ * catching the genuinely destructive `DROP COLUMN` / `DROP CONSTRAINT` (and any other
+ * `DROP <x>`). The lookahead is a bounded alternation with single linear quantifiers —
+ * no nested/overlapping quantifier, ReDoS-safe.
+ */
+const ALTER_DROP_BODY = 'ALTER\\s+TABLE\\b[^;]*\\bDROP\\b(?!\\s+(?:DEFAULT|NOT\\s+NULL|IDENTITY|EXPRESSION)\\b)';
 /** `TRUNCATE …` — data-loss on all rows. */
 const TRUNCATE_BODY = 'TRUNCATE\\b';
 
@@ -260,7 +323,11 @@ const DESTRUCTIVE_PATTERNS = [
   { rule: 'TRUNCATE',                re: safeRegExp(STMT_ANCHOR + TRUNCATE_BODY, 'i') },
   { rule: 'execute("DROP …")',       re: safeRegExp(EXEC_ANCHOR + DROP_BODY, 'i') },
   { rule: 'execute("ALTER … DROP")', re: safeRegExp(EXEC_ANCHOR + ALTER_DROP_BODY, 'i') },
-  { rule: 'execute("TRUNCATE …")',   re: safeRegExp(EXEC_ANCHOR + TRUNCATE_BODY, 'i') }
+  { rule: 'execute("TRUNCATE …")',   re: safeRegExp(EXEC_ANCHOR + TRUNCATE_BODY, 'i') },
+  // DB-w5 FN4: T-SQL dynamic DDL via `EXEC sp_executesql N'…'`.
+  { rule: 'sp_executesql(DROP …)',      re: safeRegExp(EXEC_TSQL_ANCHOR + DROP_BODY, 'i') },
+  { rule: 'sp_executesql(ALTER … DROP)', re: safeRegExp(EXEC_TSQL_ANCHOR + ALTER_DROP_BODY, 'i') },
+  { rule: 'sp_executesql(TRUNCATE …)',  re: safeRegExp(EXEC_TSQL_ANCHOR + TRUNCATE_BODY, 'i') }
 ];
 
 /**
@@ -305,7 +372,9 @@ const LIQUIBASE_YAML_PATTERNS = [
   { rule: 'Liquibase yaml dropTable',  re: safeRegExp('^\\s*(?:-\\s*)?dropTable\\s*:', 'i') },
   { rule: 'Liquibase yaml dropColumn', re: safeRegExp('^\\s*(?:-\\s*)?dropColumn\\s*:', 'i') },
   { rule: 'Liquibase yaml dropIndex',  re: safeRegExp('^\\s*(?:-\\s*)?dropIndex\\s*:', 'i') },
-  { rule: 'Liquibase yaml dropView',   re: safeRegExp('^\\s*(?:-\\s*)?dropView\\s*:', 'i') }
+  { rule: 'Liquibase yaml dropView',   re: safeRegExp('^\\s*(?:-\\s*)?dropView\\s*:', 'i') },
+  // DB-w5 FN3: parity with the XML <dropAllForeignKeyConstraints> element.
+  { rule: 'Liquibase yaml dropAllForeignKeyConstraints', re: safeRegExp('^\\s*(?:-\\s*)?dropAllForeignKeyConstraints\\s*:', 'i') }
 ];
 
 /**
@@ -326,7 +395,13 @@ const EF_CS_PATTERNS = [
   { rule: 'EF migrationBuilder.DropTable',  re: safeRegExp('\\.DropTable\\s*\\(', 'i') },
   { rule: 'EF migrationBuilder.DropColumn', re: safeRegExp('\\.DropColumn\\s*\\(', 'i') },
   { rule: 'EF migrationBuilder.DropIndex',  re: safeRegExp('\\.DropIndex\\s*\\(', 'i') },
-  { rule: 'EF migrationBuilder.Sql(DROP/TRUNCATE)', re: safeRegExp('\\.Sql\\s*\\(\\s*["\']\\s*(?:' + DROP_BODY + '|' + TRUNCATE_BODY + ')', 'i') }
+  // DB-w5 FN1: C# verbatim (`@"…"`), interpolated (`$"…"`), and interpolated-verbatim
+  // (`@$"…"` / `$@"…"`) strings put a `@`/`$` prefix BEFORE the opening quote. The prior
+  // pattern anchored the quote immediately after `.Sql(`, so `mb.Sql(@"DROP TABLE x")`
+  // and `mb.Sql($"DROP TABLE x")` — the most common EF raw-DROP forms — shipped GREEN.
+  // The optional `(?:@\$|\$@|[@$])?` prefix closes that (two-char forms first). Single
+  // linear quantifiers only, prefix matches at most once — ReDoS-safe.
+  { rule: 'EF migrationBuilder.Sql(DROP/TRUNCATE)', re: safeRegExp('\\.Sql\\s*\\(\\s*(?:@\\$|\\$@|[@$])?["\']\\s*(?:' + DROP_BODY + '|' + TRUNCATE_BODY + ')', 'i') }
 ];
 
 /**
@@ -341,6 +416,17 @@ const EF_CS_PATTERNS = [
 const XML_PATTERNS = [...LIQUIBASE_XML_PATTERNS, ...DESTRUCTIVE_PATTERNS];
 
 /**
+ * The pattern set used for `.yaml`/`.yml` Liquibase changelogs (DB-w5 FN2). The YAML
+ * changetype-KEY patterns (`dropTable:` …) catch element forms; the SQL
+ * DESTRUCTIVE_PATTERNS catch raw SQL extracted from a `sql:` value by unwrapYamlSql()
+ * (the `sql:` key is blanked and a `;` injected, leaving the inner statement anchored) —
+ * exactly the XML `<sql>` treatment, so a YAML `- sql: DROP TABLE users` no longer ships
+ * GREEN while the XML `<sql>DROP…</sql>` path catches it. First match per line wins.
+ * @type {Array<{rule: string, re: RegExp}>}
+ */
+const YAML_PATTERNS = [...LIQUIBASE_YAML_PATTERNS, ...DESTRUCTIVE_PATTERNS];
+
+/**
  * Select the destructive-pattern set for a file extension (DB-w3 fix F1). SQL-family
  * (`.sql`, `.rb`, `.py`) get the SQL/EXEC patterns; Liquibase XML/YAML and EF C# get
  * their format-appropriate sets. An extension with no set is not scannable for
@@ -350,7 +436,7 @@ const XML_PATTERNS = [...LIQUIBASE_XML_PATTERNS, ...DESTRUCTIVE_PATTERNS];
  */
 function patternsForExt(ext) {
   if (ext === '.xml') return XML_PATTERNS;
-  if (ext === '.yaml' || ext === '.yml') return LIQUIBASE_YAML_PATTERNS;
+  if (ext === '.yaml' || ext === '.yml') return YAML_PATTERNS;
   if (ext === '.cs') return EF_CS_PATTERNS;
   return DESTRUCTIVE_PATTERNS; // .sql, .rb, .py
 }
@@ -431,6 +517,16 @@ const DOWN_SIG_RE = safeRegExp('\\bDown\\s*\\(\\s*MigrationBuilder\\b', 'gi');
  */
 const ROLLBACK_KEY_RE = safeRegExp('^\\s*(?:-\\s*)?rollback\\s*:', 'i');
 
+/**
+ * Liquibase YAML `sql:` changetype key (DB-w5 FN2), optionally led by a sequence dash.
+ * unwrapYamlSql() blanks the key and injects a `;` so the raw SQL VALUE that follows on
+ * the same line (`sql: DROP TABLE users`) is statement-anchored and scanned by the SQL
+ * DESTRUCTIVE_PATTERNS — the YAML mirror of the XML `<sql>` unwrap. `g`+`m` so every
+ * `sql:` line is unwrapped; `^` + single `\s*` quantifiers — ReDoS-safe.
+ * @type {RegExp}
+ */
+const YAML_SQL_KEY_RE = safeRegExp('^\\s*(?:-\\s*)?sql\\s*:', 'gim');
+
 /** Bounds so a pathological repo can never exhaust memory or time. */
 const DEFAULT_MAX_FILES = 2000;
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024; // 2 MB per migration file
@@ -471,8 +567,37 @@ function stripLineComment(line, ext) {
   if (ext === '.xml') {
     return line;
   }
-  const i = line.indexOf('--');
-  return i === -1 ? line : line.slice(0, i);
+  // .sql (and any other default): a `--` line comment, but STRING-LITERAL-AWARE (DB-w5
+  // FN5). A naive indexOf('--') truncated at a `--` INSIDE a single-quoted literal
+  // (e.g. `VALUES ('a--b'); DROP TABLE gone;`), discarding a real trailing statement and
+  // shipping the DROP GREEN. The string-aware scan only treats a `--` outside a literal
+  // as a comment, mirroring the .cs `//` treatment.
+  return stripSqlLineComment(line);
+}
+
+/**
+ * String-literal-aware SQL `--` line-comment strip (DB-w5 FN5). Returns the code before
+ * the first `--` that is NOT inside a single-quoted string literal. A doubled `''`
+ * inside a literal is the SQL escaped-quote and keeps the string open. A linear
+ * character scan (no regex) — ReDoS-trivial by construction.
+ * @param {string} line
+ * @returns {string}
+ */
+function stripSqlLineComment(line) {
+  let inStr = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inStr) {
+      if (c === '\'') {
+        if (line[i + 1] === '\'') { i++; continue; } // escaped quote — stays in string
+        inStr = false;
+      }
+      continue;
+    }
+    if (c === '\'') { inStr = true; continue; }
+    if (c === '-' && line[i + 1] === '-') return line.slice(0, i);
+  }
+  return line;
 }
 
 /**
@@ -644,6 +769,19 @@ function stripYamlRollback(content) {
     out[i] = line;
   }
   return out.join('\n');
+}
+
+/**
+ * Blank the Liquibase YAML `sql:` KEY (DB-w5 FN2) but leave the inner SQL value in
+ * place, injecting a `;` at the key's end so the raw SQL that follows on the same line
+ * becomes a statement-anchored line the SQL DESTRUCTIVE_PATTERNS catch — the YAML mirror
+ * of unwrapSqlElements() for XML. Runs AFTER stripYamlRollback(), so a `sql:` inside a
+ * rollback block is already blanked and never surfaces here. Line count preserved.
+ * @param {string} content
+ * @returns {string}
+ */
+function unwrapYamlSql(content) {
+  return content.replace(YAML_SQL_KEY_RE, blankOpenSqlTag);
 }
 
 /**
@@ -891,7 +1029,10 @@ class MigrationSafetyChecker {
     if (ext === '.xml') {
       scanContent = unwrapSqlElements(stripXmlRollback(stripXmlComments(scanContent)));
     } else if (ext === '.yaml' || ext === '.yml') {
-      scanContent = stripYamlRollback(scanContent);
+      // DB-w5 FN2: strip rollback: sub-blocks first (a sql: DROP there is a rollback
+      // definition), THEN unwrap sql: values so a raw-SQL DROP in an apply changeset is
+      // statement-anchored and caught by the SQL DESTRUCTIVE_PATTERNS.
+      scanContent = unwrapYamlSql(stripYamlRollback(scanContent));
     } else if (ext === '.cs') {
       // DB-w4 second kickback (A+B): the brace-depth scan must run over content where
       // `//` LINE comments are ALSO stripped — block comments alone are not enough. A

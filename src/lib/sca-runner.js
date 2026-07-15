@@ -98,7 +98,12 @@ class SCARunner {
    * @param {Object} options - Configuration options
    */
   constructor(projectRoot, options = {}) {
-    this.projectRoot = projectRoot;
+    // SCA6 (defense-in-depth): mirror DependencyAuditor's `!root || typeof !== 'string'`
+    // guard. A falsy/non-string root must NEVER reach a scanner's exec `cwd` — an
+    // empty/nullish `cwd` resolves to the PROCESS cwd, scanning THIS repo instead of the
+    // (absent) target. Normalize to null here; detectLanguages, _pythonUsesOsvOnlyLock,
+    // _detectRequirementFiles, the exec methods and run() all no-op on a null root.
+    this.projectRoot = (projectRoot && typeof projectRoot === 'string') ? projectRoot : null;
     this.options = {
       severityThreshold: SEVERITY.HIGH,
       timeout: 300000, // 5 minutes, matching sast-runner
@@ -120,6 +125,7 @@ class SCARunner {
    * @returns {string[]} detected language names
    */
   detectLanguages() {
+    if (!this.projectRoot) return []; // SCA6: a normalized-null root detects nothing
     return registry.detectLanguages(this.projectRoot);
   }
 
@@ -226,23 +232,24 @@ class SCARunner {
     // and defends the short-circuit even if the language registry did not surface python.
     const osvOnlyPythonLock = this._pythonUsesOsvOnlyLock();
 
-    if (languages.length === 0 && !osvOnlyPythonLock) {
+    // Honest clean no-op ONLY when there is genuinely nothing anywhere to audit — no
+    // dependency manifest of ANY kind. (A deferred-but-present ecosystem is NOT a no-op:
+    // osv still runs below as the whole-repo net to catch nested lockfiles — SCA1.)
+    if (detected.length === 0 && !osvOnlyPythonLock) {
       return {
         success: true,
         findings: [],
         summary: this.generateSummary([], languages, 0),
-        message: detected.length === 0
-          ? 'No supported languages detected in project — no dependencies to audit'
-          : 'All detected ecosystems are audited by DependencyAuditor — nothing further for SCA to audit'
+        message: 'No supported languages detected in project — no dependencies to audit'
       };
     }
 
     let scannersRun = 0;
 
     // Native parsers, one per language whose route names a native tool. scaRouteFor()
-    // already drops python's native pip-audit route when poetry.lock/uv.lock is present
-    // (DEFECT 2), so a poetry/uv python project is excluded here without a special-case —
-    // the osv universal pass below is its real coverage.
+    // already drops python's native pip-audit route when poetry.lock/uv.lock/Pipfile.lock
+    // is present (DEFECT 2 / SCA2), so a poetry/uv/pipenv-lock python project is excluded
+    // here without a special-case — the osv universal pass below is its real coverage.
     const nativeLangs = languages.filter((l) => this.scaRouteFor(l).native);
     for (const lang of nativeLangs) {
       if (await this.runNativeScanner(lang)) {
@@ -250,17 +257,34 @@ class SCARunner {
       }
     }
 
-    // osv-scanner universal: a SINGLE pass for the whole repo, run iff at least one
-    // detected language routes to it OR a poetry.lock/uv.lock is present (osv is the ONLY
-    // engine that reads those python locks). osv-scanner is lockfile-based and
-    // multi-ecosystem, so one pass covers every osv-routed language at once.
-    const anyOsvRouted = languages.some((l) => this.scaRouteFor(l).osvUniversal) || osvOnlyPythonLock;
-    if (anyOsvRouted && this.isToolAvailable('osv-scanner')) {
+    // SCA1: osv-scanner is a WHOLE-REPO, lockfile-based net. Run it whenever it is
+    // available and the repo holds ANY dependency manifest (guaranteed here: we passed
+    // the no-op guard above) — DECOUPLED from whether a non-deferred language routes to
+    // it. Coupling osv to "some non-deferred language routes to osv" (the old
+    // `anyOsvRouted`) left a monorepo whose every ROOT ecosystem is deferred (pure
+    // npm/go/cargo/…) with NO osv pass, so a NESTED, independently-installed lockfile
+    // (packages/api/package-lock.json) — audited by neither root-only native runner — was
+    // scanned by nobody while the human was told everything was covered. osv walks the
+    // whole tree; the root-manifest dedup (parseOSVResults / _isRootManifest) drops the
+    // root double-count while keeping nested CVEs — this decoupling makes that reachable.
+    if (this.isToolAvailable('osv-scanner')) {
       scannersRun++;
       await this.runOsvScanner();
     }
 
     if (scannersRun === 0) {
+      // No native scanner ran and osv-scanner is absent. When EVERY detected ecosystem was
+      // deferred to DependencyAuditor (and there is no osv-only python lock), that runner
+      // already audits the root manifests — a truthful no-op, not a scanner-missing
+      // failure. Otherwise a non-deferred ecosystem had NO scanner and nothing was scanned.
+      if (languages.length === 0 && !osvOnlyPythonLock) {
+        return {
+          success: true,
+          findings: [],
+          summary: this.generateSummary([], languages, Date.now() - startTime),
+          message: 'All detected ecosystems are audited by DependencyAuditor — nothing further for SCA to audit'
+        };
+      }
       return {
         success: false,
         scanned: false,
@@ -331,6 +355,7 @@ class SCARunner {
    * sast-runner's runBandit/runGosec).
    */
   async runNpmAudit() {
+    if (!this.projectRoot) return; // SCA6: never exec against a leaked process cwd
     const bin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     let out = '';
     try {
@@ -361,9 +386,19 @@ class SCARunner {
    * when vulnerabilities exist but still prints JSON to stdout. Fail-closed.
    */
   async runPipAudit() {
+    if (!this.projectRoot) return; // SCA6: never exec against a leaked process cwd
+    // SCA3: `pip-audit --format json` with NO -r audits the AMBIENT interpreter's
+    // installed packages, NOT the project's pins — so a requirements-file project whose
+    // deps are not installed (typical CI) reads clean though nothing was audited. When a
+    // requirements file exists, point pip-audit at each with -r so it audits the manifest.
+    // argv-safe: a fixed argument vector (no shell string interpolation).
+    const args = ['--format', 'json'];
+    for (const reqFile of this._detectRequirementFiles()) {
+      args.push('-r', reqFile);
+    }
     let out = '';
     try {
-      out = execFileSync('pip-audit', ['--format', 'json'], {
+      out = execFileSync('pip-audit', args, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
         encoding: 'utf8',
@@ -390,6 +425,7 @@ class SCARunner {
    * vulnerabilities exist but still prints JSON to stdout. Fail-closed.
    */
   async runCargoAudit() {
+    if (!this.projectRoot) return; // SCA6: never exec against a leaked process cwd
     let out = '';
     try {
       out = execFileSync('cargo', ['audit', '--json'], {
@@ -420,6 +456,7 @@ class SCARunner {
    * still prints its OSV JSON to stdout. Fail-closed, mirroring sast-runner.
    */
   async runOsvScanner() {
+    if (!this.projectRoot) return; // SCA6: never exec against a leaked process cwd
     let out = '';
     try {
       out = execFileSync('osv-scanner', ['scan', '--format', 'json', '.'], {
@@ -509,8 +546,14 @@ class SCARunner {
   _relToRoot(sourcePath) {
     const s = String(sourcePath);
     const root = this.projectRoot;
-    if (root && typeof root === 'string' && path.isAbsolute(s) && path.isAbsolute(root)) {
-      const rel = path.relative(root, s);
+    if (root && typeof root === 'string') {
+      // SCA5: resolve BOTH sides before comparing. The old guard required BOTH to be
+      // absolute, so a caller passing a RELATIVE root (e.g. new SCARunner('.')) against
+      // an ABSOLUTE osv source.path never matched — _isRootManifest returned false for
+      // the true root manifest and the root CVE was reported by BOTH osv AND
+      // DependencyAuditor (double-count). path.resolve normalizes a relative root (and a
+      // relative source) against the process cwd so the classification is correct.
+      const rel = path.relative(path.resolve(root), path.resolve(s));
       if (rel && !rel.startsWith('..')) return rel;
     }
     return s;
@@ -547,10 +590,36 @@ class SCARunner {
     if (!root || typeof root !== 'string') return false;
     try {
       return safeFs.existsSync(path.join(root, 'poetry.lock'))
-        || safeFs.existsSync(path.join(root, 'uv.lock'));
+        || safeFs.existsSync(path.join(root, 'uv.lock'))
+        // SCA2: Pipfile.lock is the same class — pip-audit cannot read it (it audits the
+        // ambient env); only osv-scanner reads it. pipenv is not an implemented
+        // DependencyAuditor manager, so without this the project would route to the
+        // useless native pip-audit and osv would never run — a silent coverage hole.
+        || safeFs.existsSync(path.join(root, 'Pipfile.lock'));
     } catch {
       return false;
     }
+  }
+
+  /**
+   * The requirements files present at the project root, in a fixed candidate order
+   * (`requirements.txt`, `requirements-dev.txt` — the same set DependencyAuditor's `pip`
+   * manager keys on). SCA3: pip-audit MUST be pointed at these with `-r` so it audits the
+   * project's PINNED dependencies rather than the ambient interpreter's installed
+   * packages. Returns basenames (execFileSync runs with cwd=projectRoot); argv-safe, no
+   * shell interpolation. Fail-soft: an unreadable root yields an empty list.
+   * @returns {string[]} basenames of the requirements files present at the root
+   */
+  _detectRequirementFiles() {
+    const root = this.projectRoot;
+    if (!root || typeof root !== 'string') return [];
+    const found = [];
+    for (const name of ['requirements.txt', 'requirements-dev.txt']) {
+      try {
+        if (safeFs.existsSync(path.join(root, name))) found.push(name);
+      } catch { /* unreadable → skip */ }
+    }
+    return found;
   }
 
   /**

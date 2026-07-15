@@ -501,6 +501,142 @@ describe('capability-registry: detectLanguages() — MANIFEST markers outrank st
   });
 });
 
+describe('capability-registry: pipelineFor() — honest:true is IMPOSSIBLE with a null run command (F-honest)', () => {
+  // A null run command means the app CANNOT be honestly claimed runnable. app-runner treats
+  // pipeline.run.honest as AUTHORITATIVE, so honest:true + command:null propagates a lie to
+  // the human ("it ran"). When the runShape resolves to no language command, a true honest
+  // flag must degrade to false. Honest NON-true flags (false, 'build-is-last-mile') are
+  // consistent with a null command — they never claimed a live run — and are preserved.
+  it("pipelineFor('typescript','cli') is honest:false when the run command is null", () => {
+    const p = registry.pipelineFor('typescript', 'cli');
+    assert.ok(p, 'the typescript/cli merge must resolve');
+    assert.equal(p.run.command, null, 'typescript defines no cli run shape → null command');
+    assert.equal(p.run.honest, false,
+      'a null run command can never be honestly claimed runnable — honest:true must degrade to false');
+  });
+
+  it("pipelineFor('dockerfile','web-fullstack') is honest:false when the run command is null", () => {
+    const p = registry.pipelineFor('dockerfile', 'web-fullstack');
+    assert.ok(p, 'the dockerfile/web-fullstack merge must resolve');
+    assert.equal(p.run.command, null, 'dockerfile declares no run shapes → null command');
+    assert.equal(p.run.honest, false,
+      'honest:true with a null command is a lie app-runner would propagate — force false');
+  });
+
+  it("pipelineFor('typescript','web-fullstack') STAYS honest:true when a real run command exists", () => {
+    const p = registry.pipelineFor('typescript', 'web-fullstack');
+    assert.ok(p, 'the typescript/web-fullstack merge must resolve');
+    assert.equal(p.run.command, 'npm start', 'typescript supplies the server run command');
+    assert.equal(p.run.honest, true,
+      'a genuine run command keeps honest:true — the guard only downgrades the null-command lie');
+  });
+
+  it("pipelineFor('rust','desktop') KEEPS honest:'build-is-last-mile' with a null command (not a lie)", () => {
+    const p = registry.pipelineFor('rust', 'desktop');
+    assert.ok(p, 'the rust/desktop merge must resolve');
+    assert.equal(p.run.command, null, 'the desktop taxonomy supplies no language run command');
+    assert.equal(p.run.honest, 'build-is-last-mile',
+      'build-is-last-mile is honest about NOT launching — a null command is consistent, it stays');
+  });
+});
+
+describe('capability-registry: detectLanguages() — ancillary infra/config langs never take the primary slot (F-ancillary)', () => {
+  // Dockerfile and .github/workflows are EXACT markers, so before the fix dockerfile /
+  // github-actions landed in the decisive manifest tier and sorted early by filename —
+  // AHEAD of every real application language. Since almost every real repo has a Dockerfile
+  // and/or CI, detectLanguages[0] (the run target every consumer drives) was wrong for most
+  // projects. The fix marks them role:ancillary in their YAML and sorts ancillary languages
+  // into a LOWER tier than real application languages: still detected/reported, never primary.
+  it('a Node+TS repo with a Dockerfile and CI resolves primary to typescript, not dockerfile', () => {
+    const dir = makeProject('ctoc-anc-nodets-');
+    try {
+      fs.writeFileSync(path.join(dir, 'package.json'), '{}');
+      fs.writeFileSync(path.join(dir, 'tsconfig.json'), '{}');
+      fs.writeFileSync(path.join(dir, 'Dockerfile'), 'FROM node:22-alpine\n');
+      fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+      const langs = registry.detectLanguages(dir);
+      assert.equal(langs[0], 'typescript',
+        'the run target must be a real app language, never the ancillary dockerfile/github-actions');
+      assert.ok(langs.includes('dockerfile') && langs.includes('github-actions'),
+        'ancillary languages are still detected and reported');
+      assert.ok(
+        langs.indexOf('dockerfile') > langs.indexOf('typescript')
+        && langs.indexOf('dockerfile') > langs.indexOf('javascript'),
+        'dockerfile ranks after every real application language');
+      assert.ok(langs.indexOf('github-actions') > langs.indexOf('javascript'),
+        'github-actions ranks after every real application language');
+    } finally { rm(dir); }
+  });
+
+  it('a Go repo with a Dockerfile resolves primary to go, not dockerfile', () => {
+    const dir = makeProject('ctoc-anc-godock-');
+    try {
+      fs.writeFileSync(path.join(dir, 'go.mod'), 'module x\n');
+      fs.writeFileSync(path.join(dir, 'Dockerfile'), 'FROM golang:1.23\n');
+      const langs = registry.detectLanguages(dir);
+      assert.equal(langs[0], 'go', 'the run target must be go, not the ancillary dockerfile');
+      assert.ok(langs.includes('dockerfile'), 'dockerfile is still detected');
+      assert.ok(langs.indexOf('go') < langs.indexOf('dockerfile'), 'go ranks ahead of dockerfile');
+    } finally { rm(dir); }
+  });
+
+  it('dockerfile + github-actions carry role:ancillary in the shipped data; real app langs do not', () => {
+    assert.equal(registry.capabilitiesFor('dockerfile').role, 'ancillary',
+      'dockerfile is cross-cutting infra config — role:ancillary keeps it out of the primary slot');
+    assert.equal(registry.capabilitiesFor('github-actions').role, 'ancillary',
+      'github-actions is cross-cutting CI config — role:ancillary keeps it out of the primary slot');
+    assert.notEqual(registry.capabilitiesFor('typescript').role, 'ancillary',
+      'a real application language is never ancillary');
+    assert.notEqual(registry.capabilitiesFor('go').role, 'ancillary',
+      'a real application language is never ancillary');
+  });
+
+  it('an ancillary-only repo (Dockerfile alone) still detects dockerfile (detection is not lost)', () => {
+    const dir = makeProject('ctoc-anc-only-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Dockerfile'), 'FROM alpine:3.20\n');
+      const langs = registry.detectLanguages(dir);
+      assert.deepEqual(langs, ['dockerfile'],
+        'with no real app language present, the ancillary language is still detected');
+    } finally { rm(dir); }
+  });
+});
+
+describe('capability-registry: detectLanguages() — typescript outranks javascript on a TS repo (F-tsrank)', () => {
+  // typescript's SOLE detection marker is tsconfig.json, so typescript is detected IFF a
+  // tsconfig.json exists — meaning "both javascript and typescript detected" already implies
+  // tsconfig.json is present. Before the fix both were manifest-tier and javascript.yaml
+  // sorted first, so every TS repo resolved primary `javascript`, driving the UNVERIFIED
+  // `tsc --allowJs --checkJs` instead of typescript's `tsc --noEmit`. typescript.yaml now
+  // declares `outranks: [javascript]`: a data-driven pairwise precedence that ranks
+  // typescript ahead of javascript whenever both are present, keeping BOTH detected.
+  it('a package.json + tsconfig.json repo resolves primary to typescript (not javascript)', () => {
+    const dir = makeProject('ctoc-tsjs-');
+    try {
+      fs.writeFileSync(path.join(dir, 'package.json'), '{}');
+      fs.writeFileSync(path.join(dir, 'tsconfig.json'), '{}');
+      const langs = registry.detectLanguages(dir);
+      assert.equal(langs[0], 'typescript',
+        'a repo with tsconfig.json is a TypeScript project — typescript is primary, driving tsc --noEmit');
+      assert.ok(langs.includes('javascript'),
+        'javascript is still detected (a mixed repo legitimately has both) — just ranked after typescript');
+      assert.ok(langs.indexOf('typescript') < langs.indexOf('javascript'),
+        'typescript must rank before javascript whenever tsconfig.json is present');
+    } finally { rm(dir); }
+  });
+
+  it('a package.json-only repo (no tsconfig.json) stays primary javascript', () => {
+    const dir = makeProject('ctoc-jsonly-');
+    try {
+      fs.writeFileSync(path.join(dir, 'package.json'), '{}');
+      const langs = registry.detectLanguages(dir);
+      assert.equal(langs[0], 'javascript',
+        'without a tsconfig.json typescript is not detected — javascript stays primary');
+      assert.ok(!langs.includes('typescript'), 'no tsconfig.json → no typescript');
+    } finally { rm(dir); }
+  });
+});
+
 describe('capability-registry: isValidCapability — a structurally-broken override is SKIPPED + warned, not silently accepted (F2)', () => {
   it('a BLOCK-sequence detectionMarkers (rendered as {} by the flow-only parser) is skipped WITH a warning', () => {
     const dir = makeProject('ctoc-cap-blockseq-');
