@@ -14,6 +14,23 @@ const { EventEmitter } = require('node:events');
 // Import the module under test
 const version = require('../src/lib/version');
 
+// Several tests below call the REAL release()/setVersion()/syncAll()/syncToPluginJson()
+// against the actual repo files (getPluginRoot() resolves to this repo). Once
+// syncToPluginJson's ctoc-plugin/ path bug was fixed (v6.12.48) those syncs
+// actually write .claude-plugin/plugin.json, so a test that bumps the version can
+// leave the working tree with a version mismatch that then gets committed. This
+// root-level teardown restores EVERY synced file to the version present when this
+// file loaded, after all of its tests have run — so the tree is clean before any
+// `git add`. (Individual mutation tests also restore in their own finally blocks to
+// narrow the dirty window during the parallel suite run.)
+const __VERSION_AT_LOAD__ = version.getVersion();
+after(() => {
+  try {
+    version.setVersion(__VERSION_AT_LOAD__);
+    version.syncAll();
+  } catch { /* best-effort restore */ }
+});
+
 // The module captures these constants at load time from ~/.ctoc.
 // Reconstruct the same on-disk cache path so failure-path tests can drive
 // loadUpdateCache / saveUpdateCache / checkForUpdates through the real seam
@@ -733,11 +750,22 @@ describe('release', () => {
     // Arrange
     const original = version.getVersion();
 
-    // Act
-    const result = version.release('minor');
+    try {
+      // Act
+      const result = version.release('minor');
 
-    // Assert
-    assert.strictEqual(result.newVersion, version.bump(original, 'minor'));
-    assert.match(result.newVersion, /^\d+\.\d+\.0$/);
+      // Assert
+      assert.strictEqual(result.newVersion, version.bump(original, 'minor'));
+      assert.match(result.newVersion, /^\d+\.\d+\.0$/);
+    } finally {
+      // release() bumps VERSION and syncs the metadata files (plugin.json,
+      // marketplace.json, README). Restore ALL of them — not just VERSION —
+      // or the repo is left with a version mismatch that the
+      // version-license-invariant test then flags. (syncToPluginJson only
+      // began actually writing plugin.json once its ctoc-plugin/ path bug was
+      // fixed in v6.12.48, which is what exposed this missing teardown.)
+      version.setVersion(original);
+      version.syncAll();
+    }
   });
 });
