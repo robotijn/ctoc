@@ -146,7 +146,7 @@ function syncToMarketplace() {
  */
 function syncToPluginJson() {
   const root = getPluginRoot();
-  const pluginFile = path.join(root, 'ctoc-plugin', '.claude-plugin', 'plugin.json');
+  const pluginFile = path.join(root, '.claude-plugin', 'plugin.json');
 
   if (!safeFs.existsSync(pluginFile)) {
     return { success: false, error: 'plugin.json not found' };
