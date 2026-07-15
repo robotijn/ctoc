@@ -15,7 +15,13 @@ const c = {
   red: '\x1b[31m',
   cyan: '\x1b[36m',
   yellow: '\x1b[33m',
-  magenta: '\x1b[35m'
+  magenta: '\x1b[35m',
+  black: '\x1b[30m',
+  // Background colours. bgCyan is used by the overview tab's release-mode type
+  // selector; without it (and black) the cell interpolated the literal
+  // "undefined" — 18 non-ANSI chars the width stripper can't remove — overflowing
+  // the box row and crashing the render with ' '.repeat(negative).
+  bgCyan: '\x1b[46m'
 };
 
 // Security (R7-A): strip C0 (0x00-0x1F) and C1 (0x7F-0x9F) control chars before
