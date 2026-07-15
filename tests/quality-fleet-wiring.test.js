@@ -839,34 +839,40 @@ describe('F-1 — SCA whole-repo net runs for an ALL-DEFERRED repo (a nested loc
   });
 });
 
-describe('F-2 — DependencyAuditor runs the npm-audit fallback for a yarn-only repo when npm is available', () => {
-  it('a yarn.lock-only repo on an npm-only machine INVOKES the npm-audit fallback (reachable coverage, not a silent skip)', async () => {
-    // yarn.lock alone → the ONLY detected manager is `yarn` (no package.json, so npm is not
-    // co-detected). yarn's tool is absent on this machine. The OLD orchestrator computed
-    // `available = managers.filter(isToolAvailable)` = [] and NEVER called auditor.run(), so
-    // DependencyAuditor's built-in yarn/pnpm → npm-audit fallback never fired — reachable
-    // coverage lost. The fix invokes run() when a JS manager is detected and npm exists.
-    cp.execSync = (command) => {
-      if (command === 'npm --version') return 'v9\n';
-      if (command === 'yarn --version') throw new Error('not installed');
-      if (typeof command === 'string' && command.startsWith('npm audit')) {
-        // The npm-audit fallback's output: one HIGH prototype-pollution advisory.
-        return JSON.stringify({
-          vulnerabilities: {
-            'evil-pkg': {
-              name: 'evil-pkg', severity: 'high', range: '<2.0.0',
-              via: [{ title: 'Prototype pollution', severity: 'high', url: 'https://example.invalid' }]
-            }
-          }
-        });
-      }
-      throw new Error(`unexpected execSync: ${command}`);
+describe('F-2 — a yarn.lock-only repo (no package-lock.json) is covered by osv, NEVER a fabricated npm-audit clean pass', () => {
+  it('a yarn.lock-only repo with a planted CRITICAL and osv AVAILABLE surfaces the CRITICAL via osv — passed:false, no silent clean', async () => {
+    // THE CONFIRMED FALSE-CLEAN (verified against npm 11.x): `npm audit --json` on a tree
+    // with NO package-lock.json returns {"error":{"code":"ENOLOCK"}} and audits NOTHING —
+    // it can read ONLY package-lock.json, never yarn.lock. The OLD F-2 test mocked npm audit
+    // RETURNING a HIGH advisory for a yarn.lock repo — behavior real npm NEVER produces. The
+    // real coverage for a yarn.lock repo comes from osv-scanner (it reads yarn.lock
+    // natively), exactly like the poetry.lock/uv.lock → osv routing. Here osv is available
+    // and plants a CRITICAL that MUST surface — never a fabricated npm-audit finding, never
+    // a silent clean pass.
+    const osv = {
+      results: [{
+        source: { path: 'yarn.lock', type: 'lockfile' },
+        packages: [{
+          package: { name: 'evil-pkg', ecosystem: 'npm', version: '1.0.0' },
+          vulnerabilities: [{ id: 'GHSA-yarn-hole', summary: 'Prototype pollution', database_specific: { severity: 'CRITICAL' } }]
+        }]
+      }]
     };
-    cp.execFileSync = () => { throw new Error('not installed'); };
+    // osv-scanner installed + returns the yarn.lock CVE; npm/yarn/pip/cargo all absent.
+    cp.execFileSync = (cmd, args) => {
+      if (Array.isArray(args) && args.includes('--version')) {
+        if (cmd === 'osv-scanner') return '';
+        throw new Error('not installed');
+      }
+      if (cmd === 'osv-scanner') return JSON.stringify(osv);
+      throw new Error(`unexpected execFileSync ${cmd} ${JSON.stringify(args)}`);
+    };
+    cp.execSync = () => { throw new Error('not installed'); };
 
-    const dir = mkTmp('ctoc-yarn-npmfallback-');
+    const dir = mkTmp('ctoc-yarn-osv-');
     try {
-      // yarn.lock only — NO package.json, so `yarn` is the sole detected manager.
+      // A realistic yarn repo: package.json + yarn.lock, NO package-lock.json.
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"x","version":"1.0.0"}');
       fs.writeFileSync(path.join(dir, 'yarn.lock'), '# yarn lockfile v1\n');
 
       const qa = freshQualityAgent();
@@ -874,16 +880,66 @@ describe('F-2 — DependencyAuditor runs the npm-audit fallback for a yarn-only 
         qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
       );
 
-      assert.ok(
-        !res.skipped.some((s) => /dependency audit skipped: yarn/i.test(s)),
-        `yarn must NOT be skipped when npm is available for the fallback; skipped=${JSON.stringify(res.skipped)}`
+      // The CRITICAL surfaces via the SCA/osv step — never a fabricated npm-audit finding.
+      assert.ok(res.critical >= 1,
+        `the yarn.lock CRITICAL must surface via osv; got critical=${res.critical}`);
+      assert.equal(res.passed, false, 'a yarn.lock CRITICAL must FAIL the gate — never a silent clean pass');
+      assert.match(res.details, /sca\[CRITICAL\] evil-pkg/,
+        `the CVE must be in the human-facing details via SCA/osv; got: ${JSON.stringify(res.details)}`);
+      assert.doesNotMatch(res.details, /dependency\[[A-Z]+\] evil-pkg/,
+        `coverage must come from osv (SCA), NOT a fabricated npm-audit finding; got: ${JSON.stringify(res.details)}`);
+      assert.match(out, /SCA: \d+ dependency finding/, `the osv whole-repo net must have run; log:\n${out}`);
+    } finally {
+      restoreCp();
+      rm(dir);
+    }
+  });
+
+  it('a yarn.lock-only repo with osv-scanner UNAVAILABLE skips LOUDLY — never a silent clean pass', async () => {
+    // The dangerous half: yarn tool absent, npm present but no package-lock.json, AND osv
+    // absent. Real `npm audit --json` on a yarn.lock tree exits non-zero and prints the
+    // ENOLOCK envelope (verified against npm 11.x) — NOTHING was audited. Nothing can read
+    // yarn.lock → the repo must NOT read as a clean pass; the coverage gap must be a LOUD
+    // skip (the ENOLOCK envelope surfaced by parseNpmAuditResults, and/or the SCA
+    // javascript skip naming osv-scanner), never a silent 0-vuln clean.
+    const ENOLOCK = JSON.stringify({
+      error: { code: 'ENOLOCK', summary: 'This command requires an existing lockfile.' }
+    });
+    cp.execFileSync = (cmd, args) => {
+      if (Array.isArray(args) && args.includes('--version')) throw new Error('not installed');
+      throw new Error(`unexpected execFileSync ${cmd} ${JSON.stringify(args)}`);
+    };
+    cp.execSync = (command) => {
+      if (command === 'npm --version') return 'v11\n'; // npm present
+      if (typeof command === 'string' && command.startsWith('npm audit')) {
+        // Real npm audit on a yarn.lock tree: non-zero exit, ENOLOCK envelope on stdout.
+        const err = new Error('Command failed: npm audit');
+        err.stdout = ENOLOCK;
+        throw err;
+      }
+      throw new Error('not installed');
+    };
+
+    const dir = mkTmp('ctoc-yarn-noosv-');
+    try {
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"x","version":"1.0.0"}');
+      fs.writeFileSync(path.join(dir, 'yarn.lock'), '# yarn lockfile v1\n');
+
+      const qa = freshQualityAgent();
+      const { res, out } = await captureLog(() =>
+        qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
       );
-      assert.ok(res.high >= 1,
-        `the npm-audit fallback must run and surface the vulnerability; got high=${res.high}`);
-      assert.match(res.details, /dependency\[HIGH\] evil-pkg/,
-        `the fallback finding must be in the human-facing details; got: ${JSON.stringify(res.details)}`);
-      assert.match(out, /Dependencies: \d+ vulnerability/,
-        `the auditor must have RUN (not skipped); log:\n${out}`);
+
+      // Nothing could read yarn.lock (no package-lock → npm audit ENOLOCKs; no osv). The gap
+      // must be VISIBLE: either the ENOLOCK envelope surfaced as a loud dependency skip, or
+      // SCA loudly skips javascript naming osv-scanner. Never a silent clean.
+      const loudlySkipped = res.skipped.some((s) =>
+        /ENOLOCK|did not run|SCA skipped for javascript/i.test(s));
+      assert.ok(loudlySkipped,
+        `a yarn.lock repo with no reader (no package-lock, no osv) must skip LOUDLY, not pass silently; skipped=${JSON.stringify(res.skipped)}, log:\n${out}`);
+      // The ENOLOCK envelope must NOT be swallowed into a silent 0-vuln clean audit.
+      assert.ok(res.skipped.some((s) => /ENOLOCK|did not run/i.test(s)),
+        `parseNpmAuditResults must surface the ENOLOCK envelope as a loud skip, never a silent 0/0 clean; skipped=${JSON.stringify(res.skipped)}`);
     } finally {
       restoreCp();
       rm(dir);

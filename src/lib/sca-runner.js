@@ -160,6 +160,14 @@ class SCARunner {
     if (lang === 'python' && native === 'pip-audit' && this._pythonUsesOsvOnlyLock()) {
       native = null; // pip-audit cannot read poetry.lock/uv.lock → route to osv universal
     }
+    if ((lang === 'javascript' || lang === 'typescript') && native === 'npm-audit'
+        && this._jsUsesOsvOnlyLock()) {
+      // npm audit reads ONLY package-lock.json/npm-shrinkwrap.json — never yarn.lock/
+      // pnpm-lock.yaml (it ENOLOCKs). A yarn/pnpm project with no npm lockfile therefore
+      // has NO usable native parser here; only osv-scanner reads yarn.lock/pnpm-lock.yaml
+      // natively → route to the osv universal pass, exactly like poetry.lock/uv.lock.
+      native = null;
+    }
     if (native && PARSEABLE_NATIVE_TOOLS.has(native)) {
       return { native, osvUniversal: false };
     }
@@ -232,10 +240,18 @@ class SCARunner {
     // and defends the short-circuit even if the language registry did not surface python.
     const osvOnlyPythonLock = this._pythonUsesOsvOnlyLock();
 
+    // FALSE-CLEAN / JS analog: a yarn.lock/pnpm-lock.yaml with no npm lockfile is readable
+    // ONLY by osv-scanner (npm audit ENOLOCKs on it). The javascript registry marker is
+    // `package.json` alone — yarn.lock/pnpm-lock.yaml are NOT language markers — so a repo
+    // whose JS presence is signalled ONLY by yarn.lock/pnpm-lock.yaml has detected.length
+    // === 0 and would early-return as a false clean no-op unless this flag keeps osv
+    // running, exactly as osvOnlyPythonLock does for poetry.lock/uv.lock.
+    const osvOnlyJsLock = this._jsUsesOsvOnlyLock();
+
     // Honest clean no-op ONLY when there is genuinely nothing anywhere to audit — no
     // dependency manifest of ANY kind. (A deferred-but-present ecosystem is NOT a no-op:
     // osv still runs below as the whole-repo net to catch nested lockfiles — SCA1.)
-    if (detected.length === 0 && !osvOnlyPythonLock) {
+    if (detected.length === 0 && !osvOnlyPythonLock && !osvOnlyJsLock) {
       return {
         success: true,
         findings: [],
@@ -291,7 +307,7 @@ class SCARunner {
       // that runner already audits the root manifests — a truthful no-op, not a
       // scanner-missing failure. Otherwise a non-deferred ecosystem had NO scanner and
       // nothing was scanned.
-      if (languages.length === 0 && !osvOnlyPythonLock && !scannerCrashed) {
+      if (languages.length === 0 && !osvOnlyPythonLock && !osvOnlyJsLock && !scannerCrashed) {
         return {
           success: true,
           findings: [],
@@ -560,6 +576,15 @@ class SCARunner {
     if (!(this._deferredLanguages instanceof Set) || this._deferredLanguages.size === 0) return false;
     if (!ecosystem) return false;
     const langs = OSV_ECOSYSTEM_LANGUAGES[String(ecosystem).toLowerCase()] || [];
+    // FALSE-CLEAN defense-in-depth: when the JS lockfile is yarn.lock/pnpm-lock.yaml with
+    // no npm lockfile, DependencyAuditor's npm-audit fallback ENOLOCKs and audits NOTHING —
+    // so a root npm finding must NEVER be dropped as its "duplicate". osv is the only runner
+    // that reads yarn.lock/pnpm-lock.yaml; keep the finding even if a caller wrongly left
+    // javascript/typescript in _deferredLanguages. (auditedLanguagesFor already omits it,
+    // so this is belt-and-suspenders over a mis-populated deferred set.)
+    if ((langs.includes('javascript') || langs.includes('typescript')) && this._jsUsesOsvOnlyLock()) {
+      return false;
+    }
     return langs.some((l) => this._deferredLanguages.has(l));
   }
 
@@ -624,6 +649,34 @@ class SCARunner {
         // DependencyAuditor manager, so without this the project would route to the
         // useless native pip-audit and osv would never run — a silent coverage hole.
         || safeFs.existsSync(path.join(root, 'Pipfile.lock'));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * True when the project root contains a `yarn.lock` OR a `pnpm-lock.yaml` AND has NO
+   * npm lockfile (`package-lock.json` / `npm-shrinkwrap.json`). This is the JS analog of
+   * `_pythonUsesOsvOnlyLock`: `npm audit` — the native SCA tool for javascript/typescript
+   * here AND DependencyAuditor's yarn/pnpm fallback — reads ONLY package-lock.json/
+   * npm-shrinkwrap.json; on a tree with none it returns `{"error":{"code":"ENOLOCK"}}` and
+   * audits nothing. Only osv-scanner reads yarn.lock/pnpm-lock.yaml natively. Both
+   * scaRouteFor() and run() consult this to route javascript coverage through the osv
+   * universal pass (and keep osv running / keep the finding) for such a project. When an
+   * npm lockfile IS present, npm audit genuinely works → this reports false (no
+   * over-correction). Fail-soft: an unreadable root reports absent.
+   * @returns {boolean} true iff a yarn.lock/pnpm-lock.yaml exists with no npm lockfile
+   */
+  _jsUsesOsvOnlyLock() {
+    const root = this.projectRoot;
+    if (!root || typeof root !== 'string') return false;
+    try {
+      const hasYarnOrPnpm = safeFs.existsSync(path.join(root, 'yarn.lock'))
+        || safeFs.existsSync(path.join(root, 'pnpm-lock.yaml'));
+      if (!hasYarnOrPnpm) return false;
+      const hasNpmLock = safeFs.existsSync(path.join(root, 'package-lock.json'))
+        || safeFs.existsSync(path.join(root, 'npm-shrinkwrap.json'));
+      return !hasNpmLock;
     } catch {
       return false;
     }

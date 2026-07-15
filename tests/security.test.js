@@ -590,27 +590,96 @@ describe('Secrets Scanner — real synthetic secret detection', () => {
       'an extension-based skip of a secret-dense file must be recorded, not a silent clean pass');
   });
 
-  // -- S2b: Dockerfile is a FAMILY, matched case-insensitively -------------
-  // Regression: the filename check compared the RAW (un-lowercased) basename
-  // by exact match against ['Dockerfile', ...], so ONLY the bare exact-case
-  // 'Dockerfile' was recorded. Every common variant (multi-stage / per-env
-  // Dockerfile.prod, Dockerfile.dev; case variants dockerfile, DOCKERFILE)
-  // and case-variant secret-dense dotfiles (.npmRC) were SILENTLY DROPPED —
-  // breaking the exact honesty signal the ledger exists for.
-  const dockerFamily = ['Dockerfile', 'Dockerfile.prod', 'Dockerfile.dev', 'dockerfile', 'DOCKERFILE'];
-  for (const name of dockerFamily) {
-    it(`S2b a Dockerfile-family file (${name}) skip is RECORDED, not silent`, () => {
-      const dir = path.join(os.tmpdir(), 'ctoc-s2b-' + name.replace(/\W/g, '_') + '-' + Date.now());
-      fs.mkdirSync(dir, { recursive: true });
-      const f = path.join(dir, name);
-      fs.writeFileSync(f, 'FROM node:20\nENV AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY\n');
-      const scanner = new SecretsScanner(dir);
-      assert.strictEqual(scanner.shouldScan(f), false, `${name} is not in the scannable set`);
-      assert.ok(scanner.errors.some(e => (e.file || '').endsWith(name)),
-        `a secret-dense ${name} skip must be RECORDED, not silently dropped`);
-      fs.rmSync(dir, { recursive: true, force: true });
+  // -- S4: Dockerfiles are SCANNED for secrets, not skipped ----------------
+  // Prior contract had two silent gaps proven by execution: the monorepo
+  // `<service>.dockerfile` convention (api.dockerfile) was SILENTLY DROPPED
+  // (shouldScan=false, NO ledger entry, 0 findings), and the bare `Dockerfile`
+  // family was merely RECORDED-as-skipped, never scanned — so a hardcoded
+  // secret on an ENV/ARG line was caught by NO deterministic detector.
+  // Dockerfiles are plain text; the ordinary secret patterns apply to their
+  // ENV/ARG values. The whole family is now SCANNED, case-insensitively: bare
+  // `Dockerfile`, `Dockerfile.<stage>` (Dockerfile.prod/.dev), and the
+  // `<name>.dockerfile` form. Scanning is strictly better than a skip notice.
+
+  // Write `name` into a fresh, unique dir; return the shouldScan verdict, the
+  // findings (only when scanned), and a copy of the skip/error ledger.
+  function scanNamed(name, contents) {
+    const dir = path.join(
+      os.tmpdir(),
+      'ctoc-s4-' + name.replace(/\W/g, '_') + '-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+    );
+    fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, name);
+    fs.writeFileSync(f, contents);
+    const scanner = new SecretsScanner(dir);
+    const shouldScan = scanner.shouldScan(f);
+    const findings = shouldScan ? scanner.scanFile(f) : [];
+    const errors = scanner.errors.slice();
+    fs.rmSync(dir, { recursive: true, force: true });
+    return { shouldScan, findings, errors };
+  }
+
+  // S4a: the monorepo `<service>.dockerfile` convention — previously SILENTLY
+  // dropped (shouldScan=false, 0 ledger, 0 findings). Now scanned; a hardcoded
+  // secret on the ENV line fires. (Fixture uses a generic high-entropy value, not
+  // a real provider key format, so it exercises the scanner without tripping
+  // upstream secret-scanning push protection.)
+  for (const name of ['api.dockerfile', 'web.dockerfile', 'service.dockerfile']) {
+    it(`S4a ${name} is SCANNED and its ENV secret fires (was silently dropped)`, () => {
+      const { shouldScan, findings, errors } = scanNamed(
+        name, 'FROM node:20\nENV APP_SECRET="s3cr3tR4nd0mV4lue1234567890abcXYZ"\n');
+      assert.strictEqual(shouldScan, true, `${name} must be scannable, not silently dropped`);
+      assert.strictEqual(errors.length, 0, `${name} is scanned, so it must not be ledgered as a skip`);
+      assert.ok(findings.length >= 1,
+        `a hardcoded secret on a ${name} ENV line must be detected`);
     });
   }
+
+  // S4b: the bare Dockerfile family — previously recorded-as-skipped, never
+  // scanned. Now scanned: the unquoted npm access token (ARG) and the quoted
+  // AWS secret (ENV) both fire. (The AWS value is quoted — valid Docker syntax
+  // — because the AWS_SECRET_KEY pattern excludes `=` as a boundary char, a
+  // pre-existing, all-file-types limitation orthogonal to the scanned-set fix.)
+  for (const name of ['Dockerfile', 'Dockerfile.prod', 'dockerfile', 'DOCKERFILE']) {
+    it(`S4b ${name} is SCANNED and its ENV/ARG secrets fire (was skipped unscanned)`, () => {
+      const npmTok = 'npm_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'; // npm_ + 36 base62
+      const awsKey = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';     // 40-char AWS secret shape
+      const { shouldScan, findings, errors } = scanNamed(name,
+        'FROM node:20\n' +
+        'ENV AWS_SECRET_ACCESS_KEY="' + awsKey + '"\n' +
+        'ARG NPM_TOKEN=' + npmTok + '\n');
+      assert.strictEqual(shouldScan, true, `${name} must be scannable`);
+      assert.strictEqual(errors.length, 0, `${name} is scanned, not ledgered as a skip`);
+      assert.ok(findings.some(f => f.type === 'NPM_TOKEN'),
+        `an npm access token in ${name} must be detected`);
+      assert.ok(findings.some(f => f.type === 'AWS_SECRET_KEY'),
+        `a hardcoded AWS secret in ${name} must be detected`);
+    });
+  }
+
+  // S4c REGRESSION: a placeholder ENV value must still be ignored — isPlaceholder
+  // applies to a scanned Dockerfile exactly as it does elsewhere.
+  it('S4c a placeholder ENV value in a Dockerfile fires NO finding (isPlaceholder still applies)', () => {
+    const { shouldScan, findings } = scanNamed('Dockerfile',
+      'FROM node:20\nENV API_KEY="your-secret-key-here-placeholder"\n');
+    assert.strictEqual(shouldScan, true);
+    assert.strictEqual(findings.length, 0,
+      'a your-... placeholder ENV value must not fire even though the Dockerfile is scanned');
+  });
+
+  // S4d REGRESSION: unchanged skip behavior for genuinely-unscannable types — a
+  // binary asset stays SILENT (no ledger flood); a Terraform state file stays
+  // RECORDED as a secret-dense skip.
+  it('S4d a .png stays SILENT (no ledger) and a .tfstate stays RECORDED as a skip', () => {
+    const png = scanNamed('logo.png', 'PNGBINARYDATA');
+    assert.strictEqual(png.shouldScan, false, '.png is not scannable');
+    assert.strictEqual(png.errors.length, 0, 'a binary asset skip must stay silent');
+
+    const tf = scanNamed('terraform.tfstate', '{"outputs":{"k":{"value":"AKIAIOSFODNN7EXAMPLE"}}}\n');
+    assert.strictEqual(tf.shouldScan, false, '.tfstate is not scannable');
+    assert.ok(tf.errors.some(e => (e.file || '').includes('terraform.tfstate')),
+      'a secret-dense .tfstate skip must still be recorded');
+  });
 
   it('S2b a case-variant secret-dense dotfile (.npmRC) skip is RECORDED', () => {
     const dir = path.join(os.tmpdir(), 'ctoc-s2b-npmrc-' + Date.now());

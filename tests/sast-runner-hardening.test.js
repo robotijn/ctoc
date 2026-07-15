@@ -310,5 +310,154 @@ test('FN-4 regression: two identical-message findings at the same file:line stil
   assert.strictEqual(unique[0].severity, 'HIGH', 'and the higher severity is kept');
 });
 
+// ── R8-D1: the CWE floor is INERT for semgrep (cwe arrives as an array-with-desc) ──
+// Semgrep is the universal fallback for every non-native language and its cwe ALWAYS
+// arrives as ["CWE-78: OS Command Injection"], never the clean "CWE-78". Two bugs made
+// the FN-2 CRITICAL floor never fire for semgrep: extractCWE returned the raw array,
+// and cweSeverityFloor did a verbatim map lookup that missed a decorated key.
+
+test('R8-D1: a semgrep ERROR finding whose cwe is ["CWE-78: ..."] is promoted to CRITICAL', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  r.parseSemgrepResults({ results: [{
+    check_id: 'os-command-injection', path: 'h.py', start: { line: 1, col: 1 },
+    extra: { message: 'cmd inj', severity: 'ERROR',
+      metadata: { cwe: ['CWE-78: OS Command Injection'] }, lines: 'os.system(x)' } }] });
+  assert.strictEqual(r.findings[0].severity, 'CRITICAL',
+    'the array-with-description cwe (the semgrep-universal shape) must reach the CWE-78 CRITICAL floor');
+});
+
+test('R8-D1: a semgrep INFO finding whose cwe is ["CWE-78: ..."] STILL promotes to CRITICAL', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  r.parseSemgrepResults({ results: [{
+    check_id: 'os-command-injection', path: 'h.py', start: { line: 1, col: 1 },
+    extra: { message: 'cmd inj', severity: 'INFO',
+      metadata: { cwe: ['CWE-78: OS Command Injection'] }, lines: 'os.system(x)' } }] });
+  assert.strictEqual(r.findings[0].severity, 'CRITICAL',
+    'a genuine injection CWE promotes to CRITICAL regardless of the tool-reported severity');
+});
+
+test('R8-D1 control: the clean-string cwe "CWE-78" still promotes (unchanged)', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  r.parseSemgrepResults({ results: [{
+    check_id: 'x', path: 'h.py', start: { line: 1, col: 1 },
+    extra: { message: 'cmd inj', severity: 'ERROR', metadata: { cwe: 'CWE-78' }, lines: 'x' } }] });
+  assert.strictEqual(r.findings[0].severity, 'CRITICAL');
+});
+
+test('R8-D1: extractCWE unwraps the array + strips the description; cweSeverityFloor maps any shape', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  assert.strictEqual(r.extractCWE({ cwe: ['CWE-78: OS Command Injection'] }), 'CWE-78');
+  assert.strictEqual(r.extractCWE({ cwe: 'CWE-89' }), 'CWE-89');
+  assert.strictEqual(r.cweSeverityFloor(['CWE-89: SQL Injection']), 'CRITICAL');
+  assert.strictEqual(r.cweSeverityFloor('CWE-78: OS Command Injection'), 'CRITICAL');
+  assert.strictEqual(r.cweSeverityFloor('89'), 'CRITICAL');
+});
+
+// ── R8-D2: the floor must NOT over-promote routine Bandit noise (B603/B607) ────────
+// Bandit's B603 (subprocess_without_shell_equals_true) and B607 (partial-path) fire on
+// essentially every subprocess.call([...]) even with a static safe arg list. They map
+// to CWE-78; forcing them to CRITICAL blocks clean Python builds on a CRITICAL gate.
+
+test('R8-D2: bandit B603 (LOW) is NOT force-promoted to CRITICAL by the CWE-78 floor', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  r.parseBanditResults({ results: [{
+    test_id: 'B603', filename: 'a.py', line_number: 4, issue_text: 'subprocess without shell=True',
+    issue_severity: 'LOW', issue_confidence: 'LOW', code: 'subprocess.call([x])' }] });
+  assert.notStrictEqual(r.findings[0].severity, 'CRITICAL',
+    'B603 is a LOW-severity high-noise finding and must not be forced to CRITICAL');
+  assert.strictEqual(r.findings[0].severity, 'LOW', 'B603 keeps its tool-assessed LOW severity');
+});
+
+test('R8-D2: bandit B607 (partial path) is likewise not force-promoted', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  r.parseBanditResults({ results: [{
+    test_id: 'B607', filename: 'a.py', line_number: 4, issue_text: 'start process with partial path',
+    issue_severity: 'LOW', issue_confidence: 'HIGH', code: 'subprocess.call(["ls"])' }] });
+  assert.strictEqual(r.findings[0].severity, 'LOW', 'B607 keeps its LOW severity, exempt from the floor');
+});
+
+test('R8-D2 regression: a genuine bandit B602 (shell=True, HIGH) still reaches CRITICAL', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  r.parseBanditResults({ results: [{
+    test_id: 'B602', filename: 'a.py', line_number: 4, issue_text: 'subprocess with shell=True',
+    issue_severity: 'HIGH', issue_confidence: 'HIGH', code: 'subprocess.call(x, shell=True)' }] });
+  assert.strictEqual(r.findings[0].severity, 'CRITICAL', 'B602 is a real injection and must promote');
+});
+
+test('R8-D2 regression: a semgrep ERROR CWE-78 finding still reaches CRITICAL (floor intact)', () => {
+  const { SASTRunner } = require('../src/lib/sast-runner');
+  const r = new SASTRunner('/no/such/dir');
+  r.parseSemgrepResults({ results: [{
+    check_id: 'x', path: 'h.py', start: { line: 1, col: 1 },
+    extra: { message: 'cmd inj', severity: 'ERROR', metadata: { cwe: 'CWE-78' }, lines: 'x' } }] });
+  assert.strictEqual(r.findings[0].severity, 'CRITICAL');
+});
+
+// ── R8-D3: loose-source coverage — a manifest-less php/ruby/rust/c file is scanned ──
+// detectLanguages() only source-scanned the five native languages, so a manifest-less
+// php/ruby/rust/csharp/c file (which semgrep-universal CAN scan) detected as [] and
+// run() reported "no supported languages" — a real SQL/command injection read clean.
+
+test('R8-D3: a manifest-less app.php is detected and routed to semgrep universal', () => {
+  const dir = fixture({ 'app.php': '<?php system($_GET["x"]); ?>\n' });
+  try {
+    const runner = new SASTRunner_real(dir);
+    const langs = runner.detectLanguages();
+    assert.ok(langs.includes('php'), `loose .php must be detected, got ${JSON.stringify(langs)}`);
+    const route = runner.securityRouteFor('php');
+    assert.strictEqual(route.native, null, 'php has no native parser here');
+    assert.strictEqual(route.semgrepUniversal, true, 'php is covered by semgrep universal');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('R8-D3: a C injection sink under src/main.c is detected, not silently passed', () => {
+  const dir = fixture({ 'src/main.c': '#include <stdlib.h>\nint main(int c,char**v){system(v[1]);}\n' });
+  try {
+    const langs = new SASTRunner_real(dir).detectLanguages();
+    assert.ok(langs.includes('c'), `loose C source under a subdir must be detected, got ${JSON.stringify(langs)}`);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('R8-D3: loose ruby/rust/csharp source is detected (broad semgrep-scannable set)', () => {
+  const dir = fixture({ 'a.rb': 'system(ARGV[0])\n', 'b.rs': 'fn main(){}\n', 'c.cs': 'class A{}\n' });
+  try {
+    const langs = new SASTRunner_real(dir).detectLanguages();
+    for (const l of ['ruby', 'rust', 'csharp']) {
+      assert.ok(langs.includes(l), `expected ${l}, got ${JSON.stringify(langs)}`);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('R8-D3: run() on app.php with NO scanner reports scanned:false, never "no supported languages"', async () => {
+  cp.execSync = () => { throw new Error('command not found'); };   // every tool probe fails
+  const SASTRunner = freshSAST();
+  const dir = fixture({ 'app.php': '<?php system($_GET["x"]); ?>\n' });
+  try {
+    const res = await new SASTRunner(dir).run();
+    assert.notStrictEqual(res.message, 'No supported languages detected in project',
+      'analyzable php source must not read as "no supported languages"');
+    assert.strictEqual(res.scanned, false, 'no scanner available + analyzable source → scanned:false');
+    assert.notStrictEqual(res.success, true, 'nothing scanned is never dressed as success');
+  } finally { restore(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+// ── R8-D4: honesty shape — the no-analyzable-source path never reads as clean ──────
+
+test('R8-D4: run() on a truly empty repo reports scanned:false (verified-nothing ≠ verified-clean)', async () => {
+  const dir = fixture({});
+  try {
+    const res = await new SASTRunner_real(dir).run();
+    assert.strictEqual(res.scanned, false, 'empty repo → scanned:false, not undefined');
+    assert.notStrictEqual(res.success, true, 'empty repo → not dressed as a clean success:true');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 // A non-reloaded handle for the pure (no-exec) tests above.
 const { SASTRunner: SASTRunner_real } = require('../src/lib/sast-runner');

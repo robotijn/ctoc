@@ -533,13 +533,21 @@ async function runSecurityScan(_tools, opts = {}) {
     } else {
       // F-2: let DependencyAuditor decide, don't require the EXACT detected manager's own
       // tool. yarn/pnpm audit through a built-in npm-audit fallback (dependency-auditor's
-      // runAudit), so a yarn-only or pnpm-only repo on an npm-only machine is genuinely
-      // auditable — the old `filter(isToolAvailable)` marked it unavailable and never ran
-      // auditor.run(), losing reachable coverage. A manager is runnable when its own tool
-      // is present OR it is a JS manager that can fall back to npm and npm is present.
+      // runAudit) — but ONLY when an npm lockfile (package-lock.json/npm-shrinkwrap.json)
+      // is present. `npm audit` reads ONLY those files; on a yarn.lock-/pnpm-lock.yaml-only
+      // tree it returns {"error":{"code":"ENOLOCK"}} and audits NOTHING (verified against
+      // npm 11.x). Claiming the yarn/pnpm manager "runnable" there ran a fallback that
+      // audited nothing yet read as a clean pass — the confirmed FALSE-CLEAN. So the
+      // fallback is genuine ONLY with an npm lockfile present; without one, the real
+      // coverage is the SCA/osv step below (osv reads yarn.lock/pnpm-lock.yaml natively),
+      // and yarn/pnpm is a LOUD skip here rather than a fabricated clean audit. A manager
+      // is runnable when its own tool is present OR it is a JS manager whose npm fallback
+      // can actually read the tree (npm present AND an npm lockfile present).
       const JS_NPM_FALLBACK = new Set(['yarn', 'pnpm']);
       const npmAvailable = auditor.isToolAvailable('npm');
-      const runnable = (m) => auditor.isToolAvailable(m) || (JS_NPM_FALLBACK.has(m) && npmAvailable);
+      const npmLockPresent = auditor._hasNpmLockfile();
+      const runnable = (m) => auditor.isToolAvailable(m)
+        || (JS_NPM_FALLBACK.has(m) && npmAvailable && npmLockPresent);
       const available = managers.filter(runnable);
       const missing = managers.filter(m => !runnable(m));
       for (const m of missing) {
