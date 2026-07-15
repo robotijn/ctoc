@@ -525,20 +525,23 @@ test('F1: a plain npm project is DEFERRED to DependencyAuditor exactly once (no 
 
 test('F2: in a mixed C#+npm repo, the npm CVE osv also discovers is counted ONCE (dropped from SCA)', async () => {
   // osv-scanner auto-discovers EVERY lockfile, so it reports BOTH the C# (NuGet) CVE
-  // and the npm (package-lock.json) CVE. DependencyAuditor already reports the npm
-  // one; SCA must drop the npm finding to avoid the cross-runner double-count, while
-  // keeping the C# finding it is uniquely responsible for.
+  // and the npm (package-lock.json) CVE. DependencyAuditor already reports the ROOT npm
+  // one; SCA must drop the ROOT npm finding to avoid the cross-runner double-count, while
+  // keeping the C# finding it is uniquely responsible for. The osv source paths are the
+  // ROOT lockfiles under the scanned project root — exactly what osv-scanner emits and
+  // exactly what DependencyAuditor's root-cwd audit covers (F1 gates the drop on ROOT).
+  const tmp = mkTmp('sca-mixed-');
   const osv = {
     results: [
       {
-        source: { path: '/proj/packages.lock.json', type: 'lockfile' },
+        source: { path: path.join(tmp, 'packages.lock.json'), type: 'lockfile' },
         packages: [{
           package: { name: 'Newtonsoft.Json', ecosystem: 'NuGet', version: '12.0.1' },
           vulnerabilities: [{ id: 'GHSA-csharp-dos', summary: 'DoS', database_specific: { severity: 'HIGH' } }]
         }]
       },
       {
-        source: { path: '/proj/package-lock.json', type: 'lockfile' },
+        source: { path: path.join(tmp, 'package-lock.json'), type: 'lockfile' },
         packages: [{
           package: { name: 'lodash', ecosystem: 'npm', version: '4.17.4' },
           vulnerabilities: [{ id: 'GHSA-npm-dup', summary: 'Prototype pollution', database_specific: { severity: 'CRITICAL' } }]
@@ -552,7 +555,6 @@ test('F2: in a mixed C#+npm repo, the npm CVE osv also discovers is counted ONCE
     throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
   };
   const { SCARunner } = freshSCA();
-  const tmp = mkTmp('sca-mixed-');
   try {
     fs.writeFileSync(path.join(tmp, 'app.csproj'), '<Project></Project>\n'); // → csharp (osv route)
     fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}'); // → npm, deferred
@@ -563,8 +565,144 @@ test('F2: in a mixed C#+npm repo, the npm CVE osv also discovers is counted ONCE
     const packages = res.findings.map((f) => f.package);
     assert.ok(packages.includes('Newtonsoft.Json'), 'the C# CVE (SCA’s responsibility) must surface');
     assert.ok(!packages.includes('lodash'),
-      'the npm CVE is DependencyAuditor’s — SCA must DROP it so it is not counted twice');
+      'the ROOT npm CVE is DependencyAuditor’s — SCA must DROP it so it is not counted twice');
     assert.equal(res.findings.length, 1, 'exactly one finding: the C# CVE, counted once');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ── F1 REGRESSION (HIGH): the double-count drop must gate on ROOT lockfiles ONLY ──────
+//
+// DependencyAuditor audits ONLY root manifests: detectPackageManagers checks
+// path.join(projectRoot, lockFile), and `npm audit`/etc. run at cwd=projectRoot (root
+// project + declared workspaces). A NESTED independent lockfile (packages/api/
+// package-lock.json) is audited by NEITHER runner. Dropping an osv finding on ecosystem
+// ALONE over-suppresses: a real CVE from a nested lockfile would be scanned by nobody.
+// The drop must require the finding's source.path to be a ROOT manifest.
+
+test('F1: a ROOT npm finding IS dropped when js/ts is deferred (no double-count with DependencyAuditor)', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/proj');
+  r._deferredLanguages = new Set(['javascript', 'typescript']);
+  r.parseOSVResults({
+    results: [{
+      source: { path: '/proj/package-lock.json', type: 'lockfile' },
+      packages: [{
+        package: { name: 'lodash', ecosystem: 'npm', version: '4.17.4' },
+        vulnerabilities: [{ id: 'GHSA-root', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  });
+  assert.equal(r.findings.length, 0,
+    'a ROOT npm lockfile IS audited by DependencyAuditor — dropping avoids the cross-runner double-count');
+});
+
+test('F1 REGRESSION: a NESTED npm finding is KEPT even when js/ts is deferred (DependencyAuditor never audited it)', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/proj');
+  r._deferredLanguages = new Set(['javascript', 'typescript']);
+  r.parseOSVResults({
+    results: [{
+      source: { path: '/proj/packages/api/package-lock.json', type: 'lockfile' },
+      packages: [{
+        package: { name: 'lodash', ecosystem: 'npm', version: '4.17.4' },
+        vulnerabilities: [{ id: 'GHSA-nested', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  });
+  assert.equal(r.findings.length, 1,
+    'a nested independent lockfile is audited by NEITHER runner — SCA must NOT drop its CVE');
+  assert.equal(r.findings[0].package, 'lodash');
+});
+
+test('F1 REGRESSION: a NESTED requirements.txt finding is KEPT when python is deferred', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/proj');
+  r._deferredLanguages = new Set(['python']);
+  r.parseOSVResults({
+    results: [{
+      source: { path: '/proj/services/worker/requirements.txt', type: 'lockfile' },
+      packages: [{
+        package: { name: 'flask', ecosystem: 'PyPI', version: '0.5' },
+        vulnerabilities: [{ id: 'PYSEC-x', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  });
+  assert.equal(r.findings.length, 1,
+    'a nested python lockfile is unaudited by DependencyAuditor (pip-audit runs at root) — keep it');
+});
+
+test('F1 REGRESSION: a NESTED Cargo.lock finding is KEPT when rust is deferred', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/proj');
+  r._deferredLanguages = new Set(['rust']);
+  r.parseOSVResults({
+    results: [{
+      source: { path: '/proj/crates/inner/Cargo.lock', type: 'lockfile' },
+      packages: [{
+        package: { name: 'some-crate', ecosystem: 'crates.io', version: '0.1.0' },
+        vulnerabilities: [{ id: 'RUSTSEC-x', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  });
+  assert.equal(r.findings.length, 1,
+    'a nested rust lockfile is unaudited by DependencyAuditor (cargo audit runs at root) — keep it');
+});
+
+test('F1: an UNMAPPED ecosystem is never dropped even at the root (never suppress the unattributable)', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/proj');
+  r._deferredLanguages = new Set(['javascript', 'typescript']);
+  r.parseOSVResults({
+    results: [{
+      source: { path: '/proj/mix.exs', type: 'lockfile' },
+      packages: [{
+        package: { name: 'phoenix', ecosystem: 'Hex', version: '1.0.0' },
+        vulnerabilities: [{ id: 'GHSA-hex', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  });
+  assert.equal(r.findings.length, 1,
+    'an ecosystem no DependencyAuditor manager maps is never suppressed, root or not');
+});
+
+// ── F3: a poetry project gets REAL osv coverage — pip-audit cannot read poetry.lock ──
+
+test('F3: a pyproject.toml + poetry.lock project is scanned by osv-scanner, python NOT falsely deferred', async () => {
+  // osv-scanner reads poetry.lock natively; pip-audit (DependencyAuditor's AND SCA's
+  // native python tool) audits the environment, never poetry.lock. So python must NOT be
+  // deferred, native pip-audit must be SKIPPED, and osv must run and surface the CVE.
+  const osv = {
+    results: [{
+      source: { path: 'poetry.lock', type: 'lockfile' },
+      packages: [{
+        package: { name: 'jinja2', ecosystem: 'PyPI', version: '2.10' },
+        vulnerabilities: [{ id: 'PYSEC-2019-217', summary: 'SSTI in Jinja2', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-poetry-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'pyproject.toml'), '[tool.poetry]\n');
+    fs.writeFileSync(path.join(tmp, 'poetry.lock'), '');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'a poetry project must be genuinely scanned, not falsely deferred');
+    assert.equal(res.findings.length, 1, 'the poetry.lock CVE osv reads must surface');
+    assert.equal(res.findings[0].package, 'jinja2');
+    assert.equal(res.findings[0].tool, 'osv-scanner', 'poetry python coverage comes from osv, not pip-audit');
+    assert.ok(!(res.errors || []).some((e) => e.tool === 'pip-audit'),
+      'native pip-audit must NOT be invoked for a poetry project (it cannot read poetry.lock)');
+    assert.doesNotMatch(String(res.message || ''), /defer|covered/i,
+      'python must not read as deferred/covered — it was actually scanned');
   } finally {
     restore();
     fs.rmSync(tmp, { recursive: true, force: true });

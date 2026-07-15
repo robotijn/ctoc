@@ -22,7 +22,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { detectAppShape, driveApp, probeHttp } = require('../src/lib/app-runner');
+const { detectAppShape, detectRunTarget, driveApp, probeHttp } = require('../src/lib/app-runner');
 
 /** Make a fresh temp project dir. */
 function makeProject(prefix) {
@@ -66,6 +66,55 @@ describe('app-runner: detectAppShape', () => {
 
   it('classifies an empty directory as unknown', () => {
     assert.strictEqual(detectAppShape(dir), 'unknown');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F1 — the run target must follow the MANIFEST, not a stray source file. A Rust/
+// Go/Python project carrying an incidental C/C++ file at the root (FFI wrapper.h,
+// cgo bridge.c, C-extension _ext.c) must NOT be told its run target is c → ./a.out
+// (a gcc default that does not exist and is not the app). detectRunTarget consumes
+// capabilityRegistry.detectLanguages, whose first element is now manifest-first.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: detectRunTarget follows the manifest, not a stray source file (F1)', () => {
+  const projects = [];
+  after(() => { for (const p of projects) rm(p); });
+
+  it('Cargo.toml + incidental wrapper.h → rust run target (cargo run), NOT c/./a.out', () => {
+    const dir = makeProject('ctoc-rt-rust-'); projects.push(dir);
+    write(dir, 'Cargo.toml', '[package]\nname = "x"\n');
+    write(dir, 'wrapper.h', '#pragma once\n');
+    const t = detectRunTarget(dir);
+    assert.ok(t, 'a Cargo.toml project must be a native run target');
+    assert.strictEqual(t.language, 'rust', 'the run target must be rust, not c');
+    assert.strictEqual(t.strategy.command, 'cargo run', 'and its run command must be cargo run, not ./a.out');
+  });
+
+  it('go.mod + incidental bridge.c → go run target, NOT c', () => {
+    const dir = makeProject('ctoc-rt-go-'); projects.push(dir);
+    write(dir, 'go.mod', 'module x\n');
+    write(dir, 'bridge.c', 'int f(){return 0;}\n');
+    const t = detectRunTarget(dir);
+    assert.ok(t, 'a go.mod project must be a native run target');
+    assert.strictEqual(t.language, 'go', 'the run target must be go, not c');
+  });
+
+  it('requirements.txt + incidental _ext.c → python run target, NOT c', () => {
+    const dir = makeProject('ctoc-rt-py-'); projects.push(dir);
+    write(dir, 'requirements.txt', 'flask\n');
+    write(dir, '_ext.c', 'int f(){return 0;}\n');
+    const t = detectRunTarget(dir);
+    assert.ok(t, 'a requirements.txt project must be a native run target');
+    assert.strictEqual(t.language, 'python', 'the run target must be python, not c');
+  });
+
+  it('CONTROL: a pure C project (main.c) still detects c → its cli run shape', () => {
+    const dir = makeProject('ctoc-rt-purec-'); projects.push(dir);
+    write(dir, 'main.c', 'int main(void){return 0;}\n');
+    const t = detectRunTarget(dir);
+    assert.ok(t, 'a pure C project must still be a native run target');
+    assert.strictEqual(t.language, 'c', 'with no manifest language present, c stays the run target');
+    assert.strictEqual(t.strategy.command, './a.out', 'and its declared cli run command is ./a.out');
   });
 });
 

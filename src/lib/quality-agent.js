@@ -37,7 +37,7 @@ const { findAffectedTests } = require('./coverage-map');
 // LOUDLY: a missing external tool is announced as a skip, never a silent pass,
 // and never a crash.
 const { SecretsScanner } = require('./secrets-scanner');
-const { DependencyAuditor, COVERED_LANGUAGES } = require('./dependency-auditor');
+const { DependencyAuditor, auditedLanguagesFor } = require('./dependency-auditor');
 const { SASTRunner, TOOL_CONFIGS } = require('./sast-runner');
 const { SCARunner } = require('./sca-runner');
 const { MigrationSafetyChecker } = require('./migration-safety-checker');
@@ -570,10 +570,23 @@ async function runSecurityScan(_tools, opts = {}) {
     // tally and run the audit twice. SCA is therefore the osv-universal EXTENDER for
     // the long-tail ecosystems ONLY — it defers every DependencyAuditor-covered
     // language. The exclusion set is read from DependencyAuditor, never hardcoded.
-    const sca = new SCARunner(projectRoot, { excludeLanguages: COVERED_LANGUAGES });
+    // F1 (coverage hole): deferral must key on what DependencyAuditor GENUINELY
+    // audits FOR THIS PROJECT, not the static COVERED_LANGUAGES. The static set marks
+    // python "covered" unconditionally (because `pip` is implemented), so a pipenv-
+    // only (Pipfile.lock) project — whose detected manager `pipenv` DependencyAuditor
+    // does NOT implement — had python deferred here and then hit the languages.length
+    // === 0 short-circuit: sca.run() was NEVER called and the Pipfile.lock dependency
+    // set was audited by NEITHER runner while the gate returned passed:true.
+    // auditedLanguagesFor keys on DETECTED ∩ IMPLEMENTED per project, so an
+    // unimplemented-manager ecosystem now flows to a real SCA scan (or an honest
+    // scanned:false loud skip), while a genuinely audited ecosystem stays deferred
+    // exactly once. sca.run() derives the identical per-project deferral internally,
+    // so no excludeLanguages option is passed (the constructor ignores it anyway).
+    const sca = new SCARunner(projectRoot);
     const detected = sca.detectLanguages();
-    const deferred = detected.filter((l) => COVERED_LANGUAGES.has(l));
-    const languages = detected.filter((l) => !COVERED_LANGUAGES.has(l));
+    const audited = auditedLanguagesFor(projectRoot);
+    const deferred = detected.filter((l) => audited.has(l));
+    const languages = detected.filter((l) => !audited.has(l));
     if (deferred.length) {
       console.log(`   SCA: ${deferred.join(', ')} deferred to DependencyAuditor above (no double-count)`);
     }
@@ -833,7 +846,16 @@ function printSummary(results, duration) {
     console.log('    Lint:      ' + (tier1.lint.passed ? 'PASS' : 'FAIL'));
     console.log('    Typecheck: ' + (tier1.typecheck.passed ? 'PASS' : 'FAIL'));
     console.log('    Tests:     ' + (tier1.tests.passed ? 'PASS' : 'FAIL'));
-    console.log('    Security:  ' + (tier1.security.passed ? 'PASS' : 'FAIL'));
+    // F2 (honesty): the per-scanner console lines above are honest about skips, but
+    // the SUMMARY the human acts on erased them — "Security: PASS" read identically
+    // whether every scanner ran clean or N scanners never ran (tool absent, or the
+    // F1 hole). Surface the skip count so the summary reflects PARTIAL coverage. The
+    // gate is unchanged: skips legitimately do not block; the box just stops hiding.
+    const securitySkips = Array.isArray(tier1.security.skipped) ? tier1.security.skipped.length : 0;
+    const securityStatus = tier1.security.passed ? 'PASS' : 'FAIL';
+    console.log('    Security:  ' + securityStatus + (securitySkips
+      ? ` (${securitySkips} scanner(s) skipped — see log)`
+      : ''));
 
     if (tier1.tests.passed && tier1.tests.passCount) {
       console.log(`\n  Tests: ${tier1.tests.passCount} passed`);

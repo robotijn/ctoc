@@ -140,23 +140,6 @@ const IMPLEMENTED_MANAGERS = new Set([
 ]);
 
 /**
- * The capability-registry language names DependencyAuditor genuinely covers — the
- * union of MANAGER_LANGUAGES restricted to IMPLEMENTED_MANAGERS. This is the STATIC,
- * responsibility-level partition (quality-agent reads it to decide which ecosystems
- * to defer). It deliberately EXCLUDES java, whose only managers (maven/gradle) are
- * unimplemented — so java now flows to SCA/osv-scanner instead of being scanned by
- * neither runner. python REMAINS covered because `pip` is implemented; the finer
- * python-via-poetry/pipenv distinction (a static set cannot express it) is handled
- * per-project by `auditedLanguagesFor`.
- * @type {Set<string>}
- */
-const COVERED_LANGUAGES = new Set(
-  Object.entries(MANAGER_LANGUAGES)
-    .filter(([manager]) => IMPLEMENTED_MANAGERS.has(manager))
-    .flatMap(([, langs]) => langs)
-);
-
-/**
  * Dependency Auditor class
  * Scans for vulnerable dependencies across multiple package managers
  */
@@ -185,6 +168,11 @@ class DependencyAuditor {
   detectPackageManagers() {
     const detected = [];
 
+    // F4: a falsy/empty/non-string root matches nothing — mirror registry.detectLanguages,
+    // which guards length===0. Without this, path.join('', 'package.json') → 'package.json'
+    // resolves against cwd and falsely detects the CURRENT process's package managers.
+    if (!this.projectRoot || typeof this.projectRoot !== 'string') return detected;
+
     for (const [name, config] of Object.entries(PACKAGE_MANAGERS)) {
       // Check lock files first (more specific)
       for (const lockFile of config.lockFiles) {
@@ -204,7 +192,18 @@ class DependencyAuditor {
             if (configFile === 'package.json' && !detected.some(d => ['npm', 'yarn', 'pnpm'].includes(d))) {
               detected.push('npm');
             } else if (configFile === 'pyproject.toml' && !detected.some(d => ['pip', 'poetry'].includes(d))) {
-              detected.push('pip');
+              // F3: a poetry.lock present means python is poetry-managed. DependencyAuditor's
+              // `pip-audit --format=json` (no -r) audits the ENVIRONMENT, never poetry.lock —
+              // so co-detecting `pip` here falsely claims python coverage while poetry.lock's
+              // pinned deps go unaudited. Detect `poetry` (unimplemented → NOT in
+              // IMPLEMENTED_MANAGERS) instead, so auditedLanguagesFor omits python and
+              // SCA/osv-scanner (which reads poetry.lock natively) covers it. Absent a
+              // poetry.lock the project is genuinely pip-managed → keep the `pip` default.
+              if (safeFs.existsSync(path.join(this.projectRoot, 'poetry.lock'))) {
+                detected.push('poetry');
+              } else {
+                detected.push('pip');
+              }
             } else if (!detected.includes(name)) {
               detected.push(name);
             }
@@ -1051,6 +1050,5 @@ module.exports = {
   PACKAGE_MANAGERS,
   MANAGER_LANGUAGES,
   IMPLEMENTED_MANAGERS,
-  COVERED_LANGUAGES,
   auditedLanguagesFor
 };

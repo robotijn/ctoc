@@ -199,9 +199,19 @@ function maybeInjectLessons(projectPath) {
  *
  * This is the LIVE human-facing consumer that makes the databases capability data
  * wired-is-done: detectStack's dep-detected `databases` (each enriched from the
- * registry) surface here as "Databases: PostgreSQL (RLS supported, TLS required)".
+ * registry) surface here as "Databases: postgresql (RLS-capable, TLS-capable)".
  * Returns '' when no database is detected, so the banner is unchanged for projects
  * with no persistence layer — the render is purely ADDITIVE.
+ *
+ * TRUTHFUL WORDING (F5). The posture comes purely from the STATIC registry capability
+ * for the database engine, NOT from any check on THIS project's actual connection. So it
+ * is worded as a CAPABILITY ("RLS-capable", "TLS-capable"), never as a verified runtime
+ * assertion about the project ("TLS required" wrongly read as "this project's connection
+ * uses TLS").
+ *
+ * CRASH-SAFE + HIDE-NOTHING (F2/F5). SessionStart runs EVERY session and must never
+ * throw. A null / non-object / nameless element is SKIPPED (it never dereferences
+ * `.name` on null, and never renders a garbled "Databases: " header with nothing after).
  *
  * @param {{databases?: Array<{name: string, security?: Object}>}} stack
  * @returns {string} a leading-newline line, or '' when there is nothing to show.
@@ -210,16 +220,21 @@ function formatDatabasesLine(stack) {
   const dbs = Array.isArray(stack?.databases) ? stack.databases : [];
   if (dbs.length === 0) return '';
   const parts = dbs.map((db) => {
-    const sec = db && db.security ? db.security : {};
+    // F2: guard the element — a null/non-object/nameless entry is skipped, never a throw
+    // and never a garbled header.
+    const label = db && typeof db === 'object' && db.name ? String(db.name) : '';
+    if (!label) return null;
+    const sec = db.security && typeof db.security === 'object' ? db.security : {};
+    // F5: capability wording — "-capable", not a "required"/"supported" runtime assertion.
     const posture = [];
-    if (sec.rls === 'supported') posture.push('RLS supported');
+    if (sec.rls === 'supported') posture.push('RLS-capable');
     else if (sec.rls === 'not-applicable') posture.push('RLS n/a');
     else if (sec.rls === 'not-native') posture.push('RLS not native');
-    if (sec.connection === 'tls-required') posture.push('TLS required');
+    if (sec.connection === 'tls-required') posture.push('TLS-capable');
     else if (sec.connection === 'file-local') posture.push('file-local');
-    const label = String(db.name || '');
     return posture.length ? `${label} (${posture.join(', ')})` : label;
-  });
+  }).filter((p) => p);
+  if (parts.length === 0) return '';
   return `\nDatabases: ${parts.join(' · ')}`;
 }
 
@@ -229,9 +244,18 @@ function formatDatabasesLine(stack) {
  * The LIVE human-facing consumer that makes the frameworks capability data
  * wired-is-done: detectStack's registry-enriched `frameworkCapabilities` (each carrying
  * its framework-specific security concern areas) surface here as
- * "Frameworks: nextjs (security-headers, auth-middleware) · django (csrf, xss)".
+ * "Frameworks: nextjs (security-headers, env-exposure, ssrf, auth-middleware) · django (csrf, xss)".
  * Returns '' when no framework is detected, so the banner is unchanged for projects
  * with no application framework — the render is purely ADDITIVE.
+ *
+ * HIDE NOTHING (F4). ALL security concerns are shown — never silently truncated. Dropping
+ * concerns beyond the first two (the old `slice(0, 2)`) hid real security concerns (ssrf,
+ * auth-middleware) from the human with no indicator, violating the project's hard
+ * "never hide anything from the human, never by truncation" rule.
+ *
+ * CRASH-SAFE (F3). SessionStart runs EVERY session and must never throw. A null /
+ * non-object / nameless element is SKIPPED (it never dereferences `.name` on null, and
+ * never renders a garbled "Frameworks: " header with nothing after).
  *
  * @param {{frameworkCapabilities?: Array<{name: string, security?: {concerns?: string[]}}>}} stack
  * @returns {string} a leading-newline line, or '' when there is nothing to show.
@@ -240,12 +264,15 @@ function formatFrameworksLine(stack) {
   const fws = Array.isArray(stack?.frameworkCapabilities) ? stack.frameworkCapabilities : [];
   if (fws.length === 0) return '';
   const parts = fws.map((fw) => {
-    const concerns = fw && fw.security && Array.isArray(fw.security.concerns) ? fw.security.concerns : [];
-    const label = String(fw.name || '');
-    // Show the top two concern areas — enough to be useful, short enough for one line.
-    const shown = concerns.slice(0, 2);
-    return shown.length ? `${label} (${shown.join(', ')})` : label;
-  });
+    // F3: guard the element — a null/non-object/nameless entry is skipped, never a throw
+    // and never a garbled header.
+    const label = fw && typeof fw === 'object' && fw.name ? String(fw.name) : '';
+    if (!label) return null;
+    const concerns = fw.security && Array.isArray(fw.security.concerns) ? fw.security.concerns : [];
+    // F4: show ALL concern areas — hide nothing from the human, no silent truncation.
+    return concerns.length ? `${label} (${concerns.join(', ')})` : label;
+  }).filter((p) => p);
+  if (parts.length === 0) return '';
   return `\nFrameworks: ${parts.join(' · ')}`;
 }
 

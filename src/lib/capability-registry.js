@@ -851,18 +851,36 @@ function frameworkCapability(name, projectRoot) {
  * detection power as `tool-detector`; file-extension tree-walking stays in
  * stack-detector (CR5-s4), out of scope here.
  *
- * ORDER IS DETERMINISTIC AND CROSS-PLATFORM STABLE (F1). Languages are iterated in
- * load() order, which is the SORTED capability-filename order — each read*Dir loader
- * `.sort()`s its directory listing, so iteration does NOT depend on fs.readdirSync order
- * (alphabetical-ish on APFS, hash order on ext4/xfs). Each language is pushed at most once
- * (first matching marker wins). Therefore `detectLanguages(root)[0]` — the run target
- * app-runner consumes — is identical on every platform for the same repo and never shifts
- * between loads. (For a project whose overrides ADD a new language, the bundled languages
- * keep their sorted positions and the new key appends in the override dir's sorted order —
- * still fully deterministic.)
+ * ORDER IS DETERMINISTIC, CROSS-PLATFORM STABLE, AND MANIFEST-FIRST (F1). Two keys
+ * order the result:
+ *
+ *   1. PRIMARY — MARKER KIND. A language matched by an EXACT MANIFEST MARKER (a specific
+ *      filename that exists: `Cargo.toml`, `go.mod`, `requirements.txt`, `pom.xml`,
+ *      `package.json`, …) ranks AHEAD of a language matched ONLY by a SOURCE-FILE GLOB
+ *      (`*.c`, `*.h`, `*.sh`). This is the actual F1 fix. Alphabetical was the WRONG
+ *      primary key: `c.yaml` sorts first of all 26 capability files, so ANY Rust/Go/Python
+ *      repo carrying an incidental C/C++ file at the root (an FFI `wrapper.h`, a cgo
+ *      `bridge.c`, a C-extension `_ext.c`) was ranked with `c` FIRST — and app-runner's run
+ *      target (`detectLanguages[0]`) became `c` → `./a.out`, a gcc default that does not
+ *      exist and is not the app. A manifest is a decisive "this repo IS this language"
+ *      signal; a stray source file is not. So the manifest tier always precedes the
+ *      glob-only tier.
+ *
+ *   2. SECONDARY (within a tier) — SORTED capability-filename order. Each read*Dir loader
+ *      `.sort()`s its directory listing, so load() order is the sorted-filename order and
+ *      does NOT depend on fs.readdirSync order (alphabetical-ish on APFS, hash order on
+ *      ext4/xfs). Iterating load() order and pushing into per-tier buckets keeps each tier
+ *      sorted. Therefore `detectLanguages(root)[0]` — the run target app-runner consumes —
+ *      is identical on every platform for the same repo and never shifts between loads.
+ *
+ * Each language is pushed at most once. A language that matches an exact marker at all is
+ * a manifest match, even if it ALSO has glob markers (the exact signal decides the tier).
+ * (For a project whose overrides ADD a new language, tiering is unchanged and the new key
+ * appends within its tier in the override dir's sorted order — still fully deterministic.)
  *
  * @param {string} projectRoot project root to scan.
- * @returns {string[]} detected language names, in deterministic sorted-capability-filename order.
+ * @returns {string[]} detected language names — manifest-matched first, then glob-only-matched,
+ *   each sorted-capability-filename order within its tier (deterministic, cross-platform).
  */
 function detectLanguages(projectRoot) {
   if (typeof projectRoot !== 'string' || projectRoot.length === 0) return [];
@@ -873,24 +891,32 @@ function detectLanguages(projectRoot) {
   try {
     rootFiles = safeFs.readdirSync(projectRoot);
   } catch { rootFiles = []; }
-  const detected = [];
+  // Two buckets, filled in load() (sorted-filename) order so each stays sorted internally.
+  const manifestMatched = []; // matched at least one EXACT marker → decisive language signal
+  const globOnlyMatched = []; // matched ONLY a source-file glob → weak, incidental signal
   for (const [lang, cap] of Object.entries(languages)) {
     const markers = Array.isArray(cap.detectionMarkers) ? cap.detectionMarkers : [];
+    let exact = false;
+    let glob = false;
     for (const marker of markers) {
       if (typeof marker !== 'string') continue;
       if (marker.includes('*')) {
         // Glob marker: ReDoS-safe, anchored whole-filename match (see JSDoc above).
         const pattern = safeRegExp('^' + escapeRegExp(marker).replace(/\\\*/g, '.*') + '$');
-        if (rootFiles.some((f) => pattern.test(f))) { detected.push(lang); break; }
+        if (rootFiles.some((f) => pattern.test(f))) glob = true;
       } else {
-        // Exact-filename marker: unchanged existsSync behavior.
+        // Exact-filename marker: unchanged existsSync behavior (matches a file OR a dir).
         try {
-          if (safeFs.existsSync(path.join(projectRoot, marker))) { detected.push(lang); break; }
+          if (safeFs.existsSync(path.join(projectRoot, marker))) exact = true;
         } catch { /* unreadable → not detected via this marker */ }
       }
+      // An exact match is decisive — no need to keep scanning this language's markers.
+      if (exact) break;
     }
+    if (exact) manifestMatched.push(lang);
+    else if (glob) globOnlyMatched.push(lang);
   }
-  return detected;
+  return [...manifestMatched, ...globOnlyMatched];
 }
 
 /**
