@@ -135,6 +135,20 @@ describe('DEF 3: web-fullstack project type — Next/Nuxt/Remix/SvelteKit get se
     } finally { rm(dir); }
   });
 
+  it('a plain Svelte+Vite SPA (root svelte.config.js, no SvelteKit) is web-frontend, NOT web-fullstack', () => {
+    // The official create-vite --template svelte SPA ships a root svelte.config.js for
+    // vitePreprocess with NO server and dev/build/preview scripts (no `start`). Routing on
+    // that shared filename to web-fullstack drives a broken `npm start` reported honest:true.
+    // svelte.config.js is therefore NOT a fullstack marker; SvelteKit is detected by its dep.
+    const dir = makeProject('ctoc-svelte-spa-');
+    try {
+      fs.writeFileSync(path.join(dir, 'svelte.config.js'), 'export default {};\n');
+      fs.writeFileSync(path.join(dir, 'vite.config.ts'), 'export default {};\n');
+      assert.equal(registry.projectTypeFor(dir), 'web-frontend',
+        'a plain Svelte+Vite SPA must not be mis-classified as fullstack (broken npm start)');
+    } finally { rm(dir); }
+  });
+
   it('a nuxt.config.ts and a remix.config.js also classify as web-fullstack', () => {
     for (const marker of ['nuxt.config.ts', 'remix.config.js']) {
       const dir = makeProject('ctoc-fs-marker-');

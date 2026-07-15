@@ -460,6 +460,23 @@ async function runSecurityScan(_tools, opts = {}) {
     console.log(secretFindings.length
       ? `   Secrets: ${secretFindings.length} finding(s)`
       : '   Secrets: none');
+
+    // File-level skips the scanner RECORDED (an oversized file past maxFileSize, an
+    // unreadable file, or an unreadable directory) are folded into skipped[] so a
+    // file that was too large or unreadable to scan is VISIBLE — not a silent clean
+    // pass. The gate is unchanged: a skip is not a finding and does NOT block (no
+    // severity bump); the summary just stops erasing that N files went unscanned.
+    // scanner.errors entries are {file|path|tool, error}; the location is relativized
+    // to projectRoot for a legible, host-independent message.
+    for (const e of (scanner.errors || [])) {
+      const where = e.file || e.path || e.tool || 'unknown';
+      const loc = (e.file || e.path)
+        ? path.relative(projectRoot, where) || where
+        : where;
+      const msg = `secrets scan skipped file (NOT scanned): ${loc} — ${e.error}`;
+      skipped.push(msg);
+      console.log(`   ${msg}`);
+    }
   } catch (err) {
     const msg = `secrets scan skipped (error, NOT a pass): ${err.message}`;
     skipped.push(msg);

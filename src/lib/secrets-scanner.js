@@ -37,7 +37,11 @@ const SECRET_TYPES = {
   SSH_PRIVATE_KEY: { name: 'SSH Private Key', severity: 'CRITICAL', verified: true },
   PGP_PRIVATE_KEY: { name: 'PGP Private Key', severity: 'CRITICAL', verified: true },
   JWT_SECRET: { name: 'JWT Secret', severity: 'HIGH', verified: false },
-  JWT_TOKEN: { name: 'JSON Web Token', severity: 'HIGH', verified: false },
+  // A JWT is a token, not inherently a secret. Public/example/expired JWTs
+  // (the jwt.io demo token, SDK fixtures, docs) are everywhere, so a JWT must
+  // be SURFACED but must NOT block the gate — hence LOW, mirroring HIGH_ENTROPY.
+  // A JWT worth acting on is still reported; a public example no longer blocks.
+  JWT_TOKEN: { name: 'JSON Web Token', severity: 'LOW', verified: false },
   PASSWORD: { name: 'Hardcoded Password', severity: 'HIGH', verified: false },
   DATABASE_URL: { name: 'Database Connection String', severity: 'CRITICAL', verified: false },
   // A value assigned to a secret|api_key|token|auth-named variable is a real
@@ -141,8 +145,14 @@ const SECRET_PATTERNS = [
     description: 'OpenAI Project API Key'
   },
   {
+    // Classic OpenAI key. The `(?![a-z]+\b)` negative lookahead rejects an
+    // all-lowercase-alphabetic body — real OpenAI keys are mixed base62
+    // (upper + lower + digits), whereas a benign `sk-`-prefixed CSS/URL slug
+    // (`sk-buttonprimarywrapperelementxl`) is lowercase words. A key with even
+    // one uppercase letter or digit still matches. Lookahead is a single
+    // bounded `[a-z]+` (no nesting) — ReDoS-safe.
     type: 'OPENAI_API_KEY',
-    pattern: /\bsk-[A-Za-z0-9]{20,}\b/g,
+    pattern: /\bsk-(?![a-z]+\b)[A-Za-z0-9]{20,}\b/g,
     description: 'OpenAI API Key'
   },
 
@@ -459,6 +469,30 @@ class SecretsScanner {
     // 4. Runs of x's used as a mask (xxxx, xxxxxxxx).
     if (/^x{3,}$/.test(lower)) return true;
 
+    // 4b. EMBEDDED mask run: a run of >= 4 identical mask-like characters
+    //     (x / X / * / 0 / .) anywhere in the value means it is a masked
+    //     example — e.g. an OpenAI-doc `sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+    //     in a .env.example. This is a RUN signal (a repeated masking char),
+    //     NOT a dictionary substring, so it does NOT reintroduce the Round-3
+    //     substring-swallow bug: a real secret that merely CONTAINS "none" or
+    //     "test" (e.g. `AKIAnoneFODNN7Q9WZ2XY`) has no such run and stays
+    //     detected. `*` and `.` never occur in an alphanumeric key body, so
+    //     their presence in a run is unambiguously a mask. Bounded, ReDoS-safe.
+    if (/([xX*0.])\1{3,}/.test(str)) return true;
+
+    // 4c. DOMINANT single character: a value that is >= 60% one repeated
+    //     character is a mask/filler, never a real high-entropy secret. Cheap
+    //     single pass over the (short) value; no regex, ReDoS-irrelevant.
+    if (str.length >= 5) {
+      const counts = {};
+      let max = 0;
+      for (const ch of str) {
+        counts[ch] = (counts[ch] || 0) + 1;
+        if (counts[ch] > max) max = counts[ch];
+      }
+      if (max / str.length >= 0.6) return true;
+    }
+
     // 5. A word-bounded placeholder phrase — the boundary (`-`, `_` edges, space
     //    or ends) is what separates a genuine placeholder like `xxx-secret-xxx`
     //    from a random blob that happens to contain the letters.
@@ -481,11 +515,17 @@ class SecretsScanner {
     const lineEnd = content.indexOf('\n', position);
     const line = content.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
 
-    // PEM boundary lines (-----BEGIN/END ... KEY-----) begin with dashes but are
-    // NOT SQL `--` comments. Without this guard a private-key header on its own
-    // line matches /^\s*--/ and the whole key block is silently skipped — the
-    // CRITICAL private-key blind spot. Exempt PEM boundaries before any check.
-    if (/^\s*-----(BEGIN|END)\b/.test(line)) return false;
+    // REAL PEM boundary lines (-----BEGIN/END <PEM LABEL>-----) begin with
+    // dashes but are NOT SQL `--` comments. Without this guard a private-key
+    // header on its own line matches /^\s*--/ and the whole key block is
+    // silently skipped — the CRITICAL private-key blind spot. The exemption is
+    // scoped to KNOWN PEM labels (RFC 7468 + PGP), NOT an arbitrary
+    // `-----BEGIN <anything>`: a SQL comment beginning `-----BEGIN AKIA...` is a
+    // comment, not a key boundary, and must stay comment-classified. Bounded
+    // alternation, no nested quantifiers — ReDoS-safe.
+    if (/^\s*-----(BEGIN|END) (CERTIFICATE|CERTIFICATE REQUEST|X509 CRL|(RSA |EC |DSA |ENCRYPTED |OPENSSH )?PRIVATE KEY|(RSA |EC |DSA )?PUBLIC KEY|PGP (PRIVATE|PUBLIC) KEY BLOCK|PGP MESSAGE)-----/.test(line)) {
+      return false;
+    }
 
     // Check for common comment patterns
     const commentPatterns = [
@@ -524,6 +564,18 @@ class SecretsScanner {
 
           // Skip placeholders
           if (this.isPlaceholder(value)) continue;
+
+          // A canonical UUID (8-4-4-4-12 hex) assigned to a secret/token-named
+          // variable is essentially never a real credential — request ids,
+          // session ids, fixture ids and correlation ids all take this exact
+          // shape. Exclude it from the GENERIC_SECRET fallback ONLY. Pure hex
+          // (git SHA / sha256) is intentionally left in: a hex value CAN be a
+          // real token, so excluding it would risk a Round-3-style false
+          // negative. Bounded anchored regex — ReDoS-safe.
+          if (secretPattern.type === 'GENERIC_SECRET' &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+            continue;
+          }
 
           // Skip if in comment (but still flag .env files)
           if (!relativePath.includes('.env') && this.isInComment(content, position)) continue;
