@@ -78,38 +78,62 @@ function loadPackageJson(projectPath) {
 /**
  * Classify a project by the kind of human-facing runtime it has.
  *
- * Ordering rationale (documented decision under ambiguity): a detected web
- * framework wins first (Next.js has both `dev` and web deps). A `bin` field is
- * the strongest signal of a command-line tool, so it is checked before a
- * long-running `dev`/`start` script. A project with a runnable script but no bin
- * is a server. A package with only `main`/`exports`/`module` is a library — no
- * human-facing runtime, which is NOT a gate failure. Anything else is unknown.
+ * Ordering rationale (documented decision under ambiguity): a `bin` field is the
+ * strongest signal of a command-line tool, so it is checked FIRST — a published
+ * CLI that also ships a docs site is still a CLI. The hard 'web' shape is claimed
+ * only when a LAUNCHABLE web runtime is present (a `dev`/`start` script), because
+ * driveServer requires one and a missing script is a gate failure; a web SIGNAL
+ * without a runnable script (a component library with its framework as a
+ * peerDependency, or a stray framework config file) is therefore NOT web. A
+ * project with a runnable script but no web signal is a server. A package with
+ * only `main`/`exports`/`module` is a library — no human-facing runtime, which is
+ * NOT a gate failure. Anything else is unknown.
  *
  * @param {string} projectPath - Project root.
  * @returns {'web'|'server'|'cli'|'library'|'unknown'} The project shape.
  */
 function detectAppShape(projectPath) {
   const detector = new FrameworkDetector(projectPath);
-  if (detector.isWebApp()) return 'web';
-
-  // FINDING 2: MONOREPO web detection. In a workspace/monorepo (pnpm/npm/yarn/turbo)
-  // the framework dep lives in a member (apps/web, packages/frontend), NOT the root,
-  // so the root-only isWebApp() above returns false and the project would fall
-  // through to 'server' — running `turbo dev` blindly while framework-security sees
-  // no framework. detectAll() (previously a dead export) walks apps/packages/* and
-  // returns the detected web frameworks; if ANY member is a web app, the project is
-  // web-shaped. Every FRAMEWORKS entry is a web framework, so a non-empty result
-  // means a web member exists. The single-package path is untouched: a plain server
-  // with no web member yields an empty array and falls through unchanged.
-  const members = detector.detectAll();
-  if (Array.isArray(members) && members.length > 0) return 'web';
-
   const pkg = loadPackageJson(projectPath);
-  if (!pkg) return 'unknown';
+  const scripts = (pkg && pkg.scripts) || {};
+  const hasLaunchableWebRuntime = Boolean(scripts.dev || scripts.start);
 
-  const scripts = pkg.scripts || {};
-  if (pkg.bin) return 'cli';
-  if (scripts.dev || scripts.start) return 'server';
+  // A `bin` field is the strongest command-line-tool signal, so it is checked
+  // BEFORE any web branch: a published CLI that ALSO ships a docs site under
+  // apps/web is still a CLI, and driving it as a web server (which it has no
+  // dev/start script for) is a FALSE gate failure (F2). Ordering it first means a
+  // web signal in a workspace member never masks the bin.
+  if (pkg && pkg.bin) return 'cli';
+
+  // 'web' is a HARD shape: driveServer REQUIRES a dev/start script, and a missing
+  // one is surfaced as a gate failure ("no dev/start script to launch"). So only
+  // classify 'web' when a LAUNCHABLE web runtime is actually present. Without a
+  // dev/start script, a project that merely carries web SIGNALS must fall through
+  // to library/unknown rather than be forced into the hard web shape:
+  //   - F4: a component library lists its framework as a peerDependency (the
+  //         standard publish pattern) and ships only build/test scripts — it is a
+  //         library, not a web app;
+  //   - F3: a non-web project with a stray framework config file (astro.config.mjs,
+  //         next.config.js) and a malformed/absent package.json is unknown, not web.
+  // A REAL web app always carries a dev/start script, so this gate never demotes a
+  // genuine web app (the regression guards below in the test suite prove it).
+  if (hasLaunchableWebRuntime) {
+    if (detector.isWebApp()) return 'web';
+
+    // FINDING 2: MONOREPO web detection. In a workspace/monorepo (pnpm/npm/yarn/
+    // turbo) the framework dep lives in a member (apps/web, packages/frontend), NOT
+    // the root, so the root-only isWebApp() above returns false and the project
+    // would fall through to 'server' — running `turbo dev` blindly while
+    // framework-security sees no framework. detectAll() walks apps/packages/* and
+    // returns the detected web frameworks; if ANY member is a web app AND the root
+    // has a launchable runtime (the `turbo dev`/`pnpm -r dev` orchestrator script),
+    // the project is web-shaped.
+    const members = detector.detectAll();
+    if (Array.isArray(members) && members.length > 0) return 'web';
+  }
+
+  if (!pkg) return 'unknown';
+  if (hasLaunchableWebRuntime) return 'server';
   if (pkg.main || pkg.exports || pkg.module) return 'library';
   return 'unknown';
 }

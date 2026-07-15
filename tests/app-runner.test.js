@@ -61,8 +61,14 @@ describe('app-runner: detectAppShape', () => {
     assert.strictEqual(detectAppShape(dir), 'cli');
   });
 
-  it('classifies a react dependency as a web app', () => {
-    write(dir, 'package.json', JSON.stringify({ name: 'web', dependencies: { react: '^18.0.0' } }));
+  it('classifies a react dependency WITH a dev script as a web app', () => {
+    // A real web app always carries a launchable runtime (a dev/start script). A
+    // framework dependency ALONE (no dev/start) is not a launchable web app — see
+    // the F4 block below, where a react-as-peerDependency component library must
+    // NOT be forced into the hard web shape.
+    write(dir, 'package.json', JSON.stringify({
+      name: 'web', dependencies: { react: '^18.0.0' }, scripts: { dev: 'vite' }
+    }));
     assert.strictEqual(detectAppShape(dir), 'web');
   });
 
@@ -628,5 +634,169 @@ describe('app-runner: the poll loop recovers a transient 5xx, still fails a pers
 
     const after = await probeHttp(res.evidence.port);
     assert.strictEqual(after.ok, false, 'the launched server must be torn down');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F4 — a web SIGNAL without a launchable web RUNTIME must NOT be the hard 'web'
+// shape. 'web' is a HARD shape: driveServer REQUIRES a dev/start script, and a
+// missing one becomes a FALSE gate failure ("no dev/start script"). A React/Vue
+// COMPONENT LIBRARY lists its framework as a peerDependency (the standard publish
+// pattern) and ships only build/test scripts — it has NO dev/start. Round 11
+// widened hasDependency to read peerDependencies, so such a library was classified
+// 'web' and failed the gate. It must be a 'library' (no runtime → applicable:false,
+// NOT a failure).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: a web signal without a launchable runtime is NOT the hard web shape (F4)', () => {
+  const projects = [];
+  after(() => { for (const p of projects) rm(p); });
+
+  it('a component library (react as peerDependency, no dev/start) → library, NOT web', async () => {
+    const dir = makeProject('ctoc-complib-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({
+      name: 'my-react-components',
+      main: 'dist/index.js',
+      peerDependencies: { react: '^18' },
+      scripts: { build: 'tsup', test: 'vitest run' }
+    }));
+
+    assert.notStrictEqual(
+      detectAppShape(dir), 'web',
+      'a component library that lists react as a peerDependency must not be forced into the hard web shape'
+    );
+    assert.strictEqual(detectAppShape(dir), 'library', 'a main-only package with no runtime is a library');
+
+    const res = await driveApp(dir, { timeBudgetMs: 5000 });
+    assert.strictEqual(res.applicable, false, 'a library has no runtime to launch — not a gate failure');
+    assert.deepStrictEqual(res.errors, [], 'must not produce a false "no dev/start script" gate failure');
+  });
+
+  it('a Vite component library (react peerDep + vite.config + vite devDep, no dev/start) → NOT a hard web gate failure', async () => {
+    const dir = makeProject('ctoc-vitelib-');
+    projects.push(dir);
+    write(dir, 'vite.config.ts', 'export default {}');
+    write(dir, 'package.json', JSON.stringify({
+      name: 'my-vite-lib',
+      main: 'dist/index.js',
+      module: 'dist/index.mjs',
+      peerDependencies: { react: '^18' },
+      devDependencies: { vite: '^5' },
+      scripts: { build: 'vite build', test: 'vitest run' }
+    }));
+
+    assert.notStrictEqual(
+      detectAppShape(dir), 'web',
+      'a Vite-built component library with no dev/start script is not a launchable web server'
+    );
+
+    const res = await driveApp(dir, { timeBudgetMs: 5000 });
+    assert.strictEqual(res.applicable, false, 'a Vite library is not a launchable web server — not a gate failure');
+    assert.deepStrictEqual(res.errors, [], 'must not produce a false hard-web gate failure');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F2 — a `bin` field is the strongest command-line-tool signal and must win over a
+// web signal found in a workspace member. A published CLI that ALSO ships a docs
+// site under apps/web is still a CLI. Round 11 ran detectAll() (which surfaces the
+// apps/web framework) BEFORE the bin check, so the CLI was reclassified 'web' and
+// FAILED the gate (a CLI has no dev/start script). The bin check must precede the
+// detectAll web branch so the CLI is driven as a CLI.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: a bin field wins over a web signal in a workspace member (F2)', () => {
+  const projects = [];
+  after(() => { for (const p of projects) rm(p); });
+
+  it('a CLI with a docs site in apps/web is classified cli (bin wins), driven as a CLI', async () => {
+    const dir = makeProject('ctoc-cli-docs-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({
+      name: 'mycli', bin: { mycli: 'cli.js' }, scripts: { build: 'tsc' }
+    }));
+    write(dir, 'cli.js', [
+      '#!/usr/bin/env node',
+      "console.log('Usage: mycli [options]');",
+      'process.exit(0);'
+    ].join('\n'));
+    fs.mkdirSync(path.join(dir, 'apps', 'web'), { recursive: true });
+    write(path.join(dir, 'apps', 'web'), 'next.config.js', 'module.exports = {}');
+    write(path.join(dir, 'apps', 'web'), 'package.json', JSON.stringify({
+      name: 'docs', dependencies: { next: '^15.0.0', react: '^18' }
+    }));
+
+    assert.strictEqual(
+      detectAppShape(dir), 'cli',
+      'a published CLI that ships a docs site must stay a CLI, not be reclassified web'
+    );
+
+    const res = await driveApp(dir, { timeBudgetMs: 10000 });
+    assert.strictEqual(res.applicable, true, 'a CLI is app-shaped');
+    assert.strictEqual(res.responded, true, `the CLI must be driven, not failed as a web app; errors: ${JSON.stringify(res.errors)}`);
+    assert.strictEqual(res.evidence.exitCode, 0, 'the CLI must exit 0');
+    assert.deepStrictEqual(res.errors, [], 'a working CLI must not produce a false web gate failure');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F3 — a stray framework config file on a non-web project must NOT be the hard
+// 'web' shape. Round 11's config-file fallback (FINDING 5a) makes detect() report
+// a framework from a config file even with a malformed/absent package.json. On a
+// project with a stray astro.config.mjs / next.config.js but NO launchable runtime,
+// that would classify 'web' and fail the gate. With no dev/start script it must NOT
+// be web (unknown/library) → applicable:false, not a gate failure.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: a stray framework config on a non-web project is NOT the hard web shape (F3)', () => {
+  const projects = [];
+  after(() => { for (const p of projects) rm(p); });
+
+  it('a malformed package.json + a stray astro.config.mjs → NOT web, applicable:false', async () => {
+    const dir = makeProject('ctoc-strayconfig-');
+    projects.push(dir);
+    write(dir, 'package.json', '{ this is : not valid json ,,, }');
+    write(dir, 'astro.config.mjs', 'export default {}');
+
+    assert.notStrictEqual(
+      detectAppShape(dir), 'web',
+      'a stray astro.config on a project with no launchable runtime must not become a hard web gate failure'
+    );
+
+    const res = await driveApp(dir, { timeBudgetMs: 5000 });
+    assert.strictEqual(res.applicable, false, 'nothing launchable here — not a gate failure');
+    assert.deepStrictEqual(res.errors, [], 'a non-web project with a stray config must not fail the gate');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGRESSION GUARD (F2/F3/F4) — a REAL web app still classifies as web. A launchable
+// web runtime (a framework dep PLUS a dev/start script) is the whole point of the
+// hard web shape; the F2/F3/F4 fixes must not weaken it.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: a real web app (framework dep + dev script) is still web (regression guard)', () => {
+  const projects = [];
+  after(() => { for (const p of projects) rm(p); });
+
+  it('next dependency + scripts.dev → web', () => {
+    const dir = makeProject('ctoc-realweb-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({
+      name: 'realweb', dependencies: { next: '^15.0.0', react: '^18' }, scripts: { dev: 'next dev' }
+    }));
+    assert.strictEqual(detectAppShape(dir), 'web', 'a real web app with a dev script must still be web');
+  });
+
+  it('a monorepo whose apps/web is a genuine web app WITH a root dev script → web', () => {
+    const dir = makeProject('ctoc-realmonorepo-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({
+      name: 'root', private: true, workspaces: ['apps/*'],
+      scripts: { dev: 'turbo dev' }, devDependencies: { turbo: '^2.0.0' }
+    }));
+    fs.mkdirSync(path.join(dir, 'apps', 'web'), { recursive: true });
+    write(path.join(dir, 'apps', 'web'), 'next.config.js', 'module.exports = {}');
+    write(path.join(dir, 'apps', 'web'), 'package.json', JSON.stringify({
+      name: 'web', dependencies: { next: '^15.0.0', react: '^18' }
+    }));
+    assert.strictEqual(detectAppShape(dir), 'web', 'a monorepo whose apps/web is a real web app with a root dev script is web');
   });
 });

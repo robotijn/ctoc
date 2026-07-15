@@ -1099,10 +1099,15 @@ describe('Secrets Scanner — unquoted assignment detection', () => {
     assert.ok(!findings.some(f => f.type === 'AWS_SECRET_KEY'), 'the aws-secret context gate must prevent a false positive');
   });
 
-  // FINDING 2: unquoted non-provider secret on a secret-named key.
-  it('U2 unquoted high-entropy secret on a secret-named key in .env is detected', () => {
+  // FINDING 2: unquoted non-provider secret on a secret-named key. An unquoted
+  // entropy-only hit is STRICTLY WEAKER evidence than a quoted one, so it is
+  // surfaced as HIGH_ENTROPY/LOW (non-blocking), mirroring the quoted-value
+  // treatment — NOT GENERIC_SECRET/HIGH. It is still DETECTED, never dropped.
+  it('U2 unquoted high-entropy secret on a secret-named key in .env is surfaced as HIGH_ENTROPY/LOW', () => {
     const { findings } = scan('.env', 'MY_SERVICE_TOKEN=' + HIGH33 + '\n');
-    assert.ok(findings.some(f => f.type === 'GENERIC_SECRET'), 'an unquoted named secret must be detected');
+    const f = findings.find(x => x.type === 'HIGH_ENTROPY');
+    assert.ok(f, 'an unquoted named secret must still be detected (surfaced)');
+    assert.strictEqual(f.severity, 'LOW', 'an unquoted entropy-only hit must not block the gate');
   });
 
   it('U2 negative: AUTH_HEADER_NAME=X-Api-Key (low entropy) fires nothing', () => {
@@ -1118,6 +1123,93 @@ describe('Secrets Scanner — unquoted assignment detection', () => {
   it('U2 negative: a git SHA on a non-secret key (COMMIT) fires nothing', () => {
     const { findings } = scan('c.env', 'COMMIT=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0\n');
     assert.strictEqual(findings.length, 0, 'a non-secret key name must not be treated as a secret');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Secrets Scanner — an UNQUOTED entropy-only assignment must NOT block the gate
+// (Round-12 false-positive fix). The Round-11 unquoted path typed its findings
+// GENERIC_SECRET/HIGH, which FAILS checkThreshold('HIGH') and BLOCKS the build
+// on PUBLIC high-entropy values that are public BY DESIGN — exactly the SaaS
+// stack CTOC's own templates ship (Stripe publishable key, NEXT_PUBLIC_* keys,
+// cache/integrity keys). An unquoted entropy hit is STRICTLY WEAKER evidence
+// than a quoted one, so it is typed HIGH_ENTROPY/LOW: surfaced (the human sees
+// it) but non-blocking — consistent with the file's own rule that entropy-only
+// heuristics must not block. All fixtures use GENERIC high-entropy values,
+// NEVER a real provider format.
+// ---------------------------------------------------------------------------
+describe('Secrets Scanner — unquoted entropy hit is LOW (non-blocking)', () => {
+  const DIR = path.join(os.tmpdir(), 'ctoc-secrets-unq-low-' + Date.now());
+  const HIGH33 = 'Zx8Qw3Vt7Lp2Rn6Kd9Bf4Hs1Mj5Yc0Ae'; // generic high-entropy (5.0)
+
+  function scan(name, contents) {
+    fs.mkdirSync(DIR, { recursive: true });
+    const file = path.join(DIR, name);
+    fs.writeFileSync(file, contents);
+    const scanner = new SecretsScanner(DIR);
+    return { scanner, findings: scanner.scanFile(file), file };
+  }
+  function gatePass(findings) {
+    const s = new SecretsScanner(DIR);
+    s.findings = findings;
+    return s.checkThreshold('HIGH').pass;
+  }
+  after(() => { try { fs.rmSync(DIR, { recursive: true, force: true }); } catch (e) { /* ignore */ } });
+
+  it('U3 public Stripe publishable key (unquoted) is surfaced but LOW, HIGH gate passes', () => {
+    const { findings } = scan('.env', 'STRIPE_PUBLISHABLE_KEY=' + HIGH33 + '\n');
+    const f = findings.find(x => x.line === 1);
+    assert.ok(f, 'the public key value must still be surfaced');
+    assert.strictEqual(f.type, 'HIGH_ENTROPY', 'an unquoted entropy hit is HIGH_ENTROPY, not GENERIC_SECRET');
+    assert.strictEqual(f.severity, 'LOW', 'a public high-entropy value must not block the gate');
+    assert.strictEqual(gatePass(findings), true, 'the HIGH gate must pass on an entropy-only unquoted hit');
+  });
+
+  it('U3 NEXT_PUBLIC_POSTHOG_KEY (unquoted, public by design) does not block the gate', () => {
+    const { findings } = scan('web.env', 'NEXT_PUBLIC_POSTHOG_KEY=' + HIGH33 + '\n');
+    assert.ok(findings.some(f => f.type === 'HIGH_ENTROPY' && f.severity === 'LOW'),
+      'a NEXT_PUBLIC_* key value must be surfaced at LOW');
+    assert.strictEqual(gatePass(findings), true);
+  });
+
+  it('U3 CACHE_KEY and INTEGRITY_KEY (unquoted) are surfaced LOW, HIGH gate passes', () => {
+    const cache = scan('c.env', 'CACHE_KEY=' + HIGH33 + '\n');
+    const integ = scan('i.env', 'INTEGRITY_KEY=' + HIGH33 + '\n');
+    assert.ok(cache.findings.some(f => f.type === 'HIGH_ENTROPY' && f.severity === 'LOW'),
+      'CACHE_KEY value must be surfaced at LOW');
+    assert.ok(integ.findings.some(f => f.type === 'HIGH_ENTROPY' && f.severity === 'LOW'),
+      'INTEGRITY_KEY value must be surfaced at LOW');
+    assert.strictEqual(gatePass(cache.findings), true);
+    assert.strictEqual(gatePass(integ.findings), true);
+  });
+
+  // Regression: a genuine unquoted secret on a secret-ish key is STILL detected
+  // (surfaced as HIGH_ENTROPY/LOW), never silently dropped.
+  it('U3 regression: a genuine unquoted secret is still DETECTED (HIGH_ENTROPY/LOW)', () => {
+    const { findings } = scan('s.env', 'MY_SERVICE_TOKEN=' + HIGH33 + '\n');
+    const f = findings.find(x => x.type === 'HIGH_ENTROPY');
+    assert.ok(f, 'a real unquoted secret must still be surfaced, not dropped');
+    assert.strictEqual(f.severity, 'LOW');
+  });
+
+  // Regression: a REAL provider CRITICAL (unquoted AWS secret with context) is
+  // unchanged — it fires via its own provider rule at CRITICAL and still blocks.
+  it('U3 regression: unquoted AWS secret still fires CRITICAL and blocks the gate', () => {
+    const AWS40 = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'; // canonical AWS example
+    const { findings } = scan('a.env', 'AWS_SECRET_ACCESS_KEY=' + AWS40 + '\n');
+    assert.ok(findings.some(f => f.type === 'AWS_SECRET_KEY' && f.severity === 'CRITICAL'),
+      'a real provider secret must still block at CRITICAL');
+    assert.strictEqual(gatePass(findings), false, 'the CRITICAL AWS secret must fail the HIGH gate');
+  });
+
+  // New secret-ish keys: SESSION / SIGNATURE were missed by the key matcher.
+  it('U3 SESSION and SIGNATURE keys are now matched (surfaced HIGH_ENTROPY/LOW)', () => {
+    const sess = scan('sess.env', 'SESSION=' + HIGH33 + '\n');
+    const sig = scan('sig.env', 'SIGNATURE=' + HIGH33 + '\n');
+    assert.ok(sess.findings.some(f => f.type === 'HIGH_ENTROPY' && f.severity === 'LOW'),
+      'a SESSION token must now be surfaced');
+    assert.ok(sig.findings.some(f => f.type === 'HIGH_ENTROPY' && f.severity === 'LOW'),
+      'a SIGNATURE value must now be surfaced');
   });
 });
 

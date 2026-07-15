@@ -438,5 +438,166 @@ Do things.
   });
 });
 
+// ---------------------------------------------------------------------------
+// validateStepLabels — structure-aware Iron Loop step-label gate.
+//
+// This gate runs on todo->in-progress (validateForExecution). Historically it
+// ran whole-body `.test(content)` checks with no scoping, no code-fence
+// stripping, and no order/positional analysis — producing confirmed
+// false-accepts and one false-reject. These tests pin the fixed behaviour.
+// ---------------------------------------------------------------------------
+describe('validateStepLabels — structure-aware step-label gate', () => {
+  const stepValidator = require('../src/lib/plan-validator.js');
+
+  // A correctly-structured Execution Plan: steps 8-16, each exactly once, in
+  // ascending order, canonical labels, a single IMPLEMENT.
+  const WELL_FORMED = [
+    '# Plan', '', '## Scope', 'Do the thing.', '',
+    '## Execution Plan', '',
+    '### Step 8: TEST', '- [ ] Write the failing tests first', '',
+    '### Step 9: PREPARE', '- [ ] Prepare env', '',
+    '### Step 10: IMPLEMENT', '- [ ] Implement', '',
+    '### Step 11: REVIEW', '- [ ] Review', '',
+    '### Step 12: OPTIMIZE', '- [ ] Optimize', '',
+    '### Step 13: SECURE', '- [ ] Secure', '',
+    '### Step 14: VERIFY', '- [ ] Run all tests', '',
+    '### Step 15: DOCUMENT', '- [ ] Docs', '',
+    '### Step 16: FINAL-REVIEW', '- [ ] Final', '',
+  ].join('\n');
+
+  // Regression guard: a well-formed plan must ACCEPT.
+  test('regression: correctly-structured plan (8-16 in order, one IMPLEMENT) is ACCEPTED', () => {
+    const result = stepValidator.validateStepLabels(WELL_FORMED);
+    assert.strictEqual(result.valid, true,
+      `Well-formed plan must pass. Errors: ${JSON.stringify(result.errors)}`);
+    assert.strictEqual(result.errors.length, 0, 'No errors expected');
+    console.log('# validateStepLabels regression: well-formed plan accepted');
+  });
+
+  // F1 FALSE ACCEPT — step ORDER never checked.
+  test('F1: fully reversed step order (16..8) is REJECTED', () => {
+    const reversed = [
+      '## Execution Plan', '',
+      '### Step 16: FINAL-REVIEW', '- [ ] Final', '',
+      '### Step 15: DOCUMENT', '- [ ] Docs', '',
+      '### Step 14: VERIFY', '- [ ] Run all tests', '',
+      '### Step 13: SECURE', '- [ ] Secure', '',
+      '### Step 12: OPTIMIZE', '- [ ] Optimize', '',
+      '### Step 11: REVIEW', '- [ ] Review', '',
+      '### Step 10: IMPLEMENT', '- [ ] Implement', '',
+      '### Step 9: PREPARE', '- [ ] Prepare', '',
+      '### Step 8: TEST', '- [ ] Write tests', '',
+    ].join('\n');
+    const result = stepValidator.validateStepLabels(reversed);
+    assert.strictEqual(result.valid, false, 'Reversed-order plan must be rejected');
+    assert.ok(result.errors.some(e => /order/i.test(e)),
+      `Expected an out-of-order error. Got: ${JSON.stringify(result.errors)}`);
+    console.log('# validateStepLabels F1: reversed order rejected');
+  });
+
+  // F2 FALSE ACCEPT — a wrong REAL heading hidden behind a prose mention.
+  test('F2: wrong real Step-10 heading (DEPLOY) with an IMPLEMENT prose decoy is REJECTED', () => {
+    const decoy = [
+      '## Execution Plan', '',
+      '### Step 8: TEST', '- [ ] Write tests', '',
+      '### Step 9: PREPARE', '- [ ] Prepare', '',
+      '### Step 10: DEPLOY', '- [ ] Ship it', '',
+      '### Step 11: REVIEW', '- [ ] Review', '',
+      '### Step 12: OPTIMIZE', '- [ ] Optimize', '',
+      '### Step 13: SECURE', '- [ ] Secure', '',
+      '### Step 14: VERIFY', '- [ ] Run all tests', '',
+      '### Step 15: DOCUMENT', '- [ ] Docs', '',
+      '### Step 16: FINAL-REVIEW', '- [ ] Final', '',
+      '',
+      '## Notes',
+      'Remember that Step 10: IMPLEMENT is where all code changes belong.',
+    ].join('\n');
+    const result = stepValidator.validateStepLabels(decoy);
+    assert.strictEqual(result.valid, false, 'Wrong real Step-10 heading must be rejected');
+    assert.ok(result.errors.some(e => /Step 10.*wrong label/i.test(e)),
+      `Expected a Step 10 wrong-label error. Got: ${JSON.stringify(result.errors)}`);
+    console.log('# validateStepLabels F2: wrong real heading behind prose decoy rejected');
+  });
+
+  // F3 FALSE ACCEPT — the mandatory label lives ONLY inside a fenced code block.
+  test('F3: Step 10 present only inside a ``` fence is REJECTED (missing)', () => {
+    const fenced = [
+      '## Execution Plan', '',
+      '### Step 8: TEST', '- [ ] Write tests', '',
+      '### Step 9: PREPARE', '- [ ] Prepare', '',
+      '```markdown',
+      '### Step 10: IMPLEMENT',
+      '- [ ] This is only an EXAMPLE inside a fence, not a real step',
+      '```',
+      '',
+      '### Step 11: REVIEW', '- [ ] Review', '',
+      '### Step 12: OPTIMIZE', '- [ ] Optimize', '',
+      '### Step 13: SECURE', '- [ ] Secure', '',
+      '### Step 14: VERIFY', '- [ ] Run all tests', '',
+      '### Step 15: DOCUMENT', '- [ ] Docs', '',
+      '### Step 16: FINAL-REVIEW', '- [ ] Final', '',
+    ].join('\n');
+    const result = stepValidator.validateStepLabels(fenced);
+    assert.strictEqual(result.valid, false, 'Fenced-only Step 10 must be rejected');
+    assert.ok(result.errors.some(e => /Step 10.*missing/i.test(e)),
+      `Expected a Step 10 missing error. Got: ${JSON.stringify(result.errors)}`);
+    console.log('# validateStepLabels F3: fenced-only step rejected as missing');
+  });
+
+  // F4 FALSE ACCEPT — a duplicated non-IMPLEMENT step (two Step 14 headings).
+  test('F4: duplicate Step 14 (VERIFY) headings are REJECTED', () => {
+    const dup = [
+      '## Execution Plan', '',
+      '### Step 8: TEST', '- [ ] Write tests', '',
+      '### Step 9: PREPARE', '- [ ] Prepare', '',
+      '### Step 10: IMPLEMENT', '- [ ] Implement', '',
+      '### Step 11: REVIEW', '- [ ] Review', '',
+      '### Step 12: OPTIMIZE', '- [ ] Optimize', '',
+      '### Step 13: SECURE', '- [ ] Secure', '',
+      '### Step 14: VERIFY', '- [ ] Run all tests', '',
+      '### Step 14: VERIFY', '- [ ] Run all tests again (duplicate!)', '',
+      '### Step 15: DOCUMENT', '- [ ] Docs', '',
+      '### Step 16: FINAL-REVIEW', '- [ ] Final', '',
+    ].join('\n');
+    const result = stepValidator.validateStepLabels(dup);
+    assert.strictEqual(result.valid, false, 'Duplicate Step 14 must be rejected');
+    assert.ok(result.errors.some(e => /Step 14.*exactly once|Step 14.*appears/i.test(e)),
+      `Expected a Step 14 duplicate error. Got: ${JSON.stringify(result.errors)}`);
+    console.log('# validateStepLabels F4: duplicate Step 14 rejected');
+  });
+
+  // F5 FALSE REJECT — a valid plan that merely MENTIONS "Step 10: IMPLEMENT" in prose.
+  test('F5: valid plan mentioning "Step 10: IMPLEMENT" in prose is ACCEPTED', () => {
+    const prose = [
+      '## Execution Plan', '',
+      '### Step 8: TEST', '- [ ] Write tests', '',
+      '### Step 9: PREPARE', '- [ ] Prepare', '',
+      '### Step 10: IMPLEMENT',
+      '- [ ] All code changes go here; per policy Step 10: IMPLEMENT is the only build step',
+      '',
+      '### Step 11: REVIEW', '- [ ] Review', '',
+      '### Step 12: OPTIMIZE', '- [ ] Optimize', '',
+      '### Step 13: SECURE', '- [ ] Secure', '',
+      '### Step 14: VERIFY', '- [ ] Run all tests', '',
+      '### Step 15: DOCUMENT', '- [ ] Docs', '',
+      '### Step 16: FINAL-REVIEW', '- [ ] Final', '',
+    ].join('\n');
+    const result = stepValidator.validateStepLabels(prose);
+    assert.strictEqual(result.valid, true,
+      `Prose mention must not over-count. Errors: ${JSON.stringify(result.errors)}`);
+    console.log('# validateStepLabels F5: prose mention of IMPLEMENT accepted');
+  });
+
+  // Regression guard: an actual wrong label as the real heading still REJECTS.
+  test('regression: bare wrong Step-10 label (DEPLOY as the real heading) is REJECTED', () => {
+    const bare = WELL_FORMED.replace('### Step 10: IMPLEMENT', '### Step 10: DEPLOY');
+    const result = stepValidator.validateStepLabels(bare);
+    assert.strictEqual(result.valid, false, 'Bare wrong label must be rejected');
+    assert.ok(result.errors.some(e => /Step 10.*wrong label/i.test(e)),
+      `Expected a Step 10 wrong-label error. Got: ${JSON.stringify(result.errors)}`);
+    console.log('# validateStepLabels regression: bare wrong label rejected');
+  });
+});
+
 console.log('\nPlan Validator Tests');
 console.log('====================\n');

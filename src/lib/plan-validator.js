@@ -996,42 +996,91 @@ function validateStepLabels(content) {
     checklist: {}
   };
 
-  // 1. Check all 9 canonical labels are present
-  for (const [num, label] of Object.entries(CANONICAL_STEP_LABELS)) {
-    const stepPattern = safeRegExp(`Step\\s*${num}[:\\s]+${label.replace('-', '[-\\s]')}`, 'i');
-    const hasStep = stepPattern.test(content);
+  // (a) Strip fenced code blocks first. A "### Step 10: IMPLEMENT" living ONLY
+  // inside a ``` / ~~~ fence is an EXAMPLE, not a real step, and must not
+  // satisfy the mandatory-step contract (mirrors validateNoContradictions).
+  const scanContent = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '');
+
+  // (b) Extract real step HEADINGS from the "## Execution Plan" region ONLY, in
+  // document order (mirrors extractStepBlocks' region logic). Whole-body
+  // scanning let a prose mention of "Step 10: IMPLEMENT" masquerade as a step;
+  // headings under the Execution Plan are the only things that count here.
+  const execMatch = scanContent.match(/^##\s+Execution Plan[\s\S]*$/m);
+  const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : '';
+
+  const headings = [];
+  // Built via safeRegExp (the codebase's ReDoS-checked wrapper) rather than a literal:
+  // the pattern is linear (anchored, disjoint bounded classes, no star-adjacency), but
+  // eslint's static detect-unsafe-regex flags any non-trivial literal — safeRegExp is the
+  // sanctioned, runtime-validated path used throughout this file.
+  const headingRe = safeRegExp('^#{2,4}[ \\t]*Step[ \\t]*(\\d+)\\b[ \\t:.\\-–—]*([A-Za-z][A-Za-z-]*)?', 'gim');
+  let hm;
+  while ((hm = headingRe.exec(region)) !== null) {
+    headings.push({ num: parseInt(hm[1], 10), label: (hm[2] || '').toUpperCase() });
+  }
+
+  // Group real headings by step number, preserving duplicates.
+  const byNum = new Map();
+  for (const h of headings) {
+    if (!byNum.has(h.num)) byNum.set(h.num, []);
+    byNum.get(h.num).push(h);
+  }
+
+  // (c)+(d) Each required step must appear EXACTLY ONCE as a real heading, and
+  // its label — matched positionally by step number — must be canonical.
+  for (const [numStr, label] of Object.entries(CANONICAL_STEP_LABELS)) {
+    const num = parseInt(numStr, 10);
+    const found = byNum.get(num) || [];
+    const canonical = label.toUpperCase();
 
     result.checklist[`label_step_${num}`] = {
       expected: label,
-      present: hasStep
+      present: found.length > 0,
+      count: found.length
     };
 
-    if (!hasStep) {
-      // Check for wrong label at this step number
-      const anyLabelPattern = safeRegExp(`Step\\s*${num}[:\\s]+(\\w[\\w-]*)`, 'i');
-      const wrongLabel = content.match(anyLabelPattern);
-
-      if (wrongLabel) {
-        result.errors.push(
-          `Step ${num} has wrong label "${wrongLabel[1]}" - must be "${label}"`
-        );
-      } else {
-        result.errors.push(
-          `Step ${num} (${label}) is missing from the plan`
-        );
-      }
+    if (found.length === 0) {
+      result.errors.push(`Step ${num} (${label}) is missing from the plan`);
       result.valid = false;
+      continue;
+    }
+
+    if (found.length > 1) {
+      result.errors.push(
+        `Step ${num} (${label}) appears ${found.length} times - each mandatory ` +
+        `step must appear exactly once. Merge duplicate sections into one.`
+      );
+      result.valid = false;
+    }
+
+    // Positional label check on the real heading(s) for this step number. This
+    // catches a wrong REAL heading (e.g. "### Step 10: DEPLOY") regardless of
+    // any correct-label prose decoy elsewhere in the plan.
+    for (const h of found) {
+      if (h.label !== canonical) {
+        result.errors.push(
+          `Step ${num} has wrong label "${h.label || '(none)'}" - must be "${label}"`
+        );
+        result.valid = false;
+      }
     }
   }
 
-  // 2. Check for multiple IMPLEMENT steps (only Step 10 should be IMPLEMENT)
-  const implementMatches = content.match(/Step\s*(\d+)[:\s]+IMPLEMENT/gi) || [];
-  if (implementMatches.length > 1) {
-    result.errors.push(
-      `Found ${implementMatches.length} IMPLEMENT steps - only Step 10 should be IMPLEMENT. ` +
-      `Merge all code changes as sub-items under Step 10.`
-    );
-    result.valid = false;
+  // (e) Required steps must appear in ASCENDING order in the Execution Plan.
+  const requiredSeq = headings
+    .filter((h) => Object.prototype.hasOwnProperty.call(CANONICAL_STEP_LABELS, h.num))
+    .map((h) => h.num);
+  for (let i = 1; i < requiredSeq.length; i++) {
+    if (requiredSeq[i] <= requiredSeq[i - 1]) {
+      result.errors.push(
+        `Iron Loop steps are out of order: Step ${requiredSeq[i]} appears after ` +
+        `Step ${requiredSeq[i - 1]}. Steps 8-16 must run in ascending order.`
+      );
+      result.valid = false;
+      break;
+    }
   }
 
   // 3. Check Step 8 actually writes tests (not just identifies coverage)

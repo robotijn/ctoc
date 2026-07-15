@@ -341,3 +341,39 @@ describe('framework-detector: detectAll finds the web member of a monorepo (FIND
     assert.strictEqual(web.path, path.join('apps', 'web'));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// detectAll must SKIP node_modules (and other excluded dirs). The monorepo walk
+// instantiated a detector for EVERY immediate child of apps/packages/… including a
+// node_modules dir — that is a per-installed-package detector (a performance cost)
+// and a latent false positive (an installed package that itself carries a framework
+// config would be surfaced as a bogus "workspace member").
+// ─────────────────────────────────────────────────────────────────────────────
+describe('framework-detector: detectAll skips node_modules (perf + false positives)', () => {
+  let dir;
+  beforeEach(() => { dir = makeProject('framework-nm-'); });
+  afterEach(() => { rm(dir); });
+
+  it('does not descend into packages/node_modules (an installed package is not a workspace member)', () => {
+    // A genuine workspace member:
+    write(dir, path.join('packages', 'frontend', 'next.config.js'), 'module.exports = {}');
+    write(dir, path.join('packages', 'frontend', 'package.json'), JSON.stringify({
+      name: 'frontend', dependencies: { next: '^15.0.0', react: '^18' }
+    }));
+    // An installed dependency that itself carries a framework config — must be ignored:
+    write(dir, path.join('packages', 'node_modules', 'next.config.js'), 'module.exports = {}');
+    write(dir, path.join('packages', 'node_modules', 'package.json'), JSON.stringify({
+      name: 'installed-next', dependencies: { next: '^15.0.0' }
+    }));
+
+    const members = new FrameworkDetector(dir).detectAll();
+    assert.ok(
+      members.some((m) => m.path === path.join('packages', 'frontend')),
+      'the real workspace member must still be surfaced'
+    );
+    assert.ok(
+      !members.some((m) => m.path === path.join('packages', 'node_modules')),
+      `detectAll must NOT surface an installed package under node_modules; got ${JSON.stringify(members.map((m) => m.path))}`
+    );
+  });
+});

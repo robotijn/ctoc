@@ -41,8 +41,13 @@ function main() {
   try { decision = continuation.shouldContinue(projectRoot); } catch { process.exit(0); }
   if (!decision || !decision.continue) process.exit(0); // no batch / fork / complete / exhausted
 
-  // 4. There is authorized, unfinished, fork-free work — BLOCK the stop.
-  try { continuation.recordBlock(projectRoot); } catch { /* best-effort bound */ }
+  // 4. There is authorized, unfinished, fork-free work — record a block, then BLOCK the
+  //    stop. WEDGE-1: if the block could NOT be persisted (unwritable state file / full
+  //    disk), the bound cannot advance — so FAIL OPEN and allow the stop rather than
+  //    block forever on a frozen counter.
+  let persisted;
+  try { persisted = continuation.recordBlock(projectRoot); } catch { process.exit(0); }
+  if (!persisted) process.exit(0);
   writeStderr(
     `\n[CTOC] continuation-gate BLOCKED stop: ${decision.reason}. ` +
     `CTOC is autonomous building — do NOT stop mid-batch. Drive the next unit to ` +
