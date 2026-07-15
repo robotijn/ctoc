@@ -486,6 +486,22 @@ CTOC improves itself. When implementing features:
     change must tighten the test toward the real behavior, never loosen it to make
     red go green. Weakening an assertion, widening a range, deleting a case, or
     whitelisting without a justified reason is green-washing, not fixing.
+15. **Never halt without a decision — drive the whole authorization.** CTOC is
+    autonomous building steered by the human on the MAIN decisions. An agent or
+    pipeline that is in flight has exactly two legitimate stopping states: (a) the
+    authorized work is COMPLETE, or (b) a genuine FORK — a load-bearing decision that
+    is the human's to make — is surfaced as an explicit question that blocks only its
+    subtree. There is NO third state. A bare "I paused — tell me what to do", a
+    "should I continue?" check-in, or stopping partway through an authorized batch is
+    a DEFECT: it strands the human and is neither autonomous progress nor a real
+    decision. When authorized for N units of work (N rounds, a sweep, a queue, "do it
+    all"), drive ALL N to completion, committing/checkpointing at each natural
+    boundary, and stop only to surface a real fork or on genuine completion. Report
+    milestones as you pass them, but a report is not a stop — keep going. Asking the
+    human to re-authorize work they already authorized is the junior failure this
+    lesson exists to kill. (Sibling of lessons 7 no-stub and 8 async-overnight:
+    maximal lossless progress, forks block their subtree, never a stall below the
+    decision floor.)
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2
