@@ -8,14 +8,21 @@
  *
  *   1  RCE — a hostile capability override `cmd` with a shell metacharacter payload
  *      must NOT execute during detectTools (argv-safe lookup, no shell).
- *   2  Playwright  — `playwright test`, never bare `npx playwright` (runs zero tests).
- *   3  vitest      — `vitest run`, never bare `npx vitest` (watches forever).
+ *   2  Playwright  — `npx playwright test`, never bare `npx playwright` (runs zero tests).
+ *   3  vitest      — `npx vitest run`, never bare `npx vitest` (watches forever).
  *   4  phantom TS  — a pure-JS repo (no tsconfig, no .ts) gets NO typescript toolchain.
- *   5  mocha       — coverage is a valid nyc form, never the invalid `--coverage` flag.
+ *   5  mocha       — coverage is a valid `npx nyc` form, never the invalid `--coverage` flag.
  *   6  no script   — a repo with no test script is surfaced UNDETERMINED, not `npm test`.
  *   7  gradlew     — a project-local ./gradlew is resolved against the project, not PATH.
  *   8  user-config — an explicit override is APPLIED; source is not falsely 'user-config'.
  *   9  install hint— names the real tool (gradle), not the launcher (./gradlew / npx).
+ *
+ * Plus the R10-regression repairs (Findings A/B/C):
+ *   B  framework devDep — a framework-only repo emits `npx <framework> <subcommand>`
+ *      (resolves node_modules/.bin, keeps the watch-hang-avoiding subcommand) and is
+ *      NOT falsely reported missing.
+ *   C  tab-indent    — a TAB-indented quality-config `languages:` block is dropped by the
+ *      space-only indent reader, but now surfaces a WARNING (never silently ignored).
  */
 
 const { describe, it } = require('node:test');
@@ -80,9 +87,10 @@ describe('tool-detector: JS/TS test commands are correct, not broken `npx <fw>` 
       write(dir, 'package.json', JSON.stringify({ devDependencies: { '@playwright/test': '^1.44.0' } }));
       const res = toolDetector.detectTools(dir);
       const js = res.tools.javascript;
-      assert.equal(js.test, 'playwright test', 'Playwright test command must actually run tests');
+      assert.equal(js.test, 'npx playwright test', 'Playwright test command must actually run tests, launched via npx (resolves node_modules/.bin)');
       assert.notEqual(js.test, 'npx playwright', 'must NOT be bare `npx playwright` (runs zero tests)');
-      assert.notEqual(js.coverage, 'npx playwright --coverage', '`--coverage` is not a Playwright flag');
+      assert.notEqual(js.test, 'playwright test', 'must NOT be bare `playwright test` (a devDep is not on PATH)');
+      assert.equal(js.coverage, null, 'Playwright has no coverage mode — emit nothing, never an invalid `--coverage`');
     } finally { rm(dir); }
   });
 
@@ -92,9 +100,10 @@ describe('tool-detector: JS/TS test commands are correct, not broken `npx <fw>` 
       write(dir, 'package.json', JSON.stringify({ devDependencies: { vitest: '^2.0.0' } }));
       const res = toolDetector.detectTools(dir);
       const js = res.tools.javascript;
-      assert.equal(js.test, 'vitest run', 'vitest test command must be `vitest run`, not watch mode');
+      assert.equal(js.test, 'npx vitest run', 'vitest test command must be `npx vitest run`, not watch mode');
       assert.notEqual(js.test, 'npx vitest', 'bare `npx vitest` enters watch mode and never exits');
-      assert.equal(js.coverage, 'vitest run --coverage', 'vitest coverage must be `vitest run --coverage`');
+      assert.notEqual(js.test, 'vitest run', 'must NOT be bare `vitest run` (a devDep is not on PATH)');
+      assert.equal(js.coverage, 'npx vitest run --coverage', 'vitest coverage must be `npx vitest run --coverage`');
     } finally { rm(dir); }
   });
 
@@ -104,8 +113,8 @@ describe('tool-detector: JS/TS test commands are correct, not broken `npx <fw>` 
       write(dir, 'package.json', JSON.stringify({ devDependencies: { mocha: '^10.0.0' } }));
       const res = toolDetector.detectTools(dir);
       const js = res.tools.javascript;
-      assert.equal(js.test, 'mocha', 'mocha test command must be `mocha`');
-      assert.equal(js.coverage, 'nyc mocha', 'mocha coverage must be `nyc mocha`, not an invalid flag');
+      assert.equal(js.test, 'npx mocha', 'mocha test command must be `npx mocha`');
+      assert.equal(js.coverage, 'npx nyc mocha', 'mocha coverage must be `npx nyc mocha`, not an invalid flag');
       assert.notEqual(js.coverage, 'npx mocha --coverage', '`mocha --coverage` is an invalid flag');
     } finally { rm(dir); }
   });
@@ -224,6 +233,77 @@ describe('tool-detector: an install hint names the real tool, not the launcher (
       assert.ok(entry, 'the missing gradle test command must be present to check its hint');
       assert.equal(entry.install, 'Install gradle for java', 'the hint must name the real tool (gradle)');
       assert.equal(entry.install.includes('gradlew'), false, 'the hint must not name the launcher (./gradlew)');
+    } finally { rm(dir); }
+  });
+});
+
+// ── Finding B: framework devDep resolves via npx and is not falsely missing ────────
+describe('tool-detector: a framework devDep (no scripts.test) resolves via npx, not falsely missing (Finding B)', () => {
+  it('a vitest devDep → `npx vitest run`, launched via npx, and NOT reported missing', () => {
+    const dir = makeProject('ctoc-td-npx-vt-');
+    try {
+      write(dir, 'package.json', JSON.stringify({ devDependencies: { vitest: '^2.0.0' } }));
+      const res = toolDetector.detectTools(dir);
+      const js = res.tools.javascript;
+      // The framework runner must be launched via npx (resolves node_modules/.bin), which a
+      // bare `vitest run` cannot — a devDep is not on PATH, so `which vitest` / execSync
+      // both fail. The `run` subcommand is preserved so the watch-hang stays avoided.
+      assert.equal(js.test, 'npx vitest run', 'framework test must be `npx vitest run`');
+      assert.notEqual(js.test, 'vitest run', 'must NOT be a bare `vitest run` (devDep not on PATH → "command not found")');
+      assert.notEqual(js.test, 'npx vitest', 'must keep the `run` subcommand (bare `npx vitest` watch-hangs)');
+      // `which npx` resolves (npx ships with npm), so an npx-launched framework is NOT
+      // reported missing — the R10 regression told the human to install what was installed.
+      assert.equal(
+        res.missing.some((m) => m.command === js.test), false,
+        `an npx-launched framework must NOT be reported missing; missing=${JSON.stringify(res.missing)}`
+      );
+    } finally { rm(dir); }
+  });
+
+  it('a jest devDep → `npx jest` (+ `npx jest --coverage`), launched via npx', () => {
+    const dir = makeProject('ctoc-td-npx-jest-');
+    try {
+      write(dir, 'package.json', JSON.stringify({ devDependencies: { jest: '^29.0.0' } }));
+      const res = toolDetector.detectTools(dir);
+      const js = res.tools.javascript;
+      assert.equal(js.test, 'npx jest', 'jest test must be launched via npx');
+      assert.equal(js.coverage, 'npx jest --coverage', 'jest coverage must be `npx jest --coverage`');
+    } finally { rm(dir); }
+  });
+});
+
+// ── Finding C: a tab-indented quality-config languages block warns ─────────────────
+describe('tool-detector: a tab-indented quality-config languages block WARNS, not silently dropped (Finding C)', () => {
+  it('a TAB-indented languages override surfaces a warning in the detection result', () => {
+    const dir = makeProject('ctoc-td-tab-');
+    try {
+      write(dir, 'package.json', '{}');
+      // TAB indentation (YAML requires SPACES). The space-only indent reader drops the
+      // block silently — source stays 'auto-detect' with no signal to the user.
+      write(dir, path.join('.ctoc', 'quality-config.yaml'),
+        ['languages:', '\tjavascript:', '\t\ttest: my-runner --all', ''].join('\n'));
+      const res = toolDetector.detectTools(dir);
+      assert.ok(Array.isArray(res.warnings), 'detectTools must expose a warnings array');
+      assert.ok(
+        res.warnings.some((w) => /tab/i.test(w.message) && /(ignored|dropped)/i.test(w.message)),
+        `a tab-indented override must surface a warning; got ${JSON.stringify(res.warnings)}`
+      );
+    } finally { rm(dir); }
+  });
+
+  it('a correctly SPACE-indented config produces NO tab warning (precise, not noisy)', () => {
+    const dir = makeProject('ctoc-td-tab-ok-');
+    try {
+      write(dir, 'package.json', '{}');
+      write(dir, path.join('.ctoc', 'quality-config.yaml'),
+        ['languages:', '  javascript:', '    test: my-runner --all', ''].join('\n'));
+      const res = toolDetector.detectTools(dir);
+      assert.ok(
+        !(res.warnings || []).some((w) => /tab/i.test(w.message)),
+        `a space-indented config must not warn about tabs; got ${JSON.stringify(res.warnings)}`
+      );
+      // And the space-indented override still applies (no regression).
+      assert.equal(res.tools.javascript.test, 'my-runner --all', 'the space-indented override still applies');
     } finally { rm(dir); }
   });
 });

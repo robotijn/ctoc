@@ -24,6 +24,17 @@ const GATE_STATUS = {
 };
 
 /**
+ * Recognized severity labels (normalized to lower case). A KNOWN severity that
+ * has no configured threshold is an intentional "unlimited" bucket and is
+ * ignored; an UNKNOWN label with findings fails the gate closed. Kept as a set
+ * so the fail-closed check is O(1) and the recognized vocabulary is explicit.
+ * @type {Set<string>}
+ */
+const KNOWN_SEVERITIES = new Set([
+  'critical', 'high', 'medium', 'moderate', 'low', 'info', 'informational'
+]);
+
+/**
  * Default quality gate thresholds
  * @type {Object}
  */
@@ -176,7 +187,23 @@ class QualityGate {
     const warnings = [];
 
     for (const [metric, threshold] of Object.entries(thresholds)) {
-      const actual = coverage[metric] || 0;
+      // Coerce explicitly and fail CLOSED on an unmeasurable value. The old
+      // `coverage[metric] || 0` silently turned a truthy non-numeric (`"50%"`,
+      // `"N/A"`) into itself, so `actual - threshold` was NaN and BOTH `NaN<0`
+      // and `NaN<5` are false — the metric slipped through as neither failure
+      // nor warning (a fail-open pass). An unmeasurable coverage figure is not
+      // evidence of coverage; it must FAIL.
+      const rawActual = coverage[metric];
+      const actual = Number(rawActual);
+      if (Number.isNaN(actual)) {
+        failures.push({
+          metric,
+          actual: rawActual === undefined ? null : rawActual,
+          threshold,
+          message: `${metric} coverage is unmeasurable (${rawActual}) — cannot verify against threshold of ${threshold}%`
+        });
+        continue;
+      }
       const diff = actual - threshold;
 
       if (diff < 0) {
@@ -228,37 +255,48 @@ class QualityGate {
       MODERATE: 'medium'
     };
 
-    // Check SAST findings
-    for (const [severity, count] of Object.entries(security.sast || {})) {
-      const thresholdKey = severityMap[severity] || severity.toLowerCase();
-      const threshold = thresholds[thresholdKey];
+    // Evaluate one severity bucket, failing CLOSED on an UNRECOGNIZED label.
+    // The old code resolved an unknown label (`CRIT`, `BLOCKER`) to an undefined
+    // threshold and skipped it, so 50 `CRIT` findings passed the gate silently.
+    // A KNOWN severity that simply has no configured threshold (e.g. `LOW` under
+    // strict, which caps critical/high/medium only) is legitimately ignored — a
+    // deliberate "unlimited" bucket, not a blind spot. An UNKNOWN severity with
+    // any findings is treated as a failure: we cannot prove it is benign.
+    const evalBucket = (type, bucket) => {
+      for (const [severity, count] of Object.entries(bucket || {})) {
+        const thresholdKey = severityMap[severity] || severity.toLowerCase();
+        const threshold = thresholds[thresholdKey];
 
-      if (threshold !== undefined && count > threshold) {
-        failures.push({
-          type: 'sast',
-          severity,
-          actual: count,
-          threshold,
-          message: `${count} ${severity} SAST finding(s) exceeds threshold of ${threshold}`
-        });
+        if (threshold === undefined) {
+          if (!KNOWN_SEVERITIES.has(thresholdKey) && count > 0) {
+            failures.push({
+              type,
+              severity,
+              actual: count,
+              threshold: 'unrecognized',
+              message: `${count} finding(s) of unrecognized severity '${severity}' — failing closed (cannot prove benign)`
+            });
+          }
+          continue;
+        }
+
+        if (count > threshold) {
+          failures.push({
+            type,
+            severity,
+            actual: count,
+            threshold,
+            message: type === 'sast'
+              ? `${count} ${severity} SAST finding(s) exceeds threshold of ${threshold}`
+              : `${count} ${severity} dependency vulnerability(ies) exceeds threshold of ${threshold}`
+          });
+        }
       }
-    }
+    };
 
-    // Check dependency vulnerabilities
-    for (const [severity, count] of Object.entries(security.dependencies || {})) {
-      const thresholdKey = severityMap[severity] || severity.toLowerCase();
-      const threshold = thresholds[thresholdKey];
-
-      if (threshold !== undefined && count > threshold) {
-        failures.push({
-          type: 'dependencies',
-          severity,
-          actual: count,
-          threshold,
-          message: `${count} ${severity} dependency vulnerability(ies) exceeds threshold of ${threshold}`
-        });
-      }
-    }
+    // Check SAST findings and dependency vulnerabilities
+    evalBucket('sast', security.sast);
+    evalBucket('dependencies', security.dependencies);
 
     // Check secrets
     const secretsCount = security.secrets || 0;
@@ -516,6 +554,20 @@ class QualityGate {
       })));
     }
 
+    // Fail CLOSED when nothing was evaluated. `evaluate({})` or
+    // `evaluate({coverage:null})` runs zero dimension checks, produces zero
+    // failures, and the old code reported PASSED — a gate passing on the
+    // ABSENCE of evidence. Zero verified dimensions is never a pass: a gate that
+    // measured nothing has proven nothing.
+    if (this.gateResults.length === 0) {
+      allFailures.push({
+        dimension: 'gate',
+        metric: 'dimensions',
+        actual: 0,
+        message: 'No quality dimensions were evaluated — a gate with zero evidence cannot pass (fail closed)'
+      });
+    }
+
     const status = allFailures.length > 0 ? GATE_STATUS.FAILED : GATE_STATUS.PASSED;
 
     const dimensions = this.gateResults.map(r => ({
@@ -665,6 +717,12 @@ class QualityGate {
           config[currentSection] = {};
         } else if (currentSection && trimmed.includes(':')) {
           const [key, value] = trimmed.split(':').map(s => s.trim());
+          // A BLANK/absent value (`lines:` with nothing after the colon) must be
+          // IGNORED so the default threshold is retained via mergeThresholds.
+          // The old code fell through to `Number('') === 0` (because `isNaN('')`
+          // is false), silently REPLACING an 80% floor with 0 and disabling the
+          // gate. Skipping the key entirely keeps the default intact.
+          if (value === undefined || value === '') continue;
           // `value` is a raw string; global isNaN performs the same ToNumber
           // coercion internally, so the `any` cast keeps runtime behavior identical
           // while satisfying isNaN's numeric parameter type.

@@ -92,6 +92,18 @@ function detectAppShape(projectPath) {
   const detector = new FrameworkDetector(projectPath);
   if (detector.isWebApp()) return 'web';
 
+  // FINDING 2: MONOREPO web detection. In a workspace/monorepo (pnpm/npm/yarn/turbo)
+  // the framework dep lives in a member (apps/web, packages/frontend), NOT the root,
+  // so the root-only isWebApp() above returns false and the project would fall
+  // through to 'server' — running `turbo dev` blindly while framework-security sees
+  // no framework. detectAll() (previously a dead export) walks apps/packages/* and
+  // returns the detected web frameworks; if ANY member is a web app, the project is
+  // web-shaped. Every FRAMEWORKS entry is a web framework, so a non-empty result
+  // means a web member exists. The single-package path is untouched: a plain server
+  // with no web member yields an empty array and falls through unchanged.
+  const members = detector.detectAll();
+  if (Array.isArray(members) && members.length > 0) return 'web';
+
   const pkg = loadPackageJson(projectPath);
   if (!pkg) return 'unknown';
 

@@ -283,22 +283,73 @@ class SASTRunner {
    * @returns {string|null}
    */
   cweSeverityFloor(cwe) {
-    if (cwe === null || cwe === undefined) return null;
-    // R8-D1: normalize ANY shape a tool (or a direct caller) emits to a canonical
-    // "CWE-<n>" before the map lookup:
-    //   - clean string   "CWE-78"                       (semgrep/bandit, native path)
-    //   - decorated       "CWE-78: OS Command Injection" (semgrep metadata array item)
-    //   - array           ["CWE-78: ..."]               (semgrep sometimes emits an array)
-    //   - bare number     "89" or 89                     (gosec cwe.id)
-    // The old `^CWE-` branch did a verbatim uppercase lookup, so a decorated key like
-    // "CWE-78: DESC" never hit the map and the CRITICAL floor stayed inert for semgrep.
-    const raw = Array.isArray(cwe) ? (cwe.length ? cwe[0] : null) : cwe;
-    if (raw === null || raw === undefined) return null;
-    const s = String(raw).trim();
-    if (!s) return null;
-    const m = s.match(/CWE[-\s_]?(\d+)/i) || s.match(/(\d+)/);
-    if (!m) return null;
-    return CWE_SEVERITY_MAP[`CWE-${m[1]}`] || null;
+    // R8-D1 / R11: normalize ANY shape a tool (or a direct caller) emits to the full set
+    // of canonical "CWE-<n>" tokens, then take the MOST SEVERE mapped floor across ALL of
+    // them. Shapes handled:
+    //   - clean string   "CWE-78"                        (semgrep/bandit, native path)
+    //   - decorated       "CWE-78: OS Command Injection"  (semgrep metadata array item)
+    //   - array           ["CWE-79: ...", "CWE-89: ..."]  (semgrep may tag several CWEs)
+    //   - multi in string "CWE-79, CWE-89"                (several tokens in one field)
+    //   - bare number     "89" or 89                      (gosec cwe.id — a purely-numeric field)
+    // R11 fix: the old code reduced an array to element [0] and matched only the FIRST
+    // "CWE-\d+" token, so a finding whose most-severe CWE was not first (e.g.
+    // ["CWE-79","CWE-89"]) floored to the WRONG (lower) severity, dropping the CRITICAL
+    // floor of the injection CWE. We now map EVERY token and keep the most severe.
+    const tokens = this._cweTokens(cwe);
+    if (tokens.length === 0) return null;
+    let best = null;
+    let bestRank = Infinity;
+    for (const tok of tokens) {
+      const sev = CWE_SEVERITY_MAP[tok];
+      if (!sev) continue;
+      const rank = this._severityRank(sev);
+      if (rank < bestRank) { bestRank = rank; best = sev; }
+    }
+    return best;
+  }
+
+  /**
+   * R11: normalize a raw cwe value (string, number, or array of either) to the ordered,
+   * de-duplicated list of canonical "CWE-<n>" tokens it genuinely contains.
+   *   - Each item is scanned for EVERY "CWE[-\s_]?<n>" token (so a decorated multi-CWE
+   *     string like "CWE-79, CWE-89" yields both).
+   *   - A structured bare-number field (gosec's cwe.id is the ENTIRE field, e.g. "89")
+   *     is promoted to "CWE-89" ONLY when the trimmed item is purely numeric. This
+   *     preserves gosec's needs while GUARDING the pre-existing nit: a free-text string
+   *     carrying a stray digit ("line 89 of foo") is NOT scraped into a spurious CWE.
+   * @param {string|number|Array|null|undefined} cwe
+   * @returns {string[]}
+   */
+  _cweTokens(cwe) {
+    if (cwe === null || cwe === undefined) return [];
+    const items = Array.isArray(cwe) ? cwe : [cwe];
+    const out = [];
+    const seen = new Set();
+    const push = (tok) => { if (!seen.has(tok)) { seen.add(tok); out.push(tok); } };
+    for (const item of items) {
+      if (item === null || item === undefined) continue;
+      const s = String(item).trim();
+      if (!s) continue;
+      const matches = s.match(/CWE[-\s_]?\d+/gi);
+      if (matches) {
+        for (const m of matches) push(`CWE-${m.match(/\d+/)[0]}`);
+        continue;
+      }
+      // Structured bare-number fallback — only a purely-numeric field, never a scrape.
+      if (/^\d+$/.test(s)) push(`CWE-${s}`);
+    }
+    return out;
+  }
+
+  /**
+   * R11: rank a severity so a lower index is MORE severe. Unknown → Infinity (least severe).
+   * @param {string} sev
+   * @returns {number}
+   */
+  _severityRank(sev) {
+    const order = [SEVERITY.CRITICAL, SEVERITY.HIGH, SEVERITY.MEDIUM, SEVERITY.LOW, SEVERITY.INFO];
+    const i = order.indexOf(sev);
+    return i === -1 ? Infinity : i;
   }
 
   /**
@@ -798,7 +849,7 @@ class SASTRunner {
   /**
    * Extract CWE from metadata
    * @param {Object} metadata - Result metadata
-   * @returns {string|null} CWE identifier
+   * @returns {string|string[]|null} a single CWE-<n> for one token, an array for several, null when none
    */
   extractCWE(metadata) {
     if (!metadata) return null;
@@ -808,13 +859,15 @@ class SASTRunner {
     // raw array (so the later Array.isArray branch was dead) and the CWE-78 CRITICAL
     // floor never fired for any semgrep finding. Unwrap the array and strip the
     // ": description" suffix down to the canonical "CWE-<n>" head.
-    let raw = (metadata.cwe !== undefined && metadata.cwe !== null) ? metadata.cwe : metadata.cwe_id;
-    if (Array.isArray(raw)) raw = raw.length ? raw[0] : null;
-    if (raw === null || raw === undefined) return null;
-    raw = String(raw).trim();
-    if (!raw) return null;
-    const m = raw.match(/CWE-\d+/i);
-    return m ? m[0].toUpperCase() : raw;
+    // R11: keep EVERY CWE token the metadata carries, not just the first. A semgrep rule
+    // may tag several CWEs of differing severity (["CWE-79: XSS", "CWE-89: SQL Injection"]);
+    // dropping all but the first let the CWE severity floor pick the WRONG one. Return a
+    // single "CWE-<n>" string for the common one-token case (callers/reporting rely on the
+    // string shape) and the full array when a finding genuinely carries several.
+    const raw = (metadata.cwe !== undefined && metadata.cwe !== null) ? metadata.cwe : metadata.cwe_id;
+    const tokens = this._cweTokens(raw);
+    if (tokens.length === 0) return null;
+    return tokens.length === 1 ? tokens[0] : tokens;
   }
 
   /**

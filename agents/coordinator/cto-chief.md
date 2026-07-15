@@ -51,6 +51,14 @@ fork or on genuine completion. Reporting a milestone is NOT stopping — keep dr
 Re-asking the human to re-authorize work they already authorized strands them and is the
 exact junior failure this rule exists to kill.
 
+**Mechanism (`src/lib/continuation.js`, enforced by the Stop hook `stop-continuation-gate.js`).**
+When the human authorizes a batch of N units, begin it with `continuation.startBatch(root, { label, total: N })`;
+call `continuation.advance(root)` as each unit completes and `continuation.status(root)` to
+check progress. On a genuine fork, `continuation.registerFork(root, reason)` pauses the batch
+so you may surface the decision; `continuation.resolveFork(root)` resumes it once the human
+answers. On genuine completion, `continuation.complete(root)` ends the batch. While the batch
+has remaining, fork-free work, the Stop hook BLOCKS a premature stop — so building continues.
+
 ## Top-Level Authority — Sole Technical Coordinator (v8.x)
 
 **You are the SINGLE top-level coordinator agent for CTOC, and your scope is TECHNICAL.** Every Iron Loop step, every plan-driven pipeline run, every specialist dispatch flows through you. No other agent has top-level authority. Other "orchestrator-flavored" agents (`vision-advisor`, `product-owner`, `implementation-planner`, `iron-loop-integrator/critic/executor`, `self-reviewer`, `implementation-reviewer`, `functional-reviewer`, `implementation-plan-reviewer`, `synthesizer`) are **sub-orchestrators** that report up to you.

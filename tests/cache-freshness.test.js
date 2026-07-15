@@ -517,6 +517,10 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // The fs wrapper itself — owns NO count path; it writes whatever a caller
     // passes. Detecting it would be detecting the primitive, not a count writer.
     ['safe-fs.js', 'the safeFs wrapper — writes only what callers pass; owns no count path of its own'],
+    // Continuation gate (Lesson 15): writes ONLY .ctoc/state/continuation.json (the
+    // authorized-batch state the Stop hook reads). Not a plan/vision/inbox *.md, so
+    // the plan-stage/vision/inbox counts are invariant — nothing to invalidate.
+    ['continuation.js', 'writes only .ctoc/state/continuation.json (batch state for the Stop continuation-gate); never a counted plan/vision/inbox file'],
     // R4-B: after moveToReviewAfterPush was deleted, sync.js writes only the
     // .ctoc/last-sync timestamp; the `plans` tokens are git CLI args (git add
     // plans/), not fs writes to a counted *.md. No plan/vision/inbox file is written.

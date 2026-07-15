@@ -77,6 +77,62 @@ describe('app-runner: detectAppShape', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FINDING 2 — MONOREPO web detection. detectAppShape called isWebApp() at the
+// ROOT only. In a workspace/monorepo (pnpm/npm/yarn/turbo) the framework dep lives
+// in apps/web, not root, so root detect returned null → the web app was classified
+// 'server' and would run `turbo dev` blindly while framework-security saw no
+// framework. This WIRES the previously-dead detectAll(): if ANY workspace member is
+// a web app, the project is web. The single-package (non-monorepo) path must not
+// change.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: a monorepo whose web app lives in apps/web is classified web (FINDING 2)', () => {
+  const projects = [];
+  after(() => { for (const p of projects) rm(p); });
+
+  it('turbo monorepo (root turbo dev, apps/web/next.config.js) → web, NOT bare server', () => {
+    const dir = makeProject('ctoc-monorepo-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({
+      name: 'monorepo-root', private: true, workspaces: ['apps/*'],
+      scripts: { dev: 'turbo dev', build: 'turbo build' },
+      devDependencies: { turbo: '^2.0.0' }
+    }));
+    fs.mkdirSync(path.join(dir, 'apps', 'web'), { recursive: true });
+    write(path.join(dir, 'apps', 'web'), 'next.config.js', 'module.exports = {}');
+    write(path.join(dir, 'apps', 'web'), 'package.json', JSON.stringify({
+      name: 'web', dependencies: { next: '^15.0.0', react: '^18', 'react-dom': '^18' }
+    }));
+
+    assert.strictEqual(
+      detectAppShape(dir), 'web',
+      'a monorepo whose web app lives in apps/web must be web, not a bare server running turbo dev'
+    );
+  });
+
+  it('pnpm monorepo (packages/frontend with vite) → web', () => {
+    const dir = makeProject('ctoc-pnpm-monorepo-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({
+      name: 'pnpm-root', private: true, scripts: { dev: 'pnpm -r dev' }
+    }));
+    fs.mkdirSync(path.join(dir, 'packages', 'frontend'), { recursive: true });
+    write(path.join(dir, 'packages', 'frontend'), 'vite.config.ts', 'export default {}');
+    write(path.join(dir, 'packages', 'frontend'), 'package.json', JSON.stringify({
+      name: 'frontend', dependencies: { react: '^18', 'react-dom': '^18' }, devDependencies: { vite: '^5' }
+    }));
+
+    assert.strictEqual(detectAppShape(dir), 'web');
+  });
+
+  it('REGRESSION: a single-package server (no apps/packages web member) stays server', () => {
+    const dir = makeProject('ctoc-single-server-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({ name: 'srv', scripts: { dev: 'node server.js' } }));
+    assert.strictEqual(detectAppShape(dir), 'server', 'a plain single-package server must not be reclassified web');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // F1 — the run target must follow the MANIFEST, not a stray source file. A Rust/
 // Go/Python project carrying an incidental C/C++ file at the root (FFI wrapper.h,
 // cgo bridge.c, C-extension _ext.c) must NOT be told its run target is c → ./a.out

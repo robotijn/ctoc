@@ -960,6 +960,167 @@ describe('Quality Gate Tests', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Quality Gate — fail-CLOSED behavior. A gate whose job is to block must never
+// pass on absent/unmeasurable/unrecognized evidence. These drive the four
+// latent fail-open paths in QualityGate.
+// ---------------------------------------------------------------------------
+describe('Quality Gate — fail-closed defenses', () => {
+  // Defect 1: empty / partial metrics must not pass (zero dimensions is never a pass).
+  it('QG1 evaluate({}) fails closed — zero dimensions evaluated is never a pass', () => {
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const result = gate.evaluate({});
+    assert.strictEqual(result.passed, false, 'an empty-metrics evaluation must not report passed');
+    assert.strictEqual(result.status, GATE_STATUS.FAILED);
+  });
+
+  it('QG1 evaluate({coverage:null}) fails closed — a null dimension yields no evidence', () => {
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const result = gate.evaluate({ coverage: null });
+    assert.strictEqual(result.passed, false);
+    assert.strictEqual(result.status, GATE_STATUS.FAILED);
+  });
+
+  // Defect 2: NaN-string coverage must FAIL (unmeasurable → fail closed), not slip past.
+  it('QG2 evaluateCoverage fails on unmeasurable (NaN-string) coverage across all metrics', () => {
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const result = gate.evaluateCoverage({ lines: 'N/A', branches: 'N/A', functions: 'N/A', statements: 'N/A' });
+    assert.strictEqual(result.status, GATE_STATUS.FAILED, 'unmeasurable coverage must fail closed');
+    assert.ok(result.failures.length > 0);
+  });
+
+  it('QG2 evaluateCoverage({lines:"50%"}) at floor 80 is FAILED (truthy non-numeric)', () => {
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const result = gate.evaluateCoverage({ lines: '50%' });
+    assert.strictEqual(result.status, GATE_STATUS.FAILED);
+  });
+
+  it('QG2 boundary preserved: exactly at floor 80 passes, 79.999 fails', () => {
+    const atGate = new QualityGate(TEST_DIR, {
+      mode: 'strict',
+      thresholds: { coverage: { lines: 80, branches: 80, functions: 80, statements: 80 } }
+    });
+    const atFloor = atGate.evaluateCoverage({ lines: 80, branches: 80, functions: 80, statements: 80 });
+    assert.strictEqual(atFloor.status, GATE_STATUS.PASSED, 'at-or-above the floor must pass');
+
+    const belowGate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const below = belowGate.evaluateCoverage({ lines: 79.999, branches: 85, functions: 85, statements: 85 });
+    assert.strictEqual(below.status, GATE_STATUS.FAILED, 'just below the floor must fail');
+  });
+
+  // Defect 3: an unrecognized severity label with count>0 must fail closed.
+  it('QG3 evaluateSecurity fails closed on an unrecognized SAST severity (CRIT) with count>0', () => {
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const result = gate.evaluateSecurity({ sast: { CRIT: 50 } });
+    assert.strictEqual(result.status, GATE_STATUS.FAILED, 'an unmapped severity must not be silently ignored');
+  });
+
+  it('QG3 evaluateSecurity fails closed on an unrecognized dependency severity (BLOCKER)', () => {
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const result = gate.evaluateSecurity({ dependencies: { BLOCKER: 1 } });
+    assert.strictEqual(result.status, GATE_STATUS.FAILED);
+  });
+
+  it('QG3 recognized LOW severity with no configured threshold still passes (not fail-closed)', () => {
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict' });
+    const result = gate.evaluateSecurity({ sast: { LOW: 100 }, secrets: 0 });
+    assert.strictEqual(result.status, GATE_STATUS.PASSED, 'a KNOWN severity without a threshold is ignored, not failed');
+  });
+
+  // Defect 4: a blank config value must be IGNORED (default retained), never coerced to 0.
+  it('QG4 loadConfig ignores a blank value — the default floor is retained, not zeroed', () => {
+    const dir = path.join(TEST_DIR, 'qg-cfg');
+    fs.mkdirSync(dir, { recursive: true });
+    const cfgPath = path.join(dir, 'quality.yaml');
+    fs.writeFileSync(cfgPath, 'coverage:\n  lines:\n  branches: 85\n');
+
+    const config = QualityGate.loadConfig(cfgPath);
+    assert.notStrictEqual(config.coverage && config.coverage.lines, 0,
+      'a blank lines: must never be coerced to a zero (floor-disabling) threshold');
+
+    const gate = new QualityGate(TEST_DIR, { mode: 'strict', thresholds: config });
+    assert.strictEqual(gate.thresholds.coverage.lines, 80, 'default floor retained when config value is blank');
+    assert.strictEqual(gate.thresholds.coverage.branches, 85, 'a present config value still overrides the default');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Secrets Scanner — UNQUOTED assignment detection. Provider and generic secret
+// layers historically required quotes, so an unquoted `KEY=<value>` (the .env /
+// Dockerfile / shell form) was invisible. All fixtures use generic high-entropy
+// values or the canonical AWS example — never a real provider format.
+// ---------------------------------------------------------------------------
+describe('Secrets Scanner — unquoted assignment detection', () => {
+  const UNQ_DIR = path.join(os.tmpdir(), 'ctoc-secrets-unquoted-' + Date.now());
+  const AWS40 = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'; // canonical AWS example, 40 chars
+  const HIGH33 = 'Zx8Qw3Vt7Lp2Rn6Kd9Bf4Hs1Mj5Yc0Ae';        // generic high-entropy (entropy 5.0), 32 chars
+
+  function scan(name, contents) {
+    fs.mkdirSync(UNQ_DIR, { recursive: true });
+    const file = path.join(UNQ_DIR, name);
+    fs.writeFileSync(file, contents);
+    const scanner = new SecretsScanner(UNQ_DIR);
+    return { scanner, findings: scanner.scanFile(file), file };
+  }
+
+  after(() => {
+    try { fs.rmSync(UNQ_DIR, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+  });
+
+  // FINDING 1: unquoted AWS secret (the `=` before the value blocked the old lookbehind).
+  it('U1 unquoted AWS secret on a Dockerfile ENV line is detected as AWS_SECRET_KEY', () => {
+    const { findings } = scan('Dockerfile', 'FROM node:20\nENV AWS_SECRET_ACCESS_KEY=' + AWS40 + '\n');
+    assert.ok(findings.some(f => f.type === 'AWS_SECRET_KEY'), 'unquoted ENV AWS secret must fire');
+  });
+
+  it('U1 unquoted AWS secret via shell export is detected', () => {
+    const { findings } = scan('deploy.sh', 'export AWS_SECRET_ACCESS_KEY=' + AWS40 + '\n');
+    assert.ok(findings.some(f => f.type === 'AWS_SECRET_KEY'), 'unquoted export AWS secret must fire');
+  });
+
+  it('U1 unquoted AWS secret in a .env file is detected', () => {
+    const { findings } = scan('.env', 'AWS_SECRET_ACCESS_KEY=' + AWS40 + '\n');
+    assert.ok(findings.some(f => f.type === 'AWS_SECRET_KEY'), '.env unquoted AWS secret must fire');
+  });
+
+  it('U1 regression: quoted AWS secret still fires', () => {
+    const { findings } = scan('q.env', 'AWS_SECRET_ACCESS_KEY="' + AWS40 + '"\n');
+    assert.ok(findings.some(f => f.type === 'AWS_SECRET_KEY'));
+  });
+
+  it('U1 regression: space-separated (yaml) AWS secret still fires', () => {
+    const { findings } = scan('c.yaml', 'aws_secret_access_key: ' + AWS40 + '\n');
+    assert.ok(findings.some(f => f.type === 'AWS_SECRET_KEY'));
+  });
+
+  it('U1 a benign 40-char base64 with NO aws context does not fire AWS_SECRET_KEY (context gate)', () => {
+    const b64 = 'ABCDdefgHIJKlmnoPQRStuvwXYZ0123456789abcd'; // 40 chars, no aws context
+    const { findings } = scan('data.js', 'const blob = ' + b64 + ';\n');
+    assert.ok(!findings.some(f => f.type === 'AWS_SECRET_KEY'), 'the aws-secret context gate must prevent a false positive');
+  });
+
+  // FINDING 2: unquoted non-provider secret on a secret-named key.
+  it('U2 unquoted high-entropy secret on a secret-named key in .env is detected', () => {
+    const { findings } = scan('.env', 'MY_SERVICE_TOKEN=' + HIGH33 + '\n');
+    assert.ok(findings.some(f => f.type === 'GENERIC_SECRET'), 'an unquoted named secret must be detected');
+  });
+
+  it('U2 negative: AUTH_HEADER_NAME=X-Api-Key (low entropy) fires nothing', () => {
+    const { findings } = scan('h.env', 'AUTH_HEADER_NAME=X-Api-Key\n');
+    assert.strictEqual(findings.length, 0, 'a low-entropy header-name value is config, not a secret');
+  });
+
+  it('U2 negative: token_url=https://example.com/x (URL) fires nothing', () => {
+    const { findings } = scan('u.env', 'token_url=https://example.com/x\n');
+    assert.strictEqual(findings.length, 0, 'a URL value must be excluded');
+  });
+
+  it('U2 negative: a git SHA on a non-secret key (COMMIT) fires nothing', () => {
+    const { findings } = scan('c.env', 'COMMIT=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0\n');
+    assert.strictEqual(findings.length, 0, 'a non-secret key name must not be treated as a secret');
+  });
+});
+
 // Cleanup after tests
 after(() => {
   try {

@@ -193,6 +193,29 @@ describe('push.js — security skip disclosure (honesty)', () => {
   });
 });
 
+describe('push.js — Finding A: auto-undetermined tests block, never a silent green push', () => {
+  test('12. an auto-undetermined test command BLOCKS the push (real runSmartTests, not injected)', async () => {
+    // detect() returns a language whose test command the detector could NOT determine
+    // (test:null + testUndetermined:true). The REAL quality-agent.runSmartTests runs
+    // (NOT injected) so the undetermined guard is exercised end-to-end through the live
+    // push consumer. The old behavior treated null as "nothing to run = PASS" and pushed.
+    let pushed = 0;
+    const result = await push.run({}, {
+      detect: () => ({ languages: ['javascript'], tools: { javascript: { test: null, testUndetermined: true } } }),
+      runLint: async () => ({ passed: true }),
+      runTypecheck: async () => ({ passed: true }),
+      // runSmartTests intentionally NOT injected → the real one must surface undetermined.
+      runSecurityScan: async () => ({ passed: true, critical: 0, high: 0, skipped: [] }),
+      pushToRemote: () => { pushed++; return true; },
+      logger: { log: () => {} }
+    });
+    assert.equal(result.ok, false, 'undetermined tests must block the push, not silently pass');
+    assert.equal(result.tier, 1);
+    assert.ok(result.blockedBy.includes('tests'), 'tests must be the blocker');
+    assert.equal(pushed, 0, 'never pushes when the test command is undetermined');
+  });
+});
+
 describe('push.js — parsePushArgs', () => {
   test('6. recognizes every documented flag and reports unknowns', () => {
     const ok = push.parsePushArgs(['--force', '--dry-run']);

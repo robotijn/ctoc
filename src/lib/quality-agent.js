@@ -113,6 +113,43 @@ function runCommand(cmd, options = {}) {
 }
 
 /**
+ * Finding A (SEVERE) — languages whose test command the DETECTOR could not determine
+ * (test:null AND testUndetermined:true). tool-detector sets testUndetermined ONLY when it
+ * GAVE UP (no scripts.test, no recognized framework); an EXPLICIT user `test:null` override
+ * DELETES the flag, so an intentional "no test command" is NOT returned here.
+ *
+ * A detector-undetermined test command must NEVER be silently treated as "nothing to run =
+ * PASS": pre-R10 those repos got `npm test` → exit non-zero → a LOUD block, and the "no
+ * silent test failures / the measure is the human" red line requires the same loud outcome
+ * now. The R10 detector got honest (null + flag) but no consumer read the flag, so the test
+ * loop's `if (!langTools.test) continue` skipped the language and the run passed green while
+ * tests NEVER ran — pushing an unverified repo. This restores the loud block.
+ *
+ * @param {Object<string, {test?: (string|null), testUndetermined?: boolean}>} tools
+ * @returns {string[]} language names with an undetermined (detector-gave-up) test command
+ */
+function undeterminedTestLanguages(tools) {
+  return Object.entries(tools || {})
+    .filter(([, t]) => t && t.testUndetermined && !t.test)
+    .map(([lang]) => lang);
+}
+
+/**
+ * The NON-pass result surfaced when a language's test command is undetermined. Shaped like
+ * the other test-runner results so consumers (push.js) block on `!passed`; `undetermined`
+ * is added so the human sees WHY it is not a pass. Never a silent green.
+ * @param {string[]} langs the undetermined languages
+ * @returns {{passed:false, undetermined:true, passCount:number, failed:number, skipped:number, flaky:number, output:string}}
+ */
+function undeterminedTestsResult(langs) {
+  const msg = `tests undetermined — NOT verified for: ${langs.join(', ')} `
+    + '(no test script and no recognized framework — cannot confirm tests ran). '
+    + 'Declare a test command in package.json "scripts.test" or .ctoc/quality-config.yaml.';
+  console.log(`   ${msg}`);
+  return { passed: false, undetermined: true, passCount: 0, failed: 0, skipped: 0, flaky: 0, output: msg };
+}
+
+/**
  * Run lint check
  */
 async function runLint(tools) {
@@ -166,6 +203,10 @@ async function runTypecheck(tools) {
  * @returns {Object} Test result
  */
 function runSpecificTests(tools, testFiles) {
+  // Finding A: a detector-undetermined test command is NOT a silent pass.
+  const undetermined = undeterminedTestLanguages(tools);
+  if (undetermined.length) return undeterminedTestsResult(undetermined);
+
   let totalPassed = 0;
   let totalFailed = 0;
 
@@ -228,6 +269,10 @@ function runSpecificTests(tools, testFiles) {
  * Run all tests (full suite fallback)
  */
 async function runFullTests(tools) {
+  // Finding A: a detector-undetermined test command is NOT a silent pass.
+  const undetermined = undeterminedTestLanguages(tools);
+  if (undetermined.length) return undeterminedTestsResult(undetermined);
+
   let totalPassed = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
@@ -287,6 +332,12 @@ async function runFullTests(tools) {
  */
 async function runSmartTests(tools) {
   console.log('\n  Running tests...');
+
+  // Finding A (SEVERE): a detector-undetermined test command is NOT a silent pass. This
+  // MUST run before the changed-files short-circuit below — otherwise a repo with no git
+  // delta would return passed:true and the unverified state would never surface.
+  const undetermined = undeterminedTestLanguages(tools);
+  if (undetermined.length) return undeterminedTestsResult(undetermined);
 
   // 1. Get changed files from git
   const changedResult = runCommand('git diff HEAD~1 --name-only', { silent: true, allowFail: true });

@@ -69,7 +69,15 @@ const SECRET_PATTERNS = [
   },
   {
     type: 'AWS_SECRET_KEY',
-    pattern: /(?<![A-Za-z0-9/+=])([A-Za-z0-9/+=]{40})(?![A-Za-z0-9/+=])/g,
+    // `=` is DROPPED from the lookbehind (but kept in the value class as base64
+    // padding, and in the lookahead). With `=` in the lookbehind, an unquoted
+    // `AWS_SECRET_ACCESS_KEY=<40-char>` (Dockerfile ENV / shell export / .env)
+    // failed the assertion — the `=` immediately before the value blocked the
+    // match — so only QUOTED / space-separated forms fired. `=` is not a base64
+    // body character preceding a fresh secret run, so removing it from the
+    // lookbehind cannot merge two adjacent base64 blobs; the ±100-char aws-secret
+    // context gate below keeps the false-positive rate low.
+    pattern: /(?<![A-Za-z0-9/+])([A-Za-z0-9/+=]{40})(?![A-Za-z0-9/+=])/g,
     context: /aws[_-]?secret|secret[_-]?access[_-]?key/i,
     description: 'AWS Secret Access Key'
   },
@@ -705,6 +713,14 @@ class SecretsScanner {
         }
       }
 
+      // Unquoted secret assignments (KEY=<value> with no surrounding quotes) —
+      // the .env / Dockerfile ENV / shell export form. Every provider and
+      // generic pattern above anchors on a quote, so an unquoted non-provider
+      // secret was invisible across all of them. Runs after the pattern loop so
+      // it can dedup against a specific finding already located on the same line.
+      const unquotedFindings = this.detectUnquotedAssignments(lines, relativePath, findings);
+      findings.push(...unquotedFindings);
+
       // High entropy string detection (last resort)
       if (this.options.detectHighEntropy !== false) {
         const highEntropyFindings = this.detectHighEntropyStrings(content, lines, relativePath);
@@ -759,6 +775,73 @@ class SecretsScanner {
           line: i + 1,
           match: this.redactSecret(value),
           description: `High entropy string (${entropy.toFixed(2)}) - potential secret`,
+          verified: false,
+          entropy
+        });
+      }
+    }
+
+    return findings;
+  }
+
+  /**
+   * Detect UNQUOTED secret assignments: `SECRET_NAMED_KEY=<value>` with no
+   * surrounding quotes (the .env / Dockerfile ENV / shell export form). Every
+   * provider/generic pattern requires a quote, so an unquoted non-provider
+   * secret slipped past all of them. This path is deliberately narrow to avoid
+   * false positives on ordinary unquoted config:
+   *   (a) the value is boundary-anchored (whitespace / EOL / `#`), NOT a quote;
+   *   (b) the ASSIGNED KEY NAME is secret-ish (secret/api-key/key/token/
+   *       password/credential/auth) — a config key like `COMMIT` is excluded;
+   *   (c) the value is at least 20 chars AND passes a RAISED entropy floor
+   *       (the scanner's entropyThreshold, 4.5) — an unquoted low-entropy word
+   *       is config, not a secret. The quoted GENERIC_SECRET path has NO entropy
+   *       gate; requiring high entropy here is what makes the unquoted form safe;
+   *   (d) the value contains no `://`, no `/` (URL / path shape) and no space.
+   * A line that already produced a specific finding (e.g. an npm/AWS pattern
+   * hit) is skipped, so this never double-reports a provider secret.
+   * @param {string[]} lines - Lines of the file
+   * @param {string} relativePath - Relative file path
+   * @param {Array} existingFindings - Findings already located in this file
+   * @returns {Array} Unquoted-assignment findings
+   */
+  detectUnquotedAssignments(lines, relativePath, existingFindings) {
+    const findings = [];
+    // Key = identifier, value = unquoted run ending on a real boundary.
+    const pattern = /(?:^|[\s;])([A-Za-z_][A-Za-z0-9_.-]*)\s*[:=]\s*([^\s'"#]+)(?=[\s#]|$)/g;
+    const secretishKey = /secret|api[_-]?key|access[_-]?key|token|password|passwd|pwd|credential|auth|key/i;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Skip obvious comment lines in source files (not .env, where a leading
+      // `#` is still a comment but a bare `KEY=value` is the norm).
+      if (/^\s*(#|\/\/|--|;|\*)/.test(line)) continue;
+
+      for (const m of line.matchAll(pattern)) {
+        const key = m[1];
+        const value = m[2];
+
+        if (!secretishKey.test(key)) continue;
+        if (value.length < 20) continue;
+        if (value.includes('://') || value.includes('/') || value.includes(' ')) continue;
+        if (this.isPlaceholder(value)) continue;
+
+        const entropy = this.calculateEntropy(value);
+        // Raised floor: below the entropy threshold it is config/an identifier,
+        // not a secret; above 6.0 it is dense binary/base64 data, not a key.
+        if (entropy < this.options.entropyThreshold || entropy > 6.0) continue;
+
+        // Do not double-report a value a specific provider pattern already caught.
+        if (existingFindings.some(f => f.line === i + 1)) continue;
+
+        findings.push({
+          type: 'GENERIC_SECRET',
+          name: SECRET_TYPES.GENERIC_SECRET.name,
+          severity: SECRET_TYPES.GENERIC_SECRET.severity,
+          file: relativePath,
+          line: i + 1,
+          match: this.redactSecret(value),
+          description: 'Unquoted secret assigned to a secret-named identifier',
           verified: false,
           entropy
         });
