@@ -136,12 +136,24 @@ class SCARunner {
    * audit, bundler-audit, dependency-check, …) — routes to osv-scanner, NEVER to a
    * fabricated parser. `native` is therefore never a parser-less tool.
    *
+   * DEFECT 2 (poetry/uv routing): python defined by a `poetry.lock` or `uv.lock` is
+   * readable ONLY by osv-scanner. pip-audit — python's native SCA tool here — audits the
+   * AMBIENT environment, never the lockfile, so for such a project it verifies the wrong
+   * thing. So a poetry/uv python project drops its `pip-audit` native route and falls
+   * through to the osv universal pass; scannability then keys on osv availability, not
+   * pip-audit. A pip-managed python project (requirements.txt / pyproject-without-lock)
+   * keeps its pip-audit native route — no over-correction. The routing lives HERE, in one
+   * place, so every caller (run() and the quality-agent scannable filter) agrees.
+   *
    * @param {string} lang detected language name
    * @returns {{ native: (string|null), osvUniversal: boolean }}
    */
   scaRouteFor(lang) {
     const config = SCA_TOOL_CONFIGS[lang];
-    const native = config && config.native;
+    let native = config && config.native;
+    if (lang === 'python' && native === 'pip-audit' && this._pythonUsesOsvOnlyLock()) {
+      native = null; // pip-audit cannot read poetry.lock/uv.lock → route to osv universal
+    }
     if (native && PARSEABLE_NATIVE_TOOLS.has(native)) {
       return { native, osvUniversal: false };
     }
@@ -206,16 +218,15 @@ class SCARunner {
     this._deferredLanguages = deferred;
     const languages = detected.filter((l) => !deferred.has(l));
 
-    // F3: a poetry.lock present means python's dependency set is defined by poetry.lock,
-    // which pip-audit (SCA's native python tool AND DependencyAuditor's) CANNOT read —
-    // only osv-scanner reads poetry.lock natively. So route python coverage through the
-    // osv universal pass and SKIP the native pip-audit (which would audit the ambient
-    // environment, not the project — a misleading result). The direct filesystem check
-    // gives real coverage even when the language registry, whose python markers do not
-    // include poetry.lock, does not surface python.
-    const poetryLock = this._hasPoetryLock();
+    // DEFECT 2 / F3: a poetry.lock or uv.lock present means python's dependency set is
+    // defined by that lockfile, which pip-audit (SCA's native python tool AND
+    // DependencyAuditor's) CANNOT read — only osv-scanner reads poetry.lock/uv.lock
+    // natively. scaRouteFor() already drops python's pip-audit native route in that case
+    // (routing it to the osv universal pass); this flag additionally keeps osv running
+    // and defends the short-circuit even if the language registry did not surface python.
+    const osvOnlyPythonLock = this._pythonUsesOsvOnlyLock();
 
-    if (languages.length === 0 && !poetryLock) {
+    if (languages.length === 0 && !osvOnlyPythonLock) {
       return {
         success: true,
         findings: [],
@@ -228,12 +239,11 @@ class SCARunner {
 
     let scannersRun = 0;
 
-    // Native parsers, one per language that routes to one and whose tool is present.
-    // python is EXCLUDED from the native pass when poetry.lock is present — pip-audit
-    // cannot read poetry.lock; the osv universal pass below is the real coverage (F3).
-    const nativeLangs = languages.filter(
-      (l) => this.scaRouteFor(l).native && !(poetryLock && l === 'python')
-    );
+    // Native parsers, one per language whose route names a native tool. scaRouteFor()
+    // already drops python's native pip-audit route when poetry.lock/uv.lock is present
+    // (DEFECT 2), so a poetry/uv python project is excluded here without a special-case —
+    // the osv universal pass below is its real coverage.
+    const nativeLangs = languages.filter((l) => this.scaRouteFor(l).native);
     for (const lang of nativeLangs) {
       if (await this.runNativeScanner(lang)) {
         scannersRun++;
@@ -241,10 +251,10 @@ class SCARunner {
     }
 
     // osv-scanner universal: a SINGLE pass for the whole repo, run iff at least one
-    // detected language routes to it OR a poetry.lock is present (osv is the ONLY engine
-    // that reads poetry.lock). osv-scanner is lockfile-based and multi-ecosystem, so one
-    // pass covers every osv-routed language at once.
-    const anyOsvRouted = languages.some((l) => this.scaRouteFor(l).osvUniversal) || poetryLock;
+    // detected language routes to it OR a poetry.lock/uv.lock is present (osv is the ONLY
+    // engine that reads those python locks). osv-scanner is lockfile-based and
+    // multi-ecosystem, so one pass covers every osv-routed language at once.
+    const anyOsvRouted = languages.some((l) => this.scaRouteFor(l).osvUniversal) || osvOnlyPythonLock;
     if (anyOsvRouted && this.isToolAvailable('osv-scanner')) {
       scannersRun++;
       await this.runOsvScanner();
@@ -522,20 +532,22 @@ class SCARunner {
   }
 
   /**
-   * True when the project root contains a `poetry.lock`. A direct filesystem check
-   * (F3): a poetry.lock present means python is poetry-managed, and neither
-   * DependencyAuditor's nor SCA's native `pip-audit` can read it — only osv-scanner
-   * reads poetry.lock natively. run() uses this to route python coverage through the
-   * osv universal pass (and skip the useless native pip-audit), so a poetry project
-   * genuinely gets osv coverage even though the language registry's python markers do
-   * not include poetry.lock. Fail-soft: an unreadable root reports absent.
-   * @returns {boolean} true iff poetry.lock exists at the project root
+   * True when the project root contains a `poetry.lock` OR a `uv.lock` — the two python
+   * lockfiles only osv-scanner reads. A direct filesystem check (DEFECT 2 / F3): such a
+   * lock present means python's dependency set is defined by the lockfile, and neither
+   * DependencyAuditor's nor SCA's native `pip-audit` can read it (pip-audit audits the
+   * AMBIENT environment) — only osv-scanner reads poetry.lock/uv.lock natively. Both
+   * scaRouteFor() and run() consult this to route python coverage through the osv
+   * universal pass (and skip the useless native pip-audit), so a poetry/uv project
+   * genuinely gets osv coverage. Fail-soft: an unreadable root reports absent.
+   * @returns {boolean} true iff a poetry.lock or uv.lock exists at the project root
    */
-  _hasPoetryLock() {
+  _pythonUsesOsvOnlyLock() {
     const root = this.projectRoot;
     if (!root || typeof root !== 'string') return false;
     try {
-      return safeFs.existsSync(path.join(root, 'poetry.lock'));
+      return safeFs.existsSync(path.join(root, 'poetry.lock'))
+        || safeFs.existsSync(path.join(root, 'uv.lock'));
     } catch {
       return false;
     }

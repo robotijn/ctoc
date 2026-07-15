@@ -494,6 +494,214 @@ describe('F2 — the QUALITY SUMMARY must surface skipped security scanners (par
   });
 });
 
+/**
+ * DEFECT 1+2 — a poetry.lock/uv.lock python repo must reach osv-scanner through the
+ * PRODUCTION caller runSecurityScan (NOT sca.run() directly — a sca.run() unit test is
+ * the exact false-green that hid this; the dead path is the quality-agent orchestrator).
+ *
+ * These drive the LIVE runSecurityScan against real temp repos. Tool availability +
+ * osv output are controlled by mocking child_process (execFileSync/execSync) and
+ * RELOADING the fleet modules that capture those functions at load time, so the whole
+ * quality-agent → sca-runner chain is exercised with a deterministic, host-independent
+ * osv result. Only the external process boundary is mocked; the real parseOSVResults /
+ * routing / orchestration logic runs.
+ */
+const cp = require('node:child_process');
+const REAL_EXECSYNC = cp.execSync;
+const REAL_EXECFILE = cp.execFileSync;
+// Fleet modules that destructure a child_process function at load time and sit on the
+// runSecurityScan path. Reloaded so a cp mock installed here reaches them.
+const RELOAD_PATHS = [
+  '../src/lib/dependency-auditor',
+  '../src/lib/sast-runner',
+  '../src/lib/sca-runner',
+  '../src/lib/quality-agent'
+].map((p) => require.resolve(p));
+
+/** Reload the quality-agent (and its cp-capturing deps) AFTER installing cp mocks. */
+function freshQualityAgent() {
+  for (const p of RELOAD_PATHS) delete require.cache[p];
+  return require(require.resolve('../src/lib/quality-agent'));
+}
+/** Restore the real child_process and drop the freshly-loaded fleet from the cache. */
+function restoreCp() {
+  cp.execSync = REAL_EXECSYNC;
+  cp.execFileSync = REAL_EXECFILE;
+  for (const p of RELOAD_PATHS) delete require.cache[p];
+}
+
+describe('DEFECT 1+2 — poetry.lock/uv.lock python reaches osv through runSecurityScan (PRODUCTION path)', () => {
+  it('a poetry.lock-only repo with osv-scanner AVAILABLE is SCANNED via osv — the CVE surfaces, no "no language"/"covered" branch', async () => {
+    const osv = {
+      results: [{
+        source: { path: 'poetry.lock', type: 'lockfile' },
+        packages: [{
+          package: { name: 'jinja2', ecosystem: 'PyPI', version: '2.10' },
+          vulnerabilities: [{ id: 'PYSEC-2019-217', summary: 'SSTI in Jinja2', database_specific: { severity: 'HIGH' } }]
+        }]
+      }]
+    };
+    // osv-scanner installed + returns the poetry.lock CVE; every other tool absent.
+    cp.execFileSync = (cmd, args) => {
+      if (Array.isArray(args) && args.includes('--version')) {
+        if (cmd === 'osv-scanner') return '';
+        throw new Error('not installed');
+      }
+      if (cmd === 'osv-scanner') return JSON.stringify(osv);
+      throw new Error(`unexpected execFileSync ${cmd} ${JSON.stringify(args)}`);
+    };
+    cp.execSync = () => { throw new Error('not installed'); };
+
+    const dir = mkTmp('ctoc-poetry-osv-');
+    try {
+      fs.writeFileSync(path.join(dir, 'poetry.lock'), '');
+      const qa = freshQualityAgent();
+      const { res, out } = await captureLog(() =>
+        qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      // DEFECT 1: python was REACHED — not the no-language / covered short-circuits.
+      assert.doesNotMatch(out, /no supported language detected/,
+        `poetry.lock-only must NOT read as "no supported language"; log:\n${out}`);
+      assert.doesNotMatch(out, /all detected ecosystems covered by DependencyAuditor/,
+        `poetry python is NOT covered by DependencyAuditor (poetry unimplemented); log:\n${out}`);
+      // DEFECT 2: python was osv-routed and actually scanned — the CVE surfaces.
+      assert.ok(res.high >= 1, `the poetry.lock CVE must surface via osv; got high=${res.high}`);
+      assert.match(res.details, /sca\[HIGH\] jinja2/,
+        `the osv finding must be in the human-facing details; got: ${JSON.stringify(res.details)}`);
+      assert.match(out, /SCA: 1 dependency finding\(s\)/, `osv must have scanned python; log:\n${out}`);
+      assert.ok(!res.skipped.some((s) => /SCA skipped for python/i.test(s)),
+        `python must be scanned, not skipped for a missing scanner; skipped=${JSON.stringify(res.skipped)}`);
+    } finally {
+      restoreCp();
+      rm(dir);
+    }
+  });
+
+  it('a poetry.lock-only repo with osv-scanner UNAVAILABLE (pip-audit present) skips HONESTLY, naming osv-scanner — never "covered", never pip-audit', async () => {
+    // The exact DEFECT-2 environment: osv-only is where SCA works, yet the old routing
+    // (pip-audit) skipped it. Here osv is ABSENT and pip-audit PRESENT — python must
+    // skip loudly naming osv-scanner (the tool that reads poetry.lock), never claim
+    // pip-audit would help, and never read as "covered".
+    cp.execFileSync = (cmd, args) => {
+      if (Array.isArray(args) && args.includes('--version')) {
+        if (cmd === 'pip-audit') return '';   // pip-audit installed
+        throw new Error('not installed');      // osv-scanner NOT installed
+      }
+      throw new Error(`unexpected execFileSync ${cmd} ${JSON.stringify(args)}`);
+    };
+    cp.execSync = () => { throw new Error('not installed'); };
+
+    const dir = mkTmp('ctoc-poetry-noosv-');
+    try {
+      fs.writeFileSync(path.join(dir, 'poetry.lock'), '');
+      const qa = freshQualityAgent();
+      const { res, out } = await captureLog(() =>
+        qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      const pySkip = res.skipped.find((s) => /SCA skipped for python/i.test(s)) || '';
+      assert.ok(pySkip, `python must skip LOUDLY; skipped=${JSON.stringify(res.skipped)}`);
+      assert.match(pySkip, /osv-scanner/,
+        `the honest skip must name osv-scanner (reads poetry.lock); got: ${JSON.stringify(pySkip)}`);
+      assert.doesNotMatch(pySkip, /pip-audit/,
+        `the skip must NOT claim pip-audit would help — it cannot read poetry.lock; got: ${JSON.stringify(pySkip)}`);
+      // A missing scanner is not a finding — it must not block, and it must never read
+      // as a silent "covered".
+      assert.equal(res.passed, true, 'a missing scanner must not block the push');
+      assert.doesNotMatch(out, /all detected ecosystems covered by DependencyAuditor/, `not covered; log:\n${out}`);
+      assert.doesNotMatch(out, /no supported language detected/, `python WAS reached (DEFECT 1); log:\n${out}`);
+    } finally {
+      restoreCp();
+      rm(dir);
+    }
+  });
+
+  it('a uv.lock-only repo with osv-scanner AVAILABLE is SCANNED via osv (same routing as poetry)', async () => {
+    const osv = {
+      results: [{
+        source: { path: 'uv.lock', type: 'lockfile' },
+        packages: [{
+          package: { name: 'requests', ecosystem: 'PyPI', version: '2.19.0' },
+          vulnerabilities: [{ id: 'PYSEC-2018-28', summary: 'CRLF injection in requests', database_specific: { severity: 'HIGH' } }]
+        }]
+      }]
+    };
+    cp.execFileSync = (cmd, args) => {
+      if (Array.isArray(args) && args.includes('--version')) {
+        if (cmd === 'osv-scanner') return '';
+        throw new Error('not installed');
+      }
+      if (cmd === 'osv-scanner') return JSON.stringify(osv);
+      throw new Error(`unexpected execFileSync ${cmd} ${JSON.stringify(args)}`);
+    };
+    cp.execSync = () => { throw new Error('not installed'); };
+
+    const dir = mkTmp('ctoc-uv-osv-');
+    try {
+      fs.writeFileSync(path.join(dir, 'uv.lock'), '');
+      const qa = freshQualityAgent();
+      const { res, out } = await captureLog(() =>
+        qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      assert.doesNotMatch(out, /no supported language detected/, `uv.lock-only must reach python; log:\n${out}`);
+      assert.ok(res.high >= 1, `the uv.lock CVE must surface via osv; got high=${res.high}`);
+      assert.match(res.details, /sca\[HIGH\] requests/,
+        `the osv finding must be in details; got: ${JSON.stringify(res.details)}`);
+      assert.ok(!res.skipped.some((s) => /SCA skipped for python/i.test(s)),
+        `python must be osv-scanned, not skipped; skipped=${JSON.stringify(res.skipped)}`);
+    } finally {
+      restoreCp();
+      rm(dir);
+    }
+  });
+
+  it('a pyproject.toml + poetry.lock repo routes to osv — pip-audit is NEVER invoked for the poetry set (both installed)', async () => {
+    const osv = {
+      results: [{
+        source: { path: 'poetry.lock', type: 'lockfile' },
+        packages: [{
+          package: { name: 'jinja2', ecosystem: 'PyPI', version: '2.10' },
+          vulnerabilities: [{ id: 'PYSEC-2019-217', summary: 'SSTI in Jinja2', database_specific: { severity: 'HIGH' } }]
+        }]
+      }]
+    };
+    // BOTH osv-scanner and pip-audit are installed. Poetry-aware routing must pick osv;
+    // if pip-audit were invoked (old behaviour) the mock throws on its scan invocation,
+    // producing a loud pip-audit skip that this test asserts NEVER appears.
+    cp.execFileSync = (cmd, args) => {
+      if (Array.isArray(args) && args.includes('--version')) {
+        if (cmd === 'osv-scanner' || cmd === 'pip-audit') return '';
+        throw new Error('not installed');
+      }
+      if (cmd === 'osv-scanner') return JSON.stringify(osv);
+      throw new Error(`pip-audit (or other) must NOT be invoked for a poetry set: ${cmd}`);
+    };
+    cp.execSync = () => { throw new Error('not installed'); };
+
+    const dir = mkTmp('ctoc-pyproject-poetry-');
+    try {
+      fs.writeFileSync(path.join(dir, 'pyproject.toml'), '[tool.poetry]\n');
+      fs.writeFileSync(path.join(dir, 'poetry.lock'), '');
+      const qa = freshQualityAgent();
+      const { res } = await captureLog(() =>
+        qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      assert.ok(res.high >= 1, `the poetry CVE must surface via osv; got high=${res.high}`);
+      assert.match(res.details, /sca\[HIGH\] jinja2/, `finding must come from osv; got: ${JSON.stringify(res.details)}`);
+      assert.ok(!res.skipped.some((s) => /pip-audit/i.test(s)),
+        `pip-audit must NEVER be invoked for a poetry set (it cannot read poetry.lock); skipped=${JSON.stringify(res.skipped)}`);
+      assert.ok(!res.skipped.some((s) => /SCA skipped for python/i.test(s)),
+        `python must be osv-scanned, not skipped; skipped=${JSON.stringify(res.skipped)}`);
+    } finally {
+      restoreCp();
+      rm(dir);
+    }
+  });
+});
+
 describe('POST-COMMIT LOOP: initProject wires the background quality hook', () => {
   let dir;
   before(() => {

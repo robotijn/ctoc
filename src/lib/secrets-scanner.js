@@ -29,15 +29,23 @@ const SECRET_TYPES = {
   GITLAB_TOKEN: { name: 'GitLab Token', severity: 'CRITICAL', verified: true },
   SLACK_TOKEN: { name: 'Slack Token', severity: 'HIGH', verified: true },
   STRIPE_API_KEY: { name: 'Stripe API Key', severity: 'CRITICAL', verified: true },
+  OPENAI_API_KEY: { name: 'OpenAI API Key', severity: 'HIGH', verified: true },
+  ANTHROPIC_API_KEY: { name: 'Anthropic API Key', severity: 'HIGH', verified: true },
   TWILIO_API_KEY: { name: 'Twilio API Key', severity: 'HIGH', verified: true },
   SENDGRID_API_KEY: { name: 'SendGrid API Key', severity: 'HIGH', verified: true },
   PRIVATE_KEY: { name: 'Private Key', severity: 'CRITICAL', verified: true },
   SSH_PRIVATE_KEY: { name: 'SSH Private Key', severity: 'CRITICAL', verified: true },
   PGP_PRIVATE_KEY: { name: 'PGP Private Key', severity: 'CRITICAL', verified: true },
   JWT_SECRET: { name: 'JWT Secret', severity: 'HIGH', verified: false },
+  JWT_TOKEN: { name: 'JSON Web Token', severity: 'HIGH', verified: false },
   PASSWORD: { name: 'Hardcoded Password', severity: 'HIGH', verified: false },
   DATABASE_URL: { name: 'Database Connection String', severity: 'CRITICAL', verified: false },
-  GENERIC_SECRET: { name: 'Generic Secret', severity: 'MEDIUM', verified: false },
+  // A value assigned to a secret|api_key|token|auth-named variable is a real
+  // secret; it must BLOCK the gate (gate fails on CRITICAL/HIGH), so this is
+  // HIGH — not MEDIUM. HIGH_ENTROPY stays LOW on purpose: raw Shannon entropy
+  // is a noisier heuristic (base64 blobs, hashes, UUIDs trip it), so an
+  // entropy-only hit must NOT block the gate, to avoid false-positive blocks.
+  GENERIC_SECRET: { name: 'Generic Secret', severity: 'HIGH', verified: false },
   HIGH_ENTROPY: { name: 'High Entropy String', severity: 'LOW', verified: false }
 };
 
@@ -105,11 +113,37 @@ const SECRET_PATTERNS = [
     description: 'Slack App Token'
   },
 
-  // Stripe
+  // Stripe — SECRET keys only. `pk_` (publishable) is PUBLIC by design and
+  // must NOT be flagged. Note the underscore (`sk_`/`rk_`) distinguishes Stripe
+  // from the hyphenated OpenAI `sk-` family below, so there is no collision.
   {
     type: 'STRIPE_API_KEY',
-    pattern: /\b(sk|pk|rk)_(live|test)_[A-Za-z0-9]{24,}\b/g,
+    pattern: /\b(sk|rk)_(live|test)_[A-Za-z0-9]{24,}\b/g,
     description: 'Stripe API Key'
+  },
+
+  // Anthropic — `sk-ant-...` (hyphen). Bounded, ReDoS-safe (single linear
+  // character class). Live-spend exposure: this project shells to `claude`.
+  {
+    type: 'ANTHROPIC_API_KEY',
+    pattern: /\bsk-ant-[A-Za-z0-9_-]{80,}\b/g,
+    description: 'Anthropic API Key'
+  },
+
+  // OpenAI — project keys (`sk-proj-...`) and classic keys (`sk-...`). Both use
+  // a hyphen after `sk`, unlike Stripe's underscore, so they never collide with
+  // the Stripe rule. The classic `sk-[A-Za-z0-9]{20,}` cannot match `sk-ant-`
+  // or `sk-proj-` (the run of alphanumerics breaks at the hyphen after the
+  // 3-/4-char prefix), so those families are matched by their own rules only.
+  {
+    type: 'OPENAI_API_KEY',
+    pattern: /\bsk-proj-[A-Za-z0-9_-]{20,}\b/g,
+    description: 'OpenAI Project API Key'
+  },
+  {
+    type: 'OPENAI_API_KEY',
+    pattern: /\bsk-[A-Za-z0-9]{20,}\b/g,
+    description: 'OpenAI API Key'
   },
 
   // Twilio
@@ -156,6 +190,14 @@ const SECRET_PATTERNS = [
     type: 'JWT_SECRET',
     pattern: /\bjwt[_-]?secret\s*[:=]\s*['"]([^'"]{16,})['"]/gi,
     description: 'JWT Secret'
+  },
+  {
+    // A JWT itself: base64url header (`eyJ...`) . payload (`eyJ...`) . signature.
+    // The dots exclude these from GENERIC_SECRET, so they need their own rule.
+    // Three bounded segments, linear — ReDoS-safe.
+    type: 'JWT_TOKEN',
+    pattern: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+    description: 'JSON Web Token'
   },
 
   // Database URLs
@@ -229,7 +271,20 @@ const SCANNABLE_EXTENSIONS = [
   '.toml',
   '.ini', '.cfg', '.conf',
   '.env', '.env.local', '.env.development', '.env.production',
-  '.properties'
+  '.properties',
+  // Cryptographic key / certificate material — a committed key FILE must be
+  // scanned, not ignored for lacking a source-code extension.
+  '.pem', '.key', '.crt', '.cer', '.pfx', '.p12'
+];
+
+/**
+ * Well-known extensionless private-key filenames. A committed OpenSSH/DSA/EC/
+ * Ed25519 private key ships with no extension, so match by exact basename.
+ * (Public `.pub` counterparts are intentionally NOT listed — they are public.)
+ * @type {Array}
+ */
+const KEY_FILENAMES = [
+  'id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519'
 ];
 
 /**
@@ -247,6 +302,13 @@ class SecretsScanner {
       excludes: [...DEFAULT_EXCLUDES, ...(options.excludes || [])],
       extensions: options.extensions || SCANNABLE_EXTENSIONS,
       maxFileSize: options.maxFileSize || 1024 * 1024, // 1MB
+      // NOTE (#8): Shannon entropy is bounded by log2(n) for an n-char string,
+      // so this 4.5 threshold is mathematically unreachable below ~23 chars
+      // (log2(23) ≈ 4.52). The paired assignment scan uses a 20-char floor, so
+      // 20–22-char secrets can never trip the entropy heuristic — that is
+      // intentional: GENERIC_SECRET (a value assigned to a secret-named var) is
+      // the intended catch below ~23 chars, and it now blocks at HIGH. The
+      // entropy pass is only a last-resort net for long, high-randomness blobs.
       entropyThreshold: options.entropyThreshold || 4.5,
       verifySecrets: options.verifySecrets || false,
       ...options
@@ -278,13 +340,24 @@ class SecretsScanner {
     // Check if .env file (always scan)
     if (basename.startsWith('.env')) return true;
 
-    // Check extension
-    if (!this.options.extensions.includes(ext)) return false;
+    // Check extension OR well-known extensionless private-key filename
+    // (id_rsa, id_ed25519, ...). Without the filename special-case a committed
+    // OpenSSH key would never be scanned.
+    const isKeyFilename = KEY_FILENAMES.includes(basename);
+    if (!this.options.extensions.includes(ext) && !isKeyFilename) return false;
 
-    // Check file size
+    // Check file size. An oversized file is NOT silently dropped — record the
+    // skip in this.errors (mirroring the unreadable-file record) so a secret
+    // past maxFileSize is surfaced rather than invisibly unscanned.
     try {
       const stats = safeFs.statSync(filePath);
-      if (stats.size > this.options.maxFileSize) return false;
+      if (stats.size > this.options.maxFileSize) {
+        this.errors.push({
+          file: filePath,
+          error: `Skipped: file size ${stats.size} exceeds maxFileSize ${this.options.maxFileSize} bytes (unscanned)`
+        });
+        return false;
+      }
     } catch (e) {
       return false;
     }
@@ -357,15 +430,43 @@ class SecretsScanner {
    * @returns {boolean} True if placeholder
    */
   isPlaceholder(str) {
-    const placeholders = [
-      'xxx', 'changeme', 'your-', 'example', 'placeholder',
-      'replace', 'insert', 'todo', 'fixme', 'sample',
-      'test', 'fake', 'dummy', 'demo', '<', '>', 'undefined',
-      'null', 'none', 'empty', 'default'
-    ];
+    if (!str) return true;
+    const lower = str.toLowerCase().trim();
 
-    const lower = str.toLowerCase();
-    return placeholders.some(p => lower.includes(p));
+    // A value IS a placeholder when it obviously equals or is one — NOT when a
+    // structurally-valid, high-entropy secret merely CONTAINS one of these
+    // substrings. Anchoring to the whole value / a word boundary is the fix:
+    // e.g. `AKIAnoneFODNN7Q9WZ2XY` contains "none" incidentally (letters on
+    // both sides, no word boundary) and must NOT be dropped.
+
+    // 1. Whole-value equals a known placeholder token.
+    const exact = [
+      'xxx', 'changeme', 'placeholder', 'example', 'undefined', 'null', 'none',
+      'empty', 'default', 'todo', 'fixme', 'test', 'fake', 'dummy', 'demo',
+      'sample', 'replace', 'insert'
+    ];
+    if (exact.includes(lower)) return true;
+
+    // 2. Template / interpolation markers: <...>, ${...}, {{...}}, %...%.
+    if (/^<.*>$/.test(str)) return true;
+    if (/\$\{.*\}/.test(str)) return true;
+    if (/\{\{.*\}\}/.test(str)) return true;
+    if (/^%.*%$/.test(str)) return true;
+
+    // 3. "your-..." / "your_..." style stubs.
+    if (/^your[-_]/.test(lower)) return true;
+
+    // 4. Runs of x's used as a mask (xxxx, xxxxxxxx).
+    if (/^x{3,}$/.test(lower)) return true;
+
+    // 5. A word-bounded placeholder phrase — the boundary (`-`, `_` edges, space
+    //    or ends) is what separates a genuine placeholder like `xxx-secret-xxx`
+    //    from a random blob that happens to contain the letters.
+    if (/(^|[^a-z0-9])(xxx|changeme|change-me|placeholder|redacted|example|your-key|your-secret|replace-me)([^a-z0-9]|$)/.test(lower)) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -379,6 +480,12 @@ class SecretsScanner {
     const lineStart = content.lastIndexOf('\n', position) + 1;
     const lineEnd = content.indexOf('\n', position);
     const line = content.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+
+    // PEM boundary lines (-----BEGIN/END ... KEY-----) begin with dashes but are
+    // NOT SQL `--` comments. Without this guard a private-key header on its own
+    // line matches /^\s*--/ and the whole key block is silently skipped — the
+    // CRITICAL private-key blind spot. Exempt PEM boundaries before any check.
+    if (/^\s*-----(BEGIN|END)\b/.test(line)) return false;
 
     // Check for common comment patterns
     const commentPatterns = [
@@ -861,5 +968,6 @@ module.exports = {
   SECRET_TYPES,
   SECRET_PATTERNS,
   DEFAULT_EXCLUDES,
-  SCANNABLE_EXTENSIONS
+  SCANNABLE_EXTENSIONS,
+  KEY_FILENAMES
 };

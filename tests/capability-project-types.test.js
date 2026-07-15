@@ -32,14 +32,15 @@ const registry = require('../src/lib/capability-registry');
 
 // The 13 CR3 types PLUS the 8 web-grounded 2026 types added in expansion wave 2
 // (serverless, static-site, llm-agent, browser-extension, game, embedded, blockchain,
-// data-pipeline) — 21 in total. The count is a load-bearing contract: it must move in
-// lock-step with the shipped bundled data, never silently.
+// data-pipeline) PLUS web-fullstack (the security-required home for SSR frameworks —
+// Next/Nuxt/Remix/SvelteKit) — 22 in total. The count is a load-bearing contract: it
+// must move in lock-step with the shipped bundled data, never silently.
 const THE_PROJECT_TYPES = [
   'web-frontend', 'web-backend', 'mobile-crossplatform', 'mobile-native-android',
   'mobile-native-ios', 'desktop', 'cli', 'library', 'data-science', 'ml-service',
   'microservice', 'monorepo', 'infra',
   'serverless', 'static-site', 'llm-agent', 'browser-extension', 'game', 'embedded',
-  'blockchain', 'data-pipeline'
+  'blockchain', 'data-pipeline', 'web-fullstack'
 ];
 const HONEST_VALUES = new Set([true, false, 'build-is-last-mile', 'notebook-executes', 'per-workspace']);
 
@@ -52,15 +53,15 @@ function rm(dir) {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
-describe('capability-registry: loadProjectTypes() — the 21 bundled project types', () => {
-  it('loads all 21 bundled project types with zero warnings', () => {
+describe('capability-registry: loadProjectTypes() — the 22 bundled project types', () => {
+  it('loads all 22 bundled project types with zero warnings', () => {
     const reg = registry.loadProjectTypes();
     assert.ok(reg && typeof reg === 'object', 'loadProjectTypes must return an object');
     assert.ok(reg.projectTypes && typeof reg.projectTypes === 'object', 'must return a projectTypes map');
     for (const t of THE_PROJECT_TYPES) {
       assert.ok(reg.projectTypes[t], `bundled data must include the project type "${t}"`);
     }
-    assert.equal(Object.keys(reg.projectTypes).length, THE_PROJECT_TYPES.length, 'exactly the 21 project types ship');
+    assert.equal(Object.keys(reg.projectTypes).length, THE_PROJECT_TYPES.length, 'exactly the 22 project types ship');
     assert.ok(Array.isArray(reg.warnings), 'must expose a warnings array');
     assert.deepEqual(reg.warnings, [], 'the shipped project-type data must load with zero warnings');
   });

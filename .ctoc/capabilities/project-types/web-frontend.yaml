@@ -1,8 +1,13 @@
-# web-frontend — a browser SPA/SSR app (React/Vue/Svelte/Angular, Vite/Next).
+# web-frontend — a browser SPA (React/Vue/Svelte/Angular under Vite, or Angular CLI).
 # Runs a real dev server that answers HTTP, so run is genuinely honest:true.
+# DETECTION (DEF3): the SSR/fullstack framework markers (next.config.*, svelte.config.js)
+# were MOVED to the new web-fullstack project type (security:required). A Next.js /
+# SvelteKit app has server-side surface (SSRF, auth middleware, CSRF) and must not be
+# mis-classified here as a frontend where security is only `recommended`. web-frontend now
+# carries the genuinely-frontend markers only (Vite SPA configs + Angular CLI).
 projectType: web-frontend
-detectionMarkers: [vite.config.ts, vite.config.js, next.config.js, next.config.mjs, angular.json, svelte.config.js]
-frameworks: [react, vue, svelte, angular, next, vite]
+detectionMarkers: [vite.config.ts, vite.config.js, angular.json]
+frameworks: [react, vue, svelte, angular, vite]
 priority: 20
 runShape: web
 phases: { lint: required, typecheck: required, test: required, security: recommended, coverage: recommended }

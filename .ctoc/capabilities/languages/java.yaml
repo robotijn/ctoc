@@ -14,7 +14,7 @@ toolchain:
   test:      { cmd: "mvn test", tool: maven, altCmd: "gradle test", verified: web-2026-07 }
   coverage:  { cmd: "mvn jacoco:report", tool: jacoco, verified: web-2026-07 }
   security:  { cmd: "mvn com.github.spotbugs:spotbugs-maven-plugin:check", tool: spotbugs, verified: UNVERIFIED }
-  depsAudit: { cmd: "mvn org.owasp:dependency-check-maven:check", tool: dependency-check, altCmd: "osv-scanner -r .", verified: web-2026-07 }
+  depsAudit: { cmd: "mvn org.owasp:dependency-check-maven:check", tool: dependency-check, altCmd: "osv-scanner scan -r .", verified: web-2026-07 }
   build:     { cmd: "mvn package", tool: maven, verified: web-2026-07 }
 run:
   shapes: { server: "mvn spring-boot:run", cli: "java -jar target/*.jar" }

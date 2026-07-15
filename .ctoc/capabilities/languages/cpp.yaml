@@ -1,20 +1,27 @@
 # C++ capability entry — web-grounded 2026 toolchain (CMake + clang tooling).
-# depsAudit uses osv-scanner: C++ has no centralized package manager (conan/vcpkg
+# depsAudit uses osv-scanner v2: C++ has no centralized package manager (conan/vcpkg
 # vary), so OSV-Scanner matches vendored deps against OSV.dev commit-level ranges and
 # also scans Conan/vcpkg SBOMs (google.github.io/osv-scanner, verified 2026-07). The
-# two-step CMake build (configure + build) is split so the returned build cmd is a
-# SINGLE argv-safe command; `cmake -S . -B build` is the documented configure prerequisite.
+# recursive-directory scan is the v2 subcommand form `osv-scanner scan -r .` (the flat
+# `osv-scanner -r .` is the superseded v1 CLI). The two-step CMake build (configure +
+# build) is split so the returned build cmd is a SINGLE argv-safe command;
+# `cmake -S . -B build` is the documented configure prerequisite.
+# HONESTY (DEF1): `lint` (clang-tidy) cannot run zero-config — it needs a compile
+# database (CMake writes build/compile_commands.json, passed via `-p build`) AND source
+# files; a bare `clang-tidy` errors "no input files". So lint is flagged UNVERIFIED with
+# a zero-config cppcheck altCmd. `security` (`cppcheck --enable=all .`) runs standalone
+# but REQUIRES a path argument, mirroring python's `bandit -r .`.
 language: cpp
 detectionMarkers: [CMakeLists.txt, "*.cpp", "*.hpp"]
 extensions: [.cpp, .hpp, .cc, .cxx]
 toolchain:
-  lint:      { cmd: "clang-tidy", tool: clang-tidy, verified: web-2026-07 }
+  lint:      { cmd: "clang-tidy -p build", tool: clang-tidy, altCmd: "cppcheck --enable=all .", verified: UNVERIFIED }
   format:    { cmd: "clang-format --dry-run --Werror", tool: clang-format, verified: web-2026-07 }
   typecheck: { cmd: "cmake --build build", tool: cmake, verified: web-2026-07 }
   test:      { cmd: "ctest --test-dir build", tool: ctest, verified: web-2026-07 }
   coverage:  { cmd: "lcov --capture --directory build --output-file coverage.info", tool: lcov, verified: web-2026-07 }
-  security:  { cmd: "cppcheck --enable=all", tool: cppcheck, altCmd: "flawfinder .", verified: web-2026-07 }
-  depsAudit: { cmd: "osv-scanner -r .", tool: osv-scanner, verified: web-2026-07 }
+  security:  { cmd: "cppcheck --enable=all .", tool: cppcheck, altCmd: "flawfinder .", verified: web-2026-07 }
+  depsAudit: { cmd: "osv-scanner scan -r .", tool: osv-scanner, verified: web-2026-07 }
   build:     { cmd: "cmake --build build", tool: cmake, verified: web-2026-07 }
 run:
   shapes: { cli: "./build/app" }

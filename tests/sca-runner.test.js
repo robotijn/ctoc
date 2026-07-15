@@ -69,6 +69,52 @@ test('scaRouteFor: Rust routes to the cargo-audit NATIVE parser', () => {
   assert.equal(route.osvUniversal, false);
 });
 
+// ── DEFECT 2: python routing is poetry/uv AWARE — pip-audit cannot read those lockfiles
+// (it audits the ambient environment); only osv-scanner reads them. A poetry/uv project
+// must route to the osv universal pass so scannability keys on osv, not pip-audit. ──────
+
+test('scaRouteFor: python WITH a poetry.lock routes to osv (native null), NOT pip-audit', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-route-poetry-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'poetry.lock'), '');
+    const route = new SCARunner(tmp).scaRouteFor('python');
+    assert.equal(route.native, null,
+      'poetry.lock python has NO usable native parser (pip-audit cannot read poetry.lock)');
+    assert.equal(route.osvUniversal, true, 'poetry python must route to the osv universal pass');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('scaRouteFor: python WITH a uv.lock routes to osv (native null), NOT pip-audit', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-route-uv-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'uv.lock'), '');
+    const route = new SCARunner(tmp).scaRouteFor('python');
+    assert.equal(route.native, null,
+      'uv.lock python has NO usable native parser (pip-audit cannot read uv.lock)');
+    assert.equal(route.osvUniversal, true, 'uv python must route to the osv universal pass');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('scaRouteFor: python WITHOUT poetry.lock/uv.lock stays pip-audit (no over-correction)', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-route-pip-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'requirements.txt'), 'flask\n');
+    const route = new SCARunner(tmp).scaRouteFor('python');
+    assert.equal(route.native, 'pip-audit',
+      'a pip-managed python project (requirements.txt) still routes to the pip-audit native parser');
+    assert.equal(route.osvUniversal, false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test('scaRouteFor: Go/PHP/Ruby (no native parser here) route to osv-scanner UNIVERSAL', () => {
   const { SCARunner } = require(SCA_PATH);
   const r = new SCARunner('/x');
@@ -703,6 +749,42 @@ test('F3: a pyproject.toml + poetry.lock project is scanned by osv-scanner, pyth
       'native pip-audit must NOT be invoked for a poetry project (it cannot read poetry.lock)');
     assert.doesNotMatch(String(res.message || ''), /defer|covered/i,
       'python must not read as deferred/covered — it was actually scanned');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('F3-uv: a uv.lock-only project is scanned by osv-scanner, python NOT falsely deferred', async () => {
+  // uv.lock (Astral uv) is the same class as poetry.lock: only osv-scanner reads it
+  // natively; pip-audit audits the environment. A uv.lock alone must surface python
+  // (registry marker) AND route to osv, never to the useless native pip-audit.
+  const osv = {
+    results: [{
+      source: { path: 'uv.lock', type: 'lockfile' },
+      packages: [{
+        package: { name: 'requests', ecosystem: 'PyPI', version: '2.19.0' },
+        vulnerabilities: [{ id: 'PYSEC-2018-28', summary: 'CRLF in requests', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-uvlock-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'uv.lock'), '');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'a uv.lock project must be genuinely scanned, not falsely deferred');
+    assert.equal(res.findings.length, 1, 'the uv.lock CVE osv reads must surface');
+    assert.equal(res.findings[0].package, 'requests');
+    assert.equal(res.findings[0].tool, 'osv-scanner', 'uv python coverage comes from osv, not pip-audit');
+    assert.ok(!(res.errors || []).some((e) => e.tool === 'pip-audit'),
+      'native pip-audit must NOT be invoked for a uv project (it cannot read uv.lock)');
   } finally {
     restore();
     fs.rmSync(tmp, { recursive: true, force: true });

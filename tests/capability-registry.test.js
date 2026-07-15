@@ -146,6 +146,37 @@ describe('capability-registry: detectLanguages() — data-driven marker detectio
       assert.deepEqual(registry.detectLanguages(dir), []);
     } finally { rm(dir); }
   });
+
+  // DEFECT 1: a poetry.lock/uv.lock-only repo IS a python project — its markers must
+  // surface python so the SCA path (runSecurityScan → sca.run) is reached. Without
+  // these markers detectLanguages returned [] and the poetry-locked dependency set was
+  // audited by NEITHER runner.
+  it('python detectionMarkers include poetry.lock and uv.lock (the osv-only python locks)', () => {
+    const cap = registry.capabilitiesFor('python');
+    assert.ok(cap && Array.isArray(cap.detectionMarkers), 'python must carry detectionMarkers');
+    assert.ok(cap.detectionMarkers.includes('poetry.lock'),
+      'poetry.lock must be a python detection marker (a poetry repo IS a python project)');
+    assert.ok(cap.detectionMarkers.includes('uv.lock'),
+      'uv.lock must be a python detection marker (a uv repo IS a python project)');
+  });
+
+  it('detects python from a poetry.lock-only project', () => {
+    const dir = makeProject('ctoc-det-poetry-');
+    try {
+      fs.writeFileSync(path.join(dir, 'poetry.lock'), '');
+      assert.ok(registry.detectLanguages(dir).includes('python'),
+        'a poetry.lock-only repo must detect python');
+    } finally { rm(dir); }
+  });
+
+  it('detects python from a uv.lock-only project', () => {
+    const dir = makeProject('ctoc-det-uv-');
+    try {
+      fs.writeFileSync(path.join(dir, 'uv.lock'), '');
+      assert.ok(registry.detectLanguages(dir).includes('python'),
+        'a uv.lock-only repo must detect python');
+    } finally { rm(dir); }
+  });
 });
 
 describe('capability-registry: detectLanguages() — GLOB markers (CR5-s1, parity with tool-detector)', () => {

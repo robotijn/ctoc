@@ -57,7 +57,11 @@ verified: web-2026-07                   # provenance for the whole entry
 | `verified` | Provenance. `web-2026-07` (web-sourced 2026 anchor) or `UNVERIFIED`. **Never `guessed`.** |
 
 Recognized `toolchain` phases: `lint`, `format`, `typecheck`, `test`, `coverage`,
-`security`, `depsAudit`, `build`. `lint` and `test` are required for every language.
+`security`, `depsAudit`, `build`. `lint` is required for every language. `test` is
+required for every RUNNABLE language, but is honestly OMITTED by non-runnable
+config/data languages that have no test concept — `dockerfile`, `github-actions`,
+`shell`, and `yaml` deliberately declare no `test` phase (an absent phase is honest
+N/A, never a stub). A phase a language genuinely lacks is omitted, never faked.
 
 ### Provenance rule (invariant)
 

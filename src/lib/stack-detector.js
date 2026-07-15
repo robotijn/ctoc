@@ -263,12 +263,64 @@ function mergePkgDeps(target, pkg) {
 // Bound on how many workspace directories we will walk per project (F4). SessionStart
 // runs detection every session, so this stays cheap and crash-proof.
 const MAX_WORKSPACE_DIRS = 100;
+// Depth bound for a recursive `**` workspace glob (F4-defect). Real monorepos nest a
+// handful of levels; this caps the walk so a pathological tree can never blow up
+// SessionStart. Combined with MAX_WORKSPACE_DIRS the walk is doubly bounded.
+const MAX_WORKSPACE_DEPTH = 6;
+
+/**
+ * True when `target` resolves to a path AT OR UNDER `root` (F3-defect containment).
+ * Rejects any `..`-escaping or absolute-elsewhere workspace entry (e.g. `../evil`,
+ * `/etc`) so a malicious/typo `workspaces` entry can never read a package.json
+ * outside the project. Both sides are made absolute first; cross-platform via
+ * path.relative + path.isAbsolute (Windows drive-hops yield an absolute relative).
+ */
+function isWithinRoot(root, target) {
+  const rel = path.relative(path.resolve(root), path.resolve(target));
+  return rel === '' || (!rel.startsWith('..' + path.sep) && rel !== '..' && !path.isAbsolute(rel));
+}
+
+/**
+ * Collects `baseDir` and every descendant directory, bounded by depth and count
+ * (F4-defect recursive `**`). Fail-soft: an unreadable directory contributes
+ * nothing and never throws. Symlinks are followed via statSync but the count/depth
+ * bounds keep even a cyclic tree finite.
+ */
+function collectDescendantDirs(baseDir, out) {
+  const queue = [{ dir: baseDir, depth: 0 }];
+  while (queue.length > 0) {
+    if (out.length >= MAX_WORKSPACE_DIRS) break;
+    const { dir, depth } = queue.shift();
+    out.push(dir);
+    if (depth >= MAX_WORKSPACE_DEPTH) continue;
+    let entries;
+    try {
+      entries = safeFs.readdirSync(dir);
+    } catch (e) {
+      continue;
+    }
+    for (const entry of entries) {
+      if (out.length + queue.length >= MAX_WORKSPACE_DIRS) break;
+      const child = path.join(dir, entry);
+      let isDir = false;
+      try {
+        isDir = safeFs.statSync(child).isDirectory();
+      } catch (e) {
+        isDir = false;
+      }
+      if (isDir) queue.push({ dir: child, depth: depth + 1 });
+    }
+  }
+}
 
 /**
  * Resolves workspace glob patterns (e.g. `packages/*`, `apps/**`) to concrete
  * directories under the project root (F4). Hand-rolled, bounded, fail-soft — never
  * throws. Patterns always use `/` separators (package.json convention); each segment
- * is expanded against the filesystem, glob segments via matchGlob.
+ * is expanded against the filesystem, glob segments via matchGlob. A `**` segment
+ * expands recursively (F4-defect): the current directory AND every descendant, up to
+ * MAX_WORKSPACE_DEPTH / MAX_WORKSPACE_DIRS. Every resolved directory is finally
+ * filtered through isWithinRoot so a `../escape` entry is dropped (F3-defect).
  */
 function resolveWorkspaceDirs(projectPath, patterns) {
   const resolved = [];
@@ -279,7 +331,10 @@ function resolveWorkspaceDirs(projectPath, patterns) {
     for (const segment of segments) {
       const next = [];
       for (const dir of currentDirs) {
-        if (segment.includes('*')) {
+        if (segment === '**') {
+          // Recursive: this dir plus all nested subdirectories (bounded).
+          collectDescendantDirs(dir, next);
+        } else if (segment.includes('*')) {
           let entries;
           try {
             entries = safeFs.readdirSync(dir);
@@ -298,6 +353,8 @@ function resolveWorkspaceDirs(projectPath, patterns) {
       currentDirs = next.slice(0, MAX_WORKSPACE_DIRS);
     }
     for (const dir of currentDirs) {
+      // Containment (F3-defect): never read a package.json outside the project root.
+      if (!isWithinRoot(projectPath, dir)) continue;
       resolved.push(dir);
       if (resolved.length >= MAX_WORKSPACE_DIRS) return resolved;
     }
@@ -375,6 +432,26 @@ function collectQuotedRequirements(str, out) {
   }
 }
 
+/**
+ * Removes quoted substrings (double- or single-quoted) from a line so that a
+ * subsequent structural scan ignores any bracket living INSIDE a value. This is
+ * the same quote-aware view `collectQuotedRequirements` relies on: a `]` in a PEP
+ * 508 extras (`"uvicorn[standard]"`, `"django[argon2]"`) or an environment marker
+ * is part of the VALUE, not the array delimiter. Used to make the multiline-array
+ * `]`-terminator test quote-aware (F1). Mirrors the tokenizer's quote handling; no
+ * escape handling, matching `collectQuotedRequirements` (TOML basic-string escapes
+ * are out of scope for this hand-rolled parser and are not present in real dep
+ * strings).
+ */
+function stripQuotedSpans(str) {
+  return String(str).replace(/"[^"]*"|'[^']*'/g, '');
+}
+
+/** True when a line contains an array-closing `]` OUTSIDE any quoted value (F1). */
+function hasUnquotedCloseBracket(str) {
+  return stripQuotedSpans(str).includes(']');
+}
+
 // Bound on parsed dependency names from a single TOML-ish file (crash-proofing).
 const MAX_PARSED_DEPS = 2000;
 
@@ -397,7 +474,9 @@ function parsePyprojectDeps(content) {
 
     if (arrayActive) {
       collectQuotedRequirements(line, names);
-      if (line.includes(']')) arrayActive = false;
+      // Quote-aware terminator (F1): a `]` inside a quoted extras/marker value
+      // (e.g. "celery[redis]") is NOT the array delimiter — ignore it.
+      if (hasUnquotedCloseBracket(line)) arrayActive = false;
       continue;
     }
     if (!line || line.startsWith('#')) continue;
@@ -407,7 +486,7 @@ function parsePyprojectDeps(content) {
     }
 
     // Poetry dependency tables: name = version.
-    if (/^tool\.poetry\.(dependencies|group\.[^.]+\.dependencies)$/.test(section)) {
+    if (/^tool\.poetry\.(dependencies|dev-dependencies|group\.[^.]+\.dependencies)$/.test(section)) {
       const m = line.match(/^["']?([A-Za-z0-9._-]+)["']?\s*=/);
       if (m && m[1].toLowerCase() !== 'python') names.push(m[1]);
       continue;
@@ -422,7 +501,9 @@ function parsePyprojectDeps(content) {
     const isOptionalDeps = section === 'project.optional-dependencies';
     if ((isProjectDeps || isOptionalDeps) && rest.startsWith('[')) {
       collectQuotedRequirements(rest, names);
-      if (!rest.includes(']')) arrayActive = true;
+      // Quote-aware open test (F1): an extras `]` on the opening line
+      // (dependencies = ["flask[async]",) must NOT close the array immediately.
+      if (!hasUnquotedCloseBracket(rest)) arrayActive = true;
     }
   }
   return names;

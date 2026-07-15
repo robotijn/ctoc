@@ -6,6 +6,14 @@
 # collides with many YAML-config tools); jekyll stays in `frameworks` (informational).
 # priority 25 sits ABOVE web-frontend (20): a real SSG config beats a bare package.json,
 # but a plain Vite SPA (no SSG marker) still resolves to web-frontend.
+# KNOWN LIMITATION (DEF3): astro.config.mjs cannot distinguish a STATIC Astro build from
+# an SSR (server-output) Astro app — the config filename is identical for both, and the
+# output mode lives inside the file (`output: 'server'`), which the marker layer does not
+# parse. Astro is deliberately kept on static-site (security:recommended) rather than
+# routed to web-fullstack, because the common case is static and because the existing
+# detection contract asserts astro.config.mjs → static-site. An SSR Astro app is therefore
+# under-secured here until an in-file `output` parser exists; this is a documented, known
+# gap, not a silent one.
 projectType: static-site
 detectionMarkers: [astro.config.mjs, hugo.toml, .eleventy.js, gatsby-config.js, docusaurus.config.js, mkdocs.yml]
 frameworks: [astro, hugo, eleventy, jekyll, gatsby, docusaurus, mkdocs]
