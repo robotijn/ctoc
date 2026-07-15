@@ -1,7 +1,13 @@
 # Objective-C capability entry — web-grounded 2026 toolchain (OCLint + clang-format +
 # xcodebuild/XCTest). Mobile run is HONEST: build+test is the CI-safe last mile — never
-# a false "it ran". security is UNVERIFIED (no standard Objective-C SAST) and depsAudit
-# is UNVERIFIED (CocoaPods/SwiftPM have no standard audit command).
+# a false "it ran".
+# HONESTY (DEF1): OCLint cannot run zero-config — it needs a compile-command database
+# (compile_commands.json) plus source files. A bare `oclint` errors with no input; the
+# honest invocation is the `oclint-json-compilation-database` wrapper (it reads
+# compile_commands.json), and both the `lint` and `security` slots are flagged
+# UNVERIFIED (the compile DB may not exist, and OCLint is a code-quality analyzer, not a
+# confirmed dedicated SAST). depsAudit is UNVERIFIED (CocoaPods/SwiftPM have no standard
+# audit command).
 # DETECTION (CR5-FIX F2): Objective-C is detected ONLY by its source extension (*.m). A
 # bare `Podfile` (CocoaPods — used by Swift too) and `*.xcodeproj` (shared with Swift)
 # were removed as markers because they do not distinguish Objective-C from Swift; `*.m`
@@ -10,12 +16,12 @@ language: objectivec
 detectionMarkers: ["*.m"]
 extensions: [.m, .mm, .h]
 toolchain:
-  lint:      { cmd: "oclint", tool: oclint, verified: web-2026-07 }
+  lint:      { cmd: "oclint-json-compilation-database", tool: oclint, verified: UNVERIFIED }
   format:    { cmd: "clang-format --dry-run --Werror", tool: clang-format, verified: web-2026-07 }
   typecheck: { cmd: "xcodebuild build", tool: xcodebuild, verified: web-2026-07 }
   test:      { cmd: "xcodebuild test", tool: xcodebuild, verified: web-2026-07 }
   coverage:  { cmd: "xcodebuild test -enableCodeCoverage YES", tool: xcodebuild, verified: web-2026-07 }
-  security:  { cmd: "oclint", tool: oclint, verified: UNVERIFIED }
+  security:  { cmd: "oclint-json-compilation-database", tool: oclint, verified: UNVERIFIED }
   depsAudit: { cmd: "pod outdated", tool: cocoapods, verified: UNVERIFIED }
   build:     { cmd: "xcodebuild", tool: xcodebuild, verified: web-2026-07 }
 run:

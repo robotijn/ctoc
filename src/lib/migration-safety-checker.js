@@ -42,7 +42,9 @@
  * - F1 EF direction: a destructive call inside a `Down(MigrationBuilder …)` body is a
  *   ROLLBACK definition and is EXCLUDED; a drop in `Up()` (or outside any Down) is the
  *   apply and fires. The Down body is found by a bounded, string-aware brace-depth
- *   scan (efDownBodyLines). RESIDUAL: an unbalanced/pathological `Down` body is treated
+ *   scan (efDownBodyLines) that runs AFTER both block AND `//` line comments are
+ *   stripped (a brace/quote inside a Down() comment must not corrupt the scan — DB-w4
+ *   second kickback A+B). RESIDUAL: an unbalanced/pathological `Down` body is treated
  *   as running to end-of-file (over-excludes) — a deliberate bias, because Finding 1
  *   (additive migrations must pass) is non-negotiable and EF scaffolds Up() before
  *   Down(), so the dominant additive case is unaffected. A migration that places a
@@ -55,8 +57,11 @@
  *   blanked with a trailing `;` injected (blankOpenSqlTag), so an inline
  *   `<changeSet><sql dbms="…">DROP TABLE x;</sql></changeSet>` on ONE physical line —
  *   the dominant Liquibase raw-SQL form, `dbms` attribute and all — is statement-
- *   anchored and flagged (DB-w4 kickback GAP 2). The multi-line `<sql>` form remains
- *   caught by the `^\s*` branch of the anchor.
+ *   anchored and flagged (DB-w4 kickback GAP 2). CDATA markers (`<![CDATA[` / `]]>`)
+ *   are blanked in the same pass (DB-w4 second kickback C), so an inline
+ *   `<sql><![CDATA[DROP TABLE x;]]></sql>` — the idiomatic wrapper for SQL containing
+ *   `<`/`>`/`&` — is anchored too. The multi-line `<sql>` form (with or without CDATA)
+ *   remains caught by the `^\s*` branch of the anchor.
  * - F4 execute: the embedded-execute anchor now matches paren-less Ruby `execute "…"`
  *   and a single wrapping `text(`/`sa.text(` call — still executability-anchored, so a
  *   benign string value beginning with a keyword (no `execute`) never fires.
@@ -399,6 +404,17 @@ const SQL_OPEN_TAG_RE = safeRegExp('<sql\\b[^>]*>', 'gi');
 const SQL_CLOSE_TAG_RE = safeRegExp('</sql\\s*>', 'gi');
 
 /**
+ * CDATA section markers (DB-w4 second kickback C). CDATA (`<![CDATA[ … ]]>`) is the
+ * idiomatic Liquibase wrapper for raw SQL that contains `<`/`>`/`&`. Blanking the
+ * markers (keeping newlines) leaves the inner SQL statement-anchored, so an inline
+ * `<sql><![CDATA[DROP TABLE x;]]></sql>` fires just like the plain form. Both are
+ * literal-anchored single matches — ReDoS-trivial.
+ * @type {RegExp}
+ */
+const CDATA_OPEN_RE = safeRegExp('<!\\[CDATA\\[', 'g');
+const CDATA_CLOSE_RE = safeRegExp('\\]\\]>', 'g');
+
+/**
  * EF Core `Down(MigrationBuilder …)` method signature (DB-w4 fix F1). The `g` flag
  * lets efDownBodyLines() advance past each Down body. Requiring the `MigrationBuilder`
  * parameter type keeps this from matching an unrelated method named `Down`. Single
@@ -508,6 +524,18 @@ function stripCsLineComment(line) {
 }
 
 /**
+ * Apply the string-aware C# `//` line-comment strip to every line of a content
+ * string, KEEPING newlines so the total line count (and thus reported line numbers)
+ * is unchanged. Used to sanitise `.cs` content before the Down()-body brace scan
+ * (DB-w4 second kickback A+B) so a brace/quote inside a comment cannot corrupt it.
+ * @param {string} content
+ * @returns {string}
+ */
+function stripCsLineComments(content) {
+  return content.split(/\r?\n/).map(stripCsLineComment).join('\n');
+}
+
+/**
  * Strip XML `<!-- … -->` comments (DB-w4 fix F5) before scanning, blanking the span
  * but keeping newlines. A commented-out `<dropTable/>` is never a live apply.
  * @param {string} content
@@ -550,7 +578,11 @@ function stripXmlRollback(content) {
 function unwrapSqlElements(content) {
   return content
     .replace(SQL_OPEN_TAG_RE, blankOpenSqlTag)
-    .replace(SQL_CLOSE_TAG_RE, blankKeepNewlines);
+    .replace(SQL_CLOSE_TAG_RE, blankKeepNewlines)
+    // DB-w4 second kickback C: blank CDATA markers so the inner SQL is anchored even
+    // inline — `<![CDATA[` sat between the injected `;` and the DROP, breaking the anchor.
+    .replace(CDATA_OPEN_RE, blankKeepNewlines)
+    .replace(CDATA_CLOSE_RE, blankKeepNewlines);
 }
 
 /**
@@ -861,7 +893,13 @@ class MigrationSafetyChecker {
     } else if (ext === '.yaml' || ext === '.yml') {
       scanContent = stripYamlRollback(scanContent);
     } else if (ext === '.cs') {
-      excludedLines = efDownBodyLines(scanContent);
+      // DB-w4 second kickback (A+B): the brace-depth scan must run over content where
+      // `//` LINE comments are ALSO stripped — block comments alone are not enough. A
+      // brace `}` inside a Down() comment would close the body early (un-excluding a
+      // rollback drop → false positive), and a `{` or apostrophe would open a brace/
+      // string that runs to EOF (over-excluding a later Up() drop → false negative).
+      // Stripping is string-literal-aware (stripCsLineComment) and line-count-preserving.
+      excludedLines = efDownBodyLines(stripCsLineComments(scanContent));
     }
 
     const scanLines = scanContent.split(/\r?\n/);

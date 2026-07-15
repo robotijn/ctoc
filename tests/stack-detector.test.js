@@ -820,6 +820,188 @@ function testWorkspaceObjectFormDeps() {
 }
 
 // ============================================
+// F1(defect) — quote-aware multiline-array terminator in parsePyprojectDeps
+// An extras bracket `]` inside a quoted value (uvicorn[standard], django[argon2])
+// must NOT end the multiline `dependencies` array early and drop later deps.
+// ============================================
+
+function testPyprojectExtrasMultilineKeepsLaterDeps() {
+  setupTempDir();
+  // uvicorn[standard] has a `]` INSIDE a quoted value; fastapi follows on the next line.
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = [\n  "uvicorn[standard]",\n  "fastapi"\n]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('fastapi'),
+    'fastapi (after an extras dep) survives — extras `]` does not end the array');
+
+  cleanupTempDir();
+  console.log('# F1(defect) - extras `]` in multiline array does not drop later deps');
+}
+
+function testPyprojectExtrasMultilineThreeDeps() {
+  setupTempDir();
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = [\n  "flask",\n  "django[argon2]",\n  "fastapi"\n]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'flask (before extras dep) present');
+  assert.ok(stack.frameworks.includes('django'), 'django[argon2] itself parsed');
+  assert.ok(stack.frameworks.includes('fastapi'), 'fastapi (after extras dep) not dropped');
+
+  cleanupTempDir();
+  console.log('# F1(defect) - three deps with a middle extras dep all parsed');
+}
+
+function testPyprojectExtrasOnOpeningLine() {
+  setupTempDir();
+  // Extras bracket on the SAME line that opens the array — must still stay open.
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = ["flask[async]",\n  "fastapi"\n]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'flask[async] on opening line parsed');
+  assert.ok(stack.frameworks.includes('fastapi'), 'fastapi on next line not dropped by opening-line extras');
+
+  cleanupTempDir();
+  console.log('# F1(defect) - extras `]` on the array-opening line keeps array open');
+}
+
+function testPyprojectOptionalExtrasKeepsLaterDeps() {
+  setupTempDir();
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = [\n  "flask"\n]\n\n' +
+    '[project.optional-dependencies]\ndev = [\n  "pytest[xdist]",\n  "fastapi"\n]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'main dep flask parsed');
+  assert.ok(stack.frameworks.includes('fastapi'),
+    'fastapi after pytest[xdist] in optional-dependencies not dropped');
+
+  cleanupTempDir();
+  console.log('# F1(defect) - extras `]` in optional-dependencies array does not drop later deps');
+}
+
+function testPyprojectSingleLineExtrasControl() {
+  setupTempDir();
+  // CONTROL: single-line array with extras still yields all deps (stays green).
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\ndependencies = ["uvicorn[standard]", "fastapi"]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('fastapi'), 'single-line extras array keeps fastapi');
+
+  cleanupTempDir();
+  console.log('# F1(defect) - control: single-line extras array unaffected');
+}
+
+// ============================================
+// F2(defect) — legacy [tool.poetry.dev-dependencies] table read
+// ============================================
+
+function testPoetryLegacyDevDependencies() {
+  setupTempDir();
+  // Pre-Poetry-1.2 dev table (deprecated, still common). django lives ONLY here.
+  createTempFile('pyproject.toml',
+    '[tool.poetry]\nname = "svc"\n\n[tool.poetry.dependencies]\npython = "^3.11"\n\n' +
+    '[tool.poetry.dev-dependencies]\ndjango = "^4.2"\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('django'),
+    'django from legacy [tool.poetry.dev-dependencies] detected');
+
+  cleanupTempDir();
+  console.log('# F2(defect) - legacy [tool.poetry.dev-dependencies] parsed');
+}
+
+function testPoetryModernDevGroupStillWorks() {
+  setupTempDir();
+  // CONTROL: modern group form still works alongside the legacy fix.
+  createTempFile('pyproject.toml',
+    '[tool.poetry]\nname = "svc"\n\n[tool.poetry.dependencies]\npython = "^3.11"\n\n' +
+    '[tool.poetry.group.dev.dependencies]\nflask = "^3.0"\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'),
+    'flask from modern [tool.poetry.group.dev.dependencies] still detected');
+
+  cleanupTempDir();
+  console.log('# F2(defect) - control: modern poetry dev group still parsed');
+}
+
+// ============================================
+// F3(defect) — workspace path traversal containment
+// A `workspaces: ["../evil"]` entry must NOT read a package.json outside the root.
+// ============================================
+
+function testWorkspaceOutsideRootNotRead() {
+  setupTempDir();
+  // Sibling of tempDir, referenced via `../evil` — OUTSIDE the project root.
+  const outsideDir = path.join(tempDir, '..', 'evil');
+  fs.mkdirSync(outsideDir, { recursive: true });
+  fs.writeFileSync(path.join(outsideDir, 'package.json'), JSON.stringify({
+    name: 'evil', dependencies: { react: '^18.0.0' }
+  }));
+
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: ['../evil']
+  }));
+  createTempFile('tsconfig.json', '{}');
+
+  const stack = detectStack(tempDir);
+  // Clean the outside dir before asserting so a failure never leaks it.
+  fs.rmSync(outsideDir, { recursive: true, force: true });
+
+  assert.ok(!stack.frameworks.includes('react'),
+    'react from an OUTSIDE ../evil package.json is NOT read (containment enforced)');
+
+  cleanupTempDir();
+  console.log('# F3(defect) - workspace outside project root is not read');
+}
+
+function testWorkspaceInsideStillWorksWithContainment() {
+  setupTempDir();
+  // CONTROL: a legit inside `packages/*` workspace still resolves after containment.
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: ['packages/*']
+  }));
+  createTempFile('tsconfig.json', '{}');
+  createTempFile('packages/web/package.json', JSON.stringify({
+    name: 'web', dependencies: { react: '^18.0.0' }
+  }));
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('react'),
+    'inside packages/* workspace still detected with containment on');
+
+  cleanupTempDir();
+  console.log('# F3(defect) - control: inside workspace still works');
+}
+
+// ============================================
+// F4(defect) — recursive `**` workspace glob
+// ============================================
+
+function testWorkspaceRecursiveGlob() {
+  setupTempDir();
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: ['packages/**']
+  }));
+  createTempFile('tsconfig.json', '{}');
+  // Nested two levels deep — only a recursive `**` walk reaches it.
+  createTempFile('packages/a/b/package.json', JSON.stringify({
+    name: 'deep', dependencies: { react: '^18.0.0' }
+  }));
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('react'),
+    'react from a nested packages/a/b package.json detected via recursive `**`');
+
+  cleanupTempDir();
+  console.log('# F4(defect) - recursive `**` workspace glob reaches nested packages');
+}
+
+// ============================================
 // F5 — null-prototype deps object (no prototype landmine)
 // ============================================
 
@@ -965,6 +1147,28 @@ testNodeDepCaseNormalized();
 console.log('\n## F4 - monorepo workspace deps\n');
 testWorkspaceArrayFormDeps();
 testWorkspaceObjectFormDeps();
+
+// F1(defect) — quote-aware multiline-array terminator
+console.log('\n## F1(defect) - quote-aware pyproject array terminator\n');
+testPyprojectExtrasMultilineKeepsLaterDeps();
+testPyprojectExtrasMultilineThreeDeps();
+testPyprojectExtrasOnOpeningLine();
+testPyprojectOptionalExtrasKeepsLaterDeps();
+testPyprojectSingleLineExtrasControl();
+
+// F2(defect) — legacy poetry dev-dependencies
+console.log('\n## F2(defect) - legacy poetry dev-dependencies\n');
+testPoetryLegacyDevDependencies();
+testPoetryModernDevGroupStillWorks();
+
+// F3(defect) — workspace path traversal containment
+console.log('\n## F3(defect) - workspace containment\n');
+testWorkspaceOutsideRootNotRead();
+testWorkspaceInsideStillWorksWithContainment();
+
+// F4(defect) — recursive `**` workspace glob
+console.log('\n## F4(defect) - recursive workspace glob\n');
+testWorkspaceRecursiveGlob();
 
 // F5 — null-prototype deps object
 console.log('\n## F5 - null-prototype deps\n');

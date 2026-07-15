@@ -1,7 +1,7 @@
 # Python capability entry — web-grounded 2026 toolchain (ruff replaced flake8/black/
 # isort). lint + test match tool-detector DEFAULT_TOOLS exactly (parity for CR5).
 language: python
-detectionMarkers: [pyproject.toml, setup.py, requirements.txt, Pipfile]
+detectionMarkers: [pyproject.toml, setup.py, requirements.txt, Pipfile, poetry.lock, uv.lock]
 extensions: [.py]
 toolchain:
   lint:      { cmd: "ruff check .", tool: ruff, verified: web-2026-07 }

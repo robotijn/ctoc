@@ -1,9 +1,17 @@
 # C capability entry — web-grounded 2026 toolchain (Make + clang tooling).
-# depsAudit uses osv-scanner: C has no centralized package manager, so OSV-Scanner
+# depsAudit uses osv-scanner v2: C has no centralized package manager, so OSV-Scanner
 # matches vendored/submoduled sources against OSV.dev's commit-level vulnerability
-# ranges (google.github.io/osv-scanner, verified 2026-07). `test` uses ctest as the
-# generic runner (Unity/Criterion/CMocka vary); the run target `./a.out` is cc's
-# default output name.
+# ranges (google.github.io/osv-scanner, verified 2026-07). The recursive-directory scan
+# is the v2 subcommand form `osv-scanner scan -r .` (the flat `osv-scanner -r .` is the
+# superseded v1 CLI).
+# HONESTY (DEF1): `lint` and `test` cannot run zero-config, so both are flagged
+# UNVERIFIED. clang-tidy needs a compile database (compile_commands.json, passed via
+# `-p <dir>`) AND source files — a bare `clang-tidy` errors "no input files"; the
+# zero-config standalone alternative is cppcheck (the altCmd). `ctest --test-dir build`
+# needs a pre-configured CMake build directory — a bare `ctest` in the project root
+# reports "No tests were found" (Unity/Criterion/CMocka runners vary). `security`
+# (`cppcheck --enable=all .`) DOES run standalone but REQUIRES a path argument, mirroring
+# python's `bandit -r .`. The run target `./a.out` is cc's default output name.
 # DETECTION (CR5-FIX F1): C is detected ONLY by its source extensions (*.c/*.h). A
 # bare `Makefile` was removed as a marker — Make is a generic build tool used by
 # C/C++/Go/Rust/assembly/anything, so it mis-asserted C on non-C projects (a root
@@ -12,13 +20,13 @@ language: c
 detectionMarkers: ["*.c", "*.h"]
 extensions: [.c, .h]
 toolchain:
-  lint:      { cmd: "clang-tidy", tool: clang-tidy, verified: web-2026-07 }
+  lint:      { cmd: "clang-tidy -p .", tool: clang-tidy, altCmd: "cppcheck --enable=all .", verified: UNVERIFIED }
   format:    { cmd: "clang-format --dry-run --Werror", tool: clang-format, verified: web-2026-07 }
   typecheck: { cmd: "make", tool: make, verified: web-2026-07 }
-  test:      { cmd: "ctest", tool: ctest, verified: web-2026-07 }
+  test:      { cmd: "ctest --test-dir build", tool: ctest, verified: UNVERIFIED }
   coverage:  { cmd: "lcov --capture --directory . --output-file coverage.info", tool: lcov, verified: web-2026-07 }
-  security:  { cmd: "cppcheck --enable=all", tool: cppcheck, altCmd: "flawfinder .", verified: web-2026-07 }
-  depsAudit: { cmd: "osv-scanner -r .", tool: osv-scanner, verified: web-2026-07 }
+  security:  { cmd: "cppcheck --enable=all .", tool: cppcheck, altCmd: "flawfinder .", verified: web-2026-07 }
+  depsAudit: { cmd: "osv-scanner scan -r .", tool: osv-scanner, verified: web-2026-07 }
   build:     { cmd: "make", tool: make, verified: web-2026-07 }
 run:
   shapes: { cli: "./a.out" }

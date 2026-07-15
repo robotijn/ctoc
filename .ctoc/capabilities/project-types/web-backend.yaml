@@ -1,7 +1,10 @@
 # web-backend — an HTTP API/server. Runs and answers a health probe (honest:true).
 # Security is REQUIRED (it faces the network); it ships a Dockerfile + OpenAPI + migrations.
+# DETECTION (DEF5): fastify.config.js was removed — it is fabricated. Fastify ships NO
+# root config file (fastify.yaml itself declares files: []), so the marker could never
+# fire; it is dropped rather than left as dead data.
 projectType: web-backend
-detectionMarkers: [nest-cli.json, Procfile, fastify.config.js]
+detectionMarkers: [nest-cli.json, Procfile]
 frameworks: [express, fastify, nestjs, django, fastapi, spring-boot, gin]
 priority: 30
 runShape: server

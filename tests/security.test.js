@@ -298,6 +298,192 @@ describe('Secrets Scanner Tests', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Real-secret behavioral tests — these drive REALISTIC-FORMAT SYNTHETIC secret
+// STRINGS through scanFile (never a real credential; every value below is
+// invented filler that matches the shape of the credential family it tests).
+// The structural tests above never call scanFile, which is why the historical
+// blind spots shipped green. These tests assert detection AND severity.
+// ---------------------------------------------------------------------------
+describe('Secrets Scanner — real synthetic secret detection', () => {
+  const SCAN_DIR = path.join(os.tmpdir(), 'ctoc-secrets-scan-' + Date.now());
+
+  // Write a file under SCAN_DIR and scan it. Returns findings from scanFile.
+  function scan(name, contents, opts = {}) {
+    fs.mkdirSync(SCAN_DIR, { recursive: true });
+    const file = path.join(SCAN_DIR, name);
+    fs.writeFileSync(file, contents);
+    const scanner = new SecretsScanner(SCAN_DIR, opts);
+    return { scanner, findings: scanner.scanFile(file), file };
+  }
+
+  after(() => {
+    try { fs.rmSync(SCAN_DIR, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+  });
+
+  // -- #1 CRITICAL: private keys ------------------------------------------
+  // Synthetic PEM body — the header alone is what the pattern matches; the
+  // base64-ish filler is deliberately not a real key.
+  const SYNTH_RSA_KEY =
+    '-----BEGIN RSA PRIVATE KEY-----\n' +
+    'MIIBOGUSfakeKEYdoNOTuseTHISisSYNTHETICfillerAAAAAAAAAAAAAAAAAAAAAA\n' +
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n' +
+    '-----END RSA PRIVATE KEY-----\n';
+
+  it('#1b .pem file containing a synthetic RSA private key -> CRITICAL', () => {
+    const { findings } = scan('private.pem', SYNTH_RSA_KEY);
+    const pk = findings.find(f => f.type === 'PRIVATE_KEY');
+    assert.ok(pk, 'expected a PRIVATE_KEY finding in the .pem file');
+    assert.strictEqual(pk.severity, 'CRITICAL');
+  });
+
+  it('#1b .key file containing a synthetic RSA private key -> CRITICAL', () => {
+    const { findings } = scan('server.key', SYNTH_RSA_KEY);
+    assert.ok(findings.some(f => f.type === 'PRIVATE_KEY' && f.severity === 'CRITICAL'));
+  });
+
+  it('#1b well-known extensionless key file id_rsa is scannable', () => {
+    fs.mkdirSync(SCAN_DIR, { recursive: true });
+    const file = path.join(SCAN_DIR, 'id_rsa');
+    fs.writeFileSync(file, SYNTH_RSA_KEY);
+    const scanner = new SecretsScanner(SCAN_DIR);
+    assert.ok(scanner.shouldScan(file), 'id_rsa must be scanned even without an extension');
+    assert.ok(scanner.scanFile(file).some(f => f.type === 'PRIVATE_KEY'));
+  });
+
+  it('#1a PEM header on its own line inside a .js file is NOT swallowed as a comment', () => {
+    const js = 'const key = `\n' + SYNTH_RSA_KEY + '`;\n';
+    const { findings } = scan('keys.js', js);
+    const pk = findings.find(f => f.type === 'PRIVATE_KEY');
+    assert.ok(pk, 'PEM boundary must not be classified as a SQL (--) comment');
+    assert.strictEqual(pk.severity, 'CRITICAL');
+  });
+
+  it('#1a PEM header on its own line inside a .yaml file is detected', () => {
+    const yaml = 'tls:\n  key: |\n' + SYNTH_RSA_KEY;
+    const { findings } = scan('secrets.yaml', yaml);
+    assert.ok(findings.some(f => f.type === 'PRIVATE_KEY' && f.severity === 'CRITICAL'));
+  });
+
+  // -- #2 HIGH: OpenAI / Anthropic API keys -------------------------------
+  it('#2 Anthropic sk-ant key -> detected HIGH', () => {
+    const key = 'sk-ant-api03-' + 'A1b2C3d4E5f6G7h8I9j0'.repeat(4) + '_-xyz';
+    const { findings } = scan('anthropic.js', `const k = "${key}";\n`);
+    const f = findings.find(x => x.type === 'ANTHROPIC_API_KEY');
+    assert.ok(f, 'sk-ant key must be detected');
+    assert.strictEqual(f.severity, 'HIGH');
+  });
+
+  it('#2 OpenAI sk-proj key -> detected HIGH', () => {
+    const key = 'sk-proj-' + 'Ab12Cd34Ef56Gh78Ij90KlMn';
+    const { findings } = scan('openai-proj.js', `const k = "${key}";\n`);
+    const f = findings.find(x => x.type === 'OPENAI_API_KEY');
+    assert.ok(f, 'sk-proj key must be detected');
+    assert.strictEqual(f.severity, 'HIGH');
+  });
+
+  it('#2 OpenAI classic sk- key -> detected HIGH', () => {
+    const key = 'sk-' + 'Ab12Cd34Ef56Gh78Ij90KlMn';
+    const { findings } = scan('openai.js', `const k = "${key}";\n`);
+    const f = findings.find(x => x.type === 'OPENAI_API_KEY');
+    assert.ok(f, 'sk- key must be detected');
+    assert.strictEqual(f.severity, 'HIGH');
+  });
+
+  it('#2 Stripe sk_live_ key still detected as CRITICAL (no collision with OpenAI sk-)', () => {
+    const key = 'sk_live_' + '0123456789abcdefABCDEF01';
+    const { findings } = scan('stripe.js', `const k = "${key}";\n`);
+    const f = findings.find(x => x.type === 'STRIPE_API_KEY');
+    assert.ok(f, 'Stripe secret key must still be detected');
+    assert.strictEqual(f.severity, 'CRITICAL');
+    assert.ok(!findings.some(x => x.type === 'OPENAI_API_KEY'),
+      'underscore Stripe key must NOT be misclassified as an OpenAI hyphen key');
+  });
+
+  // -- #3 JWT -------------------------------------------------------------
+  it('#3 synthetic 3-part JWT -> detected', () => {
+    const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5Nqm';
+    const { findings } = scan('jwt.js', `const t = "${jwt}";\n`);
+    assert.ok(findings.some(f => f.type === 'JWT_TOKEN'), 'JWT must be detected');
+  });
+
+  // -- #4 placeholder anchoring -------------------------------------------
+  it('#4 real secret whose blob merely contains "none" is NOT swallowed', () => {
+    // 21-char structurally-valid-looking value; the substring "none" is
+    // incidental, not a word-bounded placeholder token.
+    const { findings } = scan('aws.js', 'const apiKey = "AKIAnoneFODNN7Q9WZ2XY";\n');
+    assert.ok(findings.length > 0, 'a real secret must not be dropped for containing "none"');
+    assert.ok(findings.some(f => f.type === 'GENERIC_SECRET'));
+  });
+
+  it('#4 secret value containing the substring "fake" is NOT swallowed', () => {
+    const { findings } = scan('tok.js', 'const token = "fakeAbCdEf1234567890XYZ";\n');
+    assert.ok(findings.some(f => f.type === 'GENERIC_SECRET'),
+      'a real secret must not be dropped for containing "fake"');
+  });
+
+  it('#4 genuine placeholders are still ignored', () => {
+    const { findings } = scan('ph.js', 'const apiKey = "your-secret-key-placeholder-value";\n');
+    assert.strictEqual(findings.length, 0, 'a "your-...placeholder..." value must be ignored');
+  });
+
+  it('#4 isPlaceholder anchors to the whole value / template markers', () => {
+    const scanner = new SecretsScanner(SCAN_DIR);
+    // Real-looking secrets that merely contain a placeholder substring:
+    assert.strictEqual(scanner.isPlaceholder('AKIAnoneFODNN7Q9WZ2XY'), false);
+    assert.strictEqual(scanner.isPlaceholder('fakeAbCdEf1234567890XYZ'), false);
+    // Genuine placeholders:
+    assert.strictEqual(scanner.isPlaceholder('none'), true);
+    assert.strictEqual(scanner.isPlaceholder('your-key-here'), true);
+    assert.strictEqual(scanner.isPlaceholder('${API_KEY}'), true);
+    assert.strictEqual(scanner.isPlaceholder('<REDACTED>'), true);
+    assert.strictEqual(scanner.isPlaceholder('CHANGEME'), true);
+    assert.strictEqual(scanner.isPlaceholder('xxx-secret-xxx'), true);
+  });
+
+  // -- #5 GENERIC_SECRET now blocks (HIGH) --------------------------------
+  it('#5 a secret caught only by the generic-assignment fallback is HIGH', () => {
+    const { findings } = scan('gen.js', 'const apiSecret = "aB3dE6gH9jK2mN5pQ8rT1uV4wX7yZ0aC";\n');
+    const f = findings.find(x => x.type === 'GENERIC_SECRET');
+    assert.ok(f, 'generic secret must be detected');
+    assert.strictEqual(f.severity, 'HIGH', 'a named-assignment secret must block, not warn');
+  });
+
+  // -- #6 Stripe publishable key is public, not a secret ------------------
+  it('#6 Stripe pk_live_ publishable key -> 0 findings', () => {
+    const key = 'pk_live_' + '0123456789abcdefABCDEF01';
+    const { findings } = scan('pub.js', `const stripePublic = "${key}";\n`);
+    assert.strictEqual(findings.length, 0, 'a publishable (public) key must not be flagged as a secret');
+  });
+
+  // -- #7 oversized file skip is recorded, not silent ---------------------
+  it('#7 a file larger than maxFileSize is recorded in scanner.errors', () => {
+    fs.mkdirSync(SCAN_DIR, { recursive: true });
+    const big = path.join(SCAN_DIR, 'big.js');
+    fs.writeFileSync(big, 'x'.repeat(500));
+    const scanner = new SecretsScanner(SCAN_DIR, { maxFileSize: 10 });
+    assert.strictEqual(scanner.shouldScan(big), false);
+    assert.ok(scanner.errors.some(e => (e.file || '').includes('big.js')),
+      'an oversized-file skip must be recorded, not silently dropped');
+  });
+
+  // -- ReDoS safety -------------------------------------------------------
+  it('all patterns are ReDoS-safe against a 100k adversarial string', () => {
+    const adversarial =
+      'sk-ant-' + 'a'.repeat(50000) + '\n' +
+      'eyJ' + '.'.repeat(50000) + '\n' +
+      '-'.repeat(50000);
+    fs.mkdirSync(SCAN_DIR, { recursive: true });
+    const file = path.join(SCAN_DIR, 'adversarial.js');
+    fs.writeFileSync(file, adversarial);
+    const scanner = new SecretsScanner(SCAN_DIR);
+    const start = Date.now();
+    scanner.scanFile(file);
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed < 2000, `scan of a 100k adversarial string took ${elapsed}ms (possible catastrophic backtracking)`);
+  });
+});
+
 describe('Quality Gate Tests', () => {
   it('QualityGate class exists and can be instantiated', () => {
     const gate = new QualityGate(TEST_DIR);

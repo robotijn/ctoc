@@ -1,0 +1,26 @@
+# web-fullstack — a server-rendered / full-stack web app (Next.js, Nuxt, Remix,
+# SvelteKit). It renders on the server AND ships client code, so it has genuine
+# server-side attack surface: SSRF, auth-middleware, CSRF, server-action/loader input
+# handling, env-secret exposure. Security is therefore REQUIRED (like web-backend and
+# microservice), NOT merely recommended.
+# WHY THIS TYPE EXISTS (DEF3): before it, Next/Nuxt/Remix/SvelteKit apps resolved to
+# web-frontend (priority 20) or static-site (25), where security is only `recommended` —
+# even though their framework entries flag ssrf / auth-middleware / csrf concerns. Those
+# fullstack config markers (next.config.*, nuxt.config.*, remix.config.js, svelte.config.js)
+# were moved here, off web-frontend, and this type is given a priority ABOVE both so a
+# fullstack app classifies correctly and inherits security:required.
+# RUN: a fullstack app runs a real HTTP server (`next start` / `node build` / the
+# framework dev server), so the run strategy is server-probe and honest:true (like
+# web-backend) — enriched with the language's `server` run shape (typescript → npm start).
+# NOTE: astro.config.mjs is intentionally NOT a marker here — Astro can be static OR SSR
+# and the config filename cannot distinguish them, so Astro stays on static-site (see the
+# documented limitation in static-site.yaml).
+projectType: web-fullstack
+detectionMarkers: [next.config.js, next.config.mjs, next.config.ts, nuxt.config.ts, nuxt.config.js, remix.config.js, svelte.config.js]
+frameworks: [next, nuxt, remix, sveltekit]
+priority: 28
+runShape: server
+phases: { lint: required, typecheck: required, test: required, security: required, coverage: recommended }
+run: { strategy: server-probe, honest: true }
+configScaffold: [package.json, tsconfig.json, next.config.ts, .env.example, middleware.ts]
+verified: web-2026-07

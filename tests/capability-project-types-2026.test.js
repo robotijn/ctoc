@@ -73,10 +73,10 @@ function withMarkers(prefix, markers, fn) {
 }
 
 describe('expansion wave 2: the 8 new 2026 project types load with the required contract', () => {
-  it('the registry loads all 21 project types (13 shipped + 8 new) with ZERO warnings', () => {
+  it('the registry loads all 22 project types (13 shipped + 8 wave-2 + web-fullstack) with ZERO warnings', () => {
     const { projectTypes, warnings } = registry.loadProjectTypes();
     assert.deepEqual(warnings, [], 'the shipped project-type data must load with zero warnings');
-    assert.equal(Object.keys(projectTypes).length, 21, 'exactly 21 project types ship after wave 2');
+    assert.equal(Object.keys(projectTypes).length, 22, 'exactly 22 project types ship (wave 2 + web-fullstack)');
     for (const name of Object.keys(NEW_TYPES)) {
       assert.ok(projectTypes[name], `the new project type "${name}" must be registered`);
     }

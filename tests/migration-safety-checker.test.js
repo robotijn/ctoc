@@ -1087,3 +1087,146 @@ test('DB-w4 GAP2: a single-line inline benign `<sql>SELECT ...</sql>` after mark
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── DB-w4 SECOND KICKBACK: three re-attack defects ─────────────────────────────
+// A+B share a root cause: efDownBodyLines/matchBrace ran over content where `//`
+// LINE comments were still live, so a brace/quote inside a Down() comment corrupted
+// the brace-depth scan. C: inline `<sql><![CDATA[DROP ...]]></sql>` was not anchored
+// because `<![CDATA[` sat between the injected `;` and the DROP.
+
+test('DB-w4 DEFECT A: a `}` inside a `//` comment in Down() does not un-exclude the rollback DropTable (0)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240901_A.cs'),
+      'public partial class A : Migration {\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.CreateTable("Users");\n' +
+      '  }\n' +
+      '  protected override void Down(MigrationBuilder migrationBuilder)\n' +
+      '  {\n' +
+      '      // rollback: recreate the table we removed in Up() }\n' +
+      '      migrationBuilder.DropTable(name: "Users");\n' +
+      '  }\n' +
+      '}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'the DropTable is inside Down(); the comment brace must not close the body early');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 DEFECT B: a `{` in a `//` comment in Down() does not over-extend to EOF and hide a later Up() drop (1)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240902_B.cs'),
+      'public partial class B : Migration {\n' +
+      '  protected override void Down(MigrationBuilder migrationBuilder) {\n' +
+      '    // open { brace in comment\n' +
+      '    migrationBuilder.AddColumn("x");\n' +
+      '  }\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.DropTable("Users");\n' +
+      '  }\n' +
+      '}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the real Up() DropTable still fires; the Down() comment brace must not swallow it');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 DEFECT B: an apostrophe in a `//` comment in Down() does not open string mode and hide a later Up() drop (1)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240903_B2.cs'),
+      'public partial class B2 : Migration {\n' +
+      '  protected override void Down(MigrationBuilder migrationBuilder) {\n' +
+      "    // don't touch this on rollback\n" +
+      '    migrationBuilder.AddColumn("x");\n' +
+      '  }\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.DropTable("Users");\n' +
+      '  }\n' +
+      '}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the apostrophe in the Down() comment must not swallow the Up() drop');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 DEFECT C: inline `<sql><![CDATA[DROP TABLE ...]]></sql>` fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '090.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><sql><![CDATA[DROP TABLE users;]]></sql></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the DROP inside inline CDATA is extracted and flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 DEFECT C: inline `<sql><![CDATA[TRUNCATE ...]]></sql>` fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '091.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><sql><![CDATA[TRUNCATE orders;]]></sql></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the TRUNCATE inside inline CDATA is flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 DEFECT C: multiline `<sql><![CDATA[ ... DROP ... ]]></sql>` still fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '092.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a">\n    <sql><![CDATA[\n      DROP TABLE users;\n    ]]></sql>\n  </changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the DROP on its own line inside multiline CDATA still fires');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 DEFECT C: a benign `<sql><![CDATA[SELECT ...]]></sql>` stays ZERO', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '093.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><sql><![CDATA[SELECT * FROM t;]]></sql></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a benign CDATA SELECT is not flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

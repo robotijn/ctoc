@@ -2,6 +2,13 @@
 # lint and format. Detection uses real exact-filename markers the current engine
 # supports (global.json, nuget.config); the *.csproj/*.sln extension globs are carried
 # for the glob-aware detector (CR3).
+# HONESTY (DEF4): the `security` (SAST) slot invokes security-code-scan — the genuine C#
+# Roslyn static-application-security-testing analyzer (SQLi/XSS/CSRF/XXE detectors) — NOT
+# a dependency-CVE audit. `dotnet list package --vulnerable` is software-composition
+# analysis (SCA), so it lives ONLY in depsAudit, never dressed up as SAST. security-code-scan
+# is a Roslyn analyzer whose CLI integration varies (invoked via the SecurityCodeScan.Tool
+# `security-scan` global tool or as an analyzer NuGet package), so the SAST slot is honestly
+# flagged UNVERIFIED rather than web-2026-07.
 language: csharp
 detectionMarkers: [global.json, nuget.config, "*.csproj", "*.sln"]
 extensions: [.cs, .csproj, .sln]
@@ -11,7 +18,7 @@ toolchain:
   typecheck: { cmd: "dotnet build", tool: dotnet, verified: web-2026-07 }
   test:      { cmd: "dotnet test", tool: dotnet, verified: web-2026-07 }
   coverage:  { cmd: "dotnet test --collect:\"XPlat Code Coverage\"", tool: dotnet, verified: web-2026-07 }
-  security:  { cmd: "dotnet list package --vulnerable", tool: dotnet, altCmd: "security-code-scan", verified: web-2026-07 }
+  security:  { cmd: "security-code-scan", tool: security-code-scan, verified: UNVERIFIED }
   depsAudit: { cmd: "dotnet list package --vulnerable --include-transitive", tool: dotnet, verified: web-2026-07 }
   build:     { cmd: "dotnet build -c Release", tool: dotnet, verified: web-2026-07 }
 run:
