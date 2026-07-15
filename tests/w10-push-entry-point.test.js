@@ -127,6 +127,72 @@ describe('push.js — run(opts, deps) seam', () => {
   });
 });
 
+describe('push.js — security skip disclosure (honesty)', () => {
+  test('8. passing security with skipped scanners surfaces a partial-coverage line', async () => {
+    const skipped = [
+      'secrets scan skipped (error, NOT a pass)',
+      'SCA skipped: no scanner'
+    ];
+    const { deps } = makeDeps({
+      runSecurityScan: async () => ({ passed: true, critical: 0, high: 0, skipped })
+    });
+    const result = await push.run({}, deps);
+    // The gate decision is unchanged: skips do NOT block.
+    assert.equal(result.ok, true, 'skips never block the push');
+    assert.equal(result.pushed, true);
+    assert.equal(result.blockedBy.length, 0, 'skips do not populate blockedBy');
+    // But the honesty payload MUST reach the structured output.
+    assert.ok(
+      /skip/i.test(result.text),
+      'text must disclose that scanner(s) were skipped'
+    );
+    assert.ok(
+      /2/.test(result.text),
+      'text must name how many scanners were skipped (2)'
+    );
+    assert.ok(
+      result.text.includes('secrets scan skipped (error, NOT a pass)'),
+      'text should echo at least the first skipped scanner detail'
+    );
+  });
+
+  test('9. clean security (no skips) emits no spurious skip line', async () => {
+    const { deps } = makeDeps({
+      runSecurityScan: async () => ({ passed: true, critical: 0, high: 0, skipped: [] })
+    });
+    const result = await push.run({}, deps);
+    assert.equal(result.ok, true);
+    assert.equal(result.pushed, true);
+    assert.ok(!/skip/i.test(result.text), 'no skip disclosure when nothing was skipped');
+  });
+
+  test('10. missing skipped field is read defensively (no throw, no skip line)', async () => {
+    const { deps } = makeDeps({
+      runSecurityScan: async () => ({ passed: true })
+    });
+    const result = await push.run({}, deps);
+    assert.equal(result.ok, true);
+    assert.ok(!/skip/i.test(result.text), 'undefined skipped → guarded, no line');
+  });
+
+  test('11. a blocked push (security failed) still blocks as before', async () => {
+    const { deps, calls } = makeDeps({
+      runSecurityScan: async () => ({
+        passed: false,
+        critical: 1,
+        high: 0,
+        skipped: ['SAST skipped: no scanner']
+      })
+    });
+    const result = await push.run({}, deps);
+    assert.equal(result.ok, false, 'security failure still blocks');
+    assert.equal(result.pushed, false);
+    assert.equal(result.tier, 1);
+    assert.ok(result.blockedBy.includes('security'), 'blockedBy names security');
+    assert.equal(calls.pushToRemote, 0, 'never pushes past a Tier-1 security block');
+  });
+});
+
 describe('push.js — parsePushArgs', () => {
   test('6. recognizes every documented flag and reports unknowns', () => {
     const ok = push.parsePushArgs(['--force', '--dry-run']);

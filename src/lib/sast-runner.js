@@ -11,6 +11,8 @@
  */
 
 const { execSync, execFileSync } = require('child_process');
+const safeFs = require('./safe-fs');
+const path = require('path');
 const registry = require('./capability-registry');
 
 /**
@@ -144,7 +146,111 @@ class SASTRunner {
    * @returns {string[]} Array of detected languages
    */
   detectLanguages() {
-    return registry.detectLanguages(this.projectRoot);
+    const registryLangs = registry.detectLanguages(this.projectRoot) || [];
+    const result = registryLangs.slice();
+    // FN-1: the registry detects languages by MANIFEST markers/globs only, and the five
+    // SAST-routed languages (python, javascript, typescript, go, java) have no source-file
+    // glob markers. A repo of loose .py/.js/.ts/.go/.java files with no manifest therefore
+    // detected as [] → run() reported success:true "no supported languages" and a serverless
+    // handler with os.system(request.args["cmd"]) read as a clean pass. Augment detection
+    // with a local, excludeDirs-honoring source-file scan so analyzable source is NEVER
+    // invisible. Appended AFTER the registry order so the manifest-derived primary
+    // (detectLanguages[0], the run target other modules consume) is preserved.
+    for (const lang of this.detectSastSourceLanguages()) {
+      if (!result.includes(lang)) result.push(lang);
+    }
+    return result;
+  }
+
+  /**
+   * Detect the five SAST-supported languages by the presence of their source files,
+   * recursively under the project root, honoring excludeDirs (node_modules, venv, …).
+   * Symlinked directories are skipped (they are not walked), which also avoids symlink
+   * loops. Bounded by a visit cap so a pathological tree cannot hang detection.
+   * @returns {Set<string>} detected language names
+   */
+  detectSastSourceLanguages() {
+    const extToLang = {
+      '.py': 'python',
+      '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
+      '.ts': 'typescript', '.tsx': 'typescript',
+      '.go': 'go',
+      '.java': 'java'
+    };
+    const allLangs = new Set(Object.values(extToLang));
+    const exclude = new Set([...(this.options.excludeDirs || []), '.git']);
+    const found = new Set();
+    const MAX_ENTRIES = 100000;
+    let visited = 0;
+
+    const walk = (dir) => {
+      if (found.size === allLangs.size) return;
+      let entries;
+      try {
+        entries = safeFs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return; // unreadable dir → no evidence from here
+      }
+      for (const ent of entries) {
+        if (++visited > MAX_ENTRIES) return;
+        if (ent.isDirectory()) {
+          if (exclude.has(ent.name)) continue;
+          walk(path.join(dir, ent.name));
+          if (found.size === allLangs.size) return;
+        } else if (ent.isFile()) {
+          const lang = extToLang[path.extname(ent.name).toLowerCase()];
+          if (lang) found.add(lang);
+        }
+      }
+    };
+
+    if (typeof this.projectRoot === 'string' && this.projectRoot.length > 0) {
+      walk(this.projectRoot);
+    }
+    return found;
+  }
+
+  /**
+   * Add a finding, applying the CWE severity FLOOR (FN-2). Every tool severity mapper
+   * caps at HIGH, so without this a CWE-78 (OS command injection) / CWE-89 (SQL
+   * injection) / CWE-94 / CWE-502 / CWE-798 finding never reached CRITICAL and a gate
+   * set to block on CRITICAL always passed. If the finding carries a CWE whose
+   * CWE_SEVERITY_MAP entry is MORE severe than its tool-mapped severity, promote it.
+   * Promotion only ever RAISES severity — a lower CWE floor never demotes a finding.
+   * @param {Object} finding
+   */
+  addFinding(finding) {
+    const floor = this.cweSeverityFloor(finding.cwe);
+    if (floor) {
+      const order = [SEVERITY.CRITICAL, SEVERITY.HIGH, SEVERITY.MEDIUM, SEVERITY.LOW, SEVERITY.INFO];
+      const cur = order.indexOf(finding.severity);
+      const floorIdx = order.indexOf(floor);
+      if (cur === -1 || floorIdx < cur) {
+        finding.severity = floor;
+      }
+    }
+    this.findings.push(finding);
+  }
+
+  /**
+   * Resolve the CWE severity floor for a finding's CWE identifier, normalizing the two
+   * shapes tools emit: a canonical "CWE-78" string (semgrep/bandit) and a bare number
+   * "78" (gosec's cwe.id). Returns the mapped SEVERITY or null when unknown/unmapped.
+   * @param {string|number|null|undefined} cwe
+   * @returns {string|null}
+   */
+  cweSeverityFloor(cwe) {
+    if (cwe === null || cwe === undefined) return null;
+    let key = String(cwe).trim();
+    if (!key) return null;
+    if (/^CWE-/i.test(key)) {
+      key = key.toUpperCase();
+    } else {
+      const num = key.match(/\d+/);
+      if (!num) return null;
+      key = `CWE-${num[0]}`;
+    }
+    return CWE_SEVERITY_MAP[key] || null;
   }
 
   /**
@@ -277,10 +383,17 @@ class SASTRunner {
    */
   async runSemgrep() {
     try {
-      const excludeArgs = this.options.excludeDirs.map(d => `--exclude=${d}`).join(' ');
-      const command = `semgrep --config=p/security-audit --config=p/owasp-top-ten --json ${excludeArgs} .`;
+      // INJ-1: build an argv array and invoke with NO shell, so a shell metacharacter in
+      // an excludeDirs value (e.g. `$(touch /tmp/PWNED)`) is passed to semgrep literally
+      // instead of being interpreted by /bin/sh. Each `--exclude=<dir>` is its own argv
+      // element. The old execSync SHELL-string interpolation was a command-injection sink.
+      const args = ['--config=p/security-audit', '--config=p/owasp-top-ten', '--json'];
+      for (const d of (this.options.excludeDirs || [])) {
+        args.push(`--exclude=${d}`);
+      }
+      args.push('.');
 
-      const result = execSync(command, {
+      const result = execFileSync('semgrep', args, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
         encoding: 'utf8',
@@ -346,10 +459,18 @@ class SASTRunner {
    */
   async runBandit() {
     try {
-      const excludeArgs = this.options.excludeDirs.map(d => `--exclude=${d}`).join(',');
-      const command = `bandit -r . -f json -ll ${excludeArgs ? `--exclude=${excludeArgs}` : ''}`;
+      // INJ-1: no shell — argv array so a metacharacter in an exclude value is literal.
+      // INJ-2: bandit takes a SINGLE `--exclude=<comma-separated-list>`. The old code
+      // prefixed each dir with `--exclude=` AND wrapped the join in another `--exclude=`,
+      // emitting the malformed `--exclude=--exclude=a,b` — bandit then silently failed to
+      // exclude anything and scanned node_modules/venv. Emit exactly one correct exclude.
+      const args = ['-r', '.', '-f', 'json', '-ll'];
+      const excludeDirs = this.options.excludeDirs || [];
+      if (excludeDirs.length > 0) {
+        args.push(`--exclude=${excludeDirs.join(',')}`);
+      }
 
-      const result = execSync(command, {
+      const result = execFileSync('bandit', args, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
         encoding: 'utf8'
@@ -478,7 +599,7 @@ class SASTRunner {
         confidence: result.extra.metadata?.confidence || 'MEDIUM'
       };
 
-      this.findings.push(finding);
+      this.addFinding(finding);
     }
   }
 
@@ -503,7 +624,7 @@ class SASTRunner {
         confidence: result.issue_confidence
       };
 
-      this.findings.push(finding);
+      this.addFinding(finding);
     }
   }
 
@@ -528,7 +649,7 @@ class SASTRunner {
         confidence: issue.confidence
       };
 
-      this.findings.push(finding);
+      this.addFinding(finding);
     }
   }
 
@@ -541,8 +662,11 @@ class SASTRunner {
 
     for (const file of data) {
       for (const message of file.messages || []) {
-        // Only include security-related rules
-        if (!message.ruleId?.includes('security')) continue;
+        // FN-3: keep any rule in the known security set. The old `.includes('security')`
+        // substring test silently DROPPED the core dangerous built-ins (no-eval,
+        // no-implied-eval, no-script-url) and non-'security'-named security plugins
+        // (no-unsanitized/*, xss/*), so real code-injection findings never surfaced.
+        if (!this.isSecurityRule(message.ruleId)) continue;
 
         const finding = {
           tool: 'eslint-security',
@@ -555,9 +679,27 @@ class SASTRunner {
           code: message.source
         };
 
-        this.findings.push(finding);
+        this.addFinding(finding);
       }
     }
+  }
+
+  /**
+   * Decide whether an ESLint ruleId is a security rule we keep (FN-3). Matches a known
+   * allowlist of exact rule IDs and security plugin prefixes rather than a bare
+   * 'security' substring test, so the dangerous built-ins and the no-unsanitized / xss
+   * plugins are not discarded.
+   * @param {string} ruleId
+   * @returns {boolean}
+   */
+  isSecurityRule(ruleId) {
+    if (!ruleId) return false;
+    const exact = new Set(['no-eval', 'no-implied-eval', 'no-script-url']);
+    if (exact.has(ruleId)) return true;
+    const prefixes = ['security/', 'no-unsanitized', 'xss'];
+    if (prefixes.some(p => ruleId.startsWith(p))) return true;
+    // Preserve the legacy behavior: any other security-named plugin still matches.
+    return ruleId.includes('security');
   }
 
   /**
@@ -690,7 +832,11 @@ class SASTRunner {
     const seen = new Map();
 
     for (const finding of this.findings) {
-      const key = `${finding.file}:${finding.line}:${finding.message.substring(0, 50)}`;
+      // FN-4: key on the FULL message. The old `message.substring(0, 50)` collapsed two
+      // DISTINCT findings at the same file:line whenever they shared a 50-char prefix
+      // (common for templated messages like "Potential injection sink detected in …"),
+      // silently dropping one real finding.
+      const key = `${finding.file}:${finding.line}:${finding.message}`;
 
       if (!seen.has(key)) {
         seen.set(key, finding);

@@ -468,3 +468,109 @@ describe('app-runner: resolveScriptCommand is quote-aware and operator-safe (DEF
     assert.deepStrictEqual(spec.args, ['run.js', '--title', 'a && b']);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R7 — the poll loop must keep polling THROUGH a transient 5xx.
+//
+// A warming-up dev server commonly answers '/' with a transient 5xx (DB pool
+// coming up, first compile, a migration running) before it reaches its steady
+// 200. The R6 "5xx is a failure" fix latched the FIRST 5xx: probeHttp returns
+// ok:true for ANY status, so the loop broke on that first 503 and classified
+// once on the latched 5xx → a FALSE failure for a normal startup pattern.
+//
+// The fix keeps polling through a 5xx until a NON-5xx response OR the deadline,
+// then classifies on the LAST probe:
+//   - a TRANSIENT 5xx-then-200 now recovers to its eventual 200 (responded:true);
+//   - a PERSISTENT 5xx still fails (the last probe at the deadline is 5xx) — the
+//     R6 steady-state-500-fails intent is preserved, not weakened.
+//
+// These drive REAL subprocesses on OS-allocated free ports and tear them down.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: the poll loop recovers a transient 5xx, still fails a persistent one (R7)', () => {
+  const projects = [];
+  after(() => { for (const p of projects) rm(p); });
+
+  it('a server that 503s for ~1s then 200s → responded:true, httpStatus:200 (transient recovery)', async () => {
+    const dir = makeProject('ctoc-web-warmup-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({ name: 'web-warmup', scripts: { dev: 'node server.js' } }));
+    // OS-allocated free port (PORT=0-derived via the runner; here we bind 0 too).
+    write(dir, 'server.js', [
+      "const http = require('http');",
+      'const port = Number(process.env.PORT) || 0;',
+      'const started = Date.now();',
+      'const WARMUP_MS = 1000;',
+      'const server = http.createServer((req, res) => {',
+      '  if (Date.now() - started < WARMUP_MS) {',
+      "    res.writeHead(503, { 'content-type': 'text/plain' });",
+      "    res.end('warming up');",
+      '  } else {',
+      "    res.writeHead(200, { 'content-type': 'text/plain' });",
+      "    res.end('warmed up and ready');",
+      '  }',
+      '});',
+      "server.listen(port, '127.0.0.1');"
+    ].join('\n'));
+
+    // Budget comfortably larger than the ~1s warmup so the eventual 200 is reachable.
+    const res = await driveApp(dir, { timeBudgetMs: 8000 });
+
+    assert.strictEqual(res.launched, true, 'the server must be launched');
+    assert.strictEqual(
+      res.responded, true,
+      `a 5xx-then-200 startup must be polled through to its 200; errors: ${JSON.stringify(res.errors)}`
+    );
+    assert.strictEqual(res.evidence.httpStatus, 200, 'classification must land on the eventual 200, not the latched 503');
+    assert.deepStrictEqual(res.errors, [], 'a recovered startup is not a failure');
+
+    // No leaked process: the port must no longer answer once torn down.
+    const after = await probeHttp(res.evidence.port);
+    assert.strictEqual(after.ok, false, 'the launched server must be torn down (port no longer answers)');
+  });
+
+  it('a server that 500s on EVERY request within the budget → responded:false, the 500 surfaced (R6 preserved)', async () => {
+    const dir = makeProject('ctoc-web-steady500-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({ name: 'web-steady500', scripts: { dev: 'node server.js' } }));
+    write(dir, 'server.js', [
+      "const http = require('http');",
+      'const port = Number(process.env.PORT) || 0;',
+      "http.createServer((req, res) => { res.writeHead(500); res.end('always broken'); })",
+      "  .listen(port, '127.0.0.1');"
+    ].join('\n'));
+
+    const res = await driveApp(dir, { timeBudgetMs: 2000 });
+
+    assert.strictEqual(res.launched, true, 'we attempted to launch it');
+    assert.strictEqual(res.responded, false, 'a steady 500 must still fail — polling through must not mask a persistent error');
+    assert.strictEqual(res.evidence.httpStatus, 500, 'the persistent 500 must be recorded on the last probe');
+    assert.ok(
+      res.errors.some((e) => /HTTP 500/.test(e)),
+      `the human must see the boot error; got: ${JSON.stringify(res.errors)}`
+    );
+
+    const after = await probeHttp(res.evidence.port);
+    assert.strictEqual(after.ok, false, 'the launched server must be torn down');
+  });
+
+  it('a normal 200 server → responded:true (regression guard)', async () => {
+    const dir = makeProject('ctoc-web-normal200-');
+    projects.push(dir);
+    write(dir, 'package.json', JSON.stringify({ name: 'web-normal200', scripts: { dev: 'node server.js' } }));
+    write(dir, 'server.js', [
+      "const http = require('http');",
+      'const port = Number(process.env.PORT) || 0;',
+      "http.createServer((req, res) => { res.writeHead(200); res.end('ok'); })",
+      "  .listen(port, '127.0.0.1');"
+    ].join('\n'));
+
+    const res = await driveApp(dir, { timeBudgetMs: 8000 });
+
+    assert.strictEqual(res.responded, true, `a normal 200 server must respond; errors: ${JSON.stringify(res.errors)}`);
+    assert.strictEqual(res.evidence.httpStatus, 200);
+    assert.deepStrictEqual(res.errors, []);
+
+    const after = await probeHttp(res.evidence.port);
+    assert.strictEqual(after.ok, false, 'the launched server must be torn down');
+  });
+});

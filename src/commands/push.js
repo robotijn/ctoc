@@ -106,6 +106,20 @@ async function run(opts = {}, deps = {}) {
   const security = await d.runSecurityScan(tools, opts.projectRoot ? { projectRoot: opts.projectRoot } : {});
   if (!security.passed) blockedBy.push('security');
 
+  // Honesty (H3): the orchestrator folds unrun scanners (no tooling, oversized or
+  // unreadable files, crashed scanner) into `security.skipped` and treats them as
+  // NOT-a-pass — but they legitimately do NOT block (quality-fleet-wiring's
+  // contract). printSummary surfaces that partial coverage on stdout; the structured
+  // `text` must too, so a menu/GUI/programmatic consumer of push.run(...).text is not
+  // told "clean" when N scanners never ran. This ADDS disclosure only; the gate is
+  // unchanged. Read defensively — some paths omit `skipped`.
+  const securitySkipped = Array.isArray(security.skipped) ? security.skipped : [];
+  if (security.passed && securitySkipped.length > 0) {
+    const preview = securitySkipped.slice(0, 3).join('; ');
+    const more = securitySkipped.length > 3 ? `; +${securitySkipped.length - 3} more` : '';
+    say(`Security: passed, but ${securitySkipped.length} scanner(s) were skipped (not scanned): ${preview}${more}`);
+  }
+
   // Tier-1 failure ALWAYS blocks — `--force` affects Tier-2 warnings only and
   // never flips a Tier-1 block (push.md: "Fail (Tier 1): Block push").
   if (blockedBy.length > 0) {

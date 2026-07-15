@@ -27,6 +27,7 @@ const { execFileSync } = require('node:child_process');
 const qualityAgent = require('../src/lib/quality-agent');
 const push = require('../src/commands/push');
 const { SASTRunner } = require('../src/lib/sast-runner');
+const { SecretsScanner } = require('../src/lib/secrets-scanner');
 const { initProject } = require('../src/lib/init-project');
 
 function mkTmp(prefix) {
@@ -770,5 +771,195 @@ describe('POST-COMMIT LOOP: initProject wires the background quality hook', () =
     const body = fs.readFileSync(hookPath, 'utf8');
     assert.match(body, /CTOC/, 'the installed hook must carry the CTOC marker');
     assert.match(body, /post-commit\.js/, 'the hook must launch src/hooks/post-commit.js');
+  });
+});
+
+describe('F-1 — SCA whole-repo net runs for an ALL-DEFERRED repo (a nested lockfile CRITICAL is not lost)', () => {
+  it('a pure-npm repo (root package-lock.json, all ecosystems deferred) with a nested independent lockfile CRITICAL surfaces it via the osv whole-repo net', async () => {
+    // The exact false-green: every DETECTED ecosystem is deferred to DependencyAuditor
+    // (root package-lock.json → javascript, npm implemented), so `languages.length === 0`
+    // and the OLD orchestrator took the "all detected ecosystems covered … nothing further
+    // to audit" branch and NEVER called sca.run(). But sca.run() runs osv-scanner as a
+    // WHOLE-REPO net (SCA1) precisely to catch a nested, independently-installed lockfile
+    // (packages/api/package-lock.json) that DependencyAuditor (root-only) misses. Here that
+    // nested lockfile carries a CRITICAL — the orchestrator must surface it and BLOCK.
+    const osv = {
+      results: [{
+        source: { path: 'packages/api/package-lock.json', type: 'lockfile' },
+        packages: [{
+          package: { name: 'nested-evil', ecosystem: 'npm', version: '1.0.0' },
+          vulnerabilities: [{ id: 'GHSA-nested-crit', summary: 'RCE in a nested dependency', database_specific: { severity: 'CRITICAL' } }]
+        }]
+      }]
+    };
+    // osv-scanner installed + returns the nested CVE; every other tool absent.
+    cp.execFileSync = (cmd, args) => {
+      if (Array.isArray(args) && args.includes('--version')) {
+        if (cmd === 'osv-scanner') return '';
+        throw new Error('not installed');
+      }
+      if (cmd === 'osv-scanner') return JSON.stringify(osv);
+      throw new Error(`unexpected execFileSync ${cmd} ${JSON.stringify(args)}`);
+    };
+    cp.execSync = () => { throw new Error('not installed'); };
+
+    const dir = mkTmp('ctoc-alldeferred-nested-');
+    try {
+      // Root manifest → javascript detected AND deferred to DependencyAuditor.
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'root', version: '1.0.0' }, null, 2));
+      fs.writeFileSync(path.join(dir, 'package-lock.json'), JSON.stringify({
+        name: 'root', version: '1.0.0', lockfileVersion: 3, requires: true,
+        packages: { '': { name: 'root', version: '1.0.0' } }
+      }, null, 2));
+      // A nested, independently-installed lockfile DependencyAuditor (root-only) never audits.
+      fs.mkdirSync(path.join(dir, 'packages', 'api'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'packages', 'api', 'package-lock.json'), JSON.stringify({
+        name: 'api', version: '1.0.0', lockfileVersion: 3, requires: true,
+        packages: { '': { name: 'api', version: '1.0.0' } }
+      }, null, 2));
+
+      const qa = freshQualityAgent();
+      const { res, out } = await captureLog(() =>
+        qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      // The false "covered" short-circuit must be gone — sca.run() must have been reached.
+      assert.doesNotMatch(out, /nothing further to audit/,
+        `the false-green "covered" short-circuit must be gone; log:\n${out}`);
+      assert.ok(res.critical >= 1,
+        `the nested lockfile CRITICAL must surface via the osv whole-repo net; got critical=${res.critical}`);
+      assert.equal(res.passed, false, 'a nested CRITICAL must FAIL the gate');
+      assert.match(res.details, /sca\[CRITICAL\] nested-evil/,
+        `the nested CVE must be in the human-facing details; got: ${JSON.stringify(res.details)}`);
+      assert.match(out, /SCA: 1 dependency finding/, `osv whole-repo net must have run; log:\n${out}`);
+    } finally {
+      restoreCp();
+      rm(dir);
+    }
+  });
+});
+
+describe('F-2 — DependencyAuditor runs the npm-audit fallback for a yarn-only repo when npm is available', () => {
+  it('a yarn.lock-only repo on an npm-only machine INVOKES the npm-audit fallback (reachable coverage, not a silent skip)', async () => {
+    // yarn.lock alone → the ONLY detected manager is `yarn` (no package.json, so npm is not
+    // co-detected). yarn's tool is absent on this machine. The OLD orchestrator computed
+    // `available = managers.filter(isToolAvailable)` = [] and NEVER called auditor.run(), so
+    // DependencyAuditor's built-in yarn/pnpm → npm-audit fallback never fired — reachable
+    // coverage lost. The fix invokes run() when a JS manager is detected and npm exists.
+    cp.execSync = (command) => {
+      if (command === 'npm --version') return 'v9\n';
+      if (command === 'yarn --version') throw new Error('not installed');
+      if (typeof command === 'string' && command.startsWith('npm audit')) {
+        // The npm-audit fallback's output: one HIGH prototype-pollution advisory.
+        return JSON.stringify({
+          vulnerabilities: {
+            'evil-pkg': {
+              name: 'evil-pkg', severity: 'high', range: '<2.0.0',
+              via: [{ title: 'Prototype pollution', severity: 'high', url: 'https://example.invalid' }]
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected execSync: ${command}`);
+    };
+    cp.execFileSync = () => { throw new Error('not installed'); };
+
+    const dir = mkTmp('ctoc-yarn-npmfallback-');
+    try {
+      // yarn.lock only — NO package.json, so `yarn` is the sole detected manager.
+      fs.writeFileSync(path.join(dir, 'yarn.lock'), '# yarn lockfile v1\n');
+
+      const qa = freshQualityAgent();
+      const { res, out } = await captureLog(() =>
+        qa.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      assert.ok(
+        !res.skipped.some((s) => /dependency audit skipped: yarn/i.test(s)),
+        `yarn must NOT be skipped when npm is available for the fallback; skipped=${JSON.stringify(res.skipped)}`
+      );
+      assert.ok(res.high >= 1,
+        `the npm-audit fallback must run and surface the vulnerability; got high=${res.high}`);
+      assert.match(res.details, /dependency\[HIGH\] evil-pkg/,
+        `the fallback finding must be in the human-facing details; got: ${JSON.stringify(res.details)}`);
+      assert.match(out, /Dependencies: \d+ vulnerability/,
+        `the auditor must have RUN (not skipped); log:\n${out}`);
+    } finally {
+      restoreCp();
+      rm(dir);
+    }
+  });
+});
+
+describe('F-3 — severity classification fails SECURE (an unrecognized/missing severity blocks, never a silent medium)', () => {
+  it('classifies canonical severities case-insensitively and treats unrecognized/missing as blocking HIGH', () => {
+    assert.equal(typeof qualityAgent.classifySeverity, 'function', 'quality-agent must export classifySeverity');
+
+    // Canonical, case- and whitespace-insensitive.
+    assert.equal(qualityAgent.classifySeverity('CRITICAL'), 'CRITICAL');
+    assert.equal(qualityAgent.classifySeverity('critical'), 'CRITICAL');
+    assert.equal(qualityAgent.classifySeverity(' High '), 'HIGH');
+    assert.equal(qualityAgent.classifySeverity('MEDIUM'), 'MEDIUM');
+    assert.equal(qualityAgent.classifySeverity('moderate'), 'MEDIUM');
+    assert.equal(qualityAgent.classifySeverity('low'), 'MEDIUM');   // recognized non-blocking
+    assert.equal(qualityAgent.classifySeverity('info'), 'MEDIUM');  // recognized non-blocking
+
+    // THE DEFECT: an unrecognized or missing severity must NOT be silently non-blocking.
+    const BLOCKING = new Set(['CRITICAL', 'HIGH']);
+    assert.ok(BLOCKING.has(qualityAgent.classifySeverity(undefined)),
+      'a MISSING severity must fail SECURE (block), not count as a non-blocking medium');
+    assert.ok(BLOCKING.has(qualityAgent.classifySeverity(null)),
+      'a null severity must fail SECURE (block)');
+    assert.ok(BLOCKING.has(qualityAgent.classifySeverity('Critical-ish')),
+      'an UNRECOGNIZED severity label must fail SECURE (block)');
+    assert.equal(qualityAgent.classifySeverity(undefined), 'HIGH', 'the fail-secure bucket is HIGH');
+  });
+});
+
+describe('F-4 — delta secrets scan continues past a single unreadable file (one throw must not abandon the rest)', () => {
+  it('a 3-file delta whose MIDDLE file throws still scans the first and last; the one failure is recorded, not swallowed for the whole delta', async () => {
+    // Two DISTINCT AWS-shaped keys (no placeholder substring), one BEFORE and one AFTER the
+    // throwing middle file, so both surviving files being scanned is provable by name.
+    const KEY_A = 'AKIAJKQR7MNPZ2WXVBDF';
+    const KEY_C = 'AKIA5XYZ9WVUT2QRSMLK';
+
+    const dir = mkTmp('ctoc-delta-throw-');
+    const orig = SecretsScanner.prototype.scanFile;
+    try {
+      git(['init'], dir);
+      fs.writeFileSync(path.join(dir, '01_first.js'), `const a = "${KEY_A}";\n`);
+      fs.writeFileSync(path.join(dir, '02_middle.js'), 'const b = 1;\n');
+      fs.writeFileSync(path.join(dir, '03_last.js'), `const c = "${KEY_C}";\n`);
+      git(['add', '-A'], dir);
+      git(['commit', '-m', 'c1'], dir);
+
+      // Simulate ONE unreadable/renamed file mid-delta (a real, hard-to-reproduce I/O
+      // failure). Only the middle file throws; the first and last scan normally.
+      SecretsScanner.prototype.scanFile = function (abs) {
+        if (/02_middle/.test(abs)) throw new Error('simulated unreadable/renamed file');
+        return orig.call(this, abs);
+      };
+
+      // DELTA path (no allFiles): with no upstream the whole tracked set is the delta.
+      const res = await qualityAgent.runSecurityScan(null, { projectRoot: dir });
+
+      // Before the fix the first throw jumped to the step-wide catch: deduplicateFindings
+      // never ran (so BOTH secrets vanished — a silent pass) and every remaining delta file
+      // went unscanned. After the fix both surviving files are scanned and counted.
+      assert.ok(res.critical >= 1,
+        `the surviving delta files must still be scanned; got critical=${res.critical}`);
+      assert.equal(res.passed, false, 'planted secrets must FAIL the gate');
+      assert.match(res.details, /01_first\.js/,
+        `the pre-throw file's finding must be counted; got details=${JSON.stringify(res.details)}`);
+      assert.match(res.details, /03_last\.js/,
+        `the POST-throw file must still be scanned (the loop did not abandon); got details=${JSON.stringify(res.details)}`);
+      assert.ok(
+        res.skipped.some((s) => /02_middle/.test(s) && /(not scanned|skipped)/i.test(s)),
+        `the ONE failing file must be recorded as a skip; got skipped=${JSON.stringify(res.skipped)}`
+      );
+    } finally {
+      SecretsScanner.prototype.scanFile = orig;
+      rm(dir);
+    }
   });
 });

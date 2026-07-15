@@ -45,7 +45,8 @@ function crashError(stdout) {
 }
 
 test('runBandit: a crash (traceback on stdout) surfaces in errors, not silence', async () => {
-  cp.execSync = () => { throw crashError('Traceback (most recent call last):\n  ImportError: broken plugin'); };
+  // INJ-1: runBandit now invokes execFileSync (no shell), so the crash seam is execFileSync.
+  cp.execFileSync = () => { throw crashError('Traceback (most recent call last):\n  ImportError: broken plugin'); };
   const SASTRunner = freshSAST();
   try {
     const r = new SASTRunner('/nonexistent-project');
@@ -97,14 +98,19 @@ test('CONTRAST — bandit non-zero exit WITH valid findings JSON parses as findi
       issue_text: 'subprocess with shell=True', issue_severity: 'HIGH', issue_confidence: 'HIGH'
     }]
   });
-  cp.execSync = () => { throw crashError(payload); };
+  // INJ-1: runBandit now invokes execFileSync (no shell), so mock that seam.
+  cp.execFileSync = () => { throw crashError(payload); };
   const SASTRunner = freshSAST();
   try {
     const r = new SASTRunner('/nonexistent-project');
     await r.runBandit();
     assert.equal(r.errors.length, 0, 'valid findings JSON on a non-zero exit is NOT an error');
     assert.equal(r.findings.length, 1, 'the finding must be parsed');
-    assert.equal(r.findings[0].severity, 'HIGH');
+    // FN-2: B602 (subprocess with shell=True) carries CWE-78 (OS command injection),
+    // whose CWE_SEVERITY_MAP floor is CRITICAL. Bandit's own severity was HIGH; the
+    // CWE floor correctly PROMOTES it to CRITICAL (the whole point of the FN-2 fix —
+    // a command-injection finding must be able to fail a CRITICAL gate).
+    assert.equal(r.findings[0].severity, 'CRITICAL');
   } finally {
     restore();
   }
