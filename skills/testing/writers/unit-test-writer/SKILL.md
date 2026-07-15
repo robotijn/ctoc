@@ -36,6 +36,27 @@ effort_budget:
 
 You write unit tests BEFORE the implementation exists. This is the "Red" phase of TDD. You assume every test that does not fail loudly when the code is wrong is itself a latent bug — silent green is worse than red, because red lets you fix things.
 
+## Load-bearing rule: test the non-obvious, not the obvious only
+
+This is the single rule that separates a real test from line-coverage theater. **A test that only exercises the obvious path — a constructor returns an object, a getter returns the field you just set, a function returns a string, `typeof x === 'function'` — raises line coverage but kills no mutant.** Mutate one line of the production code and the test stays green; it therefore certifies nothing. Writing more of these to chase a coverage percentage is fake work, and the refinement loop rejects it.
+
+The objective test is **mutation survival**, not line coverage:
+
+> If the assertion would still pass against a trivially-wrong (happy-path-only) implementation, the test is obvious-only. Rewrite it to pin a branch that goes **RED** when the code is wrong.
+
+Bugs do not live on the obvious path — every other test already crosses it. They live in the **non-obvious** branches, and those are where every coverage test must aim:
+
+- **Error / throw / rejection paths** — the `catch`, the thrown validation, the rejected promise.
+- **Boundaries** — `>=` vs `>`, off-by-one, zero, one, empty collection, max size, the exact cap.
+- **Coercion of untrusted or malformed input** — `Number(x)` on a string / `NaN` / negative, non-object where an object is expected, absent field.
+- **Fallbacks and defaults** — the `|| 0`, the `?? []`, the `else` of a ternary, the *second* operand of an `||` / `&&` (the first operand short-circuits it dark).
+- **State-transition edges** — gap/reset in a run, the upward-walk to the filesystem root, the branch that only fires on corrupt or concurrent state.
+- **Fail-open / fail-closed decisions** — the exact condition under which a safety gate stands down.
+
+`refinement-loop-coverage.test.js` in this repo is the reference: it drives the gap-reset, the `\b` word-boundary rejection, every `buildLetter` throw, the `>=`-not-`>` cap, the `undefined`-bucket fallback — each one dies under mutation. Match that bar.
+
+**Honesty clause:** for a line you genuinely cannot reach without malformed internal state the public API never emits, DOCUMENT it as unreachable (name the line and why) — never fabricate a hit to move the percentage. An honestly-documented unreachable branch is a passing result; a vacuous test that "covers" it is a defect.
+
 ## 2026 Best Practices (Testing category)
 
 Nine patterns are table stakes in 2026. A missing one is a refinement-loop finding.
@@ -70,6 +91,7 @@ These are the unit-test-specific findings this skill emits. Each maps to `missin
 
 | `missing_test_kind` | What it means | Why critical |
 |---|---|---|
+| `obvious_only_survives_mutation` | Test exercises only the obvious/happy path; its assertion still passes against a trivially-wrong implementation (survives mutation) | Line coverage with zero defect-detection — the exact false-green this skill exists to kill |
 | `missing_aaa_structure` | Test interleaves setup, action, assertion or has no visible blocks | Failure point is ambiguous |
 | `multiple_assertions_hiding_cases` | One test asserts unrelated behaviours; first failure masks the rest | Hides defects |
 | `snapshot_no_human_review` | Snapshot/golden test with no documented review and no semantic assertion | Snapshot updates rubber-stamped — tests become a "log of whatever the code does" |
@@ -571,7 +593,7 @@ These tiers are the **internal triage view** used when you produce a human-reada
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
-| CRITICAL | Test with no assertion · empty-catch swallowing exceptions · test passes against unimplemented code · AI-generated import that doesn't exist on the registry · test asserts on the mock instead of behaviour | BLOCK |
+| CRITICAL | Test with no assertion · obvious-only test that survives mutation (line coverage, zero defect-detection) · empty-catch swallowing exceptions · test passes against unimplemented code · AI-generated import that doesn't exist on the registry · test asserts on the mock instead of behaviour | BLOCK |
 | HIGH | Missing error path · missing boundary case · test interdependence / order-dependence · snapshot test with no human review · slow unit test (real I/O) | BLOCK |
 | MEDIUM | Missing AAA structure · multiple unrelated assertions in one test · magic numbers in inputs/expected · non-descriptive name · over-mocked domain collaborator | Fix soon |
 | LOW | Style nits · missing `@DisplayName` · row-id missing on a parameterised test | Backlog |
@@ -580,6 +602,7 @@ These tiers are the **internal triage view** used when you produce a human-reada
 
 | `missing_test_kind` | Triage tier | On-wire `severity` |
 |---|---|---|
+| `obvious_only_survives_mutation` | CRITICAL | `critical` |
 | `ai_generated_no_review` | CRITICAL | `critical` |
 | `mock_overuse_testing_the_mock` | CRITICAL | `critical` |
 | `snapshot_no_human_review` | HIGH | `critical` |
@@ -607,8 +630,8 @@ kind: unit-test-defect | missing-test | flaky-test | ai-generated-unreviewed
 target_file: tests/test_user.py                     # the test file the finding lives in
 line: 42
 subject_file: src/services/user_service.py          # the production file the test was meant to cover
-missing_test_kind: missing_aaa_structure | multiple_assertions_hiding_cases | snapshot_no_human_review |
-                   mock_overuse_testing_the_mock | test_interdependence | magic_numbers |
+missing_test_kind: obvious_only_survives_mutation | missing_aaa_structure | multiple_assertions_hiding_cases |
+                   snapshot_no_human_review | mock_overuse_testing_the_mock | test_interdependence | magic_numbers |
                    ai_generated_no_review | missing_error_path | missing_boundary_case |
                    non_descriptive_name | slow_unit_test
 suggested_test_skeleton: |

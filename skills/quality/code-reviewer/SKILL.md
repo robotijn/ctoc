@@ -613,11 +613,34 @@ When reviewing test code, **BLOCK** if you find:
    test.skipIf(!process.env.DB, 'requires DB')
    ```
 
+6. **Obvious-only tests that survive mutation** — the false-green that a coverage push produces most often. The test runs a line and asserts something that would *still be true if the code were wrong*: it re-states the obvious (a getter returns the field just set, a constructor returns an object, `typeof x === 'function'`, a value is merely `defined`). Line coverage rises; defect-detection is zero.
+   ```javascript
+   // BLOCK — passes against any implementation, kills no mutant
+   test('parseAmount returns a number', () => {
+     expect(typeof parseAmount('4.20')).toBe('number');   // NaN is a number too
+   });
+   test('getUser returns the user', () => {
+     const u = { id: 1 }; store.set(u);
+     expect(store.get(1)).toBeTruthy();                    // asserts nothing about correctness
+   });
+
+   // REQUIRE — pins the non-obvious behaviour; goes RED if the code is wrong
+   test('parseAmount rejects a non-numeric string', () => {
+     expect(() => parseAmount('4.2.0')).toThrow(/invalid amount/);
+   });
+   test('getUser returns the exact record for the id, not a neighbour', () => {
+     store.set({ id: 1, name: 'Ada' }); store.set({ id: 2, name: 'Bo' });
+     expect(store.get(1)).toEqual({ id: 1, name: 'Ada' });
+   });
+   ```
+   **The test:** would this assertion still pass against a trivially-wrong (happy-path-only) implementation? If yes, it is obvious-only — flag `obvious_only_survives_mutation`. Applies especially to coverage-driven test files whose stated purpose is to raise a percentage. See [[unit-test-writer]] "test the non-obvious, not the obvious only."
+
 ### Why This is BLOCK-worthy
 - Silent failures hide bugs from CI
 - We cannot learn from failures we don't see
 - Technical debt accumulates invisibly
 - Builds appear green while code is broken
+- Obvious-only tests inflate coverage while certifying nothing — the metric lies
 
 **If a test cannot fail loudly, it must not pass quietly.**
 

@@ -1,21 +1,37 @@
 /**
- * Iron Loop Automation Tests
+ * Iron Loop — real-behavior tests for the plan-marker/validation surface.
+ *
+ * HISTORY: this file previously carried seven "Existing integration tests"
+ * (testIntegrateReturnsValidMarkdown, testCritiqueReturnsScoresObject,
+ * testRefineLoop*, testGetNextFromTodoFifo, testSetAgentStatusWritesToState,
+ * testClearAgentStatusResetsState) that asserted on hand-written literals
+ * labelled "Simulated … result" — they never called the module and were pure
+ * false green. They were deleted; the REAL behaviour they claimed to cover now
+ * lives in tests/iron-loop-coverage.test.js (integrate/critique/refineLoop/
+ * scoreCompleteness driven against the actual exports) and tests/state-coverage.test.js
+ * (getNextFromTodo/agent-status driven against the actual state module).
+ *
+ * What remains here are the tests that always drove real functions —
+ * hasIronLoopSteps, validateForTodo, generateIronLoopTemplate, IRON_LOOP_MARKER —
+ * converted from the old console.log harness to node:test so they are counted and
+ * isolated. Together with iron-loop-coverage.test.js this pins src/lib/iron-loop.js.
  */
 
-const assert = require('assert');
+'use strict';
+
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// Import the actual functions
 const {
   hasIronLoopSteps,
   validateForTodo,
   generateIronLoopTemplate,
-  IRON_LOOP_MARKER
+  IRON_LOOP_MARKER,
 } = require('../src/lib/iron-loop');
 
-// Helper to create temp files for testing
 function createTempPlan(content) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'iron-loop-test-'));
   const tempFile = path.join(tempDir, 'test-plan.md');
@@ -27,390 +43,65 @@ function cleanupTempFile(filePath) {
   try {
     fs.unlinkSync(filePath);
     fs.rmdirSync(path.dirname(filePath));
-  } catch (e) {
-    // Ignore cleanup errors
+  } catch {
+    /* best-effort */
   }
 }
 
-// Test hasIronLoopSteps() returns false for plan without marker
-function testHasIronLoopStepsWithoutMarker() {
-  const planContent = `# Test Plan
-
-## Problem Statement
-Need to implement feature X.
-
-## Requirements
-- Requirement 1
-- Requirement 2
-`;
-  const tempFile = createTempPlan(planContent);
+test('hasIronLoopSteps returns false when the marker is absent', () => {
+  const tempFile = createTempPlan('# Test Plan\n\n## Problem Statement\nNeed feature X.\n');
   try {
-    const result = hasIronLoopSteps(tempFile);
-    assert.strictEqual(result, false, 'Should return false when marker is missing');
-    console.log('✓ hasIronLoopSteps() returns false for plan without marker');
+    assert.equal(hasIronLoopSteps(tempFile), false);
   } finally {
     cleanupTempFile(tempFile);
   }
-}
+});
 
-// Test hasIronLoopSteps() returns true for plan with marker
-function testHasIronLoopStepsWithMarker() {
-  const planContent = `# Test Plan
-
-## Problem Statement
-Need to implement feature X.
-
-${IRON_LOOP_MARKER}
-
-### Step 8: TEST
-- [ ] Write tests
-`;
-  const tempFile = createTempPlan(planContent);
+test('hasIronLoopSteps returns true when the marker is present', () => {
+  const tempFile = createTempPlan(`# Test Plan\n\n${IRON_LOOP_MARKER}\n\n### Step 8: TEST\n- [ ] Write tests\n`);
   try {
-    const result = hasIronLoopSteps(tempFile);
-    assert.strictEqual(result, true, 'Should return true when marker is present');
-    console.log('✓ hasIronLoopSteps() returns true for plan with marker');
+    assert.equal(hasIronLoopSteps(tempFile), true);
   } finally {
     cleanupTempFile(tempFile);
   }
-}
+});
 
-// Test validateForTodo() returns error when steps missing
-function testValidateForTodoWithoutSteps() {
-  const planContent = `# Test Plan
-
-## Problem Statement
-Need to implement feature X.
-`;
-  const tempFile = createTempPlan(planContent);
+test('validateForTodo rejects a plan missing the Iron Loop steps', () => {
+  const tempFile = createTempPlan('# Test Plan\n\n## Problem Statement\nNeed feature X.\n');
   try {
     const result = validateForTodo(tempFile);
-    assert.strictEqual(result.valid, false, 'Should be invalid without steps');
-    assert.ok(result.error, 'Should have error message');
-    assert.ok(result.error.includes('missing'), 'Error should mention missing steps');
-    console.log('✓ validateForTodo() returns error when steps missing');
+    assert.equal(result.valid, false);
+    assert.ok(result.error, 'an invalid plan must carry an error message');
+    assert.match(result.error, /missing/, 'error names the missing steps');
   } finally {
     cleanupTempFile(tempFile);
   }
-}
+});
 
-// Test validateForTodo() returns valid when steps present
-function testValidateForTodoWithSteps() {
-  const planContent = `# Test Plan
-
-## Problem Statement
-Need to implement feature X.
-
-${IRON_LOOP_MARKER}
-
-### Step 8: TEST
-- [ ] Write tests
-`;
-  const tempFile = createTempPlan(planContent);
+test('validateForTodo accepts a plan that carries the marker and steps', () => {
+  const tempFile = createTempPlan(`# Test Plan\n\n${IRON_LOOP_MARKER}\n\n### Step 8: TEST\n- [ ] Write tests\n`);
   try {
     const result = validateForTodo(tempFile);
-    assert.strictEqual(result.valid, true, 'Should be valid with steps');
-    assert.strictEqual(result.error, undefined, 'Should have no error');
-    console.log('✓ validateForTodo() returns valid when steps present');
+    assert.equal(result.valid, true);
+    assert.equal(result.error, undefined, 'a valid plan carries no error');
   } finally {
     cleanupTempFile(tempFile);
   }
-}
+});
 
-// Test generateIronLoopTemplate() returns valid markdown
-function testGenerateIronLoopTemplateReturnsValidMarkdown() {
-  const planContent = '# Test Plan';
-  const template = generateIronLoopTemplate(planContent);
-
-  // Check marker is present
-  assert.ok(template.includes(IRON_LOOP_MARKER), 'Should include Iron Loop marker');
-
-  // Check all steps 8-16 are present
+test('generateIronLoopTemplate emits the marker and every Step 8..16 label', () => {
+  const template = generateIronLoopTemplate('# Test Plan');
+  assert.ok(template.includes(IRON_LOOP_MARKER), 'template embeds the marker');
+  // A mutant that drops any single step label goes RED here — the whole 8..16
+  // sequence is the contract, not just "some step".
   for (let step = 8; step <= 16; step++) {
-    assert.ok(template.includes(`Step ${step}:`), `Should include Step ${step}`);
+    assert.ok(template.includes(`Step ${step}:`), `template includes Step ${step}`);
   }
+  assert.ok(template.includes('- [ ]'), 'template includes actionable checkboxes');
+});
 
-  // Check checkboxes are present
-  assert.ok(template.includes('- [ ]'), 'Should include checkboxes');
-
-  console.log('✓ generateIronLoopTemplate() returns valid markdown');
-}
-
-// Test IRON_LOOP_MARKER constant
-function testIronLoopMarkerConstant() {
-  assert.ok(IRON_LOOP_MARKER, 'IRON_LOOP_MARKER should be defined');
-  assert.strictEqual(typeof IRON_LOOP_MARKER, 'string', 'IRON_LOOP_MARKER should be a string');
-  assert.ok(IRON_LOOP_MARKER.includes('Iron Loop'), 'IRON_LOOP_MARKER should contain "Iron Loop"');
-  console.log('✓ IRON_LOOP_MARKER constant is properly defined');
-}
-
-// Test integrate() returns valid markdown with Steps 8-16
-function testIntegrateReturnsValidMarkdown() {
-  // Expected output format - canonical step labels
-  const expectedSections = [
-    '## Execution Plan (Steps 8-16)',
-    '### Step 8: TEST',
-    '### Step 9: PREPARE',
-    '### Step 10: IMPLEMENT',
-    '### Step 11: REVIEW',
-    '### Step 12: OPTIMIZE',
-    '### Step 13: SECURE',
-    '### Step 14: VERIFY',
-    '### Step 15: DOCUMENT',
-    '### Step 16: FINAL-REVIEW'
-  ];
-
-  // Simulated integrate result with canonical labels
-  const integratedContent = `
-## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] Write tests
-
-### Step 9: PREPARE
-- [ ] Install dependencies
-
-### Step 10: IMPLEMENT
-- [ ] Implement feature
-
-### Step 11: REVIEW
-- [ ] Self-review
-
-### Step 12: OPTIMIZE
-- [ ] Optimize performance
-
-### Step 13: SECURE
-- [ ] Security review
-
-### Step 14: VERIFY
-- [ ] Run lint + type check + tests
-
-### Step 15: DOCUMENT
-- [ ] Update docs
-
-### Step 16: FINAL-REVIEW
-- [ ] Final review
-`;
-
-  // Verify all sections present
-  for (const section of expectedSections) {
-    assert.ok(
-      integratedContent.includes(section),
-      `integrate() should include "${section}"`
-    );
-  }
-
-  // Verify checkboxes present
-  assert.ok(
-    integratedContent.includes('- [ ]'),
-    'integrate() should include checkboxes'
-  );
-
-  console.log('✓ integrate() returns valid markdown with Steps 8-16');
-}
-
-// Test critique() returns scores object with 5 dimensions
-function testCritiqueReturnsScoresObject() {
-  // Expected critique output structure
-  const critiqueResult = {
-    scores: {
-      completeness: 5,
-      clarity: 4,
-      edgeCases: 3,
-      efficiency: 5,
-      security: 5
-    },
-    feedback: [
-      {
-        dimension: 'clarity',
-        issue: 'Step 10 is too vague',
-        suggestion: 'List specific functions'
-      },
-      {
-        dimension: 'edgeCases',
-        issue: 'No timeout handling',
-        suggestion: 'Add timeout for agent calls'
-      }
-    ]
-  };
-
-  // Verify all 5 dimensions present
-  const requiredDimensions = ['completeness', 'clarity', 'edgeCases', 'efficiency', 'security'];
-  for (const dim of requiredDimensions) {
-    assert.ok(
-      dim in critiqueResult.scores,
-      `critique() should include "${dim}" score`
-    );
-  }
-
-  // Verify scores are 1-5
-  for (const [dim, score] of Object.entries(critiqueResult.scores)) {
-    assert.ok(
-      score >= 1 && score <= 5,
-      `${dim} score should be between 1 and 5`
-    );
-  }
-
-  // Verify feedback structure
-  assert.ok(Array.isArray(critiqueResult.feedback), 'feedback should be array');
-  if (critiqueResult.feedback.length > 0) {
-    const item = critiqueResult.feedback[0];
-    assert.ok('dimension' in item, 'feedback item should have dimension');
-    assert.ok('issue' in item, 'feedback item should have issue');
-    assert.ok('suggestion' in item, 'feedback item should have suggestion');
-  }
-
-  console.log('✓ critique() returns scores object with 5 dimensions');
-}
-
-// Test refineLoop() exits when all scores = 5
-function testRefineLoopExitsOnAllFives() {
-  // Simulate refineLoop behavior
-  let rounds = 0;
-  const maxRounds = 10;
-
-  function simulateRefineLoop() {
-    while (rounds < maxRounds) {
-      rounds++;
-      const scores = {
-        completeness: 5,
-        clarity: 5,
-        edgeCases: 5,
-        efficiency: 5,
-        security: 5
-      };
-
-      // Check if all scores are 5
-      const allPerfect = Object.values(scores).every(s => s === 5);
-      if (allPerfect) {
-        return { status: 'approved', rounds };
-      }
-    }
-    return { status: 'max-rounds', rounds };
-  }
-
-  const result = simulateRefineLoop();
-  assert.strictEqual(result.status, 'approved', 'Should be approved when all 5s');
-  assert.strictEqual(result.rounds, 1, 'Should exit after first round with all 5s');
-
-  console.log('✓ refineLoop() exits when all scores = 5');
-}
-
-// Test refineLoop() exits after maxRounds with deferred questions
-function testRefineLoopExitsAfterMaxRounds() {
-  let rounds = 0;
-  const maxRounds = 10;
-
-  function simulateRefineLoop() {
-    while (rounds < maxRounds) {
-      rounds++;
-      const scores = {
-        completeness: 5,
-        clarity: 4, // Never reaches 5
-        edgeCases: 5,
-        efficiency: 5,
-        security: 5
-      };
-
-      const allPerfect = Object.values(scores).every(s => s === 5);
-      if (allPerfect) {
-        return { status: 'approved', rounds };
-      }
-    }
-    return {
-      status: 'max-rounds',
-      rounds,
-      deferredQuestions: [
-        { dimension: 'clarity', feedback: 'Step 10 remains vague' }
-      ]
-    };
-  }
-
-  const result = simulateRefineLoop();
-  assert.strictEqual(result.status, 'max-rounds', 'Should be max-rounds when not all 5s');
-  assert.strictEqual(result.rounds, maxRounds, 'Should run all rounds');
-  assert.ok(result.deferredQuestions, 'Should have deferred questions');
-  assert.ok(result.deferredQuestions.length > 0, 'Should have at least one deferred question');
-
-  console.log('✓ refineLoop() exits after maxRounds with deferred questions');
-}
-
-// Test getNextFromTodo() returns oldest plan (FIFO)
-function testGetNextFromTodoFifo() {
-  // Simulate todo queue with timestamps
-  const todoQueue = [
-    { name: 'plan-c', created: new Date('2026-01-30') },
-    { name: 'plan-a', created: new Date('2026-01-28') }, // Oldest
-    { name: 'plan-b', created: new Date('2026-01-29') }
-  ];
-
-  // Sort by created (FIFO - oldest first)
-  todoQueue.sort((a, b) => a.created - b.created);
-
-  // Get next (oldest)
-  const next = todoQueue[0];
-
-  assert.strictEqual(next.name, 'plan-a', 'Should return oldest plan');
-
-  console.log('✓ getNextFromTodo() returns oldest plan (FIFO)');
-}
-
-// Test setAgentStatus() writes to state file
-function testSetAgentStatusWritesToState() {
-  // Simulate agent status update
-  const agentStatus = {
-    active: true,
-    plan: 'iron-loop-automation',
-    step: 9,
-    phase: 'IMPLEMENT',
-    startedAt: new Date().toISOString()
-  };
-
-  // Verify structure
-  assert.strictEqual(agentStatus.active, true, 'Should have active flag');
-  assert.ok(agentStatus.plan, 'Should have plan name');
-  assert.ok(agentStatus.step >= 8 && agentStatus.step <= 16, 'Step should be 8-16');
-  assert.ok(agentStatus.startedAt, 'Should have startedAt timestamp');
-
-  console.log('✓ setAgentStatus() writes to state file');
-}
-
-// Test clearAgentStatus() resets state
-function testClearAgentStatusResetsState() {
-  const clearedStatus = {
-    active: false,
-    plan: null,
-    step: null,
-    phase: null,
-    completedAt: new Date().toISOString()
-  };
-
-  assert.strictEqual(clearedStatus.active, false, 'Should set active to false');
-  assert.strictEqual(clearedStatus.plan, null, 'Should clear plan');
-  assert.ok(clearedStatus.completedAt, 'Should have completedAt timestamp');
-
-  console.log('✓ clearAgentStatus() resets state');
-}
-
-// Run all tests
-console.log('\nIron Loop Automation Tests\n');
-
-// Tests for new functions from iron-loop-auto-integration.md plan
-console.log('--- New validation functions ---');
-testHasIronLoopStepsWithoutMarker();
-testHasIronLoopStepsWithMarker();
-testValidateForTodoWithoutSteps();
-testValidateForTodoWithSteps();
-testGenerateIronLoopTemplateReturnsValidMarkdown();
-testIronLoopMarkerConstant();
-
-// Existing simulated tests
-console.log('\n--- Existing integration tests ---');
-testIntegrateReturnsValidMarkdown();
-testCritiqueReturnsScoresObject();
-testRefineLoopExitsOnAllFives();
-testRefineLoopExitsAfterMaxRounds();
-testGetNextFromTodoFifo();
-testSetAgentStatusWritesToState();
-testClearAgentStatusResetsState();
-console.log('\nAll iron loop tests passed!\n');
+test('IRON_LOOP_MARKER is a non-empty string that names the Iron Loop', () => {
+  assert.equal(typeof IRON_LOOP_MARKER, 'string');
+  assert.ok(IRON_LOOP_MARKER.length > 0, 'marker is non-empty');
+  assert.match(IRON_LOOP_MARKER, /Iron Loop/, 'marker text identifies the Iron Loop');
+});
