@@ -12,23 +12,58 @@
  *   - generateSummary counting (direct)
  *   - generateReport populated CRITICAL/HIGH/recommendation blocks + truncation
  *   - external-tool methods (isToolAvailable / runTruffleHog / runDetectSecrets /
- *     runWithExternalTools) via a real child_process boundary with a PATH-shimmed
- *     fake binary (POSIX); catch/fail-safe assertion on win32.
+ *     runWithExternalTools) with child_process.execSync FAKED at the module boundary
+ *     (deterministic + cross-platform; real PATH-shimmed subprocesses were flaky
+ *     under coverage load — they hit the scanner's 10s/300s execSync timeouts).
  *
  * FIXTURE CONSTRAINT: every secret-shaped value is a GENERIC high-entropy string
  * or the canonical AWS example (AKIAIOSFODNN7EXAMPLE / wJalrXUtnFEMI/...EXAMPLEKEY).
  * No value here is a real provider token FORMAT that push protection scans for.
  */
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { SecretsScanner } = require('../src/lib/secrets-scanner');
+// ── child_process.execSync stub — installed BEFORE the scanner is required ─────
+// The three external-tool methods (isToolAvailable / runTruffleHog /
+// runDetectSecrets) shell out via the scanner's module-level
+// `const { execSync } = require('child_process')`. Driving them through REAL
+// PATH-shimmed binaries made these three tests FLAKY under the full coverage run:
+// when fork/exec was starved (the gate running while other work finished), execSync
+// hit the scanner's own 10s (--version) / 300s (scan) timeouts and the assertions
+// failed. We fake execSync — the sanctioned process boundary — so the PARSING logic
+// runs deterministically, fast, and cross-platform with NO subprocess. Installed at
+// module-load time here so the scanner's destructured import captures the stub.
+const childProcess = require('child_process');
+const _realExecSync = childProcess.execSync;
+const TRUFFLEHOG_NDJSON =
+  '{"DetectorName":"AWS","Raw":"AKIAIOSFODNN7EXAMPLE","SourceMetadata":' +
+  '{"Data":{"Filesystem":{"file":"/scan/leak.js","line":3}}}}\n' +
+  'this-is-not-json\n'; // second line is malformed → exercises the skip-non-JSON catch
+const DETECT_SECRETS_JSON =
+  '{"results":{"config.py":[{"type":"Base64 High Entropy String","line_number":5}]}}';
+// Per-test knobs: which tools answer `--version`, and whether a scan command throws.
+const execState = {
+  availableTools: new Set(['trufflehog', 'detect-secrets']),
+  scanThrows: false,
+};
+childProcess.execSync = (command) => {
+  const cmd = String(command);
+  const version = cmd.match(/^(\S+)\s+--version/);
+  if (version) {
+    if (execState.availableTools.has(version[1])) return `${version[1]} (stub)\n`;
+    throw new Error(`command not found: ${version[1]}`); // → isToolAvailable false
+  }
+  if (execState.scanThrows) throw new Error('external tool exited non-zero');
+  if (cmd.startsWith('trufflehog ')) return TRUFFLEHOG_NDJSON;
+  if (cmd.startsWith('detect-secrets ')) return DETECT_SECRETS_JSON;
+  throw new Error(`unexpected execSync command in test: ${cmd}`);
+};
 
-const isPosix = process.platform !== 'win32';
+const { SecretsScanner } = require('../src/lib/secrets-scanner');
 
 // Root for all filesystem fixtures; removed in the final after().
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-secrets-cov-'));
@@ -58,68 +93,8 @@ function freshDir(tag) {
   return d;
 }
 
-// ---- PATH-shim boundary (real child_process, faked external binary) --------
-// Writes fake `trufflehog` / `detect-secrets` executables that branch on argv.
-// A real execSync invocation resolves them via PATH — the genuine boundary.
-let SHIM_DIR = null;
-function buildShims() {
-  if (!isPosix) return null;
-  const d = freshDir('shim-bin');
-  const trufflehog =
-    '#!/bin/sh\n' +
-    'if [ "$1" = "--version" ]; then echo "trufflehog 3.63.0"; exit 0; fi\n' +
-    // one valid NDJSON finding + one malformed line (exercises the inner
-    // "skip non-JSON" catch), then exit 0
-    `printf '%s\\n' '{"DetectorName":"AWS","Raw":"AKIAIOSFODNN7EXAMPLE","SourceMetadata":{"Data":{"Filesystem":{"file":"/scan/leak.js","line":3}}}}'\n` +
-    `printf '%s\\n' 'this-is-not-json'\n` +
-    'exit 0\n';
-  const detectSecrets =
-    '#!/bin/sh\n' +
-    'if [ "$1" = "--version" ]; then echo "detect-secrets 1.4.0"; exit 0; fi\n' +
-    `echo '{"results":{"config.py":[{"type":"Base64 High Entropy String","line_number":5}]}}'\n` +
-    'exit 0\n';
-  fs.writeFileSync(path.join(d, 'trufflehog'), trufflehog);
-  fs.writeFileSync(path.join(d, 'detect-secrets'), detectSecrets);
-  fs.chmodSync(path.join(d, 'trufflehog'), 0o755);
-  fs.chmodSync(path.join(d, 'detect-secrets'), 0o755);
-  return d;
-}
-
-// A second shim whose binaries are FOUND but exit non-zero on the scan command,
-// so the real execSync THROWS — the path that drives the internal catch in
-// runTruffleHog / runDetectSecrets (return [] instead of propagating).
-let FAIL_SHIM_DIR = null;
-function buildFailingShims() {
-  if (!isPosix) return null;
-  const d = freshDir('shim-fail-bin');
-  const failing = '#!/bin/sh\nif [ "$1" = "--version" ]; then exit 0; fi\nexit 1\n';
-  fs.writeFileSync(path.join(d, 'trufflehog'), failing);
-  fs.writeFileSync(path.join(d, 'detect-secrets'), failing);
-  fs.chmodSync(path.join(d, 'trufflehog'), 0o755);
-  fs.chmodSync(path.join(d, 'detect-secrets'), 0o755);
-  return d;
-}
-
-async function withPathDir(dir, fn) {
-  const orig = process.env.PATH;
-  process.env.PATH = dir + path.delimiter + orig;
-  try {
-    return await fn();
-  } finally {
-    process.env.PATH = orig;
-  }
-}
-
-async function withShimPath(fn) {
-  return withPathDir(SHIM_DIR, fn);
-}
-
-before(() => {
-  SHIM_DIR = buildShims();
-  FAIL_SHIM_DIR = buildFailingShims();
-});
-
 after(() => {
+  childProcess.execSync = _realExecSync; // restore the real boundary (hygiene)
   try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch (e) { /* ignore */ }
 });
 
@@ -375,10 +350,12 @@ describe('SecretsScanner.generateReport — populated findings', () => {
 });
 
 // ===========================================================================
-// Cluster G — external-tool methods (lines 921-1048). Real child_process
-// boundary; the external binaries are FAKED via a PATH shim (POSIX). On win32
-// the shim cannot run, so the fail-safe (catch → []) is asserted instead — no
-// skipped tests on any platform.
+// Cluster G — external-tool methods (lines 921-1048). child_process.execSync is
+// FAKED at the module boundary (see the stub near the top): a `--version` probe
+// resolves availability, scan commands return canned NDJSON/JSON, and per-test
+// knobs drive the throw path. This runs deterministically on every platform with
+// no subprocess — real PATH-shimmed binaries were flaky under coverage load,
+// hitting the scanner's own 10s/300s execSync timeouts.
 //
 // DOCUMENTED UNREACHABLE (cannot be covered without malformed internal state the
 // public API never emits):
@@ -392,83 +369,75 @@ describe('SecretsScanner.generateReport — populated findings', () => {
 // ===========================================================================
 describe('SecretsScanner — external tool integration', () => {
   it('should_report_tool_unavailable_for_unknown_and_available_when_version_succeeds', () => {
-    // Arrange
+    // Arrange — execState.availableTools has trufflehog/detect-secrets; the stub
+    // throws for any other `--version`, exercising isToolAvailable's catch.
     const scanner = new SecretsScanner(freshDir('tool-avail'));
 
-    // Act + Assert — false branch is deterministic (unknown key → execSync(undefined)).
+    // Act + Assert
     assert.equal(
       scanner.isToolAvailable('definitely-not-a-real-tool'),
       false,
       'an unknown tool must resolve to unavailable via the catch'
     );
-    if (isPosix) {
-      const ok = withShimPathSync(() => scanner.isToolAvailable('trufflehog'));
-      assert.equal(ok, true, 'a tool that answers --version is available');
-    }
+    assert.equal(
+      scanner.isToolAvailable('trufflehog'),
+      true,
+      'a tool that answers --version is available'
+    );
   });
 
   it('should_parse_trufflehog_ndjson_and_redact_or_fail_safe_on_absence', async () => {
     const scanner = new SecretsScanner(freshDir('truffle'));
-    if (isPosix) {
-      // Act — real execSync resolves the PATH-shimmed fake trufflehog.
-      const findings = await withShimPath(() => scanner.runTruffleHog());
 
-      // Assert — the one valid NDJSON line parsed (malformed line skipped),
-      // fields mapped, raw value redacted.
-      assert.equal(findings.length, 1, 'valid NDJSON parsed, malformed line skipped');
-      const f = findings[0];
-      assert.equal(f.type, 'AWS');
-      assert.equal(f.severity, 'CRITICAL', 'trufflehog findings are verified → CRITICAL');
-      assert.equal(f.file, '/scan/leak.js');
-      assert.equal(f.line, 3);
-      assert.equal(f.verified, true);
-      assert.equal(f.tool, 'trufflehog');
-      assert.ok(f.match.includes('***') && !f.match.includes('IOSFODNN7'), 'the raw secret is redacted');
-    } else {
-      // win32 fail-safe: absent binary → catch → [], never a throw.
-      const findings = await scanner.runTruffleHog();
-      assert.deepEqual(findings, []);
-    }
+    // Act — execSync stub returns the canned NDJSON (one valid line + one malformed).
+    const findings = await scanner.runTruffleHog();
+
+    // Assert — the one valid NDJSON line parsed (malformed line skipped), fields
+    // mapped, raw value redacted.
+    assert.equal(findings.length, 1, 'valid NDJSON parsed, malformed line skipped');
+    const f = findings[0];
+    assert.equal(f.type, 'AWS');
+    assert.equal(f.severity, 'CRITICAL', 'trufflehog findings are verified → CRITICAL');
+    assert.equal(f.file, '/scan/leak.js');
+    assert.equal(f.line, 3);
+    assert.equal(f.verified, true);
+    assert.equal(f.tool, 'trufflehog');
+    assert.ok(f.match.includes('***') && !f.match.includes('IOSFODNN7'), 'the raw secret is redacted');
   });
 
   it('should_parse_detect_secrets_json_or_fail_safe_on_absence', async () => {
     const scanner = new SecretsScanner(freshDir('detect'));
-    if (isPosix) {
-      // Act
-      const findings = await withShimPath(() => scanner.runDetectSecrets());
 
-      // Assert — the results map is flattened into one MEDIUM finding.
-      assert.equal(findings.length, 1);
-      const f = findings[0];
-      assert.equal(f.type, 'Base64 High Entropy String');
-      assert.equal(f.severity, 'MEDIUM', 'detect-secrets findings default to MEDIUM');
-      assert.equal(f.file, 'config.py');
-      assert.equal(f.line, 5);
-      assert.equal(f.match, '***DETECTED***');
-      assert.equal(f.tool, 'detect-secrets');
-    } else {
-      const findings = await scanner.runDetectSecrets();
-      assert.deepEqual(findings, []);
-    }
+    // Act
+    const findings = await scanner.runDetectSecrets();
+
+    // Assert — the results map is flattened into one MEDIUM finding.
+    assert.equal(findings.length, 1);
+    const f = findings[0];
+    assert.equal(f.type, 'Base64 High Entropy String');
+    assert.equal(f.severity, 'MEDIUM', 'detect-secrets findings default to MEDIUM');
+    assert.equal(f.file, 'config.py');
+    assert.equal(f.line, 5);
+    assert.equal(f.match, '***DETECTED***');
+    assert.equal(f.tool, 'detect-secrets');
   });
 
   it('should_fail_safe_to_empty_when_an_available_external_tool_errors', async () => {
-    // Arrange — the tool exists (so it is invoked) but errors on the scan
-    // command, making execSync throw. runTruffleHog/runDetectSecrets must
-    // swallow it and return [], never propagate.
+    // Arrange — the tool exists (answers --version) but the SCAN command throws,
+    // exercising the internal catch in runTruffleHog / runDetectSecrets.
     const scanner = new SecretsScanner(freshDir('ext-error'));
+    execState.scanThrows = true;
+    try {
+      // Act
+      const truffle = await scanner.runTruffleHog();
+      const detect = await scanner.runDetectSecrets();
 
-    // Act
-    const truffle = isPosix
-      ? await withPathDir(FAIL_SHIM_DIR, () => scanner.runTruffleHog())
-      : await scanner.runTruffleHog(); // win32: binary absent → same catch
-    const detect = isPosix
-      ? await withPathDir(FAIL_SHIM_DIR, () => scanner.runDetectSecrets())
-      : await scanner.runDetectSecrets();
-
-    // Assert — an erroring external tool degrades to no findings, not a crash.
-    assert.deepEqual(truffle, [], 'a trufflehog error yields [], never a throw');
-    assert.deepEqual(detect, [], 'a detect-secrets error yields [], never a throw');
+      // Assert — an erroring external tool degrades to no findings, not a crash.
+      assert.deepEqual(truffle, [], 'a trufflehog error yields [], never a throw');
+      assert.deepEqual(detect, [], 'a detect-secrets error yields [], never a throw');
+    } finally {
+      execState.scanThrows = false;
+    }
   });
 
   it('should_run_internal_scan_then_external_tools_and_return_a_wellformed_result', async () => {
@@ -478,10 +447,8 @@ describe('SecretsScanner — external tool integration', () => {
     fs.writeFileSync(path.join(root, 'keys.js'), 'const key = `\n' + SYNTH_RSA_KEY + '`;\n');
     const scanner = new SecretsScanner(root);
 
-    // Act
-    const result = isPosix
-      ? await withShimPath(() => scanner.runWithExternalTools())
-      : await scanner.runWithExternalTools();
+    // Act — both external tools are "available" and return canned findings.
+    const result = await scanner.runWithExternalTools();
 
     // Assert — orchestration completed: internal scan is present, report rebuilt.
     assert.equal(result.success, true);
@@ -490,27 +457,13 @@ describe('SecretsScanner — external tool integration', () => {
     assert.equal(result.summary.total, result.findings.length, 'summary is recomputed over the final findings');
     // External-tool findings (tagged with a `tool` field; internal findings have
     // none) MUST reach the final result — the whole point of runWithExternalTools.
-    // Only meaningful on POSIX where the PATH shim provides the fake binaries.
-    if (isPosix) {
-      assert.ok(
-        result.findings.some((f) => f.tool === 'trufflehog'),
-        'external TruffleHog findings must be included in the final result, not dropped'
-      );
-      assert.ok(
-        result.findings.some((f) => f.tool === 'detect-secrets'),
-        'external detect-secrets findings must be included in the final result, not dropped'
-      );
-    }
+    assert.ok(
+      result.findings.some((f) => f.tool === 'trufflehog'),
+      'external TruffleHog findings must be included in the final result, not dropped'
+    );
+    assert.ok(
+      result.findings.some((f) => f.tool === 'detect-secrets'),
+      'external detect-secrets findings must be included in the final result, not dropped'
+    );
   });
 });
-
-// Synchronous PATH-shim wrapper for non-async callers (isToolAvailable).
-function withShimPathSync(fn) {
-  const orig = process.env.PATH;
-  process.env.PATH = SHIM_DIR + path.delimiter + orig;
-  try {
-    return fn();
-  } finally {
-    process.env.PATH = orig;
-  }
-}
