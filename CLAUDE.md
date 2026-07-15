@@ -202,7 +202,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 339 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 345 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -212,7 +212,7 @@ All tests must show `# fail 0`. If any test fails, fix before committing.
 
 **Coverage floor — the shipped truth.** Step 14 VERIFY enforces the coverage floor
 recorded in `.ctoc/coverage-baseline.json`, which is **98** today (real src line
-coverage measured 98.42%, SCOPED to `src/**`). The gate scopes coverage with
+coverage measured 98.58%, SCOPED to `src/**`). The gate scopes coverage with
 `--test-coverage-include=src/**`; WITHOUT that scope node's `--experimental-test-coverage`
 reports a meaningless ~40% (the denominator is inflated by every file the 277-file test
 run transitively loads — that broken number, not real coverage, is why the old floor was
@@ -264,7 +264,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 25 categories
   skills/                426 skill files (100 Tier-2 specialist bodies + 326 reference)
-  tests/                 339 test files
+  tests/                 345 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
@@ -320,7 +320,7 @@ ctoc/
 
 **1 functional plan → N small implementation plans (SIP1).** Steps 5–7 decompose the functional plan into cohesive slices (~1–3 files, a module + its test kept together), each `parent_plan`-linked and `depends_on`-ordered, named `<parent-slug>-s<N>-<slice-name>.md`, each with its own Step 8–16. The `implementation-planner` typically emits many more implementation plans than functional plans. The parent implementation plan is an INDEX of its slices. Gates 2 & 3 batch per parent via `approveSubplans(parentSlug, fromStage)` in `src/lib/actions.js` — one human decision crosses every sibling (each stamped `approved_by: human`; loops the gate-safe `approvePlan`, no new auto-cross). `listSubplans(parentSlug)` enumerates a parent's set.
 
-**Step 14 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage at or above the enforced floor (`.ctoc/coverage-baseline.json` `minPct` — **98** today, measured 98.42% src line coverage scoped to `src/**`, a ratchet that may only rise), 0 skipped, 0 flaky. The gate runs via `npm test` (`src/scripts/test-gate.js`); `node --test tests/*.test.js` does NOT enforce coverage or zero-skipped. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in [IRON_LOOP.md](./docs/IRON_LOOP.md).
+**Step 14 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage at or above the enforced floor (`.ctoc/coverage-baseline.json` `minPct` — **98** today, measured 98.58% src line coverage scoped to `src/**`, a ratchet that may only rise), 0 skipped, 0 flaky. The gate runs via `npm test` (`src/scripts/test-gate.js`); `node --test tests/*.test.js` does NOT enforce coverage or zero-skipped. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in [IRON_LOOP.md](./docs/IRON_LOOP.md).
 
 **Circuit breaker**: Max 3 kickbacks to the same step, max 5 total kickbacks per plan. If exceeded, escalate to user with a summary of what keeps failing and why.
 
@@ -524,7 +524,7 @@ CTOC improves itself. When implementing features:
 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT**
 (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all
 tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json`
-`minPct`, **98** today (measured 98.42% src line coverage, scoped to `src/**`),
+`minPct`, **98** today (measured 98.58% src line coverage, scoped to `src/**`),
 ratchet-up only — 0 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
 `/ctoc:menu`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.
