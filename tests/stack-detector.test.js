@@ -13,7 +13,8 @@ const {
   detectLanguages,
   detectFrameworks,
   detectStack,
-  matchGlob
+  matchGlob,
+  readPackageDeps
 } = require('../src/lib/stack-detector');
 
 // Create temp directory for isolated tests
@@ -659,6 +660,218 @@ function testRequirementsTxtWithComments() {
 }
 
 // ============================================
+// F1 — Python deps beyond requirements.txt
+// (pyproject.toml PEP 621 + poetry, Pipfile)
+// ============================================
+
+function testPyprojectPep621Deps() {
+  setupTempDir();
+  // PEP 621 [project].dependencies as an array of PEP 508 requirement strings.
+  createTempFile('pyproject.toml',
+    '[project]\nname = "svc"\nversion = "0.1.0"\ndependencies = [\n  "fastapi",\n  "psycopg2-binary>=2.9",\n]\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.languages.includes('python'), 'Detects python from pyproject.toml');
+  assert.ok(stack.frameworks.includes('fastapi'), 'Legacy frameworks detects fastapi from pyproject dependencies');
+  assert.ok(stack.frameworkCapabilities.some(f => f.name === 'fastapi'),
+    'frameworkCapabilities includes fastapi from PEP 621 dependencies');
+  assert.ok(stack.databases.some(d => d.name === 'postgresql'),
+    'databases includes postgresql from psycopg2-binary in pyproject');
+
+  cleanupTempDir();
+  console.log('# F1 - pyproject.toml PEP 621 dependencies parsed');
+}
+
+function testPyprojectPoetryDeps() {
+  setupTempDir();
+  // Poetry table: [tool.poetry.dependencies] is name = version (python excluded).
+  createTempFile('pyproject.toml',
+    '[tool.poetry]\nname = "svc"\n\n[tool.poetry.dependencies]\npython = "^3.11"\ndjango = "^4.2"\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.languages.includes('python'), 'Detects python from pyproject.toml (poetry)');
+  assert.ok(stack.frameworks.includes('django'), 'Detects django from [tool.poetry.dependencies]');
+  assert.ok(stack.frameworkCapabilities.some(f => f.name === 'django'),
+    'frameworkCapabilities includes django from poetry table');
+
+  cleanupTempDir();
+  console.log('# F1 - pyproject.toml [tool.poetry.dependencies] parsed');
+}
+
+function testPipfileDeps() {
+  setupTempDir();
+  // Pipfile [packages] table.
+  createTempFile('Pipfile',
+    '[[source]]\nname = "pypi"\nurl = "https://pypi.org/simple"\n\n[packages]\nflask = "*"\n\n[dev-packages]\npytest = "*"\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.languages.includes('python'), 'Detects python from Pipfile');
+  assert.ok(stack.frameworks.includes('flask'), 'Detects flask from Pipfile [packages]');
+  assert.ok(stack.frameworkCapabilities.some(f => f.name === 'flask'),
+    'frameworkCapabilities includes flask from Pipfile');
+
+  cleanupTempDir();
+  console.log('# F1 - Pipfile [packages] parsed');
+}
+
+// ============================================
+// F2 — requirements.txt operator whitespace, extras, markers
+// ============================================
+
+function testRequirementsWhitespaceAroundOperator() {
+  setupTempDir();
+  createTempFile('requirements.txt', 'flask == 3.0\nfastapi>=0.1\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'flask detected despite whitespace around ==');
+  assert.ok(stack.frameworks.includes('fastapi'), 'fastapi still detected alongside');
+
+  cleanupTempDir();
+  console.log('# F2 - requirements.txt whitespace around operator');
+}
+
+function testRequirementsExtrasAndMarkers() {
+  setupTempDir();
+  createTempFile('requirements.txt',
+    'flask[async] >= 3.0\nfastapi ; python_version > "3.8"\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('flask'), 'flask detected with extras [async]');
+  assert.ok(stack.frameworks.includes('fastapi'), 'fastapi detected with environment marker');
+
+  cleanupTempDir();
+  console.log('# F2 - requirements.txt extras + environment markers');
+}
+
+// ============================================
+// F3 — PEP 503 normalized dep matching (case/separator insensitive)
+// ============================================
+
+function testPythonDepCanonicalSpellingNormalized() {
+  setupTempDir();
+  // Canonical PyPI spellings that the registry does NOT hand-dual-list.
+  createTempFile('requirements.txt', 'FastAPI==0.110\nPsycopg2-binary==2.9\n');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('fastapi'), 'FastAPI normalized to fastapi');
+  assert.ok(stack.frameworkCapabilities.some(f => f.name === 'fastapi'),
+    'frameworkCapabilities matches FastAPI via normalization');
+  assert.ok(stack.databases.some(d => d.name === 'postgresql'),
+    'Psycopg2-binary normalized to psycopg2-binary → postgresql');
+
+  cleanupTempDir();
+  console.log('# F3 - python dep names normalized (PEP 503)');
+}
+
+function testNodeDepCaseNormalized() {
+  setupTempDir();
+  // Non-canonical casing on a node dep still matches after normalization.
+  createTempFile('package.json', JSON.stringify({
+    name: 'test',
+    dependencies: { 'React': '^18.0.0' }
+  }));
+  createTempFile('tsconfig.json', '{}');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('react'), 'React (mixed case) normalized to react');
+
+  cleanupTempDir();
+  console.log('# F3 - node dep names normalized (lowercase)');
+}
+
+// ============================================
+// F4 — monorepo / workspace dependency detection
+// ============================================
+
+function testWorkspaceArrayFormDeps() {
+  setupTempDir();
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: ['packages/*']
+  }));
+  createTempFile('tsconfig.json', '{}');
+  createTempFile('packages/web/package.json', JSON.stringify({
+    name: 'web', dependencies: { next: '^15.0.0', react: '^18.0.0' }
+  }));
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('next.js'), 'next.js detected from workspace package');
+  assert.ok(stack.frameworks.includes('react'), 'react detected from workspace package');
+  assert.ok(stack.frameworkCapabilities.some(f => f.name === 'nextjs'),
+    'frameworkCapabilities includes nextjs from workspace');
+
+  cleanupTempDir();
+  console.log('# F4 - workspaces array form merges workspace deps');
+}
+
+function testWorkspaceObjectFormDeps() {
+  setupTempDir();
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: { packages: ['apps/*'] }
+  }));
+  createTempFile('apps/api/package.json', JSON.stringify({
+    name: 'api', dependencies: { express: '^4.18.0' }
+  }));
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('express'), 'express detected from workspaces object form');
+
+  cleanupTempDir();
+  console.log('# F4 - workspaces object form merges workspace deps');
+}
+
+// ============================================
+// F5 — null-prototype deps object (no prototype landmine)
+// ============================================
+
+function testNodeDepsNullPrototype() {
+  setupTempDir();
+  createTempFile('package.json', JSON.stringify({
+    name: 'test', dependencies: { express: '^4.18.0' }
+  }));
+
+  const deps = readPackageDeps(tempDir);
+  assert.strictEqual(Object.getPrototypeOf(deps), null, 'nodeDeps has null prototype');
+  assert.strictEqual(deps.toString, undefined, 'no inherited toString on deps');
+  assert.strictEqual(deps.constructor, undefined, 'no inherited constructor on deps');
+  assert.ok(deps.express, 'real dependency present');
+
+  cleanupTempDir();
+  console.log('# F5 - readPackageDeps returns null-prototype object');
+}
+
+// ============================================
+// F6 — peer / optional dependencies read
+// ============================================
+
+function testPeerDependenciesDetected() {
+  setupTempDir();
+  createTempFile('package.json', JSON.stringify({
+    name: 'test', peerDependencies: { react: '^18.0.0' }
+  }));
+  createTempFile('tsconfig.json', '{}');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('react'), 'react detected from peerDependencies');
+
+  cleanupTempDir();
+  console.log('# F6 - peerDependencies detected');
+}
+
+function testOptionalDependenciesDetected() {
+  setupTempDir();
+  createTempFile('package.json', JSON.stringify({
+    name: 'test', optionalDependencies: { vue: '^3.0.0' }
+  }));
+  createTempFile('tsconfig.json', '{}');
+
+  const stack = detectStack(tempDir);
+  assert.ok(stack.frameworks.includes('vue'), 'vue detected from optionalDependencies');
+
+  cleanupTempDir();
+  console.log('# F6 - optionalDependencies detected');
+}
+
+// ============================================
 // Run All Tests
 // ============================================
 
@@ -731,6 +944,36 @@ testMalformedPackageJson();
 testEmptyPackageJson();
 testPythonVersionSpecifiers();
 testRequirementsTxtWithComments();
+
+// F1 — python deps beyond requirements.txt
+console.log('\n## F1 - pyproject.toml / Pipfile python deps\n');
+testPyprojectPep621Deps();
+testPyprojectPoetryDeps();
+testPipfileDeps();
+
+// F2 — requirements.txt operator whitespace / extras / markers
+console.log('\n## F2 - requirements.txt parsing robustness\n');
+testRequirementsWhitespaceAroundOperator();
+testRequirementsExtrasAndMarkers();
+
+// F3 — normalized dep matching
+console.log('\n## F3 - PEP 503 normalized dep matching\n');
+testPythonDepCanonicalSpellingNormalized();
+testNodeDepCaseNormalized();
+
+// F4 — workspace / monorepo deps
+console.log('\n## F4 - monorepo workspace deps\n');
+testWorkspaceArrayFormDeps();
+testWorkspaceObjectFormDeps();
+
+// F5 — null-prototype deps object
+console.log('\n## F5 - null-prototype deps\n');
+testNodeDepsNullPrototype();
+
+// F6 — peer / optional dependencies
+console.log('\n## F6 - peer / optional dependencies\n');
+testPeerDependenciesDetected();
+testOptionalDependenciesDetected();
 
 console.log('\n' + '='.repeat(50));
 console.log('All stack-detector tests passed!\n');

@@ -401,18 +401,22 @@ test('F1: a Liquibase YAML changelog with `- dropTable:` yields one HIGH', async
   }
 });
 
-test('F1: an EF Core C# migration with migrationBuilder.DropTable("Users") yields one HIGH', async () => {
+test('F1: an EF Core C# migration with migrationBuilder.DropTable("Users") in Up() yields one HIGH', async () => {
   const dir = mkTemp();
   try {
+    // REWORK note (DB-w4 F1): the prior fixture put DropTable inside Down() and asserted
+    // a finding — that ENCODED the bug this rework fixes. A DropTable in Down() is a
+    // ROLLBACK definition (EF-scaffolded revert) and must NOT flag. The genuine
+    // destructive case is a drop in the APPLY direction: DropTable inside Up().
     writeFile(dir, path.join('src', 'Migrations', '20240101_Init.cs'),
-      'public partial class Init : Migration {\n  protected override void Down(MigrationBuilder migrationBuilder) {\n    migrationBuilder.DropTable("Users");\n  }\n}\n');
+      'public partial class Init : Migration {\n  protected override void Up(MigrationBuilder migrationBuilder) {\n    migrationBuilder.DropTable("Users");\n  }\n}\n');
 
     const checker = new MigrationSafetyChecker(dir);
     const res = await checker.run();
 
     assert.equal(res.scanned, true, 'the EF Migrations dir was discovered and scanned');
     const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
-    assert.equal(high.length, 1, 'the EF DropTable call is a HIGH finding');
+    assert.equal(high.length, 1, 'the EF DropTable call in Up() is a HIGH finding');
     assert.match(high[0].file, /20240101_Init\.cs$/, 'finding names the .cs migration');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -570,6 +574,515 @@ test('F4: extending the DROP family does not break ALTER TABLE t DROP COLUMN c (
 
     assert.equal(res.scanned, true);
     assert.equal(res.findings.length, 1, 'ALTER..DROP COLUMN still fires exactly once');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── DB-w4 REWORK (the 8 confirmed defects the .xml/.yaml/.cs pass introduced) ───
+// The prior wave added format scanning but was blunt regex-per-line: it flagged
+// EVERY additive EF migration (Down() rollback), flagged Liquibase <rollback>
+// blocks, missed attributed/multiline <sql> DROP, under-reached embedded execute,
+// flagged XML comments, missed the wider DROP family in the new formats, missed
+// dash-on-own-line YAML keys, and truncated C# lines at a `//` inside a string.
+// Every fixture below is a real temp-dir file; zero mocks. Rollback/direction-aware.
+
+// FINDING 1 — EF direction-awareness: a drop in Down() is a rollback, not a risk.
+test('DB-w4 F1: an additive EF migration (Up CreateTable / Down DropTable) yields ZERO findings', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240201_Add.cs'),
+      'public partial class Add : Migration {\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.CreateTable("Users", columns: t => new { Id = t.Column<int>() });\n' +
+      '  }\n' +
+      '  protected override void Down(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.DropTable("Users");\n' +
+      '  }\n' +
+      '}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the additive EF migration was scanned');
+    assert.equal(res.findings.length, 0, 'a DropTable inside Down() is a rollback, not a data-loss risk');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F1: a destructive EF migration (Up DropTable) yields one HIGH', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240202_Drop.cs'),
+      'public partial class Drop : Migration {\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.DropTable("Users");\n' +
+      '  }\n' +
+      '  protected override void Down(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.CreateTable("Users", columns: t => new { Id = t.Column<int>() });\n' +
+      '  }\n' +
+      '}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'a DropTable in the Up() apply direction is a HIGH finding');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F1: an EF migration that drops in Up() and adds back in Down() flags exactly the Up() drop', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240203_Both.cs'),
+      'public partial class Both : Migration {\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.DropColumn("Email", "Users");\n' +
+      '  }\n' +
+      '  protected override void Down(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.AddColumn<string>("Email", "Users");\n' +
+      '  }\n' +
+      '}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'only the Up() DropColumn fires; the Down() body is excluded');
+    assert.match(high[0].statement, /DropColumn/, 'the flagged line is the Up() drop');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FINDING 2 — Liquibase rollback blocks (XML + YAML) are recommended practice.
+test('DB-w4 F2: a Liquibase XML createTable with a <rollback><dropTable/></rollback> yields ZERO findings', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '020.xml'),
+      '<databaseChangeLog>\n' +
+      '  <changeSet id="1" author="a">\n' +
+      '    <createTable tableName="users"/>\n' +
+      '    <rollback>\n' +
+      '      <dropTable tableName="users"/>\n' +
+      '    </rollback>\n' +
+      '  </changeSet>\n' +
+      '</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the .xml changelog was scanned');
+    assert.equal(res.findings.length, 0, 'a dropTable inside <rollback> is a rollback definition, not a risk');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F2: a Liquibase YAML createTable with a rollback dropTable yields ZERO findings', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '021.yaml'),
+      'databaseChangeLog:\n' +
+      '  - changeSet:\n' +
+      '      changes:\n' +
+      '        - createTable:\n' +
+      '            tableName: users\n' +
+      '      rollback:\n' +
+      '        - dropTable:\n' +
+      '            tableName: users\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the .yaml changelog was scanned');
+    assert.equal(res.findings.length, 0, 'a dropTable inside a rollback: sub-block is not a risk');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F2: a bare <dropTable> NOT inside a rollback still fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '022.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><dropTable tableName="users"/></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a dropTable outside any rollback is a real destructive apply');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FINDING 3 — attributed / multi-line <sql> DROP/TRUNCATE must be extracted.
+test('DB-w4 F3: an attributed <sql dbms="postgresql">DROP TABLE ...</sql> fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '030.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a">\n    <sql dbms="postgresql">DROP TABLE users;</sql>\n  </changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the DROP inside an attributed <sql> element is extracted and flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F3: a multi-line <sql> with DROP on its own line fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '031.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a">\n    <sql>\n      DROP TABLE users;\n    </sql>\n  </changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the DROP on its own line inside <sql> is extracted and flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F3: <sql splitStatements="true">TRUNCATE orders;</sql> fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '032.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a">\n    <sql splitStatements="true">TRUNCATE orders;</sql>\n  </changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the TRUNCATE inside an attributed <sql> element is flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F3: a benign <sql>SELECT ...</sql> yields ZERO findings', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '033.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a">\n    <sql>SELECT * FROM t;</sql>\n  </changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a non-destructive SELECT inside <sql> is not flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FINDING 4 — broaden the embedded-execute anchor (Rails no-paren, Alembic text()).
+test('DB-w4 F4: a Rails no-paren `execute "DROP TABLE ..."` fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'migrate', '20240301_drop.rb'),
+      "class DropLegacy < ActiveRecord::Migration[7.1]\n  def up\n    execute \"DROP TABLE legacy\"\n  end\nend\n");
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a no-paren Rails execute of a DROP is caught');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F4: an Alembic `op.execute(text("DROP TABLE ..."))` fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('alembic', 'versions', 'a1_drop.py'),
+      'def upgrade():\n    op.execute(text("DROP TABLE legacy"))\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'an execute wrapping a text() DROP is caught');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F4: the plain `op.execute("DROP TABLE x")` control still fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('alembic', 'versions', 'a2_drop.py'),
+      'def upgrade():\n    op.execute("DROP TABLE x")\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the control op.execute DROP still fires');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F4: a benign INSERT whose VALUE begins with a keyword (no execute) stays ZERO', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '040_help.sql'),
+      "INSERT INTO help VALUES ('DROP TABLE removes a table');\n");
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a benign string value is not executable DDL');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FINDING 5 — XML comments must be stripped before scanning.
+test('DB-w4 F5: a <!-- ... <dropTable/> ... --> XML comment yields ZERO findings', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '050.xml'),
+      '<databaseChangeLog>\n  <!-- disabled for now:\n    <dropTable tableName="users"/>\n  -->\n  <changeSet id="1" author="a"><createTable tableName="users"/></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a commented-out <dropTable> is not live');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F5: a real <dropTable> on a live line (with a comment elsewhere) still fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '051.xml'),
+      '<databaseChangeLog>\n  <!-- historical note -->\n  <changeSet id="1" author="a"><dropTable tableName="users"/></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a live <dropTable> outside comments still fires');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FINDING 6 — the wider DROP family must reach the new formats too.
+test('DB-w4 F6: a Liquibase XML <dropIndex> fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '060.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><dropIndex indexName="idx_email" tableName="users"/></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a Liquibase <dropIndex> is destructive and flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F6: a Liquibase YAML `- dropView:` fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '061.yaml'),
+      'databaseChangeLog:\n  - changeSet:\n      changes:\n        - dropView:\n            viewName: active_users\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a Liquibase yaml dropView is destructive and flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F6: an EF `.DropIndex(` in Up() fires; the same in Down() does not', async () => {
+  const dirUp = mkTemp();
+  try {
+    writeFile(dirUp, path.join('src', 'Migrations', '20240601_UpIdx.cs'),
+      'public partial class UpIdx : Migration {\n  protected override void Up(MigrationBuilder migrationBuilder) {\n    migrationBuilder.DropIndex("IX_Users_Email", "Users");\n  }\n}\n');
+    const resUp = await new MigrationSafetyChecker(dirUp).run();
+    assert.equal(resUp.findings.length, 1, 'DropIndex in Up() is a HIGH finding');
+  } finally {
+    fs.rmSync(dirUp, { recursive: true, force: true });
+  }
+
+  const dirDown = mkTemp();
+  try {
+    writeFile(dirDown, path.join('src', 'Migrations', '20240602_DownIdx.cs'),
+      'public partial class DownIdx : Migration {\n  protected override void Up(MigrationBuilder migrationBuilder) {\n    migrationBuilder.CreateIndex("IX_Users_Email", "Users", "Email");\n  }\n  protected override void Down(MigrationBuilder migrationBuilder) {\n    migrationBuilder.DropIndex("IX_Users_Email", "Users");\n  }\n}\n');
+    const resDown = await new MigrationSafetyChecker(dirDown).run();
+    assert.equal(resDown.findings.length, 0, 'DropIndex in Down() is a rollback, not flagged');
+  } finally {
+    fs.rmSync(dirDown, { recursive: true, force: true });
+  }
+});
+
+// FINDING 7 — YAML sequence dash on its own line above the key.
+test('DB-w4 F7: a YAML dropTable with the `-` dash on the preceding line fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '070.yaml'),
+      'databaseChangeLog:\n  - changeSet:\n      changes:\n        -\n          dropTable:\n            tableName: users\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a dash-own-line dropTable key still fires');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FINDING 8 — string-literal-aware `//` stripping for C#.
+test('DB-w4 F8: a C# line with a `//` inside a string plus a real DropTable fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240801_Url.cs'),
+      'public partial class Url : Migration {\n  protected override void Up(MigrationBuilder migrationBuilder) {\n    migrationBuilder.Sql("url=\'http://x\'"); migrationBuilder.DropTable("Users");\n  }\n}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the // inside a string does not hide the trailing DropTable');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 F8: a genuine `// migrationBuilder.DropTable("x")` comment yields ZERO findings', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240802_Comment.cs'),
+      'public partial class Comment : Migration {\n  protected override void Up(MigrationBuilder migrationBuilder) {\n    // migrationBuilder.DropTable("x")\n    migrationBuilder.AddColumn<string>("Email", "Users");\n  }\n}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a genuinely commented DropTable is not flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── DB-w4 KICKBACK: two partial fixes completed ────────────────────────────────
+// GAP 1: F2 YAML rollback with the list dash ALIGNED to the `rollback:` key (the
+// standard Liquibase style) was not stripped. GAP 2: F3 single-line attributed
+// `<sql dbms="...">DROP ...</sql>` preceded by markup on the same physical line was
+// not statement-anchored, so the dominant Liquibase raw-SQL form shipped GREEN.
+
+test('DB-w4 GAP1: a YAML rollback whose `- dropTable:` is DASH-ALIGNED to `rollback:` yields ZERO', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '080.yaml'),
+      'databaseChangeLog:\n' +
+      '- changeSet:\n' +
+      '    changes:\n' +
+      '    - createTable:\n' +
+      '        tableName: u\n' +
+      '    rollback:\n' +
+      '    - dropTable:\n' +
+      '        tableName: u\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the .yaml changelog was scanned');
+    assert.equal(res.findings.length, 0, 'a dash-aligned rollback dropTable is a rollback definition, not a risk');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 GAP1: a bare dash-aligned `- dropTable:` NOT under a rollback still fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '081.yaml'),
+      'databaseChangeLog:\n' +
+      '- changeSet:\n' +
+      '    changes:\n' +
+      '    - dropTable:\n' +
+      '        tableName: u\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a dropTable outside any rollback is a real destructive apply');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 GAP2: a single-line `<changeSet><sql dbms="postgresql">DROP TABLE ...</sql></changeSet>` fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '082.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><sql dbms="postgresql">DROP TABLE users;</sql></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the DROP inside an inline attributed <sql> is extracted and flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 GAP2: a single-line inline `<sql splitStatements="true">TRUNCATE ...</sql>` after markup fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '083.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><sql splitStatements="true">TRUNCATE orders;</sql></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'the TRUNCATE inside an inline attributed <sql> is flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w4 GAP2: a single-line inline benign `<sql>SELECT ...</sql>` after markup stays ZERO', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '084.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><sql>SELECT * FROM t;</sql></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a benign inline SELECT is not flagged');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

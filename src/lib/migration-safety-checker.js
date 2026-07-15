@@ -33,6 +33,46 @@
  * - DB-w3 fix F1 adds `.yml` alongside the specified `.yaml` because Liquibase YAML
  *   changelogs use both extensions interchangeably; parsing one and silently
  *   dropping the other would reintroduce the very false-negative F1 closes.
+ *
+ * DB-w4 REWORK — the format-scanning pass added by DB-w3 was regex-per-line and too
+ * blunt; it produced eight confirmed defects (false positives that blocked ordinary
+ * additive migrations, and false negatives that let destructive DDL ship GREEN). The
+ * rework makes the scanner ROLLBACK- and DIRECTION-aware and handles
+ * attributes/multiline/comments. Decisions and residual limitations:
+ * - F1 EF direction: a destructive call inside a `Down(MigrationBuilder …)` body is a
+ *   ROLLBACK definition and is EXCLUDED; a drop in `Up()` (or outside any Down) is the
+ *   apply and fires. The Down body is found by a bounded, string-aware brace-depth
+ *   scan (efDownBodyLines). RESIDUAL: an unbalanced/pathological `Down` body is treated
+ *   as running to end-of-file (over-excludes) — a deliberate bias, because Finding 1
+ *   (additive migrations must pass) is non-negotiable and EF scaffolds Up() before
+ *   Down(), so the dominant additive case is unaffected. A migration that places a
+ *   real destructive Up() AFTER an unbalanced Down() could be missed — accepted, rare.
+ * - F2 rollback: Liquibase `<rollback>…</rollback>` (XML) and indentation-scoped
+ *   `rollback:` (YAML) blocks are stripped before scanning; a hand-written rollback
+ *   that drops the just-created object is recommended practice, not a data-loss apply.
+ * - F3 `<sql>`: the element's TEXT is scanned by blanking the open/close tags and
+ *   running the statement-anchored SQL patterns on the inner content. The open tag is
+ *   blanked with a trailing `;` injected (blankOpenSqlTag), so an inline
+ *   `<changeSet><sql dbms="…">DROP TABLE x;</sql></changeSet>` on ONE physical line —
+ *   the dominant Liquibase raw-SQL form, `dbms` attribute and all — is statement-
+ *   anchored and flagged (DB-w4 kickback GAP 2). The multi-line `<sql>` form remains
+ *   caught by the `^\s*` branch of the anchor.
+ * - F4 execute: the embedded-execute anchor now matches paren-less Ruby `execute "…"`
+ *   and a single wrapping `text(`/`sa.text(` call — still executability-anchored, so a
+ *   benign string value beginning with a keyword (no `execute`) never fires.
+ * - F5 XML comments are stripped (`<!-- … -->`, multi-line) before scanning.
+ * - F6 the wider DROP family reaches the new formats: XML `<dropIndex>`/`<dropView>`,
+ *   YAML `dropIndex:`/`dropView:`, EF `.DropIndex(`. Only genuinely destructive ops are
+ *   added. NOTE: Liquibase has no `dropSequence`/`dropType` changetype (those are
+ *   expressed as raw `<sql>`, already covered by F3); EF exposes further drops
+ *   (`DropForeignKey`, `DropPrimaryKey`, `DropSchema`, `DropSequence`) not added here —
+ *   a conscious scope line matching the family the module advertises.
+ * - F7 YAML: the `-` sequence dash may sit on its own line above the `dropTable:` key.
+ * - F8 C#: the `//` line-comment strip is string-literal-aware so a `//` inside a
+ *   quoted value (e.g. a URL) no longer truncates the line and hides a real drop.
+ *   RESIDUAL: full C# lexing (verbatim `@"…"` escape rules, interpolation) is not
+ *   implemented; the scanner treats any `//` inside a `"…"`/`'…'` span as non-comment,
+ *   which is correct for the DDL-detection goal.
  */
 
 'use strict';
@@ -167,18 +207,23 @@ const UNPARSED_MIGRATION_EXTS = new Set([
 const STMT_ANCHOR = '(?:^|;)\\s*';
 
 /**
- * Embedded-executable-DDL anchor (DB-w3 fix F3). A destructive keyword ALSO counts
- * when it is the first token of a SQL string passed to a host-language execute call
- * — `op.execute("DROP TABLE x")`, `connection.execute('TRUNCATE t')`,
- * `execute("…")`. The anchor is the execute call + opening paren + opening quote +
- * optional whitespace; the destructive keyword must be the FIRST token of the
- * string, so a benign value like `'DROP TABLE permanently removes …'` passed to an
- * INSERT (no execute call) never matches. Every metacharacter is a single linear
- * quantifier — ReDoS-safe. `\bexecute` covers `op.execute`, `connection.execute`,
- * and bare `execute`.
+ * Embedded-executable-DDL anchor (DB-w4 fix F4, broadening DB-w3 F3). A destructive
+ * keyword ALSO counts when it is the first token of a SQL string passed to a
+ * host-language execute call. The prior anchor `\bexecute\s*\(\s*["']` REQUIRED a
+ * paren immediately after `execute` and no wrapping call, so it MISSED two common
+ * forms:
+ *   - Rails no-paren:  `execute "DROP TABLE legacy"`  (a Ruby method call sans parens)
+ *   - Alembic text():  `op.execute(text("DROP TABLE legacy"))`  (SQLAlchemy `sa.text(`)
+ * The broadened anchor is: the `execute` word, an OPTIONAL open paren, an OPTIONAL
+ * single wrapping `…text(` call (`text(` / `sa.text(` / any `[A-Za-z_.]*text(`), then
+ * the opening quote. The destructive keyword must still be the FIRST token of the
+ * string, so a benign `INSERT … VALUES ('DROP TABLE removes a table')` (no `execute`
+ * word) never matches — executability, not string position. Every metacharacter is a
+ * single linear quantifier and the wrapping group appears at most once — ReDoS-safe.
+ * `\bexecute\b` covers `op.execute`, `connection.execute`, and bare `execute`.
  * @type {string}
  */
-const EXEC_ANCHOR = '\\bexecute\\s*\\(\\s*["\']\\s*';
+const EXEC_ANCHOR = '\\bexecute\\b\\s*\\(?\\s*(?:[A-Za-z_.]*text\\s*\\(\\s*)?["\']\\s*';
 
 /**
  * The DROP family this checker advertises (DB-w3 fix F4). ONE alternation covering
@@ -214,43 +259,81 @@ const DESTRUCTIVE_PATTERNS = [
 ];
 
 /**
- * Liquibase XML changelog destructive patterns (DB-w3 fix F1, `.xml`). Element
- * forms carry no SQL keyword the SQL scanner would see. `<sql>` wraps raw SQL, so a
- * DROP/TRUNCATE inside it is flagged too. `[^<]*` is a single linear quantifier
- * (bounded by the next `<`) — ReDoS-safe.
+ * Liquibase XML changelog ELEMENT destructive patterns (DB-w3 fix F1, extended by
+ * DB-w4 fix F6, `.xml`). Element forms carry no SQL keyword the SQL scanner would
+ * see, so each `<drop…>` element is matched directly. These are position-agnostic
+ * (`<dropTable\b` may appear anywhere on a line) — safe, because a `<rollback>` block
+ * and every `<!-- … -->` comment are STRIPPED from the content BEFORE scanning
+ * (DB-w4 F2 + F5), so a drop element only survives here when it is a live APPLY.
+ *
+ * DB-w4 F6 adds `<dropIndex>` and `<dropView>` to the family the module advertises
+ * (alongside the existing `<dropTable>`, `<dropColumn>`, `<dropAllForeignKeyConstraints>`).
+ * The old `<sql>[^<]*(DROP|TRUNCATE)` element pattern is REMOVED: it required a bare
+ * `<sql>` on the same physical line as the keyword and so missed attributed/multiline
+ * `<sql>` blocks (DB-w4 F3). Raw SQL inside `<sql>` is now handled by extracting the
+ * element's text content and running the statement-anchored SQL patterns against it
+ * (see unwrapSqlElements + XML_PATTERNS). `\b` closes each keyword — ReDoS-trivial.
  * @type {Array<{rule: string, re: RegExp}>}
  */
 const LIQUIBASE_XML_PATTERNS = [
   { rule: 'Liquibase <dropTable>',                      re: safeRegExp('<dropTable\\b', 'i') },
   { rule: 'Liquibase <dropColumn>',                     re: safeRegExp('<dropColumn\\b', 'i') },
-  { rule: 'Liquibase <dropAllForeignKeyConstraints>',  re: safeRegExp('<dropAllForeignKeyConstraints\\b', 'i') },
-  { rule: 'Liquibase <sql> DROP/TRUNCATE',             re: safeRegExp('<sql>[^<]*\\b(?:DROP|TRUNCATE)\\b', 'i') }
+  { rule: 'Liquibase <dropIndex>',                      re: safeRegExp('<dropIndex\\b', 'i') },
+  { rule: 'Liquibase <dropView>',                       re: safeRegExp('<dropView\\b', 'i') },
+  { rule: 'Liquibase <dropAllForeignKeyConstraints>',  re: safeRegExp('<dropAllForeignKeyConstraints\\b', 'i') }
 ];
 
 /**
- * Liquibase YAML changelog destructive patterns (DB-w3 fix F1, `.yaml`/`.yml`).
- * `- dropTable:` / `- dropColumn:` sequence-item element forms. `\s*` linear
- * quantifiers only — ReDoS-safe.
+ * Liquibase YAML changelog destructive patterns (DB-w3 fix F1, extended by DB-w4
+ * F6 + F7, `.yaml`/`.yml`). Each is the changeset key form (`dropTable:`).
+ *
+ * DB-w4 F7: the old `-\s*dropTable\s*:` required the sequence dash and the key on
+ * one physical line, so a block-style entry with the `-` on its OWN line above the
+ * key was missed. The anchor is now `^\s*(?:-\s*)?dropTable\s*:` — the key at the
+ * start of a line, with the dash OPTIONAL (it may sit on the preceding line). Every
+ * `rollback:` sub-block is stripped BEFORE scanning (DB-w4 F2), so a key that
+ * survives here is a live APPLY. DB-w4 F6 adds `dropIndex:` and `dropView:`.
+ * `^` + single `\s*` quantifiers only — ReDoS-safe.
  * @type {Array<{rule: string, re: RegExp}>}
  */
 const LIQUIBASE_YAML_PATTERNS = [
-  { rule: 'Liquibase yaml dropTable',  re: safeRegExp('-\\s*dropTable\\s*:', 'i') },
-  { rule: 'Liquibase yaml dropColumn', re: safeRegExp('-\\s*dropColumn\\s*:', 'i') }
+  { rule: 'Liquibase yaml dropTable',  re: safeRegExp('^\\s*(?:-\\s*)?dropTable\\s*:', 'i') },
+  { rule: 'Liquibase yaml dropColumn', re: safeRegExp('^\\s*(?:-\\s*)?dropColumn\\s*:', 'i') },
+  { rule: 'Liquibase yaml dropIndex',  re: safeRegExp('^\\s*(?:-\\s*)?dropIndex\\s*:', 'i') },
+  { rule: 'Liquibase yaml dropView',   re: safeRegExp('^\\s*(?:-\\s*)?dropView\\s*:', 'i') }
 ];
 
 /**
  * .NET Entity Framework Core C# migration destructive patterns (DB-w3 fix F1,
- * `.cs`). Fluent `migrationBuilder.DropTable(...)` / `.DropColumn(...)` calls, and
- * a raw `.Sql("…")` whose SQL string STARTS with a DROP/TRUNCATE (same
- * executability anchor idea as EXEC_ANCHOR — a mention mid-string is not flagged).
- * `\s*` linear quantifiers only — ReDoS-safe.
+ * extended by DB-w4 fix F6, `.cs`). Fluent `migrationBuilder.DropTable(...)` /
+ * `.DropColumn(...)` / `.DropIndex(...)` calls, and a raw `.Sql("…")` whose SQL
+ * string STARTS with a DROP/TRUNCATE (same executability anchor idea as EXEC_ANCHOR
+ * — a mention mid-string is not flagged).
+ *
+ * These are matched ONLY against lines OUTSIDE the migration's `Down(MigrationBuilder)`
+ * body (DB-w4 F1 direction-awareness): a drop inside `Down()` is the EF-scaffolded
+ * ROLLBACK definition of an additive migration, not a data-loss apply. The exclusion
+ * is computed by efDownBodyLines() and applied in scanDestructive(). `\s*` linear
+ * quantifiers only — ReDoS-safe.
  * @type {Array<{rule: string, re: RegExp}>}
  */
 const EF_CS_PATTERNS = [
   { rule: 'EF migrationBuilder.DropTable',  re: safeRegExp('\\.DropTable\\s*\\(', 'i') },
   { rule: 'EF migrationBuilder.DropColumn', re: safeRegExp('\\.DropColumn\\s*\\(', 'i') },
+  { rule: 'EF migrationBuilder.DropIndex',  re: safeRegExp('\\.DropIndex\\s*\\(', 'i') },
   { rule: 'EF migrationBuilder.Sql(DROP/TRUNCATE)', re: safeRegExp('\\.Sql\\s*\\(\\s*["\']\\s*(?:' + DROP_BODY + '|' + TRUNCATE_BODY + ')', 'i') }
 ];
+
+/**
+ * The pattern set used for `.xml` Liquibase changelogs (DB-w4 fix F3 + F6). The
+ * ELEMENT patterns catch `<drop…>` element forms; the SQL DESTRUCTIVE_PATTERNS catch
+ * raw SQL that was extracted from `<sql>…</sql>` bodies by unwrapSqlElements() (the
+ * open/close tags are blanked, leaving the inner SQL statement-anchored on its line).
+ * The EXEC patterns in DESTRUCTIVE_PATTERNS never fire on XML (no `execute` word) —
+ * harmless to include. First match per line wins.
+ * @type {Array<{rule: string, re: RegExp}>}
+ */
+const XML_PATTERNS = [...LIQUIBASE_XML_PATTERNS, ...DESTRUCTIVE_PATTERNS];
 
 /**
  * Select the destructive-pattern set for a file extension (DB-w3 fix F1). SQL-family
@@ -261,7 +344,7 @@ const EF_CS_PATTERNS = [
  * @returns {Array<{rule: string, re: RegExp}>}
  */
 function patternsForExt(ext) {
-  if (ext === '.xml') return LIQUIBASE_XML_PATTERNS;
+  if (ext === '.xml') return XML_PATTERNS;
   if (ext === '.yaml' || ext === '.yml') return LIQUIBASE_YAML_PATTERNS;
   if (ext === '.cs') return EF_CS_PATTERNS;
   return DESTRUCTIVE_PATTERNS; // .sql, .rb, .py
@@ -279,6 +362,58 @@ function patternsForExt(ext) {
  * @type {RegExp}
  */
 const BLOCK_COMMENT_RE = safeRegExp('/\\*[\\s\\S]*?\\*/', 'g');
+
+/**
+ * Every non-newline character, used to blank a stripped span while PRESERVING line
+ * count (so a finding's reported line still points at real source). CONSTANT via
+ * safeRegExp; `[^\n]` is a single-character class — ReDoS-trivial.
+ * @type {RegExp}
+ */
+const NON_NEWLINE_RE = safeRegExp('[^\\n]', 'g');
+
+/**
+ * XML comment span (DB-w4 fix F5). `<!-- … -->`, multi-line. `[\s\S]*?` is a single
+ * LAZY quantifier (non-overlapping) — no catastrophic backtracking (ReDoS-safe).
+ * @type {RegExp}
+ */
+const XML_COMMENT_RE = safeRegExp('<!--[\\s\\S]*?-->', 'g');
+
+/**
+ * Liquibase `<rollback>…</rollback>` span (DB-w4 fix F2). Attribute-tolerant open
+ * tag, multi-line body. A hand-written rollback that DROPs the just-created object is
+ * recommended practice, not a data-loss apply — its content is removed before
+ * scanning. `[\s\S]*?` is a single LAZY quantifier — ReDoS-safe.
+ * @type {RegExp}
+ */
+const XML_ROLLBACK_RE = safeRegExp('<rollback\\b[\\s\\S]*?</rollback\\s*>', 'gi');
+
+/**
+ * Liquibase `<sql …>` open tag (attribute-tolerant) and `</sql>` close tag (DB-w4
+ * fix F3). Blanking ONLY the tags (not the inner text) leaves the raw SQL in place,
+ * statement-anchored on its own line, so the SQL DESTRUCTIVE_PATTERNS catch an
+ * attributed or multi-line `<sql>` DROP/TRUNCATE. `[^>]*` / `\s*` are single linear
+ * quantifiers — ReDoS-safe.
+ * @type {RegExp}
+ */
+const SQL_OPEN_TAG_RE = safeRegExp('<sql\\b[^>]*>', 'gi');
+const SQL_CLOSE_TAG_RE = safeRegExp('</sql\\s*>', 'gi');
+
+/**
+ * EF Core `Down(MigrationBuilder …)` method signature (DB-w4 fix F1). The `g` flag
+ * lets efDownBodyLines() advance past each Down body. Requiring the `MigrationBuilder`
+ * parameter type keeps this from matching an unrelated method named `Down`. Single
+ * `\s*` quantifiers — ReDoS-safe.
+ * @type {RegExp}
+ */
+const DOWN_SIG_RE = safeRegExp('\\bDown\\s*\\(\\s*MigrationBuilder\\b', 'gi');
+
+/**
+ * Liquibase YAML `rollback:` key (DB-w4 fix F2), optionally led by a sequence dash.
+ * Introduces an indentation-scoped sub-block that stripYamlRollback() removes. `^` +
+ * single `\s*` quantifiers — ReDoS-safe.
+ * @type {RegExp}
+ */
+const ROLLBACK_KEY_RE = safeRegExp('^\\s*(?:-\\s*)?rollback\\s*:', 'i');
 
 /** Bounds so a pathological repo can never exhaust memory or time. */
 const DEFAULT_MAX_FILES = 2000;
@@ -308,10 +443,11 @@ function stripLineComment(line, ext) {
     return h === -1 ? line : line.slice(0, h);
   }
   // C# uses `//` line comments; a commented-out `// migrationBuilder.DropTable(...)`
-  // must not be flagged.
+  // must not be flagged. DB-w4 fix F8: the strip is STRING-LITERAL-AWARE — a `//`
+  // INSIDE a `"…"`/`'…'` literal (e.g. `Sql("url='http://x'")`) is NOT a comment, so
+  // it must not truncate the line and hide a real `.DropTable(...)` after it.
   if (ext === '.cs') {
-    const s = line.indexOf('//');
-    return s === -1 ? line : line.slice(0, s);
+    return stripCsLineComment(line);
   }
   // XML uses `<!-- -->`; do NOT strip on a bare `--` (it appears inside `<!--` and
   // legitimately inside attribute values), so leave XML lines intact — the crude
@@ -332,7 +468,229 @@ function stripLineComment(line, ext) {
  * @returns {string}
  */
 function stripBlockComments(content) {
-  return content.replace(BLOCK_COMMENT_RE, (m) => m.replace(/[^\n]/g, ' '));
+  return content.replace(BLOCK_COMMENT_RE, blankKeepNewlines);
+}
+
+/**
+ * Replace every non-newline character of a matched span with a space, KEEPING
+ * newlines — so blanking a multi-line comment/rollback/tag span preserves the total
+ * line count and a finding's reported line still points at real source.
+ * @param {string} span
+ * @returns {string}
+ */
+function blankKeepNewlines(span) {
+  return span.replace(NON_NEWLINE_RE, ' ');
+}
+
+/**
+ * String-literal-aware C# `//` line-comment strip (DB-w4 fix F8). Scans the line and
+ * returns the code portion before the first `//` that is NOT inside a `"…"`/`'…'`
+ * string literal. A backslash escapes the next character inside a literal. Verbatim
+ * (`@"…"`) and interpolated strings are handled well enough for the DDL-detection
+ * goal (a `//` inside any quoted span is never treated as a comment); full C# lexing
+ * is out of scope and documented.
+ * @param {string} line
+ * @returns {string}
+ */
+function stripCsLineComment(line) {
+  let inStr = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inStr) {
+      if (c === '\\') { i++; continue; }
+      if (c === inStr) inStr = null;
+      continue;
+    }
+    if (c === '"' || c === '\'') { inStr = c; continue; }
+    if (c === '/' && line[i + 1] === '/') return line.slice(0, i);
+  }
+  return line;
+}
+
+/**
+ * Strip XML `<!-- … -->` comments (DB-w4 fix F5) before scanning, blanking the span
+ * but keeping newlines. A commented-out `<dropTable/>` is never a live apply.
+ * @param {string} content
+ * @returns {string}
+ */
+function stripXmlComments(content) {
+  return content.replace(XML_COMMENT_RE, blankKeepNewlines);
+}
+
+/**
+ * Strip Liquibase `<rollback>…</rollback>` spans (DB-w4 fix F2) before scanning. A
+ * drop inside a rollback is a rollback definition (recommended practice), not a
+ * data-loss apply. Fail-soft: on a pathological input the replace simply matches
+ * nothing and the content is returned unchanged (never throws).
+ * @param {string} content
+ * @returns {string}
+ */
+function stripXmlRollback(content) {
+  return content.replace(XML_ROLLBACK_RE, blankKeepNewlines);
+}
+
+/**
+ * Blank the `<sql …>` / `</sql>` TAGS (DB-w4 fix F3, completed under the DB-w4
+ * kickback GAP 2) but leave the inner SQL text in place, so an attributed or
+ * multi-line `<sql>` DROP/TRUNCATE becomes a statement-anchored SQL line the SQL
+ * DESTRUCTIVE_PATTERNS catch. Line count is preserved.
+ *
+ * The open tag is blanked to spaces with its LAST non-newline character replaced by a
+ * `;` (blankOpenSqlTag). That injected statement separator makes the SQL that
+ * immediately follows match STMT_ANCHOR's `(?:^|;)` even when the whole element sits
+ * on ONE physical line AFTER other markup — the dominant Liquibase raw-SQL form,
+ * e.g. `<changeSet><sql dbms="postgresql">DROP TABLE users;</sql></changeSet>`, where
+ * the line does NOT start with whitespace before the DROP. When the open tag ends the
+ * line (multi-line `<sql>` form) the `;` is harmless and the DROP on the next line is
+ * still caught by the `^\s*` branch of the anchor. A `<sql>` whose content is
+ * non-destructive (e.g. `SELECT …`) leaves a harmless line that matches nothing.
+ * @param {string} content
+ * @returns {string}
+ */
+function unwrapSqlElements(content) {
+  return content
+    .replace(SQL_OPEN_TAG_RE, blankOpenSqlTag)
+    .replace(SQL_CLOSE_TAG_RE, blankKeepNewlines);
+}
+
+/**
+ * Blank a `<sql …>` opening tag to spaces (preserving line count) but end it with a
+ * `;` statement separator when the tag ends on a content-bearing line, so the SQL
+ * that follows on the SAME physical line is statement-anchored (DB-w4 kickback GAP 2).
+ * @param {string} tag - the matched `<sql …>` open tag
+ * @returns {string}
+ */
+function blankOpenSqlTag(tag) {
+  const blanked = blankKeepNewlines(tag);
+  if (blanked.length === 0) return blanked;
+  const last = blanked[blanked.length - 1];
+  if (last === '\n') return blanked; // tag ends at a newline — leave the `^\s*` branch to anchor
+  return blanked.slice(0, -1) + ';';
+}
+
+/**
+ * Strip Liquibase YAML `rollback:` sub-blocks (DB-w4 fix F2, completed under the
+ * DB-w4 kickback GAP 1), indentation-scoped. From a `rollback:` key at indent R, the
+ * following lines are blanked until the block ends:
+ *   - a line more deeply indented than R (a nested mapping) is inside the block;
+ *   - a `- ` list ITEM at EXACTLY indent R is inside the block — the STANDARD
+ *     Liquibase style aligns the sequence dash with the `rollback:` key, so the
+ *     rollback's own list items sit at the key's indent, not deeper;
+ *   - a blank line stays in the block;
+ *   - a non-dash key at indent ≤ R, or ANY line dedented below R, ENDS the block
+ *     (a sibling mapping key like `changes:` / a lower-level `- changeSet:`).
+ * A drop inside a rollback block is a rollback definition, not a data-loss apply.
+ * Line-based, bounded by the line count, fail-soft (never throws). This is safe
+ * because in a YAML mapping only the rollback list's own items are dashes at indent R;
+ * a sibling of `rollback:` is a mapping key (non-dash), which ends the block.
+ * @param {string} content
+ * @returns {string}
+ */
+function stripYamlRollback(content) {
+  const lines = content.split(/\r?\n/);
+  const out = new Array(lines.length);
+  let inRollback = false;
+  let rollbackIndent = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (inRollback) {
+      if (line.trim() === '') { out[i] = ''; continue; } // blank line stays in block
+      const indent = line.length - line.trimStart().length;
+      const isDashItem = line.trimStart().charAt(0) === '-';
+      if (indent > rollbackIndent || (indent === rollbackIndent && isDashItem)) {
+        out[i] = ''; // deeper mapping, or the rollback list's own dash-aligned item
+        continue;
+      }
+      inRollback = false; // sibling key / dedent → block ended; process this line
+    }
+    if (ROLLBACK_KEY_RE.test(line)) {
+      rollbackIndent = line.length - line.trimStart().length;
+      inRollback = true;
+      out[i] = ''; // blank the rollback: key line itself
+      continue;
+    }
+    out[i] = line;
+  }
+  return out.join('\n');
+}
+
+/**
+ * Index of the `}` that closes the block opened at `openIdx` (a `{`), scanned
+ * string-literal-aware so a brace inside a `"…"`/`'…'` literal is not counted. On an
+ * unbalanced input returns the last index (fail-soft: the Down body is treated as
+ * running to end-of-file, which over-EXCLUDES rather than risk false-positiving the
+ * dominant additive migration — Finding 1 is non-negotiable).
+ * @param {string} s
+ * @param {number} openIdx
+ * @returns {number}
+ */
+function matchBrace(s, openIdx) {
+  let depth = 0;
+  let inStr = null;
+  for (let i = openIdx; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (c === '\\') { i++; continue; }
+      if (c === inStr) inStr = null;
+      continue;
+    }
+    if (c === '"' || c === '\'') { inStr = c; continue; }
+    if (c === '{') { depth++; }
+    else if (c === '}') { depth--; if (depth === 0) return i; }
+  }
+  return s.length - 1;
+}
+
+/**
+ * Count of newlines in `s` before index `end` — i.e. the 0-based line number of the
+ * character at `end`.
+ * @param {string} s
+ * @param {number} end
+ * @returns {number}
+ */
+function countNewlines(s, end) {
+  let n = 0;
+  const stop = Math.min(end, s.length);
+  for (let i = 0; i < stop; i++) if (s[i] === '\n') n++;
+  return n;
+}
+
+/**
+ * EF Core direction-awareness (DB-w4 fix F1). Returns the set of 0-based line indices
+ * that fall inside any `Down(MigrationBuilder …)` method body. A destructive call in
+ * `Down()` is the EF-scaffolded ROLLBACK of an additive migration and MUST NOT be
+ * flagged; a destructive call in `Up()` (or outside any Down) IS the apply direction
+ * and IS flagged. The body span is found by locating the signature, then a bounded,
+ * string-aware brace-depth scan to the matching close. Bounded (≤ a guard cap of Down
+ * signatures) and fail-soft: any error yields an EMPTY set, so on parse trouble the
+ * scanner falls back to flagging (prefers a true positive over a silent miss for the
+ * apply direction), EXCEPT that an unbalanced body is treated as running to EOF to
+ * protect the dominant additive case.
+ * @param {string} content - C# migration content (block comments already blanked)
+ * @returns {Set<number>} 0-based line indices to exclude from EF pattern matching
+ */
+function efDownBodyLines(content) {
+  const excluded = new Set();
+  try {
+    let from = 0;
+    for (let guard = 0; guard < 100; guard++) {
+      DOWN_SIG_RE.lastIndex = from;
+      const m = DOWN_SIG_RE.exec(content);
+      if (!m) break;
+      const openIdx = content.indexOf('{', m.index + m[0].length);
+      if (openIdx === -1) break;
+      const end = matchBrace(content, openIdx);
+      const startLine = countNewlines(content, openIdx);
+      const endLine = countNewlines(content, end);
+      for (let ln = startLine; ln <= endLine; ln++) excluded.add(ln);
+      const next = end + 1;
+      if (next <= m.index) break; // no forward progress — bail (defensive)
+      from = next;
+    }
+  } catch {
+    return new Set(); // fail-soft: exclude nothing
+  }
+  return excluded;
 }
 
 /**
@@ -485,12 +843,30 @@ class MigrationSafetyChecker {
     const out = [];
     const ext = path.extname(file).toLowerCase();
     const patterns = patternsForExt(ext);
-    // Original lines drive the human-readable `statement`; the block-stripped copy
-    // (same line count — newlines preserved) drives matching. Line-comment stripping
-    // is then applied per line, file-type aware.
+    // Original lines drive the human-readable `statement`; a preprocessed copy (same
+    // line count — newlines preserved) drives matching.
     const originalLines = content.split(/\r?\n/);
-    const scanLines = stripBlockComments(content).split(/\r?\n/);
+
+    // Block comments are stripped for every format (C-style `/* … */`). Then, per
+    // format, the DB-w4 rework applies rollback/direction/element-aware preprocessing:
+    //   .xml  — strip <!-- … --> comments (F5) and <rollback>…</rollback> spans (F2),
+    //           then blank <sql> tags so the inner SQL is scanned statement-anchored (F3);
+    //   .yaml — strip indentation-scoped rollback: sub-blocks (F2);
+    //   .cs   — compute the Down(MigrationBuilder) body line span to EXCLUDE (F1),
+    //           since a drop there is a rollback definition, not a data-loss apply.
+    let scanContent = stripBlockComments(content);
+    let excludedLines = null;
+    if (ext === '.xml') {
+      scanContent = unwrapSqlElements(stripXmlRollback(stripXmlComments(scanContent)));
+    } else if (ext === '.yaml' || ext === '.yml') {
+      scanContent = stripYamlRollback(scanContent);
+    } else if (ext === '.cs') {
+      excludedLines = efDownBodyLines(scanContent);
+    }
+
+    const scanLines = scanContent.split(/\r?\n/);
     for (let i = 0; i < scanLines.length; i++) {
+      if (excludedLines && excludedLines.has(i)) continue; // EF Down() rollback direction
       const scanText = stripLineComment(scanLines[i], ext);
       for (const { rule, re } of patterns) {
         if (re.test(scanText)) {
@@ -499,7 +875,7 @@ class MigrationSafetyChecker {
             rule,
             file,
             line: i + 1,
-            statement: originalLines[i].trim(),
+            statement: (originalLines[i] || '').trim(),
             severity: SEVERITY.HIGH
           });
           break; // one finding per line — dedupe by (file,line)

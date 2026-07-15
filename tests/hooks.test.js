@@ -450,6 +450,66 @@ describe('SessionStart - Stack Detection', () => {
   });
 });
 
+// ============================================================================
+// TEST: SessionStart.js - banner render guards (F2/F3 crash guard, F4 hide-nothing,
+// F5 truthful capability wording). SessionStart runs EVERY session; a throw here
+// kills the whole banner, so these render helpers must never throw and must hide
+// nothing from the human.
+// ============================================================================
+describe('SessionStart - banner render helpers (F2-F5)', () => {
+  const { formatDatabasesLine, formatFrameworksLine } = require('../src/hooks/SessionStart');
+
+  describe('F2/F3 - a null/empty element must never throw and must not render a garbled header', () => {
+    it('formatDatabasesLine([null]) returns "" (no throw, no garbled header)', () => {
+      assert.strictEqual(formatDatabasesLine({ databases: [null] }), '');
+    });
+    it('formatFrameworksLine([null]) returns "" (no throw, no garbled header)', () => {
+      assert.strictEqual(formatFrameworksLine({ frameworkCapabilities: [null] }), '');
+    });
+    it('formatDatabasesLine([{}]) returns "" — a nameless element must not print "Databases: "', () => {
+      assert.strictEqual(formatDatabasesLine({ databases: [{}] }), '');
+    });
+    it('formatFrameworksLine([{}]) returns "" — a nameless element must not print "Frameworks: "', () => {
+      assert.strictEqual(formatFrameworksLine({ frameworkCapabilities: [{}] }), '');
+    });
+    it('a valid element still renders after a null element is skipped', () => {
+      const line = formatDatabasesLine({
+        databases: [null, { name: 'sqlite', security: { connection: 'file-local' } }]
+      });
+      assert.match(line, /sqlite/, 'the valid database must still render');
+      assert.doesNotMatch(line, /Databases: ·|· *$/, 'no dangling separator from the skipped element');
+    });
+  });
+
+  describe('F4 - hide nothing: ALL security concerns are shown, never silently truncated', () => {
+    it('a 4-concern Next.js record renders ALL four concern names', () => {
+      const line = formatFrameworksLine({
+        frameworkCapabilities: [{
+          name: 'nextjs',
+          security: { concerns: ['security-headers', 'env-exposure', 'ssrf', 'auth-middleware'] }
+        }]
+      });
+      for (const c of ['security-headers', 'env-exposure', 'ssrf', 'auth-middleware']) {
+        assert.ok(line.includes(c), `concern "${c}" must not be hidden from the human; got: ${line}`);
+      }
+    });
+  });
+
+  describe('F5 - truthful wording: the posture is a CAPABILITY, not a verified project fact', () => {
+    it('a postgresql record does not assert project-specific runtime state ("TLS required")', () => {
+      const line = formatDatabasesLine({
+        databases: [{ name: 'postgresql', security: { rls: 'supported', connection: 'tls-required' } }]
+      });
+      assert.ok(line.includes('postgresql'), 'the database name must still render');
+      assert.doesNotMatch(line, /TLS required/,
+        'must not assert "TLS required" as if verified against this project');
+      assert.doesNotMatch(line, /RLS supported/,
+        'must not assert "RLS supported" as a verified project fact');
+      assert.match(line, /capab/i, 'the wording must mark the posture as a capability, not a verified fact');
+    });
+  });
+});
+
 describe('SessionStart - State Management', () => {
   // Import state manager functions
   const {

@@ -24,6 +24,8 @@
  */
 
 const { execFileSync } = require('child_process');
+const path = require('path');
+const safeFs = require('./safe-fs');
 const registry = require('./capability-registry');
 const { severityFromCvss } = require('./cvss');
 const { auditedLanguagesFor } = require('./dependency-auditor');
@@ -204,7 +206,16 @@ class SCARunner {
     this._deferredLanguages = deferred;
     const languages = detected.filter((l) => !deferred.has(l));
 
-    if (languages.length === 0) {
+    // F3: a poetry.lock present means python's dependency set is defined by poetry.lock,
+    // which pip-audit (SCA's native python tool AND DependencyAuditor's) CANNOT read —
+    // only osv-scanner reads poetry.lock natively. So route python coverage through the
+    // osv universal pass and SKIP the native pip-audit (which would audit the ambient
+    // environment, not the project — a misleading result). The direct filesystem check
+    // gives real coverage even when the language registry, whose python markers do not
+    // include poetry.lock, does not surface python.
+    const poetryLock = this._hasPoetryLock();
+
+    if (languages.length === 0 && !poetryLock) {
       return {
         success: true,
         findings: [],
@@ -218,7 +229,11 @@ class SCARunner {
     let scannersRun = 0;
 
     // Native parsers, one per language that routes to one and whose tool is present.
-    const nativeLangs = languages.filter((l) => this.scaRouteFor(l).native);
+    // python is EXCLUDED from the native pass when poetry.lock is present — pip-audit
+    // cannot read poetry.lock; the osv universal pass below is the real coverage (F3).
+    const nativeLangs = languages.filter(
+      (l) => this.scaRouteFor(l).native && !(poetryLock && l === 'python')
+    );
     for (const lang of nativeLangs) {
       if (await this.runNativeScanner(lang)) {
         scannersRun++;
@@ -226,10 +241,10 @@ class SCARunner {
     }
 
     // osv-scanner universal: a SINGLE pass for the whole repo, run iff at least one
-    // detected language routes to it and the tool is installed. osv-scanner is
-    // lockfile-based and multi-ecosystem, so one pass covers every osv-routed
-    // language at once.
-    const anyOsvRouted = languages.some((l) => this.scaRouteFor(l).osvUniversal);
+    // detected language routes to it OR a poetry.lock is present (osv is the ONLY engine
+    // that reads poetry.lock). osv-scanner is lockfile-based and multi-ecosystem, so one
+    // pass covers every osv-routed language at once.
+    const anyOsvRouted = languages.some((l) => this.scaRouteFor(l).osvUniversal) || poetryLock;
     if (anyOsvRouted && this.isToolAvailable('osv-scanner')) {
       scannersRun++;
       await this.runOsvScanner();
@@ -433,11 +448,15 @@ class SCARunner {
       for (const pkg of result.packages || []) {
         const info = pkg.package || {};
         for (const vuln of pkg.vulnerabilities || []) {
-          // F2: osv discovers every lockfile in the repo, including those for
-          // ecosystems DependencyAuditor already audits. Drop such findings so the
-          // same CVE is not counted by both runners. Only active inside run() (when
-          // _deferredLanguages is set); standalone parse still sees every finding.
-          if (this._isEcosystemDeferred(info.ecosystem)) continue;
+          // F2/F1: osv discovers every lockfile in the repo. Drop a finding as
+          // DependencyAuditor's ONLY when (a) its ecosystem is one DependencyAuditor
+          // audits for this project AND (b) its source is a ROOT manifest — the only
+          // thing DependencyAuditor actually covers (detectPackageManagers checks
+          // path.join(root, lockFile); npm/pip/cargo audit run at cwd=root). A finding
+          // from a NESTED, independent lockfile (packages/api/package-lock.json) is
+          // audited by NEITHER runner, so it must NEVER be dropped. Only active inside
+          // run() (when _deferredLanguages is set); standalone parse sees every finding.
+          if (this._isEcosystemDeferred(info.ecosystem) && this._isRootManifest(source)) continue;
           this.findings.push({
             tool: 'osv-scanner',
             package: info.name || 'unknown',
@@ -467,6 +486,59 @@ class SCARunner {
     if (!ecosystem) return false;
     const langs = OSV_ECOSYSTEM_LANGUAGES[String(ecosystem).toLowerCase()] || [];
     return langs.some((l) => this._deferredLanguages.has(l));
+  }
+
+  /**
+   * Express an osv `source.path` relative to the project root. osv-scanner (run with
+   * cwd=projectRoot and arg `.`) emits either a path under the root or a repo-relative
+   * one; both normalize here. A path that is NOT under the root (absolute + escapes via
+   * `..`) is returned unchanged — it is not a manifest of THIS project.
+   * @param {string} sourcePath - the osv `source.path`
+   * @returns {string} the path relative to projectRoot when it is under it, else as-is
+   */
+  _relToRoot(sourcePath) {
+    const s = String(sourcePath);
+    const root = this.projectRoot;
+    if (root && typeof root === 'string' && path.isAbsolute(s) && path.isAbsolute(root)) {
+      const rel = path.relative(root, s);
+      if (rel && !rel.startsWith('..')) return rel;
+    }
+    return s;
+  }
+
+  /**
+   * True when an osv finding's source is a ROOT manifest — one whose directory IS the
+   * project root. DependencyAuditor audits ONLY root manifests (detectPackageManagers
+   * checks path.join(root, lockFile); the audit tools run at cwd=root), so ONLY a root
+   * finding may be dropped as its duplicate (F1). A nested lockfile is audited by
+   * neither runner and is always kept.
+   * @param {string|null|undefined} sourcePath - the osv `source.path`
+   * @returns {boolean} true iff the manifest sits directly at the project root
+   */
+  _isRootManifest(sourcePath) {
+    if (!sourcePath) return false;
+    const dir = path.dirname(this._relToRoot(sourcePath));
+    return dir === '.' || dir === '' || dir === path.sep;
+  }
+
+  /**
+   * True when the project root contains a `poetry.lock`. A direct filesystem check
+   * (F3): a poetry.lock present means python is poetry-managed, and neither
+   * DependencyAuditor's nor SCA's native `pip-audit` can read it — only osv-scanner
+   * reads poetry.lock natively. run() uses this to route python coverage through the
+   * osv universal pass (and skip the useless native pip-audit), so a poetry project
+   * genuinely gets osv coverage even though the language registry's python markers do
+   * not include poetry.lock. Fail-soft: an unreadable root reports absent.
+   * @returns {boolean} true iff poetry.lock exists at the project root
+   */
+  _hasPoetryLock() {
+    const root = this.projectRoot;
+    if (!root || typeof root !== 'string') return false;
+    try {
+      return safeFs.existsSync(path.join(root, 'poetry.lock'));
+    } catch {
+      return false;
+    }
   }
 
   /**

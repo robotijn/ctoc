@@ -394,6 +394,82 @@ describe('capability-registry: detectLanguages() — DETERMINISTIC sorted order,
   });
 });
 
+describe('capability-registry: detectLanguages() — MANIFEST markers outrank stray SOURCE-FILE globs (F1)', () => {
+  // The primary key for detectLanguages ordering is MARKER KIND, not alphabetical
+  // capability-filename. A language matched by an EXACT manifest marker (Cargo.toml,
+  // go.mod, requirements.txt) ranks AHEAD of a language matched only by a source-file
+  // GLOB (*.c, *.h). Alphabetical was the WRONG primary key: `c.yaml` sorts first of
+  // all languages, so any Rust/Go/Python repo carrying an incidental C/C++ file at the
+  // root (FFI wrapper.h, cgo bridge.c, C-extension _ext.c) was mis-ranked with `c`
+  // first — and app-runner's run target (detectLanguages[0]) became `c` → `./a.out`, a
+  // gcc default that is not the app. Within each tier order stays sorted (deterministic,
+  // cross-platform); only the tier boundary is new.
+  it('Cargo.toml + incidental wrapper.h → rust (manifest) ranks ahead of c (glob)', () => {
+    const dir = makeProject('ctoc-f1-rust-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "x"\n');
+      fs.writeFileSync(path.join(dir, 'wrapper.h'), '#pragma once\n');
+      const langs = registry.detectLanguages(dir);
+      assert.ok(langs.includes('rust') && langs.includes('c'), 'both must still be detected');
+      assert.ok(langs.indexOf('rust') < langs.indexOf('c'),
+        'a manifest-matched rust must rank ahead of a glob-matched c');
+      assert.equal(langs[0], 'rust', 'the run target must be rust, not c');
+    } finally { rm(dir); }
+  });
+
+  it('go.mod + incidental bridge.c → go (manifest) ranks ahead of c (glob)', () => {
+    const dir = makeProject('ctoc-f1-go-');
+    try {
+      fs.writeFileSync(path.join(dir, 'go.mod'), 'module x\n');
+      fs.writeFileSync(path.join(dir, 'bridge.c'), 'int f(){return 0;}\n');
+      const langs = registry.detectLanguages(dir);
+      assert.ok(langs.indexOf('go') < langs.indexOf('c'),
+        'a manifest-matched go must rank ahead of a glob-matched c');
+      assert.equal(langs[0], 'go', 'the run target must be go, not c');
+    } finally { rm(dir); }
+  });
+
+  it('requirements.txt + incidental _ext.c → python (manifest) ranks ahead of c (glob)', () => {
+    const dir = makeProject('ctoc-f1-py-');
+    try {
+      fs.writeFileSync(path.join(dir, 'requirements.txt'), 'flask\n');
+      fs.writeFileSync(path.join(dir, '_ext.c'), 'int f(){return 0;}\n');
+      const langs = registry.detectLanguages(dir);
+      assert.ok(langs.indexOf('python') < langs.indexOf('c'),
+        'a manifest-matched python must rank ahead of a glob-matched c');
+      assert.equal(langs[0], 'python', 'the run target must be python, not c');
+    } finally { rm(dir); }
+  });
+
+  it('CONTROL: a pure C project (main.c + Makefile) still detects c first (no manifest to outrank it)', () => {
+    const dir = makeProject('ctoc-f1-purec-');
+    try {
+      fs.writeFileSync(path.join(dir, 'main.c'), 'int main(void){return 0;}\n');
+      fs.writeFileSync(path.join(dir, 'Makefile'), 'all:\n\tgcc main.c\n');
+      const langs = registry.detectLanguages(dir);
+      assert.ok(langs.includes('c'), 'a pure C project must still detect c');
+      assert.equal(langs[0], 'c', 'with no manifest language present, c stays the run target');
+    } finally { rm(dir); }
+  });
+
+  it('within the manifest tier order stays sorted+deterministic across repeated loads', () => {
+    const dir = makeProject('ctoc-f1-multi-');
+    try {
+      // go.mod (manifest) + Cargo.toml (manifest) + stray bridge.c (glob).
+      fs.writeFileSync(path.join(dir, 'go.mod'), 'module x\n');
+      fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "x"\n');
+      fs.writeFileSync(path.join(dir, 'bridge.c'), 'int f(){return 0;}\n');
+      const pick = (a) => a.filter((l) => ['go', 'rust', 'c'].includes(l));
+      const first = pick(registry.detectLanguages(dir));
+      // Manifest tier sorted among itself (go before rust — go.yaml < rust.yaml), then
+      // glob-only c last.
+      assert.deepEqual(first, ['go', 'rust', 'c'],
+        'manifest langs sorted first, glob-only c last — deterministic');
+      assert.deepEqual(pick(registry.detectLanguages(dir)), first, 'identical on a second load');
+    } finally { rm(dir); }
+  });
+});
+
 describe('capability-registry: isValidCapability — a structurally-broken override is SKIPPED + warned, not silently accepted (F2)', () => {
   it('a BLOCK-sequence detectionMarkers (rendered as {} by the flow-only parser) is skipped WITH a warning', () => {
     const dir = makeProject('ctoc-cap-blockseq-');

@@ -297,6 +297,203 @@ describe('the scan degrades gracefully — clean project, no crash, no false blo
   });
 });
 
+/**
+ * Capture everything a function logs to console.log while it runs, restoring the
+ * real console afterward. runSecurityScan / printSummary write the human-facing
+ * story through console.log, so the story IS the thing under test here.
+ */
+async function captureLog(fn) {
+  const orig = console.log;
+  const lines = [];
+  console.log = (...a) => lines.push(a.map(String).join(' '));
+  let res;
+  try {
+    res = await fn();
+  } finally {
+    console.log = orig;
+  }
+  return { res, out: lines.join('\n') };
+}
+
+const { SCARunner } = require('../src/lib/sca-runner');
+
+describe('F1 — SCA coverage hole: a manager DependencyAuditor does NOT implement must route to SCA, never be silently deferred', () => {
+  it('a pipenv-only python repo (Pipfile.lock, unimplemented by DependencyAuditor) is NOT falsely reported "covered" — SCA is reached', async () => {
+    // Pipfile is a python detection marker for SCARunner AND a config marker for
+    // DependencyAuditor, so DependencyAuditor DETECTS `pipenv` — but its runAudit
+    // switch has NO pipenv arm (IMPLEMENTED_MANAGERS excludes pipenv), so it audits
+    // NOTHING here. The old orchestrator computed deferral from the STATIC
+    // COVERED_LANGUAGES (which contains python unconditionally because `pip` is
+    // implemented), so it deferred python to DependencyAuditor and short-circuited
+    // with "all detected ecosystems covered by DependencyAuditor — nothing further
+    // to audit" — sca.run() was NEVER called and the Pipfile.lock dependency set was
+    // audited by NEITHER runner while the gate returned passed:true. Deferral must
+    // key on the PER-PROJECT audited set (auditedLanguagesFor), which is empty here.
+    const dir = mkTmp('ctoc-pipenv-');
+    try {
+      fs.writeFileSync(path.join(dir, 'Pipfile'), '[[source]]\nname = "pypi"\n', 'utf8');
+      fs.writeFileSync(path.join(dir, 'Pipfile.lock'), '{"_meta": {}, "default": {}}', 'utf8');
+      fs.writeFileSync(path.join(dir, 'app.py'), 'print("hi")\n', 'utf8');
+
+      const { res, out } = await captureLog(() =>
+        qualityAgent.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      // The exact false claim the hole produced must NOT appear: python is NOT
+      // covered by DependencyAuditor for a pipenv-only project. (host-independent.)
+      assert.doesNotMatch(
+        out,
+        /all detected ecosystems covered by DependencyAuditor/,
+        `python must NOT be falsely deferred to DependencyAuditor for a pipenv-only repo; SCA log was:\n${out}`
+      );
+      assert.doesNotMatch(
+        out,
+        /SCA: python deferred to DependencyAuditor/,
+        `python must NOT be listed as deferred to DependencyAuditor for a pipenv-only repo; SCA log was:\n${out}`
+      );
+
+      // And the honest positive: python must be ROUTED TO SCA — either it scans, or
+      // (no pip-audit / no osv-scanner on this host) it emits a LOUD per-language skip
+      // that lands in skipped[]. Never a silent "covered".
+      const probe = new SCARunner(dir);
+      const pyScannable = probe.isToolAvailable('pip-audit') || probe.isToolAvailable('osv-scanner');
+      if (pyScannable) {
+        // A real SCA scanner is installed: sca.run() executed against python. The
+        // result is well-formed and the outcome is visible (a finding count, or a
+        // belt-and-suspenders scanned:false skip) — not the "covered" short-circuit.
+        assert.equal(typeof res.passed, 'boolean');
+        assert.match(
+          out,
+          /SCA: \d+ dependency finding\(s\)|SCA skipped/,
+          `python must be scanned by SCA (or skip loudly), not silently covered; log:\n${out}`
+        );
+      } else {
+        assert.ok(
+          res.skipped.some((s) => /SCA skipped for python/i.test(s)),
+          `with no python SCA scanner installed, python must skip LOUDLY, got skipped=${JSON.stringify(res.skipped)}`
+        );
+        // A missing scanner is not a finding — it must not falsely block the gate.
+        assert.equal(res.passed, true, 'a missing scanner must not block the push');
+      }
+    } finally {
+      rm(dir);
+    }
+  });
+
+  it('a normal npm repo still defers javascript to DependencyAuditor exactly once (no regression, no double-run)', async () => {
+    // npm IS implemented by DependencyAuditor, so javascript stays deferred: SCA must
+    // announce the deferral and must NOT ALSO skip-or-scan javascript itself (that
+    // would double-count a CVE into the human tally). Behavior identical before and
+    // after the fix — javascript is in BOTH COVERED_LANGUAGES and auditedLanguagesFor.
+    const dir = mkTmp('ctoc-npm-defer-');
+    try {
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+        name: 'ctoc-npm-defer', version: '1.0.0', dependencies: {}
+      }, null, 2), 'utf8');
+      fs.writeFileSync(path.join(dir, 'package-lock.json'), JSON.stringify({
+        name: 'ctoc-npm-defer', version: '1.0.0', lockfileVersion: 3, requires: true,
+        packages: { '': { name: 'ctoc-npm-defer', version: '1.0.0' } }
+      }, null, 2), 'utf8');
+      fs.writeFileSync(path.join(dir, 'index.js'), 'module.exports = 1;\n', 'utf8');
+
+      const { res, out } = await captureLog(() =>
+        qualityAgent.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      assert.equal(typeof res.passed, 'boolean');
+      // SCA must NOT skip javascript — it is deferred to DependencyAuditor, not
+      // SCA-scanned. A javascript SCA skip would mean SCA tried to own it (regression).
+      assert.ok(
+        !res.skipped.some((s) => /SCA skipped for javascript/i.test(s)),
+        `javascript must be DEFERRED to DependencyAuditor, not SCA-skipped; skipped=${JSON.stringify(res.skipped)}`
+      );
+      assert.match(
+        out,
+        /SCA: javascript deferred to DependencyAuditor/,
+        `javascript must be announced as deferred to DependencyAuditor; log:\n${out}`
+      );
+    } finally {
+      rm(dir);
+    }
+  });
+
+  it('a requirements.txt (pip) python repo still defers python to DependencyAuditor (pip IS implemented)', async () => {
+    // requirements.txt maps python via `pip`, which DependencyAuditor DOES implement,
+    // so python stays deferred and must NOT be SCA-skipped. This guards against the
+    // fix over-correcting and routing a genuinely-audited ecosystem to SCA.
+    const dir = mkTmp('ctoc-pip-defer-');
+    try {
+      fs.writeFileSync(path.join(dir, 'requirements.txt'), 'flask==2.0.0\n', 'utf8');
+      fs.writeFileSync(path.join(dir, 'app.py'), 'print("hi")\n', 'utf8');
+
+      const { res, out } = await captureLog(() =>
+        qualityAgent.runSecurityScan(null, { projectRoot: dir, allFiles: true })
+      );
+
+      assert.equal(typeof res.passed, 'boolean');
+      assert.ok(
+        !res.skipped.some((s) => /SCA skipped for python/i.test(s)),
+        `python (pip) must be DEFERRED to DependencyAuditor, not SCA-skipped; skipped=${JSON.stringify(res.skipped)}`
+      );
+      assert.match(
+        out,
+        /SCA: python deferred to DependencyAuditor|all detected ecosystems covered by DependencyAuditor/,
+        `python (pip) must be announced as covered by DependencyAuditor; log:\n${out}`
+      );
+    } finally {
+      rm(dir);
+    }
+  });
+});
+
+describe('F2 — the QUALITY SUMMARY must surface skipped security scanners (partial coverage is not a clean pass)', () => {
+  function baseResults(security) {
+    return {
+      allPassed: true,
+      tier1: {
+        lint: { passed: true },
+        typecheck: { passed: true },
+        tests: { passed: true },
+        security
+      },
+      tier2: {}
+    };
+  }
+
+  it('renders the skipped scanner count on the Security line when scanners were skipped', async () => {
+    const results = baseResults({
+      passed: true,
+      skipped: [
+        'SCA skipped for python: no dependency scanner installed (need pip-audit or osv-scanner)',
+        'SAST skipped for go: no scanner installed (need semgrep or gosec)'
+      ]
+    });
+    const { out } = await captureLog(async () => qualityAgent.printSummary(results, 1000));
+
+    // The human's takeaway box must not claim an unqualified PASS while 2 scanners
+    // never ran — the count of skips must appear on (or beside) the Security line.
+    const securityLine = out.split('\n').find((l) => /Security:/.test(l)) || '';
+    assert.match(
+      securityLine,
+      /2 scanner\(s\) skipped/,
+      `the Security summary line must surface the 2 skipped scanners; got: ${JSON.stringify(securityLine)}\nfull:\n${out}`
+    );
+  });
+
+  it('leaves the Security line an unqualified PASS when nothing was skipped', async () => {
+    const results = baseResults({ passed: true, skipped: [] });
+    const { out } = await captureLog(async () => qualityAgent.printSummary(results, 1000));
+
+    const securityLine = out.split('\n').find((l) => /Security:/.test(l)) || '';
+    assert.match(securityLine, /Security:\s+PASS/, `expected a clean PASS, got: ${JSON.stringify(securityLine)}`);
+    assert.doesNotMatch(
+      securityLine,
+      /skipped/i,
+      `a fully-scanned clean result must carry NO skip note; got: ${JSON.stringify(securityLine)}`
+    );
+  });
+});
+
 describe('POST-COMMIT LOOP: initProject wires the background quality hook', () => {
   let dir;
   before(() => {

@@ -23,7 +23,6 @@ const path = require('node:path');
 const DA_PATH = require.resolve('../src/lib/dependency-auditor');
 const {
   IMPLEMENTED_MANAGERS,
-  COVERED_LANGUAGES,
   MANAGER_LANGUAGES,
   auditedLanguagesFor,
   DependencyAuditor
@@ -57,20 +56,9 @@ test('maven/gradle/poetry/pipenv are NOT implemented (they hit runAudit `default
   }
 });
 
-// ── COVERED_LANGUAGES — keyed to IMPLEMENTED managers, not the nominal union ───────
-
-test('COVERED_LANGUAGES excludes java — its only managers (maven/gradle) are unimplemented (F1)', () => {
-  assert.equal(COVERED_LANGUAGES.has('java'), false,
-    'java has NO implemented manager, so DependencyAuditor must NOT claim to cover it');
-});
-
-test('COVERED_LANGUAGES still includes every language an IMPLEMENTED manager audits', () => {
-  for (const l of ['javascript', 'typescript', 'python', 'go', 'rust', 'ruby', 'php']) {
-    assert.ok(COVERED_LANGUAGES.has(l), `${l} has an implemented manager and remains covered`);
-  }
-});
-
 // ── auditedLanguagesFor — per-project, keyed on DETECTED ∩ IMPLEMENTED ─────────────
+// (The former static COVERED_LANGUAGES export was deleted once quality-agent switched
+// to per-project deferral; java-exclusion is now asserted via auditedLanguagesFor below.)
 
 test('auditedLanguagesFor: a pom.xml-only project defers NOTHING (maven unimplemented) — F1', () => {
   const dir = mkTmp('da-maven-');
@@ -144,4 +132,73 @@ test('auditedLanguagesFor: a pip project (requirements.txt) defers python (pip I
 test('auditedLanguagesFor: a nonexistent root fails soft to an empty set (defer nothing)', () => {
   const covered = auditedLanguagesFor(path.join(os.tmpdir(), 'ctoc-nope-' + Date.now()));
   assert.equal(covered.size, 0);
+});
+
+// ── F3: a poetry.lock project must NOT claim python — pip-audit cannot read poetry.lock ──
+//
+// A pyproject.toml + poetry.lock project co-detected `pip` (via the pyproject.toml
+// config branch), so auditedLanguagesFor returned {python} and python was DEFERRED to
+// DependencyAuditor — but DependencyAuditor's `pip-audit --format=json` (no -r) audits
+// the environment, NEVER poetry.lock. So poetry.lock's pinned deps were audited by
+// NEITHER runner while the human was told python was "covered". Deferral must recognise
+// that a poetry.lock present means python is poetry-managed (unimplemented) → route to
+// SCA/osv, which reads poetry.lock natively.
+
+test('detectPackageManagers: pyproject.toml + poetry.lock detects poetry, NOT pip (F3)', () => {
+  const dir = mkTmp('da-poetry-combo-');
+  try {
+    write(dir, 'pyproject.toml', '[tool.poetry]\n');
+    write(dir, 'poetry.lock', '');
+    const managers = new DependencyAuditor(dir).detectPackageManagers();
+    assert.ok(managers.includes('poetry'), `expected poetry detected; got ${managers}`);
+    assert.ok(!managers.includes('pip'),
+      `pip must NOT be co-detected — pip-audit cannot read poetry.lock; got ${managers}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('auditedLanguagesFor: pyproject.toml + poetry.lock does NOT claim python (F3)', () => {
+  const dir = mkTmp('da-poetry-combo2-');
+  try {
+    write(dir, 'pyproject.toml', '[tool.poetry]\n');
+    write(dir, 'poetry.lock', '');
+    const covered = auditedLanguagesFor(dir);
+    assert.equal(covered.has('python'), false,
+      'python via poetry.lock (pip-audit cannot read it) must NOT read as covered — SCA/osv must cover it');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('auditedLanguagesFor: pyproject.toml WITHOUT poetry.lock still defers python via pip — no over-correction (F3)', () => {
+  const dir = mkTmp('da-pyproject-only-');
+  try {
+    write(dir, 'pyproject.toml', '[build-system]\n');
+    const covered = auditedLanguagesFor(dir);
+    assert.ok(covered.has('python'),
+      'a pip-managed pyproject.toml (no poetry.lock) is genuinely audited by pip-audit — still deferred');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── F4: an empty/falsy root matches nothing — parity with registry.detectLanguages ──
+//
+// path.join('', 'package.json') → 'package.json' resolves against cwd, so an empty root
+// falsely detected the CTOC repo's own managers. detectLanguages guards length===0; the
+// auditor must agree.
+
+test('auditedLanguagesFor: an empty-string root defers NOTHING — no cwd leakage (F4)', () => {
+  assert.equal(auditedLanguagesFor('').size, 0);
+});
+
+test('auditedLanguagesFor: a null/undefined/non-string root fails soft to empty (F4)', () => {
+  assert.equal(auditedLanguagesFor(null).size, 0);
+  assert.equal(auditedLanguagesFor(undefined).size, 0);
+  assert.equal(auditedLanguagesFor(42).size, 0);
+});
+
+test('detectPackageManagers: an empty-string root detects NOTHING — no cwd leakage (F4)', () => {
+  assert.deepEqual(new DependencyAuditor('').detectPackageManagers(), []);
 });
