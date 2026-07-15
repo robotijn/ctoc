@@ -554,6 +554,56 @@ describe('Secrets Scanner — real synthetic secret detection', () => {
       'a genuine -----BEGIN RSA PRIVATE KEY----- boundary must still be detected');
   });
 
+  // -- S1: mask-run char class must NOT include 0/x/X (real key-body chars) --
+  // The embedded-mask-run rule swallowed real keys whose bodies happen to
+  // contain an incidental run of 0/x/X. Only `*` and `.` never occur in an
+  // alphanumeric secret body, so only those belong in the run class.
+  it('S1 isPlaceholder("AKIAI0000SFODNN7EXAM") is NOT a placeholder (incidental 0000 run)', () => {
+    const scanner = new SecretsScanner(SCAN_DIR);
+    assert.strictEqual(scanner.isPlaceholder('AKIAI0000SFODNN7EXAM'), false,
+      'a valid-format AWS key with an incidental 0000 run must not be treated as a mask');
+  });
+
+  it('S1 a real sk-ant key containing a 0000 run is DETECTED (not dropped as a mask)', () => {
+    const key = 'sk-ant-api03-' + '0000' + 'A1b2C3d4E5f6G7h8I9j0'.repeat(4);
+    const { findings } = scan('ant0000.js', 'const k = "' + key + '";\n');
+    assert.ok(findings.some(f => f.type === 'ANTHROPIC_API_KEY' && f.severity === 'HIGH'),
+      'a real sk-ant key with an incidental 0000 run must still be detected (worst outcome is a clean pass on a real secret)');
+  });
+
+  it('S1 regression: a genuine x/X-mask run is STILL a placeholder (dominant-char catch)', () => {
+    const scanner = new SecretsScanner(SCAN_DIR);
+    assert.strictEqual(scanner.isPlaceholder('sk-' + 'x'.repeat(32)), true,
+      'a dominant x-mask is still a placeholder');
+    assert.strictEqual(scanner.isPlaceholder('sk-' + 'X'.repeat(16)), true,
+      'a dominant X-mask is still a placeholder');
+  });
+
+  // -- S2: an unscannable-extension skip must be RECORDED, not a silent pass --
+  it('S2 an unscannable-extension file (.tfstate) skip is RECORDED, not silent', () => {
+    fs.mkdirSync(SCAN_DIR, { recursive: true });
+    const tf = path.join(SCAN_DIR, 'terraform.tfstate');
+    fs.writeFileSync(tf, '{"outputs":{"secret":{"value":"AKIAIOSFODNN7EXAMPLE"}}}\n');
+    const scanner = new SecretsScanner(SCAN_DIR);
+    assert.strictEqual(scanner.shouldScan(tf), false, '.tfstate is not in the scannable set');
+    assert.ok(scanner.errors.some(e => (e.file || '').includes('terraform.tfstate')),
+      'an extension-based skip of a secret-dense file must be recorded, not a silent clean pass');
+  });
+
+  // -- S3: npm access token detection -------------------------------------
+  it('S3 a real npm token (npm_ + 36 base62) -> detected', () => {
+    const tok = 'npm_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'; // 36 base62 chars
+    const { findings } = scan('npmtok.js', 'const t = "' + tok + '";\n');
+    assert.ok(findings.some(f => f.type === 'NPM_TOKEN'),
+      'a modern npm access token (npm_ + 36 base62) must be detected');
+  });
+
+  it('S3 a benign npm_ lookalike is NOT flagged as an npm token', () => {
+    const { findings } = scan('npmbenign.js', 'const label = "npm_install_the_package_now";\n');
+    assert.ok(!findings.some(f => f.type === 'NPM_TOKEN'),
+      'an underscore-separated npm_ phrase is not a 36-char base62 token');
+  });
+
   // -- ReDoS safety -------------------------------------------------------
   it('all patterns are ReDoS-safe against a 100k adversarial string', () => {
     const adversarial =

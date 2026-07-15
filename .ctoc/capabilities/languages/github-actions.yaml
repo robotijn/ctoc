@@ -13,7 +13,13 @@
 # glob; detectLanguages globs the project root only). The two never conflict: actionlint
 # lints the workflow, `yamllint .` lints every YAML in the tree. (Recursive extension
 # tree-walking for the yaml half is stack-detector's job, out of scope for the registry.)
+# ROLE (F-ancillary): a GitHub Actions workflow is CROSS-CUTTING CI config, not the
+# application's own language. Its EXACT `.github/workflows` directory marker would otherwise
+# place it in the decisive manifest tier, AHEAD of the real app language, making it
+# detectLanguages[0] (the run target) for almost every real repo. role:ancillary keeps it
+# DETECTED/reported but sorted below every real application language — never the primary.
 language: github-actions
+role: ancillary
 detectionMarkers: [.github/workflows]
 extensions: [.yml, .yaml]
 toolchain:

@@ -346,6 +346,139 @@ describe('FrameworkSecurityChecker: adversarial-review fixes (F1 honesty, F2 FP,
   });
 });
 
+describe('FrameworkSecurityChecker: adversarial-review round 5 (FW1 FP / FW2 FN / FW3 honesty)', () => {
+  /** Run the checker against a one-file fixture and return its result. */
+  async function resultFor({ nodeDeps, envName, envBody }) {
+    const dir = mkTmp('ctoc-fwsec-r5-');
+    try {
+      if (nodeDeps) writePkg(dir, nodeDeps);
+      if (envName) fs.writeFileSync(path.join(dir, envName), envBody, 'utf8');
+      return await new FrameworkSecurityChecker(dir).run();
+    } finally { rm(dir); }
+  }
+  const highsOf = res => res.findings.filter(f => f.severity === SEVERITY.HIGH);
+
+  // ── FW1 — the compound branch was open-ended, flagging benign metadata config ──
+  it('FW1: NEXT_PUBLIC_API_KEY_HEADER does NOT flag (a header name, not a secret)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_API_KEY_HEADER=x-api-key\n' });
+    assert.equal(res.findings.length, 0, `header-name metadata must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('FW1: NEXT_PUBLIC_ACCESS_TOKEN_URL does NOT flag (an endpoint URL, not a secret)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_ACCESS_TOKEN_URL=/oauth/token\n' });
+    assert.equal(res.findings.length, 0, `endpoint-URL metadata must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('FW1: NEXT_PUBLIC_PRIVATE_KEY_ID does NOT flag (a JWKS kid, not a secret)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_PRIVATE_KEY_ID=kid-123\n' });
+    assert.equal(res.findings.length, 0, `key-id metadata must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('FW1: NEXT_PUBLIC_ACCESS_TOKEN_STORAGE_KEY does NOT flag (a localStorage key name)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_ACCESS_TOKEN_STORAGE_KEY=auth.token\n' });
+    assert.equal(res.findings.length, 0, `storage-key metadata must not flag; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('FW1 regression: bare NEXT_PUBLIC_API_KEY STILL flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_API_KEY=sk_live_leak\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `bare API_KEY is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_API_KEY');
+  });
+
+  it('FW1 regression: NEXT_PUBLIC_STRIPE_SECRET_KEY STILL flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_STRIPE_SECRET_KEY=sk_live_leak\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `SECRET_KEY is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_STRIPE_SECRET_KEY');
+  });
+
+  it('FW1 regression: bare NEXT_PUBLIC_ACCESS_TOKEN STILL flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_ACCESS_TOKEN=abc\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `bare ACCESS_TOKEN is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_ACCESS_TOKEN');
+  });
+
+  it('FW1 regression: a secret-ish suffix NEXT_PUBLIC_SECRET_KEY_BASE STILL flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_SECRET_KEY_BASE=deadbeef\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `SECRET_KEY_BASE is a real leak (non-benign suffix); got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_SECRET_KEY_BASE');
+  });
+
+  // ── FW2 — high-value compounds (service-role / vcs tokens) were silently dropped ──
+  it('FW2: NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY flags HIGH (RLS-bypass leak)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=eyJ...\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `service-role key is the highest-value client leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY');
+  });
+
+  it('FW2: NEXT_PUBLIC_GITHUB_TOKEN flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_GITHUB_TOKEN=ghp_x\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `github token is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_GITHUB_TOKEN');
+  });
+
+  it('FW2: NEXT_PUBLIC_NPM_TOKEN flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_NPM_TOKEN=npm_x\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `npm token is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_NPM_TOKEN');
+  });
+
+  it('FW2: NEXT_PUBLIC_SLACK_TOKEN flags HIGH', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_SLACK_TOKEN=xoxb-x\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `slack token is a real leak; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_SLACK_TOKEN');
+  });
+
+  it('FW2 regression: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY still does NOT flag', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_ok\n' });
+    assert.equal(res.findings.length, 0, `publishable keys are public; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('FW2 regression: NEXT_PUBLIC_TOKEN_ADDRESS still does NOT flag', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_TOKEN_ADDRESS=0xabc\n' });
+    assert.equal(res.findings.length, 0, `a web3 contract address is public; got ${JSON.stringify(res.findings)}`);
+  });
+
+  // ── FW3 — an unscannable env-exposure framework co-occurring with a scannable one ──
+  it('FW3: angular+next discloses angular as unscanned WHILE still scanning next', async () => {
+    const res = await resultFor({
+      nodeDeps: { '@angular/core': '18.0.0', next: '15.0.0' },
+      envName: '.env',
+      envBody: 'NEXT_PUBLIC_API_SECRET=leak\n'
+    });
+    assert.equal(res.scanned, true, 'a scannable framework (next) is present → the scan proceeds');
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `next's leak must still be caught; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_API_SECRET');
+    assert.ok(Array.isArray(res.unscanned), 'the result discloses an unscanned array');
+    assert.ok(res.unscanned.some(n => /angular/i.test(n)), `angular's exposure path must be disclosed as unscanned; got ${JSON.stringify(res.unscanned)}`);
+  });
+
+  it('FW3 regression: an all-unscannable repo (angular only) still reports scanned:false', async () => {
+    const res = await resultFor({
+      nodeDeps: { '@angular/core': '18.0.0' },
+      envName: '.env',
+      envBody: 'NEXT_PUBLIC_API_SECRET=leak\n'
+    });
+    assert.equal(res.scanned, false, 'all-unscannable → honest skip, not a clean pass');
+    assert.equal(res.findings.length, 0);
+    assert.match(res.reason, /angular/i, 'the reason names the offending framework');
+  });
+
+  it('FW3 regression: a plain next repo reports an empty unscanned array', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_SAFE=ok\n' });
+    assert.equal(res.scanned, true);
+    assert.ok(Array.isArray(res.unscanned) && res.unscanned.length === 0, `no unscannable framework → empty array; got ${JSON.stringify(res.unscanned)}`);
+  });
+});
+
 describe('quality-agent integration: a NEXT_PUBLIC_*_SECRET bumps the HIGH tally', () => {
   let dir;
   before(() => {

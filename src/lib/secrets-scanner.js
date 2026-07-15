@@ -27,6 +27,9 @@ const SECRET_TYPES = {
   GCP_API_KEY: { name: 'GCP API Key', severity: 'CRITICAL', verified: true },
   GITHUB_TOKEN: { name: 'GitHub Token', severity: 'CRITICAL', verified: true },
   GITLAB_TOKEN: { name: 'GitLab Token', severity: 'CRITICAL', verified: true },
+  // An npm granular/automation access token can publish to the registry — a
+  // supply-chain compromise vector — so it BLOCKS the gate at CRITICAL.
+  NPM_TOKEN: { name: 'npm Access Token', severity: 'CRITICAL', verified: true },
   SLACK_TOKEN: { name: 'Slack Token', severity: 'HIGH', verified: true },
   STRIPE_API_KEY: { name: 'Stripe API Key', severity: 'CRITICAL', verified: true },
   OPENAI_API_KEY: { name: 'OpenAI API Key', severity: 'HIGH', verified: true },
@@ -103,6 +106,17 @@ const SECRET_PATTERNS = [
     type: 'GITLAB_TOKEN',
     pattern: /\bglpat-[A-Za-z0-9\-_]{20,}\b/g,
     description: 'GitLab Personal Access Token'
+  },
+
+  // npm — modern access tokens are `npm_` + exactly 36 base62 characters. The
+  // fixed length + distinctive prefix bound the false-positive risk: an
+  // underscore-separated `npm_config_...` phrase breaks the `[A-Za-z0-9]{36}`
+  // run at its first underscore and cannot match. Single linear character
+  // class, no nested quantifier — ReDoS-safe.
+  {
+    type: 'NPM_TOKEN',
+    pattern: /\bnpm_[A-Za-z0-9]{36}\b/g,
+    description: 'npm Access Token'
   },
 
   // Slack
@@ -354,7 +368,18 @@ class SecretsScanner {
     // (id_rsa, id_ed25519, ...). Without the filename special-case a committed
     // OpenSSH key would never be scanned.
     const isKeyFilename = KEY_FILENAMES.includes(basename);
-    if (!this.options.extensions.includes(ext) && !isKeyFilename) return false;
+    if (!this.options.extensions.includes(ext) && !isKeyFilename) {
+      // An unscannable extension is NOT silently dropped. Secret-dense types
+      // (.tf, .tfvars, .tfstate, .npmrc, .netrc, .pgpass, Dockerfile, ...) would
+      // otherwise produce a false all-clear. Record the skip (one cheap entry,
+      // naming the extension) so the caller can surface "N files unscanned"
+      // instead of a silent clean pass — mirroring the oversized-file branch.
+      this.errors.push({
+        file: filePath,
+        error: `Skipped: extension '${ext || '(none)'}' not in scannable set (unscanned)`
+      });
+      return false;
+    }
 
     // Check file size. An oversized file is NOT silently dropped — record the
     // skip in this.errors (mirroring the unreadable-file record) so a secret
@@ -469,16 +494,21 @@ class SecretsScanner {
     // 4. Runs of x's used as a mask (xxxx, xxxxxxxx).
     if (/^x{3,}$/.test(lower)) return true;
 
-    // 4b. EMBEDDED mask run: a run of >= 4 identical mask-like characters
-    //     (x / X / * / 0 / .) anywhere in the value means it is a masked
-    //     example — e.g. an OpenAI-doc `sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-    //     in a .env.example. This is a RUN signal (a repeated masking char),
-    //     NOT a dictionary substring, so it does NOT reintroduce the Round-3
-    //     substring-swallow bug: a real secret that merely CONTAINS "none" or
-    //     "test" (e.g. `AKIAnoneFODNN7Q9WZ2XY`) has no such run and stays
-    //     detected. `*` and `.` never occur in an alphanumeric key body, so
-    //     their presence in a run is unambiguously a mask. Bounded, ReDoS-safe.
-    if (/([xX*0.])\1{3,}/.test(str)) return true;
+    // 4b. EMBEDDED mask run: a run of >= 4 identical mask characters (`*` or
+    //     `.`) anywhere in the value means it is a masked example — e.g. an
+    //     OpenAI-doc `sk-****...` or `sk-....` in a .env.example. The class is
+    //     RESTRICTED to `*` and `.`, the only characters that NEVER occur in an
+    //     alphanumeric secret body; `0`, `x`, `X` are DELIBERATELY EXCLUDED
+    //     because they appear in REAL key bodies (e.g. the valid-format AWS key
+    //     `AKIAI0000SFODNN7EXAM`, or an `sk-ant-...0000...` key). Including them
+    //     produced a CRITICAL false negative — a real secret with an incidental
+    //     `0000`/`xxxx` run was dropped as a mask (a clean pass on a live
+    //     credential, the worst outcome). Whole-value `0000…`/`xxxx…` masks are
+    //     still caught by the dominant-char rule (4c) below, so no genuine
+    //     placeholder is lost. This is a RUN signal (a repeated masking char),
+    //     NOT a dictionary substring, so it does not reintroduce the Round-3
+    //     substring-swallow bug. Bounded, ReDoS-safe.
+    if (/([*.])\1{3,}/.test(str)) return true;
 
     // 4c. DOMINANT single character: a value that is >= 60% one repeated
     //     character is a mask/filler, never a real high-entropy secret. Cheap

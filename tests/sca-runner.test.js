@@ -522,6 +522,8 @@ test('F1: a Pipfile python project (pipenv unimplemented) is SCANNED, not silent
   cp.execFileSync = (cmd, args) => {
     if (Array.isArray(args) && args.includes('--version')) return '';
     if (cmd === 'pip-audit') return JSON.stringify(pip);
+    // SCA1: osv-scanner now also runs as the whole-repo net; here it finds nothing new.
+    if (cmd === 'osv-scanner') return JSON.stringify({ results: [] });
     throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
   };
   const { SCARunner } = freshSCA();
@@ -541,25 +543,35 @@ test('F1: a Pipfile python project (pipenv unimplemented) is SCANNED, not silent
   }
 });
 
-test('F1: a plain npm project is DEFERRED to DependencyAuditor exactly once (no SCA double-run)', async () => {
-  // Every tool probe would succeed, but SCA must still not scan js/ts — npm is an
-  // IMPLEMENTED DependencyAuditor manager, so SCA defers it and runs NO scanner.
+test('F1/SCA1: a plain npm project — SCA runs the osv whole-repo net but DROPS the ROOT npm duplicate (counted once)', async () => {
+  // npm is an IMPLEMENTED DependencyAuditor manager, so DependencyAuditor audits the
+  // ROOT lockfile. osv-scanner (SCA's whole-repo net) also discovers that root lockfile;
+  // SCA must DROP osv's root npm finding so the CVE is counted ONCE, never twice. SCA
+  // must still run NO NATIVE scanner (npm/pip/cargo) for a deferred js/ts ecosystem.
+  const tmp = mkTmp('sca-npm-defer-');
+  const osv = {
+    results: [{
+      source: { path: path.join(tmp, 'package-lock.json'), type: 'lockfile' },
+      packages: [{
+        package: { name: 'lodash', ecosystem: 'npm', version: '4.17.4' },
+        vulnerabilities: [{ id: 'GHSA-root-npm', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  };
   cp.execFileSync = (cmd, args) => {
     if (Array.isArray(args) && args.includes('--version')) return '';
-    throw new Error(`SCA must not invoke a scanner for a deferred npm project (got ${cmd})`);
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`SCA must run NO native scanner for a deferred npm project (got ${cmd})`);
   };
   const { SCARunner } = freshSCA();
-  const tmp = mkTmp('sca-npm-defer-');
   try {
     fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
     fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
     const r = new SCARunner(tmp);
     const res = await r.run();
-    assert.equal(res.success, true);
-    assert.deepEqual(res.findings, [], 'SCA must not double-scan an ecosystem DependencyAuditor audits');
-    assert.notEqual(res.scanned, true, 'no SCA scanner ran — js/ts is DependencyAuditor’s to audit');
-    assert.match(String(res.message || ''), /audited by DependencyAuditor/i,
-      'the "covered" message is truthful here — DependencyAuditor genuinely audits npm');
+    assert.equal(res.scanned, true, 'osv-scanner runs as the whole-repo net');
+    assert.deepEqual(res.findings, [],
+      'the ROOT npm CVE is DependencyAuditor’s — SCA drops osv’s duplicate so it is counted once, never twice');
   } finally {
     restore();
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -785,6 +797,253 @@ test('F3-uv: a uv.lock-only project is scanned by osv-scanner, python NOT falsel
     assert.equal(res.findings[0].tool, 'osv-scanner', 'uv python coverage comes from osv, not pip-audit');
     assert.ok(!(res.errors || []).some((e) => e.tool === 'pip-audit'),
       'native pip-audit must NOT be invoked for a uv project (it cannot read uv.lock)');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ── SCA1 (silent coverage hole): osv-scanner is a WHOLE-REPO net. When every ROOT ──────
+// ecosystem is deferred (pure npm/go/cargo/…), osv must STILL run so a NESTED,
+// independently-installed lockfile (packages/api/package-lock.json) — audited by NEITHER
+// native runner (both are root-only) — is scanned, not swallowed by an early return.
+
+test('SCA1: a monorepo (root npm + nested independent lockfile) runs osv — the nested CVE is NOT swallowed', async () => {
+  const tmp = mkTmp('sca-monorepo-');
+  let osvInvoked = false;
+  const osv = {
+    results: [{
+      source: { path: path.join(tmp, 'packages', 'api', 'package-lock.json'), type: 'lockfile' },
+      packages: [{
+        package: { name: 'nested-vuln', ecosystem: 'npm', version: '1.0.0' },
+        vulnerabilities: [{ id: 'GHSA-nested-hole', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') { osvInvoked = true; return JSON.stringify(osv); }
+    throw new Error(`only osv should scan a pure-npm monorepo here (got ${cmd})`);
+  };
+  const { SCARunner } = freshSCA();
+  try {
+    fs.mkdirSync(path.join(tmp, 'packages', 'api'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"root","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
+    fs.writeFileSync(path.join(tmp, 'packages', 'api', 'package-lock.json'), '{}');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.ok(osvInvoked,
+      'run() must attempt an osv pass — never early-return at line 229 while a nested lockfile is unscanned');
+    assert.equal(res.scanned, true, 'the repo WAS scanned by osv, not falsely reported as fully covered');
+    const pkgs = res.findings.map((f) => f.package);
+    assert.ok(pkgs.includes('nested-vuln'),
+      'the nested lockfile CVE is audited by NEITHER native runner — osv must surface it, not swallow it');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ── SCA2: Pipfile.lock is the same class as poetry.lock/uv.lock — pip-audit cannot read ──
+// it (it audits the ambient env), only osv can. python must route to osv, not pip-audit.
+
+test('SCA2: a Pipfile.lock project routes python to osv (native null), NOT ambient-env pip-audit', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-route-pipfilelock-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'Pipfile'), '[packages]\n');
+    fs.writeFileSync(path.join(tmp, 'Pipfile.lock'), '{}');
+    const route = new SCARunner(tmp).scaRouteFor('python');
+    assert.equal(route.native, null,
+      'Pipfile.lock python has NO usable native parser (pip-audit cannot read Pipfile.lock)');
+    assert.equal(route.osvUniversal, true, 'Pipfile.lock python must route to the osv universal pass');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('SCA2: a Pipfile.lock project is scanned by osv-scanner (run()), never the useless native pip-audit', async () => {
+  const osv = {
+    results: [{
+      source: { path: 'Pipfile.lock', type: 'lockfile' },
+      packages: [{
+        package: { name: 'django', ecosystem: 'PyPI', version: '2.0' },
+        vulnerabilities: [{ id: 'PYSEC-2019-django', summary: 'SQLi in Django', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-pipfilelock-run-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'Pipfile'), '[packages]\n');
+    fs.writeFileSync(path.join(tmp, 'Pipfile.lock'), '{}');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'a Pipfile.lock project must be genuinely scanned');
+    assert.equal(res.findings.length, 1, 'the Pipfile.lock CVE osv reads must surface');
+    assert.equal(res.findings[0].package, 'django');
+    assert.equal(res.findings[0].tool, 'osv-scanner');
+    assert.ok(!(res.errors || []).some((e) => e.tool === 'pip-audit'),
+      'native pip-audit must NOT be invoked for a Pipfile.lock project (it cannot read Pipfile.lock)');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ── SCA3: pip-audit must audit the project's PINNED requirements (-r), not the ambient env ──
+
+test('SCA3: SCARunner.runPipAudit invokes pip-audit with -r <requirements> when one exists (not the ambient env)', async () => {
+  let pipArgs = null;
+  cp.execFileSync = (cmd, args) => {
+    if (cmd === 'pip-audit') { pipArgs = args; return JSON.stringify({ dependencies: [] }); }
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-pip-r-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'requirements.txt'), 'flask==0.5\n');
+    const r = new SCARunner(tmp);
+    await r.runPipAudit();
+    assert.ok(pipArgs, 'pip-audit was invoked');
+    const i = pipArgs.indexOf('-r');
+    assert.ok(i >= 0, `pip-audit args must include -r; got ${JSON.stringify(pipArgs)}`);
+    assert.ok(/requirements\.txt$/.test(pipArgs[i + 1]),
+      `-r must be followed by the requirements path; got ${JSON.stringify(pipArgs)}`);
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('SCA3: SCARunner.runPipAudit WITHOUT a requirements file falls back to the plain (ambient) invocation', async () => {
+  let pipArgs = null;
+  cp.execFileSync = (cmd, args) => {
+    if (cmd === 'pip-audit') { pipArgs = args; return JSON.stringify({ dependencies: [] }); }
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-pip-nor-');
+  try {
+    const r = new SCARunner(tmp);
+    await r.runPipAudit();
+    assert.ok(pipArgs, 'pip-audit was invoked');
+    assert.equal(pipArgs.indexOf('-r'), -1,
+      `with no requirements file present there is nothing to point -r at; got ${JSON.stringify(pipArgs)}`);
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ── SCA5: a RELATIVE projectRoot must still classify its root manifest as root, so the ──
+// osv/DependencyAuditor double-count drop fires (path.resolve both sides before compare).
+
+test('SCA5: a RELATIVE projectRoot still classifies its root manifest as root (no double-count)', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('.'); // relative root
+  r._deferredLanguages = new Set(['javascript', 'typescript']);
+  const absRootLock = path.resolve('package-lock.json'); // what osv may emit as an absolute source
+  r.parseOSVResults({
+    results: [{
+      source: { path: absRootLock, type: 'lockfile' },
+      packages: [{
+        package: { name: 'lodash', ecosystem: 'npm', version: '4.17.4' },
+        vulnerabilities: [{ id: 'GHSA-relroot', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  });
+  assert.equal(r.findings.length, 0,
+    'with a relative root, the root manifest must still be recognized as root and its osv duplicate dropped');
+});
+
+test('SCA5: a relative root still KEEPS a nested lockfile finding (nested classification survives resolve)', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('.');
+  r._deferredLanguages = new Set(['javascript', 'typescript']);
+  const absNested = path.resolve('packages', 'api', 'package-lock.json');
+  r.parseOSVResults({
+    results: [{
+      source: { path: absNested, type: 'lockfile' },
+      packages: [{
+        package: { name: 'nested-dep', ecosystem: 'npm', version: '1.0.0' },
+        vulnerabilities: [{ id: 'GHSA-rel-nested', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  });
+  assert.equal(r.findings.length, 1,
+    'a nested lockfile is audited by neither runner — a relative root must not misclassify it as root and drop it');
+});
+
+// ── SCA6: a falsy/non-string projectRoot must never leak the process cwd into a scanner ──
+// exec (an empty/nullish cwd resolves to the process cwd). Mirror DependencyAuditor's guard.
+
+test('SCA6: a falsy/non-string projectRoot is normalized to null and never leaks the process cwd into a scanner exec', async () => {
+  let execCwd = 'UNSET';
+  cp.execFileSync = (cmd, args, opts) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    execCwd = opts && opts.cwd; // a leaked exec would carry cwd = undefined/'' → process cwd
+    throw new Error(`scanner ran with cwd=${JSON.stringify(execCwd)}`);
+  };
+  const { SCARunner } = freshSCA();
+  try {
+    for (const bad of ['', null, undefined, 42]) {
+      const r = new SCARunner(bad);
+      assert.equal(r.projectRoot, null,
+        `a falsy/non-string root must normalize to null (got ${JSON.stringify(r.projectRoot)})`);
+      // Even a DIRECT native/osv scanner call must refuse to exec against a leaked cwd.
+      await r.runNpmAudit();
+      await r.runOsvScanner();
+      const res = await r.run();
+      assert.deepEqual(res.findings, [], `falsy root (${JSON.stringify(bad)}) must scan nothing`);
+      assert.notEqual(res.scanned, true, 'a falsy root must not report a real scan of the process cwd');
+    }
+    assert.equal(execCwd, 'UNSET', 'no scanner may exec when the root is falsy — no process-cwd leak');
+  } finally {
+    restore();
+  }
+});
+
+// ── SCA4 (subsumed by SCA1): once osv always runs, a NESTED poetry.lock CVE is covered ──
+// by the whole-repo osv net even though DependencyAuditor's root-only detection misses it.
+
+test('SCA4: a nested poetry.lock CVE is surfaced by the osv whole-repo net (root-only detection would miss it)', async () => {
+  const tmp = mkTmp('sca-nested-poetry-');
+  let osvInvoked = false;
+  const osv = {
+    results: [{
+      source: { path: path.join(tmp, 'services', 'billing', 'poetry.lock'), type: 'lockfile' },
+      packages: [{
+        package: { name: 'cryptography', ecosystem: 'PyPI', version: '2.3' },
+        vulnerabilities: [{ id: 'PYSEC-nested-poetry', summary: 'weak cipher', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') { osvInvoked = true; return JSON.stringify(osv); }
+    throw new Error(`only osv should scan here (got ${cmd})`);
+  };
+  const { SCARunner } = freshSCA();
+  try {
+    // Root is a plain npm project (js/ts deferred); the poetry.lock lives NESTED, where
+    // DependencyAuditor's root-only detectPackageManagers never looks — osv is its only net.
+    fs.mkdirSync(path.join(tmp, 'services', 'billing'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"root","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
+    fs.writeFileSync(path.join(tmp, 'services', 'billing', 'poetry.lock'), '');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.ok(osvInvoked, 'osv must run as the whole-repo net');
+    const pkgs = res.findings.map((f) => f.package);
+    assert.ok(pkgs.includes('cryptography'),
+      'a nested poetry.lock CVE is covered only by the osv whole-repo net — it must surface');
   } finally {
     restore();
     fs.rmSync(tmp, { recursive: true, force: true });

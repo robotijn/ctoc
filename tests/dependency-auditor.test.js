@@ -19,6 +19,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const cp = require('node:child_process');
 
 const DA_PATH = require.resolve('../src/lib/dependency-auditor');
 const {
@@ -27,6 +28,21 @@ const {
   auditedLanguagesFor,
   DependencyAuditor
 } = require(DA_PATH);
+
+const REAL_EXEC = cp.execSync;
+const REAL_EXECFILE = cp.execFileSync;
+
+/** Reload dependency-auditor AFTER installing the current cp fakes — the module
+ *  destructures execSync/execFileSync at load time. */
+function freshDA() {
+  delete require.cache[DA_PATH];
+  return require(DA_PATH);
+}
+function restoreDA() {
+  cp.execSync = REAL_EXEC;
+  cp.execFileSync = REAL_EXECFILE;
+  delete require.cache[DA_PATH];
+}
 
 function mkTmp(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -201,4 +217,56 @@ test('auditedLanguagesFor: a null/undefined/non-string root fails soft to empty 
 
 test('detectPackageManagers: an empty-string root detects NOTHING — no cwd leakage (F4)', () => {
   assert.deepEqual(new DependencyAuditor('').detectPackageManagers(), []);
+});
+
+// ── SCA3: pip-audit must audit the project's PINNED requirements, not the ambient env ──
+//
+// `pip-audit --format=json` with NO -r audits the current interpreter's INSTALLED
+// packages, NOT requirements.txt. In CI (deps not installed) a requirements.txt-only
+// project then reads as clean though nothing was audited. When a requirements file
+// exists, pip-audit must be pointed at it with -r <file> (iterating each detected file),
+// invoked argv-safe via execFileSync (no shell string interpolation).
+
+test('SCA3: DependencyAuditor.runPipAudit invokes pip-audit with -r <requirements> (audits pins, not ambient env)', async () => {
+  let pipArgs = null;
+  cp.execFileSync = (cmd, args) => {
+    if (cmd === 'pip-audit') { pipArgs = args; return JSON.stringify([]); }
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-pip-r-');
+  try {
+    write(dir, 'requirements.txt', 'flask==0.5\n');
+    const a = new DA(dir);
+    await a.runPipAudit();
+    assert.ok(pipArgs, 'pip-audit must be invoked (argv-safe via execFileSync)');
+    const i = pipArgs.indexOf('-r');
+    assert.ok(i >= 0, `pip-audit args must include -r; got ${JSON.stringify(pipArgs)}`);
+    assert.ok(/requirements\.txt$/.test(pipArgs[i + 1]),
+      `-r must be followed by the requirements path; got ${JSON.stringify(pipArgs)}`);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('SCA3: DependencyAuditor.runPipAudit iterates -r for EACH detected requirements file', async () => {
+  let pipArgs = null;
+  cp.execFileSync = (cmd, args) => {
+    if (cmd === 'pip-audit') { pipArgs = args; return JSON.stringify([]); }
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-pip-r-multi-');
+  try {
+    write(dir, 'requirements.txt', 'flask==0.5\n');
+    write(dir, 'requirements-dev.txt', 'pytest\n');
+    const a = new DA(dir);
+    await a.runPipAudit();
+    const rCount = pipArgs.filter((x) => x === '-r').length;
+    assert.equal(rCount, 2, `each detected requirements file must get its own -r; got ${JSON.stringify(pipArgs)}`);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

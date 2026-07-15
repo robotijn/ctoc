@@ -581,6 +581,17 @@ function pipelineFor(language, projectType, projectRoot) {
   const shapes = cap.run && cap.run.shapes && typeof cap.run.shapes === 'object' ? cap.run.shapes : {};
   const runCommand = runShape && typeof shapes[runShape] === 'string' ? shapes[runShape] : null;
 
+  // HONEST-RUN CONTRACT. `honest: true` asserts "this genuinely runs" — but a NULL run
+  // command means there is nothing to run, so honest:true + command:null is a lie:
+  // app-runner treats pipeline.run.honest as AUTHORITATIVE and would propagate a false
+  // "it ran" to the human. When the language supplies no command for the type's runShape,
+  // a `true` honest flag degrades to `false`. NON-true honest flags — `false` and
+  // 'build-is-last-mile' — are CONSISTENT with a null command (they never claimed a live
+  // run) and are preserved verbatim. Mirrors runStrategyFor's guard, which returns null
+  // rather than ever pairing honest:true with a missing command.
+  const rawHonest = type.run ? type.run.honest : null;
+  const honest = (rawHonest === true && runCommand == null) ? false : rawHonest;
+
   // Union the two scaffolds, preserving first-seen order and de-duplicating.
   const langScaffold = Array.isArray(cap.configScaffold) ? cap.configScaffold : [];
   const typeScaffold = Array.isArray(type.configScaffold) ? type.configScaffold : [];
@@ -595,7 +606,7 @@ function pipelineFor(language, projectType, projectRoot) {
     phases,
     run: {
       strategy: type.run && type.run.strategy != null ? type.run.strategy : null,
-      honest: type.run ? type.run.honest : null,
+      honest,
       command: runCommand,
       shape: runShape
     },
@@ -891,9 +902,10 @@ function detectLanguages(projectRoot) {
   try {
     rootFiles = safeFs.readdirSync(projectRoot);
   } catch { rootFiles = []; }
-  // Two buckets, filled in load() (sorted-filename) order so each stays sorted internally.
-  const manifestMatched = []; // matched at least one EXACT marker → decisive language signal
-  const globOnlyMatched = []; // matched ONLY a source-file glob → weak, incidental signal
+  // Three buckets, filled in load() (sorted-filename) order so each stays sorted internally.
+  const manifestMatched = [];  // real app language, matched an EXACT marker → decisive signal
+  const globOnlyMatched = [];  // real app language, matched ONLY a source-file glob → weak signal
+  const ancillaryMatched = []; // cross-cutting infra/config language (role:ancillary) → never primary
   for (const [lang, cap] of Object.entries(languages)) {
     const markers = Array.isArray(cap.detectionMarkers) ? cap.detectionMarkers : [];
     let exact = false;
@@ -913,10 +925,52 @@ function detectLanguages(projectRoot) {
       // An exact match is decisive — no need to keep scanning this language's markers.
       if (exact) break;
     }
-    if (exact) manifestMatched.push(lang);
-    else if (glob) globOnlyMatched.push(lang);
+    if (!exact && !glob) continue;
+    // ANCILLARY (F-ancillary): a cross-cutting infra/config language (role:ancillary — a
+    // Dockerfile, a CI workflow) is DETECTED but never allowed to take the primary slot. It
+    // ranks BELOW every real application language regardless of its marker kind, because it
+    // describes how the app is packaged/shipped, not what the app IS. Without this, its exact
+    // marker (Dockerfile, .github/workflows) would land it in the decisive manifest tier and,
+    // sorting early by filename, make it detectLanguages[0] — the wrong run target — for
+    // almost every real repo.
+    if (cap.role === 'ancillary') ancillaryMatched.push(lang);
+    else if (exact) manifestMatched.push(lang);
+    else globOnlyMatched.push(lang);
   }
-  return [...manifestMatched, ...globOnlyMatched];
+  const ordered = [...manifestMatched, ...globOnlyMatched, ...ancillaryMatched];
+  return applyOutranks(ordered, languages);
+}
+
+/**
+ * Apply each language's optional `outranks: [otherLang, …]` precedence — a data-driven,
+ * PAIRWISE reorder. When language A declares it outranks B and BOTH are present in the
+ * detected list, A is moved to immediately BEFORE B; every other language's relative order
+ * is preserved. This is how typescript.yaml (`outranks: [javascript]`) expresses that a repo
+ * carrying a tsconfig.json is a TypeScript project whose primary must be typescript, not
+ * javascript — WITHOUT deleting javascript (a mixed repo legitimately has both). The engine
+ * stays dumb: the relationship lives entirely in the YAML data.
+ *
+ * Iteration is load() order (sorted-filename), so the reorder is deterministic and
+ * cross-platform stable. A named target that is absent, or already ahead of A, is a no-op.
+ *
+ * @param {string[]} ordered the tiered detection order.
+ * @param {Object<string, Object>} languages the loaded capability map (source of `outranks`).
+ * @returns {string[]} the order with every satisfied `outranks` precedence applied.
+ */
+function applyOutranks(ordered, languages) {
+  const result = ordered.slice();
+  for (const [lang, cap] of Object.entries(languages)) {
+    const targets = Array.isArray(cap.outranks) ? cap.outranks : [];
+    for (const target of targets) {
+      if (typeof target !== 'string') continue;
+      const ai = result.indexOf(lang);
+      const bi = result.indexOf(target);
+      if (ai === -1 || bi === -1 || ai < bi) continue; // absent, or A already ahead of B
+      result.splice(ai, 1);                             // remove A
+      result.splice(result.indexOf(target), 0, lang);   // reinsert A immediately before B
+    }
+  }
+  return result;
 }
 
 /**

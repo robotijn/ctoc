@@ -1230,3 +1230,281 @@ test('DB-w4 DEFECT C: a benign `<sql><![CDATA[SELECT ...]]></sql>` stays ZERO', 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── DB-w5 ADVERSARIAL: five false-negatives + one false-positive ───────────────
+// FN1 EF `.Sql(@"…")`/`.Sql($"…")` verbatim/interpolated string prefixes; FN2 YAML
+// `sql:` raw-SQL changetype; FN3 YAML dropAllForeignKeyConstraints parity with XML;
+// FN4 T-SQL `EXEC sp_executesql N'…'`; FN5 `--` inside a string literal truncating a
+// real trailing statement; FP-A safe constraint-relaxing ALTER…DROP {DEFAULT|NOT
+// NULL|IDENTITY|EXPRESSION} wrongly flagged HIGH. Real temp-dir fixtures, zero mocks.
+
+// FN1 — EF verbatim/interpolated `.Sql(@"…")` / `.Sql($"…")` DROP in Up() must fire.
+test('DB-w5 FN1: an EF `.Sql(@"DROP TABLE Users")` verbatim string in Up() fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20250101_VerbatimDrop.cs'),
+      'public partial class VerbatimDrop : Migration {\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.Sql(@"DROP TABLE Users");\n' +
+      '  }\n' +
+      '}\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'a verbatim @"DROP TABLE …" string is a HIGH finding');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FN1: an EF `.Sql($"DROP TABLE Users")` interpolated string in Up() fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20250102_InterpDrop.cs'),
+      'public partial class InterpDrop : Migration {\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.Sql($"DROP TABLE Users");\n' +
+      '  }\n' +
+      '}\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'an interpolated $"DROP TABLE …" string is a HIGH finding');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FN1: verbatim/interpolated `.Sql(@"DROP …")` / `.Sql($"DROP …")` inside Down() stay EXCLUDED (0)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20250103_SqlDown.cs'),
+      'public partial class SqlDown : Migration {\n' +
+      '  protected override void Up(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.CreateTable("Users");\n' +
+      '  }\n' +
+      '  protected override void Down(MigrationBuilder migrationBuilder) {\n' +
+      '    migrationBuilder.Sql(@"DROP TABLE Users");\n' +
+      '    migrationBuilder.Sql($"DROP TABLE Orders");\n' +
+      '  }\n' +
+      '}\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a .Sql DROP inside Down() is a rollback definition, not a risk');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FN2 — Liquibase YAML `sql:` raw-SQL changetype carrying a DROP.
+test('DB-w5 FN2: a Liquibase YAML `sql: DROP TABLE …` raw-SQL changetype fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '100.yaml'),
+      'databaseChangeLog:\n' +
+      '  - changeSet:\n' +
+      '      changes:\n' +
+      '        - sql: DROP TABLE users\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true, 'the .yaml changelog was scanned');
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'raw SQL in a YAML sql: value is scanned like the XML <sql> path');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FN2: a Liquibase YAML `sql: DROP TABLE …` inside a rollback yields ZERO', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '101.yaml'),
+      'databaseChangeLog:\n' +
+      '  - changeSet:\n' +
+      '      changes:\n' +
+      '        - createTable:\n' +
+      '            tableName: users\n' +
+      '      rollback:\n' +
+      '        - sql: DROP TABLE users\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a sql: DROP inside a rollback: sub-block is a rollback definition');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FN2: a benign Liquibase YAML `sql: SELECT …` stays ZERO', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '102.yaml'),
+      'databaseChangeLog:\n' +
+      '  - changeSet:\n' +
+      '      changes:\n' +
+      '        - sql: SELECT count(*) FROM users\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a non-destructive sql: SELECT is not flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FN3 — YAML dropAllForeignKeyConstraints parity with the XML element.
+test('DB-w5 FN3: a Liquibase YAML `- dropAllForeignKeyConstraints:` fires (XML parity)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '110.yaml'),
+      'databaseChangeLog:\n' +
+      '  - changeSet:\n' +
+      '      changes:\n' +
+      '        - dropAllForeignKeyConstraints:\n' +
+      '            baseTableName: users\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'YAML dropAllForeignKeyConstraints is destructive, matching the XML element');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FN4 — T-SQL dynamic DDL `EXEC sp_executesql N'DROP …'`.
+test('DB-w5 FN4: a T-SQL `EXEC sp_executesql N\'DROP TABLE Users\'` fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '120_dynamic.sql'),
+      "EXEC sp_executesql N'DROP TABLE Users';\n");
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'dynamic DDL via sp_executesql is caught');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FN4: a benign `EXEC some_proc @id` stays ZERO', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '121_proc.sql'),
+      'EXEC some_proc @id;\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a plain stored-proc EXEC with no dynamic DROP is not flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FN5 — `--` inside a string literal must not truncate a real trailing statement.
+test('DB-w5 FN5: a `--` inside a string literal does not hide a trailing real DROP', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '130_dashstr.sql'),
+      "INSERT INTO t VALUES ('a--b'); DROP TABLE gone;\n");
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'the -- inside the string literal must not discard the real DROP after it');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FN5: a genuine trailing `-- DROP TABLE …` line comment is still stripped (0)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '131_realcomment.sql'),
+      "INSERT INTO t VALUES ('x'); -- DROP TABLE gone later\n");
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a real -- line comment mentioning DROP is not executable DDL');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// FP-A — safe constraint-relaxing ALTER…DROP {DEFAULT|NOT NULL|IDENTITY|EXPRESSION}.
+test('DB-w5 FP-A: `ALTER TABLE … ALTER COLUMN … DROP DEFAULT` is NOT flagged (no data loss)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '140_dropdefault.sql'),
+      'ALTER TABLE users ALTER COLUMN status DROP DEFAULT;\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'DROP DEFAULT relaxes a constraint and loses no data');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FP-A: `ALTER TABLE … ALTER COLUMN … DROP NOT NULL` is NOT flagged (no data loss)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '141_dropnotnull.sql'),
+      'ALTER TABLE users ALTER COLUMN status DROP NOT NULL;\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'DROP NOT NULL relaxes a constraint and loses no data');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FP-A: `ALTER TABLE … DROP COLUMN email` is STILL flagged (real data loss)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '142_dropcol.sql'),
+      'ALTER TABLE users DROP COLUMN email;\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'DROP COLUMN destroys column data and must stay flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DB-w5 FP-A: `ALTER TABLE … DROP CONSTRAINT fk_x` is STILL flagged', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '143_dropconstraint.sql'),
+      'ALTER TABLE users DROP CONSTRAINT fk_x;\n');
+
+    const res = await new MigrationSafetyChecker(dir).run();
+
+    assert.equal(res.scanned, true);
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'DROP CONSTRAINT is a schema change worth reviewing and stays flagged');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

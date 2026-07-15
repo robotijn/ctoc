@@ -154,6 +154,13 @@ const FRAMEWORK_PUBLIC_PREFIXES = {
  * even though the bare terminal treatment would not (they are not the final segment
  * once `_KEY` follows); `API_KEY`/`APIKEY` and the `*_TOKEN` auth compounds are
  * load-bearing (neither `API`/`KEY` nor a bare `TOKEN` is an indicator on its own).
+ *
+ * A CURATED high-value compound set — `SERVICE_ROLE_KEY`, `GITHUB_TOKEN`, `NPM_TOKEN`,
+ * `SLACK_TOKEN` — is included because these are the most damaging client-exposure leaks
+ * (a Supabase `SERVICE_ROLE_KEY` bypasses all row-level security → full DB compromise;
+ * a `GITHUB_TOKEN` / `NPM_TOKEN` grants repo / registry write). They are compound-only
+ * so the bare-`KEY` / bare-`TOKEN` exclusion that spares `PUBLISHABLE_KEY` and
+ * `TOKEN_ADDRESS` is preserved — only these specific two-plus-segment forms fire.
  * @type {string[]}
  */
 const COMPOUND_INDICATORS = [
@@ -161,12 +168,16 @@ const COMPOUND_INDICATORS = [
   'PRIVATE_KEY',
   'API_KEY',
   'APIKEY',
+  'SERVICE_ROLE_KEY',
   'ACCESS_TOKEN',
   'AUTH_TOKEN',
   'API_TOKEN',
   'BEARER_TOKEN',
   'SESSION_TOKEN',
-  'REFRESH_TOKEN'
+  'REFRESH_TOKEN',
+  'GITHUB_TOKEN',
+  'NPM_TOKEN',
+  'SLACK_TOKEN'
 ];
 
 /**
@@ -196,6 +207,24 @@ const COMPOUND_INDICATORS = [
 const TERMINAL_INDICATORS = ['SECRET', 'PASSWORD', 'PASSWD', 'PRIVATE', 'CREDENTIAL'];
 
 /**
+ * BENIGN metadata suffixes (CONSTANT). A compound indicator (`API_KEY`, `ACCESS_TOKEN`,
+ * `PRIVATE_KEY`, …) followed by ONE of these to the end of the name denotes METADATA
+ * ABOUT a secret, not the secret value itself, and is therefore client-safe:
+ *   - `NEXT_PUBLIC_API_KEY_HEADER`          the HTTP header NAME the key travels in
+ *   - `NEXT_PUBLIC_ACCESS_TOKEN_URL`        the token ENDPOINT
+ *   - `NEXT_PUBLIC_PRIVATE_KEY_ID`          a JWKS `kid`
+ *   - `NEXT_PUBLIC_ACCESS_TOKEN_STORAGE_KEY` a localStorage key NAME
+ * The compound branch anchors symmetrically with the terminal branch by rejecting these
+ * suffixes via a negative lookahead (below). Any OTHER trailing suffix is treated as
+ * secret-ish and STILL fires (`…_SECRET_KEY_BASE`), and a bare compound with no trailing
+ * segment (`…_API_KEY`, `…_ACCESS_TOKEN`) always fires. `_STORAGE_KEY` is listed as its
+ * own two-segment suffix so a bare trailing `_KEY` is NOT globally whitelisted (that
+ * would silence real leaks) — only the specific benign forms are.
+ * @type {string[]}
+ */
+const BENIGN_COMPOUND_SUFFIXES = ['HEADER', 'URL', 'ID', 'NAME', 'STORAGE_KEY', 'PATH', 'PREFIX', 'ENDPOINT'];
+
+/**
  * Expand an uppercase literal indicator token into a CASE-INSENSITIVE regex source
  * WITHOUT the `i` flag — each ASCII letter becomes a two-char class (`S`→`[Ss]`),
  * `_` and digits stay literal. This lets the name TAIL match case-insensitively
@@ -212,6 +241,8 @@ function ciPattern(token) {
 /** Case-insensitive indicator alternations (CONSTANT sources). */
 const COMPOUND_ALT = COMPOUND_INDICATORS.map(ciPattern).join('|');
 const TERMINAL_ALT = TERMINAL_INDICATORS.map(ciPattern).join('|');
+/** Benign metadata-suffix alternation, each anchored by a leading `_` (CONSTANT source). */
+const BENIGN_SUFFIX_ALT = BENIGN_COMPOUND_SUFFIXES.map(s => `_${ciPattern(s)}`).join('|');
 
 /**
  * Build the client-exposed-secret NAME pattern (CONSTANT via safeRegExp) for a
@@ -229,8 +260,13 @@ const TERMINAL_ALT = TERMINAL_INDICATORS.map(ciPattern).join('|');
  *     a single linear quantifier with NO overlapping ambiguity (ReDoS-safe). The
  *     class is case-insensitive so a lowercase/mixed tail (`VITE_api_secret`) is
  *     caught while the uppercase prefix requirement holds (F5).
- *   - branch 1: a COMPOUND indicator on segment boundaries, trailing segments
- *     allowed (`VITE_STRIPE_SECRET_KEY`, `NEXT_PUBLIC_ACCESS_TOKEN`).
+ *   - branch 1: a COMPOUND indicator on segment boundaries. A negative lookahead
+ *     `(?!<benign-suffix>\b)` rejects a trailing METADATA suffix (`_HEADER`, `_URL`,
+ *     `_ID`, `_NAME`, `_STORAGE_KEY`, `_PATH`, `_PREFIX`, `_ENDPOINT`) so
+ *     `NEXT_PUBLIC_API_KEY_HEADER` (a header name) does NOT fire, while a bare compound
+ *     (`NEXT_PUBLIC_ACCESS_TOKEN`) and a secret-ish trailing suffix
+ *     (`…_SECRET_KEY_BASE`) still do. This anchors branch 1 symmetrically with the
+ *     terminal branch 2, closing the open-ended-suffix false positive.
  *   - branch 2: the TERMINAL `SECRET` with NO trailing segment, so it flags only as
  *     the last segment (`NEXT_PUBLIC_API_SECRET`) and never mid-name
  *     (`NEXT_PUBLIC_SECRET_SANTA_ENABLED`).
@@ -246,7 +282,7 @@ function buildClientSecretRe(activePrefixes) {
   if (!Array.isArray(activePrefixes) || activePrefixes.length === 0) return null;
   const prefixAlt = activePrefixes.map(escapeRegExp).join('|');
   return safeRegExp(
-    `\\b(?:${prefixAlt})(?:(?:[A-Za-z0-9]+_)*(?:${COMPOUND_ALT})(?:_[A-Za-z0-9]+)*|(?:[A-Za-z0-9]+_)*(?:${TERMINAL_ALT}))\\b`,
+    `\\b(?:${prefixAlt})(?:(?:[A-Za-z0-9]+_)*(?:${COMPOUND_ALT})(?!(?:${BENIGN_SUFFIX_ALT})\\b)(?:_[A-Za-z0-9]+)*|(?:[A-Za-z0-9]+_)*(?:${TERMINAL_ALT}))\\b`,
     'g'
   );
 }
@@ -469,26 +505,31 @@ class FrameworkSecurityChecker {
         scanned: false,
         findings: [],
         errors: this.errors,
+        unscanned: [],
         reason,
         summary: this.generateSummary([], 0),
         message: `Framework security: ${reason}; nothing was scanned (not a clean pass)`
       };
     }
 
-    // Scope the scanned prefixes to the DETECTED frameworks (F3.1), then build the
-    // one constant, ReDoS-safe pattern from that active set.
-    const activePrefixes = this.activePublicPrefixes(relevant);
+    // Partition the relevant frameworks into SCANNABLE (a prefix mapping exists, so the
+    // NAME-based scan can key on them) and UNSCANNABLE (their env exposure is not
+    // prefix-named — Angular's build-time `environment.ts` replacement, Remix's loader /
+    // `window.ENV` — for which FRAMEWORK_PUBLIC_PREFIXES has no entry). This is tracked
+    // PER framework, not all-or-nothing over the union, so a mix does not silently hide
+    // the unscannable member (FW3).
+    const scannable = relevant.filter(f => f && Array.isArray(FRAMEWORK_PUBLIC_PREFIXES[f.name]));
+    const unscanned = relevant
+      .filter(f => f && !Array.isArray(FRAMEWORK_PUBLIC_PREFIXES[f.name]))
+      .map(f => f.name)
+      .filter(Boolean);
 
-    // HONESTY (F1). A framework can carry the `env-exposure` concern yet expose env
-    // via NON-prefix-named paths (Angular's build-time `environment.ts` replacement,
-    // Remix's loader / `window.ENV`) — for which FRAMEWORK_PUBLIC_PREFIXES has no
-    // entry. In that case the active prefix set is empty, `buildClientSecretRe`
-    // returns null, and the scan pattern LITERALLY never runs. Reporting that as a
-    // clean pass is the exact honesty hole this module's docstring claims to have
-    // closed — a relevant-but-unscannable repo would be told "scanned, no secrets
-    // found" when no pattern scan happened. So we skip HONESTLY: scanned:false with a
-    // reason naming the offending framework(s).
-    if (activePrefixes.length === 0) {
+    // HONESTY (F1). When NO relevant framework is scannable, the scan pattern LITERALLY
+    // never runs. Reporting that as a clean pass is the exact honesty hole this module
+    // closes — a relevant-but-unscannable repo would be told "scanned, no secrets found"
+    // when no pattern scan happened. So we skip HONESTLY: scanned:false with a reason
+    // naming the offending framework(s).
+    if (scannable.length === 0) {
       const names = relevant.map(f => f && f.name).filter(Boolean).join(', ');
       const reason =
         `detected framework(s) [${names}] expose env via non-prefix-named paths ` +
@@ -497,12 +538,16 @@ class FrameworkSecurityChecker {
         scanned: false,
         findings: [],
         errors: this.errors,
+        unscanned,
         reason,
         summary: this.generateSummary([], 0),
         message: `Framework security: ${reason}; nothing was scanned (not a clean pass)`
       };
     }
 
+    // Scope the scanned prefixes to the SCANNABLE detected frameworks (F3.1), then build
+    // the one constant, ReDoS-safe pattern from that active set.
+    const activePrefixes = this.activePublicPrefixes(scannable);
     const scanRe = buildClientSecretRe(activePrefixes);
 
     const files = this.collectFiles();
@@ -526,12 +571,22 @@ class FrameworkSecurityChecker {
 
     const findings = this.deduplicateFindings();
 
+    // FW3 disclosure: even though the scan PROCEEDED on the scannable framework(s), a
+    // co-occurring unscannable env-exposure framework (angular / remix) had its exposure
+    // path skipped. Surface it so the pass is not read as covering the whole repo.
+    const baseMessage = this.generateReport(findings, scannedCount);
+    const message = unscanned.length > 0
+      ? `${baseMessage}\n  NOTE: env exposure for [${unscanned.join(', ')}] was NOT scanned ` +
+        '(non-prefix-named exposure path this NAME-based scan cannot key on)'
+      : baseMessage;
+
     return {
       scanned: true,
       findings,
       errors: this.errors,
+      unscanned,
       summary: this.generateSummary(findings, scannedCount),
-      message: this.generateReport(findings, scannedCount)
+      message
     };
   }
 
