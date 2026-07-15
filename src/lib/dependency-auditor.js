@@ -217,6 +217,29 @@ class DependencyAuditor {
   }
 
   /**
+   * True when the project root carries an npm lockfile (`package-lock.json` or
+   * `npm-shrinkwrap.json`) — the ONLY files `npm audit` can read. yarn/pnpm are
+   * "implemented" in this auditor solely via the npm-audit fallback (runAudit routes
+   * yarn/pnpm → runNpmAudit), but `npm audit --json` on a tree with NO npm lockfile
+   * returns `{"error":{"code":"ENOLOCK",…}}` and audits NOTHING — it cannot read
+   * yarn.lock/pnpm-lock.yaml. So a yarn.lock-/pnpm-lock.yaml-only project is genuinely
+   * auditable here ONLY when an npm lockfile is ALSO present; otherwise its coverage
+   * belongs to osv-scanner (which reads yarn.lock/pnpm-lock.yaml natively). Fail-soft:
+   * an unreadable/falsy root reports absent.
+   * @returns {boolean} true iff an npm lockfile exists at the project root
+   */
+  _hasNpmLockfile() {
+    const root = this.projectRoot;
+    if (!root || typeof root !== 'string') return false;
+    for (const lockFile of PACKAGE_MANAGERS.npm.lockFiles) {
+      try {
+        if (safeFs.existsSync(path.join(root, lockFile))) return true;
+      } catch { /* unreadable → skip */ }
+    }
+    return false;
+  }
+
+  /**
    * Check if an audit tool is available
    * @param {string} manager - Package manager name
    * @returns {boolean} True if tool is available
@@ -598,6 +621,21 @@ class DependencyAuditor {
    * @param {Object} data - npm audit JSON output
    */
   parseNpmAuditResults(data) {
+    if (!data || typeof data !== 'object') return;
+
+    // Error envelope (ENOLOCK, registry error, …): `npm audit --json` on a tree with
+    // NO npm lockfile (yarn.lock/pnpm-lock.yaml only) exits non-zero and prints
+    // `{"error":{"code":"ENOLOCK",…}}` — NOTHING was audited. The old parser saw no
+    // `vulnerabilities`/`advisories` key and returned SILENTLY, so the run read as a
+    // clean 0-vuln/0-error pass though it verified nothing. Record a LOUD error instead
+    // (defense-in-depth, mirroring sca-runner's parseNpmAuditResults); never silence.
+    if (data.error && typeof data.error === 'object') {
+      const code = data.error.code || 'unknown';
+      const summary = data.error.summary ? `: ${data.error.summary}` : '';
+      this.errors.push({ manager: 'npm', error: `npm audit did not run (${code})${summary}` });
+      return;
+    }
+
     // Handle npm audit v2 format
     if (data.vulnerabilities) {
       for (const [name, vuln] of Object.entries(data.vulnerabilities)) {
@@ -1059,8 +1097,21 @@ function auditedLanguagesFor(projectRoot) {
   const covered = new Set();
   try {
     const auditor = new DependencyAuditor(projectRoot);
+    const npmLockPresent = auditor._hasNpmLockfile();
     for (const manager of auditor.detectPackageManagers()) {
       if (!IMPLEMENTED_MANAGERS.has(manager)) continue;
+      // Every JS manager (npm/yarn/pnpm) is audited here through `npm audit`: npm →
+      // runNpmAudit directly, yarn/pnpm → the runNpmAudit fallback. `npm audit` reads ONLY
+      // package-lock.json/npm-shrinkwrap.json — never yarn.lock/pnpm-lock.yaml, and on a
+      // tree with NO npm lockfile it returns {"error":{"code":"ENOLOCK"}} and audits
+      // NOTHING (verified against npm 11.x). A yarn.lock-/pnpm-lock.yaml-only project — and
+      // note detectPackageManagers also co-detects `npm` from a bare package.json — is
+      // therefore NOT genuinely audited here absent an npm lockfile, so javascript/
+      // typescript must be OMITTED and routed to SCA/osv (which reads yarn.lock/
+      // pnpm-lock.yaml natively) — never claimed covered while its lockfile CVEs go
+      // unaudited. Mirror of the F3 poetry.lock routing. With an npm lockfile present, npm
+      // audit genuinely works → keep the deferral.
+      if ((manager === 'npm' || manager === 'yarn' || manager === 'pnpm') && !npmLockPresent) continue;
       for (const lang of (MANAGER_LANGUAGES[manager] || [])) {
         covered.add(lang);
       }

@@ -897,6 +897,159 @@ test('SCA2: a Pipfile.lock project is scanned by osv-scanner (run()), never the 
   }
 });
 
+// ── FALSE-CLEAN: a yarn.lock/pnpm-lock.yaml-only repo (no package-lock.json) ───────────
+// npm audit reads ONLY package-lock.json/npm-shrinkwrap.json — never yarn.lock/
+// pnpm-lock.yaml (it ENOLOCKs). javascript's native npm-audit route is therefore useless
+// for such a project; only osv-scanner reads yarn.lock/pnpm-lock.yaml natively. This is
+// the JS analog of the poetry.lock/uv.lock → osv routing.
+
+test('scaRouteFor: javascript WITH a yarn.lock (no package-lock.json) routes to osv (native null), NOT npm-audit', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-route-yarn-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'yarn.lock'), '# yarn lockfile v1\n');
+    const route = new SCARunner(tmp).scaRouteFor('javascript');
+    assert.equal(route.native, null,
+      'yarn.lock javascript has NO usable native parser (npm audit cannot read yarn.lock)');
+    assert.equal(route.osvUniversal, true, 'yarn.lock javascript must route to the osv universal pass');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('scaRouteFor: javascript WITH a pnpm-lock.yaml (no package-lock.json) routes to osv, NOT npm-audit', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-route-pnpm-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'pnpm-lock.yaml'), 'lockfileVersion: 5.4\n');
+    const route = new SCARunner(tmp).scaRouteFor('javascript');
+    assert.equal(route.native, null, 'pnpm-lock.yaml javascript has NO usable native parser');
+    assert.equal(route.osvUniversal, true, 'pnpm-lock.yaml javascript must route to osv');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('scaRouteFor: javascript WITH a package-lock.json stays npm-audit (no over-correction)', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-route-npmlock-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
+    const route = new SCARunner(tmp).scaRouteFor('javascript');
+    assert.equal(route.native, 'npm-audit', 'package-lock.json is genuinely npm-auditable — keep the native route');
+    assert.equal(route.osvUniversal, false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('_isEcosystemDeferred: a root yarn.lock npm CVE is KEPT (never dropped as a DependencyAuditor double)', () => {
+  // The false-clean: DependencyAuditor claims npm coverage but its npm-audit fallback
+  // ENOLOCKs on yarn.lock — so a root yarn.lock CVE dropped as a "deferred double" is
+  // reported by NEITHER runner. When the JS lockfile is yarn.lock with no package-lock.json,
+  // osv is the ONLY runner that reads it → the finding must be KEPT even with npm in the
+  // deferred set (defense-in-depth over a wrongly-populated _deferredLanguages).
+  const { SCARunner } = require(SCA_PATH);
+  const tmp = mkTmp('sca-deferred-yarn-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'yarn.lock'), '# yarn lockfile v1\n');
+    const r = new SCARunner(tmp);
+    r._deferredLanguages = new Set(['javascript', 'typescript']);
+    r.parseOSVResults({
+      results: [{
+        source: { path: path.join(tmp, 'yarn.lock'), type: 'lockfile' },
+        packages: [{
+          package: { name: 'evil-pkg', ecosystem: 'npm', version: '1.0.0' },
+          vulnerabilities: [{ id: 'GHSA-yarn-hole', database_specific: { severity: 'CRITICAL' } }]
+        }]
+      }]
+    });
+    assert.equal(r.findings.length, 1,
+      'a root yarn.lock CVE is audited by NEITHER runner unless osv keeps it — it must NOT be dropped');
+    assert.equal(r.findings[0].package, 'evil-pkg');
+    assert.equal(r.findings[0].severity, 'CRITICAL');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('run(): a yarn.lock-only repo (osv available) surfaces the root yarn.lock CVE — javascript NOT falsely deferred', async () => {
+  const osv = {
+    results: [{
+      source: { path: 'yarn.lock', type: 'lockfile' },
+      packages: [{
+        package: { name: 'evil-pkg', ecosystem: 'npm', version: '1.0.0' },
+        vulnerabilities: [{ id: 'GHSA-yarn-crit', summary: 'Prototype pollution', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) {
+      if (cmd === 'osv-scanner') return '';
+      throw new Error('not installed');
+    }
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-yarn-run-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'yarn.lock'), '# yarn lockfile v1\n');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'a yarn.lock project must be genuinely scanned, not falsely deferred');
+    assert.equal(res.findings.length, 1, 'the root yarn.lock CVE osv reads must surface (not dropped as a deferred double)');
+    assert.equal(res.findings[0].package, 'evil-pkg');
+    assert.equal(res.findings[0].severity, 'CRITICAL');
+    assert.equal(res.findings[0].tool, 'osv-scanner', 'yarn.lock coverage comes from osv, not npm-audit');
+    assert.ok(!(res.errors || []).some((e) => e.tool === 'npm-audit'),
+      'native npm-audit must NOT be invoked for a yarn.lock project (it cannot read yarn.lock)');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('run(): a pure yarn.lock repo (no package.json) STILL runs osv via _jsUsesOsvOnlyLock — no false no-op', async () => {
+  const osv = {
+    results: [{
+      source: { path: 'yarn.lock', type: 'lockfile' },
+      packages: [{
+        package: { name: 'lone-vuln', ecosystem: 'npm', version: '2.0.0' },
+        vulnerabilities: [{ id: 'GHSA-lone', database_specific: { severity: 'HIGH' } }]
+      }]
+    }]
+  };
+  let osvInvoked = false;
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) {
+      if (cmd === 'osv-scanner') return '';
+      throw new Error('not installed');
+    }
+    if (cmd === 'osv-scanner') { osvInvoked = true; return JSON.stringify(osv); }
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-yarn-lone-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'yarn.lock'), '# yarn lockfile v1\n');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.ok(osvInvoked, 'osv must run even when the registry detects no language — the yarn.lock lock is the signal');
+    assert.equal(res.scanned, true, 'the yarn.lock repo WAS scanned by osv, not a false clean no-op');
+    assert.ok(res.findings.some((f) => f.package === 'lone-vuln'),
+      'the yarn.lock CVE must surface');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 // ── SCA3: pip-audit must audit the project's PINNED requirements (-r), not the ambient env ──
 
 test('SCA3: SCARunner.runPipAudit invokes pip-audit with -r <requirements> when one exists (not the ambient env)', async () => {

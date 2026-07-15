@@ -12,8 +12,26 @@
 const safeFs = require('./safe-fs');
 const { safeRegExp, escapeRegExp } = require('./regex-utils');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const registry = require('./capability-registry');
+
+/**
+ * Correct, framework-specific JS/TS test + coverage invocations. This replaces the old
+ * `npx <framework>` / `npx <framework> --coverage` construction, which produced broken
+ * commands: bare `npx playwright` prints usage and runs ZERO tests; bare `npx vitest`
+ * enters WATCH mode and never exits; `mocha --coverage` / `ava --coverage` are invalid
+ * flags (coverage is `nyc mocha` / `c8 ava`). A `null` coverage means the framework has
+ * no coverage mode (e.g. Playwright), so we emit no invalid flag rather than a wrong one.
+ * @type {Object<string, {test: string, coverage: (string|null)}>}
+ */
+const JS_FRAMEWORK_COMMANDS = {
+  vitest:     { test: 'vitest run',      coverage: 'vitest run --coverage' },
+  jest:       { test: 'jest',            coverage: 'jest --coverage' },
+  mocha:      { test: 'mocha',           coverage: 'nyc mocha' },
+  ava:        { test: 'ava',             coverage: 'c8 ava' },
+  playwright: { test: 'playwright test', coverage: null },
+  tap:        { test: 'tap',             coverage: 'tap --coverage' }
+};
 
 /**
  * Language detection from project files
@@ -151,18 +169,55 @@ function detectPythonTestFramework(projectPath = process.cwd()) {
 }
 
 /**
- * Check if a command exists
+ * Check if a command exists — ARGV-SAFE, no shell (Findings 1 & 7).
+ *
+ * The tool token is looked up via `execFileSync('which'|'where', [tool])`, NOT
+ * interpolated into a shell string. A capability `cmd` is untrusted data (a project may
+ * drop a hostile `.ctoc/capabilities` override); the old `execSync('which ' + tok)` fed
+ * it to `/bin/sh`, so a token like `zzz||touch$IFS/tmp/PWNED` executed during detection.
+ * With execFile there is no shell: the whole token is one inert argv value that either
+ * resolves or does not — never runs.
+ *
+ * A project-local launcher (POSIX `./gradlew`, Windows `gradlew.bat`) is resolved against
+ * the PROJECT dir, not PATH — `which ./gradlew` never works, so a real project-local
+ * wrapper was always reported "missing" (Finding 7). We resolve it via the filesystem
+ * relative to projectPath instead.
+ *
+ * @param {string} cmd the inert command string (first token is the tool).
+ * @param {string} [projectPath] project root — project-local launchers resolve against it.
+ * @returns {boolean}
  */
-function commandExists(cmd) {
+function commandExists(cmd, projectPath = process.cwd()) {
   try {
-    const checkCmd = process.platform === 'win32'
-      ? `where ${cmd.split(' ')[0]}`
-      : `which ${cmd.split(' ')[0]}`;
-    execSync(checkCmd, { stdio: 'ignore' });
+    const tool = String(cmd).split(' ')[0];
+    if (tool.startsWith('./') || tool.startsWith('.\\') || tool === 'gradlew.bat') {
+      const rel = tool.replace(/^\.[\\/]/, '');
+      return safeFs.existsSync(path.join(projectPath, rel));
+    }
+    const finder = process.platform === 'win32' ? 'where' : 'which';
+    execFileSync(finder, [tool], { stdio: 'ignore', cwd: projectPath });
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * The real tool NAME for an install hint, stripping launcher prefixes so the hint names
+ * the tool the user must install — not the launcher (Finding 9). `./gradlew test` → gradle,
+ * `bundle exec rspec` → rspec, `vitest run` → vitest, `nyc mocha` → mocha. `npx`/`npm`
+ * were the specific launchers the old `cmd.split(' ')[0]` surfaced ("Install npx for …").
+ * @param {string} cmd
+ * @returns {string}
+ */
+function toolNameForInstall(cmd) {
+  const parts = String(cmd).split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return String(cmd);
+  if (/(^|[\\/])gradlew(\.bat)?$/.test(parts[0])) return 'gradle';
+  const launchers = new Set(['npx', 'npm', 'bundle', 'exec', 'c8', 'nyc', 'run']);
+  let i = 0;
+  while (i < parts.length - 1 && launchers.has(parts[i])) i++;
+  return parts[i] || parts[0];
 }
 
 /**
@@ -200,20 +255,145 @@ function getInstallCommand(tool, language) {
 }
 
 /**
- * Read user config
+ * The project has TypeScript EVIDENCE — a tsconfig.json, or an actual `.ts`/`.tsx`
+ * source at the root. Aligns with the R8 capability-registry rule (typescript needs
+ * tsconfig.json): without evidence, a bare package.json must NOT conjure a phantom
+ * typescript toolchain whose `tsc --noEmit` errors "no inputs were found" (Finding 4).
+ * @param {string} projectPath
+ * @returns {boolean}
+ */
+function hasTypeScriptEvidence(projectPath) {
+  if (safeFs.existsSync(path.join(projectPath, 'tsconfig.json'))) return true;
+  try {
+    return safeFs.readdirSync(projectPath).some((f) => /\.(ts|tsx|mts|cts)$/.test(f));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The project's declared npm test script (`package.json` → `scripts.test`), or null.
+ * A declared script is the honest, authoritative test command and is used VERBATIM.
+ * @param {string} projectPath
+ * @returns {string|null}
+ */
+function readJsTestScript(projectPath) {
+  const pkgPath = path.join(projectPath, 'package.json');
+  if (!safeFs.existsSync(pkgPath)) return null;
+  try {
+    const pkg = JSON.parse(safeFs.readFileSync(pkgPath, 'utf8'));
+    const t = pkg.scripts && pkg.scripts.test;
+    return typeof t === 'string' && t.trim() ? t.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read user config (.ctoc/quality-config.yaml) raw text, or null when absent/unreadable.
+ * @param {string} projectPath
+ * @returns {{raw: string, path: string}|null}
  */
 function readUserConfig(projectPath = process.cwd()) {
   const configPath = path.join(projectPath, '.ctoc', 'quality-config.yaml');
   if (!safeFs.existsSync(configPath)) return null;
 
   try {
-    // Simple YAML parsing for key sections
     const content = safeFs.readFileSync(configPath, 'utf8');
-    // For now, return raw content - full YAML parsing would need a library
     return { raw: content, path: configPath };
   } catch {
     return null;
   }
+}
+
+/**
+ * Strip a trailing `# …` comment from a YAML line, honoring simple quotes (a `#` opens a
+ * comment only at line start or after whitespace). Zero-dependency, pure string parsing —
+ * the same approach the codebase's other config readers use.
+ * @param {string} s
+ * @returns {string}
+ */
+function stripYamlComment(s) {
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quote) { if (c === quote) quote = null; continue; }
+    if (c === '"' || c === "'") { quote = c; continue; }
+    if (c === '#' && (i === 0 || /\s/.test(s[i - 1]))) return s.slice(0, i);
+  }
+  return s;
+}
+
+/**
+ * Parse a scalar YAML value: `null`/`~`/empty → null; a quoted string → its inner text;
+ * anything else → the trimmed bareword (e.g. `eslint .`, `npm test -- --coverage`).
+ * @param {string} v
+ * @returns {string|null}
+ */
+function parseYamlScalar(v) {
+  const t = v.trim();
+  if (t === '' || t === 'null' || t === '~') return null;
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    return t.slice(1, -1);
+  }
+  return t;
+}
+
+/**
+ * Parse the `languages:` section of a quality-config.yaml into per-language phase
+ * overrides — Finding 8. Wires the previously-ignored user override hatch: for each
+ * `languages.<lang>` block we read the scalar `lint`/`typecheck`/`test`/`coverage` values
+ * (a `null` means "explicitly no command for this phase"). Block-sequence sub-keys like
+ * `detect:` are skipped — only the scalar phase commands are honored. The parser is a
+ * minimal 2-space-indent block-map reader (zero dependencies), matching the shape of the
+ * shipped template.
+ *
+ * @param {string} raw the quality-config.yaml text.
+ * @returns {Object<string, {lint?: (string|null), typecheck?: (string|null), test?: (string|null), coverage?: (string|null)}>}
+ */
+function parseUserLanguageOverrides(raw) {
+  const PHASES = ['lint', 'typecheck', 'test', 'coverage'];
+  /** @type {Object.<string, Object>} */
+  const out = {};
+  let inLanguages = false;
+  let curLang = null;
+  let langIndent = null; // indent of the language-name tier (first empty-value key under languages)
+
+  for (const rawLine of String(raw).split(/\r?\n/)) {
+    if (!rawLine.trim() || rawLine.trim().startsWith('#')) continue;
+    const indent = rawLine.match(/^ */)[0].length;
+    const body = stripYamlComment(rawLine).trim();
+    if (!body) continue;
+
+    if (indent === 0) {
+      inLanguages = /^languages\s*:\s*$/.test(body);
+      curLang = null;
+      langIndent = null;
+      continue;
+    }
+    if (!inLanguages) continue;
+
+    const ci = body.indexOf(':');
+    if (ci === -1) continue;
+    const key = body.slice(0, ci).trim().replace(/^["']|["']$/g, '');
+    const valRaw = body.slice(ci + 1).trim();
+
+    if (valRaw === '') {
+      // A container key. The SHALLOWEST such tier under `languages:` is the language name;
+      // deeper empty-value keys (e.g. `detect:`) are ignored.
+      if (langIndent === null) langIndent = indent;
+      if (indent === langIndent) {
+        curLang = key;
+        out[curLang] = {};
+      }
+      continue;
+    }
+    // A scalar phase command, deeper than the language tier.
+    if (curLang && langIndent !== null && indent > langIndent && PHASES.includes(key)) {
+      out[curLang][key] = parseYamlScalar(valRaw);
+    }
+  }
+  return out;
 }
 
 /**
@@ -235,6 +415,7 @@ function readUserConfig(projectPath = process.cwd()) {
  */
 function toolsFromRegistry(lang, registryLanguages) {
   /** @type {{lint: (string|null), typecheck: (string|null), test: (string|null), coverage: (string|null), testFramework?: string}} */
+  /** @type {{lint: ?string, typecheck: ?string, test: ?string, coverage: ?string, testFramework?: string, testUndetermined?: boolean}} */
   const tools = { lint: null, typecheck: null, test: null, coverage: null };
   const cap = registryLanguages && registryLanguages[lang];
   const toolchain = cap && cap.toolchain && typeof cap.toolchain === 'object' ? cap.toolchain : {};
@@ -256,12 +437,13 @@ function detectTools(projectPath = process.cwd()) {
     source: 'auto-detect'
   };
 
-  // 1. Check user config first
+  // 1. Check user config first (explicit override — the highest-priority source). We
+  //    PARSE the languages section (Finding 8) instead of the old no-op that set
+  //    source:'user-config' and then ignored the file. `source` is only flipped to
+  //    'user-config' below if an override actually takes effect on a detected language.
   const userConfig = readUserConfig(projectPath);
-  if (userConfig) {
-    result.source = 'user-config';
-    // TODO: Parse YAML config for explicit tool settings
-  }
+  const userLangOverrides = userConfig ? parseUserLanguageOverrides(userConfig.raw) : null;
+  let appliedUserOverride = false;
 
   // 2. Auto-detect languages
   result.languages = detectLanguages(projectPath);
@@ -276,6 +458,13 @@ function detectTools(projectPath = process.cwd()) {
   //    registry, NOT the static DEFAULT_TOOLS table. This is what gives ALL 20
   //    registry languages a toolchain (csharp/php previously got none).
   for (const lang of result.languages) {
+    // Finding 4: `detectLanguages` still lists `typescript` for a bare package.json
+    // (legacy back-compat), but WITHOUT a tsconfig.json or any .ts source that toolchain
+    // (`tsc --noEmit`) is phantom — it errors "no inputs were found". Do not fabricate a
+    // typescript toolchain unless there is real TypeScript evidence.
+    if (lang === 'typescript' && !hasTypeScriptEvidence(projectPath)) continue;
+
+    /** @type {{lint: ?string, typecheck: ?string, test: ?string, coverage: ?string, testFramework?: string, testUndetermined?: boolean}} */
     const tools = toolsFromRegistry(lang, registryLanguages);
 
     // JAVA build-system nuance (documented decision): the registry's java commands are
@@ -306,14 +495,33 @@ function detectTools(projectPath = process.cwd()) {
       }
     }
 
-    // Language-specific detection
+    // Language-specific detection (Findings 2,3,5,6): resolve the CORRECT test/coverage
+    // commands. A declared `scripts.test` is authoritative and used VERBATIM; otherwise a
+    // known framework maps to its correct invocation (`vitest run`, `playwright test`,
+    // `nyc mocha`, …), never the old broken `npx <framework>` / `npx <framework> --coverage`.
+    // When nothing is determinable, the test command is surfaced as UNDETERMINED (null +
+    // flag) rather than a plausible-but-wrong `npm test`.
     if (lang === 'javascript' || lang === 'typescript') {
       const framework = detectJsTestFramework(projectPath);
-      if (framework) {
-        tools.testFramework = framework;
-        tools.test = `npx ${framework}`;
-        tools.coverage = `npx ${framework} --coverage`;
+      const scriptTest = readJsTestScript(projectPath);
+      if (framework) tools.testFramework = framework;
+      const fw = framework ? JS_FRAMEWORK_COMMANDS[framework] : null;
+
+      if (scriptTest) {
+        tools.test = scriptTest; // honest: the project declares its own test command
+      } else if (fw) {
+        tools.test = fw.test;    // framework-correct runner (never bare `npx <fw>`)
+      } else {
+        tools.test = null;       // genuinely undetermined — surfaced, not guessed
+        tools.testUndetermined = true;
       }
+
+      if (fw) {
+        tools.coverage = fw.coverage; // framework-correct; null when the fw has no coverage mode
+      } else if (!scriptTest) {
+        tools.coverage = null;        // undetermined
+      }
+      // else (custom script, unknown framework): keep the registry coverage command.
     } else if (lang === 'python') {
       const framework = detectPythonTestFramework(projectPath);
       if (framework) {
@@ -321,20 +529,40 @@ function detectTools(projectPath = process.cwd()) {
       }
     }
 
+    // User config wins (Finding 8): apply explicit per-phase overrides for this language.
+    // A `null` value is an explicit "no command for this phase". Only phases the user
+    // declared are overridden; the rest keep the detected/registry value.
+    if (userLangOverrides && userLangOverrides[lang]) {
+      const ov = userLangOverrides[lang];
+      for (const phase of ['lint', 'typecheck', 'test', 'coverage']) {
+        if (Object.prototype.hasOwnProperty.call(ov, phase)) {
+          tools[phase] = ov[phase];
+          appliedUserOverride = true;
+          if (phase === 'test') delete tools.testUndetermined;
+        }
+      }
+    }
+
     result.tools[lang] = tools;
 
-    // Check which tools are missing
-    for (const [name, cmd] of Object.entries(tools)) {
-      if (cmd && !commandExists(cmd)) {
+    // Check which real toolchain phases are missing (only the four command phases — never
+    // metadata like testFramework/testUndetermined, which are not commands to look up).
+    for (const phase of ['lint', 'typecheck', 'test', 'coverage']) {
+      const cmd = tools[phase];
+      if (cmd && !commandExists(cmd, projectPath)) {
         result.missing.push({
-          tool: name,
+          tool: phase,
           command: cmd,
           language: lang,
-          install: getInstallCommand(cmd.split(' ')[0], lang)
+          install: getInstallCommand(toolNameForInstall(cmd), lang)
         });
       }
     }
   }
+
+  // Only claim source:'user-config' when an override actually took effect (Finding 8):
+  // never assert an override happened when the config touched no detected language.
+  if (appliedUserOverride) result.source = 'user-config';
 
   // 4. If no languages detected, need user input
   if (result.languages.length === 0) {

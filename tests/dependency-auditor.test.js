@@ -219,6 +219,81 @@ test('detectPackageManagers: an empty-string root detects NOTHING — no cwd lea
   assert.deepEqual(new DependencyAuditor('').detectPackageManagers(), []);
 });
 
+// ── FALSE-CLEAN: a yarn.lock/pnpm-lock.yaml-only repo (no package-lock.json) ──────────
+//
+// npm audit can read ONLY package-lock.json/npm-shrinkwrap.json — NEVER yarn.lock or
+// pnpm-lock.yaml (it ENOLOCKs). yarn/pnpm are "implemented" in DependencyAuditor solely
+// via the npm-audit fallback, so absent an npm lockfile that fallback audits NOTHING. So
+// a yarn.lock-/pnpm-lock.yaml-only project must NOT be claimed as audited-by-
+// DependencyAuditor — javascript is OMITTED from auditedLanguagesFor and routed to
+// SCA/osv (which reads yarn.lock/pnpm-lock.yaml natively). Mirror of the F3 poetry.lock
+// routing. When a package-lock.json IS present, npm audit genuinely works → keep the
+// deferral.
+
+test('auditedLanguagesFor: a yarn.lock-only repo (no package-lock.json) does NOT claim javascript — route to osv', () => {
+  const dir = mkTmp('da-yarn-only-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'yarn.lock', '# yarn lockfile v1\n');
+    const covered = auditedLanguagesFor(dir);
+    assert.equal(covered.has('javascript'), false,
+      'yarn.lock with no package-lock.json is NOT auditable by npm audit (ENOLOCK) — must route to osv, not be claimed covered');
+    assert.equal(covered.has('typescript'), false,
+      'typescript likewise must not be claimed for a yarn.lock-only repo');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('auditedLanguagesFor: a pnpm-lock.yaml-only repo (no package-lock.json) does NOT claim javascript — route to osv', () => {
+  const dir = mkTmp('da-pnpm-only-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'pnpm-lock.yaml', 'lockfileVersion: 5.4\n');
+    const covered = auditedLanguagesFor(dir);
+    assert.equal(covered.has('javascript'), false,
+      'pnpm-lock.yaml with no package-lock.json is NOT auditable by npm audit (ENOLOCK) — must route to osv');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('auditedLanguagesFor: yarn.lock WITH a package-lock.json still defers javascript (npm audit genuinely works)', () => {
+  const dir = mkTmp('da-yarn-npmlock-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'yarn.lock', '# yarn lockfile v1\n');
+    write(dir, 'package-lock.json', '{}');
+    const covered = auditedLanguagesFor(dir);
+    assert.ok(covered.has('javascript') && covered.has('typescript'),
+      'a package-lock.json present means npm audit can read the tree — javascript is genuinely deferred (no over-correction)');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── ENOLOCK error envelope: `npm audit --json` on a tree with NO package-lock.json ─────
+// returns {"error":{"code":"ENOLOCK",...}} and exits non-zero — NOTHING was audited.
+// parseNpmAuditResults must detect the error envelope and push a LOUD error, never parse
+// it to a silent 0-vuln/0-error clean pass (defense-in-depth, mirroring sca-runner's
+// parseNpmAuditResults).
+
+test('parseNpmAuditResults: an ENOLOCK error envelope pushes a LOUD error, NOT a silent 0/0 clean', () => {
+  const a = new DependencyAuditor(mkTmp('da-enolock-'));
+  a.parseNpmAuditResults({ error: { code: 'ENOLOCK', summary: 'This command requires an existing lockfile.' } });
+  assert.equal(a.vulnerabilities.length, 0, 'an error envelope carries no vulnerabilities');
+  assert.equal(a.errors.length, 1, 'the error envelope must be recorded as a LOUD error, never a silent clean');
+  assert.match(a.errors[0].error, /ENOLOCK/,
+    `the recorded error must name the failure code; got ${JSON.stringify(a.errors[0])}`);
+});
+
+test('parseNpmAuditResults: any error-envelope code (not just ENOLOCK) is a loud error', () => {
+  const a = new DependencyAuditor(mkTmp('da-enolock2-'));
+  a.parseNpmAuditResults({ error: { code: 'ECONNREFUSED', summary: 'registry unreachable' } });
+  assert.equal(a.errors.length, 1, 'a registry error is a loud skip, never a clean pass');
+  assert.equal(a.vulnerabilities.length, 0);
+});
+
 // ── SCA3: pip-audit must audit the project's PINNED requirements, not the ambient env ──
 //
 // `pip-audit --format=json` with NO -r audits the current interpreter's INSTALLED

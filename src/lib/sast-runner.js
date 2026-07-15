@@ -163,19 +163,42 @@ class SASTRunner {
   }
 
   /**
-   * Detect the five SAST-supported languages by the presence of their source files,
-   * recursively under the project root, honoring excludeDirs (node_modules, venv, …).
-   * Symlinked directories are skipped (they are not walked), which also avoids symlink
-   * loops. Bounded by a visit cap so a pathological tree cannot hang detection.
+   * Detect analyzable source by the presence of its source files, recursively under the
+   * project root, honoring excludeDirs (node_modules, venv, …). Symlinked directories are
+   * skipped (they are not walked), which also avoids symlink loops. Bounded by a visit cap
+   * so a pathological tree cannot hang detection.
+   *
+   * R8-D3: the set is the BROAD extension family semgrep's universal config can scan, not
+   * just the five native-tool languages. A manifest-less php/ruby/rust/csharp/elixir/…/C
+   * file used to detect as [] (the registry only matches manifest markers, and the local
+   * scan only knew py/js/ts/go/java), so run() reported "no supported languages" and a real
+   * SQL/command-injection sink read as a clean pass. Language names match the capability
+   * registry so a source-derived detection dedups against a manifest-derived one.
    * @returns {Set<string>} detected language names
    */
   detectSastSourceLanguages() {
     const extToLang = {
+      // Native-tool languages (bandit / gosec / eslint parsers)
       '.py': 'python',
-      '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
+      '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript', '.jsx': 'javascript',
       '.ts': 'typescript', '.tsx': 'typescript',
       '.go': 'go',
-      '.java': 'java'
+      '.java': 'java',
+      // Semgrep-universal languages (no native parser here → covered by semgrep universal)
+      '.php': 'php',
+      '.rb': 'ruby',
+      '.rs': 'rust',
+      '.cs': 'csharp',
+      '.ex': 'elixir', '.exs': 'elixir',
+      '.swift': 'swift',
+      '.kt': 'kotlin', '.kts': 'kotlin',
+      '.scala': 'scala', '.sc': 'scala',
+      '.lua': 'lua',
+      '.dart': 'dart',
+      '.sol': 'solidity',
+      '.c': 'c', '.h': 'c',
+      '.cc': 'cpp', '.cpp': 'cpp', '.cxx': 'cpp', '.hpp': 'cpp',
+      '.sql': 'sql'
     };
     const allLangs = new Set(Object.values(extToLang));
     const exclude = new Set([...(this.options.excludeDirs || []), '.git']);
@@ -221,7 +244,7 @@ class SASTRunner {
    */
   addFinding(finding) {
     const floor = this.cweSeverityFloor(finding.cwe);
-    if (floor) {
+    if (floor && !this.isFloorExempt(finding)) {
       const order = [SEVERITY.CRITICAL, SEVERITY.HIGH, SEVERITY.MEDIUM, SEVERITY.LOW, SEVERITY.INFO];
       const cur = order.indexOf(finding.severity);
       const floorIdx = order.indexOf(floor);
@@ -233,6 +256,26 @@ class SASTRunner {
   }
 
   /**
+   * R8-D2: exempt known-noisy tool rules from the CWE severity FLOOR. Bandit's B603
+   * (subprocess_without_shell_equals_true) and B607 (start_process_with_partial_path)
+   * both map to CWE-78, yet they fire on essentially EVERY `subprocess.call([...])` even
+   * with a static, safe argument list — they are LOW-severity, high-noise findings.
+   * Forcing them to CRITICAL blocked clean Python builds on a CRITICAL gate. Excluding
+   * exactly these two rule IDs from floor promotion (rather than gating on severity or
+   * confidence) is the surgical fix: it preserves the floor for a genuine injection —
+   * a semgrep ERROR/INFO CWE-78, or bandit B602 (shell=True) — which still reaches
+   * CRITICAL, so Defect FN-2 is NOT reintroduced.
+   * @param {Object} finding
+   * @returns {boolean} true when this finding must keep its tool-assessed severity
+   */
+  isFloorExempt(finding) {
+    const NOISY_BANDIT_RULES = new Set(['B603', 'B607']);
+    return finding
+      && finding.tool === 'bandit'
+      && NOISY_BANDIT_RULES.has(finding.rule);
+  }
+
+  /**
    * Resolve the CWE severity floor for a finding's CWE identifier, normalizing the two
    * shapes tools emit: a canonical "CWE-78" string (semgrep/bandit) and a bare number
    * "78" (gosec's cwe.id). Returns the mapped SEVERITY or null when unknown/unmapped.
@@ -241,16 +284,21 @@ class SASTRunner {
    */
   cweSeverityFloor(cwe) {
     if (cwe === null || cwe === undefined) return null;
-    let key = String(cwe).trim();
-    if (!key) return null;
-    if (/^CWE-/i.test(key)) {
-      key = key.toUpperCase();
-    } else {
-      const num = key.match(/\d+/);
-      if (!num) return null;
-      key = `CWE-${num[0]}`;
-    }
-    return CWE_SEVERITY_MAP[key] || null;
+    // R8-D1: normalize ANY shape a tool (or a direct caller) emits to a canonical
+    // "CWE-<n>" before the map lookup:
+    //   - clean string   "CWE-78"                       (semgrep/bandit, native path)
+    //   - decorated       "CWE-78: OS Command Injection" (semgrep metadata array item)
+    //   - array           ["CWE-78: ..."]               (semgrep sometimes emits an array)
+    //   - bare number     "89" or 89                     (gosec cwe.id)
+    // The old `^CWE-` branch did a verbatim uppercase lookup, so a decorated key like
+    // "CWE-78: DESC" never hit the map and the CRITICAL floor stayed inert for semgrep.
+    const raw = Array.isArray(cwe) ? (cwe.length ? cwe[0] : null) : cwe;
+    if (raw === null || raw === undefined) return null;
+    const s = String(raw).trim();
+    if (!s) return null;
+    const m = s.match(/CWE[-\s_]?(\d+)/i) || s.match(/(\d+)/);
+    if (!m) return null;
+    return CWE_SEVERITY_MAP[`CWE-${m[1]}`] || null;
   }
 
   /**
@@ -312,16 +360,19 @@ class SASTRunner {
     const languages = this.detectLanguages();
 
     if (languages.length === 0) {
+      // R8-D4: verified-nothing is NEVER verified-clean. The old return was
+      // `{ success: true }` with NO `scanned` field, so a caller keying on
+      // result.scanned could not tell "nothing to scan" from "scanned clean" — and a
+      // security gate reading `success` passed. When there is no analyzable source we
+      // scanned nothing: report scanned:false / success:false, honestly.
       return {
-        success: true,
+        success: false,
+        scanned: false,
         findings: [],
-        summary: {
-          filesScanned: 0,
-          languages: [],
-          duration: 0,
-          bySeverity: {}
-        },
-        message: 'No supported languages detected in project'
+        errors: this.errors,
+        reason: 'no analyzable source detected',
+        summary: this.generateSummary([], [], Date.now() - startTime),
+        message: 'No analyzable source files detected in project — nothing was scanned'
       };
     }
 
@@ -751,10 +802,19 @@ class SASTRunner {
    */
   extractCWE(metadata) {
     if (!metadata) return null;
-    if (metadata.cwe) return metadata.cwe;
-    if (metadata.cwe_id) return metadata.cwe_id;
-    if (Array.isArray(metadata.cwe)) return metadata.cwe[0];
-    return null;
+    // R8-D1: semgrep's universal config (the fallback for EVERY non-native language)
+    // emits cwe as an array-with-description — ["CWE-78: OS Command Injection"] — never
+    // the clean "CWE-78". The old `if (metadata.cwe) return metadata.cwe` returned that
+    // raw array (so the later Array.isArray branch was dead) and the CWE-78 CRITICAL
+    // floor never fired for any semgrep finding. Unwrap the array and strip the
+    // ": description" suffix down to the canonical "CWE-<n>" head.
+    let raw = (metadata.cwe !== undefined && metadata.cwe !== null) ? metadata.cwe : metadata.cwe_id;
+    if (Array.isArray(raw)) raw = raw.length ? raw[0] : null;
+    if (raw === null || raw === undefined) return null;
+    raw = String(raw).trim();
+    if (!raw) return null;
+    const m = raw.match(/CWE-\d+/i);
+    return m ? m[0].toUpperCase() : raw;
   }
 
   /**

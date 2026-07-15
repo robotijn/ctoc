@@ -328,11 +328,15 @@ const SECRET_DENSE_UNSCANNED_EXTENSIONS = ['.tf', '.tfvars', '.tfstate', '.sql']
 
 /**
  * Secret-dense files whose whole name is significant rather than the extension
- * — dotfiles have no `path.extname` (`.npmrc` → ''), and Dockerfile is
- * extensionless. Same ledger-on-skip rationale as the extensions above.
+ * — dotfiles have no `path.extname` (`.npmrc` → ''). These types CAN hold a
+ * text credential but are not in the scannable set, so their skip is ledgered.
+ * Same ledger-on-skip rationale as the extensions above. (The Dockerfile family
+ * is deliberately NOT here: Dockerfiles are now SCANNED outright — see
+ * `isDockerfileFamily` in `shouldScan` — because scanning their ENV/ARG lines
+ * for secrets is strictly better than a skip notice.)
  * @type {Array}
  */
-const SECRET_DENSE_UNSCANNED_FILENAMES = ['.npmrc', '.netrc', '.pgpass', 'Dockerfile'];
+const SECRET_DENSE_UNSCANNED_FILENAMES = ['.npmrc', '.netrc', '.pgpass'];
 
 /**
  * Secrets Scanner class
@@ -391,7 +395,22 @@ class SecretsScanner {
     // (id_rsa, id_ed25519, ...). Without the filename special-case a committed
     // OpenSSH key would never be scanned.
     const isKeyFilename = KEY_FILENAMES.includes(basename);
-    if (!this.options.extensions.includes(ext) && !isKeyFilename) {
+
+    // Dockerfiles are plain text and routinely carry hardcoded secrets on
+    // ENV/ARG lines, so the whole FAMILY is SCANNED (not skip-ledgered) using
+    // the ordinary secret patterns. Matched case-insensitively so dockerfile /
+    // DOCKERFILE are not dropped. Covered forms: bare `Dockerfile`,
+    // `Dockerfile.<stage>` (multi-stage / per-environment Dockerfile.prod,
+    // Dockerfile.dev), and the monorepo `<service>.dockerfile` convention
+    // (api.dockerfile, web.dockerfile — the common `-f api.dockerfile` form).
+    // Scanning is strictly better than a "N files unscanned" notice.
+    const lowerBasename = basename.toLowerCase();
+    const isDockerfileFamily =
+      lowerBasename === 'dockerfile' ||
+      lowerBasename.startsWith('dockerfile.') ||
+      lowerBasename.endsWith('.dockerfile');
+
+    if (!this.options.extensions.includes(ext) && !isKeyFilename && !isDockerfileFamily) {
       // Only SECRET-DENSE unscanned types are ledgered — files that CAN hold a
       // text credential but are not in the scannable set (Terraform state/vars,
       // SQL dumps, .npmrc/.netrc/.pgpass, Dockerfile). Recording those lets the
@@ -402,19 +421,13 @@ class SecretsScanner {
       // ledgering it floods the honesty signal — 50 benign .png skips shoved a
       // genuine EACCES read error out of generateReport's window. Silence on
       // assets, honesty on secret-dense types: that preserves the signal.
-      // Mirror the ext handling: compare a LOWERCASED basename so case
-      // variants (dockerfile / DOCKERFILE / .npmRC) are matched, not silently
-      // dropped. Dockerfile is a FAMILY — multi-stage / per-environment
-      // Dockerfile.prod, Dockerfile.dev, Dockerfile.staging are the COMMON
-      // form and carry `ENV AWS_SECRET_ACCESS_KEY=...`. (service.dockerfile is
-      // already caught via the '.dockerfile' extension path below.) The other
-      // secret-dense filenames (.npmrc/.netrc/.pgpass) match case-insensitively.
-      const lowerBasename = basename.toLowerCase();
-      const isDockerfileFamily =
-        lowerBasename === 'dockerfile' || lowerBasename.startsWith('dockerfile.');
+      // Mirror the ext handling: compare a LOWERCASED basename so case variants
+      // (.npmRC) are matched, not silently dropped — the secret-dense filenames
+      // (.npmrc/.netrc/.pgpass) match case-insensitively. (The Dockerfile family
+      // never reaches here: it is SCANNED via `isDockerfileFamily` above, so it
+      // is caught by the ordinary secret patterns rather than skip-ledgered.)
       const isSecretDense =
         SECRET_DENSE_UNSCANNED_EXTENSIONS.includes(ext) ||
-        isDockerfileFamily ||
         SECRET_DENSE_UNSCANNED_FILENAMES.some(
           (name) => name.toLowerCase() === lowerBasename
         );
