@@ -146,6 +146,22 @@ enforcement:
 
 **Plans must declare `files:`** in YAML frontmatter to be coverage-aware. Pre-v7 plans without this declaration fall through to escape-phrase / block (per the X1 decision: warn-only treatment is logged but not yet block-default for legacy plans).
 
+## Continuation Gate — building CONTINUES (Operating Lesson 15 enforcement)
+
+CTOC is autonomous building steered by the human on the MAIN decisions. So building
+must not silently stop mid-batch. `src/lib/continuation.js` + the Stop hook
+`src/hooks/stop-continuation-gate.js` make this deterministic: when the human authorizes
+a BATCH of N units (N rounds, N plans, a queue, "do it all"), call
+`continuation.startBatch(root, { label, total: N })`, and `continuation.advance(root)`
+as each unit completes. While the batch has remaining, fork-free work, the Stop hook
+**blocks a premature stop** (exit 2, re-injecting "drive the next unit") — so an agent
+CANNOT randomly halt mid-batch. The gate ALLOWS the stop (exit 0) only on: batch complete
+(`remaining === 0`), a registered FORK (`continuation.registerFork(root, reason)` — a
+decision that is the human's), the bounded block-budget exhausted, or no active batch.
+It is OPT-IN (inert with no batch — safe to ship enabled), FORK-AWARE, BOUNDED (`maxBlocks`),
+FAIL-OPEN (any error → allow), and ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). The two
+legitimate stops are the ONLY stops: work complete, or a real fork surfaced as a question.
+
 ---
 
 ## Critical Rules
@@ -186,7 +202,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 290 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 291 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -241,14 +257,14 @@ ctoc/
   docs/                  IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
-    hooks/               13 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-    lib/                 93 JS modules (state, quality, security, planning, UI, analysis)
+    hooks/               14 Claude Code hooks (session start, pre-tool-use, post-tool-use)
+    lib/                 94 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 25 categories
   skills/                426 skill files (100 Tier-2 specialist bodies + 326 reference)
-  tests/                 290 test files
+  tests/                 291 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

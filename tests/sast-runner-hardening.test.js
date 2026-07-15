@@ -461,3 +461,68 @@ test('R8-D4: run() on a truly empty repo reports scanned:false (verified-nothing
 
 // A non-reloaded handle for the pure (no-exec) tests above.
 const { SASTRunner: SASTRunner_real } = require('../src/lib/sast-runner');
+
+// ── R11: the CWE floor takes the MAX over ALL CWEs on a finding ───────────────────
+// A finding may carry MULTIPLE CWEs and the most-severe need not be first. The floor
+// must map EVERY CWE token and keep the most severe — else a semgrep rule tagging
+// ["CWE-79: XSS", "CWE-89: SQL Injection"] recorded HIGH (from CWE-79), silently
+// dropping CWE-89's CRITICAL floor. The floor's whole job is to guarantee an injection
+// CWE reaches CRITICAL regardless of position or tool severity.
+
+test('R11: cweSeverityFloor(["CWE-79","CWE-89"]) takes the MAX → CRITICAL (not the first)', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  assert.strictEqual(r.cweSeverityFloor(['CWE-79', 'CWE-89']), 'CRITICAL',
+    'HIGH-then-CRITICAL array must floor to CRITICAL (the max), not HIGH (the first)');
+});
+
+test('R11: cweSeverityFloor(["CWE-200","CWE-78"]) — low first, critical second → CRITICAL', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  assert.strictEqual(r.cweSeverityFloor(['CWE-200', 'CWE-78']), 'CRITICAL',
+    'LOW-then-CRITICAL array must floor to CRITICAL');
+});
+
+test('R11: a decorated multi-CWE string "CWE-79, CWE-89" floors to CRITICAL', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  assert.strictEqual(r.cweSeverityFloor('CWE-79, CWE-89'), 'CRITICAL',
+    'both CWE tokens in one string must be mapped; the max wins');
+});
+
+test('R11: addFinding on a MEDIUM finding tagged ["CWE-79","CWE-89"] is promoted to CRITICAL', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  r.addFinding({ severity: 'MEDIUM', cwe: ['CWE-79: XSS', 'CWE-89: SQL Injection'],
+    tool: 'semgrep', file: 'a.py', line: 1, message: 'multi-cwe' });
+  assert.strictEqual(r.findings[0].severity, 'CRITICAL',
+    "the finding's most-severe CWE (CWE-89) must set the floor, not the first (CWE-79)");
+});
+
+test('R11: extractCWE returns ALL tokens for a multi-CWE metadata array', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  assert.deepStrictEqual(r.extractCWE({ cwe: ['CWE-79: XSS', 'CWE-89: SQL Injection'] }),
+    ['CWE-79', 'CWE-89'],
+    'a multi-CWE finding must keep every CWE token so the floor can take the max');
+});
+
+test('R11 regression: single-CWE shapes unchanged; a lone LOW CWE never over-promotes', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  assert.strictEqual(r.cweSeverityFloor('CWE-78'), 'CRITICAL', 'clean-string CWE-78 → CRITICAL');
+  assert.strictEqual(r.cweSeverityFloor(['CWE-78: desc']), 'CRITICAL', 'array-with-desc CWE-78 → CRITICAL');
+  assert.strictEqual(r.cweSeverityFloor('89'), 'CRITICAL', 'bare gosec number → CRITICAL');
+  assert.strictEqual(r.cweSeverityFloor(['CWE-200']), 'LOW', 'a lone LOW CWE must not over-promote');
+  assert.strictEqual(r.cweSeverityFloor('CWE-200'), 'LOW');
+  assert.strictEqual(r.extractCWE({ cwe: 'CWE-89' }), 'CWE-89', 'single token stays a string');
+});
+
+test('R11 regression: a decorated non-CWE string with a stray digit does NOT over-promote', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  // "line 89 of foo" has a bare 89 but is NOT a structured CWE field — must not floor to CRITICAL.
+  assert.strictEqual(r.cweSeverityFloor('reported at line 89 of handler'), null,
+    'free-text digit scraping is forbidden; only a genuine CWE token or a purely-numeric field promotes');
+});
+
+test('R11 regression: B603 multi-CWE bandit finding stays LOW (floor exemption intact)', () => {
+  const r = new SASTRunner_real('/no/such/dir');
+  r.addFinding({ severity: 'LOW', cwe: ['CWE-78', 'CWE-89'], tool: 'bandit', rule: 'B603',
+    file: 'a.py', line: 1, message: 'subprocess' });
+  assert.strictEqual(r.findings[0].severity, 'LOW',
+    'B603 is exempt from the floor even when it carries a CRITICAL multi-CWE set');
+});

@@ -752,6 +752,44 @@ describe('DEFECT 1+2 — poetry.lock/uv.lock python reaches osv through runSecur
   });
 });
 
+describe('Finding A (SEVERE) — an AUTO-UNDETERMINED test command is NOT a silent pass', () => {
+  // tool-detector sets test:null + testUndetermined:true when it GAVE UP (no scripts.test,
+  // no recognized framework). Pre-R10 those repos got `npm test` → exit non-zero → a LOUD
+  // block. The R10 detector got honest but NO consumer read testUndetermined, so the test
+  // loop treated null as "nothing to run = PASS" and pushed a repo whose tests NEVER ran —
+  // the "no silent test failures / the measure is the human" red line. These prove the
+  // consumer now surfaces undetermined as a NON-pass.
+
+  it('runFullTests surfaces an auto-undetermined test command as a NON-pass (tests not verified)', async () => {
+    const tools = { javascript: { lint: null, typecheck: null, test: null, coverage: null, testUndetermined: true } };
+    const res = await qualityAgent.runFullTests(tools);
+    assert.equal(res.passed, false, 'a detector-undetermined test command must NOT be reported as passed');
+    assert.equal(res.undetermined, true, 'the undetermined state must be surfaced honestly');
+  });
+
+  it('runSmartTests (the live push entry) also surfaces auto-undetermined tests as a NON-pass', async () => {
+    const tools = { javascript: { test: null, testUndetermined: true } };
+    const res = await qualityAgent.runSmartTests(tools);
+    assert.equal(res.passed, false, 'runSmartTests must not silently pass when tests are undetermined');
+    assert.equal(res.undetermined, true);
+  });
+
+  it('an EXPLICIT user test:null override (no testUndetermined) stays a legitimate PASS', async () => {
+    // The critical distinction: an intentional "no test command" override (tool-detector
+    // deletes testUndetermined for an explicit user override) must remain a pass.
+    const tools = { javascript: { lint: null, typecheck: null, test: null, coverage: null } };
+    const res = await qualityAgent.runFullTests(tools);
+    assert.equal(res.passed, true, 'an intentional no-test-command override must remain a pass');
+    assert.ok(!res.undetermined, 'an explicit override is not "undetermined"');
+  });
+
+  it('a real, resolvable test command runs as before (passes)', async () => {
+    const tools = { javascript: { test: 'node -e 0' } };
+    const res = await qualityAgent.runFullTests(tools);
+    assert.equal(res.passed, true, 'a real passing test command still passes');
+  });
+});
+
 describe('POST-COMMIT LOOP: initProject wires the background quality hook', () => {
   let dir;
   before(() => {

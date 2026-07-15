@@ -16,21 +16,29 @@ const { execFileSync } = require('child_process');
 const registry = require('./capability-registry');
 
 /**
- * Correct, framework-specific JS/TS test + coverage invocations. This replaces the old
- * `npx <framework>` / `npx <framework> --coverage` construction, which produced broken
- * commands: bare `npx playwright` prints usage and runs ZERO tests; bare `npx vitest`
- * enters WATCH mode and never exits; `mocha --coverage` / `ava --coverage` are invalid
- * flags (coverage is `nyc mocha` / `c8 ava`). A `null` coverage means the framework has
- * no coverage mode (e.g. Playwright), so we emit no invalid flag rather than a wrong one.
+ * Correct, framework-specific JS/TS test + coverage invocations, launched via `npx`
+ * (Finding B). A framework detected WITHOUT a `scripts.test` is almost always installed
+ * ONLY as a devDependency (node_modules/.bin), NOT on PATH — so a bare `vitest run` /
+ * `jest` is reported MISSING by `which` (tells the human to install what is already
+ * installed) and fails "command not found" under the runner's execSync (neither puts
+ * node_modules/.bin on PATH). `npx` resolves node_modules/.bin; the SUBCOMMAND after it
+ * is what keeps each invocation honest: `vitest run` (not `npx vitest`, which enters WATCH
+ * mode and never exits), `playwright test` (not `npx playwright`, which prints usage and
+ * runs ZERO tests). Coverage uses the correct per-framework form (`npx nyc mocha` /
+ * `npx c8 ava`, never an invalid `--coverage` flag); a `null` coverage means the framework
+ * has no coverage mode (e.g. Playwright), so we emit nothing rather than a wrong flag.
+ *
+ * The prior R10 fix deleted `npx` wholesale, over-correcting past the real defect — the
+ * watch-hang came from the MISSING subcommand (`npx vitest`), not from `npx` itself.
  * @type {Object<string, {test: string, coverage: (string|null)}>}
  */
 const JS_FRAMEWORK_COMMANDS = {
-  vitest:     { test: 'vitest run',      coverage: 'vitest run --coverage' },
-  jest:       { test: 'jest',            coverage: 'jest --coverage' },
-  mocha:      { test: 'mocha',           coverage: 'nyc mocha' },
-  ava:        { test: 'ava',             coverage: 'c8 ava' },
-  playwright: { test: 'playwright test', coverage: null },
-  tap:        { test: 'tap',             coverage: 'tap --coverage' }
+  vitest:     { test: 'npx vitest run',      coverage: 'npx vitest run --coverage' },
+  jest:       { test: 'npx jest',            coverage: 'npx jest --coverage' },
+  mocha:      { test: 'npx mocha',           coverage: 'npx nyc mocha' },
+  ava:        { test: 'npx ava',             coverage: 'npx c8 ava' },
+  playwright: { test: 'npx playwright test', coverage: null },
+  tap:        { test: 'npx tap',             coverage: 'npx tap --coverage' }
 };
 
 /**
@@ -397,6 +405,32 @@ function parseUserLanguageOverrides(raw) {
 }
 
 /**
+ * Finding C — the space-only indent reader in parseUserLanguageOverrides (it counts leading
+ * spaces only) silently drops a TAB-indented `languages:` block: a leading tab yields a
+ * computed indent of 0, so
+ * `\tjavascript:` is read as a top-level key, the override vanishes, and `source` stays
+ * 'auto-detect' with NO signal to the user. Detect leading-tab indentation anywhere inside
+ * the `languages:` block so the caller can WARN — mirroring capability-registry's
+ * skip-and-warn contract (a malformed override is never silently ignored).
+ * @param {string} raw the quality-config.yaml text
+ * @returns {boolean} true iff a line under `languages:` is indented with a tab
+ */
+function configUsesTabIndentedLanguages(raw) {
+  let inLanguages = false;
+  for (const line of String(raw).split(/\r?\n/)) {
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    if (!/^\s/.test(line)) {
+      // A top-level (unindented) key toggles whether we are inside `languages:`.
+      inLanguages = /^languages\s*:\s*$/.test(line.trim());
+      continue;
+    }
+    // An indented line whose leading whitespace contains a tab is the dropped-override bug.
+    if (inLanguages && /^ *\t/.test(line)) return true;
+  }
+  return false;
+}
+
+/**
  * Resolve the lint/typecheck/test/coverage commands for a language from the capability
  * registry (the single source of truth). Each command is an inert STRING; a phase the
  * language does not define yields `null` (same shape the old DEFAULT_TOOLS table
@@ -434,7 +468,8 @@ function detectTools(projectPath = process.cwd()) {
     languages: [],
     tools: {},
     missing: [],
-    source: 'auto-detect'
+    source: 'auto-detect',
+    warnings: []
   };
 
   // 1. Check user config first (explicit override — the highest-priority source). We
@@ -444,6 +479,18 @@ function detectTools(projectPath = process.cwd()) {
   const userConfig = readUserConfig(projectPath);
   const userLangOverrides = userConfig ? parseUserLanguageOverrides(userConfig.raw) : null;
   let appliedUserOverride = false;
+
+  // Finding C: a TAB-indented `languages:` block is silently dropped by the space-only
+  // indent reader. Surface a warning so the user knows their override never took effect,
+  // rather than the confusing silent 'auto-detect' fallthrough.
+  if (userConfig && configUsesTabIndentedLanguages(userConfig.raw)) {
+    result.warnings.push({
+      file: userConfig.path,
+      message: 'tab-indented `languages:` overrides in .ctoc/quality-config.yaml were IGNORED — '
+        + 'YAML requires SPACE indentation, so your per-language overrides were DROPPED '
+        + '(falling back to auto-detect). Re-indent the languages block with spaces.'
+    });
+  }
 
   // 2. Auto-detect languages
   result.languages = detectLanguages(projectPath);
@@ -597,6 +644,13 @@ function printDetectionResults(results) {
     for (const m of results.missing) {
       console.log(`  ${m.tool} (${m.language})`);
       console.log(`    Install: ${m.install}\n`);
+    }
+  }
+
+  if (Array.isArray(results.warnings) && results.warnings.length > 0) {
+    console.log('⚠️  Config warnings:\n');
+    for (const w of results.warnings) {
+      console.log(`  ${w.message}${w.file ? ` (${w.file})` : ''}\n`);
     }
   }
 }
