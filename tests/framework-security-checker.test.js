@@ -479,6 +479,59 @@ describe('FrameworkSecurityChecker: adversarial-review round 5 (FW1 FP / FW2 FN 
   });
 });
 
+describe('FrameworkSecurityChecker: adversarial-review round 6 (explicit-secret compound vs benign suffix)', () => {
+  /** Run the checker against a one-file fixture and return its result. */
+  async function resultFor({ nodeDeps, envName, envBody }) {
+    const dir = mkTmp('ctoc-fwsec-r6-');
+    try {
+      if (nodeDeps) writePkg(dir, nodeDeps);
+      if (envName) fs.writeFileSync(path.join(dir, envName), envBody, 'utf8');
+      return await new FrameworkSecurityChecker(dir).run();
+    } finally { rm(dir); }
+  }
+  const highsOf = res => res.findings.filter(f => f.severity === SEVERITY.HIGH);
+
+  // ── The defect: a benign suffix on an EXPLICIT-secret compound over-suppressed. ──
+  it('NEXT_PUBLIC_STRIPE_SECRET_KEY_ID flags HIGH (explicit SECRET_KEY — benign _ID cannot silence it)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_STRIPE_SECRET_KEY_ID=leak\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `SECRET_KEY is an explicit secret; a benign suffix must not silence it; got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_STRIPE_SECRET_KEY_ID');
+  });
+
+  it('NEXT_PUBLIC_STRIPE_SECRET_KEY_PATH flags HIGH (explicit SECRET_KEY — benign _PATH cannot silence it)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_STRIPE_SECRET_KEY_PATH=leak\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_STRIPE_SECRET_KEY_PATH');
+  });
+
+  // ── Regression guards: the benign-suffix suppression must STILL apply to the non-explicit compounds. ──
+  it('regression: NEXT_PUBLIC_PRIVATE_KEY_ID stays silent (a JWKS kid — genuinely public metadata)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_PRIVATE_KEY_ID=kid-123\n' });
+    assert.equal(res.findings.length, 0, `PRIVATE_KEY_ID is a benign JWKS kid; must NOT regress to firing; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('regression: NEXT_PUBLIC_API_KEY_HEADER stays silent (an HTTP header name)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_API_KEY_HEADER=x-api-key\n' });
+    assert.equal(res.findings.length, 0, `API_KEY_HEADER is a benign header name; must NOT regress; got ${JSON.stringify(res.findings)}`);
+  });
+
+  it('regression: bare NEXT_PUBLIC_STRIPE_SECRET_KEY still flags HIGH (unchanged)', async () => {
+    const res = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_STRIPE_SECRET_KEY=sk_live_leak\n' });
+    const highs = highsOf(res);
+    assert.equal(highs.length, 1, `got ${JSON.stringify(res.findings)}`);
+    assert.equal(highs[0].varName, 'NEXT_PUBLIC_STRIPE_SECRET_KEY');
+  });
+
+  it('regression: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY and NEXT_PUBLIC_TOKEN_ADDRESS stay silent (unchanged)', async () => {
+    const pub = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_ok\n' });
+    assert.equal(pub.findings.length, 0, `publishable key is public; got ${JSON.stringify(pub.findings)}`);
+    const addr = await resultFor({ nodeDeps: { next: '15.0.0' }, envName: '.env', envBody: 'NEXT_PUBLIC_TOKEN_ADDRESS=0xabc\n' });
+    assert.equal(addr.findings.length, 0, `web3 contract address is public; got ${JSON.stringify(addr.findings)}`);
+  });
+});
+
 describe('quality-agent integration: a NEXT_PUBLIC_*_SECRET bumps the HIGH tally', () => {
   let dir;
   before(() => {

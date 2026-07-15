@@ -1508,3 +1508,75 @@ test('DB-w5 FP-A: `ALTER TABLE … DROP CONSTRAINT fk_x` is STILL flagged', asyn
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── DB-w6 REPAIR: dollar-quote / double-quote aware `--` stripping ──────────────
+// REGRESSION (introduced by the DB-w5 FN5 single-quote-only `stripSqlLineComment`):
+// a lone apostrophe inside a Postgres dollar-quoted string ($$don't$$) left the
+// quote count ODD, so the stripper believed it was still inside a string at the
+// trailing `--`, declined to strip it, and the leaked comment text matched the
+// position-agnostic EXEC_ANCHOR / EXEC_TSQL_ANCHOR — a FALSE POSITIVE on a benign
+// additive migration ("additive migrations must pass" — non-negotiable). ALSO a
+// pre-existing FALSE NEGATIVE with the same root cause: a `--` inside a double-quoted
+// identifier truncated a real DROP. Both fixed by making the stripper dollar-quote-
+// and double-quote-aware. Direct scanDestructive() calls (the task's reproduction
+// recipe), zero fixtures, zero mocks.
+
+test('DB-w6: a lone apostrophe in a $$…$$ dollar-quoted string does not leak a trailing -- into an execute FP (0)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  const sql = "INSERT INTO msgs VALUES ($$don't$$); -- op.execute(\"DROP TABLE msgs\")";
+  assert.equal(checker.scanDestructive(sql, 'm.sql').length, 0,
+    'the dollar-quoted apostrophe must not un-balance quote tracking and leak the -- comment');
+});
+
+test('DB-w6: a lone apostrophe in $$…$$ does not leak a trailing -- into a sp_executesql FP (0)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  const sql = "INSERT INTO msgs VALUES ($$don't$$); -- EXEC sp_executesql N'DROP TABLE x'";
+  assert.equal(checker.scanDestructive(sql, 'm.sql').length, 0,
+    'the EXEC_TSQL_ANCHOR must not fire on a comment leaked past a dollar-quoted apostrophe');
+});
+
+test('DB-w6: a tagged $body$…$body$ dollar-quote with an apostrophe does not leak a trailing -- (0)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  const sql = "INSERT INTO logs VALUES ($body$it's a trap$body$); -- op.execute(\"DROP TABLE users\")";
+  assert.equal(checker.scanDestructive(sql, 'm.sql').length, 0,
+    'a tagged dollar-quote span must be recognised so the trailing -- is stripped');
+});
+
+test('DB-w6 (pre-existing FN): a `--` inside a double-quoted identifier does not truncate a real DROP (>=1)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  const sql = 'ALTER TABLE "we--ird" DROP COLUMN x;';
+  assert.ok(checker.scanDestructive(sql, 'm.sql').length >= 1,
+    'the -- inside a double-quoted identifier is data, not a comment; the DROP COLUMN is real and must fire');
+});
+
+// Regression guards — the controls that were already correct must STAY correct.
+test('DB-w6 control: a balanced $$can\'\'t$$ dollar-quote strips its trailing -- comment (0)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  const sql = "INSERT INTO msgs VALUES ($$can''t$$); -- op.execute(\"DROP TABLE x\")";
+  assert.equal(checker.scanDestructive(sql, 'm.sql').length, 0,
+    'a balanced dollar-quote with escaped quotes still strips the trailing comment');
+});
+
+test('DB-w6 control: a statement-anchored DROP that lives inside a -- comment is not flagged (0)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  const sql = 'INSERT INTO t VALUES (1); -- DROP TABLE x';
+  assert.equal(checker.scanDestructive(sql, 'm.sql').length, 0,
+    'a DROP inside a real line comment is not executable DDL');
+});
+
+test('DB-w6 control: a real op.execute("DROP TABLE msgs") apply still fires (1)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  const sql = 'op.execute("DROP TABLE msgs")';
+  assert.equal(checker.scanDestructive(sql, 'm.sql').length, 1,
+    'making the stripper quote-aware must not stop a genuine embedded execute DROP from firing');
+});
+
+test('DB-w6: a real DROP inside a dollar-quoted string BODY is string data, not a statement (0)', () => {
+  const checker = new MigrationSafetyChecker('/tmp');
+  // The DROP is the VALUE stored in the row, not an executed statement — it is not
+  // statement-anchored (preceded by $body$, not ^ or ;) and carries no execute call,
+  // so it is correctly NOT a finding. Documented under Decisions Taken Under Ambiguity.
+  const sql = 'INSERT INTO t VALUES ($body$DROP TABLE x$body$);';
+  assert.equal(checker.scanDestructive(sql, 'm.sql').length, 0,
+    'a DROP that is dollar-quoted string data is not an executable statement');
+});

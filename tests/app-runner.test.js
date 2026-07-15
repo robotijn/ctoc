@@ -22,7 +22,14 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { detectAppShape, detectRunTarget, driveApp, probeHttp } = require('../src/lib/app-runner');
+const {
+  detectAppShape,
+  detectRunTarget,
+  driveApp,
+  probeHttp,
+  resolveScriptCommand,
+  classifyServerOutcome
+} = require('../src/lib/app-runner');
 
 /** Make a fresh temp project dir. */
 function makeProject(prefix) {
@@ -287,5 +294,177 @@ describe('app-runner: driveAppSync (the path Step 14 VERIFY actually calls)', ()
     const res = driveAppSync(dir, { timeBudgetMs: 5000 });
     assert.strictEqual(res.applicable, false);
     assert.deepStrictEqual(res.errors, []);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEFECT 1 — a booted-but-ERRORING server must NOT pass the last-mile gate.
+// "The measure is the human": a server that answers '/' with HTTP 500 shows the
+// person an error page — that is NOT "working". A 5xx is a FAILURE and the status
+// is surfaced. A 2xx/3xx/4xx server is up (an API-only server legitimately 404s
+// on '/'), so those stay responded:true.
+// classifyServerOutcome is the REAL decision code driveServer runs (extracted for
+// deterministic coverage, not a double).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: a 5xx response is a failure, 2xx/3xx/4xx is up (DEFECT 1)', () => {
+  const port = 54321;
+  const budget = 1000;
+  const projects500 = [];
+  after(() => { for (const p of projects500) rm(p); });
+
+  it('HTTP 500 → responded:false, the 500 surfaced in errors, status in evidence', () => {
+    const o = classifyServerOutcome({
+      exited: false,
+      exitInfo: null,
+      probe: { ok: true, statusCode: 500, body: 'internal error page' },
+      port,
+      budget,
+      stderr: ''
+    });
+    assert.strictEqual(o.responded, false, 'a server that 500s on / is NOT working');
+    assert.strictEqual(o.httpStatus, 500, 'the 500 status must be surfaced to the human');
+    assert.ok(
+      o.errors.some((e) => /HTTP 500/.test(e) && /errors on load/.test(e)),
+      `the boot-error must name the 500; got: ${JSON.stringify(o.errors)}`
+    );
+  });
+
+  it('HTTP 200 → responded:true (regression guard)', () => {
+    const o = classifyServerOutcome({
+      exited: false, exitInfo: null, probe: { ok: true, statusCode: 200, body: 'ok' }, port, budget, stderr: ''
+    });
+    assert.strictEqual(o.responded, true, 'a 200 server is working');
+    assert.strictEqual(o.httpStatus, 200);
+    assert.deepStrictEqual(o.errors, []);
+  });
+
+  it('HTTP 404 on / → responded:true (an API-only server is still up)', () => {
+    const o = classifyServerOutcome({
+      exited: false, exitInfo: null, probe: { ok: true, statusCode: 404, body: 'not found' }, port, budget, stderr: ''
+    });
+    assert.strictEqual(o.responded, true, 'a bound server that 404s on / is still up — must NOT be failed');
+    assert.strictEqual(o.httpStatus, 404);
+    assert.deepStrictEqual(o.errors, []);
+  });
+
+  it('end-to-end: a REAL server that 500s on / is failed, not attested (the human sees the error)', async () => {
+    const dir = makeProject('ctoc-web-500-');
+    projects500.push(dir);
+    write(dir, 'package.json', JSON.stringify({ name: 'web-500', scripts: { dev: 'node server.js' } }));
+    write(dir, 'server.js', [
+      "const http = require('http');",
+      'const port = Number(process.env.PORT) || 0;',
+      "http.createServer((req, res) => { res.writeHead(500); res.end('boom'); })",
+      "  .listen(port, '127.0.0.1');"
+    ].join('\n'));
+
+    const res = await driveApp(dir, { timeBudgetMs: 10000 });
+
+    assert.strictEqual(res.launched, true, 'we attempted to launch it');
+    assert.strictEqual(res.responded, false, 'a 500-on-/ server must NOT be attested as responded');
+    assert.strictEqual(res.evidence.httpStatus, 500, 'the 500 must be recorded in the evidence');
+    assert.ok(
+      res.errors.some((e) => /HTTP 500/.test(e)),
+      `the human must see the boot error; got: ${JSON.stringify(res.errors)}`
+    );
+
+    // The child must be torn down.
+    const probe = await probeHttp(res.evidence.port);
+    assert.strictEqual(probe.ok, false, 'the launched server must be torn down');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEFECT 2 — the child WE launched exiting is DECISIVE. If our child crashed
+// (e.g. EADDRINUSE in the port TOCTOU gap) and a FOREIGN process answers the
+// port, we must NOT falsely attest responded:true. A dead child is a failure
+// regardless of who answers.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: a crashed child is a failure even if the port answers (DEFECT 2)', () => {
+  it('exited:true + a probe that WOULD succeed → responded:false, crash surfaced', () => {
+    const o = classifyServerOutcome({
+      exited: true,
+      exitInfo: { code: 1, signal: null },
+      // a foreign process answering the (supposedly private) port with a 200
+      probe: { ok: true, statusCode: 200, body: 'answered by a foreign process' },
+      port: 54322,
+      budget: 1000,
+      stderr: 'Error: listen EADDRINUSE'
+    });
+    assert.strictEqual(o.responded, false, 'a dead child must never attest responded, even if the port answers');
+    assert.ok(
+      o.errors.some((e) => /exited before responding/.test(e)),
+      `the crash must be surfaced; got: ${JSON.stringify(o.errors)}`
+    );
+  });
+
+  it('exited:true with a spawn error (ENOENT) → responded:false, error detail surfaced', () => {
+    const o = classifyServerOutcome({
+      exited: true,
+      exitInfo: { code: null, signal: null, error: 'spawn nope ENOENT' },
+      probe: { ok: false },
+      port: 54323,
+      budget: 1000,
+      stderr: ''
+    });
+    assert.strictEqual(o.responded, false);
+    assert.ok(o.errors.some((e) => /spawn nope ENOENT/.test(e)), 'the spawn error must be surfaced');
+  });
+
+  it('a normal non-response (alive but silent) still fails with the timeout message', () => {
+    const o = classifyServerOutcome({
+      exited: false, exitInfo: null, probe: { ok: false }, port: 54324, budget: 1500, stderr: 'still compiling'
+    });
+    assert.strictEqual(o.responded, false);
+    assert.ok(o.errors.some((e) => /did not respond/.test(e) && /1500ms/.test(e)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEFECT 3 — resolveScriptCommand must be quote-aware (a spaced quoted arg stays
+// ONE token, so a correct dev script is not falsely failed on POSIX), and it must
+// NOT silently hand shell operators (&&, ||, |, ;, &) from a semi-trusted
+// package.json to cmd.exe — such scripts are handled explicitly (surfaced as an
+// unsupported-script error), never mis-tokenized into a wrong command.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('app-runner: resolveScriptCommand is quote-aware and operator-safe (DEFECT 3)', () => {
+  it('keeps a double-quoted spaced arg as ONE token', () => {
+    const spec = resolveScriptCommand('next dev --hostname "my host"');
+    assert.ok(!spec.unsupported, 'a plain single command must be launchable');
+    assert.strictEqual(spec.command, 'next');
+    assert.deepStrictEqual(spec.args, ['dev', '--hostname', 'my host']);
+  });
+
+  it('keeps a single-quoted spaced arg as ONE token', () => {
+    const spec = resolveScriptCommand("node -e 'console.log(1 + 1)'");
+    assert.ok(!spec.unsupported);
+    assert.strictEqual(spec.command, process.execPath, 'a node script runs via process.execPath');
+    assert.deepStrictEqual(spec.args, ['-e', 'console.log(1 + 1)']);
+  });
+
+  it('a plain node script still resolves to execPath (regression guard)', () => {
+    const spec = resolveScriptCommand('node server.js');
+    assert.ok(!spec.unsupported);
+    assert.strictEqual(spec.command, process.execPath);
+    assert.deepStrictEqual(spec.args, ['server.js']);
+  });
+
+  it('a script with && is handled explicitly, NOT silently split into a wrong command', () => {
+    const spec = resolveScriptCommand('npm run build && node server.js');
+    assert.strictEqual(spec.unsupported, true, 'a compound shell script must be flagged, not mis-launched');
+    assert.notStrictEqual(spec.command, 'npm', 'it must NOT be reduced to `npm` with && handed on as an arg');
+    assert.ok(/shell operator/i.test(spec.reason), 'the reason must explain the unsupported operator');
+  });
+
+  it('a script with a pipe is handled explicitly', () => {
+    const spec = resolveScriptCommand('cat data | node process.js');
+    assert.strictEqual(spec.unsupported, true);
+    assert.ok(/shell operator/i.test(spec.reason));
+  });
+
+  it('an operator INSIDE quotes is data, not an operator (not flagged)', () => {
+    const spec = resolveScriptCommand('node run.js --title "a && b"');
+    assert.ok(!spec.unsupported, 'a quoted && is a literal argument, not a shell operator');
+    assert.deepStrictEqual(spec.args, ['run.js', '--title', 'a && b']);
   });
 });

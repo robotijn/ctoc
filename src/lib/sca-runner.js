@@ -267,20 +267,35 @@ class SCARunner {
     // scanned by nobody while the human was told everything was covered. osv walks the
     // whole tree; the root-manifest dedup (parseOSVResults / _isRootManifest) drops the
     // root double-count while keeping nested CVEs — this decoupling makes that reachable.
+    // SCA7 (honesty): count osv toward scannersRun ONLY when its scan actually RAN and
+    // produced parseable output — mirror how runNativeScanner is consumed above. osv used to
+    // be counted on tool AVAILABILITY, BEFORE the scan; a crashed osv (non-zero + empty
+    // stdout, or unparseable output) that is the SOLE scanner for the ecosystem then read as
+    // scanned:true/findings:[] — a crashed scanner reading as a clean pass, the exact thing
+    // this module promises never happens. runOsvScanner now returns false on crash (with the
+    // error recorded in this.errors), so a sole-osv crash falls through to the fail-closed
+    // scannersRun===0 branch below and surfaces the failure.
     if (this.isToolAvailable('osv-scanner')) {
-      scannersRun++;
-      await this.runOsvScanner();
+      if (await this.runOsvScanner()) scannersRun++;
     }
 
     if (scannersRun === 0) {
-      // No native scanner ran and osv-scanner is absent. When EVERY detected ecosystem was
-      // deferred to DependencyAuditor (and there is no osv-only python lock), that runner
-      // already audits the root manifests — a truthful no-op, not a scanner-missing
-      // failure. Otherwise a non-deferred ecosystem had NO scanner and nothing was scanned.
-      if (languages.length === 0 && !osvOnlyPythonLock) {
+      // SCA7: an available scanner whose scan CRASHED recorded an error in this.errors. That
+      // is NOT a clean pass even when every ROOT ecosystem is deferred to DependencyAuditor —
+      // the osv whole-repo net that catches NESTED lockfiles failed, so we cannot claim the
+      // repo clean. Only a genuinely quiet no-op (no scanner ran AND nothing crashed) may
+      // report the deferred-clean message.
+      const scannerCrashed = this.errors.length > 0;
+      // No native scanner ran and osv-scanner is absent (not crashed). When EVERY detected
+      // ecosystem was deferred to DependencyAuditor (and there is no osv-only python lock),
+      // that runner already audits the root manifests — a truthful no-op, not a
+      // scanner-missing failure. Otherwise a non-deferred ecosystem had NO scanner and
+      // nothing was scanned.
+      if (languages.length === 0 && !osvOnlyPythonLock && !scannerCrashed) {
         return {
           success: true,
           findings: [],
+          errors: this.errors,
           summary: this.generateSummary([], languages, Date.now() - startTime),
           message: 'All detected ecosystems are audited by DependencyAuditor — nothing further for SCA to audit'
         };
@@ -290,9 +305,13 @@ class SCARunner {
         scanned: false,
         findings: [],
         errors: this.errors,
-        reason: 'no dependency (SCA) scanner available',
+        reason: scannerCrashed
+          ? 'dependency (SCA) scanner ran but failed — nothing was reliably scanned'
+          : 'no dependency (SCA) scanner available',
         summary: this.generateSummary([], languages, Date.now() - startTime),
-        message: 'No SCA scanner available for the detected language(s) — nothing was scanned'
+        message: scannerCrashed
+          ? 'An SCA scanner was available but its scan failed — nothing was reliably scanned'
+          : 'No SCA scanner available for the detected language(s) — nothing was scanned'
       };
     }
 
@@ -454,9 +473,16 @@ class SCARunner {
    * Run the osv-scanner UNIVERSAL pass — `osv-scanner scan --format json .` — for
    * the whole repo. osv-scanner exits non-zero when vulnerabilities are found but
    * still prints its OSV JSON to stdout. Fail-closed, mirroring sast-runner.
+   *
+   * SCA7: returns whether the scan actually RAN SUCCESSFULLY (produced parseable output),
+   * mirroring runNativeScanner. run() counts osv toward scannersRun ONLY on true, so a
+   * crashed osv (non-zero + empty stdout, or unparseable output — error recorded here) is
+   * NOT mistaken for a clean pass. A leaked/absent projectRoot (SCA6) also returns false:
+   * nothing was scanned.
+   * @returns {Promise<boolean>} true iff osv ran and its output parsed
    */
   async runOsvScanner() {
-    if (!this.projectRoot) return; // SCA6: never exec against a leaked process cwd
+    if (!this.projectRoot) return false; // SCA6: never exec against a leaked process cwd
     let out = '';
     try {
       out = execFileSync('osv-scanner', ['scan', '--format', 'json', '.'], {
@@ -470,7 +496,7 @@ class SCARunner {
       out = (error && error.stdout) ? String(error.stdout) : '';
       if (!(out && out.trim())) {
         this.errors.push({ tool: 'osv-scanner', error: error.message });
-        return;
+        return false;
       }
     }
 
@@ -478,7 +504,9 @@ class SCARunner {
       this.parseOSVResults(JSON.parse(out));
     } catch (e) {
       this.errors.push({ tool: 'osv-scanner', error: e.message });
+      return false;
     }
+    return true;
   }
 
   /**

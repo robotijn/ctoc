@@ -604,6 +604,95 @@ describe('Secrets Scanner — real synthetic secret detection', () => {
       'an underscore-separated npm_ phrase is not a 36-char base62 token');
   });
 
+  // -- R6: the skip-ledger must not FLOOD, and must not bury a real failure --
+  // Regression from the previous round: shouldScan ledgered EVERY skipped
+  // extension, so a repo of 50 .png assets produced 50 benign "unscanned"
+  // notices that shoved a genuine EACCES read error out of generateReport's
+  // 5-line window — defeating the honesty purpose the ledger was added for.
+  it('R6 50 .png skips are SILENT (not ledgered) while a .tfstate skip is still recorded', () => {
+    const dir = path.join(os.tmpdir(), 'ctoc-r6-flood-' + Date.now());
+    fs.mkdirSync(dir, { recursive: true });
+    // 50 benign binary/asset files — cannot hold a text secret this scanner detects
+    for (let i = 0; i < 50; i++) {
+      fs.writeFileSync(path.join(dir, `img${i}.png`), 'PNGBINARYDATA');
+    }
+    // 1 secret-dense unscanned file (Terraform state) — MUST stay ledgered
+    fs.writeFileSync(path.join(dir, 'terraform.tfstate'),
+      '{"outputs":{"k":{"value":"AKIAIOSFODNN7EXAMPLE"}}}\n');
+
+    const scanner = new SecretsScanner(dir);
+    scanner.getFilesToScan();
+
+    const pngEntries = scanner.errors.filter(e => (e.file || '').endsWith('.png'));
+    assert.strictEqual(pngEntries.length, 0,
+      '.png skips must be SILENT — a binary asset cannot hold a text secret, ledgering it floods the honesty signal');
+    assert.ok(scanner.errors.some(e => (e.file || '').includes('terraform.tfstate')),
+      'a secret-dense .tfstate skip MUST still be recorded (the honesty signal the ledger exists for)');
+    assert.ok(scanner.errors.length < 10,
+      `ledger flooded: ${scanner.errors.length} entries — the 50 benign .png skips leaked into the honesty ledger`);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('R6 generateReport surfaces a genuine read error AHEAD of benign skip notices', () => {
+    const scanner = new SecretsScanner(os.tmpdir());
+    // Simulate a scan that produced many secret-dense skips plus one real
+    // read/permission failure (the genuine signal). The real failure must be
+    // visible in the report, never buried behind the benign skip notices.
+    for (let i = 0; i < 8; i++) {
+      scanner.errors.push({
+        file: `/x/state${i}.tfstate`,
+        kind: 'skip',
+        error: "Skipped: secret-dense type '.tfstate' not in scannable set (unscanned)"
+      });
+    }
+    scanner.errors.push({
+      file: '/x/secret.js',
+      kind: 'error',
+      error: 'EACCES: permission denied, open'
+    });
+
+    const summary = {
+      timestamp: 'now', filesScanned: 0, duration: 0,
+      total: 0, verified: 0, bySeverity: {}
+    };
+    const report = scanner.generateReport([], summary);
+
+    const idxGenuine = report.indexOf('secret.js');
+    const idxFirstSkip = report.indexOf('state0.tfstate');
+    assert.ok(idxGenuine !== -1,
+      'the genuine read/permission error MUST appear in generateReport, never dropped behind benign skips');
+    assert.ok(idxGenuine < idxFirstSkip,
+      'a genuine failure must be surfaced AHEAD of benign skip notices, never buried behind them');
+  });
+
+  it('R6 a genuinely-unreadable (chmod 000) .js with a real AWS key surfaces a read error in the report', () => {
+    const dir = path.join(os.tmpdir(), 'ctoc-r6-eacces-' + Date.now());
+    fs.mkdirSync(dir, { recursive: true });
+    const secret = path.join(dir, 'secret.js');
+    fs.writeFileSync(secret, 'const k = "AKIAIOSFODNN7EXAMPLE";\n');
+    try { fs.chmodSync(secret, 0o000); } catch (e) { /* platform may ignore */ }
+
+    const scanner = new SecretsScanner(dir);
+    scanner.scanFile(secret); // read → EACCES pushes a genuine error (unless root/Windows)
+
+    const genuine = scanner.errors.filter(e => e.kind !== 'skip');
+    const summary = {
+      timestamp: 'now', filesScanned: 1, duration: 0,
+      total: 0, verified: 0, bySeverity: {}
+    };
+    const report = scanner.generateReport([], summary);
+
+    try { fs.chmodSync(secret, 0o644); } catch (e) { /* ignore */ }
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    // Guarded: chmod 000 does not deny reads for root or on some Windows setups.
+    if (genuine.length > 0) {
+      assert.ok(report.includes('secret.js'),
+        'a genuine read/permission failure on a secret-bearing file must be surfaced in generateReport');
+    }
+  });
+
   // -- ReDoS safety -------------------------------------------------------
   it('all patterns are ReDoS-safe against a 100k adversarial string', () => {
     const adversarial =
