@@ -22,6 +22,17 @@
  *
  * Cross-platform: `path.join` for every location, `safeFs` for every read, no shell
  * entry point, no OS-specific assumption.
+ *
+ * ## Decisions Taken Under Ambiguity
+ * - DB-w3 fix F4 deliberately extends ONLY the DROP family (adds INDEX, VIEW,
+ *   SEQUENCE, TYPE, MATERIALIZED VIEW to the existing TABLE/DATABASE/SCHEMA/COLUMN)
+ *   plus the existing ALTER…DROP and TRUNCATE. `DELETE` without a `WHERE`,
+ *   `RENAME COLUMN`, and `ALTER … TYPE` are consciously EXCLUDED — they are a
+ *   different heuristic family (data-shape / data-mutation rather than object DROP),
+ *   carry higher false-positive risk, and were out of scope for this fix.
+ * - DB-w3 fix F1 adds `.yml` alongside the specified `.yaml` because Liquibase YAML
+ *   changelogs use both extensions interchangeably; parsing one and silently
+ *   dropping the other would reintroduce the very false-negative F1 closes.
  */
 
 'use strict';
@@ -105,53 +116,156 @@ const DISCOVERY_SKIP_DIRS = new Set([
   'coverage', 'vendor', '.next', '.nuxt', 'target', '.venv', 'venv'
 ]);
 
-/** Migration file extensions we read. Wave 2 scans SQL DDL; `.rb`/`.py` are read so a
- *  raw SQL DDL statement embedded in them is still caught, but ORM METHOD forms
- *  (Rails `remove_column`, Alembic `op.drop_column`) are a documented follow-up. */
-const MIGRATION_EXTS = new Set(['.sql', '.rb', '.py']);
+/** Migration file extensions we read and can PARSE for destructive DDL.
+ *  - `.sql` raw DDL; `.rb`/`.py` so a raw SQL DDL statement (or an `op.execute("…")`
+ *    embedded statement) is still caught — ORM METHOD forms (Rails `remove_column`,
+ *    Alembic `op.drop_column`) remain a documented follow-up.
+ *  - `.xml`/`.yaml`/`.yml` Liquibase changelogs (DB-w3 fix F1) — `<dropTable>` /
+ *    `- dropTable:` element forms carry no SQL keyword the SQL scanner would see.
+ *  - `.cs` .NET Entity Framework Core migrations (DB-w3 fix F1) — `migrationBuilder
+ *    .DropTable(...)` / `.DropColumn(...)` / `.Sql("…DROP…")` fluent forms.
+ *  Before F1 these files were WALKED (the dir is a searched root / matches /migrat/i)
+ *  and SEEN, then discarded by the ext filter, so a destructive changelog shipped
+ *  GREEN under a materially false "no migration files found" skip. */
+const MIGRATION_EXTS = new Set(['.sql', '.rb', '.py', '.xml', '.yaml', '.yml', '.cs']);
 
 /**
- * Statement-position anchor (DB-w2 fix F3). A destructive keyword only counts when
- * it is the STATEMENT VERB, i.e. it appears at line start (after optional
- * whitespace), immediately after a `;` (a second statement on the same line), OR
- * immediately after an opening string quote. The quote branch is what keeps
- * embedded executable DDL — a Python/Ruby migration's `op.execute("DROP TABLE x")`
- * — a true positive (fix F2's "must still be caught"), while a value that merely
- * MENTIONS a keyword mid-string (`'auto-truncate logs'`) does NOT match because the
- * keyword is not the first token after the quote. `\s*` is a single linear
- * quantifier, so the anchor adds no backtracking risk.
+ * Extensions that plausibly hold a migration but that this static scanner cannot
+ * parse (Knex/TypeORM `.ts`/`.js`, Laravel/Doctrine `.php`, Liquibase JSON/Groovy,
+ * and other host languages). DB-w3 fix F1 belt-and-suspenders: when a searched or
+ * discovered migration directory physically contains files of one of these
+ * extensions, the checker emits a LOUD skip naming them, so it can NEVER silently
+ * report "no migration files found" while destructive-capable files sit unread in a
+ * searched dir. Purely a honesty signal — it never fabricates a finding.
+ * @type {Set<string>}
+ */
+const UNPARSED_MIGRATION_EXTS = new Set([
+  '.ts', '.js', '.php', '.json', '.groovy', '.go', '.kt', '.scala', '.java'
+]);
+
+/**
+ * Statement-position anchor. A destructive keyword only counts when it is the
+ * STATEMENT VERB, i.e. it appears at line start (after optional whitespace) OR
+ * immediately after a `;` (a second statement on the same line). `\s*` is a single
+ * linear quantifier, so the anchor adds no backtracking risk.
  *
- * SCOPE LIMITATION (fix F4, documented, intentional not-fixed): a destructive
- * statement split across physical lines (`DROP\nTABLE`) is NOT detected — scanning
- * is line-oriented and statement anchoring is per line. Formatters keep
- * `DROP TABLE` together, so the probability is low; catching it would require a
- * full multi-line tokenizer, out of scope for this static heuristic.
+ * DB-w3 fix F3: the earlier design added an OPENING-QUOTE branch to this anchor so
+ * `op.execute("DROP TABLE x")` would fire. That branch over-reached — it matched on
+ * position-within-string, so ANY string value whose content merely BEGINS with a
+ * destructive keyword (`INSERT … VALUES ('DROP TABLE permanently removes a table')`)
+ * false-positived and BLOCKED the gate. The quote branch is removed here; embedded
+ * executable DDL is now detected by anchoring on the host-language EXECUTE call (see
+ * EXEC_ANCHOR), i.e. on executability, not on position inside a string literal.
+ *
+ * SCOPE LIMITATION (documented, intentional not-fixed): a destructive statement
+ * split across physical lines (`DROP\nTABLE`) is NOT detected — scanning is
+ * line-oriented and statement anchoring is per line. Formatters keep `DROP TABLE`
+ * together, so the probability is low; catching it would require a full multi-line
+ * tokenizer, out of scope for this static heuristic.
  * @type {string}
  */
-const STMT_ANCHOR = '(?:^|;|["\'])\\s*';
+const STMT_ANCHOR = '(?:^|;)\\s*';
 
 /**
- * Destructive DDL patterns. Each is a CONSTANT string compiled once via safeRegExp,
- * built by concatenating the statement anchor with a keyword body — still a
- * literal, no user-derived input. `\b` word boundaries close each keyword; `[^;]*`
- * in the ALTER form is a single linear quantifier (no nesting) so there is no
- * catastrophic backtracking (ReDoS-safe). Case insensitive. Order matters only for
- * the human-readable `rule` label on a line that matches more than one (the line is
- * reported ONCE, deduped by file:line).
- *
- * All keywords are statement-anchored (see STMT_ANCHOR): a keyword embedded in a
- * string value or a comment is no longer a false positive. `DROP DATABASE|SCHEMA
- * |COLUMN` are folded into one alternation (standalone `DROP COLUMN` covers
- * dialects that allow it without ALTER; the `ALTER TABLE … DROP` rule covers the
- * usual `ALTER TABLE t DROP COLUMN c` form).
+ * Embedded-executable-DDL anchor (DB-w3 fix F3). A destructive keyword ALSO counts
+ * when it is the first token of a SQL string passed to a host-language execute call
+ * — `op.execute("DROP TABLE x")`, `connection.execute('TRUNCATE t')`,
+ * `execute("…")`. The anchor is the execute call + opening paren + opening quote +
+ * optional whitespace; the destructive keyword must be the FIRST token of the
+ * string, so a benign value like `'DROP TABLE permanently removes …'` passed to an
+ * INSERT (no execute call) never matches. Every metacharacter is a single linear
+ * quantifier — ReDoS-safe. `\bexecute` covers `op.execute`, `connection.execute`,
+ * and bare `execute`.
+ * @type {string}
+ */
+const EXEC_ANCHOR = '\\bexecute\\s*\\(\\s*["\']\\s*';
+
+/**
+ * The DROP family this checker advertises (DB-w3 fix F4). ONE alternation covering
+ * every object kind whose DROP is a data-loss risk: TABLE, DATABASE, SCHEMA, COLUMN,
+ * INDEX, VIEW, SEQUENCE, TYPE, and MATERIALIZED VIEW (two words). `\b` closes each
+ * keyword. Single linear quantifiers only — ReDoS-safe.
+ * @type {string}
+ */
+const DROP_BODY = 'DROP\\s+(?:TABLE|DATABASE|SCHEMA|COLUMN|INDEX|VIEW|SEQUENCE|TYPE|MATERIALIZED\\s+VIEW)\\b';
+/** `ALTER TABLE t … DROP …` form — `[^;]*` is a single linear quantifier (ReDoS-safe). */
+const ALTER_DROP_BODY = 'ALTER\\s+TABLE\\b[^;]*\\bDROP\\b';
+/** `TRUNCATE …` — data-loss on all rows. */
+const TRUNCATE_BODY = 'TRUNCATE\\b';
+
+/**
+ * Destructive DDL patterns for the SQL-family files (`.sql`, `.rb`, `.py`). Each is
+ * a CONSTANT string compiled once via safeRegExp, built by concatenating an anchor
+ * with a keyword body — still a literal, no user-derived input. Case insensitive.
+ * The line is reported ONCE, deduped by file:line. Two anchor families:
+ *   - STMT_ANCHOR: raw statement-position DDL (`DROP TABLE …`, post-`;`, `ALTER …
+ *     DROP`, `TRUNCATE …`).
+ *   - EXEC_ANCHOR: the same bodies embedded in an executable `execute("…")` string
+ *     (DB-w3 fix F3) — executability, not string position.
  * @type {Array<{rule: string, re: RegExp}>}
  */
 const DESTRUCTIVE_PATTERNS = [
-  { rule: 'DROP TABLE',              re: safeRegExp(STMT_ANCHOR + 'DROP\\s+TABLE\\b', 'i') },
-  { rule: 'DROP DATABASE/SCHEMA/COLUMN', re: safeRegExp(STMT_ANCHOR + 'DROP\\s+(?:DATABASE|SCHEMA|COLUMN)\\b', 'i') },
-  { rule: 'ALTER TABLE … DROP',      re: safeRegExp(STMT_ANCHOR + 'ALTER\\s+TABLE\\b[^;]*\\bDROP\\b', 'i') },
-  { rule: 'TRUNCATE',                re: safeRegExp(STMT_ANCHOR + 'TRUNCATE\\b', 'i') }
+  { rule: 'DROP <object>',           re: safeRegExp(STMT_ANCHOR + DROP_BODY, 'i') },
+  { rule: 'ALTER TABLE … DROP',      re: safeRegExp(STMT_ANCHOR + ALTER_DROP_BODY, 'i') },
+  { rule: 'TRUNCATE',                re: safeRegExp(STMT_ANCHOR + TRUNCATE_BODY, 'i') },
+  { rule: 'execute("DROP …")',       re: safeRegExp(EXEC_ANCHOR + DROP_BODY, 'i') },
+  { rule: 'execute("ALTER … DROP")', re: safeRegExp(EXEC_ANCHOR + ALTER_DROP_BODY, 'i') },
+  { rule: 'execute("TRUNCATE …")',   re: safeRegExp(EXEC_ANCHOR + TRUNCATE_BODY, 'i') }
 ];
+
+/**
+ * Liquibase XML changelog destructive patterns (DB-w3 fix F1, `.xml`). Element
+ * forms carry no SQL keyword the SQL scanner would see. `<sql>` wraps raw SQL, so a
+ * DROP/TRUNCATE inside it is flagged too. `[^<]*` is a single linear quantifier
+ * (bounded by the next `<`) — ReDoS-safe.
+ * @type {Array<{rule: string, re: RegExp}>}
+ */
+const LIQUIBASE_XML_PATTERNS = [
+  { rule: 'Liquibase <dropTable>',                      re: safeRegExp('<dropTable\\b', 'i') },
+  { rule: 'Liquibase <dropColumn>',                     re: safeRegExp('<dropColumn\\b', 'i') },
+  { rule: 'Liquibase <dropAllForeignKeyConstraints>',  re: safeRegExp('<dropAllForeignKeyConstraints\\b', 'i') },
+  { rule: 'Liquibase <sql> DROP/TRUNCATE',             re: safeRegExp('<sql>[^<]*\\b(?:DROP|TRUNCATE)\\b', 'i') }
+];
+
+/**
+ * Liquibase YAML changelog destructive patterns (DB-w3 fix F1, `.yaml`/`.yml`).
+ * `- dropTable:` / `- dropColumn:` sequence-item element forms. `\s*` linear
+ * quantifiers only — ReDoS-safe.
+ * @type {Array<{rule: string, re: RegExp}>}
+ */
+const LIQUIBASE_YAML_PATTERNS = [
+  { rule: 'Liquibase yaml dropTable',  re: safeRegExp('-\\s*dropTable\\s*:', 'i') },
+  { rule: 'Liquibase yaml dropColumn', re: safeRegExp('-\\s*dropColumn\\s*:', 'i') }
+];
+
+/**
+ * .NET Entity Framework Core C# migration destructive patterns (DB-w3 fix F1,
+ * `.cs`). Fluent `migrationBuilder.DropTable(...)` / `.DropColumn(...)` calls, and
+ * a raw `.Sql("…")` whose SQL string STARTS with a DROP/TRUNCATE (same
+ * executability anchor idea as EXEC_ANCHOR — a mention mid-string is not flagged).
+ * `\s*` linear quantifiers only — ReDoS-safe.
+ * @type {Array<{rule: string, re: RegExp}>}
+ */
+const EF_CS_PATTERNS = [
+  { rule: 'EF migrationBuilder.DropTable',  re: safeRegExp('\\.DropTable\\s*\\(', 'i') },
+  { rule: 'EF migrationBuilder.DropColumn', re: safeRegExp('\\.DropColumn\\s*\\(', 'i') },
+  { rule: 'EF migrationBuilder.Sql(DROP/TRUNCATE)', re: safeRegExp('\\.Sql\\s*\\(\\s*["\']\\s*(?:' + DROP_BODY + '|' + TRUNCATE_BODY + ')', 'i') }
+];
+
+/**
+ * Select the destructive-pattern set for a file extension (DB-w3 fix F1). SQL-family
+ * (`.sql`, `.rb`, `.py`) get the SQL/EXEC patterns; Liquibase XML/YAML and EF C# get
+ * their format-appropriate sets. An extension with no set is not scannable for
+ * content (handled by the UNPARSED loud-skip path, never a silent clean pass).
+ * @param {string} ext - lowercased file extension
+ * @returns {Array<{rule: string, re: RegExp}>}
+ */
+function patternsForExt(ext) {
+  if (ext === '.xml') return LIQUIBASE_XML_PATTERNS;
+  if (ext === '.yaml' || ext === '.yml') return LIQUIBASE_YAML_PATTERNS;
+  if (ext === '.cs') return EF_CS_PATTERNS;
+  return DESTRUCTIVE_PATTERNS; // .sql, .rb, .py
+}
 
 /**
  * Block-comment stripper (DB-w2 fix F3). Removes every C-style slash-star block
@@ -188,9 +302,22 @@ const MAX_WALK_DEPTH = 12;
  * @returns {string}
  */
 function stripLineComment(line, ext) {
-  if (ext === '.py' || ext === '.rb') {
+  // Hash-comment languages: Python, Ruby, and YAML changelogs.
+  if (ext === '.py' || ext === '.rb' || ext === '.yaml' || ext === '.yml') {
     const h = line.indexOf('#');
     return h === -1 ? line : line.slice(0, h);
+  }
+  // C# uses `//` line comments; a commented-out `// migrationBuilder.DropTable(...)`
+  // must not be flagged.
+  if (ext === '.cs') {
+    const s = line.indexOf('//');
+    return s === -1 ? line : line.slice(0, s);
+  }
+  // XML uses `<!-- -->`; do NOT strip on a bare `--` (it appears inside `<!--` and
+  // legitimately inside attribute values), so leave XML lines intact — the crude
+  // block/line SQL strippers would corrupt XML more than they help.
+  if (ext === '.xml') {
+    return line;
   }
   const i = line.indexOf('--');
   return i === -1 ? line : line.slice(0, i);
@@ -233,6 +360,13 @@ class MigrationSafetyChecker {
     };
     this.findings = [];
     this.errors = [];
+    // DB-w3 fix F1/F2 honesty accumulators (populated by detectMigrationFiles):
+    //   _unparsedMigrationFiles — files in a searched migration dir with an ext this
+    //     scanner cannot parse (loud skip, never a silent "no migrations found");
+    //   _capHit — the file-count cap truncated the walk (loud skip, never a silent
+    //     clean pass on a partial scan).
+    this._unparsedMigrationFiles = [];
+    this._capHit = false;
   }
 
   /**
@@ -250,9 +384,13 @@ class MigrationSafetyChecker {
    */
   detectMigrationFiles(projectRoot = this.projectRoot) {
     const found = [];
+    const unparsed = [];
     const cap = this.options.maxFiles;
 
-    // Recursively collect every migration-ext file under a directory.
+    // Recursively collect every migration-ext file under a directory. Files that
+    // physically sit in a migration dir but carry an ext this scanner cannot parse
+    // (UNPARSED_MIGRATION_EXTS) are recorded so run() can emit a LOUD skip — never a
+    // silent "no migrations found" while destructive-capable files sit unread.
     const collect = (absDir, depth) => {
       if (found.length >= cap || depth > MAX_WALK_DEPTH) return;
       let entries;
@@ -274,8 +412,13 @@ class MigrationSafetyChecker {
         }
         if (isDir) {
           collect(abs, depth + 1);
-        } else if (isFile && MIGRATION_EXTS.has(path.extname(entry.name).toLowerCase())) {
-          found.push(abs);
+        } else if (isFile) {
+          const fext = path.extname(entry.name).toLowerCase();
+          if (MIGRATION_EXTS.has(fext)) {
+            found.push(abs);
+          } else if (UNPARSED_MIGRATION_EXTS.has(fext)) {
+            unparsed.push(abs);
+          }
         }
       }
     };
@@ -317,6 +460,13 @@ class MigrationSafetyChecker {
     // 3: any *migrat* directory anywhere in the tree.
     discover(projectRoot, 0);
 
+    // DB-w3 fix F2: if the walk stopped at the file cap, the scan is TRUNCATED — the
+    // remaining files were never read, so a "clean" result would be a lie. Record it
+    // so run() surfaces a loud skip.
+    this._capHit = found.length >= cap;
+    // DB-w3 fix F1 belt-and-suspenders: dedupe the unparseable-but-present files.
+    this._unparsedMigrationFiles = Array.from(new Set(unparsed));
+
     // Dedupe absolute paths (an *migrat* dir may also be an explicit root, and
     // nested locations like `migrations` and `migrations/versions` can otherwise
     // surface the same file twice).
@@ -334,6 +484,7 @@ class MigrationSafetyChecker {
   scanDestructive(content, file) {
     const out = [];
     const ext = path.extname(file).toLowerCase();
+    const patterns = patternsForExt(ext);
     // Original lines drive the human-readable `statement`; the block-stripped copy
     // (same line count — newlines preserved) drives matching. Line-comment stripping
     // is then applied per line, file-type aware.
@@ -341,7 +492,7 @@ class MigrationSafetyChecker {
     const scanLines = stripBlockComments(content).split(/\r?\n/);
     for (let i = 0; i < scanLines.length; i++) {
       const scanText = stripLineComment(scanLines[i], ext);
-      for (const { rule, re } of DESTRUCTIVE_PATTERNS) {
+      for (const { rule, re } of patterns) {
         if (re.test(scanText)) {
           out.push({
             tool: 'migration-safety',
@@ -443,6 +594,28 @@ class MigrationSafetyChecker {
    */
   async run() {
     const files = this.detectMigrationFiles();
+
+    // DB-w3 fix F2: a truncated walk (file cap hit) is NEVER a clean pass. Surface a
+    // loud skip so runSecurityScan lists it and a reader knows files went unread.
+    if (this._capHit) {
+      this.errors.push({
+        tool: 'migration-safety',
+        error: `migration scan capped at ${this.options.maxFiles} files; further files were NOT scanned (loud skip, not a clean pass)`
+      });
+    }
+
+    // DB-w3 fix F1 belt-and-suspenders: destructive-capable files whose extension
+    // this scanner cannot parse physically sit in a searched migration dir. Name
+    // them loudly — a "no migrations found" skip must never hide unread files.
+    if (this._unparsedMigrationFiles.length > 0) {
+      const shown = this._unparsedMigrationFiles.slice(0, 20).join(', ');
+      const more = this._unparsedMigrationFiles.length > 20
+        ? ` (+${this._unparsedMigrationFiles.length - 20} more)` : '';
+      this.errors.push({
+        tool: 'migration-safety',
+        error: `migration directory holds file(s) this scanner cannot parse — NOT scanned (loud skip, not a clean pass): ${shown}${more}`
+      });
+    }
 
     if (files.length === 0) {
       // HONEST skip (DB-w2 fix F1): NAME the locations that were searched so

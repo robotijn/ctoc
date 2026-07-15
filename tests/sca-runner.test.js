@@ -352,7 +352,11 @@ test('run(): a language with NO available scanner yields scanned:false, never a 
   const { SCARunner } = freshSCA();
   const tmp = mkTmp('sca-noscanner-');
   try {
-    fs.writeFileSync(path.join(tmp, 'go.mod'), 'module x\n'); // detectable, routes to osv
+    // C# is an ecosystem SCA genuinely OWNS: it has no DependencyAuditor manager, so
+    // it is not deferred, and it routes to the osv-scanner universal pass. (go was the
+    // old fixture, but go IS audited by DependencyAuditor (govulncheck) and is now
+    // correctly deferred — it would never reach SCA's scanner-availability path.)
+    fs.writeFileSync(path.join(tmp, 'app.csproj'), '<Project></Project>\n'); // detectable, routes to osv
     const r = new SCARunner(tmp);
     const res = await r.run();
     assert.equal(res.scanned, false, 'run() must report that nothing was scanned');
@@ -393,4 +397,176 @@ test('checkThreshold: a HIGH finding fails a HIGH threshold', () => {
   const res = r.checkThreshold('HIGH');
   assert.equal(res.pass, false);
   assert.equal(res.failing, 1);
+});
+
+// ── INFO: checkThreshold must count the DEDUPED set, matching run()'s report ──────
+
+test('checkThreshold: the SAME (package, advisory) reported twice counts ONCE, not twice', () => {
+  const { SCARunner } = require(SCA_PATH);
+  const r = new SCARunner('/x');
+  // Two OSV lockfiles carrying the identical advisory for the identical package —
+  // run() returns deduplicateFindings(), so checkThreshold must agree (one failing).
+  const dup = (src) => ({
+    source: { path: src, type: 'lockfile' },
+    packages: [{
+      package: { name: 'p', ecosystem: 'npm', version: '1.0.0' },
+      vulnerabilities: [{ id: 'GHSA-dup', database_specific: { severity: 'HIGH' } }]
+    }]
+  });
+  r.parseOSVResults({ results: [dup('a'), dup('b')] });
+  assert.equal(r.findings.length, 2, 'pre-dedup there are two raw findings');
+  const res = r.checkThreshold('HIGH');
+  assert.equal(res.failing, 1, 'checkThreshold must count the deduped set (one), consistent with run()');
+  assert.equal(res.pass, false);
+});
+
+// ── F1 PARTITION: an ecosystem DependencyAuditor cannot audit is NOT early-excluded ──
+//
+// The old partition deferred java (maven/gradle unimplemented) and python-via-
+// poetry/pipenv to DependencyAuditor, which then reported "not implemented" — so the
+// ecosystem was scanned by NEITHER runner. The redesign defers only DETECTED-AND-
+// IMPLEMENTED managers, so these projects flow to a real SCA scanner.
+
+test('F1: a pom.xml-only Java project is SCANNED by osv-scanner, never early-excluded', async () => {
+  const osv = {
+    results: [{
+      source: { path: '/proj/pom.xml', type: 'lockfile' },
+      packages: [{
+        package: { name: 'org.apache.commons:commons-text', ecosystem: 'Maven', version: '1.9' },
+        vulnerabilities: [{ id: 'GHSA-maven-rce', summary: 'RCE in commons-text', database_specific: { severity: 'CRITICAL' } }]
+      }]
+    }]
+  };
+  // osv-scanner is available and returns the Java CVE; nothing else is invoked.
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-java-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'pom.xml'), '<project></project>\n');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'the Java ecosystem must actually be scanned, never deferred to nothing');
+    assert.equal(res.findings.length, 1, 'the Maven CVE must surface');
+    assert.equal(res.findings[0].package, 'org.apache.commons:commons-text');
+    assert.equal(res.findings[0].severity, 'CRITICAL');
+    assert.doesNotMatch(String(res.message || ''), /defer|covered/i,
+      'the report must NOT claim java was deferred/covered — it was actually scanned');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('F1: a Pipfile python project (pipenv unimplemented) is SCANNED, not silently deferred', async () => {
+  // pipenv is NOT an implemented DependencyAuditor manager, so python must NOT be
+  // deferred; SCA covers it via its pip-audit native parser. (A pure poetry.lock
+  // project is the same class — poetry is likewise unimplemented — but the registry
+  // detects python from Pipfile, so Pipfile is the reproducible python fixture.)
+  const pip = {
+    dependencies: [{
+      name: 'flask',
+      version: '0.5',
+      vulns: [{ id: 'PYSEC-2019-179', severity: 'HIGH', description: 'DoS', aliases: ['CVE-2019-1010083'] }]
+    }]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'pip-audit') return JSON.stringify(pip);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-pipenv-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'Pipfile'), '[packages]\n');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'python must actually be scanned, not deferred to an unimplemented pipenv audit');
+    assert.equal(res.findings.length, 1);
+    assert.equal(res.findings[0].package, 'flask');
+    assert.doesNotMatch(String(res.message || ''), /defer|covered/i,
+      'the report must NOT claim python was deferred/covered');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('F1: a plain npm project is DEFERRED to DependencyAuditor exactly once (no SCA double-run)', async () => {
+  // Every tool probe would succeed, but SCA must still not scan js/ts — npm is an
+  // IMPLEMENTED DependencyAuditor manager, so SCA defers it and runs NO scanner.
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    throw new Error(`SCA must not invoke a scanner for a deferred npm project (got ${cmd})`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-npm-defer-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
+    fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.success, true);
+    assert.deepEqual(res.findings, [], 'SCA must not double-scan an ecosystem DependencyAuditor audits');
+    assert.notEqual(res.scanned, true, 'no SCA scanner ran — js/ts is DependencyAuditor’s to audit');
+    assert.match(String(res.message || ''), /audited by DependencyAuditor/i,
+      'the "covered" message is truthful here — DependencyAuditor genuinely audits npm');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ── F2 DOUBLE-COUNT: osv walks the whole repo; drop findings for ecosystems that ──
+// DependencyAuditor already audits, so an npm CVE is counted ONCE, not twice.
+
+test('F2: in a mixed C#+npm repo, the npm CVE osv also discovers is counted ONCE (dropped from SCA)', async () => {
+  // osv-scanner auto-discovers EVERY lockfile, so it reports BOTH the C# (NuGet) CVE
+  // and the npm (package-lock.json) CVE. DependencyAuditor already reports the npm
+  // one; SCA must drop the npm finding to avoid the cross-runner double-count, while
+  // keeping the C# finding it is uniquely responsible for.
+  const osv = {
+    results: [
+      {
+        source: { path: '/proj/packages.lock.json', type: 'lockfile' },
+        packages: [{
+          package: { name: 'Newtonsoft.Json', ecosystem: 'NuGet', version: '12.0.1' },
+          vulnerabilities: [{ id: 'GHSA-csharp-dos', summary: 'DoS', database_specific: { severity: 'HIGH' } }]
+        }]
+      },
+      {
+        source: { path: '/proj/package-lock.json', type: 'lockfile' },
+        packages: [{
+          package: { name: 'lodash', ecosystem: 'npm', version: '4.17.4' },
+          vulnerabilities: [{ id: 'GHSA-npm-dup', summary: 'Prototype pollution', database_specific: { severity: 'CRITICAL' } }]
+        }]
+      }
+    ]
+  };
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args.includes('--version')) return '';
+    if (cmd === 'osv-scanner') return JSON.stringify(osv);
+    throw new Error(`unexpected exec ${cmd} ${JSON.stringify(args)}`);
+  };
+  const { SCARunner } = freshSCA();
+  const tmp = mkTmp('sca-mixed-');
+  try {
+    fs.writeFileSync(path.join(tmp, 'app.csproj'), '<Project></Project>\n'); // → csharp (osv route)
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}'); // → npm, deferred
+    fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
+    const r = new SCARunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true);
+    const packages = res.findings.map((f) => f.package);
+    assert.ok(packages.includes('Newtonsoft.Json'), 'the C# CVE (SCA’s responsibility) must surface');
+    assert.ok(!packages.includes('lodash'),
+      'the npm CVE is DependencyAuditor’s — SCA must DROP it so it is not counted twice');
+    assert.equal(res.findings.length, 1, 'exactly one finding: the C# CVE, counted once');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });

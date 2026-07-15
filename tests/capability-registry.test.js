@@ -364,3 +364,152 @@ describe('capability-registry: WIRED into app-runner (a live consumer, not test-
     } finally { rm(dir); }
   });
 });
+
+describe('capability-registry: detectLanguages() — DETERMINISTIC sorted order, cross-platform stable (F1)', () => {
+  it('a polyglot repo returns a STABLE, sorted-by-capability-filename order across repeated loads', () => {
+    const dir = makeProject('ctoc-det-order-');
+    try {
+      // One decisive single-language marker per bundled capability file:
+      //   main.c → c.yaml, app.cpp → cpp.yaml, schema.sql → sql.yaml, config.yaml → yaml.yaml
+      fs.writeFileSync(path.join(dir, 'main.c'), 'int main(void){return 0;}\n');
+      fs.writeFileSync(path.join(dir, 'app.cpp'), 'int f(){return 0;}\n');
+      fs.writeFileSync(path.join(dir, 'schema.sql'), 'select 1;\n');
+      fs.writeFileSync(path.join(dir, 'config.yaml'), 'a: 1\n');
+      const relevant = (arr) => arr.filter((l) => ['c', 'cpp', 'sql', 'yaml'].includes(l));
+      const first = relevant(registry.detectLanguages(dir));
+      // The order is the SORTED capability-filename order (c.yaml < cpp.yaml < sql.yaml <
+      // yaml.yaml) — identical on every filesystem. It is NOT readdir order, which is
+      // hash-ordered on ext4/xfs and would otherwise pick a different run target on Linux
+      // CI than on a macOS laptop for the very same repo.
+      assert.deepEqual(first, ['c', 'cpp', 'sql', 'yaml'],
+        'primary-language order must be the deterministic sorted-filename order on every platform');
+      // Stability: detectLanguages(root)[0] — app-runner\'s run target — never shifts.
+      const second = relevant(registry.detectLanguages(dir));
+      const third = relevant(registry.detectLanguages(dir));
+      assert.deepEqual(second, first, 'order must be identical on a second fresh load');
+      assert.deepEqual(third, first, 'order must be identical on a third fresh load');
+      assert.equal(first[0], 'c',
+        'the run target detectLanguages[0] is deterministic (c here), never filesystem-dependent');
+    } finally { rm(dir); }
+  });
+});
+
+describe('capability-registry: isValidCapability — a structurally-broken override is SKIPPED + warned, not silently accepted (F2)', () => {
+  it('a BLOCK-sequence detectionMarkers (rendered as {} by the flow-only parser) is skipped WITH a warning', () => {
+    const dir = makeProject('ctoc-cap-blockseq-');
+    try {
+      // Idiomatic YAML the flow-only parser cannot represent: a block sequence parses to {}.
+      // Before F2 this passed isValidCapability, then silently never detected — no warning.
+      writeOverride(dir, 'blockseq.yaml',
+        'language: blockseq\n' +
+        'detectionMarkers:\n' +
+        '  - Block.toml\n' +
+        'toolchain:\n' +
+        '  test: { cmd: "echo hi", tool: echo, verified: UNVERIFIED }\n' +
+        'verified: UNVERIFIED\n');
+      const reg = registry.load(dir);
+      assert.ok(!reg.languages.blockseq,
+        'a block-sequence detectionMarkers override must NOT be silently accepted');
+      assert.ok(reg.warnings.some((w) => /blockseq\.yaml/.test(JSON.stringify(w))),
+        'the skip must be LOUD — a warning naming the offending file (skip-and-warn contract)');
+    } finally { rm(dir); }
+  });
+
+  it('an empty (tab-mangled) toolchain override is skipped WITH a warning', () => {
+    const dir = makeProject('ctoc-cap-emptytc-');
+    try {
+      // toolchain: with no representable children → {} → previously passed validation, then
+      // toolchainFor returned null silently. Non-empty-toolchain check makes it loud.
+      writeOverride(dir, 'emptytc.yaml',
+        'language: emptytc\n' +
+        'detectionMarkers: [emptytc.marker]\n' +
+        'toolchain:\n' +
+        'verified: UNVERIFIED\n');
+      const reg = registry.load(dir);
+      assert.ok(!reg.languages.emptytc,
+        'an empty-toolchain override must be rejected, not silently accepted');
+      assert.ok(reg.warnings.some((w) => /emptytc\.yaml/.test(JSON.stringify(w))),
+        'the empty-toolchain skip must be warned');
+    } finally { rm(dir); }
+  });
+
+  it('a valid FLOW-list override still loads with no warning (the tightening does not reject good data)', () => {
+    const dir = makeProject('ctoc-cap-flowok-');
+    try {
+      writeOverride(dir, 'flowlang.yaml',
+        'language: flowlang\n' +
+        'detectionMarkers: [flow.marker]\n' +
+        'toolchain:\n' +
+        '  lint: { cmd: "flowlint", tool: flowlint, verified: UNVERIFIED }\n' +
+        '  test: { cmd: "flowtest", tool: flowtest, verified: UNVERIFIED }\n' +
+        'verified: UNVERIFIED\n');
+      const reg = registry.load(dir);
+      assert.ok(reg.languages.flowlang, 'a valid flow-list override must still load');
+      assert.deepEqual(reg.warnings, [], 'a valid override must produce no warning');
+    } finally { rm(dir); }
+  });
+});
+
+describe('capability-registry: parseValue — version-like scalars are preserved as strings (F3)', () => {
+  it('verified: 1.0 stays the STRING "1.0" (a trailing-.0 version is not coerced to Number 1)', () => {
+    const dir = makeProject('ctoc-f3-ver-');
+    try {
+      writeOverride(dir, 'verlang.yaml',
+        'language: verlang\n' +
+        'detectionMarkers: [ver.marker]\n' +
+        'toolchain:\n' +
+        '  test: { cmd: "t", tool: t, verified: 1.0 }\n' +
+        'verified: UNVERIFIED\n');
+      const cap = registry.capabilitiesFor('verlang', dir);
+      assert.ok(cap, 'the override must load');
+      assert.strictEqual(cap.toolchain.test.verified, '1.0',
+        'a trailing-.0 version scalar must be preserved verbatim, never coerced to Number 1');
+    } finally { rm(dir); }
+  });
+
+  it('a leading-zero scalar 007 stays the string "007" (not Number 7)', () => {
+    const dir = makeProject('ctoc-f3-lz-');
+    try {
+      writeOverride(dir, 'lzlang.yaml',
+        'language: lzlang\n' +
+        'detectionMarkers: [lz.marker]\n' +
+        'toolchain:\n' +
+        '  test: { cmd: "t", tool: t, verified: 007 }\n' +
+        'verified: UNVERIFIED\n');
+      const cap = registry.capabilitiesFor('lzlang', dir);
+      assert.strictEqual(cap.toolchain.test.verified, '007',
+        'a leading-zero scalar must be preserved verbatim, never coerced to Number 7');
+    } finally { rm(dir); }
+  });
+
+  it('a genuine integer scalar still parses to Number (coercion is preserved for real numbers)', () => {
+    const dir = makeProject('ctoc-f3-int-');
+    try {
+      writeOverride(dir, 'intlang.yaml',
+        'language: intlang\n' +
+        'detectionMarkers: [int.marker]\n' +
+        'budget: 2\n' +
+        'toolchain:\n' +
+        '  test: { cmd: "t", tool: t, verified: UNVERIFIED }\n' +
+        'verified: UNVERIFIED\n');
+      const cap = registry.capabilitiesFor('intlang', dir);
+      assert.strictEqual(cap.budget, 2, 'a real integer must still coerce to Number 2');
+      assert.strictEqual(typeof cap.budget, 'number', 'genuine numbers stay numbers');
+    } finally { rm(dir); }
+  });
+
+  it('a float like 3.5 still parses to Number (no over-correction)', () => {
+    const dir = makeProject('ctoc-f3-float-');
+    try {
+      writeOverride(dir, 'floatlang.yaml',
+        'language: floatlang\n' +
+        'detectionMarkers: [f.marker]\n' +
+        'ratio: 3.5\n' +
+        'toolchain:\n' +
+        '  test: { cmd: "t", tool: t, verified: UNVERIFIED }\n' +
+        'verified: UNVERIFIED\n');
+      const cap = registry.capabilitiesFor('floatlang', dir);
+      assert.strictEqual(cap.ratio, 3.5, 'a genuine float must still coerce to Number 3.5');
+    } finally { rm(dir); }
+  });
+});

@@ -358,3 +358,219 @@ test('F3: statement-anchored true positives still fire (line-start, post-;, ALTE
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── DB-w3 fix (00047): four adversarial defects against real fixtures ──────────
+// F1 non-SQL migration formats (Liquibase XML/YAML, EF C#) silently dropped by the
+// ext filter; F2 file-cap truncation reads as a clean pass; F3 a string-value
+// beginning with a keyword false-positives; F4 the DROP family (INDEX/VIEW/SEQUENCE
+// /MATERIALIZED VIEW) the module advertises is not detected. Real temp-dir
+// fixtures, zero mocks.
+
+test('F1: a Liquibase XML changelog with <dropTable> yields one HIGH (previously dropped by ext filter → GREEN)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '001.xml'),
+      '<databaseChangeLog>\n  <changeSet id="1" author="a"><dropTable tableName="users"/></changeSet>\n</databaseChangeLog>\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the .xml changelog was actually scanned');
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'the Liquibase <dropTable> is a HIGH finding');
+    assert.match(high[0].file, /001\.xml$/, 'finding names the changelog file');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F1: a Liquibase YAML changelog with `- dropTable:` yields one HIGH', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('db', 'changelog', '002.yaml'),
+      'databaseChangeLog:\n  - changeSet:\n      changes:\n        - dropTable:\n            tableName: users\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the .yaml changelog was actually scanned');
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'the Liquibase yaml dropTable is a HIGH finding');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F1: an EF Core C# migration with migrationBuilder.DropTable("Users") yields one HIGH', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240101_Init.cs'),
+      'public partial class Init : Migration {\n  protected override void Down(MigrationBuilder migrationBuilder) {\n    migrationBuilder.DropTable("Users");\n  }\n}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the EF Migrations dir was discovered and scanned');
+    const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+    assert.equal(high.length, 1, 'the EF DropTable call is a HIGH finding');
+    assert.match(high[0].file, /20240101_Init\.cs$/, 'finding names the .cs migration');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F1: an EF C# migration with only additive AddColumn yields zero findings but IS scanned', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('src', 'Migrations', '20240102_Add.cs'),
+      'protected override void Up(MigrationBuilder migrationBuilder) {\n  migrationBuilder.AddColumn<string>("Email", "Users");\n}\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'additive EF migration was scanned');
+    assert.equal(res.findings.length, 0, 'AddColumn is not destructive → no finding');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F1: a genuine no-migrations repo still reports scanned:false with a reason naming searched dirs', async () => {
+  const dir = mkTemp();
+  try {
+    fs.writeFileSync(path.join(dir, 'README.md'), '# nothing here\n', 'utf8');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, false, 'no migrations → honest scanned:false, not a pass');
+    assert.match(res.reason, /search/i, 'reason frames these as locations that WERE searched');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F2: exceeding the file cap surfaces a loud skip marker — a truncated scan is NEVER a clean pass', async () => {
+  const dir = mkTemp();
+  try {
+    const migDir = path.join(dir, 'migrations');
+    fs.mkdirSync(migDir, { recursive: true });
+    // 2101 > DEFAULT_MAX_FILES (2000). One holds a DROP that may sort past the cap.
+    for (let i = 0; i < 2101; i++) {
+      const name = String(i).padStart(5, '0') + '_m.sql';
+      const body = i === 2100 ? 'DROP TABLE late;\n' : `CREATE TABLE t${i} (id int);\n`;
+      fs.writeFileSync(path.join(migDir, name), body, 'utf8');
+    }
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true, 'the scan ran on the files it could reach');
+    assert.ok(
+      (res.errors || []).some(e => e.tool === 'migration-safety' && /cap/i.test(e.error)),
+      'the cap-hit truncation is surfaced as a loud skip, not silently dropped'
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: a benign INSERT whose string VALUE begins with "DROP TABLE" is NOT flagged', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '008_help.sql'),
+      "INSERT INTO help(body) VALUES ('DROP TABLE permanently removes a table');\n");
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a string value that merely starts with a keyword is not executable DDL');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: a benign INSERT whose string VALUE begins with "TRUNCATE" is NOT flagged', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '009_docs.sql'),
+      "INSERT INTO docs(t) VALUES ('TRUNCATE empties a table fast');\n");
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 0, 'a string value starting with TRUNCATE is not executable DDL');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: an executable op.execute("DROP TABLE x") in a .py migration STILL fires (true positive preserved)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '010_exec.py'),
+      'def upgrade():\n    op.execute("DROP TABLE x")\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'embedded executable DROP via execute() is still caught');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3: a plain line-start `DROP TABLE users;` STILL fires', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '011_plain.sql'), 'DROP TABLE users;\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'a plain statement-anchored DROP TABLE still fires');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4: the wider DROP family (INDEX, VIEW, SEQUENCE, MATERIALIZED VIEW) each yields one HIGH', async () => {
+  const cases = [
+    ['012_index.sql', 'DROP INDEX idx_unique_email;\n'],
+    ['013_view.sql', 'DROP VIEW active_users;\n'],
+    ['014_seq.sql', 'DROP SEQUENCE s;\n'],
+    ['015_matview.sql', 'DROP MATERIALIZED VIEW mv;\n']
+  ];
+  for (const [name, body] of cases) {
+    const dir = mkTemp();
+    try {
+      writeFile(dir, path.join('migrations', name), body);
+      const checker = new MigrationSafetyChecker(dir);
+      const res = await checker.run();
+      assert.equal(res.scanned, true, `${name} scanned`);
+      const high = res.findings.filter(f => f.severity === SEVERITY.HIGH);
+      assert.equal(high.length, 1, `${name}: the DROP is a HIGH finding`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('F4: extending the DROP family does not break ALTER TABLE t DROP COLUMN c (still exactly one finding)', async () => {
+  const dir = mkTemp();
+  try {
+    writeFile(dir, path.join('migrations', '016_alter.sql'), 'ALTER TABLE t DROP COLUMN c;\n');
+
+    const checker = new MigrationSafetyChecker(dir);
+    const res = await checker.run();
+
+    assert.equal(res.scanned, true);
+    assert.equal(res.findings.length, 1, 'ALTER..DROP COLUMN still fires exactly once');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

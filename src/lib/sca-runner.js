@@ -26,6 +26,7 @@
 const { execFileSync } = require('child_process');
 const registry = require('./capability-registry');
 const { severityFromCvss } = require('./cvss');
+const { auditedLanguagesFor } = require('./dependency-auditor');
 
 /**
  * Severity levels aligned with CVSS (same shape as sast-runner's SEVERITY).
@@ -64,6 +65,28 @@ const SCA_TOOL_CONFIGS = {
 };
 
 /**
+ * OSV ecosystem name → the capability-registry language(s) it belongs to (keys are
+ * lowercased for case-insensitive matching; osv emits "npm", "PyPI", "Go", "Maven",
+ * "crates.io", "RubyGems", "Packagist", "NuGet", …). F2: osv-scanner walks the WHOLE
+ * repo and auto-discovers every lockfile, so its universal pass reports findings from
+ * ecosystems DependencyAuditor already audits. This map lets the runner drop those
+ * findings — keyed on the per-finding `ecosystem` osv records — so an npm CVE that
+ * DependencyAuditor also reports is counted ONCE, not twice. An ecosystem absent from
+ * this map is never dropped (kept — we never suppress a finding we cannot attribute).
+ * @type {Object<string, string[]>}
+ */
+const OSV_ECOSYSTEM_LANGUAGES = {
+  npm: ['javascript', 'typescript'],
+  pypi: ['python'],
+  go: ['go'],
+  'crates.io': ['rust'],
+  rubygems: ['ruby'],
+  packagist: ['php'],
+  maven: ['java'],
+  nuget: ['csharp']
+};
+
+/**
  * SCA Runner class. Orchestrates dependency auditing across the native parsers and
  * the osv-scanner universal engine.
  */
@@ -81,6 +104,11 @@ class SCARunner {
     };
     this.findings = [];
     this.errors = [];
+    // The languages DependencyAuditor audits for THIS project, set by run() before
+    // the osv-scanner universal pass so parseOSVResults can drop findings from an
+    // ecosystem DependencyAuditor already covers (F2). null outside a run() → no
+    // filtering, so the standalone parser tests see every finding.
+    this._deferredLanguages = null;
   }
 
   /**
@@ -160,15 +188,21 @@ class SCARunner {
     const startTime = Date.now();
     const detected = this.detectLanguages();
 
-    // F2 partition: DependencyAuditor already audits its covered ecosystems (js/ts,
-    // python, go, rust, java, ruby, php). Running SCA for them too double-counts the
-    // SAME CVE into the human-facing tally and runs the tool twice. When the caller
-    // passes `excludeLanguages` (quality-agent passes DependencyAuditor.COVERED_
-    // LANGUAGES), SCA scans ONLY the long-tail ecosystems — no overlap, no double-run.
-    const excluded = this.options.excludeLanguages instanceof Set
-      ? this.options.excludeLanguages
-      : new Set(this.options.excludeLanguages || []);
-    const languages = detected.filter((l) => !excluded.has(l));
+    // F1 partition (redesigned): defer an ecosystem to DependencyAuditor ONLY when
+    // the manager it DETECTED for THIS project is one it actually AUDITS (an
+    // implemented switch arm). The old logic deferred the NOMINAL language union, so
+    // maven/gradle (java) and poetry/pipenv (python) projects — which DependencyAuditor
+    // reports "not implemented" for — were EXCLUDED here and thus scanned by NEITHER
+    // runner. auditedLanguagesFor keys on DETECTED ∩ IMPLEMENTED, so those projects now
+    // flow to a real SCA scanner (osv-scanner universal / native), while a genuinely
+    // audited ecosystem (npm/pip/go/cargo/bundler/composer) is still deferred exactly
+    // once. Fail-soft inside auditedLanguagesFor: on error it defers nothing.
+    const deferred = auditedLanguagesFor(this.projectRoot);
+    // Record the deferred set so the osv-scanner universal pass — which walks the whole
+    // repo and auto-discovers EVERY lockfile regardless of this filter — does not ALSO
+    // report findings from an ecosystem DependencyAuditor already audits (F2).
+    this._deferredLanguages = deferred;
+    const languages = detected.filter((l) => !deferred.has(l));
 
     if (languages.length === 0) {
       return {
@@ -399,6 +433,11 @@ class SCARunner {
       for (const pkg of result.packages || []) {
         const info = pkg.package || {};
         for (const vuln of pkg.vulnerabilities || []) {
+          // F2: osv discovers every lockfile in the repo, including those for
+          // ecosystems DependencyAuditor already audits. Drop such findings so the
+          // same CVE is not counted by both runners. Only active inside run() (when
+          // _deferredLanguages is set); standalone parse still sees every finding.
+          if (this._isEcosystemDeferred(info.ecosystem)) continue;
           this.findings.push({
             tool: 'osv-scanner',
             package: info.name || 'unknown',
@@ -413,6 +452,21 @@ class SCARunner {
         }
       }
     }
+  }
+
+  /**
+   * True when an osv finding's ecosystem belongs to a language DependencyAuditor
+   * already audits for this project (F2 cross-runner de-duplication). Inert unless a
+   * run() set `_deferredLanguages`; an unmapped/absent ecosystem is never deferred, so
+   * a finding we cannot attribute is kept (never silently suppressed).
+   * @param {string|null|undefined} ecosystem - the OSV ecosystem name for the finding
+   * @returns {boolean} true iff the finding should be dropped as DependencyAuditor's
+   */
+  _isEcosystemDeferred(ecosystem) {
+    if (!(this._deferredLanguages instanceof Set) || this._deferredLanguages.size === 0) return false;
+    if (!ecosystem) return false;
+    const langs = OSV_ECOSYSTEM_LANGUAGES[String(ecosystem).toLowerCase()] || [];
+    return langs.some((l) => this._deferredLanguages.has(l));
   }
 
   /**
@@ -739,7 +793,9 @@ class SCARunner {
     const order = [SEVERITY.CRITICAL, SEVERITY.HIGH, SEVERITY.MEDIUM, SEVERITY.LOW, SEVERITY.INFO];
     const thresholdIndex = order.indexOf(threshold);
 
-    const failing = this.findings.filter((f) => order.indexOf(f.severity) <= thresholdIndex);
+    // Count the DEDUPED set so the pass/fail tally matches what run() reports (the
+    // same advisory reported by two lockfiles/tools is one finding, not two).
+    const failing = this.deduplicateFindings().filter((f) => order.indexOf(f.severity) <= thresholdIndex);
 
     return {
       pass: failing.length === 0,

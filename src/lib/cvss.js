@@ -34,6 +34,19 @@ function midBand(SEVERITY) {
 }
 
 /**
+ * The lowest / NONE-equivalent severity for a given vocabulary. A CVSS base score of
+ * exactly 0.0 is the "None" band in the CVSS v3.1 qualitative scale. Prefer an explicit
+ * NONE token, then INFO, then LOW, with the mid band as a last resort so a vocabulary
+ * with none of those never crashes. Used only for a GENUINE computed 0.0 — the
+ * null/unparseable "unknown" path is handled separately and still bands cautiously.
+ * @param {Record<string, string>} SEVERITY
+ * @returns {string}
+ */
+function lowestBand(SEVERITY) {
+  return SEVERITY.NONE ?? SEVERITY.INFO ?? SEVERITY.LOW ?? midBand(SEVERITY);
+}
+
+/**
  * Rank a severity STRING for MAX comparison (higher = worse). Keyed by the literal
  * severity tokens of both vocabularies (MODERATE and MEDIUM share rank 2).
  * @param {string} sev
@@ -77,8 +90,12 @@ function labelToSeverity(raw, SEVERITY) {
 }
 
 /**
- * Band a finite CVSS v3 base score into a severity. Only ever called with a real
- * number. 0/negative is not a real score ⇒ mid band (unknown), never LOW.
+ * Band a finite CVSS v3 base score into a severity, following the CVSS v3.1
+ * qualitative scale (None 0.0 · Low 0.1–3.9 · Medium 4.0–6.9 · High 7.0–8.9 ·
+ * Critical 9.0–10.0). Only ever called with a REAL computed number — the
+ * null/unparseable "unknown" case never reaches here (it bands HIGH upstream), so a
+ * score of exactly 0.0 is always a genuine all-None vector and maps to the lowest /
+ * NONE-equivalent band, never the mid band.
  * @param {number} score - CVSS v3 base score (0.0–10.0)
  * @param {Record<string, string>} SEVERITY
  * @returns {string}
@@ -88,7 +105,7 @@ function bandCvss(score, SEVERITY) {
   if (score >= 7.0) return SEVERITY.HIGH;
   if (score >= 4.0) return midBand(SEVERITY);
   if (score > 0) return SEVERITY.LOW;
-  return midBand(SEVERITY);
+  return lowestBand(SEVERITY); // a genuine computed 0.0 ⇒ None, not the mid band
 }
 
 /**
@@ -125,13 +142,23 @@ function cvssVectorBaseScore(vector) {
   }
 
   const iss = 1 - (1 - C) * (1 - I) * (1 - A);
+  // Scope:Changed uses the CVSS v3.1 impact sub-score. The v3.0 term
+  // (3.25*(iss-0.02)^15) under-scores genuine HIGH CVEs to 6.9 (MEDIUM); v3.1 uses
+  // 3.25*(iss*0.9731-0.02)^13 (coefficient 0.9731 inside, exponent 13), landing them
+  // at 7.0 (HIGH). Scope:Unchanged (6.42*iss) is identical between v3.0 and v3.1.
   const impact = scope === 'C'
-    ? 7.52 * (iss - 0.029) - 3.25 * Math.pow(iss - 0.02, 15)
+    ? 7.52 * (iss - 0.029) - 3.25 * Math.pow(iss * 0.9731 - 0.02, 13)
     : 6.42 * iss;
   const exploitability = 8.22 * AV * AC * PR * UI;
 
   if (impact <= 0) return 0;
-  const roundup = (x) => Math.ceil(x * 10) / 10;
+  // The official CVSS v3.1 Roundup: round to one decimal, but round UP only when the
+  // value is not already exact to a hundred-thousandth — this keeps boundary scores
+  // (e.g. 7.0) exact rather than nudging them up like a naive Math.ceil(x*10)/10.
+  const roundup = (input) => {
+    const r = Math.round(input * 100000);
+    return (r % 10000 === 0) ? r / 100000 : (Math.floor(r / 10000) + 1) / 10;
+  };
   const raw = scope === 'C'
     ? Math.min(1.08 * (impact + exploitability), 10)
     : Math.min(impact + exploitability, 10);
