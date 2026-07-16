@@ -486,6 +486,242 @@ test('topicCriticalOpenCount can be asked about any topic directly', () => {
   assert.equal(flow.topicCriticalOpenCount(state, { id: 'x', label: 'x' }), 0);
 });
 
+// ===========================================================================
+// SLICE: BATCH-APPROVE mechanic.
+// Owner's rule: "after the user is choosing the recommended action 5-10 times,
+// then there is a batch option … the 5-10 times is only for NON-critical issues."
+// Track a streak of RECOMMENDED picks on NON-critical questions; once it reaches
+// a threshold, offer a batch-approve that answers the REMAINING non-critical
+// questions (that have a recommended option) with their recommended key in one
+// action. Criticals are NEVER batched.
+// ===========================================================================
+
+// A single topic whose ordered questions are: crit (critical) → q1,q2,q3 (normal,
+// recommended) → norec (normal, NO recommended option). Authored NON-critical-first
+// so ordering is exercised too.
+function batchTopics() {
+  return [
+    {
+      id: 'stack', label: 'Stack', critical: false,
+      questions: [
+        { id: 'q1', prompt: 'q1?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+        { id: 'q2', prompt: 'q2?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+        { id: 'q3', prompt: 'q3?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+        { id: 'norec', prompt: 'norec?', options: [{ key: '1', label: 'a' }, { key: '2', label: 'b' }] },
+        { id: 'crit', critical: true, prompt: 'crit?', options: [{ key: '1', label: 'a', recommended: true }] },
+      ],
+    },
+  ];
+}
+
+// Two non-critical topics for the roll-to-next-topic advance test.
+function batchTwoTopics() {
+  return [
+    {
+      id: 'stack', label: 'Stack', critical: false, questions: [
+        { id: 'q1', prompt: 'q1?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+        { id: 'q2', prompt: 'q2?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+      ],
+    },
+    {
+      id: 'next', label: 'Next', critical: false, questions: [
+        { id: 'n1', prompt: 'n1?', options: [{ key: '1', label: 'a', recommended: true }] },
+      ],
+    },
+  ];
+}
+
+// A topic of two normal recommended questions (simple streak fixture).
+function twoNormals() {
+  return [
+    {
+      id: 't', label: 't', critical: false, questions: [
+        { id: 'n1', prompt: 'n1?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+        { id: 'n2', prompt: 'n2?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+      ],
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// recommendedStreak
+// ---------------------------------------------------------------------------
+test('initFlow initializes recommendedStreak to 0', () => {
+  assert.equal(flow.initFlow(topics()).recommendedStreak, 0);
+});
+
+test('recommendedStreak increments on a non-critical recommended pick', () => {
+  let state = flow.initFlow(twoNormals());
+  assert.equal(state.recommendedStreak, 0);
+  state = flow.answer(state, '1'); // n1: recommended, normal
+  assert.equal(state.recommendedStreak, 1);
+  state = flow.answer(state, '1'); // n2: recommended, normal
+  assert.equal(state.recommendedStreak, 2);
+});
+
+test('an important recommended pick counts toward the streak (non-critical)', () => {
+  let state = flow.initFlow([
+    { id: 't', label: 't', critical: false, questions: [
+      { id: 'imp', important: true, prompt: 'i?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+    ] },
+  ]);
+  state = flow.answer(state, '1');
+  assert.equal(state.recommendedStreak, 1);
+});
+
+test('recommendedStreak resets on a non-recommended pick', () => {
+  let state = flow.initFlow(twoNormals());
+  state = flow.answer(state, '1'); // streak 1
+  state = flow.answer(state, '2'); // non-recommended → reset
+  assert.equal(state.recommendedStreak, 0);
+});
+
+test('recommendedStreak resets on a comment', () => {
+  let state = flow.initFlow(twoNormals());
+  state = flow.answer(state, '1'); // streak 1
+  state = flow.answer(state, '(comment)'); // comment ≠ recommendedKey → reset
+  assert.equal(state.recommendedStreak, 0);
+});
+
+test('recommendedStreak resets when answering a critical question, even with the recommended option', () => {
+  // ordered: crit first, then n1
+  let state = flow.initFlow([
+    { id: 't', label: 't', critical: true, questions: [
+      { id: 'n1', prompt: 'n1?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+      { id: 'crit', critical: true, prompt: 'c?', options: [{ key: '1', label: 'a', recommended: true }] },
+    ] },
+  ]);
+  assert.equal(flow.currentQuestion(state).id, 'crit');
+  state = flow.answer(state, '1'); // critical recommended → streak stays 0
+  assert.equal(state.recommendedStreak, 0);
+  assert.equal(flow.currentQuestion(state).id, 'n1');
+  state = flow.answer(state, '1'); // normal recommended → 1
+  assert.equal(state.recommendedStreak, 1);
+});
+
+test('answer does not mutate recommendedStreak on the input state', () => {
+  const state = flow.initFlow(twoNormals());
+  const next = flow.answer(state, '1');
+  assert.equal(state.recommendedStreak, 0);
+  assert.equal(next.recommendedStreak, 1);
+});
+
+// ---------------------------------------------------------------------------
+// DEFAULT_BATCH_THRESHOLD
+// ---------------------------------------------------------------------------
+test('DEFAULT_BATCH_THRESHOLD is 5 (in the owner\'s 5-10 range)', () => {
+  assert.equal(flow.DEFAULT_BATCH_THRESHOLD, 5);
+});
+
+// ---------------------------------------------------------------------------
+// pendingBatchQuestions
+// ---------------------------------------------------------------------------
+test('pendingBatchQuestions returns unanswered non-critical questions that have a recommended option', () => {
+  const state = flow.initFlow(batchTopics());
+  // ordered: crit, q1, q2, q3, norec. pending excludes crit + norec.
+  assert.deepEqual(flow.pendingBatchQuestions(state).map(q => q.id), ['q1', 'q2', 'q3']);
+});
+
+test('pendingBatchQuestions excludes already-answered questions', () => {
+  let state = flow.initFlow(batchTopics());
+  state = flow.answer(state, '1'); // crit (presented first)
+  state = flow.answer(state, '1'); // q1
+  assert.deepEqual(flow.pendingBatchQuestions(state).map(q => q.id), ['q2', 'q3']);
+});
+
+test('pendingBatchQuestions is [] past the end and for a null state', () => {
+  assert.deepEqual(flow.pendingBatchQuestions(flow.initFlow([])), []);
+  assert.deepEqual(flow.pendingBatchQuestions(null), []);
+});
+
+test('pendingBatchQuestions is [] when the current topic has no questions array', () => {
+  const state = { topics: [{ id: 't', label: 't' }], topicIndex: 0, questionIndex: 0, answers: {} };
+  assert.deepEqual(flow.pendingBatchQuestions(state), []);
+});
+
+// ---------------------------------------------------------------------------
+// batchAvailable
+// ---------------------------------------------------------------------------
+test('batchAvailable requires the streak to reach the threshold AND pending items to exist', () => {
+  let state = flow.initFlow(batchTopics());
+  state = flow.answer(state, '1'); // crit → streak 0
+  assert.equal(flow.batchAvailable(state, 2), false);
+  state = flow.answer(state, '1'); // q1 → streak 1
+  assert.equal(flow.batchAvailable(state, 2), false);
+  state = flow.answer(state, '1'); // q2 → streak 2, pending [q3]
+  assert.equal(flow.batchAvailable(state, 2), true);
+});
+
+test('batchAvailable is false when no pending batch questions remain even with a high streak', () => {
+  let state = flow.initFlow(batchTopics());
+  state = flow.answer(state, '1'); // crit
+  state = flow.answer(state, '1'); // q1
+  state = flow.answer(state, '1'); // q2
+  state = flow.answer(state, '1'); // q3 → only norec (no recommended) left → pending []
+  assert.equal(flow.pendingBatchQuestions(state).length, 0);
+  assert.equal(flow.batchAvailable(state, 1), false);
+});
+
+test('batchAvailable uses DEFAULT_BATCH_THRESHOLD (5) when no threshold is given', () => {
+  const base = flow.initFlow(batchTopics());
+  assert.equal(flow.batchAvailable({ ...base, recommendedStreak: 4 }), false);
+  assert.equal(flow.batchAvailable({ ...base, recommendedStreak: 5 }), true);
+});
+
+test('batchAvailable is false for a null state', () => {
+  assert.equal(flow.batchAvailable(null, 1), false);
+});
+
+// ---------------------------------------------------------------------------
+// batchApprove
+// ---------------------------------------------------------------------------
+test('batchApprove records the recommended key for every pending non-critical and advances', () => {
+  let state = flow.initFlow(batchTopics());
+  state = flow.answer(state, '1'); // crit answered → pointer at q1
+  const approved = flow.batchApprove(state);
+  assert.equal(approved.answers['stack/q1'], '1');
+  assert.equal(approved.answers['stack/q2'], '1');
+  assert.equal(approved.answers['stack/q3'], '1');
+  assert.equal(approved.answers['stack/crit'], '1'); // pre-existing, untouched
+  assert.equal('stack/norec' in approved.answers, false); // no recommended → left for the human
+  // pointer advances to the next unanswered question → norec (the only one left)
+  assert.equal(flow.currentQuestion(approved).id, 'norec');
+});
+
+test('batchApprove leaves an unanswered critical untouched and lands the pointer on it', () => {
+  const state = flow.initFlow(batchTopics()); // pointer at crit, nothing answered
+  const approved = flow.batchApprove(state);
+  assert.equal('stack/crit' in approved.answers, false); // critical NOT auto-answered
+  assert.equal(approved.answers['stack/q1'], '1'); // non-criticals were
+  assert.equal(flow.currentQuestion(approved).id, 'crit'); // first unanswered is the critical
+});
+
+test('batchApprove rolls the pointer to the next topic when the current topic is fully answered', () => {
+  const state = flow.initFlow(batchTwoTopics());
+  const approved = flow.batchApprove(state);
+  assert.equal(approved.answers['stack/q1'], '1');
+  assert.equal(approved.answers['stack/q2'], '1');
+  assert.equal(flow.currentTopic(approved).id, 'next');
+  assert.equal(flow.currentQuestion(approved).id, 'n1');
+});
+
+test('batchApprove does not mutate the input state', () => {
+  const state = flow.initFlow(batchTopics());
+  const snap = JSON.stringify(state);
+  const approved = flow.batchApprove(state);
+  assert.equal(JSON.stringify(state), snap);
+  assert.notEqual(approved, state);
+  assert.notEqual(approved.answers, state.answers);
+});
+
+test('batchApprove on a completed/empty flow is a no-op clone', () => {
+  const state = flow.initFlow([]);
+  const approved = flow.batchApprove(state);
+  assert.deepEqual(approved.answers, {});
+  assert.ok(flow.isComplete(approved));
+  assert.notEqual(approved, state);
+});
+
 test('initFlow passes through a topic that has no questions array untouched', () => {
   // Exercises the pass-through branch: a topic with no `questions` array is left
   // as-is (not forced to []), and is simply skipped as an empty topic.
