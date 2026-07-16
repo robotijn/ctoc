@@ -417,6 +417,69 @@ function batchApprove(state) {
   return { topics, topicIndex, questionIndex, answers, recommendedStreak };
 }
 
+// --- next-topic fast-forward ----------------------------------------------
+
+/**
+ * True iff the human may fast-forward past the CURRENT topic's remaining questions
+ * to the next topic: there IS a next topic (the pointer is not on the last topic or
+ * past the end) AND the current topic has NO unanswered critical question. The
+ * owner's rule: "you understand this part well enough, next topic" — but criticals
+ * come first and must be resolved, so a still-open critical always blocks it. Pure;
+ * false for a null/undefined state, an empty flow, the last topic, or any open
+ * critical.
+ * @param {object} state FlowState
+ * @returns {boolean}
+ */
+function canFastForward(state) {
+  const topics = (state && state.topics) || [];
+  const ti = state ? state.topicIndex : 0;
+  // No next topic when the pointer is on the last topic or already past the end
+  // (topics.length - 1 is -1 for an empty flow, so an empty flow is false too).
+  if (ti >= topics.length - 1) return false;
+  return criticalOpenCount(state) === 0;
+}
+
+/**
+ * Fast-forward to the FIRST answerable question of the NEXT topic (skipping any
+ * empty topics in between), intentionally leaving the current topic's remaining
+ * NON-critical questions unanswered — the human declared the topic understood
+ * enough. `recommendedStreak` is RESET to 0 because a new topic is a fresh context
+ * (the batch-approve streak must not carry over and wrongly offer a batch on the new
+ * topic's first question). When there is no answerable next topic (the pointer is on
+ * the last topic, past the end, or every following topic is empty), this is a no-op
+ * clone that preserves the pointer, answers, and streak. PURE — returns a NEW state
+ * and never mutates the input; the current topic's recorded answers are copied as-is.
+ * @param {object} state FlowState
+ * @returns {object} the next FlowState
+ */
+function nextTopic(state) {
+  const topics = (state && state.topics) || [];
+  const ti = state ? state.topicIndex : 0;
+  const answers = Object.assign({}, state && state.answers);
+  // First topic strictly AFTER the current one that has answerable questions.
+  let target = null;
+  for (let n = ti + 1; n < topics.length; n++) {
+    if (hasQuestions(topics[n])) { target = { topicIndex: n, questionIndex: 0 }; break; }
+  }
+  if (!target) {
+    // No next answerable topic → no-op clone (pointer + streak preserved).
+    return {
+      topics,
+      topicIndex: ti,
+      questionIndex: state ? state.questionIndex : 0,
+      answers,
+      recommendedStreak: (state && typeof state.recommendedStreak === 'number') ? state.recommendedStreak : 0,
+    };
+  }
+  return {
+    topics,
+    topicIndex: target.topicIndex,
+    questionIndex: target.questionIndex,
+    answers,
+    recommendedStreak: 0, // fresh context on the new topic
+  };
+}
+
 module.exports = {
   orderTopics,
   orderQuestions,
@@ -434,6 +497,8 @@ module.exports = {
   pendingBatchQuestions,
   batchAvailable,
   batchApprove,
+  canFastForward,
+  nextTopic,
   // exported for future-slice reuse (fast-forward, batch-approve) and unit testing
   advancePointer,
   nextUnansweredPointer,

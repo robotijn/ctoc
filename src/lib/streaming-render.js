@@ -253,6 +253,12 @@ function render(app) {
     out += `\n  ${c.green}recommendation taken ${state.recommendedStreak}×${c.reset} → ${c.cyan}a${c.reset} batch-approve the rest\n`;
     footerKeys.push('a batch');
   }
+  // Next-topic fast-forward: advertised ONLY when it actually works — a next topic
+  // exists AND the current topic's criticals are cleared. Never shown while a
+  // critical is open (the human must resolve criticals first).
+  if (streamingFlow.canFastForward(state)) {
+    footerKeys.push('n next topic');
+  }
   footerKeys.push('b back', 's settings');
 
   out += '\n' + line() + '\n';
@@ -310,6 +316,27 @@ function handleKey(key, app) {
   // a dead key). When unavailable, `a` falls through to a genuine no-op.
   if (seq === 'a' && streamingFlow.batchAvailable(state)) {
     app.batchPreview = true;
+    return true;
+  }
+
+  // Next-topic fast-forward. `n` (the letter — distinct from a digit pick) advances
+  // past the current topic's remaining NON-critical questions to the next topic, but
+  // ONLY when `canFastForward` (a next topic exists AND the topic's criticals are
+  // cleared). The key is advertised on the question screen only under that condition.
+  // A stray `n` when it cannot fast-forward is a NON-silent no-op: it never advances
+  // past a critical (or off the last topic) and sets a status message so the human
+  // sees why nothing happened — never a dead key, never a crash. In the batch preview
+  // this block is unreachable (the preview intercepts keys above), so `n` there is an
+  // unadvertised no-op that stays in the preview.
+  if (seq === 'n') {
+    if (streamingFlow.canFastForward(state)) {
+      app.buildFlow = streamingFlow.nextTopic(state);
+      app.message = 'Skipped to next topic';
+      return true;
+    }
+    app.message = streamingFlow.criticalOpenCount(state) > 0
+      ? 'Resolve the critical issue first'
+      : 'No next topic to skip to';
     return true;
   }
 

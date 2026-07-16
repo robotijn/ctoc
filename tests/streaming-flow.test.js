@@ -738,3 +738,156 @@ test('initFlow passes through a topic that has no questions array untouched', ()
   assert.equal(flow.currentTopic(state).id, 'stack');
   assert.equal(flow.criticalOpenCount(state), 0);
 });
+
+// ===========================================================================
+// SLICE: NEXT-TOPIC fast-forward.
+// Owner's rule: "you understand this part well enough, next topic" — the human
+// may fast-forward past the current topic's remaining NON-critical questions to
+// the next topic, but NEVER past an unanswered CRITICAL in the current topic.
+// canFastForward gates it; nextTopic performs it.
+// ===========================================================================
+
+// Two topics: stack (non-critical) authored first, auth (critical, with a
+// critical `session` question) second — so after ordering the pointer lands on
+// auth first and a next topic (stack) always exists behind it.
+function ffTopics() {
+  return [
+    {
+      id: 'stack', label: 'Stack', critical: false, questions: [
+        { id: 'lang', prompt: 'lang?', options: [{ key: '1', label: 'TS', recommended: true }, { key: '2', label: 'Py' }] },
+        { id: 'db', prompt: 'db?', options: [{ key: '1', label: 'PG', recommended: true }, { key: '2', label: 'SQLite' }] },
+      ],
+    },
+    {
+      id: 'auth', label: 'Authentication', critical: true, questions: [
+        { id: 'provider', prompt: 'provider?', options: [{ key: '1', label: 'Clerk', recommended: true }, { key: '2', label: 'Authjs' }] },
+        { id: 'session', critical: true, prompt: 'session?', options: [{ key: '1', label: 'cookie', recommended: true }, { key: '2', label: 'ls' }] },
+      ],
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// canFastForward
+// ---------------------------------------------------------------------------
+test('canFastForward is false while the current topic has an unanswered critical', () => {
+  const state = flow.initFlow(ffTopics());
+  // ordered → pointer on auth/session (critical, unanswered)
+  assert.equal(flow.currentTopic(state).id, 'auth');
+  assert.equal(flow.criticalOpenCount(state), 1);
+  assert.equal(flow.canFastForward(state), false);
+});
+
+test('canFastForward is true once the current topic\'s criticals are cleared and a next topic exists', () => {
+  let state = flow.initFlow(ffTopics());
+  state = flow.answer(state, '1'); // answer auth/session (critical) → now on provider
+  assert.equal(flow.criticalOpenCount(state), 0);
+  assert.equal(flow.currentTopic(state).id, 'auth');
+  assert.equal(flow.canFastForward(state), true);
+});
+
+test('canFastForward is false on the last topic (no next topic to skip to)', () => {
+  let state = flow.initFlow(ffTopics());
+  state = flow.answer(state, '1'); // session
+  state = flow.answer(state, '1'); // provider → rolls to stack (last topic)
+  assert.equal(flow.currentTopic(state).id, 'stack');
+  assert.equal(flow.criticalOpenCount(state), 0);
+  assert.equal(flow.canFastForward(state), false);
+});
+
+test('canFastForward is false for a null state and for an empty/past-the-end flow', () => {
+  assert.equal(flow.canFastForward(null), false);
+  assert.equal(flow.canFastForward(undefined), false);
+  assert.equal(flow.canFastForward(flow.initFlow([])), false);
+  // explicit past-the-end pointer
+  assert.equal(flow.canFastForward({ topics: ffTopics(), topicIndex: 2, questionIndex: 0, answers: {} }), false);
+});
+
+// ---------------------------------------------------------------------------
+// nextTopic
+// ---------------------------------------------------------------------------
+test('nextTopic advances to the first answerable question of the next topic', () => {
+  let state = flow.initFlow(ffTopics());
+  state = flow.answer(state, '1'); // clear auth/session critical → provider current
+  assert.equal(flow.canFastForward(state), true);
+  const next = flow.nextTopic(state);
+  assert.equal(flow.currentTopic(next).id, 'stack');
+  assert.equal(flow.currentQuestion(next).id, 'lang');
+});
+
+test('nextTopic resets recommendedStreak to 0 (a new topic is fresh context)', () => {
+  let state = flow.initFlow(ffTopics());
+  state = flow.answer(state, '1'); // session (critical)
+  state = { ...state, recommendedStreak: 4 }; // pretend a streak carried in the current topic
+  const next = flow.nextTopic(state);
+  assert.equal(next.recommendedStreak, 0);
+});
+
+test('nextTopic leaves the current topic\'s recorded answers untouched (remaining non-criticals stay unanswered)', () => {
+  let state = flow.initFlow(ffTopics());
+  state = flow.answer(state, '1'); // auth/session answered; auth/provider still open
+  const next = flow.nextTopic(state);
+  assert.equal(next.answers['auth/session'], '1'); // kept
+  assert.equal('auth/provider' in next.answers, false); // intentionally left unanswered
+});
+
+test('nextTopic never mutates the input state', () => {
+  let state = flow.initFlow(ffTopics());
+  state = flow.answer(state, '1');
+  const snap = JSON.stringify(state);
+  const next = flow.nextTopic(state);
+  assert.equal(JSON.stringify(state), snap);
+  assert.notEqual(next, state);
+  assert.notEqual(next.answers, state.answers);
+});
+
+test('nextTopic is a no-op clone on the last topic (pointer + answers preserved)', () => {
+  let state = flow.initFlow(ffTopics());
+  state = flow.answer(state, '1'); // session
+  state = flow.answer(state, '1'); // provider → stack (last topic)
+  assert.equal(flow.currentTopic(state).id, 'stack');
+  const next = flow.nextTopic(state);
+  assert.notEqual(next, state); // still a fresh object
+  assert.equal(next.topicIndex, state.topicIndex); // pointer preserved
+  assert.equal(next.questionIndex, state.questionIndex);
+  assert.deepEqual(next.answers, state.answers);
+});
+
+test('nextTopic skips an empty topic and lands on the next answerable one', () => {
+  const state = flow.initFlow([
+    { id: 'a', label: 'A', critical: false, questions: [{ id: 'q', prompt: 'q?', options: [{ key: '1', label: 'x', recommended: true }] }] },
+    { id: 'empty', label: 'Empty', critical: false, questions: [] },
+    { id: 'c', label: 'C', critical: false, questions: [{ id: 'q', prompt: 'q?', options: [{ key: '1', label: 'x', recommended: true }] }] },
+  ]);
+  assert.equal(flow.currentTopic(state).id, 'a');
+  const next = flow.nextTopic(state);
+  assert.equal(flow.currentTopic(next).id, 'c'); // empty topic between was skipped
+});
+
+test('nextTopic tolerates a null state (no-op clone, no throw)', () => {
+  const next = flow.nextTopic(null);
+  assert.equal(next.topicIndex, 0);
+  assert.equal(next.questionIndex, 0);
+  assert.deepEqual(next.answers, {});
+  assert.equal(next.recommendedStreak, 0);
+});
+
+test('an open CRITICAL blocks canFastForward; once answered a fast-forward leaves the topic\'s non-criticals unanswered', () => {
+  let state = flow.initFlow([
+    { id: 'auth', label: 'Auth', critical: true, questions: [
+      { id: 'crit', critical: true, prompt: 'c?', options: [{ key: '1', label: 'a', recommended: true }] },
+      { id: 'n1', prompt: 'n1?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+      { id: 'n2', prompt: 'n2?', options: [{ key: '1', label: 'a', recommended: true }, { key: '2', label: 'b' }] },
+    ] },
+    { id: 'stack', label: 'Stack', critical: false, questions: [
+      { id: 's1', prompt: 's1?', options: [{ key: '1', label: 'a', recommended: true }] },
+    ] },
+  ]);
+  assert.equal(flow.canFastForward(state), false); // critical open
+  state = flow.answer(state, '1'); // answer the critical
+  assert.equal(flow.canFastForward(state), true);
+  const next = flow.nextTopic(state);
+  assert.equal(flow.currentTopic(next).id, 'stack');
+  assert.equal('auth/n1' in next.answers, false); // left unanswered — intentional
+  assert.equal('auth/n2' in next.answers, false);
+});

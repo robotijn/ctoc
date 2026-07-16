@@ -438,3 +438,88 @@ test('exampleTopics: an all-recommended run reaches a batch offer under the defa
   }
   assert.equal(flow.batchAvailable(app.buildFlow), true, 'a batch becomes reachable with all-recommended picks');
 });
+
+// ===========================================================================
+// SLICE: NEXT-TOPIC fast-forward (renderer).
+// The footer advertises `n next topic` ONLY when streamingFlow.canFastForward is
+// true (the current topic's criticals are cleared AND a next topic exists).
+// Pressing `n` then advances to the next topic. While a critical is open, `n` is
+// NOT advertised and a stray press is a non-silent no-op (a status message,
+// never a crash or a dead key). `n` (letter) never collides with a digit pick.
+// ===========================================================================
+
+test('footer does NOT advertise "n next topic" while a critical is open', () => {
+  const app = {};
+  render.initBuildFlow(app); // seed points at the critical `session` question
+  assert.ok(flow.criticalOpenCount(app.buildFlow) > 0);
+  const out = plain(render.render(app));
+  assert.ok(!out.includes('n next topic'), 'no next-topic key while a critical is open');
+});
+
+test('footer advertises "n next topic" once criticals are cleared and a next topic exists', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  assert.equal(flow.questionTier(flow.currentQuestion(app.buildFlow)), 'critical');
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // answer the critical `session`
+  assert.equal(flow.criticalOpenCount(app.buildFlow), 0);
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth'); // still on auth; next topic (stack) exists
+  const out = plain(render.render(app));
+  assert.ok(out.includes('n next topic'), 'next-topic key advertised once criticals clear');
+});
+
+test('pressing "n" when canFastForward advances to the next topic', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // clear the critical
+  assert.equal(flow.canFastForward(app.buildFlow), true);
+  const consumed = render.handleKey({ sequence: 'n' }, app);
+  assert.equal(consumed, true);
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'stack');
+  assert.ok(app.message && app.message.length > 0, 'a non-silent status message was set');
+});
+
+test('pressing "n" while a critical is open is a non-silent no-op (message set, no advance past the critical)', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  const before = app.buildFlow;
+  assert.ok(flow.criticalOpenCount(before) > 0);
+  const consumed = render.handleKey({ sequence: 'n' }, app);
+  assert.equal(consumed, true); // consumed → host re-renders and shows the message
+  assert.equal(app.buildFlow, before, 'flow state unchanged (never fast-forward past a critical)');
+  assert.ok(app.message && app.message.toLowerCase().includes('critical'), 'explains why it did nothing');
+});
+
+test('pressing "n" on the last topic (no next topic) is a non-silent no-op', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  // Answer all of auth (session, mfa, provider) → roll to stack (the last topic).
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // session (critical)
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // mfa (important)
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // provider (normal) → stack/lang
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'stack');
+  assert.equal(flow.canFastForward(app.buildFlow), false);
+  const before = app.buildFlow;
+  const consumed = render.handleKey({ sequence: 'n' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.buildFlow, before, 'no advance on the last topic');
+  assert.ok(app.message && app.message.length > 0, 'a non-silent message was set');
+});
+
+test('a DIGIT still picks the option even when "n next topic" is available (no collision)', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // clear critical → n becomes available
+  assert.equal(flow.canFastForward(app.buildFlow), true);
+  const topic = flow.currentTopic(app.buildFlow);
+  const question = flow.currentQuestion(app.buildFlow);
+  const consumed = render.handleKey({ sequence: '1' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.buildFlow.answers[`${topic.id}/${question.id}`], '1'); // digit PICKED, did not fast-forward
+});
+
+test('"n" inside the batch preview is an unadvertised no-op that stays in the preview', () => {
+  const app = { buildFlow: { ...flow.initFlow(batchSeed()), recommendedStreak: 5 }, batchPreview: true };
+  const consumed = render.handleKey({ sequence: 'n' }, app);
+  assert.equal(consumed, false);
+  assert.equal(app.batchPreview, true, 'still in preview; n is not a preview action');
+});
