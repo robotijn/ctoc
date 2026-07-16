@@ -19,11 +19,26 @@
  *                                               //   option key OR free-text comment
  *   }
  *   Topic    = { id, label, critical: boolean, questions: [Question] }
- *   Question = { id, prompt, options: [{ key, label, recommended?: boolean }] }
+ *   Question = { id, prompt, critical?: boolean, important?: boolean,
+ *                options: [{ key, label, recommended?: boolean }] }
+ *
+ * QUESTION TIERS (this slice)
+ * ---------------------------
+ * A Question carries an OPTIONAL severity tier via two flags:
+ *   - `critical: true`   → highest severity (a load-bearing decision the human must
+ *                          confront first; NOT batchable with the non-critical tail);
+ *   - `important: true`  → middle severity;
+ *   - neither flag        → NORMAL (the default; fully backward-compatible — pre-tier
+ *                          questions have no flags and behave exactly as before).
+ * `critical` OUTRANKS `important` when both are set. Within a topic, questions are
+ * presented CRITICAL → IMPORTANT → NORMAL (see `orderQuestions`), one at a time, so
+ * the human "always goes through the critical issues first, then the important ones".
+ * The batch-approve mechanic that skips only the NON-critical tail is a later slice;
+ * this slice establishes the ordering + surfacing so criticals naturally come first.
  *
  * The one guided-flow invariant this slice enforces: topics are presented
- * CRITICAL-FIRST, and within a topic questions are presented in their given order,
- * one at a time, never switching topics mid-stream.
+ * CRITICAL-FIRST, questions WITHIN a topic are presented CRITICAL-FIRST (then
+ * important, then normal), one at a time, never switching topics mid-stream.
  *
  * FUTURE-SLICE SEAMS (intentionally NOT implemented here — clean attach points):
  *   - batch-approve after ~5-10 recommended-accepts  → attaches around `answer()`
@@ -54,6 +69,40 @@ function orderTopics(topics) {
     else rest.push(t);
   }
   return critical.concat(rest);
+}
+
+/**
+ * The severity tier of a question: 'critical' | 'important' | 'normal'.
+ * `critical` OUTRANKS `important`; a question with neither flag (or a
+ * null/undefined question) is 'normal'.
+ * @param {object|null} question
+ * @returns {'critical'|'important'|'normal'}
+ */
+function questionTier(question) {
+  if (question && question.critical) return 'critical';
+  if (question && question.important) return 'important';
+  return 'normal';
+}
+
+/**
+ * Return questions ordered CRITICAL first, then IMPORTANT, then NORMAL, STABLE
+ * within each tier (source order preserved inside a tier). Pure — a new array over
+ * the same question references; never mutates the input. Tolerates non-arrays → [].
+ * @param {Array<object>} questions
+ * @returns {Array<object>}
+ */
+function orderQuestions(questions) {
+  if (!Array.isArray(questions)) return [];
+  const critical = [];
+  const important = [];
+  const normal = [];
+  for (const q of questions) {
+    const tier = questionTier(q);
+    if (tier === 'critical') critical.push(q);
+    else if (tier === 'important') important.push(q);
+    else normal.push(q);
+  }
+  return critical.concat(important, normal);
 }
 
 // --- internal helpers -----------------------------------------------------
@@ -109,7 +158,15 @@ function firstAnswerable(topics) {
  * @returns {object} FlowState
  */
 function initFlow(topics) {
-  const ordered = orderTopics(topics);
+  // Order topics critical-first, then order EACH topic's questions critical-first.
+  // Pure: build a NEW topic object with a NEW (ordered) questions array so the caller's
+  // input topics/questions are never mutated. Topics with no questions array pass through
+  // untouched (backward-compatible with directly-constructed states).
+  const ordered = orderTopics(topics).map(t =>
+    (t && Array.isArray(t.questions))
+      ? Object.assign({}, t, { questions: orderQuestions(t.questions) })
+      : t
+  );
   const { topicIndex, questionIndex } = firstAnswerable(ordered);
   return {
     topics: ordered,
@@ -228,8 +285,38 @@ function progress(state) {
   };
 }
 
+/**
+ * Number of UNANSWERED critical questions in a given topic. "Answered" uses the same
+ * `<topicId>/<questionId>` keying as `answer()`. A missing topic / one with no
+ * questions array contributes 0. Pure.
+ * @param {object} state FlowState
+ * @param {object|null} topic
+ * @returns {number}
+ */
+function topicCriticalOpenCount(state, topic) {
+  const answers = (state && state.answers) || {};
+  if (!topic || !Array.isArray(topic.questions)) return 0;
+  let n = 0;
+  for (const q of topic.questions) {
+    if (questionTier(q) === 'critical' && !(`${topic.id}/${q.id}` in answers)) n++;
+  }
+  return n;
+}
+
+/**
+ * Number of UNANSWERED critical questions in the CURRENT topic — the count behind the
+ * "⚠ N critical open" header. 0 when past the end / on a topic with no criticals. Pure.
+ * @param {object} state FlowState
+ * @returns {number}
+ */
+function criticalOpenCount(state) {
+  return topicCriticalOpenCount(state, currentTopic(state));
+}
+
 module.exports = {
   orderTopics,
+  orderQuestions,
+  questionTier,
   initFlow,
   currentTopic,
   currentQuestion,
@@ -237,6 +324,8 @@ module.exports = {
   answer,
   isComplete,
   progress,
+  criticalOpenCount,
+  topicCriticalOpenCount,
   // exported for future-slice reuse (fast-forward, batch-approve) and unit testing
   advancePointer,
 };

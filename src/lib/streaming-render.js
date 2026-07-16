@@ -34,10 +34,14 @@ const { c, line, renderFooter, stripCtl } = require('./tui');
 const streamingFlow = require('./streaming-flow');
 
 /**
- * Minimal in-memory seed: 2 topics, ONE marked critical, each with 2-3 questions and
- * a recommended option — enough to make the streaming screen real and drivable this
- * slice. `auth` is critical and listed second so `orderTopics` visibly reorders it to
- * the front. NOT the real question source — see the module seam note above.
+ * Minimal in-memory seed: 2 topics, ONE marked critical, each with a recommended
+ * option — enough to make the streaming screen real and drivable this slice. Two
+ * orderings are made OBSERVABLE by construction:
+ *   - `auth` is the critical TOPIC and listed second so `orderTopics` reorders it front;
+ *   - within `auth`, the `session` QUESTION is `critical` and authored AFTER the normal
+ *     `provider`, with `mfa` marked `important` — so `orderQuestions` visibly pulls the
+ *     critical to the front (session → mfa → provider) and criticals surface first.
+ * NOT the real question source — see the module seam note above.
  * @returns {Array<object>}
  */
 function exampleTopics() {
@@ -71,6 +75,7 @@ function exampleTopics() {
       critical: true,
       questions: [
         {
+          // NORMAL — authored first, but ordered AFTER the critical below.
           id: 'provider',
           prompt: 'Which authentication provider should the app use?',
           options: [
@@ -80,7 +85,20 @@ function exampleTopics() {
           ],
         },
         {
+          // CRITICAL — authored AFTER a normal question so critical-first ordering is
+          // visible: session-token storage is a load-bearing security decision.
+          id: 'session',
+          critical: true,
+          prompt: 'Where should session tokens be stored?',
+          options: [
+            { key: '1', label: 'httpOnly, Secure cookie', recommended: true },
+            { key: '2', label: 'localStorage' },
+          ],
+        },
+        {
+          // IMPORTANT — a lighter tier than critical, above normal.
           id: 'mfa',
+          important: true,
           prompt: 'Should multi-factor authentication be required?',
           options: [
             { key: '1', label: 'Yes — require MFA', recommended: true },
@@ -136,8 +154,29 @@ function render(app) {
   const p = streamingFlow.progress(state);
   const recKey = streamingFlow.recommendedKey(question);
 
-  out += `  ${c.cyan}${stripCtl(topic.label)}${c.reset}  ${c.dim}topic ${p.topicIndex + 1}/${p.topicCount}${c.reset}\n\n`;
-  out += `  ${stripCtl(question.prompt)}\n\n`;
+  // Header: topic label + progress, plus a "⚠ N critical open" marker whenever the
+  // current topic still has unanswered critical questions (owner's rule: criticals first).
+  const critOpen = streamingFlow.criticalOpenCount(state);
+  const critMarker = critOpen > 0 ? `  ${c.red}⚠ ${critOpen} critical open${c.reset}` : '';
+  out += `  ${c.cyan}${stripCtl(topic.label)}${c.reset}  ${c.dim}topic ${p.topicIndex + 1}/${p.topicCount}${c.reset}${critMarker}\n\n`;
+
+  // Current question, surfaced by tier. CRITICAL carries a "⚠ CRITICAL k/N" label
+  // (k = its position among the topic's criticals, N = total criticals) plus a note
+  // that criticals are answered one at a time and are NOT part of the batch. IMPORTANT
+  // gets a lighter marker; NORMAL renders plainly. All prompts are control-char stripped.
+  const tier = streamingFlow.questionTier(question);
+  const prompt = stripCtl(question.prompt);
+  if (tier === 'critical') {
+    const criticals = topic.questions.filter(q => streamingFlow.questionTier(q) === 'critical');
+    const total = criticals.length;
+    const k = criticals.indexOf(question) + 1;
+    out += `  ${c.red}⚠ CRITICAL ${k}/${total}${c.reset} — ${prompt}\n`;
+    out += `  ${c.dim}criticals come first — one at a time, not batchable${c.reset}\n\n`;
+  } else if (tier === 'important') {
+    out += `  ${c.yellow}IMPORTANT${c.reset} — ${prompt}\n\n`;
+  } else {
+    out += `  ${prompt}\n\n`;
+  }
   for (const opt of question.options) {
     const mark = opt.key === recKey ? `   ${c.green}✓ recommended${c.reset}` : '';
     out += `    ${c.cyan}${stripCtl(opt.key)}${c.reset}  ${stripCtl(opt.label)}${mark}\n`;
