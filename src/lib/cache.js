@@ -33,12 +33,18 @@ function _now() { return Date.now(); }
  */
 function memoize(fn, key, ttlMs = DEFAULT_TTL_MS) {
   return function memoized(...args) {
-    const argsKey = args.map(a => {
-      if (a === undefined) return 'undef';
-      if (a === null) return 'null';
-      if (typeof a === 'string') return a;
-      try { return JSON.stringify(a); } catch { return String(a); }
-    }).join('|');
+    // Build an INJECTIVE key: type-tag every arg and serialize the whole array
+    // as JSON. Tagging removes type ambiguity (null vs the string 'null', 5 vs
+    // '5', undefined vs null) and the JSON array boundary removes cross-arg
+    // ambiguity (['a','b'] vs ['a|b']), which a plain `.join('|')` conflated.
+    const argsKey = JSON.stringify(args.map(a => {
+      if (a === undefined) return ['u'];
+      if (a === null) return ['n'];
+      const t = typeof a;
+      if (t === 'string') return ['s', a];
+      if (t === 'number' || t === 'boolean' || t === 'bigint') return ['p', String(a)];
+      try { return ['j', JSON.stringify(a)]; } catch { return ['x', String(a)]; }
+    }));
     const cacheKey = `${key}::${argsKey}`;
     const cached = _store.get(cacheKey);
     if (cached && cached.expiresAt > _now()) {

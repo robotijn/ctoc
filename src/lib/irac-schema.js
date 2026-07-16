@@ -50,7 +50,7 @@ function validate(finding) {
   if (finding.citations) {
     if (!Array.isArray(finding.citations)) errors.push('citations must be an array');
     else for (const c of finding.citations) {
-      if (!c.url) errors.push(`citation missing url: ${JSON.stringify(c)}`);
+      if (!c || typeof c !== 'object' || !c.url) errors.push(`citation missing url: ${JSON.stringify(c)}`);
     }
   }
   if (finding.issue && !finding.issue.includes('?')) {

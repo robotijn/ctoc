@@ -153,9 +153,11 @@ describe('CF1 — read cache is busted on every state write', () => {
     writePlan(root, 'todo', 'cf1-readonly');
 
     const first = getPlanCounts(root);
-    const key = `getPlanCounts::${root}`;
+    // Pin the key PREFIX that invalidate() relies on ("<name>::…"), not the
+    // internal args serialization (which is deliberately injective/opaque).
+    const keyPrefix = 'getPlanCounts::';
     const dbgAfterFirst = cache._debug();
-    assert.ok(dbgAfterFirst.keys.includes(key), 'first read populates the exact cache key');
+    assert.ok(dbgAfterFirst.keys.some(k => k.startsWith(keyPrefix)), 'first read populates the getPlanCounts cache key');
     const sizeAfterFirst = dbgAfterFirst.size;
 
     // No write between the two reads.
@@ -163,7 +165,7 @@ describe('CF1 — read cache is busted on every state write', () => {
 
     const dbgAfterSecond = cache._debug();
     // Same key still present, store size unchanged → served from cache (no recompute-and-reset).
-    assert.ok(dbgAfterSecond.keys.includes(key), 'AC3: cache key persists across a no-write read');
+    assert.ok(dbgAfterSecond.keys.some(k => k.startsWith(keyPrefix)), 'AC3: cache key persists across a no-write read');
     assert.equal(dbgAfterSecond.size, sizeAfterFirst, 'AC3: cache size unchanged (perf preserved)');
     // Memoized object identity is returned on a cache hit — proves no recompute.
     assert.strictEqual(second, first, 'AC3: identical object returned from cache (no recompute)');

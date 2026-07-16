@@ -162,11 +162,25 @@ function syncToPluginJson() {
 }
 
 /**
- * Sync VERSION to README.md
- * Updates the version line: **X.Y.Z** — description
+ * Sync VERSION to README.md.
+ *
+ * Updates the two README targets that reflect the product version — the same
+ * targets the release script (src/scripts/release.js) rewrites:
+ *   1. the version line at the start of a line: `**X.Y.Z**` (whatever separator
+ *      or text follows — em-dash, middle-dot, etc.);
+ *   2. the shields.io version badge: `version-X.Y.Z-blue`.
+ *
+ * FAIL LOUD: if the version line token is absent (e.g. the README format drifted
+ * so no `**X.Y.Z**` appears at a line start), the sync cannot do its job and
+ * returns `{ success: false, matched: false }` instead of a phantom success — so
+ * a future format drift surfaces loudly rather than silently disabling the sync.
+ *
+ * @param {string} [root] - Repo root (defaults to the resolved plugin root).
+ *   An explicit root lets a test drive a fixture README without touching the
+ *   tracked one.
+ * @returns {{success: boolean, version?: string, matched?: boolean, error?: string}}
  */
-function syncToReadme() {
-  const root = getPluginRoot();
+function syncToReadme(root = getPluginRoot()) {
   const readmeFile = path.join(root, 'README.md');
 
   if (!safeFs.existsSync(readmeFile)) {
@@ -176,15 +190,22 @@ function syncToReadme() {
   const version = getVersion();
   let content = safeFs.readFileSync(readmeFile, 'utf8');
 
-  // Match pattern: **X.Y.Z** — (at start of line in ## Version section)
-  content = content.replace(
-    /^\*\*\d+\.\d+\.\d+\*\* — /m,
-    `**${version}** — `
-  );
+  // Version token at the start of a line: **X.Y.Z** (separator-agnostic).
+  const versionLine = /^\*\*\d+\.\d+\.\d+\*\*/m;
+  // shields.io version badge.
+  const badge = /version-\d+\.\d+\.\d+-blue/g;
+
+  if (!versionLine.test(content)) {
+    return { success: false, matched: false, version, error: 'README version line not found' };
+  }
+
+  content = content
+    .replace(versionLine, `**${version}**`)
+    .replace(badge, `version-${version}-blue`);
 
   safeFs.writeFileSync(readmeFile, content);
 
-  return { success: true, version };
+  return { success: true, matched: true, version };
 }
 
 /**

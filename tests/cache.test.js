@@ -73,6 +73,52 @@ describe('memoize', () => {
     assert.ok(DEFAULT_TTL_MS >= 1000 && DEFAULT_TTL_MS <= 30000, 'TTL between 1s and 30s');
   });
 
+  it('does not collide distinct arg signatures that join to the same string', () => {
+    // ['a','b'] and ['a|b'] both naively join to 'a|b' — they must stay distinct.
+    let calls = 0;
+    const fn = (...args) => { calls += 1; return args.join('#'); };
+    const cached = memoize(fn, 'collide-join');
+    const r1 = cached('a', 'b'); // signature: two args
+    const r2 = cached('a|b');    // signature: one arg — genuinely different
+    assert.equal(calls, 2, 'two distinct signatures must invoke the fn twice');
+    assert.notEqual(r1, r2, 'distinct signatures must return distinct values');
+    assert.equal(r1, 'a#b');
+    assert.equal(r2, 'a|b');
+  });
+
+  it('does not collide null with the string "null" (type ambiguity)', () => {
+    let calls = 0;
+    const fn = (a) => { calls += 1; return a; };
+    const cached = memoize(fn, 'collide-nulltype');
+    const r1 = cached(null);
+    const r2 = cached('null');
+    assert.equal(calls, 2, 'null and "null" are distinct signatures');
+    assert.equal(r1, null);
+    assert.equal(r2, 'null');
+  });
+
+  it('does not collide the number 5 with the string "5" (type ambiguity)', () => {
+    let calls = 0;
+    const fn = (a) => { calls += 1; return typeof a; };
+    const cached = memoize(fn, 'collide-numtype');
+    const r1 = cached(5);
+    const r2 = cached('5');
+    assert.equal(calls, 2, '5 and "5" are distinct signatures');
+    assert.equal(r1, 'number');
+    assert.equal(r2, 'string');
+  });
+
+  it('keeps undefined and null as distinct signatures', () => {
+    let calls = 0;
+    const fn = (a) => { calls += 1; return a === undefined ? 'U' : (a === null ? 'N' : 'V'); };
+    const cached = memoize(fn, 'collide-undefnull');
+    const r1 = cached(undefined);
+    const r2 = cached(null);
+    assert.equal(calls, 2, 'undefined and null are distinct signatures');
+    assert.equal(r1, 'U');
+    assert.equal(r2, 'N');
+  });
+
   it('_debug exposes cache size', () => {
     invalidate();
     const fn = memoize((x) => x, 'debug-test');

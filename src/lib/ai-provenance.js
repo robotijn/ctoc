@@ -127,11 +127,17 @@ function getEventsSince(projectRoot, sinceISO) {
   const logPath = path.join(projectRoot, PROVENANCE_LOG);
   if (!safeFs.existsSync(logPath)) return [];
   const cutoff = new Date(sinceISO).getTime();
-  return safeFs.readFileSync(logPath, 'utf8')
-    .split('\n')
-    .filter(Boolean)
-    .map(line => JSON.parse(line))
-    .filter(e => new Date(e.timestamp).getTime() >= cutoff);
+  // Per-line guarded parse: a single torn trailing line (crash mid-append) must NOT
+  // make the whole log unreadable — skip the unparseable line and return the intact
+  // records (mirrors data-lineage.readAll and durable-log.parseJsonl).
+  const out = [];
+  for (const line of safeFs.readFileSync(logPath, 'utf8').split('\n')) {
+    if (!line) continue;
+    let e;
+    try { e = JSON.parse(line); } catch { continue; }
+    if (new Date(e.timestamp).getTime() >= cutoff) out.push(e);
+  }
+  return out;
 }
 
 function ensureDir(dir) {

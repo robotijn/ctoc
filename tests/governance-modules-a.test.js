@@ -335,6 +335,11 @@ describe('privilege-posture.js — attorney-client privilege disclosure', () => 
     assert.equal(privilege.getPosture(p), 'none');
   });
 
+  it('getPosture strips an inline YAML comment after the declared value', () => {
+    const p = writeFile(root, 'plan.md', planText({ posture: 'counsel-directed  # per counsel' }));
+    assert.equal(privilege.getPosture(p), 'counsel-directed');
+  });
+
   // --- getPosture error paths (documented to THROW, not silently coerce) ---
   it('PROPERTY: getPosture THROWS on an invalid declared posture (no silent coercion)', () => {
     const p = writeFile(root, 'plan.md', planText({ posture: 'super-secret' }));
@@ -685,5 +690,61 @@ describe('legal-hold.js — litigation hold freeze', () => {
     const holds = legalHold.activeHolds(root);
     assert.equal(holds.length, 1, 'a colon in matter must not corrupt status detection');
     assert.equal(holds[0].id, 'h1');
+  });
+
+  // --- D2: status detection must FAIL CLOSED on annotated / quoted `active` ---
+  // A hold with a trailing comment or quotes around the token is STILL active
+  // YAML. The safety-critical check must classify it as HELD (block the
+  // destructive op), never fail open and permit deletion while a hold is live.
+
+  it('PROPERTY: an active status with a trailing comment is HELD (fail closed)', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'h1.yaml'),
+      'id: h1\nstatus: active   # do not delete\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), true, 'annotated active is a LIVE hold');
+    assert.throws(
+      () => legalHold.assertNotHeld(root, 'rm plan', ['plans/a.md']),
+      /LEGAL HOLD ACTIVE/,
+      'destructive op MUST be blocked while an annotated hold is active'
+    );
+  });
+
+  it('PROPERTY: a quoted "active" status is HELD (fail closed)', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'h2.yaml'),
+      'id: h2\nstatus: "active"\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), true, 'quoted active is a LIVE hold');
+    assert.throws(() => legalHold.assertNotHeld(root, 'rm', []), /LEGAL HOLD ACTIVE/);
+  });
+
+  it('release relaxes the SAME way: it flips a quoted/annotated active to released', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'h3.yaml'),
+      'id: h3\nstatus: "active"  # frozen\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), true);
+    legalHold.release(root, 'h3', 'counsel cleared');
+    const content = fs.readFileSync(
+      path.join(root, '.ctoc', 'legal-hold', 'h3.yaml'),
+      'utf8'
+    );
+    assert.match(content, /status: released/, 'release must land on an annotated hold');
+    assert.doesNotMatch(content, /status:\s*["']?active\b/);
+    assert.equal(legalHold.isHeld(root), false, 'freeze lifts after release');
+  });
+
+  it('a released status with a trailing comment stays NOT held (no over-blocking)', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'h4.yaml'),
+      'id: h4\nstatus: released   # closed by counsel\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), false);
+    assert.doesNotThrow(() => legalHold.assertNotHeld(root, 'rm', []));
   });
 });

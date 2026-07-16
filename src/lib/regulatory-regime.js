@@ -174,7 +174,7 @@ function loadActiveProfiles(projectRoot) {
   const content = safeFs.readFileSync(settingsPath, 'utf8');
 
   // Extract just the regulatory_regime block
-  const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|Z)/m);
+  const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|(?![\s\S]))/m);
   if (!blockMatch) return { profiles: [], overrides: {}, declined: false };
 
   return parseRegimeBlock(blockMatch[1]);

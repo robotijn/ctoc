@@ -153,8 +153,11 @@ function readPlanFiles(planPath) {
  */
 function globEscapesRoot(glob) {
   if (typeof glob !== 'string') return false;
-  const segments = glob.replace(/\\/g, '/').split('/');
-  return segments.includes('..');
+  // NORMALIZE before testing: a `..` SEGMENT is not the same as an ESCAPE. A glob
+  // like `src/mod/../mod/**` normalizes back inside the tree and must keep covering;
+  // only a glob that normalizes to `..` or `../…` actually escapes root.
+  const n = path.posix.normalize(glob.replace(/\\/g, '/'));
+  return n === '..' || n.startsWith('../');
 }
 
 /**
@@ -210,7 +213,13 @@ function findCoveringPlan(targetFile, root) {
     for (const f of files) {
       const planPath = path.join(stageDir, f);
       const globs = readPlanFiles(planPath);
-      for (const glob of globs) {
+      for (const rawGlob of globs) {
+        // Normalize the glob ONCE (collapse `.`/`..`/`//` segments) so a non-escaping
+        // `..` like `src/mod/../mod/**` both survives the escape check AND matches
+        // `src/mod/thing.js`. Only a glob that normalizes to `..`/`../…` truly escapes.
+        const glob = typeof rawGlob === 'string'
+          ? path.posix.normalize(rawGlob.replace(/\\/g, '/'))
+          : rawGlob;
         // Defense in depth: a plan may not declare out-of-tree coverage.
         if (globEscapesRoot(glob)) continue;
         const re = globToRegex(glob);

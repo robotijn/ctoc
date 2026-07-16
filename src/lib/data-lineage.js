@@ -83,9 +83,12 @@ function descendantsOf(projectRoot, dispatchId) {
     childrenOf[e.parent_dispatch_id].push(e);
   }
   const out = [];
+  const seen = new Set();
   const stack = [dispatchId];
   while (stack.length > 0) {
     const id = stack.pop();
+    if (seen.has(id)) continue; // cycle guard: a corrupt log (self/mutual parent) must not loop forever
+    seen.add(id);
     for (const child of childrenOf[id] || []) {
       out.push(child);
       stack.push(child.dispatch_id);
