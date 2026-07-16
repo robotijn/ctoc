@@ -88,6 +88,14 @@ describe('matchEscapePhrase', () => {
     assert.equal(matchEscapePhrase('hotfix.'), 'hotfix');
     assert.equal(matchEscapePhrase('urgent!'), 'urgent');
     assert.equal(matchEscapePhrase('hotfix'), 'hotfix');
+    // A RUN of sentence punctuation (ellipsis / !! / ?!) is still a boundary — the
+    // trailing lookahead quantifies the punct class, so common emphatic prose works
+    // while a filename dot (alnum after the dot) still does NOT match.
+    assert.equal(matchEscapePhrase('please do a quick fix...'), 'quick fix');
+    assert.equal(matchEscapePhrase('this is urgent!!'), 'urgent');
+    assert.equal(matchEscapePhrase('hotfix?!'), 'hotfix');
+    assert.equal(matchEscapePhrase('urgent.js...'), null); // filename, not a directive
+    assert.equal(matchEscapePhrase('hotfix.md.'), null);
   });
 
   it('still matches multi-word directives', () => {

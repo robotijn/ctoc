@@ -232,6 +232,11 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
       `cd .ctoc && touch approvals/x.json`,
       `cd '.ctoc' && cp /tmp/forged.json approvals/x.json`,   // quoted cd target
       `pushd .ctoc && cp /tmp/forged.json approvals/x.json`,  // pushd, not cd
+      // Re-attack: a `~`/`~user` home prefix must NOT discard the ledger suffix —
+      // strip only the tilde+user+slash, keep the remainder as a rooted prefix.
+      `cd ~/Code/ctoc/.ctoc/approvals && tee evil.json`,
+      `cd ~/.ctoc/approvals && cp /tmp/forged.json evil.json`,
+      `cd ~user/x/.ctoc/approvals && cp f evil.json`,
     ];
     for (const w of bypasses) assertDenied(w, 'cd-boundary ledger write');
   });

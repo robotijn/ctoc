@@ -50,7 +50,7 @@ function matchEscapePhrase(text) {
     //                       a boundary — closing the dot-extension false-open hole.
     // \b doesn't work cleanly with multi-word phrases, so we use lookarounds.
     const pattern = safeRegExp(
-      `(^|[\\s('"\\[])${escapeRegExp(phrase)}(?=[\\s)'"\\]]|[.,!?;:](?:\\s|$)|$)`,
+      `(^|[\\s('"\\[])${escapeRegExp(phrase)}(?=[\\s)'"\\]]|[.,!?;:]+(?:\\s|$)|$)`,
       'i'
     );
     if (pattern.test(normalized)) return phrase;

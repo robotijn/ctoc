@@ -239,4 +239,70 @@ describe('four-eyes.js — bare-string-path overload + inferProjectRoot (dark br
     assert.equal(res.author, 'rev');
     assert.equal(res.independent, 'app');
   });
+
+  // -------------------------------------------------------------------------
+  // Cluster 5 — same-NAME segregation-of-duties fail-open (DEFECT 1).
+  // The identity-equality guard on line 239 short-circuits FALSE when a role
+  // has no `identity` field (parser never requires one). A single role that
+  // holds BOTH can_review and can_approve, signed into BOTH markers, then
+  // slipped through to passed:true — a fail-open on a dual-control compliance
+  // gate. The fix: a single role NAME signing both markers MUST refuse,
+  // regardless of identity presence. Distinct NAMES remain a valid
+  // distinctness signal, so name-only roles must still pass (next test).
+  // -------------------------------------------------------------------------
+
+  it('single_role_name_signing_both_markers_refuses_even_without_identity', () => {
+    // Arrange — ONE role `alice` that can both review and approve, NO identity
+    // field (the parser does not require one). This is the reported repro.
+    writeFile(root, path.join('.ctoc', 'roles.yaml'), rolesYaml([
+      { name: 'alice', can_review: true, can_approve: true },
+    ]));
+
+    // Act — the same principal signs BOTH markers.
+    const res = fourEyes.verifyFourEyes(
+      { text: planText({ author: 'alice', independent: 'alice' }), projectRoot: root });
+
+    // Assert — MUST refuse. Before the fix, both identity operands are
+    // undefined → the guard short-circuits → passed:true (fail-open). After the
+    // fix, the same-NAME check fires first → passed:false.
+    assert.equal(res.passed, false, 'same role signing both markers must be refused');
+    assert.match(res.reason, /single role|distinct principals/i);
+  });
+
+  it('two_distinct_name_only_roles_without_identity_still_pass', () => {
+    // Arrange — TWO distinct role names, NEITHER with an identity field. These
+    // are legitimately distinct principals; over-blocking on "missing identity"
+    // would break every name-only roles.yaml. Distinct NAMES are the signal.
+    writeFile(root, path.join('.ctoc', 'roles.yaml'), rolesYaml([
+      { name: 'alice', can_review: true },
+      { name: 'bob', can_approve: true },
+    ]));
+
+    // Act
+    const res = fourEyes.verifyFourEyes(
+      { text: planText({ author: 'alice', independent: 'bob' }), projectRoot: root });
+
+    // Assert — PASS. Guards against a blanket "fail when identity missing" fix.
+    assert.equal(res.passed, true, res.reason);
+    assert.equal(res.author, 'alice');
+    assert.equal(res.independent, 'bob');
+  });
+
+  it('two_different_names_same_identity_still_refuses', () => {
+    // Arrange — the classic self-approval: two DIFFERENT names mapping to the
+    // SAME identity. The existing identity-equality guard must still catch it.
+    writeFile(root, path.join('.ctoc', 'roles.yaml'), rolesYaml([
+      { name: 'rev', identity: 'alice', can_review: true },
+      { name: 'app', identity: 'alice', can_approve: true },
+    ]));
+
+    // Act
+    const res = fourEyes.verifyFourEyes(
+      { text: planText({ author: 'rev', independent: 'app' }), projectRoot: root });
+
+    // Assert — REFUSE via the identity-equality branch (precedence: name check
+    // does not fire because names differ; identity check catches the collision).
+    assert.equal(res.passed, false);
+    assert.match(res.reason, /identity|distinct principals/i);
+  });
 });

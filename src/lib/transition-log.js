@@ -74,7 +74,8 @@ function logTransition(entry, projectPath) {
     actor: entry.actor || 'human',
     validation: entry.validation || null,
     humanGate: entry.humanGate || false,
-    marker: entry.marker || false
+    marker: entry.marker || false,
+    override: entry.override || false
   };
 
   durableLog.appendEntry(getLogPath(projectPath), logEntry);

@@ -401,3 +401,79 @@ describe('findCoveringPlan', () => {
     } finally { rm(root); }
   });
 });
+
+// ===========================================================================
+// findCoveringPlan — ROOT CONFINEMENT (out-of-repo write prevention).
+// A plan whose `files:` declares a root-escaping glob (e.g. "../../**") must
+// NEVER vouch for a path outside the project tree. The coverage oracle backs
+// the Edit hook's allow-decision; without confinement, an agent-authored plan
+// (plans/**.md are edit-whitelisted) could authorize an arbitrary out-of-repo
+// file write. Two independent guards: (1) reject an escaping relTarget, and
+// (2) ignore any plan glob that itself contains a `..` path segment.
+// ===========================================================================
+
+describe('findCoveringPlan — root confinement', () => {
+  it('returns_null_for_an_out_of_repo_absolute_target_even_when_a_traversal_plan_covers_it', () => {
+    // The core CVE: a plan declaring files: ["../../**"] must not authorize a
+    // write to a path OUTSIDE root. Under the unpatched oracle, relTarget is
+    // "../../../../etc/passwd" and globToRegex("../../**") → /^\.\./\.\./.*$/
+    // matches it, so the plan is (wrongly) returned. The confinement guard must
+    // reject the escaping target and return null.
+    const root = makeRoot(['todo']);
+    try {
+      writePlan(root, 'todo', 'traversal', ['../../**']);
+      const outside = path.resolve(root, '..', '..', '..', '..', 'etc', 'passwd');
+
+      assert.equal(
+        findCoveringPlan(outside, root),
+        null,
+        'an out-of-repo target must never be covered, regardless of a traversal plan'
+      );
+    } finally { rm(root); }
+  });
+
+  it('returns_null_for_a_relative_traversal_target', () => {
+    // Same guard via a relative "../../etc/x" target string (path.join then
+    // path.relative still yields a "../"-prefixed relTarget).
+    const root = makeRoot(['todo']);
+    try {
+      writePlan(root, 'todo', 'traversal', ['../../**']);
+
+      assert.equal(
+        findCoveringPlan('../../etc/x', root),
+        null,
+        'a relative traversal target escapes root and must not be covered'
+      );
+    } finally { rm(root); }
+  });
+
+  it('ignores_a_traversal_glob_so_it_never_covers_even_an_in_repo_path', () => {
+    // Defense in depth: a `..`-containing glob is skipped entirely. It must not
+    // cover an in-repo file either (a glob like "../<root-basename>/src/x.js"
+    // could otherwise resolve back inside the tree). The plan declares only the
+    // escaping glob, so nothing it lists is honored.
+    const root = makeRoot(['todo']);
+    try {
+      const base = path.basename(root);
+      writePlan(root, 'todo', 'sneaky', [`../${base}/src/x.js`]);
+
+      assert.equal(
+        findCoveringPlan('src/x.js', root),
+        null,
+        'a glob containing a ".." segment is ignored and covers nothing'
+      );
+    } finally { rm(root); }
+  });
+
+  it('still_covers_an_in_repo_file_via_a_legit_glob_no_regression', () => {
+    // The confinement must NOT disturb normal in-repo coverage: a plan covering
+    // src/** still covers src/lib/x.js exactly as before.
+    const root = makeRoot(['todo']);
+    try {
+      writePlan(root, 'todo', 'legit', ['src/**']);
+
+      const match = findCoveringPlan('src/lib/x.js', root);
+      assert.equal(match && match.glob, 'src/**', 'in-repo coverage is unchanged by confinement');
+    } finally { rm(root); }
+  });
+});
