@@ -335,6 +335,21 @@ function openStore(jsonPath, opts = {}) {
         }
         validateLoadedUnit(u);
         const emb = decodeEmbedding(u.embedding);
+        // MED (correctness): the UPSERT path (validateUpsertInput, F7) rejects a
+        // non-finite (NaN/±Infinity) component because it poisons _norm and makes
+        // cosine scores — and therefore the search sort order — undefined (a NaN
+        // score survives the `score < minScore` filter and returns NaN from the
+        // comparator). The disk-load path is a fail-open cache rebuilt from
+        // foreign/corrupt files, so the same guard belongs here. Skip+warn per unit
+        // (like the NUL-key precedent above) so the rest of the index still opens.
+        let finite = true;
+        for (let i = 0; i < emb.length; i++) {
+          if (!Number.isFinite(emb[i])) { finite = false; break; }
+        }
+        if (!finite) {
+          warnLog('unit_skipped_non_finite', { planPath: u.planPath, sectionId: u.sectionId });
+          continue;
+        }
         if (dim === null) dim = emb.length;
         else if (emb.length !== dim) throw new Error('plan-index: inconsistent embedding dimensions in file');
         next.set(key(u.planPath, u.sectionId), {

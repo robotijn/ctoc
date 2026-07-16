@@ -306,6 +306,70 @@ test('renderList_appends_pagination_block_when_showBack_but_single_page', () => 
 });
 
 // ---------------------------------------------------------------------------
+// renderList — terminal ANSI-injection sanitisation (R7-B, HIGH).
+// renderList is the shared renderer for the review/gate surface; its live
+// caller (src/tabs/review.js) passes on-disk plan objects straight in, and the
+// menu driver writes the returned string RAW to the terminal. A plan filename
+// carrying ESC/CR/C1 bytes must NOT reach the terminal as live control codes —
+// renderList must run every attacker-influenceable field (item.name AND
+// item.ago, plus the bare-string item shape) through stripCtl centrally so it
+// backstops every present and future caller. The forged payload here is the
+// real screen-forge attack: clear-screen + green "GATE APPROVED" prompt.
+// ---------------------------------------------------------------------------
+
+const FORGE = '\x1b[2J\x1b[1;32mGATE APPROVED';
+
+test('renderList_strips_ESC_from_object_item_name_so_screen_forge_cannot_reach_terminal', () => {
+  const items = [{ name: `plan-${FORGE}` }];
+
+  const out = tui.renderList(items, -1, { showNumbers: false });
+
+  // The clear-screen and forged-green control sequences must be gone as live
+  // codes. (Legit colour codes like \x1b[0m / \x1b[2m still appear — those are
+  // the renderer's own, not attacker input; \x1b[2J and \x1b[1;32m are neither.)
+  assert.ok(!out.includes('\x1b[2J'), 'clear-screen sequence must be stripped');
+  assert.ok(!out.includes('\x1b[1;32m'), 'forged green attribute must be stripped');
+  // The inert text survives as plain, harmless characters.
+  assert.ok(out.includes('GATE APPROVED'), 'text content is preserved, only control bytes removed');
+});
+
+test('renderList_strips_ESC_from_bare_string_item', () => {
+  const items = [`plan-${FORGE}`];
+
+  const out = tui.renderList(items, -1, { showNumbers: false });
+
+  assert.ok(!out.includes('\x1b[2J'), 'clear-screen sequence must be stripped from string item');
+  assert.ok(!out.includes('\x1b[1;32m'), 'forged green attribute must be stripped from string item');
+});
+
+test('renderList_strips_ESC_from_ago_suffix_field', () => {
+  const items = [{ name: 'clean-plan', ago: `2h${FORGE}` }];
+
+  const out = tui.renderList(items, -1, { showNumbers: false });
+
+  assert.ok(!out.includes('\x1b[2J'), 'clear-screen in ago must be stripped');
+  assert.ok(!out.includes('\x1b[1;32m'), 'forged green in ago must be stripped');
+});
+
+test('renderList_leaves_clean_name_and_alignment_untouched', () => {
+  // No over-stripping: a legitimate name/ago renders byte-for-byte as before,
+  // and the width/padding math is unchanged for a clean item.
+  const restore = overrideProp(process.stdout, 'columns', 80);
+  try {
+    const items = [{ name: 'my-feature-plan', ago: '3h ago' }];
+
+    const out = tui.renderList(items, -1, { showNumbers: false });
+
+    assert.ok(out.includes('my-feature-plan'), 'clean name preserved verbatim');
+    // Padding = width(80) - name(15) - num(0) - 4 - ago(6) - statusLen(0) = 55.
+    const expected = `my-feature-plan${' '.repeat(55)}${tui.c.dim}3h ago${tui.c.reset}`;
+    assert.ok(out.includes(expected), 'clean-item padding/alignment unchanged');
+  } finally {
+    restore();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // renderActionMenu — `action.key || i + 1` second operand.
 // tui.test.js always supplies keys; the fallback numbering is dark.
 // ---------------------------------------------------------------------------

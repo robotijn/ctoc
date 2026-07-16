@@ -159,3 +159,60 @@ describe('approvePlan — validates every transition (R5-B)', () => {
     assert.throws(() => approvePlan(p, root), /Unknown plan location/);
   });
 });
+
+describe('approvePlan — an un-keyable (non [a-z0-9-]) slug is REFUSED, never crossed marker-only', () => {
+  // The defect: the approval ledger keys a plan by a slug restricted to
+  // /^[a-z0-9][a-z0-9-]*$/, so a basename with an underscore (or dot/space) is
+  // un-keyable and ledgerPath THROWS. stampAndLedger used to cross such a plan
+  // MARKER-ONLY — moved into the gate destination + stamped `approved_by: human`
+  // in the body, but with NO ledger entry. Residency is ledger-driven (R3-C), so
+  // human-gate-check.js / iron-loop-enforcer.checkGateDestinationsApproved then
+  // treat that no-ledger resident as a HUMAN GATE VIOLATION and revert it — a plan
+  // the human genuinely approved is silently reverted and branded a forgery. The
+  // ledger is the source of approval truth: a crossing that cannot be ledgered is
+  // NOT a real crossing, so approvePlan must REFUSE up front and leave the plan in
+  // its source stage.
+  const { checkGateDestinationsApproved } = require('../src/lib/iron-loop-enforcer.js');
+
+  it('REFUSES an underscore-named review plan crossing review→done: unmoved, no ledger, no offender', () => {
+    const root = makeSandbox();
+    // Override bypasses the review→done content validator so the ONLY thing under
+    // test is the un-keyable-slug refusal — an un-keyable slug can never be ledgered,
+    // so even a human "approve anyway" cannot record it and must still be refused.
+    const planPath = writePlan(root, 'review', 'my_plan', `# my_plan\n\nBody.\n`);
+    const before = fs.readFileSync(planPath, 'utf8');
+
+    const res = approvePlan(planPath, root, { override: { reason: 'human ordered ship' } });
+
+    assert.equal(res.ok, false, 'an un-keyable crossing returns ok:false');
+    assert.equal(res.refused, true, 'the crossing is refused, not crossed marker-only');
+    assert.ok(/keyable/i.test(res.reason), 'reason explains the slug is not ledger-keyable');
+
+    // Plan is UNMOVED and byte-identical in review/ — nothing squats done/.
+    assert.ok(fs.existsSync(planPath), 'plan still resident in review/');
+    assert.equal(fs.readFileSync(planPath, 'utf8'), before, 'refused plan is byte-identical (no marker stamped)');
+    assert.ok(!fs.existsSync(path.join(root, 'plans', 'done', 'my_plan.md')), 'nothing landed in done/');
+
+    // No ledger entry was minted, AND the enforcer reports NO offender — the exact
+    // "genuinely-approved plan reverted as a violation" failure is closed.
+    assert.ok(!fs.existsSync(ledgerFile(root, 'my_plan')), 'no ledger entry for an un-keyable crossing');
+    assert.equal(checkGateDestinationsApproved(root), null, 'no gate-destination offender — nothing squatting done/');
+  });
+
+  it('the keyable control STILL crosses review→done and writes its ledger entry (no regression)', () => {
+    const root = makeSandbox();
+    const planPath = writePlan(root, 'review', 'keyable-plan', `# keyable-plan\n\nBody.\n`);
+
+    const res = approvePlan(planPath, root, { override: { reason: 'human ordered ship' } });
+
+    assert.ok(!res.refused, 'a keyable slug is not refused');
+    const dest = path.join(root, 'plans', 'done', 'keyable-plan.md');
+    assert.equal(res.newPath, dest, 'crossed to done/');
+    assert.ok(fs.existsSync(dest), 'plan landed in done/');
+    assert.ok(fs.existsSync(ledgerFile(root, 'keyable-plan')), 'the ledger entry was written');
+    const entry = JSON.parse(fs.readFileSync(ledgerFile(root, 'keyable-plan'), 'utf8'));
+    assert.equal(entry.approved_by, 'human');
+    assert.equal(entry.stage_to, 'done');
+    assert.equal(checkGateDestinationsApproved(root), null, 'a properly-ledgered done/ resident is clean');
+  });
+});

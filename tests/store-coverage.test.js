@@ -95,6 +95,13 @@ function writeDiskIndex(jsonPath, unitRecords) {
   fs.writeFileSync(jsonPath, JSON.stringify({ version: 1, dimension: 3, units: unitRecords }));
 }
 
+/** Encode a Float32Array as base64 of its native-endian buffer (matches the
+ *  store's on-disk embedding format). NaN/±Infinity survive the Float32 round-trip. */
+function encodeEmb(arr) {
+  const f = Float32Array.from(arr);
+  return Buffer.from(f.buffer, f.byteOffset, f.byteLength).toString('base64');
+}
+
 // ── decodeEmbedding: a corrupt embedding on disk fails the WHOLE load open ──────
 // (Not a partial load, not a crash, not a fabricated vector.) Lines 137-138, 141-142.
 
@@ -136,6 +143,52 @@ test('openStore_fails_open_when_a_persisted_embedding_has_a_non_multiple_of_4_by
   assert.ok(
     readLog(logPath).some(e => e.event === 'index_load_failed'),
     'the malformed byte length is warned'
+  );
+  cleanup(dir);
+});
+
+// ── loadFromDisk: a non-finite (NaN/±Infinity) embedding component is skipped ───
+// The UPSERT path already rejects non-finite components (validateUpsertInput, F7),
+// but the disk-load path (a fail-open cache rebuilt from foreign/corrupt files) is
+// exactly where the same guard belongs: a poisoned _norm makes cosine scores — and
+// therefore the search sort order — undefined (score NaN survives the `score <
+// minScore` filter and returns NaN from the comparator). Per-unit skip+warn, mirroring
+// the NUL-key skip precedent; the rest of the index still opens.
+
+test('loadFromDisk_skips_a_persisted_unit_whose_embedding_has_a_non_finite_component', () => {
+  // Arrange — one clean unit ([1,0,0]) and one poisoned unit ([NaN,1,0]) on disk.
+  const { dir, jsonPath, logPath } = tmpIndex();
+  writeDiskIndex(jsonPath, [
+    {
+      planPath: 'clean.md', sectionId: 's1', kind: 'section', text: 't',
+      files: [], parentVision: null, stepLabel: null, contentHash: 'hc',
+      embedding: encodeEmb([1, 0, 0])
+    },
+    {
+      planPath: 'poison.md', sectionId: 's1', kind: 'section', text: 't',
+      files: [], parentVision: null, stepLabel: null, contentHash: 'hp',
+      embedding: encodeEmb([NaN, 1, 0])
+    }
+  ]);
+
+  // Act
+  const store = openStore(jsonPath);
+
+  // Assert — the poisoned unit is NOT loaded; only the clean unit survives.
+  assert.equal(store.size, 1, 'the non-finite unit is skipped on load; only the clean unit is kept');
+  assert.equal(store.getUnit('poison.md', 's1'), null, 'the poisoned unit is absent from the store');
+  assert.ok(store.getUnit('clean.md', 's1'), 'the clean unit loads normally alongside the skip');
+
+  // Search returns only finite-scored hits (never a NaN score poisoning the sort).
+  const res = store.search(f32([1, 0, 0]), 10);
+  assert.equal(res.length, 1, 'search returns only the clean unit');
+  assert.equal(res[0].planPath, 'clean.md', 'the surviving hit is the clean unit');
+  assert.ok(Number.isFinite(res[0].score), 'no NaN-scored hit is ever returned');
+
+  // The skip is warned, not silent.
+  assert.ok(
+    readLog(logPath).some(e => e.event === 'unit_skipped_non_finite' && e.level === 'warn'),
+    'the non-finite skip is observable in the warn log'
   );
   cleanup(dir);
 });

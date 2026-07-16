@@ -18,7 +18,7 @@
  *   - appendDispatch missing-dispatch_id     the guard throw (lines 88-90)
  *   - appendDispatch timestamp fallback      the `|| new Date().toISOString()` (line 98)
  *   - getChainHead ternary fallbacks         present-but-unparseable head (lines 72-74)
- *   - verifyChain `count > 0` head guard     empty-but-present log + stale head (line 171)
+ *   - verifyChain head/log reconciliation   wiped/truncated log vs non-genesis head (line 171)
  *
  * Hermetic: each test creates its own mkdtemp root, realpath-resolved for the
  * macOS /var -> /private/var symlink, and removes it in `finally`. Cross-platform:
@@ -302,17 +302,23 @@ describe('audit-chain: getChainHead fallbacks on a present-but-unparseable head'
   });
 });
 
-describe('audit-chain: verifyChain count-guard on an empty-but-present log', () => {
-  // Cluster E — line 171: `head.hash !== previousChainHash && count > 0`.
-  // The sibling suite never hits the state where a log file EXISTS but yields zero
-  // entries while the head is non-genesis. In that state `head.hash !== GENESIS` is
-  // true, so only the `&& count > 0` short-circuit stops verifyChain from falsely
-  // flagging tamper. This test pins that guard.
+describe('audit-chain: verifyChain reconciles the durable head against the walked log', () => {
+  // Cluster E — line 171 head/log reconciliation. The chain head lives in a SEPARATE
+  // durable file (.ctoc/audit/chain-head.yaml) from the walked log (.ctoc/audit/chain.jsonl).
+  // A non-genesis head PROVES entries once existed. The pre-fix guard read
+  // `head.hash !== previousChainHash && count > 0`, which DISABLED the reconciliation
+  // exactly when the walked log was empty — so an attacker who truncates/erases
+  // chain.jsonl (count -> 0, walked hash -> GENESIS) left a non-genesis head behind and
+  // verifyChain still returned ok:true: full audit-trail erasure passed undetected.
+  // These tests pin the fixed contract: reconcile INDEPENDENT of count, and additionally
+  // cross-check head.sequence against the walked length (safe because the log is strictly
+  // append-only — no rotation/prune/truncate exists in this module or in the only other
+  // reader, src/scripts/evidence-pack.js).
 
-  test('should_return_ok_true_for_a_present_but_empty_log_even_when_head_is_stale', () => {
+  test('should_flag_a_present_but_empty_log_when_the_head_records_a_non_genesis_hash', () => {
     // Arrange — an existing (whitespace-only) log with no parseable entries, plus a
-    // head that records a non-genesis hash. count walks to 0; previousChainHash stays
-    // at GENESIS; the head disagrees.
+    // head that records a non-genesis hash and sequence. count walks to 0;
+    // previousChainHash stays at GENESIS; the durable head still proves entries existed.
     const root = makeRoot();
     try {
       fs.mkdirSync(path.join(root, AUDIT_DIR_REL), { recursive: true });
@@ -322,19 +328,101 @@ describe('audit-chain: verifyChain count-guard on an empty-but-present log', () 
       // Act
       const result = verifyChain(root);
 
-      // Assert — with zero counted entries the head/log mismatch must be SUPPRESSED by
-      // the `count > 0` guard: an empty log is vacuously valid regardless of head state.
-      // A mutant dropping `&& count > 0` would report ok:false here -> red.
-      assert.equal(result.ok, true, 'an empty-but-present log must verify ok despite a stale head');
+      // Assert — a non-genesis head over an empty walked log is a WIPE, not a fresh
+      // project: it MUST fail the head/log reconciliation. (Pre-fix code returned
+      // ok:true here — the exact forgery this module exists to catch.)
+      assert.equal(result.ok, false, 'a non-genesis head over an empty log MUST be flagged as tamper');
+      assert.equal(result.reason, 'chain head does not match last log entry',
+        'must fail specifically on the head/log mismatch');
+      assert.equal(result.stored, 'c'.repeat(64), 'must echo the stored (head) hash');
+      assert.equal(result.expected, GENESIS_HASH, 'walked-empty log terminates at genesis');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('should_verify_ok_for_a_genuinely_fresh_project_empty_log_and_genesis_head', () => {
+    // Arrange — the legitimate empty state that MUST still pass: a present but empty log
+    // and NO head file (getChainHead reads genesis). This is a never-initialized chain,
+    // not an erased one, so reconciliation is correctly skipped at genesis.
+    const root = makeRoot();
+    try {
+      fs.mkdirSync(path.join(root, AUDIT_DIR_REL), { recursive: true });
+      fs.writeFileSync(path.join(root, LOG_REL), '\n\n');
+      // deliberately no HEAD_REL file
+
+      // Act
+      const result = verifyChain(root);
+
+      // Assert — genesis head + empty log is vacuously valid.
+      assert.equal(result.ok, true, 'a genuinely fresh chain (genesis head, empty log) must verify ok');
       assert.equal(result.count, 0, 'no parseable entries means a count of zero');
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
-  test('should_flag_a_stale_head_only_once_at_least_one_entry_exists', () => {
-    // Arrange — contrast case that proves the guard is `count > 0`, not `count >= 0`:
-    // with ONE genuine entry, corrupting the head to a non-matching hash MUST be caught.
+  test('should_flag_a_truncated_log_that_erases_every_entry_but_leaves_a_non_genesis_head', () => {
+    // Arrange — the executed security repro: append 3 real dispatches (head advances to a
+    // non-genesis hash, sequence 3), then wipe chain.jsonl to "" as an attacker erasing
+    // the audit trail. The durable head still records sequence:3 and the real hash.
+    const root = makeRoot();
+    try {
+      appendDispatch(root, { dispatch_id: 'e-1', timestamp: '2026-06-15T00:00:01.000Z' });
+      appendDispatch(root, { dispatch_id: 'e-2', timestamp: '2026-06-15T00:00:02.000Z' });
+      appendDispatch(root, { dispatch_id: 'e-3', timestamp: '2026-06-15T00:00:03.000Z' });
+      assert.equal(verifyChain(root).ok, true, 'precondition: the intact 3-entry chain verifies');
+      assert.notEqual(getChainHead(root).hash, GENESIS_HASH, 'precondition: head moved off genesis');
+
+      // Attacker truncates the append-only log to nothing.
+      fs.writeFileSync(path.join(root, LOG_REL), '');
+
+      // Act
+      const result = verifyChain(root);
+
+      // Assert — full erasure MUST be detected (pre-fix returned ok:true, count:0).
+      assert.equal(result.ok, false, 'erasing every log entry MUST be detected via the durable head');
+      assert.equal(result.reason, 'chain head does not match last log entry',
+        'must fail on the head/log reconciliation');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('should_flag_a_reset_head_that_tries_to_hide_an_intact_log', () => {
+    // Arrange — the OTHER erasure direction the sequence cross-check exists to catch:
+    // keep an intact 3-entry log but RESET the head to genesis/sequence 0 (an attacker
+    // pretending the chain was never started). The hash reconciliation skips at genesis;
+    // the sequence cross-check (head.sequence 0 != walked length 3) catches it. This is
+    // only sound because the log is strictly append-only — verified: no rotation/prune.
+    const root = makeRoot();
+    try {
+      appendDispatch(root, { dispatch_id: 'e-1', timestamp: '2026-06-15T00:00:01.000Z' });
+      appendDispatch(root, { dispatch_id: 'e-2', timestamp: '2026-06-15T00:00:02.000Z' });
+      appendDispatch(root, { dispatch_id: 'e-3', timestamp: '2026-06-15T00:00:03.000Z' });
+
+      // Attacker resets the head to a never-started state while the log survives intact.
+      fs.writeFileSync(path.join(root, HEAD_REL),
+        `hash: ${GENESIS_HASH}\nsequence: 0\nupdated_at: 2026-06-15T00:00:00.000Z\n`);
+
+      // Act
+      const result = verifyChain(root);
+
+      // Assert — a genesis head over a non-empty walked log is inconsistent and MUST fail.
+      assert.equal(result.ok, false, 'a reset head over an intact log MUST be detected');
+      assert.equal(result.reason, 'chain head sequence does not match log length',
+        'must fail on the head-sequence cross-check');
+      assert.equal(result.expected, 3, 'expected must be the walked log length');
+      assert.equal(result.stored, 0, 'stored must be the reset head sequence');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('should_flag_a_stale_head_hash_over_a_non_empty_chain', () => {
+    // Arrange — the original non-empty head-mismatch case, retained: with ONE genuine
+    // entry, corrupting the head hash to a non-matching value MUST be caught by the
+    // hash reconciliation (independent of the now-removed count guard).
     const root = makeRoot();
     try {
       appendDispatch(root, { dispatch_id: 'e-1', timestamp: '2026-06-15T00:00:01.000Z' });
@@ -345,8 +433,7 @@ describe('audit-chain: verifyChain count-guard on an empty-but-present log', () 
       // Act
       const result = verifyChain(root);
 
-      // Assert — count is 1, so the guard lets the mismatch through as a real failure.
-      // Paired with the empty-log test above, this brackets the boundary at exactly 1.
+      // Assert — the non-genesis stale head disagrees with the walked terminal hash.
       assert.equal(result.ok, false, 'a stale head over a non-empty chain MUST be detected');
       assert.equal(result.reason, 'chain head does not match last log entry',
         'must fail specifically on the head/log mismatch');

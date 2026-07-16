@@ -138,7 +138,11 @@ function renderList(items, selectedIndex, options = {}) {
     const globalIndex = pagination.startIndex + i;
     const arrow = globalIndex === selectedIndex ? '→' : ' ';
     const num = showNumbers ? `[${i + 1}] ` : '';
-    const name = typeof item === 'string' ? item : item.name;
+    // R7-B (security): the item name is attacker-influenceable — for the live
+    // review/gate surface it is a plan's on-disk filename (minus .md), which may
+    // carry ESC/CR/C1 control bytes. renderList is written RAW to the terminal by
+    // the menu driver, so sanitize centrally here to backstop every caller.
+    const name = stripCtl(typeof item === 'string' ? item : item.name);
 
     // Background status icon (if available)
     let statusIcon = '';
@@ -157,7 +161,10 @@ function renderList(items, selectedIndex, options = {}) {
       }
     }
 
-    const suffix = typeof item === 'object' && item.ago ? `${c.dim}${item.ago}${c.reset}` : '';
+    // R7-B (security): item.ago is likewise attacker-influenceable — sanitize
+    // before interpolation. Stripping only shortens the string, so the padding
+    // math below (which uses item.ago?.length) still floors at one space.
+    const suffix = typeof item === 'object' && item.ago ? `${c.dim}${stripCtl(item.ago)}${c.reset}` : '';
 
     output += `${arrow} ${num}${statusIcon}${name}`;
     if (suffix) {
