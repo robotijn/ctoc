@@ -523,3 +523,71 @@ test('"n" inside the batch preview is an unadvertised no-op that stays in the pr
   assert.equal(consumed, false);
   assert.equal(app.batchPreview, true, 'still in preview; n is not a preview action');
 });
+
+// ---------------------------------------------------------------------------
+// initBuildFlow — REAL topics seed (streaming, slice 1 REAL DATA)
+//
+// initBuildFlow now tries streamingTopics.loadTopics(app.projectPath) FIRST; if it
+// returns a non-empty valid topics[], the flow seeds from the file; otherwise it
+// falls back to exampleTopics() exactly as before.
+// ---------------------------------------------------------------------------
+const os = require('os');
+const path = require('path');
+const nodeFs = require('fs');
+
+function withTempProject(fn) {
+  const root = nodeFs.mkdtempSync(path.join(os.tmpdir(), 'streaming-render-'));
+  try { return fn(root); }
+  finally { try { nodeFs.rmSync(root, { recursive: true, force: true }); } catch { /* best-effort */ } }
+}
+
+function writeRealTopics(root, raw) {
+  const dir = path.join(root, '.ctoc', 'streaming');
+  nodeFs.mkdirSync(dir, { recursive: true });
+  nodeFs.writeFileSync(path.join(dir, 'topics.json'), raw, 'utf8');
+}
+
+test('initBuildFlow seeds from REAL topics.json when present and valid', () => {
+  withTempProject((root) => {
+    const real = [
+      {
+        id: 'realtopic', label: 'Real Topic', critical: true,
+        questions: [
+          { id: 'realq', prompt: 'A real question from disk?', options: [
+            { key: '1', label: 'Yes', recommended: true }, { key: '2', label: 'No' },
+          ] },
+        ],
+      },
+    ];
+    writeRealTopics(root, JSON.stringify(real));
+    const app = { projectPath: root };
+    render.initBuildFlow(app);
+    // first topic/question come from the FILE, not the example seed
+    assert.equal(flow.currentTopic(app.buildFlow).id, 'realtopic');
+    assert.equal(flow.currentQuestion(app.buildFlow).id, 'realq');
+  });
+});
+
+test('initBuildFlow falls back to exampleTopics when topics.json is ABSENT', () => {
+  withTempProject((root) => {
+    const app = { projectPath: root };
+    render.initBuildFlow(app);
+    // example seed: critical topic is 'auth'
+    assert.equal(flow.currentTopic(app.buildFlow).id, 'auth');
+  });
+});
+
+test('initBuildFlow falls back to exampleTopics when topics.json is INVALID', () => {
+  withTempProject((root) => {
+    writeRealTopics(root, JSON.stringify([{ id: 'x', label: 'X' }])); // no questions array → invalid
+    const app = { projectPath: root };
+    render.initBuildFlow(app);
+    assert.equal(flow.currentTopic(app.buildFlow).id, 'auth'); // example seed
+  });
+});
+
+test('initBuildFlow falls back to exampleTopics when app.projectPath is absent', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth'); // example seed, no crash
+});
