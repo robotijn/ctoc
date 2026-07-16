@@ -80,7 +80,7 @@ function normalizeRel(filePath) {
  * uses — lazily required and fail-open (a missing lib → false, guard simply skips).
  *
  * @param {string} filePath
- * @param {(glob: string) => RegExp} [globToRegex] - injectable for tests
+ * @param {(glob: string) => {test: (input: any) => boolean}} [globToRegex] - injectable for tests
  * @returns {boolean}
  */
 function isPlanTarget(filePath, globToRegex) {
@@ -207,7 +207,7 @@ function resolveCheckDuplicate() {
  * @param {{ tool_input?: { file_path?: string, content?: string } }} payload
  * @param {object} [deps]
  * @param {(summary: string, options: object) => Promise<Array<{plan:string,similarity:number}>>} [deps.checkDuplicate]
- * @param {(glob: string) => RegExp} [deps.globToRegex]
+ * @param {(glob: string) => {test: (input: any) => boolean}} [deps.globToRegex]
  * @param {{ write: (s: string) => void }} [deps.stderr]
  * @param {string} [deps.projectPath]
  * @returns {Promise<{ warned: boolean, warnings: Array<{plan:string,similarity:number}> }>}

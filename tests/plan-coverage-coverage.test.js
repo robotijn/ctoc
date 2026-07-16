@@ -17,16 +17,16 @@
  * AI-generated, human-reviewed line-by-line per the unit-test-writer skill.
  *
  * DOCUMENTED UNREACHABLE (honesty clause — no fabricated hit):
- *   plan-coverage.js lines 98-99 — the `catch { return true; }` inside
- *   touchesOverlap. It fires only when `globToRegex(a).test(b)` (or the b→a
- *   direction) THROWS. globToRegex escapes every regex metacharacter and only
- *   ever calls `new RegExp` on a fully-escaped string; for ANY string input it
- *   provably produces a valid pattern and never throws (verified empirically over
- *   a battery of pathological inputs: lone backslashes, brackets, quantifiers,
- *   NUL). The two loop guards above it (`typeof a !== 'string'`) skip every
- *   non-string entry before it can reach globToRegex, so no public-API call can
- *   make globToRegex throw. Reaching the catch would require monkeypatching the
- *   module internals, which the public surface never emits. Documented, not faked.
+ *   plan-coverage.js — the `catch { return true; }` inside touchesOverlap. It
+ *   fires only when `globToRegex(a).test(b)` (or the b→a direction) THROWS.
+ *   globToRegex now compiles the glob into a linear-time matcher (tokenize +
+ *   bottom-up dynamic program — NO `new RegExp`, no backtracking); both
+ *   tokenize and match are TOTAL functions that never throw for any input
+ *   (`.test` even coerces a non-string arg via String()). The two loop guards
+ *   above it (`typeof a !== 'string'`) additionally skip every non-string entry
+ *   before it can reach globToRegex, so no public-API call can make it throw.
+ *   Reaching the catch would require monkeypatching the module internals, which
+ *   the public surface never emits. Documented, not faked.
  */
 
 const { describe, it, before, after } = require('node:test');
@@ -144,6 +144,50 @@ describe('globToRegex', () => {
 
     assert.equal(re.test('xsrc/foo.js'), false, 'not a suffix match');
     assert.equal(re.test('src/foo.jsx'), false, 'not a prefix match');
+  });
+
+  it('globstar_then_star_mixed_matches_across_and_within_segments', () => {
+    // Pins the linear matcher on the exact case a naive single-star-backtrack
+    // matcher gets WRONG: `**/*x` = globstar (crosses `/`) then star (one
+    // segment) then a literal. The old `.*[^/]*x` regex handled it; the linear
+    // dynamic program must reproduce it EXACTLY — an earlier globstar has to be
+    // able to absorb a `/` so a later slash-bounded `*` can still land the
+    // literal. Semantics: `^.*[^/]*x$`.
+    const re = globToRegex('**/*x');
+
+    assert.equal(re.test('x'), true, '** and * both empty, literal x lands');
+    assert.equal(re.test('a/bx'), true, '** absorbs "a/", * absorbs "b", then x');
+    assert.equal(re.test('a/b/cx'), true, '** absorbs "a/b/", * absorbs "c", then x');
+    assert.equal(re.test('a/bxy'), false, 'must END at the literal x (anchored)');
+  });
+
+  it('an_adversarial_star_literal_glob_matches_in_linear_time_not_redos', () => {
+    // ReDoS regression (HIGH). A plan `files:` entry is author-controlled — LLM
+    // agents (an in-model taint source) or anyone who can drop a plan .md — and
+    // is `.test()`-ed on EVERY file edit by the PreToolUse enforcement hook
+    // (PreToolUse.Edit → findCoveringPlan → globToRegex → test). The former
+    // glob→regex path emitted `^([^/]*a){15}$` — textbook catastrophic
+    // backtracking: `*a`×N against `a`×M + a trailing `/` (which forces total
+    // failure, so the engine explores every wildcard distribution) is
+    // exponential in N. Measured against the old code: `*a`×10 vs `a`×40 + "/"
+    // took ~5.1–5.7s and roughly DOUBLED per added `*a`, so a ~40-char entry
+    // hangs the hook indefinitely. The hook fails OPEN only on a thrown error;
+    // a HANG is neither an error nor time-bounded, so it stalls every edit in
+    // the project. The linear (O(tokens × chars)) matcher has no backtracking,
+    // so this must complete essentially instantly regardless of glob shape.
+    const glob = '*a'.repeat(15); // 30-char author-controlled files: entry
+    const input = 'a'.repeat(40) + '/'; // non-matching: trailing '/' can't be [^/]*
+    const re = globToRegex(glob);
+
+    const t0 = Date.now();
+    const result = re.test(input);
+    const elapsed = Date.now() - t0;
+
+    assert.equal(result, false, 'the adversarial glob does not match the non-matching input');
+    assert.ok(
+      elapsed < 50,
+      `glob matching must be linear-time (< 50ms); took ${elapsed}ms — catastrophic backtracking`
+    );
   });
 });
 

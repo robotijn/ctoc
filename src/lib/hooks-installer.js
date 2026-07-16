@@ -498,6 +498,26 @@ const POST_COMMIT_SENTINEL_END = '# <<< CTOC post-commit <<<';
 // post-commit.js line.
 const CTOC_LEGACY_INVOCATION = /node\s+"?[^"\n]*post-commit\.js"?\s+2>\/dev\/null\s+&/;
 
+// The unambiguous CTOC comment markers emitted by ctocPostCommitBlock. A
+// `*post-commit.js … 2>/dev/null &` invocation is an extremely common user
+// pattern, so it alone can NEVER prove CTOC ownership. Legacy (sentinel-less)
+// recognition is gated on the presence of one of these exact comment strings —
+// a foreign `node build/post-commit.js 2>/dev/null &` line with no CTOC comment
+// marker is therefore NOT treated as a CTOC install.
+const CTOC_COMMENT_MARKERS = [
+  'CTOC post-commit hook - triggers background quality agent',
+  'CTOC hook is NON-BLOCKING'
+];
+
+/**
+ * True when the hook file carries at least one unambiguous CTOC comment marker.
+ * @param {string} content - existing hook file contents
+ * @returns {boolean}
+ */
+function hasCtocCommentMarker(content) {
+  return CTOC_COMMENT_MARKERS.some(marker => content.includes(marker));
+}
+
 /**
  * Build the identical sentinel-wrapped CTOC block used by BOTH write paths
  * (new-file create and append-to-foreign). Trailing newline included so the
@@ -518,14 +538,20 @@ function ctocPostCommitBlock(agentHookPath) {
 
 /**
  * Decide whether an existing post-commit hook already carries a CTOC install.
- * Primary signal is the opening sentinel; the legacy invocation signature is a
- * fallback so a pre-sentinel install is still recognised as idempotent. A mere
- * mention of "CTOC" in a comment is deliberately NOT a signal.
+ * Primary signal is the opening sentinel. The legacy (pre-sentinel) fallback
+ * requires BOTH the invocation signature AND an unambiguous CTOC comment marker,
+ * so a foreign `node build/post-commit.js 2>/dev/null &` line — a common user
+ * backgrounding pattern — is never mistaken for a CTOC install. A mere mention
+ * of "CTOC" in a comment is likewise NOT, on its own, a signal.
  * @param {string} content - existing hook file contents
  * @returns {boolean}
  */
 function isCtocPostCommitInstalled(content) {
-  return content.includes(POST_COMMIT_SENTINEL_START) || CTOC_LEGACY_INVOCATION.test(content);
+  if (content.includes(POST_COMMIT_SENTINEL_START)) return true;
+  // Legacy (sentinel-less) recognition requires BOTH the invocation signature
+  // AND a CTOC comment marker. The invocation alone is a common user pattern and
+  // must never, by itself, prove CTOC ownership.
+  return CTOC_LEGACY_INVOCATION.test(content) && hasCtocCommentMarker(content);
 }
 
 /**

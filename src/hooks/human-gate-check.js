@@ -312,6 +312,22 @@ function revertPlan(violation) {
   const destDir = path.join(plans, violation.revertTo);
   const destPath = path.join(destDir, path.basename(violation.path));
 
+  // Destination-collision guard (mirrors actions.movePlan:92-97). This hand-rolled
+  // move bypasses movePlan's own guard, so without this check a same-basename plan
+  // reverted from a downstream folder (e.g. an unapproved todo/foo.md → implementation)
+  // would OVERWRITE a DIFFERENT legitimate implementation/foo.md and unlink the source
+  // — destroying real in-flight work while reporting a clean reverted:1. Refuse loudly
+  // instead: the throw is captured in revertAll's per-violation failures[], turning a
+  // silent clobber into a surfaced INCOMPLETE outcome. A self-path revert (dest === the
+  // plan's own file) is exempt — it is a legitimate in-place rewrite, destroys nothing.
+  const sameAsSource = path.resolve(destPath) === path.resolve(violation.path);
+  if (safeFs.existsSync(destPath) && !sameAsSource) {
+    throw new Error(
+      `refusing to revert onto existing ${violation.revertTo}/${path.basename(violation.path)} ` +
+      `(would destroy a resident plan)`
+    );
+  }
+
   // Read content and add violation note
   let content = safeFs.readFileSync(violation.path, 'utf8');
   const note = `\n\n---\n**⚠️ HUMAN GATE VIOLATION**\nThis plan was moved to ${violation.folder}/ without human approval.\nAutomatically reverted to ${violation.revertTo}/ at ${new Date().toISOString()}\n---\n`;
@@ -320,7 +336,9 @@ function revertPlan(violation) {
   // Move file
   ensureDir(destDir);
   safeFs.writeFileSync(destPath, content);
-  safeFs.unlinkSync(violation.path);
+  // Skip the unlink on a self-path revert: writeFileSync already rewrote the plan in
+  // place, so unlinking violation.path would delete the very file we just wrote.
+  if (!sameAsSource) safeFs.unlinkSync(violation.path);
 
   return destPath;
 }

@@ -39,6 +39,7 @@ const os = require('os');
 // module-load time here so the scanner's destructured import captures the stub.
 const childProcess = require('child_process');
 const _realExecSync = childProcess.execSync;
+const _realExecFileSync = childProcess.execFileSync;
 const TRUFFLEHOG_NDJSON =
   '{"DetectorName":"AWS","Raw":"AKIAIOSFODNN7EXAMPLE","SourceMetadata":' +
   '{"Data":{"Filesystem":{"file":"/scan/leak.js","line":3}}}}\n' +
@@ -49,6 +50,13 @@ const DETECT_SECRETS_JSON =
 const execState = {
   availableTools: new Set(['trufflehog', 'detect-secrets']),
   scanThrows: false,
+  // Records the most recent scan invocation so tests can assert HOW the
+  // external tool was called (argv form vs. a shell string). The scanner
+  // destructures execSync/execFileSync at module load, so a per-test swap is
+  // invisible to it — recording through the module-load stub is the only
+  // vantage point that sees the real call.
+  execFileCalls: [],
+  execSyncScanCalls: [],
 };
 childProcess.execSync = (command) => {
   const cmd = String(command);
@@ -58,9 +66,24 @@ childProcess.execSync = (command) => {
     throw new Error(`command not found: ${version[1]}`); // → isToolAvailable false
   }
   if (execState.scanThrows) throw new Error('external tool exited non-zero');
-  if (cmd.startsWith('trufflehog ')) return TRUFFLEHOG_NDJSON;
-  if (cmd.startsWith('detect-secrets ')) return DETECT_SECRETS_JSON;
+  // A scan reaching execSync means the code shelled out via a string — record
+  // it so the injection-regression test can prove it did NOT happen.
+  if (cmd.startsWith('trufflehog ')) { execState.execSyncScanCalls.push(cmd); return TRUFFLEHOG_NDJSON; }
+  if (cmd.startsWith('detect-secrets ')) { execState.execSyncScanCalls.push(cmd); return DETECT_SECRETS_JSON; }
   throw new Error(`unexpected execSync command in test: ${cmd}`);
+};
+// The two projectRoot-interpolated scans now shell out via execFileSync (argv
+// form, no shell) instead of execSync. Fake execFileSync at the same module
+// boundary so runTruffleHog / runDetectSecrets parse the canned output with no
+// subprocess. `--version` availability probes still go through execSync above.
+childProcess.execFileSync = (file, args) => {
+  execState.execFileCalls.push({ file, args });
+  if (execState.scanThrows) throw new Error('external tool exited non-zero');
+  if (file === 'trufflehog') return TRUFFLEHOG_NDJSON;
+  if (file === 'detect-secrets') return DETECT_SECRETS_JSON;
+  throw new Error(
+    `unexpected execFileSync command in test: ${file} ${JSON.stringify(args)}`
+  );
 };
 
 const { SecretsScanner } = require('../src/lib/secrets-scanner');
@@ -95,6 +118,7 @@ function freshDir(tag) {
 
 after(() => {
   childProcess.execSync = _realExecSync; // restore the real boundary (hygiene)
+  childProcess.execFileSync = _realExecFileSync;
   try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch (e) { /* ignore */ }
 });
 
@@ -403,6 +427,36 @@ describe('SecretsScanner — external tool integration', () => {
     assert.equal(f.verified, true);
     assert.equal(f.tool, 'trufflehog');
     assert.ok(f.match.includes('***') && !f.match.includes('IOSFODNN7'), 'the raw secret is redacted');
+  });
+
+  it('should_invoke_trufflehog_in_argv_form_so_a_metacharacter_projectRoot_cannot_inject', async () => {
+    // DEFECT 2 regression — the trufflehog scan must shell out via execFileSync
+    // (argv form, NO shell). A projectRoot carrying shell metacharacters must
+    // arrive as a SINGLE literal argument, never spliced into a command string.
+    const evil = '/tmp/$(touch INJECTED);rm -rf x';
+    const scanner = new SecretsScanner(evil);
+
+    execState.execFileCalls.length = 0;
+    execState.execSyncScanCalls.length = 0;
+    await scanner.runTruffleHog();
+
+    // Assert — went through argv-form execFileSync, never a shell string. A
+    // regression to execSync(`trufflehog ... ${projectRoot}`) would land in
+    // execSyncScanCalls instead, which must stay empty.
+    assert.deepEqual(
+      execState.execSyncScanCalls,
+      [],
+      'the scan must NOT shell out via an execSync command string'
+    );
+    assert.equal(execState.execFileCalls.length, 1, 'exactly one argv-form invocation');
+    const call = execState.execFileCalls[0];
+    assert.equal(call.file, 'trufflehog', 'binary is argv[0], not a command line');
+    assert.ok(Array.isArray(call.args), 'arguments are an argv array');
+    assert.deepEqual(
+      call.args,
+      ['filesystem', '--json', '--only-verified', evil],
+      'projectRoot is a single discrete argv element — no shell can expand $(...) in it'
+    );
   });
 
   it('should_parse_detect_secrets_json_or_fail_safe_on_absence', async () => {

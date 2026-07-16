@@ -131,10 +131,14 @@ function validateStepsComplete(content, planPath, projectPath) {
     if (block) {
       const hasUnchecked = /-\s*\[ \]/.test(block);
       const hasChecked = /-\s*\[x\]/i.test(block);
+      const hasAnyBox = /-\s*\[[ x]\]/i.test(block);
       const hasWord = /\b(?:COMPLETE|COMPLETED|DONE)\b/i.test(block) || /✓/.test(block);
       // Complete iff there is positive evidence (a ticked box or a completion
-      // word) AND no remaining unchecked box in the block.
-      isCompleted = (hasChecked || hasWord) && !hasUnchecked;
+      // word) AND no remaining unchecked box in the block. A completion WORD
+      // cannot, by itself, finish a step that carries NO checklist at all: a
+      // word-only stub (just "COMPLETE"/"DONE"/"✓", no checkbox) is a stub, not
+      // a done step, so a step with no checkbox is never complete.
+      isCompleted = hasAnyBox ? ((hasChecked || hasWord) && !hasUnchecked) : false;
       // Skipped only on an EXPLICIT, un-completed skip marker — not the words
       // "n/a"/"skipped" appearing inside completed checkbox prose (e.g.
       // "- [x] 0 skipped, 0 flaky tests" or "(n/a — Node built-ins only)").

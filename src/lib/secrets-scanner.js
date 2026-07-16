@@ -14,7 +14,7 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 /**
  * Secret types and their severity
@@ -978,12 +978,18 @@ class SecretsScanner {
     const findings = [];
 
     try {
-      const command = `trufflehog filesystem --json --only-verified ${this.projectRoot}`;
-      const result = execSync(command, {
-        encoding: 'utf8',
-        maxBuffer: 50 * 1024 * 1024,
-        timeout: 300000
-      });
+      // execFileSync (argv form, no shell) — a projectRoot containing shell
+      // metacharacters ($(...), ;, backticks) is passed as a single literal
+      // argument and can never be interpreted as a command.
+      const result = execFileSync(
+        'trufflehog',
+        ['filesystem', '--json', '--only-verified', this.projectRoot],
+        {
+          encoding: 'utf8',
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: 300000
+        }
+      );
 
       // TruffleHog outputs NDJSON
       const lines = result.trim().split('\n');
@@ -1020,12 +1026,17 @@ class SecretsScanner {
     const findings = [];
 
     try {
-      const command = `detect-secrets scan ${this.projectRoot} --all-files`;
-      const result = execSync(command, {
-        encoding: 'utf8',
-        maxBuffer: 50 * 1024 * 1024,
-        timeout: 300000
-      });
+      // execFileSync (argv form, no shell) — projectRoot is passed as a single
+      // literal argument, so shell metacharacters in the path cannot inject.
+      const result = execFileSync(
+        'detect-secrets',
+        ['scan', this.projectRoot, '--all-files'],
+        {
+          encoding: 'utf8',
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: 300000
+        }
+      );
 
       const data = JSON.parse(result);
       for (const [file, secrets] of Object.entries(data.results || {})) {

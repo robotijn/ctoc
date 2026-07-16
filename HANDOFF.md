@@ -13,6 +13,15 @@
   block), legal-hold status matcher fail-open (delete during a live hold),
   traceability-matrix non-atomic save; + irac/data-lineage/ai-provenance/version MED,
   privilege/cache/plan-coverage-glob LOW. Wave-5 re-attack cleared 5/6 fixes clean.
+  v6.12.64 (45318b6) wave 7 shipped 7 fixes: sync.js auto-commit shell-injection RCE
+  (HIGH, all 20 git calls -> execFileSync argv), tabs/vision.js ANSI injection (HIGH),
+  playwright-scaffolder silent overwrite, hooks-installer substring-ownership x2,
+  dependency-auditor npm-audit parse fail-open, project-root .ctoc-priority two-pass
+  (MED). Wave-6 re-attack was CLEAN. Completeness sweep: the WHOLE lib/hook/tab
+  surface is now audited (only areas.js/tabs.js remained, pure in-memory + clean).
+  Boundary caught a real sync.js Buffer/encoding bug (tsc) + 3 false-green tests
+  (project-root priority, init-project comment-only skip, ship-gate execSync spy) —
+  all fixed/tightened. TOTAL: 53 defects, 8 pushed waves. Convergence NOT reached.
 
 ## The order (verbatim)
 "fix them all, do 50 rounds of hard critique, keep fixing the code, use ctoc agents every
@@ -49,6 +58,22 @@ gate (push) is the human's — but Tijn said "commit push", so pushing each gree
   first-match hijack (now last-match).
 
 ## Surfaced FORKS (Tijn's call — do NOT self-pick; documented, not baked)
+0. [NEW, CRITICAL — v6.12.64 re-attack] ledger-backfill.js is an agent-runnable
+   Gate-2/Gate-3 FORGERY tool: PreToolUse.Bash denies the `node -e ...backfillEntry`
+   form but ALLOWS `node src/scripts/ledger-backfill.js` (its own SANCTIONED_WRITER),
+   which mints an accepted approved_by:human residency for arbitrary agent-written
+   plan bytes (plans/**.md is Edit-whitelisted), crossing Gate 3 with NO human.
+   CANNOT just deny it on Bash: the `claude:approve-stubs` MENU RECIPE (menu.md:55,
+   wired menu-screens.js:1367 "Looks good -- refine all") runs `ledger-backfill.js
+   --vision` THROUGH the agent Bash channel — denying breaks vision archival + 3
+   ledger-forgery tests. Three postures, Tijn picks: (A) move --vision ledgering
+   in-process into approvePlan/decompose (no Bash argv), then deny the script on Bash;
+   (B) split: --vision = internal lib call, --plan/--stage = human-terminal-only +
+   Bash-denied; (C) fix the CERTIFICATION root — backfillEntry/writeVisionArchiveEntry
+   refuse to certify a residency with no prior gate/pipeline event (closes the
+   non-eval bypass the hook admits it can't see). Recommend C. Spans approval-ledger.js
+   + human-gate-check.js + the menu recipe → its own Iron Loop plan.
+
 1. duplicate-guard threshold: compares RRF fused score (max ~0.033) vs a cosine-scale 0.85
    default → duplicate guard NEVER fires. Fix = choose retrieval semantics (threshold raw
    cosine vs rescale RRF vs RRF-scale default). Recommend: threshold raw cosine.

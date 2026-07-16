@@ -101,6 +101,9 @@ describe('project-root.js', () => {
 
   test('findProjectRoot walks up to a .ctoc marker', () => {
     fs.mkdirSync(path.join(tmpRoot, '.ctoc'), { recursive: true });
+    // A genuine project .ctoc carries settings (init writes it); a bare .ctoc is the
+    // global crypto home shape and must NOT be treated as a project root.
+    fs.writeFileSync(path.join(tmpRoot, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
     const nested = path.join(tmpRoot, 'a', 'b', 'c');
     fs.mkdirSync(nested, { recursive: true });
 
@@ -152,6 +155,9 @@ describe('project-root.js', () => {
     // levels — a nested .git/package.json (a common monorepo subpackage) must NOT
     // shadow the ancestor .ctoc root (that mis-rooting was the confirmed defect).
     fs.mkdirSync(path.join(tmpRoot, '.ctoc'), { recursive: true });
+    // Make the ancestor .ctoc a genuine project root (settings present), not the bare
+    // crypto-home shape — otherwise it correctly no longer qualifies as a CTOC root.
+    fs.writeFileSync(path.join(tmpRoot, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
     const child = path.join(tmpRoot, 'child');
     fs.mkdirSync(path.join(child, '.git'), { recursive: true });
     // From the child, the ancestor .ctoc wins over the child's own .git.
@@ -177,6 +183,7 @@ describe('project-root.js', () => {
 
   test('getPlansPath / getCtocPath / fromProjectRoot derive from the resolved root', () => {
     fs.mkdirSync(path.join(tmpRoot, '.ctoc'), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
     const nested = path.join(tmpRoot, 'a', 'b');
     fs.mkdirSync(nested, { recursive: true });
 

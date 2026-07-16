@@ -255,7 +255,9 @@ function toolExists(bin, cwd) {
  *   - `ran:true, passed:false`       — a candidate ran and failed (pushes an error)
  *
  * @param {string} label - Human label ("Lint", "Type check", "Tests").
- * @param {string[]} candidates - Pre-qualified command strings.
+ * @param {Array<string|{cmd: string, required?: boolean}>} candidates - Pre-qualified
+ *   command strings, or {cmd, required} objects (a required candidate that fails to
+ *   launch is a real failure, not a benign skip).
  * @param {string} projectPath - Project root.
  * @param {string[]} errors - Errors array to append a failure to.
  * @returns {Object} The check record.
@@ -266,6 +268,23 @@ function evalCategory(label, candidates, projectPath, errors) {
   }
   const r = tryCommands(candidates, projectPath);
   if (!r.ran) {
+    if (r.requiredLaunchFailure) {
+      // A PRESENCE-QUALIFIED candidate — the project's OWN declared npm script —
+      // could not launch (its inner binary is missing). This is a REAL failure,
+      // NOT the benign not-applicable used for an absent OPTIONAL tool: a declared
+      // suite that never started must fail the gate, not be silently dropped.
+      const detail = label === 'Tests'
+        ? `${label} could not launch: ${r.requiredLaunchFailure} — the declared test suite failed to start`
+        : `${label} could not launch: ${r.requiredLaunchFailure}`;
+      errors.push(detail);
+      return {
+        ran: false,
+        applicable: true,
+        passed: false,
+        command: r.requiredLaunchFailure,
+        reason: detail
+      };
+    }
     return { ran: false, applicable: false, passed: null, command: null, reason: `${label} candidates were not runnable` };
   }
   const check = {
@@ -311,6 +330,23 @@ function parseSkippedCount(out) {
   return n;
 }
 
+/**
+ * Return the LAST capture-group match of `re` (which MUST carry the `g` flag) in
+ * `text`, or null when there is none. The test runner emits the REAL coverage
+ * summary row LAST — after all other test output — so an earlier stray/spoofed
+ * `all files | 100` line in stdout must NOT win over the real `# all files | 40 |`
+ * summary. Taking the last match closes that spoof (mirrors src/scripts/test-gate.js).
+ * @param {string} text
+ * @param {RegExp} re - a global (`g`) regex with one capture group.
+ * @returns {RegExpExecArray|null}
+ */
+function lastCap(text, re) {
+  let m;
+  let last = null;
+  while ((m = re.exec(text)) !== null) last = m;
+  return last;
+}
+
 /** Parse a coverage percentage from test-runner output, or null if not present. */
 function parseCoveragePct(out) {
   const text = out || '';
@@ -320,11 +356,16 @@ function parseCoveragePct(out) {
   // Istanbul/nyc format — otherwise a `node --test` project's coverage parses to
   // null and its declared floor is silently unenforced. The same regex also
   // matches the Istanbul "All files | 95 |" row (case-insensitive covers "All").
-  let m = text.match(/^\s*#?\s*all files\s*\|\s*([\d.]+)/im);
+  //
+  // For EVERY format, take the LAST match: the real coverage summary is emitted
+  // last, so an earlier line reading `all files | 100` (a stray log or a spoof)
+  // must never win over the real below-floor summary that follows it. A non-global
+  // `.match()` returned the FIRST match and let a spoofed 100 pass a below-floor run.
+  let m = lastCap(text, /^\s*#?\s*all files\s*\|\s*([\d.]+)/img);
   if (m) return parseFloat(m[1]);
-  m = text.match(/Lines\s*:\s*([\d.]+)\s*%/i);
+  m = lastCap(text, /Lines\s*:\s*([\d.]+)\s*%/ig);
   if (m) return parseFloat(m[1]);
-  m = text.match(/Statements\s*:\s*([\d.]+)\s*%/i);
+  m = lastCap(text, /Statements\s*:\s*([\d.]+)\s*%/ig);
   if (m) return parseFloat(m[1]);
   return null;
 }
@@ -341,6 +382,17 @@ function parseCoveragePct(out) {
  * @param {string[]} errors - Errors array to append violations to.
  */
 function applyTestQualityContracts(check, projectPath, errors) {
+  // A runner can report FAILURES on stdout yet exit 0 (jest --passWithNoTests, a
+  // wrapping `|| true`, `set +e`, or a custom reporter that swallows the exit
+  // code). tryCommand derives success solely from the zero exit, so parse the TAP
+  // `# fail N` summary and fail closed — mirroring the skipped-count logic below,
+  // which already proves we do not fully trust the exit code.
+  const mFail = (check.output || '').match(/^#\s*fail\s+(\d+)/im);
+  if (mFail && parseInt(mFail[1], 10) > 0) {
+    check.passed = false;
+    errors.push(`${mFail[1]} failing test(s) reported despite exit 0`);
+  }
+
   const skipped = parseSkippedCount(check.output);
   check.skipped = skipped;
   if (skipped > 0) {
@@ -395,9 +447,14 @@ function runFallbackChecks(projectPath) {
   // script (finding C2: an ABSENT script is applicable:false, never a failing
   // check) or an INSTALLED tool. This is what distinguishes NOT-RUN from FAILED.
 
+  // A candidate qualified by a DECLARED npm script (npmScriptExists) is REQUIRED —
+  // the project owns it, so its inner binary failing to launch is a REAL failure.
+  // A candidate qualified by an INSTALLED external tool (toolExists) is OPTIONAL —
+  // its absence is a benign not-applicable, never a failure.
+
   // Lint checks
   const lintCommands = [];
-  if (hasPackageJson && npmScriptExists(pkg, 'lint')) lintCommands.push('npm run lint');
+  if (hasPackageJson && npmScriptExists(pkg, 'lint')) lintCommands.push({ cmd: 'npm run lint', required: true });
   if (hasPyproject && toolExists('ruff', projectPath)) lintCommands.push('ruff check .');
   if (hasGoMod && toolExists('golangci-lint', projectPath)) lintCommands.push('golangci-lint run');
   if (hasCargoToml && toolExists('cargo', projectPath)) lintCommands.push('cargo clippy');
@@ -405,14 +462,14 @@ function runFallbackChecks(projectPath) {
 
   // Type check
   const typeCommands = [];
-  if (hasPackageJson && npmScriptExists(pkg, 'typecheck')) typeCommands.push('npm run typecheck');
+  if (hasPackageJson && npmScriptExists(pkg, 'typecheck')) typeCommands.push({ cmd: 'npm run typecheck', required: true });
   if (hasPyproject && toolExists('mypy', projectPath)) typeCommands.push('mypy .');
   if (hasGoMod && toolExists('go', projectPath)) typeCommands.push('go vet ./...');
   checks.types = evalCategory('Type check', typeCommands, projectPath, errors);
 
   // Test suite
   const testCommands = [];
-  if (hasPackageJson && npmScriptExists(pkg, 'test')) testCommands.push('npm test');
+  if (hasPackageJson && npmScriptExists(pkg, 'test')) testCommands.push({ cmd: 'npm test', required: true });
   if (hasPyproject && toolExists('pytest', projectPath)) testCommands.push('pytest');
   if (hasGoMod && toolExists('go', projectPath)) testCommands.push('go test ./...');
   if (hasCargoToml && toolExists('cargo', projectPath)) testCommands.push('cargo test');
@@ -479,12 +536,23 @@ function tryCommand(command, cwd) {
  * file" would only MISFIRE and swallow a genuine failure, carrying VERIFY to
  * green on some other passing check.
  *
- * @param {string[]} commands - Commands to try in order.
+ * REQUIRED candidates (the project's OWN declared npm scripts) are distinguished
+ * from OPTIONAL ones (installed external tools like ruff/pytest). A candidate may
+ * be a bare string (optional, backward-compatible) or `{ cmd, required }`. When
+ * NOTHING ran and a REQUIRED candidate spawn-failed, the returned `ran:false`
+ * result carries `requiredLaunchFailure: <cmd>` so the caller can treat "the
+ * declared suite could not launch" as a REAL failure — NOT a benign not-applicable
+ * (which is correct only for an absent OPTIONAL tool).
+ *
+ * @param {(string|{cmd: string, required?: boolean})[]} commands - Candidates, in order.
  * @param {string} cwd - Working directory.
- * @returns {Object} `{ ran, success, output, command, error }`.
+ * @returns {Object} `{ ran, success, output, command, error, requiredLaunchFailure? }`.
  */
 function tryCommands(commands, cwd) {
-  for (const cmd of commands) {
+  const normalized = commands.map((c) =>
+    typeof c === 'string' ? { cmd: c, required: false } : c);
+  let requiredLaunchFailure = null;
+  for (const { cmd, required } of normalized) {
     const result = tryCommand(cmd, cwd);
     if (result.success) {
       return { ...result, command: cmd, ran: true };
@@ -494,21 +562,27 @@ function tryCommands(commands, cwd) {
       // ENOENT or shell exit status 127), despite the upstream presence
       // precondition — treat as NOT this check and try the next candidate. This
       // NEVER fires on a substring of the command's own output, so a real
-      // non-zero exit (e.g. status 1) is never swallowed as not-run.
+      // non-zero exit (e.g. status 1) is never swallowed as not-run. Remember the
+      // FIRST required candidate that could not launch: a project's OWN declared
+      // script whose inner binary is missing is a REAL failure, not a benign skip.
+      if (required && requiredLaunchFailure === null) requiredLaunchFailure = cmd;
       continue;
     }
     // The command launched and exited non-zero — a REAL failure.
     return { ...result, command: cmd, ran: true };
   }
 
-  // Nothing ran. This is NOT a pass — the caller records it as applicable:false.
+  // Nothing ran. An absent OPTIONAL tool is applicable:false (a benign skip); a
+  // REQUIRED (project-declared) candidate that could not launch is surfaced via
+  // requiredLaunchFailure so the caller fails the category loudly.
   return {
     ran: false,
     success: false,
     applicable: false,
     output: '',
     command: null,
-    error: null
+    error: null,
+    requiredLaunchFailure
   };
 }
 

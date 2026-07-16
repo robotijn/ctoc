@@ -346,7 +346,7 @@ describe('init-project dark branches', () => {
       const hooksDir = path.join(tempDir, '.git', 'hooks');
       fs.mkdirSync(hooksDir, { recursive: true });
       const hookPath = path.join(hooksDir, 'post-commit');
-      const existing = '#!/bin/sh\n# CTOC post-commit hook\nnode ".ctoc/agent/post-commit.js" 2>/dev/null &\n';
+      const existing = '#!/bin/sh\n# CTOC post-commit hook - triggers background quality agent\nnode ".ctoc/agent/post-commit.js" 2>/dev/null &\n';
       fs.writeFileSync(hookPath, existing);
 
       // Act

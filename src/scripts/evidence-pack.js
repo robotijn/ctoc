@@ -21,7 +21,7 @@
 const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const crypto = require('crypto');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const EVIDENCE_DIR = path.join(ROOT, '.ctoc', 'evidence-packs');
@@ -145,6 +145,15 @@ function readActiveRegimes() {
   }
 }
 
+// execFileSync (argv form, no shell) — tarPath is derived from unvalidated
+// --since/--until CLI args, so it must NEVER be interpolated into a shell
+// string. Passing tar its arguments as a discrete argv array means shell
+// metacharacters in the path ($(...), backticks, ;) are inert literal
+// characters that tar receives as a filename, never as a command.
+function packWithTar(tarPath, listFile, cwd = ROOT) {
+  execFileSync('tar', ['-czf', tarPath, '-T', listFile], { cwd, stdio: 'inherit' });
+}
+
 function main() {
   const args = parseArgs(process.argv);
   console.log(`Evidence pack: ${args.since} to ${args.until}`);
@@ -182,7 +191,7 @@ function main() {
       const relInputs = inputs.map(p => path.relative(ROOT, p));
       const listFile = path.join(EVIDENCE_DIR, `.pack-${args.since}.list`);
       safeFs.writeFileSync(listFile, relInputs.join('\n'));
-      execSync(`tar -czf "${tarPath}" -T "${listFile}"`, { cwd: ROOT, stdio: 'inherit' });
+      packWithTar(tarPath, listFile);
       safeFs.unlinkSync(listFile);
     }
   } catch (e) {
@@ -211,4 +220,6 @@ function yamlify(obj, indent = 0) {
   return String(obj);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { packWithTar, parseArgs, collectInputs };

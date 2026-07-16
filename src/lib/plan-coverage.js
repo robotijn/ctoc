@@ -26,45 +26,139 @@
  */
 
 const safeFs = require('./safe-fs');
-const { safeRegExp } = require('./regex-utils');
 const { parseFrontmatter } = require('./frontmatter');
 const path = require('path');
 
 const STAGE_PRIORITY = ['in-progress', 'todo', 'implementation'];
 
 /**
- * Convert a glob pattern to a RegExp.
+ * @typedef {{ k: 'lit', c: string } | { k: 'one' } | { k: 'star' } | { k: 'globstar' }} GlobToken
+ */
+
+/**
+ * Tokenize a glob into a flat token list, mirroring EXACTLY the segment
+ * semantics the enforcement hook has always used:
+ *   **  → globstar  (matches any run of chars, INCLUDING `/`); a `/` immediately
+ *        following the `**` is CONSUMED, so a `**`-then-slash before `b` also
+ *        matches with zero middle segments (`a/b`) and a leading globstar-slash
+ *        matches a root-level file.
+ *   *   → star      (matches a run of chars EXCEPT `/` — within one path segment)
+ *   ?   → one       (matches exactly one char except `/`)
+ *   c   → lit(c)    (matches the literal char c — no metacharacter meaning)
  *
  * @param {string} glob
- * @returns {RegExp}
+ * @returns {GlobToken[]}
  */
-function globToRegex(glob) {
-  let out = '^';
+function tokenizeGlob(glob) {
+  const g = typeof glob === 'string' ? glob : '';
+  const tokens = [];
   let i = 0;
-  while (i < glob.length) {
-    const c = glob[i];
+  while (i < g.length) {
+    const c = g[i];
     if (c === '*') {
-      if (glob[i + 1] === '*') {
-        out += '.*';
+      if (g[i + 1] === '*') {
+        tokens.push({ k: 'globstar' });
         i += 2;
-        if (glob[i] === '/') i += 1; // consume trailing slash so "**/x" matches "x"
+        if (g[i] === '/') i += 1; // consume trailing slash so "**/x" matches "x"
       } else {
-        out += '[^/]*';
+        tokens.push({ k: 'star' });
         i += 1;
       }
     } else if (c === '?') {
-      out += '[^/]';
-      i += 1;
-    } else if ('.+^${}()|[]\\'.includes(c)) {
-      out += '\\' + c;
+      tokens.push({ k: 'one' });
       i += 1;
     } else {
-      out += c;
+      tokens.push({ k: 'lit', c });
       i += 1;
     }
   }
-  out += '$';
-  return safeRegExp(out);
+  return /** @type {GlobToken[]} */ (tokens);
+}
+
+/**
+ * Linear-time glob match. Replaces the former glob→RegExp→`.test()` path, whose
+ * emitted pattern (`[^/]*` / `.*` alternating with literals the wildcard could
+ * ALSO match — e.g. `*a*a*a…` → `^([^/]*a)+$`) was a catastrophic-backtracking
+ * ReDoS. That pattern is `.test()`-ed on EVERY file edit by the PreToolUse
+ * enforcement hook against an author-controlled plan `files:` entry (an
+ * in-model taint source), and a crafted glob took seconds-to-forever on a
+ * pathological target — stalling every edit in the project (the hook fails OPEN
+ * only on a THROWN error; a HANG is neither an error nor time-bounded).
+ *
+ * This is a bottom-up dynamic program with NO backtracking, so match cost is
+ * bounded by O(tokens × chars) regardless of glob shape. Semantics are
+ * byte-for-byte identical to the old regex:
+ *   lit(c)   ↔ literal c         star     ↔ [^/]*
+ *   one      ↔ [^/]              globstar ↔ .*
+ * and the whole input must match (full `^…$` anchoring). A rolling single-star
+ * backtrack pointer is INSUFFICIENT here — a segment-bounded `*` after a
+ * `/`-crossing `**` needs the earlier `**` to be able to absorb a `/` — so the
+ * full DP (not the O(1)-space greedy) is required for correctness.
+ *
+ * @param {GlobToken[]} tokens
+ * @param {*} input - coerced to string, matching RegExp.prototype.test semantics
+ * @returns {boolean}
+ */
+function matchTokens(tokens, input) {
+  const s = typeof input === 'string' ? input : String(input);
+  const n = s.length;
+  const m = tokens.length;
+  // prev[j] === true  ⇔  tokens[0..i-1] match the input prefix s[0..j-1].
+  let prev = new Array(n + 1).fill(false);
+  prev[0] = true; // empty token list matches the empty prefix
+  for (let i = 1; i <= m; i += 1) {
+    const tok = tokens[i - 1];
+    const cur = new Array(n + 1).fill(false);
+    if (tok.k === 'star' || tok.k === 'globstar') {
+      const crossesSlash = tok.k === 'globstar';
+      for (let j = 0; j <= n; j += 1) {
+        // Star matches empty here (inherit prev[j]), OR absorbs one more input
+        // char (extend cur[j-1]) provided the char is permitted by this star.
+        let v = prev[j];
+        if (!v && j > 0 && cur[j - 1]) {
+          const ch = s[j - 1];
+          if (crossesSlash || ch !== '/') v = true;
+        }
+        cur[j] = v;
+      }
+    } else {
+      // lit / one consume EXACTLY one input char.
+      for (let j = 1; j <= n; j += 1) {
+        if (!prev[j - 1]) continue;
+        const ch = s[j - 1];
+        if (tok.k === 'one') {
+          if (ch !== '/') cur[j] = true;
+        } else if (ch === tok.c) {
+          cur[j] = true;
+        }
+      }
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/**
+ * Compile a glob into a linear-time matcher. Named `globToRegex` for backward
+ * compatibility — every caller (this module's `touchesOverlap` and
+ * `findCoveringPlan`, plus `plan-index/conflict-detect.js` and
+ * `hooks/PreToolUse.Write.js`) uses ONLY the returned object's `.test(str)`,
+ * which is contract-compatible with `RegExp.prototype.test` but backed by the
+ * ReDoS-immune dynamic program above. Never throws for any input (tokenize and
+ * match are total functions), so the safety-oracle catch in `touchesOverlap`
+ * stays correct as documented-unreachable defense in depth.
+ *
+ * @param {string} glob
+ * @returns {{ test: (input: *) => boolean, glob: string }}
+ */
+function globToRegex(glob) {
+  const tokens = tokenizeGlob(glob);
+  return {
+    glob: typeof glob === 'string' ? glob : '',
+    test(input) {
+      return matchTokens(tokens, input);
+    },
+  };
 }
 
 /**
