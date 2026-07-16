@@ -29,9 +29,9 @@ function render(app) {
   out += `${c.bold}System${c.reset}\n\n`;
 
   out += `  ${c.bold}Tools${c.reset}\n`;
-  out += `    ${c.dim}1${c.reset}  Doctor      — run /ctoc:menu and select Tools > Doctor\n`;
-  out += `    ${c.dim}2${c.reset}  Update      — /plugin update ctoc\n`;
-  out += `    ${c.dim}3${c.reset}  Settings    — .ctoc/settings.yaml\n\n`;
+  out += `    ${c.cyan}d${c.reset}  Doctor      — health check & troubleshooting\n`;
+  out += `    ${c.cyan}u${c.reset}  Update      — check for CTOC updates\n`;
+  out += `    ${c.cyan}s${c.reset}  Settings    — configure CTOC\n\n`;
 
   out += `  ${c.bold}Logs${c.reset}\n`;
   out += `    Enforcement     ${fileSize(enforcementLog).toString().padStart(8)} bytes  ${c.dim}.ctoc/logs/enforcement.json${c.reset}\n`;
@@ -47,7 +47,7 @@ function render(app) {
   }
 
   out += '\n' + line() + '\n';
-  out += renderFooter(['←/→ areas', 'q quit']);
+  out += renderFooter(['d doctor', 'u update', 's settings', '←/→ areas', 'q quit']);
   return out;
 }
 
@@ -62,7 +62,21 @@ function render(app) {
  */
 function handleKey(key, app) {
   if (app && app.toolMode) {
+    // Inside a sub-mode, tabs/tools.js owns the keys (arrow nav, Enter, b/escape back).
     return toolsTab.handleKey(key, app);
+  }
+  // Landing: owner-approved lowercase mnemonics open the sub-modes the render
+  // advertises. The internal toolMode values ('1'/'2'/'3') are the ones menu.js's
+  // render + tabs/tools.js already expect — d/u/s are the human-facing keys mapped
+  // onto them, replacing the bare digits the global router used to eat as area switches.
+  const seq = key ? (key.sequence || key.name) : undefined;
+  if (seq === 'd') { app.toolMode = '1'; return true; }                              // Doctor
+  if (seq === 'u') { app.toolMode = '2'; app.updateMessage = null; return true; }    // Update
+  if (seq === 's') {                                                                 // Settings
+    app.toolMode = '3';
+    app.settingsTabIndex = 0;
+    app.settingIndex = 0;
+    return true;
   }
   return false;
 }
