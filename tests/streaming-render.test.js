@@ -295,3 +295,146 @@ test('exampleTopics seed: initBuildFlow presents the critical question first', (
   render.initBuildFlow(app);
   assert.equal(flow.questionTier(flow.currentQuestion(app.buildFlow)), 'critical');
 });
+
+// ===========================================================================
+// SLICE: BATCH-APPROVE mechanic (renderer).
+// The question screen advertises `a batch-approve the rest` ONLY when
+// streamingFlow.batchAvailable is true; pressing `a` opens a preview listing the
+// pending non-critical Q→recommended pairs; `a` in preview approves, `b` exits,
+// a digit exits to answer individually. Criticals are never listed.
+// ===========================================================================
+
+// A single non-critical topic with three recommended questions — enough pending
+// items to preview once a streak is seeded.
+function batchSeed() {
+  return [
+    {
+      id: 'stack', label: 'Stack', critical: false, questions: [
+        { id: 'q1', prompt: 'q1 prompt?', options: [{ key: '1', label: 'One', recommended: true }, { key: '2', label: 'Two' }] },
+        { id: 'q2', prompt: 'q2 prompt?', options: [{ key: '1', label: 'One', recommended: true }, { key: '2', label: 'Two' }] },
+        { id: 'q3', prompt: 'q3 prompt?', options: [{ key: '1', label: 'One', recommended: true }, { key: '2', label: 'Two' }] },
+      ],
+    },
+  ];
+}
+
+test('the batch offer line and key are hidden when batch is not available', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  const out = plain(render.render(app));
+  assert.ok(!out.includes('batch-approve'), 'no batch offer at start');
+  assert.ok(!out.includes('a batch'), 'no batch key advertised at start');
+});
+
+test('the batch offer line + key appear once the streak reaches the threshold with pending items', () => {
+  const app = { buildFlow: { ...flow.initFlow(batchSeed()), recommendedStreak: 5 } };
+  const out = plain(render.render(app));
+  assert.ok(out.includes('batch-approve'), 'offer line advertised');
+  assert.ok(out.includes('5'), 'offer shows the streak count');
+  assert.ok(out.includes('a batch'), 'batch key advertised in the footer');
+});
+
+test('pressing a when batch is available opens the preview listing pending Q→recommended pairs', () => {
+  const app = { buildFlow: { ...flow.initFlow(batchSeed()), recommendedStreak: 5 } };
+  const consumed = render.handleKey({ sequence: 'a' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.batchPreview, true);
+  const out = plain(render.render(app));
+  assert.ok(out.includes('q1 prompt?'), 'lists q1');
+  assert.ok(out.includes('q2 prompt?'), 'lists q2');
+  assert.ok(out.includes('q3 prompt?'), 'lists q3');
+  assert.ok(out.includes('One'), 'shows the recommended option label');
+  assert.ok(out.toLowerCase().includes('recommended'), 'marks the pairs as recommended');
+  assert.ok(out.includes('approve all'), 'preview footer offers approve all');
+});
+
+test('pressing a when batch is NOT available is a no-op (a is not advertised)', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  const before = app.buildFlow;
+  assert.equal(render.handleKey({ sequence: 'a' }, app), false);
+  assert.equal(app.buildFlow, before, 'state unchanged');
+  assert.ok(!app.batchPreview, 'no preview opened');
+});
+
+test('pressing a in the preview approves all pending questions and closes the preview', () => {
+  const app = { buildFlow: { ...flow.initFlow(batchSeed()), recommendedStreak: 5 }, batchPreview: true };
+  const consumed = render.handleKey({ sequence: 'a' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.batchPreview, false);
+  assert.equal(app.buildFlow.answers['stack/q1'], '1');
+  assert.equal(app.buildFlow.answers['stack/q2'], '1');
+  assert.equal(app.buildFlow.answers['stack/q3'], '1');
+  assert.ok(app.message && app.message.length > 0, 'a non-silent status message was set');
+});
+
+test('pressing b in the preview exits WITHOUT approving', () => {
+  const app = { buildFlow: { ...flow.initFlow(batchSeed()), recommendedStreak: 5 }, batchPreview: true };
+  const consumed = render.handleKey({ sequence: 'b' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.batchPreview, false);
+  assert.deepEqual(app.buildFlow.answers, {}, 'nothing approved');
+});
+
+test('pressing a digit in the preview exits to answer individually (no approval)', () => {
+  const app = { buildFlow: { ...flow.initFlow(batchSeed()), recommendedStreak: 5 }, batchPreview: true };
+  const consumed = render.handleKey({ sequence: '2' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.batchPreview, false);
+  assert.deepEqual(app.buildFlow.answers, {}, 'nothing approved on revisit');
+  assert.ok(app.message && app.message.toLowerCase().includes('revisit'), 'revisit status message set');
+});
+
+test('an unadvertised key in the preview is a no-op that stays in the preview', () => {
+  const app = { buildFlow: { ...flow.initFlow(batchSeed()), recommendedStreak: 5 }, batchPreview: true };
+  assert.equal(render.handleKey({ sequence: 'z' }, app), false);
+  assert.equal(app.batchPreview, true, 'stays in preview');
+});
+
+test('a critical question is never listed in the batch preview', () => {
+  const seed = [
+    {
+      id: 'auth', label: 'Auth', critical: true, questions: [
+        { id: 'crit', critical: true, prompt: 'critical question?', options: [{ key: '1', label: 'Safe', recommended: true }] },
+        { id: 'q1', prompt: 'normal one?', options: [{ key: '1', label: 'One', recommended: true }, { key: '2', label: 'Two' }] },
+        { id: 'q2', prompt: 'normal two?', options: [{ key: '1', label: 'One', recommended: true }, { key: '2', label: 'Two' }] },
+      ],
+    },
+  ];
+  let bf = flow.initFlow(seed);
+  bf = flow.answer(bf, '1'); // answer the critical (presented first) → pointer in the non-critical tail
+  const app = { buildFlow: { ...bf, recommendedStreak: 5 }, batchPreview: true };
+  const out = plain(render.render(app));
+  assert.ok(!out.includes('critical question?'), 'critical prompt not in the preview');
+  assert.ok(out.includes('normal one?'), 'non-critical listed');
+  assert.ok(out.includes('normal two?'), 'non-critical listed');
+});
+
+test('the preview strips control characters from prompts and labels', () => {
+  const seed = [
+    {
+      id: 't', label: 't', critical: false, questions: [
+        { id: 'q1', prompt: 'pr\x1b[2Jompt', options: [{ key: '1', label: 'la\x07bel', recommended: true }, { key: '2', label: 'b' }] },
+      ],
+    },
+  ];
+  const app = { buildFlow: { ...flow.initFlow(seed), recommendedStreak: 5 }, batchPreview: true };
+  const out = render.render(app);
+  assert.ok(!out.includes('\x1b[2J'), 'clear-screen sequence stripped from a preview prompt');
+  assert.ok(!out.includes('\x07'), 'bell stripped from a preview label');
+});
+
+// ---------------------------------------------------------------------------
+// exampleTopics: a batch is reachable in a short all-recommended manual run.
+// ---------------------------------------------------------------------------
+test('exampleTopics: an all-recommended run reaches a batch offer under the default threshold', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  let guard = 0;
+  // Drive recommended picks until the batch becomes available (or everything is answered).
+  while (!flow.batchAvailable(app.buildFlow) && !flow.isComplete(app.buildFlow) && guard++ < 50) {
+    const rec = flow.recommendedKey(flow.currentQuestion(app.buildFlow));
+    app.buildFlow = flow.answer(app.buildFlow, rec);
+  }
+  assert.equal(flow.batchAvailable(app.buildFlow), true, 'a batch becomes reachable with all-recommended picks');
+});

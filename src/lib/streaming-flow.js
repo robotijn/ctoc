@@ -148,6 +148,28 @@ function firstAnswerable(topics) {
   return { topicIndex: topics.length, questionIndex: 0 };
 }
 
+/**
+ * The pointer of the FIRST question (in presentation order) that has no recorded
+ * answer, scanning every topic/question, or past-the-end when all are answered.
+ * Used by `batchApprove` to land the pointer on the next thing the human must see
+ * (a still-open critical, a no-recommended question, or the next topic). Pure.
+ * @param {Array<object>} topics
+ * @param {object} answers
+ * @returns {{topicIndex: number, questionIndex: number}}
+ */
+function nextUnansweredPointer(topics, answers) {
+  for (let ti = 0; ti < topics.length; ti++) {
+    const t = topics[ti];
+    if (!hasQuestions(t)) continue;
+    for (let qi = 0; qi < t.questions.length; qi++) {
+      if (!(`${t.id}/${t.questions[qi].id}` in answers)) {
+        return { topicIndex: ti, questionIndex: qi };
+      }
+    }
+  }
+  return { topicIndex: topics.length, questionIndex: 0 };
+}
+
 // --- construction ---------------------------------------------------------
 
 /**
@@ -173,6 +195,10 @@ function initFlow(topics) {
     topicIndex,
     questionIndex,
     answers: {},
+    // Streak of consecutive RECOMMENDED picks on NON-critical questions. Drives the
+    // batch-approve offer (see `batchAvailable`). Reset by any non-recommended pick,
+    // a comment, or answering a critical question.
+    recommendedStreak: 0,
   };
 }
 
@@ -231,6 +257,7 @@ function answer(state, optionKeyOrComment) {
   const topics = (state && state.topics) || [];
   const topic = currentTopic(state);
   const question = currentQuestion(state);
+  const prevStreak = (state && typeof state.recommendedStreak === 'number') ? state.recommendedStreak : 0;
 
   // No-op clone when there is nothing to answer (past the end / empty).
   if (!topic || !question) {
@@ -239,13 +266,20 @@ function answer(state, optionKeyOrComment) {
       topicIndex: state ? state.topicIndex : topics.length,
       questionIndex: state ? state.questionIndex : 0,
       answers: Object.assign({}, state && state.answers),
+      recommendedStreak: prevStreak,
     };
   }
 
   const key = `${topic.id}/${question.id}`;
   const answers = Object.assign({}, state.answers, { [key]: optionKeyOrComment });
+  // Streak: increment only when the chosen key is the recommended option AND the
+  // question is NON-critical (important or normal). Any other case — a
+  // non-recommended pick, a free-text comment, or a critical question — resets it.
+  const tookRecommended = optionKeyOrComment === recommendedKey(question);
+  const nonCritical = questionTier(question) !== 'critical';
+  const recommendedStreak = (tookRecommended && nonCritical) ? prevStreak + 1 : 0;
   const { topicIndex, questionIndex } = advancePointer(topics, state.topicIndex, state.questionIndex);
-  return { topics, topicIndex, questionIndex, answers };
+  return { topics, topicIndex, questionIndex, answers, recommendedStreak };
 }
 
 // --- status ---------------------------------------------------------------
@@ -313,6 +347,76 @@ function criticalOpenCount(state) {
   return topicCriticalOpenCount(state, currentTopic(state));
 }
 
+// --- batch-approve --------------------------------------------------------
+
+/**
+ * Default streak length that unlocks the batch-approve offer. The owner's rule puts
+ * this in the 5–10 range ("after choosing the recommended action 5-10 times"); 5 is
+ * the low end so the offer surfaces as early as the rule allows. A caller may pass an
+ * explicit threshold to `batchAvailable` (tests use a small one for determinism).
+ * @type {number}
+ */
+const DEFAULT_BATCH_THRESHOLD = 5;
+
+/**
+ * The remaining UNANSWERED, NON-critical questions in the CURRENT topic that HAVE a
+ * recommended option — exactly the set a batch-approve can auto-answer. Criticals are
+ * excluded (answered individually, first); a non-critical with no recommended option
+ * cannot be auto-answered and is excluded too (the human must pick it). Order follows
+ * the topic's presentation order. Returns [] past-the-end / for a null state / when the
+ * current topic has no questions array. Pure.
+ * @param {object} state FlowState
+ * @returns {Array<object>}
+ */
+function pendingBatchQuestions(state) {
+  const topic = currentTopic(state);
+  const answers = (state && state.answers) || {};
+  if (!topic || !Array.isArray(topic.questions)) return [];
+  return topic.questions.filter(q =>
+    q &&
+    questionTier(q) !== 'critical' &&
+    !(`${topic.id}/${q.id}` in answers) &&
+    recommendedKey(q) !== null
+  );
+}
+
+/**
+ * True iff the batch-approve offer should be surfaced: the recommended streak has
+ * reached `threshold` AND there is at least one pending non-critical question with a
+ * recommended option to approve. Pure.
+ * @param {object} state FlowState
+ * @param {number} [threshold=DEFAULT_BATCH_THRESHOLD]
+ * @returns {boolean}
+ */
+function batchAvailable(state, threshold = DEFAULT_BATCH_THRESHOLD) {
+  const streak = (state && typeof state.recommendedStreak === 'number') ? state.recommendedStreak : 0;
+  return streak >= threshold && pendingBatchQuestions(state).length > 0;
+}
+
+/**
+ * Approve every `pendingBatchQuestions` item at once: record each one's recommended
+ * option key under "<topicId>/<questionId>", then advance the pointer to the next
+ * UNANSWERED question (a still-open critical, a no-recommended question, or the first
+ * question of the next topic — whichever comes first). Criticals and no-recommended
+ * questions are left untouched for the human. The recommended streak carries forward
+ * unchanged (the next critical answer resets it). PURE — returns a NEW state, never
+ * mutates the input. A past-the-end / empty flow is a no-op clone.
+ * @param {object} state FlowState
+ * @returns {object} the next FlowState
+ */
+function batchApprove(state) {
+  const topics = (state && state.topics) || [];
+  const topic = currentTopic(state);
+  const pending = pendingBatchQuestions(state);
+  const answers = Object.assign({}, state && state.answers);
+  for (const q of pending) {
+    answers[`${topic.id}/${q.id}`] = recommendedKey(q);
+  }
+  const { topicIndex, questionIndex } = nextUnansweredPointer(topics, answers);
+  const recommendedStreak = (state && typeof state.recommendedStreak === 'number') ? state.recommendedStreak : 0;
+  return { topics, topicIndex, questionIndex, answers, recommendedStreak };
+}
+
 module.exports = {
   orderTopics,
   orderQuestions,
@@ -326,6 +430,11 @@ module.exports = {
   progress,
   criticalOpenCount,
   topicCriticalOpenCount,
+  DEFAULT_BATCH_THRESHOLD,
+  pendingBatchQuestions,
+  batchAvailable,
+  batchApprove,
   // exported for future-slice reuse (fast-forward, batch-approve) and unit testing
   advancePointer,
+  nextUnansweredPointer,
 };

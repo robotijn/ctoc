@@ -50,6 +50,11 @@ function exampleTopics() {
       id: 'stack',
       label: 'Stack',
       critical: false,
+      // Five NON-critical questions, each with a recommended option. This is enough
+      // that an all-recommended manual run (which carries a streak of 2 out of the
+      // Authentication topic — mfa + provider) reaches the DEFAULT_BATCH_THRESHOLD (5)
+      // with pending questions still remaining, so the batch-approve offer is
+      // reachable in a short real session.
       questions: [
         {
           id: 'lang',
@@ -65,6 +70,30 @@ function exampleTopics() {
           options: [
             { key: '1', label: 'PostgreSQL', recommended: true },
             { key: '2', label: 'SQLite' },
+          ],
+        },
+        {
+          id: 'framework',
+          prompt: 'Which web framework should the app use?',
+          options: [
+            { key: '1', label: 'Next.js', recommended: true },
+            { key: '2', label: 'Remix' },
+          ],
+        },
+        {
+          id: 'styling',
+          prompt: 'Which styling approach should the app use?',
+          options: [
+            { key: '1', label: 'Tailwind CSS', recommended: true },
+            { key: '2', label: 'CSS Modules' },
+          ],
+        },
+        {
+          id: 'hosting',
+          prompt: 'Where should the app be deployed?',
+          options: [
+            { key: '1', label: 'Vercel', recommended: true },
+            { key: '2', label: 'Self-hosted' },
           ],
         },
       ],
@@ -135,8 +164,40 @@ function ensureFlow(app) {
  * @param {object} app host state object (uses/seeds `app.buildFlow`)
  * @returns {string}
  */
+/**
+ * Render the BATCH PREVIEW screen: every pending non-critical question that a
+ * batch-approve would auto-answer, shown as `<prompt> → <recommended label>
+ * (recommended)`. Criticals and no-recommended questions are excluded by
+ * `pendingBatchQuestions`, so they can never appear here. All model text is
+ * control-char sanitized. The footer's keys all work (see `handleKey`).
+ * @param {object} state FlowState
+ * @returns {string}
+ */
+function renderBatchPreview(state) {
+  const pending = streamingFlow.pendingBatchQuestions(state);
+
+  let out = '\n';
+  out += `${c.bold}Build — batch approve${c.reset}\n\n`;
+  out += `  ${c.dim}these ${pending.length} non-critical question(s) will take their recommended option:${c.reset}\n\n`;
+  for (const q of pending) {
+    const recKey = streamingFlow.recommendedKey(q);
+    const opt = (q.options || []).find(o => o && o.key === recKey);
+    const label = opt ? opt.label : recKey;
+    out += `    ${stripCtl(q.prompt)} ${c.dim}→${c.reset} ${c.green}${stripCtl(label)}${c.reset} ${c.dim}(recommended)${c.reset}\n`;
+  }
+
+  out += '\n' + line() + '\n';
+  // Every advertised key works: a approves, a digit exits to answer individually, b backs out.
+  out += renderFooter(['a approve all', '<n> revisit individually', 'b back']);
+  return out;
+}
+
 function render(app) {
   const state = ensureFlow(app);
+
+  // Batch preview is a HOST UI mode (app.batchPreview), NOT part of the pure flow
+  // state — it overlays the question screen until the human approves or backs out.
+  if (app.batchPreview) return renderBatchPreview(state);
 
   let out = '\n';
   out += `${c.bold}Build${c.reset}\n\n`;
@@ -182,9 +243,21 @@ function render(app) {
     out += `    ${c.cyan}${stripCtl(opt.key)}${c.reset}  ${stripCtl(opt.label)}${mark}\n`;
   }
 
+  // Batch-approve offer: only surfaced (and only advertised) when the streak has
+  // reached the threshold AND non-critical questions with a recommended option remain.
+  // Owner's rule: the streak counts NON-critical recommended picks; criticals are
+  // never part of the batch, so this line never appears while a critical is current.
+  const batchAvail = streamingFlow.batchAvailable(state);
+  const footerKeys = ['<n> pick', 'c comment'];
+  if (batchAvail) {
+    out += `\n  ${c.green}recommendation taken ${state.recommendedStreak}×${c.reset} → ${c.cyan}a${c.reset} batch-approve the rest\n`;
+    footerKeys.push('a batch');
+  }
+  footerKeys.push('b back', 's settings');
+
   out += '\n' + line() + '\n';
   // CONSISTENT lowercase keys — every advertised key works this slice.
-  out += renderFooter(['<n> pick', 'c comment', 'b back', 's settings']);
+  out += renderFooter(footerKeys);
   return out;
 }
 
@@ -202,6 +275,28 @@ function handleKey(key, app) {
 
   const state = ensureFlow(app);
 
+  // BATCH PREVIEW mode (app.batchPreview) intercepts keys before anything else so its
+  // `b` means "back out of the preview" (not the global back intent). All three keys
+  // work — none is dead:
+  //   a       → approve every pending non-critical with its recommended option;
+  //   <digit> → exit the preview to answer the questions individually (no approval);
+  //   b       → exit the preview without approving.
+  if (app.batchPreview) {
+    if (seq === 'a') {
+      app.buildFlow = streamingFlow.batchApprove(state);
+      app.batchPreview = false;
+      app.message = 'Batch approved — remaining non-critical questions took their recommended option';
+      return true;
+    }
+    if (/^[0-9]$/.test(seq)) {
+      app.batchPreview = false;
+      app.message = 'Revisit — answer each question individually';
+      return true;
+    }
+    if (seq === 'b') { app.batchPreview = false; return true; }
+    return false; // any other key is an unadvertised no-op inside the preview
+  }
+
   // Navigation intents — work on every screen (including the completion summary).
   // These emit an intent for the host to act on; no menu-tab coupling.
   if (seq === 'b') { app.streamAction = 'back'; return true; }
@@ -209,6 +304,14 @@ function handleKey(key, app) {
 
   // Nothing left to answer → picks/comments are inert (and unadvertised) when complete.
   if (streamingFlow.isComplete(state)) return false;
+
+  // Open the batch preview only when the offer is actually available (the `a` key is
+  // advertised on the question screen only under that same condition, so this is never
+  // a dead key). When unavailable, `a` falls through to a genuine no-op.
+  if (seq === 'a' && streamingFlow.batchAvailable(state)) {
+    app.batchPreview = true;
+    return true;
+  }
 
   const question = streamingFlow.currentQuestion(state);
 
