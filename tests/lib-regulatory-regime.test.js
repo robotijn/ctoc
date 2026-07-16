@@ -462,3 +462,72 @@ describe('parseYAMLShallow block lists (KNOWN BUG — expected to fail)', () => 
     assert.match(summary, /\(3 controls active\)$/, `summary was: ${summary}`);
   });
 });
+
+// ===========================================================================
+// loadActiveProfiles block-extractor terminator (D1)
+//
+// The block extractor in loadActiveProfiles must bound the `regulatory_regime:`
+// body by the NEXT top-level key OR the END OF INPUT. Two failure modes are
+// asserted here, both driven by real settings.yaml layouts written directly to
+// disk (NOT via writeSettings, which always appends a trailing top-level key and
+// would mask the last-block case):
+//
+//   1. regulatory_regime is the LAST top-level block (its natural, opt-in layout —
+//      appended to the end of settings.yaml). With no following top-level key the
+//      extractor must fall through to end-of-input, not fail and silently
+//      deactivate the entire regime.
+//   2. The block body contains an uppercase 'Z' (e.g. an ISO-8601 timestamp
+//      ...T00:00:00Z). That 'Z' must NOT truncate the block and drop the
+//      active_profiles that follow it.
+// ===========================================================================
+
+describe('loadActiveProfiles block terminator (D1)', () => {
+  function writeRawSettings(root, text) {
+    fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), text);
+  }
+
+  it('reads profiles when regulatory_regime is the LAST top-level block', () => {
+    const root = makeProject();
+    // No trailing top-level key: regulatory_regime is the final block, as it is
+    // when appended opt-in to a real settings.yaml.
+    writeRawSettings(
+      root,
+      'timezone: "UTC"\n\nregulatory_regime:\n  active_profiles:\n    - hipaa\n'
+    );
+    const { profiles } = loadActiveProfiles(root);
+    assert.deepEqual(
+      profiles,
+      ['hipaa'],
+      'last-block regulatory_regime must still activate its profiles (regime silently deactivated otherwise)'
+    );
+  });
+
+  it('an uppercase Z (ISO timestamp) in the body does NOT truncate the block', () => {
+    const root = makeProject();
+    writeRawSettings(
+      root,
+      'regulatory_regime:\n' +
+      '  instituted_at: 2026-07-15T00:00:00Z\n' +
+      '  active_profiles:\n' +
+      '    - hipaa\n' +
+      'enforcement:\n' +
+      '  mode: strict\n'
+    );
+    const { profiles } = loadActiveProfiles(root);
+    assert.deepEqual(
+      profiles,
+      ['hipaa'],
+      'a Z in an ISO timestamp must not truncate the block and drop active_profiles'
+    );
+  });
+
+  it('a block FOLLOWED BY a top-level key still parses (no regression)', () => {
+    const root = makeProject();
+    writeRawSettings(
+      root,
+      'regulatory_regime:\n  active_profiles:\n    - hipaa\nenforcement:\n  mode: strict\n'
+    );
+    const { profiles } = loadActiveProfiles(root);
+    assert.deepEqual(profiles, ['hipaa']);
+  });
+});

@@ -249,14 +249,16 @@ test('syncToReadme replaces the line-start version anchor with the new version',
   // Act
   const result = version.syncToReadme();
 
-  // Assert — the anchor line now carries 2.0.0 and the old version is gone
-  assert.deepEqual(result, { success: true, version: '2.0.0' });
+  // Assert — the anchor line now carries 2.0.0 and the old version is gone.
+  // A matched sync reports { success:true, matched:true, version } (matched is
+  // the honesty flag added when syncToReadme was made fail-loud).
+  assert.deepEqual(result, { success: true, matched: true, version: '2.0.0' });
   const written = s.writes[0].data;
   assert.match(written, /^\*\*2\.0\.0\*\* — the tagline$/m);
   assert.ok(!written.includes('**1.2.3**'), 'old version anchor is removed');
 });
 
-test('syncToReadme leaves a version reference that is not at line start untouched (pins the ^ anchor)', (t) => {
+test('syncToReadme fails loud when the only version reference is mid-line (pins the ^ anchor)', (t) => {
   // Arrange — the version token sits mid-line, not at column 0
   const readme = 'See **1.2.3** — inline reference\n';
   const s = fakeFs(t, {
@@ -267,9 +269,12 @@ test('syncToReadme leaves a version reference that is not at line start untouche
   // Act — a mutant dropping the `^` anchor would match mid-line and rewrite it
   const result = version.syncToReadme();
 
-  // Assert — content is byte-identical; only success/version metadata differs
-  assert.equal(result.success, true);
-  assert.equal(s.writes[0].data, readme, 'no replacement when the anchor is mid-line');
+  // Assert — no line-start version anchor means nothing to sync: fail loud,
+  // write nothing, never rewrite the mid-line reference. A mutant dropping `^`
+  // would match mid-line, report success:true, and write — failing here.
+  assert.equal(result.success, false);
+  assert.equal(result.matched, false);
+  assert.equal(s.writes.length, 0, 'no write when there is no line-start anchor to match');
 });
 
 // ===========================================================================

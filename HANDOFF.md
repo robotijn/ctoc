@@ -5,9 +5,10 @@
 - Updated: 2026-07-16 by claude
 - Branch: main
 - Status: in progress — FRESH 50-round campaign (Tijn re-issued the order 2026-07-16 as
-  a NEW round of improvement, not the old standing order). ~7 rounds done, 3 waves
-  committed + pushed. Convergence (3 consecutive different-lens clean rounds) NOT reached —
-  every fleet so far has found real defects.
+  a NEW round of improvement, not the old standing order). ~11 rounds done, 6 waves
+  committed + pushed (v6.12.57 → v6.12.62), 36 real defects fixed. Convergence (3
+  consecutive different-lens clean rounds) NOT reached — every fleet still finds real
+  HIGH/CRITICAL defects, incl. the re-attack lens on our own fixes.
 
 ## The order (verbatim)
 "fix them all, do 50 rounds of hard critique, keep fixing the code, use ctoc agents every
@@ -60,12 +61,39 @@ Plus a note (not a fork): the OLD 2026-07-14 continuation batch is still "active
 ## Ledger (full round-by-round detail)
 Scratch: /private/tmp/claude-501/.../scratchpad/repair-loop-ledger.md (this session's).
 
+## Shipped waves 4-5 (after the first 3)
+- v6.12.61 (0bd9dde): wave 4, 8 fixes — move-plan overwrite data-loss (HIGH), vision
+  completeVision no-ledger revert (HIGH), vision createStub slug-collision (HIGH),
+  menu-screens live-grenade Approve (HIGH), vision parseCanvas stray-Z (MED),
+  v8-dispatcher total_med phantom key (MED); + RE-ATTACK found escape-phrases
+  dot-extension hole (HIGH), Bash isLedgerWrite branch-a unbounded (MED).
+- v6.12.62 (a0e2fe1): wave 5, 7 fixes — four-eyes segregation-of-duties fail-open
+  (CRITICAL), transition-log override dropped from audit (CRITICAL), Bash ~cd
+  ledger-forgery bypass (HIGH), plan-coverage ../ out-of-repo write (HIGH),
+  approval-ledger non-atomic persistEntry (MED), escape-phrases multi-punct (MED),
+  quality-state unguarded RMW (LOW).
+
+## STILL-UNAUDITED load-bearing modules (mapped by the completeness sweep — NEXT TARGETS)
+Mostly EU-compliance/legal-program files: ai-provenance, app-runner, background, cache,
+cvss, data-lineage, dependency-auditor, durable-log, enforcement-log, eu-ai-act-agent-runner,
+gdpr-agent-runner, irac-schema, iron-loop-compliance-trigger, legal-hold, operating-manual,
+claude-md-lessons, plan-index/index, playwright-scaffolder, privilege-posture, project-root,
+proportionality, regulatory-regime, retention, sections, spoliation-safe, sync, tabs,
+task-view, traceability-matrix, version.
+AUDITED-CLEAN this session: violation-tracker, state-manager, stale-cleanup, refinement-loop,
+budget, comparator-agent, ctoc-project-detector, eval-harness, calibration, settings,
+frontmatter, task-registry, continuation, safe-fs, release.js, ledger-backfill, post-commit,
+hooks-installer, crypto, hash-utils.
+
 ## Resume here
-Continue the loop: next fleet on lenses/modules NOT yet attacked — v8-dispatcher /
-capability-registry / operating-manual (orchestration), the release/git scripts
-(release.js / move-plan.js / ledger-backfill.js / post-commit.js / hooks-installer.js),
-budget / quality-state / eval-harness, vision-decomposer, AND a RE-ATTACK lens on THIS
-session's 21 fixes (did any over-narrow and break a legit path, or leave an adjacent hole?).
-Verify every finding against disk first. Integrate at one boundary; commit patch bump; push
-(Tijn said "commit push"). Loop is done at 3 consecutive different-lens rounds with zero
-confirmed defects — NOT there yet.
+Fresh fleet on the STILL-UNAUDITED compliance/legal core (regulatory-regime, retention,
+legal-hold, spoliation-safe, privilege-posture, proportionality, data-lineage, ai-provenance,
+durable-log, traceability-matrix, cvss, irac-schema) + the runners (eu-ai-act-agent-runner,
+gdpr-agent-runner, iron-loop-compliance-trigger, app-runner) PLUS a RE-ATTACK of wave-5 fixes.
+Same defect classes: fail-open vs fail-closed, parse regex (first-match/stray-literal/CRLF/
+NaN/$-under-m), gate reached without a ledger entry, >=/> boundary, silent overwrite,
+accumulator-to-wrong-field, non-atomic state write. Verify every finding against disk first.
+One boundary: full npm test gate + eslint; commit patch bump; push (Tijn said "commit push").
+NOTE: adding N new test files requires bumping the "N test files" counts in CLAUDE.md
+(lines ~205, ~267) or tests/doc-counts.test.js fails. Done at 3 consecutive different-lens
+clean rounds — NOT there yet.

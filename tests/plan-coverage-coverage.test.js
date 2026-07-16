@@ -465,6 +465,19 @@ describe('findCoveringPlan — root confinement', () => {
     } finally { rm(root); }
   });
 
+  it('a_non_escaping_dotdot_glob_STILL_covers_its_in_repo_file', () => {
+    // Re-attack fix: a `..` SEGMENT is not an ESCAPE. `src/mod/../mod/**`
+    // normalizes back inside the tree to `src/mod/**` and must keep covering
+    // `src/mod/thing.js` — the confinement guard must not over-block it.
+    const root = makeRoot(['todo']);
+    try {
+      writePlan(root, 'todo', 'noesc', ['src/mod/../mod/**']);
+      const hit = findCoveringPlan('src/mod/thing.js', root);
+      assert.ok(hit, 'a non-escaping ".."-glob still covers its in-repo file');
+      assert.equal(hit.plan, 'todo/noesc');
+    } finally { rm(root); }
+  });
+
   it('still_covers_an_in_repo_file_via_a_legit_glob_no_regression', () => {
     // The confinement must NOT disturb normal in-repo coverage: a plan covering
     // src/** still covers src/lib/x.js exactly as before.

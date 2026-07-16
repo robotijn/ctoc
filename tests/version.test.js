@@ -336,6 +336,65 @@ describe('syncToReadme', () => {
 });
 
 // =============================================================================
+// syncToReadme — fixture-driven: real update + fail-loud on format drift
+// =============================================================================
+
+describe('syncToReadme against a fixture README', () => {
+  const realReadme = path.join(path.dirname(__dirname), 'README.md');
+  let savedReal;
+  let tmpDir;
+
+  before(() => {
+    // Restore the tracked README verbatim no matter what the fixture calls do.
+    savedReal = fs.existsSync(realReadme) ? fs.readFileSync(realReadme) : null;
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-readme-'));
+  });
+
+  after(() => {
+    if (savedReal !== null) fs.writeFileSync(realReadme, savedReal);
+    if (tmpDir && fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('updates the version line + badge even when the separator drifted from em-dash', () => {
+    // Arrange — a README whose version line uses the CURRENT middle-dot style,
+    // not the em-dash the old regex demanded.
+    const current = version.getVersion();
+    const readme = path.join(tmpDir, 'README.md');
+    fs.writeFileSync(readme,
+      '  <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue">\n' +
+      '\n' +
+      '**1.0.0** · Built by someone\n');
+
+    // Act
+    const result = version.syncToReadme(tmpDir);
+    const after = fs.readFileSync(readme, 'utf8');
+
+    // Assert — real update happened, and success is honest.
+    assert.strictEqual(result.success, true);
+    assert.ok(after.includes(`**${current}**`), 'version line updated to current version');
+    assert.ok(after.includes(`version-${current}-blue`), 'shields badge updated to current version');
+    assert.ok(!after.includes('**1.0.0**'), 'old version line replaced');
+    assert.ok(!after.includes('version-1.0.0-blue'), 'old badge replaced');
+  });
+
+  test('returns success:false when no version line is present (fail loud, no phantom success)', () => {
+    // Arrange — a README with no matchable version token at line start.
+    const readme = path.join(tmpDir, 'README.md');
+    fs.writeFileSync(readme, '# A README with no version token at the start of any line\n');
+    const before = fs.readFileSync(readme, 'utf8');
+
+    // Act
+    const result = version.syncToReadme(tmpDir);
+    const after = fs.readFileSync(readme, 'utf8');
+
+    // Assert — must NOT report a phantom success; file untouched.
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.matched, false);
+    assert.strictEqual(after, before, 'nothing written when there was nothing to match');
+  });
+});
+
+// =============================================================================
 // syncAll Tests
 // =============================================================================
 

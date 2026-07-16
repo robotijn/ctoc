@@ -39,6 +39,7 @@ const lineage = require(path.join(REPO, 'src/lib/data-lineage.js'));
 const proportionality = require(path.join(REPO, 'src/lib/proportionality.js'));
 const traceability = require(path.join(REPO, 'src/lib/traceability-matrix.js'));
 const irac = require(path.join(REPO, 'src/lib/irac-schema.js'));
+const safeFs = require(path.join(REPO, 'src/lib/safe-fs.js'));
 
 // --- shared temp-dir scaffolding -------------------------------------------
 
@@ -163,6 +164,26 @@ describe('ai-provenance.js — EU AI Act Article 50 provenance', () => {
     fs.writeFileSync(logPath, JSON.stringify({ timestamp: cutoff, target_path: 'edge.js' }) + '\n');
     const got = provenance.getEventsSince(root, cutoff);
     assert.equal(got.length, 1, 'event at the exact cutoff is included (>=)');
+  });
+
+  it('PROPERTY: getEventsSince skips a torn trailing line and returns the intact events (fails open)', () => {
+    // DEFECT 3 (MEDIUM): a single torn line (crash mid-append) must NOT make the
+    // whole provenance log unreadable — mirror data-lineage.readAll / durable-log,
+    // which skip an unparseable line rather than throwing out of the whole call.
+    const logPath = path.join(root, provenance.PROVENANCE_LOG);
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    const a = { timestamp: '2030-01-01T00:00:00.000Z', target_path: 'a.js' };
+    const b = { timestamp: '2030-01-02T00:00:00.000Z', target_path: 'b.js' };
+    fs.writeFileSync(
+      logPath,
+      JSON.stringify(a) + '\n' +
+      JSON.stringify(b) + '\n' +
+      '{"timestamp":"2030-01-03T00:00:00.000Z","target_pa', // torn trailing line
+    );
+    let got;
+    assert.doesNotThrow(() => { got = provenance.getEventsSince(root, '2025-01-01T00:00:00.000Z'); },
+      'a torn trailing line must not make the whole log unreadable');
+    assert.deepEqual(got.map((e) => e.target_path).sort(), ['a.js', 'b.js']);
   });
 
   it('logEvent then getEventsSince round-trips a recorded event', () => {
@@ -330,6 +351,24 @@ describe('data-lineage.js — BCBS 239 lineage DAG', () => {
   it('descendantsOf returns [] for a leaf with no children', () => {
     lineage.record(root, { dispatch_id: 'lonely' });
     assert.deepEqual(lineage.descendantsOf(root, 'lonely'), []);
+  });
+
+  it('PROPERTY: descendantsOf terminates on a cyclic lineage (A<->B) instead of overflowing', () => {
+    // DEFECT 2 (MEDIUM): a corrupt/malformed log with mutual parents (A.parent=B,
+    // B.parent=A) forms a cycle. Without a visited-set descendantsOf revisits forever
+    // until `out` overflows (RangeError: Invalid array length) and /ctoc:lineage crashes.
+    const logPath = path.join(root, lineage.LINEAGE_LOG);
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.writeFileSync(
+      logPath,
+      JSON.stringify({ timestamp: '2025-01-01T00:00:00.000Z', dispatch_id: 'A', parent_dispatch_id: 'B', agent: 'a' }) + '\n' +
+      JSON.stringify({ timestamp: '2025-01-01T00:00:01.000Z', dispatch_id: 'B', parent_dispatch_id: 'A', agent: 'b' }) + '\n',
+    );
+    let desc;
+    assert.doesNotThrow(() => { desc = lineage.descendantsOf(root, 'A'); },
+      'a cyclic lineage must not overflow the stack');
+    // bounded: each distinct node visited at most once
+    assert.ok(desc.length <= 2, 'result is bounded by the number of distinct nodes');
   });
 
   // --- renderLineage ---
@@ -574,6 +613,52 @@ describe('traceability-matrix.js — DO-178C / IEC 62304 traceability', () => {
     assert.equal(r.verification_status, 'covered');
   });
 
+  it('PROPERTY: save is atomic — a crash mid-commit leaves the previous matrix intact (no truncation)', () => {
+    // DEFECT 1 (HIGH): a bare writeFileSync is non-atomic — a crash mid-write leaves a
+    // truncated matrix.yaml, which load()/parseMatrix silently reads as a lost-rows
+    // prefix (no error), so Gate 3 findOrphans/summary run against a matrix missing rows.
+    // The fix writes a temp sibling then renames over the target; a failed commit must
+    // leave the committed matrix UNCHANGED and clean up the temp file.
+    traceability.save(root, {
+      generated_at: '2025-01-01T00:00:00.000Z',
+      requirements: [
+        { id: 'REQ-1', description: 'first' },
+        { id: 'REQ-2', description: 'second' },
+        { id: 'REQ-3', description: 'third' },
+      ],
+    });
+    const matrixFile = path.join(root, traceability.MATRIX_PATH);
+    const before = fs.readFileSync(matrixFile, 'utf8');
+
+    const origRename = safeFs.renameSync;
+    safeFs.renameSync = () => { throw new Error('simulated crash mid-rename'); };
+    try {
+      assert.throws(
+        () => traceability.save(root, { requirements: [{ id: 'REQ-ONLY-ONE' }] }),
+        /simulated crash mid-rename/,
+        'a failed commit must surface the error, not silently write a partial file',
+      );
+    } finally {
+      safeFs.renameSync = origRename;
+    }
+
+    const after = fs.readFileSync(matrixFile, 'utf8');
+    assert.equal(after, before, 'a failed save must not corrupt or truncate the committed matrix');
+    assert.deepEqual(
+      traceability.load(root).requirements.map((r) => r.id),
+      ['REQ-1', 'REQ-2', 'REQ-3'],
+      'all previously-committed requirements survive a failed save',
+    );
+    const leftovers = fs.readdirSync(path.join(root, '.ctoc', 'traceability')).filter((f) => f.includes('.tmp-'));
+    assert.deepEqual(leftovers, [], 'no temp file may leak on a failed commit');
+  });
+
+  it('save leaves no temp file behind on success', () => {
+    traceability.save(root, { requirements: [{ id: 'REQ-1' }] });
+    const dirFiles = fs.readdirSync(path.join(root, '.ctoc', 'traceability')).sort();
+    assert.deepEqual(dirFiles, ['matrix.yaml'], 'only the committed matrix remains after a clean save');
+  });
+
   it('save round-trips a requirement with empty file/test lists', () => {
     traceability.save(root, {
       requirements: [{ id: 'REQ-EMPTY', level: 'LLR' }],
@@ -735,6 +820,31 @@ describe('irac-schema.js — IRAC legal-memo output schema', () => {
     const r = irac.validate(makeFinding({ citations: [{ title: 'no url here' }] }));
     assert.equal(r.ok, false);
     assert.ok(r.errors.some((e) => /citation missing url/.test(e)));
+  });
+
+  it('PROPERTY: validate does NOT throw on a null citation element (dropped LLM entry)', () => {
+    let r;
+    assert.doesNotThrow(() => { r = irac.validate(makeFinding({ citations: [null] })); },
+      'a null array element must be reported, not thrown on');
+    assert.equal(r.ok, false);
+    assert.ok(r.errors.some((e) => /citation missing url/.test(e)));
+  });
+
+  it('validate does NOT throw on an undefined citation element', () => {
+    let r;
+    assert.doesNotThrow(() => { r = irac.validate(makeFinding({ citations: [undefined] })); });
+    assert.equal(r.ok, false);
+    assert.ok(r.errors.some((e) => /citation missing url/.test(e)));
+  });
+
+  it('validateAll does NOT throw when a finding carries a null/undefined citation element', () => {
+    let r;
+    assert.doesNotThrow(() => {
+      r = irac.validateAll([makeFinding({ citations: [undefined] })]);
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.errors[0].index, 0);
+    assert.ok(r.errors[0].errors.some((e) => /citation missing url/.test(e)));
   });
 
   // --- validateAll ---

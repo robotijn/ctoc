@@ -82,7 +82,23 @@ function save(projectRoot, matrix) {
     lines.push(`    last_updated: ${req.last_updated || new Date().toISOString()}`);
     lines.push('');
   }
-  safeFs.writeFileSync(path.join(projectRoot, MATRIX_PATH), lines.join('\n'));
+  // ATOMIC WRITE: write to a temp sibling, then rename over the target. A bare
+  // writeFileSync is non-atomic — a crash mid-write leaves a truncated matrix.yaml,
+  // which load()/parseMatrix silently reads as a surviving-prefix (lost rows, no
+  // error), so Gate 3 findOrphans/summary run against an incomplete matrix. The
+  // temp+rename makes the commit all-or-nothing (mirrors task-registry.save and
+  // durable-log). NOTE: upsert() (load -> mutate -> save) is still NOT safe against
+  // two SIMULTANEOUS writers — the atomic rename prevents torn files, not lost
+  // updates under concurrency; a full lock is out of scope for this slice.
+  const target = path.join(projectRoot, MATRIX_PATH);
+  const tmp = `${target}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    safeFs.writeFileSync(tmp, lines.join('\n'));
+    safeFs.renameSync(tmp, target);
+  } catch (err) {
+    try { safeFs.unlinkSync(tmp); } catch { /* temp may not exist */ }
+    throw err;
+  }
 }
 
 /**

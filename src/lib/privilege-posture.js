@@ -101,10 +101,13 @@ function getPosture(planPath) {
     return DEFAULT_POSTURE;
   }
   const fm = fmMatch[1];
-  const m = fm.match(/^\s*privilege_posture\s*:\s*(.+?)\s*$/m);
+  const m = fm.match(/^\s*privilege_posture\s*:\s*(.+)$/m);
   if (!m) return DEFAULT_POSTURE;
 
-  const raw = m[1].replace(/^["']|["']$/g, '').trim();
+  const raw = m[1]
+    .replace(/\s+#.*$/, '')      // strip an inline YAML comment (e.g. "counsel-directed  # per counsel")
+    .replace(/^["']|["']$/g, '') // strip surrounding quotes
+    .trim();
   if (!VALID_POSTURES.includes(raw)) {
     throw new Error(
       `Invalid privilege_posture "${raw}" in ${planPath}. ` +

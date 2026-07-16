@@ -40,7 +40,7 @@ function activeHolds(projectRoot) {
     if (entry.startsWith('_')) continue; // skip template/_README files
     const full = path.join(dir, entry);
     const content = safeFs.readFileSync(full, 'utf8');
-    if (/^status:\s*active\s*$/m.test(content)) {
+    if (/^status:\s*["']?active\b/m.test(content)) {
       out.push({
         id: entry.replace(/\.(yaml|yml)$/, ''),
         path: path.relative(projectRoot, full),
@@ -130,7 +130,7 @@ function release(projectRoot, holdId, reason) {
     throw new Error(`legal-hold.release: no such hold ${holdId}`);
   }
   let content = safeFs.readFileSync(holdPath, 'utf8');
-  content = content.replace(/^status:\s*active\s*$/m, `status: released`);
+  content = content.replace(/^status:\s*["']?active\b.*$/m, `status: released`);
   content += `released_at: ${new Date().toISOString()}\nrelease_reason: ${escape(reason || '(unspecified)')}\n`;
   safeFs.writeFileSync(holdPath, content);
   return { id: holdId, released_at: new Date().toISOString() };
