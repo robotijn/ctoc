@@ -220,6 +220,7 @@ function isLedgerWrite(command) {
       let dir = '';
       let afterSep = false;      // have we passed the `--` end-of-options marker?
       let dirIsAfterSep = false; // did the chosen dir token come after `--`?
+      let sawOperand = false;    // did a real directory operand token appear at all?
       for (const rawTok of tokens) {
         const tok = rawTok.replace(/['"`()]/g, '');       // dequote BEFORE deciding
         if (!afterSep) {
@@ -228,9 +229,18 @@ function isLedgerWrite(command) {
         }
         dir = tok;
         dirIsAfterSep = afterSep;
+        sawOperand = true;
         break;
       }
-      if (!dir || (dir === '-' && !dirIsAfterSep)) prefix = '';
+      // An EMPTY dequoted operand (`cd ""` / `cd ''` / `cd -- ""`) is a bash NO-OP:
+      // it stays in the current directory and returns exit 0, so the `&&` chain
+      // continues from the SAME cwd. Resetting the prefix to root there let
+      // `cd .ctoc/approvals && cd "" && tee evil.json` resolve evil.json to root and
+      // slip the ledger guard while bash actually wrote `.ctoc/approvals/evil.json`.
+      // Leave the prefix UNCHANGED for an empty operand (a present-but-empty token);
+      // a bare `cd` with NO operand at all is `cd $HOME` and keeps its prior reset.
+      if (sawOperand && dir === '') continue;
+      if (dir === '' || (dir === '-' && !dirIsAfterSep)) prefix = '';
       // A `~`/`~user` home prefix: STRIP only the tilde+user+slash and keep the
       // REMAINDER as a rooted prefix — do NOT discard the whole path. Resetting to
       // '' on any `~` threw away the ledger suffix, so `cd ~/…/.ctoc/approvals && tee

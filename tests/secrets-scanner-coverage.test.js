@@ -108,6 +108,14 @@ const JWT_DEMO =
 // key — trips detectHighEntropyStrings but is NOT a provider format.
 const HIGH_ENTROPY = 'Zx8Qw3Vt7Lp2Rn6Kd9Bf4Hs1Mj5Yc0Ae';
 
+// A synthetic database connection string — DATABASE_URL, severity CRITICAL, fully
+// non-real credentials. Its detection pattern sits AFTER JWT_TOKEN in
+// SECRET_PATTERNS (scanFile emits findings in PATTERN-array order, not file
+// position), so in the natural pre-sort emission order this CRITICAL finding lands
+// AFTER the LOW JWT — which is exactly what makes the severity sort load-bearing in
+// the CRITICAL-before-LOW test below.
+const SYNTH_DB_URL = 'postgres://appuser:synthFILLERpw0000@localhost:5432/appdb';
+
 // Make a fresh unique dir under ROOT.
 let dirSeq = 0;
 function freshDir(tag) {
@@ -256,17 +264,26 @@ describe('SecretsScanner.run — end-to-end scan', () => {
   });
 
   it('should_sort_findings_critical_before_low', async () => {
-    // Arrange — one CRITICAL (private key) and one LOW (public JWT) in one file.
+    // Arrange — one LOW (public JWT) and one CRITICAL (database URL) in one file.
+    // CRUCIAL: the natural (pre-sort) emission order must DISAGREE with severity so
+    // the sort is actually pinned. scanFile emits in SECRET_PATTERNS order, and the
+    // DATABASE_URL pattern sits AFTER JWT_TOKEN — so without the severity sort the
+    // LOW JWT is emitted FIRST and the CRITICAL DB-URL SECOND. Using PRIVATE_KEY
+    // here (its pattern precedes JWT_TOKEN) would be CRITICAL-first naturally and the
+    // assertion would pass even with the sort deleted — a false green. The DB URL
+    // forces the sort to do real work.
     const root = freshDir('run-sort');
     fs.writeFileSync(
       path.join(root, 'mixed.js'),
-      'const key = `\n' + SYNTH_RSA_KEY + '`;\nconst t = "' + JWT_DEMO + '";\n'
+      'const t = "' + JWT_DEMO + '";\nconst db = "' + SYNTH_DB_URL + '";\n'
     );
 
     // Act
     const { findings } = await new SecretsScanner(root).run();
 
-    // Assert — severity order places CRITICAL ahead of LOW.
+    // Assert — severity order places CRITICAL ahead of LOW. Because emission order is
+    // LOW-then-CRITICAL, this holds ONLY if run()'s `uniqueFindings.sort(...)` ran;
+    // delete that sort and idxCritical > idxLow → this test goes RED.
     const idxCritical = findings.findIndex((f) => f.severity === 'CRITICAL');
     const idxLow = findings.findIndex((f) => f.severity === 'LOW');
     assert.ok(idxCritical !== -1 && idxLow !== -1, 'both a CRITICAL and a LOW finding are present');
@@ -715,6 +732,183 @@ describe('SecretsScanner.isInComment — block-comment span analysis', () => {
     assert.ok(
       !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
       'a secret inside a genuine /* ... */ block must still be skipped'
+    );
+  });
+});
+
+// ===========================================================================
+// Cluster I2 — C-style block comments are a C-FAMILY-ONLY construct.
+// `/* ... */` block comments exist ONLY in C-family languages (JS/TS/C/C++/
+// Java/Go/Rust/C#/CSS/SQL/…). In shell, YAML, Python, Ruby, TOML, ini, etc.
+// a bare `/*` is a GLOB or a path segment, NEVER a comment open. The prior
+// `_inBlockCommentAt` scan applied the `/* … */` suppression to EVERY language,
+// so any bare `/*` before a real secret opened a PHANTOM block comment that
+// swallowed the secret — a security-gate fail-OPEN. The fix language-gates the
+// block-comment suppression: it applies ONLY to C-family extensions, and fails
+// CLOSED (report the secret) for non-C-family AND unknown/absent extensions.
+// The single-line comment handling (`//`, `#`, `--`, `<!--`, `;`, `%`, PEM) is
+// unchanged. Fixtures use the canonical AWS example key (push-protection safe).
+// ===========================================================================
+describe('SecretsScanner.isInComment — block comments are C-family only', () => {
+  it('reports a secret after a `/*` GLOB line in a .sh file (fail closed)', () => {
+    // RED today: `cp /etc/* /backup/` — the `/` before `*` opens a phantom
+    // block comment that is never closed, swallowing the later secret. `/*` is
+    // a glob in shell, not a comment; the secret MUST be reported.
+    const root = freshDir('sh-glob-block');
+    const file = path.join(root, 'deploy.sh');
+    fs.writeFileSync(
+      file,
+      'cp /etc/* /backup/\n' +
+      `export AWS_KEY="${AWS_EXAMPLE}"\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret after a `/*` glob in a shell file MUST be reported — `/*` is not a comment in shell'
+    );
+  });
+
+  it('reports a secret after a `/*` line in a .yaml file (fail closed)', () => {
+    // RED today: the `# glob: /*.js` line contains a bare `/*` (the `_inBlock`
+    // scan does not treat `#` as a comment, only `/*`), opening a phantom block
+    // span over the later secret. YAML has no C-style block comments.
+    const root = freshDir('yaml-glob-block');
+    const file = path.join(root, 'config.yaml');
+    fs.writeFileSync(
+      file,
+      '# glob: /*.js\n' +
+      `api_key: "${AWS_EXAMPLE}"\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret after a `/*`-bearing line in YAML MUST be reported — YAML has no /* */ comments'
+    );
+  });
+
+  it('reports a secret after a `/*` line in a .py file (fail closed)', () => {
+    // RED today: `# cleanup /* temp` — the bare `/*` opens a phantom block span
+    // over the secret. Python has no C-style block comments.
+    const root = freshDir('py-block');
+    const file = path.join(root, 'settings.py');
+    fs.writeFileSync(
+      file,
+      '# cleanup /* temp files\n' +
+      `API_KEY = "${AWS_EXAMPLE}"\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret after a `/*`-bearing line in Python MUST be reported — Python has no /* */ comments'
+    );
+  });
+
+  it('reports a secret after a `/*` line in an UNKNOWN-extension file (fail closed)', () => {
+    // A scanner must fail CLOSED for languages it does not recognize: an unknown
+    // extension must NOT get the /* */ block-comment benefit of the doubt.
+    const root = freshDir('unknown-ext-block');
+    const file = path.join(root, 'data.xyz');
+    fs.writeFileSync(
+      file,
+      'pattern /*.o\n' +
+      `token = "${AWS_EXAMPLE}"\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'unknown extension MUST fail closed — the secret after a bare `/*` MUST be reported'
+    );
+  });
+
+  it('reports a secret after a `/*` line in a no-extension file (fail closed)', () => {
+    const root = freshDir('no-ext-block');
+    const file = path.join(root, 'Makefile');
+    fs.writeFileSync(
+      file,
+      'clean: rm -f /*.tmp\n' +
+      `SECRET = "${AWS_EXAMPLE}"\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'no-extension file MUST fail closed — the secret after a bare `/*` MUST be reported'
+    );
+  });
+
+  it('STILL skips a secret inside a genuine /* ... */ block in a .go file (C-family)', () => {
+    // Regression: the language gate must not over-correct. Go IS C-family and
+    // HAS /* */ block comments, so a secret genuinely inside one stays skipped.
+    const root = freshDir('go-genuine-block');
+    const file = path.join(root, 'main.go');
+    fs.writeFileSync(
+      file,
+      '/* deprecated config\n' +
+      `key = "${AWS_EXAMPLE}"\n` +
+      '*/\n'
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret inside a genuine /* ... */ block in a Go file must stay skipped'
+    );
+  });
+
+  it('STILL skips a secret inside a genuine /* ... */ block in a .css file (C-family)', () => {
+    const root = freshDir('css-genuine-block');
+    const file = path.join(root, 'theme.css');
+    fs.writeFileSync(
+      file,
+      '/* palette tokens\n' +
+      `--key: "${AWS_EXAMPLE}";\n` +
+      '*/\n'
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret inside a genuine /* ... */ block in a CSS file must stay skipped'
+    );
+  });
+
+  it('STILL reports a secret in a .sh file whose OWN line has no comment (no regression)', () => {
+    // Fail-closed must not create false negatives elsewhere: a plain secret in a
+    // shell file is reported exactly as before.
+    const root = freshDir('sh-plain');
+    const file = path.join(root, 'plain.sh');
+    fs.writeFileSync(file, `export AWS_KEY="${AWS_EXAMPLE}"\n`);
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a plain secret in a shell file must be reported'
+    );
+  });
+
+  it('STILL skips a `#`-commented secret in a .sh file (single-line handling unchanged)', () => {
+    // The language-appropriate single-line `#` comment handling is untouched.
+    const root = freshDir('sh-hash-comment');
+    const file = path.join(root, 'commented.sh');
+    fs.writeFileSync(file, `# old key was ${AWS_EXAMPLE}\n`);
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret behind a `#` line comment in shell must stay skipped'
     );
   });
 });

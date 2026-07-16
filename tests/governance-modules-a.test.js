@@ -747,4 +747,95 @@ describe('legal-hold.js — litigation hold freeze', () => {
     assert.equal(legalHold.isHeld(root), false);
     assert.doesNotThrow(() => legalHold.assertNotHeld(root, 'rm', []));
   });
+
+  // --- DEFECT 1: status detection must be CASE-INSENSITIVE (fail closed) ---
+  // A hold file hand-authored (or exported by an external e-discovery tool)
+  // with `status: Active` or `status: ACTIVE` is still an ACTIVE litigation
+  // hold. A case-SENSITIVE matcher fails open: activeHolds() returns [],
+  // isHeld() is false, assertNotHeld() does not block, and a record is
+  // deletable while a hold is live. The matcher must classify any case
+  // variant of `active` as HELD.
+
+  it('PROPERTY: a capitalized "Active" status is HELD (fail closed)', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'cap.yaml'),
+      'id: cap\nstatus: Active\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), true, 'status: Active is a LIVE hold');
+    const holds = legalHold.activeHolds(root);
+    assert.equal(holds.length, 1);
+    assert.equal(holds[0].id, 'cap');
+    assert.throws(
+      () => legalHold.assertNotHeld(root, 'rm plan', ['plans/a.md']),
+      /LEGAL HOLD ACTIVE/,
+      'destructive op MUST be blocked while a capitalized hold is active'
+    );
+  });
+
+  it('PROPERTY: an upper-case "ACTIVE" status is HELD (fail closed)', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'up.yaml'),
+      'id: up\nstatus: ACTIVE\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), true, 'status: ACTIVE is a LIVE hold');
+    assert.throws(() => legalHold.assertNotHeld(root, 'rm', []), /LEGAL HOLD ACTIVE/);
+  });
+
+  it('a quoted capitalized "Active" status is HELD (fail closed)', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'q.yaml'),
+      'id: q\nstatus: "Active"   # frozen\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), true);
+    assert.throws(() => legalHold.assertNotHeld(root, 'rm', []), /LEGAL HOLD ACTIVE/);
+  });
+
+  // --- Regressions: the case-insensitive fix must NOT broaden the matcher ---
+
+  it('REGRESSION: lower-case "active" is still HELD', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'lc.yaml'),
+      'id: lc\nstatus: active\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), true);
+    assert.throws(() => legalHold.assertNotHeld(root, 'rm', []), /LEGAL HOLD ACTIVE/);
+  });
+
+  it('REGRESSION: a commented-out "# status: active" line is NOT held', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'comment.yaml'),
+      'id: comment\n# status: active\nstatus: released\nmatter: M\n'
+    );
+    assert.equal(
+      legalHold.isHeld(root),
+      false,
+      'a commented status line must not be read as an active hold'
+    );
+    assert.doesNotThrow(() => legalHold.assertNotHeld(root, 'rm', []));
+  });
+
+  it('REGRESSION: an "inactive" status is NOT held (word-boundary preserved)', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'inact.yaml'),
+      'id: inact\nstatus: inactive\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), false);
+    assert.doesNotThrow(() => legalHold.assertNotHeld(root, 'rm', []));
+  });
+
+  it('REGRESSION: a "released" status is NOT held', () => {
+    writeFile(
+      root,
+      path.join('.ctoc', 'legal-hold', 'rel.yaml'),
+      'id: rel\nstatus: released\nmatter: M\n'
+    );
+    assert.equal(legalHold.isHeld(root), false);
+    assert.doesNotThrow(() => legalHold.assertNotHeld(root, 'rm', []));
+  });
 });

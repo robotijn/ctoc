@@ -235,6 +235,32 @@ function readLogLinesHealed(projectRoot) {
 }
 
 /**
+ * Preserve a TOTALLY-corrupt chain log before the chain resumes from genesis. Moves the
+ * existing (entirely unparseable) log aside to a sibling `chain.jsonl.corrupt-<n>` so the
+ * corrupt bytes survive on disk as forensic evidence, and emits a stderr warning matching the
+ * module's fail-open warn style. The suffix is DETERMINISTIC (not Date.now/random): the first
+ * free `-<n>` slot, so repeated corruption events never collide and never overwrite prior
+ * evidence. After the rename the original log path is free for a fresh, genesis-based append.
+ * @param {string} logPath absolute path to the corrupt chain log
+ * @returns {string} the sibling path the corrupt bytes were moved to
+ */
+function preserveCorruptLog(logPath) {
+  let n = 0;
+  let target = `${logPath}.corrupt-${n}`;
+  while (safeFs.existsSync(target)) {
+    n++;
+    target = `${logPath}.corrupt-${n}`;
+  }
+  safeFs.renameSync(logPath, target);
+  process.stderr.write(
+    `audit-chain: WARNING — the chain log at ${logPath} was ENTIRELY unparseable ` +
+    `(total corruption). Preserved the corrupt bytes at ${target} for forensics and ` +
+    `resumed the chain from genesis (verifyChain still reflects the live chain).\n`
+  );
+  return target;
+}
+
+/**
  * Append a new dispatch entry to the chain. The caller has already written
  * the dispatch YAML to disk; this records a chain entry referencing the
  * entry's content hash and the previous chain head.
@@ -277,7 +303,19 @@ function appendDispatch(projectRoot, dispatch, opts = {}) {
     // well-formed but altered line is left intact so verifyChain still detects tamper.
     const { validLines, hadTrailingPartial } = readLogLinesHealed(projectRoot);
     if (hadTrailingPartial) {
-      safeFs.writeFileSync(logPath, validLines.length ? validLines.join('\n') + '\n' : '');
+      if (validLines.length) {
+        // A trailing partial AFTER valid entries: strip only the crash artifact, keep the
+        // verifiable entries. This is the correct, information-preserving heal.
+        safeFs.writeFileSync(logPath, validLines.join('\n') + '\n');
+      } else {
+        // TOTAL corruption: the ENTIRE existing (non-empty) log is unparseable. Overwriting it
+        // with '' here would silently DESTROY the corrupt bytes — but for a forensic, tamper-
+        // evident chain those bytes ARE the evidence that the log was corrupted; zeroing them
+        // erases the very thing an audit is meant to retain. Instead PRESERVE the corrupt bytes
+        // to a deterministic, non-colliding sibling and surface the event, THEN let the chain
+        // continue from genesis (forward progress, no brick). verifyChain is untouched.
+        preserveCorruptLog(logPath);
+      }
     }
 
     // Read the head from the AUTHORITATIVE (now healed) log tail inside the lock (see

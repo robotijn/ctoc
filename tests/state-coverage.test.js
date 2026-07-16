@@ -221,6 +221,57 @@ describe('readPlans', () => {
 
     assert.deepStrictEqual(names, ['p1', 'p2']);
   });
+
+  // -------------------------------------------------------------------------
+  // Fail-soft per file: one bad entry must NOT crash the whole reader.
+  // A subdirectory literally named `*.md` passes the `.endsWith('.md')` filter
+  // and readFileSync(dir) throws EISDIR — the real-world trigger for the whole
+  // dashboard crashing. readPlans must skip it and still return valid plans.
+  // -------------------------------------------------------------------------
+  test('skips an entry whose read throws (a *.md subdirectory → EISDIR) and returns the valid plans', () => {
+    const root = mkProject();
+    const dir = path.join(root, 'plans', 'review');
+    ensureDir(dir);
+    writePlan(root, 'review', 'good-plan', { frontmatter: { status: 'review' } });
+    // A directory named like a plan file. readdirSync lists it, `.endsWith('.md')`
+    // passes, and readFileSync(<dir>) rejects with EISDIR — exactly today's crash.
+    fs.mkdirSync(path.join(dir, 'bad.md'));
+
+    let plans;
+    assert.doesNotThrow(() => { plans = state.readPlans(dir); });
+    assert.strictEqual(plans.length, 1);
+    assert.strictEqual(plans[0].name, 'good-plan');
+  });
+
+  test('skips a *.md that disappears between the listing and the read (readdir→read race)', () => {
+    const root = mkProject();
+    const dir = path.join(root, 'plans', 'review');
+    ensureDir(dir);
+    writePlan(root, 'review', 'survivor', { frontmatter: { status: 'review' } });
+    writePlan(root, 'review', 'ghost', { frontmatter: { status: 'review' } });
+
+    // Simulate the race: safeFs.readFileSync throws ENOENT for the ghost path
+    // (an agent moved/deleted it after the directory listing). Only that one
+    // path faults; every other read delegates to the real fs.
+    const safeFs = require('../src/lib/safe-fs');
+    const realRead = safeFs.readFileSync;
+    const ghostPath = path.join(dir, 'ghost.md');
+    safeFs.readFileSync = (p, ...rest) => {
+      if (p === ghostPath) {
+        const err = new Error(`ENOENT: no such file or directory, open '${p}'`);
+        /** @type {any} */ (err).code = 'ENOENT';
+        throw err;
+      }
+      return realRead(p, ...rest);
+    };
+    try {
+      let plans;
+      assert.doesNotThrow(() => { plans = state.readPlans(dir); });
+      assert.deepStrictEqual(plans.map(p => p.name), ['survivor']);
+    } finally {
+      safeFs.readFileSync = realRead;
+    }
+  });
 });
 
 // ===========================================================================
@@ -488,6 +539,22 @@ describe('getPlanCounts', () => {
     for (const k of ['canvas', 'functional', 'implementation', 'review', 'todo', 'inProgress', 'done']) {
       assert.strictEqual(typeof counts[k], 'number', `${k} is numeric`);
     }
+  });
+
+  // The dashboard calls getPlanCounts un-wrapped; a single bad plan file in ANY
+  // stage must NOT throw a stack trace over the human's counts. It counts only
+  // the readable plans in that stage and every other stage is unaffected.
+  test('a bad plan entry in one stage does not crash the counts (skipped, other stages intact)', () => {
+    const root = mkProject();
+    writePlan(root, 'todo', 't1', { frontmatter: { status: 'todo' } });
+    writePlan(root, 'review', 'good', { frontmatter: { status: 'review' } });
+    // A *.md subdirectory in review — EISDIR on read, today crashes the whole dashboard.
+    fs.mkdirSync(path.join(root, 'plans', 'review', 'corrupt.md'));
+
+    let counts;
+    assert.doesNotThrow(() => { counts = state.getPlanCounts(root); });
+    assert.strictEqual(counts.todo, 1);
+    assert.strictEqual(counts.review, 1); // only the readable plan is counted
   });
 });
 

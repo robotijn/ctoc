@@ -103,24 +103,49 @@ describe('duplicate-guard checkDuplicate — dark branches (Option B)', () => {
   });
 
   // ── getWiring dep-resolution catch: a throwing getWiring degrades to {} → [] ──
+  // Discriminating: the INNER try/catch degrades the throw to `{}` and lets
+  // execution CONTINUE — so the settings read (getSetting) is reached before the
+  // no-store guard returns []. Removing the inner catch would let the throw abort
+  // to the OUTER catch BEFORE getSetting is ever read. The call-count spy pins that
+  // difference: 1 (inner catch present) vs 0 (mutant). `deepEqual([])` alone cannot
+  // tell the two apart — both return [].
   it('a throwing getWiring is caught → no store → [] (fail-open dep resolution)', async () => {
+    let getSettingCalls = 0;
+    const getSetting = () => { getSettingCalls += 1; return 0.85; };
     await withFakeWiring(() => { throw new Error('wiring boom'); }, async () => {
-      const out = await checkDuplicate('draft text', { getSetting: stubGetSetting(0.85) });
+      const out = await checkDuplicate('draft text', { getSetting });
       assert.deepEqual(out, []);
     });
+    assert.equal(getSettingCalls, 1, 'execution continued past the caught getWiring throw (inner catch is live)');
   });
 
   // ── `getWiring(...) || {}`: a falsy wiring falls to {} → store undefined → [] ──
+  // Discriminating: with `|| {}`, a null wiring becomes `{}` and execution CONTINUES
+  // to the settings read (getSetting invoked) before the no-store guard returns [].
+  // Dropping `|| {}` makes `wiring.store` a `null.store` TypeError that aborts to the
+  // OUTER catch BEFORE getSetting is read. The call-count spy (1 vs 0) kills that
+  // mutant; `deepEqual([])` alone would pass either way.
   it('a falsy wiring is replaced by {} → no store → [] (pins the `|| {}` operand)', async () => {
+    let getSettingCalls = 0;
+    const getSetting = () => { getSettingCalls += 1; return 0.85; };
     await withFakeWiring(() => null, async () => {
-      const out = await checkDuplicate('draft text', { getSetting: stubGetSetting(0.85) });
+      const out = await checkDuplicate('draft text', { getSetting });
       assert.deepEqual(out, []);
     });
+    assert.equal(getSettingCalls, 1, 'execution continued past the `|| {}` fallback (operand is live)');
   });
 
   // ── getSetting guard: the resolved REAL getSetting is a non-function → [] ─────
   // Reachable only via a broken real `../settings` export (no getSetting injected,
   // store+embedder injected so the wiring block is skipped).
+  // HONEST LABEL — REDUNDANT FAIL-SAFE (not a mutation kill): deleting the
+  // `typeof getSetting !== 'function'` guard yields byte-identical, side-effect-
+  // identical behavior — the subsequent `Number(getSetting(...))` call on a
+  // non-function throws and is swallowed by the OUTER try/catch, still returning []
+  // with no embed and no store.search. A non-function value cannot be spied, and
+  // neither path touches embedder/store.search, so NO observable distinguishes the
+  // guard from its outer-catch fallback. This test keeps the branch covered but does
+  // NOT pin behavior the outer catch doesn't already guarantee.
   it('non-function real getSetting export → [] (graceful degrade, never crashes)', async () => {
     const origGet = realSettingsModule.getSetting;
     realSettingsModule.getSetting = 'not-a-function';
@@ -145,6 +170,14 @@ describe('duplicate-guard checkDuplicate — dark branches (Option B)', () => {
   });
 
   // ── embedder function guard: a resolved non-function embedder → [] ────────────
+  // HONEST LABEL — REDUNDANT FAIL-SAFE (not a mutation kill): deleting the
+  // `typeof embedder !== 'function'` guard yields identical output AND identical
+  // side-effects — the subsequent `await embedder([draftSummary])` on a non-function
+  // throws and is swallowed by the INNER embed try/catch, still returning [] and
+  // still never reaching store.search. A non-function embedder cannot be spied, and
+  // store.search is unreachable either way, so NO observable distinguishes the guard
+  // from the embed try/catch fallback. Branch stays covered; behavior is NOT pinned
+  // beyond what the embed catch already guarantees.
   it('a non-function injected embedder → [] (pins the embedder function guard)', async () => {
     const store = fakeStore([{ planPath: 'plans/z.md', sectionId: '__plan__', score: 1.0 }]);
     const out = await checkDuplicate('draft text', {
