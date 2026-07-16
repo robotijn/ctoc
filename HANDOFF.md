@@ -4,6 +4,43 @@
 
 - Updated: 2026-07-16 by claude
 - Branch: main
+
+## ⭐ CURRENT FOCUS (2026-07-16 late): STREAMING PIVOT — "make CTOC streaming, fuck the menu"
+
+Tijn pivoted CTOC away from the menu dashboard to a STREAMING topic-Q&A interaction. His design
+directives (all binding — see also memory [[feedback_menu_keybindings]]):
+- The human is guided ONE TOPIC AT A TIME, most-critical topic first, never switching topics mid-stream.
+- Questions come ONE AT A TIME, each labeled with its topic, each with a RECOMMENDED answer, always
+  a free-text COMMENT path. Within a topic: CRITICAL issues first (individually, not batchable), then
+  IMPORTANT, then NORMAL.
+- After the human takes the recommended answer ~5-10× on NON-critical questions → offer a BATCH-APPROVE
+  (every Q→answer shown, approve in one action). Human can FAST-FORWARD: "you understand topic X enough
+  → next topic".
+- "Goes through" = the human CLOSES + APPROVES a topic (functional plan + its critical/important impl
+  details) → it streams to implementation → iron loop → todo. The 4 discrete human gates DISSOLVE into
+  this streaming per-topic approval (Tijn's explicit, deliberate speed/correctness trade: "mistakes are
+  made, but artifacts are produced faster"). The iron loop still runs per topic behind the approval —
+  that's the safety net.
+- UI/UX FIRST, then functionality (→ no dead code — only build what the interface reaches). Menu keys =
+  numbers OR consistent LOWERCASE mnemonic letters (s=settings, b=back, d=doctor, u=update, g=start,
+  x=stop — always lowercase). Present decisions as /ask-me-questions matrices (Pros·Cons·Recommendation);
+  the Recommendation is the HIGHEST-QUALITY path for the whole project, never the easy one.
+- HONESTY: verify a URL resolves before citing it (Tijn caught a dead egitech.io link — a rigor failure).
+
+SHIPPED streaming slices (all gate-green, pushed):
+- v6.12.70 (8b33d77): menu dead-ends wired, consistent lowercase keys (down-payment on the directive).
+- v6.12.71 (7e73476): SLICE 1+2 — streaming-flow.js (pure state machine) + streaming-render.js (standalone
+  renderer) + menu.js now OPENS INTO streaming (reachability fence green; classic dashboard reachable via
+  transitional `m` bridge, nothing orphaned; menu retired in a LATER slice).
+- v6.12.72 (7f8c3c5): SLICE 3 — critical-first question ordering (critical/important/normal tiers,
+  orderQuestions, criticalOpenCount, ⚠ CRITICAL k/N + ⚠ N critical-open surfacing).
+
+NEXT streaming slices (Tijn schedules the order; he picks one at a time): BATCH-APPROVE after a recommended
+run · NEXT-TOPIC fast-forward · REAL question source (replace exampleTopics with real plan-derived topics)
+· RETIRE the menu (remove the dashboard/areas + the `m` bridge, streaming only). Files: src/lib/streaming-flow.js,
+src/lib/streaming-render.js, src/commands/menu.js.
+
+## Prior work: 50-round adversarial repair campaign (COMPLETE-ish, backgrounded by the pivot)
 - Status: in progress — FRESH 50-round campaign (Tijn re-issued the order 2026-07-16 as
   a NEW round of improvement, not the old standing order). ~19 rounds done, 11 waves
   committed + pushed (v6.12.57 → v6.12.67), 80 real defects fixed. Convergence (3
