@@ -51,11 +51,20 @@ function rm(dir) {
  */
 function withGitSpy(modulePath, impl) {
   const calls = [];
-  const original = cp.execSync;
-  cp.execSync = (cmd, opts) => {
-    calls.push(String(cmd));
-    return impl ? impl(String(cmd), opts) : '';
+  const originalExecSync = cp.execSync;
+  const originalExecFileSync = cp.execFileSync;
+  const record = (cmdStr, opts) => {
+    calls.push(cmdStr);
+    return impl ? impl(cmdStr, opts) : '';
   };
+  // sync.js now runs git argv-safe via execFileSync('git', [...args], opts) — no
+  // shell. Reconstruct the equivalent command string so the dirtyGit/pushes()
+  // matchers still work. execSync is spied too (other modules / legacy callers).
+  cp.execSync = (cmd, opts) => record(String(cmd), opts);
+  cp.execFileSync = (file, args, opts) =>
+    Array.isArray(args)
+      ? record(`${file} ${args.join(' ')}`, opts)
+      : record(String(file), args);
   const resolved = require.resolve(modulePath);
   delete require.cache[resolved];
   const mod = require(modulePath);
@@ -64,7 +73,8 @@ function withGitSpy(modulePath, impl) {
     calls,
     pushes: () => calls.filter(c => /\bgit\s+push\b/.test(c)),
     restore() {
-      cp.execSync = original;
+      cp.execSync = originalExecSync;
+      cp.execFileSync = originalExecFileSync;
       delete require.cache[resolved];
     }
   };

@@ -25,8 +25,10 @@ describe('Sync Manager Tests', () => {
     };
     fileSystem = {};
 
-    // Create mock for execSync
-    mockExecSync = (cmd, opts) => {
+    // Create mock for execFileSync (argv form: git is invoked as execFileSync('git', [args], opts)).
+    // Reconstruct the command string so the behavioral assertions below still read naturally.
+    mockExecSync = (file, args, opts) => {
+      const cmd = [file, ...args].join(' ');
       execSyncCalls.push({ cmd, opts });
 
       // Simulate git status --porcelain
@@ -62,8 +64,8 @@ describe('Sync Manager Tests', () => {
   test('getLastSync returns null initially', (t) => {
     // Create a fresh module instance for this test
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -77,15 +79,15 @@ describe('Sync Manager Tests', () => {
       assert.strictEqual(lastSync, null, 'Last sync should be null initially');
       console.log('# getLastSync returns null initially');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('syncPlans returns no changes when git status is empty', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -103,7 +105,7 @@ describe('Sync Manager Tests', () => {
       assert.strictEqual(result.reason, 'no changes', 'Reason should be no changes');
       console.log('# syncPlans returns no changes when git status is empty');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
@@ -113,8 +115,8 @@ describe('Sync Manager Tests', () => {
   // ship gate on a clock. The timer may commit (local, reversible); it may not ship.
   test('syncPlans commits but does NOT push when the ship gate is closed (default)', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -144,7 +146,7 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans commits but does not push with the ship gate closed');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       settings.isAutoPushEnabled = originalIsAutoPush;
     }
@@ -152,8 +154,8 @@ describe('Sync Manager Tests', () => {
 
   test('syncPlans pushes ONLY when the human opened the ship gate', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -177,7 +179,7 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans pushes only when the human opened the ship gate');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       settings.isAutoPushEnabled = originalIsAutoPush;
     }
@@ -185,9 +187,10 @@ describe('Sync Manager Tests', () => {
 
   test('syncPlans returns error on git failure', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
+    const originalExecFileSync = childProcess.execFileSync;
 
-    childProcess.execSync = (cmd, opts) => {
+    childProcess.execFileSync = (file, args, opts) => {
+      const cmd = [file, ...args].join(' ');
       if (cmd.includes('git status --porcelain')) {
         return 'M plans/test-plan.md';
       }
@@ -213,15 +216,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans returns error on git failure');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('manualSync calls syncPlans', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -240,15 +243,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# manualSync calls syncPlans');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('startAutoSync does nothing when sync disabled', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -268,15 +271,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# startAutoSync does nothing when sync disabled');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('startAutoSync performs initial sync when enabled', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -299,15 +302,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# startAutoSync performs initial sync when enabled');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('stopAutoSync clears the interval', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -327,7 +330,7 @@ describe('Sync Manager Tests', () => {
 
       console.log('# stopAutoSync clears the interval');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
@@ -363,8 +366,8 @@ describe('Sync Manager Tests', () => {
 
   test('syncPlans uses correct project path', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -384,15 +387,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans uses correct project path');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('syncPlans updates lastSync timestamp', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -415,15 +418,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans updates lastSync timestamp');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('syncPlans updates lastSync even when no changes', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -442,7 +445,7 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans updates lastSync even when no changes');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
@@ -452,10 +455,11 @@ describe('Sync Manager Tests', () => {
   // degrade gracefully when there is no upstream.
   test('syncPlans handles pull rebase failure gracefully (ship gate open)', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
+    const originalExecFileSync = childProcess.execFileSync;
 
     let pullFailed = false;
-    childProcess.execSync = (cmd, opts) => {
+    childProcess.execFileSync = (file, args, opts) => {
+      const cmd = [file, ...args].join(' ');
       execSyncCalls.push({ cmd, opts });
       if (cmd.includes('git status --porcelain')) {
         return 'M plans/test.md';
@@ -484,7 +488,7 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans handles pull rebase failure gracefully');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       settings.isAutoPushEnabled = originalIsAutoPush;
     }
@@ -492,8 +496,8 @@ describe('Sync Manager Tests', () => {
 
   test('syncPlans NEVER rebases when the ship gate is closed', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -515,7 +519,7 @@ describe('Sync Manager Tests', () => {
 
       console.log('# syncPlans never rebases behind a closed ship gate');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       settings.isAutoPushEnabled = originalIsAutoPush;
     }
@@ -523,8 +527,8 @@ describe('Sync Manager Tests', () => {
 
   test('commit message includes ISO timestamp', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -545,15 +549,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# commit message includes ISO timestamp');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('startAutoSync uses configured interval', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -575,15 +579,15 @@ describe('Sync Manager Tests', () => {
 
       console.log('# startAutoSync uses configured interval');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('startAutoSync clears existing interval before starting new one', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -603,7 +607,7 @@ describe('Sync Manager Tests', () => {
       // No assertion needed - if this doesn't throw, it works
       console.log('# startAutoSync clears existing interval before starting new one');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
@@ -641,7 +645,8 @@ describe('Event-Triggered Sync Tests', () => {
     };
     fileSystem = {};
 
-    mockExecSync = (cmd, opts) => {
+    mockExecSync = (file, args, opts) => {
+      const cmd = [file, ...args].join(' ');
       execSyncCalls.push({ cmd, opts });
       if (cmd.includes('git status --porcelain')) {
         return fileSystem.gitStatus || '';
@@ -704,8 +709,8 @@ describe('Event-Triggered Sync Tests', () => {
     fs.mkdirSync = () => {};
 
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -725,7 +730,7 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# onPlanOperation triggers sync check with rate limiting');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       fs.existsSync = originalExistsSync;
       fs.readFileSync = originalReadFileSync;
@@ -736,8 +741,8 @@ describe('Event-Triggered Sync Tests', () => {
 
   test('onPlanOperation detects remote changes', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -757,15 +762,15 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# onPlanOperation detects remote changes');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('onPlanOperation handles offline mode gracefully', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -784,15 +789,15 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# onPlanOperation handles offline mode gracefully');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('autoCommitPlan creates commit with correct message format', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -812,17 +817,18 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# autoCommitPlan creates commit with correct message format');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('autoCommitPlan uses different messages for different actions', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
+    const originalExecFileSync = childProcess.execFileSync;
 
     const commitMessages = [];
-    childProcess.execSync = (cmd, opts) => {
+    childProcess.execFileSync = (file, args, opts) => {
+      const cmd = [file, ...args].join(' ');
       if (cmd.includes('git commit')) {
         commitMessages.push(cmd);
       }
@@ -854,17 +860,18 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# autoCommitPlan uses different messages for different actions');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
 
   test('autoCommitPlan handles approve action with stage transition', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
+    const originalExecFileSync = childProcess.execFileSync;
 
     let commitMessage = '';
-    childProcess.execSync = (cmd, opts) => {
+    childProcess.execFileSync = (file, args, opts) => {
+      const cmd = [file, ...args].join(' ');
       if (cmd.includes('git commit')) {
         commitMessage = cmd;
       }
@@ -888,7 +895,7 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# autoCommitPlan handles approve action with stage transition');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });
@@ -916,8 +923,8 @@ describe('Event-Triggered Sync Tests', () => {
     fs.mkdirSync = () => {};
 
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -929,7 +936,7 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# getLastSyncTimestamp returns timestamp from file');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       fs.existsSync = originalExistsSync;
       fs.readFileSync = originalReadFileSync;
@@ -957,8 +964,8 @@ describe('Event-Triggered Sync Tests', () => {
     };
 
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -970,7 +977,7 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# isRateLimited returns true when within cooldown period');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       fs.existsSync = originalExistsSync;
       fs.readFileSync = originalReadFileSync;
@@ -996,8 +1003,8 @@ describe('Event-Triggered Sync Tests', () => {
     };
 
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -1009,7 +1016,7 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# isRateLimited returns false when outside cooldown period');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       fs.existsSync = originalExistsSync;
       fs.readFileSync = originalReadFileSync;
@@ -1018,9 +1025,10 @@ describe('Event-Triggered Sync Tests', () => {
 
   test('detectConflicts identifies conflicting files', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
+    const originalExecFileSync = childProcess.execFileSync;
 
-    childProcess.execSync = (cmd, opts) => {
+    childProcess.execFileSync = (file, args, opts) => {
+      const cmd = [file, ...args].join(' ');
       if (cmd.includes('git diff --name-only')) {
         return 'plans/conflict-plan.md\n';
       }
@@ -1051,7 +1059,7 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# detectConflicts identifies conflicting files');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
       fs.existsSync = originalExistsSync;
     }
@@ -1059,8 +1067,8 @@ describe('Event-Triggered Sync Tests', () => {
 
   test('sync settings are configurable', (t) => {
     const childProcess = require('child_process');
-    const originalExecSync = childProcess.execSync;
-    childProcess.execSync = mockExecSync;
+    const originalExecFileSync = childProcess.execFileSync;
+    childProcess.execFileSync = mockExecSync;
 
     const settings = require('../src/lib/settings.js');
     const originalGetSetting = settings.getSetting;
@@ -1086,7 +1094,7 @@ describe('Event-Triggered Sync Tests', () => {
 
       console.log('# sync settings are configurable');
     } finally {
-      childProcess.execSync = originalExecSync;
+      childProcess.execFileSync = originalExecFileSync;
       settings.getSetting = originalGetSetting;
     }
   });

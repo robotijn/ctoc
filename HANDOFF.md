@@ -5,10 +5,14 @@
 - Updated: 2026-07-16 by claude
 - Branch: main
 - Status: in progress — FRESH 50-round campaign (Tijn re-issued the order 2026-07-16 as
-  a NEW round of improvement, not the old standing order). ~11 rounds done, 6 waves
-  committed + pushed (v6.12.57 → v6.12.62), 36 real defects fixed. Convergence (3
+  a NEW round of improvement, not the old standing order). ~13 rounds done, 7 waves
+  committed + pushed (v6.12.57 → v6.12.63), 46 real defects fixed. Convergence (3
   consecutive different-lens clean rounds) NOT reached — every fleet still finds real
-  HIGH/CRITICAL defects, incl. the re-attack lens on our own fixes.
+  HIGH/CRITICAL defects. v6.12.63 (b0ac2fe) wave 6 shipped 10 fixes incl. 3 HIGH:
+  regulatory-regime stray-Z (whole regime silently off when it is the last settings
+  block), legal-hold status matcher fail-open (delete during a live hold),
+  traceability-matrix non-atomic save; + irac/data-lineage/ai-provenance/version MED,
+  privilege/cache/plan-coverage-glob LOW. Wave-5 re-attack cleared 5/6 fixes clean.
 
 ## The order (verbatim)
 "fix them all, do 50 rounds of hard critique, keep fixing the code, use ctoc agents every

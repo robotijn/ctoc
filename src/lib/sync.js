@@ -10,7 +10,7 @@
  * - Conflict detection
  */
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
 // R3-C: the push ship gate. `isAutoPushEnabled` is the ONE key every push path in
@@ -39,6 +39,24 @@ const COMMIT_MESSAGES = {
   delete: (name) => `plan: delete ${name}`,
   approve: (name, opts) => `plan: ${opts?.from || 'unknown'} → ${opts?.to || 'unknown'} ${name}`
 };
+
+// SECURITY: every git subprocess in this module runs argv-safe via execFileSync — a
+// fixed argument vector, NO shell. Nothing (a plan name, a stage name, a branch name,
+// a commit message) is ever concatenated into a shell string, so a shell metacharacter
+// in plan-controlled data (e.g. autoCommitPlan's commit message) can never break out of
+// its argument and execute. This closes the autoCommitPlan commit-message injection: a
+// plan name like `a";touch X;echo "` is now an inert literal, not a command.
+/**
+ * Run git argv-safe (no shell). Defaults to utf8 so the return is a string a
+ * caller can `.trim()` — the same encoding the old execSync calls passed. A
+ * caller may override any option (cwd, stdio, encoding).
+ * @param {string[]} args
+ * @param {object} [options]
+ * @returns {string}
+ */
+function git(args, options = {}) {
+  return /** @type {string} */ (execFileSync('git', args, { encoding: 'utf8', ...options }));
+}
 
 // Start auto-sync
 function startAutoSync(projectPath = process.cwd()) {
@@ -76,7 +94,7 @@ function stopAutoSync() {
 function syncPlans(projectPath = process.cwd()) {
   try {
     // Check for changes in plans directory
-    const status = execSync('git status --porcelain plans/', {
+    const status = git(['status', '--porcelain', 'plans/'], {
       cwd: projectPath,
       encoding: 'utf8'
     }).trim();
@@ -87,10 +105,10 @@ function syncPlans(projectPath = process.cwd()) {
     }
 
     // Add + commit. Committing is local and reversible — it is NOT a ship gate.
-    execSync('git add plans/', { cwd: projectPath });
+    git(['add', 'plans/'], { cwd: projectPath });
 
     const commitMsg = `chore: auto-sync plans [${new Date().toISOString()}]`;
-    execSync(`git commit -m "${commitMsg}"`, { cwd: projectPath });
+    git(['commit', '-m', commitMsg], { cwd: projectPath });
 
     // SHIP GATE (R3-C). This timer fires every 5 minutes from a menu open. It used
     // to rebase and push `origin main` unattended — a machine crossing a human ship
@@ -108,12 +126,12 @@ function syncPlans(projectPath = process.cwd()) {
 
     // Pull first to avoid conflicts (only on the opted-in path).
     try {
-      execSync('git pull --rebase origin main', { cwd: projectPath, stdio: 'pipe' });
+      git(['pull', '--rebase', 'origin', 'main'], { cwd: projectPath, stdio: 'pipe' });
     } catch (e) {
       // May fail if no upstream, continue anyway
     }
 
-    execSync('git push origin main', { cwd: projectPath, stdio: 'pipe' });
+    git(['push', 'origin', 'main'], { cwd: projectPath, stdio: 'pipe' });
 
     lastSync = new Date();
     return { synced: true, pushed: true, timestamp: lastSync };
@@ -224,14 +242,14 @@ function checkRemoteChanges(projectPath = process.cwd()) {
 
   try {
     // Fetch from remote
-    execSync(`git fetch origin ${config.branch}`, {
+    git(['fetch', 'origin', config.branch], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
     });
 
     // Check for remote commits not in local
-    const remoteDiff = execSync(`git log HEAD..origin/${config.branch} --oneline plans/`, {
+    const remoteDiff = git(['log', `HEAD..origin/${config.branch}`, '--oneline', 'plans/'], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
@@ -262,7 +280,7 @@ function detectConflicts(projectPath = process.cwd()) {
 
   try {
     // Get locally modified files
-    const localChanges = execSync('git status --porcelain plans/', {
+    const localChanges = git(['status', '--porcelain', 'plans/'], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
@@ -278,7 +296,7 @@ function detectConflicts(projectPath = process.cwd()) {
     }
 
     // Get remotely modified files
-    const remoteChanges = execSync(`git diff --name-only HEAD..origin/${config.branch} -- plans/`, {
+    const remoteChanges = git(['diff', '--name-only', `HEAD..origin/${config.branch}`, '--', 'plans/'], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
@@ -305,7 +323,7 @@ function autoCommitPlan(action, planName, projectPath = process.cwd(), opts = {}
 
   try {
     // Check if there are changes to commit
-    const status = execSync('git status --porcelain plans/', {
+    const status = git(['status', '--porcelain', 'plans/'], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
@@ -316,13 +334,15 @@ function autoCommitPlan(action, planName, projectPath = process.cwd(), opts = {}
     }
 
     // Stage changes
-    execSync('git add plans/', { cwd: projectPath, stdio: 'pipe' });
+    git(['add', 'plans/'], { cwd: projectPath, stdio: 'pipe' });
 
-    // Create commit message based on action
+    // Create commit message based on action. The message may contain arbitrary
+    // plan-controlled text (plan name, stage names); it is passed as an argv element
+    // to execFileSync (no shell), so shell metacharacters in it are inert.
     const messageFunc = COMMIT_MESSAGES[action] || COMMIT_MESSAGES.edit;
     const message = messageFunc(planName, opts);
 
-    execSync(`git commit -m "${message}"`, { cwd: projectPath, stdio: 'pipe' });
+    git(['commit', '-m', message], { cwd: projectPath, stdio: 'pipe' });
 
     return { committed: true, message };
   } catch (error) {
@@ -340,7 +360,7 @@ function autoPush(projectPath = process.cwd()) {
   }
 
   try {
-    execSync(`git push origin ${config.branch}`, {
+    git(['push', 'origin', config.branch], {
       cwd: projectPath,
       stdio: 'pipe'
     });
@@ -429,7 +449,7 @@ function fullPlansSync(projectPath = process.cwd()) {
   // 1. Pull with rebase
   try {
     const branch = getCurrentBranch(projectPath) || config.branch;
-    execSync(`git pull --rebase origin ${branch}`, {
+    git(['pull', '--rebase', 'origin', branch], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
@@ -442,15 +462,15 @@ function fullPlansSync(projectPath = process.cwd()) {
 
   // 2-3. Stage and commit plans/
   try {
-    const status = execSync('git status --porcelain plans/', {
+    const status = git(['status', '--porcelain', 'plans/'], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
     }).trim();
 
     if (status) {
-      execSync('git add plans/', { cwd: projectPath, stdio: 'pipe' });
-      execSync('git commit -m "plans: sync pipeline state"', {
+      git(['add', 'plans/'], { cwd: projectPath, stdio: 'pipe' });
+      git(['commit', '-m', 'plans: sync pipeline state'], {
         cwd: projectPath,
         stdio: 'pipe'
       });
@@ -469,7 +489,7 @@ function fullPlansSync(projectPath = process.cwd()) {
 
   try {
     const branch = getCurrentBranch(projectPath) || config.branch;
-    execSync(`git push origin ${branch}`, {
+    git(['push', 'origin', branch], {
       cwd: projectPath,
       stdio: 'pipe'
     });
@@ -488,7 +508,7 @@ function fullPlansSync(projectPath = process.cwd()) {
  */
 function getCurrentBranch(projectPath = process.cwd()) {
   try {
-    return execSync('git rev-parse --abbrev-ref HEAD', {
+    return git(['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'
@@ -506,7 +526,7 @@ function getCurrentBranch(projectPath = process.cwd()) {
 function silentPull(projectPath = process.cwd()) {
   try {
     const branch = getCurrentBranch(projectPath) || 'main';
-    execSync(`git pull --rebase origin ${branch}`, {
+    git(['pull', '--rebase', 'origin', branch], {
       cwd: projectPath,
       encoding: 'utf8',
       stdio: 'pipe'

@@ -147,18 +147,19 @@ describe('project-root.js', () => {
   });
 
   test('.ctoc takes priority over a deeper .git when both are present', () => {
-    // .ctoc at the top, .git also at the top — .ctoc is checked first in-loop,
-    // but both resolve to the same dir; verify the higher .ctoc wins over a
-    // child marker. Put .git in a child and .ctoc at the parent.
+    // .ctoc at the parent, a WEAKER marker (.git) in a child. `.ctoc` is the
+    // authoritative CTOC-root marker (documented priority 1) and must win ACROSS
+    // levels — a nested .git/package.json (a common monorepo subpackage) must NOT
+    // shadow the ancestor .ctoc root (that mis-rooting was the confirmed defect).
     fs.mkdirSync(path.join(tmpRoot, '.ctoc'), { recursive: true });
     const child = path.join(tmpRoot, 'child');
     fs.mkdirSync(path.join(child, '.git'), { recursive: true });
-    // Starting from the child, the nearest marker is the child's .git.
-    assert.equal(projectRoot.findProjectRoot(child), child);
-    // Starting one level deeper, still finds the child's .git first.
+    // From the child, the ancestor .ctoc wins over the child's own .git.
+    assert.equal(projectRoot.findProjectRoot(child), tmpRoot);
+    // One level deeper: still the .ctoc ancestor.
     const deeper = path.join(child, 'inner');
     fs.mkdirSync(deeper, { recursive: true });
-    assert.equal(projectRoot.findProjectRoot(deeper), child);
+    assert.equal(projectRoot.findProjectRoot(deeper), tmpRoot);
   });
 
   test('findProjectRoot falls back to cwd when no markers exist up the tree', () => {

@@ -339,11 +339,15 @@ describe('init-project dark branches', () => {
     });
 
     it('should_skip_post_commit_hook_when_a_ctoc_hook_is_already_installed', () => {
-      // Arrange — a pre-existing CTOC-tagged hook.
+      // Arrange — a pre-existing REAL CTOC hook (carries the actual CTOC
+      // invocation, not just a comment). Install ownership is now decided by the
+      // CTOC invocation/sentinel, NOT by a bare "CTOC" mention — a foreign hook
+      // that merely comments the word CTOC must no longer be treated as installed.
       const hooksDir = path.join(tempDir, '.git', 'hooks');
       fs.mkdirSync(hooksDir, { recursive: true });
       const hookPath = path.join(hooksDir, 'post-commit');
-      fs.writeFileSync(hookPath, '#!/bin/sh\n# CTOC post-commit hook\n');
+      const existing = '#!/bin/sh\n# CTOC post-commit hook\nnode ".ctoc/agent/post-commit.js" 2>/dev/null &\n';
+      fs.writeFileSync(hookPath, existing);
 
       // Act
       const result = initProject(tempDir);
@@ -353,7 +357,7 @@ describe('init-project dark branches', () => {
         result.skipped.some(s => s.includes('post-commit') && s.includes('already installed')),
         'already-installed skip must be reported'
       );
-      assert.equal(fs.readFileSync(hookPath, 'utf8'), '#!/bin/sh\n# CTOC post-commit hook\n');
+      assert.equal(fs.readFileSync(hookPath, 'utf8'), existing);
     });
 
     it('should_fail_open_and_report_skip_when_hook_install_throws', () => {

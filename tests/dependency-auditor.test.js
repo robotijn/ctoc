@@ -830,17 +830,71 @@ test('parseNpmAuditResults: a null or non-object payload is ignored, recording n
   assert.equal(a.errors.length, 0);
 });
 
-test('parseNpmAuditResults: v2 records object advisories and skips string via entries', () => {
+test('parseNpmAuditResults: v2 records an object advisory AND a string-via advisory (CRITICAL never dropped)', () => {
   const a = pureAuditor();
   a.parseNpmAuditResults({
     vulnerabilities: {
       good: { range: '<1.0.0', severity: 'high', isDirect: true, via: [{ title: 'Bug', severity: 'high', url: 'https://example.test/g', cve: 'CVE-2021-0001', cwe: ['CWE-79'], overview: 'ov', fixAvailable: { version: '1.0.0' } }] },
-      indirect: { range: '<2.0.0', severity: 'low', via: ['just-a-string-ref'] }  // string via → skipped
+      // npm v2 transitive advisory: via[0] is a package-name STRING, no object advisory.
+      // It carries its OWN severity/range — must still be recorded, never silently dropped.
+      indirect: { range: '<2.0.0', severity: 'critical', via: ['just-a-string-ref'] }
     }
   });
-  assert.equal(a.vulnerabilities.length, 1, 'only the object-advisory entry is recorded');
-  assert.equal(a.vulnerabilities[0].package, 'good');
-  assert.equal(a.vulnerabilities[0].fixedIn, '1.0.0');
+  assert.equal(a.vulnerabilities.length, 2, 'BOTH the object-advisory and the string-via entry are recorded');
+  const good = a.vulnerabilities.find(v => v.package === 'good');
+  const indirect = a.vulnerabilities.find(v => v.package === 'indirect');
+  assert.ok(good, 'object-advisory entry recorded');
+  assert.equal(good.fixedIn, '1.0.0');
+  assert.ok(indirect, 'string-via entry recorded (not dropped)');
+  assert.equal(indirect.severity, SEVERITY.CRITICAL, 'string-via CRITICAL is preserved from the entry severity');
+  assert.equal(indirect.version, '<2.0.0', 'string-via version comes from the entry range');
+});
+
+// DEFECT 1(b): a v2 entry with a STRING-only via must not be silently dropped — its own
+// severity/range/name record a vuln. Prior code did `typeof 'lodash' === 'object'` → false
+// → skipped, dropping a real (possibly CRITICAL) advisory.
+test('parseNpmAuditResults: a string-only via records a vuln from the entry severity/range/name', () => {
+  const a = pureAuditor();
+  a.parseNpmAuditResults({
+    vulnerabilities: {
+      minimist: { name: 'minimist', range: '<0.2.1', severity: 'critical', via: ['lodash'], isDirect: false }
+    }
+  });
+  assert.equal(a.vulnerabilities.length, 1, 'the string-via CRITICAL is recorded, never dropped');
+  assert.equal(a.vulnerabilities[0].package, 'minimist');
+  assert.equal(a.vulnerabilities[0].severity, SEVERITY.CRITICAL);
+  assert.equal(a.errors.length, 0, 'a well-formed string-via entry is a vuln, not an error');
+});
+
+// DEFECT 1(a): a v2 entry with a MISSING via must NOT throw (which, on runNpmAudit's success
+// path, has no .stdout and is swallowed → fail-open 0-vuln/0-error clean). It records the vuln
+// from the entry's own severity, and one bad entry never nukes the rest of the report.
+test('parseNpmAuditResults: a MISSING via does not throw and still records the vuln', () => {
+  const a = pureAuditor();
+  assert.doesNotThrow(() => {
+    a.parseNpmAuditResults({
+      vulnerabilities: {
+        lodash: { severity: 'high', range: '<4.17.21' }  // no `via` at all
+      }
+    });
+  }, 'a missing via must never throw a TypeError');
+  assert.equal(a.vulnerabilities.length, 1, 'the entry is recorded from its own severity/range');
+  assert.equal(a.vulnerabilities[0].package, 'lodash');
+  assert.equal(a.vulnerabilities[0].severity, SEVERITY.HIGH);
+});
+
+test('parseNpmAuditResults: one uninterpretable entry records a per-entry error, never nuking the whole report', () => {
+  const a = pureAuditor();
+  a.parseNpmAuditResults({
+    vulnerabilities: {
+      broken: null,  // vuln is null → cannot index; must be a per-entry error, not a throw
+      real: { severity: 'critical', range: '<1.0.0', via: [{ title: 'RCE', severity: 'critical' }] }
+    }
+  });
+  assert.equal(a.vulnerabilities.length, 1, 'the good entry after a bad one is still recorded');
+  assert.equal(a.vulnerabilities[0].package, 'real');
+  assert.equal(a.errors.length, 1, 'the bad entry records a loud per-entry error');
+  assert.match(a.errors[0].error, /broken/, 'the per-entry error names the offending package');
 });
 
 test('parseNpmAuditResults: v1 advisories shape is recorded with first CVE and patched range', () => {

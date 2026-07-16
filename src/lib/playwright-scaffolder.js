@@ -41,6 +41,7 @@ class PlaywrightScaffolder {
    */
   async init() {
     const createdFiles = [];
+    const skippedFiles = [];
     const commands = [];
 
     // Ensure test directory exists
@@ -50,27 +51,35 @@ class PlaywrightScaffolder {
       safeFs.mkdirSync(testDirPath, { recursive: true });
     }
 
-    // Create playwright.config.ts
+    // Create playwright.config.ts (never clobber an existing user file)
     const configContent = this.generateConfig();
-    const configPath = path.join(this.projectRoot, 'playwright.config.ts');
-    safeFs.writeFileSync(configPath, configContent);
-    createdFiles.push('playwright.config.ts');
+    this.writeArtifact(
+      path.join(this.projectRoot, 'playwright.config.ts'),
+      configContent,
+      'playwright.config.ts',
+      createdFiles,
+      skippedFiles
+    );
 
     // Create example test
     const exampleContent = this.generateExampleTest();
-    const examplePath = path.join(testDirPath, 'example.spec.ts');
-    safeFs.writeFileSync(examplePath, exampleContent);
-    createdFiles.push(`${testDir}/example.spec.ts`);
+    this.writeArtifact(
+      path.join(testDirPath, 'example.spec.ts'),
+      exampleContent,
+      `${testDir}/example.spec.ts`,
+      createdFiles,
+      skippedFiles
+    );
 
     // Create Page Object Model structure if requested
     if (this.options.pageObjects) {
-      const pomFiles = this.generatePageObjects(testDir);
+      const pomFiles = this.generatePageObjects(testDir, skippedFiles);
       createdFiles.push(...pomFiles);
     }
 
     // Create CI workflow if requested
     if (this.options.ci) {
-      const ciFile = this.generateCIWorkflow();
+      const ciFile = this.generateCIWorkflow(skippedFiles);
       if (ciFile) {
         createdFiles.push(ciFile);
       }
@@ -86,9 +95,32 @@ class PlaywrightScaffolder {
       framework: this.framework ? this.framework.name : 'Unknown',
       testDir,
       files: createdFiles,
+      skipped: skippedFiles,
       commands,
-      message: this.generateSummary(createdFiles, commands)
+      message: this.generateSummary(createdFiles, commands, skippedFiles)
     };
+  }
+
+  /**
+   * Write a scaffolded artifact, guarding against silent overwrite of a
+   * user's existing file. If the target already exists and overwrite is not
+   * explicitly requested, the file is preserved and recorded as skipped;
+   * otherwise it is written and recorded as created.
+   * @param {string} targetPath - Absolute path to write
+   * @param {string} content - File content
+   * @param {string} label - Project-relative label for the result lists
+   * @param {Array<string>} createdFiles - Mutated with the label when written
+   * @param {Array<string>} skippedFiles - Mutated with the label when preserved
+   * @returns {boolean} True if written, false if preserved (skipped)
+   */
+  writeArtifact(targetPath, content, label, createdFiles, skippedFiles) {
+    if (safeFs.existsSync(targetPath) && this.options.overwrite !== true) {
+      skippedFiles.push(label);
+      return false;
+    }
+    safeFs.writeFileSync(targetPath, content);
+    createdFiles.push(label);
+    return true;
   }
 
   /**
@@ -245,9 +277,10 @@ test.describe('Performance', () => {
   /**
    * Generate Page Object Model files
    * @param {string} testDir - Test directory
+   * @param {Array<string>} skippedFiles - Mutated with any preserved files
    * @returns {Array<string>} Created file paths
    */
-  generatePageObjects(testDir) {
+  generatePageObjects(testDir, skippedFiles = []) {
     const createdFiles = [];
     const pagesDir = path.join(this.projectRoot, testDir, 'pages');
 
@@ -320,8 +353,7 @@ export abstract class BasePage {
 `;
 
     const basePagePath = path.join(pagesDir, 'BasePage.ts');
-    safeFs.writeFileSync(basePagePath, basePageContent);
-    createdFiles.push(`${testDir}/pages/BasePage.ts`);
+    this.writeArtifact(basePagePath, basePageContent, `${testDir}/pages/BasePage.ts`, createdFiles, skippedFiles);
 
     // Create HomePage example
     const homePageContent = `import { Page, Locator } from '@playwright/test';
@@ -373,8 +405,7 @@ export class HomePage extends BasePage {
 `;
 
     const homePagePath = path.join(pagesDir, 'HomePage.ts');
-    safeFs.writeFileSync(homePagePath, homePageContent);
-    createdFiles.push(`${testDir}/pages/HomePage.ts`);
+    this.writeArtifact(homePagePath, homePageContent, `${testDir}/pages/HomePage.ts`, createdFiles, skippedFiles);
 
     // Create index.ts for exports
     const indexContent = `export { BasePage } from './BasePage';
@@ -382,17 +413,17 @@ export { HomePage } from './HomePage';
 `;
 
     const indexPath = path.join(pagesDir, 'index.ts');
-    safeFs.writeFileSync(indexPath, indexContent);
-    createdFiles.push(`${testDir}/pages/index.ts`);
+    this.writeArtifact(indexPath, indexContent, `${testDir}/pages/index.ts`, createdFiles, skippedFiles);
 
     return createdFiles;
   }
 
   /**
    * Generate CI workflow file
-   * @returns {string|null} Created file path or null
+   * @param {Array<string>} skippedFiles - Mutated when an existing workflow is preserved
+   * @returns {string|null} Created file path, or null if preserved/skipped
    */
-  generateCIWorkflow() {
+  generateCIWorkflow(skippedFiles = []) {
     const workflowDir = path.join(this.projectRoot, '.github', 'workflows');
     if (!safeFs.existsSync(workflowDir)) {
       safeFs.mkdirSync(workflowDir, { recursive: true });
@@ -443,8 +474,13 @@ jobs:
 `;
 
     const workflowPath = path.join(workflowDir, 'playwright.yml');
+    const label = '.github/workflows/playwright.yml';
+    if (safeFs.existsSync(workflowPath) && this.options.overwrite !== true) {
+      skippedFiles.push(label);
+      return null;
+    }
     safeFs.writeFileSync(workflowPath, content);
-    return '.github/workflows/playwright.yml';
+    return label;
   }
 
   /**
@@ -465,9 +501,10 @@ jobs:
    * Generate summary message
    * @param {Array<string>} files - Created files
    * @param {Array<string>} commands - Commands to run
+   * @param {Array<string>} skipped - Preserved (not overwritten) files
    * @returns {string} Summary message
    */
-  generateSummary(files, commands) {
+  generateSummary(files, commands, skipped = []) {
     const lines = [];
     lines.push('Playwright E2E Testing Setup Complete');
     lines.push('=====================================');
@@ -482,6 +519,12 @@ jobs:
     lines.push('Files created:');
     files.forEach(f => lines.push(`  - ${f}`));
     lines.push('');
+
+    if (skipped.length > 0) {
+      lines.push('Files preserved (already existed, not overwritten):');
+      skipped.forEach(f => lines.push(`  - ${f}`));
+      lines.push('');
+    }
 
     lines.push('Next steps:');
     lines.push('');
