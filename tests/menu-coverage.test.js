@@ -46,6 +46,8 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 
 const menu = require('../src/commands/menu.js');
+const streamingFlow = require('../src/lib/streaming-flow');
+const { TABS } = require('../src/lib/tabs');
 const {
   splitCliArgs,
   extractLiveAgentIds,
@@ -85,6 +87,13 @@ function withStdout(fn) {
 // (FIRST.Independent) despite the shared module-level `app` object.
 function baselineApp() {
   app.searchMode = false;
+  // The streaming view is the session's primary screen (app-literal default true).
+  // The legacy in-process render/handleKey suites below assert CLASSIC-dashboard
+  // behavior, so the fixture puts the app into the classic-dashboard state
+  // (streamView=false); the streaming suite re-enables it explicitly. This keeps the
+  // pre-existing dashboard/area assertions unchanged while streaming is primary live.
+  app.streamView = false;
+  app.streamAction = null;
   app.mode = 'list';
   app.tabIndex = 0;
   app.viewContent = null;
@@ -606,6 +615,99 @@ describe('render() plan-content view — truncation boundary', () => {
     app.viewContent = Array.from({ length: 200 }, (_, i) => `line-${i}`).join('\n');
     const out = withStdout(() => render());
     assert.match(out, /more lines/, 'overflow notice rendered');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STREAMING PRIMARY VIEW WIRING — streaming-render is the session's primary screen.
+// The classic dashboard + areas stay reachable via the transitional 'm' bridge (a
+// temporary key the menu-retirement slice removes). Written RED first: against the
+// pre-wiring menu.js the default render showed the classic dashboard and the
+// streaming keys did nothing, so every assertion below failed until menu.js routed
+// the streaming view (streamView) through streaming-render.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('streaming primary view — render + key routing (the wiring under test)', () => {
+  let exitCalls, origExit;
+  beforeEach(() => {
+    baselineApp();
+    app.streamView = true;   // session-start state: streaming is primary
+    delete app.buildFlow;    // fresh flow — nothing answered yet
+    app.streamAction = null;
+    exitCalls = [];
+    origExit = process.exit;
+    process.exit = (code) => { exitCalls.push(code); throw new Error('__EXIT__'); };
+  });
+  afterEach(() => { process.exit = origExit; app.message = null; app.streamView = false; });
+
+  const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
+  function press(str, key) {
+    withStdout(() => { try { handleKey(str, key); } catch (e) { if (e.message !== '__EXIT__') throw e; } });
+  }
+
+  it('the DEFAULT session render is the streaming topic-Q&A, NOT the classic dashboard', () => {
+    const out = plain(withStdout(() => render()));
+    // Streaming heartbeat: the critical topic label (ordered first by the flow) plus a
+    // recommended-tagged option — this is streaming-render's output, proving it primary.
+    assert.match(out, /Authentication/, 'streaming topic label is shown as the first screen');
+    assert.match(out, /recommended/, 'the recommended option is tagged (streaming heartbeat)');
+    // The old pipeline dashboard is NOT the first screen.
+    assert.doesNotMatch(out, /Plans at gates/, 'the classic pipeline dashboard is not the primary view');
+    assert.ok(app.buildFlow, 'render lazily seeded the streaming flow via streaming-render');
+  });
+
+  it('a digit key drives streaming-flow — the answer is recorded and the pointer advances', () => {
+    render(); // seeds app.buildFlow (critical topic auth/provider is current)
+    const before = streamingFlow.currentQuestion(app.buildFlow);
+    assert.equal(before.id, 'provider', 'the critical topic question is current first');
+    press('1', { name: '1', sequence: '1' }); // pick the recommended option
+    assert.equal(app.buildFlow.answers['auth/provider'], '1', 'the chosen option key is recorded');
+    const after = streamingFlow.currentQuestion(app.buildFlow);
+    assert.notStrictEqual(after, before, 'the flow pointer advanced to the next question');
+  });
+
+  it('the "settings" intent opens the System Settings sub-mode (reuses toolMode=3)', () => {
+    render();
+    press('s', { name: 's', sequence: 's' });
+    assert.equal(TABS[app.tabIndex].id, 'system', 'settings intent switched to the system area');
+    assert.equal(app.toolMode, '3', 'the existing Settings sub-mode is selected');
+    assert.equal(app.streamAction, null, 'streamAction cleared after the host interpreted it');
+    // And that sub-mode actually renders the Settings screen.
+    const out = plain(withStdout(() => render()));
+    assert.match(out, /Settings/i, 'the Settings screen renders after the intent');
+  });
+
+  it('the transitional "m" bridge reaches the classic dashboard and area keys still work there', () => {
+    render();
+    press('m', { name: 'm', sequence: 'm' });
+    assert.equal(app.streamView, false, '"m" left the streaming view for the classic dashboard');
+    const out = plain(withStdout(() => render()));
+    assert.doesNotMatch(out, /Authentication/, 'the classic dashboard, not streaming, renders after "m"');
+    // Once in the classic dashboard, the existing area navigation works exactly as today.
+    press('2', { name: '2', sequence: '2' });
+    assert.equal(app.tabIndex, 1, 'numeric area switch works in the classic dashboard');
+    press('', { name: 'right' });
+    assert.equal(app.tabIndex, 2, 'right-arrow area nav still works in the classic dashboard');
+    // And a way BACK to streaming exists from the dashboard.
+    app.tabIndex = 0; app.toolMode = null; app.mode = 'list';
+    press('m', { name: 'm', sequence: 'm' });
+    assert.equal(app.streamView, true, '"m" returns from the classic dashboard to streaming');
+  });
+
+  it('regression: q quits from streaming; the prior-slice "s"=Settings binding survives; initProject still runs', () => {
+    // q still quits from the primary streaming view (session lifecycle preserved).
+    press('q', { name: 'q' });
+    assert.deepEqual(exitCalls, [0], 'q quits with exit 0 from the primary streaming view');
+
+    // Reach the classic dashboard, then the global "s" = Settings binding still works.
+    app.streamView = false; app.tabIndex = 0; app.toolMode = null; app.mode = 'list';
+    press('s', { name: 's', sequence: 's' });
+    assert.equal(TABS[app.tabIndex].id, 'system', 'global s reaches System from the dashboard');
+    assert.equal(app.toolMode, '3', 'the s=Settings binding from the prior slice is intact');
+
+    // initProject still runs on first open (auto-init unchanged by the streaming wiring).
+    const dir = mkTmp('menu-stream-init-');
+    assert.equal(ensureInitialized(dir), true, 'ensureInitialized initializes a fresh project');
+    assert.ok(fs.existsSync(path.join(dir, '.ctoc')), '.ctoc created on first open');
   });
 });
 

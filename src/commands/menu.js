@@ -262,6 +262,15 @@ const overviewTab = require('../tabs/overview');
 const reviewTab = require('../tabs/review');
 const toolsTab = require('../tabs/tools');
 
+// Streaming interaction model (slice 1): the PRIMARY session view. This is a
+// standalone { render, handleKey } pair over the host `app` (it seeds app.buildFlow
+// lazily and emits app.streamAction intents for the host to interpret). Wiring it
+// here as the session's default screen is what makes the human see streaming FIRST
+// and what makes streaming-render reachable from a live root (the dead-code fence).
+// The classic dashboard + areas remain reachable via the transitional `m` bridge
+// (a temporary key the menu-retirement slice will remove).
+const streamingRender = require('../lib/streaming-render');
+
 const tabModules = {
   pipeline: pipelineArea,
   inbox: inboxArea,
@@ -279,6 +288,12 @@ const app = {
   width: process.stdout.columns || 80,
   tabIndex: 0,
   mode: 'list',
+  // Streaming is the PRIMARY view of the interactive session (slice 1). Default true
+  // so the first screen the human sees is the streaming topic-Q&A, not the classic
+  // dashboard. The `m` bridge toggles to the classic dashboard/areas during the
+  // transition; the menu-retirement slice removes the classic side entirely.
+  streamView: true,
+  streamAction: null,
   selectedIndex: 0,
   actionIndex: 0,
   selectedPlan: null,
@@ -343,6 +358,12 @@ function render() {
     if (app.toolMode === '1') output += toolsTab.renderDoctor(app);
     else if (app.toolMode === '2') output += toolsTab.renderUpdate(app);
     else if (app.toolMode === '3') output += toolsTab.renderSettings(app);
+  } else if (app.streamView) {
+    // PRIMARY streaming view: the topic-labeled question with the recommended option
+    // tagged. Rendered BELOW the search/view/actions/reject/settings sub-modes so a
+    // detour (e.g. the settings intent) still shows its own screen, but ABOVE the
+    // classic dashboard so streaming is what the human sees by default.
+    output += streamingRender.render(app);
   } else if (tabModule && tabModule.render) {
     output += tabModule.render(app);
   }
@@ -413,6 +434,43 @@ function handleKey(str, key) {
     process.exit(0);
   }
 
+  // PRIMARY streaming view owns keystrokes. Guarded to plain list mode with no active
+  // sub-mode (search/settings) so a detour keeps its own key handling. q is handled
+  // ABOVE, so the session still quits. Everything else routes through streaming-render
+  // FIRST; its emitted intents (settings/back) are interpreted here.
+  if (app.streamView && !app.searchMode && !app.toolMode && app.mode === 'list') {
+    // Transitional bridge OUT of streaming into the classic dashboard (temporary; the
+    // menu-retirement slice removes it). `m` collides with NO streaming key (digits,
+    // c, b, s) nor any area letter key (agent g/x, system d/u/s/b), so it falls
+    // through streaming-render cleanly and is safe as the documented bridge.
+    if (key.sequence === 'm' || key.name === 'm') {
+      app.streamView = false;
+      render();
+      return;
+    }
+    if (streamingRender.handleKey(key, app)) {
+      // Interpret the intents streaming-render emits onto the host.
+      if (app.streamAction === 'settings') {
+        // Reuse the existing System → Settings sub-mode (toolMode='3'). streamView
+        // stays true, so exiting Settings returns the human to the streaming view.
+        app.tabIndex = TABS.findIndex(t => t.id === 'system');
+        app.toolMode = '3';
+        app.settingsTabIndex = 0;
+        app.settingIndex = 0;
+      } else if (app.streamAction === 'back') {
+        // In the primary streaming view, `back` toggles to the classic dashboard.
+        app.streamView = false;
+      }
+      app.streamAction = null;
+      render();
+      return;
+    }
+    // Streaming owns the screen: an unmapped key stays in streaming rather than
+    // leaking to the numeric/area shortcuts below (which would silently jump areas).
+    render();
+    return;
+  }
+
   // Tab switching (always available)
   if (key.name === 'left') {
     app.tabIndex = prevTab(app.tabIndex);
@@ -462,6 +520,16 @@ function handleKey(str, key) {
   const tabModule = tabModules[currentTab.id];
 
   if (tabModule.handleKey && tabModule.handleKey(key, app)) {
+    render();
+    return;
+  }
+
+  // Transitional bridge BACK into the primary streaming view from the classic
+  // dashboard (temporary; removed with the menu-retirement slice). Guarded to list
+  // mode with no sub-mode so it never shadows typed text or an area sub-mode. Runs
+  // AFTER area delegation, so an area that consumes `m` itself still wins.
+  if ((key.sequence === 'm' || key.name === 'm') && !app.streamView && app.mode === 'list' && !app.toolMode) {
+    app.streamView = true;
     render();
     return;
   }
@@ -636,6 +704,9 @@ function main() {
     });
     setupKeyboard(handleKey);
     app.navStack.push('Overview');
+    // The interactive session opens on the PRIMARY streaming view — the first thing
+    // the human sees after initProject is the streaming topic-Q&A, not the dashboard.
+    app.streamView = true;
     if (justInitialized) app.message = 'CTOC initialized for this project';
     // PI4-s4 kickback: kick the landing area's related-plans pre-fetch so the panel
     // is populated on first paint (fire-and-forget, fail-open).
