@@ -120,6 +120,23 @@ test('parseCoveragePct: extracts the LINE percentage, not branch/funcs', () => {
   assert.strictEqual(gate.parseCoveragePct('ℹ all files | 73.50 |  61.00 |  80.00 | 12-15'), 73.5);
 });
 
+// Regression: a stray `all files | N` earlier in the run (a test NAME or stdout
+// containing a fixture coverage row — e.g. the step-13-verify parser tests) must
+// NOT hijack the gate. Node prints the real coverage summary LAST, so last-match
+// wins. A first-match parse reported the fixture's 42.10 as the whole suite's
+// coverage and FAILED a genuinely-99% run.
+test('parseCoveragePct: the trailing real summary wins over an earlier stray row', () => {
+  const polluted = [
+    '  ✔ H1: reads a Node-native "# all files | 42.10 |" row (0.3ms)', // a test NAME
+    '  console.log fixture: # all files | 42.10 | 30.00 | 25.00 | 1-9', // stray stdout
+    'ℹ tests 8990',
+    'ℹ pass 8990',
+    'ℹ all files                          |  99.38 |    92.29 |   98.76 | ', // the REAL row, last
+    'ℹ end of coverage report',
+  ].join('\n');
+  assert.strictEqual(gate.parseCoveragePct(polluted), 99.38);
+});
+
 // Wiring assertion — read the REAL package.json from disk and prove coverage is
 // wired into `npm test` through the gate. RED-now: today's scripts.test is
 // `node --test tests/*.test.js` (no coverage flag, no gate).

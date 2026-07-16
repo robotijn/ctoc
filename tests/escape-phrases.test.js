@@ -54,4 +54,32 @@ describe('matchEscapePhrase', () => {
     const match = matchEscapePhrase(text);
     assert.ok(['hotfix', 'trivial fix'].includes(match), 'returns a recognized phrase');
   });
+
+  it('does NOT match bare-word phrases embedded in a file path or identifier', () => {
+    // Path/identifier punctuation (/ \ - _ .) is NOT a word boundary for escape
+    // detection. A user innocuously naming a file must never disable the
+    // write-enforcement guard. See adversarial-repair: silent gate bypass.
+    assert.equal(matchEscapePhrase('please fix the bug in src/hotfix-runner.js'), null);
+    assert.equal(matchEscapePhrase('the issue is in src/urgent-alerts.js'), null);
+    assert.equal(matchEscapePhrase('look at hotfix_manager.py'), null);
+    assert.equal(matchEscapePhrase('hotfixes are queued'), null);
+    assert.equal(matchEscapePhrase('trivially complex logic'), null);
+    assert.equal(matchEscapePhrase('C:\\repo\\urgent-alerts.js'), null);
+  });
+
+  it('still matches bare-word phrases used as genuine standalone directives', () => {
+    assert.equal(matchEscapePhrase('do a proper hotfix now'), 'hotfix');
+    assert.equal(matchEscapePhrase('this is urgent'), 'urgent');
+    assert.equal(matchEscapePhrase('hotfix.'), 'hotfix');
+    assert.equal(matchEscapePhrase('urgent!'), 'urgent');
+    assert.equal(matchEscapePhrase('hotfix'), 'hotfix');
+  });
+
+  it('still matches multi-word directives', () => {
+    assert.equal(matchEscapePhrase('please skip planning for this'), 'skip planning');
+    assert.equal(matchEscapePhrase('just skip iron loop here'), 'skip iron loop');
+    assert.equal(matchEscapePhrase('this is a quick fix'), 'quick fix');
+    assert.equal(matchEscapePhrase('a trivial fix'), 'trivial fix');
+    assert.equal(matchEscapePhrase('only a trivial change'), 'trivial change');
+  });
 });

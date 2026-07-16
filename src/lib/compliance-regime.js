@@ -168,7 +168,24 @@ function writeActiveProfiles(projectRoot, profileNames) {
     //    Static literal regex (no dynamic RegExp from untrusted input): the
     //    `m` flag + `.*$` is CRLF-tolerant.
     const lineRe = /^([ \t]*)active_profiles:.*$/m;
-    if (!lineRe.test(content)) return { ok: false, profiles: [] };
+    const m = lineRe.exec(content);
+    if (!m) return { ok: false, profiles: [] };
+
+    // BLOCK-STYLE GUARD. If the matched `active_profiles:` line carries no inline
+    // value (only whitespace and/or a trailing comment after the colon), the list
+    // items live on following `- item` lines. A single-line inline replace would
+    // leave those `- item` lines dangling under the new `[...]` value → invalid
+    // YAML a real parser rejects, while CTOC's own regex reader tolerates the
+    // garbage and this function would falsely report ok:true. Refuse rather than
+    // corrupt: return the existing profiles and write NOTHING (byte-identical).
+    // String-sliced (no dynamic/backtracking regex): take everything after the
+    // first colon, drop a trailing `#` comment, and treat blank as block style.
+    const afterColon = m[0].slice(m[0].indexOf(':') + 1);
+    const inlineValue = afterColon.split('#')[0].trim();
+    if (inlineValue === '') {
+      return { ok: false, profiles: existing };
+    }
+
     const updated = content.replace(lineRe, `$1${inline}`);
 
     // 5. Write back.

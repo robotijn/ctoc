@@ -246,11 +246,6 @@ function toolExists(bin, cwd) {
   }
 }
 
-/** Heuristic: does a command result read as NOT-RUN (missing tool/script)? */
-function looksNotRun(errText) {
-  return /not found|ENOENT|command not found|Missing script|is not recognized|No such file/i.test(errText || '');
-}
-
 /**
  * Evaluate one check category (lint/typecheck/tests) from a list of candidate
  * commands whose preconditions (script present, or tool installed) already held.
@@ -319,7 +314,13 @@ function parseSkippedCount(out) {
 /** Parse a coverage percentage from test-runner output, or null if not present. */
 function parseCoveragePct(out) {
   const text = out || '';
-  let m = text.match(/All files\s*\|\s*([\d.]+)/);
+  // Node's own --experimental-test-coverage table prints the summary row as
+  // `# all files | <line%> | …` (lowercase, leading `# ` under the TAP reporter).
+  // Match it case-insensitively and tolerant of the `# ` prefix, and BEFORE the
+  // Istanbul/nyc format — otherwise a `node --test` project's coverage parses to
+  // null and its declared floor is silently unenforced. The same regex also
+  // matches the Istanbul "All files | 95 |" row (case-insensitive covers "All").
+  let m = text.match(/^\s*#?\s*all files\s*\|\s*([\d.]+)/im);
   if (m) return parseFloat(m[1]);
   m = text.match(/Lines\s*:\s*([\d.]+)\s*%/i);
   if (m) return parseFloat(m[1]);
@@ -355,8 +356,20 @@ function applyTestQualityContracts(check, projectPath, errors) {
       errors.push(`Coverage ${cov}% is below the project floor of ${floor}%`);
     }
   } else {
-    // Coverage genuinely could not be measured — recorded, never treated as a pass.
+    // Coverage could not be measured. With NO floor declared, coverage is not
+    // gated (we do not invent a floor). But when a floor IS declared, unmeasured
+    // is NOT a pass: fail closed rather than silently letting below-floor coverage
+    // through when the figure merely failed to parse (defense in depth, consistent
+    // with this module's fail-closed contract).
     check.coverage = null;
+    check.coverageFloor = floor;
+    if (floor != null) {
+      check.passed = false;
+      errors.push(
+        `coverage floor ${floor}% declared but no coverage figure was produced — ` +
+        'unmeasured is NOT a pass'
+      );
+    }
   }
 }
 
@@ -428,12 +441,21 @@ function tryCommand(command, cwd) {
       timeout: 120000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    return { success: true, output: output.trim(), error: null };
+    return { success: true, output: output.trim(), error: null, spawnFailed: false };
   } catch (e) {
     return {
       success: false,
       output: e.stdout ? e.stdout.toString().trim() : '',
-      error: e.stderr ? e.stderr.toString().trim() : e.message
+      error: e.stderr ? e.stderr.toString().trim() : e.message,
+      // A TRUE launch failure: the binary itself could not be run, signalled
+      // STRUCTURALLY by the exit layer — either a spawn ENOENT (`e.code`, when no
+      // shell is used) or the shell's canonical command-not-found exit status 127
+      // (`e.status`, which execSync's default shell returns for a missing command).
+      // ONLY these exit-layer signals — never a substring of the tool's OWN
+      // stdout/stderr — may reclassify a check as NOT-RUN. A genuine failure that
+      // launched and exited non-zero (e.g. status 1) is a REAL failure even when
+      // its output happens to contain "No such file"/"ENOENT".
+      spawnFailed: !!(e && (e.code === 'ENOENT' || e.status === 127))
     };
   }
 }
@@ -447,10 +469,15 @@ function tryCommand(command, cwd) {
  * passed. When EVERY candidate is missing, this returns `{ ran:false,
  * success:false, applicable:false, command:null }` — never the old
  * `{ success:true, output:'...skipped' }` sentinel that let a gate open on
- * nothing. The old detector also keyed only off the literal "not found", so an
- * npm "Missing script" (finding C2) was miscounted as a real failure; the
- * `looksNotRun` heuristic now recognizes that and every common missing-tool
- * message.
+ * nothing. NOT-RUN is decided ONLY on a TRUE launch failure
+ * (`result.spawnFailed`, i.e. execSync threw with `e.code === 'ENOENT'` or the
+ * shell's command-not-found exit status `e.status === 127`) — the binary could
+ * not be launched at all — never on a substring of the command's OWN output.
+ * Candidates are already presence-filtered upstream
+ * (npmScriptExists/toolExists), so a command that launched and exited non-zero is
+ * always a REAL failure; scanning its stdout/stderr for "not found"/"No such
+ * file" would only MISFIRE and swallow a genuine failure, carrying VERIFY to
+ * green on some other passing check.
  *
  * @param {string[]} commands - Commands to try in order.
  * @param {string} cwd - Working directory.
@@ -462,10 +489,15 @@ function tryCommands(commands, cwd) {
     if (result.success) {
       return { ...result, command: cmd, ran: true };
     }
-    if (looksNotRun(result.error)) {
-      continue; // executable/script missing → NOT this check; try the next candidate
+    if (result.spawnFailed) {
+      // The binary itself could not be launched (a TRUE launch failure: spawn
+      // ENOENT or shell exit status 127), despite the upstream presence
+      // precondition — treat as NOT this check and try the next candidate. This
+      // NEVER fires on a substring of the command's own output, so a real
+      // non-zero exit (e.g. status 1) is never swallowed as not-run.
+      continue;
     }
-    // The command ran and failed for a real reason.
+    // The command launched and exited non-zero — a REAL failure.
     return { ...result, command: cmd, ran: true };
   }
 
@@ -572,6 +604,7 @@ module.exports = {
   buildSummary,
   tryCommand,
   tryCommands,
+  parseCoveragePct,
   verifyEvidencePath,
   persistVerifyResult,
   readVerifyEvidence

@@ -8,9 +8,14 @@
  * .claudeignore can be bypassed by indexing; this hook fires on every matching
  * tool call and cannot be.
  *
- * I/O convention (matches src/hooks/PreToolUse.Edit.js):
+ * I/O convention (matches src/hooks/PreToolUse.Edit.js / PreToolUse.Bash.js):
  *   - reads BOTH the env var CLAUDE_TOOL_INPUT (JSON string) AND stdin JSON.
- *   - Exit 0 = ALLOWED, Exit 1 = BLOCKED.
+ *   - BLOCK is signalled through the shared `hook-deny-signal` emitter
+ *     (`permissionDecision:"deny"` JSON on stdout + exit 0) — the ONLY signal the
+ *     Claude Code harness actually treats as blocking. A bare `process.exit(1)` is
+ *     a NON-blocking error: it prints the banner and lets the tool run anyway
+ *     (the exact bypass this hook must not have for a secret-file guard).
+ *   - ALLOW = exit 0 silent.
  *   - FAILS OPEN (exit 0) on any internal error — never break the user's flow
  *     because of a hook bug.
  *
@@ -23,6 +28,7 @@
  */
 
 const fs = require('fs');
+const { emitDeny } = require('../lib/hook-deny-signal');
 
 /**
  * Secret-bearing target patterns (ported verbatim from guard-files.sh).
@@ -115,7 +121,11 @@ function main() {
         'Secrets are referenced by name, never by value. If access is genuinely ' +
         'needed, the human handles it outside the session.\n\n'
       );
-      process.exit(1);
+      // The ONLY harness-recognized block: permissionDecision:"deny" on stdout via
+      // the shared emitter (exits 0). A bare process.exit(1) was a NON-blocking
+      // error that printed "BLOCKED" while letting the secret access proceed.
+      emitDeny('CTOC: guard-files blocked access to a secret-bearing target (referenced by name, never value).');
+      return;
     }
     process.exit(0);
   } catch (err) {

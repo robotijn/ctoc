@@ -217,7 +217,7 @@ function logNote(logDir, note, detail = {}) {
  *   logDir?: string,
  *   batchApi?: object
  * }} [deps]  Required at runtime: `store` and `embedder` (validated below).
- * @returns {Promise<{ changed: string[], skipped: boolean, reason?: string }>}
+ * @returns {Promise<{ changed: string[], skipped: boolean, reason?: string, reconcile?: object }>}
  */
 async function syncUnit(planPath, deps = {}) {
   const { store, embedder, calibrationReady, plansRoot, logDir, batchApi } = deps;
@@ -246,6 +246,15 @@ async function syncUnit(planPath, deps = {}) {
   const units = parseUnits(content);
   const changed = [];
 
+  // D1 (dimension-wipe guard): capture the store's current dimension BEFORE any
+  // mutation. `applyUpsert` performs a full reset (`units.clear()`) whenever an
+  // upsert's vector length differs from this dimension (AC15 — it assumes the CALLER
+  // rebuilds). syncUnit sees only THIS ONE plan, so it cannot rebuild the others: a
+  // single dimension-changing upsert here would wipe every OTHER plan permanently.
+  // A real store's `dimension` is a number (settled) or null (empty). Anything else
+  // (e.g. a boundary fake store that does not track a dimension) disables the guard.
+  const storeDim = store.dimension;
+
   // 5. per-unit diff → embed + upsert only on change (idempotent).
   for (const u of units) {
     const h = hashUnit(u.text, { files: u.files, parentVision: u.parentVision, status: u.status });
@@ -258,6 +267,34 @@ async function syncUnit(planPath, deps = {}) {
     if (!(vector instanceof Float32Array)) {
       throw new Error(`syncUnit: embedder did not return a Float32Array for ${normPath}#${u.sectionId}`);
     }
+
+    // D1 (dimension-wipe guard, continued): the embedder's output dimension differs
+    // from the store's current dimension (e.g. in-process 384-dim ↔ Ollama 768-dim).
+    // Performing this single-unit upsert would trip the AC15 full reset and clear every
+    // OTHER plan — which syncUnit cannot see or rebuild. Never do that. Instead rebuild
+    // the WHOLE index at the new dimension via a full reconcile (leaves every plan
+    // present AND fresh). If a full rebuild is not possible here — no `plansRoot` to
+    // walk, or we are already running inside a batch (a reconcile would take a nested
+    // lock) — refuse the destructive upsert and flag a backfill, leaving the existing
+    // index intact rather than reducing it to this one plan. This runs BEFORE any
+    // upsert, and the embedder dimension is uniform per call, so no same-dimension
+    // upsert has happened yet in this call.
+    if (typeof storeDim === 'number' && vector.length !== storeDim) {
+      if (plansRoot && !batchApi) {
+        // Lazy require: reconcile.js requires this module at load time; requiring it
+        // lazily here (at call time, when both modules are fully loaded) avoids a
+        // load-time circular dependency.
+        const { reconcileIndex } = require('./reconcile');
+        const rec = await reconcileIndex(plansRoot, { store, embedder, calibrationReady, logDir });
+        logNote(logDir, 'syncUnit: embedding dimension changed — full reconcile rebuilt the index',
+          { planPath: normPath, from: storeDim, to: vector.length });
+        return { changed: [], skipped: true, reason: 'dimension-changed-reconciled', reconcile: rec };
+      }
+      logNote(logDir, 'syncUnit: embedding dimension changed but a full rebuild is not possible here — backfill needed',
+        { planPath: normPath, from: storeDim, to: vector.length });
+      return { changed: [], skipped: true, reason: 'dimension-changed-backfill-needed' };
+    }
+
     api.upsertUnit({
       planPath: normPath,
       sectionId: u.sectionId,
@@ -272,12 +309,13 @@ async function syncUnit(planPath, deps = {}) {
     changed.push(u.sectionId);
   }
 
-  // 6. remove stale sections: any stored unit for this plan whose sectionId is no
-  //    longer present in the freshly-parsed set. Only reachable when the api can
-  //    enumerate a plan's sections (the batch/real store expose listPlanPaths but
-  //    section enumeration needs getUnit probing; the sweep handles plan-level
-  //    orphans — section-level orphans self-heal on the next full-body re-embed
-  //    because a body edit changes the plan-unit hash). Documented in the plan.
+  // 6. Section orphans (a `## ` heading deleted from this plan while the plan file
+  //    itself remains on disk) are NOT removed on this single-plan hot path. They do
+  //    NOT self-heal on the next full-body re-embed: re-hashing `__plan__` re-embeds
+  //    `__plan__`, it does not delete the orphaned `sec-*` unit. Section-orphan removal
+  //    is done by the full sweep — `reconcileIndex` (phase 2) diffs each present plan's
+  //    stored section ids against its freshly-parsed set and deletes the difference.
+  //    See src/lib/plan-index/reconcile.js.
   return { changed, skipped: false };
 }
 

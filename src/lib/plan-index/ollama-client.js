@@ -30,18 +30,44 @@ const DEFAULT_BASE_URL = 'http://localhost:11434';
 const DEFAULT_EMBED_TIMEOUT_MS = 5000;
 
 /**
- * Perform a bounded fetch under an AbortController timeout.
+ * A promise that REJECTS when `signal` aborts — used to race a stalled response
+ * body read against the same AbortController timeout, so reading a hung body can
+ * never outlive the bound even if the body promise itself ignores the signal.
+ * @param {AbortSignal} signal
+ * @param {number} timeoutMs
+ * @returns {Promise<never>}
+ */
+function rejectOnAbort(signal, timeoutMs) {
+  return new Promise((_resolve, reject) => {
+    const fail = () => reject(new Error(`ollama-client: request exceeded ${timeoutMs}ms timeout`));
+    if (signal.aborted) {
+      fail();
+      return;
+    }
+    signal.addEventListener('abort', fail, { once: true });
+  });
+}
+
+/**
+ * Perform a bounded fetch AND consume its body under a single AbortController
+ * timeout. `handle(res, signal)` runs while the timer is still armed, so the
+ * HEADERS read (`doFetch`) AND the BODY read the handler performs are BOTH
+ * bounded — the timer is cleared only after the handler settles, never the
+ * instant headers arrive. The handler races its body read against
+ * `rejectOnAbort(signal, timeoutMs)` so a stalled body is aborted by the timeout.
  * @param {Function} doFetch
  * @param {string} url
  * @param {object} options
  * @param {number} timeoutMs
- * @returns {Promise<any>} the Response
+ * @param {(res: any, signal: AbortSignal) => Promise<any>} handle
+ * @returns {Promise<any>} whatever `handle` resolves to
  */
-async function boundedFetch(doFetch, url, options, timeoutMs) {
+async function boundedFetch(doFetch, url, options, timeoutMs, handle) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await doFetch(url, { ...options, signal: controller.signal });
+    const res = await doFetch(url, { ...options, signal: controller.signal });
+    return await handle(res, controller.signal);
   } finally {
     clearTimeout(timer);
   }
@@ -129,7 +155,7 @@ function createOllamaClient(config = {}) {
     if (!Array.isArray(input) || input.length === 0) {
       throw new Error('ollama-client: embed requires a non-empty input string[]');
     }
-    const res = await boundedFetch(
+    return boundedFetch(
       doFetch,
       `${baseUrl}/api/embed`,
       {
@@ -137,14 +163,16 @@ function createOllamaClient(config = {}) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, input })
       },
-      timeoutMs
+      timeoutMs,
+      async (res, signal) => {
+        if (!res || !(res.ok || res.status === 200)) {
+          const status = res ? res.status : 'no-response';
+          throw new Error(`ollama-client: /api/embed returned HTTP ${status}`);
+        }
+        const json = await Promise.race([res.json(), rejectOnAbort(signal, timeoutMs)]);
+        return parseEmbeddings(json);
+      }
     );
-    if (!res || !(res.ok || res.status === 200)) {
-      const status = res ? res.status : 'no-response';
-      throw new Error(`ollama-client: /api/embed returned HTTP ${status}`);
-    }
-    const json = await res.json();
-    return parseEmbeddings(json);
   }
 
   /**
@@ -152,16 +180,17 @@ function createOllamaClient(config = {}) {
    * @returns {Promise<string[]>}
    */
   async function listModels() {
-    const res = await boundedFetch(doFetch, `${baseUrl}/api/tags`, { method: 'GET' }, timeoutMs);
-    if (!res || !(res.ok || res.status === 200)) {
-      const status = res ? res.status : 'no-response';
-      throw new Error(`ollama-client: /api/tags returned HTTP ${status}`);
-    }
-    const json = await res.json();
-    const models = json && Array.isArray(json.models) ? json.models : [];
-    return models
-      .map((m) => (m && typeof m.name === 'string' ? stripTag(m.name) : null))
-      .filter((n) => typeof n === 'string' && n.length > 0);
+    return boundedFetch(doFetch, `${baseUrl}/api/tags`, { method: 'GET' }, timeoutMs, async (res, signal) => {
+      if (!res || !(res.ok || res.status === 200)) {
+        const status = res ? res.status : 'no-response';
+        throw new Error(`ollama-client: /api/tags returned HTTP ${status}`);
+      }
+      const json = await Promise.race([res.json(), rejectOnAbort(signal, timeoutMs)]);
+      const models = json && Array.isArray(json.models) ? json.models : [];
+      return models
+        .map((m) => (m && typeof m.name === 'string' ? stripTag(m.name) : null))
+        .filter((n) => typeof n === 'string' && n.length > 0);
+    });
   }
 
   return { embed, listModels, baseUrl };
