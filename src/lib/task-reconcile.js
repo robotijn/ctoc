@@ -135,6 +135,10 @@ const TEMP_PREFIX = 'tasks.json.tmp-';
  * @property {Array<{id:string, reason:string, deps:string[], summary:string}>} unsatisfiable
  *   queued tasks marked `failed` this pass because they can NEVER run (dead dep / cycle —
  *   C1-1/C1-7). Surfaced so a permanent wedge is a loud event, never silent-forever.
+ * @property {Array<{id:string, reason:string, deps:string[], summary:string}>} deferred
+ *   queued tasks LEFT queued this pass despite a dead dep, because EVERY dead dep was
+ *   orphaned on staleness alone (may still complete — the sibling of the R3-B item 8 file
+ *   quarantine). Not failed, not in `unsatisfiable`; re-evaluated next pass.
  * @property {Array<{id:string, summary:*}>} failed  surfaced already-failed tasks (never dropped).
  * @property {string[]} swept  terminal-task ids pruned from the active view this pass.
  * @property {null|{reason?:string, skipped?:number}} corrupt  fail-open marker, else null.
@@ -230,7 +234,7 @@ function reconcile(tasks, opts = {}) {
   /** @type {ReconcileReport} */
   const report = {
     orphaned: [], stalenessOrphaned: [], cancelled: [], stalenessCancelled: [],
-    unsatisfiable: [], failed: [], swept: [], corrupt: null
+    unsatisfiable: [], deferred: [], failed: [], swept: [], corrupt: null
   };
 
   const version = (tasks && typeof tasks === 'object' && Number.isSafeInteger(tasks.version))
@@ -355,8 +359,36 @@ function reconcile(tasks, opts = {}) {
   // `failed` with a loud result + report entry so the wedge becomes a visible event
   // rather than a task stuck queued forever. Evaluated over the post-orphan `kept` set,
   // so a dep orphaned THIS pass also wedges its non-sync dependents (caught at review).
+  //
+  // R5 STALENESS-ORPHAN DEFERRAL — the sibling of the R3-B item 8 file quarantine. An
+  // orphaning decided by the staleness backstop ALONE (TaskList unavailable) is NOT
+  // confirmed death: the agent MAY still be alive and can complete legally (orphaned→done).
+  // So a dependent whose EVERY dead dep is such a staleness-orphan (from THIS pass) is
+  // NOT unsatisfiable — failing it here would be silent, unrecoverable loss of queued work
+  // on the NORMAL degraded path. It is instead DEFERRED one pass (left queued, untouched);
+  // the next pass either sees the dep complete (→ dependent runnable) or sees it confirmed
+  // absent / retention-swept (→ dependent then legitimately failed). Only the
+  // reason==='dep-failed' && all-dead-deps-are-staleness-orphaned case defers; a
+  // confirmed-absent orphan (in report.orphaned but NOT stalenessOrphaned), a genuine
+  // failed/cancelled/missing dep, and a dep-cycle ALL fail immediately, unchanged.
+  const stalenessOrphanIds = new Set(report.stalenessOrphaned.map(e => e.id));
   for (const entry of taskRegistry.unsatisfiableTasks({ tasks: kept })) {
     const summary = `${entry.reason}: ${entry.deps.join(', ')}`;
+    const allDeadDepsAreStalenessOrphans = entry.reason === 'dep-failed' &&
+      entry.deps.length > 0 && entry.deps.every(d => stalenessOrphanIds.has(d));
+    if (allDeadDepsAreStalenessOrphans) {
+      // Defer: leave the task `queued` and untouched, and do NOT add it to
+      // report.unsatisfiable/failed. Record it in report.deferred so the deferral is a
+      // visible event, never a silent skip.
+      report.deferred.push({
+        id: entry.task.id,
+        reason: 'staleness-orphan-dep-deferral',
+        deps: entry.deps,
+        summary: 'held one pass — every dead dependency was orphaned on staleness alone ' +
+          '(the previous holder was never confirmed dead and may still complete)'
+      });
+      continue;
+    }
     entry.task.status = 'failed';
     entry.task.result = { ok: false, summary };
     if (!entry.task.ts || typeof entry.task.ts !== 'object') entry.task.ts = {};
@@ -474,7 +506,7 @@ function reconcileState(root, opts = {}) {
       /** @type {ReconcileReport} */
       const failReport = {
         orphaned: [], stalenessOrphaned: [], cancelled: [], stalenessCancelled: [],
-        unsatisfiable: [], failed: [], swept: [], corrupt: { reason: 'load-failed' }
+        unsatisfiable: [], deferred: [], failed: [], swept: [], corrupt: { reason: 'load-failed' }
       };
       return { report: failReport, promote: [] };
     }

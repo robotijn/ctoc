@@ -516,6 +516,41 @@ describe('reconcile — unsatisfiable queued surfacing (C1-1/C1-7)', () => {
     assert.deepEqual(report.unsatisfiable, []);
   });
 
+  it('a queued dependent whose ONLY dead dep was orphaned on staleness alone is DEFERRED (left queued), not failed', () => {
+    // The dep is a running review agent aged past the 30-min flat staleness floor with NO
+    // TaskList (liveAgentIds:null) → orphaned on STALENESS ALONE. Such an orphan MAY still be
+    // alive and supports a legal orphaned→done late completion, so failing its queued
+    // dependent as dep-failed silently and unrecoverably loses queued work on the normal
+    // degraded path.
+    const r = mkReg([
+      running({ id: 'dep', kind: 'review', agentTaskId: 'ghost', started: ago(31 * MIN) }),
+      task({ id: 'dependent', kind: 'review', status: 'queued', touches: ['b.js'], blockedBy: ['dep'], done: undefined })
+    ]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: null });
+    assert.equal(tasks.tasks.find(x => x.id === 'dep').status, 'orphaned');
+    assert.ok(report.stalenessOrphaned.some(o => o.id === 'dep'), 'dep orphaned on staleness alone');
+    assert.equal(tasks.tasks.find(x => x.id === 'dependent').status, 'queued',
+      'deferred one pass — never permanently failed while its dep can still complete');
+    assert.ok(!report.unsatisfiable.some(u => u.id === 'dependent'),
+      'a deferred dependent is NOT pushed to the unsatisfiable/failed report list');
+  });
+
+  it('a queued dependent whose dep was a CONFIRMED-ABSENT orphan (TaskList present, no match) IS still failed', () => {
+    // Same shape, but a TaskList IS present and does NOT list the dep\'s agent → the dep is
+    // CONFIRMED gone, not merely stale. A confirmed-dead dep is unrecoverable, so its
+    // dependent must still be failed immediately (unchanged behavior).
+    const r = mkReg([
+      running({ id: 'dep', kind: 'review', agentTaskId: 'ghost', started: ago(31 * MIN) }),
+      task({ id: 'dependent', kind: 'review', status: 'queued', touches: ['b.js'], blockedBy: ['dep'], done: undefined })
+    ]);
+    const { tasks, report } = rec.reconcile(r, { now: NOW, graceMs: GRACE, staleThresholdMs: STALE, liveAgentIds: ['someone-else'] });
+    assert.equal(tasks.tasks.find(x => x.id === 'dep').status, 'orphaned');
+    assert.deepEqual(report.stalenessOrphaned, [], 'confirmed-absent, not staleness-based');
+    assert.equal(tasks.tasks.find(x => x.id === 'dependent').status, 'failed',
+      'a confirmed-dead dep is unrecoverable → its dependent is failed immediately');
+    assert.ok(report.unsatisfiable.some(u => u.id === 'dependent' && u.reason === 'dep-failed'));
+  });
+
   it('reconcileState persists the unsatisfiable-failed marking to disk', () => {
     const seed = mkReg([
       task({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'], done: ago(0) }),

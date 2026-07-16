@@ -428,9 +428,48 @@ async function executeWebhook(config, context, opts = {}) {
 }
 
 /**
+ * Resolve the interpreter + args for a deploy SCRIPT FILE by extension, platform-aware.
+ * The script is run via execFileSync with shell:false (no shell), so the chosen `file`
+ * must be a real program on PATH — the script path is passed as a single inert argument.
+ *
+ * Platform correctness (DEFECT 2): Windows has no POSIX `sh`, and its Python launcher is
+ * `py`, not `python3`. A `.sh`/`.bash` script therefore has no portable Windows
+ * interpreter — we throw a CLEAR unsupported error rather than letting execFileSync raise
+ * a bare ENOENT for a missing `sh`. An unknown extension falls through to executing the
+ * file directly (relies on its shebang / the OS file association), preserving prior behavior.
+ *
+ * @param {string} scriptPath absolute path to the resolved script file
+ * @param {string} [platform] process.platform — injectable so the win32 branches are testable
+ * @returns {{file: string, args: string[]}}
+ * @throws {Error} for a POSIX shell script (.sh/.bash) on Windows
+ */
+function scriptInterpreter(scriptPath, platform = process.platform) {
+  const ext = path.extname(scriptPath).toLowerCase();
+  if (ext === '.js' || ext === '.cjs' || ext === '.mjs') {
+    return { file: process.execPath, args: [scriptPath] };
+  }
+  if (ext === '.sh' || ext === '.bash') {
+    if (platform === 'win32') {
+      throw new Error(
+        `POSIX shell scripts are not supported on Windows: ${path.basename(scriptPath)}`
+      );
+    }
+    return { file: 'sh', args: [scriptPath] };
+  }
+  if (ext === '.py') {
+    return { file: platform === 'win32' ? 'py' : 'python3', args: [scriptPath] };
+  }
+  // Unknown extension: execute the file directly (shebang / OS association).
+  return { file: scriptPath, args: [] };
+}
+
+/**
  * script strategy: run a custom deploy script.
  * Live: executes `config.script` in the project dir with DEPLOY_ENV/DEPLOY_COMMIT
- * exported. Cross-platform: the script string is run through the platform shell.
+ * exported. The script FILE is run via execFileSync with shell:false (NO platform shell) —
+ * the interpreter is chosen by extension (scriptInterpreter), so config cannot inject a
+ * command. Cross-platform: `.py` uses `py` on Windows / `python3` on POSIX; a POSIX
+ * shell script on Windows is rejected with a clear error rather than a raw ENOENT.
  */
 function executeScript(config, context, opts = {}) {
   if (!config.script) {
@@ -451,12 +490,7 @@ function executeScript(config, context, opts = {}) {
   }
   // Pick the interpreter by extension and pass the script as a single argument
   // (no shell), so it stays usable cross-platform without ever shelling out.
-  const ext = path.extname(scriptPath).toLowerCase();
-  let file = scriptPath;
-  let args = [];
-  if (ext === '.js' || ext === '.cjs' || ext === '.mjs') { file = process.execPath; args = [scriptPath]; }
-  else if (ext === '.sh' || ext === '.bash') { file = 'sh'; args = [scriptPath]; }
-  else if (ext === '.py') { file = 'python3'; args = [scriptPath]; }
+  const { file, args } = scriptInterpreter(scriptPath);
   const output = execFileSync(file, args, {
     cwd,
     encoding: 'utf8',
@@ -639,6 +673,7 @@ module.exports = {
   buildDeploymentContext,
   deployToEnvironment,
   executeStrategy,
+  scriptInterpreter,
   isLive,
   httpPostJson,
   rollback,

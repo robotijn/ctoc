@@ -45,6 +45,32 @@ function write(dir, rel, body) {
   fs.writeFileSync(full, body);
 }
 
+// ── DEFECT 1: a missing/unreadable project path must not throw ─────────────────────
+// The glob branch of detectLanguagesLegacy read the project dir with an UNGUARDED
+// readdirSync. On a missing (ENOENT) or unreadable (EACCES) path the exception escaped
+// detectTools, so the module's DESIGNED empty-result path (source:'unknown' +
+// needsUserInput:true) was never reached — unlike every sibling readdir in the codebase.
+describe('tool-detector: a missing project path yields the empty/needsUserInput result, never throws', () => {
+  it('detectTools on a NON-EXISTENT path returns source:unknown + needsUserInput, does not throw', () => {
+    const missing = path.join(os.tmpdir(), `ctoc-td-missing-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    assert.equal(fs.existsSync(missing), false, 'precondition: the path must not exist');
+    let res;
+    assert.doesNotThrow(() => { res = toolDetector.detectTools(missing); },
+      'detectTools must not let an ENOENT from the glob readdir escape');
+    assert.deepEqual(res.languages, [], 'no languages detected on a missing path');
+    assert.equal(res.source, 'unknown', 'the designed empty-result path sets source:unknown');
+    assert.equal(res.needsUserInput, true, 'the designed empty-result path flags needsUserInput');
+  });
+
+  it('detectLanguages on a NON-EXISTENT path returns [] rather than throwing', () => {
+    const missing = path.join(os.tmpdir(), `ctoc-td-missing2-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    let langs;
+    assert.doesNotThrow(() => { langs = toolDetector.detectLanguages(missing); },
+      'detectLanguages must not let an ENOENT from the glob readdir escape');
+    assert.deepEqual(langs, [], 'a missing path detects no languages');
+  });
+});
+
 // ── Finding 1: RCE during detection ──────────────────────────────────────────────
 describe('tool-detector: a hostile capability override cmd is NEVER shell-executed (Finding 1)', () => {
   it('a `cmd` with a shell metacharacter payload runs NO side-effect during detectTools', () => {

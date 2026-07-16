@@ -90,6 +90,13 @@ function needsRebuild() {
     const age = Date.now() - new Date(map._meta.rebuiltAt).getTime();
     const maxAge = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
+    // A truthy but unparseable timestamp yields a NaN age; `NaN > maxAge` is false,
+    // which would silently certify a corrupt/unverifiable map as fresh. Treat an
+    // unverifiable age as stale and force a rebuild.
+    if (Number.isNaN(age)) {
+      return { needed: true, reason: 'Coverage map has an unparseable rebuild timestamp' };
+    }
+
     if (age > maxAge) {
       return { needed: true, reason: `Coverage map is older than ${MAX_AGE_DAYS} days` };
     }
