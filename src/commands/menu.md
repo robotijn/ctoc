@@ -22,7 +22,11 @@ The command outputs JSON: `{ text, ask, actions }`.
 
 | Command | Screen |
 |---------|--------|
-| (no args) | Dashboard Pipeline |
+| (no args) | **Streaming gate-decision screen** — ASKS the pending gate decisions ONE AT A TIME (the plans at Gate 1/2/3 ARE the questions); the "nothing pending" screen when none wait |
+| `stream approve {stage}/{file}.md` | The human's gate approval — crosses via the gate-safe `approvePlan` (validates + stamps `approved_by: human`; refuses an invalid transition), then shows the next decision |
+| `stream skip {stage}/{file}.md` | Advance to the next pending decision (writes nothing) |
+| `stream comment {stage}/{file}.md {text}` | Record a free-text comment to `.ctoc/streaming/comments.jsonl` (never edits the plan or crosses a gate), then advance |
+| `dashboard` | Classic Dashboard Pipeline overview (still reachable; the "Open the dashboard" action on the streaming screen) |
 | `menu commands` | Dashboard Commands |
 | `browse {stage}` | Stage plan list |
 | `plan {stage}/{file}` | Plan actions |
@@ -77,8 +81,12 @@ foreground. This is where CTOC's non-blocking behavior actually happens.
 Resolve the user's reply to an action string `A`, then classify:
 
 1. `A` is blank, or a **NAV route** — one of `menu` / `browse` / `section` /
-   `plan` / `stubs` / `validate` / `inbox` / `tasks` / `task` → **NAV**: render the
-   screen synchronously, record no task, minimal reasoning.
+   `plan` / `stubs` / `validate` / `inbox` / `tasks` / `task` / `stream` /
+   `dashboard` → **NAV**: render the screen synchronously, record no task, minimal
+   reasoning. `stream approve` is a foreground NAV route that crosses a human gate
+   through the gate-safe `approvePlan` — the human's "Approve" reply IS the gate
+   approval (Gate 4 stays sacred: only a human-answered reply crosses, never a
+   background task).
 2. `A` is a **NAV-claude** action (`view-edit`, `approve`, `reject`, `delete`,
    `edit`, `edit-stubs`, `add-stub`, `cleanup-exec`, `sync`, `set-environment`,
    `env-keep-defaults`, `dismiss-stale`, `set-compliance-regime`, `stop-agent`,
