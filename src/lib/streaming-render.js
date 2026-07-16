@@ -158,15 +158,167 @@ function exampleTopics() {
  */
 function initBuildFlow(app) {
   const realTopics = streamingTopics.loadTopics(app && app.projectPath);
-  const topics = (Array.isArray(realTopics) && realTopics.length > 0) ? realTopics : exampleTopics();
-  app.buildFlow = streamingFlow.initFlow(topics);
+  if (Array.isArray(realTopics) && realTopics.length > 0) {
+    // REAL topics on disk → drive them directly; the idea prompt is not shown.
+    app.ideaMode = false;
+    app.buildFlow = streamingFlow.initFlow(realTopics);
+    return app.buildFlow;
+  }
+  // No real topics → the empty state is the IN-FLOW IDEA PROMPT (the human dumps an
+  // idea and the vision-decomposer turns it into real topics). The canned demo is NOT
+  // the default; it stays reachable as a graceful fallback (the `b` key, and the
+  // CLI-absent path in submitIdea) so the screen is never empty.
+  app.ideaMode = true;
+  app.ideaBuffer = '';
+  app.buildFlow = null; // seeded once a real decomposition — or the demo — lands
   return app.buildFlow;
 }
 
-/** Ensure `app.buildFlow` exists, seeding it lazily if the host has not. */
+/**
+ * ONE-TIME initialization: decide between real-topic flow and the idea-prompt empty
+ * state. Once `app.ideaMode` is a boolean (init ran) OR a `buildFlow` already exists
+ * (a host/test seeded it directly), initialization has happened and this is a no-op —
+ * so it never clobbers a typed idea buffer or a seeded flow on re-render.
+ * @param {object} app
+ */
+function ensureInit(app) {
+  if (app.ideaMode === undefined && !app.buildFlow) initBuildFlow(app);
+}
+
+/**
+ * Ensure a NON-idea `app.buildFlow` exists for the question renderer. After
+ * `ensureInit`, a real-topic session already has one; this seeds the DEMO directly as a
+ * last-resort safety net (never re-entering `initBuildFlow`, which could flip idea mode
+ * back on). Idea mode is handled before this is ever reached.
+ * @param {object} app
+ */
 function ensureFlow(app) {
-  if (!app.buildFlow) initBuildFlow(app);
+  if (!app.buildFlow) app.buildFlow = streamingFlow.initFlow(exampleTopics());
   return app.buildFlow;
+}
+
+/**
+ * Load the canned DEMO topics and leave idea mode. This is the graceful fallback the
+ * `b` key and the CLI-absent decompose path use so the screen always shows something
+ * drivable, even when no real decomposition exists yet.
+ * @param {object} app
+ * @returns {object} the demo flow state
+ */
+function loadDemo(app) {
+  app.buildFlow = streamingFlow.initFlow(exampleTopics());
+  app.ideaMode = false;
+  app.ideaBuffer = '';
+  return app.buildFlow;
+}
+
+/**
+ * Default idea decomposer: the real `./streaming-decompose` entry (which spawns the
+ * Claude CLI). Isolated + lazily required so a host/test can inject `app.decompose`
+ * without the real CLI, and so the require edge keeps `streaming-decompose` REACHABLE
+ * from this menu-reachable module (the dead-code fence).
+ * @param {string} idea
+ * @param {string} projectRoot
+ * @returns {{ ok: boolean, topics?: Array<object>, reason?: string, errors?: string[], message?: string }}
+ */
+function defaultDecompose(idea, projectRoot) {
+  const { decomposeIdea } = require('./streaming-decompose');
+  return decomposeIdea(idea, projectRoot);
+}
+
+/**
+ * Render the IN-FLOW idea prompt: an instruction to dump an idea, the echoed buffer
+ * (control-char sanitized), and a footer advertising Enter (decompose) + `b` (demo).
+ * @param {object} app
+ * @returns {string}
+ */
+function renderIdea(app) {
+  let out = '\n';
+  out += `${c.bold}Build${c.reset}\n\n`;
+  out += `  ${c.dim}No topics yet.${c.reset} Dump your idea — I'll decompose it into real topics.\n\n`;
+  const buffer = stripCtl(app.ideaBuffer || '');
+  out += `  ${c.cyan}›${c.reset} ${buffer}${c.dim}▏${c.reset}\n`;
+  out += '\n' + line() + '\n';
+  out += renderFooter(['type your idea', 'Enter decompose', 'b demo']);
+  return out;
+}
+
+/**
+ * Submit the typed idea to the decomposer and route the discriminated result:
+ *   ok:true          → reload real topics from disk, exit idea mode, drive them;
+ *   reason:'no-cli'  → fall back to the demo with a non-silent CLI-absent message;
+ *   reason:'empty-idea' → a non-silent "type your idea first" prompt (stay in idea mode);
+ *   any other reason → a non-silent error message (stay in idea mode so the human retries).
+ * @param {object} app
+ * @returns {boolean} always true (the key was consumed → the host re-renders)
+ */
+function submitIdea(app) {
+  const idea = app.ideaBuffer || '';
+  const decompose = (typeof app.decompose === 'function') ? app.decompose : defaultDecompose;
+  const result = decompose(idea, app.projectPath) || { ok: false, reason: 'error' };
+
+  if (result.ok) {
+    const real = streamingTopics.loadTopics(app.projectPath);
+    if (Array.isArray(real) && real.length > 0) {
+      app.buildFlow = streamingFlow.initFlow(real);
+      app.ideaMode = false;
+      app.ideaBuffer = '';
+      app.message = 'Decomposed your idea into topics';
+      return true;
+    }
+    // Wrote ok but could not reload → never leave the screen empty; show the demo.
+    loadDemo(app);
+    app.message = 'Decomposition saved but could not be reloaded — showing the demo';
+    return true;
+  }
+
+  if (result.reason === 'no-cli') {
+    loadDemo(app);
+    app.message = 'decomposition needs the Claude CLI — showing the demo';
+    return true;
+  }
+  if (result.reason === 'empty-idea') {
+    app.message = 'Type your idea first, then press Enter to decompose';
+    return true;
+  }
+  app.message = `Could not decompose the idea (${result.reason || 'error'}) — try again, or press b for the demo`;
+  return true;
+}
+
+/**
+ * Handle a keystroke while in idea mode. Enter → decompose; Backspace → edit; `b` on an
+ * EMPTY buffer → load the demo (documented: once typing has started, `b` is a normal
+ * character so an idea containing `b` is typable); any other printable single character
+ * → append (echoed by `renderIdea`). Returns true iff the key was consumed.
+ * @param {{sequence?: string, name?: string}} key
+ * @param {object} app
+ * @returns {boolean}
+ */
+function handleIdeaKey(key, app) {
+  const name = key ? key.name : undefined;
+  const seq = key ? key.sequence : undefined;
+  if (!name && !seq) return false;
+
+  // Enter → submit the idea for decomposition.
+  if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
+    return submitIdea(app);
+  }
+  // Backspace → trim the last character.
+  if (name === 'backspace' || seq === '\x7f' || seq === '\b') {
+    app.ideaBuffer = (app.ideaBuffer || '').slice(0, -1);
+    return true;
+  }
+  // `b` on an empty buffer → the demo fallback (documented above).
+  if (seq === 'b' && (app.ideaBuffer || '').length === 0) {
+    loadDemo(app);
+    app.message = 'Loaded the demo topics';
+    return true;
+  }
+  // Any other single printable character → append to the buffer.
+  if (typeof seq === 'string' && seq.length === 1 && seq >= ' ' && seq !== '\x7f') {
+    app.ideaBuffer = (app.ideaBuffer || '') + seq;
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -206,6 +358,11 @@ function renderBatchPreview(state) {
 }
 
 function render(app) {
+  // Decide idea-prompt vs. real/demo flow ONCE, then render the idea prompt when the
+  // empty state is active (no real topics on disk yet).
+  ensureInit(app);
+  if (app.ideaMode) return renderIdea(app);
+
   const state = ensureFlow(app);
 
   // Batch preview is a HOST UI mode (app.batchPreview), NOT part of the pure flow
@@ -289,6 +446,11 @@ function render(app) {
  * @returns {boolean}
  */
 function handleKey(key, app) {
+  // Idea-prompt mode owns every keystroke (typing, Backspace, Enter, `b` demo) until a
+  // real decomposition or the demo lands.
+  ensureInit(app);
+  if (app.ideaMode) return handleIdeaKey(key, app);
+
   const seq = key ? (key.sequence || key.name) : undefined;
   if (!seq) return false;
 

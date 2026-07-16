@@ -19,6 +19,17 @@ const flow = require('../src/lib/streaming-flow');
 // Strip ANSI so assertions match on visible text only.
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
+// Slice 2 changed the empty-state default: with NO real topics on disk, the screen is
+// the IDEA PROMPT (idea dump), not the canned demo. The demo is now reached explicitly
+// (the `b` key from idea mode / the CLI-absent fallback). These mechanics tests drive
+// the demo topics directly — exactly the state a `b` press produces — so the demo
+// render/handleKey behavior stays covered.
+function seedDemo(app) {
+  app.ideaMode = false;
+  app.buildFlow = flow.initFlow(render.exampleTopics());
+  return app.buildFlow;
+}
+
 // ---------------------------------------------------------------------------
 // example seed
 // ---------------------------------------------------------------------------
@@ -34,9 +45,17 @@ test('exampleTopics seeds 2 topics, one critical, each with a recommended option
   }
 });
 
-test('initBuildFlow attaches an ordered flow state onto app.buildFlow', () => {
+test('initBuildFlow with NO real topics enters idea mode (idea prompt), not the demo', () => {
   const app = {};
   render.initBuildFlow(app);
+  assert.equal(app.ideaMode, true, 'the empty-state default is the idea prompt');
+  assert.equal(app.ideaBuffer, '', 'a fresh idea buffer is created');
+  assert.ok(!app.buildFlow, 'no flow attached until a real decomposition (or the demo) lands');
+});
+
+test('the demo seed (via seedDemo / the b key) attaches an ordered critical-first flow', () => {
+  const app = {};
+  seedDemo(app);
   assert.ok(app.buildFlow);
   // critical-first: the critical topic must be first
   assert.equal(flow.currentTopic(app.buildFlow).critical, true);
@@ -45,16 +64,25 @@ test('initBuildFlow attaches an ordered flow state onto app.buildFlow', () => {
 // ---------------------------------------------------------------------------
 // render
 // ---------------------------------------------------------------------------
-test('render lazily initializes the flow when app.buildFlow is absent', () => {
+test('render on a fresh app with no real topics shows the idea prompt (not the demo)', () => {
   const app = {};
+  const out = plain(render.render(app));
+  assert.equal(app.ideaMode, true, 'render seeds the idea-prompt empty state');
+  assert.ok(out.toLowerCase().includes('dump your idea'), 'the idea prompt is shown');
+  assert.ok(!out.includes('Authentication'), 'not the canned demo');
+});
+
+test('render lazily initializes the demo flow when app.buildFlow is seeded via the demo', () => {
+  const app = {};
+  seedDemo(app);
   const out = render.render(app);
-  assert.ok(app.buildFlow, 'render seeds app.buildFlow');
+  assert.ok(app.buildFlow, 'render drives the seeded flow');
   assert.ok(typeof out === 'string' && out.length > 0);
 });
 
 test('render shows the topic label, a progress indicator, and the question prompt', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const topic = flow.currentTopic(app.buildFlow);
   const question = flow.currentQuestion(app.buildFlow);
   const out = plain(render.render(app));
@@ -65,7 +93,7 @@ test('render shows the topic label, a progress indicator, and the question promp
 
 test('render marks the recommended option with a ✓ recommended tag', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const out = plain(render.render(app));
   assert.ok(out.includes('✓ recommended'), 'recommended marker present');
   // Exactly one option in the current question is marked.
@@ -75,7 +103,7 @@ test('render marks the recommended option with a ✓ recommended tag', () => {
 
 test('render footer advertises ONLY keys that work this slice', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const out = plain(render.render(app));
   assert.ok(out.includes('<n> pick'), 'pick advertised');
   assert.ok(out.includes('c comment'), 'comment advertised');
@@ -85,7 +113,7 @@ test('render footer advertises ONLY keys that work this slice', () => {
 
 test('render shows an "all topics answered" summary when complete', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   // answer everything
   let guard = 0;
   while (!flow.isComplete(app.buildFlow) && guard++ < 50) {
@@ -113,7 +141,7 @@ test('render strips control characters from model-supplied text', () => {
 // ---------------------------------------------------------------------------
 test('handleKey with a valid option digit records the answer and advances', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const before = app.buildFlow;
   const topic = flow.currentTopic(before);
   const question = flow.currentQuestion(before);
@@ -128,7 +156,7 @@ test('handleKey with a valid option digit records the answer and advances', () =
 
 test('handleKey "c" records a comment NON-silently and advances', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const topic = flow.currentTopic(app.buildFlow);
   const question = flow.currentQuestion(app.buildFlow);
   const consumed = render.handleKey({ sequence: 'c' }, app);
@@ -140,7 +168,7 @@ test('handleKey "c" records a comment NON-silently and advances', () => {
 
 test('handleKey "b" emits a back intent (not a dead key)', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const consumed = render.handleKey({ sequence: 'b' }, app);
   assert.equal(consumed, true);
   assert.equal(app.streamAction, 'back');
@@ -148,7 +176,7 @@ test('handleKey "b" emits a back intent (not a dead key)', () => {
 
 test('handleKey "s" emits a settings intent (not a dead key)', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const consumed = render.handleKey({ sequence: 's' }, app);
   assert.equal(consumed, true);
   assert.equal(app.streamAction, 'settings');
@@ -156,7 +184,7 @@ test('handleKey "s" emits a settings intent (not a dead key)', () => {
 
 test('handleKey ignores an unadvertised / non-matching key (no-op, not consumed)', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const before = app.buildFlow;
   const consumed = render.handleKey({ sequence: 'z' }, app);
   assert.equal(consumed, false);
@@ -165,7 +193,7 @@ test('handleKey ignores an unadvertised / non-matching key (no-op, not consumed)
 
 test('handleKey ignores a digit that matches no option (no-op)', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const before = app.buildFlow;
   // '9' is not an option key in the seed
   const consumed = render.handleKey({ sequence: '9' }, app);
@@ -182,7 +210,7 @@ test('handleKey seeds the flow lazily if the host has not initialized it', () =>
 
 test('handleKey returns false for a keyless / empty event', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   assert.equal(render.handleKey({}, app), false);
   assert.equal(render.handleKey(null, app), false);
 });
@@ -290,9 +318,9 @@ test('exampleTopics: Authentication has a critical question authored after a nor
   assert.ok(tiers.slice(0, firstCritical).includes('normal'), 'a normal question precedes the critical in source order');
 });
 
-test('exampleTopics seed: initBuildFlow presents the critical question first', () => {
+test('exampleTopics demo seed presents the critical question first', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   assert.equal(flow.questionTier(flow.currentQuestion(app.buildFlow)), 'critical');
 });
 
@@ -320,7 +348,7 @@ function batchSeed() {
 
 test('the batch offer line and key are hidden when batch is not available', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const out = plain(render.render(app));
   assert.ok(!out.includes('batch-approve'), 'no batch offer at start');
   assert.ok(!out.includes('a batch'), 'no batch key advertised at start');
@@ -350,7 +378,7 @@ test('pressing a when batch is available opens the preview listing pending Q→r
 
 test('pressing a when batch is NOT available is a no-op (a is not advertised)', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const before = app.buildFlow;
   assert.equal(render.handleKey({ sequence: 'a' }, app), false);
   assert.equal(app.buildFlow, before, 'state unchanged');
@@ -429,7 +457,7 @@ test('the preview strips control characters from prompts and labels', () => {
 // ---------------------------------------------------------------------------
 test('exampleTopics: an all-recommended run reaches a batch offer under the default threshold', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   let guard = 0;
   // Drive recommended picks until the batch becomes available (or everything is answered).
   while (!flow.batchAvailable(app.buildFlow) && !flow.isComplete(app.buildFlow) && guard++ < 50) {
@@ -450,7 +478,7 @@ test('exampleTopics: an all-recommended run reaches a batch offer under the defa
 
 test('footer does NOT advertise "n next topic" while a critical is open', () => {
   const app = {};
-  render.initBuildFlow(app); // seed points at the critical `session` question
+  seedDemo(app); // seed points at the critical `session` question
   assert.ok(flow.criticalOpenCount(app.buildFlow) > 0);
   const out = plain(render.render(app));
   assert.ok(!out.includes('n next topic'), 'no next-topic key while a critical is open');
@@ -458,7 +486,7 @@ test('footer does NOT advertise "n next topic" while a critical is open', () => 
 
 test('footer advertises "n next topic" once criticals are cleared and a next topic exists', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   assert.equal(flow.questionTier(flow.currentQuestion(app.buildFlow)), 'critical');
   app.buildFlow = flow.answer(app.buildFlow, '1'); // answer the critical `session`
   assert.equal(flow.criticalOpenCount(app.buildFlow), 0);
@@ -469,7 +497,7 @@ test('footer advertises "n next topic" once criticals are cleared and a next top
 
 test('pressing "n" when canFastForward advances to the next topic', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   app.buildFlow = flow.answer(app.buildFlow, '1'); // clear the critical
   assert.equal(flow.canFastForward(app.buildFlow), true);
   const consumed = render.handleKey({ sequence: 'n' }, app);
@@ -480,7 +508,7 @@ test('pressing "n" when canFastForward advances to the next topic', () => {
 
 test('pressing "n" while a critical is open is a non-silent no-op (message set, no advance past the critical)', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   const before = app.buildFlow;
   assert.ok(flow.criticalOpenCount(before) > 0);
   const consumed = render.handleKey({ sequence: 'n' }, app);
@@ -491,7 +519,7 @@ test('pressing "n" while a critical is open is a non-silent no-op (message set, 
 
 test('pressing "n" on the last topic (no next topic) is a non-silent no-op', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   // Answer all of auth (session, mfa, provider) → roll to stack (the last topic).
   app.buildFlow = flow.answer(app.buildFlow, '1'); // session (critical)
   app.buildFlow = flow.answer(app.buildFlow, '1'); // mfa (important)
@@ -507,7 +535,7 @@ test('pressing "n" on the last topic (no next topic) is a non-silent no-op', () 
 
 test('a DIGIT still picks the option even when "n next topic" is available (no collision)', () => {
   const app = {};
-  render.initBuildFlow(app);
+  seedDemo(app);
   app.buildFlow = flow.answer(app.buildFlow, '1'); // clear critical → n becomes available
   assert.equal(flow.canFastForward(app.buildFlow), true);
   const topic = flow.currentTopic(app.buildFlow);
@@ -525,11 +553,14 @@ test('"n" inside the batch preview is an unadvertised no-op that stays in the pr
 });
 
 // ---------------------------------------------------------------------------
-// initBuildFlow — REAL topics seed (streaming, slice 1 REAL DATA)
+// initBuildFlow — REAL topics seed vs. the IDEA-PROMPT empty state
+//   (streaming, slice 1 REAL DATA + slice 2 in-flow idea dump)
 //
-// initBuildFlow now tries streamingTopics.loadTopics(app.projectPath) FIRST; if it
-// returns a non-empty valid topics[], the flow seeds from the file; otherwise it
-// falls back to exampleTopics() exactly as before.
+// initBuildFlow tries streamingTopics.loadTopics(app.projectPath) FIRST; if it returns
+// a non-empty valid topics[], the flow seeds from the file (ideaMode false). When there
+// are NO real topics (absent / invalid / no projectPath), the empty state is the IDEA
+// PROMPT (ideaMode true, ideaBuffer ''), NOT the canned demo — the demo is reached
+// explicitly via the `b` key / the CLI-absent fallback.
 // ---------------------------------------------------------------------------
 const os = require('os');
 const path = require('path');
@@ -562,32 +593,208 @@ test('initBuildFlow seeds from REAL topics.json when present and valid', () => {
     writeRealTopics(root, JSON.stringify(real));
     const app = { projectPath: root };
     render.initBuildFlow(app);
-    // first topic/question come from the FILE, not the example seed
+    // first topic/question come from the FILE, not the example seed; no idea prompt
+    assert.ok(!app.ideaMode, 'real topics drive; the idea prompt is not entered');
     assert.equal(flow.currentTopic(app.buildFlow).id, 'realtopic');
     assert.equal(flow.currentQuestion(app.buildFlow).id, 'realq');
   });
 });
 
-test('initBuildFlow falls back to exampleTopics when topics.json is ABSENT', () => {
+test('initBuildFlow enters idea mode (idea prompt) when topics.json is ABSENT', () => {
   withTempProject((root) => {
     const app = { projectPath: root };
     render.initBuildFlow(app);
-    // example seed: critical topic is 'auth'
-    assert.equal(flow.currentTopic(app.buildFlow).id, 'auth');
+    assert.equal(app.ideaMode, true, 'no real topics → the idea prompt, not the demo');
+    assert.ok(!app.buildFlow, 'no demo flow attached at init');
   });
 });
 
-test('initBuildFlow falls back to exampleTopics when topics.json is INVALID', () => {
+test('initBuildFlow enters idea mode when topics.json is INVALID', () => {
   withTempProject((root) => {
     writeRealTopics(root, JSON.stringify([{ id: 'x', label: 'X' }])); // no questions array → invalid
     const app = { projectPath: root };
     render.initBuildFlow(app);
-    assert.equal(flow.currentTopic(app.buildFlow).id, 'auth'); // example seed
+    assert.equal(app.ideaMode, true, 'an invalid file is fail-soft null → the idea prompt');
   });
 });
 
-test('initBuildFlow falls back to exampleTopics when app.projectPath is absent', () => {
+test('initBuildFlow enters idea mode when app.projectPath is absent (no crash)', () => {
   const app = {};
   render.initBuildFlow(app);
-  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth'); // example seed, no crash
+  assert.equal(app.ideaMode, true);
+});
+
+// ===========================================================================
+// SLICE 2: the IN-FLOW IDEA DUMP UX.
+// With no real topics, the empty state is the idea prompt. Printable keys append to
+// the buffer (echoed in the render); Backspace edits; Enter calls decompose (injected
+// via app.decompose) — ok:true reloads real topics and exits idea mode, a no-cli
+// result falls back to the demo with a non-silent message, other failures stay in idea
+// mode with an error message; `b` (empty buffer) loads the demo. All echoed text is
+// control-char stripped.
+// ===========================================================================
+
+test('the idea prompt render shows the dump-your-idea instruction and the demo key', () => {
+  const app = {};
+  const out = plain(render.render(app));
+  assert.ok(out.toLowerCase().includes('dump your idea'), 'idea instruction shown');
+  assert.ok(out.toLowerCase().includes('decompose'), 'Enter-to-decompose advertised');
+  assert.ok(out.toLowerCase().includes('demo'), 'the demo fallback key advertised');
+  assert.ok(!out.includes('Authentication'), 'not the canned demo');
+});
+
+test('typing in idea mode appends to the buffer and echoes it in the render', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  for (const ch of 'a task app') assert.equal(render.handleKey({ sequence: ch }, app), true);
+  assert.equal(app.ideaBuffer, 'a task app');
+  const out = plain(render.render(app));
+  assert.ok(out.includes('a task app'), 'the typed idea is echoed');
+});
+
+test('Backspace in idea mode edits the buffer', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  render.handleKey({ sequence: 'h' }, app);
+  render.handleKey({ sequence: 'i' }, app);
+  render.handleKey({ name: 'backspace' }, app);
+  assert.equal(app.ideaBuffer, 'h');
+});
+
+test('pressing b on an EMPTY idea buffer loads the demo and leaves idea mode', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  const consumed = render.handleKey({ sequence: 'b' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.ideaMode, false, 'left idea mode');
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth', 'the demo is loaded');
+  assert.ok(app.message && app.message.length > 0, 'a non-silent status message was set');
+});
+
+test('b with a NON-empty buffer is a normal character (does not trigger the demo)', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  render.handleKey({ sequence: 'a' }, app); // buffer 'a' (non-empty)
+  render.handleKey({ sequence: 'b' }, app); // 'b' now appends
+  assert.equal(app.ideaBuffer, 'ab');
+  assert.equal(app.ideaMode, true, 'still typing the idea');
+});
+
+test('Enter with a decompose that returns ok reloads real topics and exits idea mode', () => {
+  withTempProject((root) => {
+    const app = { projectPath: root };
+    render.initBuildFlow(app);
+    for (const ch of 'a blog') render.handleKey({ sequence: ch }, app);
+    // Stub decompose: write a REAL topics.json (what decomposeIdea does) and return ok.
+    app.decompose = (idea, projectRoot) => {
+      assert.equal(idea, 'a blog', 'the typed idea is passed to decompose');
+      assert.equal(projectRoot, root, 'the project path is passed to decompose');
+      writeRealTopics(projectRoot, JSON.stringify([
+        {
+          id: 'db', label: 'Database', critical: true,
+          questions: [{ id: 'engine', prompt: 'Which engine?', options: [{ key: '1', label: 'Postgres', recommended: true }] }],
+        },
+      ]));
+      return { ok: true, topics: [] };
+    };
+    const consumed = render.handleKey({ name: 'return' }, app);
+    assert.equal(consumed, true);
+    assert.equal(app.ideaMode, false, 'exited idea mode into the real flow');
+    assert.equal(flow.currentTopic(app.buildFlow).id, 'db', 'real topics drive after decompose');
+    assert.ok(app.message && app.message.length > 0, 'a non-silent status message was set');
+  });
+});
+
+test('Enter with a no-cli decompose falls back to the demo with a non-silent message', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  render.handleKey({ sequence: 'x' }, app); // a non-empty buffer
+  app.decompose = () => ({ ok: false, reason: 'no-cli' });
+  const consumed = render.handleKey({ name: 'return' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.ideaMode, false, 'fell back into the demo');
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth', 'the demo is loaded');
+  assert.ok(app.message && app.message.toLowerCase().includes('claude cli'), 'CLI-absent message shown');
+});
+
+test('Enter with an invalid-output decompose stays in idea mode with an error message', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  render.handleKey({ sequence: 'x' }, app);
+  app.decompose = () => ({ ok: false, reason: 'invalid-output', errors: ['bad'] });
+  const consumed = render.handleKey({ name: 'return' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.ideaMode, true, 'stays in idea mode so the human can retry');
+  assert.ok(!app.buildFlow, 'no flow driven on a failed decompose');
+  assert.ok(app.message && app.message.length > 0, 'a non-silent error message was set');
+});
+
+test('Enter with a blank idea buffer prompts to type first and stays in idea mode', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  app.decompose = () => ({ ok: false, reason: 'empty-idea' });
+  const consumed = render.handleKey({ name: 'return' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.ideaMode, true);
+  assert.ok(app.message && app.message.length > 0);
+});
+
+test('with a valid topics.json present, idea mode is NOT entered (real topics drive)', () => {
+  withTempProject((root) => {
+    writeRealTopics(root, JSON.stringify([
+      {
+        id: 'realtopic', label: 'Real', critical: true,
+        questions: [{ id: 'q', prompt: 'Real?', options: [{ key: '1', label: 'Yes', recommended: true }] }],
+      },
+    ]));
+    const app = { projectPath: root };
+    const out = plain(render.render(app));
+    assert.ok(!app.ideaMode, 'real topics drive; no idea prompt');
+    assert.equal(flow.currentTopic(app.buildFlow).id, 'realtopic');
+    assert.ok(!out.toLowerCase().includes('dump your idea'), 'the idea prompt is not shown');
+    assert.ok(out.includes('Real?'), 'the real question renders');
+  });
+});
+
+test('the echoed idea buffer is control-char stripped in the render', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  app.ideaBuffer = 'ho\x1b[2Jstile\x07';
+  const out = render.render(app);
+  assert.ok(!out.includes('\x1b[2J'), 'clear-screen sequence stripped from the echoed idea');
+  assert.ok(!out.includes('\x07'), 'bell stripped from the echoed idea');
+});
+
+test('Enter with NO injected decompose uses the real entry — a blank idea short-circuits (no CLI)', () => {
+  // Exercises the DEFAULT decompose path (module require → decomposeIdea) without a real
+  // CLI: a blank idea returns empty-idea before any spawn. Proves the wiring, CLI-free.
+  withTempProject((root) => {
+    const app = { projectPath: root };
+    render.initBuildFlow(app); // idea mode, empty buffer, no app.decompose
+    const consumed = render.handleKey({ name: 'return' }, app);
+    assert.equal(consumed, true);
+    assert.equal(app.ideaMode, true, 'stays in idea mode on a blank submit');
+    assert.ok(app.message && app.message.length > 0, 'a non-silent prompt-to-type message');
+    assert.ok(!nodeFs.existsSync(path.join(root, '.ctoc', 'streaming', 'topics.json')), 'no file written');
+  });
+});
+
+test('Enter with a decompose that returns ok but writes NO file falls back to the demo', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  render.handleKey({ sequence: 'x' }, app);
+  app.decompose = () => ({ ok: true, topics: [] }); // claims success but no topics.json exists
+  const consumed = render.handleKey({ name: 'return' }, app);
+  assert.equal(consumed, true);
+  assert.equal(app.ideaMode, false, 'never leaves the screen empty — the demo is shown');
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth', 'demo loaded');
+  assert.ok(app.message && app.message.toLowerCase().includes('demo'), 'a non-silent reload-failed message');
+});
+
+test('a non-typing key (e.g. left arrow) in idea mode is an unconsumed no-op', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  const consumed = render.handleKey({ name: 'left' }, app);
+  assert.equal(consumed, false, 'a navigation key is not swallowed by the idea buffer');
+  assert.equal(app.ideaBuffer, '', 'buffer unchanged');
 });

@@ -7,7 +7,10 @@
  * dashboard always renders, and the environment question rides along as a
  * second question when the environment is unset.
  *
- * These tests pin that contract: the plan overview must NEVER be gated.
+ * These tests pin that contract: the primary screen must NEVER be gated by a
+ * ride-along. The primary screen is now the STREAMING GATE-DECISION screen (the
+ * `/ctoc:menu` default); the environment question still rides along as a second
+ * question and the classic dashboard stays reachable via its explicit route.
  */
 
 const { describe, it, after } = require('node:test');
@@ -47,18 +50,16 @@ function runMenu(cwd) {
 }
 
 describe('Menu — environment question rides along, never gates', () => {
-  it('environment UNSET: dashboard overview renders WITH the env question attached', () => {
+  it('environment UNSET: streaming gate screen renders WITH the env question attached', () => {
     const r = runMenu(projectWith(undefined)); // no settings.json → env unset
-    // The plan-phase overview must be present.
-    assert.match(r.text, /▼ Business/, 'Business section visible');
-    assert.match(r.text, /▼ Implementation/, 'Implementation section visible');
-    assert.match(r.text, /▼ Execution/, 'Execution section visible');
+    // The new default is the streaming gate screen (empty project → nothing pending).
+    assert.match(r.text, /No gate decisions pending/i, 'streaming gate screen is the default');
     // The env question is the SECOND question, not a replacement.
-    assert.equal(r.ask.questions.length, 2, 'pipeline + environment questions');
-    assert.equal(r.ask.questions[0].header, 'Pipeline', 'pipeline question first');
+    assert.equal(r.ask.questions.length, 2, 'gate-decision + environment questions');
+    assert.equal(r.ask.questions[0].header, 'Gate decisions', 'gate-decision question first');
     assert.equal(r.ask.questions[1].header, 'Environment', 'environment question second');
-    // Both action sets present.
-    assert.ok('Business' in r.actions, 'pipeline navigation intact');
+    // Both action sets present — the dashboard stays reachable via its explicit route.
+    assert.ok('Open the dashboard' in r.actions, 'dashboard reachable alongside the streaming screen');
     assert.equal(r.actions['Development'], 'claude:set-environment dev');
     // R2-C2 item 2: the one-turn "Decide later" skip (the F7 re-ask hell) is
     // REPLACED by a durable "Keep defaults, stop asking" option that persists
@@ -76,17 +77,17 @@ describe('Menu — environment question rides along, never gates', () => {
     // The human already chose "Keep defaults, stop asking" — the durable marker
     // makes needsEnvironmentPrompt false even though environment stays 'ask'.
     const r = runMenu(projectWith({ general: { environment_prompt_dismissed: true } }));
-    assert.match(r.text, /▼ Business/, 'overview still visible');
-    assert.equal(r.ask.questions.length, 1, 'only the pipeline question — env ride-along suppressed');
-    assert.equal(r.ask.questions[0].header, 'Pipeline');
+    assert.match(r.text, /No gate decisions pending/i, 'streaming gate screen still the default');
+    assert.equal(r.ask.questions.length, 1, 'only the gate-decision question — env ride-along suppressed');
+    assert.equal(r.ask.questions[0].header, 'Gate decisions');
     assert.ok(!('Development' in r.actions), 'no env actions once dismissed');
     assert.ok(!('Keep defaults, stop asking' in r.actions), 'no env dismiss action once dismissed');
   });
 
-  it('environment SET: plain dashboard, single question, no banner', () => {
+  it('environment SET: plain streaming screen, single question, no banner', () => {
     const r = runMenu(projectWith({ general: { environment: 'prod' } }));
-    assert.match(r.text, /▼ Business/, 'overview visible');
-    assert.equal(r.ask.questions.length, 1, 'only the pipeline question');
+    assert.match(r.text, /No gate decisions pending/i, 'streaming gate screen visible');
+    assert.equal(r.ask.questions.length, 1, 'only the gate-decision question');
     assert.ok(!r.text.includes('No CTOC environment'), 'no env banner');
     assert.ok(!('Development' in r.actions), 'no env actions');
   });
@@ -99,11 +100,11 @@ describe('Menu — environment question rides along, never gates', () => {
     }
   });
 
-  it('the dashboard is never replaced: every menu output contains the pipeline question', () => {
+  it('the primary screen is never replaced: every menu output leads with the gate-decision question', () => {
     for (const settings of [undefined, { general: { environment: 'dev' } }, { general: { environment: 'bogus' } }]) {
       const r = runMenu(projectWith(settings));
-      assert.equal(r.ask.questions[0].header, 'Pipeline',
-        'first question is always the pipeline — the overview is never gated');
+      assert.equal(r.ask.questions[0].header, 'Gate decisions',
+        'first question is always the streaming gate decision — never gated by a ride-along');
     }
   });
 });

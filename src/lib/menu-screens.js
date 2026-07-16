@@ -30,6 +30,10 @@ const taskRegistry = require('./task-registry');
 const taskView = require('./task-view');
 // NB4: on-open reconciliation of the registry against the live harness TaskList.
 const taskReconcile = require('./task-reconcile');
+// Streaming gate-decision screen — the new `/ctoc:menu` default. Its routes
+// (`stream approve|skip|comment`) live here in the router; the `dashboard` route
+// keeps the classic pipeline overview reachable.
+const streamingGate = require('./streaming-gate');
 
 // R3-B item 4: the terminal set is IMPORTED from the registry — there is exactly ONE
 // encoding. The former local mirror (`['done','failed','orphaned']`) was STALE in both
@@ -2264,6 +2268,25 @@ function route(args, projectPath, opts = {}) {
 
     case 'task':
       return taskDetailScreen(args[1], projectPath);
+
+    // Streaming gate-decision routes. The reply to a streaming question IS the
+    // human's action: `approve` crosses the gate through the gate-safe approvePlan
+    // (never automatically — only via this human-answered reply), `skip` advances,
+    // `comment` records a free-text note out-of-band. Bare `stream` re-renders the
+    // current gate screen.
+    case 'stream': {
+      const sub = args[1];
+      const ref = args[2];
+      if (sub === 'approve') return streamingGate.streamApprove(ref, projectPath);
+      if (sub === 'skip') return streamingGate.streamSkip(ref, projectPath);
+      if (sub === 'comment') return streamingGate.streamComment(ref, args.slice(3).join(' '), projectPath);
+      return streamingGate.streamingGateScreen(projectPath);
+    }
+
+    // The classic pipeline dashboard stays reachable behind an explicit route, so
+    // nothing is orphaned once the no-args default becomes the streaming screen.
+    case 'dashboard':
+      return dashboardPipeline(projectPath, opts);
 
     case 'browse':
       return stageBrowse(args[1], projectPath);

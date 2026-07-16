@@ -713,18 +713,19 @@ function main() {
     activateCurrentArea();
     render();
   } else {
-    // Non-interactive with no args: JSON dashboard output for Claude.
-    // The dashboard (plan overview across all phases) ALWAYS renders. When the
-    // environment is not yet chosen, the environment question rides along as a
-    // second question — it never replaces or gates the overview.
-    // H8: the live on-open render — thread the live-agent ids so a long-running
-    // background agent is reconciled against the real live set, not a blind clock.
-    // Absent ⇒ undefined ⇒ the staleness backstop (true session restart).
-    // Aliased to a distinct local: tsc's checkJs treats these two CommonJS
-    // `require` destructures as re-declaring the same binding (TS2300) even
-    // though they sit in disjoint branches — the alias keeps them separate.
-    const { route: routeDashboard } = require('../lib/menu-screens');
-    const result = routeDashboard([], app.projectPath, { liveAgentIds });
+    // Non-interactive with no args: the STREAMING GATE-DECISION screen is the
+    // default. `/ctoc:menu` ASKS the human the pending gate decisions ONE AT A TIME
+    // — the plans sitting at the three human gates ARE the questions — instead of
+    // rendering the navigation dashboard. The classic dashboard stays reachable via
+    // the explicit `dashboard` route (menu-screens.route), so nothing is orphaned.
+    //
+    // Environment/compliance ride-alongs still attach here exactly as before: they
+    // ride along as SECOND/THIRD questions on whatever the default screen is (the
+    // streaming decision, or its "nothing pending" screen). A brand-new project with
+    // an unset environment has no plans at gates, so the environment prompt rides
+    // along on the "nothing pending" screen — first-open prompting is preserved.
+    const streamingGate = require('../lib/streaming-gate');
+    const result = streamingGate.streamingGateScreen(app.projectPath);
     if (needsEnvironmentPrompt(app.projectPath)) {
       attachEnvironmentQuestion(result);
     }

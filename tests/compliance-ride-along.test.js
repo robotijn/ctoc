@@ -87,14 +87,12 @@ function complianceQuestion(r) {
 }
 
 describe('Menu — compliance-regime question rides along, never gates', () => {
-  it('neither profile active → compliance question rides along, dashboard intact', () => {
+  it('neither profile active → compliance question rides along, streaming screen intact', () => {
     const r = runMenu(projectWith([], 'prod')); // env set → only compliance rides
-    // Dashboard NOT replaced — the plan-phase overview is present.
-    assert.match(r.text, /▼ Business/, 'Business section visible');
-    assert.match(r.text, /▼ Implementation/, 'Implementation section visible');
-    assert.match(r.text, /▼ Execution/, 'Execution section visible');
-    // Pipeline question is always first — the overview is never gated.
-    assert.equal(r.ask.questions[0].header, 'Pipeline', 'pipeline question first');
+    // Primary screen NOT replaced — the streaming gate screen is the default.
+    assert.match(r.text, /No gate decisions pending/i, 'streaming gate screen is the default');
+    // The gate-decision question is always first — never gated by a ride-along.
+    assert.equal(r.ask.questions[0].header, 'Gate decisions', 'gate-decision question first');
     // The compliance question rides along (not replacing the dashboard).
     const cq = complianceQuestion(r);
     assert.ok(cq, 'compliance question present');
@@ -106,13 +104,13 @@ describe('Menu — compliance-regime question rides along, never gates', () => {
     assert.equal(r.actions['GDPR'], 'claude:set-compliance-regime gdpr');
     assert.equal(r.actions['EU AI Act'], 'claude:set-compliance-regime eu-ai-act');
     assert.equal(r.actions['Both'], 'claude:set-compliance-regime both');
-    // Pipeline navigation intact — the dashboard actions still present.
-    assert.ok('Business' in r.actions, 'pipeline navigation intact');
+    // Dashboard stays reachable alongside the streaming screen.
+    assert.ok('Open the dashboard' in r.actions, 'dashboard reachable');
   });
 
   it('gdpr profile already active → NO compliance question (asked once)', () => {
     const r = runMenu(projectWith(['gdpr'], 'prod'));
-    assert.match(r.text, /▼ Business/, 'overview visible');
+    assert.match(r.text, /No gate decisions pending/i, 'streaming screen visible');
     assert.ok(!complianceQuestion(r), 'no compliance question when gdpr active');
     assert.ok(
       !Object.values(r.actions).some(a => a.startsWith('claude:set-compliance-regime')),
@@ -122,7 +120,7 @@ describe('Menu — compliance-regime question rides along, never gates', () => {
 
   it('eu-ai-act-high-risk active also suppresses the compliance prompt', () => {
     const r = runMenu(projectWith(['eu-ai-act-high-risk'], 'prod'));
-    assert.match(r.text, /▼ Business/, 'overview visible');
+    assert.match(r.text, /No gate decisions pending/i, 'streaming screen visible');
     assert.ok(!complianceQuestion(r), 'no compliance question when eu-ai-act active');
   });
 
@@ -134,9 +132,9 @@ describe('Menu — compliance-regime question rides along, never gates', () => {
     }
   });
 
-  it('Pipeline always first; both ride-alongs present when env + compliance unset', () => {
+  it('gate-decision question always first; both ride-alongs present when env + compliance unset', () => {
     const r = runMenu(projectWith([], 'ask'));
-    assert.equal(r.ask.questions[0].header, 'Pipeline', 'pipeline first (overview never gated)');
+    assert.equal(r.ask.questions[0].header, 'Gate decisions', 'gate-decision first (never gated)');
     const hs = headers(r);
     assert.ok(hs.includes('Environment'), 'environment question rides along');
     assert.ok(hs.includes('Compliance'), 'compliance question rides along');
@@ -156,8 +154,8 @@ describe('Menu — compliance-regime question rides along, never gates', () => {
 
   it('gate safety: compliance activation never touches enforcementMode / requireReviewGate', () => {
     const r = runMenu(projectWith(['gdpr', 'eu-ai-act-high-risk'], 'prod'));
-    // Pipeline question intact — the gate surface is unchanged.
-    assert.equal(r.ask.questions[0].header, 'Pipeline', 'pipeline intact');
+    // Gate-decision question intact — the gate surface is unchanged.
+    assert.equal(r.ask.questions[0].header, 'Gate decisions', 'gate-decision question intact');
     const blob = JSON.stringify(r);
     assert.ok(!/enforcementMode/.test(blob), 'no enforcementMode in the menu output');
     assert.ok(!/requireReviewGate/.test(blob), 'no requireReviewGate in the menu output');
@@ -179,7 +177,7 @@ describe('Menu — compliance-regime question rides along, never gates', () => {
       JSON.stringify({ general: { environment: 'prod' } })
     );
     const r = runMenu(dir);
-    assert.match(r.text, /▼ Business/, 'dashboard still renders (fail-open)');
+    assert.match(r.text, /No gate decisions pending/i, 'streaming screen still renders (fail-open)');
     // No active profiles readable → question rides along (fail-open, not a crash).
     assert.ok(complianceQuestion(r), 'compliance question rides along when settings.yaml absent');
   });

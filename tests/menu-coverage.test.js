@@ -627,24 +627,74 @@ describe('render() plan-content view — truncation boundary', () => {
 // the streaming view (streamView) through streaming-render.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('streaming primary view — render + key routing (the wiring under test)', () => {
-  let exitCalls, origExit;
+  // Slice 2: streaming-render shows the IN-FLOW IDEA PROMPT when there are NO real
+  // topics on disk, and drives real topics when `<projectPath>/.ctoc/streaming/topics.json`
+  // exists. These routing tests exercise the REAL-topic flow, so beforeEach points
+  // app.projectPath at a temp project carrying a real topics.json (auth/session critical,
+  // mirroring the prior demo so the routing assertions hold on real data). The DEFAULT
+  // idea-prompt state gets its own test with an empty project (no topics.json).
+  let exitCalls, origExit, savedProjectPath, realTopicsDir, emptyDir;
+  const REAL_TOPICS = JSON.stringify([
+    {
+      id: 'auth', label: 'Authentication', critical: true,
+      questions: [
+        { id: 'session', critical: true, prompt: 'Where should session tokens be stored?',
+          options: [{ key: '1', label: 'httpOnly cookie', recommended: true }, { key: '2', label: 'localStorage' }] },
+        { id: 'mfa', important: true, prompt: 'Require MFA?',
+          options: [{ key: '1', label: 'Yes', recommended: true }, { key: '2', label: 'No' }] },
+        { id: 'provider', prompt: 'Auth provider?',
+          options: [{ key: '1', label: 'Clerk', recommended: true }, { key: '2', label: 'Auth.js' }] },
+      ],
+    },
+    {
+      id: 'stack', label: 'Stack', critical: false,
+      questions: [
+        { id: 'lang', prompt: 'Language?', options: [{ key: '1', label: 'TypeScript', recommended: true }, { key: '2', label: 'Python' }] },
+      ],
+    },
+  ]);
   beforeEach(() => {
     baselineApp();
+    if (!realTopicsDir) {
+      realTopicsDir = mkTmp('menu-cov-streaming-real-');
+      const dir = path.join(realTopicsDir, '.ctoc', 'streaming');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'topics.json'), REAL_TOPICS, 'utf8');
+      emptyDir = mkTmp('menu-cov-streaming-empty-'); // no topics.json → idea prompt
+    }
     app.streamView = true;   // session-start state: streaming is primary
     delete app.buildFlow;    // fresh flow — nothing answered yet
+    delete app.ideaMode;     // fresh init decision each test
+    delete app.ideaBuffer;
     app.streamAction = null;
+    savedProjectPath = app.projectPath;
+    app.projectPath = realTopicsDir; // real topics drive the routing tests
     exitCalls = [];
     origExit = process.exit;
     process.exit = (code) => { exitCalls.push(code); throw new Error('__EXIT__'); };
   });
-  afterEach(() => { process.exit = origExit; app.message = null; app.streamView = false; });
+  afterEach(() => {
+    process.exit = origExit; app.message = null; app.streamView = false;
+    app.projectPath = savedProjectPath; delete app.ideaMode; delete app.ideaBuffer;
+  });
 
   const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
   function press(str, key) {
     withStdout(() => { try { handleKey(str, key); } catch (e) { if (e.message !== '__EXIT__') throw e; } });
   }
 
-  it('the DEFAULT session render is the streaming topic-Q&A, NOT the classic dashboard', () => {
+  it('with NO decomposition yet (empty project) the DEFAULT session render is the idea prompt', () => {
+    app.projectPath = emptyDir;   // no topics.json → the in-flow idea dump
+    delete app.buildFlow; delete app.ideaMode; delete app.ideaBuffer;
+    const out = plain(withStdout(() => render()));
+    // The idea prompt is the empty-state default — NOT the canned demo, NOT the dashboard.
+    assert.match(out, /Dump your idea/i, 'the idea prompt is the default when nothing is decomposed yet');
+    assert.doesNotMatch(out, /Plans at gates/, 'the classic pipeline dashboard is not the primary view');
+    assert.doesNotMatch(out, /Authentication/, 'not the canned demo');
+    assert.equal(app.ideaMode, true, 'idea mode is the empty-state default');
+  });
+
+  it('the DEFAULT session render with real topics is the streaming topic-Q&A, NOT the classic dashboard', () => {
     const out = plain(withStdout(() => render()));
     // Streaming heartbeat: the critical topic label (ordered first by the flow) plus a
     // recommended-tagged option — this is streaming-render's output, proving it primary.
@@ -749,23 +799,24 @@ describe('main() — real behavior, cross-process (documented uncredited coverag
     assert.match(parsed.text, /\[functional\]/, 'the functional stage screen, not the overview');
   });
 
-  it('treats a --live-agent-ids-only invocation as the no-args dashboard', () => {
+  it('treats a --live-agent-ids-only invocation as the no-args streaming default', () => {
     const dir = project({ settingsJson: '{"general":{"environment":"dev"}}' });
     const out = run(dir, ['--live-agent-ids', 'agent-1,agent-2']);
     const parsed = JSON.parse(out);
-    // Residual args empty → dashboard branch: a Pipeline question is always present.
+    // Residual args empty → streaming gate branch: the gate-decision question leads
+    // (empty project → the "nothing pending" screen).
     assert.ok(Array.isArray(parsed.ask.questions));
-    assert.equal(parsed.ask.questions[0].header, 'Pipeline');
+    assert.equal(parsed.ask.questions[0].header, 'Gate decisions');
   });
 
-  it('FAILS OPEN: a corrupt settings.yaml still renders the dashboard (never crashes)', () => {
+  it('FAILS OPEN: a corrupt settings.yaml still renders the streaming screen (never crashes)', () => {
     const dir = project({
       settingsJson: '{"general":{"environment":"dev"}}',
       settingsYaml: 'regulatory_regime:\n  active_profiles: [gdpr\n  : : : not yaml : :\n',
     });
     // If the compliance read threw instead of failing open, execFileSync would throw
-    // on a non-zero exit. Reaching a parseable dashboard proves fail-open.
+    // on a non-zero exit. Reaching a parseable screen proves fail-open.
     const parsed = JSON.parse(run(dir));
-    assert.equal(parsed.ask.questions[0].header, 'Pipeline', 'overview never gated by a parse fault');
+    assert.equal(parsed.ask.questions[0].header, 'Gate decisions', 'primary never gated by a parse fault');
   });
 });

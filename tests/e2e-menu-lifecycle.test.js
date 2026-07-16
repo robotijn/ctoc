@@ -107,8 +107,10 @@ function dashboardStageCount(text, label) {
 }
 
 describe('e2e: menu state machine via real process', () => {
-  it('1. empty project renders the three sections all-zero with full action map', () => {
-    const { json } = runMenu([]);
+  it('1. the dashboard route renders the three sections all-zero with full action map', () => {
+    // The dashboard is now reached via its explicit route (the no-args default is
+    // the streaming gate screen — covered in test 1b). It stays fully reachable.
+    const { json } = runMenu(['dashboard']);
 
     // Three task-aligned sections, all expanded (▼), all zero.
     assert.match(json.text, /▼ Business \(0\)/, 'Business section header, 0 total');
@@ -136,6 +138,16 @@ describe('e2e: menu state machine via real process', () => {
     assert.equal(json.actions['More ▶'], 'menu commands');
   });
 
+  it('1b. the NO-ARGS default is the streaming gate screen (nothing pending on an empty project)', () => {
+    const { json } = runMenu([]);
+    // The new default ASKS the human — it is NOT the navigation dashboard.
+    assert.match(json.text, /No gate decisions pending/i, 'no-args default is the streaming gate screen');
+    assert.equal(json.ask.questions[0].header, 'Gate decisions', 'the gate-decision question leads');
+    assert.doesNotMatch(json.text, /▼ Business/, 'the classic dashboard is not the no-args default');
+    // The dashboard stays reachable from the streaming screen.
+    assert.equal(json.actions['Open the dashboard'], 'dashboard');
+  });
+
   it('2. dashboard counts reflect the fixture exactly', () => {
     // Place a known, distinct number of plans per stage.
     writePlan('functional', 'fn-a');
@@ -149,7 +161,8 @@ describe('e2e: menu state machine via real process', () => {
     writePlan('done', 'done-c');
     writePlan('done', 'done-d');               // done = 4
 
-    const { json } = runMenu([]);
+    // Counts live on the dashboard, now reached via its explicit route.
+    const { json } = runMenu(['dashboard']);
 
     assert.equal(dashboardStageCount(json.text, 'Functional'), 3, 'functional count');
     assert.equal(dashboardStageCount(json.text, 'Implementation'), 1, 'implementation count');
@@ -298,7 +311,7 @@ describe('e2e: menu state machine via real process', () => {
     assert.equal(json.actions['Confirm approve'], 'claude:approve functional/complete.md');
   });
 
-  it('6. dashboard always renders WITH a second environment question when env is unset (v6.9.44)', () => {
+  it('6. streaming screen always renders WITH a second environment question when env is unset (v6.9.44)', () => {
     // settings.json present but WITHOUT general.environment → needsEnvironmentPrompt true.
     fs.writeFileSync(
       path.join(tempProject, '.ctoc', 'settings.json'),
@@ -311,36 +324,35 @@ describe('e2e: menu state machine via real process', () => {
 
     const { json } = runMenu([]);
 
-    // The dashboard (overview) is NEVER replaced — all three sections render.
-    assert.match(json.text, /▼ Business/, 'Business overview still visible under env prompt');
-    assert.match(json.text, /▼ Implementation/, 'Implementation overview still visible');
-    assert.match(json.text, /▼ Execution/, 'Execution overview still visible');
+    // The streaming gate screen (the no-args default) is NEVER replaced by the
+    // ride-along — an empty project shows the "nothing pending" screen.
+    assert.match(json.text, /No gate decisions pending/i, 'streaming gate screen is the primary');
 
     // The environment prompt rides along as a SECOND question.
-    assert.equal(json.ask.questions.length, 2, 'pipeline + environment = 2 questions');
-    assert.equal(json.ask.questions[0].header, 'Pipeline', 'pipeline question is first (overview not gated)');
+    assert.equal(json.ask.questions.length, 2, 'gate-decision + environment = 2 questions');
+    assert.equal(json.ask.questions[0].header, 'Gate decisions', 'gate-decision question leads (not gated)');
     assert.equal(json.ask.questions[1].header, 'Environment', 'environment question is second');
 
-    // Pipeline navigation survives alongside the environment actions.
-    assert.ok('Business' in json.actions, 'pipeline navigation intact');
+    // The dashboard stays reachable alongside the environment actions.
+    assert.ok('Open the dashboard' in json.actions, 'dashboard reachable');
     assert.equal(json.actions['Development'], 'claude:set-environment dev');
     assert.equal(json.actions['Keep defaults, stop asking'], 'claude:env-keep-defaults',
       'the environment ride-along offers the durable stop (R2-C2: one-turn skips were the re-ask defect)');
   });
 
-  it('6b. env SET → plain dashboard, single question, no environment banner', () => {
+  it('6b. env SET → plain streaming screen, single question, no environment banner', () => {
     fs.writeFileSync(
       path.join(tempProject, '.ctoc', 'settings.json'),
       JSON.stringify({ general: { environment: 'prod' } }, null, 2));
     // EC1-s3: mark a compliance profile active so its ride-along does NOT attach
-    // — this case pins the "single pipeline question" count when env is set.
+    // — this case pins the "single gate-decision question" count when env is set.
     fs.writeFileSync(
       path.join(tempProject, '.ctoc', 'settings.yaml'),
       'regulatory_regime:\n  active_profiles: [gdpr]\n  overrides: {}\n\ngeneral:\n  x: 1\n');
 
     const { json } = runMenu([]);
-    assert.match(json.text, /▼ Business/, 'overview visible');
-    assert.equal(json.ask.questions.length, 1, 'only the pipeline question');
+    assert.match(json.text, /No gate decisions pending/i, 'streaming screen visible');
+    assert.equal(json.ask.questions.length, 1, 'only the gate-decision question');
     assert.ok(!json.text.includes('No CTOC environment'), 'no environment banner');
     assert.ok(!('Development' in json.actions), 'no environment actions when env is set');
   });

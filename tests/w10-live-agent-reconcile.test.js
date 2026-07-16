@@ -296,10 +296,11 @@ describe('W10-s4 (H8) — ride-along preserved when only --live-agent-ids is pas
       });
       const r = JSON.parse(out);
 
-      // The plan overview still renders (flag did not divert to a sub-command screen).
-      assert.match(r.text, /▼ Business/, 'dashboard overview renders on the live on-open path');
+      // The streaming gate screen still renders (flag did not divert to a
+      // sub-command screen); an empty project shows the "nothing pending" screen.
+      assert.match(r.text, /No gate decisions pending/i, 'streaming gate screen renders on the live on-open path');
       // The environment question rides along as a SECOND question — not bypassed.
-      assert.equal(r.ask.questions.length, 2, 'pipeline + environment questions');
+      assert.equal(r.ask.questions.length, 2, 'gate-decision + environment questions');
       assert.equal(r.ask.questions[1].header, 'Environment', 'environment ride-along preserved');
       assert.equal(r.actions['Development'], 'claude:set-environment dev');
     } finally {
