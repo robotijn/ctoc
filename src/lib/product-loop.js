@@ -25,6 +25,24 @@ const EXPERIMENTS_DIR = path.join(ROOT, '.ctoc', 'product-loop', 'experiments');
 function ensureDir(d) { if (!safeFs.existsSync(d)) safeFs.mkdirSync(d, { recursive: true }); }
 function readFile(p, fallback = '') { return safeFs.existsSync(p) ? safeFs.readFileSync(p, 'utf8') : fallback; }
 
+// A path segment derived from a slug must be a bare single filename token —
+// same guard as actions.js `completeTaskPlan`. Anything with a separator,
+// NUL, whitespace, or a `..`/`.` component is refused BEFORE path.join, so a
+// slug like `../../../tmp/evil` can never escape the intended root.
+function assertSafeSlug(slug) {
+  if (typeof slug !== 'string' || slug.length === 0 ||
+      !/^[A-Za-z0-9._-]+$/.test(slug) || slug === '.' || slug === '..' || slug.includes('..')) {
+    throw new Error(`unsafe slug refused: ${String(slug).slice(0, 40)}`);
+  }
+}
+
+// A date segment must be a strict YYYY-MM-DD token before it is used in a path.
+function assertSafeDate(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(`unsafe date refused (expected YYYY-MM-DD): ${String(date).slice(0, 40)}`);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  KPI library loading
 // ─────────────────────────────────────────────────────────────────────
@@ -121,6 +139,7 @@ function parseLaunchKpis(content) {
 // ─────────────────────────────────────────────────────────────────────
 
 function projectKPIPlanPath(slug) {
+  assertSafeSlug(slug);
   return path.join(ROOT, 'plans', 'canvas', `${slug}-kpis.yaml`);
 }
 
@@ -174,6 +193,7 @@ function latestReview() {
 }
 
 function saveReview(date, content) {
+  assertSafeDate(date);
   ensureDir(REVIEWS_DIR);
   const p = path.join(REVIEWS_DIR, `${date}.md`);
   safeFs.writeFileSync(p, content);

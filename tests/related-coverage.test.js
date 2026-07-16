@@ -19,8 +19,10 @@
  *   • line 112     — the seed AND-chain boundary: seed present but `embedding` is
  *                    NOT a Float32Array, and present-but-length-0 → fall to fallback.
  *   • line 116     — the `: []` arm (seeded path, `store.search` returns a non-array).
- *   • lines 142-143 — the fallback `catch` (s2 `search` THROWS, not just degrades).
- *   • line 140     — the `: []` arm (s2 `search` resolves a NON-array).
+ *   • the text-seeded fallback error arms (Option B: the fallback embeds once then
+ *     calls `store.search` DIRECTLY — no delegation to s2 `search()`): a throwing
+ *     `store.search`, a non-array `store.search` result, a throwing embedder, and a
+ *     `{vectors:[]}` (no usable query vector) all fail open to [].
  *   • line 56      — normalizeLimit `Number.isInteger(limit) && limit > 0` boundary
  *                    (0 / negative / float / string all fall to DEFAULT, not through).
  *
@@ -45,7 +47,6 @@ const { openStore, PLAN_SENTINEL } = require('../src/lib/plan-index/store');
 // resolved absolute path, so these are the exact keys `require('./wiring')` /
 // `require('./search')` inside related.js will hit — swapping them here reroutes it.
 const WIRING_PATH = require.resolve('../src/lib/plan-index/wiring');
-const SEARCH_PATH = require.resolve('../src/lib/plan-index/search');
 
 // ── fixture (deterministic 8-dim vectors; no Ollama / no network) ────────────────
 
@@ -276,41 +277,82 @@ test('RLC-H1 seeded path, store.search returns a non-array → [] (line 116 `: [
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Group I — fallback error arms (s2 search THROWS / resolves non-array)
+//  Group I — text-seeded fallback error arms (Option B: fallback uses store.search
+//  DIRECTLY on the embedded slug vector — NO delegation to s2 search()).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-test('RLC-I1 fallback where s2 search THROWS synchronously → [] (lines 142-143)', async () => {
-  // Arrange — no seed → fallback. The store's listPlanPaths throws INSIDE s2.search
-  // (before its own await, and s2 does not wrap collectUnits), so s2.search itself
-  // rejects — exercising related()'s OWN fallback catch, which the companion suite's
-  // store-search-throw case does not (s2 swallows a store.search throw internally).
+test('RLC-I1 fallback where store.search THROWS → [] (fallback catch)', async () => {
+  // Arrange — no seed → text-seeded fallback. The embedder yields a usable query
+  // vector, but store.search throws (e.g. a dimension mismatch). related()'s OWN
+  // fallback catch must degrade to [] without rejecting.
   const store = {
     getUnit() { return null; },                       // no __plan__ seed → fallback
-    listPlanPaths() { throw new Error('boom: listPlanPaths inside s2'); },
+    search() { throw new Error('boom: fallback store.search failure'); },
   };
   Object.defineProperty(store, 'size', { get: () => 1 });
+  const embedder = spyEmbedder(new Map([['plans/new.md', [1, 0, 0, 0, 0, 0, 0, 0]]]));
 
   // Act
-  const results = await related('plans/new.md', { store, embedder: spyEmbedder() });
+  const results = await related('plans/new.md', { store, embedder });
 
-  // Assert — related caught the propagated throw and failed open.
-  assert.deepEqual(results, [], 's2 search throwing degrades related() to [] (no rejection)');
+  // Assert — related embedded once, then caught the store.search throw and failed open.
+  assert.deepEqual(results, [], 'a throwing store.search on the fallback degrades to []');
+  assert.equal(embedder.calls.length, 1, 'the fallback embedded the slug exactly once before searching');
 });
 
-test('RLC-I2 fallback where s2 search resolves a NON-array → [] (line 140 `: []`)', async () => {
-  // Arrange — no seed → fallback. Swap ./search for a fake that resolves `undefined`;
-  // `Array.isArray(results) ? results : []` must choose []. A mutant returning the raw
-  // value would leak undefined.
-  const store = { getUnit() { return null; } };
+test('RLC-I2 fallback where store.search resolves a NON-array → [] (`Array.isArray(hits) ? … : []`)', async () => {
+  // Arrange — no seed → fallback. A usable query vector, but store.search hands back
+  // `undefined` instead of an array; `Array.isArray(hits) ? hits : []` must choose [].
+  // A mutant returning the raw value would leak undefined to the caller.
+  const store = {
+    getUnit() { return null; },
+    search() { return undefined; },
+  };
   Object.defineProperty(store, 'size', { get: () => 1 });
+  const embedder = spyEmbedder(new Map([['plans/new.md', [1, 0, 0, 0, 0, 0, 0, 0]]]));
 
-  await withFakeModule(SEARCH_PATH, { search: async () => undefined, DEFAULT_SEARCH_LIMIT: 10 }, async () => {
-    // Act
-    const results = await related('plans/new.md', { store, embedder: spyEmbedder() });
+  // Act
+  const results = await related('plans/new.md', { store, embedder });
 
-    // Assert
-    assert.deepEqual(results, [], 'a non-array s2 search result is normalized to []');
-  });
+  // Assert
+  assert.deepEqual(results, [], 'a non-array store.search result is normalized to []');
+});
+
+test('RLC-I3 fallback where the embedder THROWS → [] (fallback catch, before search)', async () => {
+  // Arrange — no seed → fallback. The embedder itself throws; the fallback try/catch
+  // must degrade to [] without rejecting.
+  const store = {
+    getUnit() { return null; },
+    search() { throw new Error('should not reach store.search'); },
+  };
+  Object.defineProperty(store, 'size', { get: () => 1 });
+  const embedder = async () => { throw new Error('boom: embedder failure on the fallback'); };
+
+  // Act
+  const results = await related('plans/new.md', { store, embedder });
+
+  // Assert
+  assert.deepEqual(results, [], 'a throwing embedder on the fallback degrades to []');
+});
+
+test('RLC-I4 fallback where the embedder yields no usable vector → [] (qVec guard)', async () => {
+  // Arrange — no seed → fallback. The embedder returns `{vectors:[]}` (fail-open
+  // source), so there is no query vector; the `!(qVec instanceof Float32Array)`
+  // guard returns [] WITHOUT ever calling store.search.
+  let searchCalls = 0;
+  const store = {
+    getUnit() { return null; },
+    search() { searchCalls += 1; return []; },
+  };
+  Object.defineProperty(store, 'size', { get: () => 1 });
+  const embedder = async () => ({ vectors: [], source: 'stub' });
+
+  // Act
+  const results = await related('plans/new.md', { store, embedder });
+
+  // Assert
+  assert.deepEqual(results, [], 'no usable query vector → [] on the fallback');
+  assert.equal(searchCalls, 0, 'store.search is never called without a query vector');
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

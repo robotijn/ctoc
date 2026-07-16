@@ -35,6 +35,37 @@ const KNOWN_SEVERITIES = new Set([
 ]);
 
 /**
+ * Coerce a metric to a number, failing CLOSED on a non-numeric value.
+ *
+ * This is the single guard evaluateCoverage introduced, factored so every
+ * dimension evaluator shares ONE code path. A metric that is PRESENT but not a
+ * number ("N/A", "2 found", NaN) is evidence of a broken measurement, never of a
+ * clean result, and must FAIL its dimension rather than be silently coerced to 0
+ * and pass — the old `(metric || 0) > threshold` fail-open, under which a truthy
+ * non-numeric turned `actual - threshold` (or `actual > threshold`) into a false
+ * NaN comparison and the metric slipped through as neither failure nor warning.
+ *
+ * ABSENT handling is caller-defined via `absentDefault`: count metrics pass 0
+ * (an absent count means "none reported"), while coverage passes NO default so an
+ * unmeasured coverage figure is `undefined -> NaN -> FAIL`. `null` is treated as
+ * absent to mirror the old `(metric || 0)` truthiness fallback.
+ *
+ * @param {*} value - raw metric value
+ * @param {number} [absentDefault] - value to use when `value` is absent (undefined/null)
+ * @returns {{ failed: boolean, value: * }} on failure `value` carries the raw input for reporting
+ */
+function numericOrFail(value, absentDefault) {
+  if ((value === undefined || value === null) && absentDefault !== undefined) {
+    return { failed: false, value: absentDefault };
+  }
+  const n = Number(value);
+  if (Number.isNaN(n)) {
+    return { failed: true, value: value === undefined ? null : value };
+  }
+  return { failed: false, value: n };
+}
+
+/**
  * Default quality gate thresholds
  * @type {Object}
  */
@@ -187,23 +218,25 @@ class QualityGate {
     const warnings = [];
 
     for (const [metric, threshold] of Object.entries(thresholds)) {
-      // Coerce explicitly and fail CLOSED on an unmeasurable value. The old
-      // `coverage[metric] || 0` silently turned a truthy non-numeric (`"50%"`,
-      // `"N/A"`) into itself, so `actual - threshold` was NaN and BOTH `NaN<0`
-      // and `NaN<5` are false — the metric slipped through as neither failure
-      // nor warning (a fail-open pass). An unmeasurable coverage figure is not
-      // evidence of coverage; it must FAIL.
+      // Coerce explicitly and fail CLOSED on an unmeasurable value via the shared
+      // numericOrFail guard (no absentDefault: absent coverage is undefined ->
+      // NaN -> FAIL). The old `coverage[metric] || 0` silently turned a truthy
+      // non-numeric (`"50%"`, `"N/A"`) into itself, so `actual - threshold` was
+      // NaN and BOTH `NaN<0` and `NaN<5` are false — the metric slipped through
+      // as neither failure nor warning (a fail-open pass). An unmeasurable
+      // coverage figure is not evidence of coverage; it must FAIL.
       const rawActual = coverage[metric];
-      const actual = Number(rawActual);
-      if (Number.isNaN(actual)) {
+      const coerced = numericOrFail(rawActual);
+      if (coerced.failed) {
         failures.push({
           metric,
-          actual: rawActual === undefined ? null : rawActual,
+          actual: coerced.value,
           threshold,
           message: `${metric} coverage is unmeasurable (${rawActual}) — cannot verify against threshold of ${threshold}%`
         });
         continue;
       }
+      const actual = coerced.value;
       const diff = actual - threshold;
 
       if (diff < 0) {
@@ -263,9 +296,25 @@ class QualityGate {
     // deliberate "unlimited" bucket, not a blind spot. An UNKNOWN severity with
     // any findings is treated as a failure: we cannot prove it is benign.
     const evalBucket = (type, bucket) => {
-      for (const [severity, count] of Object.entries(bucket || {})) {
+      for (const [severity, rawCount] of Object.entries(bucket || {})) {
         const thresholdKey = severityMap[severity] || severity.toLowerCase();
         const threshold = thresholds[thresholdKey];
+
+        // Fail CLOSED on a non-numeric finding count. A broken count ("2 found",
+        // NaN) must never slip through the `count > threshold` comparison as a
+        // false NaN result; an unmeasurable finding count is not proof of safety.
+        const coerced = numericOrFail(rawCount, 0);
+        if (coerced.failed) {
+          failures.push({
+            type,
+            severity,
+            actual: rawCount,
+            threshold: threshold === undefined ? 'unrecognized' : threshold,
+            message: `${type} finding count for severity '${severity}' is unmeasurable (${rawCount}) — failing closed`
+          });
+          continue;
+        }
+        const count = coerced.value;
 
         if (threshold === undefined) {
           if (!KNOWN_SEVERITIES.has(thresholdKey) && count > 0) {
@@ -298,14 +347,25 @@ class QualityGate {
     evalBucket('sast', security.sast);
     evalBucket('dependencies', security.dependencies);
 
-    // Check secrets
-    const secretsCount = security.secrets || 0;
-    if (secretsCount > thresholds.secrets) {
+    // Check secrets — fail CLOSED on a non-numeric count. The old
+    // `security.secrets || 0` turned a truthy non-numeric ("2 found") into
+    // itself, so `"2 found" > 0` was a false NaN comparison and TWO secrets
+    // passed the gate; NaN || 0 was worse, coercing straight to 0.
+    const secretsRaw = security.secrets;
+    const secretsCoerced = numericOrFail(secretsRaw, 0);
+    if (secretsCoerced.failed) {
       failures.push({
         type: 'secrets',
-        actual: secretsCount,
+        actual: secretsRaw,
         threshold: thresholds.secrets,
-        message: `${secretsCount} secret(s) detected exceeds threshold of ${thresholds.secrets}`
+        message: `secrets count is unmeasurable (${secretsRaw}) — cannot verify against threshold of ${thresholds.secrets}`
+      });
+    } else if (secretsCoerced.value > thresholds.secrets) {
+      failures.push({
+        type: 'secrets',
+        actual: secretsCoerced.value,
+        threshold: thresholds.secrets,
+        message: `${secretsCoerced.value} secret(s) detected exceeds threshold of ${thresholds.secrets}`
       });
     }
 
@@ -333,8 +393,18 @@ class QualityGate {
     const failures = [];
     const warnings = [];
 
-    // Lint errors
-    if ((quality.lintErrors || 0) > thresholds.lintErrors) {
+    // Lint errors — coerce and fail CLOSED on a non-numeric count. The old
+    // `(quality.lintErrors || 0) > threshold` turned a truthy non-numeric
+    // ("N/A") into a false NaN comparison and passed the dimension.
+    const lintErrors = numericOrFail(quality.lintErrors, 0);
+    if (lintErrors.failed) {
+      failures.push({
+        metric: 'lintErrors',
+        actual: quality.lintErrors,
+        threshold: thresholds.lintErrors,
+        message: `lintErrors is unmeasurable (${quality.lintErrors}) — cannot verify against threshold of ${thresholds.lintErrors}`
+      });
+    } else if (lintErrors.value > thresholds.lintErrors) {
       failures.push({
         metric: 'lintErrors',
         actual: quality.lintErrors,
@@ -343,8 +413,18 @@ class QualityGate {
       });
     }
 
-    // Lint warnings
-    if ((quality.lintWarnings || 0) > thresholds.lintWarnings) {
+    // Lint warnings — an unmeasurable count fails CLOSED regardless of mode; a
+    // valid numeric overage stays mode-gated (failure under strictest, warning
+    // otherwise), preserving the existing escalation semantics.
+    const lintWarnings = numericOrFail(quality.lintWarnings, 0);
+    if (lintWarnings.failed) {
+      failures.push({
+        metric: 'lintWarnings',
+        actual: quality.lintWarnings,
+        threshold: thresholds.lintWarnings,
+        message: `lintWarnings is unmeasurable (${quality.lintWarnings}) — cannot verify against threshold of ${thresholds.lintWarnings}`
+      });
+    } else if (lintWarnings.value > thresholds.lintWarnings) {
       if (this.mode === 'strictest') {
         failures.push({
           metric: 'lintWarnings',
@@ -362,8 +442,16 @@ class QualityGate {
       }
     }
 
-    // Duplicated lines percentage
-    if ((quality.duplicatedLines || 0) > thresholds.duplicatedLines) {
+    // Duplicated lines percentage — fail CLOSED on a non-numeric value.
+    const duplicatedLines = numericOrFail(quality.duplicatedLines, 0);
+    if (duplicatedLines.failed) {
+      failures.push({
+        metric: 'duplicatedLines',
+        actual: quality.duplicatedLines,
+        threshold: thresholds.duplicatedLines,
+        message: `duplicatedLines is unmeasurable (${quality.duplicatedLines}) — cannot verify against threshold of ${thresholds.duplicatedLines}%`
+      });
+    } else if (duplicatedLines.value > thresholds.duplicatedLines) {
       failures.push({
         metric: 'duplicatedLines',
         actual: quality.duplicatedLines,
@@ -372,8 +460,16 @@ class QualityGate {
       });
     }
 
-    // Code smells
-    if ((quality.codeSmells || 0) > thresholds.codeSmells) {
+    // Code smells — fail CLOSED on a non-numeric count.
+    const codeSmells = numericOrFail(quality.codeSmells, 0);
+    if (codeSmells.failed) {
+      failures.push({
+        metric: 'codeSmells',
+        actual: quality.codeSmells,
+        threshold: thresholds.codeSmells,
+        message: `codeSmells is unmeasurable (${quality.codeSmells}) — cannot verify against threshold of ${thresholds.codeSmells}`
+      });
+    } else if (codeSmells.value > thresholds.codeSmells) {
       failures.push({
         metric: 'codeSmells',
         actual: quality.codeSmells,
@@ -406,8 +502,18 @@ class QualityGate {
     const failures = [];
     const warnings = [];
 
-    // Check functions exceeding cyclomatic complexity
-    if ((complexity.functionsOverCyclomatic || 0) > 0) {
+    // Each check fires on "count of functions/files over the limit > 0". Coerce
+    // and fail CLOSED on a non-numeric count: the old `(complexity.x || 0) > 0`
+    // turned a truthy non-numeric ("N/A") into a false NaN comparison and passed.
+    const cyclomatic = numericOrFail(complexity.functionsOverCyclomatic, 0);
+    if (cyclomatic.failed) {
+      failures.push({
+        metric: 'cyclomatic',
+        actual: complexity.functionsOverCyclomatic,
+        threshold: thresholds.cyclomatic,
+        message: `functionsOverCyclomatic is unmeasurable (${complexity.functionsOverCyclomatic}) — cannot verify cyclomatic complexity of ${thresholds.cyclomatic}`
+      });
+    } else if (cyclomatic.value > 0) {
       failures.push({
         metric: 'cyclomatic',
         actual: complexity.functionsOverCyclomatic,
@@ -417,7 +523,15 @@ class QualityGate {
     }
 
     // Check functions exceeding cognitive complexity
-    if ((complexity.functionsOverCognitive || 0) > 0) {
+    const cognitive = numericOrFail(complexity.functionsOverCognitive, 0);
+    if (cognitive.failed) {
+      failures.push({
+        metric: 'cognitive',
+        actual: complexity.functionsOverCognitive,
+        threshold: thresholds.cognitive,
+        message: `functionsOverCognitive is unmeasurable (${complexity.functionsOverCognitive}) — cannot verify cognitive complexity of ${thresholds.cognitive}`
+      });
+    } else if (cognitive.value > 0) {
       failures.push({
         metric: 'cognitive',
         actual: complexity.functionsOverCognitive,
@@ -427,7 +541,15 @@ class QualityGate {
     }
 
     // Check functions exceeding length limit
-    if ((complexity.functionsOverLength || 0) > 0) {
+    const functionLength = numericOrFail(complexity.functionsOverLength, 0);
+    if (functionLength.failed) {
+      failures.push({
+        metric: 'functionLength',
+        actual: complexity.functionsOverLength,
+        threshold: thresholds.functionLength,
+        message: `functionsOverLength is unmeasurable (${complexity.functionsOverLength}) — cannot verify against ${thresholds.functionLength} lines`
+      });
+    } else if (functionLength.value > 0) {
       failures.push({
         metric: 'functionLength',
         actual: complexity.functionsOverLength,
@@ -436,8 +558,17 @@ class QualityGate {
       });
     }
 
-    // Check files exceeding length limit
-    if ((complexity.filesOverLength || 0) > 0) {
+    // Check files exceeding length limit. A valid numeric overage is advisory
+    // (a WARNING, not a failure); an UNMEASURABLE count still fails CLOSED.
+    const fileLength = numericOrFail(complexity.filesOverLength, 0);
+    if (fileLength.failed) {
+      failures.push({
+        metric: 'fileLength',
+        actual: complexity.filesOverLength,
+        threshold: thresholds.fileLength,
+        message: `filesOverLength is unmeasurable (${complexity.filesOverLength}) — cannot verify against ${thresholds.fileLength} lines`
+      });
+    } else if (fileLength.value > 0) {
       warnings.push({
         metric: 'fileLength',
         actual: complexity.filesOverLength,
@@ -470,8 +601,18 @@ class QualityGate {
     const failures = [];
     const warnings = [];
 
-    // Check dependency violations
-    if ((architecture.violations || 0) > thresholds.violations) {
+    // Check dependency violations — fail CLOSED on a non-numeric count. The old
+    // `(architecture.violations || 0) > threshold` turned a truthy non-numeric
+    // into a false NaN comparison and passed the dimension.
+    const violations = numericOrFail(architecture.violations, 0);
+    if (violations.failed) {
+      failures.push({
+        metric: 'violations',
+        actual: architecture.violations,
+        threshold: thresholds.violations,
+        message: `violations is unmeasurable (${architecture.violations}) — cannot verify against threshold of ${thresholds.violations}`
+      });
+    } else if (violations.value > thresholds.violations) {
       failures.push({
         metric: 'violations',
         actual: architecture.violations,
@@ -480,8 +621,16 @@ class QualityGate {
       });
     }
 
-    // Check circular dependencies
-    if ((architecture.circularDeps || 0) > thresholds.circularDeps) {
+    // Check circular dependencies — fail CLOSED on a non-numeric count.
+    const circularDeps = numericOrFail(architecture.circularDeps, 0);
+    if (circularDeps.failed) {
+      failures.push({
+        metric: 'circularDeps',
+        actual: architecture.circularDeps,
+        threshold: thresholds.circularDeps,
+        message: `circularDeps is unmeasurable (${architecture.circularDeps}) — cannot verify against threshold of ${thresholds.circularDeps}`
+      });
+    } else if (circularDeps.value > thresholds.circularDeps) {
       failures.push({
         metric: 'circularDeps',
         actual: architecture.circularDeps,

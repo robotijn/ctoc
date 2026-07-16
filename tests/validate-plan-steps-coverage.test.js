@@ -302,3 +302,165 @@ describe('autoFixStepLabels — no-op and partial-fix wiring', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cluster F — decoy resistance: a label must be satisfied by a REAL heading,
+// never by a fenced example, a prose mention, or a markdown-table row.
+//
+// The pre-fix hook ran `stepPattern.test(content)` against the ENTIRE file with
+// no code-fence stripping and no scoping to the Execution-Plan region, so a plan
+// whose REAL heading was wrong (e.g. "### Step 14: DEPLOY") but which ALSO
+// contained the string "Step 14: VERIFY" inside a fence or prose PASSED, and a
+// meta-plan that merely tabulated the labels PASSED with zero real steps. These
+// tests mirror plan-validator's fence-strip + Execution-Plan-region + real-
+// heading rigor.
+// ---------------------------------------------------------------------------
+
+// A fully-canonical Execution-Plan body (with the "## Execution Plan" heading
+// that region-scoping keys off). Tests mutate exactly one thing to isolate the
+// decoy vector under test.
+const EXEC_PLAN_CANONICAL = [
+  '# Sample Slice Plan',
+  '',
+  '## Execution Plan',
+  '',
+  '### Step 8: TEST',
+  '- [x] Write the failing tests first (TDD).',
+  '### Step 9: PREPARE',
+  '- [x] Prepare scaffolding.',
+  '### Step 10: IMPLEMENT',
+  '- [x] Implement the change.',
+  '### Step 11: REVIEW',
+  '- [x] Self review.',
+  '### Step 12: OPTIMIZE',
+  '- [x] Optimize.',
+  '### Step 13: SECURE',
+  '- [x] Security scan.',
+  '### Step 14: VERIFY',
+  '- [x] Verify quality gate.',
+  '### Step 15: DOCUMENT',
+  '- [x] Document.',
+  '### Step 16: FINAL-REVIEW',
+  '- [x] Final review.',
+  ''
+].join('\n');
+
+describe('validatePlanStepLabels — decoy resistance (fence / prose / table)', () => {
+  it('rejects_wrong_real_heading_even_when_a_fenced_and_prose_decoy_names_the_correct_label', () => {
+    // Arrange — the REAL Step 14 heading is DEPLOY (wrong). The canonical label
+    // "Step 14: VERIFY" appears ONLY inside a fenced example and in a prose line.
+    const body = [
+      '# Sample Slice Plan',
+      '',
+      '## Execution Plan',
+      '',
+      '### Step 8: TEST',
+      '- [x] Write the failing tests first (TDD).',
+      '### Step 9: PREPARE',
+      '- [x] Prepare scaffolding.',
+      '### Step 10: IMPLEMENT',
+      '- [x] Implement the change.',
+      '### Step 11: REVIEW',
+      '- [x] Self review.',
+      '### Step 12: OPTIMIZE',
+      '- [x] Optimize.',
+      '### Step 13: SECURE',
+      '- [x] Security scan.',
+      '### Step 14: DEPLOY',               // <-- the WRONG real heading
+      '- [x] Ship to prod.',
+      '',
+      'For reference, in prose the canonical label is Step 14: VERIFY here.',
+      '```md',
+      '### Step 14: VERIFY',                // <-- decoy inside a fence
+      '- [x] run the gate',
+      '```',
+      '',
+      '### Step 15: DOCUMENT',
+      '- [x] Document.',
+      '### Step 16: FINAL-REVIEW',
+      '- [x] Final review.',
+      ''
+    ].join('\n');
+    const plan = writePlan(body);
+
+    // Act
+    const res = validatePlanStepLabels(plan);
+
+    // Assert — the fenced/prose decoy must NOT satisfy Step 14; the wrong real
+    // heading is caught. (Pre-fix, the decoy made this PASS.)
+    assert.equal(res.valid, false, `unexpected pass; errors: ${res.errors.join(' | ')}`);
+    assert.ok(
+      res.errors.some(e => /Step 14/.test(e) && /DEPLOY/.test(e) && /VERIFY/.test(e)),
+      `errors: ${res.errors.join(' | ')}`
+    );
+  });
+
+  it('rejects_meta_plan_that_only_tabulates_the_labels_with_no_real_step_headings', () => {
+    // Arrange — every "Step N: LABEL" string is present, but ONLY as table rows;
+    // there is not a single real "### Step N:" heading in the Execution Plan.
+    const body = [
+      '# Iron Loop Reference',
+      '',
+      '## Execution Plan',
+      '',
+      'This meta-plan merely documents the loop. It has no real step headings.',
+      '',
+      '| Step / Label            | Meaning     |',
+      '| ----------------------- | ----------- |',
+      '| Step 8: TEST            | write tests |',
+      '| Step 9: PREPARE         | prepare     |',
+      '| Step 10: IMPLEMENT      | implement   |',
+      '| Step 11: REVIEW         | review      |',
+      '| Step 12: OPTIMIZE       | optimize    |',
+      '| Step 13: SECURE         | secure      |',
+      '| Step 14: VERIFY         | verify      |',
+      '| Step 15: DOCUMENT       | document    |',
+      '| Step 16: FINAL-REVIEW   | final       |',
+      ''
+    ].join('\n');
+    const plan = writePlan(body);
+
+    // Act
+    const res = validatePlanStepLabels(plan);
+
+    // Assert — a table of labels is not an execution plan; every step is missing.
+    // (Pre-fix, all nine labels matched the table rows and this PASSED.)
+    assert.equal(res.valid, false, `unexpected pass; errors: ${res.errors.join(' | ')}`);
+    assert.ok(
+      res.errors.some(e => /Step 8 \(TEST\) is missing/.test(e)),
+      `errors: ${res.errors.join(' | ')}`
+    );
+    assert.ok(
+      res.errors.some(e => /Step 16 \(FINAL-REVIEW\) is missing/.test(e)),
+      `errors: ${res.errors.join(' | ')}`
+    );
+  });
+
+  it('accepts_a_correctly_labeled_execution_plan_with_all_real_headings', () => {
+    // Arrange — the regression guard: real headings, correct labels, in a real
+    // "## Execution Plan" region.
+    const plan = writePlan(EXEC_PLAN_CANONICAL);
+
+    // Act
+    const res = validatePlanStepLabels(plan);
+
+    // Assert
+    assert.equal(res.valid, true, `unexpected errors: ${res.errors.join(' | ')}`);
+  });
+
+  it('still_rejects_a_plan_genuinely_missing_a_step_with_the_existing_message', () => {
+    // Arrange — remove the real Step 13 heading + body entirely.
+    const body = EXEC_PLAN_CANONICAL.replace('### Step 13: SECURE\n- [x] Security scan.\n', '');
+    const plan = writePlan(body);
+
+    // Act
+    const res = validatePlanStepLabels(plan);
+
+    // Assert — the existing "missing from the plan" message still fires for 13.
+    assert.equal(res.valid, false);
+    assert.ok(
+      res.errors.some(e => /Step 13 \(SECURE\) is missing from the plan/.test(e)),
+      `errors: ${res.errors.join(' | ')}`
+    );
+  });
+});

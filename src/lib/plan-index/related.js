@@ -21,10 +21,16 @@
  *
  * • TEXT-SEEDED FALLBACK for a not-yet-indexed plan. If the plan-level unit is
  *   absent (e.g. a freshly created plan not yet reconciled into the index),
- *   `related` degrades to s2 `search(planSlug, { excludePlanPath: planSlug })` — a
- *   text-seeded query that DOES embed once — so a brand-new plan still surfaces
- *   neighbours instead of returning empty. If no embedder is available either, it
- *   fails open to `[]` (never a throw — the overview/inbox render must not crash).
+ *   `related` embeds the slug text ONCE via the wired `embedder` and feeds that
+ *   query vector STRAIGHT into `store.search(qVec, limit, { excludePlanPath, kind })`
+ *   — the SAME TRUE-COSINE surface the common path uses. It does NOT delegate to s2
+ *   `search()` (which fuses BM25+cosine via Reciprocal Rank Fusion and would return
+ *   RRF-scaled scores, ~0.0328 ceiling, on the fallback path — breaking any caller
+ *   that thresholds `related()`'s score on the cosine scale, e.g. conflict-detect's
+ *   0.78). Both paths now return TRUE cosine. A brand-new plan still surfaces
+ *   neighbours instead of returning empty; if no embedder is available, or the embed
+ *   yields no usable vector, it fails open to `[]` (never a throw — the overview/inbox
+ *   render must not crash).
  *
  * • `kind` PASSTHROUGH for PI6. `related(slug, { kind: 'section' })` passes `kind`
  *   straight into `store.search` `opts.kind`, restricting the cosine scan to
@@ -122,22 +128,24 @@ async function related(planSlug, opts = {}) {
   }
 
   // ── text-seeded fallback: the plan is not yet indexed ─────────────────────────
-  // Delegate to s2 `search` on the slug text, embedding once; still self-excluded.
-  // Requires an embedder — without one there is nothing to embed, so degrade to [].
+  // Embed the slug text ONCE, then feed the query vector straight into the store's
+  // TRUE-COSINE search — mirroring the common path so BOTH paths return cosine (not
+  // the RRF scores s2 `search()` would produce). Still self-excluded via
+  // excludePlanPath. Requires an embedder — without one there is nothing to embed,
+  // so degrade to []. Any embed / search failure or a missing query vector is
+  // fail-open → [].
   if (typeof embedder !== 'function') {
     return [];
   }
   try {
-    const { search } = require('./search'); // string-literal require
-    const results = await search(planSlug, {
-      store,
-      embedder,
-      projectPath: opts.projectPath,
-      limit,
-      kind,
-      excludePlanPath: planSlug,
-    });
-    return Array.isArray(results) ? results : [];
+    const embedResult = await embedder([planSlug]); // the single embed
+    const vectors = embedResult && Array.isArray(embedResult.vectors) ? embedResult.vectors : [];
+    const qVec = vectors[0];
+    if (!(qVec instanceof Float32Array) || qVec.length === 0) {
+      return []; // no usable query vector → fail-open
+    }
+    const hits = store.search(qVec, limit, { kind, excludePlanPath: planSlug });
+    return Array.isArray(hits) ? hits : [];
   } catch {
     return []; // fallback failure is still fail-open
   }

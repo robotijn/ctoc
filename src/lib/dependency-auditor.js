@@ -240,6 +240,30 @@ class DependencyAuditor {
   }
 
   /**
+   * True when the project root carries the NATIVE lockfile a given manager's audit reads
+   * (`yarn.lock` for yarn, `pnpm-lock.yaml` for pnpm, etc.). `yarn audit`/`pnpm audit`
+   * read ONLY their own lockfile and ENOLOCK without it, so on a legitimate npm project
+   * that merely has yarn/pnpm installed a native yarn/pnpm audit would fail for lack of a
+   * lockfile — noise that must NOT be mistaken for a real scanner hard-failure. runAudit
+   * uses this to route yarn/pnpm to the npm-audit fallback when their lockfile is absent.
+   * Fail-soft: an unreadable/falsy root reports absent.
+   * @param {string} manager - Package manager name
+   * @returns {boolean} true iff the manager's native lockfile exists at the project root
+   */
+  _hasNativeLockfile(manager) {
+    const root = this.projectRoot;
+    if (!root || typeof root !== 'string') return false;
+    const cfg = PACKAGE_MANAGERS[manager];
+    if (!cfg) return false;
+    for (const lockFile of cfg.lockFiles) {
+      try {
+        if (safeFs.existsSync(path.join(root, lockFile))) return true;
+      } catch { /* unreadable → skip */ }
+    }
+    return false;
+  }
+
+  /**
    * Check if an audit tool is available
    * @param {string} manager - Package manager name
    * @returns {boolean} True if tool is available
@@ -310,11 +334,23 @@ class DependencyAuditor {
     const duration = Date.now() - startTime;
     const summary = this.generateSummary(uniqueVulns, managers, duration);
 
+    // Honesty (mirror of sca-runner's runOsvScanner→run() contract): an ATTEMPTED scanner
+    // (tool present) that hard-failed to produce a reliable result must NOT read as a
+    // clean/success verdict. `_recordScannerFailure` flags such entries `hardFailure`;
+    // when any is present this run scanned nothing reliable, so success/scanned are false
+    // and a reason is stated. A MISSING tool is NOT flagged hardFailure (quiet skip), and
+    // a normal non-zero exit whose stdout parsed records no error at all.
+    const hardFailed = this.errors.some(e => e && e.hardFailure);
+
     return {
-      success: true,
+      success: !hardFailed,
+      scanned: !hardFailed,
       vulnerabilities: uniqueVulns,
       errors: this.errors,
       summary,
+      ...(hardFailed ? {
+        reason: 'a dependency audit scanner was attempted but hard-failed — this run is NOT a reliable clean verdict'
+      } : {}),
       message: this.generateReport(uniqueVulns, summary)
     };
   }
@@ -324,12 +360,24 @@ class DependencyAuditor {
    * @param {string} manager - Package manager name
    */
   async runAudit(manager) {
-    if (!this.isToolAvailable(manager)) {
-      // Use npm as fallback for yarn/pnpm
-      if (['yarn', 'pnpm'].includes(manager) && this.isToolAvailable('npm')) {
-        await this.runNpmAudit();
+    // yarn/pnpm audit read ONLY their own lockfile (yarn.lock / pnpm-lock.yaml) and ENOLOCK
+    // without it. detectPackageManagers co-detects yarn AND pnpm from a bare package.json,
+    // so a legitimate npm project (npm lockfile, no yarn.lock/pnpm-lock.yaml) that merely
+    // has yarn/pnpm installed would run doomed native yarn/pnpm audits. Those are NOT real
+    // scanner failures — npm audit covers the same tree — so route yarn/pnpm to the
+    // npm-audit fallback (this auditor implements yarn/pnpm solely via that fallback) when
+    // their native lockfile is absent OR the native tool is missing, rather than letting a
+    // doomed native audit record a spurious hard-failure that would sink a clean verdict.
+    if (['yarn', 'pnpm'].includes(manager)) {
+      if (!this.isToolAvailable(manager) || !this._hasNativeLockfile(manager)) {
+        if (this.isToolAvailable('npm')) {
+          await this.runNpmAudit();
+          return;
+        }
+        this.errors.push({ manager, error: `${manager} audit tool not available` });
         return;
       }
+    } else if (!this.isToolAvailable(manager)) {
       this.errors.push({ manager, error: `${manager} audit tool not available` });
       return;
     }
@@ -369,6 +417,47 @@ class DependencyAuditor {
   }
 
   /**
+   * Record a LOUD hard-failure for an ATTEMPTED scanner (tool present) that failed to
+   * produce a reliable result AND left no parseable stdout to salvage.
+   *
+   * The fail-open (false-clean) bug this closes: every runXxxAudit's catch parsed
+   * `error.stdout` when present but did NOTHING when it was absent. A scanner that TIMED
+   * OUT (killed, empty stdout) or CRASHED writing only to stderr therefore pushed nothing
+   * to this.errors and recorded no finding — run() then returned success:true/errors:[],
+   * INDISTINGUISHABLE from a genuinely clean audit. Mirrors sca-runner's runOsvScanner
+   * contract: never silently drop a scanner crash. The `hardFailure:true` flag lets run()
+   * refuse a clean verdict; quality-agent already surfaces every this.errors entry as a
+   * loud skip. This is NEVER called for a MISSING tool (ENOENT/isToolAvailable false) —
+   * that legitimate not-applicable skip is handled in runAudit and stays a quiet skip.
+   *
+   * The failure mode is classified so the human sees WHY: a timeout/kill (error.killed /
+   * error.signal / error.code === 'ETIMEDOUT'), a non-zero exit with stderr only (a
+   * bounded stderr snippet is included), or any other throw (its message).
+   *
+   * @param {string} manager - Package manager name
+   * @param {Error & {killed?: boolean, signal?: string, code?: string, stderr?: string|Buffer}} error
+   */
+  _recordScannerFailure(manager, error) {
+    let mode;
+    if (error && (error.killed || error.signal || error.code === 'ETIMEDOUT')) {
+      const sig = error.signal ? ` (signal ${error.signal})` : '';
+      const code = error.code ? ` [${error.code}]` : '';
+      mode = `timed out or was killed with no output${sig}${code}`;
+    } else if (error && error.stderr && String(error.stderr).trim()) {
+      const snippet = String(error.stderr).trim().slice(0, 500);
+      mode = `exited non-zero with no parseable stdout; stderr: ${snippet}`;
+    } else {
+      const msg = (error && error.message) ? error.message : 'unknown error';
+      mode = `failed with no parseable output: ${msg}`;
+    }
+    this.errors.push({
+      manager,
+      error: `${manager} audit failed to produce a reliable result — ${mode}`,
+      hardFailure: true
+    });
+  }
+
+  /**
    * Run npm audit
    */
   async runNpmAudit() {
@@ -393,6 +482,8 @@ class DependencyAuditor {
         } catch (e) {
           this.errors.push({ manager: 'npm', error: `Failed to parse audit results: ${e.message}` });
         }
+      } else {
+        this._recordScannerFailure('npm', error);
       }
     }
   }
@@ -436,6 +527,8 @@ class DependencyAuditor {
             // Skip non-JSON lines
           }
         }
+      } else {
+        this._recordScannerFailure('yarn', error);
       }
     }
   }
@@ -463,6 +556,8 @@ class DependencyAuditor {
         } catch (e) {
           this.errors.push({ manager: 'pnpm', error: `Failed to parse audit results: ${e.message}` });
         }
+      } else {
+        this._recordScannerFailure('pnpm', error);
       }
     }
   }
@@ -516,6 +611,8 @@ class DependencyAuditor {
         } catch (e) {
           this.errors.push({ manager: 'pip', error: `Failed to parse audit results: ${e.message}` });
         }
+      } else {
+        this._recordScannerFailure('pip', error);
       }
     }
   }
@@ -530,13 +627,16 @@ class DependencyAuditor {
       const result = execSync(command, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
-        encoding: 'utf8'
+        encoding: 'utf8',
+        maxBuffer: 50 * 1024 * 1024
       });
 
       this.parseGovulncheckResults(result);
     } catch (error) {
       if (error.stdout) {
         this.parseGovulncheckResults(error.stdout);
+      } else {
+        this._recordScannerFailure('go', error);
       }
     }
   }
@@ -551,7 +651,8 @@ class DependencyAuditor {
       const result = execSync(command, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
-        encoding: 'utf8'
+        encoding: 'utf8',
+        maxBuffer: 50 * 1024 * 1024
       });
 
       this.parseCargoAuditResults(JSON.parse(result));
@@ -562,6 +663,8 @@ class DependencyAuditor {
         } catch (e) {
           this.errors.push({ manager: 'cargo', error: `Failed to parse audit results: ${e.message}` });
         }
+      } else {
+        this._recordScannerFailure('cargo', error);
       }
     }
   }
@@ -576,7 +679,8 @@ class DependencyAuditor {
       const result = execSync(command, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
-        encoding: 'utf8'
+        encoding: 'utf8',
+        maxBuffer: 50 * 1024 * 1024
       });
 
       this.parseBundlerAuditResults(JSON.parse(result));
@@ -587,6 +691,8 @@ class DependencyAuditor {
         } catch (e) {
           this.errors.push({ manager: 'bundler', error: `Failed to parse audit results: ${e.message}` });
         }
+      } else {
+        this._recordScannerFailure('bundler', error);
       }
     }
   }
@@ -601,7 +707,8 @@ class DependencyAuditor {
       const result = execSync(command, {
         cwd: this.projectRoot,
         timeout: this.options.timeout,
-        encoding: 'utf8'
+        encoding: 'utf8',
+        maxBuffer: 50 * 1024 * 1024
       });
 
       this.parseComposerAuditResults(JSON.parse(result));
@@ -612,6 +719,8 @@ class DependencyAuditor {
         } catch (e) {
           this.errors.push({ manager: 'composer', error: `Failed to parse audit results: ${e.message}` });
         }
+      } else {
+        this._recordScannerFailure('composer', error);
       }
     }
   }

@@ -1192,3 +1192,360 @@ test('runBundlerAudit: records a loud parse error when error.stdout is malformed
     restoreDA();
   }
 });
+
+// ── FAIL-OPEN (false-clean) on scanner hard-failure — the CRITICAL fix ─────────
+// Every audit method's catch parses error.stdout when present but did NOTHING when it
+// was absent. An installed scanner that TIMES OUT (killed, empty stdout) or CRASHES
+// writing only to stderr therefore pushed no error and recorded no finding — run() then
+// returned success:true / errors:[], INDISTINGUISHABLE from a genuinely clean audit
+// (a fail-open false-clean on the Step-13 SECURE path). The fix mirrors sca-runner's
+// runOsvScanner contract: the empty-stdout branch records a LOUD hardFailure error, and
+// run() must NOT report a clean/success verdict when an ATTEMPTED scanner hard-failed.
+
+test('runNpmAudit: a timeout-kill (killed, empty stdout) records a LOUD hard-failure, never a silent drop', async () => {
+  cp.execSync = () => {
+    const err = new Error('spawn npm ETIMEDOUT');
+    err.killed = true;
+    err.signal = 'SIGTERM';
+    err.stdout = '';
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runNpmAudit();
+    assert.equal(a.errors.length, 1, 'the empty-stdout timeout must NOT be silently dropped');
+    assert.equal(a.errors[0].manager, 'npm');
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.match(a.errors[0].error, /timed out|killed/i);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('run: an npm scanner that times out (killed, empty stdout) does NOT read as a clean success', async () => {
+  cp.execSync = (cmd) => {
+    if (cmd.includes('--version')) return '10.0.0';               // isToolAvailable('npm')
+    if (cmd === 'npm audit --json') {
+      const err = new Error('killed');
+      err.killed = true; err.signal = 'SIGTERM'; err.stdout = '';
+      throw err;
+    }
+    throw new Error(`unexpected exec ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-timeout-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'package-lock.json', '{}');
+    const result = await new DA(dir).run();
+    assert.ok(result.errors.length >= 1, 'the hard failure must be surfaced in errors');
+    assert.ok(result.errors.some(e => e.hardFailure), 'a hardFailure error is recorded');
+    assert.notEqual(result.success, true, 'a hard-failed scanner is NOT a clean success');
+    assert.equal(result.vulnerabilities.length, 0);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runCargoAudit: a non-zero exit with stderr only (empty stdout) records a LOUD hard-failure with the stderr cause', async () => {
+  cp.execSync = () => {
+    const err = new Error('cargo audit crashed');
+    err.status = 1;
+    err.stdout = '';
+    err.stderr = 'error: failed to load Cargo.lock: permission denied';
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runCargoAudit();
+    assert.equal(a.errors.length, 1, 'a stderr-only crash must NOT be silently dropped');
+    assert.equal(a.errors[0].manager, 'cargo');
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.match(a.errors[0].error, /permission denied/);
+  } finally {
+    restoreDA();
+  }
+});
+
+test('runComposerAudit: a stderr-only crash bounds the stderr snippet (does not embed the whole stream)', async () => {
+  cp.execSync = () => {
+    const err = new Error('boom'); err.status = 1; err.stdout = ''; err.stderr = 'X'.repeat(5000);
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runComposerAudit();
+    assert.equal(a.errors.length, 1);
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.ok(a.errors[0].error.length < 800, 'the stderr snippet is bounded, not the whole 5000-char stream');
+  } finally {
+    restoreDA();
+  }
+});
+
+// ── Regressions: the genuine paths must be unchanged ──────────────────────────
+
+test('run: a genuinely clean npm audit (valid empty-vuln JSON) still reports success with no spurious error', async () => {
+  cp.execSync = (cmd) => {
+    if (cmd.includes('--version')) return '10.0.0';
+    if (cmd === 'npm audit --json') return JSON.stringify({ vulnerabilities: {} });
+    throw new Error(`unexpected exec ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-clean-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'package-lock.json', '{}');
+    const result = await new DA(dir).run();
+    assert.equal(result.success, true);
+    assert.equal(result.vulnerabilities.length, 0);
+    assert.equal((result.errors || []).length, 0, 'a truly clean audit records NO error');
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runNpmAudit: a non-zero exit WITH parseable error.stdout still parses findings (else branch NOT taken)', async () => {
+  cp.execSync = () => {
+    const err = new Error('vulns found');
+    err.stdout = JSON.stringify({
+      vulnerabilities: { axios: { range: '<1', severity: 'high', via: [{ title: 'x', severity: 'high', url: 'https://e.test/a' }] } }
+    });
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runNpmAudit();
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.errors.length, 0, 'a parseable non-zero exit is the normal path, not a hard failure');
+  } finally {
+    restoreDA();
+  }
+});
+
+test('run: a MISSING scanner (tool unavailable / ENOENT) is a quiet not-applicable skip, not a hard failure', async () => {
+  cp.execSync = (cmd) => {
+    if (cmd.includes('--version')) throw new Error('ENOENT'); // every version probe fails → tool missing
+    throw new Error(`unexpected exec ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-missing-');
+  try {
+    write(dir, 'Cargo.toml', '[package]\nname="x"');
+    write(dir, 'Cargo.lock', '');
+    const result = await new DA(dir).run();
+    assert.ok(!result.errors.some(e => e.hardFailure), 'a missing tool is not a scanner hard-failure');
+    assert.equal(result.success, true, 'a not-applicable missing tool is a quiet skip, not a fail');
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── LOW sibling defect: large -json streams must not be truncated (maxBuffer) ──
+
+test('runGoVulncheck/runCargoAudit/runBundlerAudit/runComposerAudit pass maxBuffer to exec (no truncation of large -json streams)', async () => {
+  const seen = {};
+  cp.execSync = (cmd, opts) => { seen.go = opts; return '{"x":1}\n'; };
+  let { DependencyAuditor: DA } = freshDA();
+  await new DA('x').runGoVulncheck();
+  restoreDA();
+
+  cp.execSync = (cmd, opts) => { seen.cargo = opts; return JSON.stringify({ vulnerabilities: { list: [] } }); };
+  ({ DependencyAuditor: DA } = freshDA());
+  await new DA('x').runCargoAudit();
+  restoreDA();
+
+  cp.execSync = (cmd, opts) => { seen.bundler = opts; return JSON.stringify({ results: [] }); };
+  ({ DependencyAuditor: DA } = freshDA());
+  await new DA('x').runBundlerAudit();
+  restoreDA();
+
+  cp.execSync = (cmd, opts) => { seen.composer = opts; return JSON.stringify({ advisories: {} }); };
+  ({ DependencyAuditor: DA } = freshDA());
+  await new DA('x').runComposerAudit();
+  restoreDA();
+
+  for (const k of ['go', 'cargo', 'bundler', 'composer']) {
+    assert.ok(seen[k] && seen[k].maxBuffer >= 50 * 1024 * 1024, `${k} exec passes maxBuffer (>=50MB)`);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PER-METHOD HARD-FAILURE else branches + runAudit routing arms + the generic
+// classifier arm. These cover the empty-stdout failure branches for the managers
+// npm/cargo/composer did NOT already exercise (yarn/pnpm/pip/go/bundler), the two
+// runAudit switch arms only reachable with a present native lockfile + tool
+// (case 'yarn' / case 'pnpm'), the no-fallback-possible "tool not available"
+// branch, and the _recordScannerFailure generic (non-kill, non-stderr) arm.
+// Seam control: only child_process (execSync/execFileSync) is faked.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 377-379 + generic classifier arm 450-452: yarn unavailable AND npm unavailable →
+// no fallback is possible, so a loud "tool not available" is recorded and nothing runs.
+test('runAudit: yarn unavailable AND npm unavailable records a loud "tool not available" (no fallback possible)', async () => {
+  cp.execSync = () => { throw new Error('ENOENT'); };   // every version probe fails → both tools missing
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');                              // nonexistent root → no native lockfile either
+    await a.runAudit('yarn');
+    assert.equal(a.errors.length, 1, 'with no yarn AND no npm, the yarn audit cannot run — a loud skip is recorded');
+    assert.equal(a.errors[0].manager, 'yarn');
+    assert.match(a.errors[0].error, /yarn audit tool not available/);
+  } finally {
+    restoreDA();
+  }
+});
+
+// 391-392: yarn WITH its native lockfile AND the yarn tool present routes to the
+// switch `case 'yarn'` arm (runYarnAudit) — NOT the npm-audit fallback. Proven by the
+// recorded manager: the yarn arm records under 'yarn'; the npm fallback would record 'npm'.
+test('runAudit: yarn with yarn.lock present and yarn available routes to the yarn audit arm (not the npm fallback)', async () => {
+  const advisory = {
+    type: 'auditAdvisory',
+    data: { advisory: { module_name: 'ylib', vulnerable_versions: '<1', severity: 'high', title: 'Y-bug', url: 'https://example.test/y' } }
+  };
+  cp.execSync = (cmd) => {
+    if (/--version/.test(cmd)) return 'ok';             // isToolAvailable('yarn') → true
+    if (cmd.startsWith('yarn audit')) return JSON.stringify(advisory);
+    throw new Error(`npm fallback must NOT run; got ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-yarn-route-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'yarn.lock', '# yarn lockfile v1\n');
+    const a = new DA(dir);
+    await a.runAudit('yarn');
+    assert.equal(a.errors.length, 0, `the yarn arm ran cleanly; got ${JSON.stringify(a.errors)}`);
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.vulnerabilities[0].manager, 'yarn',
+      'the switch case yarn arm ran (records under yarn) — the npm fallback would record under npm');
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 394-395: pnpm WITH pnpm-lock.yaml AND the pnpm tool present routes to the switch
+// `case 'pnpm'` arm (runPnpmAudit, which runs `pnpm audit --json`) — NOT the npm fallback.
+test('runAudit: pnpm with pnpm-lock.yaml present and pnpm available routes to the pnpm audit arm (not the npm fallback)', async () => {
+  let ranPnpmCommand = false;
+  cp.execSync = (cmd) => {
+    if (/--version/.test(cmd)) return 'ok';             // isToolAvailable('pnpm') → true
+    if (cmd.startsWith('pnpm audit')) {
+      ranPnpmCommand = true;
+      return JSON.stringify({ vulnerabilities: { glob: { range: '<7', severity: 'low', via: [{ title: 'ReDoS', severity: 'low', url: 'https://example.test/g' }] } } });
+    }
+    throw new Error(`npm fallback must NOT run; got ${cmd}`);
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-pnpm-route-');
+  try {
+    write(dir, 'package.json', '{"name":"x","version":"1.0.0"}');
+    write(dir, 'pnpm-lock.yaml', 'lockfileVersion: 5.4\n');
+    const a = new DA(dir);
+    await a.runAudit('pnpm');
+    assert.equal(ranPnpmCommand, true, 'the switch case pnpm arm ran the `pnpm audit` command, not the npm fallback');
+    assert.equal(a.vulnerabilities.length, 1);
+    assert.equal(a.errors.length, 0);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 531-532 (yarn hard-failure else) + 450-452 (generic classifier arm): a plain throw with
+// NO stdout, NO kill/signal/code, NO stderr must record a LOUD hardFailure via the generic arm.
+test('runYarnAudit: a plain throw (no stdout/stderr/kill) records a LOUD hard-failure via the generic classifier arm', async () => {
+  cp.execSync = () => { throw new Error('yarn exploded with no output'); };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runYarnAudit();
+    assert.equal(a.errors.length, 1, 'an empty-output yarn crash must NOT be silently dropped');
+    assert.equal(a.errors[0].manager, 'yarn');
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.match(a.errors[0].error, /failed with no parseable output: yarn exploded with no output/,
+      'the generic classifier arm reports the raw error message');
+  } finally {
+    restoreDA();
+  }
+});
+
+// 560-561: pnpm hard-failure else — a timeout-kill with empty stdout records a LOUD hardFailure.
+test('runPnpmAudit: a timeout-kill (killed, empty stdout) records a LOUD hard-failure', async () => {
+  cp.execSync = () => { const err = new Error('killed'); err.killed = true; err.signal = 'SIGKILL'; err.stdout = ''; throw err; };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runPnpmAudit();
+    assert.equal(a.errors.length, 1, 'an empty-stdout pnpm timeout must NOT be silently dropped');
+    assert.equal(a.errors[0].manager, 'pnpm');
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.match(a.errors[0].error, /timed out|killed/i);
+  } finally {
+    restoreDA();
+  }
+});
+
+// 615-616: pip hard-failure else (execFileSync seam) — an ETIMEDOUT with empty stdout records a LOUD hardFailure.
+test('runPipAudit: a timeout (ETIMEDOUT, empty stdout) records a LOUD hard-failure', async () => {
+  cp.execFileSync = () => { const err = new Error('pip-audit timed out'); err.code = 'ETIMEDOUT'; err.stdout = ''; throw err; };
+  const { DependencyAuditor: DA } = freshDA();
+  const dir = mkTmp('da-pip-timeout-');
+  try {
+    write(dir, 'requirements.txt', 'flask==0.5\n');
+    const a = new DA(dir);
+    await a.runPipAudit();
+    assert.equal(a.errors.length, 1, 'an empty-stdout pip-audit timeout must NOT be silently dropped');
+    assert.equal(a.errors[0].manager, 'pip');
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.match(a.errors[0].error, /timed out|killed/i);
+  } finally {
+    restoreDA();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 639-640: go hard-failure else — a stderr-only crash (empty stdout) records a LOUD hardFailure naming the cause.
+test('runGoVulncheck: a stderr-only crash (empty stdout) records a LOUD hard-failure naming the stderr cause', async () => {
+  cp.execSync = () => {
+    const err = new Error('govulncheck failed'); err.status = 2; err.stdout = '';
+    err.stderr = 'govulncheck: failed to load packages: build error';
+    throw err;
+  };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runGoVulncheck();
+    assert.equal(a.errors.length, 1, 'a stderr-only govulncheck crash must NOT be silently dropped');
+    assert.equal(a.errors[0].manager, 'go');
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.match(a.errors[0].error, /failed to load packages/);
+  } finally {
+    restoreDA();
+  }
+});
+
+// 695-696: bundler hard-failure else — a timeout-kill with empty stdout records a LOUD hardFailure.
+test('runBundlerAudit: a timeout-kill (killed, empty stdout) records a LOUD hard-failure', async () => {
+  cp.execSync = () => { const err = new Error('killed'); err.killed = true; err.stdout = ''; throw err; };
+  const { DependencyAuditor: DA } = freshDA();
+  try {
+    const a = new DA('x');
+    await a.runBundlerAudit();
+    assert.equal(a.errors.length, 1, 'an empty-stdout bundler timeout must NOT be silently dropped');
+    assert.equal(a.errors[0].manager, 'bundler');
+    assert.equal(a.errors[0].hardFailure, true);
+    assert.match(a.errors[0].error, /timed out|killed/i);
+  } finally {
+    restoreDA();
+  }
+});

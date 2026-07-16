@@ -60,18 +60,53 @@ function validatePlanStepLabels(planPath) {
   const errors = [];
   const warnings = [];
 
-  // Check each canonical label
+  // Strip fenced code blocks (``` … ``` and ~~~ … ~~~) BEFORE any label match, and
+  // scope detection to the "## Execution Plan" region when present. This mirrors
+  // the wired, non-vulnerable src/lib/plan-validator.js (validateStepLabels +
+  // extractStepBlocks): a step label living ONLY inside a fenced example, a prose
+  // line, or a markdown-table row must NOT satisfy a mandatory step. Without this,
+  // a plan whose REAL heading is wrong (e.g. "### Step 14: DEPLOY") but which also
+  // contained the string "Step 14: VERIFY" in a fence/prose PASSED, and a meta-plan
+  // that merely tabulated the labels PASSED with zero real steps. Legacy plans
+  // without an Execution Plan section fall back to the whole (fence-stripped) body
+  // (as validateEscalations does), and matching is still anchored to REAL
+  // "### Step N:" headings — a table row or prose mention never starts with `#`.
+  const scanContent = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '');
+  const execMatch = scanContent.match(/^##\s+Execution Plan[\s\S]*$/m);
+  const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : scanContent;
+
+  // Collect REAL step headings ("## … #### Step N: …") in the region, keyed by
+  // step number. Only a heading LINE can satisfy a step.
+  const headingsByNum = new Map();
+  const headingLineRe = safeRegExp('^#{2,4}[ \\t]*Step[ \\t]*(\\d+)\\b[^\\n]*', 'gim');
+  let headingMatch;
+  while ((headingMatch = headingLineRe.exec(region)) !== null) {
+    const n = headingMatch[1];
+    if (!headingsByNum.has(n)) headingsByNum.set(n, []);
+    headingsByNum.get(n).push(headingMatch[0]);
+  }
+
+  // Check each canonical label against the REAL heading(s) for that step number.
   for (const [num, label] of Object.entries(CANONICAL_LABELS)) {
     const escapedLabel = label.replace('-', '[-\\s]');
     // Trailing (?![\w-]) is REQUIRED: without it "TEST" matches inside the known-
     // wrong label "TESTING" (and "REVIEW" inside "REVIEWS"), so a wrong label
     // would silently pass the step-label gate.
     const stepPattern = safeRegExp(`Step\\s*${num}[:\\s]+${escapedLabel}(?![\\w-])`, 'i');
+    const stepHeadings = headingsByNum.get(num) || [];
 
-    if (!stepPattern.test(content)) {
-      // Check if there's a wrong label at this position
+    if (!stepHeadings.some((line) => stepPattern.test(line))) {
+      // No real heading for this step carries the canonical label. If a heading
+      // for this step exists but is mislabeled, extract the wrong label; if no
+      // heading exists at all, it is missing.
       const anyLabelPattern = safeRegExp(`Step\\s*${num}[:\\s]+(\\w[\\w-]*)`, 'i');
-      const wrongMatch = content.match(anyLabelPattern);
+      let wrongMatch = null;
+      for (const line of stepHeadings) {
+        wrongMatch = line.match(anyLabelPattern);
+        if (wrongMatch) break;
+      }
 
       if (wrongMatch) {
         const foundLabel = wrongMatch[1].toUpperCase();
@@ -88,8 +123,10 @@ function validatePlanStepLabels(planPath) {
     }
   }
 
-  // Check for multiple IMPLEMENT steps
-  const implementMatches = content.match(/Step\s*(\d+)[:\s]+IMPLEMENT/gi) || [];
+  // Check for multiple IMPLEMENT steps — count REAL IMPLEMENT-labeled headings in
+  // the (fence-stripped, region-scoped) content only, so a fenced/prose example
+  // never inflates the count.
+  const implementMatches = region.match(/^#{2,4}[ \t]*Step\s*\d+[:\s]+IMPLEMENT\b/gim) || [];
   if (implementMatches.length > 1) {
     errors.push(
       `Found ${implementMatches.length} IMPLEMENT steps. Only Step 10 should be IMPLEMENT. ` +
@@ -97,8 +134,9 @@ function validatePlanStepLabels(planPath) {
     );
   }
 
-  // Check Step 7 writes tests (not just identifies)
-  const step8Match = content.match(/Step\s*8[:\s]+TEST[^\n]*\n([\s\S]*?)(?=###\s*Step\s*9|$)/i);
+  // Check Step 8 writes tests (not just identifies) — scoped to the region so a
+  // fenced example cannot trip the TDD check.
+  const step8Match = region.match(/Step\s*8[:\s]+TEST[^\n]*\n([\s\S]*?)(?=###\s*Step\s*9|$)/i);
   if (step8Match) {
     const step8Content = step8Match[1];
     if (/identify.*coverage|review.*pattern/i.test(step8Content) &&
