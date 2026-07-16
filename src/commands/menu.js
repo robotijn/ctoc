@@ -427,16 +427,6 @@ function handleKey(str, key) {
     return;
   }
 
-  // Settings shortcut: jump to System area's Settings sub-mode
-  if (key.sequence === 's' && app.mode === 'list' && TABS[app.tabIndex].id === 'pipeline') {
-    app.tabIndex = TABS.findIndex(t => t.id === 'system');
-    app.toolMode = '3'; // Settings
-    app.settingsTabIndex = 0;
-    app.settingIndex = 0;
-    render();
-    return;
-  }
-
   // PI4-s4: "Search plans" shortcut ('/' in list mode). Enters the search sub-mode
   // with an empty query buffer; from here `handleSearchInput` (above) accumulates
   // keystrokes and enter runs the search. Additive + fail-open.
@@ -465,11 +455,26 @@ function handleKey(str, key) {
     return;
   }
 
-  // Delegate to tab module
+  // Delegate to the active area FIRST so it gets first crack at its own letter keys
+  // (agent g/x, system d/u/s/b, pipeline section toggles) before any global letter
+  // binding. Global navigation keys above (q, arrows, digit area-switch) still win.
   const currentTab = TABS[app.tabIndex];
   const tabModule = tabModules[currentTab.id];
 
   if (tabModule.handleKey && tabModule.handleKey(key, app)) {
+    render();
+    return;
+  }
+
+  // Global `s` = Settings — the consistent, area-independent mnemonic. If the active
+  // area did not consume `s` itself, jump to the System area's Settings sub-mode.
+  // (In the System area, system.handleKey already consumed `s`, so this never double-
+  // fires; guarded to list mode with no active sub-mode so it never shadows typed text.)
+  if (key.sequence === 's' && app.mode === 'list' && !app.toolMode) {
+    app.tabIndex = TABS.findIndex(t => t.id === 'system');
+    app.toolMode = '3';
+    app.settingsTabIndex = 0;
+    app.settingIndex = 0;
     render();
     return;
   }

@@ -518,6 +518,17 @@ describe('handleKey() — global key routing and guards', () => {
     assert.equal(app.toolMode, '3', 'Settings sub-mode selected');
   });
 
+  it('"s" is CONSISTENTLY Settings from a non-pipeline area too (library)', () => {
+    // The owner directive: s = Settings is a GLOBAL, consistent binding, not a
+    // pipeline-only surprise. From the library area (index 3), an area that does not
+    // consume 's' itself, pressing 's' must still open the System Settings sub-mode.
+    app.tabIndex = 3; // library
+    app.toolMode = null;
+    press('s', { sequence: 's', name: 's' });
+    assert.equal(app.tabIndex, 4, 'switched to the system area');
+    assert.equal(app.toolMode, '3', 'Settings sub-mode selected from library too');
+  });
+
   it('"/" enters the search sub-mode and clears prior results', () => {
     app.searchResults = [{ plan: 'stale' }];
     press('', { sequence: '/' });

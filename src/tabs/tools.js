@@ -10,6 +10,7 @@ const {
   SETTINGS_TABS,
   loadSettings,
   toggleSetting,
+  setSetting,
   getCategorySchema
 } = require('../lib/settings');
 const { getLastSync, manualSync } = require('../lib/sync');
@@ -153,7 +154,7 @@ function renderSettings(app) {
   });
 
   output += '\n';
-  output += renderFooter(['←/→ category', '↑/↓ nav', 'Enter toggle/edit', 'b back', 'q quit']);
+  output += renderFooter(['←/→ category', '↑/↓ nav', 'Enter toggle/cycle', 'b back', 'q quit']);
 
   return output;
 }
@@ -310,9 +311,27 @@ function handleKey(key, app) {
     if (key.name === 'return') {
       const setting = schema.settings[app.settingIndex];
       if (setting.type === 'toggle') {
-        toggleSetting(currentTab.id, setting.key, app.projectPath);
+        const nv = toggleSetting(currentTab.id, setting.key, app.projectPath);
+        app.message = `${setting.label}: ${nv ? 'ON' : 'OFF'}`;
+      } else if (setting.type === 'select') {
+        // Enter CYCLES a select to the next allowed option (wrap around) and persists.
+        // An unknown current value (indexOf === -1) starts the cycle at the first option.
+        const opts = Array.isArray(setting.options) ? setting.options : [];
+        if (opts.length > 0) {
+          const cur = loadSettings(app.projectPath)[currentTab.id]?.[setting.key] ?? setting.default;
+          const next = opts[(opts.indexOf(cur) + 1) % opts.length];
+          setSetting(currentTab.id, setting.key, next, app.projectPath);
+          app.message = `${setting.label} → ${next}`;
+        }
+      } else if (setting.type === 'number') {
+        // No in-TUI numeric editor yet — give a NON-SILENT hint pointing at the real
+        // store (this module writes .ctoc/settings.json, per docs/CONFIG_SOURCES.md)
+        // instead of a silent no-op. Never reports a false "changed".
+        app.message = `Edit "${setting.label}" numerically in .ctoc/settings.json`;
+      } else {
+        // string / list — same non-silent, correct-file guidance.
+        app.message = `Edit "${setting.label}" in .ctoc/settings.json`;
       }
-      // TODO: handle other types (number input, select cycling)
       return true;
     }
   }

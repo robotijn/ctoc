@@ -599,20 +599,59 @@ describe('tools.handleKey() settings mode state machine', () => {
     assert.equal(settings.loadSettings(project).general.syncEnabled, false);
   });
 
-  test('Enter on a non-toggle setting is a no-op that does not persist a toggle', () => {
-    // Arrange — general.environment is a select at index 0; the if(type==='toggle') is false.
+  test('Enter on a select setting CYCLES to the next allowed option and persists', () => {
+    // Arrange — agents.defaultModel is a clean select ['opus','sonnet','haiku'] with
+    // no environment-profile side effects. Current 'opus' → Enter should cycle to 'sonnet'.
     const tools = freshTools();
     const settings = require('../src/lib/settings');
-    const selectIdx = settings.getCategorySchema('general').settings.findIndex((s) => s.key === 'environment');
-    const project = makeProject({ settingsFile: { general: { environment: 'ask' } } });
-    const app = makeApp({ projectPath: project, toolMode: '3', settingsTabIndex: 0, settingIndex: selectIdx });
+    const agentsTabIdx = settings.SETTINGS_TABS.findIndex((t) => t.id === 'agents');
+    const selectIdx = settings.getCategorySchema('agents').settings.findIndex((s) => s.key === 'defaultModel');
+    assert.ok(agentsTabIdx >= 0 && selectIdx >= 0, 'sanity: agents.defaultModel select exists');
+    const project = makeProject({ settingsFile: { agents: { defaultModel: 'opus' } } });
+    const app = makeApp({ projectPath: project, toolMode: '3', settingsTabIndex: agentsTabIdx, settingIndex: selectIdx });
+
+    // Act — Enter cycles the select and persists via setSetting.
+    const handled = tools.handleKey(key('return'), app);
+
+    // Assert — value advanced to the next option and was written to disk (behaviour).
+    assert.equal(handled, true);
+    assert.equal(settings.loadSettings(project).agents.defaultModel, 'sonnet', 'cycled opus → sonnet');
+  });
+
+  test('Enter on a select setting WRAPS from the last option back to the first', () => {
+    // Arrange — 'haiku' is the last option; Enter must wrap to 'opus'.
+    const tools = freshTools();
+    const settings = require('../src/lib/settings');
+    const agentsTabIdx = settings.SETTINGS_TABS.findIndex((t) => t.id === 'agents');
+    const selectIdx = settings.getCategorySchema('agents').settings.findIndex((s) => s.key === 'defaultModel');
+    const project = makeProject({ settingsFile: { agents: { defaultModel: 'haiku' } } });
+    const app = makeApp({ projectPath: project, toolMode: '3', settingsTabIndex: agentsTabIdx, settingIndex: selectIdx });
+
+    // Act
+    tools.handleKey(key('return'), app);
+
+    // Assert — wrapped around.
+    assert.equal(settings.loadSettings(project).agents.defaultModel, 'opus', 'wrapped haiku → opus');
+  });
+
+  test('Enter on a number setting is NOT a silent no-op — it surfaces a hint and does not falsely change the value', () => {
+    // Arrange — agents.maxParallelAgents is a number setting. Enter must give visible
+    // feedback (a hint pointing at the file to edit) and must NOT mutate the value.
+    const tools = freshTools();
+    const settings = require('../src/lib/settings');
+    const agentsTabIdx = settings.SETTINGS_TABS.findIndex((t) => t.id === 'agents');
+    const numIdx = settings.getCategorySchema('agents').settings.findIndex((s) => s.key === 'maxParallelAgents');
+    assert.ok(numIdx >= 0, 'sanity: agents.maxParallelAgents number exists');
+    const project = makeProject({ settingsFile: { agents: { maxParallelAgents: 2 } } });
+    const app = makeApp({ projectPath: project, toolMode: '3', settingsTabIndex: agentsTabIdx, settingIndex: numIdx });
 
     // Act
     const handled = tools.handleKey(key('return'), app);
 
-    // Assert — handler returns true but the select value is untouched (no toggle path taken).
+    // Assert — consumed, an observable hint was set, value unchanged (no false "changed").
     assert.equal(handled, true);
-    assert.equal(settings.loadSettings(project).general.environment, 'ask');
+    assert.match(strip(app.message || ''), /settings\.json/, 'non-silent hint points at the editable file');
+    assert.equal(settings.loadSettings(project).agents.maxParallelAgents, 2, 'number value untouched');
   });
 
   test('b exits settings mode', () => {
