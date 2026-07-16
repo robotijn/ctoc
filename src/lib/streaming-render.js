@@ -32,6 +32,7 @@
 
 const { c, line, renderFooter, stripCtl } = require('./tui');
 const streamingFlow = require('./streaming-flow');
+const streamingTopics = require('./streaming-topics');
 
 /**
  * Minimal in-memory seed: 2 topics, ONE marked critical, each with a recommended
@@ -140,13 +141,25 @@ function exampleTopics() {
 }
 
 /**
- * Attach a fresh, ordered flow state onto the host as `app.buildFlow`, seeded from the
- * example topics. A later slice swaps `exampleTopics()` here for the real source.
- * @param {object} app host state object
+ * Attach a fresh, ordered flow state onto the host as `app.buildFlow`. REAL topics
+ * take precedence: `streamingTopics.loadTopics(app.projectPath)` is tried FIRST and,
+ * when it returns a non-empty valid `topics[]` from
+ * `<projectPath>/.ctoc/streaming/topics.json`, the flow seeds from the file. When the
+ * file is absent, unreadable, unparseable, invalid, or `app.projectPath` is missing,
+ * `loadTopics` returns null (fail-soft, never throws) and we fall back to the in-memory
+ * `exampleTopics()` seed exactly as before. This is the side-effecty init (I/O allowed);
+ * `render()`/`handleKey()` stay pure of file access.
+ *
+ * A later slice (the vision-decomposer WRITING topics.json from an idea) produces the
+ * real source this consumes; the `exampleTopics()` fall-back keeps the screen drivable
+ * until then.
+ * @param {object} app host state object (uses `app.projectPath` for the real source)
  * @returns {object} the created flow state
  */
 function initBuildFlow(app) {
-  app.buildFlow = streamingFlow.initFlow(exampleTopics());
+  const realTopics = streamingTopics.loadTopics(app && app.projectPath);
+  const topics = (Array.isArray(realTopics) && realTopics.length > 0) ? realTopics : exampleTopics();
+  app.buildFlow = streamingFlow.initFlow(topics);
   return app.buildFlow;
 }
 
