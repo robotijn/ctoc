@@ -11,7 +11,7 @@ CTOC v8 organizes the agent layer into four tiers. See [`docs/AGENT_ARCHITECTURE
 
 ```
 Tier 0  CTO CHIEF (1)              top-level, sole dispatcher
-Tier 1  Sub-orchestrators (16)     incl. NEW synthesizer (cross-pillar)
+Tier 1  Sub-orchestrators (20)     incl. synthesizer (cross-pillar) + adversarial gate-critique fleet (4)
 Tier 2  Specialist skills (99)     leaf agents → skills, structured outputs
 Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatches
 ```
@@ -202,7 +202,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 401 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 402 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -236,6 +236,15 @@ Commit messages ALWAYS include the version: `feat: feature name (vX.Y.Z)`
 
 Semantic versioning: patch (default every commit), minor (user says "minor"), major (user says "major").
 
+**Updates ALWAYS run in the background — never in the foreground (Tijn, non-negotiable).**
+Every UPDATE — CTOC self-update (`/ctoc:update`), the version bump + `release.js`
+count/version sync, doc-count reconciliation, the `npm test` gate, and commit/push — runs
+as a background command or background subagent (`run_in_background`), never blocking the
+terminal. Report the result when it lands; never make the human watch a spinner. This is
+the never-wait principle (Operating Lesson 8 async-overnight, and the streaming
+precompute) applied to CTOC's own maintenance: the foreground stays free for conversation
+while updates run behind it.
+
 ### Release Menu
 
 When user selects `[8] release` from dashboard, show:
@@ -258,13 +267,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               14 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-    lib/                 99 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 100 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
-  agents/                124 agent definitions across 25 categories
+  agents/                128 agent definitions across 25 categories
   skills/                426 skill files (100 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill; + 326 reference)
-  tests/                 401 test files
+  tests/                 402 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

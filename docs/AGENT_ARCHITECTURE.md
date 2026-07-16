@@ -85,13 +85,14 @@ dispatches: [<all-19-categories>]
 
 ### Tier 1 — Sub-Orchestrators
 
-**Members** (16):
+**Members** (20):
 - Planning (4): `vision-advisor`, `vision-decomposer`, `product-owner`, `implementation-planner`
 - Planning reviewers (2): `functional-reviewer`, `implementation-plan-reviewer`
 - Iron-loop (3): `iron-loop-integrator`, `iron-loop-critic`, `iron-loop-executor`
 - Pipeline (5): `agent-writer`, `agent-critic`, `agent-tester`, `agent-qa`, `agent-publisher`
 - Implementation reviewers (1): `implementation-reviewer`
-- Synthesis (1, NEW): `synthesizer` — cross-pillar finding integration
+- Synthesis (1): `synthesizer` — cross-pillar finding integration
+- Gate critique (4, NEW): `premortem-critic`, `devils-advocate-critic`, `red-team-critic` — three independent adversarial lenses run in parallel — and `gate-critic` — synthesizes their findings into the human's per-gate decision questions. Advisory (Read/Grep) and run in the background precompute so the human never waits; the human's streaming answer is the gate crossing.
 
 **Authority**: recommend dispatches; never execute peer dispatches directly. Read full plan ancestry. Defer-and-continue on ambiguity (no stubs).
 
@@ -110,7 +111,7 @@ dispatch_protocol: v1
 
 **Members** (99 `SKILL.md` bodies across 20 categories): 14 testing + 12 saas + 11 quality + 11 specialized + 10 security + 5 compliance + 5 infrastructure + 3 ai-quality + 3 data-ml + 3 frontend + 3 mobile + 3 safety + 3 versioning + 2 architecture + 2 devex + 2 documentation + 2 legal + 2 product + 2 realtime + 1 cost.
 
-**Wrapper coverage (CU5).** Every one of the 99 `SKILL.md` bodies is now dispatch-reachable through an agent under `agents/<category>/`: a rich agent (which declares `extends_skill:` in frontmatter or references the skill by `skills/<category>/<name>/` path in its body), or a thin `type: wrapper` redirect whose frontmatter is exactly `{name, type, target_skill}` and whose body points at `skills/<category>/<name>/SKILL.md`. CU5 added **12 thin wrappers** for the previously-unwrapped skills — safety/{fault-tree-builder, fmeda-analyzer, redundancy-pattern-picker}, security/{cra-incident-clocks, incident-responder, threat-modeler}, legal/{clm-obligations, dsar-handler}, realtime/{hil-harness, wcet-budget}, compliance/sbom-cra-checker, and ai-quality/llm-security-tester — creating three new agent directories: `agents/safety/`, `agents/legal/`, and `agents/realtime/`. The 13th candidate, `compliance/gdpr-compliance-checker`, gets **no** thin wrapper: it is already covered by the rich `agents/compliance/gdpr-agent.md`, which subsumed and deleted the old thin wrapper in EC2-s3 and delegates to the same SKILL.md body — CU5 honors that removal rather than re-introducing a redundant wrapper. Net +12 agent files → **124 agent `.md` files across 25 categories**. `tests/cu5-wrapper-coverage-completeness.test.js` enforces that the unwrapped set stays empty.
+**Wrapper coverage (CU5).** Every one of the 99 `SKILL.md` bodies is now dispatch-reachable through an agent under `agents/<category>/`: a rich agent (which declares `extends_skill:` in frontmatter or references the skill by `skills/<category>/<name>/` path in its body), or a thin `type: wrapper` redirect whose frontmatter is exactly `{name, type, target_skill}` and whose body points at `skills/<category>/<name>/SKILL.md`. CU5 added **12 thin wrappers** for the previously-unwrapped skills — safety/{fault-tree-builder, fmeda-analyzer, redundancy-pattern-picker}, security/{cra-incident-clocks, incident-responder, threat-modeler}, legal/{clm-obligations, dsar-handler}, realtime/{hil-harness, wcet-budget}, compliance/sbom-cra-checker, and ai-quality/llm-security-tester — creating three new agent directories: `agents/safety/`, `agents/legal/`, and `agents/realtime/`. The 13th candidate, `compliance/gdpr-compliance-checker`, gets **no** thin wrapper: it is already covered by the rich `agents/compliance/gdpr-agent.md`, which subsumed and deleted the old thin wrapper in EC2-s3 and delegates to the same SKILL.md body — CU5 honors that removal rather than re-introducing a redundant wrapper. Net +12 agent files → 124 agent `.md` files across 25 categories. `tests/cu5-wrapper-coverage-completeness.test.js` enforces that the unwrapped set stays empty. The subsequent adversarial gate-critique fleet added 4 more Tier-1 agents (`premortem-critic`, `devils-advocate-critic`, `red-team-critic`, `gate-critic`) → **128 agent `.md` files across 25 categories**.
 
 **Authority**: domain expert. Single-purpose. Returns structured findings (YAML format per [`DISPATCH_PROTOCOL.md`](./DISPATCH_PROTOCOL.md)).
 

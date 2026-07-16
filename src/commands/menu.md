@@ -187,6 +187,52 @@ any `--next` route is navigation-only — never a gate transition. Crossing the 
 is a foreground NAV action the user takes deliberately. No completion, promotion, or
 `--next` may ever perform a gate transition.
 
+### Streaming gate questions — background precompute (never-wait)
+
+**The human must NEVER wait for a critique to run.** Question generation is decoupled
+from answering: the adversarial gate-critique fleet writes each plan's decision
+questions to a file *ahead of demand*, and the foreground streaming screen reads only
+the already-computed files. A plan whose questions are not ready yet is simply not
+asked with rich questions — the screen falls back to the plain Approve/Open/Skip for
+that plan (from `richQuestionScreen` returning null) and the human moves on. Nobody
+watches a spinner.
+
+**Fire on open (background, bounded, critical-first).** When you render the `(no args)`
+streaming screen, read the plans whose questions are absent or stale:
+`node -e "console.log(JSON.stringify(require('${CLAUDE_PLUGIN_ROOT}/src/lib/streaming-precompute').plansNeedingQuestions(process.cwd()).map(d=>d.ref)))"`.
+If the list is non-empty and no precompute task is already in flight, run the
+**gate-critique precompute** for the FIRST ref (the list is already ordered
+critical-first, furthest-along) as **BACKGROUND WORK** — never foreground, never
+`await`ed, never blocking the render. It is a render-time background behavior (like the
+on-open reconcile), not a user-pickable action. Precompute ONE plan at a time so the three
+parallel lens critics stay within the 5-concurrent-subagent cap; each COMPLETION
+promotes the next pending ref. The precompute stays ahead of the human, so the answer
+queue is always ready.
+
+**The gate-critique precompute — the fleet dispatch (background WORK).** Record the task
+first (`menu task add`, kind `precompute`, `--touches .ctoc/streaming/questions/<ref>`),
+and on the scheduler's `run`:
+1. Dispatch the three adversarial lens critics — `premortem-critic`,
+   `devils-advocate-critic`, `red-team-critic` — as **parallel** background agents on
+   `{ref}`. Each reads the full plan ancestry (Read/Grep only) and returns its findings
+   JSON in the shared lens contract `{ ref, lens, findings: [...] }`. They are advisory:
+   they never edit the plan, never cross the gate.
+2. When all three return, dispatch `gate-critic` to **synthesize** their findings into
+   the streaming decision-question contract `{ ref, questions: [...] }` — deduped across
+   lenses, criticals first, each option carrying a precomputed pro/con and exactly one
+   recommended (the highest-quality path, never the easy one), the last question the
+   gate ruling.
+3. **Validate and write** the synthesized JSON via
+   `streaming-precompute.writePlanQuestions(root, ref, questions)` — it validates the
+   contract (malformed → `{ok:false, errors}`, no file written) and atomically stamps
+   the plan's current mtime so the file reads fresh until the plan changes. The
+   dispatcher writes the file; the critics never do. No plan is moved, no gate crossed —
+   this is pure precompute. On completion, promote the next pending ref.
+
+Any failure falls back silently to the plain gate question — the human is never blocked
+or shown a crash. This is the async-overnight / precompute-never-wait principle applied
+to the gates.
+
 ### Interactive work — async with documented choices
 
 `discuss` and `decompose` are **WORK**, not foreground prompts. They dispatch as

@@ -21,6 +21,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const streamingGate = require('../src/lib/streaming-gate.js');
+const precompute = require('../src/lib/streaming-precompute.js');
 const { route } = require('../src/lib/menu-screens.js');
 
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
@@ -368,5 +369,145 @@ describe('route wiring — stream approve / skip / comment / dashboard', () => {
     // Ref not found → index 0 → shows the first pending decision.
     assert.ok(screen && screen.ask && Array.isArray(screen.ask.questions));
     assert.match(screen.text, /Skipped garbage-ref/i);
+  });
+});
+
+// ── PRE-COMPUTE integration: the screen reads ALREADY-WRITTEN questions ─────────
+
+function planMtimeMs(root, stage, slug) {
+  return fs.statSync(path.join(root, 'plans', stage, slug + '.md')).mtimeMs;
+}
+
+// A precomputed two-question set with pros/cons + a recommended option each.
+function precomputedQuestions() {
+  return [
+    {
+      id: 'db',
+      prompt: 'Which database engine?',
+      critical: true,
+      options: [
+        { key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS, mature', cons: 'More ops' },
+        { key: 'sqlite', label: 'SQLite', pros: 'Zero-config', cons: 'No concurrency' },
+      ],
+    },
+    {
+      id: 'auth',
+      prompt: 'Which auth provider?',
+      options: [
+        { key: 'clerk', label: 'Clerk', recommended: true, description: 'Managed auth' },
+        { key: 'roll', label: 'Roll your own', description: 'Full control' },
+      ],
+    },
+  ];
+}
+
+describe('streamingGateScreen — precomputed questions vs simple-Approve fallback', () => {
+  it('asks the FIRST precomputed question (not the simple Approve) and routes options to `stream answer`', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'rich', validFunctionalBody('rich'));
+    precompute.writePlanQuestions(root, 'functional/rich.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'rich'));
+
+    const screen = streamingGate.streamingGateScreen(root);
+    const q = screen.ask.questions[0];
+
+    // The prompt is the precomputed question, NOT the simple "Approve … across Gate 1?".
+    assert.match(q.question, /Which database engine\?/);
+    assert.doesNotMatch(q.question, /Approve rich across/);
+    // Progress reflects the precomputed question index.
+    assert.match(screen.text, /question 1 of 2/i);
+
+    // The recommended option is marked; each option routes to `stream answer`.
+    const pg = q.options.find(o => o.label === 'Postgres');
+    assert.ok(pg, 'the Postgres option is present');
+    assert.match(pg.description, /Recommended/i);
+    assert.match(pg.description, /RLS/, 'pros are surfaced in the description');
+    assert.equal(screen.actions['Postgres'], 'stream answer functional/rich.md db pg');
+    assert.equal(screen.actions['SQLite'], 'stream answer functional/rich.md db sqlite');
+
+    // Skip / Open / comment are preserved.
+    assert.equal(screen.actions['Skip for now'], 'stream skip functional/rich.md');
+    assert.equal(screen.actions['Open the plan'], 'plan functional/rich.md');
+    assert.equal(screen.actions['Other'], 'stream comment functional/rich.md');
+  });
+
+  it('falls back to the simple Approve question when NO precomputed file exists', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'plain', validFunctionalBody('plain'));
+
+    const screen = streamingGate.streamingGateScreen(root);
+    assert.match(screen.ask.questions[0].question, /Approve plain across Gate 1\?/);
+    assert.equal(screen.actions['Approve'], 'stream approve functional/plain.md');
+  });
+
+  it('answering the LAST precomputed question routes the screen back to `stream approve <ref>`', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'seq', validFunctionalBody('seq'));
+    // ONE precomputed question so answering it exhausts the set.
+    const oneQ = [{
+      id: 'db',
+      prompt: 'Which database engine?',
+      options: [
+        { key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS' },
+        { key: 'sqlite', label: 'SQLite', cons: 'No concurrency' },
+      ],
+    }];
+    precompute.writePlanQuestions(root, 'functional/seq.md', oneQ, planMtimeMs(root, 'functional', 'seq'));
+
+    // Answer the only precomputed question.
+    const after = route(['stream', 'answer', 'functional/seq.md', 'db', 'pg'], root);
+
+    // All precomputed questions answered → the screen is now the simple gate crossing.
+    assert.match(after.ask.questions[0].question, /Approve seq across Gate 1\?/);
+    assert.equal(after.actions['Approve'], 'stream approve functional/seq.md');
+  });
+
+  it('advances through MULTIPLE precomputed questions before offering the gate crossing', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'multi', validFunctionalBody('multi'));
+    precompute.writePlanQuestions(root, 'functional/multi.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'multi'));
+
+    // Answer question 1 (db) → screen should now ask question 2 (auth).
+    const afterFirst = route(['stream', 'answer', 'functional/multi.md', 'db', 'pg'], root);
+    assert.match(afterFirst.ask.questions[0].question, /Which auth provider\?/);
+    assert.match(afterFirst.text, /question 2 of 2/i);
+    assert.equal(afterFirst.actions['Clerk'], 'stream answer functional/multi.md auth clerk');
+
+    // Answer question 2 (auth) → all answered → simple Approve.
+    const afterSecond = route(['stream', 'answer', 'functional/multi.md', 'auth', 'clerk'], root);
+    assert.match(afterSecond.ask.questions[0].question, /Approve multi across Gate 1\?/);
+    assert.equal(afterSecond.actions['Approve'], 'stream approve functional/multi.md');
+  });
+});
+
+describe('route wiring — `stream answer` records the answer, never crosses a gate or edits the plan', () => {
+  it('records the answer to .ctoc/streaming/answers.jsonl and leaves the plan byte-identical + in place', () => {
+    const root = makeSandbox();
+    const planPath = writePlan(root, 'functional', 'ans', validFunctionalBody('ans'));
+    const before = fs.readFileSync(planPath, 'utf8');
+    precompute.writePlanQuestions(root, 'functional/ans.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'ans'));
+
+    route(['stream', 'answer', 'functional/ans.md', 'db', 'pg'], root);
+
+    // Plan untouched, unmoved (no gate crossing).
+    assert.equal(fs.readFileSync(planPath, 'utf8'), before, 'the plan body is never edited');
+    assert.ok(fs.existsSync(planPath), 'plan stays in functional/');
+    assert.ok(!fs.existsSync(path.join(root, 'plans', 'implementation', 'ans.md')), 'nothing crossed the gate');
+
+    // Answer recorded to the append-only log.
+    const log = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
+    assert.ok(fs.existsSync(log), 'the answers log was written');
+    const lines = fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].ref, 'functional/ans.md');
+    assert.equal(lines[0].questionId, 'db');
+    assert.equal(lines[0].optionKey, 'pg');
+  });
+
+  it('a malformed ref on `stream answer` is ignored safely (no log, no crash)', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'safe', validFunctionalBody('safe'));
+    const screen = route(['stream', 'answer', 'no-slash-ref', 'q', 'k'], root);
+    assert.ok(screen && screen.ask && Array.isArray(screen.ask.questions), 'still a valid screen');
+    assert.ok(!fs.existsSync(path.join(root, '.ctoc', 'streaming', 'answers.jsonl')), 'no log for a bad ref');
   });
 });

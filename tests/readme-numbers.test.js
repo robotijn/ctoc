@@ -111,8 +111,8 @@ function countQualityConfigs() {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('Ground truth — project counts (sanity checks)', () => {
-  it('agents/: 124 .md files (excluding _shared/, +12 CU5 Tier-3 wrappers; gdpr thin wrapper stays deleted per EC2-s3)', () => {
-    assert.equal(countAgentMdFiles(), 124);
+  it('agents/: 128 .md files (excluding _shared/, +12 CU5 Tier-3 wrappers; gdpr thin wrapper stays deleted per EC2-s3)', () => {
+    assert.equal(countAgentMdFiles(), 128);
   });
 
   it('agents/: 25 categories (+safety, +legal, +realtime, CU5)', () => {
@@ -133,8 +133,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 99 JS modules at top level (+streaming-decompose +streaming-gate 2026-07-16)', () => {
-    assert.equal(countTopLevelJs("src/lib"), 99);
+  it('src/lib/: 100 JS modules at top level (+streaming-precompute 2026-07-16)', () => {
+    assert.equal(countTopLevelJs("src/lib"), 100);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {
@@ -198,24 +198,24 @@ describe('Ground truth — project counts (sanity checks)', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('README — explicit numeric claims match reality', () => {
-  it('badge: agents-124', () => {
-    assert.match(README, /agents-124-orange/);
+  it('badge: agents-128', () => {
+    assert.match(README, /agents-128-orange/);
   });
 
   it('badge: skills-422 (v6.10.3+)', () => {
     assert.match(README, /skills-426-blue/);
   });
 
-  it('lead paragraph: 124 agents across 25 categories', () => {
-    assert.match(README, /\*\*124 agents\*\* across \*\*25 categories\*\*/);
+  it('lead paragraph: 128 agents across 25 categories', () => {
+    assert.match(README, /\*\*128 agents\*\* across \*\*25 categories\*\*/);
   });
 
-  it('Compare table: 124 across 25 categories', () => {
-    assert.match(README, /124 across 25 categories/);
+  it('Compare table: 128 across 25 categories', () => {
+    assert.match(README, /128 across 25 categories/);
   });
 
-  it('Key Features: 124 agents across 25 categories', () => {
-    assert.match(README, /\*\*124 agents\*\* across 25 categories/);
+  it('Key Features: 128 agents across 25 categories', () => {
+    assert.match(README, /\*\*128 agents\*\* across 25 categories/);
   });
 
   it('Key Features: 426 skill files (v6.10.3+)', () => {
@@ -226,8 +226,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /14 languages/);
   });
 
-  it('Tier table: 16 sub-orchestrators in Tier 1', () => {
-    assert.match(README, /16 sub-orchestrators/);
+  it('Tier table: 20 sub-orchestrators in Tier 1', () => {
+    assert.match(README, /20 sub-orchestrators/);
   });
 
   it('Tier table: 5 Haiku scouts in Tier 3', () => {
@@ -259,19 +259,19 @@ describe('README — explicit numeric claims match reality', () => {
   });
 
   it('Project structure: 91 JS modules in src/lib', () => {
-    assert.match(README, /99 JS modules/);
+    assert.match(README, /100 JS modules/);
   });
 
-  it('Project structure: 124 agent definitions across 25 categories', () => {
-    assert.match(README, /124 agent definitions across 25 categories/);
+  it('Project structure: 128 agent definitions across 25 categories', () => {
+    assert.match(README, /128 agent definitions across 25 categories/);
   });
 
   it('Project structure: 426 skill files (v6.10.3+)', () => {
     assert.match(README, /426 skill files/);
   });
 
-  it('Agents intro: 124 agents across 25 categories', () => {
-    assert.match(README, /\*\*124 agents across 25 categories\*\*/);
+  it('Agents intro: 128 agents across 25 categories', () => {
+    assert.match(README, /\*\*128 agents across 25 categories\*\*/);
   });
 
   it('Skills intro: 426 skill files (v6.10.3+)', () => {
