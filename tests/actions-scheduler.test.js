@@ -22,6 +22,7 @@ const path = require('path');
 const actions = require('../src/lib/actions');
 const taskRegistry = require('../src/lib/task-registry');
 const state = require('../src/lib/state');
+const safeFs = require('../src/lib/safe-fs');
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -135,6 +136,66 @@ describe('taskSpecFromPlan', () => {
     const spec = actions.taskSpecFromPlan(todoPlan('needs-live'), root);
     assert.deepEqual(spec.blockedBy, [dep.task.id],
       'the dependent task is blocked by the live dependency task id');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1b. taskSpecFromPlan — path-traversal guard on depends_on (LOW existence-oracle)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('taskSpecFromPlan — depends_on path-traversal guard', () => {
+  const UNSAFE = [
+    ['dotdot traversal', '../../../../etc/passwd'],
+    ['NUL byte', 'evil' + String.fromCharCode(0) + 'dep'],
+    ['path separator', 'sub/dir/dep'],
+  ];
+
+  for (const [label, token] of UNSAFE) {
+    it(`SKIPS an unsafe depends_on token (${label}) — no out-of-root existsSync oracle, no scheduler throw`, () => {
+      writePlan('todo', 'guarded', { files: ['src/x.js'], dependsOn: token });
+      const rootResolved = path.resolve(root);
+
+      const calls = [];
+      const orig = safeFs.existsSync;
+      safeFs.existsSync = (p) => { calls.push(p); return orig(p); };
+      let spec;
+      try {
+        spec = actions.taskSpecFromPlan(todoPlan('guarded'), root);
+      } finally {
+        safeFs.existsSync = orig;
+      }
+
+      assert.deepEqual(spec.blockedBy, [],
+        'an unsafe depends_on token is ignored — never a scheduler blocker, never a throw');
+
+      for (const p of calls) {
+        const resolved = path.resolve(String(p));
+        const inRoot = resolved === rootResolved || resolved.startsWith(rootResolved + path.sep);
+        assert.ok(inRoot,
+          `existsSync must never probe outside the project root (existence oracle): ${resolved}`);
+      }
+    });
+  }
+
+  it('a VALID depends_on beside an unsafe token still resolves and drives ordering (regression)', () => {
+    const dep = taskRegistry.addAndClaim(root, {
+      kind: 'implement', plan: 'live-dep', touches: ['src/dep.js']
+    });
+    assert.equal(dep.claimed, true, 'dep runs on an empty registry');
+
+    writePlan('todo', 'mixed', {
+      files: ['src/w.js'], dependsOn: '../../../../etc/passwd live-dep'
+    });
+    const spec = actions.taskSpecFromPlan(todoPlan('mixed'), root);
+    assert.deepEqual(spec.blockedBy, [dep.task.id],
+      'the valid dependency still blocks; the unsafe token is silently skipped');
+  });
+
+  it('a normal depends_on with no unsafe tokens is unchanged: done dependency → no blocker', () => {
+    writePlan('done', 'done-dep2', { files: ['src/y2.js'] });
+    writePlan('todo', 'needs-done2', { files: ['src/z2.js'], dependsOn: 'done-dep2' });
+    const spec = actions.taskSpecFromPlan(todoPlan('needs-done2'), root);
+    assert.deepEqual(spec.blockedBy, [], 'a valid, satisfied dependency still adds no blocker');
   });
 });
 

@@ -1020,6 +1020,21 @@ function completeExecution(planPath, projectPath, options = {}) {
  * @returns {{ran: boolean, reason?: string, blocked?: boolean, stage?: string,
  *   newPath?: (string|null), verify?: Object|null, errors?: string[]}}
  */
+/**
+ * A plan slug is a bare filename token — the ONLY shape that may be joined into a
+ * path under `plans/`. Anything with a separator, a `.`/`..` traversal, a NUL, or
+ * any character outside `[A-Za-z0-9._-]` is UNSAFE and must be refused before any
+ * `path.join`/filesystem access. Shared by `completeTaskPlan` (refuses) and
+ * `planDependsOn` (skips) so both guard on one code path.
+ * @param {*} slug
+ * @returns {boolean} true iff `slug` is a bare, path-safe plan slug
+ */
+function isSafePlanSlug(slug) {
+  return typeof slug === 'string'
+    && /^[A-Za-z0-9._-]+$/.test(slug)
+    && slug !== '.' && slug !== '..' && !slug.includes('..');
+}
+
 function completeTaskPlan(projectPath, planSlug) {
   const root = projectPath || findProjectRoot();
 
@@ -1028,7 +1043,7 @@ function completeTaskPlan(projectPath, planSlug) {
   }
   // A plan slug is a bare filename token. Anything else is refused BEFORE path.join.
   const slug = planSlug.replace(/\.md$/i, '');
-  if (!/^[A-Za-z0-9._-]+$/.test(slug) || slug === '.' || slug === '..' || slug.includes('..')) {
+  if (!isSafePlanSlug(slug)) {
     return { ran: false, reason: `unsafe plan slug refused: ${slug.slice(0, 40)}` };
   }
 
@@ -1264,7 +1279,14 @@ function planDependsOn(plan) {
   const raw = plan && plan.metadata ? plan.metadata.depends_on : null;
   if (raw == null) return [];
   const parts = String(raw).split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
-  return parts.filter((s) => s.toLowerCase() !== 'none');
+  // `depends_on` is attacker-influenceable YAML frontmatter, and each slug is later
+  // joined into a path (done/ and review/ existence probes). Drop the `none`
+  // sentinel and REFUSE any unsafe token here — a crafted `../../../../etc/passwd`,
+  // NUL-bearing, or separator-bearing entry is silently ignored rather than allowed
+  // to escape plans/ as an existence oracle (documented choice: an unsafe depends_on
+  // entry is ignored, not fatal — one malformed dependency must not throw the whole
+  // scheduler).
+  return parts.filter((s) => s.toLowerCase() !== 'none' && isSafePlanSlug(s));
 }
 
 /**

@@ -45,6 +45,202 @@ after(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Non-numeric metric hardening — a metric that is PRESENT but not a number
+// ("2 found", "N/A", NaN) is a BROKEN measurement, never evidence of a clean
+// result, and must FAIL its dimension (fail closed). This replicates the guard
+// evaluateCoverage already enforces across security / codeQuality / complexity /
+// architecture. Kills the old `(metric || 0) > threshold` fail-open, under which
+// a non-numeric metric coerced to 0 (or to NaN in a false comparison) and the
+// dimension silently PASSED. An ABSENT count field (undefined) still defaults to
+// zero and passes — absent means "none reported", not "unmeasurable".
+// ---------------------------------------------------------------------------
+describe('non-numeric metric hardening — fail closed across all dimensions', () => {
+  test('security_secrets_as_non_numeric_string_FAILS_the_dimension', () => {
+    // '2 found' > 0 is false under the old shape -> two secrets slipped through.
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateSecurity({ secrets: '2 found' });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a non-numeric secrets count must fail closed, not pass');
+    assert.ok(result.failures.some(f => f.type === 'secrets'),
+      'the failure must be attributed to the secrets metric');
+  });
+
+  test('security_secrets_as_NaN_FAILS_the_dimension', () => {
+    // NaN || 0 = 0 under the old shape -> passed with secrets unmeasurable.
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateSecurity({ secrets: NaN });
+    assert.equal(result.status, GATE_STATUS.FAILED);
+    assert.ok(result.failures.some(f => f.type === 'secrets'));
+  });
+
+  test('security_sast_count_as_non_numeric_string_FAILS_closed', () => {
+    // A known severity with a broken count must not slip through count>threshold.
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateSecurity({ sast: { CRITICAL: '2 found' } });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'an unmeasurable SAST count must fail closed');
+    assert.ok(result.failures.some(f => f.severity === 'CRITICAL'));
+  });
+
+  test('codeQuality_lintErrors_as_non_numeric_string_FAILS_the_dimension', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateCodeQuality({
+      lintErrors: 'N/A', lintWarnings: 0, duplicatedLines: 0, codeSmells: 0
+    });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      "a non-numeric lint-error count ('N/A') must fail closed");
+    assert.ok(result.failures.some(f => f.metric === 'lintErrors'));
+  });
+
+  test('complexity_metric_as_NaN_FAILS_the_dimension', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateComplexity({ functionsOverCyclomatic: NaN });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a NaN complexity count must fail closed');
+    assert.ok(result.failures.some(f => f.metric === 'cyclomatic'));
+  });
+
+  test('architecture_metric_as_non_numeric_string_FAILS_the_dimension', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateArchitecture({ violations: 'lots', circularDeps: 0 });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a non-numeric architecture violation count must fail closed');
+    assert.ok(result.failures.some(f => f.metric === 'violations'));
+  });
+
+  // -- Regression: numeric + absent metrics keep their EXACT existing behavior -
+  test('regression_clean_numeric_metrics_still_PASS_every_dimension', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    assert.equal(gate.evaluateSecurity({ sast: {}, dependencies: {}, secrets: 0 }).status, GATE_STATUS.PASSED);
+    assert.equal(gate.evaluateCodeQuality({ lintErrors: 0, lintWarnings: 0, duplicatedLines: 0, codeSmells: 0 }).status, GATE_STATUS.PASSED);
+    assert.equal(gate.evaluateComplexity({}).status, GATE_STATUS.PASSED);
+    assert.equal(gate.evaluateArchitecture({ violations: 0, circularDeps: 0 }).status, GATE_STATUS.PASSED);
+  });
+
+  test('regression_over_threshold_numeric_still_FAILS_with_existing_message', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateSecurity({ secrets: 3 });
+    assert.equal(result.status, GATE_STATUS.FAILED);
+    assert.ok(result.failures.some(f => f.type === 'secrets'
+      && f.message === '3 secret(s) detected exceeds threshold of 0'),
+      'the existing over-threshold secrets message shape must be preserved verbatim');
+  });
+
+  test('regression_absent_count_fields_default_to_zero_and_PASS', () => {
+    // undefined count -> 0 (none reported), NOT a fail-closed non-numeric.
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    assert.equal(gate.evaluateSecurity({}).status, GATE_STATUS.PASSED);
+    assert.equal(gate.evaluateCodeQuality({}).status, GATE_STATUS.PASSED);
+  });
+
+  test('regression_coverage_unmeasurable_behavior_unchanged', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateCoverage({ lines: 'N/A', branches: 90, functions: 90, statements: 90 });
+    assert.equal(result.status, GATE_STATUS.FAILED);
+    assert.ok(result.failures.some(f => f.metric === 'lines' && /unmeasurable/.test(f.message)),
+      "coverage's existing unmeasurable message must be unchanged");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-dimension fail-closed branches — one non-numeric metric per specific
+// evaluator field. Each targets a DISTINCT `numericOrFail(...).failed` return
+// branch that the broader hardening block above does not reach (it only pins
+// lintErrors / functionsOverCyclomatic / violations / secrets / sast). Every
+// listed uncovered range is a per-field failure push: feeding a NON-NUMERIC
+// value ('N/A', '2 found', NaN) to exactly that field drives the branch and the
+// dimension must be FAILED with the field attributed. All sibling fields are
+// held at 0 so the target field is the sole failure signal.
+// ---------------------------------------------------------------------------
+describe('per-dimension fail-closed branches — each listed uncovered field', () => {
+  // src/lib/quality-gate.js:421-426 — codeQuality lintWarnings non-numeric.
+  // A non-numeric lint-WARNING count fails CLOSED regardless of mode (it never
+  // reaches the mode-gated escalation below it).
+  test('codeQuality_lintWarnings_non_numeric_FAILS_closed', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateCodeQuality({
+      lintErrors: 0, lintWarnings: '2 found', duplicatedLines: 0, codeSmells: 0
+    });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a non-numeric lint-warning count must fail closed even under strict');
+    assert.ok(result.failures.some(f => f.metric === 'lintWarnings' && /unmeasurable/.test(f.message)),
+      'the failure must be attributed to lintWarnings with the unmeasurable message');
+    assert.equal(result.warnings.length, 0,
+      'an unmeasurable count must fail, never be demoted to a warning');
+  });
+
+  // src/lib/quality-gate.js:448-453 — codeQuality duplicatedLines non-numeric.
+  test('codeQuality_duplicatedLines_non_numeric_FAILS_closed', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateCodeQuality({
+      lintErrors: 0, lintWarnings: 0, duplicatedLines: 'N/A', codeSmells: 0
+    });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a non-numeric duplicated-lines percentage must fail closed');
+    assert.ok(result.failures.some(f => f.metric === 'duplicatedLines' && /unmeasurable/.test(f.message)),
+      'the failure must be attributed to duplicatedLines');
+  });
+
+  // src/lib/quality-gate.js:466-471 — codeQuality codeSmells non-numeric.
+  test('codeQuality_codeSmells_non_numeric_FAILS_closed', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateCodeQuality({
+      lintErrors: 0, lintWarnings: 0, duplicatedLines: 0, codeSmells: NaN
+    });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a NaN code-smell count must fail closed');
+    assert.ok(result.failures.some(f => f.metric === 'codeSmells' && /unmeasurable/.test(f.message)),
+      'the failure must be attributed to codeSmells');
+  });
+
+  // src/lib/quality-gate.js:528-533 — complexity functionsOverCognitive non-numeric
+  // (dimension metric key 'cognitive').
+  test('complexity_functionsOverCognitive_non_numeric_FAILS_closed', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateComplexity({ functionsOverCognitive: 'N/A' });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a non-numeric cognitive-overage count must fail closed');
+    assert.ok(result.failures.some(f => f.metric === 'cognitive' && /unmeasurable/.test(f.message)),
+      'the failure must be attributed to the cognitive metric');
+  });
+
+  // src/lib/quality-gate.js:546-551 — complexity functionsOverLength non-numeric
+  // (dimension metric key 'functionLength').
+  test('complexity_functionsOverLength_non_numeric_FAILS_closed', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateComplexity({ functionsOverLength: '3 found' });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a non-numeric function-length overage count must fail closed');
+    assert.ok(result.failures.some(f => f.metric === 'functionLength' && /unmeasurable/.test(f.message)),
+      'the failure must be attributed to the functionLength metric');
+  });
+
+  // src/lib/quality-gate.js:565-570 — complexity filesOverLength non-numeric.
+  // A VALID numeric overage here is only a WARNING; an UNMEASURABLE count still
+  // fails CLOSED, so status must flip to FAILED (unlike the numeric-warning case).
+  test('complexity_filesOverLength_non_numeric_FAILS_closed_not_warns', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateComplexity({ filesOverLength: NaN });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'an unmeasurable files-over-length count must fail closed, not be demoted to a warning');
+    assert.ok(result.failures.some(f => f.metric === 'fileLength' && /unmeasurable/.test(f.message)),
+      'the failure must be attributed to the fileLength metric');
+    assert.equal(result.warnings.length, 0,
+      'a non-numeric file-length count must not surface as a warning');
+  });
+
+  // src/lib/quality-gate.js:627-632 — architecture circularDeps non-numeric.
+  test('architecture_circularDeps_non_numeric_FAILS_closed', () => {
+    const gate = new QualityGate(TMP_ROOT, { mode: 'strict' });
+    const result = gate.evaluateArchitecture({ violations: 0, circularDeps: '2 found' });
+    assert.equal(result.status, GATE_STATUS.FAILED,
+      'a non-numeric circular-dependency count must fail closed');
+    assert.ok(result.failures.some(f => f.metric === 'circularDeps' && /unmeasurable/.test(f.message)),
+      'the failure must be attributed to the circularDeps metric');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // evaluateComplexity — the FAIL trigger is "count of functions over the limit
 // is > 0", NOT "actual metric > threshold". filesOverLength is a WARNING and
 // must NOT flip status. Kills: `> 0` mutated to `>= 0`, the `|| 0` absent-field

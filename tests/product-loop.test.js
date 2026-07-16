@@ -203,6 +203,73 @@ describe('Product Loop — review scheduling', () => {
   });
 });
 
+describe('Product Loop — path-traversal hardening', () => {
+  let originalCwd;
+  let tmpDir;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-product-'));
+    process.chdir(tmpDir);
+    fs.mkdirSync('plans/canvas', { recursive: true });
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore: best-effort, non-fatal */ }
+  });
+
+  const traversalSlugs = ['../../../tmp/evil', '..', '.', 'a/../../b', 'foo/bar', 'foo bar'];
+
+  it('projectKPIPlanPath refuses traversal / separator / NUL slugs (never yields a path outside plans/canvas)', () => {
+    const { projectKPIPlanPath } = loadModule();
+    const root = process.cwd();
+    const canvasRoot = path.join(root, 'plans', 'canvas');
+    for (const bad of traversalSlugs) {
+      assert.throws(() => projectKPIPlanPath(bad), /unsafe/i, `should refuse slug: ${JSON.stringify(bad)}`);
+    }
+    // A normal slug stays inside the intended root, no `..` component.
+    const ok = projectKPIPlanPath('my-kpi-plan');
+    assert.ok(ok.startsWith(canvasRoot + path.sep), 'normal slug must stay in plans/canvas');
+    assert.ok(!ok.includes('..'), 'joined path must not contain ..');
+  });
+
+  it('loadProjectKPIPlan + saveProjectKPIPlan refuse traversal slugs before any I/O', () => {
+    const { loadProjectKPIPlan, saveProjectKPIPlan } = loadModule();
+    assert.throws(() => loadProjectKPIPlan('../../../tmp/evil'), /unsafe/i);
+    assert.throws(
+      () => saveProjectKPIPlan('../../../tmp/evil', { project: 'x', launch_kpis: [] }),
+      /unsafe/i,
+    );
+    // The traversal target must NOT have been written anywhere outside the root.
+    assert.ok(!fs.existsSync(path.join(tmpDir, '..', '..', '..', 'tmp', 'evil-kpis.yaml')));
+  });
+
+  it('saveReview refuses non-date / traversal date segments (never writes outside the reviews dir)', () => {
+    const { saveReview } = loadModule();
+    for (const bad of ['../../etc/evil', '..', '2026-05-14/../../evil', 'not-a-date', '2026-5-1', 'foo bar']) {
+      assert.throws(() => saveReview(bad, 'x'), /unsafe|invalid|date/i, `should refuse date: ${JSON.stringify(bad)}`);
+    }
+  });
+
+  it('regression: a normal slug and a valid YYYY-MM-DD date still work exactly as before', () => {
+    const { projectKPIPlanPath, saveProjectKPIPlan, loadProjectKPIPlan, saveReview, listReviews } = loadModule();
+    const root = process.cwd();
+    // projectKPIPlanPath — exact in-root path, unchanged from today's contract.
+    assert.equal(
+      projectKPIPlanPath('my-kpi-plan'),
+      path.join(root, 'plans', 'canvas', 'my-kpi-plan-kpis.yaml'),
+    );
+    // Round-trip save/load still works.
+    saveProjectKPIPlan('my-kpi-plan', { project: 'p', launch_kpis: [{ id: 'mrr', target: 'x' }] });
+    assert.ok(loadProjectKPIPlan('my-kpi-plan'));
+    // Valid date still writes normally.
+    const p = saveReview('2026-05-14', '# Review');
+    assert.match(p, /2026-05-14\.md$/);
+    assert.equal(listReviews().length, 1);
+  });
+});
+
 describe('Product Loop — agent + skill conformance', () => {
   it('kpi-planner exists at tier:1 reporting outside the CTO Chief chain (Product Loop, not Iron Loop)', () => {
     const p = path.join(projectRoot, 'agents/planning/kpi-planner.md');

@@ -239,6 +239,29 @@ test('RL-A5 kind:section passthrough — only section-kind units surface', async
   assert.equal(embedder.calls.length, 0, 'seeded from stored vector, still no re-embed');
 });
 
+test('RL-A6 text-seeded fallback returns TRUE COSINE scores, not RRF (Option B)', async () => {
+  // A NOT-yet-indexed plan (no __plan__ unit) forces the text-seeded fallback. Before
+  // Option B that fallback delegated to s2 search() and returned Reciprocal Rank
+  // Fusion scores (mathematical ceiling ≈ 2/(60+1) = 0.0328). The fix embeds the slug
+  // ONCE and calls store.search directly (mirroring the common path), so the fallback
+  // returns TRUE cosine. We map the slug's embedding to ps1's EXACT stored vector, so
+  // ps1 is the nearest neighbour at cosine ≈ 1.0 — a value the RRF path could never
+  // produce.
+  const store = realStoreWithFixture();
+  const seedPlan = FIXTURE.plans.find((p) => p.planPath === 'plans/ps1-sync-state.md');
+  const slug = 'plans/brand-new-unindexed.md'; // absent from the index → fallback
+  const embedder = makeSpyEmbedder(new Map([[slug, seedPlan.embedding]]));
+  const results = await related(slug, { store, embedder });
+
+  assert.equal(embedder.calls.length, 1, 'fallback embeds the slug text exactly once');
+  assert.ok(results.length > 0, 'fallback surfaces neighbours');
+  const top = results[0];
+  assert.equal(top.planPath, 'plans/ps1-sync-state.md', 'nearest neighbour is the plan whose vector we matched');
+  assert.ok(top.score > 0.5, `fallback score is TRUE cosine (~1.0), not an RRF value (~0.03); got ${top.score}`);
+  assert.ok(top.score <= 1 + 1e-6, 'cosine is bounded by 1.0');
+  assert.ok(!results.some((r) => r.planPath === slug), 'fallback still self-excludes the seed slug');
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Group B — fail-open (empty / single / null store / absent seed)
 // ═══════════════════════════════════════════════════════════════════════════════

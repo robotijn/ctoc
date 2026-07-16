@@ -169,6 +169,34 @@ test('CF-A3 HARD FAIL: files overlap ONLY (cosine below threshold) → NOT flagg
   );
 });
 
+test('CF-A4 fresh UNINDEXED target (related fallback path) is flagged on TRUE cosine (Option B)', async () => {
+  // A target whose plan-vector is not yet reconciled into the index (getUnit(__plan__)
+  // → null) forces related() onto its text-seeded fallback. Before Option B that
+  // fallback returned Reciprocal Rank Fusion scores (~0.0328 < 0.78), so conflict
+  // detection SILENTLY failed on the not-yet-indexed path. On TRUE cosine the identical
+  // candidate scores ~1.0 ≥ 0.78 AND shares files → it is flagged.
+  const vec = [1, 0, 0, 0, 0, 0, 0, 0];
+  const store = buildStore([
+    { planSlug: 'fresh-target', sectionVec: vec, files: ['src/lib/auth.js'] },
+    { planSlug: 'existing-plan', sectionVec: vec, files: ['src/lib/auth.js'] },
+  ]);
+  // Hide ONLY the target's __plan__ seed so related() takes the text-seeded fallback,
+  // while getFilesForPlan still returns the target's declared files (simulating a plan
+  // whose files: are known but whose plan vector isn't indexed yet).
+  const realGetUnit = store.getUnit.bind(store);
+  store.getUnit = (p, s) => (p === 'fresh-target' && s === PLAN_SENTINEL ? null : realGetUnit(p, s));
+  // The fallback embeds the target slug; map it to the shared axis so its section-KNN
+  // lands on existing-plan's section unit at cosine 1.0.
+  const embedder = async (texts) => ({ vectors: texts.map(() => Float32Array.from(vec)), source: 'spy' });
+
+  const rows = await detectConflicts('fresh-target', { store, embedder, getSetting: () => 0.78 });
+
+  assert.equal(rows.length, 1, 'the identical existing plan is flagged via the fallback path');
+  assert.equal(rows[0].conflictingPlan, 'existing-plan');
+  assert.ok(rows[0].score >= 0.78, `flagged on TRUE cosine (~1.0), not RRF (~0.03); got ${rows[0].score}`);
+  assert.ok(rows[0].overlappingFiles.includes('src/lib/auth.js'), 'overlap names the shared literal');
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Group B — glob-aware overlap (>50% rule, broad matches specific, non-overlap)
 // ═══════════════════════════════════════════════════════════════════════════════
