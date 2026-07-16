@@ -143,17 +143,41 @@ describe('quality-state.js — dark branches', () => {
 
   // ── acquireLock: corrupted lock file catch (lines 133-136) ────────────────
 
-  test('acquireLock_removes_corrupt_lock_and_reclaims_when_json_is_garbage', () => {
-    // Arrange — a lock file whose contents are not valid JSON.
+  test('acquireLock_does_not_steal_a_FRESH_unparseable_lock_mid_write', () => {
+    // Arrange — a lock file whose contents are not valid JSON, with a FRESH mtime.
+    // This is indistinguishable from a live winner mid-write (openSync('wx')
+    // succeeded, a partial/empty writeSync of the identity has not fully landed).
+    // Reclaiming it now would hand out a SECOND holder of the mutual-exclusion
+    // lock. The reader-side retry + grace window must treat it as a live holder.
     qs.ensureStateDir();
     const lockPath = qs.getLockFilePath();
     fs.writeFileSync(lockPath, '{ this is not json', 'utf8');
+    const now = new Date();
+    fs.utimesSync(lockPath, now, now);
 
     // Act
     const acquired = qs.acquireLock();
 
-    // Assert — the garbage lock was cleared and re-created under our pid.
-    assert.equal(acquired, true, 'corrupt lock must not block acquisition');
+    // Assert — a fresh unparseable lock is a live holder mid-write, NOT reclaimed.
+    assert.equal(acquired, false, 'a fresh unparseable lock is a live winner mid-write, not a corrupt lock to steal');
+    assert.equal(fs.readFileSync(lockPath, 'utf8'), '{ this is not json',
+      'acquireLock must not overwrite the in-progress lock');
+  });
+
+  test('acquireLock_reclaims_an_ABANDONED_unparseable_lock_older_than_the_grace_window', () => {
+    // Arrange — the same garbage contents, but an OLD mtime marks it abandoned
+    // (a process killed mid-write). It must eventually be reclaimed — no deadlock.
+    qs.ensureStateDir();
+    const lockPath = qs.getLockFilePath();
+    fs.writeFileSync(lockPath, '{ this is not json', 'utf8');
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lockPath, old, old);
+
+    // Act
+    const acquired = qs.acquireLock();
+
+    // Assert — the abandoned garbage lock was cleared and re-created under our pid.
+    assert.equal(acquired, true, 'an abandoned corrupt lock must not block acquisition forever');
     assert.equal(JSON.parse(fs.readFileSync(lockPath, 'utf8')).pid, process.pid,
       'reclaimed lock must record the acquiring pid');
   });

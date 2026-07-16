@@ -241,20 +241,41 @@ describe('plan-index/duplicate-guard checkDuplicate', () => {
     assert.deepEqual(out, []);
   });
 
-  // 8. Fail-open — non-finite threshold yields [] (no guess), and does NOT embed.
-  it('fail-open: undefined threshold → [] (no guess, no embed)', async () => {
+  // 8. A non-finite resolved threshold RE-DEFAULTS to the shipped 0.85 (mirrors
+  //    conflict-detect's DEFAULT_CONFLICT_THRESHOLD fallback) rather than silently
+  //    DISABLING duplicate detection. A typo'd threshold ("high" → NaN, or an
+  //    explicit undefined) must not kill the guard — it falls back to 0.85.
+  it('non-finite threshold re-defaults to 0.85: an explicit garbage ("high") threshold still flags a near-duplicate', async () => {
+    const store = buildStore([{ planPath: 'plans/existing.md', vec: AXIS_X }]);
+    const embedder = stubEmbedder(new Map([['near-identical draft', AXIS_X]]));
+    // getSetting yields the raw string "high" → Number("high") === NaN (non-finite).
+    const out = await checkDuplicate('near-identical draft', {
+      store,
+      embedder,
+      getSetting: stubGetSetting('high'),
+    });
+    assert.equal(out.length, 1, 'the near-duplicate is flagged at the 0.85 fallback (not silently disabled)');
+    assert.equal(out[0].plan, 'plans/existing.md');
+    assert.ok(out[0].similarity >= 0.85, `flagged at the cosine-scale 0.85 fallback, got ${out[0].similarity}`);
+    assert.equal(embedder.calls.length, 1, 'the draft is embedded once (the guard is NOT short-circuited)');
+  });
+
+  it('undefined threshold re-defaults to 0.85 and flags a near-identical draft', async () => {
     const store = buildStore([{ planPath: 'plans/a.md', vec: AXIS_X }]);
     const embedder = stubEmbedder(new Map([['q', AXIS_X]]));
     const out = await checkDuplicate('q', { store, embedder, getSetting: stubGetSetting(undefined) });
-    assert.deepEqual(out, []);
-    assert.equal(embedder.calls.length, 0, 'a non-finite threshold short-circuits before the embed');
+    assert.equal(out.length, 1, 'undefined threshold → 0.85 fallback → cosine 1.0 flags');
+    assert.equal(out[0].plan, 'plans/a.md');
   });
 
-  it('fail-open: NaN threshold → [] (no guess)', async () => {
-    const store = buildStore([{ planPath: 'plans/a.md', vec: AXIS_X }]);
+  it('NaN threshold re-defaults to 0.85: a BELOW-0.85 cosine match is still suppressed (pins the fallback value)', async () => {
+    // A store plan at cosine 0.5 to the query — under the 0.85 fallback it must be
+    // dropped. This pins the fallback at exactly 0.85 (a lower fallback would flag it).
+    const COS_050 = [0.5, Math.sqrt(1 - 0.5 * 0.5), 0, 0, 0, 0, 0, 0];
+    const store = buildStore([{ planPath: 'plans/a.md', vec: COS_050 }]);
     const embedder = stubEmbedder(new Map([['q', AXIS_X]]));
     const out = await checkDuplicate('q', { store, embedder, getSetting: stubGetSetting(NaN) });
-    assert.deepEqual(out, []);
+    assert.deepEqual(out, [], 'NaN → 0.85 fallback → a 0.5 cosine match is below threshold → []');
   });
 
   // Results carrying a non-finite score are dropped before comparison.

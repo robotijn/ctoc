@@ -778,6 +778,15 @@ function openStore(jsonPath, opts = {}) {
     }
     const limit = Number.isInteger(k) && k > 0 ? k : 0;
     if (limit === 0) return [];
+    // Symmetric with the stored-side guard (validateUpsertInput F7 + the loadFromDisk
+    // skip): a non-finite (NaN/±Infinity) QUERY component poisons cosine scoring —
+    // qNorm goes non-finite so `denom === 0` is false, every hit scores dot/NaN = NaN,
+    // the `score < minScore` filter fails to drop a NaN, and the `b.score - a.score`
+    // comparator returns NaN, CORRUPTING the KNN sort. A non-finite query has no
+    // meaningful ranking → [], mirroring the `qNorm === 0 → []` early return below.
+    for (let i = 0; i < queryEmbedding.length; i++) {
+      if (!Number.isFinite(queryEmbedding[i])) return [];
+    }
     const qNorm = l2norm(queryEmbedding);
     if (qNorm === 0) return []; // a zero query has no meaningful ranking
 

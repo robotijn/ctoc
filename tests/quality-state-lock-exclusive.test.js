@@ -91,6 +91,43 @@ describe('quality-state — acquireLock atomic exclusive-create', () => {
     assert.equal(held.pid, process.pid, 'the reclaimed lock must now record THIS process as holder');
   });
 
+  test('RED (regression): a FRESH empty (0-byte) lock is a live winner mid-write — acquireLock must NOT steal it', () => {
+    // A prior wave replaced existsSync-then-write with an atomic openSync('wx').
+    // But writing the holder identity (writeSync) is a SEPARATE step AFTER the
+    // create. Between a winner's successful openSync('wx') and its writeSync the
+    // lock file EXISTS but is 0 BYTES. The old reclaim branch read that empty
+    // file, JSON.parse('') threw → lockData=null → "Removing corrupted lock file"
+    // → it UNLINKED the live winner's lock and re-created its own: TWO holders.
+    // This reproduces that in-progress state deterministically: a 0-byte lock with
+    // a FRESH mtime (a winner that has created but not yet populated it).
+    qs.ensureStateDir();
+    const lockFile = qs.getLockFilePath();
+    fs.writeFileSync(lockFile, '', 'utf8');
+    const now = new Date();
+    fs.utimesSync(lockFile, now, now);
+
+    const result = qs.acquireLock();
+
+    assert.equal(result, false, 'a fresh 0-byte lock is a live holder mid-write, not a corrupt lock to reclaim');
+    assert.equal(fs.existsSync(lockFile), true, 'acquireLock must NOT unlink a fresh empty lock');
+    assert.equal(fs.readFileSync(lockFile, 'utf8'), '', 'acquireLock must NOT overwrite the winner\'s in-progress lock with its own pid');
+  });
+
+  test('a genuinely abandoned empty (0-byte) lock older than the grace window is eventually reclaimed (no deadlock)', () => {
+    // If a process is killed BETWEEN openSync('wx') and writeSync it leaves a
+    // permanently 0-byte lock. That must still be reclaimable — otherwise the
+    // grace-based back-off would deadlock forever. An old mtime marks it abandoned.
+    qs.ensureStateDir();
+    const lockFile = qs.getLockFilePath();
+    fs.writeFileSync(lockFile, '', 'utf8');
+    const old = new Date(Date.now() - 60_000); // 1 minute old — well past any grace window
+    fs.utimesSync(lockFile, old, old);
+
+    assert.equal(qs.acquireLock(), true, 'an abandoned empty lock (create died before write) must eventually be reclaimed');
+    const held = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+    assert.equal(held.pid, process.pid, 'the reclaimed lock records THIS process as holder');
+  });
+
   test('RED (secondary): a concurrent reclaimer removing the stale lock (ENOENT) does not throw out of acquireLock', () => {
     const dead = spawnSync(process.execPath, ['-e', '0']);
     const deadPid = dead.pid;

@@ -209,6 +209,85 @@ describe('audit-chain: appendDispatch is crash-safe across the append/head-write
   });
 });
 
+describe('audit-chain: appendDispatch tolerates and self-heals a crash-truncated trailing log line', () => {
+  // A crash DURING appendFileSync leaves a truncated, unterminated JSON line at the tail of
+  // chain.jsonl — the exact crash window the log-tail head derivation was supposed to make
+  // self-healing. The prior fix's `JSON.parse(lines[last])` throws on that partial line, and
+  // the throw propagates out of EVERY subsequent appendDispatch: the chain is bricked until a
+  // human hand-edits the log. These tests pin the self-heal: skip the trailing partial, chain
+  // onto the last WELL-FORMED entry, and remove the artifact so it does not accumulate.
+  const PARTIAL = '{"sequence":2,"dispatch_id":"d2","chain_ha';
+
+  test('should_not_throw_and_should_verify_when_a_partial_line_follows_a_valid_entry', () => {
+    // Arrange — one valid entry, then a crash-truncated trailing line (no newline).
+    const root = makeRoot();
+    try {
+      appendDispatch(root, { dispatch_id: 'd1', timestamp: '2026-06-15T00:00:01.000Z' });
+      const logPath = path.join(root, LOG_REL);
+      fs.appendFileSync(logPath, PARTIAL); // crash mid-appendFileSync: unterminated JSON tail
+      assert.equal(verifyChain(root).ok, false,
+        'precondition: an unterminated trailing line is malformed JSON');
+
+      // Act — the next append must NOT throw on the truncated tail. Against today's code it
+      // throws "Unterminated string in JSON" here, and would keep throwing forever.
+      assert.doesNotThrow(
+        () => appendDispatch(root, { dispatch_id: 'd3', timestamp: '2026-06-15T00:00:03.000Z' }),
+        'a crash-truncated trailing line must not brick appendDispatch');
+
+      // Assert — the chain is verifiable again after the re-append.
+      const result = verifyChain(root);
+      assert.equal(result.ok, true,
+        `a re-append after a partial-line crash must restore a verifiable chain; got ${JSON.stringify(result)}`);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('should_remove_the_partial_line_from_the_log_after_a_successful_reappend', () => {
+    // Arrange
+    const root = makeRoot();
+    try {
+      appendDispatch(root, { dispatch_id: 'd1', timestamp: '2026-06-15T00:00:01.000Z' });
+      const logPath = path.join(root, LOG_REL);
+      fs.appendFileSync(logPath, PARTIAL);
+
+      // Act
+      appendDispatch(root, { dispatch_id: 'd3', timestamp: '2026-06-15T00:00:03.000Z' });
+
+      // Assert — the crash artifact is healed out; only the two well-formed entries remain.
+      const raw = fs.readFileSync(logPath, 'utf8');
+      assert.ok(!raw.includes(PARTIAL),
+        'the crash-truncated partial line must be healed out of the log, not accumulated');
+      assert.equal(logCount(root), 2, 'log must contain exactly the two valid entries d1, d3');
+      assert.equal(getChainHead(root).sequence, 2,
+        'head sequence must reflect the two valid entries after self-heal');
+      assert.equal(verifyChain(root).ok, true, 'the healed chain must verify');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('should_treat_an_all_malformed_log_as_genesis_for_the_next_append', () => {
+    // Not a trailing-partial-after-valid case: the WHOLE log is unparseable. The next append
+    // must still make forward progress (genesis-based) rather than throw forever.
+    const root = makeRoot();
+    try {
+      fs.mkdirSync(path.join(root, '.ctoc', 'audit'), { recursive: true });
+      fs.writeFileSync(path.join(root, LOG_REL), '{"garbage": ');
+
+      assert.doesNotThrow(
+        () => appendDispatch(root, { dispatch_id: 'g1', timestamp: '2026-06-15T00:00:01.000Z' }),
+        'an all-malformed log must not brick appendDispatch');
+      const result = verifyChain(root);
+      assert.equal(result.ok, true,
+        `after healing an all-malformed log the fresh entry must verify; got ${JSON.stringify(result)}`);
+      assert.equal(result.count, 1, 'the single new entry must be the only entry');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('audit-chain: regression — sequential integrity and tamper-evidence intact', () => {
   test('should_verify_a_purely_sequential_chain_with_strictly_increasing_sequences', () => {
     const root = makeRoot();

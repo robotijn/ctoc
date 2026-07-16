@@ -26,8 +26,13 @@
  *
  *  • Threshold via the real 3-arg `getSetting('plan_index','duplicate_threshold',
  *    projectPath)` (`src/lib/settings.js`; shipped default 0.85, on the cosine
- *    scale). The threshold is always READ, never hardcoded. A missing / non-finite
- *    threshold → `[]` (we cannot compare without one and we do not guess a default).
+ *    scale). The threshold is always READ, never hardcoded. A MISSING setting
+ *    already resolves to 0.85 via settings; an explicit NON-FINITE value (e.g. a
+ *    typo'd `"high"` → `Number("high")` === NaN) RE-DEFAULTS to the shipped
+ *    {@link DEFAULT_DUPLICATE_THRESHOLD} (0.85) rather than silently DISABLING the
+ *    guard — mirroring the sibling `conflict-detect.js`, which falls back to its own
+ *    `DEFAULT_CONFLICT_THRESHOLD` on the same bad-input class. A typo must not kill
+ *    duplicate detection.
  *
  *  • Fail-open, always. The whole body is a single `try { … } catch { return []; }`.
  *    A throwing embedder, a throwing `store.search`, a throwing `getSetting`, a
@@ -52,6 +57,16 @@
  * @type {number}
  */
 const DEFAULT_DUPLICATE_LIMIT = 5;
+
+/**
+ * Shipped duplicate-guard cosine threshold — matches the `plan_index.duplicate_threshold`
+ * settings-schema default (`src/lib/settings.js`). Used as the last-resort fallback when
+ * the resolved threshold is non-finite (a typo'd / garbage setting value), mirroring
+ * `conflict-detect.js`'s `DEFAULT_CONFLICT_THRESHOLD` fallback so a bad setting re-defaults
+ * rather than silently disabling duplicate detection.
+ * @type {number}
+ */
+const DEFAULT_DUPLICATE_THRESHOLD = 0.85;
 
 /**
  * Check whether a draft plan is semantically too close to existing plans.
@@ -111,12 +126,13 @@ async function checkDuplicate(draftSummary, options = {}) {
       return [];
     }
 
-    // Threshold: always read, never hardcoded. NaN/undefined → [] (do not guess).
-    // On the cosine scale — the store's raw cosine `score` is compared against it.
-    const threshold = Number(getSetting('plan_index', 'duplicate_threshold', projectPath));
-    if (!Number.isFinite(threshold)) {
-      return [];
-    }
+    // Threshold: always read, never hardcoded. On the cosine scale — the store's raw
+    // cosine `score` is compared against it. A MISSING setting already resolves to
+    // 0.85 via settings; an explicit NON-FINITE value (typo'd / garbage) RE-DEFAULTS
+    // to the shipped DEFAULT_DUPLICATE_THRESHOLD (mirroring conflict-detect) rather
+    // than silently disabling the guard.
+    const resolved = Number(getSetting('plan_index', 'duplicate_threshold', projectPath));
+    const threshold = Number.isFinite(resolved) ? resolved : DEFAULT_DUPLICATE_THRESHOLD;
 
     const limit =
       Number.isInteger(opts.limit) && opts.limit > 0 ? opts.limit : DEFAULT_DUPLICATE_LIMIT;
@@ -165,4 +181,4 @@ async function checkDuplicate(draftSummary, options = {}) {
   }
 }
 
-module.exports = { checkDuplicate, DEFAULT_DUPLICATE_LIMIT };
+module.exports = { checkDuplicate, DEFAULT_DUPLICATE_LIMIT, DEFAULT_DUPLICATE_THRESHOLD };

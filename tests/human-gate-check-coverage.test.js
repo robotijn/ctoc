@@ -559,6 +559,82 @@ test('revertPlan_doesNotFalselyBlock_whenDestinationEqualsSource', () => {
 });
 
 // ============================================================================
+// Cluster P — the SIP1 exemption requires an APPROVED/LEDGERED PARENT (Gate-1
+// residency hole). Before this fix, isFreshSip1Slice exempted ANY implementation/
+// plan carrying a non-empty `parent_plan` with no ledger entry of its own — it
+// NEVER checked that `parent_plan` named an approved/ledgered parent. Since
+// plans/**.md is Edit-whitelisted, an agent could Write
+// plans/implementation/x.md containing a lone `parent_plan:` line and squat the
+// Gate-1 destination with zero provenance. The exemption must now additionally
+// require the parent to resolve to a real ledger entry; a dangling / unapproved /
+// nonexistent parent is NOT exempt (fail toward flagging).
+// ============================================================================
+
+const flaggedSlugs = (projectDir, stage) =>
+  gate.checkFolder(stage, projectDir).map((v) => path.basename(v.path).replace(/\.md$/, ''));
+
+test('isFreshSip1Slice_isFalse_whenParentPlanNamesNonexistentUnledgeredParent', () => {
+  // Arrange — a slice in implementation/ whose parent_plan points at a parent that
+  // has NO ledger entry and does not exist at all. Under the old predicate this was
+  // exempt (a Gate-1 residency bypass); it must now be flagged and reverted.
+  const projectDir = makeProject();
+  const { filePath, content } = writePlan(
+    projectDir, 'implementation', 'orphan-slice', 'parent_plan: nonexistent-parent\n');
+
+  // Act
+  const fresh = gate.isFreshSip1Slice(filePath, 'implementation', projectDir, content);
+  const flagged = flaggedSlugs(projectDir, 'implementation');
+
+  // Assert — not exempt; the residency sweep records a violation for it.
+  assert.equal(fresh, false, 'a dangling/unledgered parent must NOT earn the fresh-slice exemption');
+  assert.ok(flagged.includes('orphan-slice'),
+    'a slice under a nonexistent, unledgered parent must be flagged, not exempted');
+});
+
+test('isFreshSip1Slice_isFalse_whenParentPlanFileExistsButIsNotLedgered', () => {
+  // Arrange — the parent plan FILE exists on disk, but it has NO ledger entry (it
+  // never crossed Gate 1). A mere sibling file is not provenance; still flagged.
+  const projectDir = makeProject();
+  writePlan(projectDir, 'implementation', 'real-but-unapproved-parent'); // exists, no ledger
+  const { filePath, content } = writePlan(
+    projectDir, 'implementation', 'child-slice', 'parent_plan: real-but-unapproved-parent\n');
+
+  // Act
+  const fresh = gate.isFreshSip1Slice(filePath, 'implementation', projectDir, content);
+  const flagged = flaggedSlugs(projectDir, 'implementation');
+
+  // Assert — an existing-but-unapproved parent is not a valid provenance root.
+  assert.equal(fresh, false, 'an existing but unledgered parent must NOT earn the exemption');
+  assert.ok(flagged.includes('child-slice'),
+    'a slice under an existing-but-unapproved parent must be flagged');
+});
+
+test('isFreshSip1Slice_isTrue_whenParentPlanResolvesToAnApprovedLedgeredParent', () => {
+  // Arrange — the legitimate case the exemption exists for: a genuine fresh SIP1
+  // slice whose parent_plan resolves to a parent that DID cross Gate 1 (a real
+  // ledger entry with stage_to=implementation). The slice itself has no entry yet.
+  const projectDir = makeProject();
+  const { content: parentContent } = writePlan(projectDir, 'implementation', 'approved-parent');
+  ledger.writeEntry('approved-parent', {
+    content_sha256: ledger.computeContentHash(parentContent),
+    stage_from: 'functional',
+    stage_to: 'implementation', // the parent crossed Gate 1
+  }, projectDir);
+  const { filePath, content } = writePlan(
+    projectDir, 'implementation', 'approved-parent-s1-slice', 'parent_plan: approved-parent\n');
+
+  // Act
+  const fresh = gate.isFreshSip1Slice(filePath, 'implementation', projectDir, content);
+  const flagged = flaggedSlugs(projectDir, 'implementation');
+
+  // Assert — STILL exempt (wrongly reverting this would destroy legitimate work),
+  // and the sweep does not flag it.
+  assert.equal(fresh, true, 'a slice under an approved/ledgered parent stays exempt');
+  assert.ok(!flagged.includes('approved-parent-s1-slice'),
+    'a genuine fresh slice under an approved parent must NOT be reverted');
+});
+
+// ============================================================================
 // Cluster L — main() OUTER CATCH fail-open on an INFRASTRUCTURE error
 // (lines 413-431). When a gate-destination path is a FILE, readdirSync throws
 // ENOTDIR out of checkFolder; main() must swallow it, LOG a sweep_error, and

@@ -97,29 +97,80 @@ function isWhitelisted(filePath) {
 const LEDGER_DIR = '.ctoc/approvals';
 
 /**
- * Whether `filePath` targets the approval ledger (`.ctoc/approvals/` or any path
- * beneath it). Relativizes against the project root exactly as `isWhitelisted`
- * does — absolute → `path.relative`; `\\`→`/`; reject any `..` traversal;
- * `path.posix.normalize` — so a crafted target like `.ctoc/approvals/../x.js`
- * (which resolves OUT of the ledger) is NOT reported as protected and falls
- * through to the normal whitelist/coverage flow. Pure: no filesystem access.
+ * The Gate-3 VERIFY EVIDENCE directory, as a POSIX-relative prefix. The artifact
+ * `.ctoc/state/verify/<slug>.json` under this path is written PROGRAMMATICALLY by
+ * `src/lib/step-13-verify.js` (via safeFs, inside the CTOC process — NOT a tool
+ * call) and is the one automated assurance `plan-validator.validateReviewToDone`
+ * checks before review→done. A write there by an agent editing TOOL would forge
+ * that evidence ({"passed":true,...}) and cross Gate 3 on fabricated data, so it
+ * is denied ahead of the `.ctoc/` whitelist — exactly like the approval ledger.
+ * step-13-verify's real write does not pass through these tool hooks, so it is
+ * unaffected.
+ */
+const VERIFY_EVIDENCE_DIR = '.ctoc/state/verify';
+
+/**
+ * Normalize a tool-call target to a project-root-relative POSIX path for
+ * protected-directory matching, or return null if it is empty or escapes the
+ * root via traversal. Mirrors `isWhitelisted`'s normalization exactly —
+ * absolute → `path.relative`; `\\`→`/`; strip leading `./`; reject any `..`
+ * traversal; `path.posix.normalize` — so a crafted target like
+ * `.ctoc/approvals/../x.js` (which resolves OUT of the protected dir) is NOT
+ * reported as protected and falls through to the normal whitelist/coverage flow.
+ * Pure: no filesystem access.
  *
  * @param {string} filePath - the tool-call target (relative or absolute)
- * @returns {boolean} true iff the normalized path is the ledger dir or under it
+ * @returns {string|null} normalized POSIX-relative path, or null if unusable
  */
-function isProtectedLedgerPath(filePath) {
-  if (!filePath) return false;
+function normalizeForProtection(filePath) {
+  if (!filePath) return null;
   let norm = filePath;
   if (path.isAbsolute(norm)) {
     norm = path.relative(process.cwd(), norm);
   }
   norm = norm.replace(/\\/g, '/').replace(/^\.\//, '');
-  // Reuse the whitelist's traversal rejection so `.ctoc/approvals/../escape.js`
-  // cannot be treated as "protected" (and, symmetrically, cannot slip through).
-  if (norm === '' || norm === '..' || norm.startsWith('../') || norm.includes('/../')) return false;
+  if (norm === '' || norm === '..' || norm.startsWith('../') || norm.includes('/../')) return null;
   norm = path.posix.normalize(norm);
-  if (norm.startsWith('../')) return false;
-  return norm === LEDGER_DIR || norm.startsWith(`${LEDGER_DIR}/`);
+  if (norm.startsWith('../')) return null;
+  return norm;
+}
+
+/**
+ * Whether `norm` (an already-normalized POSIX-relative path or null) is the
+ * given protected directory or a path strictly beneath it. Segment-precise: it
+ * matches `dir` and `dir/...` but NOT a same-prefix sibling like `${dir}OTHER/`.
+ *
+ * @param {string|null} norm - output of `normalizeForProtection`
+ * @param {string} dir - POSIX-relative protected directory prefix (no trailing /)
+ * @returns {boolean}
+ */
+function isUnderProtectedDir(norm, dir) {
+  if (norm === null) return false;
+  return norm === dir || norm.startsWith(`${dir}/`);
+}
+
+/**
+ * Whether `filePath` targets the approval ledger (`.ctoc/approvals/` or any path
+ * beneath it). See `normalizeForProtection` for the traversal-safe normalization.
+ *
+ * @param {string} filePath - the tool-call target (relative or absolute)
+ * @returns {boolean} true iff the normalized path is the ledger dir or under it
+ */
+function isProtectedLedgerPath(filePath) {
+  return isUnderProtectedDir(normalizeForProtection(filePath), LEDGER_DIR);
+}
+
+/**
+ * Whether `filePath` targets the Gate-3 verify-evidence store
+ * (`.ctoc/state/verify/` or any path beneath it). See `normalizeForProtection`
+ * for the traversal-safe normalization; a crafted `.ctoc/state/verify/../x.js`
+ * resolves out of the store and is NOT reported as protected.
+ *
+ * @param {string} filePath - the tool-call target (relative or absolute)
+ * @returns {boolean} true iff the normalized path is the verify dir or under it
+ */
+function isProtectedVerifyPath(filePath) {
+  return isUnderProtectedDir(normalizeForProtection(filePath), VERIFY_EVIDENCE_DIR);
 }
 
 function readStdinJson() {
@@ -329,6 +380,19 @@ async function enforce(stdinJson) {
       });
     }
 
+    // 0b. Gate-3 verify evidence is pipeline provenance (forgeable-evidence
+    //     defect). `.ctoc/state/verify/<slug>.json` is written PROGRAMMATICALLY
+    //     by step-13-verify.js (not a tool call) and is what validateReviewToDone
+    //     gates review→done on. Deny ANY editing-tool write there — ahead of the
+    //     Step-1 `.ctoc/` whitelist — so an agent cannot forge {"passed":true}
+    //     and cross Gate 3 on fabricated data. step-13-verify's real write does
+    //     not pass through these hooks, so it is unaffected.
+    if (targetFile && isProtectedVerifyPath(targetFile)) {
+      return block('verify evidence is written by the pipeline (step-13-verify), not by hand; agent writes to .ctoc/state/verify/ are denied', {
+        tool, target_file: targetFile, project_root: root,
+      });
+    }
+
     // 1. Whitelist (infrastructure files always allowed)
     if (targetFile && isWhitelisted(targetFile)) {
       return allow('whitelist', { tool, target_file: targetFile, project_root: root });
@@ -374,7 +438,8 @@ async function enforce(stdinJson) {
 }
 
 module.exports = {
-  enforce, isWhitelisted, isProtectedLedgerPath, getTargetFile, readStdinJson,
+  enforce, isWhitelisted, isProtectedLedgerPath, isProtectedVerifyPath,
+  getTargetFile, readStdinJson,
   findEscapeInTranscript, extractUserTypedText, buildBlockMessage,
 };
 

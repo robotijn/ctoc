@@ -117,8 +117,70 @@ function splitFrontmatter(raw) {
 }
 
 /**
+ * Extract the YAML text of EVERY stacked leading frontmatter block. Human-gate
+ * crossings PREPEND a fresh first `---…---` block (actions.addApprovalMarker /
+ * stampAndLedger), so over a fail→revert→re-approve cycle the block that carries
+ * `kickback_counts` is pushed DEEPER while a new counter-less block sits on top.
+ * Reading only the first block therefore orphaned the real count and silently
+ * reset the per-plan escalation to zero every cycle. We peel every consecutive
+ * leading block (separated only by whitespace) so no prepend can hide the count.
+ *
+ * Only LEADING blocks are scanned: prepended approval markers always stack at the
+ * very top, and stopping at the first non-frontmatter text avoids mistaking a
+ * `---` thematic break inside the plan BODY for a frontmatter block.
+ *
+ * @param {string} raw - the full plan file text
+ * @returns {Array<string>} the YAML text of each leading block, top-first
+ */
+function frontmatterBlocks(raw) {
+  const blocks = [];
+  let rest = raw;
+  for (;;) {
+    // `^\s*` swallows only whitespace before the next `---`; a body line stops it.
+    const m = rest.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/);
+    if (!m) break;
+    blocks.push(m[1]);
+    rest = rest.slice(m[0].length);
+  }
+  return blocks;
+}
+
+/**
+ * Read `kickback_counts` across ALL leading frontmatter blocks and fold them into
+ * the MAX per-step count and MAX total found in any block. Max (not first, not
+ * last, not sum) is the correct fold: a prepended counter-less block contributes
+ * zeros and cannot lower the result, while the true prior count — wherever it now
+ * lives — is always surfaced. Never throws; a block with malformed YAML or no
+ * counter contributes zeros.
+ *
+ * @param {string} raw - the full plan file text
+ * @returns {{ by_step: Object<string,number>, total: number }} null-proto by_step
+ */
+function maxCountsAcrossBlocks(raw) {
+  const merged = Object.create(null);
+  let total = 0;
+  for (const fmText of frontmatterBlocks(raw)) {
+    let parsed;
+    try {
+      parsed = yaml.load(fmText);
+    } catch {
+      continue; // malformed block contributes nothing
+    }
+    const counts = normalizeCounts(parsed && parsed.kickback_counts);
+    if (counts.total > total) total = counts.total;
+    for (const k of Object.keys(counts.by_step)) {
+      const v = counts.by_step[k];
+      if (!(k in merged) || v > merged[k]) merged[k] = v;
+    }
+  }
+  return { by_step: merged, total };
+}
+
+/**
  * Read the persisted kickback counts from a plan file. Never throws — a plan
  * with no counter, no frontmatter, or a malformed counter reads as all zeros.
+ * Robust to human-gate block-prepend: scans every leading frontmatter block and
+ * returns the max per-step count and max total (see maxCountsAcrossBlocks).
  *
  * @param {string} planPath - absolute path to the plan `.md` file
  * @returns {{ by_step: Object<string,number>, total: number }}
@@ -130,15 +192,7 @@ function readKickbackCounts(planPath) {
   } catch {
     return { by_step: {}, total: 0 };
   }
-  const { fmText } = splitFrontmatter(raw);
-  if (fmText === null) return { by_step: {}, total: 0 };
-  let parsed;
-  try {
-    parsed = yaml.load(fmText);
-  } catch {
-    return { by_step: {}, total: 0 };
-  }
-  const counts = normalizeCounts(parsed && parsed.kickback_counts);
+  const counts = maxCountsAcrossBlocks(raw);
   // Return a plain object (drop the null prototype) for ergonomic caller use.
   return { by_step: Object.assign({}, counts.by_step), total: counts.total };
 }
@@ -249,16 +303,12 @@ function recordKickback(planPath, step, projectPath) {
   const stepKey = normalizeStep(step); // throws before any file read/write
 
   const raw = safeFs.readFileSync(planPath, 'utf8');
-  const { fmText } = splitFrontmatter(raw);
-  let parsed = null;
-  if (fmText !== null) {
-    try {
-      parsed = yaml.load(fmText);
-    } catch {
-      parsed = null;
-    }
-  }
-  const counts = normalizeCounts(parsed && parsed.kickback_counts);
+  // Read the MAX across every leading frontmatter block, not just the first —
+  // otherwise a human-gate prepend of a counter-less block resets the running
+  // total and the per-plan escalation is silently defeated. Incrementing from the
+  // true max keeps the (first-block) write >= any stale deeper value, so a later
+  // max-across read never regresses.
+  const counts = maxCountsAcrossBlocks(raw);
 
   const nextByStep = (counts.by_step[stepKey] || 0) + 1;
   counts.by_step[stepKey] = nextByStep;

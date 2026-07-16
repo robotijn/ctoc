@@ -603,6 +603,71 @@ class SecretsScanner {
   }
 
   /**
+   * String-literal-aware block-comment span check. Scans content[0..position)
+   * left-to-right tracking string-literal state (single-quote, double-quote,
+   * backtick — honoring backslash escapes) and block-comment state, counting a
+   * `/*` as a comment open (and `* /` as a comment close) ONLY when not inside a
+   * string. Returns true iff the scan ends INSIDE a block comment at `position`.
+   * A `/*` that occurs inside a string literal (glob, wildcard URL, regex) is
+   * therefore NOT treated as a comment open — the fail-closed fix for a real
+   * secret being dropped after such a line. O(n) single pass, no regex.
+   * @param {string} content - File content
+   * @param {number} position - Match start offset
+   * @returns {boolean} True if position is inside an unclosed block comment
+   */
+  _inBlockCommentAt(content, position) {
+    let inBlock = false;   // inside /* ... */
+    let quote = '';        // '', "'", '"', or '`' — active string delimiter
+    let escaped = false;   // previous char was an unescaped backslash (in string)
+
+    for (let i = 0; i < position; i++) {
+      const ch = content[i];
+
+      if (quote) {
+        // Inside a string literal: only the matching delimiter (unescaped)
+        // closes it. Everything else — including `/*` — is inert.
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === quote) {
+          quote = '';
+        }
+        continue;
+      }
+
+      if (inBlock) {
+        // Inside a block comment: only `* /` closes it. String delimiters are
+        // inert inside a comment.
+        if (ch === '*' && content[i + 1] === '/') {
+          inBlock = false;
+          i++; // consume the '/'
+        }
+        continue;
+      }
+
+      // In code (not in a string, not in a block comment).
+      if (ch === '/' && content[i + 1] === '/') {
+        // A `//` line comment runs to end of line. Skip it so a `/*` sequence
+        // appearing INSIDE the line comment cannot open a phantom block span
+        // (which would wrongly cover — and DROP — a real secret on a later
+        // line: a fail-OPEN regression). If the newline is at/after `position`
+        // we simply stop.
+        const nl = content.indexOf('\n', i + 2);
+        if (nl === -1 || nl >= position) return inBlock; // false here
+        i = nl; // loop ++ moves past the newline
+      } else if (ch === '/' && content[i + 1] === '*') {
+        inBlock = true;
+        i++; // consume the '*'
+      } else if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch;
+      }
+    }
+
+    return inBlock;
+  }
+
+  /**
    * Check if a finding is in a comment or documentation
    * @param {string} content - File content
    * @param {number} position - Position in content
@@ -626,20 +691,26 @@ class SecretsScanner {
       return false;
     }
 
-    // Block-comment SPAN analysis (position-aware). The previous heuristic used
-    // an UNANCHORED `/\/\*/` that matched `/*` ANYWHERE on the line, so a real
-    // secret followed by a TRAILING block comment on the same code line
-    // (`const k = "AKIA..."; /* rotate */`) was classified in-comment and
-    // silently dropped — a fail-OPEN on the security gate. Instead: the match at
-    // `position` is inside a block comment ONLY if, in content[0..position], the
-    // last `/*` occurs AFTER the last `*/` — i.e. an UNCLOSED block-comment span
-    // (including multi-line blocks) actually covers the position. When in doubt
-    // we report (fail closed). indexOf/-1 arithmetic is O(n), no regex, ReDoS-safe.
-    const before = content.slice(0, position);
-    const lastOpen = before.lastIndexOf('/*');
-    const lastClose = before.lastIndexOf('*/');
-    if (lastOpen > lastClose) {
-      return true; // an unclosed /* ... */ span covers the match
+    // Block-comment SPAN analysis (position-aware, STRING-LITERAL AWARE). The
+    // match at `position` is inside a block comment ONLY if an UNCLOSED `/*`
+    // span (including multi-line blocks) actually covers the position. Two prior
+    // heuristics both failed OPEN:
+    //   1. An UNANCHORED `/\/\*/` matched `/*` anywhere on the line, so a real
+    //      secret with a TRAILING comment (`k = "AKIA..."; /* rotate */`) was
+    //      dropped.
+    //   2. A naive lastIndexOf('/*') > lastIndexOf('*/') span counted `/*` that
+    //      appears INSIDE STRING LITERALS — glob patterns (`"src/*.js"`),
+    //      wildcard URLs (`"http://x/*"`), regex-in-strings — as comment opens,
+    //      so a genuine secret on a later line was silently DROPPED whenever an
+    //      earlier line contained `/*` inside a string. A broad blind spot.
+    // The correct test is a lightweight left-to-right scan of content[0..pos]
+    // that tracks string-literal state (', ", `) with backslash escapes, and
+    // only counts `/*`/`*/` as comment boundaries when NOT inside a string. The
+    // match is in a block comment iff the scan ends INSIDE a block comment. When
+    // ambiguous we bias to REPORTING (a security scanner must fail closed).
+    // O(n) single pass, no regex — ReDoS-safe.
+    if (this._inBlockCommentAt(content, position)) {
+      return true; // an unclosed /* ... */ span (string-aware) covers the match
     }
 
     // Single-line comment patterns — anchored: the comment marker begins the

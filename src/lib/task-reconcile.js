@@ -144,6 +144,8 @@ const TEMP_PREFIX = 'tasks.json.tmp-';
  * @property {null|{reason?:string, skipped?:number}} corrupt  fail-open marker, else null.
  * @property {string} [saveFailed]  set by reconcileState when the fail-loud save threw.
  * @property {string[]} [tempSwept]  set by reconcileState — swept temp-artifact paths.
+ * @property {string[]} [quarantineReleased]  set by reconcileState — staleness-orphan ids whose
+ *   file quarantine was released this pass because the agent was confirmed dead.
  */
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -234,7 +236,7 @@ function reconcile(tasks, opts = {}) {
   /** @type {ReconcileReport} */
   const report = {
     orphaned: [], stalenessOrphaned: [], cancelled: [], stalenessCancelled: [],
-    unsatisfiable: [], deferred: [], failed: [], swept: [], corrupt: null
+    unsatisfiable: [], deferred: [], failed: [], swept: [], quarantineReleased: [], corrupt: null
   };
 
   const version = (tasks && typeof tasks === 'object' && Number.isSafeInteger(tasks.version))
@@ -333,6 +335,20 @@ function reconcile(tasks, opts = {}) {
           t.status = 'orphaned';
           report.orphaned.push(t.id);
           if (stalenessBased) {
+            // DURABLE quarantine marker (concurrent-edit defect). An age-only orphaning is
+            // NOT confirmed death — the agent may STILL be alive and editing these files.
+            // The R3-B item 8 file quarantine must therefore hold ACROSS passes, not just
+            // the pass that did the orphaning. `normalizeLoadedTask` strips unknown top-level
+            // fields, but PRESERVES `result`, so the reason is recorded there: reconcileState
+            // reserves the files of every orphaned task still marked `orphanReason:'staleness'`,
+            // and the across-passes branch below flips it to `confirmed-dead` (releasing the
+            // files) only once the harness confirms the agent gone.
+            t.result = {
+              ok: false,
+              orphanReason: 'staleness',
+              summary: 'orphaned on staleness alone — the agent was never confirmed dead ' +
+                'and may still be editing its files'
+            };
             // Loud detail so the inbox can warn "orphaned on staleness alone — may still
             // be alive" (C1-5). Only the backstop path; confirmed-absent is not here.
             report.stalenessOrphaned.push({
@@ -347,6 +363,26 @@ function reconcile(tasks, opts = {}) {
     } else if (t.status === 'failed') {
       // Surface every failure so the caller can push it to the inbox — never dropped.
       report.failed.push({ id: t.id, summary: (t.result && t.result.summary) || null });
+    } else if (t.status === 'orphaned' && t.result && t.result.orphanReason === 'staleness') {
+      // ACROSS-PASSES quarantine release (concurrent-edit defect). A task orphaned on age
+      // alone in a PRIOR pass still carries `orphanReason:'staleness'`, so reconcileState is
+      // still reserving its files. Release that reservation — but ONLY when the agent is
+      // CONFIRMED DEAD, never on a hunch, or a still-live agent would lose its files to a
+      // rival. Confirmation requires a present live list, a recorded agent id, and that id
+      // ABSENT from the live list (the same evidence-of-death rule the running branch uses;
+      // a missing id or an absent list is missing information, not death). The marker is
+      // flipped DURABLY to `confirmed-dead` so a later list-absent pass does not re-reserve
+      // the freed files (which would strand new queued work) — the queue never deadlocks.
+      const hasRecordedId = t.agentTaskId != null;
+      if (live !== null && hasRecordedId && !live.has(String(t.agentTaskId))) {
+        t.result = {
+          ok: false,
+          orphanReason: 'confirmed-dead',
+          summary: 'orphaned — the agent was later confirmed gone by the harness; ' +
+            'its files are released'
+        };
+        report.quarantineReleased.push(t.id);
+      }
     }
 
     kept.push(t);
@@ -490,7 +526,8 @@ function reconcileState(root, opts = {}) {
       reconciled = out.tasks;
       report = out.report;
       const changed = report.orphaned.length > 0 || report.swept.length > 0 ||
-        report.cancelled.length > 0 || report.unsatisfiable.length > 0;
+        report.cancelled.length > 0 || report.unsatisfiable.length > 0 ||
+        report.quarantineReleased.length > 0;
       if (!changed) {
         ctx.abort(); // nothing to persist — a pure read must not bump the generation
         return;
@@ -506,7 +543,8 @@ function reconcileState(root, opts = {}) {
       /** @type {ReconcileReport} */
       const failReport = {
         orphaned: [], stalenessOrphaned: [], cancelled: [], stalenessCancelled: [],
-        unsatisfiable: [], deferred: [], failed: [], swept: [], corrupt: { reason: 'load-failed' }
+        unsatisfiable: [], deferred: [], failed: [], swept: [], quarantineReleased: [],
+        corrupt: { reason: 'load-failed' }
       };
       return { report: failReport, promote: [] };
     }
@@ -535,11 +573,19 @@ function reconcileState(root, opts = {}) {
   }
   report.quarantined = [];
   try {
-    const byId = new Map((reconciled.tasks || []).map((t) => [t.id, t]));
+    // PERSISTENT quarantine set (concurrent-edit defect). Reserve the files of EVERY task
+    // currently `orphaned` on staleness — this-pass orphans (their `result` marker was set
+    // in reconcile just now) AND prior-pass orphans still carrying it (the marker survives
+    // load via `result`). Deriving from the reconciled TASK SET, not the this-pass
+    // `report.stalenessOrphaned`, is what makes the hold persist across passes: a still-alive
+    // age-orphan keeps its files reserved until the across-passes branch flips its marker to
+    // `confirmed-dead` (agent confirmed gone), at which point it drops out of this set.
     const quarantinedTouches = [];
-    for (const entry of report.stalenessOrphaned || []) {
-      const t = byId.get(entry.id);
-      if (t && Array.isArray(t.touches)) quarantinedTouches.push(...t.touches);
+    for (const t of reconciled.tasks || []) {
+      if (t && t.status === 'orphaned' && t.result &&
+          t.result.orphanReason === 'staleness' && Array.isArray(t.touches)) {
+        quarantinedTouches.push(...t.touches);
+      }
     }
     if (quarantinedTouches.length > 0) {
       promote = promote.filter((cand) => {

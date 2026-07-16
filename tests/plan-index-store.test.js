@@ -769,3 +769,39 @@ test('F9 withBatch moveUnit enforces the same arg validation as public moveUnit'
     cleanup(dir);
   }
 });
+
+// ── F10 (MED): a non-finite QUERY vector returns [] (symmetric query-side guard) ─
+//
+// Regression: search() guarded `qNorm === 0` (zero query → []) but NOT a non-finite
+// query. A NaN/±Infinity query COMPONENT makes qNorm non-finite, so `denom === 0`
+// is false, every hit scores dot/NaN = NaN, the `score < minScore` filter does not
+// drop a NaN, and the `b.score - a.score` comparator returns NaN → a CORRUPTED KNN
+// sort. The STORED side already guards non-finite (validateUpsertInput F7, and the
+// loadFromDisk skip); this is the missing SYMMETRIC query-side guard, mirroring the
+// `qNorm === 0 → []` early return. Queries are kept at the store dimension (3) so
+// this isolates the finiteness guard from the dimension-mismatch check.
+
+test('F10 a non-finite query vector (NaN/Infinity component) returns [] (no corrupted sort)', () => {
+  const { dir, jsonPath } = tmpIndex();
+  try {
+    const store = openStore(jsonPath);
+    store.upsertUnit(fullUnit({ planPath: 'a.md', sectionId: 's1', embedding: f32([1, 0, 0]) }));
+    store.upsertUnit(fullUnit({ planPath: 'b.md', sectionId: 's1', embedding: f32([0, 1, 0]) }));
+
+    // Non-finite queries → [] (today: NaN-scored corrupted hits of length 2).
+    assert.deepEqual(store.search(f32([NaN, 0, 0]), 5, {}), [], 'NaN query → []');
+    assert.deepEqual(store.search(f32([Infinity, 1, 0]), 5, {}), [], '+Infinity query → []');
+    assert.deepEqual(store.search(f32([0, -Infinity, 0]), 5, {}), [], '-Infinity query → []');
+
+    // Regression: a FINITE query still returns correctly-ordered cosine hits.
+    const res = store.search(f32([1, 0, 0]), 5, {});
+    assert.equal(res.length, 2, 'finite query still returns both hits');
+    assert.equal(res[0].planPath, 'a.md', 'nearest (cosine 1.0) ranks first');
+    assert.ok(res[0].score > res[1].score, 'finite cosine order preserved (strictly ordered)');
+
+    // Regression: a ZERO query still returns [] (unchanged existing guard).
+    assert.deepEqual(store.search(f32([0, 0, 0]), 5, {}), [], 'zero query → []');
+  } finally {
+    cleanup(dir);
+  }
+});

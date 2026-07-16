@@ -132,11 +132,28 @@ test('[C4] a plan edited after approval (hash diverges) is FLAGGED', () => {
 
 // --- [H7] fresh SIP1 slice exemption -----------------------------------------
 
-test('[H7] fresh SIP1 slice in implementation/ (parent_plan, no ledger) is EXEMPT', () => {
+test('[H7] fresh SIP1 slice in implementation/ (parent_plan → approved parent, no own ledger) is EXEMPT', () => {
+  // The exemption is valid ONLY under an APPROVED/LEDGERED parent: the parent index
+  // crossed Gate 1 (functional→implementation) and carries a real ledger entry,
+  // while the freshly-decomposed slice has none of its own yet. A dangling parent
+  // is NOT exempt (that was a Gate-1 residency hole) and is covered separately.
+  const { content: parentContent } = writePlan('implementation', 'parent-thing');
+  approve('parent-thing', parentContent, 'functional', 'implementation');
   writePlan('implementation', 'parent-thing-s1-slice', { parentPlan: 'parent-thing' });
   assert.ok(
     !flaggedSlugs('implementation').includes('parent-thing-s1-slice'),
-    'a fresh SIP1 slice (parent_plan set, no ledger entry) must NOT be reverted',
+    'a fresh SIP1 slice under an approved/ledgered parent (no ledger entry of its own) must NOT be reverted',
+  );
+});
+
+test('[H7] fresh SIP1 slice whose parent_plan is DANGLING (no ledger) is FLAGGED', () => {
+  // The Gate-1 residency hole: a lone `parent_plan:` line pointing at a parent with
+  // no ledger entry must NOT earn the exemption — it is squatting implementation/
+  // with zero provenance and must be reverted like any unstamped Gate-1 resident.
+  writePlan('implementation', 'dangling-parent-slice', { parentPlan: 'no-such-parent' });
+  assert.ok(
+    flaggedSlugs('implementation').includes('dangling-parent-slice'),
+    'a slice under a dangling/unledgered parent must be flagged, not exempted',
   );
 });
 

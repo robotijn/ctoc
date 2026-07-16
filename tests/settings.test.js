@@ -18,7 +18,9 @@ const {
   getCategorySettings,
   toggleSetting,
   getCategorySchema,
-  getSettingsTabs
+  getSettingsTabs,
+  getEnvironment,
+  needsEnvironmentPrompt
 } = require('../src/lib/settings.js');
 
 // Create a temporary test directory
@@ -477,6 +479,131 @@ function testListDefaults() {
   console.log('# List defaults validation');
 }
 
+// DEFECT 1 (prototype-chain read). getEnvironment used `env in ENVIRONMENT_PROFILES`,
+// which walks the prototype chain, so a settings.json declaring an inherited
+// Object.prototype name (e.g. "constructor", "toString") as general.environment was
+// accepted as a real environment. That silently suppressed the first-run environment
+// prompt and let a bogus environment be recorded. The resolver must accept ONLY the
+// four own keys of ENVIRONMENT_PROFILES; anything else resolves to 'ask'.
+function testGetEnvironmentRejectsPrototypeKeys() {
+  setup();
+
+  const ctocDir = path.join(testDir, '.ctoc');
+  fs.mkdirSync(ctocDir, { recursive: true });
+
+  for (const bogus of ['constructor', 'toString', 'valueOf', 'hasOwnProperty', 'isPrototypeOf']) {
+    fs.writeFileSync(
+      path.join(ctocDir, 'settings.json'),
+      JSON.stringify({ general: { environment: bogus } })
+    );
+    assert.strictEqual(
+      getEnvironment(testDir),
+      'ask',
+      `general.environment "${bogus}" is an inherited prototype name, not a real environment — must resolve to 'ask'`
+    );
+    assert.strictEqual(
+      needsEnvironmentPrompt(testDir),
+      true,
+      `a bogus prototype-name environment ("${bogus}") must NOT suppress the first-run prompt`
+    );
+  }
+
+  cleanup();
+  console.log('# getEnvironment() rejects prototype-chain names');
+}
+
+// Regression for DEFECT 1. A valid environment resolves to itself and, for a real
+// non-'ask' choice, suppresses the prompt. 'ask' keeps prompting.
+function testGetEnvironmentValidResolves() {
+  setup();
+
+  const ctocDir = path.join(testDir, '.ctoc');
+  fs.mkdirSync(ctocDir, { recursive: true });
+
+  for (const env of ['dev', 'staging', 'prod']) {
+    fs.writeFileSync(
+      path.join(ctocDir, 'settings.json'),
+      JSON.stringify({ general: { environment: env } })
+    );
+    assert.strictEqual(getEnvironment(testDir), env, `valid environment "${env}" resolves to itself`);
+    assert.strictEqual(needsEnvironmentPrompt(testDir), false, `a real choice ("${env}") suppresses the prompt`);
+  }
+
+  // 'ask' is a real own key that resolves to itself and keeps prompting.
+  fs.writeFileSync(
+    path.join(ctocDir, 'settings.json'),
+    JSON.stringify({ general: { environment: 'ask' } })
+  );
+  assert.strictEqual(getEnvironment(testDir), 'ask', "'ask' resolves to itself");
+  assert.strictEqual(needsEnvironmentPrompt(testDir), true, "'ask' keeps prompting");
+
+  cleanup();
+  console.log('# getEnvironment() resolves valid environments');
+}
+
+// DEFECT 2 (prototype pollution via setSetting). `raw['__proto__']` is Object.prototype
+// (truthy, typeof 'object'), so the old guard fell through and `raw['__proto__'][key] = value`
+// wrote onto Object.prototype. setSetting must reject a dangerous __proto__ / constructor /
+// prototype category or key and never pollute the global prototype.
+function testSetSettingRejectsPrototypePollution() {
+  setup();
+
+  const canary = {};
+
+  // Dangerous CATEGORY.
+  for (const bad of ['__proto__', 'constructor', 'prototype']) {
+    assert.throws(
+      () => setSetting(bad, 'polluted', 'x', testDir),
+      /category|key|__proto__|constructor|prototype/i,
+      `setSetting must reject dangerous category "${bad}"`
+    );
+    assert.strictEqual({}.polluted, undefined, `Object.prototype not polluted via category "${bad}"`);
+    assert.strictEqual(canary.polluted, undefined, `unrelated object not polluted via category "${bad}"`);
+  }
+
+  // Dangerous KEY.
+  for (const bad of ['__proto__', 'constructor', 'prototype']) {
+    assert.throws(
+      () => setSetting('general', bad, 'x', testDir),
+      /category|key|__proto__|constructor|prototype/i,
+      `setSetting must reject dangerous key "${bad}"`
+    );
+    assert.strictEqual({}.polluted, undefined, `Object.prototype not polluted via key "${bad}"`);
+  }
+
+  // The rejections must not have written a settings file that later reads trip on.
+  const raw = readRawSettings(testDir);
+  assert.strictEqual(raw.polluted, undefined, 'no phantom polluted key persisted');
+
+  cleanup();
+  console.log('# setSetting() rejects prototype-pollution category/key');
+}
+
+// Regression for DEFECT 2. A normal setSetting still writes and round-trips, and
+// getSetting precedence (explicit > profile > default) is unchanged.
+function testSetSettingNormalStillWorks() {
+  setup();
+
+  // Round-trip a plan_index numeric setting (a non-general category).
+  setSetting('plan_index', 'duplicate_threshold', 0.9, testDir);
+  assert.strictEqual(getSetting('plan_index', 'duplicate_threshold', testDir), 0.9, 'explicit value round-trips');
+
+  // Precedence: explicit user setting beats the environment profile beats default.
+  // dev profile sets workflow.enforcementMode='soft'; default is 'strict'.
+  fs.writeFileSync(
+    path.join(testDir, '.ctoc', 'settings.json'),
+    JSON.stringify({ general: { environment: 'dev' } })
+  );
+  assert.strictEqual(getSetting('workflow', 'enforcementMode', testDir), 'soft', 'profile beats default');
+  setSetting('workflow', 'enforcementMode', 'strict', testDir);
+  assert.strictEqual(getSetting('workflow', 'enforcementMode', testDir), 'strict', 'explicit beats profile');
+  // A key the profile does not name falls through to its schema default.
+  assert.strictEqual(getSetting('agents', 'defaultModel', testDir), 'opus', 'unnamed key uses schema default');
+
+  cleanup();
+  console.log('# setSetting() normal path + precedence unchanged');
+}
+
 // Run all tests
 console.log('\nSettings Management Tests\n');
 
@@ -524,5 +651,9 @@ testToggleSettingNonBoolean();
 testSettingTypes();
 testSelectOptions();
 testListDefaults();
+testGetEnvironmentRejectsPrototypeKeys();
+testGetEnvironmentValidResolves();
+testSetSettingRejectsPrototypePollution();
+testSetSettingNormalStillWorks();
 
 console.log('\nAll settings tests passed!\n');
