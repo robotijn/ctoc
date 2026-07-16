@@ -163,6 +163,129 @@ function pendingGateDecisions(projectRoot) {
   return critical.concat(rest);
 }
 
+/**
+ * Compose a precomputed OPTION's description from its pros/cons/description, with a
+ * "Recommended — " prefix on the recommended option. All fields pass through
+ * stripCtl (they are subagent-authored, so treated as untrusted for rendering).
+ */
+function precomputedOptionDescription(option) {
+  const parts = [];
+  if (isNonEmptyStr(option.description)) parts.push(stripCtl(option.description));
+  if (isNonEmptyStr(option.pros)) parts.push(`Pros: ${stripCtl(option.pros)}`);
+  if (isNonEmptyStr(option.cons)) parts.push(`Cons: ${stripCtl(option.cons)}`);
+  let body = parts.join('  ·  ');
+  if (option.recommended === true) body = body ? `Recommended — ${body}` : 'Recommended';
+  return body || 'Select this option.';
+}
+
+function isNonEmptyStr(v) {
+  return typeof v === 'string' && v.length > 0;
+}
+
+/**
+ * The set of question ids ALREADY answered for `ref`, read from the append-only
+ * answers log (`.ctoc/streaming/answers.jsonl`). Last write wins. Fail-soft: an
+ * absent/unreadable/corrupt log yields an empty set, and a malformed JSONL line is
+ * skipped rather than fatal.
+ * @param {string} root
+ * @param {string} ref
+ * @returns {Set<string>}
+ */
+function answeredQuestionIds(root, ref) {
+  const ids = new Set();
+  try {
+    const file = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
+    if (!safeFs.existsSync(file)) return ids;
+    const raw = safeFs.readFileSync(file, 'utf8');
+    for (const line of raw.split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      let obj;
+      try { obj = JSON.parse(t); } catch { continue; }
+      if (obj && obj.ref === ref && typeof obj.questionId === 'string') {
+        ids.add(obj.questionId);
+      }
+    }
+  } catch { /* fail-soft: no answers */ }
+  return ids;
+}
+
+/**
+ * Build the RICH single-question screen for decision `d` from its PRECOMPUTED
+ * questions, or return null to fall back to the simple Approve screen. Null is
+ * returned when there are no fresh precomputed questions OR when every precomputed
+ * question has already been answered (in which case the fallback screen offers the
+ * FINAL gate crossing — `stream approve <ref>` — which stays the human's explicit
+ * answer).
+ *
+ * @param {object} d one pendingGateDecisions descriptor
+ * @param {number} index its position in the ordered list (for the counter text)
+ * @param {number} total the total decision count
+ * @param {string|undefined} statusLine optional status prepended to the text
+ * @param {string} root project root
+ * @returns {object|null} a { text, ask, actions } screen, or null to fall back
+ */
+function richQuestionScreen(d, index, total, statusLine, root) {
+  // Lazy require avoids a load-time circular dependency (streaming-precompute
+  // requires this module at call time for plansNeedingQuestions).
+  const precompute = require('./streaming-precompute');
+  const questions = precompute.loadPlanQuestions(root, d.ref);
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+
+  const answered = answeredQuestionIds(root, d.ref);
+  const nextIdx = questions.findIndex((q) => !answered.has(q.id));
+  if (nextIdx === -1) return null; // all answered → simple Approve (final gate crossing)
+
+  const q = questions[nextIdx];
+
+  // Recommended option first (menu convention), stable otherwise.
+  const ordered = [
+    ...q.options.filter((o) => o.recommended === true),
+    ...q.options.filter((o) => o.recommended !== true),
+  ];
+
+  const optionEntries = ordered.map((o) => ({
+    key: o.key,
+    label: stripCtl(o.label),
+    description: precomputedOptionDescription(o),
+  }));
+
+  // Question options + Skip; add Open the plan only if it fits the harness's
+  // 4-explicit-option cap (comment rides the built-in "Other" free-text path).
+  const options = optionEntries.map((e) => ({ label: e.label, description: e.description }));
+  options.push({ label: 'Skip for now', description: 'Move to the next pending decision (nothing is changed).' });
+  if (options.length < 4) {
+    options.push({ label: 'Open the plan', description: 'View the plan before deciding.' });
+  }
+
+  const actions = {};
+  for (const e of optionEntries) {
+    actions[e.label] = `stream answer ${d.ref} ${q.id} ${e.key}`;
+  }
+  actions['Skip for now'] = `stream skip ${d.ref}`;
+  actions['Open the plan'] = `plan ${d.ref}`;
+  actions['Other'] = `stream comment ${d.ref}`;
+
+  let text = '';
+  if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
+  text += `Topic: ${d.slug}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  `
+    + `decision ${index + 1} of ${total}  ·  question ${nextIdx + 1} of ${questions.length}\n`;
+  text += `${'─'.repeat(40)}\n\n`;
+  text += `  ${stripCtl(q.prompt)}\n\n\n`;
+
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: stripCtl(q.prompt),
+        header: d.gateName,
+        options,
+      }],
+    },
+    actions,
+  };
+}
+
 /** Build the option list; the RECOMMENDED option is placed FIRST (menu convention). */
 function buildOptions(d) {
   const approve = {
@@ -218,12 +341,25 @@ function nothingPendingScreen(statusLine) {
  * out of range (nothing left), returns the nothing-pending screen (carrying any
  * status line). `statusLine` reports what the previous action just did.
  */
-function gateScreenAt(decisions, index, statusLine) {
+function gateScreenAt(decisions, index, statusLine, root) {
   if (!Array.isArray(decisions) || index < 0 || index >= decisions.length) {
     return nothingPendingScreen(statusLine);
   }
   const d = decisions[index];
   const total = decisions.length;
+
+  // PRE-COMPUTE: if this plan has fresh, not-yet-fully-answered precomputed
+  // questions, ask the first unanswered one INSTANTLY. Otherwise (no precompute,
+  // or all answered) fall through to the simple Approve question below — which,
+  // once every precomputed question is answered, is the FINAL gate crossing. The
+  // read is fail-soft: any hiccup returns null and we ask the simple question.
+  if (isNonEmptyStr(root)) {
+    let rich = null;
+    try {
+      rich = richQuestionScreen(d, index, total, statusLine, root);
+    } catch { rich = null; }
+    if (rich) return rich;
+  }
 
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
@@ -260,7 +396,7 @@ function gateScreenAt(decisions, index, statusLine) {
  */
 function streamingGateScreen(projectRoot, statusLine) {
   const decisions = pendingGateDecisions(projectRoot);
-  return gateScreenAt(decisions, 0, statusLine);
+  return gateScreenAt(decisions, 0, statusLine, projectRoot);
 }
 
 /**
@@ -272,7 +408,7 @@ function advanceAfter(ref, projectRoot, statusLine) {
   const decisions = pendingGateDecisions(projectRoot);
   const idx = decisions.findIndex(d => d.ref === ref);
   const nextIndex = idx >= 0 ? idx + 1 : 0;
-  return gateScreenAt(decisions, nextIndex, statusLine);
+  return gateScreenAt(decisions, nextIndex, statusLine, projectRoot);
 }
 
 /**
@@ -287,7 +423,7 @@ function advanceAfter(ref, projectRoot, statusLine) {
  */
 function advanceExcludingSlug(slug, projectRoot, statusLine) {
   const decisions = pendingGateDecisions(projectRoot).filter(d => d.slug !== slug);
-  return gateScreenAt(decisions, 0, statusLine);
+  return gateScreenAt(decisions, 0, statusLine, projectRoot);
 }
 
 /**
@@ -358,10 +494,56 @@ function streamComment(ref, text, projectRoot) {
   return advanceAfter(ref, projectRoot, status);
 }
 
+/**
+ * `stream answer <ref> <questionId> <optionKey>` — the human answered ONE
+ * precomputed decision question. Records the answer to the append-only log
+ * (`.ctoc/streaming/answers.jsonl`) — the LEAST-invasive record: it NEVER edits
+ * the plan body and NEVER crosses a gate (the gate crossing stays on the explicit
+ * `stream approve`, offered only once every precomputed question is answered).
+ * Then re-renders the streaming screen, which advances to this plan's NEXT
+ * unanswered question (or the final Approve). Fail-soft: a malformed ref is ignored
+ * and a write failure is surfaced, never thrown.
+ *
+ * @param {string} ref plan reference ("stage/file.md")
+ * @param {string} questionId the answered question's id
+ * @param {string} optionKey the chosen option's key
+ * @param {string} projectRoot
+ */
+function streamAnswer(ref, questionId, optionKey, projectRoot) {
+  const parsed = parseRef(ref);
+  if (!parsed) {
+    return streamingGateScreen(projectRoot, `Ignored an answer for an invalid plan reference: ${stripCtl(String(ref))}`);
+  }
+  const qid = stripCtl(String(questionId == null ? '' : questionId)).trim();
+  const key = stripCtl(String(optionKey == null ? '' : optionKey)).trim();
+  if (!qid || !key) {
+    return streamingGateScreen(projectRoot, `Ignored an incomplete answer for ${parsed.file}.`);
+  }
+  let status;
+  try {
+    const dir = path.join(projectRoot, '.ctoc', 'streaming');
+    if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      ref,
+      questionId: qid,
+      optionKey: key,
+    }) + '\n';
+    safeFs.appendFileSync(path.join(dir, 'answers.jsonl'), line, 'utf8');
+    status = `Recorded your answer for ${parsed.file}.`;
+  } catch (err) {
+    status = `Could not record the answer for ${parsed.file}: ${stripCtl((err && err.message) || String(err))}`;
+  }
+  // Stay on the SAME plan (answering never moves it): re-render → next unanswered
+  // question, or the final Approve when all are answered.
+  return streamingGateScreen(projectRoot, status);
+}
+
 module.exports = {
   pendingGateDecisions,
   streamingGateScreen,
   streamApprove,
   streamSkip,
   streamComment,
+  streamAnswer,
 };

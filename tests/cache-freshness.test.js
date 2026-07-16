@@ -571,6 +571,12 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // Streaming gate screen: its only direct fs write is appending .ctoc/streaming/comments.jsonl;
     // the actual gate crossing (plan move) goes through actions.approvePlan, which itself invalidates.
     ['streaming-gate.js', 'appends .ctoc/streaming/comments.jsonl only; the gate move goes through actions.approvePlan (which invalidates), never a direct counted-file write here'],
+    // Streaming precompute: writePlanQuestions writes .ctoc/streaming/questions/<ref>.json
+    // question-cache files (atomic temp+rename); streamAnswer appends
+    // .ctoc/streaming/answers.jsonl. Neither is a counted plan/vision/inbox *.md — the
+    // question cache never changes a plan-stage/vision/inbox count, so there is nothing
+    // to invalidate.
+    ['streaming-precompute.js', 'writes .ctoc/streaming/questions/<ref>.json question-cache files (atomic temp+rename) via writePlanQuestions; never a counted plan/vision/inbox file'],
   ]);
 
   // The known count-mutating writers already wired (CF1 + its kickback). These

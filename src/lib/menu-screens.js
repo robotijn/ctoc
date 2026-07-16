@@ -2280,6 +2280,10 @@ function route(args, projectPath, opts = {}) {
       if (sub === 'approve') return streamingGate.streamApprove(ref, projectPath);
       if (sub === 'skip') return streamingGate.streamSkip(ref, projectPath);
       if (sub === 'comment') return streamingGate.streamComment(ref, args.slice(3).join(' '), projectPath);
+      // `stream answer <ref> <questionId> <optionKey>` — record a precomputed-
+      // question answer (out-of-band log; never edits the plan, never crosses a
+      // gate) and advance to the next question / final Approve.
+      if (sub === 'answer') return streamingGate.streamAnswer(ref, args[3], args[4], projectPath);
       return streamingGate.streamingGateScreen(projectPath);
     }
 
