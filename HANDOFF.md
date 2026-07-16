@@ -45,7 +45,42 @@
   precedence + no-profile-weakens-a-gate; vector math; continuation/stop machinery) — a real
   convergence signal on those axes; defects were in adjacent legs. Next: continue fleets
   (re-attack wave 11 + compliance/legal, human-facing menu/dashboard, test-quality meta lenses)
-  toward the 3-clean-rounds convergence. STILL OPEN (Tijn's, not mine): the
+  toward the 3-clean-rounds convergence.
+  v6.12.69 (1bc4be5) wave 12 — 9 code defects + 6 false-green test tightenings, incl. 3 HIGH:
+  secrets-scanner treated /* as a comment-open in EVERY language (INCOMPLETE fix — dropped
+  secrets after a shell/YAML glob) -> language-gated to C-family; verify/ledger deny was
+  case-sensitive while the .ctoc whitelist matched a case-variant (macOS/Windows Gate-3 evidence
+  + ledger forgery) -> lowercased segment-precise + traversal-robust; task-reconcile permanent
+  DEADLOCK (SELF-REGRESSION of wave 11 — persistent quarantine never released on the default
+  no-live-list path) -> bounded release (confirmed-dead OR presumed-dead 2x floor). + MED:
+  readPlans crashed the whole dashboard on one bad plan file -> fail-soft per file; cd "" bash
+  no-op reset the ledger prefix to root -> keep prefix; legal-hold case-sensitive active-status
+  -> i flag; four-eyes truthiness let identity:0 bypass SoD -> != null; regulatory-regime
+  silently ran zero controls for an unloadable profile -> surfaces it. + LOW: audit-chain wiped
+  an all-malformed log -> preserves .corrupt-N. TEST-QUALITY META-AUDIT: the campaign's ~40 new
+  test files are genuinely rigorous (ZERO HIGH/MED false-greens on any security/gate/data test)
+  — a real convergence signal; the 6 LOW false-greens found were tightened. The re-attack lens
+  has now caught a regression in the session's own fixes for 5 STRAIGHT ROUNDS (incl. the wave-11
+  deadlock) — a churn signal that each fix-round still introduces ~1-2 self-regressions.
+  SESSION TOTAL (waves 9-12): 36 code defects + 6 test tightenings, 4 pushed waves (v6.12.66-69).
+  CAMPAIGN: ~101 defects, 13 waves.
+
+  == OPEN ITEMS AWAITING TIJN'S DECISION (forks — his, not mine) ==
+  1. Ledger-backfill forgery (option C, Tijn-decided earlier): its own Iron Loop plan spanning
+     approval-ledger + human-gate-check + a human-confirmation path, through Tijn's Gate 2.
+  2. Menu-routing UX dead-ends (human-facing, his menu design): (a) Agent area advertises "g start
+     / s stop" but the keys are dead (handleKey returns false); (b) System area lists "1 Doctor /
+     2 Update / 3 Settings" but the digits switch AREAS instead, so Doctor/Update are unreachable;
+     (c) Settings sub-mode: numbered settings aren't number-selectable and Enter on select/number
+     settings no-ops. Fix requires deciding intended key-routing — surfaced, not freelanced.
+  3. Compliance-gate WIRING (his build schedule): legal-hold (assertNotHeld) is not called on any
+     destructive path, and four-eyes (verifyFourEyes) is not called at Gate 3 — the logic is now
+     hardened but UNWIRED. Wiring a compliance gate into the pipeline is a feature to schedule.
+  4. gdpr-helpers PII_FIELD_TO_ARTICLES omits ssn/passport/dob/creditcard/etc. -> advisory
+     under-detection; may be intentional scoping (corpus owner's call).
+
+  == earlier waves (unchanged history) below ==
+  STILL OPEN (Tijn's, not mine): the
   ledger-backfill forgery (option C, Tijn-decided) — its own Iron Loop plan spanning
   approval-ledger + human-gate-check + a human-confirmation path, through Tijn's Gate 2.
   --- earlier waves (unchanged history) below ---
