@@ -121,8 +121,25 @@ Resolve the user's reply to an action string `A`, then classify:
 When a background task fires its task-notification:
 
 1. `menu task complete <id> --summary "…" [--gate N] [--next <navroute>]` (the store rejects a `claude:` `--next`), or `menu task fail <id> --summary "…"` on failure — a failure is surfaced in the inbox, never silently lost.
-2. Emit **ONE** compact, pull-based inbox notice. **Do not** change or hijack the user's current screen — completions pull, they never push.
+2. Emit **ONE** compact, pull-based inbox notice — a **high-level, human-phrased status line** (see "Foreground status plane" below). **Do not** change or hijack the user's current screen — completions pull, they never push.
 3. **Promote.** For each task in the response's `promote[]` (the scheduler's `nextRunnable` set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
+
+**Foreground status plane — high-level, human-phrased (Tijn, non-negotiable).** The work
+runs in the background; the FOREGROUND is the status plane. At each milestone show the human
+ONE short, high-level status line — never tool-call noise, never a spinner, never silence.
+Phrase it in the human's OWN terms, naming the real feature or plan by its actual subject
+(never an internal code, slug, or section tag). The shapes:
+- **Started:** "Starting implementation of <feature>." / "Reviewing <feature>."
+- **Milestone passed:** "<feature>: tests green." / "Committed, bumped patch v<X.Y.Z>."
+- **Ready for inspection (gate-ready):** "<feature> ready for your inspection — <nav route>."
+- **Decision surfaced (a real fork):** end the line with the decision, e.g. "Committed and
+  bumped patch v<X.Y.Z>. Push?" — the human answers "push"/"yes" to proceed.
+
+One line per milestone; a report is NOT a stop (Operating Lesson 15) — keep driving the
+authorized work and report as you pass each boundary. Only a genuine fork stops the subtree.
+**Push is outward-facing:** commit and the patch bump happen on their own at natural points,
+but the push is SURFACED as a decision ("… Push?"), never auto-pushed. The human reads
+progress, not process.
 
 **`menu task complete` on an `implement` task IS the plan completion.** It calls
 `completeTaskPlan` → `completeExecution` (`src/lib/actions.js`): the plan is validated,
