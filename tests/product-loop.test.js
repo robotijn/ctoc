@@ -53,13 +53,23 @@ describe('Product Loop — canonical KPI library', () => {
     try {
       const { getApplicableKPIs } = loadModule();
       const saasKpis = getApplicableKPIs({ projectType: 'saas-b2c' });
+      const mobileKpis = getApplicableKPIs({ projectType: 'mobile-app' });
       assert.ok(saasKpis.length > 0, 'should return saas-b2c KPIs');
-      // All returned KPIs should have applicable_to including saas-b2c (or empty/missing)
+      // All returned KPIs must have applicable_to including saas-b2c (or empty/missing).
       for (const k of saasKpis) {
         if (k.applicable_to && k.applicable_to.length > 0) {
           assert.ok(k.applicable_to.includes('saas-b2c'), `${k.id} should be applicable to saas-b2c`);
         }
       }
+      // The filter must actually DISCRIMINATE — not return everything regardless of
+      // type. This is the assertion that the first-line-only parser defect broke:
+      // with applicable_to always [], every project type returned the full set.
+      const saasIds = saasKpis.map(k => k.id).sort();
+      const mobileIds = mobileKpis.map(k => k.id).sort();
+      assert.notDeepEqual(saasIds, mobileIds, 'different project types must yield different KPI sets');
+      // mrr is saas-only in the shipped library → present for saas-b2c, absent for mobile-app.
+      assert.ok(saasIds.includes('mrr'), 'mrr applies to saas-b2c');
+      assert.ok(!mobileIds.includes('mrr'), 'mrr must NOT apply to mobile-app');
     } finally {
       process.chdir(originalCwd);
     }
