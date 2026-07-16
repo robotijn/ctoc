@@ -117,18 +117,48 @@ describe('W05-s2 validateReviewToDone: the review->done gate can now REJECT', ()
     }
   });
 
-  // M1a — missing human-approval marker -> valid:false.
-  it('M1a: rejects a plan missing the "approved_by: human" marker', () => {
-    const slug = 'm1a-missing-marker';
+  // M1a — the body `approved_by: human` marker is NOT a Gate-3 signal. A
+  // marker-free plan that is otherwise complete (all boxes ticked + fresh
+  // passing VERIFY evidence) must PASS: the marker rides in from an EARLIER
+  // gate (implementation->todo stamps it) and carries no Gate-3 meaning, so it
+  // must never gate this transition. This is the RED-first assertion — it fails
+  // against the pre-fix code, which false-blocks on the missing body marker.
+  it('M1a: a marker-free but otherwise complete plan is NOT blocked (the body marker is not a Gate-3 signal)', () => {
+    const slug = 'm1a-no-marker-complete';
     const planPath = writePlan(fxDir, slug, { marker: false });
     writeArtifact(tempRoot, slug, { passed: true });
 
     const result = validateReviewToDone(planPath, tempRoot);
 
-    assert.strictEqual(result.valid, false, 'missing marker must block review->done');
+    assert.strictEqual(
+      result.valid,
+      true,
+      `a complete plan must pass regardless of the body marker, errors: ${JSON.stringify(result.errors)}`
+    );
+    assert.strictEqual(result.errors.length, 0, 'no blocking errors for a complete marker-free plan');
     assert.ok(
-      result.errors.some((e) => /approv/i.test(e) && /marker|human/i.test(e)),
-      `expected a marker error, got: ${JSON.stringify(result.errors)}`
+      !result.errors.some((e) => /approved_by|marker/i.test(e)),
+      `no error may mention the body approval marker, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
+  // M1a2 — a marker-free plan that is genuinely incomplete (no VERIFY evidence)
+  // still blocks, but on the REAL quality leg (evidence), never on the marker.
+  it('M1a2: a marker-free plan missing VERIFY evidence blocks on the evidence leg, not the marker', () => {
+    const slug = 'm1a2-no-marker-no-evidence';
+    const planPath = writePlan(fxDir, slug, { marker: false });
+    // Intentionally write NO artifact.
+
+    const result = validateReviewToDone(planPath, tempRoot);
+
+    assert.strictEqual(result.valid, false, 'missing VERIFY evidence must block');
+    assert.ok(
+      result.errors.some((e) => /VERIFY evidence/i.test(e)),
+      `expected a missing-evidence error, got: ${JSON.stringify(result.errors)}`
+    );
+    assert.ok(
+      !result.errors.some((e) => /approved_by|marker/i.test(e)),
+      `the block reason must be the evidence leg, not the marker, got: ${JSON.stringify(result.errors)}`
     );
   });
 
@@ -231,19 +261,23 @@ describe('W05-s2 approveSubplans inherits the fix (integration, no approveSubpla
   });
 
   // M3 — approveSubplans moves the compliant sibling to done and SKIPS the bad
-  // one (missing marker), reporting it with a reason.
+  // one, reporting it with a reason. The bad sibling fails on a REAL quality leg
+  // (no recorded VERIFY evidence) — NOT on a body marker, which is no longer a
+  // Gate-3 signal.
   it('M3: approves the compliant sibling and skips the bad one with a reason', () => {
     const goodSlug = 'fixparent-s1-good';
     const badSlug = 'fixparent-s2-bad';
 
-    // Both are review-stage siblings of parent "fixparent".
-    writePlan(reviewDir, goodSlug, { marker: true, parent: 'fixparent' });
+    // Both are review-stage siblings of parent "fixparent". Neither carries a
+    // body marker — proving the batch decision rides on real quality legs, not
+    // on the leftover `approved_by: human` line.
+    writePlan(reviewDir, goodSlug, { marker: false, parent: 'fixparent' });
     writePlan(reviewDir, badSlug, { marker: false, parent: 'fixparent' });
 
-    // Fresh passing evidence for BOTH — so the only thing that fails the bad
-    // sibling is its missing human-approval marker.
+    // Fresh passing evidence for the GOOD sibling only. The bad sibling has NO
+    // recorded VERIFY evidence, which is the sole reason it fails.
     writeArtifact(tempRoot, goodSlug, { passed: true });
-    writeArtifact(tempRoot, badSlug, { passed: true });
+    // Intentionally write NO artifact for badSlug.
 
     const { approved, skipped } = approveSubplans('fixparent', 'review', tempRoot);
 
@@ -253,7 +287,7 @@ describe('W05-s2 approveSubplans inherits the fix (integration, no approveSubpla
     const badSkip = skipped.find((s) => s.slug === badSlug);
     assert.ok(badSkip, `expected the bad sibling in skipped[], got skipped=${JSON.stringify(skipped)}`);
     assert.ok(typeof badSkip.reason === 'string' && badSkip.reason.length > 0, 'skip must carry a non-empty reason');
-    assert.ok(/approv|marker|human/i.test(badSkip.reason), `skip reason should name the missing approval, got: ${badSkip.reason}`);
+    assert.ok(/VERIFY evidence/i.test(badSkip.reason), `skip reason should name the missing VERIFY evidence, got: ${badSkip.reason}`);
 
     // Behavior on disk: good moved to done, bad stayed in review.
     assert.ok(fs.existsSync(path.join(tempRoot, 'plans', 'done', `${goodSlug}.md`)), 'good sibling should be in plans/done');

@@ -311,6 +311,30 @@ describe('coverage-map.js — non-obvious branches', () => {
     // Assert: just under the cap is fresh. A `>=` mutation would wrongly flag it stale.
     assert.deepEqual(r, { needed: false });
   });
+
+  // --- needsRebuild: an UNPARSEABLE rebuiltAt yields NaN age and must force rebuild ---
+
+  test('needsRebuild — a truthy but UNPARSEABLE rebuiltAt is treated as stale (NaN age forces rebuild)', () => {
+    // Arrange: a populated map whose rebuiltAt is a non-empty, non-date string.
+    // `Date.now() - new Date("not-a-date").getTime()` is NaN; `NaN > maxAge` is
+    // false, so a naive `age > maxAge` check falls through to needed:false and
+    // certifies a corrupt/unverifiable timestamp as fresh. It must NOT.
+    const m = cm.createEmptyCoverageMap();
+    m.files[path.normalize('a.js')] = { tests: ['t.test.js'] };
+    cm.saveCoverageMap(m);
+    const file = cm.getCoverageMapFilePath();
+    const onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
+    onDisk._meta.rebuiltAt = 'not-a-date';
+    fs.writeFileSync(file, JSON.stringify(onDisk), 'utf8');
+
+    // Act
+    const r = cm.needsRebuild();
+
+    // Assert: an unparseable timestamp is unverifiable, so a rebuild is forced with a
+    // reason that names the bad timestamp — never a silent needed:false.
+    assert.equal(r.needed, true);
+    assert.match(r.reason, /unparseable|unverifiable/i);
+  });
 });
 
 // ---------------------------------------------------------------------------

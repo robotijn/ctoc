@@ -217,6 +217,32 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
     assertAllowed('ls .ctoc/approvals', 'listing the ledger is not forgery');
     assertAllowed('grep -rn stage_to .ctoc/approvals', 'grepping the ledger is not forgery');
   });
+
+  // Re-attack: the literal-path deny above is bypassed by splitting `.ctoc/` and
+  // `approvals` across a `cd`, since cp/mv are not write-patterns and the adjacency
+  // regex no longer matches. These MUST be denied identically to their literal form.
+  test('cd-boundary ledger writes (path split across a cd) are DENIED', () => {
+    const bypasses = [
+      `cd .ctoc && cp /tmp/forged.json approvals/x.json`,
+      `cd .ctoc && mv /tmp/forged.json approvals/x.json`,
+      `cd .ctoc/approvals && cp /tmp/forged.json x.json`,
+      `cd .ctoc/approvals && mv /tmp/forged.json x.json`,
+      `cd .ctoc && echo '{}' > approvals/x.json`,
+      `cd .ctoc && echo '{}' | tee approvals/x.json`,
+      `cd .ctoc && touch approvals/x.json`,
+      `cd '.ctoc' && cp /tmp/forged.json approvals/x.json`,   // quoted cd target
+      `pushd .ctoc && cp /tmp/forged.json approvals/x.json`,  // pushd, not cd
+    ];
+    for (const w of bypasses) assertDenied(w, 'cd-boundary ledger write');
+  });
+
+  test('cd-boundary READS and unrelated cd writes stay ALLOWED (no false positives)', () => {
+    fs.writeFileSync(path.join(project, '.ctoc', 'approvals', 'x.json'), '{}');
+    assertAllowed('cd .ctoc && cat approvals/x.json', 'reading via cd is not forgery');
+    assertAllowed('cd .ctoc/approvals && ls', 'listing via cd is not forgery');
+    assertAllowed('cd src && cp a.js b.js', 'unrelated cd + copy is not a ledger write');
+    assertAllowed('cd .ctoc && cp a.json approvals-summary/x.json', 'approvals-summary is not the ledger dir');
+  });
 });
 
 // =============================================================================

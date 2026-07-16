@@ -78,8 +78,12 @@ function detectLanguagesLegacy(projectPath) {
         : null;
 
       if (pattern) {
-        // Glob pattern
-        const files = safeFs.readdirSync(projectPath);
+        // Glob pattern. A missing (ENOENT) or unreadable (EACCES) projectPath must NOT
+        // escape here — every sibling readdir in the codebase is guarded (see
+        // hasTypeScriptEvidence below and init-project.js). Treat an unreadable dir as
+        // "no files" so detection falls through to the intended empty/needsUserInput result.
+        let files;
+        try { files = safeFs.readdirSync(projectPath); } catch { files = []; }
         if (files.some(f => pattern.test(f))) {
           detected.push(lang);
           break;

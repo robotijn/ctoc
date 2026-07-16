@@ -61,6 +61,7 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const { loadState, STEP_NAMES } = require('../lib/state-manager');
 const { writeToTerminal, colors } = require('../lib/ui');
 const { emitDeny } = require('../lib/hook-deny-signal');
@@ -131,6 +132,85 @@ function normalizeForMatch(command) {
 
 /** The ledger directory, as it appears inside a command string (post-normalize). */
 const LEDGER_PATH_RE = /\.ctoc\/+approvals/i;
+
+/**
+ * The ledger directory as a RESOLVED path fragment: `.ctoc/approvals` at a path
+ * boundary. Tested against a cd-resolved token so `.ctoc/approvals-summary/x` does
+ * NOT match while `.ctoc/approvals` and `.ctoc/approvals/x.json` do.
+ */
+const LEDGER_RESOLVED_RE = /(^|\/)\.ctoc\/+approvals(\/|$)/i;
+
+/**
+ * Resolve one command token to a POSIX path against the accumulated cwd built up
+ * from prior `cd`/`pushd` segments, stripping quotes, wrapping parens, and any
+ * leading redirect operators. Matching-only — never used for execution.
+ * @param {string} prefix - accumulated cwd ('' = repo root)
+ * @param {string} token
+ * @returns {string}
+ */
+function resolveTokenPath(prefix, token) {
+  const t = String(token).replace(/['"`()]/g, '').replace(/^[<>]+/, '');
+  if (!t) return '';
+  if (t.startsWith('/')) return path.posix.normalize(t);
+  return path.posix.normalize((prefix ? prefix + '/' : '') + t);
+}
+
+/**
+ * Does a command make a NON-READ touch of the ledger directory — in ANY form:
+ * literal-adjacent (`cp x .ctoc/approvals/y`), quote-split (`.ctoc"/"approvals`),
+ * inline-code (`python3 -c "open('.ctoc/approvals/x','w')"`), OR split across a
+ * `cd` (`cd .ctoc && cp forged.json approvals/x.json`)? This is the single ledger-
+ * write gate — it SUBSUMES the old adjacency-only check, which both missed the
+ * cd-split bypass (cp/mv are not write-patterns and `.ctoc/`+`approvals` were not
+ * adjacent) AND false-denied a read reached through a `cd` (its read exemption
+ * only inspected the command's FIRST verb, so `cd .ctoc/approvals && cat x` — a
+ * read — was blocked because the first verb was `cd`).
+ *
+ * Evaluated PER shell segment, tracking the cwd across `cd`/`pushd`:
+ *  • a `cd`/`pushd` segment only updates the cwd — it is never itself a write, so
+ *    `cd .ctoc/approvals && ls` is allowed (the `ls` segment has no ledger operand);
+ *  • a non-cd segment TOUCHES the ledger when its normalized text contains the
+ *    adjacent `.ctoc/approvals`, OR one of its operands resolves under the ledger
+ *    once the accumulated cd prefix is applied;
+ *  • a touching segment is denied only when it is NOT a pure read — so
+ *    `cat`/`ls`/`grep` of the ledger, with or without a preceding `cd`, stay
+ *    allowed, while `cp`/`mv`/`tee`/redirect/`touch`/an interpreter are denied.
+ *
+ * Conservative-but-narrow: once the cwd is fully inside `.ctoc/approvals`, every
+ * operand resolves under the ledger, so any non-read command there is denied —
+ * standing inside the human-approval store to run a non-read command IS the
+ * forgery shape (`cd .ctoc/approvals && git status` is denied; fail-closed, not a
+ * menu recipe — accepted by design).
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isLedgerWrite(command) {
+  const segments = String(command).split(/[\n;]|&&|\|\||\|/);
+  let prefix = '';
+  for (const rawSeg of segments) {
+    const seg = rawSeg.replace(/^[\s({]+/, '').trim();
+    if (!seg) continue;
+    const cd = seg.match(/^(?:cd|pushd)\s+([^\s;&|)]+)/i);
+    if (cd) {
+      const dir = cd[1].replace(/['"`()]/g, '');
+      if (!dir || dir === '-' || dir.startsWith('~')) prefix = '';
+      else if (dir.startsWith('/')) prefix = path.posix.normalize(dir);
+      else prefix = path.posix.normalize((prefix ? prefix + '/' : '') + dir);
+      continue;
+    }
+    // (a) adjacent path anywhere in the normalized segment (literal / quote-split
+    //     / inline-code); OR (b) an operand resolving under the ledger via the cd
+    //     prefix. Redirect operators become separators so `echo x>approvals/y` splits.
+    let touches = LEDGER_PATH_RE.test(normalizeForMatch(seg));
+    if (!touches) {
+      const tokens = seg.replace(/[<>]+/g, ' ').split(/\s+/).filter(Boolean);
+      const operands = tokens.slice(1).filter((t) => !t.startsWith('-'));
+      touches = operands.some((t) => LEDGER_RESOLVED_RE.test(resolveTokenPath(prefix, t)));
+    }
+    if (touches && !isReadOnlyLedgerCommand(seg)) return true;
+  }
+  return false;
+}
 
 /**
  * Tokens that make an INLINE-EVAL command a ledger/gate write. The module name and
@@ -211,11 +291,13 @@ function isLedgerForgery(command) {
   if (!command) return { deny: false, reason: null };
   const norm = normalizeForMatch(command);
 
-  // 1. Anything that TOUCHES the ledger directory and is not a pure read.
-  if (LEDGER_PATH_RE.test(norm) && !isReadOnlyLedgerCommand(command)) {
+  // 1. A NON-READ touch of the ledger directory in ANY form — literal-adjacent,
+  //    quote-split, inline-code, or split across a `cd`. Per-segment + cd-aware, so
+  //    reads (incl. `cd .ctoc/approvals && cat x`) stay allowed.
+  if (isLedgerWrite(command)) {
     return {
       deny: true,
-      reason: `writes to the approval ledger (.ctoc/approvals/) are DENIED on the Bash channel — the ledger is human-approval provenance. Cross the gate through /ctoc:menu; the ONLY sanctioned ledger writer is \`node ${SANCTIONED_WRITER}\` (argv-driven, reviewable).`,
+      reason: `writes to the approval ledger (.ctoc/approvals/) are DENIED on the Bash channel — the ledger is human-approval provenance, and splitting the path across a \`cd\` does not change that. Cross the gate through /ctoc:menu; the ONLY sanctioned ledger writer is \`node ${SANCTIONED_WRITER}\` (argv-driven, reviewable).`,
     };
   }
 

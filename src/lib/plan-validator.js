@@ -541,17 +541,27 @@ function validateFunctionalToImpl(planPath, projectPath) {
  * the three named defect conditions, while a genuinely finished plan still passes.
  *
  * A plan is REJECTED (`valid:false`, with a specific `errors[]` entry) when ANY of:
- *   1. No `approved_by: human` marker is present.
- *   2. A required Iron Loop step is absent, OR a required step is present but has
+ *   1. A required Iron Loop step is absent, OR a required step is present but has
  *      an unchecked checkbox (notably Step 14 VERIFY) — a ticked-but-unfinished
  *      plan cannot ship.
- *   3. The persisted VERIFY evidence for this plan is absent, records a failing
+ *   2. The persisted VERIFY evidence for this plan is absent, records a failing
  *      run, or is stale (recorded before the plan's last content change). The
  *      failure message names the SPECIFIC VERIFY failure, not a generic "not
  *      approved."
  *
+ * This validator deliberately does NOT check for an `approved_by: human` body
+ * marker. That marker is stamped at Gate 2 (implementation → todo) and rides
+ * through to review/ via plain file moves, so matching it here would rubber-stamp
+ * every real pipeline plan through Gate 3 with no Gate-3 decision AND false-block
+ * a complete plan that lacks it. The genuine Gate-3 human decision is the act of
+ * invoking approvePlan, which writes the edge-specific ledger entry
+ * (stage_to === 'done'); done/-residency is enforced by human-gate-check.js
+ * reading that ledger, never a body marker. At pre-cross validation time the
+ * Gate-3 approval cannot yet exist, so this validator gates only on the quality
+ * legs it can verify.
+ *
  * The unresolved-feedback (TODO/FIXME) check stays a WARNING — it is not one of
- * the three named rejection conditions and promoting it would risk rejecting a
+ * the named rejection conditions and promoting it would risk rejecting a
  * compliant plan that legitimately mentions "TODO" in prose.
  *
  * Fails closed: an unreadable plan file, or corrupt/absent/stale evidence, all
@@ -583,17 +593,22 @@ function validateReviewToDone(planPath, projectPath) {
     result.checklist.readable = false;
     return result;
   }
-  const metadata = parseMetadata(content);
+  // NOTE: this validator deliberately does NOT check for an `approved_by: human`
+  // body marker. That marker is stamped at an EARLIER gate — stampAndLedger
+  // prepends it when a plan crosses Gate 2 (implementation → todo) — and it
+  // rides untouched through todo → in-progress → review via plain file moves.
+  // So by the time a plan reaches review/, it already carries a marker from a
+  // DIFFERENT gate. Matching that leftover would (a) rubber-stamp every real
+  // pipeline plan through Gate 3 with no Gate-3 decision, and (b) false-block a
+  // genuinely-complete plan that happens to lack it. The real Gate-3 human
+  // decision is recorded by approvePlan → stampAndLedger writing the
+  // edge-specific ledger entry (stage_to === 'done') AS the act of approval, and
+  // done/-residency is enforced by human-gate-check.js reading that ledger —
+  // never a body marker. At pre-cross validation time the Gate-3 approval cannot
+  // exist yet, so this validator gates only on the QUALITY legs it can verify:
+  // required-step completeness and fresh, passing VERIFY evidence.
 
-  // 1. Human-approval marker (was a warning; now a blocking error).
-  const hasApproval = /approved_by:\s*human/i.test(content) || metadata.approved_by === 'human';
-  result.checklist.humanReviewed = hasApproval;
-  if (!hasApproval) {
-    result.errors.push('review→done blocked: no "approved_by: human" marker found');
-    result.valid = false;
-  }
-
-  // 2. Required-step completeness. validateStepsComplete errors only when a
+  // 1. Required-step completeness. validateStepsComplete errors only when a
   //    required step is ABSENT; it records present-but-unchecked steps in its
   //    checklist. Promote each present-required-but-unchecked step to an error so
   //    an unchecked Step 14 VERIFY box blocks the transition.
@@ -615,7 +630,7 @@ function validateReviewToDone(planPath, projectPath) {
     }
   }
 
-  // 3. VERIFY evidence: must exist, record a passing run, and be fresh. A ticked
+  // 2. VERIFY evidence: must exist, record a passing run, and be fresh. A ticked
   //    Step 14 checkbox is self-reported; the artifact is produced by an actual
   //    runVerify execution and closes that trust gap (belt and suspenders — both
   //    the checkbox in (2) and the artifact here must hold).
@@ -653,7 +668,7 @@ function validateReviewToDone(planPath, projectPath) {
     }
   }
 
-  // 4. Unresolved-feedback stays a WARNING (not one of the three rejection
+  // 3. Unresolved-feedback stays a WARNING (not one of the rejection
   //    conditions) so a compliant plan mentioning "TODO" in prose is not blocked.
   const hasUnresolved = /unresolved/i.test(content) || /\bTODO\b/.test(content) || /\bFIXME\b/.test(content);
   result.checklist.noUnresolved = !hasUnresolved;

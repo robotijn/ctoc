@@ -25,7 +25,8 @@ const {
   runDeploymentPipeline,
   isLive,
   httpPostJson,
-  getDeploymentHistory
+  getDeploymentHistory,
+  scriptInterpreter
 } = require('../src/lib/deployment.js');
 
 const tmpDirs = [];
@@ -183,6 +184,41 @@ describe('Deployment execution — full pipeline (live script via config)', () =
     assert.equal(result.dryRun, false);
     assert.equal(fs.existsSync(path.join(dir, 'shipped.txt')), true, 'pipeline really ran the script');
     assert.ok(getDeploymentHistory(dir).length > 0, 'history recorded');
+  });
+});
+
+// ── DEFECT 2: script-strategy interpreter selection is platform-correct (win32-gated) ──
+// executeScript picks the interpreter by extension with shell:false. On Windows there is
+// no `sh` and the Python launcher is `py`, not `python3`. The interpreter selection is a
+// pure, platform-injectable helper so the win32 branches (un-runnable on darwin) are tested.
+describe('Deployment execution — script interpreter selection (platform-aware, shell:false)', () => {
+  it('a .py script resolves to python3 on POSIX and py on Windows', () => {
+    const posix = scriptInterpreter('/proj/deploy.py', 'linux');
+    assert.equal(posix.file, 'python3', 'POSIX Python interpreter is python3');
+    assert.deepEqual(posix.args, ['/proj/deploy.py']);
+
+    const win = scriptInterpreter('C:\\proj\\deploy.py', 'win32');
+    assert.equal(win.file, 'py', 'Windows Python launcher is `py`, not `python3`');
+    assert.deepEqual(win.args, ['C:\\proj\\deploy.py']);
+  });
+
+  it('a .sh script resolves to sh on POSIX', () => {
+    const posix = scriptInterpreter('/proj/deploy.sh', 'linux');
+    assert.equal(posix.file, 'sh');
+    assert.deepEqual(posix.args, ['/proj/deploy.sh']);
+  });
+
+  it('a POSIX shell script (.sh/.bash) on Windows throws a CLEAR unsupported error, not raw ENOENT', () => {
+    assert.throws(() => scriptInterpreter('C:\\proj\\deploy.sh', 'win32'),
+      /POSIX shell scripts are not supported on Windows/);
+    assert.throws(() => scriptInterpreter('C:\\proj\\deploy.bash', 'win32'),
+      /POSIX shell scripts are not supported on Windows/);
+  });
+
+  it('a .js script resolves to the current node executable on any platform', () => {
+    const r = scriptInterpreter('/proj/deploy.js', 'win32');
+    assert.equal(r.file, process.execPath);
+    assert.deepEqual(r.args, ['/proj/deploy.js']);
   });
 });
 

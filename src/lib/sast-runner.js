@@ -433,10 +433,18 @@ class SASTRunner {
     // silently means "checked nothing").
     let scannersRun = 0;
 
-    // Try Semgrep first (universal scanner)
+    // Try Semgrep first (universal scanner). FAIL-OPEN FIX: count semgrep toward
+    // scannersRun ONLY when its scan actually RAN and produced parseable output —
+    // exactly how runLanguageScanner is consumed below, mirroring sca-runner's SCA7
+    // osv handling. The old code did scannersRun++ on tool AVAILABILITY, BEFORE the
+    // scan, and ignored runSemgrep's outcome: a semgrep that is installed but whose
+    // invocation crashes (non-zero exit + no parseable stdout) then read as the SOLE
+    // scanner, so scannersRun>0 skipped the fail-closed guard and run() returned
+    // success:true / scanned:true / findings:[] — a crashed scanner reporting the
+    // project clean. runSemgrep now returns false on crash, so a sole-scanner crash
+    // falls through to the scannersRun===0 branch and surfaces the failure.
     if (this.isToolAvailable('semgrep')) {
-      scannersRun++;
-      await this.runSemgrep();
+      if (await this.runSemgrep()) scannersRun++;
     }
 
     // Run language-specific scanners
@@ -481,7 +489,15 @@ class SASTRunner {
   }
 
   /**
-   * Run Semgrep universal scanner
+   * Run Semgrep universal scanner.
+   *
+   * Returns whether the scan actually RAN SUCCESSFULLY (produced parseable output), so
+   * run() counts it toward scannersRun ONLY on a genuine execution — mirroring
+   * runLanguageScanner and sca-runner's runOsvScanner. A non-zero exit that still
+   * carries valid findings JSON (semgrep's normal "findings present" path) parses and
+   * returns true; a real crash (non-zero exit with no parseable stdout, or unparseable
+   * output) records the error and returns false, never reading as a clean pass.
+   * @returns {Promise<boolean>} true iff semgrep ran and its output parsed
    */
   async runSemgrep() {
     try {
@@ -504,16 +520,20 @@ class SASTRunner {
 
       const data = JSON.parse(result);
       this.parseSemgrepResults(data);
+      return true;
     } catch (error) {
       if (error.stdout) {
         try {
           const data = JSON.parse(error.stdout);
           this.parseSemgrepResults(data);
+          return true;
         } catch (e) {
           this.errors.push({ tool: 'semgrep', error: error.message });
+          return false;
         }
       } else {
         this.errors.push({ tool: 'semgrep', error: error.message });
+        return false;
       }
     }
   }
@@ -521,7 +541,7 @@ class SASTRunner {
   /**
    * Run language-specific scanner
    * @param {string} lang - Language to scan
-   * @returns {Promise<boolean>} true iff a scanner was available and ran
+   * @returns {Promise<boolean>} true iff a native scanner ran and reliably scanned
    */
   async runLanguageScanner(lang) {
     // Honest routing: only run a NATIVE scanner we can parse. A language with no
@@ -534,6 +554,15 @@ class SASTRunner {
       return false;
     }
 
+    // FAIL-OPEN FIX: the inner run methods (runBandit/runGosec/runESLintSecurity)
+    // record a crash by PUSHING to this.errors — they do not throw. The old code then
+    // returned true UNCONDITIONALLY, so a native scanner that crashed (a traceback /
+    // config error where findings JSON was expected) still counted toward scannersRun
+    // and, as the sole scanner, let run() report the project clean. Snapshot the error
+    // count and return true ONLY when this scanner's run added no error — so a crashed
+    // native scanner returns false and is not counted, mirroring runSemgrep and
+    // sca-runner's runOsvScanner (a crashed scanner never reads as a clean pass).
+    const errorsBefore = this.errors.length;
     try {
       switch (native) {
         case 'bandit':
@@ -553,7 +582,7 @@ class SASTRunner {
     } catch (error) {
       this.errors.push({ tool: native, language: lang, error: error.message });
     }
-    return true;
+    return this.errors.length === errorsBefore;
   }
 
   /**

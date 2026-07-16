@@ -116,6 +116,86 @@ test('CONTRAST — bandit non-zero exit WITH valid findings JSON parses as findi
   }
 });
 
+test('runSemgrep: a crash (no parseable stdout) returns false and records an error', async () => {
+  // R13: a scanner method must SIGNAL whether it actually ran+parsed, so run() can
+  // count only genuine executions. A crash (ENOENT: non-zero exit, no stdout) → false.
+  cp.execFileSync = () => { throw crashError(undefined); };
+  const SASTRunner = freshSAST();
+  try {
+    const r = new SASTRunner('/nonexistent-project');
+    const ok = await r.runSemgrep();
+    assert.equal(ok, false, 'a crashed semgrep must return false (it did not scan)');
+    assert.ok(r.errors.some(e => e.tool === 'semgrep' && e.error), 'the crash is recorded');
+    assert.equal(r.findings.length, 0, 'a crash produces no findings');
+  } finally {
+    restore();
+  }
+});
+
+test('runSemgrep: a clean run (valid empty JSON) returns true', async () => {
+  cp.execFileSync = () => JSON.stringify({ results: [] });
+  const SASTRunner = freshSAST();
+  try {
+    const r = new SASTRunner('/nonexistent-project');
+    const ok = await r.runSemgrep();
+    assert.equal(ok, true, 'a semgrep run that parsed must return true');
+    assert.equal(r.errors.length, 0, 'a clean run records no error');
+  } finally {
+    restore();
+  }
+});
+
+test('run(): sole scanner AVAILABLE but its scan CRASHES reports scanned:false / success:false', async () => {
+  // The fail-OPEN defect: run() counted semgrep on AVAILABILITY, before the scan, and
+  // ignored its result. A semgrep that is installed but whose invocation crashes (ENOENT
+  // / no parseable stdout) then read as scanned:true / findings:[] — a crashed scanner
+  // reporting the project clean. It must fall through to the fail-closed branch.
+  cp.execSync = (cmd) => {
+    if (typeof cmd === 'string' && cmd.startsWith('semgrep')) return ''; // semgrep "installed"
+    throw new Error('command not found'); // every other tool probe fails
+  };
+  cp.execFileSync = () => { throw crashError(undefined); }; // the semgrep invocation crashes
+  const SASTRunner = freshSAST();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r13-sast-'));
+  try {
+    fs.writeFileSync(path.join(tmp, 'go.mod'), 'module x\n'); // a detectable language
+    const r = new SASTRunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, false, 'a crashed sole scanner scanned nothing');
+    assert.equal(res.success, false, 'a crashed sole scanner is not a success');
+    assert.ok(/no security scanner/i.test(res.reason || ''), 'reason names the fail-closed cause');
+    assert.deepEqual(res.findings, [], 'no findings when nothing reliably scanned');
+    assert.ok(r.errors.some(e => e.tool === 'semgrep'), 'the semgrep crash is surfaced');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('run(): OVER-CORRECTION GUARD — a genuinely clean scan (scanner ran, zero findings) stays success:true', async () => {
+  // Guards against failing a real clean pass: semgrep is available, runs, and returns
+  // valid empty JSON. That is a genuine scan of a clean project → success:true / scanned:true.
+  cp.execSync = (cmd) => {
+    if (typeof cmd === 'string' && cmd.startsWith('semgrep')) return ''; // semgrep installed
+    throw new Error('command not found'); // native tools (gosec) unavailable
+  };
+  cp.execFileSync = () => JSON.stringify({ results: [] }); // semgrep runs, finds nothing
+  const SASTRunner = freshSAST();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r13clean-sast-'));
+  try {
+    fs.writeFileSync(path.join(tmp, 'go.mod'), 'module x\n');
+    const r = new SASTRunner(tmp);
+    const res = await r.run();
+    assert.equal(res.scanned, true, 'a scanner genuinely ran → scanned:true');
+    assert.equal(res.success, true, 'a clean scan is a success, not a false failure');
+    assert.deepEqual(res.findings, [], 'a clean project has zero findings');
+    assert.equal(r.errors.length, 0, 'no crash recorded on a clean run');
+  } finally {
+    restore();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test('run(): zero scanners available reports scanned:false / success:false, never a clean pass', async () => {
   // Every tool probe fails → no scanner is available.
   cp.execSync = () => { throw new Error('command not found'); };
