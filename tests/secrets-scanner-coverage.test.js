@@ -521,3 +521,105 @@ describe('SecretsScanner — external tool integration', () => {
     );
   });
 });
+
+// ===========================================================================
+// Cluster I — isInComment block-comment SPAN analysis (position-aware).
+// The old block-comment-start test `/\/\*/` was UNANCHORED: it matched `/*`
+// ANYWHERE on the line, so a real secret with a TRAILING block comment on the
+// same code line was classified "in comment" and silently dropped — a
+// fail-OPEN on the security gate. The fix classifies a match as in-comment
+// only when an UNCLOSED `/*` span actually covers the match position.
+// The canonical AWS example key (AKIAIOSFODNN7EXAMPLE) is used — a documented
+// non-secret that push protection ignores.
+// ===========================================================================
+const AWS_EXAMPLE = 'AKIAIOSFODNN7EXAMPLE';
+
+describe('SecretsScanner.isInComment — block-comment span analysis', () => {
+  it('reports a secret that PRECEDES a trailing block comment on a code line', () => {
+    // RED under the old whole-line `/\/\*/` heuristic: the line contains `/*`,
+    // so the finding was dropped and the file reported secret-clean.
+    const root = freshDir('trailing-block');
+    const file = path.join(root, 'config.js');
+    fs.writeFileSync(file, `const key = "${AWS_EXAMPLE}"; /* rotate me later */\n`);
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret before a trailing /* ... */ on a code line MUST be reported (fail closed)'
+    );
+  });
+
+  it('skips a secret genuinely INSIDE an inline single-line block comment', () => {
+    const root = freshDir('inline-block');
+    const file = path.join(root, 'note.js');
+    fs.writeFileSync(file, `const x = 1; /* old key was ${AWS_EXAMPLE} */\n`);
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret inside an inline /* ... */ span must stay comment-classified (skipped)'
+    );
+  });
+
+  it('skips a secret INSIDE a multi-line block comment whose line has no comment marker', () => {
+    // The middle line has no leading `//`, `#`, or `*` — only the SPAN analysis
+    // (unclosed `/*` above it) can classify it. The old whole-line heuristic
+    // would have REPORTED it (wrong direction) since the line lacks `/*`.
+    const root = freshDir('multiline-block');
+    const file = path.join(root, 'block.js');
+    fs.writeFileSync(
+      file,
+      '/* deprecated config below\n' +
+      `key = "${AWS_EXAMPLE}"\n` +
+      'end of note */\n'
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret inside a multi-line /* ... */ span must be skipped'
+    );
+  });
+
+  it('still reports a secret AFTER a closed block comment on the same line', () => {
+    const root = freshDir('closed-then-code');
+    const file = path.join(root, 'after.js');
+    fs.writeFileSync(file, `/* header */ const key = "${AWS_EXAMPLE}";\n`);
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret after a CLOSED /* ... */ is live code and MUST be reported'
+    );
+  });
+
+  it('regression: single-line // comment still skips its secret', () => {
+    const root = freshDir('slash-slash');
+    const file = path.join(root, 'line.js');
+    fs.writeFileSync(file, `// const key = "${AWS_EXAMPLE}"\n`);
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret behind a // single-line comment stays skipped'
+    );
+  });
+
+  it('regression: a PEM boundary line is not treated as a comment', () => {
+    const root = freshDir('pem-boundary');
+    const file = path.join(root, 'key.pem');
+    fs.writeFileSync(file, SYNTH_RSA_KEY);
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'PRIVATE_KEY'),
+      'the PEM boundary exemption must keep private keys reportable'
+    );
+  });
+});

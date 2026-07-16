@@ -31,6 +31,33 @@ const { invalidate } = require('./cache');
 const taskRegistry = require('./task-registry');
 
 /**
+ * Commit `data` to `target` ATOMICALLY (temp sibling + rename), mirroring the
+ * reference-correct writer in approval-ledger.persistEntry and task-registry.save.
+ * A bare in-place `writeFileSync(target, …)` truncates the file if a crash lands
+ * between open(O_TRUNC) and the full write — corrupting the only copy of a
+ * single-source-of-truth artifact (a committed ledger entry, a just-renamed plan).
+ * Writing a temp then renaming makes the commit all-or-nothing: a reader sees either
+ * the whole old file or the whole new file, never a truncation. On any failure the
+ * temp is unlinked and the error rethrown, so a failed commit leaves the prior bytes
+ * byte-identical and no litter. rename is atomic on POSIX and a same-directory replace
+ * on Windows.
+ *
+ * @param {string} target - the destination path
+ * @param {string|Buffer} data - the bytes to commit
+ * @returns {void}
+ */
+function atomicWriteFileSync(target, data) {
+  const tmp = `${target}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    safeFs.writeFileSync(tmp, data);
+    safeFs.renameSync(tmp, target);
+  } catch (err) {
+    try { safeFs.unlinkSync(tmp); } catch { /* temp may not exist */ }
+    throw err;
+  }
+}
+
+/**
  * Background Agent Types
  */
 const AGENT_TYPES = {
@@ -300,7 +327,9 @@ function stampAndLedger(planPath, from, to, root, deps = {}, override = null) {
   // The marker never touches the source file, so state (c) cannot occur.
   const newPath = move(planPath, to);
   try {
-    safeFs.writeFileSync(newPath, destContent);
+    // ATOMIC (temp+rename): the source was just renamed to newPath, so a bare in-place
+    // write here would be the ONLY copy of the plan — a crash mid-write would truncate it.
+    atomicWriteFileSync(newPath, destContent);
     // Step 3: commit the approval in the ledger (the source of approval truth).
     writeEntry(slug, {
       content_sha256: contentHash,
@@ -330,7 +359,10 @@ function stampAndLedger(planPath, from, to, root, deps = {}, override = null) {
         persisted.override = true;
         persisted.override_reason =
           String((override && override.reason) || '').replace(/[\r\n]+/g, ' ').trim();
-        safeFs.writeFileSync(entryPath, JSON.stringify(persisted, null, 2));
+        // ATOMIC (temp+rename): this re-opens a COMMITTED ledger entry — the single source
+        // of approval truth. A bare in-place write would truncate it on a crash, so verify()
+        // would fail and the residency sweep would revert the freshly-approved plan as a forgery.
+        atomicWriteFileSync(entryPath, JSON.stringify(persisted, null, 2));
       }
     }
   } catch (err) {

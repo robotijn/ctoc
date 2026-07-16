@@ -14,6 +14,7 @@ const cp = require('node:child_process');
 
 const QA_PATH = require.resolve('../src/lib/quality-agent');
 const REAL_EXEC = cp.execSync;
+const REAL_EXECFILE = cp.execFileSync;
 
 function freshQA() {
   delete require.cache[QA_PATH];
@@ -37,18 +38,25 @@ test('runCommand: a command that outlives the timeout fails LOUDLY, does not han
   }
 });
 
-test('runSpecificTests: Go package paths use forward slashes even for backslash inputs', () => {
+test('runSpecificTests: Go package paths use forward slashes even for backslash inputs (argv vector)', () => {
+  // The go operands now run via execFileSync (shell:false) as an argv vector, so the
+  // package paths are captured as array elements — no shell string, no injection surface.
   let captured;
-  cp.execSync = (command) => { captured = command; return ''; };
+  cp.execFileSync = (bin, args) => { captured = { bin, args }; return ''; };
+  cp.execSync = () => ''; // fallback path must not touch a real shell
   const { runSpecificTests } = freshQA();
   try {
     const tools = { go: { test: 'go test ./...', testFramework: 'go' } };
     const testFiles = ['pkg\\sub\\a_test.go', 'pkg\\sub2\\b_test.go'];
     runSpecificTests(tools, testFiles);
     assert.ok(captured, 'a go test command must have been issued');
-    assert.ok(!captured.includes('\\'), `go package path must not contain backslashes: ${captured}`);
-    assert.equal(captured, 'go test ./pkg/sub/... ./pkg/sub2/...');
+    assert.equal(captured.bin, 'go');
+    assert.deepEqual(captured.args, ['test', './pkg/sub/...', './pkg/sub2/...']);
+    for (const a of captured.args) {
+      assert.ok(!a.includes('\\'), `go package path must not contain backslashes: ${a}`);
+    }
   } finally {
+    cp.execFileSync = REAL_EXECFILE;
     cp.execSync = REAL_EXEC;
     delete require.cache[QA_PATH];
   }

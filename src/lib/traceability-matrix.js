@@ -26,6 +26,45 @@ const path = require('path');
 
 const MATRIX_PATH = '.ctoc/traceability/matrix.yaml';
 
+/** Bounded compare-and-swap retries in `upsert` (no sleep, no busy-wait). */
+const UPSERT_ATTEMPTS = 5;
+
+/**
+ * A stale-write refusal (mirrors task-registry.StaleRegistryError): the on-disk
+ * `generation` moved between a value's `load` and its `save`, so persisting would
+ * clobber another writer's committed row. Thrown by `save`; caught + retried by `upsert`.
+ */
+class StaleMatrixError extends Error {
+  /** @param {string} message @param {{expected?:number, actual?:number}} [detail] */
+  constructor(message, detail = {}) {
+    super(message);
+    this.name = 'StaleMatrixError';
+    this.expected = detail.expected;
+    this.actual = detail.actual;
+  }
+}
+
+/**
+ * The matrix `generation` as recorded on disk. Fail-open: an absent, unparseable, or
+ * non-integer generation reads as 0, so every pre-CAS matrix.yaml is a valid
+ * generation-0 matrix and no migration is required.
+ * @param {string} projectRoot
+ * @returns {number}
+ */
+function diskGeneration(projectRoot) {
+  const p = path.join(projectRoot, MATRIX_PATH);
+  try {
+    if (!safeFs.existsSync(p)) return 0;
+    const content = safeFs.readFileSync(p, 'utf8');
+    const m = content.match(/^generation:\s*(\d+)\s*$/m);
+    if (!m) return 0;
+    const n = Number(m[1]);
+    return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0; // a corrupt/unreadable file has no committed generation to protect
+  }
+}
+
 /**
  * Schema for one requirement entry:
  *
@@ -41,27 +80,53 @@ const MATRIX_PATH = '.ctoc/traceability/matrix.yaml';
  */
 
 /**
- * Load the matrix from disk. Returns `{requirements: [], generated_at}`.
+ * Load the matrix from disk. Returns `{requirements: [], generated_at, generation}`.
+ * A LOADED value always carries a `generation` (absent on disk ⇒ 0), so a subsequent
+ * `save` is a real compare-and-swap.
  */
 function load(projectRoot) {
   const p = path.join(projectRoot, MATRIX_PATH);
-  if (!safeFs.existsSync(p)) return { requirements: [], generated_at: null };
+  if (!safeFs.existsSync(p)) return { requirements: [], generated_at: null, generation: 0 };
   const content = safeFs.readFileSync(p, 'utf8');
   return parseMatrix(content);
 }
 
 /**
  * Save the matrix to disk in a canonical YAML form so diffs stay clean.
+ *
+ * COMPARE-AND-SWAP on `generation` (mirrors task-registry.save): when the value carries
+ * a numeric `generation` (i.e. it came from `load`) and the on-disk generation has MOVED
+ * since, this REFUSES with `StaleMatrixError` and writes NOTHING — another writer
+ * committed in between and a blind write would lose its row. `upsert` is the sanctioned
+ * retry. A value with NO numeric `generation` (a hand-built literal) is an UNVERSIONED
+ * (seeding) write and skips the compare, preserving the pre-CAS public contract for
+ * direct `save` callers. The committed generation is written as `diskGeneration + 1` and
+ * stamped back onto the in-memory value.
  */
 function save(projectRoot, matrix) {
   const dir = path.join(projectRoot, '.ctoc', 'traceability');
   if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
+
+  const onDisk = diskGeneration(projectRoot);
+  const loadedAt = Number.isSafeInteger(matrix.generation) && matrix.generation >= 0
+    ? matrix.generation
+    : null; // unversioned (hand-built) value → no compare
+  if (loadedAt !== null && onDisk !== loadedAt) {
+    throw new StaleMatrixError(
+      `traceability-matrix: stale write refused — the matrix moved from generation ${loadedAt} ` +
+      `to ${onDisk} while this value was held (another writer committed). Reload and re-apply.`,
+      { expected: loadedAt, actual: onDisk },
+    );
+  }
+  const nextGeneration = onDisk + 1;
+
   const lines = [
     `# Requirements Traceability Matrix`,
     `# Bidirectional links from high-level requirement to low-level requirement to source code to tests.`,
     `# Maintained by src/lib/traceability-matrix.js`,
     ``,
     `generated_at: ${matrix.generated_at || new Date().toISOString()}`,
+    `generation: ${nextGeneration}`,
     `requirement_count: ${(matrix.requirements || []).length}`,
     ``,
     `requirements:`,
@@ -87,9 +152,9 @@ function save(projectRoot, matrix) {
   // which load()/parseMatrix silently reads as a surviving-prefix (lost rows, no
   // error), so Gate 3 findOrphans/summary run against an incomplete matrix. The
   // temp+rename makes the commit all-or-nothing (mirrors task-registry.save and
-  // durable-log). NOTE: upsert() (load -> mutate -> save) is still NOT safe against
-  // two SIMULTANEOUS writers — the atomic rename prevents torn files, not lost
-  // updates under concurrency; a full lock is out of scope for this slice.
+  // durable-log). The `generation` compare-and-swap ABOVE additionally closes the
+  // LOST-UPDATE race: two simultaneous upsert() writers can no longer clobber each
+  // other's row (the atomic rename prevents torn files, the CAS prevents lost updates).
   const target = path.join(projectRoot, MATRIX_PATH);
   const tmp = `${target}.tmp-${process.pid}-${Date.now()}`;
   try {
@@ -99,21 +164,42 @@ function save(projectRoot, matrix) {
     try { safeFs.unlinkSync(tmp); } catch { /* temp may not exist */ }
     throw err;
   }
+  // Advance the in-memory value to the committed generation, so a caller may save the
+  // SAME value again (sequential mutations) without a false compare-and-swap conflict.
+  matrix.generation = nextGeneration;
 }
 
 /**
  * Insert or replace a requirement entry by id.
+ *
+ * LOST-UPDATE SAFE: the load → modify → save cycle runs under the `generation`
+ * compare-and-swap (see `save`). When a concurrent writer commits between this cycle's
+ * load and save, `save` throws `StaleMatrixError`; this reloads the winner's matrix and
+ * re-applies the row (bounded retry, no sleep/busy-wait), so a concurrent upsert RETRIES
+ * instead of silently dropping the other writer's row. The re-apply is idempotent — it
+ * finds-or-adds this `req.id` against the fresh matrix each attempt.
  */
 function upsert(projectRoot, req) {
   if (!req.id) throw new Error('traceability-matrix.upsert: id required');
-  const matrix = load(projectRoot);
-  const idx = matrix.requirements.findIndex(r => r.id === req.id);
-  req.last_updated = new Date().toISOString();
-  if (idx >= 0) matrix.requirements[idx] = { ...matrix.requirements[idx], ...req };
-  else matrix.requirements.push(req);
-  matrix.generated_at = new Date().toISOString();
-  save(projectRoot, matrix);
-  return req;
+  let lastErr = null;
+  for (let attempt = 0; attempt < UPSERT_ATTEMPTS; attempt++) {
+    const matrix = load(projectRoot);
+    const idx = matrix.requirements.findIndex(r => r.id === req.id);
+    req.last_updated = new Date().toISOString();
+    if (idx >= 0) matrix.requirements[idx] = { ...matrix.requirements[idx], ...req };
+    else matrix.requirements.push(req);
+    matrix.generated_at = new Date().toISOString();
+    try {
+      save(projectRoot, matrix);
+      return req;
+    } catch (err) {
+      if (err instanceof StaleMatrixError) { lastErr = err; continue; } // reload + re-apply
+      throw err;
+    }
+  }
+  throw lastErr || new StaleMatrixError(
+    `traceability-matrix.upsert: gave up after ${UPSERT_ATTEMPTS} compare-and-swap attempts`,
+  );
 }
 
 /**
@@ -173,9 +259,14 @@ function jsonStr(v) {
 
 function parseMatrix(content) {
   // Minimal parser for the canonical shape written by save().
-  const out = { requirements: [], generated_at: null };
+  const out = { requirements: [], generated_at: null, generation: 0 };
   const tsMatch = content.match(/^generated_at:\s+(\S+)$/m);
   if (tsMatch) out.generated_at = tsMatch[1];
+  const genMatch = content.match(/^generation:\s*(\d+)\s*$/m);
+  if (genMatch) {
+    const n = Number(genMatch[1]);
+    if (Number.isSafeInteger(n) && n >= 0) out.generation = n;
+  }
   const blocks = content.split(/^\s+- id:\s+/m).slice(1);
   for (const blk of blocks) {
     const idLine = blk.split('\n')[0];
@@ -207,4 +298,5 @@ module.exports = {
   findDanglingReferences,
   summary,
   MATRIX_PATH,
+  StaleMatrixError,
 };

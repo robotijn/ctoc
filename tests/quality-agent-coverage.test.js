@@ -132,6 +132,38 @@ function withExecSyncSpy(impl, fn) {
 }
 
 // ---------------------------------------------------------------------------
+// child_process argv spy seam — the INJECTION-SAFE boundary. runSpecificTests now
+// runs jest/vitest/pytest/go via execFileSync with an ARGV VECTOR (shell:false), so
+// a test-file path from coverage-map.json can never be interpreted by a shell. This
+// harness captures the {bin, args, opts} of every execFileSync call AND harmlessly
+// stubs execSync (the fallback full-suite path) so nothing real is ever executed —
+// a malicious `a$(...).test.js` path in a test cannot run a command on the host.
+// ---------------------------------------------------------------------------
+const REAL_EXECFILESYNC = cp.execFileSync;
+
+function withExecSpies(impl, fn) {
+  const fileCalls = [];
+  const shellCalls = [];
+  cp.execFileSync = (bin, args, opts) => {
+    fileCalls.push({ bin, args, opts });
+    return impl(bin, args, opts);
+  };
+  cp.execSync = (command) => {
+    shellCalls.push(command);
+    return '';
+  };
+  delete require.cache[QA_PATH];
+  const qa = require(QA_PATH);
+  try {
+    return { fileCalls, shellCalls, ...fn(qa, fileCalls, shellCalls) };
+  } finally {
+    cp.execFileSync = REAL_EXECFILESYNC;
+    cp.execSync = REAL_EXECSYNC;
+    delete require.cache[QA_PATH];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // parseArgs — the ship-gate-safe defaults and every recognized flag (63-81)
 // ---------------------------------------------------------------------------
 describe('parseArgs', () => {
@@ -215,54 +247,94 @@ describe('runTypecheck', () => {
 });
 
 // ---------------------------------------------------------------------------
-// runSpecificTests — the EXACT per-framework command is pinned via the execSync spy
-// (205-266). A mutant that swaps a framework's command builder goes red here.
+// runSpecificTests — the EXACT per-framework ARGV VECTOR is pinned via the
+// execFileSync spy. jest/vitest/pytest/go run with shell:false so a test-file path
+// (which originates from coverage-map.json — arbitrary, unsanitized strings) can
+// NEVER be interpreted by a shell. A mutant that rebuilds a shell STRING, or swaps a
+// framework's argv, goes red here — including the command-injection regression.
 // ---------------------------------------------------------------------------
-describe('runSpecificTests — per-framework command construction (pinned at the process boundary)', () => {
-  it('builds `npx jest <files>` for the jest framework', () => {
-    withExecSyncSpy(() => '5 passed', (qa, calls) => {
+describe('runSpecificTests — per-framework argv construction (injection-safe process boundary)', () => {
+  it('SECURITY (RCE regression): a shell-metacharacter test path is a LITERAL argv element, never interpolated into a shell string', () => {
+    // A path like this arrives verbatim from .ctoc/state/coverage-map.json (entry.tests)
+    // with NO sanitization. On the old string-interpolation path
+    // (`npx jest ${testFiles.join(' ')}` → execSync → /bin/sh -c) the `$(...)` was a
+    // command substitution and executed arbitrary code on every /ctoc:push. The fix
+    // passes it as one raw argv element to execFileSync (shell:false), so no shell
+    // ever sees it. This test fails LOUDLY against the vulnerable string code (which
+    // never calls execFileSync and leaks the payload into a shell string).
+    const evil = 'a$(touch /tmp/ctoc_pwn).test.js';
+    withExecSpies(() => '0 passed', (qa, fileCalls, shellCalls) => {
+      qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, [evil]);
+
+      const jestCall = fileCalls.find(c => Array.isArray(c.args) && c.args[0] === 'jest');
+      assert.ok(jestCall,
+        `jest must run via an execFileSync ARGV vector, not a shell string. execFile calls=${JSON.stringify(fileCalls)}; shell calls=${JSON.stringify(shellCalls)}`);
+      assert.ok(jestCall.args.includes(evil),
+        'the raw, unescaped path must be a standalone argv element (a shell never interprets it)');
+      assert.equal(jestCall.opts && jestCall.opts.shell, false,
+        'execFileSync must run with shell:false so no shell interprets the path');
+      // And the payload must never have reached the shell-string (execSync) path.
+      assert.ok(!shellCalls.some(c => c.includes(evil)),
+        `the malicious path must never appear in a shell command string; shell calls=${JSON.stringify(shellCalls)}`);
+      return {};
+    });
+  });
+
+  it('builds an `npx jest <files>` ARGV vector for the jest framework', () => {
+    withExecSpies(() => '5 passed', (qa, fileCalls) => {
       const res = qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, ['a.test.js', 'b.test.js']);
       assert.equal(res.passed, true);
-      assert.ok(calls.some(c => c === 'npx jest a.test.js b.test.js'),
-        `expected an npx jest command; got ${JSON.stringify(calls)}`);
+      const c = fileCalls.find(x => x.args && x.args[0] === 'jest');
+      assert.ok(c, `expected an execFileSync npx jest call; got ${JSON.stringify(fileCalls)}`);
+      assert.match(c.bin, /^npx(\.cmd)?$/, 'jest launches via npx (npx.cmd on win32)');
+      assert.deepEqual(c.args, ['jest', 'a.test.js', 'b.test.js']);
+      assert.equal(c.opts && c.opts.shell, false);
       return {};
     });
   });
 
-  it('builds `npx vitest run <files>` for the vitest framework', () => {
-    withExecSyncSpy(() => '', (qa, calls) => {
+  it('builds an `npx vitest run <files>` ARGV vector for the vitest framework', () => {
+    withExecSpies(() => '', (qa, fileCalls) => {
       qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'vitest' } }, ['a.test.js']);
-      assert.ok(calls.some(c => c === 'npx vitest run a.test.js'),
-        `expected an npx vitest run command; got ${JSON.stringify(calls)}`);
+      const c = fileCalls.find(x => x.args && x.args[0] === 'vitest');
+      assert.ok(c, `expected an execFileSync npx vitest call; got ${JSON.stringify(fileCalls)}`);
+      assert.match(c.bin, /^npx(\.cmd)?$/);
+      assert.deepEqual(c.args, ['vitest', 'run', 'a.test.js']);
+      assert.equal(c.opts && c.opts.shell, false);
       return {};
     });
   });
 
-  it('builds `pytest <files>` for the pytest framework', () => {
-    withExecSyncSpy(() => '', (qa, calls) => {
+  it('builds a `pytest <files>` ARGV vector for the pytest framework', () => {
+    withExecSpies(() => '', (qa, fileCalls) => {
       qa.runSpecificTests({ py: { test: 'ignored', testFramework: 'pytest' } }, ['test_a.py']);
-      assert.ok(calls.some(c => c === 'pytest test_a.py'),
-        `expected a pytest command; got ${JSON.stringify(calls)}`);
+      const c = fileCalls.find(x => x.bin === 'pytest');
+      assert.ok(c, `expected an execFileSync pytest call; got ${JSON.stringify(fileCalls)}`);
+      assert.deepEqual(c.args, ['test_a.py']);
+      assert.equal(c.opts && c.opts.shell, false);
       return {};
     });
   });
 
-  it('derives DEDUPED, POSIX (forward-slash) go package paths even from backslash inputs', () => {
-    withExecSyncSpy(() => '', (qa, calls) => {
+  it('derives DEDUPED, POSIX (forward-slash) go package paths even from backslash inputs, as an ARGV vector', () => {
+    withExecSpies(() => '', (qa, fileCalls) => {
       // Two files in the SAME package, one with Windows backslashes — must collapse to a
       // single `./pkg/sub/...` with forward slashes, never `./pkg\sub/...`.
       qa.runSpecificTests({ go: { test: 'ignored', testFramework: 'go' } },
         ['pkg/sub/a_test.go', 'pkg\\sub\\b_test.go']);
-      const goCall = calls.find(c => c.startsWith('go test'));
-      assert.ok(goCall, `expected a go test command; got ${JSON.stringify(calls)}`);
-      assert.equal(goCall, 'go test ./pkg/sub/...',
+      const c = fileCalls.find(x => x.bin === 'go');
+      assert.ok(c, `expected an execFileSync go test call; got ${JSON.stringify(fileCalls)}`);
+      assert.deepEqual(c.args, ['test', './pkg/sub/...'],
         'go packages must be deduped and posix-normalized regardless of input separators');
-      assert.ok(!goCall.includes('\\'), 'no backslashes may leak into a go import path');
+      for (const a of c.args) assert.ok(!a.includes('\\'), 'no backslashes may leak into a go import path');
+      assert.equal(c.opts && c.opts.shell, false);
       return {};
     });
   });
 
-  it('falls back to langTools.test verbatim when no framework is named, and parses the pass count', () => {
+  it('falls back to langTools.test verbatim (shell path) when no framework is named, and parses the pass count', () => {
+    // The fallback is a CONFIGURED full-suite string from the detector (langTools.test)
+    // with NO file-derived interpolation, so it legitimately stays on the shell path.
     withExecSyncSpy(() => '7 passed', (qa, calls) => {
       const res = qa.runSpecificTests({ js: { test: 'my-custom-runner' } }, ['a.test.js']);
       assert.ok(calls.includes('my-custom-runner'),
@@ -273,8 +345,8 @@ describe('runSpecificTests — per-framework command construction (pinned at the
   });
 
   it('returns a failing result (failed:1, passCount preserved) when a framework command exits non-zero', () => {
-    withExecSyncSpy((command) => {
-      if (command.startsWith('npx jest')) { const e = new Error('boom'); e.stdout = 'nope'; throw e; }
+    withExecSpies((bin, args) => {
+      if (args && args[0] === 'jest') { const e = new Error('boom'); e.stdout = 'nope'; throw e; }
       return '';
     }, (qa) => {
       const res = qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, ['a.test.js']);

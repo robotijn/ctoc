@@ -85,7 +85,15 @@ function parseFail(summaryText) {
  */
 function parseCoveragePct(coverageText) {
   if (!coverageText) return null;
-  const matches = [...String(coverageText).matchAll(/all files\s*\|\s*([\d.]+)/g)];
+  // LINE-ANCHORED to the reporter prefix (mirrors src/lib/step-13-verify.js): the
+  // coverage row is `all files | …` only at line start, optionally after the spec
+  // reporter's `ℹ ` or the TAP `# ` prefix. main() concatenates stdout + stderr, so
+  // an UNANCHORED parse would let a stray `all files | N` a test emitted to stderr —
+  // which lands AFTER node's trailing coverage block in the joined string — hijack
+  // last-match and become the reported figure. Anchoring rejects that mid-line stray.
+  // Take the FIRST percentage column (line coverage), and the LAST anchored match
+  // (node's real coverage row is emitted last).
+  const matches = [...String(coverageText).matchAll(/^\s*(?:ℹ|#)?\s*all files\s*\|\s*([\d.]+)/img)];
   return matches.length ? Number(matches[matches.length - 1][1]) : null;
 }
 
@@ -107,7 +115,10 @@ function evaluateSummary(summary, opts) {
   if (skipped > 0) {
     reasons.push(`# skipped ${skipped} > 0`);
   }
-  if (coveragePct === null) {
+  if (coveragePct === null || !Number.isFinite(coveragePct)) {
+    // Absent OR non-finite (a malformed capture like "1.2.3" parses to NaN). NaN is
+    // neither `=== null` nor `< threshold`, so without this guard an unmeasured,
+    // non-finite figure silently PASSED the gate. Treat it as unmeasured → FAIL.
     reasons.push('coverage not measured (no coverage report in run output) — unmeasured coverage fails the gate');
   } else if (coveragePct < threshold) {
     reasons.push(`coverage ${coveragePct}% < ${threshold}%`);
