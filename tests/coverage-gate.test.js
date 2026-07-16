@@ -156,6 +156,46 @@ test('parseCoveragePct: the trailing real summary wins over an earlier stray row
   assert.strictEqual(gate.parseCoveragePct(polluted), 99.38);
 });
 
+// Regression (defect a): the parser must be LINE-ANCHORED to the reporter prefix.
+// main() builds `output = stdout + stderr`, so a test line emitted to STDERR that
+// contains `all files | 100` lands AFTER node's own trailing coverage block in the
+// concatenated string. An UNANCHORED last-match parse then picks up that stray 100
+// and reports it as the whole suite's coverage — defeating the "no test can print
+// after node's coverage block" assumption. Anchoring to line-start (mirroring
+// src/lib/step-13-verify.js) rejects the mid-line stray; the real `# all files | 40`
+// row wins.
+test('parseCoveragePct: a stray "all files | N" appended by stderr cannot override the real anchored row', () => {
+  const polluted = [
+    '# all files | 40.00 |',                       // the REAL coverage row (line-anchored)
+    'stderr log from a test: all files | 100',     // stray, mid-line — appended after coverage
+  ].join('\n');
+  assert.strictEqual(gate.parseCoveragePct(polluted), 40);
+});
+
+// Regression (defect b): a malformed capture (e.g. "1.2.3") yields NaN, which is
+// neither null nor < threshold — an UNGUARDED evaluateSummary let a non-finite,
+// unmeasured coverage silently PASS. A non-finite figure is treated as unmeasured
+// and FAILS the gate.
+test('parseCoveragePct + evaluateSummary: a malformed capture is treated as unmeasured and fails the gate', () => {
+  const cov = gate.parseCoveragePct('all files | 1.2.3');
+  assert.ok(cov === null || !Number.isFinite(cov), `expected null or non-finite, got ${cov}`);
+  const r = gate.evaluateSummary({ fail: 0, skipped: 0, coveragePct: cov }, { threshold: 99 });
+  assert.strictEqual(r.ok, false);
+  assert.ok(
+    r.reasons.some((x) => /coverage/i.test(x)),
+    `expected a reason about coverage, got ${JSON.stringify(r.reasons)}`
+  );
+});
+
+test('evaluateSummary: a NaN coverage figure is unmeasured and fails the gate', () => {
+  const r = gate.evaluateSummary({ fail: 0, skipped: 0, coveragePct: NaN }, { threshold: 99 });
+  assert.strictEqual(r.ok, false);
+  assert.ok(
+    r.reasons.some((x) => /coverage/i.test(x)),
+    `expected a reason about unmeasured coverage, got ${JSON.stringify(r.reasons)}`
+  );
+});
+
 // Wiring assertion — read the REAL package.json from disk and prove coverage is
 // wired into `npm test` through the gate. RED-now: today's scripts.test is
 // `node --test tests/*.test.js` (no coverage flag, no gate).

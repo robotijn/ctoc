@@ -1023,6 +1023,88 @@ test('installPostCommitHook does NOT false-skip a foreign backgrounded post-comm
   }
 });
 
+test('uninstallPostCommitHook PRESERVES a foreign backgrounded post-commit.js line in a LEGACY CTOC install (D5)', () => {
+  const dir = mkRepo();
+  // A hook written by the OLD (pre-sentinel) installer: the CTOC comment markers
+  // and CTOC's OWN backgrounded invocation, PLUS a separate foreign line that
+  // also backgrounds a file named post-commit.js with the common `2>/dev/null &`
+  // suffix. The foreign line is NOT CTOC's path and is NOT inside the CTOC comment
+  // block, so it must survive verbatim while the whole CTOC block is removed.
+  const legacy = [
+    '#!/bin/sh',
+    'node tools/my-notify-post-commit.js 2>/dev/null &',
+    '# CTOC post-commit hook - triggers background quality agent',
+    '# CTOC hook is NON-BLOCKING - commit always succeeds instantly.',
+    'node "/plugins/ctoc/src/hooks/post-commit.js" 2>/dev/null &',
+  ].join('\n') + '\n';
+  write(path.join(dir, '.git', 'hooks', 'post-commit'), legacy);
+  const { uninstallPostCommitHook } = load({ exec: router([]) });
+  try {
+    const res = uninstallPostCommitHook(dir, { pluginRoot: '/plugins/ctoc' });
+    assert.deepEqual(res, { removed: true, partial: true });
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(
+      content,
+      /^node tools\/my-notify-post-commit\.js 2>\/dev\/null &$/m,
+      'foreign backgrounded post-commit.js line survived verbatim'
+    );
+    assert.ok(!content.includes('/plugins/ctoc/src/hooks/post-commit.js'), 'CTOC invocation removed');
+    assert.ok(!content.includes('CTOC post-commit hook'), 'CTOC comment markers removed');
+    assert.ok(!content.includes('NON-BLOCKING'), 'CTOC comment markers removed');
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
+test('uninstallPostCommitHook fully removes a LEGACY CTOC install that has NO foreign line (D5 regression)', () => {
+  const dir = mkRepo();
+  const legacy = [
+    '#!/bin/sh',
+    '# CTOC post-commit hook - triggers background quality agent',
+    '# CTOC hook is NON-BLOCKING - commit always succeeds instantly.',
+    'node "/plugins/ctoc/src/hooks/post-commit.js" 2>/dev/null &',
+  ].join('\n') + '\n';
+  write(path.join(dir, '.git', 'hooks', 'post-commit'), legacy);
+  const { uninstallPostCommitHook } = load({ exec: router([]) });
+  try {
+    const res = uninstallPostCommitHook(dir, { pluginRoot: '/plugins/ctoc' });
+    assert.deepEqual(res, { removed: true }, 'pure-CTOC legacy hook deleted entirely');
+    assert.equal(fs.existsSync(path.join(dir, '.git', 'hooks', 'post-commit')), false);
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
+test('uninstallPostCommitHook removes a LEGACY CTOC block even when the current plugin root differs from install time (D5 fallback)', () => {
+  const dir = mkRepo();
+  // Installed from /old/ctoc; uninstalling from a DIFFERENT current root. The path
+  // no longer matches, but the CTOC invocation still sits directly under a CTOC
+  // comment marker, so block-contiguity recognises and removes it. The foreign
+  // standalone line (not under a marker) is preserved.
+  const legacy = [
+    '#!/bin/sh',
+    'node tools/my-notify-post-commit.js 2>/dev/null &',
+    '# CTOC post-commit hook - triggers background quality agent',
+    '# CTOC hook is NON-BLOCKING - commit always succeeds instantly.',
+    'node "/old/ctoc/src/hooks/post-commit.js" 2>/dev/null &',
+  ].join('\n') + '\n';
+  write(path.join(dir, '.git', 'hooks', 'post-commit'), legacy);
+  const { uninstallPostCommitHook } = load({ exec: router([]) });
+  try {
+    const res = uninstallPostCommitHook(dir, { pluginRoot: '/new/ctoc' });
+    assert.deepEqual(res, { removed: true, partial: true });
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(content, /^node tools\/my-notify-post-commit\.js 2>\/dev\/null &$/m, 'foreign line survived');
+    assert.ok(!content.includes('/old/ctoc/src/hooks/post-commit.js'), 'CTOC invocation removed via block-contiguity');
+    assert.ok(!content.includes('CTOC post-commit hook'), 'CTOC comment markers removed');
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
 // ============================================================================
 // HooksInstaller — detection, status, dispatch
 // ============================================================================

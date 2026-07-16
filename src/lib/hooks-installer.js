@@ -554,17 +554,60 @@ function isCtocPostCommitInstalled(content) {
   return CTOC_LEGACY_INVOCATION.test(content) && hasCtocCommentMarker(content);
 }
 
+// Captures the script path out of a legacy CTOC-style backgrounded invocation
+// (`node "<path>/post-commit.js" 2>/dev/null &`, quoted or not). Group 1 is the
+// referenced path, used to decide whether the line points at CTOC's OWN
+// post-commit.js or at a foreign script that merely shares the filename.
+const CTOC_LEGACY_INVOCATION_PATH = /node\s+"?([^"\n]*post-commit\.js)"?\s+2>\/dev\/null\s+&/;
+
 /**
- * Legacy per-line ownership test for a sentinel-less CTOC install. Only the
- * exact CTOC comment markers and the exact CTOC invocation signature qualify —
- * never a foreign line that merely contains "post-commit.js".
+ * Normalise a filesystem path for a separator-insensitive comparison. Git hooks
+ * are shell scripts and the CTOC invocation is written with forward slashes by
+ * convention, but on Windows the installer computes the path with `path.join`
+ * (backslashes). Comparing on a common separator keeps ownership correct on all
+ * platforms.
+ * @param {string} p
+ * @returns {string}
+ */
+function normalizeHookPath(p) {
+  return String(p).replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+/**
+ * True when the line is one of CTOC's unambiguous comment markers.
  * @param {string} line
  * @returns {boolean}
  */
-function isLegacyCtocPostCommitLine(line) {
-  return CTOC_LEGACY_INVOCATION.test(line) ||
-    line.includes('CTOC post-commit hook - triggers background quality agent') ||
+function isLegacyCtocCommentMarker(line) {
+  return line.includes('CTOC post-commit hook - triggers background quality agent') ||
     line.includes('CTOC hook is NON-BLOCKING');
+}
+
+/**
+ * Legacy per-line ownership test for a sentinel-less CTOC install. A line is
+ * CTOC-owned when it is one of the exact CTOC comment markers, OR it is a
+ * backgrounded `post-commit.js` invocation whose referenced script path IS
+ * CTOC's own (equal to `expectedPath`, or located under `pluginRoot`). A foreign
+ * line such as `node tools/my-notify-post-commit.js 2>/dev/null &` — same shape,
+ * different path — is NEVER treated as CTOC-owned here; block-contiguity in the
+ * uninstaller is the only additional route, and it too refuses standalone
+ * foreign lines.
+ * @param {string} line
+ * @param {string} [expectedPath] - absolute path to CTOC's own post-commit.js
+ * @param {string} [pluginRoot] - CTOC plugin root; any post-commit.js under it is CTOC's
+ * @returns {boolean}
+ */
+function isLegacyCtocPostCommitLine(line, expectedPath, pluginRoot) {
+  if (isLegacyCtocCommentMarker(line)) return true;
+  const match = line.match(CTOC_LEGACY_INVOCATION_PATH);
+  if (!match) return false;
+  const linePath = normalizeHookPath(match[1]);
+  if (expectedPath && linePath === normalizeHookPath(expectedPath)) return true;
+  if (pluginRoot) {
+    const root = normalizeHookPath(pluginRoot);
+    if (root && (linePath === root || linePath.startsWith(root + '/'))) return true;
+  }
+  return false;
 }
 
 /**
@@ -623,15 +666,24 @@ function installPostCommitHook(projectRoot, options = {}) {
 /**
  * Uninstall the CTOC post-commit hook
  * @param {string} projectRoot - The project root directory
+ * @param {Object} [options] - Uninstallation options
+ * @param {string} [options.pluginRoot] - CTOC plugin root (auto-detected if not provided),
+ *   used to identify CTOC's OWN post-commit.js path on the legacy (sentinel-less) branch.
  * @returns {Object} Uninstallation result
  */
-function uninstallPostCommitHook(projectRoot) {
+function uninstallPostCommitHook(projectRoot, options = {}) {
   const hooksDir = getGitHooksDir(projectRoot);
   const hookPath = path.join(hooksDir, 'post-commit');
 
   if (!safeFs.existsSync(hookPath)) {
     return { removed: false, reason: 'No post-commit hook found' };
   }
+
+  // Derive CTOC's own post-commit.js path exactly as installPostCommitHook does,
+  // so the legacy per-line removal can tell CTOC's own invocation from a foreign
+  // `node <other>/post-commit.js 2>/dev/null &` line and refuse to delete the latter.
+  const pluginRoot = options.pluginRoot || process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, '..', '..');
+  const expectedPath = path.join(pluginRoot, 'src', 'hooks', 'post-commit.js');
 
   const content = safeFs.readFileSync(hookPath, 'utf8');
   const lines = content.split('\n');
@@ -646,11 +698,27 @@ function uninstallPostCommitHook(projectRoot) {
     remaining = lines.filter((_, i) => i < startIdx || i > endIdx);
   } else if (isCtocPostCommitInstalled(content)) {
     // BACK-COMPAT: a hook installed by the previous (sentinel-less) code has no
-    // sentinels. Remove ONLY lines matching the exact CTOC command signature, so
-    // a foreign line that merely contains "post-commit.js" (e.g.
-    // `node scripts/post-commit.js --notify`) is never eaten. Re-installs write
-    // sentinels, so this legacy path is a one-time clean-up.
-    remaining = lines.filter(line => !isLegacyCtocPostCommitLine(line));
+    // sentinels. Ownership is PATH-AWARE: remove the CTOC comment markers and
+    // ONLY the invocation line whose script path is CTOC's own (expectedPath, or
+    // under pluginRoot). A foreign backgrounded line — same `…post-commit.js
+    // 2>/dev/null &` shape but a different path — is preserved.
+    const removeIdx = new Set();
+    lines.forEach((line, i) => {
+      if (isLegacyCtocPostCommitLine(line, expectedPath, pluginRoot)) removeIdx.add(i);
+    });
+    // FALLBACK for installs whose recorded path differs from the CURRENT plugin
+    // root (CTOC moved/reinstalled since install): a legacy invocation that sits
+    // directly under a CTOC comment marker is unambiguously part of the CTOC
+    // block. A STANDALONE foreign invocation is never adjacent to a marker, so it
+    // is never eaten by this route.
+    lines.forEach((line, i) => {
+      if (removeIdx.has(i)) return;
+      if (!CTOC_LEGACY_INVOCATION.test(line)) return;
+      if (i > 0 && removeIdx.has(i - 1) && isLegacyCtocCommentMarker(lines[i - 1])) {
+        removeIdx.add(i);
+      }
+    });
+    remaining = lines.filter((_, i) => !removeIdx.has(i));
   } else {
     return { removed: false, reason: 'Post-commit hook is not a CTOC hook' };
   }

@@ -200,10 +200,31 @@ function isLedgerWrite(command) {
   for (const rawSeg of segments) {
     const seg = rawSeg.replace(/^[\s({]+/, '').trim();
     if (!seg) continue;
-    const cd = seg.match(/^(?:cd|pushd)\s+([^\s;&|)]+)/i);
-    if (cd) {
-      const dir = cd[1].replace(/['"`()]/g, '');
-      if (!dir || dir === '-') prefix = '';
+    const cdKw = seg.match(/^(?:cd|pushd)\b(.*)$/i);
+    if (cdKw) {
+      // `cd`/`pushd` accept OPTIONS (-L, -P, -e, -@, combined -LP) and a `--`
+      // end-of-options marker BEFORE the directory operand. Skip the leading
+      // options and a single `--`, then take the FIRST real operand as the dir —
+      // the naive "first token after cd" capture set the prefix to the literal
+      // `--`/`-L`/… and let a following write resolve outside the ledger, slipping
+      // the forgery gate. A bare `-` WITHOUT a preceding `--` is the previous-dir
+      // shortcut (reset); AFTER `--` the next token is the directory even if it
+      // begins with `-` (`cd -- -` is a dir literally named `-`, not the shortcut).
+      const tokens = cdKw[1].split(/\s+/).filter(Boolean);
+      let rawDir = '';
+      let afterSep = false;      // have we passed the `--` end-of-options marker?
+      let dirIsAfterSep = false; // did the chosen dir token come after `--`?
+      for (const tok of tokens) {
+        if (!afterSep) {
+          if (tok === '--') { afterSep = true; continue; } // end-of-options marker
+          if (/^-[A-Za-z@]+$/.test(tok)) continue;         // a leading cd OPTION
+        }
+        rawDir = tok;
+        dirIsAfterSep = afterSep;
+        break;
+      }
+      const dir = rawDir.replace(/['"`()]/g, '');
+      if (!dir || (dir === '-' && !dirIsAfterSep)) prefix = '';
       // A `~`/`~user` home prefix: STRIP only the tilde+user+slash and keep the
       // REMAINDER as a rooted prefix — do NOT discard the whole path. Resetting to
       // '' on any `~` threw away the ledger suffix, so `cd ~/…/.ctoc/approvals && tee

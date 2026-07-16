@@ -12,6 +12,7 @@
  */
 
 const safeFs = require('./safe-fs');
+const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
@@ -109,42 +110,93 @@ function isProcessAlive(pid) {
 }
 
 /**
+ * Number of exclusive-create attempts before giving up while racing concurrent
+ * reclaimers of a stale lock. Each losing race removes/observes the stale lock
+ * and retries; a small bound prevents an unbounded spin if reclaimers keep
+ * re-creating the lock, in which case a live holder ultimately owns it.
+ */
+const LOCK_ACQUIRE_ATTEMPTS = 5;
+
+/**
+ * Remove the lock file, tolerating a concurrent reclaimer having already removed
+ * it. A missing file (ENOENT) means someone else won the removal — that is the
+ * desired end state, not an error, so it is swallowed. Any other error is real
+ * and propagates.
+ */
+function removeStaleLock(lockFile) {
+  try {
+    safeFs.unlinkSync(lockFile);
+  } catch (err) {
+    if (!err || err.code !== 'ENOENT') throw err;
+  }
+}
+
+/**
  * Acquire lock for quality checks
  * Returns true if lock acquired, false if another process is running
+ *
+ * Uses an ATOMIC exclusive-create (openSync with the 'wx' flag = O_CREAT|O_EXCL)
+ * so exactly one process can win — no check-then-act TOCTOU where two processes
+ * both observe "no lock" and both write it, yielding two holders and a lost
+ * update in withStatusLock's read-modify-write. On EEXIST the lock is held (return
+ * false if the holder is alive) or stale (dead pid / corrupt), in which case it is
+ * reclaimed by unlink-then-retry within a bounded loop; a concurrent reclaimer's
+ * ENOENT/EEXIST is treated as "someone else won, retry", never thrown.
  */
 function acquireLock() {
   ensureStateDir();
   const lockFile = getLockFilePath();
 
-  // Check for existing lock
-  if (safeFs.existsSync(lockFile)) {
+  for (let attempt = 0; attempt < LOCK_ACQUIRE_ATTEMPTS; attempt++) {
+    let fd;
     try {
-      const lockData = JSON.parse(safeFs.readFileSync(lockFile, 'utf8'));
+      // Atomic exclusive create: fails with EEXIST if the lock already exists.
+      fd = safeFs.openSync(lockFile, 'wx');
+    } catch (err) {
+      if (!err || err.code !== 'EEXIST') throw err;
 
-      // Check if lock holder is still alive
-      if (isProcessAlive(lockData.pid)) {
+      // Lock exists: inspect the holder. A read failure means a corrupt/partial
+      // lock, which is reclaimable.
+      let lockData = null;
+      try {
+        lockData = JSON.parse(safeFs.readFileSync(lockFile, 'utf8'));
+      } catch {
+        lockData = null;
+      }
+
+      if (lockData && isProcessAlive(lockData.pid)) {
         console.log(`Another quality check is running (PID: ${lockData.pid})`);
         return false;
       }
 
-      // Stale lock - previous process crashed
-      console.log(`Removing stale lock from crashed process (PID: ${lockData.pid})`);
-      safeFs.unlinkSync(lockFile);
-    } catch {
-      // Corrupted lock file, remove it
-      safeFs.unlinkSync(lockFile);
+      // Stale (dead pid) or corrupt lock — reclaim it and retry the exclusive
+      // create. Tolerate a concurrent reclaimer having already removed it.
+      if (lockData) {
+        console.log(`Removing stale lock from crashed process (PID: ${lockData.pid})`);
+      } else {
+        console.log('Removing corrupted lock file');
+      }
+      removeStaleLock(lockFile);
+      continue;
     }
+
+    // Won the exclusive create — write our identity into the open fd, then close.
+    try {
+      const lockData = {
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        hostname: os.hostname()
+      };
+      fs.writeSync(fd, JSON.stringify(lockData, null, 2));
+    } finally {
+      fs.closeSync(fd);
+    }
+    return true;
   }
 
-  // Create new lock
-  const lockData = {
-    pid: process.pid,
-    startedAt: new Date().toISOString(),
-    hostname: os.hostname()
-  };
-
-  atomicWrite(lockFile, lockData);
-  return true;
+  // Exhausted attempts racing concurrent reclaimers — a live holder owns the lock.
+  console.log('Another quality check is running (could not acquire lock)');
+  return false;
 }
 
 /**

@@ -626,12 +626,30 @@ class SecretsScanner {
       return false;
     }
 
-    // Check for common comment patterns
+    // Block-comment SPAN analysis (position-aware). The previous heuristic used
+    // an UNANCHORED `/\/\*/` that matched `/*` ANYWHERE on the line, so a real
+    // secret followed by a TRAILING block comment on the same code line
+    // (`const k = "AKIA..."; /* rotate */`) was classified in-comment and
+    // silently dropped — a fail-OPEN on the security gate. Instead: the match at
+    // `position` is inside a block comment ONLY if, in content[0..position], the
+    // last `/*` occurs AFTER the last `*/` — i.e. an UNCLOSED block-comment span
+    // (including multi-line blocks) actually covers the position. When in doubt
+    // we report (fail closed). indexOf/-1 arithmetic is O(n), no regex, ReDoS-safe.
+    const before = content.slice(0, position);
+    const lastOpen = before.lastIndexOf('/*');
+    const lastClose = before.lastIndexOf('*/');
+    if (lastOpen > lastClose) {
+      return true; // an unclosed /* ... */ span covers the match
+    }
+
+    // Single-line comment patterns — anchored: the comment marker begins the
+    // line, so everything after it (including the secret) is commentary. The
+    // `^\s*\*` case still catches a JSDoc/block continuation line inside a
+    // multi-line comment whose opener is on a preceding line.
     const commentPatterns = [
       /^\s*\/\//, // JS/TS/Go/C single line
       /^\s*#/,    // Python/Ruby/Shell
       /^\s*\*/,   // JS block comment continuation
-      /\/\*/,     // JS block comment start
       /^\s*<!--/, // HTML
       /^\s*--/,   // SQL/Haskell
       /^\s*;/,    // Lisp/ASM

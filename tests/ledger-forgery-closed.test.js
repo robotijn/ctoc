@@ -261,6 +261,61 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
     // ...while the real ledger directory is still DENIED (guard intact):
     assertDenied('cp /tmp/f.json .ctoc/approvals/x.json', 'the real ledger dir');
   });
+
+  // Re-attack: `cd` accepts OPTIONS (-L, -P, -e, -@, combined -LP) and a `--`
+  // end-of-options marker BEFORE the directory operand. The old matcher captured
+  // the FIRST token after `cd` as the directory, so `cd -- .ctoc/approvals` set
+  // the prefix to the literal `--` (and `cd -L …` to `-L`), the following write
+  // resolved under `--/…` / `-L/…`, never matched the ledger, and the forgery was
+  // ALLOWED. The cd branch also `continue`s before the adjacency check runs, so the
+  // literal `.ctoc/approvals` on the cd line itself was skipped too. All of these
+  // MUST be denied identically to `cd .ctoc/approvals && <write>`.
+  test('cd OPTION / -- bypasses (options before the dir operand) are DENIED', () => {
+    const bypasses = [
+      `cd -- .ctoc/approvals && tee evil.json`,       // `--` end-of-options marker
+      `cd -- .ctoc/approvals && cp /tmp/forged.json x.json`,
+      `cd -L .ctoc/approvals && cp x y`,              // -L logical option
+      `cd -P .ctoc/approvals && tee z`,               // -P physical option
+      `cd -e .ctoc/approvals && touch x.json`,        // -e option
+      `cd -@ .ctoc/approvals && cp f x.json`,         // -@ option (extended attrs)
+      `cd -LP .ctoc/approvals && tee z`,              // combined short cluster
+      `cd -P -- .ctoc/approvals && cp f x.json`,      // option THEN `--` THEN dir
+      `pushd -- .ctoc/approvals && cp /tmp/f.json x.json`, // pushd + `--`
+    ];
+    for (const w of bypasses) assertDenied(w, 'cd option/-- bypass');
+  });
+
+  // After `--`, the NEXT token is the directory even if it starts with `-`: `cd -- -`
+  // means a directory literally named `-`, NOT the previous-directory shortcut. So
+  // stepping into `.ctoc/approvals` then `cd -- -` lands in `.ctoc/approvals/-`, still
+  // inside the ledger — a following write there MUST be denied (proves `-` after `--`
+  // is a literal subdir, does not reset the prefix, and does not crash).
+  test('cd -- - is a LITERAL dir (not previous-dir); write under it stays DENIED', () => {
+    assertDenied('cd .ctoc/approvals && cd -- - && tee evil.json',
+      '`cd -- -` is a literal subdir of the ledger, not a reset');
+    // And it must not crash on its own with a harmless read.
+    assertAllowed('cd -- - && ls', '`cd -- -` alone with a read does not crash / is not a write');
+  });
+
+  // Regression net — every one of these MUST keep its pre-fix outcome.
+  test('cd option-skip fix preserves all existing cd outcomes (regression)', () => {
+    fs.writeFileSync(path.join(project, '.ctoc', 'approvals', 'x.json'), '{}');
+    // Plain (no options) ledger writes still DENIED.
+    assertDenied('cd .ctoc/approvals && tee evil.json', 'plain cd into ledger + tee');
+    // Reads via a plain cd still ALLOWED.
+    assertAllowed('cd .ctoc/approvals && ls', 'plain cd + ls is a read');
+    assertAllowed('cd .ctoc/approvals && cat x.json', 'plain cd + cat is a read');
+    // Reads via an OPTION cd still ALLOWED (option-skip must not turn a read into a deny).
+    assertAllowed('cd -- .ctoc/approvals && ls', '`cd --` + ls is still just a read');
+    assertAllowed('cd -P .ctoc/approvals && cat x.json', '`cd -P` + cat is still just a read');
+    // Bare `-` WITHOUT `--` is the previous-dir shortcut → prefix reset → ALLOWED.
+    assertAllowed('cd .ctoc/approvals && cd - && tee evil.json',
+      'bare `cd -` resets to the previous dir (out of the ledger)');
+    // Absolute path into the ledger still DENIED.
+    assertDenied('cd /abs/.ctoc/approvals && cp f evil.json', 'absolute cd into ledger + cp');
+    // A normal, non-ledger cd + build command still ALLOWED.
+    assertAllowed('cd src && node build.js', 'ordinary cd + node build is not a ledger write');
+  });
 });
 
 // =============================================================================
