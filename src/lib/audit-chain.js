@@ -168,12 +168,35 @@ function verifyChain(projectRoot) {
   }
 
   const head = getChainHead(projectRoot);
-  if (head.hash !== previousChainHash && count > 0) {
+  // Reconcile the durable chain head (a SEPARATE file, .ctoc/audit/chain-head.yaml)
+  // against the walked log — INDEPENDENT of `count`. A non-genesis head PROVES entries
+  // once existed; if the walked log no longer terminates at that head, the log has been
+  // truncated or erased and the chain is broken. The former `&& count > 0` guard disabled
+  // exactly this check for an empty log, so full audit-trail erasure (wipe chain.jsonl ->
+  // count 0, walked hash GENESIS_HASH, non-genesis head) passed as ok:true. A
+  // never-initialized project has head.hash === GENESIS_HASH and is correctly skipped.
+  if (head.hash !== GENESIS_HASH && head.hash !== previousChainHash) {
     return {
       ok: false,
       reason: 'chain head does not match last log entry',
       expected: previousChainHash,
       stored: head.hash,
+    };
+  }
+  // Additional cross-check: the audit log is STRICTLY append-only. appendDispatch only
+  // ever appends one line and bumps head.sequence by exactly 1, and NO code path rotates,
+  // prunes, or truncates chain.jsonl — verified by grepping this module for
+  // rotate/prune/truncate/maxEntries (none) and confirming the only other reader,
+  // src/scripts/evidence-pack.js, is read-only. Hence head.sequence === (walked entry
+  // count) in every legitimate state, so a mismatch is tamper. This additionally catches
+  // the reset-head-keep-log direction (head reset to genesis while an intact log
+  // survives), which the hash reconciliation above deliberately skips at genesis.
+  if (head.sequence !== count) {
+    return {
+      ok: false,
+      reason: 'chain head sequence does not match log length',
+      expected: count,
+      stored: head.sequence,
     };
   }
   return { ok: true, count };

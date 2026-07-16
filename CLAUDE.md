@@ -263,7 +263,7 @@ ctoc/
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 25 categories
-  skills/                426 skill files (100 Tier-2 specialist bodies + 326 reference)
+  skills/                426 skill files (100 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill; + 326 reference)
   tests/                 382 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
@@ -314,7 +314,7 @@ ctoc/
 | 15 | DOCUMENT | iron-loop-executor (opus) | |
 | 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: User approves result |
 
-**Step labels are MANDATORY** — validated by `src/lib/plan-validator.js` (library) and enforced at runtime by `src/hooks/validate-plan-steps.js` (hook). Plans with wrong labels are REJECTED.
+**Step labels are MANDATORY.** The wired `src/lib/plan-validator.js` rejects a plan that is missing a required step (matched by step *number*). Label-*text* correctness (e.g. `TEST`, not `TESTING`) is checked by `src/hooks/validate-plan-steps.js`, which today runs only as a standalone script (`node src/hooks/validate-plan-steps.js`) and is NOT wired as a runtime hook — so a present-but-mislabeled step is not auto-rejected at runtime.
 
 **Step 10 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
 

@@ -268,60 +268,49 @@ function stampAndLedger(planPath, from, to, root, deps = {}, override = null) {
   const destContent = addApprovalMarker(originalContent, from, to, override);
   const contentHash = ledger.computeContentHash(destContent);
 
-  // Can the content-hashed ledger KEY this slug? The ledger (slice s1) restricts a
-  // slug to a lowercase-alphanumeric-plus-hyphen token as a hard path-traversal
-  // guard, so a legacy mixed-case slug (e.g. an early `CU1-…` plan) cannot be
-  // keyed. For such a plan we cross the gate MARKER-ONLY — the exact pre-ledger
-  // behavior — rather than refuse the crossing outright (which would strand real
-  // legacy plans). `ledger.slugFromPlanPath` is the SAME derivation the residency
-  // sweep (s3) uses, so a keyable (lowercase) slug is written and verified
-  // consistently on both sides; an un-keyable one is simply un-tracked on both.
-  // `ledgerPath` is a side-effect-free probe: it only validates and joins.
-  let ledgerKeyable = true;
-  try {
-    ledger.ledgerPath(slug, root);
-  } catch {
-    ledgerKeyable = false;
-  }
+  // The slug is guaranteed ledger-keyable here: the ONLY live caller, `approvePlan`,
+  // REFUSES an un-keyable slug (a basename outside `[a-z0-9-]`) BEFORE it ever reaches
+  // this function, and the residency sweep uses the SAME `ledger.slugFromPlanPath`
+  // derivation. The former "cross MARKER-ONLY when the slug is un-keyable" branch was
+  // REMOVED: it moved + stamped a plan with NO ledger entry, and because residency is
+  // ledger-driven (R3-C) the sweep then reverted that resident as a gate violation — a
+  // genuinely-approved plan branded a forgery. So the ledger entry is ALWAYS written.
 
   // Step 2: move (rename) source → dest, then write the MARKED bytes at the dest.
   // The marker never touches the source file, so state (c) cannot occur.
   const newPath = move(planPath, to);
   try {
     safeFs.writeFileSync(newPath, destContent);
-    // Step 3: commit the approval in the ledger (the source of approval truth)
-    // whenever the slug is keyable.
-    if (ledgerKeyable) {
-      writeEntry(slug, {
-        content_sha256: contentHash,
-        stage_from: from,
-        stage_to: to,
-        approved_by: 'human',
-        // Handover (a): the case-collision guard in approval-ledger.persistEntry only fires
-        // when BOTH the existing and incoming records carry `plan_basename`. The live human-
-        // approval path omitted it, so two case-differing plans (e.g. `case-plan.md` and
-        // `Case-Plan.md`) silently overwrote each other's provenance on the shared canonical
-        // key — and the first plan then FAILED its content-hash verify and got reverted out
-        // of its gate destination. Recording the original-cased basename arms the guard.
-        plan_basename: path.basename(planPath).replace(/\.md$/i, '')
-      }, root);
+    // Step 3: commit the approval in the ledger (the source of approval truth).
+    writeEntry(slug, {
+      content_sha256: contentHash,
+      stage_from: from,
+      stage_to: to,
+      approved_by: 'human',
+      // Handover (a): the case-collision guard in approval-ledger.persistEntry only fires
+      // when BOTH the existing and incoming records carry `plan_basename`. The live human-
+      // approval path omitted it, so two case-differing plans (e.g. `case-plan.md` and
+      // `Case-Plan.md`) silently overwrote each other's provenance on the shared canonical
+      // key — and the first plan then FAILED its content-hash verify and got reverted out
+      // of its gate destination. Recording the original-cased basename arms the guard.
+      plan_basename: path.basename(planPath).replace(/\.md$/i, '')
+    }, root);
 
-      // R5-B: record the override PROVENANCE in the ledger entry. A silent override
-      // — a forced crossing indistinguishable from a clean one — is the defect. The
-      // approval ledger (READ-ONLY here) only persists its whitelisted fields, so the
-      // override flag is merged into the persisted record via the ledger's OWN
-      // ledgerPath, AFTER writeEntry, so the collision + required-field guards still
-      // run first. Any failure here throws into the rollback below (never a partial,
-      // provenance-less forced crossing).
-      if (override) {
-        const entryPath = ledger.ledgerPath(slug, root);
-        if (safeFs.existsSync(entryPath)) {
-          const persisted = JSON.parse(safeFs.readFileSync(entryPath, 'utf8'));
-          persisted.override = true;
-          persisted.override_reason =
-            String((override && override.reason) || '').replace(/[\r\n]+/g, ' ').trim();
-          safeFs.writeFileSync(entryPath, JSON.stringify(persisted, null, 2));
-        }
+    // R5-B: record the override PROVENANCE in the ledger entry. A silent override
+    // — a forced crossing indistinguishable from a clean one — is the defect. The
+    // approval ledger (READ-ONLY here) only persists its whitelisted fields, so the
+    // override flag is merged into the persisted record via the ledger's OWN
+    // ledgerPath, AFTER writeEntry, so the collision + required-field guards still
+    // run first. Any failure here throws into the rollback below (never a partial,
+    // provenance-less forced crossing).
+    if (override) {
+      const entryPath = ledger.ledgerPath(slug, root);
+      if (safeFs.existsSync(entryPath)) {
+        const persisted = JSON.parse(safeFs.readFileSync(entryPath, 'utf8'));
+        persisted.override = true;
+        persisted.override_reason =
+          String((override && override.reason) || '').replace(/[\r\n]+/g, ' ').trim();
+        safeFs.writeFileSync(entryPath, JSON.stringify(persisted, null, 2));
       }
     }
   } catch (err) {
@@ -334,7 +323,7 @@ function stampAndLedger(planPath, from, to, root, deps = {}, override = null) {
     // there is nothing OUR crossing added to remove — and removing it would erase the very
     // provenance the collision guard exists to protect. Skip removeEntry in that case.
     const isCollision = /collision/i.test(String(err && err.message));
-    if (ledgerKeyable && !isCollision) { try { removeEntry(slug, root); } catch { /* best-effort */ } }
+    if (!isCollision) { try { removeEntry(slug, root); } catch { /* best-effort */ } }
     throw err;
   }
   return newPath;
@@ -385,6 +374,35 @@ function approvePlan(planPath, projectPath, options = {}) {
           failures,
           validation
         };
+      }
+
+      // The approval ledger is the SOURCE OF APPROVAL TRUTH (R3-C): residency at a
+      // gate destination is ledger-driven, so a crossing that CANNOT be recorded in
+      // the ledger is NOT a real crossing. A slug the ledger cannot KEY (a basename
+      // with an underscore, dot, space, or any char outside `[a-z0-9-]`) would cross
+      // MARKER-ONLY — moved + stamped but with no ledger entry — and the residency
+      // sweep (human-gate-check.js / iron-loop-enforcer.checkGateDestinationsApproved)
+      // would then REVERT it and brand it a gate violation: a plan the human genuinely
+      // approved, silently reverted as a forgery. Even a human override cannot rescue
+      // it — an un-keyable slug can never be ledgered, so the override provenance has
+      // nowhere to be recorded. REFUSE up front (before clearStatus/applyIronLoop, so
+      // the refused plan is left byte-identical and in place), matching the failing-
+      // validation refusal contract. `ledger.slugFromPlanPath` is the SAME derivation
+      // the residency sweep uses, so this probe agrees with the sweep exactly.
+      if (isHumanGate) {
+        const ledger = require('./approval-ledger');
+        try {
+          ledger.ledgerPath(ledger.slugFromPlanPath(planPath), root);
+        } catch {
+          return {
+            ok: false,
+            refused: true,
+            reason: `${from}→${to} refused: plan slug is not ledger-keyable ` +
+                    `(rename to a lowercase [a-z0-9-] basename so the approval can be recorded)`,
+            failures: ['un-keyable slug'],
+            validation: null
+          };
+        }
       }
 
       // Clear any existing status from previous stage
