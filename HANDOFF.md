@@ -5,10 +5,33 @@
 - Updated: 2026-07-16 by claude
 - Branch: main
 - Status: in progress — FRESH 50-round campaign (Tijn re-issued the order 2026-07-16 as
-  a NEW round of improvement, not the old standing order). ~13 rounds done, 7 waves
-  committed + pushed (v6.12.57 → v6.12.63), 46 real defects fixed. Convergence (3
-  consecutive different-lens clean rounds) NOT reached — every fleet still finds real
-  HIGH/CRITICAL defects. v6.12.63 (b0ac2fe) wave 6 shipped 10 fixes incl. 3 HIGH:
+  a NEW round of improvement, not the old standing order). ~19 rounds done, 11 waves
+  committed + pushed (v6.12.57 → v6.12.67), 80 real defects fixed. Convergence (3
+  consecutive different-lens clean rounds) NOT reached — but the lenses are narrowing
+  (wave-10 cross-platform lens was the FIRST fully-clean lens; slug-provenance had only
+  1 LOW oracle). LATEST TWO WAVES:
+  v6.12.66 (d975fbc) wave 9 — 9 fixes incl. 2 CRITICAL (secrets-scanner isInComment
+  dropped a real secret when the line merely contained /*, now position-aware block-
+  comment span; PreToolUse.Bash cd --/-L/-P/-@ option-token captured as the cd target,
+  bypassing the ledger-forgery gate) + 1 HIGH RCE (quality-agent execSync interpolated
+  coverage-map test paths -> execFileSync argv) + 1 HIGH concurrency (audit-chain
+  appendDispatch no lock + 2 non-atomic writes -> O_EXCL chain lock + log-tail-derived
+  self-healing head) + quality-state O_EXCL lock, actions/traceability atomic writes,
+  test-gate unanchored-coverage+NaN, hooks-installer foreign-hook deletion.
+  v6.12.67 (0831eb0) wave 10 — 6 fixes incl. 1 CRITICAL (dependency-auditor swallowed
+  empty-stdout scanner failure -> false-clean CVE verdict; _recordScannerFailure +
+  honest run() + maxBuffer + _hasNativeLockfile) + the RRF->cosine index fix (TIJN
+  APPROVED option B 2026-07-16: duplicate-guard + related() fallback now read true
+  cosine from store.search, not RRF, so the 0.85/0.78 thresholds work again — the
+  duplicate guard was a silent no-op on every default install) + quality-gate
+  numericOrFail (non-numeric metric passed every dimension but coverage) + validate-
+  plan-steps fence/region/heading scoping + actions.js planDependsOn + product-loop
+  slug/date guards (LOW traversal). Next: continue fleets (re-attack waves 9-10 + fresh
+  deep angles) toward the 3-clean-rounds convergence. STILL OPEN (Tijn's, not mine): the
+  ledger-backfill forgery (option C, Tijn-decided) — its own Iron Loop plan spanning
+  approval-ledger + human-gate-check + a human-confirmation path, through Tijn's Gate 2.
+  --- earlier waves (unchanged history) below ---
+  v6.12.63 (b0ac2fe) wave 6 shipped 10 fixes incl. 3 HIGH:
   regulatory-regime stray-Z (whole regime silently off when it is the last settings
   block), legal-hold status matcher fail-open (delete during a live hold),
   traceability-matrix non-atomic save; + irac/data-lineage/ai-provenance/version MED,
