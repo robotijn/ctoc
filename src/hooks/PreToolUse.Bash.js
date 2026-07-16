@@ -141,6 +141,16 @@ const LEDGER_PATH_RE = /\.ctoc\/+approvals/i;
 const LEDGER_RESOLVED_RE = /(^|\/)\.ctoc\/+approvals(\/|$)/i;
 
 /**
+ * Adjacency match for the ledger dir ANYWHERE in a normalized command segment
+ * (catches literal, quote-split, and inline-code forms), but PATH-BOUNDED so a
+ * sibling like `.ctoc/approvals-summary/x`, `.ctoc/approvalsdata.txt`, or
+ * `.ctoc/approvals.bak` does NOT false-match. `.ctoc/approvals` must be a whole
+ * path component: preceded by a non-[a-z0-9._-] char (or start) and followed by a
+ * `/`, whitespace, or end (quotes are already stripped by normalizeForMatch).
+ */
+const LEDGER_SEGMENT_RE = /(^|[^a-z0-9._-])\.ctoc\/+approvals(\/|\s|$)/i;
+
+/**
  * Resolve one command token to a POSIX path against the accumulated cwd built up
  * from prior `cd`/`pushd` segments, stripping quotes, wrapping parens, and any
  * leading redirect operators. Matching-only — never used for execution.
@@ -201,7 +211,7 @@ function isLedgerWrite(command) {
     // (a) adjacent path anywhere in the normalized segment (literal / quote-split
     //     / inline-code); OR (b) an operand resolving under the ledger via the cd
     //     prefix. Redirect operators become separators so `echo x>approvals/y` splits.
-    let touches = LEDGER_PATH_RE.test(normalizeForMatch(seg));
+    let touches = LEDGER_SEGMENT_RE.test(normalizeForMatch(seg));
     if (!touches) {
       const tokens = seg.replace(/[<>]+/g, ' ').split(/\s+/).filter(Boolean);
       const operands = tokens.slice(1).filter((t) => !t.startsWith('-'));

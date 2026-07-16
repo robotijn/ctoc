@@ -1418,25 +1418,35 @@ function planActions(stage, file, projectPath) {
 
   text += '\n  Type "more" for delete and other actions.\n\n\n';
 
-  const nextStage = NEXT_STAGE[stage];
-  const approveLabel = nextStage ? `Approve → ${nextStage}` : 'Approve';
+  // Approve is a HUMAN-GATE affordance, gated on the REAL crossable set
+  // (HUMAN_GATES: functional→implementation, implementation→todo) — NOT on the
+  // full pipeline flow NEXT_STAGE. approvePlan only crosses the three human-gate
+  // edges and THROWS "Unknown plan location" for anything else; offering Approve
+  // for a non-gate stage (todo, canvas, in-progress) made validate signal
+  // autoApprove:true and the driver auto-crashed on the clean path. (review has
+  // its own reviewActions, handled above.)
+  const gateTarget = HUMAN_GATES[stage];
 
   // Critique comes FIRST — it is the most important thing you can do to a plan.
-  // Then the same verbs: Create, View/Edit, Approve. View and Edit are one action
-  // — opening a plan shows it and lets you edit it in the same step.
+  // Then the same verbs: Create, View/Edit, and (only at a real gate) Approve.
+  // View and Edit are one action — opening a plan shows it and lets you edit it.
   const options = [
     { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.' },
     { label: 'Create new', description: `Create a new ${stage} plan` },
-    { label: 'View/Edit', description: 'Show the plan, then edit it' },
-    { label: approveLabel, description: `Validate and move to ${nextStage || 'next stage'}` }
+    { label: 'View/Edit', description: 'Show the plan, then edit it' }
   ];
 
   const actions = {
     'Discuss': 'claude:discuss',
     'Create new': `claude:create-plan ${stage}`,
-    'View/Edit': `claude:view-edit ${stage}/${file}`,
-    [approveLabel]: `validate ${stage}/${file}`
+    'View/Edit': `claude:view-edit ${stage}/${file}`
   };
+
+  if (gateTarget) {
+    const approveLabel = `Approve → ${gateTarget}`;
+    options.push({ label: approveLabel, description: `Validate and move to ${gateTarget}` });
+    actions[approveLabel] = `validate ${stage}/${file}`;
+  }
 
   return {
     text,
@@ -1618,7 +1628,27 @@ function validateScreen(stage, file, projectPath) {
     return invalidPlanRefScreen(stage, file);
   }
   const planPath = path.join(plansDir, folder, file);
-  const nextStage = NEXT_STAGE[stage];
+  // Approval crosses only the three human-gate edges (HUMAN_GATES). For any
+  // other stage (canvas, todo, in-progress) there is no gate to validate:
+  // running the transition-as-gate here returned autoApprove:true and the driver
+  // auto-ran claude:approve → approvePlan THROWS "Unknown plan location". Refuse
+  // with a non-approving screen (no autoApprove, no claude:approve) instead.
+  const nextStage = HUMAN_GATES[stage];
+  if (!nextStage) {
+    return {
+      text: `No approval gate for ${stage}\n${'─'.repeat(40)}\n\n  ${stage} plans do not cross a human gate here.\n  (todo advances via start-agent; in-progress → review via task completion.)\n\n\n`,
+      ask: {
+        questions: [{
+          question: 'Not a human-gate approval.',
+          header: 'Validate',
+          options: [{ label: 'Back', description: `Return to ${stage} list` }]
+        }]
+      },
+      actions: { 'Back': `browse ${stage}` },
+      // One-turn signal is OFF: there is nothing to auto-approve here.
+      autoApprove: false
+    };
+  }
 
   // Run validation
   const validationResult = validateTransition(planPath, stage, nextStage, root);

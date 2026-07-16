@@ -244,6 +244,37 @@ describe('successful moves', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Destination collision — a same-basename plan already resident at the target
+// stage must NOT be silently overwritten (rename atomically replaces it, which
+// is silent data loss). The CLI must REFUSE and leave BOTH files intact.
+// ---------------------------------------------------------------------------
+describe('destination collision protection', () => {
+  test('refuses to overwrite an existing plan of the same basename at the destination', () => {
+    // Two plans share the basename foo.md across stages: content A in the source
+    // (todo), content B already resident at the destination (in-progress). A bare
+    // rename would destroy content B AND remove the source — both silently.
+    const src = writePlan('todo', 'foo.md', 'content A\n');
+    const destExisting = path.join(fixtureDir, 'plans', 'in-progress', 'foo.md');
+    fs.writeFileSync(destExisting, 'content B\n');
+
+    // todo -> in-progress crosses no gate, so nothing else intervenes.
+    const { code, stderr } = runMovePlan(['todo/foo.md', 'in-progress']);
+
+    assert.strictEqual(code, 1, 'a destination collision must be refused');
+    assert.match(stderr, /Refusing to overwrite existing plan/);
+    assert.match(stderr, /in-progress\/foo\.md/);
+    // BOTH files must survive byte-for-byte — no move happened.
+    assert.ok(fs.existsSync(src), 'source must remain after a refused collision');
+    assert.strictEqual(fs.readFileSync(src, 'utf8'), 'content A\n', 'source content intact');
+    assert.strictEqual(
+      fs.readFileSync(destExisting, 'utf8'),
+      'content B\n',
+      'existing destination content must NOT be overwritten',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Failure of the underlying move — the try/catch guard around movePlan().
 // ---------------------------------------------------------------------------
 describe('movePlan failure surfaces as exit 1', () => {

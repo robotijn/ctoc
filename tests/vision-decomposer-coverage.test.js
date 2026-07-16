@@ -28,6 +28,7 @@ const os = require('os');
 const path = require('path');
 
 const decomposer = require('../src/lib/vision-decomposer');
+const gate = require('../src/hooks/human-gate-check');
 
 // ---------------------------------------------------------------------------
 // Fixture helpers — real temp projects on disk, tracked for teardown.
@@ -446,5 +447,113 @@ describe('listStubs', () => {
 
     // Assert
     assert.deepEqual(stubs, []);
+  });
+});
+
+// ===========================================================================
+// DEFECT 1 (HIGH) — completeVision must write a ledger archive entry BEFORE the
+// move to done/, or human-gate-check's uniformly ledger-driven done/ residency
+// sweep brands the just-archived vision 'no-ledger-entry' and reverts it.
+// ===========================================================================
+
+describe('completeVision — ledger archive entry (Defect 1)', () => {
+  /** Build the full plan folder skeleton the residency sweep expects. */
+  function mkGateRoot(label) {
+    const root = mkRoot(label);
+    for (const d of ['vision', 'functional', 'done', 'review']) {
+      fs.mkdirSync(path.join(root, 'plans', d), { recursive: true });
+    }
+    fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+    return root;
+  }
+
+  test('leaves NO done/ residency violation after archiving the vision', () => {
+    // Arrange — a live vision ready to decompose.
+    const root = mkGateRoot('cv-ledger');
+    const vp = writeVision(root, 'my-vision',
+      '---\ntype: vision\n---\n\n## Vision: My Vision\nProblem/audience/success.\n');
+
+    // Act — the live archive path.
+    const { newPath } = decomposer.completeVision(vp, root);
+
+    // Assert — the archive landed in done/ AND the ledger sweep is clean.
+    assert.ok(fs.existsSync(newPath), 'vision archived to done/');
+    const violations = gate.checkFolder('done', root);
+    assert.deepEqual(
+      violations,
+      [],
+      'the ledger-driven residency sweep must report zero violations; a ' +
+      "missing archive entry brands the vision 'no-ledger-entry' and reverts it"
+    );
+  });
+});
+
+// ===========================================================================
+// DEFECT 2 (MEDIUM) — parseCanvas H2-block regex carries a stray literal `Z|`
+// in its terminating lookahead, so any capital Z in a block body truncates the
+// capture ("New Zealand" → "New"). Silent corruption of pipeline-entry data.
+// ===========================================================================
+
+describe('parseCanvas — capital-Z truncation (Defect 2)', () => {
+  test('keeps full block bodies that contain a capital Z', () => {
+    // Arrange — canvas prose with capital-Z words in the block bodies.
+    const root = mkRoot('canvas-z');
+    const cdir = path.join(root, 'plans', 'canvas');
+    fs.mkdirSync(cdir, { recursive: true });
+    const cpath = path.join(cdir, 'zed.md');
+    fs.writeFileSync(cpath,
+      '---\ncanvas_type: lean\n---\n\n' +
+      '## Problem\nWe serve customers in New Zealand and the Zurich Zone.\n\n' +
+      '## Solution\nAutomated Zebra reporting.\n', 'utf8');
+
+    // Act
+    const parsed = decomposer.parseCanvas(cpath);
+
+    // Assert — the full text survives; a stray `Z|` in the lookahead truncates it.
+    assert.equal(
+      parsed.blocks.Problem,
+      'We serve customers in New Zealand and the Zurich Zone.',
+      'a capital Z must not terminate the block capture'
+    );
+    assert.equal(parsed.blocks.Solution, 'Automated Zebra reporting.');
+  });
+});
+
+// ===========================================================================
+// DEFECT 3 (HIGH) — createStub derives the filename from slugify(goal.title) and
+// unconditionally writes it, so two DISTINCT goals that slugify identically map
+// to the same file — the second overwrites the first, silently dropping a whole
+// functional goal while decomposeVision still reports N stubs.
+// ===========================================================================
+
+describe('decomposeVision — slug-collision data loss (Defect 3)', () => {
+  test('persists BOTH goals when their titles slugify to the same value', () => {
+    // Arrange — two DIFFERENT goals whose titles slugify identically.
+    const root = mkRoot('dv-collision');
+    const vp = writeVision(root, 'my-vision', '---\ntype: vision\n---\n# Vision\n');
+    const goals = [
+      { title: 'User Login', scope: 'first goal body' },
+      { title: 'user  login!', scope: 'SECOND goal body — different requirement' },
+    ];
+
+    // Act
+    const { stubs } = decomposer.decomposeVision(vp, goals, root);
+
+    // Assert — two stubs returned AND two distinct files on disk.
+    assert.equal(stubs.length, 2, 'one stub per goal returned');
+    const files = fs.readdirSync(path.join(root, 'plans', 'functional'));
+    assert.equal(files.length, 2, 'both stubs written to disk — no silent overwrite');
+
+    // Both goal bodies must survive somewhere on disk.
+    const bodies = files.map(f =>
+      fs.readFileSync(path.join(root, 'plans', 'functional', f), 'utf8'));
+    assert.ok(bodies.some(b => b.includes('first goal body')), "first goal's body persisted");
+    assert.ok(bodies.some(b => b.includes('SECOND goal body')), "second goal's body persisted");
+
+    // The returned list must MATCH disk — every returned path exists and is unique.
+    const returnedPaths = stubs.map(s => s.path);
+    assert.equal(new Set(returnedPaths).size, 2, 'returned paths are distinct');
+    assert.ok(returnedPaths.every(p => fs.existsSync(p)), 'every returned path exists on disk');
+    assert.equal(new Set(stubs.map(s => s.name)).size, 2, 'returned names are distinct');
   });
 });

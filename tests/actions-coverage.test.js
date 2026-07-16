@@ -180,6 +180,26 @@ describe('movePlan', () => {
     assert.equal(fs.existsSync(planPath), false);
     assert.equal(exists('review', 'mover'), true);
   });
+
+  it('THROWS instead of overwriting an existing plan of the same basename at the destination', () => {
+    // A plan slug lives in exactly one stage; a same-basename file already at the
+    // destination is always a bug (a stale revert copy, a re-created slug). A bare
+    // renameSync would atomically REPLACE it — silent data loss. movePlan is the
+    // chokepoint that also protects approvePlan's internal move, so it must throw.
+    const planPath = writePlan('in-progress', 'dupe', 'content A\n');
+    const destExisting = writePlan('todo', 'dupe', 'content B\n');
+
+    assert.throws(
+      () => actions.movePlan(planPath, 'todo', root),
+      /exist/i,
+      'movePlan must refuse to overwrite an existing destination',
+    );
+
+    // BOTH files survive byte-for-byte — no rename happened.
+    assert.equal(fs.existsSync(planPath), true, 'source must survive');
+    assert.equal(fs.readFileSync(planPath, 'utf8'), 'content A\n');
+    assert.equal(fs.readFileSync(destExisting, 'utf8'), 'content B\n', 'destination not overwritten');
+  });
 });
 
 // ── rejectPlan ────────────────────────────────────────────────────────────────

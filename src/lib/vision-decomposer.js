@@ -54,7 +54,7 @@ function parseCanvas(canvasPath) {
   // Parse H2 blocks — keyed by the heading text, so the shape is a string map.
   /** @type {{[heading: string]: string}} */
   const blocks = {};
-  const blockRegex = /^##\s+(.+?)\n([\s\S]*?)(?=^##\s+|Z|$(?![\s\S]))/gm;
+  const blockRegex = /^##\s+(.+?)\n([\s\S]*?)(?=^##\s+|$(?![\s\S]))/gm;
   let match;
   while ((match = blockRegex.exec(body)) !== null) {
     const heading = match[1].trim();
@@ -157,8 +157,20 @@ function createStub(visionSlug, goal, visionPath, projectPath) {
   }
 
   const goalSlug = slugify(goal.title);
-  const fileName = `${visionSlug}-${goalSlug}.md`;
-  const filePath = path.join(functionalDir, fileName);
+  const baseSlug = `${visionSlug}-${goalSlug}`;
+  // Defect 3: two DISTINCT goal titles can slugify identically (case/whitespace/
+  // punctuation collapse). Unconditionally writing `${baseSlug}.md` would let the
+  // second goal silently overwrite the first — a whole functional goal lost with
+  // no error. Disambiguate against what is already on disk: keep the plain slug
+  // when free, else append -2, -3, … until a free name is found, so BOTH goals
+  // persist. The ACTUAL name used is threaded back through the return value so
+  // decomposeVision's reported list matches disk.
+  let fileName = `${baseSlug}.md`;
+  let filePath = path.join(functionalDir, fileName);
+  for (let n = 2; safeFs.existsSync(filePath); n += 1) {
+    fileName = `${baseSlug}-${n}.md`;
+    filePath = path.join(functionalDir, fileName);
+  }
   const visionBasename = path.basename(visionPath);
   const visionRef = `vision/${visionBasename}`;
 
@@ -258,6 +270,14 @@ function completeVision(visionPath, projectPath) {
   }
 
   safeFs.writeFileSync(visionPath, content);
+
+  // Defect 1: done/ residency is uniformly ledger-driven (R3-A) — an archived
+  // vision with no ledger entry is branded 'no-ledger-entry' and reverted by
+  // human-gate-check's residency sweep. Write the sanctioned archive entry NOW,
+  // against the final on-disk bytes (which move byte-identically to done/), so
+  // the archive earns its residency BEFORE the move. Its docstring mandates this
+  // immediately before movePlan.
+  require('./approval-ledger').writeVisionArchiveEntry(root, visionPath);
 
   // Move to done/
   const newPath = movePlan(visionPath, 'done', root);
