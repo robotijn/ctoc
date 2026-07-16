@@ -203,7 +203,12 @@ function isLedgerWrite(command) {
     const cd = seg.match(/^(?:cd|pushd)\s+([^\s;&|)]+)/i);
     if (cd) {
       const dir = cd[1].replace(/['"`()]/g, '');
-      if (!dir || dir === '-' || dir.startsWith('~')) prefix = '';
+      if (!dir || dir === '-') prefix = '';
+      // A `~`/`~user` home prefix: STRIP only the tilde+user+slash and keep the
+      // REMAINDER as a rooted prefix — do NOT discard the whole path. Resetting to
+      // '' on any `~` threw away the ledger suffix, so `cd ~/…/.ctoc/approvals && tee
+      // evil.json` resolved evil.json to root and slipped the forgery gate.
+      else if (dir.startsWith('~')) prefix = path.posix.normalize(dir.replace(/^~[^/]*\/?/, ''));
       else if (dir.startsWith('/')) prefix = path.posix.normalize(dir);
       else prefix = path.posix.normalize((prefix ? prefix + '/' : '') + dir);
       continue;

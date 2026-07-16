@@ -166,6 +166,45 @@ function releaseLock() {
 }
 
 /**
+ * Whether THIS process currently holds the quality-state lock. Reads the lock
+ * file directly (never through the noisy acquireLock path) so a nested update can
+ * detect that the surrounding quality run already owns the lock.
+ * @returns {boolean}
+ */
+function lockHeldBySelf() {
+  const lockFile = getLockFilePath();
+  if (!safeFs.existsSync(lockFile)) return false;
+  const lockData = safeRead(lockFile);
+  return !!(lockData && lockData.pid === process.pid);
+}
+
+/**
+ * Serialize a read-modify-write of the quality state under the module's own lock,
+ * so two writers cannot interleave getStatus()→mutate→atomicWrite() and lose each
+ * other's update (a failing tier result must never be clobbered by a concurrent
+ * pass). Re-entrancy-safe and best-effort:
+ *   - If this process ALREADY holds the lock (the quality runner acquires it
+ *     around the whole run, then calls these wrappers), run the critical section
+ *     WITHOUT re-acquiring and WITHOUT releasing the outer lock.
+ *   - Otherwise acquire the lock, run, and release it in `finally` — but only
+ *     release a lock WE acquired. acquireLock is non-blocking; when a foreign live
+ *     holder owns it we proceed best-effort (advisory), which is strictly better
+ *     than the previous unguarded write and never blocks the caller.
+ * @template T
+ * @param {() => T} fn  the load→mutate→write critical section
+ * @returns {T}
+ */
+function withStatusLock(fn) {
+  if (lockHeldBySelf()) return fn(); // nested under the run-level lock: do not double-lock/release
+  const acquired = acquireLock();
+  try {
+    return fn();
+  } finally {
+    if (acquired) releaseLock();
+  }
+}
+
+/**
  * Get current status
  */
 function getStatus() {
@@ -198,10 +237,12 @@ function getStatus() {
  * Update status
  */
 function updateStatus(updates) {
-  const current = getStatus();
-  const updated = { ...current, ...updates, asOf: new Date().toISOString() };
-  atomicWrite(getStatusFilePath(), updated);
-  return updated;
+  return withStatusLock(() => {
+    const current = getStatus();
+    const updated = { ...current, ...updates, asOf: new Date().toISOString() };
+    atomicWrite(getStatusFilePath(), updated);
+    return updated;
+  });
 }
 
 /**
@@ -250,17 +291,19 @@ function setCompleted(passed, summary) {
  * @param {Object} tierResult - { status, checks?, warnings?, details? }
  */
 function updateTierStatus(tierName, tierResult) {
-  const status = getStatus();
-  if (!status.tiers) {
-    status.tiers = {};
-  }
-  status.tiers[tierName] = {
-    ...status.tiers[tierName],
-    ...tierResult,
-    checkedAt: new Date().toISOString()
-  };
-  atomicWrite(getStatusFilePath(), { ...status, asOf: new Date().toISOString() });
-  return status;
+  return withStatusLock(() => {
+    const status = getStatus();
+    if (!status.tiers) {
+      status.tiers = {};
+    }
+    status.tiers[tierName] = {
+      ...status.tiers[tierName],
+      ...tierResult,
+      checkedAt: new Date().toISOString()
+    };
+    atomicWrite(getStatusFilePath(), { ...status, asOf: new Date().toISOString() });
+    return status;
+  });
 }
 
 /**
@@ -301,10 +344,12 @@ function getFileHashes() {
  * Update file hashes
  */
 function updateFileHashes(hashes) {
-  const current = getFileHashes();
-  const updated = { ...current, ...hashes };
-  atomicWrite(getFileHashesPath(), updated);
-  return updated;
+  return withStatusLock(() => {
+    const current = getFileHashes();
+    const updated = { ...current, ...hashes };
+    atomicWrite(getFileHashesPath(), updated);
+    return updated;
+  });
 }
 
 /**

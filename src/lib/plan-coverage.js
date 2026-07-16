@@ -141,6 +141,23 @@ function readPlanFiles(planPath) {
 }
 
 /**
+ * Whether a plan `files:` glob itself escapes the project root — i.e. it is
+ * `..` or contains a `..` path segment (either separator). Defense in depth for
+ * root confinement: such a glob is ignored so a plan can never declare
+ * out-of-tree coverage in the first place. A literal `..` inside a filename
+ * segment (never a real path) is not our concern; matching whole segments is
+ * the correct, conservative test.
+ *
+ * @param {string} glob
+ * @returns {boolean}
+ */
+function globEscapesRoot(glob) {
+  if (typeof glob !== 'string') return false;
+  const segments = glob.replace(/\\/g, '/').split('/');
+  return segments.includes('..');
+}
+
+/**
  * Score a glob's specificity (more specific = higher score).
  * Used to pick the most-specific match within a stage.
  *
@@ -162,7 +179,27 @@ function specificity(glob) {
 function findCoveringPlan(targetFile, root) {
   // Normalize target relative to root for matching
   const absTarget = path.isAbsolute(targetFile) ? targetFile : path.join(root, targetFile);
-  const relTarget = path.relative(root, absTarget).replace(/\\/g, '/');
+  const relRaw = path.relative(root, absTarget);
+  const relTarget = relRaw.replace(/\\/g, '/');
+
+  // ROOT CONFINEMENT (out-of-repo write prevention). The coverage oracle backs
+  // the Edit hook's allow-decision, so it must NEVER vouch for a path outside
+  // the project tree. A target whose relative path escapes root — '..', a
+  // '../…' prefix (either separator), or an absolute path (path.relative can
+  // return one for a different Windows drive) — is rejected outright. Without
+  // this, a plan declaring `files: ["../../**"]` (plan files are edit-
+  // whitelisted, so an agent can author one) would authorize an arbitrary
+  // write anywhere on disk.
+  if (
+    relTarget === '..' ||
+    relTarget.startsWith('../') ||
+    relRaw === '..' ||
+    relRaw.startsWith('..' + path.sep) ||
+    path.isAbsolute(relRaw) ||
+    path.isAbsolute(relTarget)
+  ) {
+    return null;
+  }
 
   for (const stage of STAGE_PRIORITY) {
     const stageDir = path.join(root, 'plans', stage);
@@ -174,6 +211,8 @@ function findCoveringPlan(targetFile, root) {
       const planPath = path.join(stageDir, f);
       const globs = readPlanFiles(planPath);
       for (const glob of globs) {
+        // Defense in depth: a plan may not declare out-of-tree coverage.
+        if (globEscapesRoot(glob)) continue;
         const re = globToRegex(glob);
         if (re.test(relTarget)) {
           const score = specificity(glob);

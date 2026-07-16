@@ -137,6 +137,40 @@ describe('Transition Log Tests', () => {
     console.log('# logTransition records human gate crossing');
   });
 
+  test('logTransition records override flag when a failed validation is forced (R5-B)', () => {
+    // A forced Gate-3 crossing past a FAILED validation must be persisted
+    // distinguishably from a clean approval. actions.approvePlan passes
+    // override:true; the logEntry must carry it through to disk.
+    const returned = transitionLog.logTransition({
+      plan: 'forced-plan.md',
+      from: 'review',
+      to: 'done',
+      actor: 'human',
+      override: true
+    }, testDir);
+
+    assert.strictEqual(returned.override, true, 'returned entry carries override:true');
+
+    const entries = transitionLog.readLog(testDir);
+    assert.strictEqual(entries[0].override, true, 'persisted line carries override:true');
+    console.log('# logTransition records override flag');
+  });
+
+  test('logTransition defaults override to false for a clean transition', () => {
+    const returned = transitionLog.logTransition({
+      plan: 'clean-plan.md',
+      from: 'review',
+      to: 'done',
+      actor: 'human'
+    }, testDir);
+
+    assert.strictEqual(returned.override, false, 'returned entry defaults override to false');
+
+    const entries = transitionLog.readLog(testDir);
+    assert.strictEqual(entries[0].override, false, 'persisted line defaults override to false');
+    console.log('# logTransition defaults override to false');
+  });
+
   test('getTransitionsForPlan filters by plan name', () => {
     transitionLog.logTransition({ plan: 'plan-a.md', from: 'functional', to: 'implementation', actor: 'human' }, testDir);
     transitionLog.logTransition({ plan: 'plan-b.md', from: 'functional', to: 'implementation', actor: 'human' }, testDir);

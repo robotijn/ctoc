@@ -418,3 +418,4 @@
 {"timestamp":"2026-07-13T20:53:25.238Z","plan":"ctoc-audit-w11-s7-queue-order-and-dead-exports.md","from":"review","to":"done","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true}
 {"timestamp":"2026-07-13T20:53:25.260Z","plan":"ctoc-audit-w11-state-durability-and-deadcode.md","from":"review","to":"done","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true}
 {"timestamp":"2026-07-13T20:53:25.285Z","plan":"menu-critique-first.md","from":"review","to":"done","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true}
+{"timestamp":"2026-07-16T08:01:15.053Z","plan":"x.md","from":"review","to":"done","actor":"human","validation":null,"humanGate":true,"marker":true,"override":true}

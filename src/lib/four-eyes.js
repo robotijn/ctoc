@@ -235,6 +235,27 @@ function verifyFourEyes(plan, projectRoot) {
     return { passed: false, reason: `Role "${independent}" lacks can_approve authority; cannot sign approved_by_independent.`, author, independent };
   }
 
+  // Segregation-of-duties, primary check: a single role NAME cannot sign both
+  // markers. Role identity is OPTIONAL in roles.yaml — when a role has no
+  // `identity` field, the identity-equality guard below short-circuits FALSE
+  // and a single principal signing BOTH markers would otherwise fall through to
+  // passed:true (a fail-open on a dual-control gate). The role NAME is always
+  // present and is itself a valid distinctness signal, so a matching NAME is an
+  // unconditional refusal here — independent of any identity field.
+  //
+  // Note we do NOT refuse merely because identities are missing: two DIFFERENT
+  // name-only roles (e.g. alice vs bob, no identity) are legitimately distinct
+  // principals and must still PASS; over-blocking would break every name-only
+  // roles.yaml. Precedence is: same NAME → fail; else same identity → fail;
+  // else → pass.
+  if (author === independent) {
+    return {
+      passed: false,
+      reason: `Four-eyes violation: a single role "${author}" signed both markers; author-review and independent approval must be distinct principals.`,
+      author, independent,
+    };
+  }
+
   // The load-bearing check: identities must differ.
   if (authorRole.identity && independentRole.identity && authorRole.identity === independentRole.identity) {
     return {

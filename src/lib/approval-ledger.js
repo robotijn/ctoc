@@ -286,9 +286,11 @@ function writeVisionArchiveEntry(projectPath, planPath) {
 
 /**
  * Shared write path for both entry kinds: validates the slug (traversal guard),
- * validates the REQUIRED_FIELDS, runs the case-collision guard, then writes the
- * record atomically-enough for a pretty-printed JSON leaf. The guards all run
- * BEFORE any filesystem write, so a rejected write never leaves a partial file.
+ * validates the REQUIRED_FIELDS, runs the case-collision guard, then commits the
+ * record ATOMICALLY (temp sibling + rename, as in task-registry.save) so a crash
+ * mid-write can never truncate a committed approval. The guards all run BEFORE any
+ * filesystem write, so a rejected write never leaves a partial file, and a failed
+ * commit unlinks its temp and rethrows — the prior entry survives byte-identical.
  *
  * Case-collision guard: if an entry already exists at the canonical key AND both
  * the existing and incoming records carry a `plan_basename`, a DIFFERENCE means
@@ -320,7 +322,22 @@ function persistEntry(slug, record, projectPath) {
     }
   }
   safeFs.mkdirSync(ledgerDir(projectPath), { recursive: true });
-  safeFs.writeFileSync(target, JSON.stringify(record, null, 2));
+  // ATOMIC COMMIT (temp sibling + rename), mirroring task-registry.save. The
+  // ledger is the single source of approval truth: a bare in-place writeFileSync
+  // truncates a COMMITTED entry if a crash lands between open and full write, so
+  // every re-write (re-approval, backfill, vision archive, idempotent re-write)
+  // would be destructive-in-place. Writing a temp then renaming makes the commit
+  // atomic — a reader sees either the whole old file or the whole new file, never
+  // a truncation. On any failure the temp is unlinked and the error rethrown, so
+  // a failed commit leaves the pre-existing entry byte-identical and no litter.
+  const tmp = `${target}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    safeFs.writeFileSync(tmp, JSON.stringify(record, null, 2));
+    safeFs.renameSync(tmp, target);
+  } catch (err) {
+    try { safeFs.unlinkSync(tmp); } catch { /* temp may not exist */ }
+    throw err;
+  }
   return record;
 }
 
