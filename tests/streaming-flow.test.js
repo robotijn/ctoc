@@ -313,3 +313,192 @@ test('edge: a topic with no questions is skipped and never blocks completion', (
   const next = flow.answer(state, '1');
   assert.equal(flow.isComplete(next), true);
 });
+
+// ===========================================================================
+// SLICE: CRITICAL-FIRST question ordering + critical-issue surfacing.
+// Owner's rule: "always go through the critical issues first then the most
+// important … the batch is only for non-critical issues." WITHIN a topic,
+// questions are ordered CRITICAL → IMPORTANT → NORMAL, stable within a tier.
+// ===========================================================================
+
+// A tier fixture: one topic whose questions are authored NORMAL, then CRITICAL,
+// then IMPORTANT — so critical-first ordering is observable (the critical one is
+// LAST in source but must be presented FIRST).
+function tierTopic() {
+  return {
+    id: 'auth',
+    label: 'Authentication',
+    critical: true,
+    questions: [
+      { id: 'nrm', prompt: 'normal?', options: [{ key: '1', label: 'a', recommended: true }] },
+      { id: 'imp', important: true, prompt: 'important?', options: [{ key: '1', label: 'a', recommended: true }] },
+      { id: 'crit', critical: true, prompt: 'critical?', options: [{ key: '1', label: 'a', recommended: true }] },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// questionTier
+// ---------------------------------------------------------------------------
+test('questionTier classifies critical, important, and normal questions', () => {
+  assert.equal(flow.questionTier({ id: 'a', critical: true }), 'critical');
+  assert.equal(flow.questionTier({ id: 'b', important: true }), 'important');
+  assert.equal(flow.questionTier({ id: 'c' }), 'normal');
+});
+
+test('questionTier: critical outranks important when both flags are set', () => {
+  assert.equal(flow.questionTier({ id: 'a', critical: true, important: true }), 'critical');
+});
+
+test('questionTier tolerates a null/undefined question (normal)', () => {
+  assert.equal(flow.questionTier(null), 'normal');
+  assert.equal(flow.questionTier(undefined), 'normal');
+});
+
+// ---------------------------------------------------------------------------
+// orderQuestions
+// ---------------------------------------------------------------------------
+test('orderQuestions puts critical before important before normal', () => {
+  const ordered = flow.orderQuestions(tierTopic().questions);
+  assert.deepEqual(ordered.map(q => q.id), ['crit', 'imp', 'nrm']);
+});
+
+test('orderQuestions is stable within each tier (preserves source order)', () => {
+  const input = [
+    { id: 'n1' },
+    { id: 'c1', critical: true },
+    { id: 'i1', important: true },
+    { id: 'n2' },
+    { id: 'c2', critical: true },
+    { id: 'i2', important: true },
+  ];
+  assert.deepEqual(
+    flow.orderQuestions(input).map(q => q.id),
+    ['c1', 'c2', 'i1', 'i2', 'n1', 'n2']
+  );
+});
+
+test('orderQuestions tolerates a non-array argument', () => {
+  assert.deepEqual(flow.orderQuestions(undefined), []);
+  assert.deepEqual(flow.orderQuestions(null), []);
+  assert.deepEqual(flow.orderQuestions('nope'), []);
+});
+
+test('orderQuestions does not mutate its input array', () => {
+  const input = tierTopic().questions;
+  const snapshot = input.map(q => q.id);
+  flow.orderQuestions(input);
+  assert.deepEqual(input.map(q => q.id), snapshot);
+});
+
+test('backward-compat: orderQuestions preserves order when no question has a tier flag', () => {
+  const input = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  assert.deepEqual(flow.orderQuestions(input).map(q => q.id), ['a', 'b', 'c']);
+});
+
+// ---------------------------------------------------------------------------
+// initFlow — orders questions within each topic
+// ---------------------------------------------------------------------------
+test('initFlow presents a critical question FIRST even when authored last', () => {
+  const state = flow.initFlow([tierTopic()]);
+  // 'crit' was the LAST question in source; it must now be pointed at first.
+  assert.equal(flow.currentQuestion(state).id, 'crit');
+});
+
+test('initFlow orders every topic\'s questions critical-first', () => {
+  const state = flow.initFlow([tierTopic()]);
+  assert.deepEqual(state.topics[0].questions.map(q => q.id), ['crit', 'imp', 'nrm']);
+});
+
+test('initFlow does not mutate the input topics/questions', () => {
+  const input = [tierTopic()];
+  const snapshot = JSON.stringify(input);
+  flow.initFlow(input);
+  assert.equal(JSON.stringify(input), snapshot);
+  // original question order untouched
+  assert.deepEqual(input[0].questions.map(q => q.id), ['nrm', 'imp', 'crit']);
+});
+
+test('backward-compat: initFlow leaves flagless topics behaving exactly as before', () => {
+  const state = flow.initFlow(topics());
+  // topics() has no tier flags → question order is preserved as authored.
+  assert.deepEqual(state.topics.map(t => t.id), ['auth', 'stack']);
+  assert.deepEqual(state.topics[0].questions.map(q => q.id), ['provider', 'mfa']);
+  assert.deepEqual(state.topics[1].questions.map(q => q.id), ['lang', 'db']);
+});
+
+// ---------------------------------------------------------------------------
+// criticalOpenCount / topicCriticalOpenCount
+// ---------------------------------------------------------------------------
+test('criticalOpenCount counts unanswered criticals in the current topic', () => {
+  const state = flow.initFlow([
+    {
+      id: 'auth', label: 'Authentication', critical: true,
+      questions: [
+        { id: 'c1', critical: true, prompt: 'c1?', options: [{ key: '1', label: 'a', recommended: true }] },
+        { id: 'c2', critical: true, prompt: 'c2?', options: [{ key: '1', label: 'a', recommended: true }] },
+        { id: 'n1', prompt: 'n1?', options: [{ key: '1', label: 'a', recommended: true }] },
+      ],
+    },
+  ]);
+  assert.equal(flow.criticalOpenCount(state), 2);
+});
+
+test('criticalOpenCount drops as criticals are answered and ignores normal answers', () => {
+  let state = flow.initFlow([
+    {
+      id: 'auth', label: 'Authentication', critical: true,
+      questions: [
+        { id: 'c1', critical: true, prompt: 'c1?', options: [{ key: '1', label: 'a', recommended: true }] },
+        { id: 'c2', critical: true, prompt: 'c2?', options: [{ key: '1', label: 'a', recommended: true }] },
+        { id: 'n1', prompt: 'n1?', options: [{ key: '1', label: 'a', recommended: true }] },
+      ],
+    },
+  ]);
+  assert.equal(flow.criticalOpenCount(state), 2);
+  state = flow.answer(state, '1'); // answers c1 (critical, presented first)
+  assert.equal(flow.criticalOpenCount(state), 1);
+  state = flow.answer(state, '1'); // answers c2 (critical)
+  assert.equal(flow.criticalOpenCount(state), 0);
+  state = flow.answer(state, '1'); // answers n1 (normal) — count stays 0
+  assert.equal(flow.criticalOpenCount(state), 0);
+});
+
+test('criticalOpenCount is 0 for a topic with no critical questions', () => {
+  const state = flow.initFlow([
+    {
+      id: 'stack', label: 'Stack', critical: false,
+      questions: [{ id: 'n1', prompt: 'n1?', options: [{ key: '1', label: 'a', recommended: true }] }],
+    },
+  ]);
+  assert.equal(flow.criticalOpenCount(state), 0);
+});
+
+test('criticalOpenCount is 0 when past the end / null state', () => {
+  assert.equal(flow.criticalOpenCount(flow.initFlow([])), 0);
+  assert.equal(flow.criticalOpenCount(null), 0);
+});
+
+test('topicCriticalOpenCount can be asked about any topic directly', () => {
+  const state = flow.initFlow([tierTopic()]);
+  assert.equal(flow.topicCriticalOpenCount(state, state.topics[0]), 1);
+  assert.equal(flow.topicCriticalOpenCount(state, null), 0);
+  assert.equal(flow.topicCriticalOpenCount(state, { id: 'x', label: 'x' }), 0);
+});
+
+test('initFlow passes through a topic that has no questions array untouched', () => {
+  // Exercises the pass-through branch: a topic with no `questions` array is left
+  // as-is (not forced to []), and is simply skipped as an empty topic.
+  const noQuestions = { id: 'meta', label: 'Meta', critical: true };
+  const real = {
+    id: 'stack', label: 'Stack', critical: false,
+    questions: [{ id: 'q', prompt: 'q?', options: [{ key: '1', label: 'a', recommended: true }] }],
+  };
+  const state = flow.initFlow([noQuestions, real]);
+  // The flagless topic is preserved verbatim (same shape, no injected questions field).
+  const meta = state.topics.find(t => t.id === 'meta');
+  assert.equal('questions' in meta, false);
+  // Pointer skips the question-less topic and lands on the real one.
+  assert.equal(flow.currentTopic(state).id, 'stack');
+  assert.equal(flow.criticalOpenCount(state), 0);
+});

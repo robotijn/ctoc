@@ -656,11 +656,11 @@ describe('streaming primary view — render + key routing (the wiring under test
   });
 
   it('a digit key drives streaming-flow — the answer is recorded and the pointer advances', () => {
-    render(); // seeds app.buildFlow (critical topic auth/provider is current)
+    render(); // seeds app.buildFlow (critical topic auth; critical question 'session' is first)
     const before = streamingFlow.currentQuestion(app.buildFlow);
-    assert.equal(before.id, 'provider', 'the critical topic question is current first');
+    assert.equal(before.id, 'session', 'the critical question is current first (critical-first ordering)');
     press('1', { name: '1', sequence: '1' }); // pick the recommended option
-    assert.equal(app.buildFlow.answers['auth/provider'], '1', 'the chosen option key is recorded');
+    assert.equal(app.buildFlow.answers['auth/session'], '1', 'the chosen option key is recorded');
     const after = streamingFlow.currentQuestion(app.buildFlow);
     assert.notStrictEqual(after, before, 'the flow pointer advanced to the next question');
   });

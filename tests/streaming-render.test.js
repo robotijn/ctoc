@@ -186,3 +186,112 @@ test('handleKey returns false for a keyless / empty event', () => {
   assert.equal(render.handleKey({}, app), false);
   assert.equal(render.handleKey(null, app), false);
 });
+
+// ===========================================================================
+// SLICE: CRITICAL-FIRST surfacing in the renderer.
+// The header shows "⚠ <n> critical open" while criticals are unanswered; a
+// critical question renders a "⚠ CRITICAL k/N" label + a not-batchable note.
+// ===========================================================================
+
+// A topic with a critical question authored AFTER a normal one, plus an
+// important one — mirrors the owner's rule so ordering + surfacing are visible.
+function criticalSeed() {
+  return [
+    {
+      id: 'auth', label: 'Authentication', critical: true,
+      questions: [
+        { id: 'provider', prompt: 'Auth provider?', options: [{ key: '1', label: 'Clerk', recommended: true }, { key: '2', label: 'Auth.js' }] },
+        { id: 'session', critical: true, prompt: 'Where are session tokens stored?', options: [{ key: '1', label: 'httpOnly cookie', recommended: true }, { key: '2', label: 'localStorage' }] },
+        { id: 'mfa', important: true, prompt: 'Require MFA?', options: [{ key: '1', label: 'Yes', recommended: true }, { key: '2', label: 'No' }] },
+      ],
+    },
+  ];
+}
+
+test('header shows "⚠ N critical open" while a topic has unanswered criticals', () => {
+  const app = {};
+  app.buildFlow = flow.initFlow(criticalSeed());
+  const out = plain(render.render(app));
+  assert.ok(out.includes('⚠ 1 critical open'), 'critical-open marker present in header');
+});
+
+test('header hides the critical-open marker once all criticals in the topic are answered', () => {
+  const app = {};
+  app.buildFlow = flow.initFlow(criticalSeed());
+  // The critical question ('session') is presented FIRST — answer it.
+  assert.equal(flow.currentQuestion(app.buildFlow).id, 'session');
+  app.buildFlow = flow.answer(app.buildFlow, '1');
+  const out = plain(render.render(app));
+  assert.ok(!out.includes('critical open'), 'marker gone after the only critical is answered');
+});
+
+test('a critical question renders the ⚠ CRITICAL k/N label and the not-batchable note', () => {
+  const app = {};
+  app.buildFlow = flow.initFlow(criticalSeed());
+  const out = plain(render.render(app));
+  assert.ok(out.includes('⚠ CRITICAL 1/1'), 'critical label with k/N position');
+  assert.ok(out.includes('Where are session tokens stored?'), 'critical prompt shown');
+  assert.ok(out.toLowerCase().includes('not batchable'), 'not-batchable note shown');
+});
+
+test('an important question renders a lighter IMPORTANT marker (no critical label)', () => {
+  const app = {};
+  app.buildFlow = flow.initFlow(criticalSeed());
+  // Order: session (critical) → mfa (important) → provider (normal). Answer the critical.
+  app.buildFlow = flow.answer(app.buildFlow, '1');
+  assert.equal(flow.currentQuestion(app.buildFlow).id, 'mfa');
+  const out = plain(render.render(app));
+  assert.ok(out.includes('IMPORTANT'), 'important marker present');
+  assert.ok(!out.includes('⚠ CRITICAL'), 'no critical label on an important question');
+  assert.ok(out.includes('Require MFA?'), 'important prompt shown');
+});
+
+test('a normal question renders without any tier marker', () => {
+  const app = {};
+  app.buildFlow = flow.initFlow(criticalSeed());
+  // Answer critical then important → land on the normal 'provider' question.
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // session
+  app.buildFlow = flow.answer(app.buildFlow, '1'); // mfa
+  assert.equal(flow.currentQuestion(app.buildFlow).id, 'provider');
+  const out = plain(render.render(app));
+  assert.ok(!out.includes('⚠ CRITICAL'), 'no critical label on a normal question');
+  assert.ok(!out.includes('IMPORTANT'), 'no important marker on a normal question');
+  assert.ok(!out.includes('critical open'), 'no critical-open header once criticals are done');
+  assert.ok(out.includes('Auth provider?'), 'normal prompt shown');
+});
+
+test('critical label/header text is still control-char stripped', () => {
+  const app = {};
+  app.buildFlow = flow.initFlow([
+    {
+      id: 't', label: 'Ho\x1b[2Jstile', critical: true,
+      questions: [{ id: 'q', critical: true, prompt: 'pr\x07ompt', options: [{ key: '1', label: 'la\x1bbel', recommended: true }] }],
+    },
+  ]);
+  const out = render.render(app);
+  assert.ok(out.includes('⚠ CRITICAL'), 'critical label rendered');
+  assert.ok(!out.includes('\x1b[2J'), 'clear-screen sequence stripped');
+  assert.ok(!out.includes('\x07'), 'bell stripped from a critical prompt');
+});
+
+// ---------------------------------------------------------------------------
+// exampleTopics seed now demonstrates ordering: the Authentication topic has a
+// critical question authored AFTER a normal one, plus an important question.
+// ---------------------------------------------------------------------------
+test('exampleTopics: Authentication has a critical question authored after a normal one', () => {
+  const topics = render.exampleTopics();
+  const auth = topics.find(t => t.id === 'auth');
+  assert.ok(auth, 'auth topic present');
+  const tiers = auth.questions.map(q => flow.questionTier(q));
+  assert.ok(tiers.includes('critical'), 'auth has a critical question');
+  assert.ok(tiers.includes('important'), 'auth has an important question');
+  // critical is authored AFTER a normal one (a normal precedes the first critical in source)
+  const firstCritical = tiers.indexOf('critical');
+  assert.ok(tiers.slice(0, firstCritical).includes('normal'), 'a normal question precedes the critical in source order');
+});
+
+test('exampleTopics seed: initBuildFlow presents the critical question first', () => {
+  const app = {};
+  render.initBuildFlow(app);
+  assert.equal(flow.questionTier(flow.currentQuestion(app.buildFlow)), 'critical');
+});
