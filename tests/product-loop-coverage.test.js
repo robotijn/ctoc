@@ -97,18 +97,17 @@ describe('Product Loop — canonical KPI parse + applicability filter', () => {
   let originalCwd;
   let tmpDir;
 
-  // IMPORTANT — real parser behavior: the block-body regex in loadCanonicalKPIs
-  // uses `(?=^\s*- id:|^\s*#=|$)` under the `m` flag, so `$` terminates each
-  // entry's body at its FIRST line. Only the field immediately after `- id:` is
-  // ever captured; all later fields are null/[] — for the real product-kpis.yaml
-  // too (the shipped file's category/applicable_to/etc. all parse as null/[]).
-  // These tests therefore pin ACTUAL behavior and lead each entry with the field
-  // under test. (See report: this is a latent defect in loadCanonicalKPIs.)
+  // The block-body regex in loadCanonicalKPIs terminates each entry's body at the
+  // next `- id:`, a section-separator comment, or TRUE end of input — so EVERY
+  // line of an entry is captured (the "parses fields on non-leading body lines"
+  // regression above proves this against the fixed parser). These fixtures keep a
+  // single descriptive line per entry only to isolate one branch each; the
+  // multi-line coverage is proven separately.
   //
-  // alpha : applicable_to leads → ['saas-b2c','saas-b2b'] (getList found + split)
+  // alpha : applicable_to → ['saas-b2c','saas-b2b'] (getList found + split)
   // beta  : applicable_to = [saas-b2b] → EXCLUDED for saas-b2c (the !includes → false path)
   // gamma : applicable_to: [] → empty list, always applicable (length>0 second operand)
-  // delta : name leads (quoted) → getList('applicable_to') finds nothing → [] branch;
+  // delta : quoted name → getList('applicable_to') finds nothing → [] branch;
   //         get('category') finds nothing → null branch
   const CANONICAL = [
     'schema_version: 1',
@@ -209,6 +208,56 @@ describe('Product Loop — canonical KPI parse + applicability filter', () => {
 
     // Assert — nothing filtered out, including beta
     assert.deepEqual(ids.sort(), ['alpha', 'beta', 'delta', 'gamma']);
+  });
+
+  // Regression: the block-body capture MUST span every line of an entry, not
+  // stop at the first. A multi-line body places category/formula/applicable_to
+  // on LATER lines; a parser whose lookahead terminates the body at end-of-first
+  // -line (the `$`-under-`m` defect) leaves them null/[] and this goes RED.
+  it('loadCanonicalKPIs parses fields on non-leading body lines', () => {
+    // Arrange — every descriptive field is BELOW the id line
+    fs.writeFileSync(path.join('.ctoc', 'templates', 'product-kpis.yaml'), [
+      'schema_version: 1',
+      'kpis:',
+      '',
+      '  - id: epsilon',
+      '    name: "Epsilon Metric"',
+      '    category: retention',
+      '    definition: "returning users"',
+      '    formula: "returning / total"',
+      '    applicable_to: [saas-b2c, mobile-app]',
+      '',
+    ].join('\n'));
+    const { loadCanonicalKPIs } = loadModule();
+
+    // Act
+    const eps = loadCanonicalKPIs().find(k => k.id === 'epsilon');
+
+    // Assert — a first-line-only capture leaves every one of these null/[]
+    assert.equal(eps.category, 'retention');
+    assert.equal(eps.definition, 'returning users');
+    assert.equal(eps.formula, 'returning / total');
+    assert.deepEqual(eps.applicable_to, ['saas-b2c', 'mobile-app']);
+  });
+
+  // Regression: the SHIPPED canonical library must parse fully — not just the
+  // synthetic fixtures. Pins a known real KPI's later-line fields.
+  it('loadCanonicalKPIs fully parses the shipped canonical library', () => {
+    // Arrange — point ROOT back at the real repo so the real file is read
+    process.chdir(originalCwd);
+    const { loadCanonicalKPIs } = loadModule();
+
+    // Act
+    const kpis = loadCanonicalKPIs();
+    const signup = kpis.find(k => k.id === 'signup_completion');
+
+    // Assert — these are on lines 2..N of the entry in the real file
+    assert.ok(signup, 'signup_completion present in shipped library');
+    assert.equal(signup.category, 'acquisition');
+    assert.match(signup.formula, /signup_completed/);
+    assert.ok(signup.applicable_to.includes('saas-b2c'), 'applicable_to parsed');
+    // No KPI may lose its formula (the whole-file symptom of the defect)
+    assert.equal(kpis.filter(k => !k.formula).length, 0, 'every KPI keeps its formula');
   });
 });
 

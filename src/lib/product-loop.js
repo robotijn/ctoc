@@ -38,8 +38,12 @@ function loadCanonicalKPIs() {
   const content = readFile(CANONICAL_KPI_PATH);
   if (!content) return [];
   const kpis = [];
-  // Parse minimal YAML — extract each entry under `kpis:`
-  const blockMatches = [...content.matchAll(/^\s*- id:\s*(\S+)\n([\s\S]*?)(?=^\s*- id:|^\s*#=|$)/gm)];
+  // Parse minimal YAML — extract each entry under `kpis:`. The body capture must
+  // span EVERY line of an entry, so the terminator is the next `- id:`, a section
+  // separator comment (`# ===` / `#===`), or TRUE end of input — written as
+  // `(?![\s\S])`, NOT `$`. Under the `m` flag `$` matches end-of-LINE, which would
+  // terminate each body at its first line and drop all but the first field.
+  const blockMatches = [...content.matchAll(/^\s*- id:\s*(\S+)\n([\s\S]*?)(?=^\s*- id:|^\s*#\s*=|(?![\s\S]))/gm)];
   for (const m of blockMatches) {
     const id = m[1];
     const body = m[2];
