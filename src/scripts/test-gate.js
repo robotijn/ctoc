@@ -63,14 +63,22 @@ function parseFail(summaryText) {
  * `--experimental-test-coverage` output. The coverage table row is
  * `all files | <line%> | <branch%> | <funcs%> | <uncovered>`; we take the first
  * percentage column (line coverage).
+ *
+ * Uses the LAST matching row, not the first: node emits the coverage report at the
+ * very END of the run (after every test's name and output), so the real summary is
+ * always the final `all files | N` in the text. A test whose NAME or stdout happens
+ * to contain a literal `all files | 42.10` (e.g. a fixture for a coverage-parser
+ * test) would otherwise hijack a first-match parse and report that stray number as
+ * the whole suite's coverage — a self-inflicted false gate result. Last-match is
+ * immune: no test can print after node's own trailing coverage block.
  * @param {string} coverageText
  * @returns {number|null} the line-coverage percentage, or null when no coverage
  *   block is present — an unmeasured run is itself a failure condition.
  */
 function parseCoveragePct(coverageText) {
   if (!coverageText) return null;
-  const m = coverageText.match(/all files\s*\|\s*([\d.]+)/);
-  return m ? Number(m[1]) : null;
+  const matches = [...String(coverageText).matchAll(/all files\s*\|\s*([\d.]+)/g)];
+  return matches.length ? Number(matches[matches.length - 1][1]) : null;
 }
 
 /**

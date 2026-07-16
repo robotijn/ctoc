@@ -34,9 +34,17 @@ function matchEscapePhrase(text) {
   if (typeof text !== 'string' || !text.length) return null;
   const normalized = text.toLowerCase();
   for (const phrase of ESCAPE_PHRASES) {
-    // Word-bounded: ensure phrase doesn't appear inside another word.
+    // Word-bounded, but path/identifier punctuation (/ \ - _ .) must NOT count
+    // as a boundary: otherwise a bare-word phrase like "hotfix" or "urgent"
+    // matches when it appears as a token inside a filename or identifier
+    // (e.g. "src/hotfix-runner.js", "urgent_alerts.py") in genuine user prose,
+    // silently disabling the write-enforcement guard. So a boundary is only
+    // whitespace, a string edge, or sentence punctuation — never a path char.
     // \b doesn't work cleanly with multi-word phrases, so we use lookarounds.
-    const pattern = safeRegExp(`(^|[^a-z0-9])${escapeRegExp(phrase)}([^a-z0-9]|$)`, 'i');
+    const pattern = safeRegExp(
+      `(^|\\s)${escapeRegExp(phrase)}(?=\\s|[.,!?;:'")\\]]|$)`,
+      'i'
+    );
     if (pattern.test(normalized)) return phrase;
   }
   return null;

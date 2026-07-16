@@ -88,6 +88,18 @@ function dedupKey(finding) {
   return `${kind}::${normalizeRegulationRef(ref)}`;
 }
 
+/**
+ * True when a finding resolves to NO topic (its `regulation_ref` normalizes to
+ * `''`). Real GDPR findings carry `gdpr_article` + `kind` only and NEVER a
+ * `regulation_ref`, so they all normalize to `''`; such a finding must NEVER be
+ * mergeable — otherwise distinct Articles sharing a `kind` collapse to the key
+ * `${kind}::` and all but the highest-confidence one are silently dropped.
+ */
+function hasNoTopic(finding) {
+  const ref = finding && typeof finding === 'object' ? finding.regulation_ref : undefined;
+  return normalizeRegulationRef(ref) === '';
+}
+
 /** Numeric confidence rank; unknown/undefined ⇒ 0. */
 function confidenceRank(finding) {
   if (!finding || typeof finding !== 'object') return 0;
@@ -141,11 +153,16 @@ function deduplicateFindings(ec2Findings, ec3Findings) {
       continue;
     }
 
-    // Collision. Non-object members never merge — keep them distinct by
-    // pushing under a unique synthetic key so both survive.
+    // Collision. Members that never merge — a non-object, OR a finding with no
+    // resolvable topic (empty normalized ref) — are kept distinct by pushing
+    // under a unique synthetic key so BOTH survive. A shared `kind` with an
+    // empty topic (every ref-less GDPR finding) must not collapse distinct
+    // Articles; when the challenger has no topic the incumbent shares its empty
+    // topic too (same key), so checking the challenger is sufficient.
     if (
       !finding || typeof finding !== 'object' ||
-      !existing.survivor || typeof existing.survivor !== 'object'
+      !existing.survivor || typeof existing.survivor !== 'object' ||
+      hasNoTopic(finding)
     ) {
       // Preserve both: re-insert the incoming element under a fresh unique key.
       let uniq = key;

@@ -305,6 +305,67 @@ test('embed_aborts_the_request_via_the_timeout_signal_when_fetch_hangs', async (
   assert.equal(sawSignal.aborted, true);
 });
 
+// ── boundedFetch: a STALLED response BODY must be bounded too (regression) ───
+// The abort timer must stay alive across `res.json()`. A fetch whose HEADERS
+// resolve immediately (ok:200) but whose BODY (`.json()`) never resolves and
+// ignores the abort signal must still cause embed()/listModels() to REJECT
+// within the timeout — not hang unbounded past >10x the bound. Structured as a
+// timer race so the hang manifests as a bounded FAILURE, never an infinite test.
+
+test('embed_rejects_within_the_timeout_when_the_response_body_stalls', async () => {
+  // Arrange — headers resolve 200 instantly; the body read never settles and
+  // deliberately ignores the abort signal (worst case for a stalled body).
+  const stallingFetch = async () => ({
+    ok: true,
+    status: 200,
+    json() { return new Promise(() => {}); }
+  });
+  const client = createOllamaClient({ fetch: stallingFetch, timeoutMs: 100 });
+
+  const STILL_PENDING = Symbol('still-pending');
+  let guardTimer;
+  const guard = new Promise((resolve) => {
+    guardTimer = setTimeout(() => resolve(STILL_PENDING), 1000); // 10x the bound
+  });
+
+  // Act — race the embed outcome against a 1000ms guard
+  const outcome = await Promise.race([
+    client.embed('m', ['x']).then(() => 'resolved', () => 'rejected'),
+    guard
+  ]);
+  clearTimeout(guardTimer);
+
+  // Assert — embed must REJECT within the bound; if it hangs, outcome is the
+  // guard sentinel (RED against the pre-fix code, which reads the body unbounded).
+  assert.equal(outcome, 'rejected', 'embed must reject on a stalled body within the timeout, not hang past 10x the bound');
+});
+
+test('listModels_rejects_within_the_timeout_when_the_response_body_stalls', async () => {
+  // Arrange
+  const stallingFetch = async () => ({
+    ok: true,
+    status: 200,
+    json() { return new Promise(() => {}); }
+  });
+  const client = createOllamaClient({ fetch: stallingFetch, timeoutMs: 100 });
+
+  const STILL_PENDING = Symbol('still-pending');
+  let guardTimer;
+  const guard = new Promise((resolve) => {
+    guardTimer = setTimeout(() => resolve(STILL_PENDING), 1000);
+  });
+
+  // Act
+  const outcome = await Promise.race([
+    client.listModels().then(() => 'resolved', () => 'rejected'),
+    guard
+  ]);
+  clearTimeout(guardTimer);
+
+  // Assert
+  assert.equal(outcome, 'rejected', 'listModels must reject on a stalled body within the timeout, not hang past 10x the bound');
+});
+
 // ── parseEmbeddings exported directly: well-formed maps to Float32Array[] ─────
 
 test('parseEmbeddings_maps_a_well_formed_matrix_to_float32arrays_verbatim', () => {

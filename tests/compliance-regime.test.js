@@ -121,3 +121,43 @@ describe('declineComplianceRegime — durable "None" persist (R1)', () => {
     assert.match(readSettings(root), /^\s+declined: true\s*$/m);
   });
 });
+
+describe('D2 (defect) — block-style active_profiles is refused, never corrupted', () => {
+  // A YAML BLOCK-style list: the header line carries NO inline value; items live
+  // on following `- item` lines. The single-line inline replace would leave the
+  // `- gdpr` line dangling under a new inline value → invalid YAML.
+  const BLOCK = [
+    'regulatory_regime:',
+    '  active_profiles:',
+    '    - gdpr',
+    '  overrides: {}',
+    '',
+    'enforcement:',
+    '  mode: strict',
+    '',
+  ].join('\n');
+
+  it('block-style list → {ok:false} and settings.yaml stays byte-identical (real parser accepts it)', () => {
+    const root = tmpProject();
+    writeSettings(root, BLOCK);
+    const before = readSettings(root);
+    const res = compliance.writeActiveProfiles(root, ['eu-ai-act-high-risk']);
+    assert.equal(res.ok, false, 'block style refused, not silently corrupted');
+    assert.equal(readSettings(root), before, 'file byte-identical — nothing written');
+    // The untouched file is still valid YAML a real parser accepts.
+    assert.doesNotThrow(
+      () => require('js-yaml').load(readSettings(root)),
+      'settings.yaml remains valid YAML'
+    );
+  });
+
+  it('control: inline-style active_profiles still updates correctly', () => {
+    const root = tmpProject();
+    writeSettings(root, FRESH); // `active_profiles: []` — inline style
+    const res = compliance.writeActiveProfiles(root, ['gdpr']);
+    assert.equal(res.ok, true, 'inline activation still succeeds');
+    assert.equal(compliance.shouldRunGdpr(root), true);
+    assert.match(readSettings(root), /active_profiles: \[gdpr\]/, 'inline list updated');
+    assert.doesNotThrow(() => require('js-yaml').load(readSettings(root)));
+  });
+});

@@ -1,8 +1,9 @@
 /**
  * Coverage-hardening for src/hooks/guard-files.js — the PreToolUse secret-guard.
  *
- * This is a PROTECTIVE hook: it BLOCKS (exit 1) any tool call whose target path
- * or Bash command points at a secret-bearing file, and ALLOWS (exit 0) anything
+ * This is a PROTECTIVE hook: it BLOCKS (the harness deny protocol —
+ * permissionDecision:"deny" on stdout + exit 2, via emitDeny) any tool call whose
+ * target path or Bash command points at a secret-bearing file, and ALLOWS (exit 0) anything
  * else. The load-bearing behavior is the BLOCK-vs-ALLOW decision boundary — for
  * every guarded pattern there is an allow-list carve-out or word-boundary that a
  * mutant could wrongly flip. Each test below pins one such boundary so that
@@ -183,8 +184,9 @@ describe('isSecretTarget — normalization and falsy guard', () => {
 // ---------------------------------------------------------------------------
 // Cluster 4 — the hook as a REAL process. Exercises readStdinJson, getTarget,
 // and main (all un-exported, guarded by require.main === module). Each test
-// asserts the harness-visible contract: exit 1 = BLOCKED (+ stderr banner),
-// exit 0 = ALLOWED. process.env is spread so the child inherits
+// asserts the harness-visible contract: BLOCK = permissionDecision:"deny" on
+// stdout + exit 2 (emitDeny) + stderr banner; ALLOW = exit 0 silent.
+// process.env is spread so the child inherits
 // NODE_V8_COVERAGE and its coverage is aggregated.
 // ---------------------------------------------------------------------------
 describe('guard-files hook process — getTarget source resolution + exit codes', () => {
@@ -204,8 +206,11 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
     // Act
     const res = runHook({ toolInput: payload });
 
-    // Assert — blocked, with the human-readable banner on stderr
-    assert.equal(res.status, 1);
+    // Assert — the REAL harness block: permissionDecision:"deny" on stdout (the
+    // only signal the harness treats as blocking) + the human banner on stderr.
+    // A bare exit 1 with empty stdout let the secret access proceed.
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny)
+    assert.match(res.stdout, /"permissionDecision":"deny"/);
     assert.match(res.stderr, /guard-files BLOCKED/);
   });
 
@@ -222,7 +227,7 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
     // env branch of getTarget: JSON.parse(CLAUDE_TOOL_INPUT) succeeds and wins
     const res = runHook({ envToolInput: JSON.stringify({ file_path: 'config/secrets.json' }) });
 
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_exit_1_when_target_is_a_bash_command_reading_a_secret', () => {
@@ -231,21 +236,21 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
 
     const res = runHook({ toolInput: payload });
 
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_resolve_env_path_field_via_second_or_operand', () => {
     // getTarget: parsed.path is the 2nd operand of `file_path || path || notebook_path`
     const res = runHook({ envToolInput: JSON.stringify({ path: '.aws/credentials' }) });
 
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_resolve_env_notebook_path_field_via_third_or_operand', () => {
     // getTarget: parsed.notebook_path is the 3rd operand — a mutant dropping it would allow this
     const res = runHook({ envToolInput: JSON.stringify({ notebook_path: 'id_rsa' }) });
 
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_resolve_stdin_path_field_when_env_absent', () => {
@@ -254,7 +259,7 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
 
     const res = runHook({ toolInput: payload });
 
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_resolve_stdin_notebook_path_field_when_env_absent', () => {
@@ -263,7 +268,7 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
 
     const res = runHook({ toolInput: payload });
 
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_fall_through_to_stdin_when_env_json_is_malformed', () => {
@@ -272,7 +277,7 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
 
     const res = runHook({ toolInput: payload, envToolInput: 'not json{' });
 
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_NOT_consult_stdin_when_env_supplies_a_command', () => {

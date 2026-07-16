@@ -60,11 +60,19 @@ function withFakedBoundary(fakes, fn) {
   }
 }
 
-/** An execSync failure that mimics a MISSING tool/script (looksNotRun == true). */
+/** An execSync failure that mimics a MISSING tool/script (a spawn-layer error). */
 function missingToolError(msg) {
   return Object.assign(new Error('spawn failed'), { stderr: msg, stdout: '' });
 }
-/** An execSync failure that mimics a REAL nonzero exit (looksNotRun == false). */
+/**
+ * An execSync failure that mimics a TRUE spawn-layer ENOENT — the binary itself
+ * could not be launched. This (and ONLY this) is what reclassifies a check as
+ * NOT-RUN; a substring of the command's own output never does.
+ */
+function absentBinaryError(msg) {
+  return Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT', stderr: msg, stdout: '' });
+}
+/** An execSync failure that mimics a REAL nonzero exit (launched, then failed). */
 function realFailureError(msg) {
   return Object.assign(new Error('exit 1'), { stderr: msg, stdout: '' });
 }
@@ -179,14 +187,16 @@ describe('runVerify — pyproject arm selects ruff/pytest when the tools exist',
 // "command not found" — the NOT-RUN heuristic must NOT count that as a failure.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('runVerify — a selected candidate that reports missing is NOT a failure', () => {
-  it('C1: ruff selected but exec reports "command not found" → applicable:false, "not runnable"', () => {
-    // Arrange — toolExists says ruff is present, but the actual invocation reports
-    // missing (the race/heuristic edge the three-state contract exists to handle).
+  it('C1: ruff selected but the binary is truly absent at exec (spawn ENOENT) → applicable:false, "not runnable"', () => {
+    // Arrange — toolExists says ruff is present, but the actual invocation fails
+    // at the SPAWN layer with a true ENOENT (the binary vanished between probe and
+    // run — the only race the NOT-RUN reclassification legitimately handles). A
+    // mere "command not found" substring is NOT enough; it must be a real spawn ENOENT.
     write('pyproject.toml', '[project]\nname = "p"\n');
     const spawnSync = () => ({ error: null });                 // toolExists → true → candidate pushed
     const execSync = (command) => {
       if (/ctoc quality/.test(command)) throw missingToolError('ctoc: command not found');
-      throw missingToolError(`${command}: command not found`); // every candidate reads NOT-RUN
+      throw absentBinaryError(`${command}: ENOENT`);           // every candidate is a true spawn ENOENT
     };
 
     // Act
@@ -352,5 +362,138 @@ describe('buildSummary — the pass line names what ran and what was skipped', (
 
     // Assert
     assert.match(s, /ran: nothing/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cluster G — DEFECT 1: a REAL non-zero exit whose OWN output contains a
+// ubiquitous substring ("No such file", "ENOENT", …) must be a REAL failure, NOT
+// swallowed as NOT-RUN. Candidates are already presence-filtered upstream
+// (npmScriptExists/toolExists), so the only thing an output-scan can do is MISFIRE
+// on a genuine failure and carry VERIFY to green on some other passing check.
+// A NOT-RUN reclassification is legitimate ONLY on a TRUE spawn error
+// (execSync throwing with e.code === 'ENOENT'), never on a substring of stdout/stderr.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('runVerify — a real failure containing "No such file" is NOT swallowed (DEFECT 1)', () => {
+  it('G1: lint passes, tests exit non-zero with "No such file" in stderr → tests FAIL, VERIFY fails', () => {
+    // Arrange — a node project whose lint script passes but whose test script
+    // exits non-zero; its output happens to contain "No such file". The candidates
+    // were presence-verified (both scripts exist), so this is a genuine failure.
+    pkg({ name: 'app', version: '1.0.0', scripts: { lint: 'x', test: 'y' } });
+    const execSync = (command) => {
+      if (/ctoc quality/.test(command)) throw missingToolError('ctoc: command not found');
+      if (/lint/.test(command)) return 'lint clean';
+      // The test command RAN and exited non-zero; the OLD looksNotRun swallowed
+      // this as NOT-RUN because of the "No such file" substring, letting the
+      // passing lint carry VERIFY to green.
+      throw realFailureError('Error: boom: No such file or directory');
+    };
+
+    // Act
+    const res = withFakedBoundary(
+      { execSync, driveAppSync: noApp },
+      (mod) => mod.runVerify(dir)
+    );
+
+    // Assert — the command executed and exited non-zero → it RAN and FAILED; the
+    // ubiquitous substring must not reclassify it as not-run.
+    assert.equal(res.checks.tests.ran, true, 'a command that executed and exited non-zero RAN');
+    assert.equal(res.checks.tests.passed, false);
+    assert.equal(res.passed, false, 'a genuine test failure must fail VERIFY even when its output contains "No such file"');
+    assert.ok(res.errors.some((e) => /Tests failed/i.test(e)), `errors: ${JSON.stringify(res.errors)}`);
+  });
+
+  it('G2: a real failure whose stderr contains "ENOENT" (but NOT a spawn ENOENT) still FAILS', () => {
+    // Arrange — same idea, different ubiquitous substring, and asserted via lint.
+    pkg({ name: 'app', version: '1.0.0', scripts: { lint: 'x', test: 'y' } });
+    const execSync = (command) => {
+      if (/ctoc quality/.test(command)) throw missingToolError('ctoc: command not found');
+      if (/lint/.test(command)) throw realFailureError('AssertionError: ENOENT appeared in the diff output');
+      return 'tests ok';
+    };
+
+    // Act
+    const res = withFakedBoundary(
+      { execSync, driveAppSync: noApp },
+      (mod) => mod.runVerify(dir)
+    );
+
+    // Assert — a real lint failure, not a not-run reclassification.
+    assert.equal(res.checks.lint.ran, true);
+    assert.equal(res.checks.lint.passed, false);
+    assert.equal(res.passed, false);
+    assert.ok(res.errors.some((e) => /Lint failed/i.test(e)), `errors: ${JSON.stringify(res.errors)}`);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cluster H — DEFECT 2: the coverage floor must be enforced against Node's own
+// --experimental-test-coverage table ("# all files | 42.10 | …"), which the old
+// case-sensitive Istanbul-only regex missed → parseCoveragePct returned null →
+// the floor was SILENTLY unenforced (below-floor coverage PASSED). Also: a
+// declared floor with UNMEASURABLE coverage must fail closed (unmeasured != pass).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('parseCoveragePct — Node native and Istanbul rows (DEFECT 2 unit)', () => {
+  it('H1: reads a Node-native lowercase coverage summary row (hash prefix), parsing 42.10 percent', () => {
+    assert.equal(require(MOD).parseCoveragePct('# all files | 42.10 | 30.00 | 25.00 | 1-9'), 42.10);
+  });
+  it('H2: still reads the Istanbul "All files | 95 |" row (no regression)', () => {
+    assert.equal(require(MOD).parseCoveragePct('All files |     95 |'), 95);
+  });
+  it('H3: returns null when no coverage figure is present', () => {
+    assert.equal(require(MOD).parseCoveragePct('ok, nothing here'), null);
+  });
+});
+
+describe('runVerify — coverage floor enforced against Node-native format (DEFECT 2)', () => {
+  it('H4: 99% floor + a Node-native 42.10% coverage table → VERIFY FAILS below floor', () => {
+    // Arrange — the exact repro: a declared 99 floor and a node --test-shaped
+    // coverage table printing "# all files | 42.10 |".
+    write('.ctoc/coverage-baseline.json', JSON.stringify({ minPct: 99 }));
+    pkg({ name: 'nodecov', version: '1.0.0', scripts: {
+      test: 'node -e "console.log(\'# all files | 42.10 |\'); process.exit(0)"'
+    } });
+
+    // Act
+    const res = require(MOD).runVerify(dir);
+
+    // Assert — coverage parsed from the Node-native row, and below the floor.
+    assert.equal(res.checks.tests.coverage, 42.10, 'the Node-native coverage row must be parsed');
+    assert.equal(res.passed, false, 'below-floor Node-native coverage must fail VERIFY');
+    assert.ok(res.errors.some((e) => /below the project floor/i.test(e)), `errors: ${JSON.stringify(res.errors)}`);
+  });
+
+  it('H5: floor declared but coverage UNPARSEABLE → VERIFY fails closed (unmeasured is not a pass)', () => {
+    // Arrange — a declared floor, a passing test that emits NO coverage table.
+    write('.ctoc/coverage-baseline.json', JSON.stringify({ minPct: 99 }));
+    pkg({ name: 'nocov', version: '1.0.0', scripts: {
+      test: 'node -e "console.log(\'ok, no coverage table here\'); process.exit(0)"'
+    } });
+
+    // Act
+    const res = require(MOD).runVerify(dir);
+
+    // Assert — unmeasured coverage against a declared floor fails closed.
+    assert.equal(res.checks.tests.coverage, null);
+    assert.equal(res.passed, false, 'a declared floor with no measurable coverage must fail closed');
+    assert.ok(
+      res.errors.some((e) => /no coverage figure|unmeasured is NOT a pass/i.test(e)),
+      `the failure must name the unmeasured coverage; errors: ${JSON.stringify(res.errors)}`
+    );
+  });
+
+  it('H6: a passing project with above-floor Node-native coverage PASSES (happy path)', () => {
+    // Arrange — floor 40, node-native table reporting 99.50%.
+    write('.ctoc/coverage-baseline.json', JSON.stringify({ minPct: 40 }));
+    pkg({ name: 'goodcov', version: '1.0.0', scripts: {
+      test: 'node -e "console.log(\'# all files | 99.50 |\'); process.exit(0)"'
+    } });
+
+    // Act
+    const res = require(MOD).runVerify(dir);
+
+    // Assert
+    assert.equal(res.checks.tests.coverage, 99.5);
+    assert.equal(res.passed, true, `above-floor coverage must pass; errors: ${JSON.stringify(res.errors)}`);
   });
 });

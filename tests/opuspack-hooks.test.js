@@ -9,8 +9,9 @@
  *   PreToolUse.Bash.js (blocklist fold)  — input via STDIN JSON payload (finding C2),
  *       exit 0 = ALLOW, exit 2 = BLOCK  (shared deny emitter, HARNESS_BLOCK_EXIT_CODE).
  *   guard-files.js (PreToolUse)          — input via env CLAUDE_TOOL_INPUT AND
- *       stdin JSON, exit 0 = ALLOW, exit 1 = BLOCK, fail-OPEN (0) on error
- *       (matches PreToolUse.Edit.js).
+ *       stdin JSON, exit 0 = ALLOW, exit 2 = BLOCK (shared deny emitter — a bare
+ *       exit 1 was NON-blocking, letting the secret access proceed), fail-OPEN (0)
+ *       on error (matches PreToolUse.Edit.js / PreToolUse.Bash.js).
  *   stop-test-gate.js (Stop)             — exit 0 = ALLOW/fail-open,
  *       exit 2 = BLOCK the stop (matches andon-halt.js).
  *
@@ -343,10 +344,10 @@ describe('OM2 blocklist fold — benign commands allowed (exit 0)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  SECRET GUARD (guard-files.js) — exit 1 on hit, 0 on miss, fail-open
+//  SECRET GUARD (guard-files.js) — deny (exit 2) on hit, 0 on miss, fail-open
 // ═══════════════════════════════════════════════════════════════════════
 
-describe('OM2 guard-files — secret file_path blocked (exit 1)', () => {
+describe('OM2 guard-files — secret file_path blocked (deny, exit 2)', () => {
   const cases = [
     '/proj/.env',
     '/proj/.env.local',
@@ -363,19 +364,19 @@ describe('OM2 guard-files — secret file_path blocked (exit 1)', () => {
   for (const fp of cases) {
     it(`blocks file_path ${fp}`, () => {
       const res = runGuardFiles({ file_path: fp });
-      assert.equal(res.status, 1, `expected BLOCK for ${fp}, got ${res.status}\n${res.stderr}`);
+      assert.equal(res.status, 2, `expected BLOCK (deny, exit 2) for ${fp}, got ${res.status}\n${res.stderr}`);
     });
   }
 });
 
-describe('OM2 guard-files — secret Bash command blocked (exit 1)', () => {
+describe('OM2 guard-files — secret Bash command blocked (deny, exit 2)', () => {
   it('blocks cat .env', () => {
     const res = runGuardFiles({ command: 'cat .env' });
-    assert.equal(res.status, 1, res.stderr);
+    assert.equal(res.status, 2, res.stderr);
   });
   it('blocks grep of secrets.json', () => {
     const res = runGuardFiles({ command: 'grep KEY config/secrets.json' });
-    assert.equal(res.status, 1, res.stderr);
+    assert.equal(res.status, 2, res.stderr);
   });
 });
 
@@ -410,7 +411,7 @@ describe('OM2 guard-files — secret-lookalike source files ALLOWED (exit 0)', (
 });
 
 // ── Under-block regression: real secret files/variants must BLOCK ───────────
-describe('OM2 guard-files — additional secret variants BLOCKED (exit 1)', () => {
+describe('OM2 guard-files — additional secret variants BLOCKED (deny, exit 2)', () => {
   const blocked = [
     '/proj/access_token.json',
     '/proj/.envrc',
@@ -424,7 +425,7 @@ describe('OM2 guard-files — additional secret variants BLOCKED (exit 1)', () =
   for (const fp of blocked) {
     it(`blocks ${fp}`, () => {
       const res = runGuardFiles({ file_path: fp });
-      assert.equal(res.status, 1, `expected BLOCK for ${fp}, got ${res.status}\n${res.stderr}`);
+      assert.equal(res.status, 2, `expected BLOCK (deny, exit 2) for ${fp}, got ${res.status}\n${res.stderr}`);
     });
   }
 });
@@ -432,7 +433,7 @@ describe('OM2 guard-files — additional secret variants BLOCKED (exit 1)', () =
 describe('OM2 guard-files — cross-platform + fail-open', () => {
   it('blocks a Windows backslash secret path (separator normalization)', () => {
     const res = runGuardFiles({ file_path: 'C:\\Users\\x\\.ssh\\id_rsa' });
-    assert.equal(res.status, 1, res.stderr);
+    assert.equal(res.status, 2, res.stderr);
   });
   it('fails OPEN (exit 0) on malformed stdin with no env', () => {
     const res = spawnSync(process.execPath, [GUARD_FILES_HOOK], {

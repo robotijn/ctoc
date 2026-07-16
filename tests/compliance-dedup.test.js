@@ -227,6 +227,37 @@ describe('dedupKey — unit', () => {
   });
 });
 
+describe('D1 (defect) — a finding with no resolvable topic never merges', () => {
+  it('3 real ref-less GDPR findings (gdpr_article + shared kind, distinct Arts 6/9/30) all survive', () => {
+    // The GDPR runner/agent/skill emit `gdpr_article` + `kind` only — NEVER
+    // `regulation_ref`. normalizeRegulationRef(undefined) === '' for all three,
+    // so pre-fix they collapse to the single key `${kind}::` and only the
+    // highest-confidence survivor remains — dropping distinct Articles.
+    const gdpr = [
+      { kind: 'missing-lawful-basis', gdpr_article: 'GDPR-6', confidence: 'high', severity: 'critical', message: 'no lawful basis' },
+      { kind: 'missing-lawful-basis', gdpr_article: 'GDPR-9', confidence: 'medium', severity: 'critical', message: 'special-category data' },
+      { kind: 'missing-lawful-basis', gdpr_article: 'GDPR-30', confidence: 'low', severity: 'critical', message: 'records of processing' },
+    ];
+    const out = deduplicateFindings(gdpr, []);
+    assert.equal(out.length, 3, 'all 3 distinct-article findings survive (none dropped)');
+    assert.deepEqual(
+      out.map(f => f.gdpr_article).sort(),
+      ['GDPR-30', 'GDPR-6', 'GDPR-9'],
+      'each distinct Article is preserved'
+    );
+  });
+
+  it('control: two findings with a REAL shared topic still merge to one', () => {
+    // Regression guard — legitimate cross-regime dedup must keep working.
+    const ec2 = [{ kind: 'missing-data-governance', regulation_ref: 'GDPR Art. 5', confidence: 'medium', severity: 'critical' }];
+    const ec3 = [{ kind: 'missing-data-governance', regulation_ref: 'EU-AI-Act Art. 10', confidence: 'high', severity: 'critical' }];
+    const out = deduplicateFindings(ec2, ec3);
+    assert.equal(out.length, 1, 'real same-topic cross-regime findings still merge');
+    assert.equal(out[0].severity, 'critical');
+    assert.match(out[0].message, /Cross-regime overlap/);
+  });
+});
+
 describe('GATE-INVARIANT (load-bearing)', () => {
   it('case 10: human-gate-check keeps exactly 3 destination keys and dedup names no gate key', () => {
     // Assert the REAL runtime map (stronger than grepping source text): the
