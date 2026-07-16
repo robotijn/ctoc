@@ -26,8 +26,26 @@
   duplicate guard was a silent no-op on every default install) + quality-gate
   numericOrFail (non-numeric metric passed every dimension but coverage) + validate-
   plan-steps fence/region/heading scoping + actions.js planDependsOn + product-loop
-  slug/date guards (LOW traversal). Next: continue fleets (re-attack waves 9-10 + fresh
-  deep angles) toward the 3-clean-rounds convergence. STILL OPEN (Tijn's, not mine): the
+  slug/date guards (LOW traversal).
+  v6.12.68 (f40eb26) wave 11 — 12 fixes incl. 3 HIGH: secrets-scanner block-comment span
+  treated /* inside a string/glob/URL as a comment (SELF-REGRESSION of wave 9, dropped real
+  secrets) -> string-literal-aware scan; PreToolUse.Bash quoted "--" bypassed the cd option-
+  skip (SELF-REGRESSION of wave 9) -> dequote-first; verify-store forgery (.ctoc/state/verify
+  was agent-writable so Gate-3 VERIFY evidence was forgeable) -> extended the edit-hook deny
+  carve-out to it. + 6 MED: audit-chain chainHeadFromLog threw on a truncated tail line
+  (SELF-REGRESSION of wave 9, bricked all appends) -> backward-scan + heal; quality-state
+  O_EXCL 0-byte window let a concurrent acquirer steal a live lock (SELF-REGRESSION of wave 9)
+  -> retry+grace; circuit-breaker counter reset by prepended approval block -> read max across
+  all blocks; SIP1 residency exemption didn't require a ledgered parent -> now does; task-
+  reconcile one-pass quarantine handed a live orphan's files to a sibling -> persistent
+  quarantine; plan-index store query finiteness guard. + 3 LOW: settings in->hasOwnProperty +
+  __proto__ guard; duplicate-guard non-finite-threshold re-default. FOUR of these were
+  regressions the re-attack lens caught in this session's own wave-9 fixes (its 4th straight
+  high-yield round). Three fleet-11 lenses reported their CORE invariant SOUND (settings
+  precedence + no-profile-weakens-a-gate; vector math; continuation/stop machinery) — a real
+  convergence signal on those axes; defects were in adjacent legs. Next: continue fleets
+  (re-attack wave 11 + compliance/legal, human-facing menu/dashboard, test-quality meta lenses)
+  toward the 3-clean-rounds convergence. STILL OPEN (Tijn's, not mine): the
   ledger-backfill forgery (option C, Tijn-decided) — its own Iron Loop plan spanning
   approval-ledger + human-gate-check + a human-confirmation path, through Tijn's Gate 2.
   --- earlier waves (unchanged history) below ---
