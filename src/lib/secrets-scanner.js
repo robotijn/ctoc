@@ -17,6 +17,39 @@ const path = require('path');
 const { execSync, execFileSync } = require('child_process');
 
 /**
+ * File extensions whose language has C-style `/* ... *\/` BLOCK comments.
+ * The block-comment suppression in isInComment (`_inBlockCommentAt` and the
+ * `^\s*\*` continuation line) applies ONLY to these. In shell / YAML / Python /
+ * Ruby / TOML / ini / PowerShell / etc. a bare `/*` is a GLOB or path segment,
+ * never a comment open — so treating `/*` as a block-comment start there would
+ * open a PHANTOM span that swallows a later real secret (a security-gate
+ * fail-OPEN). For any extension NOT in this set — including unknown or absent
+ * extensions — the scanner FAILS CLOSED: it does not apply block-comment
+ * suppression and reports the secret rather than guessing it is commented.
+ * The single-line comment handling (`//`, `#`, `--`, `<!--`, `;`, `%`) and the
+ * PEM exemption remain language-appropriate and are applied regardless.
+ * @type {Set<string>}
+ */
+const C_FAMILY_BLOCK_COMMENT_EXTENSIONS = new Set([
+  // JavaScript / TypeScript family
+  '.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts',
+  // C / C++ family
+  '.c', '.h', '.cpp', '.cc', '.cxx', '.hpp', '.hh', '.hxx', '.ino',
+  // Objective-C
+  '.m', '.mm',
+  // JVM / .NET
+  '.java', '.cs', '.scala', '.kt', '.kts', '.groovy', '.gvy',
+  // Systems / modern compiled
+  '.go', '.rs', '.swift', '.dart', '.d',
+  // PHP
+  '.php',
+  // Stylesheets with /* */ comments
+  '.css', '.scss', '.less',
+  // SQL (ANSI /* */ block comments)
+  '.sql',
+]);
+
+/**
  * Secret types and their severity
  * @type {Object}
  */
@@ -671,9 +704,20 @@ class SecretsScanner {
    * Check if a finding is in a comment or documentation
    * @param {string} content - File content
    * @param {number} position - Position in content
+   * @param {string} [filePath] - Path of the scanned file. Its extension gates
+   *   the C-style block-comment (`/* ... *\/`) suppression: applied only for
+   *   C-family languages, fail-closed (not applied) otherwise. When absent, the
+   *   scanner fails CLOSED and skips block-comment suppression.
    * @returns {boolean} True if in comment
    */
-  isInComment(content, position) {
+  isInComment(content, position, filePath) {
+    // A C-style `/* ... *\/` block comment exists ONLY in C-family languages.
+    // Gate the block-comment suppression on the file extension so a bare `/*`
+    // in a shell glob / YAML / Python line cannot open a PHANTOM block span that
+    // swallows a later real secret. Unknown / absent extension => fail closed.
+    const ext = filePath ? path.extname(String(filePath)).toLowerCase() : '';
+    const isCFamily = C_FAMILY_BLOCK_COMMENT_EXTENSIONS.has(ext);
+
     // Get the line containing the match
     const lineStart = content.lastIndexOf('\n', position) + 1;
     const lineEnd = content.indexOf('\n', position);
@@ -708,24 +752,33 @@ class SecretsScanner {
     // only counts `/*`/`*/` as comment boundaries when NOT inside a string. The
     // match is in a block comment iff the scan ends INSIDE a block comment. When
     // ambiguous we bias to REPORTING (a security scanner must fail closed).
-    // O(n) single pass, no regex — ReDoS-safe.
-    if (this._inBlockCommentAt(content, position)) {
+    // O(n) single pass, no regex — ReDoS-safe. C-FAMILY ONLY: a non-C-family or
+    // unknown extension has no /* */ block comments, so this suppression is
+    // skipped (fail closed) — the secret is reported rather than presumed inside
+    // a phantom block opened by a glob/path `/*`.
+    if (isCFamily && this._inBlockCommentAt(content, position)) {
       return true; // an unclosed /* ... */ span (string-aware) covers the match
     }
 
     // Single-line comment patterns — anchored: the comment marker begins the
-    // line, so everything after it (including the secret) is commentary. The
-    // `^\s*\*` case still catches a JSDoc/block continuation line inside a
-    // multi-line comment whose opener is on a preceding line.
+    // line, so everything after it (including the secret) is commentary. These
+    // are language-appropriate and applied regardless of extension.
     const commentPatterns = [
       /^\s*\/\//, // JS/TS/Go/C single line
       /^\s*#/,    // Python/Ruby/Shell
-      /^\s*\*/,   // JS block comment continuation
       /^\s*<!--/, // HTML
       /^\s*--/,   // SQL/Haskell
       /^\s*;/,    // Lisp/ASM
       /^\s*%/     // LaTeX/Erlang
     ];
+
+    // The `^\s*\*` block-comment CONTINUATION line (a JSDoc/block interior line
+    // whose opener `/*` is on a preceding line) is meaningful ONLY in C-family
+    // languages. Elsewhere a leading `*` is not a comment marker, so gating it
+    // here keeps the scanner fail-closed for non-C-family files.
+    if (isCFamily) {
+      commentPatterns.push(/^\s*\*/); // JS/C block comment continuation
+    }
 
     return commentPatterns.some(p => p.test(line));
   }
@@ -765,8 +818,11 @@ class SecretsScanner {
             continue;
           }
 
-          // Skip if in comment (but still flag .env files)
-          if (!relativePath.includes('.env') && this.isInComment(content, position)) continue;
+          // Skip if in comment (but still flag .env files). Pass filePath so the
+          // block-comment suppression is gated to C-family languages (fail closed
+          // for shell/YAML/Python/unknown — a bare `/*` there is a glob, never a
+          // comment, and must not swallow the secret).
+          if (!relativePath.includes('.env') && this.isInComment(content, position, filePath)) continue;
 
           // Find line number
           let lineNumber = 1;

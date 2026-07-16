@@ -40,7 +40,7 @@ function activeHolds(projectRoot) {
     if (entry.startsWith('_')) continue; // skip template/_README files
     const full = path.join(dir, entry);
     const content = safeFs.readFileSync(full, 'utf8');
-    if (/^status:\s*["']?active\b/m.test(content)) {
+    if (/^status:\s*["']?active\b/mi.test(content)) {
       out.push({
         id: entry.replace(/\.(yaml|yml)$/, ''),
         path: path.relative(projectRoot, full),

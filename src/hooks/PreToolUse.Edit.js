@@ -112,12 +112,17 @@ const VERIFY_EVIDENCE_DIR = '.ctoc/state/verify';
 /**
  * Normalize a tool-call target to a project-root-relative POSIX path for
  * protected-directory matching, or return null if it is empty or escapes the
- * root via traversal. Mirrors `isWhitelisted`'s normalization exactly —
- * absolute → `path.relative`; `\\`→`/`; strip leading `./`; reject any `..`
- * traversal; `path.posix.normalize` — so a crafted target like
- * `.ctoc/approvals/../x.js` (which resolves OUT of the protected dir) is NOT
- * reported as protected and falls through to the normal whitelist/coverage flow.
- * Pure: no filesystem access.
+ * root via traversal. Mirrors `isWhitelisted`'s normalization —
+ * absolute → `path.relative`; `\\`→`/`; strip leading `./` — then RESOLVES
+ * `.`/`..` via `path.posix.normalize` and rejects only a result that escapes the
+ * project root (`..` / `.` / `../…`).
+ *
+ * Traversal-robust (HIGH gate-bypass fix): a `..` is no longer rejected up front;
+ * it is resolved first. So `.ctoc/state/verify/../verify/x.js` collapses to
+ * `.ctoc/state/verify/x.js` and IS reported as protected, while
+ * `.ctoc/approvals/../x.js` collapses to `.ctoc/x.js` (resolves OUT of the
+ * protected dir) and is NOT — it falls through to the normal whitelist/coverage
+ * flow. Pure: no filesystem access.
  *
  * @param {string} filePath - the tool-call target (relative or absolute)
  * @returns {string|null} normalized POSIX-relative path, or null if unusable
@@ -129,16 +134,21 @@ function normalizeForProtection(filePath) {
     norm = path.relative(process.cwd(), norm);
   }
   norm = norm.replace(/\\/g, '/').replace(/^\.\//, '');
-  if (norm === '' || norm === '..' || norm.startsWith('../') || norm.includes('/../')) return null;
+  if (norm === '') return null;
+  // Resolve `.`/`..` FIRST, then reject only a result that escapes the root — so a
+  // `..` that lands back inside a protected dir is still matched (not evadable).
   norm = path.posix.normalize(norm);
-  if (norm.startsWith('../')) return null;
+  if (norm === '..' || norm === '.' || norm.startsWith('../')) return null;
   return norm;
 }
 
 /**
  * Whether `norm` (an already-normalized POSIX-relative path or null) is the
- * given protected directory or a path strictly beneath it. Segment-precise: it
- * matches `dir` and `dir/...` but NOT a same-prefix sibling like `${dir}OTHER/`.
+ * given protected directory or a path strictly beneath it. Segment-precise AND
+ * CASE-INSENSITIVE: it matches `dir` and `dir/...` regardless of segment casing
+ * (macOS APFS / Windows route a case-variant write into the REAL lowercase dir,
+ * so a case-sensitive gate was forgeable — HIGH gate-bypass), but NOT a
+ * same-prefix sibling like `${dir}OTHER/` (the `/` boundary is required).
  *
  * @param {string|null} norm - output of `normalizeForProtection`
  * @param {string} dir - POSIX-relative protected directory prefix (no trailing /)
@@ -146,7 +156,9 @@ function normalizeForProtection(filePath) {
  */
 function isUnderProtectedDir(norm, dir) {
   if (norm === null) return false;
-  return norm === dir || norm.startsWith(`${dir}/`);
+  const n = norm.toLowerCase();
+  const d = dir.toLowerCase();
+  return n === d || n.startsWith(`${d}/`);
 }
 
 /**

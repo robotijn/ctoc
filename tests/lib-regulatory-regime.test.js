@@ -531,3 +531,79 @@ describe('loadActiveProfiles block terminator (D1)', () => {
     assert.deepEqual(profiles, ['hipaa']);
   });
 });
+
+// ===========================================================================
+// DEFECT 3 — a named-but-unloadable active profile must be SURFACED LOUDLY,
+// never silently dropped.
+//
+// `active_profiles: [hippa]` (a typo for hipaa, or a profile that failed to
+// ship/parse) → loadProfile returns null → effectiveControls() silently skips
+// it → the regime enforces ZERO controls with NO error. That is a fail-open to
+// unregulated: the operator believes hippa governs the project, but nothing
+// does. A requested-but-missing regime must be visible.
+//
+// The surfacing contract:
+//   - unloadableProfiles(root) lists every active profile that fails to load.
+//   - regimeSummary(root) shows the unloadable profiles PROMINENTLY (not just
+//     the misleading "(0 controls active)").
+// Profiles that DO load are unaffected.
+// ===========================================================================
+
+describe('unloadable active profiles are surfaced (DEFECT 3)', () => {
+  it('unloadableProfiles lists a typo/missing active profile', () => {
+    const root = makeProject();
+    writeActiveProfiles(root, ['hippa']); // typo for hipaa — no such file
+    assert.deepEqual(
+      regime.unloadableProfiles(root),
+      ['hippa'],
+      'a declared profile with no loadable file must be reported, not silently dropped'
+    );
+  });
+
+  it('regimeSummary surfaces the unloadable profile prominently, not just "0 controls"', () => {
+    const root = makeProject();
+    writeActiveProfiles(root, ['hippa']);
+    const summary = regimeSummary(root);
+    assert.equal(typeof summary, 'string');
+    assert.match(summary, /hippa/, 'the summary must name the unloadable profile');
+    assert.match(
+      summary,
+      /unloadable|not found|no controls enforced/i,
+      'the summary must flag that the named regime is NOT enforcing anything'
+    );
+  });
+
+  it('a mix of a loadable and an unloadable profile: controls from the good one still active, bad one flagged', () => {
+    const root = makeProject();
+    writeProfile(root, 'good', shippedStyleProfile(['audit_hash_chain']));
+    writeActiveProfiles(root, ['good', 'hippa']);
+
+    // The loadable profile still contributes its controls (no behavior change).
+    const controls = effectiveControls(root);
+    assert.ok(controls.has('audit_hash_chain'), 'the loadable profile still activates its control');
+
+    // The unloadable one is flagged.
+    assert.deepEqual(regime.unloadableProfiles(root), ['hippa']);
+    assert.match(regimeSummary(root), /hippa/);
+    assert.match(regimeSummary(root), /unloadable|not found|no controls enforced/i);
+  });
+
+  it('REGRESSION: an all-loadable profile set has no unloadable profiles and a clean summary', () => {
+    const root = makeProject();
+    writeProfile(root, 'alpha', shippedStyleProfile(['audit_hash_chain', 'four_eyes_gate3']));
+    writeProfile(root, 'beta', shippedStyleProfile(['legal_hold']));
+    writeActiveProfiles(root, ['alpha', 'beta']);
+
+    assert.deepEqual(regime.unloadableProfiles(root), []);
+    const summary = regimeSummary(root);
+    // Unchanged clean shape — no unloadable warning appended.
+    assert.match(summary, /^Regulatory regime: alpha, beta \(\d+ controls active\)$/);
+    assert.doesNotMatch(summary, /unloadable|not found|no controls enforced/i);
+  });
+
+  it('REGRESSION: unloadableProfiles is empty when there are no active profiles', () => {
+    const root = makeProject();
+    writeActiveProfiles(root, []);
+    assert.deepEqual(regime.unloadableProfiles(root), []);
+  });
+});

@@ -278,17 +278,33 @@ describe('plan-index/duplicate-guard checkDuplicate', () => {
     assert.deepEqual(out, [], 'NaN → 0.85 fallback → a 0.5 cosine match is below threshold → []');
   });
 
-  // Results carrying a non-finite score are dropped before comparison.
-  it('drops results whose score is non-finite', async () => {
-    const store = buildStore([{ planPath: 'plans/a.md', vec: AXIS_X }, { planPath: 'plans/b.md', vec: AXIS_X }]);
-    // Force one hit to carry a NaN score and the other a valid 0.9.
+  // Results carrying a non-finite score are dropped before comparison. The
+  // mutation-killer here is the +Infinity hit: `Infinity >= 0.85` is TRUE, so
+  // WITHOUT the `Number.isFinite(r.score)` guard the +Infinity result would be
+  // wrongly INCLUDED (and, sorting descending, land FIRST). WITH the guard it is
+  // dropped. A NaN-only fixture (the previous version) could NOT kill the mutant
+  // because `NaN >= 0.85` is already false — deleting the guard left the output
+  // byte-identical. The finite 0.9 hit stays to prove the filter is selective, not
+  // a blanket reject.
+  it('drops results whose score is non-finite (+Infinity and NaN), keeps finite in-threshold', async () => {
+    const store = buildStore([
+      { planPath: 'plans/a.md', vec: AXIS_X },
+      { planPath: 'plans/b.md', vec: AXIS_X },
+      { planPath: 'plans/c.md', vec: AXIS_X },
+    ]);
+    // a.md: +Infinity (passes `>= threshold`, so ONLY the isFinite guard drops it).
+    // c.md: NaN (already fails `>= threshold`). b.md: a valid in-threshold 0.9.
     store.search = () => ([
-      { planPath: 'plans/a.md', sectionId: PLAN_SENTINEL, score: Number.NaN },
+      { planPath: 'plans/a.md', sectionId: PLAN_SENTINEL, score: Number.POSITIVE_INFINITY },
       { planPath: 'plans/b.md', sectionId: PLAN_SENTINEL, score: 0.9 },
+      { planPath: 'plans/c.md', sectionId: PLAN_SENTINEL, score: Number.NaN },
     ]);
     const embedder = stubEmbedder(new Map([['q', AXIS_X]]));
     const out = await checkDuplicate('q', { store, embedder, getSetting: stubGetSetting(0.85) });
+    // Only the finite in-threshold b.md survives; the +Infinity a.md is absent —
+    // deleting `Number.isFinite(r.score)` would put {plan:'plans/a.md', similarity:Infinity} first.
     assert.deepEqual(out, [{ plan: 'plans/b.md', similarity: 0.9 }]);
+    assert.ok(!out.some((r) => r.plan === 'plans/a.md'), 'the +Infinity result must be dropped by the isFinite guard');
   });
 
   // 9. Non-string / empty draftSummary yields [] WITHOUT embedding.

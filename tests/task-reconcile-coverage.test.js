@@ -222,6 +222,125 @@ describe('reconcileState — two-pass staleness-orphan quarantine persistence', 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// reconcileState / reconcile — BOUNDED staleness-orphan quarantine (permanent-deadlock
+// regression). A prior wave made the quarantine PERSIST across passes, releasing it only
+// on the CONFIRMED-DEAD signal (live list present + id absent). But the DEFAULT /ctoc:menu
+// path passes NO --live-agent-ids, so `liveAgentIds` is null on EVERY pass → confirmed-dead
+// NEVER fires → a staleness-orphan's files stay reserved FOREVER → any rival queued task
+// touching them can NEVER promote. That is a permanent scheduler deadlock, WORSE than the
+// original one-pass bug (which at least made progress). The quarantine MUST be bounded:
+// released once the orphan is PRESUMED DEAD (total age ≥ a documented multiple of the SAME
+// kind-aware staleness floor that orphaned it) even when the live list is absent forever.
+// A plausibly-alive agent is still protected during the window just after orphaning.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** An already-`orphaned`-on-staleness task literal (carries the durable quarantine marker). */
+function stalenessOrphan(over = {}) {
+  return {
+    id: over.id || 'o1',
+    kind: over.kind || 'implement',
+    label: '',
+    plan: over.plan ?? 'plans/todo/x.md',
+    status: 'orphaned',
+    agentTaskId: 'agentTaskId' in over ? over.agentTaskId : 'a1',
+    touches: over.touches || ['src/shared.js'],
+    gitOp: false,
+    blockedBy: [],
+    result: { ok: false, orphanReason: 'staleness',
+      summary: 'orphaned on staleness alone — may still be editing its files' },
+    ts: {
+      created: over.created || ago(300 * MIN),
+      started: over.started || ago(280 * MIN),
+      done: over.done || ago(150 * MIN)
+    }
+  };
+}
+
+describe('reconcile — bounded staleness-orphan quarantine (presumed-dead release, no deadlock)', () => {
+  // implement floor = 120 min; presumed-dead bound = 2× = 240 min (default multiple).
+  it('RELEASES a staleness-orphan on the default path (live null forever) once it is presumed dead', () => {
+    // The deadlock: live list ABSENT, orphan aged 280 min > 240-min presumed-dead bound.
+    // Against today's code the release branch requires live !== null → NOT released forever.
+    const o = stalenessOrphan({ id: 'o-old', started: ago(280 * MIN) });
+    const { tasks, report } = rec.reconcile(mkReg([o]),
+      { now: NOW, graceMs: GRACE, liveAgentIds: null });
+
+    assert.ok(report.quarantineReleased.includes('o-old'),
+      'a presumed-dead orphan releases its file quarantine even with no live list — no permanent deadlock');
+    assert.equal(tasks.tasks.find(t => t.id === 'o-old').result.orphanReason, 'presumed-dead',
+      'the durable marker flips to presumed-dead so reconcileState stops reserving its files');
+  });
+
+  it('still HOLDS a staleness-orphan within the plausibly-alive window (age past floor, below bound)', () => {
+    // Regression — the original bug must stay fixed: a slow-but-alive agent is protected. Age
+    // 200 min is past the 120-min floor but below the 240-min presumed-dead bound → NOT released.
+    const o = stalenessOrphan({ id: 'o-fresh', started: ago(200 * MIN) });
+    const { tasks, report } = rec.reconcile(mkReg([o]),
+      { now: NOW, graceMs: GRACE, liveAgentIds: null });
+
+    assert.deepEqual(report.quarantineReleased, [],
+      'within the plausibly-alive window the quarantine holds — a slow agent keeps its files');
+    assert.equal(tasks.tasks.find(t => t.id === 'o-fresh').result.orphanReason, 'staleness',
+      'the marker stays staleness so the files remain reserved');
+  });
+
+  it('RELEASES a no-recorded-id staleness-orphan once presumed dead (never unconditionally stuck)', () => {
+    // A null agentTaskId can NEVER match a live list, so the confirmed-dead path alone leaves it
+    // stuck forever. The presumed-dead bound must release it too. Age 280 min > 240-min bound.
+    const o = stalenessOrphan({ id: 'o-noid', agentTaskId: null, started: ago(280 * MIN) });
+    const { report } = rec.reconcile(mkReg([o]),
+      { now: NOW, graceMs: GRACE, liveAgentIds: null });
+
+    assert.ok(report.quarantineReleased.includes('o-noid'),
+      'a no-id orphan is released on the presumed-dead bound — not unreleasable forever');
+  });
+
+  it('still RELEASES immediately on the confirmed-dead signal even before the presumed-dead age', () => {
+    // Regression — the existing confirmed-dead signal is preserved and takes precedence: a
+    // young orphan (100 min, below both floor-2× and even the floor) whose agent the live list
+    // excludes is released NOW with the confirmed-dead marker, not held to the presumed age.
+    const o = stalenessOrphan({ id: 'o-dead', agentTaskId: 'gone', started: ago(100 * MIN) });
+    const { tasks, report } = rec.reconcile(mkReg([o]),
+      { now: NOW, graceMs: GRACE, liveAgentIds: ['other-live-agent'] });
+
+    assert.ok(report.quarantineReleased.includes('o-dead'),
+      'a confirmed-dead orphan releases immediately, regardless of age');
+    assert.equal(tasks.tasks.find(t => t.id === 'o-dead').result.orphanReason, 'confirmed-dead',
+      'the confirmed-dead marker (not presumed-dead) records the stronger evidence');
+  });
+
+  it('END-TO-END: the default-path queue makes progress — a rival promotes once the orphan ages out', () => {
+    // The headline property, at the reconcileState level: live list absent on EVERY pass. A
+    // staleness-orphan holds a rival across passes while plausibly alive, then releases it once
+    // presumed dead. Against today's code the rival NEVER promotes (permanent deadlock).
+    const seed = mkReg([
+      running({ id: 't-orphan', kind: 'implement', agentTaskId: 'maybe-alive',
+        touches: ['src/shared.js'], started: ago(130 * MIN) }),
+      task({ id: 'q-rival', kind: 'review', status: 'queued', touches: ['src/shared.js'], done: undefined })
+    ]);
+    reg.save(root, seed);
+
+    // Pass 1 (now = NOW): age-orphan t-orphan (130 > 120 floor), hold q-rival.
+    const p1 = rec.reconcileState(root, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.ok(p1.report.stalenessOrphaned.some(o => o.id === 't-orphan'), 'pass 1 age-orphans');
+    assert.deepEqual(p1.promote.map(t => t.id), [], 'pass 1 holds the rival');
+
+    // Pass 2 (now = NOW, age 130 < 240 bound): still within the plausibly-alive window → held.
+    const p2 = rec.reconcileState(root, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.deepEqual(p2.promote.map(t => t.id), [],
+      'the slow-but-alive agent is still protected while below the presumed-dead bound');
+
+    // Pass 3 (now = NOW + 130 min → total age 260 > 240 bound): presumed dead → rival promotes.
+    const late = NOW + 130 * MIN;
+    const p3 = rec.reconcileState(root, { now: late, graceMs: GRACE, liveAgentIds: null });
+    assert.deepEqual(p3.promote.map(t => t.id), ['q-rival'],
+      'once presumed dead the quarantine releases and the rival finally runs — no permanent deadlock');
+    assert.ok((p3.report.quarantineReleased || []).includes('t-orphan'),
+      'the presumed-dead release is a reported event');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // reconcileState FAIL-OPEN trio — every degraded path is a recorded note, not a throw.
 // ─────────────────────────────────────────────────────────────────────────────
 

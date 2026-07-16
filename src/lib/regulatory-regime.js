@@ -320,13 +320,42 @@ function retentionDays(projectRoot, category) {
 }
 
 /**
- * Summary of active regime for display in session-start banner.
+ * List every ACTIVE profile that fails to load — declared in
+ * active_profiles but with no readable profile file (a typo like `hippa` for
+ * `hipaa`, or a profile that failed to ship/parse). loadProfile returns null
+ * for these, and effectiveControls() silently skips them: the regime would
+ * enforce ZERO controls with no error, a fail-open to unregulated. Surfacing
+ * them makes a requested-but-missing regime visible instead of silent.
+ *
+ * @param {string} projectRoot
+ * @returns {string[]} names of active-but-unloadable profiles, in declared order
+ */
+function unloadableProfiles(projectRoot) {
+  const { profiles } = loadActiveProfiles(projectRoot);
+  const bad = [];
+  for (const profileName of profiles) {
+    if (loadProfile(projectRoot, profileName) === null) bad.push(profileName);
+  }
+  return bad;
+}
+
+/**
+ * Summary of active regime for display in session-start banner. When any
+ * active profile is unloadable, the summary flags it PROMINENTLY — a bare
+ * "(0 controls active)" would read as "nothing required" and hide the fact
+ * that a named regime silently enforces nothing.
  */
 function regimeSummary(projectRoot) {
   const { profiles } = loadActiveProfiles(projectRoot);
   if (profiles.length === 0) return null;
   const controls = effectiveControls(projectRoot);
-  return `Regulatory regime: ${profiles.join(', ')} (${controls.size} controls active)`;
+  let summary = `Regulatory regime: ${profiles.join(', ')} (${controls.size} controls active)`;
+  const bad = unloadableProfiles(projectRoot);
+  if (bad.length > 0) {
+    const plural = bad.length > 1 ? 's' : '';
+    summary += ` — ⚠ UNLOADABLE PROFILE${plural} (declared but NOT found; NO controls enforced for): ${bad.join(', ')}`;
+  }
+  return summary;
 }
 
 /**
@@ -352,5 +381,6 @@ module.exports = {
   isControlEnabled,
   retentionDays,
   regimeSummary,
+  unloadableProfiles,
   listAvailableProfiles,
 };

@@ -105,6 +105,20 @@ const DEFAULT_RETENTION_MS = 7 * 24 * 3600_000;
 const DEFAULT_CANCEL_DEADLINE_MS = 30 * 60_000;
 /** 1 h: orphaned atomic-write temp artifacts older than this are swept. */
 const DEFAULT_TEMP_TTL_MS = 60 * 60_000;
+/**
+ * PRESUMED-DEAD bound (permanent-deadlock guard). A staleness-orphan's file quarantine is
+ * released when the agent is CONFIRMED dead (live list present + its id absent) OR once the
+ * orphan's TOTAL age (now − ts.started) reaches this multiple of the SAME kind-aware staleness
+ * floor that orphaned it. WHY a second release path is load-bearing: the default /ctoc:menu
+ * path passes NO --live-agent-ids, so `liveAgentIds` is null on EVERY pass and the confirmed-
+ * dead signal can NEVER fire. Without this bound a staleness-orphan's `touches` stay in the
+ * quarantine FOREVER and any rival queued task touching them can NEVER promote — a permanent
+ * scheduler deadlock (worse than the original one-pass bug, which at least made progress).
+ * 2× the floor keeps protecting a plausibly-alive agent for one MORE full staleness window
+ * after orphaning (e.g. an `implement` orphan at 120 min is held until 240 min), then the
+ * quarantine ALWAYS elapses. Injectable via opts.presumedDeadMultiple (D-NB4-1).
+ */
+const DEFAULT_PRESUMED_DEAD_MULTIPLE = 2;
 
 /**
  * Terminal statuses for the RETENTION sweep — old ones leave the active view. Includes
@@ -144,8 +158,10 @@ const TEMP_PREFIX = 'tasks.json.tmp-';
  * @property {null|{reason?:string, skipped?:number}} corrupt  fail-open marker, else null.
  * @property {string} [saveFailed]  set by reconcileState when the fail-loud save threw.
  * @property {string[]} [tempSwept]  set by reconcileState — swept temp-artifact paths.
- * @property {string[]} [quarantineReleased]  set by reconcileState — staleness-orphan ids whose
- *   file quarantine was released this pass because the agent was confirmed dead.
+ * @property {string[]} [quarantineReleased]  staleness-orphan ids whose file quarantine was
+ *   released this pass — because the agent was CONFIRMED dead (live list excludes its id) OR
+ *   PRESUMED dead (aged past presumedDeadMultiple × the kind staleness floor). The second
+ *   signal bounds the quarantine so the default (no-live-list) path never deadlocks.
  */
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -206,6 +222,10 @@ function cloneTask(t) {
  *   Default DEFAULT_CANCEL_DEADLINE_MS (30 min).
  * @param {Object<string,number>} [opts.cancelDeadlineMsByKind]  per-kind cancel-deadline
  *   overrides (R3-B item 10). Kinds absent fall back to cancelDeadlineMs.
+ * @param {number} [opts.presumedDeadMultiple]  permanent-deadlock guard: a staleness-orphan's
+ *   file quarantine is released once its total age (now − ts.started) reaches this multiple of
+ *   the kind-aware staleness floor, even with the live list absent forever. Default
+ *   DEFAULT_PRESUMED_DEAD_MULTIPLE (2×).
  * @returns {{tasks:{version:number, generation?:number, seq:number, tasks:Array<object>}, report:ReconcileReport}}
  */
 function reconcile(tasks, opts = {}) {
@@ -219,6 +239,8 @@ function reconcile(tasks, opts = {}) {
     ? opts.cancelDeadlineMs : DEFAULT_CANCEL_DEADLINE_MS;
   const cancelByKind = (opts.cancelDeadlineMsByKind && typeof opts.cancelDeadlineMsByKind === 'object')
     ? opts.cancelDeadlineMsByKind : null;
+  const presumedDeadMultiple = (Number.isFinite(opts.presumedDeadMultiple) && opts.presumedDeadMultiple > 0)
+    ? opts.presumedDeadMultiple : DEFAULT_PRESUMED_DEAD_MULTIPLE;
   /** Kind-aware cancel deadline (R3-B item 10): per-kind override > flat default. */
   const cancelDeadlineFor = (kind) => {
     if (cancelByKind && Number.isFinite(cancelByKind[kind])) return cancelByKind[kind];
@@ -364,23 +386,47 @@ function reconcile(tasks, opts = {}) {
       // Surface every failure so the caller can push it to the inbox — never dropped.
       report.failed.push({ id: t.id, summary: (t.result && t.result.summary) || null });
     } else if (t.status === 'orphaned' && t.result && t.result.orphanReason === 'staleness') {
-      // ACROSS-PASSES quarantine release (concurrent-edit defect). A task orphaned on age
-      // alone in a PRIOR pass still carries `orphanReason:'staleness'`, so reconcileState is
-      // still reserving its files. Release that reservation — but ONLY when the agent is
-      // CONFIRMED DEAD, never on a hunch, or a still-live agent would lose its files to a
-      // rival. Confirmation requires a present live list, a recorded agent id, and that id
-      // ABSENT from the live list (the same evidence-of-death rule the running branch uses;
-      // a missing id or an absent list is missing information, not death). The marker is
-      // flipped DURABLY to `confirmed-dead` so a later list-absent pass does not re-reserve
-      // the freed files (which would strand new queued work) — the queue never deadlocks.
+      // ACROSS-PASSES quarantine release. A task orphaned on age alone in a PRIOR pass still
+      // carries `orphanReason:'staleness'`, so reconcileState is still reserving its files. The
+      // reservation is released — and the marker flipped DURABLY off `staleness` — on EITHER of
+      // two signals, so the quarantine is BOUNDED and the queue can NEVER deadlock:
+      //
+      //   (1) CONFIRMED DEAD — a present live list, a recorded agent id, and that id ABSENT
+      //       from the list (the same evidence-of-death rule the running branch uses; a missing
+      //       id or an absent list is missing information, not death). The strongest signal.
+      //
+      //   (2) PRESUMED DEAD — the orphan's TOTAL age (now − ts.started) has reached
+      //       presumedDeadMultiple × the SAME kind-aware staleness floor that orphaned it. This
+      //       is the load-bearing deadlock guard: the DEFAULT /ctoc:menu path passes no live
+      //       list, so `live` is null on EVERY pass and signal (1) can never fire. Without a
+      //       time bound the files would stay reserved FOREVER and any rival queued task
+      //       touching them could never run. The bound keeps protecting a plausibly-alive agent
+      //       during the window just after orphaning, then ALWAYS elapses. A NaN/absent
+      //       ts.started (already treated as "very old" when orphaning) is presumed dead at once,
+      //       which also frees the no-recorded-id orphan that signal (1) can never reach.
+      //
+      // The marker is flipped so a later pass does not re-reserve the freed files (which would
+      // re-strand new queued work) — confirmed-dead records the stronger evidence and takes
+      // precedence over presumed-dead when both hold.
       const hasRecordedId = t.agentTaskId != null;
-      if (live !== null && hasRecordedId && !live.has(String(t.agentTaskId))) {
-        t.result = {
-          ok: false,
-          orphanReason: 'confirmed-dead',
-          summary: 'orphaned — the agent was later confirmed gone by the harness; ' +
-            'its files are released'
-        };
+      const confirmedDead = live !== null && hasRecordedId && !live.has(String(t.agentTaskId));
+      const startedMs = parseTs(t.ts && t.ts.started);
+      const presumedDeadMs = staleThresholdFor(t.kind) * presumedDeadMultiple;
+      const presumedDead = !Number.isFinite(startedMs) || (now - startedMs) >= presumedDeadMs;
+      if (confirmedDead || presumedDead) {
+        t.result = confirmedDead
+          ? {
+              ok: false,
+              orphanReason: 'confirmed-dead',
+              summary: 'orphaned — the agent was later confirmed gone by the harness; ' +
+                'its files are released'
+            }
+          : {
+              ok: false,
+              orphanReason: 'presumed-dead',
+              summary: 'orphaned — the agent was never confirmed alive and the orphan aged past ' +
+                'the presumed-dead bound; its files are released so the queue can make progress'
+            };
         report.quarantineReleased.push(t.id);
       }
     }
@@ -623,5 +669,6 @@ module.exports = {
   DEFAULT_STALE_MS,
   DEFAULT_STALE_MS_BY_KIND,
   DEFAULT_RETENTION_MS,
-  DEFAULT_TEMP_TTL_MS
+  DEFAULT_TEMP_TTL_MS,
+  DEFAULT_PRESUMED_DEAD_MULTIPLE
 };

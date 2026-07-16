@@ -318,6 +318,23 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
     for (const w of bypasses) assertDenied(w, 'quoted cd option/-- bypass');
   });
 
+  // Re-attack (empty-operand hole): after dequoting, `cd ""` / `cd ''` / `cd -- ""`
+  // yield an EMPTY dir string. The old code treated an empty dir like a bare `cd -`
+  // and RESET the accumulated prefix to root — but in real bash `cd ""` is a NO-OP:
+  // it stays in the current directory and returns exit 0, so the `&&` chain
+  // continues from the SAME cwd. So `cd .ctoc/approvals && cd "" && tee evil.json`
+  // actually writes to `.ctoc/approvals/evil.json` while the hook — having reset the
+  // prefix — resolved it to root and ALLOWED it. An empty operand must LEAVE the
+  // prefix UNCHANGED so the ledger prefix persists and the following write is DENIED.
+  test('empty-operand cd ("" / \'\' / -- "") is a NO-OP; write after it stays DENIED', () => {
+    const bypasses = [
+      `cd .ctoc/approvals && cd "" && tee evil.json`,          // double-quoted empty operand
+      `cd .ctoc/approvals && cd '' && cp x y`,                 // single-quoted empty operand
+      `cd .ctoc/approvals && cd -- "" && echo x > evil.json`,  // `--` then empty operand
+    ];
+    for (const w of bypasses) assertDenied(w, 'empty-operand cd no-op bypass');
+  });
+
   // Regression net — every one of these MUST keep its pre-fix outcome.
   test('cd option-skip fix preserves all existing cd outcomes (regression)', () => {
     fs.writeFileSync(path.join(project, '.ctoc', 'approvals', 'x.json'), '{}');

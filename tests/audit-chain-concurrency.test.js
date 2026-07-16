@@ -286,6 +286,70 @@ describe('audit-chain: appendDispatch tolerates and self-heals a crash-truncated
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test('should_PRESERVE_the_corrupt_bytes_of_a_totally_unparseable_log_not_silently_wipe_them', () => {
+    // FORENSIC-INTEGRITY: when the ENTIRE existing (non-empty) log is unparseable, the heal
+    // must NOT silently overwrite it with '' — for a tamper-evident audit chain the corrupt
+    // bytes ARE the evidence that the log was corrupted, and zeroing them erases that evidence.
+    // The correct behavior: MOVE the corrupt log aside to a deterministic, non-colliding
+    // sibling (chain.jsonl.corrupt-<n>) so the bytes survive on disk, then let the chain make
+    // forward progress from genesis. Against today's code the corrupt bytes are wiped
+    // (writeFileSync('')) and no sibling exists — so these assertions go RED.
+    const root = makeRoot();
+    try {
+      fs.mkdirSync(path.join(root, '.ctoc', 'audit'), { recursive: true });
+      const logPath = path.join(root, LOG_REL);
+      const GARBAGE = '{"totally": broken\n<<<not json at all>>>\n'; // two unparseable lines
+      fs.writeFileSync(logPath, GARBAGE);
+
+      // Act — the append must still make forward progress (no brick), and must NOT lose bytes.
+      assert.doesNotThrow(
+        () => appendDispatch(root, { dispatch_id: 'g1', timestamp: '2026-06-15T00:00:01.000Z' }),
+        'an all-malformed log must not brick appendDispatch');
+
+      // Assert 1 — forward progress: the chain continues from genesis, verifiable, one entry.
+      const result = verifyChain(root);
+      assert.equal(result.ok, true,
+        `after preserving+healing a totally corrupt log the fresh entry must verify; got ${JSON.stringify(result)}`);
+      assert.equal(result.count, 1, 'the single new entry must be the only entry in the live chain');
+
+      // Assert 2 — the corrupt bytes are PRESERVED in a sibling .corrupt-<n> file, unaltered.
+      const corruptSibling = `${logPath}.corrupt-0`;
+      assert.equal(fs.existsSync(corruptSibling), true,
+        'the corrupt log must be preserved to a sibling .corrupt-0 file, not silently zeroed');
+      assert.equal(fs.readFileSync(corruptSibling, 'utf8'), GARBAGE,
+        'the preserved sibling must contain the ORIGINAL corrupt bytes, byte-for-byte');
+
+      // Assert 3 — the live log holds ONLY the fresh genesis-based entry, not the garbage.
+      const liveRaw = fs.readFileSync(logPath, 'utf8');
+      assert.ok(!liveRaw.includes('totally') && !liveRaw.includes('not json'),
+        'the live chain log must not carry the corrupt bytes forward');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('should_pick_a_non_colliding_corrupt_sibling_name_when_one_already_exists', () => {
+    // Deterministic, collision-free naming (no Date.now/random): if chain.jsonl.corrupt-0
+    // already exists from a prior corruption event, the next preserve must use .corrupt-1, etc.
+    const root = makeRoot();
+    try {
+      fs.mkdirSync(path.join(root, '.ctoc', 'audit'), { recursive: true });
+      const logPath = path.join(root, LOG_REL);
+      fs.writeFileSync(`${logPath}.corrupt-0`, 'a prior corruption event\n'); // occupy slot 0
+      const GARBAGE = 'not json this time either\n';
+      fs.writeFileSync(logPath, GARBAGE);
+
+      appendDispatch(root, { dispatch_id: 'g1', timestamp: '2026-06-15T00:00:01.000Z' });
+
+      assert.equal(fs.existsSync(`${logPath}.corrupt-0`), true, 'the pre-existing sibling must be untouched');
+      assert.equal(fs.readFileSync(`${logPath}.corrupt-1`, 'utf8'), GARBAGE,
+        'the new corruption must be preserved to the next free slot (.corrupt-1)');
+      assert.equal(verifyChain(root).ok, true, 'the chain must still verify after the preserve');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('audit-chain: regression — sequential integrity and tamper-evidence intact', () => {

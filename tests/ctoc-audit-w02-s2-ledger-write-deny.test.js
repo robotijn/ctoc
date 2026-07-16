@@ -150,6 +150,25 @@ describe('W02-s2: isProtectedLedgerPath predicate', () => {
     // catch a same-prefix sibling directory.
     assert.equal(isProtectedLedgerPath('.ctoc/approvals-backup/x.json'), false);
   });
+
+  // --- HIGH gate-bypass: case-insensitive + traversal-robust protected match ---
+
+  it('is true for an UPPERCASE .ctoc/APPROVALS/ segment (case-insensitive)', () => {
+    // On macOS APFS and Windows the OS routes an UPPERCASE write into the REAL
+    // lowercase approvals/ dir; a case-sensitive gate that let it through forged
+    // the human-approval ledger.
+    assert.equal(isProtectedLedgerPath('.ctoc/APPROVALS/x.json'), true);
+  });
+
+  it('is true for a MIXED-case .ctoc/Approvals/ segment (case-insensitive)', () => {
+    assert.equal(isProtectedLedgerPath('.ctoc/Approvals/x.json'), true);
+  });
+
+  it('is true for a traversal that RESOLVES BACK INTO the approvals dir', () => {
+    // `.ctoc/approvals/../approvals/x` resolves into the protected dir; the match
+    // must be robust to `..` that lands back inside, not evadable by it.
+    assert.equal(isProtectedLedgerPath('.ctoc/approvals/../approvals/x.json'), true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -205,6 +224,45 @@ describe('W02-s2: enforce() denies writes under .ctoc/approvals/ (subprocess)', 
       /approvals/.test(String(res.stdout)) || /approvals/.test(String(res.stderr));
     assert.ok(namesLedger,
       `deny output must name the .ctoc/approvals/ policy; stdout=${res.stdout} stderr=${res.stderr}`);
+  });
+
+  it('DENIES an Edit forging UPPERCASE .ctoc/APPROVALS/<slug>.json (case-insensitive gate)', () => {
+    dir = makeProject();
+    // Absolute UPPERCASE-segment target: on this case-insensitive filesystem it
+    // routes into the REAL lowercase approvals/ dir. The gate must deny regardless.
+    const targetAbs = path.join(dir, '.ctoc', 'APPROVALS', 'forged.json');
+
+    const res = runEditHook(dir, targetAbs);
+
+    assert.equal(deniedOnStdout(res), true,
+      `an uppercase .ctoc/APPROVALS/ write must BLOCK; stdout=${res.stdout} stderr=${res.stderr}`);
+    assert.equal(fs.existsSync(targetAbs), false,
+      'a denied ledger write must not have created the entry file');
+  });
+
+  it('DENIES a RELATIVE-path traversal into approvals EVEN under an active escape phrase', () => {
+    dir = makeProject();
+    // The user typed an escape phrase (would otherwise allow a non-covered edit);
+    // the ledger carve-out must win, and a `..` resolving into approvals/ must not
+    // evade the protected match.
+    const transcriptPath = path.join(dir, 'transcript.jsonl');
+    fs.writeFileSync(transcriptPath,
+      `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'please hotfix this' } })}\n`);
+    const relTarget = '.ctoc/approvals/../approvals/forged.json';
+
+    const res = spawnSync(process.execPath, [EDIT_HOOK], {
+      cwd: dir,
+      input: JSON.stringify({
+        tool_name: 'Edit',
+        tool_input: { file_path: relTarget },
+        transcript_path: transcriptPath,
+      }),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
+    });
+    assert.equal(res.signal, null, `edit hook killed by signal ${res.signal}`);
+    assert.equal(deniedOnStdout(res), true,
+      `a traversal into approvals must deny even under an escape phrase; stdout=${res.stdout} stderr=${res.stderr}`);
   });
 
   it('ALLOWS a sibling .ctoc/logs/ write (whitelist unaffected — no deny)', () => {

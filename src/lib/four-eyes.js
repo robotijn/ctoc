@@ -256,8 +256,14 @@ function verifyFourEyes(plan, projectRoot) {
     };
   }
 
-  // The load-bearing check: identities must differ.
-  if (authorRole.identity && independentRole.identity && authorRole.identity === independentRole.identity) {
+  // The load-bearing check: identities must differ. Guard on `!= null` (not
+  // truthiness): a present-but-falsy identity — coerceScalar('0') → the number
+  // 0, or `false` — is still a real, comparable principal. Under a truthiness
+  // guard two roles that BOTH carry `identity: 0` would short-circuit FALSE and
+  // slip through to passed:true, letting a single principal satisfy both
+  // approver roles (a self-approval fail-open). Missing identities (null) remain
+  // exempt so two distinct name-only roles still pass.
+  if (authorRole.identity != null && independentRole.identity != null && authorRole.identity === independentRole.identity) {
     return {
       passed: false,
       reason: `Four-eyes violation: both markers resolve to identity "${authorRole.identity}". The author-side reviewer and the independent approver must be distinct principals.`,

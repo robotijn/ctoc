@@ -22,32 +22,52 @@ function readPlans(dirPath) {
     return [];
   }
 
+  // Fail-soft per file: one unreadable/unparseable entry must NOT crash the
+  // whole reader. readdirSync lists names, but a name ending in `.md` can be a
+  // DIRECTORY (readFileSync → EISDIR), a broken symlink (statSync → ENOENT), an
+  // unreadable file (EACCES), or vanish in a readdir→read race with an agent
+  // moving a plan (ENOENT). safe-fs delegates to fs and THROWS on any of these;
+  // an un-caught throw here takes down getPlanCounts and the entire dashboard.
+  // We stat+read+build each plan in isolation, SKIP (omit) any entry that
+  // faults, warn once to stderr (matching the codebase's fail-open hook style),
+  // and keep going. Only the per-file IO/parse is caught — the surrounding
+  // control flow still surfaces genuine programming bugs. The happy path is
+  // byte-for-byte unchanged: valid plans yield the same objects in the same order.
   const files = safeFs.readdirSync(dirPath)
     .filter(f => f.endsWith('.md'))
     .map(f => {
       const filePath = path.join(dirPath, f);
-      const stat = safeFs.statSync(filePath);
-      const content = safeFs.readFileSync(filePath, 'utf8');
-      const metadata = parseMetadata(content);
+      try {
+        const stat = safeFs.statSync(filePath);
+        const content = safeFs.readFileSync(filePath, 'utf8');
+        const metadata = parseMetadata(content);
 
-      // Read background processing status
-      const bgStatus = readStatus(filePath);
+        // Read background processing status
+        const bgStatus = readStatus(filePath);
 
-      return {
-        name: f.replace('.md', ''),
-        path: filePath,
-        created: stat.birthtime,
-        modified: stat.mtime,
-        ago: timeAgo(stat.mtime),
-        metadata,
-        content,
-        // Background processing status
-        bgStatus: bgStatus.status,
-        bgAgent: bgStatus.agent || null,
-        bgMessage: bgStatus.message || null,
-        bgIcon: getStatusIcon(bgStatus.status)
-      };
-    });
+        return {
+          name: f.replace('.md', ''),
+          path: filePath,
+          created: stat.birthtime,
+          modified: stat.mtime,
+          ago: timeAgo(stat.mtime),
+          metadata,
+          content,
+          // Background processing status
+          bgStatus: bgStatus.status,
+          bgAgent: bgStatus.agent || null,
+          bgMessage: bgStatus.message || null,
+          bgIcon: getStatusIcon(bgStatus.status)
+        };
+      } catch (err) {
+        // Skip the unreadable entry; do NOT pretend it succeeded.
+        process.stderr.write(
+          `[ctoc] skipping unreadable plan ${filePath}: ${(err && err.message) || err}\n`
+        );
+        return null;
+      }
+    })
+    .filter(Boolean);
 
   // The todo stage honors an explicit, mutable ordering key
   // (.ctoc/state/todo-order.json) so a queue reorder is genuinely observable

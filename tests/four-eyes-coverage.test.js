@@ -305,4 +305,55 @@ describe('four-eyes.js — bare-string-path overload + inferProjectRoot (dark br
     assert.equal(res.passed, false);
     assert.match(res.reason, /identity|distinct principals/i);
   });
+
+  // -------------------------------------------------------------------------
+  // Cluster 6 — falsy-identity segregation-of-duties fail-open (DEFECT 2).
+  // The identity-equality guard uses TRUTHINESS:
+  //   authorRole.identity && independentRole.identity && a === b
+  // coerceScalar('0') returns the NUMBER 0 (falsy). Two DIFFERENT-name roles
+  // that BOTH carry `identity: 0` (or `false`) short-circuit the guard on the
+  // falsy operands, so the a === b collision is never evaluated → the same
+  // principal (identity 0) satisfies both approver roles and the plan PASSES:
+  // a self-approval fail-open on a dual-control gate. The fix guards on
+  // `!= null` so a present-but-falsy identity is still compared.
+  // -------------------------------------------------------------------------
+
+  it('two_names_both_identity_zero_refuses_same_identity_soD', () => {
+    // Arrange — two DISTINCT role names, both mapping to identity 0 (numeric,
+    // falsy). Distinct names so the name-equality check does NOT fire; the
+    // identity-equality check is the ONLY thing that can catch the collision.
+    writeFile(root, path.join('.ctoc', 'roles.yaml'), rolesYaml([
+      { name: 'rev', identity: 0, can_review: true },
+      { name: 'app', identity: 0, can_approve: true },
+    ]));
+
+    // Act
+    const res = fourEyes.verifyFourEyes(
+      { text: planText({ author: 'rev', independent: 'app' }), projectRoot: root });
+
+    // Assert — MUST refuse. Before the fix the falsy `0` operands short-circuit
+    // the guard → passed:true (fail-open). After the fix (`!= null`) the guard
+    // runs `0 === 0` → passed:false.
+    assert.equal(res.passed, false, 'two roles with identity 0 are the SAME principal — must refuse');
+    assert.match(res.reason, /identity|distinct principals/i);
+  });
+
+  it('two_names_distinct_numeric_identities_zero_and_one_still_pass', () => {
+    // Arrange — regression: distinct NUMERIC identities (0 vs 1) are distinct
+    // principals and must still cross the gate. Guards against a fix that
+    // over-blocks any falsy identity.
+    writeFile(root, path.join('.ctoc', 'roles.yaml'), rolesYaml([
+      { name: 'rev', identity: 0, can_review: true },
+      { name: 'app', identity: 1, can_approve: true },
+    ]));
+
+    // Act
+    const res = fourEyes.verifyFourEyes(
+      { text: planText({ author: 'rev', independent: 'app' }), projectRoot: root });
+
+    // Assert — PASS: 0 != null and 1 != null, but 0 !== 1.
+    assert.equal(res.passed, true, res.reason);
+    assert.equal(res.author, 'rev');
+    assert.equal(res.independent, 'app');
+  });
 });

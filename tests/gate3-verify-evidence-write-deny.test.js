@@ -156,6 +156,29 @@ describe('Gate-3: isProtectedVerifyPath predicate', () => {
     // catch a same-prefix sibling directory.
     assert.equal(isProtectedVerifyPath('.ctoc/state/verifyOTHER/x.json'), false);
   });
+
+  // --- HIGH gate-bypass: case-insensitive + traversal-robust protected match ---
+
+  it('is true for an UPPERCASE .ctoc/state/VERIFY/ segment (case-insensitive)', () => {
+    // On macOS APFS and Windows the OS routes an UPPERCASE write into the REAL
+    // lowercase verify/ dir; a case-sensitive gate that let it through was forgeable.
+    assert.equal(isProtectedVerifyPath('.ctoc/state/VERIFY/forged.json'), true);
+  });
+
+  it('is true for a MIXED-case .ctoc/State/Verify/ segment (case-insensitive)', () => {
+    assert.equal(isProtectedVerifyPath('.ctoc/State/Verify/x.json'), true);
+  });
+
+  it('is true for a traversal that RESOLVES BACK INTO the verify dir', () => {
+    // `.ctoc/state/verify/../verify/x` resolves into the protected dir; the match
+    // must be robust to `..` that lands back inside, not evadable by it.
+    assert.equal(isProtectedVerifyPath('.ctoc/state/verify/../verify/x.json'), true);
+  });
+
+  it('does not match a same-prefix sibling .ctoc/state/verifel/ (segment precise)', () => {
+    // Lowercasing must not collapse segment precision — verifel is NOT verify.
+    assert.equal(isProtectedVerifyPath('.ctoc/state/verifel/x.json'), false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -216,6 +239,45 @@ describe('Gate-3: enforce() denies writes under .ctoc/state/verify/ (subprocess)
     const out = `${res.stdout} ${res.stderr}`;
     assert.ok(/verify/.test(out) && /pipeline/i.test(out),
       `deny output must name verify evidence + that the pipeline writes it; stdout=${res.stdout} stderr=${res.stderr}`);
+  });
+
+  it('DENIES an Edit forging UPPERCASE .ctoc/state/VERIFY/<slug>.json (case-insensitive gate)', () => {
+    dir = makeProject();
+    // Absolute UPPERCASE-segment target: on this case-insensitive filesystem it
+    // routes into the REAL lowercase verify/ dir. The gate must deny regardless.
+    const targetAbs = path.join(dir, '.ctoc', 'state', 'VERIFY', 'forged-plan.json');
+
+    const res = runHook(EDIT_HOOK, 'Edit', dir, targetAbs, 'file_path');
+
+    assert.equal(deniedOnStdout(res), true,
+      `an uppercase .ctoc/state/VERIFY/ write must BLOCK; stdout=${res.stdout} stderr=${res.stderr}`);
+    assert.equal(fs.existsSync(targetAbs), false,
+      'a denied verify-evidence write must not have created the file');
+  });
+
+  it('DENIES a RELATIVE-path traversal into verify EVEN under an active escape phrase', () => {
+    dir = makeProject();
+    // A transcript where the USER typed an escape phrase — which would otherwise
+    // ALLOW a non-covered edit. The verify carve-out must win regardless, and a
+    // `..` that resolves back into verify/ must not evade the protected match.
+    const transcriptPath = path.join(dir, 'transcript.jsonl');
+    fs.writeFileSync(transcriptPath,
+      `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'please hotfix this' } })}\n`);
+    const relTarget = '.ctoc/state/verify/../verify/forged.json';
+
+    const res = spawnSync(process.execPath, [EDIT_HOOK], {
+      cwd: dir,
+      input: JSON.stringify({
+        tool_name: 'Edit',
+        tool_input: { file_path: relTarget },
+        transcript_path: transcriptPath,
+      }),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_TOOL_INPUT: '' },
+    });
+    assert.equal(res.signal, null, `edit hook killed by signal ${res.signal}`);
+    assert.equal(deniedOnStdout(res), true,
+      `a traversal into verify must deny even under an escape phrase; stdout=${res.stdout} stderr=${res.stderr}`);
   });
 
   // ---- Regression: every other whitelist / deny behavior is preserved --------
