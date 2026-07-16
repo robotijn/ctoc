@@ -297,6 +297,27 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
     assertAllowed('cd -- - && ls', '`cd -- -` alone with a read does not crash / is not a write');
   });
 
+  // Re-attack (adjacent hole left by the option-skip wave): the `tok === '--'`
+  // separator check and the option regex ran on the RAW token, BEFORE quote-
+  // stripping. So a QUOTED `"--"` / `'--'` was NOT `=== '--'`, was taken as the
+  // directory LITERAL (`--`), and the real `.ctoc/approvals` operand was discarded
+  // — yet real bash HONORS a quoted `--` as the end-of-options separator and cds
+  // into the ledger (`cd "--" .ctoc/approvals && pwd` → …/.ctoc/approvals). Same
+  // for quoted options `"-L"`/`"-P"`. These MUST be denied identically to their
+  // unquoted forms. Dequote each token FIRST, then apply the option/`--` logic.
+  test('QUOTED `--` / quoted-option cd bypasses are DENIED (dequote-first)', () => {
+    const bypasses = [
+      `cd "--" .ctoc/approvals && tee evil.json`,        // quoted end-of-options marker
+      `cd '--' .ctoc/approvals && cp x y`,               // single-quoted `--`
+      `cd '--' .ctoc/approvals && cp /tmp/forged.json x.json`,
+      `cd "-L" .ctoc/approvals && tee z`,                // quoted -L option
+      `cd '-P' .ctoc/approvals && cp x y`,               // single-quoted -P option
+      `cd "-P" -- .ctoc/approvals && cp a b`,            // quoted option THEN `--` THEN dir
+      `pushd "--" .ctoc/approvals && cp /tmp/f.json x.json`, // pushd + quoted `--`
+    ];
+    for (const w of bypasses) assertDenied(w, 'quoted cd option/-- bypass');
+  });
+
   // Regression net — every one of these MUST keep its pre-fix outcome.
   test('cd option-skip fix preserves all existing cd outcomes (regression)', () => {
     fs.writeFileSync(path.join(project, '.ctoc', 'approvals', 'x.json'), '{}');

@@ -186,18 +186,52 @@ function chainHeadFromLog(projectRoot) {
     return { hash: GENESIS_HASH, sequence: 0, updated_at: null };
   }
   const lines = safeFs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean);
-  if (lines.length === 0) {
-    return { hash: GENESIS_HASH, sequence: 0, updated_at: null };
+  // Scan from the END for the last WELL-FORMED entry. A crash DURING appendFileSync leaves a
+  // TRUNCATED, unterminated JSON line at the tail — the very crash window this log-tail
+  // derivation exists to self-heal. TOLERATE it: skip trailing unparseable line(s) and chain
+  // onto the last well-formed entry, whose line index (1-based) is the true sequence (the log
+  // is strictly append-only, so only the tail can ever be a partial write). A strict
+  // `JSON.parse(last)` here throws on that partial and — because the throw propagates out of
+  // every subsequent appendDispatch — permanently bricks the chain until a human hand-edits
+  // the log; that regression is exactly what this scan removes. An EMPTY or ALL-malformed log
+  // (no well-formed line at all) falls through to genesis, so the next append still progresses.
+  for (let i = lines.length - 1; i >= 0; i--) {
+    let entry;
+    try {
+      entry = JSON.parse(lines[i]);
+    } catch {
+      continue; // trailing crash-truncated artifact — ignore it, keep scanning backward
+    }
+    return {
+      hash: entry.chain_hash,
+      sequence: i + 1,
+      updated_at: entry.timestamp || null,
+    };
   }
-  // The last line is the predecessor; the line count is the sequence (append-only ==
-  // one line per entry). A malformed tail throws — you cannot safely extend a corrupt
-  // chain, and normal operation only ever writes well-formed JSON lines.
-  const last = JSON.parse(lines[lines.length - 1]);
-  return {
-    hash: last.chain_hash,
-    sequence: lines.length,
-    updated_at: last.timestamp || null,
-  };
+  return { hash: GENESIS_HASH, sequence: 0, updated_at: null };
+}
+
+/**
+ * Read the append-only log's WELL-FORMED lines, dropping any contiguous run of unparseable
+ * lines at the TAIL — the artifact of a crash mid-appendFileSync. Only the tail can be a
+ * partial write (the log is strictly append-only), so a trailing unparseable line is the
+ * crash fingerprint, not tamper. Returns the surviving valid lines plus a flag telling the
+ * caller a heal (rewrite-without-the-partial) is warranted.
+ * @param {string} projectRoot
+ * @returns {{validLines:string[], hadTrailingPartial:boolean}}
+ */
+function readLogLinesHealed(projectRoot) {
+  const logPath = path.join(projectRoot, CHAIN_LOG_PATH);
+  if (!safeFs.existsSync(logPath)) {
+    return { validLines: [], hadTrailingPartial: false };
+  }
+  const lines = safeFs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean);
+  let end = lines.length;
+  while (end > 0) {
+    try { JSON.parse(lines[end - 1]); break; }
+    catch { end--; } // strip the crash-truncated trailing line(s)
+  }
+  return { validLines: lines.slice(0, end), hadTrailingPartial: end < lines.length };
 }
 
 /**
@@ -232,8 +266,22 @@ function appendDispatch(projectRoot, dispatch, opts = {}) {
 
   const lockPath = acquireChainLock(projectRoot, opts);
   try {
-    // Read the head from the AUTHORITATIVE log tail inside the lock (see chainHeadFromLog):
-    // this is what makes the append both crash-safe and race-safe.
+    const logPath = path.join(projectRoot, CHAIN_LOG_PATH);
+
+    // Self-heal a crash-truncated trailing line BEFORE extending the chain. A death mid-
+    // appendFileSync leaves an unterminated JSON line at the tail; left in place it would
+    // both brick chainHeadFromLog's old strict parse AND fail verifyChain forever. Under the
+    // lock we rewrite the log without that artifact so the next entry appends onto a clean,
+    // verifiable log rather than accumulating the partial line. Only ever removes an
+    // UNPARSEABLE trailing line (append-only ⇒ only the tail can be a partial write); a
+    // well-formed but altered line is left intact so verifyChain still detects tamper.
+    const { validLines, hadTrailingPartial } = readLogLinesHealed(projectRoot);
+    if (hadTrailingPartial) {
+      safeFs.writeFileSync(logPath, validLines.length ? validLines.join('\n') + '\n' : '');
+    }
+
+    // Read the head from the AUTHORITATIVE (now healed) log tail inside the lock (see
+    // chainHeadFromLog): this is what makes the append both crash-safe and race-safe.
     const head = chainHeadFromLog(projectRoot);
     const entryHash = canonicalHash(dispatch);
 
@@ -246,8 +294,7 @@ function appendDispatch(projectRoot, dispatch, opts = {}) {
     };
     chainEntry.chain_hash = canonicalHash(chainEntry);
 
-    // Append to the chain log (newline-delimited JSON, never rewritten)
-    const logPath = path.join(projectRoot, CHAIN_LOG_PATH);
+    // Append to the chain log (newline-delimited JSON)
     safeFs.appendFileSync(logPath, JSON.stringify(chainEntry) + '\n');
 
     // Update the chain head. If the process dies here (after the append, before this

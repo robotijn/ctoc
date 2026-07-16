@@ -235,7 +235,15 @@ function hasLedgerApproval(filePath, folderName, projectPath = process.cwd(), co
  *     exactly as `actions.js:listSubplans` does — independent of any
  *     `parseMetadata` fix);
  *   - it has NEVER appeared in the ledger (`readEntry === null`), the operational
- *     proxy for "never resided downstream / never crossed a gate".
+ *     proxy for "never resided downstream / never crossed a gate";
+ *   - its `parent_plan` resolves to a parent that ITSELF carries a real ledger
+ *     entry (an approved/ledgered parent — the same `readEntryResult(...).status
+ *     === 'ok'` check the residency sweep uses for a normal resident). Without
+ *     this leg the exemption was a Gate-1 residency HOLE: because `plans/**.md` is
+ *     Edit-whitelisted, an agent could Write `plans/implementation/x.md` carrying a
+ *     lone `parent_plan:` line and squat the Gate-1 destination with zero
+ *     provenance. A dangling / unapproved / nonexistent parent is NOT a valid
+ *     provenance root, so the slice is NOT exempt (fail toward flagging).
  * The exemption cannot fire outside `implementation/`.
  *
  * @param {string} filePath - absolute path to the plan file
@@ -257,7 +265,17 @@ function isFreshSip1Slice(filePath, folderName, projectPath = process.cwd(), con
   const ledger = require('../lib/approval-ledger');
   // "Never appeared in the ledger" means a TRUE absence — an un-keyable or corrupt
   // entry must NOT be laundered into an exemption (fail SAFE toward evaluation).
-  return ledger.readEntryResult(ledger.slugFromPlanPath(filePath), projectPath).status === 'absent';
+  if (ledger.readEntryResult(ledger.slugFromPlanPath(filePath), projectPath).status !== 'absent') {
+    return false;
+  }
+  // The exemption is valid ONLY under an approved/ledgered parent. Resolve the
+  // parent slug the same way a plan path maps to a ledger key (basename minus .md,
+  // lowercased — robust to a bare slug, a `<slug>.md`, or a path value), then apply
+  // the SAME ledger-entry check the sweep uses for a normal resident: the parent
+  // must have a real, readable ledger entry (`status === 'ok'`). A dangling,
+  // unapproved, un-keyable, or corrupt parent yields anything but 'ok' → NOT exempt.
+  const parentSlug = ledger.slugFromPlanPath(parentPlan);
+  return ledger.readEntryResult(parentSlug, projectPath).status === 'ok';
 }
 
 /**

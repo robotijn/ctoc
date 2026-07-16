@@ -622,4 +622,99 @@ describe('SecretsScanner.isInComment — block-comment span analysis', () => {
       'the PEM boundary exemption must keep private keys reportable'
     );
   });
+
+  // ---------------------------------------------------------------------------
+  // REGRESSION: a `/*` INSIDE A STRING LITERAL on an earlier line must NOT be
+  // counted as a block-comment open. The naive lastIndexOf('/*') span check
+  // (lastOpen > lastClose) fails OPEN here: it sees the `/*` inside "src/*.js"
+  // as an unclosed comment covering the later secret, so the secret is silently
+  // DROPPED. The span scan must be string-literal aware.
+  // ---------------------------------------------------------------------------
+  it('reports a secret after a prior line with /* inside a GLOB string', () => {
+    const root = freshDir('glob-string-open');
+    const file = path.join(root, 'glob.js');
+    fs.writeFileSync(
+      file,
+      'const glob = "src/*.js";\n' +
+      `const awsKey = "${AWS_EXAMPLE}";\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a /* inside a string literal is NOT a comment open — the later secret MUST be reported'
+    );
+  });
+
+  it('reports a secret after a prior line with /* inside a WILDCARD URL string', () => {
+    const root = freshDir('url-string-open');
+    const file = path.join(root, 'url.js');
+    fs.writeFileSync(
+      file,
+      'const endpoint = "https://api.example.com/*";\n' +
+      `const awsKey = "${AWS_EXAMPLE}";\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a /* inside a wildcard-URL string is NOT a comment open — the later secret MUST be reported'
+    );
+  });
+
+  it('reports a secret after a prior line with /* inside a REGEX-in-string', () => {
+    const root = freshDir('regex-string-open');
+    const file = path.join(root, 'regex.js');
+    fs.writeFileSync(
+      file,
+      "const re = 'a/*b';\n" +
+      `const awsKey = "${AWS_EXAMPLE}";\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a /* inside a single-quoted regex string is NOT a comment open — the later secret MUST be reported'
+    );
+  });
+
+  it('reports a secret whose own code line has /* inside a string BEFORE it', () => {
+    const root = freshDir('inline-glob-string');
+    const file = path.join(root, 'inline.js');
+    fs.writeFileSync(
+      file,
+      `const cfg = { glob: "src/*.js", key: "${AWS_EXAMPLE}" };\n`
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a /* inside a same-line string before the secret must not classify it as in-comment'
+    );
+  });
+
+  it('still SKIPS a genuine multi-line block even when an earlier line has /* in a string', () => {
+    // The real /* opener (line 2) must still win: string-aware scan must not
+    // over-correct and start reporting secrets inside true block comments.
+    const root = freshDir('string-then-real-block');
+    const file = path.join(root, 'mixed.js');
+    fs.writeFileSync(
+      file,
+      'const glob = "src/*.js";\n' +
+      '/* deprecated below\n' +
+      `key = "${AWS_EXAMPLE}"\n` +
+      'end */\n'
+    );
+
+    const findings = new SecretsScanner(root).scanFile(file);
+
+    assert.ok(
+      !findings.some((f) => f.type === 'AWS_ACCESS_KEY'),
+      'a secret inside a genuine /* ... */ block must still be skipped'
+    );
+  });
 });

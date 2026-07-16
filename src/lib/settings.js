@@ -186,7 +186,12 @@ function readRawSettings(projectPath = process.cwd()) {
 // Reads the raw file so it never depends on the merge it drives.
 function getEnvironment(projectPath = process.cwd()) {
   const env = readRawSettings(projectPath).general?.environment;
-  return env && env in ENVIRONMENT_PROFILES ? env : 'ask';
+  // Use hasOwnProperty (not the `in` operator) so an inherited Object.prototype
+  // name — "constructor", "toString", "valueOf", … — declared in settings.json is
+  // NOT mistaken for a real environment. `in` walks the prototype chain and would
+  // accept those, silently suppressing the first-run prompt and recording a bogus
+  // environment. Only the four own keys of ENVIRONMENT_PROFILES are valid.
+  return env && Object.prototype.hasOwnProperty.call(ENVIRONMENT_PROFILES, env) ? env : 'ask';
 }
 
 // Sparse override map for an environment (safe to mutate by caller — it's fresh).
@@ -261,9 +266,22 @@ function getSetting(category, key, projectPath = process.cwd()) {
 // Set a single setting. Round-trips the RAW file (not the schema-merged object)
 // so non-schema top-level blocks — e.g. `deployment` and `sync` — survive the
 // write instead of being dropped. Reads still merge schema/profile/defaults.
+// Names that, used as a category or key, would resolve through the prototype chain
+// instead of an own property — writing them onto Object.prototype (prototype
+// pollution). `raw['__proto__']` is Object.prototype (truthy + typeof 'object'), so
+// the object guard below would fall through and `raw['__proto__'][key] = value` would
+// pollute the global prototype. All CTOC callers pass schema-fixed names, so this is a
+// defensive reject, not a happy-path change.
+const UNSAFE_SETTING_NAMES = new Set(['__proto__', 'constructor', 'prototype']);
+
 function setSetting(category, key, value, projectPath = process.cwd()) {
+  if (UNSAFE_SETTING_NAMES.has(category) || UNSAFE_SETTING_NAMES.has(key)) {
+    throw new Error(`setSetting: unsafe category/key "${UNSAFE_SETTING_NAMES.has(category) ? category : key}" (prototype pollution)`);
+  }
   const raw = readRawSettings(projectPath);
-  if (!raw[category] || typeof raw[category] !== 'object') raw[category] = {};
+  if (!Object.prototype.hasOwnProperty.call(raw, category) || typeof raw[category] !== 'object' || raw[category] === null) {
+    raw[category] = {};
+  }
   raw[category][key] = value;
   saveSettings(raw, projectPath);
 }

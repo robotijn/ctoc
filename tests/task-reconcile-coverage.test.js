@@ -164,6 +164,64 @@ describe('reconcileState — staleness-orphan file quarantine (R3-B item 8)', ()
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// reconcileState — TWO-PASS staleness-orphan quarantine PERSISTENCE (concurrent-edit /
+// double-run defect). The single-pass quarantine (R3-B item 8) armed only for the pass
+// that DID the orphaning. On the very NEXT pass the age-orphaned task is already terminal
+// `orphaned`, so it is re-added to nothing and the quarantine goes inert — its files are
+// handed to a conflicting queued sibling while the original agent may STILL be alive,
+// putting two live agents on one file. The reservation MUST persist across passes and be
+// released ONLY when the agent is CONFIRMED DEAD (never a permanent deadlock).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('reconcileState — two-pass staleness-orphan quarantine persistence', () => {
+  it('holds a conflicting sibling on the SECOND pass while the age-orphaned agent may still be alive', () => {
+    // t-orphan: implement, 130 min old (> 120-min floor), recorded agent id, touches a file
+    // a queued review conflicts on. TaskList unavailable (liveAgentIds null) throughout.
+    const seed = mkReg([
+      running({ id: 't-orphan', kind: 'implement', agentTaskId: 'alive-agent',
+        touches: ['src/shared.js'], started: ago(130 * MIN) }),
+      task({ id: 'q-conflict', kind: 'review', status: 'queued', touches: ['src/shared.js'], done: undefined })
+    ]);
+    reg.save(root, seed);
+
+    // Pass 1 — age-orphans t-orphan and HOLDS q-conflict (the working single-pass rule).
+    const p1 = rec.reconcileState(root, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.ok(p1.report.stalenessOrphaned.some(o => o.id === 't-orphan'),
+      'pass 1 must age-orphan t-orphan for the quarantine to arm');
+    assert.deepEqual(p1.promote.map(t => t.id), [], 'pass 1 holds the conflicting sibling');
+
+    // Pass 2 — t-orphan is now terminal `orphaned`; its agent is STILL alive (TaskList still
+    // unavailable). Its files MUST stay reserved: promoting q-conflict now would start a
+    // second live agent on src/shared.js. Against the single-pass code this FAILS
+    // (q-conflict is promoted on pass 2 because the quarantine went inert).
+    const p2 = rec.reconcileState(root, { now: NOW, graceMs: GRACE, liveAgentIds: null });
+    assert.deepEqual(p2.promote.map(t => t.id), [],
+      'pass 2 STILL holds the conflicting sibling — the age-orphan was never confirmed dead');
+    assert.ok((p2.report.quarantined || []).some(q => q.id === 'q-conflict'),
+      'the persistent hold is REPORTED, never silent');
+  });
+
+  it('releases the sibling on a later pass once the age-orphaned agent is CONFIRMED DEAD (no deadlock)', () => {
+    const seed = mkReg([
+      running({ id: 't-orphan', kind: 'implement', agentTaskId: 'dead-agent',
+        touches: ['src/shared.js'], started: ago(130 * MIN) }),
+      task({ id: 'q-conflict', kind: 'review', status: 'queued', touches: ['src/shared.js'], done: undefined })
+    ]);
+    reg.save(root, seed);
+
+    rec.reconcileState(root, { now: NOW, graceMs: GRACE, liveAgentIds: null }); // pass 1 holds
+
+    // Pass 2 with a LIVE list that does NOT list the orphan's agent → the agent is confirmed
+    // dead. The reservation is released so the queue never deadlocks forever.
+    const p2 = rec.reconcileState(root, { now: NOW, graceMs: GRACE, liveAgentIds: ['some-other-agent'] });
+    assert.deepEqual(p2.promote.map(t => t.id), ['q-conflict'],
+      'a confirmed-dead orphan releases its files to the waiting sibling');
+    assert.ok((p2.report.quarantineReleased || []).includes('t-orphan'),
+      'the release is a reported event, never silent');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // reconcileState FAIL-OPEN trio — every degraded path is a recorded note, not a throw.
 // ─────────────────────────────────────────────────────────────────────────────
 

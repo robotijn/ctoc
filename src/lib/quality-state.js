@@ -118,6 +118,43 @@ function isProcessAlive(pid) {
 const LOCK_ACQUIRE_ATTEMPTS = 5;
 
 /**
+ * When the lock file EXISTS but is empty / unparseable it may be a live winner
+ * mid-create: openSync(lockFile,'wx') succeeds atomically, but writing the holder
+ * identity (fs.writeSync) is a SEPARATE step, so for a brief window (typically
+ * microseconds, across two OS processes) the lock is 0 bytes. Treating that as a
+ * corrupt lock and reclaiming it would UNLINK the live winner's lock and hand out
+ * a second holder. So a reader that sees an empty lock first RETRIES the read a
+ * few times with a tiny backoff — a live winner populates the identity almost
+ * immediately — and only reclaims an empty lock that REMAINS empty AND has
+ * persisted past a short grace window (an abandoned create: a process killed
+ * between openSync and writeSync), which keeps the lock deadlock-free.
+ */
+const EMPTY_LOCK_READ_RETRIES = 5;
+const EMPTY_LOCK_READ_BACKOFF_MS = 2;
+const EMPTY_LOCK_GRACE_MS = 1000;
+
+/**
+ * Synchronous sleep with no busy-spin, cross-platform (no shell). Atomics.wait on
+ * a private SharedArrayBuffer blocks the current thread for `ms` and returns
+ * 'timed-out'; used only for the sub-millisecond backoff between empty-lock reads.
+ */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Parse the lock holder identity, returning null when the file is missing, empty,
+ * or unparseable (e.g. a winner's not-yet-populated 0-byte lock).
+ */
+function readLockData(lockFile) {
+  try {
+    return JSON.parse(safeFs.readFileSync(lockFile, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Remove the lock file, tolerating a concurrent reclaimer having already removed
  * it. A missing file (ENOENT) means someone else won the removal — that is the
  * desired end state, not an error, so it is swallowed. Any other error is real
@@ -155,13 +192,19 @@ function acquireLock() {
     } catch (err) {
       if (!err || err.code !== 'EEXIST') throw err;
 
-      // Lock exists: inspect the holder. A read failure means a corrupt/partial
-      // lock, which is reclaimable.
-      let lockData = null;
-      try {
-        lockData = JSON.parse(safeFs.readFileSync(lockFile, 'utf8'));
-      } catch {
-        lockData = null;
+      // Lock exists: inspect the holder.
+      let lockData = readLockData(lockFile);
+
+      // Empty / unparseable lock: distinguish a live winner mid-create (0-byte
+      // between openSync('wx') and writeSync) from a genuinely abandoned/corrupt
+      // lock. Retry the read a few times with a tiny backoff — a live winner
+      // populates the identity within microseconds. Do NOT unlink here: reclaiming
+      // now would steal a live holder's lock and yield two holders.
+      if (lockData === null) {
+        for (let r = 0; r < EMPTY_LOCK_READ_RETRIES && lockData === null; r++) {
+          sleepSync(EMPTY_LOCK_READ_BACKOFF_MS);
+          lockData = readLockData(lockFile);
+        }
       }
 
       if (lockData && isProcessAlive(lockData.pid)) {
@@ -169,13 +212,33 @@ function acquireLock() {
         return false;
       }
 
-      // Stale (dead pid) or corrupt lock — reclaim it and retry the exclusive
-      // create. Tolerate a concurrent reclaimer having already removed it.
-      if (lockData) {
-        console.log(`Removing stale lock from crashed process (PID: ${lockData.pid})`);
-      } else {
-        console.log('Removing corrupted lock file');
+      if (lockData === null) {
+        // Still empty after the retries. Only reclaim it if it has persisted past
+        // the grace window (an abandoned create — a process killed between
+        // openSync and writeSync). A still-fresh empty lock is a live holder
+        // mid-write: back off (return false) rather than steal it.
+        let ageMs;
+        try {
+          ageMs = Date.now() - safeFs.statSync(lockFile).mtimeMs;
+        } catch (statErr) {
+          // The lock vanished between EEXIST and stat (a concurrent reclaimer or
+          // the winner releasing) → retry the exclusive create.
+          if (statErr && statErr.code === 'ENOENT') continue;
+          throw statErr;
+        }
+        if (ageMs < EMPTY_LOCK_GRACE_MS) {
+          console.log('Another quality check is starting (lock is being written)');
+          return false;
+        }
+        console.log('Removing abandoned empty lock file');
+        removeStaleLock(lockFile);
+        continue;
       }
+
+      // Populated but the holding pid is dead — a stale lock from a crashed
+      // process. Reclaim it and retry the exclusive create; tolerate a concurrent
+      // reclaimer having already removed it.
+      console.log(`Removing stale lock from crashed process (PID: ${lockData.pid})`);
       removeStaleLock(lockFile);
       continue;
     }

@@ -210,20 +210,26 @@ function isLedgerWrite(command) {
       // the forgery gate. A bare `-` WITHOUT a preceding `--` is the previous-dir
       // shortcut (reset); AFTER `--` the next token is the directory even if it
       // begins with `-` (`cd -- -` is a dir literally named `-`, not the shortcut).
+      // DEQUOTE each token FIRST, then apply the option-skip / `--`-separator
+      // logic on the dequoted value. bash honors a QUOTED `"--"` / `'--'` as the
+      // end-of-options separator (and quoted `"-L"`/`"-P"` as options) exactly like
+      // the bare forms; matching `tok === '--'` / the option regex on the RAW token
+      // (before quote-stripping) let `cd "--" .ctoc/approvals && <write>` take `--`
+      // as the literal directory, discard the ledger operand, and slip the gate.
       const tokens = cdKw[1].split(/\s+/).filter(Boolean);
-      let rawDir = '';
+      let dir = '';
       let afterSep = false;      // have we passed the `--` end-of-options marker?
       let dirIsAfterSep = false; // did the chosen dir token come after `--`?
-      for (const tok of tokens) {
+      for (const rawTok of tokens) {
+        const tok = rawTok.replace(/['"`()]/g, '');       // dequote BEFORE deciding
         if (!afterSep) {
           if (tok === '--') { afterSep = true; continue; } // end-of-options marker
           if (/^-[A-Za-z@]+$/.test(tok)) continue;         // a leading cd OPTION
         }
-        rawDir = tok;
+        dir = tok;
         dirIsAfterSep = afterSep;
         break;
       }
-      const dir = rawDir.replace(/['"`()]/g, '');
       if (!dir || (dir === '-' && !dirIsAfterSep)) prefix = '';
       // A `~`/`~user` home prefix: STRIP only the tilde+user+slash and keep the
       // REMAINDER as a rooted prefix — do NOT discard the whole path. Resetting to
