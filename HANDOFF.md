@@ -21,7 +21,19 @@
   surface is now audited (only areas.js/tabs.js remained, pure in-memory + clean).
   Boundary caught a real sync.js Buffer/encoding bug (tsc) + 3 false-green tests
   (project-root priority, init-project comment-only skip, ship-gate execSync spy) —
-  all fixed/tightened. TOTAL: 53 defects, 8 pushed waves. Convergence NOT reached.
+  all fixed/tightened. v6.12.65 (7b5a0d0) wave 8 shipped 12 fixes incl. 2 CRITICAL
+  step-13-verify false-passes (parseCoveragePct first-match coverage spoof; a
+  declared npm-test that can't launch dropped as not-run), plan-coverage globToRegex
+  ReDoS (linear DP matcher), 3 wave-7 REGRESSIONS caught by re-attack (project-root
+  ~/.ctoc over-root, hooks-installer legacy false-match, vision renderActions ANSI),
+  revertPlan clobber, plan-validator stub-step, evidence-pack/secrets-scanner execSync
+  injections, test-gate parseFail/parseSkipped test-name hijack. + the CRITICAL
+  ledger-backfill FORK (item 0 above) surfaced for Tijn. TOTAL: 65 defects, 9 pushed
+  waves (v6.12.57->65). Convergence NOT reached (fleet 8 still found 2 CRIT + a ReDoS),
+  but many fresh-assault angles RESISTED (wrong-edge/TOCTOU/batch gate replay; most
+  taint sinks argv-safe). Next: Tijn decides the ledger-backfill fork (its own Iron
+  Loop plan, spans approval-ledger+human-gate-check+menu); then continue fleets
+  (re-attack wave 8 + any remaining deep angles) toward the 3-clean-rounds convergence.
 
 ## The order (verbatim)
 "fix them all, do 50 rounds of hard critique, keep fixing the code, use ctoc agents every
@@ -73,6 +85,18 @@ gate (push) is the human's — but Tijn said "commit push", so pushing each gree
    refuse to certify a residency with no prior gate/pipeline event (closes the
    non-eval bypass the hook admits it can't see). Recommend C. Spans approval-ledger.js
    + human-gate-check.js + the menu recipe → its own Iron Loop plan.
+   >>> TIJN CHOSE C (2026-07-16). Design note from tracing the chain: entryKind already
+   labels the backfill 'backfilled' (never 'human'); classifyResidency accepts it at
+   human-gate-check.js:212 on a content-hash match. NO field-based guard in those two
+   files alone closes it — backfillEntry is AGENT-INVOCABLE and the agent controls every
+   field (content, hash, stage_to, backfilled). Robust C needs an OUT-OF-BAND anchor: a
+   'backfilled' entry must NOT self-certify — require a human confirmation OR a committed
+   migration-set that grandfathers the ~234 real legacy done plans WITHOUT accepting a
+   fresh agent forge. Scope: approval-ledger.js (confirm marker/set) + human-gate-check.js
+   (reject unconfirmed backfilled at done/todo → inbox) + a human-confirmation path
+   (menu/inbox). HUMAN-GATE change → Iron Loop + Tijn Gate 2, NOT a freelance patch.
+   Interim exposure LOW: needs a deliberate agent self-forge; every audit still labels it
+   'backfilled' (never 'human'); the human clicks a menu label, never types the command.
 
 1. duplicate-guard threshold: compares RRF fused score (max ~0.033) vs a cosine-scale 0.85
    default → duplicate guard NEVER fires. Fix = choose retrieval semantics (threshold raw
