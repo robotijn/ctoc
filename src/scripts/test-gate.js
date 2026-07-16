@@ -41,10 +41,14 @@ const DEFAULT_THRESHOLD = 80;
  * @param {string} summaryText
  * @returns {number} the skipped count, or 0 when no such line is present.
  */
+// Read a node:test SUMMARY counter (`ℹ skipped N` / TAP `# skipped N`). Anchored to
+// the LINE START and taking the LAST match: node emits the aggregate summary after all
+// test output, and a `# skipped N` embedded mid-line in a TEST NAME (e.g. a test named
+// "... '# skipped 3' ...") is never at line-start, so it can never hijack the gate.
 function parseSkipped(summaryText) {
   if (!summaryText) return 0;
-  const m = summaryText.match(/(?:#|ℹ)\s+skipped\s+(\d+)/);
-  return m ? Number(m[1]) : 0;
+  const matches = [...String(summaryText).matchAll(/^\s*(?:#|ℹ)\s+skipped\s+(\d+)/gm)];
+  return matches.length ? Number(matches[matches.length - 1][1]) : 0;
 }
 
 /**
@@ -52,10 +56,14 @@ function parseSkipped(summaryText) {
  * @param {string} summaryText
  * @returns {number} the failing count, or 0 when no such line is present.
  */
+// Read the node:test SUMMARY fail counter (`ℹ fail N` / TAP `# fail N`). Anchored to the
+// LINE START + LAST match (the real aggregate is emitted last), so a `# fail 2` inside a
+// TEST NAME (e.g. the step-13-verify test that names a TAP `# fail 2` fixture) is mid-line
+// and cannot spoof the gate into failing a green run.
 function parseFail(summaryText) {
   if (!summaryText) return 0;
-  const m = summaryText.match(/(?:#|ℹ)\s+fail\s+(\d+)/);
-  return m ? Number(m[1]) : 0;
+  const matches = [...String(summaryText).matchAll(/^\s*(?:#|ℹ)\s+fail\s+(\d+)/gm)];
+  return matches.length ? Number(matches[matches.length - 1][1]) : 0;
 }
 
 /**

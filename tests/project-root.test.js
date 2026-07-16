@@ -37,6 +37,7 @@ test('findProjectRoot: an ancestor .ctoc outranks a nested package.json (monorep
   const repo = mkTmp('pr-monorepo-');
   try {
     mkdirp(path.join(repo, '.ctoc'));
+    touch(path.join(repo, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
     const pkg = path.join(repo, 'packages', 'foo');
     mkdirp(pkg);
     touch(path.join(pkg, 'package.json'), '{}');
@@ -56,6 +57,7 @@ test('findProjectRoot: an ancestor .ctoc outranks a nested .git AND a nested CLA
   const repo = mkTmp('pr-nested-git-');
   try {
     mkdirp(path.join(repo, '.ctoc'));
+    touch(path.join(repo, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
     const sub = path.join(repo, 'services', 'api');
     mkdirp(path.join(sub, '.git'));
     touch(path.join(sub, 'CLAUDE.md'), '# nested');
@@ -68,12 +70,52 @@ test('findProjectRoot: an ancestor .ctoc outranks a nested .git AND a nested CLA
   }
 });
 
+// ── Defect (HIGH): the global crypto home (~/.ctoc, holds only .secret) must NOT hijack ──
+
+test('findProjectRoot: a bare crypto-home .ctoc (only .secret) does NOT hijack a child with .git', () => {
+  // src/lib/crypto.js creates ~/.ctoc containing only `.secret` for anyone who has used
+  // CTOC's crypto path — it exists on real machines. A child project under it that has
+  // its own .git but NO local .ctoc must root at the CHILD, not climb to the bare .ctoc
+  // (that over-rooting to $HOME was the confirmed HIGH regression from the two-pass change).
+  const home = mkTmp('pr-cryptohome-');
+  try {
+    mkdirp(path.join(home, '.ctoc'));
+    touch(path.join(home, '.ctoc', '.secret'), 'deadbeef');   // crypto-home shape: only .secret
+    const child = path.join(home, 'realproject');
+    mkdirp(path.join(child, '.git'));
+    touch(path.join(child, 'package.json'), '{}');
+
+    assert.equal(findProjectRoot(child), child,
+      'a bare .ctoc carrying no project marker is not a CTOC root — the child .git wins');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('findProjectRoot: a REAL .ctoc (with settings.yaml) still outranks a nested .git across levels', () => {
+  // The positive half of the same discriminator: a genuine CTOC project root (init writes
+  // .ctoc/settings.yaml) must remain authoritative ACROSS levels over a nested weak marker.
+  const repo = mkTmp('pr-real-ctoc-');
+  try {
+    mkdirp(path.join(repo, '.ctoc'));
+    touch(path.join(repo, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
+    const sub = path.join(repo, 'services', 'api');
+    mkdirp(path.join(sub, '.git'));
+
+    assert.equal(findProjectRoot(sub), repo,
+      'a real .ctoc/settings.yaml root still wins over a nested .git across levels');
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 // ── No regression: .ctoc in the SAME dir still roots there ──
 
 test('findProjectRoot: .ctoc in the start dir roots there directly', () => {
   const repo = mkTmp('pr-samedir-');
   try {
     mkdirp(path.join(repo, '.ctoc'));
+    touch(path.join(repo, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
     assert.equal(findProjectRoot(repo), repo);
     assert.equal(getCtocPath(repo), path.join(repo, '.ctoc'));
   } finally {

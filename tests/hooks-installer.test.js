@@ -975,6 +975,54 @@ test('uninstallPostCommitHook cleanly removes a LEGACY (sentinel-less) CTOC inst
   }
 });
 
+test('uninstallPostCommitHook does NOT eat a foreign backgrounded post-commit.js line lacking any CTOC comment marker (D3)', () => {
+  const dir = mkRepo();
+  // A user's OWN hook backgrounds a file literally named post-commit.js with the
+  // extremely common `2>/dev/null &` suffix — but there is NO CTOC comment
+  // marker anywhere. It must NOT be recognised as a legacy CTOC install.
+  const foreign = [
+    '#!/bin/sh',
+    '# my own project notifier',
+    'node build/post-commit.js 2>/dev/null &',
+    'echo done',
+  ].join('\n') + '\n';
+  write(path.join(dir, '.git', 'hooks', 'post-commit'), foreign);
+  const { uninstallPostCommitHook } = load({ exec: router([]) });
+  try {
+    const res = uninstallPostCommitHook(dir);
+    assert.deepEqual(res, { removed: false, reason: 'Post-commit hook is not a CTOC hook' });
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(content, /node build\/post-commit\.js 2>\/dev\/null &/, 'foreign backgrounded line survived');
+    assert.match(content, /# my own project notifier/, 'foreign comment survived');
+    assert.match(content, /echo done/, 'foreign command survived');
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
+test('installPostCommitHook does NOT false-skip a foreign backgrounded post-commit.js hook lacking any CTOC comment marker (D4)', () => {
+  const dir = mkRepo();
+  // Same foreign shape, but as the ONLY content. install must NOT treat it as an
+  // existing CTOC install; it must append the real sentinel-wrapped CTOC block.
+  write(
+    path.join(dir, '.git', 'hooks', 'post-commit'),
+    '#!/bin/sh\nnode build/post-commit.js 2>/dev/null &\n'
+  );
+  const { installPostCommitHook } = load({ exec: router([]) });
+  try {
+    const res = installPostCommitHook(dir, { pluginRoot: '/plugins/ctoc' });
+    assert.equal(res.skipped, undefined, 'must NOT skip a foreign hook');
+    assert.equal(res.installed, true, 'CTOC block installed');
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(content, /# >>> CTOC post-commit >>>/, 'sentinel-wrapped CTOC block written');
+    assert.match(content, /node build\/post-commit\.js 2>\/dev\/null &/, 'foreign backgrounded line retained');
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
 // ============================================================================
 // HooksInstaller — detection, status, dispatch
 // ============================================================================

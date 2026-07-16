@@ -484,6 +484,81 @@ test('main_isolatesRevertFailure_revertsOthers_andLogsIncomplete', () => {
 });
 
 // ============================================================================
+// Cluster M — revertPlan MUST NOT clobber a resident plan at the destination
+// (HIGH: the gate enforcer's own revert destroying legitimate work). A same-
+// basename plan reverted from a downstream folder (todo/foo.md, unapproved →
+// revertTo implementation) must NOT overwrite a DIFFERENT legitimate
+// implementation/foo.md. The collision must be REPORTED in failures[] (a
+// surfaced INCOMPLETE outcome), never a silent reverted:1 with the real work
+// destroyed. Mirrors actions.movePlan's destination-collision guard.
+// ============================================================================
+
+test('revertPlan_refusesToClobber_residentPlanAtDestination_andRecordsFailure', () => {
+  // Arrange — legit REAL in-flight work in implementation/, and a planted
+  // unapproved squatter of the SAME basename in the downstream todo/ folder.
+  const projectDir = makeProject();
+  const realPath = path.join(projectDir, 'plans', 'implementation', 'foo.md');
+  const realContent = '# REAL in-flight work\n\nDo not destroy me.\n';
+  fs.writeFileSync(realPath, realContent);
+  writePlan(projectDir, 'todo', 'foo'); // unapproved junk → violation, revertTo implementation
+
+  // Act — the todo/ sweep flags foo.md->implementation; revert them all.
+  const violations = gate.checkFolder('todo', projectDir);
+  assert.equal(violations.length, 1, 'the unapproved todo/foo.md must be flagged');
+  assert.equal(violations[0].revertTo, 'implementation');
+  const { reverted, failures } = gate.revertAll(violations);
+
+  // Assert — the collision is a REPORTED failure, not a silent clobber.
+  assert.equal(reverted.length, 0, 'a clobbering revert must NOT be reported as reverted');
+  assert.equal(failures.length, 1, 'the destination collision must surface in failures[]');
+  assert.match(failures[0].error, /would destroy a resident plan/i);
+
+  // And the REAL work is intact, byte-for-byte — never overwritten by the junk.
+  assert.equal(fs.readFileSync(realPath, 'utf8'), realContent,
+    'the legitimate implementation/foo.md must be preserved unchanged');
+});
+
+// ============================================================================
+// Cluster N — revertPlan NO-REGRESSION: a normal revert with NO collision at
+// the destination still moves the plan back and unlinks the source. And the
+// self-path edge (destination === source) does not falsely block.
+// ============================================================================
+
+test('revertPlan_stillReverts_whenDestinationHasNoResidentPlan', () => {
+  // Arrange — an unapproved squatter in todo/, and an EMPTY implementation/.
+  const projectDir = makeProject();
+  const { filePath, content } = writePlan(projectDir, 'todo', 'lonely');
+
+  // Act
+  const dest = gate.revertPlan({ path: filePath, folder: 'todo', revertTo: 'implementation' });
+
+  // Assert — the plan moved back, source removed, note appended.
+  assert.equal(dest, path.join(projectDir, 'plans', 'implementation', 'lonely.md'));
+  assert.equal(fs.existsSync(filePath), false, 'source plan must be removed');
+  const moved = fs.readFileSync(dest, 'utf8');
+  assert.ok(moved.startsWith(content), 'the reverted plan preserves its original content');
+  assert.match(moved, /HUMAN GATE VIOLATION/, 'reverted plan carries the violation note');
+});
+
+test('revertPlan_doesNotFalselyBlock_whenDestinationEqualsSource', () => {
+  // Arrange — the pathological self-revert (revertTo === the plan's own folder).
+  // The destination path resolves to the source path, so the collision guard must
+  // NOT fire; the plan is rewritten in place with the violation note.
+  const projectDir = makeProject();
+  const { filePath, content } = writePlan(projectDir, 'implementation', 'selfsame');
+
+  // Act — revertTo implementation, where the plan already lives (dest === source).
+  const dest = gate.revertPlan({ path: filePath, folder: 'implementation', revertTo: 'implementation' });
+
+  // Assert — no false block; the file survives and gains the note.
+  assert.equal(dest, filePath);
+  assert.equal(fs.existsSync(filePath), true, 'a self-revert must not destroy the plan');
+  const after = fs.readFileSync(filePath, 'utf8');
+  assert.ok(after.startsWith(content), 'original content preserved on self-revert');
+  assert.match(after, /HUMAN GATE VIOLATION/);
+});
+
+// ============================================================================
 // Cluster L — main() OUTER CATCH fail-open on an INFRASTRUCTURE error
 // (lines 413-431). When a gate-destination path is a FILE, readdirSync throws
 // ENOTDIR out of checkFolder; main() must swallow it, LOG a sweep_error, and

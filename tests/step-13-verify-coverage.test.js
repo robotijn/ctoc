@@ -497,3 +497,189 @@ describe('runVerify — coverage floor enforced against Node-native format (DEFE
     assert.equal(res.passed, true, `above-floor coverage must pass; errors: ${JSON.stringify(res.errors)}`);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cluster I — DEFECT 1 (CRITICAL, coverage spoof): parseCoveragePct used a
+// non-global `.match()` which returns the FIRST match. Node prints the REAL
+// coverage-summary row LAST (after all test output), so any earlier line reading
+// `all files | 100` in test stdout wins over the real `# all files | 40.1 |`
+// summary → below-floor coverage passes green AND is copied verbatim into the
+// durable VERIFY artifact that Gate 3 trusts. The fix takes the LAST match for
+// EVERY format parseCoveragePct handles (mirroring test-gate.js intent).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('parseCoveragePct — the LAST (real) summary row wins over an earlier spoof (DEFECT 1)', () => {
+  it('I1: an early "all files | 100" then a real "# all files | 40.1" → 40.1 (last match)', () => {
+    const polluted = [
+      'some test log line mentioning all files | 100 in prose',
+      'all files | 100',                 // an early stray/spoof row
+      'ok 1 - a passing assertion',
+      '# all files | 40.1 |  30.0 | 25.0 | 1-9'  // the REAL summary, emitted last
+    ].join('\n');
+    assert.equal(require(MOD).parseCoveragePct(polluted), 40.1,
+      'the real summary is emitted last; the last "all files" match must win');
+  });
+
+  it('I2: an early Istanbul "All files | 100 |" then a real "All files | 42 |" → 42 (last match)', () => {
+    const polluted = 'All files | 100 |\n...more output...\nAll files |     42 |';
+    assert.equal(require(MOD).parseCoveragePct(polluted), 42);
+  });
+
+  it('I3: multiple "Lines: NN%" rows → the last one wins', () => {
+    assert.equal(require(MOD).parseCoveragePct('Lines: 100%\n...\nLines: 55.5%'), 55.5);
+  });
+});
+
+describe('runVerify — a spoofed early coverage row does not defeat the floor (DEFECT 1)', () => {
+  it('I4: 99 floor, test prints "all files | 100" early then real "# all files | 40.1" last → VERIFY FAILS', () => {
+    // Arrange — the exact executed repro: an early spoof row, then the real
+    // Node-native summary row below the floor, printed last.
+    write('.ctoc/coverage-baseline.json', JSON.stringify({ minPct: 99 }));
+    pkg({ name: 'spoofcov', version: '1.0.0', scripts: {
+      test: 'node -e "console.log(\'all files | 100\'); console.log(\'# all files | 40.1 |\'); process.exit(0)"'
+    } });
+
+    // Act
+    const res = require(MOD).runVerify(dir);
+
+    // Assert — the real (last) figure is parsed, below floor → VERIFY fails.
+    assert.equal(res.checks.tests.coverage, 40.1, 'the real last-emitted coverage row must win over the early spoof');
+    assert.equal(res.passed, false, 'below-floor coverage must fail VERIFY even when an earlier row reads 100');
+    assert.ok(res.errors.some((e) => /below the project floor/i.test(e)), `errors: ${JSON.stringify(res.errors)}`);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cluster J — DEFECT 2 (CRITICAL, a declared suite that cannot launch is silently
+// dropped): a `test` candidate is presence-qualified by npmScriptExists (the
+// script STRING exists), but when the script's INNER binary is missing, `npm test`
+// spawn-fails (exit 127) → tryCommands treats it as NOT-RUN with no error → the
+// test category is recorded {ran:false, applicable:false}. One passing lint then
+// carries VERIFY green while the project's OWN declared suite never ran. The fix
+// distinguishes a PRESENCE-QUALIFIED (project-owned npm script) candidate that
+// could not launch — a REAL failure — from a genuinely-absent OPTIONAL tool.
+// ─────────────────────────────────────────────────────────────────────────────
+/** An execSync failure that mimics the shell's command-not-found exit status 127. */
+function exit127Error(msg) {
+  return Object.assign(new Error('exit 127'), { status: 127, stderr: msg, stdout: '' });
+}
+describe('runVerify — a declared npm test whose binary is missing FAILS (DEFECT 2)', () => {
+  it('J1: lint passes, npm test spawn-fails (127) → VERIFY FAILS, tests not recorded as not-applicable', () => {
+    // Arrange — the project declares BOTH lint and test scripts (presence-qualified),
+    // lint passes, but the test script's inner binary is missing → npm test exits 127.
+    pkg({ name: 'app', version: '1.0.0', scripts: { lint: 'x', test: 'y' } });
+    const execSync = (command) => {
+      if (/ctoc quality/.test(command)) throw missingToolError('ctoc: command not found');
+      if (/npm run lint/.test(command)) return 'lint clean';
+      if (/npm test/.test(command)) throw exit127Error('sh: this-binary-does-not-exist-xyz: command not found');
+      throw realFailureError(`unexpected: ${command}`);
+    };
+
+    // Act
+    const res = withFakedBoundary(
+      { execSync, driveAppSync: noApp },
+      (mod) => mod.runVerify(dir)
+    );
+
+    // Assert — the declared suite could not launch → a REAL failure, NOT a passed-on-lint.
+    assert.equal(res.passed, false, 'a declared test suite that fails to start must fail VERIFY, not pass on lint');
+    assert.notEqual(res.checks.tests.applicable, false,
+      'a presence-qualified test candidate that spawn-failed must NOT be recorded as not-applicable');
+    assert.equal(res.checks.tests.passed, false);
+    assert.ok(
+      res.errors.some((e) => /could not launch|failed to start/i.test(e)),
+      `the failure must name the launch failure; errors: ${JSON.stringify(res.errors)}`
+    );
+  });
+
+  it('J2: NO-REGRESSION — a project with NO test script at all is still applicable:false (not a failure)', () => {
+    // Arrange — only a passing lint script; no test/typecheck declared, no app.
+    pkg({ name: 'nolint', version: '1.0.0', scripts: { lint: 'x' } });
+    const execSync = (command) => {
+      if (/ctoc quality/.test(command)) throw missingToolError('ctoc: command not found');
+      if (/npm run lint/.test(command)) return 'lint clean';
+      throw realFailureError(`unexpected: ${command}`);
+    };
+
+    // Act
+    const res = withFakedBoundary(
+      { execSync, driveAppSync: noApp },
+      (mod) => mod.runVerify(dir)
+    );
+
+    // Assert — no declared test candidate → applicable:false (a project with no
+    // test script is not a VERIFY failure by this axis), and lint carries the pass.
+    assert.equal(res.checks.tests.applicable, false, 'no declared test script → not-applicable, unchanged');
+    assert.equal(res.passed, true, 'a project with a passing lint and no test script still passes');
+    assert.ok(!res.errors.some((e) => /could not launch|failed to start/i.test(e)),
+      `no launch-failure error when nothing was declared; errors: ${JSON.stringify(res.errors)}`);
+  });
+
+  it('J3: NO-REGRESSION — a genuinely-absent OPTIONAL tool (ruff) is still a benign skip, not a failure', () => {
+    // Arrange — a Python project whose ruff/mypy/pytest are NOT installed, but a
+    // node lint script passes. The optional tools are toolExists-qualified; their
+    // absence must remain a benign not-applicable, never a launch failure.
+    write('pyproject.toml', '[project]\nname = "p"\n');
+    pkg({ name: 'mixed', version: '1.0.0', scripts: { lint: 'x' } });
+    const spawnSync = () => ({ error: missingToolError('ENOENT') }); // ruff/mypy/pytest absent
+    const execSync = (command) => {
+      if (/ctoc quality/.test(command)) throw missingToolError('ctoc: command not found');
+      if (/npm run lint/.test(command)) return 'lint clean';
+      throw realFailureError(`unexpected: ${command}`);
+    };
+
+    // Act
+    const res = withFakedBoundary(
+      { execSync, spawnSync, driveAppSync: noApp },
+      (mod) => mod.runVerify(dir)
+    );
+
+    // Assert — the absent optional test tool is applicable:false, not a launch failure.
+    assert.equal(res.checks.tests.applicable, false, 'absent optional pytest → benign not-applicable');
+    assert.equal(res.passed, true, 'a passing lint with only absent optional tools still passes');
+    assert.ok(!res.errors.some((e) => /could not launch|failed to start/i.test(e)),
+      `an absent optional tool must not be a launch failure; errors: ${JSON.stringify(res.errors)}`);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cluster K — DEFECT 3 (HIGH, TAP failures on stdout with exit 0 pass):
+// tryCommand sets success solely from execSync not throwing (exit 0).
+// applyTestQualityContracts parses stdout for skipped/todo and coverage (proving
+// the author does NOT fully trust the exit code) but NEVER parses failure counts.
+// A runner reporting failures on stdout but exiting 0 (jest --passWithNoTests, a
+// wrapping `|| true`, `set +e`, a custom reporter) passes. The fix parses the TAP
+// `# fail N` summary and fails closed, mirroring the existing skipped-count logic.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('runVerify — TAP failures on stdout with exit 0 must FAIL (DEFECT 3)', () => {
+  it('K1: test prints "not ok"/"# fail 2" then exits 0 → VERIFY FAILS', () => {
+    // Arrange — the exact executed repro: TAP failures on stdout, exit 0.
+    pkg({ name: 'tapfail', version: '1.0.0', scripts: {
+      test: 'node -e "console.log(\'not ok 1\'); console.log(\'not ok 2\'); console.log(\'# fail 2\'); process.exit(0)"'
+    } });
+
+    // Act
+    const res = require(MOD).runVerify(dir);
+
+    // Assert — reported failures fail the gate despite a zero exit code.
+    assert.equal(res.passed, false, 'reported test failures must fail VERIFY even when the runner exits 0');
+    assert.equal(res.checks.tests.passed, false);
+    assert.ok(
+      res.errors.some((e) => /failing test/i.test(e)),
+      `the failure must name the failing tests; errors: ${JSON.stringify(res.errors)}`
+    );
+  });
+
+  it('K2: NO-REGRESSION — a genuinely-passing suite reporting "# fail 0" still PASSES', () => {
+    // Arrange — a node --test-shaped run that honestly reports zero failures.
+    pkg({ name: 'tapok', version: '1.0.0', scripts: {
+      test: 'node -e "console.log(\'ok 1\'); console.log(\'# pass 1\'); console.log(\'# fail 0\'); process.exit(0)"'
+    } });
+
+    // Act
+    const res = require(MOD).runVerify(dir);
+
+    // Assert — "# fail 0" is not a failure; the suite passes.
+    assert.equal(res.passed, true, `# fail 0 must not fail the gate; errors: ${JSON.stringify(res.errors)}`);
+    assert.equal(res.checks.tests.passed, true);
+  });
+});

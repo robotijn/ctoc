@@ -87,7 +87,10 @@ function renderActions(app, vision) {
     return a;
   });
 
-  return renderActionMenu(vision.name, actions, app.actionIndex);
+  // stripCtl the action-menu title too (vision.name is a filename): the list
+  // render sanitizes it, so this sibling path must as well — a filename with an
+  // ANSI sequence must not reach the terminal raw. Mirrors review.js.
+  return renderActionMenu(stripCtl(vision.name), actions, app.actionIndex);
 }
 
 function handleKey(key, app) {

@@ -661,4 +661,89 @@ describe('plan-validator dark-branch coverage', () => {
     assert.ok(!result.errors.some((e) => /must run automated checks/i.test(e)),
       `automated run present must suppress the manual-only error, got: ${JSON.stringify(result.errors)}`);
   });
+
+  // ========================================================================
+  // validateStepsComplete via validateReviewToDone — word-only stub step
+  // (a required step body is the bare completion WORD with NO checkbox at all)
+  // must NOT count as completed. A completion word cannot, by itself, finish a
+  // step that carries no checklist. Reached through validateReviewToDone's
+  // present-required-but-unchecked promotion loop.
+  // ========================================================================
+
+  test('validateReviewToDone_blocks_when_a_required_step_body_is_only_the_word_COMPLETE_with_no_checkbox', () => {
+    // Arrange — every step ticked EXCEPT Step 14 VERIFY, whose entire body is the
+    // bare word COMPLETE and NO checkbox. Fresh passing evidence isolates the
+    // stub-step path (not the evidence path) as the failure.
+    const exec = FULL_EXEC.replace(
+      '### Step 14: VERIFY\n- [x] all green, 0 skipped, 0 flaky',
+      '### Step 14: VERIFY\nCOMPLETE'
+    );
+    const p = writePlan('word-only-stub-14', `---\napproved_by: human\n---\n\n# Plan\n\n${exec}`);
+    const mtime = fs.statSync(p).mtimeMs;
+    writeEvidence('word-only-stub-14', {
+      planSlug: 'word-only-stub-14',
+      timestamp: new Date(mtime + 60000).toISOString(),
+      passed: true, errors: [], summary: 'ok',
+    });
+
+    // Act
+    const result = validator.validateReviewToDone(p, testDir);
+
+    // Assert — the word-only stub is a checklist-less step: it must be treated as
+    // present-but-unchecked and block the transition, not rubber-stamp Gate 3.
+    assert.equal(result.checklist.steps.step_14.completed, false,
+      'a step whose only body is the word COMPLETE (no checkbox) must NOT be completed');
+    assert.equal(result.valid, false, 'word-only stub Step 14 must block review->done');
+    assert.ok(result.errors.some((e) => /Step 14 \(VERIFY\) has an unchecked required checkbox/i.test(e)),
+      `expected the unchecked/stub error, got: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('validateReviewToDone_completes_a_step_that_has_a_ticked_box_and_a_completion_word', () => {
+    // Arrange — Step 14 has a genuinely ticked checkbox AND the word COMPLETE.
+    // The tightening must NOT regress the real completed path.
+    const exec = FULL_EXEC.replace(
+      '### Step 14: VERIFY\n- [x] all green, 0 skipped, 0 flaky',
+      '### Step 14: VERIFY\n- [x] all green, 0 skipped, 0 flaky — COMPLETE'
+    );
+    const p = writePlan('ticked-and-word-14', `---\napproved_by: human\n---\n\n# Plan\n\n${exec}`);
+    const mtime = fs.statSync(p).mtimeMs;
+    writeEvidence('ticked-and-word-14', {
+      planSlug: 'ticked-and-word-14',
+      timestamp: new Date(mtime + 60000).toISOString(),
+      passed: true, errors: [], summary: 'ok',
+    });
+
+    // Act
+    const result = validator.validateReviewToDone(p, testDir);
+
+    // Assert — a ticked box still completes the step and crosses the gate.
+    assert.equal(result.checklist.steps.step_14.completed, true,
+      'a ticked box (with or without a completion word) must complete the step');
+    assert.equal(result.valid, true,
+      `fully-ticked plan with fresh passing evidence must cross, got: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('validateReviewToDone_blocks_when_a_required_step_has_an_unchecked_box', () => {
+    // Arrange — Step 14 has an OPEN checkbox (no completion word). Must stay
+    // NOT-completed after the tightening (unchanged behavior, regression guard).
+    const exec = FULL_EXEC.replace(
+      '### Step 14: VERIFY\n- [x] all green, 0 skipped, 0 flaky',
+      '### Step 14: VERIFY\n- [ ] not run yet'
+    );
+    const p = writePlan('unchecked-box-14', `---\napproved_by: human\n---\n\n# Plan\n\n${exec}`);
+    const mtime = fs.statSync(p).mtimeMs;
+    writeEvidence('unchecked-box-14', {
+      planSlug: 'unchecked-box-14',
+      timestamp: new Date(mtime + 60000).toISOString(),
+      passed: true, errors: [], summary: 'ok',
+    });
+
+    // Act
+    const result = validator.validateReviewToDone(p, testDir);
+
+    // Assert
+    assert.equal(result.checklist.steps.step_14.completed, false,
+      'an unchecked box must NOT complete the step');
+    assert.equal(result.valid, false, 'unchecked Step 14 must block review->done');
+  });
 });

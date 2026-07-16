@@ -34,8 +34,23 @@ function findProjectRoot(startDir = process.cwd()) {
   {
     let dir = start;
     for (let i = 0; i < 15; i++) {
-      if (safeFs.existsSync(path.join(dir, '.ctoc'))) {
-        return dir;
+      const ctocDir = path.join(dir, '.ctoc');
+      if (safeFs.existsSync(ctocDir)) {
+        // A `.ctoc` entry alone is NOT proof of a project root: src/lib/crypto.js creates
+        // the global crypto home `~/.ctoc` (holding only `.secret`) on any machine that has
+        // used CTOC's crypto path. Accepting a bare `.ctoc` made Pass 1 climb from any
+        // project under $HOME up to `~/.ctoc` and over-root to $HOME. Require a genuine
+        // PROJECT CTOC root: a `.ctoc` that also carries `settings.yaml`/`settings.json`
+        // (what init writes) OR sits beside a `plans/` sibling. The crypto home (only
+        // `.secret`, no plans/ sibling in $HOME) then no longer qualifies, while a real
+        // CTOC project root still wins across levels.
+        const isProjectCtoc =
+          safeFs.existsSync(path.join(ctocDir, 'settings.yaml')) ||
+          safeFs.existsSync(path.join(ctocDir, 'settings.json')) ||
+          safeFs.existsSync(path.join(dir, 'plans'));
+        if (isProjectCtoc) {
+          return dir;
+        }
       }
       if (safeFs.existsSync(path.join(dir, 'plans'))) {
         // Verify it's a CTOC plans directory (has expected subdirs)

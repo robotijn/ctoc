@@ -92,6 +92,25 @@ test('parseSkipped: Node spec-reporter shape (real piped output)', () => {
   assert.strictEqual(gate.parseSkipped('ℹ skipped 7'), 7);
 });
 
+test('parseFail/parseSkipped: a "# fail N"/"# skipped N" inside a TEST NAME cannot hijack the gate', () => {
+  // Regression: the counters are read from the line-start summary token, LAST match —
+  // node emits the real aggregate after all test output, and a `# fail 2` embedded
+  // mid-line in a test name (a step-13-verify test names a TAP `# fail 2` fixture) is
+  // never at line-start. A first-match/unanchored parse wrongly failed a green run.
+  const polluted = [
+    '  ✔ K1: test prints "not ok"/"# fail 2" then exits 0 → VERIFY FAILS (2ms)',
+    '  ✔ handles a "# skipped 5" literal in its name',
+    'ℹ tests 9133',
+    'ℹ pass 9133',
+    'ℹ fail 0',
+    'ℹ skipped 0',
+  ].join('\n');
+  assert.strictEqual(gate.parseFail(polluted), 0, 'test-name # fail 2 must not spoof a failure');
+  assert.strictEqual(gate.parseSkipped(polluted), 0, 'test-name # skipped 5 must not spoof a skip');
+  // A genuine aggregate failure is still detected.
+  assert.strictEqual(gate.parseFail(['ℹ tests 10', 'ℹ pass 8', 'ℹ fail 2'].join('\n')), 2);
+});
+
 test('parseSkipped: absent line means zero', () => {
   assert.strictEqual(gate.parseSkipped('no summary here'), 0);
 });
