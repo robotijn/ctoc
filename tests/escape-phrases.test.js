@@ -65,6 +65,21 @@ describe('matchEscapePhrase', () => {
     assert.equal(matchEscapePhrase('hotfixes are queued'), null);
     assert.equal(matchEscapePhrase('trivially complex logic'), null);
     assert.equal(matchEscapePhrase('C:\\repo\\urgent-alerts.js'), null);
+    // Dot-EXTENSION filenames must NOT match: a `.` is a boundary only when it is
+    // itself followed by whitespace/end (a sentence period), never when followed
+    // by an extension char. This was a surviving hole of the same class.
+    assert.equal(matchEscapePhrase('the file urgent.js is broken'), null);
+    assert.equal(matchEscapePhrase('run hotfix.md now'), null);
+    assert.equal(matchEscapePhrase('urgent.json'), null);
+  });
+
+  it('matches genuine directives wrapped in brackets/quotes (opening punctuation is a boundary)', () => {
+    // The leading boundary accepts an opening bracket/quote so a real directive
+    // wrapped in punctuation is not silently dropped (a fail-safe over-narrowing).
+    assert.equal(matchEscapePhrase('(hotfix)'), 'hotfix');
+    assert.equal(matchEscapePhrase('"urgent"'), 'urgent');
+    assert.equal(matchEscapePhrase('[skip planning]'), 'skip planning');
+    assert.equal(matchEscapePhrase('please, urgent, do it'), 'urgent');
   });
 
   it('still matches bare-word phrases used as genuine standalone directives', () => {

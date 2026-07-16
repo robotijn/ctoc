@@ -1,102 +1,71 @@
-# Handoff — CTOC repair loop (Tijn's "50 rounds of hard critique, keep fixing the code")
+# Handoff — CTOC adversarial repair loop (Tijn: "fix them all, 50 rounds of hard critique")
 
 <!-- Maintained by the handoff skill. Last-known state — verify against the repo before acting. -->
 
-- Updated: 2026-07-15 01:30 by claude
+- Updated: 2026-07-16 by claude
 - Branch: main
-- Status: in progress (multi-round adversarial critique→fix loop; ~12 rounds done, 7 waves committed)
+- Status: in progress — FRESH 50-round campaign (Tijn re-issued the order 2026-07-16 as
+  a NEW round of improvement, not the old standing order). ~7 rounds done, 3 waves
+  committed + pushed. Convergence (3 consecutive different-lens clean rounds) NOT reached —
+  every fleet so far has found real defects.
 
-## Goal
-Tijn's standing order (2026-07-14, repeated): "fix them all, do 50 rounds of hard
-critique, keep fixing the code, use ctoc agents every 2 rounds for feedback and
-implementation, look at the code do not guess from memory." Every round: CTOC
-critic agents attack the shipped code; every finding is VERIFIED AGAINST DISK
-(often by direct execution) before a fix; CTOC executor agents fix on
-file-disjoint slices via the iron loop (TDD-Red first); the coordinator
-integrates at a boundary (full suite + eslint + typecheck ratchet + reachability
-fences + commit) and RE-EXECUTES load-bearing claims by hand rather than trusting
-reports. Ship gates (git push, deploy) stay human. NEVER push unless Tijn says.
+## The order (verbatim)
+"fix them all, do 50 rounds of hard critique, keep fixing the code, use ctoc agents every
+2 rounds for feedback and implementation, look at the code do not guess from memory, eat
+your own dog food."
 
-## Current status — COMMITTED WAVES (all pushed? NO — commits local, push is a
-## human gate; ask before pushing)
-- v6.12.3 (1fc8de9): R2 wave — scheduler lifecycle, gate hook revived (was DEAD —
-  crashed on legacy slugs, exited 0, enforced nothing for weeks), ship gate,
-  honest surfaces, typecheck→0.
-- v6.12.4 (2e0bb35): R3 wave — Gate 3 made passable (completeExecution was a dead
-  export → wired), export-level fence, push ship gate, mapPipSeverity.
-- v6.12.5 (33707e9): R3/R4 — VERIFY fails loudly (THE deepest defect: gate passed
-  empty projects & FAILED real ones — re-verified by hand), ledger forgery closed
-  (node -e Bash bypass), scheduler ENFORCES (canRun on start + CAS + crash-safe
-  completion), fence credits CALLS not prose (23 gate exports restored live),
-  placebos deleted.
-- v6.12.6 (a854872): R5 — approvePlan VALIDATES + records overrides, ONE gate
-  encoding (gate-order.js), greenfield journey test (walks init→gates→build→
-  verify→done; 4 negative controls catch this session's 4 shipped-then-caught
-  defects at named lines), assignDirectly deleted, dead functional tab deleted.
-- v6.12.7 (f153861): R6 — SECURITY FAILS CLOSED (sast-runner runGosec/runBandit/
-  runESLintSecurity swallowed a scanner CRASH as a clean pass — fail-open in the
-  push gate; now records the error + surfaces a loud skip; run() honest when zero
-  scanners ran); cross-platform (hasCommand `where` on win32, runCommand timeout,
-  go path slashes, os.homedir); single gate encoding FINISHED (last 2 inverse
-  copies → gate-order); override auditable (--override token); ui.js#doctor
-  deleted; 6 false-green source-grep compliance tests → value assertions.
-- Suite 5730/5730, 0 skipped; eslint clean; typecheck 0; file fence 0/138;
-  export fence 103 (ratcheting down).
+## Method (working well — keep it)
+Each round: dispatch a fleet of 5 CTOC `ctoc:quality:code-reviewer` critics in parallel,
+each a DISTINCT lens on a DISJOINT module cluster, EACH REQUIRED to verify every finding
+against disk BY EXECUTION (a node -e / spawned-hook repro) before reporting — confirmed-only,
+no edits. Then dispatch CTOC `iron-loop:iron-loop-executor` agents on FILE-DISJOINT slices
+(TDD-Red first; invert any false-green test per Lesson 14). Coordinator (me) re-executes
+each load-bearing claim BY HAND, integrates at ONE boundary (full `npm test` gate + eslint +
+typecheck), commits (patch bump + release.js), pushes. Concurrency cap 5 subagents. Ship
+gate (push) is the human's — but Tijn said "commit push", so pushing each green wave.
 
-## Key decisions (Tijn's — do not relitigate)
-- Ship gates push + deploy stay human; internal gates dissolve into question flow.
-- Fix the failures not the tests (lesson 14); test change only when it pins a
-  defect the human replaced, tightening only.
-- No dead code / no dead exports — rewire or delete, never baseline a "third state".
-- Honesty: report own mistakes unprompted (this session: falsely claimed auto_push
-  deleted in v6.12.4 msg — fixed in v6.12.5; declared vacuous verify "fixed" — it
-  wasn't — re-verified by hand in v6.12.5). Coordinator hand-stamped approved_by:
-  human into plan frontmatter all session (a forgery R3 closed); all recorded via
-  backfillEntry with the violation NAMED so migrated ≠ clicked.
-- CTOC runtime is the Claude CLI; model calls spawn `claude -p`; never a raw key.
+## Shipped (all pushed to origin/main, gate green 99.38%)
+- v6.12.57 (77a2109): R1 — product-loop KPI parser (`$` under /m captured only the first
+  body line; every KPI field but name was null; getApplicableKPIs never filtered).
+- v6.12.58 (3ca6f1f): wave 1, 7 defects incl. 2 CRITICAL — sast-runner fail-open (crashed
+  scanner = clean pass), PreToolUse.Bash ledger-forgery cd-bypass (`cd .ctoc && cp f
+  approvals/x`), task-reconcile staleness-orphan permanent-fail, tool-detector readdir
+  crash, coverage-map NaN fail-open, plan-validator Gate-3 body-marker no-op, deployment win32.
+- v6.12.59 (65150da): wave 2, 4 defects + docs — audit-chain wipe-evidence (`&& count>0`
+  disabled reconciliation on empty log), tui ANSI gate-forge (unstripped plan name to
+  terminal), actions un-keyable-slug gate flip-flop (marker-only crossing, no ledger entry),
+  store.js non-finite load; + CLAUDE.md truth (false label-enforcement claim; 99-vs-100 count).
+- v6.12.60 (7db104e): wave 3, 9 fixes incl. 2 CRITICAL + 3 HIGH — step-13-verify two
+  false-PASSes (failure swallowed via output string-match; Node-native coverage unparsed →
+  floor unenforced), guard-files secret-guard bypass (exit 1 non-blocking → emitDeny),
+  plan-index dimension-wipe (single write wipes whole index on 384<->768) + stale-section,
+  compliance-dedup drops GDPR articles, escape-phrases filename-mention disables enforcement,
+  ollama body-read hang, compliance-regime block-YAML corruption, + test-gate coverage-parse
+  first-match hijack (now last-match).
 
-## Gotchas
-- Three ratchets, tightening-only: .ctoc/reachability-baseline.json (file fence,
-  0), .ctoc/export-reachability-baseline.json (104), .ctoc/typecheck-baseline.json
-  (0). Paying debt down FAILS "lower the baseline" tests until you re-seed — that's
-  the ratchet working, not a bug.
-- The gate hook reads the LEDGER (.ctoc/approvals/), not the frontmatter marker.
-  Any plan staged into implementation/todo/review/done via hand-stamped frontmatter
-  with no ledger entry is flagged by human-gate-check + iron-loop-enforcer. Fix:
-  `node -e "…backfillEntry…"` per folder (see the commits) — records backfilled:true.
-- Two executors must never edit the same file; partition by file, dispatch waves,
-  integrate at ONE boundary. Never run a git-touching agent alongside file-editing
-  agents.
-- Loop scratch ledger (ephemeral): /private/tmp/.../scratchpad/repair-loop-ledger.md.
+## Surfaced FORKS (Tijn's call — do NOT self-pick; documented, not baked)
+1. duplicate-guard threshold: compares RRF fused score (max ~0.033) vs a cosine-scale 0.85
+   default → duplicate guard NEVER fires. Fix = choose retrieval semantics (threshold raw
+   cosine vs rescale RRF vs RRF-scale default). Recommend: threshold raw cosine.
+2. scheduler sync-barrier under UNCONFIRMED death: a wave-integration barrier treats a
+   staleness-orphaned (maybe-alive) member as settled → integration may start against a tree
+   a live agent is still editing. Direction clear (don't settle on unconfirmed death) but it
+   trades a stall risk vs a corruption risk — Tijn picks the default.
+3. Wire `validate-plan-steps.js` as a REAL runtime hook so wrong step LABELS are actually
+   rejected (today it's an unwired standalone script; I corrected the doc to stop claiming it
+   is wired). Wiring changes hook/gate behavior → Tijn's call.
+Plus a note (not a fork): the OLD 2026-07-14 continuation batch is still "active" (38/50) in
+.ctoc — bounded + fail-open, harmless, but stale; the Stop hook may block a stop against it.
 
-## Open items (next rounds) — ranked
-1. DONE R5-B/R6: override token (R6-A), inverse gate maps converged (R6-B),
-   ui.js#doctor deleted (R6-C), security fail-closed + cross-platform (R6-D).
-2. vision-decomposer.completeVision must write the pipeline ledger entry before its
-   movePlan(done) (R3-A follow-up; ledger-backfill --vision covers it meanwhile).
-3. HUMAN DECISION for Tijn (do not self-pick): coverage floor is 40 (.ctoc/
-   coverage-baseline.json); CLAUDE.md Step-14 aspiration is 80. Reconcile or state
-   both — surface this to Tijn, don't decide it.
-4. detectLanguages (sast-runner) only scans DETECTED languages — a project whose
-   language it doesn't detect gets "No supported languages → success:true". Honest
-   message, but worth a critic pass: is language detection itself fail-open?
-5. Keep launching fresh critic lenses each round (DONE so far: greenfield-journey,
-   false-green, security, concurrency, gate-machinery, cross-platform, error-paths;
-   NOT YET: performance/scale, injection/ANSI-in-render, felt-ride re-audit of the
-   NOW-fixed pipeline, docs-vs-code truth re-audit). Loop is done when 3 consecutive
-   DIFFERENT-lens rounds find zero confirmed defects — NOT there yet.
-
-## Key files
-- src/lib/reachability.js (both fences), src/lib/step-13-verify.js (VERIFY),
-  src/hooks/human-gate-check.js + src/lib/approval-ledger.js (ledger truth),
-  src/hooks/PreToolUse.Bash.js (forgery deny), src/lib/task-registry.js +
-  task-reconcile.js (scheduler), src/lib/actions.js (approvePlan/completeExecution),
-  src/lib/gate-order.js (ONE gate encoding), tests/greenfield-journey.test.js (the net).
+## Ledger (full round-by-round detail)
+Scratch: /private/tmp/claude-501/.../scratchpad/repair-loop-ledger.md (this session's).
 
 ## Resume here
-Continue the loop. Next concrete action: one fix wave for Open-items 1–3 (all
-file-disjoint: menu-screens.js; human-gate-check.js+approval-ledger.js+gate-order.js;
-ui.js+menu.js) via iron-loop executors, PLUS one fresh CTOC critic (a lens not yet
-run this session — cross-platform or error-paths). Verify every finding against
-disk first. Integrate at one boundary, re-execute claims by hand, commit (patch
-bump). Do NOT push without Tijn.
+Continue the loop: next fleet on lenses/modules NOT yet attacked — v8-dispatcher /
+capability-registry / operating-manual (orchestration), the release/git scripts
+(release.js / move-plan.js / ledger-backfill.js / post-commit.js / hooks-installer.js),
+budget / quality-state / eval-harness, vision-decomposer, AND a RE-ATTACK lens on THIS
+session's 21 fixes (did any over-narrow and break a legit path, or leave an adjacent hole?).
+Verify every finding against disk first. Integrate at one boundary; commit patch bump; push
+(Tijn said "commit push"). Loop is done at 3 consecutive different-lens rounds with zero
+confirmed defects — NOT there yet.

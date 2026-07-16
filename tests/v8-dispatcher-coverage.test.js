@@ -311,6 +311,32 @@ describe('v8-dispatcher — updateGrade confidence routing', () => {
     });
   }
 
+  it('increments the canonical total_med counter (not a phantom total_medium) for MEDIUM findings', () => {
+    setupTempProject();
+    try {
+      const { updateGrade } = loadDispatcher();
+
+      // Two MEDIUM-confidence findings: one accepted, one false_positive.
+      updateGrade('quality/code-reviewer', 'MEDIUM', 'accepted');
+      const entry = updateGrade('quality/code-reviewer', 'MEDIUM', 'false_positive');
+
+      // The total counter MUST land in the schema field total_med. Before the
+      // fix, the total key was derived from the RAW confidence string
+      // ('total_medium') while the precision key was bucketed ('precision_med'),
+      // so total_med stayed 0 and a phantom out-of-schema total_medium accrued.
+      assert.equal(entry.total_med, 2, 'both MEDIUM findings must count toward total_med');
+      assert.ok(
+        !Object.prototype.hasOwnProperty.call(entry, 'total_medium'),
+        'no phantom out-of-schema total_medium key may exist',
+      );
+      // precision_med must remain numerically correct (1 accept of 2 → 0.5),
+      // and derived from a non-zero denominator (not NaN).
+      assert.equal(entry.precision_med, 0.5, 'precision_med = 1 accepted / 2 total');
+    } finally {
+      teardownTempProject();
+    }
+  });
+
   it('decays precision on a kickback outcome (the || second operand)', () => {
     setupTempProject();
     try {

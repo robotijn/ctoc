@@ -370,8 +370,12 @@ function updateGrade(agentName, confidence, outcome) {
   };
 
   const conf = (confidence || 'LOW').toLowerCase();
-  const totalKey = `total_${conf}`;
-  const precKey = `precision_${conf === 'high' ? 'high' : conf === 'medium' ? 'med' : 'low'}`;
+  // Derive BOTH keys from one bucket so the total and precision counters can
+  // never diverge. 'medium' maps to the 'med' schema field — building the total
+  // key from the raw string produced a phantom out-of-schema 'total_medium'.
+  const bucket = conf === 'high' ? 'high' : conf === 'medium' ? 'med' : 'low';
+  const totalKey = `total_${bucket}`;
+  const precKey = `precision_${bucket}`;
 
   entry[totalKey] = (entry[totalKey] || 0) + 1;
   if (outcome === 'accepted') {

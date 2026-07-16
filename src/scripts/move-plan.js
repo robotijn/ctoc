@@ -80,6 +80,19 @@ if (!safeFs.existsSync(planPath)) {
   process.exit(1);
 }
 
+// Refuse to clobber a DIFFERENT same-basename plan already resident at the
+// destination. movePlan does a bare renameSync, which atomically REPLACES the
+// destination — silently destroying an existing plan (a stale revert copy, a
+// re-created slug, a manually staged file). A plan slug lives in exactly one
+// stage, so a collision here is always a bug; fail loudly rather than lose data.
+// A same-stage move (destination === source stage) resolves to the same file and
+// is a harmless no-op, so it is exempt.
+const destPath = path.join(plansRoot, destination, path.basename(planPath));
+if (safeFs.existsSync(destPath) && path.resolve(destPath) !== resolvedPlanPath) {
+  console.error(`Refusing to overwrite existing plan at ${destination}/${path.basename(planPath)}`);
+  process.exit(1);
+}
+
 try {
   movePlan(planPath, destination, root);
   console.log(`Moved ${ref} -> ${destination}/`);

@@ -76,6 +76,26 @@ function movePlan(planPath, destination, projectPath) {
   const fileName = path.basename(planPath);
   const newPath = path.join(destDir, fileName);
 
+  // PRIMARY chokepoint guard against silent data loss: renameSync atomically
+  // REPLACES an existing destination, so a DIFFERENT same-basename plan already
+  // resident at the target stage would be destroyed without a trace (exit 0,
+  // "Moved"). In the normal pipeline a plan has ONE slug and lives in ONE stage, so
+  // such a collision is always a bug (a stale revert copy, a re-created slug, a
+  // manually staged file). Refuse loudly. This also protects approvePlan's internal
+  // move (via stampAndLedger) — the rollback there always moves back onto an EMPTY
+  // source, so it never trips this guard.
+  //
+  // A self-move (source path === destination path) is exempt: it is a legitimate
+  // idempotent no-op — e.g. completeExecution re-running on a plan an agent already
+  // moved to review/ calls movePlan(review/slug.md, 'review'). Moving a file onto
+  // itself destroys nothing.
+  if (safeFs.existsSync(newPath) && path.resolve(newPath) !== path.resolve(planPath)) {
+    throw new Error(
+      `Refusing to overwrite existing plan at ${destination}/${fileName} ` +
+      `(a same-basename plan already resident there would be destroyed)`
+    );
+  }
+
   safeFs.renameSync(planPath, newPath);
   invalidate(); // CF1: bust cached counts so the next read reflects the move
 

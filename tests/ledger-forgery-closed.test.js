@@ -243,6 +243,19 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
     assertAllowed('cd src && cp a.js b.js', 'unrelated cd + copy is not a ledger write');
     assertAllowed('cd .ctoc && cp a.json approvals-summary/x.json', 'approvals-summary is not the ledger dir');
   });
+
+  // Re-attack fix: the ADJACENCY check must be path-BOUNDED — a sibling under
+  // `.ctoc/` whose name merely starts with "approvals" is NOT the ledger directory
+  // and must not be false-blocked. (The unbounded `.ctoc/+approvals` regex denied
+  // these; the bounded LEDGER_SEGMENT_RE requires a whole path component.)
+  test('sibling .ctoc/approvals* paths (not the ledger dir) stay ALLOWED', () => {
+    assertAllowed('cp /tmp/f.json .ctoc/approvals-summary/report.json', 'approvals-summary/ is a different dir');
+    assertAllowed('mv /tmp/f.json .ctoc/approvals-archive.json', 'approvals-archive.json is a different file');
+    assertAllowed('cp /tmp/f.json .ctoc/approvalsdata.txt', 'approvalsdata.txt is a different file');
+    assertAllowed('cat .ctoc/approvals-summary/report.json', 'reading a sibling is fine');
+    // ...while the real ledger directory is still DENIED (guard intact):
+    assertDenied('cp /tmp/f.json .ctoc/approvals/x.json', 'the real ledger dir');
+  });
 });
 
 // =============================================================================

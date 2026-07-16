@@ -415,6 +415,91 @@ describe('Menu Screens Tests', () => {
     console.log('# validateScreen clean Confirm approve has no override');
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // HUMAN-GATE Approve affordance. The Approve option and the validateScreen
+  // autoApprove signal must be gated on the REAL crossable set (HUMAN_GATES:
+  // functional→implementation, implementation→todo, review→done), NOT on the
+  // full pipeline flow NEXT_STAGE. approvePlan throws "Unknown plan location"
+  // for any non-gate stage; offering Approve there (todo, canvas, in-progress)
+  // made validate return autoApprove:true and the driver auto-crashed on the
+  // clean path. Below: todo & canvas must NOT offer Approve / autoApprove;
+  // the three real gates MUST keep it (no regression).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  test('planActions (todo) does NOT offer an Approve-to-next-stage action', () => {
+    createPlan('todo', 'queued-plan');
+
+    const result = menuScreens.planActions('todo', 'queued-plan.md', testDir);
+    const labels = result.ask.questions[0].options.map(o => o.label);
+    assert.ok(!labels.some(l => l.startsWith('Approve')),
+      'todo is not a human gate — no Approve option (approvePlan throws Unknown plan location)');
+    assert.ok(!Object.keys(result.actions).some(k => k.startsWith('Approve')),
+      'no Approve action string for a todo plan');
+    // Non-approve affordances remain.
+    assert.ok(labels.includes('Discuss') && labels.includes('View/Edit'),
+      'browse/discuss/view affordances are untouched for todo');
+    console.log('# planActions todo has no Approve');
+  });
+
+  test('planActions (canvas) does NOT offer an Approve-to-next-stage action', () => {
+    fs.mkdirSync(path.join(plansDir, 'canvas'), { recursive: true });
+    createPlan('canvas', 'canvas-plan');
+
+    const result = menuScreens.planActions('canvas', 'canvas-plan.md', testDir);
+    const labels = result.ask.questions[0].options.map(o => o.label);
+    assert.ok(!labels.some(l => l.startsWith('Approve')),
+      'canvas is not a human gate — no Approve option');
+    assert.ok(!Object.keys(result.actions).some(k => k.startsWith('Approve')),
+      'no Approve action string for a canvas plan');
+    console.log('# planActions canvas has no Approve');
+  });
+
+  test('validateScreen (todo) does NOT return autoApprove:true with a claude:approve action', () => {
+    createPlan('todo', 'queued-plan');
+
+    const result = menuScreens.validateScreen('todo', 'queued-plan.md', testDir);
+    assert.notStrictEqual(result.autoApprove, true,
+      'todo is not a human gate — must not signal one-turn auto-approve (would auto-crash approvePlan)');
+    assert.ok(!Object.values(result.actions).some(v => typeof v === 'string' && v.startsWith('claude:approve')),
+      'no claude:approve action for a non-gate todo plan');
+    console.log('# validateScreen todo no autoApprove');
+  });
+
+  test('validateScreen (canvas) does NOT return autoApprove:true with a claude:approve action', () => {
+    fs.mkdirSync(path.join(plansDir, 'canvas'), { recursive: true });
+    createPlan('canvas', 'canvas-plan');
+
+    const result = menuScreens.validateScreen('canvas', 'canvas-plan.md', testDir);
+    assert.notStrictEqual(result.autoApprove, true,
+      'canvas is not a human gate — must not signal one-turn auto-approve');
+    assert.ok(!Object.values(result.actions).some(v => typeof v === 'string' && v.startsWith('claude:approve')),
+      'no claude:approve action for a non-gate canvas plan');
+    console.log('# validateScreen canvas no autoApprove');
+  });
+
+  test('planActions (implementation) STILL offers Approve → todo (real gate, no regression)', () => {
+    createPlan('implementation', 'impl-plan');
+
+    const result = menuScreens.planActions('implementation', 'impl-plan.md', testDir);
+    const labels = result.ask.questions[0].options.map(o => o.label);
+    assert.ok(labels.includes('Approve → todo'), 'implementation is a real human gate — keeps Approve → todo');
+    assert.strictEqual(result.actions['Approve → todo'], 'validate implementation/impl-plan.md',
+      'Approve routes to validate for the real gate');
+    console.log('# planActions implementation keeps Approve → todo');
+  });
+
+  test('validateScreen (implementation, clean) STILL autoApprove:true with claude:approve (real gate)', () => {
+    createPlan('implementation', 'impl-clean',
+      '---\ntitle: Impl\ntype: implementation\nfiles:\n  - src/x.js\n---\n\n' +
+      '# Impl\n\n## Implementation\nTechnical approach here.\n\n## Scope\nThe thing.\n');
+
+    const result = menuScreens.validateScreen('implementation', 'impl-clean.md', testDir);
+    assert.strictEqual(result.autoApprove, true, 'clean implementation validation still auto-approves (real gate)');
+    assert.strictEqual(result.actions['Confirm approve'], 'claude:approve implementation/impl-clean.md',
+      'real-gate approve action unchanged');
+    console.log('# validateScreen implementation clean still autoApprove');
+  });
+
   test('all text fields end with triple newline', () => {
     createPlan('functional', 'plan-a');
 
