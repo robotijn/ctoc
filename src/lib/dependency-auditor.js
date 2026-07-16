@@ -636,24 +636,62 @@ class DependencyAuditor {
       return;
     }
 
-    // Handle npm audit v2 format
+    // Handle npm audit v2 format.
+    //
+    // `vuln.via` is an array whose elements are EITHER an object advisory OR a
+    // package-name STRING (npm v2 lists transitive advisories by the string name of
+    // the dependency that pulls them in). Two latent bugs the guards below fence:
+    //   (a) MISSING via → `vuln.via[0]` on undefined throws a TypeError mid-loop; on
+    //       runNpmAudit's success path that error has no `.stdout`, so it is swallowed
+    //       and run() returns success:true / 0 vulns / 0 errors — a fail-OPEN clean pass
+    //       that verified nothing. Every remaining entry is also abandoned.
+    //   (b) STRING-only via → `typeof 'lodash' === 'object'` is false → the entry was
+    //       SKIPPED, silently dropping a real (possibly CRITICAL) advisory.
+    // Fix: index safely, prefer the first OBJECT advisory for its rich fields, and when
+    // there is none still record the vuln from the entry's own severity/range/name.
+    // A per-entry try/catch records a LOUD error instead of letting one malformed entry
+    // nuke the whole report.
     if (data.vulnerabilities) {
       for (const [name, vuln] of Object.entries(data.vulnerabilities)) {
-        const advisory = vuln.via[0];
-        if (typeof advisory === 'object') {
-          this.vulnerabilities.push({
-            manager: 'npm',
-            package: name,
-            version: vuln.range || vuln.version,
-            severity: this.mapNpmSeverity(advisory.severity || vuln.severity),
-            title: advisory.title || vuln.name,
-            description: advisory.overview || advisory.title,
-            cve: advisory.cve || null,
-            cwe: advisory.cwe || null,
-            url: advisory.url || null,
-            fixedIn: advisory.fixAvailable ? advisory.fixAvailable.version : null,
-            isDirect: vuln.isDirect || false
-          });
+        try {
+          const via = Array.isArray(vuln.via) ? vuln.via : [];
+          const advisory = via.find(v => v && typeof v === 'object');
+          if (advisory) {
+            this.vulnerabilities.push({
+              manager: 'npm',
+              package: name,
+              version: vuln.range || vuln.version,
+              severity: this.mapNpmSeverity(advisory.severity || vuln.severity),
+              title: advisory.title || vuln.name,
+              description: advisory.overview || advisory.title,
+              cve: advisory.cve || null,
+              cwe: advisory.cwe || null,
+              url: advisory.url || null,
+              fixedIn: advisory.fixAvailable ? advisory.fixAvailable.version : null,
+              isDirect: vuln.isDirect || false
+            });
+          } else {
+            // No object advisory (missing via, or a string-only via). Record the vuln
+            // from the entry itself — NEVER silently drop it.
+            this.vulnerabilities.push({
+              manager: 'npm',
+              package: name,
+              version: vuln.range || vuln.version,
+              severity: this.mapNpmSeverity(vuln.severity),
+              title: vuln.name || name,
+              description: null,
+              cve: null,
+              cwe: null,
+              url: null,
+              fixedIn: (vuln.fixAvailable && typeof vuln.fixAvailable === 'object')
+                ? vuln.fixAvailable.version
+                : null,
+              isDirect: vuln.isDirect || false
+            });
+          }
+        } catch (e) {
+          // One uninterpretable entry must never abandon the rest of the report.
+          this.errors.push({ manager: 'npm', error: `Failed to interpret vulnerability entry '${name}': ${e.message}` });
         }
       }
     }

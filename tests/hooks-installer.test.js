@@ -772,13 +772,43 @@ test('installPostCommitHook writes a new CTOC post-commit hook', () => {
   }
 });
 
-test('installPostCommitHook skips when a CTOC hook is already present', () => {
+test('installPostCommitHook skips when a real CTOC hook is already present (idempotent)', () => {
   const dir = mkRepo();
-  write(path.join(dir, '.git', 'hooks', 'post-commit'), '#!/bin/sh\n# CTOC post-commit hook\n');
+  const { installPostCommitHook } = load({ exec: router([]) });
+  try {
+    // First install writes the sentinel-wrapped CTOC block.
+    installPostCommitHook(dir, { pluginRoot: dir });
+    // Second install must recognise the prior install (by the opening sentinel)
+    // and skip — it must NOT append a duplicate block.
+    const res = installPostCommitHook(dir, { pluginRoot: dir });
+    assert.deepEqual(res, { installed: false, skipped: true, reason: 'CTOC post-commit hook already installed' });
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    const opens = content.split('# >>> CTOC post-commit >>>').length - 1;
+    assert.equal(opens, 1, 'exactly one CTOC block — no duplication on re-install');
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
+test('installPostCommitHook does NOT false-skip a foreign hook that merely mentions CTOC (D2)', () => {
+  const dir = mkRepo();
+  // A foreign hook whose comment happens to contain the string "CTOC" but is NOT
+  // a CTOC install. The old substring check false-skipped this, silently failing
+  // to wire the background quality agent at init time.
+  write(
+    path.join(dir, '.git', 'hooks', 'post-commit'),
+    '#!/bin/sh\n# migrated away from CTOC in 2025\necho "user hook"\n'
+  );
   const { installPostCommitHook } = load({ exec: router([]) });
   try {
     const res = installPostCommitHook(dir, { pluginRoot: dir });
-    assert.deepEqual(res, { installed: false, skipped: true, reason: 'CTOC post-commit hook already installed' });
+    assert.equal(res.skipped, undefined, 'must not skip a mere CTOC mention');
+    assert.equal(res.installed, true, 'CTOC block is actually installed');
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(content, /# >>> CTOC post-commit >>>/, 'sentinel-wrapped CTOC block written');
+    assert.match(content, /migrated away from CTOC/, 'foreign comment retained');
+    assert.match(content, /echo "user hook"/, 'foreign command retained');
   } finally {
     restore();
     rm(dir);
@@ -877,23 +907,68 @@ test('uninstallPostCommitHook deletes a hook that contains only CTOC content', (
   }
 });
 
-test('uninstallPostCommitHook strips only CTOC lines from a mixed hook (partial removal)', () => {
+test('uninstallPostCommitHook removes ONLY the sentinel-delimited CTOC block (partial removal)', () => {
   const dir = mkRepo();
-  const mixed = [
+  // A foreign hook, then a real CTOC install appended after it. Uninstall must
+  // remove exactly the sentinel block and leave every foreign line untouched.
+  write(path.join(dir, '.git', 'hooks', 'post-commit'), '#!/bin/sh\necho "keep me"\n');
+  const { installPostCommitHook, uninstallPostCommitHook } = load({ exec: router([]) });
+  try {
+    installPostCommitHook(dir, { pluginRoot: '/plugins/ctoc' });
+    const res = uninstallPostCommitHook(dir);
+    assert.deepEqual(res, { removed: true, partial: true });
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(content, /keep me/, 'foreign line retained');
+    assert.ok(!content.includes('CTOC'), 'CTOC block stripped');
+    assert.ok(!content.includes('# >>> CTOC'), 'sentinels stripped');
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
+test('install-then-uninstall PRESERVES a foreign line that contains post-commit.js (D1)', () => {
+  const dir = mkRepo();
+  // The user's own post-commit hook literally runs a file named post-commit.js.
+  // The old substring filter treated this as CTOC-owned and dropped it silently.
+  write(
+    path.join(dir, '.git', 'hooks', 'post-commit'),
+    '#!/bin/sh\nnode scripts/post-commit.js --notify\n'
+  );
+  const { installPostCommitHook, uninstallPostCommitHook } = load({ exec: router([]) });
+  try {
+    installPostCommitHook(dir, { pluginRoot: '/plugins/ctoc' });
+    const res = uninstallPostCommitHook(dir);
+    assert.deepEqual(res, { removed: true, partial: true });
+    const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(content, /node scripts\/post-commit\.js --notify/, 'foreign post-commit.js line survived');
+    assert.ok(!content.includes('# >>> CTOC'), 'CTOC block removed');
+  } finally {
+    restore();
+    rm(dir);
+  }
+});
+
+test('uninstallPostCommitHook cleanly removes a LEGACY (sentinel-less) CTOC install without eating a foreign post-commit.js line', () => {
+  const dir = mkRepo();
+  // A hook written by the OLD (pre-sentinel) installer: a foreign build step that
+  // also runs a file named post-commit.js, plus the legacy CTOC lines.
+  const legacy = [
     '#!/bin/sh',
-    'echo "keep me"',
+    'node scripts/post-commit.js --notify',
     '# CTOC post-commit hook - triggers background quality agent',
+    '# CTOC hook is NON-BLOCKING - commit always succeeds instantly.',
     'node "/plugins/ctoc/src/hooks/post-commit.js" 2>/dev/null &',
   ].join('\n') + '\n';
-  write(path.join(dir, '.git', 'hooks', 'post-commit'), mixed);
+  write(path.join(dir, '.git', 'hooks', 'post-commit'), legacy);
   const { uninstallPostCommitHook } = load({ exec: router([]) });
   try {
     const res = uninstallPostCommitHook(dir);
     assert.deepEqual(res, { removed: true, partial: true });
     const content = fs.readFileSync(path.join(dir, '.git', 'hooks', 'post-commit'), 'utf8');
-    assert.match(content, /keep me/, 'foreign line retained');
-    assert.ok(!content.includes('CTOC'), 'CTOC lines stripped');
-    assert.ok(!content.includes('post-commit.js'), 'CTOC invocation stripped');
+    assert.match(content, /node scripts\/post-commit\.js --notify/, 'foreign build step survived legacy removal');
+    assert.ok(!content.includes('CTOC'), 'legacy CTOC lines removed');
+    assert.ok(!content.includes('2>/dev/null &'), 'legacy CTOC invocation removed');
   } finally {
     restore();
     rm(dir);

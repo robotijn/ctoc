@@ -6,7 +6,7 @@
 const safeFs = require('../lib/safe-fs');
 const { safeRegExp } = require('../lib/regex-utils');
 const path = require('path');
-const { c, renderActionMenu, renderFooter } = require('../lib/tui');
+const { c, renderActionMenu, renderFooter, stripCtl } = require('../lib/tui');
 const { getPlansDir, timeAgo } = require('../lib/state');
 
 const ACTIONS = [
@@ -49,15 +49,20 @@ function renderVisionList(visions, selectedIndex) {
   visions.forEach((vision, i) => {
     const selected = i === selectedIndex;
     const prefix = selected ? `${c.cyan}→${c.reset}` : ' ';
-    const name = selected ? `${c.bold}${vision.name}${c.reset}` : vision.name;
+    // stripCtl every file-derived field (name = filename, problem/progress = plan
+    // content): an ANSI/control sequence in a vision file must not reach the
+    // terminal raw (screen-clear / cursor-hijack). Mirrors overview.js/review.js.
+    const safeName = stripCtl(vision.name);
+    const name = selected ? `${c.bold}${safeName}${c.reset}` : safeName;
 
     // Show progress indicator
-    const progressStr = vision.progress ? `${c.dim}(${vision.progress})${c.reset}` : '';
+    const progressStr = vision.progress ? `${c.dim}(${stripCtl(vision.progress)})${c.reset}` : '';
     const statusIcon = getStatusIcon(vision.status);
 
     output += `${prefix} [${i + 1}] ${statusIcon} ${name} ${progressStr}\n`;
     if (selected && vision.problem) {
-      output += `    ${c.dim}${vision.problem.substring(0, 50)}${vision.problem.length > 50 ? '...' : ''}${c.reset}\n`;
+      const problem = stripCtl(vision.problem);
+      output += `    ${c.dim}${problem.substring(0, 50)}${problem.length > 50 ? '...' : ''}${c.reset}\n`;
     }
   });
 

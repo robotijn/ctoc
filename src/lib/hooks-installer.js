@@ -477,6 +477,70 @@ class NativeHooksInstaller {
 // POST-COMMIT HOOK INSTALLER (Quality Agent)
 // ==============================================================================
 
+// ------------------------------------------------------------------------------
+// Post-commit block ownership — sentinels, NOT substrings.
+//
+// The CTOC-emitted post-commit block is delimited by a pair of sentinel comment
+// lines. Ownership of a line is decided by whether it falls between the sentinels,
+// never by whether it merely *contains* the string "CTOC" or "post-commit.js".
+// This is what makes install idempotent and uninstall surgical: a foreign hook
+// line such as `node scripts/post-commit.js --notify`, or a comment that mentions
+// CTOC, is never mistaken for a CTOC-owned line.
+// ------------------------------------------------------------------------------
+const POST_COMMIT_SENTINEL_START = '# >>> CTOC post-commit >>>';
+const POST_COMMIT_SENTINEL_END = '# <<< CTOC post-commit <<<';
+
+// The exact CTOC invocation signature, used ONLY for back-compat with hooks
+// installed by the previous (sentinel-less) code. It matches CTOC's own
+// `node "<...>post-commit.js" 2>/dev/null &` line but NOT a foreign line like
+// `node scripts/post-commit.js --notify` (which lacks the `2>/dev/null &`
+// redirect), so a legacy CTOC install can be removed without eating a foreign
+// post-commit.js line.
+const CTOC_LEGACY_INVOCATION = /node\s+"?[^"\n]*post-commit\.js"?\s+2>\/dev\/null\s+&/;
+
+/**
+ * Build the identical sentinel-wrapped CTOC block used by BOTH write paths
+ * (new-file create and append-to-foreign). Trailing newline included so the
+ * closing sentinel sits on its own line.
+ * @param {string} agentHookPath - absolute path to the CTOC post-commit.js script
+ * @returns {string} the sentinel-delimited block, newline-terminated
+ */
+function ctocPostCommitBlock(agentHookPath) {
+  return [
+    POST_COMMIT_SENTINEL_START,
+    '# CTOC post-commit hook - triggers background quality agent',
+    '# CTOC hook is NON-BLOCKING - commit always succeeds instantly.',
+    `node "${agentHookPath}" 2>/dev/null &`,
+    POST_COMMIT_SENTINEL_END,
+    ''
+  ].join('\n');
+}
+
+/**
+ * Decide whether an existing post-commit hook already carries a CTOC install.
+ * Primary signal is the opening sentinel; the legacy invocation signature is a
+ * fallback so a pre-sentinel install is still recognised as idempotent. A mere
+ * mention of "CTOC" in a comment is deliberately NOT a signal.
+ * @param {string} content - existing hook file contents
+ * @returns {boolean}
+ */
+function isCtocPostCommitInstalled(content) {
+  return content.includes(POST_COMMIT_SENTINEL_START) || CTOC_LEGACY_INVOCATION.test(content);
+}
+
+/**
+ * Legacy per-line ownership test for a sentinel-less CTOC install. Only the
+ * exact CTOC comment markers and the exact CTOC invocation signature qualify —
+ * never a foreign line that merely contains "post-commit.js".
+ * @param {string} line
+ * @returns {boolean}
+ */
+function isLegacyCtocPostCommitLine(line) {
+  return CTOC_LEGACY_INVOCATION.test(line) ||
+    line.includes('CTOC post-commit hook - triggers background quality agent') ||
+    line.includes('CTOC hook is NON-BLOCKING');
+}
+
 /**
  * Install the CTOC post-commit hook that triggers the background quality agent.
  * This is separate from the hook system installers (Husky/pre-commit/native)
@@ -505,30 +569,26 @@ function installPostCommitHook(projectRoot, options = {}) {
   // Check for existing hook
   if (safeFs.existsSync(hookPath)) {
     const existing = safeFs.readFileSync(hookPath, 'utf8');
-    if (existing.includes('CTOC')) {
+    // Idempotency is decided by the OPENING sentinel (or a legacy CTOC
+    // invocation), never by a bare "CTOC" substring — a foreign comment that
+    // merely mentions CTOC must not false-skip the install.
+    if (isCtocPostCommitInstalled(existing)) {
       return { installed: false, skipped: true, reason: 'CTOC post-commit hook already installed' };
     }
 
-    // Non-CTOC hook exists -- append our invocation
-    const appendContent = `
-# CTOC post-commit hook - triggers background quality agent
-node "${agentHookPath}" 2>/dev/null &
-`;
-    safeFs.appendFileSync(hookPath, appendContent);
+    // Non-CTOC hook exists -- append our sentinel-wrapped block. A leading
+    // newline separates it from the foreign content; the block is identical to
+    // the new-file body so uninstall can own it by sentinels either way.
+    safeFs.appendFileSync(hookPath, '\n' + ctocPostCommitBlock(agentHookPath));
     // Ensure executable
     safeFs.chmodSync(hookPath, 0o755);
     return { installed: true, appended: true };
   }
 
-  // Create new hook script. EVERY generated content line must carry a CTOC
-  // marker ("CTOC" or "post-commit.js"), because uninstallPostCommitHook
-  // identifies removable lines by that marker — an untagged line would be
-  // treated as foreign and leave a dangling hook file behind.
-  const hookContent = `#!/bin/sh
-# CTOC post-commit hook - triggers background quality agent
-# CTOC hook is NON-BLOCKING - commit always succeeds instantly.
-node "${agentHookPath}" 2>/dev/null &
-`;
+  // Create new hook script. The CTOC body is wrapped in the same sentinel block
+  // used by the append path, so uninstallPostCommitHook removes exactly the
+  // delimited lines and never guesses ownership by substring.
+  const hookContent = '#!/bin/sh\n' + ctocPostCommitBlock(agentHookPath);
 
   safeFs.writeFileSync(hookPath, hookContent, { mode: 0o755 });
   return { installed: true };
@@ -548,29 +608,36 @@ function uninstallPostCommitHook(projectRoot) {
   }
 
   const content = safeFs.readFileSync(hookPath, 'utf8');
-  if (!content.includes('CTOC')) {
+  const lines = content.split('\n');
+  const startIdx = lines.findIndex(l => l.trim() === POST_COMMIT_SENTINEL_START);
+  const endIdx = lines.findIndex(l => l.trim() === POST_COMMIT_SENTINEL_END);
+
+  let remaining;
+  if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+    // Own the block by SENTINELS: drop only the lines between (and including)
+    // the delimiters. Every foreign line — even one that contains the literal
+    // "post-commit.js" — is preserved verbatim.
+    remaining = lines.filter((_, i) => i < startIdx || i > endIdx);
+  } else if (isCtocPostCommitInstalled(content)) {
+    // BACK-COMPAT: a hook installed by the previous (sentinel-less) code has no
+    // sentinels. Remove ONLY lines matching the exact CTOC command signature, so
+    // a foreign line that merely contains "post-commit.js" (e.g.
+    // `node scripts/post-commit.js --notify`) is never eaten. Re-installs write
+    // sentinels, so this legacy path is a one-time clean-up.
+    remaining = lines.filter(line => !isLegacyCtocPostCommitLine(line));
+  } else {
     return { removed: false, reason: 'Post-commit hook is not a CTOC hook' };
   }
 
-  // If the hook only contains CTOC content, remove it entirely
-  const lines = content.split('\n');
-  const nonCtocLines = lines.filter(line =>
-    !line.includes('CTOC') &&
-    !line.includes('post-commit.js') &&
-    line.trim() !== '' &&
-    !line.startsWith('#!/')
-  );
-
-  if (nonCtocLines.length === 0) {
+  // Preserve the prior empty-file semantics: if only a shebang and/or blank
+  // lines remain, the hook is now pure boilerplate — delete it entirely.
+  const meaningful = remaining.filter(l => l.trim() !== '' && !l.startsWith('#!/'));
+  if (meaningful.length === 0) {
     safeFs.unlinkSync(hookPath);
     return { removed: true };
   }
 
-  // Otherwise, remove only CTOC lines
-  const cleanedContent = lines
-    .filter(line => !line.includes('CTOC') && !line.includes('post-commit.js'))
-    .join('\n');
-  safeFs.writeFileSync(hookPath, cleanedContent, { mode: 0o755 });
+  safeFs.writeFileSync(hookPath, remaining.join('\n'), { mode: 0o755 });
   return { removed: true, partial: true };
 }
 
