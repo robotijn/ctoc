@@ -45,7 +45,8 @@
  * every path is composed with `path.join`, so the module is cross-platform and
  * never writes outside `.ctoc/approvals/`.
  *
- * FOUR ENTRY KINDS (R2-F, extended by R3-A item 5; made honest by X5). Every entry
+ * FIVE ENTRY KINDS (R2-F, extended by R3-A item 5; made honest by X5; the fifth,
+ * SUFFICIENCY, added by X6). Every entry
  * declares its provenance POSITIVELY, and `entryKind(entry)` reports it honestly —
  * a claim this header made from R3-A onward while the code did the opposite, until
  * X5. Until X5 the classifier `return`ed `'human'` for ANYTHING it did not
@@ -69,6 +70,16 @@
  *     `evidence` string; a write with no evidence is refused loudly.
  *     `human-gate-check.js` accepts a pipeline entry ONLY at `done/` (never at the
  *     pre-done gate `todo/`, which stays human-only).
+ *   - SUFFICIENCY kind (`writeSufficiencyEntry`, X6): the plan carried ENOUGH
+ *     INFORMATION to be built without guessing — every fork among its computed
+ *     decision questions was answered — so the pipeline advanced it ITSELF and the
+ *     human approved nothing. It carries `advanced_by: 'sufficiency'` and a
+ *     MANDATORY non-empty `evidence` string, and `approved_by` is FORBIDDEN on it
+ *     (refused loudly, never stripped — a sufficiency entry wearing the human's
+ *     marker is the forgery shape X5 closed). `human-gate-check.js` accepts it ONLY
+ *     at the PRE-BUILD gate destinations (implementation, todo) with evidence, and
+ *     REJECTS it at `done/` — Gate 3 asks "was this built correctly?", answered by
+ *     review and the 14 quality dimensions, not by an answered-question log.
  *   - UNKNOWN kind (X5): no recognised provenance — an unrecognised non-empty
  *     `advanced_by`, or an entry carrying no positive marker at all. It is REJECTED
  *     by `human-gate-check.js` at every gate (`unknown-provenance`). This kind is
@@ -260,6 +271,66 @@ function writePipelineEntry(slug, entry, projectPath) {
 }
 
 /**
+ * Record a SUFFICIENCY-kind entry (X6): the plan carried ENOUGH INFORMATION to be
+ * built WITHOUT GUESSING — its decision questions were computed against the current
+ * plan text and every fork among them was answered — so the pipeline advanced it
+ * ITSELF, and the human approved nothing. This mirrors {@link writePipelineEntry}
+ * exactly, with ONE extra guard that is the whole point of the kind:
+ *
+ *   - `evidence` is MANDATORY and non-empty (names the plan ref, the count of
+ *     answered questions, and their ids — so an auditor reconstructs the decision
+ *     from the entry alone). A write with no evidence is refused LOUDLY.
+ *   - `approved_by` is FORBIDDEN — not omitted, actively REFUSED. A sufficiency
+ *     entry wearing the human's marker is the exact forgery shape X5 closed (a
+ *     machine cross claiming a human clicked). Silent sanitisation would reopen the
+ *     hole, so the KEY'S PRESENCE (mirroring `entryKind`'s presence-guard) throws.
+ *
+ * Stamps `advanced_by: 'sufficiency'` and NO `approved_by`, so `entryKind`
+ * classifies it `'sufficiency'` and `human-gate-check.js` accepts it ONLY at the
+ * PRE-BUILD gate destinations (implementation, todo) with evidence — never at
+ * `done/`, where the question is "was this built correctly?", not "is there enough
+ * information to build?".
+ *
+ * @param {string} slug - the plan slug
+ * @param {LedgerEntryInput} entry - the entry fields; required fields
+ *   `content_sha256`, `stage_from`, `stage_to`, and a non-empty `evidence` string
+ *   are enforced at runtime, and a present `approved_by` KEY is refused
+ * @param {string} projectPath - the project root
+ * @returns {object} the entry object as written
+ * @throws {Error} `Invalid slug`; a missing-required-field error; a
+ *   `sufficiency entry requires non-empty "evidence"` error; or a
+ *   `sufficiency entry must NOT carry "approved_by"` error — all BEFORE any write.
+ */
+function writeSufficiencyEntry(slug, entry, projectPath) {
+  const src = /** @type {LedgerEntryInput} */ (entry || {});
+  // THE FORGERY GUARD (Decision 2). Checked FIRST: a machine cross must never wear
+  // the human's marker. The KEY'S PRESENCE decides — not its value — so even
+  // `approved_by: undefined` is refused. This is REFUSAL, never silent stripping.
+  if (Object.prototype.hasOwnProperty.call(src, 'approved_by')) {
+    throw new Error(
+      'approval-ledger: a sufficiency entry must NOT carry "approved_by" ' +
+      '(a machine cross wearing the human marker is the exact forgery shape)',
+    );
+  }
+  if (typeof src.evidence !== 'string' || src.evidence.trim() === '') {
+    throw new Error('approval-ledger: sufficiency entry requires non-empty "evidence"');
+  }
+  const record = {
+    content_sha256: src.content_sha256,
+    stage_from: src.stage_from,
+    stage_to: src.stage_to,
+    approved_at: src.approved_at || new Date().toISOString(),
+    advanced_by: 'sufficiency',
+    evidence: src.evidence,
+  };
+  // The case-collision guard is available on this path too (same rationale as the
+  // pipeline path): two plans differing only by case must never silently overwrite
+  // each other's provenance.
+  if (src.plan_basename !== undefined) record.plan_basename = src.plan_basename;
+  return persistEntry(slug, record, projectPath);
+}
+
+/**
  * Ledger a DECOMPOSED VISION archived to `plans/done/` as a PIPELINE-kind entry
  * (R3-A item 3). A vision crossed Gate 0 in `vision/`, never the review→done code
  * gate, and carries no approval marker — which is why `human-gate-check.js` used to
@@ -385,8 +456,9 @@ function persistEntry(slug, record, projectPath) {
  * classifier simply never looked at the evidence already on disk.
  *
  * @param {object|null} entry - a parsed ledger entry
- * @returns {('human'|'backfilled'|'pipeline'|'unknown'|null)} `pipeline` when
- *   `advanced_by === 'pipeline'`; `unknown` for any OTHER non-empty `advanced_by`;
+ * @returns {('human'|'backfilled'|'pipeline'|'sufficiency'|'unknown'|null)}
+ *   `pipeline` when `advanced_by === 'pipeline'`; `sufficiency` when
+ *   `advanced_by === 'sufficiency'` (X6); `unknown` for any OTHER non-empty `advanced_by`;
  *   `backfilled` when the entry carries `backfilled: true`; `human` ONLY when the
  *   entry positively carries `approved_by === 'human'`; `unknown` for any other real
  *   entry (fail closed); `null` for no entry.
@@ -397,16 +469,20 @@ function entryKind(entry) {
   // `advanced_by` is NOT the human — that default forged 26 approvals.
   //
   // The key's PRESENCE decides, not its type. An entry carrying `advanced_by` at
-  // all is claiming a MACHINE crossed this gate; only the exact string 'pipeline'
-  // names a provenance this system recognises. Everything else — 'sufficiency-gate',
-  // '', null, 123, an object — is `unknown` and is rejected, EVEN WHEN the entry
+  // all is claiming a MACHINE crossed this gate; only the exact strings 'pipeline'
+  // and 'sufficiency' (X6) name a provenance this system recognises, each added
+  // HERE deliberately with its own guard in `human-gate-check.js`. Everything else —
+  // 'sufficiency-gate', 'Sufficiency', ' sufficiency ', '', null, 123, an object —
+  // is `unknown` and is rejected, EVEN WHEN the entry
   // also carries `approved_by: 'human'`. That pairing is not an edge case: a machine
   // cross wearing the human's marker is the exact shape of the 26 forgeries removed
   // from this repo on 2026-07-17. Type-guarding here instead of presence-guarding
   // would let a malformed `advanced_by` fall through to the `approved_by` check and
   // be accepted as a clicked approval.
   if (Object.prototype.hasOwnProperty.call(entry, 'advanced_by')) {
-    return entry.advanced_by === 'pipeline' ? 'pipeline' : 'unknown';
+    if (entry.advanced_by === 'pipeline') return 'pipeline';
+    if (entry.advanced_by === 'sufficiency') return 'sufficiency';
+    return 'unknown';
   }
   if (entry.backfilled === true) return 'backfilled';
   if (entry.approved_by === 'human') return 'human';
@@ -557,6 +633,7 @@ module.exports = {
   computeContentHash,
   writeEntry,
   writePipelineEntry,
+  writeSufficiencyEntry,
   writeVisionArchiveEntry,
   entryKind,
   readEntry,

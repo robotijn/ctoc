@@ -568,9 +568,9 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // Writes .ctoc/audit/dispatches/*.yaml + .ctoc/agents/dispatch-grades.yaml —
     // audit trail, not counted.
     ['v8-dispatcher.js', 'writes .ctoc/audit/dispatches/*.yaml + dispatch-grades.yaml (audit trail), not a counted file'],
-    // Streaming gate screen: its only direct fs write is appending .ctoc/streaming/comments.jsonl;
-    // the actual gate crossing (plan move) goes through actions.approvePlan, which itself invalidates.
-    ['streaming-gate.js', 'appends .ctoc/streaming/comments.jsonl only; the gate move goes through actions.approvePlan (which invalidates), never a direct counted-file write here'],
+    // (streaming-gate.js is no longer whitelisted: as of X6 it CROSSES a sufficient plan
+    // via actions.movePlan — a direct movePlan reference — so bustsCache() is true and it
+    // needs no exemption. Whitelisting it would now be dead weight.)
     // Streaming precompute: writePlanQuestions writes .ctoc/streaming/questions/<ref>.json
     // question-cache files (atomic temp+rename); streamAnswer appends
     // .ctoc/streaming/answers.jsonl. Neither is a counted plan/vision/inbox *.md — the

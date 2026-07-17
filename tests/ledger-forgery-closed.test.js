@@ -808,3 +808,113 @@ describe('X5 — an unrecognised provenance is NOT the human', () => {
     }
   });
 });
+
+// =============================================================================
+// 11. X6 — THE SUFFICIENCY KIND crosses the PRE-BUILD gates by itself.
+//
+// A sufficiency entry (advanced_by:'sufficiency' + evidence) is the machine
+// recording that a plan had ENOUGH INFORMATION to be built without guessing.
+// The gate hook accepts it ONLY at the PRE-BUILD gate destinations (derived
+// from the code: implementation, todo) and ONLY with evidence — and REJECTS it
+// at done/, where the question is "was this built correctly?", answered by
+// review and the 14 quality dimensions, not by an answered-question log.
+//
+// The pre-build gate names are read from gate-order, not hardcoded here — the
+// same derivation the hook itself uses.
+// =============================================================================
+
+describe('X6 — a sufficiency entry crosses the pre-build gates, never done/', () => {
+  const gateOrder = require(path.join(REPO, 'src', 'lib', 'gate-order.js'));
+  const buildStart = gateOrder.STAGE_ORDER.indexOf('in-progress');
+  const PRE_BUILD = gateOrder.GATE_DESTINATIONS.filter(
+    d => gateOrder.STAGE_ORDER.indexOf(d) < buildStart);
+
+  // --- Case 5: accepted at every pre-build gate, with evidence ----------------
+  test('case 5: a sufficiency entry with evidence is ACCEPTED at every pre-build gate', () => {
+    assert.deepEqual(PRE_BUILD, ['implementation', 'todo'],
+      'sanity: the pre-build gate destinations derived from the code');
+    for (const folder of PRE_BUILD) {
+      const slug = `suff-${folder}`;
+      const p = path.join(project, 'plans', folder, `${slug}.md`);
+      const content = `---\ntype: implementation\n---\n\nbody ${folder}\n`;
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, content);
+      // Drive the REAL writer — no hand-planted JSON.
+      ledger.writeSufficiencyEntry(slug, {
+        content_sha256: ledger.computeContentHash(content),
+        stage_from: gateOrder.sourceOf(folder),
+        stage_to: folder,
+        evidence: `sufficiency: ${folder}/${slug}.md — 1 answered (db)`,
+      }, project);
+
+      const verdict = gate.classifyResidency(p, folder, project);
+      assert.equal(verdict.accepted, true, `enough information must cross the pre-build gate ${folder}/`);
+      assert.equal(verdict.kind, 'sufficiency', `kind reported honestly at ${folder}/`);
+      assert.equal(verdict.reason, null, `no reason on acceptance at ${folder}/`);
+    }
+  });
+
+  // --- Case 6: REJECTED at done/ (Decision 1) --------------------------------
+  test('case 6: a sufficiency entry is REJECTED at done/ — Gate 3 is not an information gate', () => {
+    const slug = 'suff-done';
+    const p = path.join(project, 'plans', 'done', `${slug}.md`);
+    const content = '---\ntype: implementation\n---\n\ndone body\n';
+    fs.writeFileSync(p, content);
+    ledger.writeSufficiencyEntry(slug, {
+      content_sha256: ledger.computeContentHash(content),
+      stage_from: 'review',
+      stage_to: 'done',
+      evidence: 'sufficiency: done/suff-done.md — 1 answered (db)',
+    }, project);
+
+    const verdict = gate.classifyResidency(p, 'done', project);
+    assert.equal(verdict.accepted, false, 'sufficiency must NEVER cross Gate 3 (review → done)');
+    assert.equal(verdict.reason, 'sufficiency-not-allowed');
+    assert.equal(verdict.kind, 'sufficiency', 'still classified honestly, just not accepted here');
+  });
+
+  // --- Case 7: a sufficiency entry with NO evidence is rejected everywhere -----
+  test('case 7: a sufficiency entry with no evidence is REJECTED at every gate', () => {
+    // The real writer REFUSES a no-evidence write, so this malformed shape can only
+    // be hand-planted — exactly what a not-yet-trusted writer might mint. The gate
+    // must reject it on its own, regardless.
+    for (const folder of ['implementation', 'todo', 'done']) {
+      const slug = `suff-noev-${folder}`;
+      const p = path.join(project, 'plans', folder, `${slug}.md`);
+      const content = `---\ntype: implementation\n---\n\nno-ev ${folder}\n`;
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, content);
+      fs.writeFileSync(
+        path.join(project, '.ctoc', 'approvals', `${slug}.json`),
+        JSON.stringify({
+          content_sha256: ledger.computeContentHash(content),
+          stage_from: folder === 'done' ? 'review' : gateOrder.sourceOf(folder),
+          stage_to: folder,
+          advanced_by: 'sufficiency', // NO evidence
+        }, null, 2),
+      );
+
+      const verdict = gate.classifyResidency(p, folder, project);
+      assert.equal(verdict.accepted, false, `a no-evidence sufficiency entry must be rejected at ${folder}/`);
+      assert.equal(verdict.kind, 'sufficiency');
+      // At a pre-build gate the miss is the evidence; at done/ it is not-allowed (checked first).
+      const expected = PRE_BUILD.includes(folder) ? 'sufficiency-no-evidence' : 'sufficiency-not-allowed';
+      assert.equal(verdict.reason, expected, `wrong rejection reason at ${folder}/`);
+    }
+  });
+
+  // --- The no-false-red guard: a REAL human/pipeline/backfilled entry unaffected
+  test('case 5b: adding sufficiency did not disturb the other kinds at these gates', () => {
+    // A genuine human crossing into todo still accepted.
+    const p = path.join(project, 'plans', 'todo', 'still-human.md');
+    const content = '---\ntype: implementation\n---\n\nhuman\n';
+    fs.writeFileSync(p, content);
+    ledger.writeEntry('still-human', {
+      content_sha256: ledger.computeContentHash(content),
+      stage_from: 'implementation', stage_to: 'todo', approved_by: 'human',
+    }, project);
+    const verdict = gate.classifyResidency(p, 'todo', project);
+    assert.equal(verdict.accepted, true);
+    assert.equal(verdict.kind, 'human');
+  });
+});
