@@ -639,3 +639,172 @@ describe('R3-A item 7 — oversized dismissal store fails open', () => {
     assert.ok(Array.isArray(out.candidates), 'the scan still returns candidates (fail-open = keep nagging)');
   });
 });
+
+// =============================================================================
+// 10. X5 — provenance is a POSITIVE claim, never a fallthrough
+//
+// `entryKind` classified ANY unrecognised provenance as 'human', and
+// `classifyResidency` guarded ONLY 'pipeline' — so an entry carrying
+// `advanced_by: 'sufficiency-gate'` was classified as the human, skipped the
+// guard, and was ACCEPTED at every gate including `todo`, with no evidence.
+// That is the mechanism behind the 26 forged approvals removed from this repo.
+// =============================================================================
+
+describe('X5 — an unrecognised provenance is NOT the human', () => {
+  // --- Case 1: the bug, at the classifier ------------------------------------
+  test('case 1: an entry with an unrecognised advanced_by is NOT classified as human', () => {
+    const kind = ledger.entryKind({ advanced_by: 'sufficiency-gate', stage_to: 'todo' });
+    assert.notEqual(kind, 'human',
+      'an unrecognised advanced_by is the ABSENCE of human evidence, never the human');
+    assert.equal(kind, 'unknown',
+      'it must classify as unknown — a new provenance is added deliberately, in the open, with its own guard');
+  });
+
+  // --- Case 2: the bug that matters, at the gate ------------------------------
+  test('case 2: an unrecognised provenance is REJECTED by the gate hook at every gate', () => {
+    for (const folder of ['todo', 'review', 'done']) {
+      const p = path.join(project, 'plans', folder, `sufficiency-${folder}.md`);
+      const content = `---\ntype: implementation\n---\n\nbody ${folder}\n`;
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, content);
+      // Plant the entry directly: this is the shape a not-yet-recognised writer
+      // would mint. It carries a real hash and the right edge, so ONLY the
+      // provenance classification can reject it.
+      fs.writeFileSync(
+        path.join(project, '.ctoc', 'approvals', `sufficiency-${folder}.json`),
+        JSON.stringify({
+          content_sha256: ledger.computeContentHash(content),
+          stage_from: 'implementation',
+          stage_to: folder,
+          approved_at: new Date().toISOString(),
+          advanced_by: 'sufficiency-gate',
+        }, null, 2),
+      );
+
+      const verdict = gate.classifyResidency(p, folder, project);
+      assert.equal(verdict.accepted, false,
+        `an unrecognised provenance must NEVER be accepted — it was waved through at ${folder}/`);
+      assert.equal(verdict.reason, 'unknown-provenance', `wrong reason at ${folder}/`);
+      assert.equal(verdict.kind, 'unknown', `wrong kind at ${folder}/`);
+    }
+  });
+
+  // --- Case 3: the forgery shape — Decision 3, the whole fix ------------------
+  test('case 3: an entry carrying BOTH advanced_by and approved_by:human is unknown, not human', () => {
+    // A machine cross wearing the human's marker. `advanced_by` MUST be checked
+    // BEFORE `approved_by`; check `approved_by` first and this is accepted.
+    assert.equal(
+      ledger.entryKind({ advanced_by: 'sufficiency-gate', approved_by: 'human' }),
+      'unknown',
+      'advanced_by must be checked FIRST — this ordering is the whole fix',
+    );
+
+    const p = path.join(project, 'plans', 'todo', 'wearing-the-marker.md');
+    const content = '---\ntype: implementation\n---\n\nbody\n';
+    fs.writeFileSync(p, content);
+    fs.writeFileSync(
+      path.join(project, '.ctoc', 'approvals', 'wearing-the-marker.json'),
+      JSON.stringify({
+        content_sha256: ledger.computeContentHash(content),
+        stage_from: 'implementation',
+        stage_to: 'todo',
+        approved_by: 'human',
+        advanced_by: 'sufficiency-gate',
+      }, null, 2),
+    );
+    const verdict = gate.classifyResidency(p, 'todo', project);
+    assert.equal(verdict.accepted, false, 'the forgery shape must be rejected at the gate');
+    assert.equal(verdict.kind, 'unknown');
+  });
+
+  // --- Case 4: the proof that NO migration is needed --------------------------
+  test('case 4: all real ledger entries in this repo keep their current classification', () => {
+    const realDir = path.join(REPO, '.ctoc', 'approvals');
+    const files = fs.readdirSync(realDir).filter(f => f.endsWith('.json'));
+    // Non-vacuous: an empty or truncated directory must NOT pass this test.
+    assert.ok(files.length > 200,
+      `the real ledger must be present and populated (found ${files.length})`);
+
+    const tally = {};
+    for (const f of files) {
+      let entry;
+      assert.doesNotThrow(() => { entry = JSON.parse(fs.readFileSync(path.join(realDir, f), 'utf8')); },
+        `real ledger entry ${f} must parse`);
+      const kind = ledger.entryKind(entry);
+      tally[kind] = (tally[kind] || 0) + 1;
+    }
+
+    assert.equal(tally.unknown, undefined,
+      `NO real entry may become unknown — every existing entry already carries its own ` +
+      `evidence, so the honest classifier reclassifies nothing (got ${JSON.stringify(tally)})`);
+    assert.ok(tally.backfilled > 200, `backfilled count moved: ${JSON.stringify(tally)}`);
+    assert.ok(tally.human > 40, `human count moved: ${JSON.stringify(tally)}`);
+    assert.equal(tally.backfilled + (tally.human || 0) + (tally.pipeline || 0), files.length,
+      'every real entry must classify into a recognised kind');
+  });
+
+  // --- Case 5: the no-false-red guard ----------------------------------------
+  test('case 5: a real human entry is still accepted', () => {
+    const p = path.join(project, 'plans', 'todo', 'genuine.md');
+    const content = '---\ntype: implementation\n---\n\nbody\n';
+    fs.writeFileSync(p, content);
+    ledger.writeEntry('genuine', {
+      content_sha256: ledger.computeContentHash(content),
+      stage_from: 'implementation',
+      stage_to: 'todo',
+      approved_by: 'human',
+    }, project);
+    const verdict = gate.classifyResidency(p, 'todo', project);
+    assert.equal(verdict.accepted, true, 'a genuine human crossing must never be flagged');
+    assert.equal(verdict.kind, 'human');
+    assert.equal(verdict.reason, null);
+  });
+
+  // --- Case 6: pipeline keeps its existing guards ----------------------------
+  test('case 6: pipeline provenance still obeys its existing guards', () => {
+    const mk = (slug, folder, evidence) => {
+      const p = path.join(project, 'plans', folder, `${slug}.md`);
+      const content = `---\ntype: implementation\n---\n\n${slug}\n`;
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, content);
+      fs.writeFileSync(path.join(project, '.ctoc', 'approvals', `${slug}.json`),
+        JSON.stringify({
+          content_sha256: ledger.computeContentHash(content),
+          stage_from: folder === 'done' ? 'review' : 'implementation',
+          stage_to: folder,
+          advanced_by: 'pipeline',
+          ...(evidence !== undefined ? { evidence } : {}),
+        }, null, 2));
+      return p;
+    };
+
+    const okDone = gate.classifyResidency(mk('pipe-done', 'done', 'stale-reconciliation'), 'done', project);
+    assert.equal(okDone.accepted, true, 'pipeline + evidence at done/ stays accepted');
+    assert.equal(okDone.kind, 'pipeline');
+
+    const atTodo = gate.classifyResidency(mk('pipe-todo', 'todo', 'stale-reconciliation'), 'todo', project);
+    assert.equal(atTodo.accepted, false, 'todo/ stays human-only');
+    assert.equal(atTodo.reason, 'pipeline-not-allowed');
+    assert.equal(atTodo.kind, 'pipeline');
+
+    const noEv = gate.classifyResidency(mk('pipe-noev', 'done', undefined), 'done', project);
+    assert.equal(noEv.accepted, false, 'pipeline without evidence stays rejected');
+    assert.equal(noEv.reason, 'pipeline-no-evidence');
+    assert.equal(noEv.kind, 'pipeline');
+  });
+
+  // --- Case 7: Decision 1's guard — the 210 must not move --------------------
+  test('case 7: backfilled entries are still accepted at every gate', () => {
+    for (const folder of ['todo', 'done']) {
+      const p = path.join(project, 'plans', folder, `migrated-${folder}.md`);
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, `---\ntype: implementation\n---\n\nmigrated ${folder}\n`);
+      ledger.backfillEntry(project, p, { stage_to: folder, reason: 'legacy' });
+
+      const verdict = gate.classifyResidency(p, folder, project);
+      assert.equal(verdict.accepted, true,
+        `the human ordered the migration — a backfilled entry must stay accepted at ${folder}/`);
+      assert.equal(verdict.kind, 'backfilled', 'and it is still reported honestly as backfilled');
+    }
+  });
+});

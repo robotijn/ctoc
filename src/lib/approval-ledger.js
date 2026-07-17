@@ -45,10 +45,17 @@
  * every path is composed with `path.join`, so the module is cross-platform and
  * never writes outside `.ctoc/approvals/`.
  *
- * THREE ENTRY KINDS (R2-F, extended by R3-A item 5). Every entry declares its
- * provenance, and `entryKind(entry)` reports it HONESTLY:
+ * FOUR ENTRY KINDS (R2-F, extended by R3-A item 5; made honest by X5). Every entry
+ * declares its provenance POSITIVELY, and `entryKind(entry)` reports it honestly —
+ * a claim this header made from R3-A onward while the code did the opposite, until
+ * X5. Until X5 the classifier `return`ed `'human'` for ANYTHING it did not
+ * recognise, so `'human'` was the ABSENCE of evidence and an entry stamped
+ * `advanced_by: 'sufficiency-gate'` was waved through every gate as a human
+ * approval. It now fails CLOSED to `'unknown'`, and the gate hook rejects
+ * `'unknown'` on every path:
  *   - HUMAN kind (`writeEntry`, the default): a human crossed the gate via the
- *     menu (`approvePlan`/`stampAndLedger`).
+ *     menu (`approvePlan`/`stampAndLedger`). Classified `'human'` ONLY on a
+ *     positive `approved_by: 'human'` marker — never as a fallthrough.
  *   - BACKFILLED kind (`backfillEntry`): a human-authorized MIGRATION of a plan that
  *     crossed a gate BEFORE the ledger existed — a human-kind record additionally
  *     stamped `backfilled: true` + `backfill_reason`, hashing the plan's CURRENT
@@ -62,6 +69,12 @@
  *     `evidence` string; a write with no evidence is refused loudly.
  *     `human-gate-check.js` accepts a pipeline entry ONLY at `done/` (never at the
  *     pre-done gate `todo/`, which stays human-only).
+ *   - UNKNOWN kind (X5): no recognised provenance — an unrecognised non-empty
+ *     `advanced_by`, or an entry carrying no positive marker at all. It is REJECTED
+ *     by `human-gate-check.js` at every gate (`unknown-provenance`). This kind is
+ *     never WRITTEN by this module; it is what an unrecognised entry CLASSIFIES as.
+ *     Adding a new provenance means adding it to `entryKind` deliberately, in the
+ *     open, with its own guard in the hook — never inventing it at a call site.
  *
  * CANONICAL LOWERCASE SLUGS (R2-F). `slugFromPlanPath` lowercases and every
  * boundary (`ledgerPath`, and thus every read/write) canonicalizes its slug to
@@ -342,23 +355,62 @@ function persistEntry(slug, record, projectPath) {
 }
 
 /**
- * Classify a ledger entry's provenance kind — HONESTLY (R3-A item 5).
+ * Classify a ledger entry's provenance kind — HONESTLY (R3-A item 5, made real by X5).
  *
- * `'backfilled'` is a THIRD kind, not a flavour of `'human'`: the gate accepts it
- * (the human ordered the migration), but a migrated entry and a live human approval
- * are different facts and an audit must be able to tell them apart. Acceptance is
- * unchanged; only the classification became truthful.
+ * PROVENANCE IS A POSITIVE CLAIM, NEVER A FALLTHROUGH (X5). This function used to
+ * `return 'human'` for anything it did not recognise — so `'human'`, the most
+ * privileged kind, was the ABSENCE of evidence rather than an assertion of it. An
+ * entry stamped `advanced_by: 'sufficiency-gate'` was reported as the human, skipped
+ * `human-gate-check.js`'s pipeline-only guard, and was ACCEPTED at every gate
+ * including `todo/`, with no evidence. That default is the mechanism behind the 26
+ * forged approvals whose own backfill reason reads: "Claude wrote approved_by:human
+ * into plan frontmatter directly instead of crossing Gate 2 via approvePlan — a
+ * forged marker." An unrecognised provenance is now `'unknown'`, and the gate hook
+ * REJECTS `'unknown'` on every path: the classifier fails CLOSED.
+ *
+ * ORDER IS LOAD-BEARING. `advanced_by` is tested BEFORE `approved_by`, because an
+ * entry carrying BOTH `advanced_by: 'sufficiency-gate'` AND `approved_by: 'human'`
+ * is precisely the forgery shape — a machine cross wearing the human's marker.
+ * Testing `approved_by` first would launder it back into `'human'` and make this
+ * whole change a no-op.
+ *
+ * An unrecognised `advanced_by` returns `'unknown'`, NOT its own value: returning it
+ * verbatim would let a new provenance be invented at the CALL SITE, which is the same
+ * defect one level up. A new kind must be added HERE, deliberately, with its own guard
+ * in `human-gate-check.js` — that is how the sufficiency gate will be added.
+ *
+ * This classification reclassifies NOTHING that exists: measured across all 263 real
+ * entries in this repo, 210 carry `backfilled: true` and the other 53 all carry
+ * `approved_by: 'human'` explicitly. Zero carry nothing. There is no migration; the
+ * classifier simply never looked at the evidence already on disk.
  *
  * @param {object|null} entry - a parsed ledger entry
- * @returns {('human'|'backfilled'|'pipeline'|null)} `pipeline` when
- *   `advanced_by === 'pipeline'`; `backfilled` when the entry carries
- *   `backfilled: true`; `human` for any other real entry; `null` for no entry.
+ * @returns {('human'|'backfilled'|'pipeline'|'unknown'|null)} `pipeline` when
+ *   `advanced_by === 'pipeline'`; `unknown` for any OTHER non-empty `advanced_by`;
+ *   `backfilled` when the entry carries `backfilled: true`; `human` ONLY when the
+ *   entry positively carries `approved_by === 'human'`; `unknown` for any other real
+ *   entry (fail closed); `null` for no entry.
  */
 function entryKind(entry) {
   if (!entry || typeof entry !== 'object') return null;
-  if (entry.advanced_by === 'pipeline') return 'pipeline';
+  // Provenance is a POSITIVE claim, never a fallthrough. An unrecognised
+  // `advanced_by` is NOT the human — that default forged 26 approvals.
+  //
+  // The key's PRESENCE decides, not its type. An entry carrying `advanced_by` at
+  // all is claiming a MACHINE crossed this gate; only the exact string 'pipeline'
+  // names a provenance this system recognises. Everything else — 'sufficiency-gate',
+  // '', null, 123, an object — is `unknown` and is rejected, EVEN WHEN the entry
+  // also carries `approved_by: 'human'`. That pairing is not an edge case: a machine
+  // cross wearing the human's marker is the exact shape of the 26 forgeries removed
+  // from this repo on 2026-07-17. Type-guarding here instead of presence-guarding
+  // would let a malformed `advanced_by` fall through to the `approved_by` check and
+  // be accepted as a clicked approval.
+  if (Object.prototype.hasOwnProperty.call(entry, 'advanced_by')) {
+    return entry.advanced_by === 'pipeline' ? 'pipeline' : 'unknown';
+  }
   if (entry.backfilled === true) return 'backfilled';
-  return 'human';
+  if (entry.approved_by === 'human') return 'human';
+  return 'unknown';
 }
 
 /**

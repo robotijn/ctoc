@@ -214,10 +214,68 @@ describe('entryKind classifies provenance honestly and never launders a backfill
     { id: 'backfilled-true', entry: { backfilled: true, approved_by: 'human' }, expected: 'backfilled' },
     { id: 'plain-human', entry: { approved_by: 'human' }, expected: 'human' },
     // A truthy-but-not-strictly-true backfilled value must NOT classify as backfilled
-    // (kills a `=== true` -> truthy mutant): it falls through to 'human'.
+    // (kills a `=== true` -> truthy mutant): it rests on its explicit approved_by
+    // marker and classifies 'human'.
     { id: 'backfilled-truthy-not-true', entry: { backfilled: 'yes', approved_by: 'human' }, expected: 'human' },
     // Precedence: pipeline is checked before backfilled.
     { id: 'pipeline-wins-over-backfilled', entry: { advanced_by: 'pipeline', backfilled: true }, expected: 'pipeline' },
+
+    // --- X5: provenance is a POSITIVE claim, never a fallthrough -------------
+    // An entry with NO positive marker is 'unknown' — NOT 'human'. Until X5 this
+    // returned 'human' and the gate hook accepted it at every gate: `'human'` was
+    // the ABSENCE of evidence. This row kills the `return 'human'` default.
+    { id: 'no-marker-at-all', entry: {}, expected: 'unknown' },
+    { id: 'approved_by-not-human', entry: { approved_by: 'claude' }, expected: 'unknown' },
+    // An unrecognised machine provenance is 'unknown', never 'human'. This is the
+    // exact shape (`advanced_by: 'sufficiency-gate'`) that was waved through.
+    { id: 'unrecognised-advanced_by', entry: { advanced_by: 'sufficiency-gate' }, expected: 'unknown' },
+    // THE FORGERY SHAPE (Decision 3, the whole fix): a machine cross WEARING the
+    // human's marker. `advanced_by` is checked BEFORE `approved_by`; reverse the
+    // order and this launders back to 'human' and the plan is a no-op.
+    { id: 'machine-wearing-the-human-marker',
+      entry: { advanced_by: 'sufficiency-gate', approved_by: 'human' }, expected: 'unknown' },
+    // ...and it beats a backfilled marker too — order is advanced_by, then backfilled.
+    { id: 'machine-wearing-the-backfill-marker',
+      entry: { advanced_by: 'sufficiency-gate', backfilled: true }, expected: 'unknown' },
+    // Recognition is EXACT: a near-miss on the one recognised value fails CLOSED
+    // rather than being normalised into acceptance (kills a loosened-match mutant).
+    { id: 'pipeline-wrong-case', entry: { advanced_by: 'PIPELINE' }, expected: 'unknown' },
+    { id: 'pipeline-padded', entry: { advanced_by: ' pipeline ' }, expected: 'unknown' },
+    // TIGHTENED after X5 (owner's call): the KEY'S PRESENCE decides, not its type.
+    //
+    // These three rows previously expected 'human' / 'backfilled' — they encoded a
+    // type-guard (`typeof advanced_by === 'string' && trim() !== ''`) under which a
+    // MALFORMED advanced_by fell through to the approved_by check and was accepted
+    // as a clicked approval. That is a fallthrough, and a fallthrough is the exact
+    // defect class X5 exists to kill, one level down: "the machine's provenance
+    // claim is malformed, therefore trust the human marker sitting next to it."
+    //
+    // An entry carrying `advanced_by` AT ALL is claiming a machine crossed this
+    // gate. A malformed claim is still a claim. Only the exact string 'pipeline'
+    // names a provenance this system recognises; everything else fails closed,
+    // EVEN beside an explicit approved_by:'human'. That pairing — a machine cross
+    // wearing the human's marker — is the precise shape of the 26 forgeries removed
+    // from this repo on 2026-07-17.
+    //
+    // Verified free: 0 of the 263 real ledger entries carry an `advanced_by` key of
+    // any type, so this reclassifies nothing on disk. Verified non-vacuous: all 8
+    // malformed shapes ('', '   ', null, 123, 0, false, {}, []) paired with
+    // approved_by:'human' classified 'human' under the old guard and 'unknown' now.
+    { id: 'empty-advanced_by-no-marker', entry: { advanced_by: '' }, expected: 'unknown' },
+    { id: 'empty-advanced_by-with-human', entry: { advanced_by: '', approved_by: 'human' }, expected: 'unknown' },
+    { id: 'whitespace-advanced_by-backfilled',
+      entry: { advanced_by: '   ', backfilled: true }, expected: 'unknown' },
+    // A non-string advanced_by is a claim too — the key is present. These rows kill
+    // any attempt to reintroduce a `typeof` or truthiness guard on the value.
+    { id: 'numeric-advanced_by-no-marker', entry: { advanced_by: 123 }, expected: 'unknown' },
+    { id: 'numeric-advanced_by-with-human',
+      entry: { advanced_by: 123, approved_by: 'human' }, expected: 'unknown' },
+    { id: 'null-advanced_by-with-human',
+      entry: { advanced_by: null, approved_by: 'human' }, expected: 'unknown' },
+    { id: 'object-advanced_by-with-human',
+      entry: { advanced_by: {}, approved_by: 'human' }, expected: 'unknown' },
+    { id: 'false-advanced_by-with-backfill',
+      entry: { advanced_by: false, backfilled: true }, expected: 'unknown' },
   ];
 
   for (const { id, entry, expected } of rows) {
