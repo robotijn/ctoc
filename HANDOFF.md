@@ -134,17 +134,54 @@ Verify against disk; never trust a summary, a commit title, or a header.
 
 ## Resume here
 
-**The highest-value action: split the `null` in `streaming-precompute.loadPlanQuestions`.**
+**THE REAL BLOCKER — `entryKind` PRESUMES YOU APPROVED IT. This is the mechanism behind every
+forged approval in this repo, and it is still armed.**
 
-That is the one thing blocking the owner's whole design. `loadPlanQuestions` returns `null` for BOTH
-*"no questions needed"* and *"not computed yet"* — indistinguishable. There are currently **zero
-question files on disk**. So a gate built on "enough information" today fails **open** (null → cross →
-all 255 plans cross instantly, the gate ceases to exist) or **closed** (null → nothing ever crosses →
-deadlock). Split those states, then make the precompute actually populate questions for every plan.
-Until that exists, the "enough information" gate cannot ship — everything else waits behind it.
+`src/lib/approval-ledger.js:357-362`:
+```js
+function entryKind(entry) {
+  if (entry.advanced_by === 'pipeline') return 'pipeline';
+  if (entry.backfilled === true)        return 'backfilled';
+  return 'human';                    // ← DEFAULTS TO HUMAN
+}
+```
+Anything the classifier does not recognise, it attributes to the human. So writing
+`advanced_by: 'adversarial-fleet'` for an automatic crossing returns **`'human'`** — laundering it
+into a human approval across every audit surface, and slipping past the `kind === 'pipeline'`
+restriction so it would be accepted at `todo/` where every pre-done gate is meant to stay human-only.
+Wiring the sufficiency gate before fixing this builds the 27th forgery in at the foundation.
 
-Second: the 28 failing gate decisions need **VERIFY evidence** (Step 14), not a parser fix. That is
-the Iron Loop working correctly, not a bug.
+**The fix has a trap:** whitelist `human`, default to non-human. BUT the 234 genuine `done/` entries
+carry no explicit kind — they are classified `human` *by that very default*. Flip it naively and all
+234 stop being human → mass revert.
+
+**THE ORDER (do not reorder):**
+1. **Migrate** the 234 genuine `done/` ledger entries to carry an EXPLICIT human kind.
+2. **Flip** `entryKind` to whitelist `human` and fail toward non-human/unknown.
+3. **Wire** sufficiency ADDITIVELY into `human-gate-check.classifyResidency` — a NEW acceptance path
+   BESIDE the ledger, never replacing it. Invariant to PROVE by measurement, not assertion:
+   `done/` accepts **234 → 234**, reverts **0 → 0**. (Sufficiency fails closed and there are zero
+   question files, so a replacement wiring reverts 235 plans.)
+4. **Then** the last mile (below).
+
+**DONE — the predicate exists and is mutation-proven** (`src/lib/streaming-precompute.js`):
+`planQuestionsStatus(root, ref)` → `ready` (carries `questions`, may be `[]`) | `not-computed` |
+`stale` | `invalid` | `unknown-plan`; `hasEnoughInformation(root, ref)` →
+`{enough, reason, unanswered, blocking}`, failing CLOSED on every uncertain state. 61 tests, 100%
+line coverage. Mutations proving the fail-closed branch is load-bearing: flip it → 6 fails; drop
+`important` from the blocking rule → 2 fails; unreadable log → "all answered" → 1 fail.
+
+**THE LAST MILE — why you have never been asked about your app:** `product-owner` emits product
+questions correctly, `writePlanQuestions` writes them correctly, and the reader ALREADY prefers them
+(`richQuestionScreen` calls `loadPlanQuestions` before ever building a gate prompt). **Nothing
+dispatches `product-owner`.** `menu.md`'s precompute only fans out the adversarial fleet — which
+CHECKS a plan, never asks what the app should do. Second gap: `plansNeedingQuestions` only walks the
+three gate stages, so **vision and canvas — where product questions are richest — are structurally
+unreachable**. `.ctoc/streaming/` has never been created; zero question files have ever existed.
+
+Also: the 28 failing gate decisions need **VERIFY evidence** (Step 14), not a parser fix — the Iron
+Loop working correctly. And `implementation/` has **21** live `no-ledger-entry` violations (NOT just
+`00050` as an earlier version of this file claimed).
 
 Third: `plans/implementation/00050-sweep-corpus-adversarial-critique.md` is UNTRACKED, has no
 `parent_plan` and no ledger entry, and is currently the sole cause of `iron-loop-enforcer` failing
