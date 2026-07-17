@@ -9,7 +9,6 @@ reports_to: cto-chief
 effort: xhigh
 reads_ancestry: true
 async_choice_protocol: enabled
-model_optimized_for: opus-4-8
 dispatch_protocol: v1
 effort_budget:
   max_tokens: 200000
@@ -49,13 +48,6 @@ specialist_responses:
   - agent: testing/coverage-enforcer
     findings: [...]
   # ... up to 15 specialist outputs
-
-scout_decisions:
-  - scout: scouts/syntax-scout
-    decision: pass
-  - scout: scouts/secret-scout
-    decision: flag
-    next_specialist: security/secrets-detector
 
 plan_ancestry:
   vision: plans/done/<slug>.md

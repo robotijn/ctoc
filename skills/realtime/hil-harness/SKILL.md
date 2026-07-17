@@ -26,7 +26,6 @@ related_skills:
   - testing/test-strategy
   - quality/performance-validator
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Grep, Glob
 model: opus
 tier: 2

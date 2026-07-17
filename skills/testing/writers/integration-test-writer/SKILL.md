@@ -15,7 +15,6 @@ related_skills:
   - testing/writers/e2e-test-writer
   - specialized/api-contract-validator
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Write, Edit, Bash
 model: opus
 tier: 2

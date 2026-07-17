@@ -1,12 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-15T01:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: "Standing 2026-07-14 orders. Cross-platform/error-path critic + coordinator verified on disk: sast-runner's runGosec/runBandit/runESLintSecurity swallow a JSON-parse failure with a bare comment (runSemgrep correctly pushes the error) — a CRASHED scanner reads as CLEAN, fail-open in the push-blocking security gate. Plus Windows gaps: hasCommand uses POSIX-only `command -v`; quality-agent runCommand has no timeout."
----
-
----
 title: "R6-D — A crashed security scanner is a FAILURE, not a pass; Windows/timeout gaps closed"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

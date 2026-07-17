@@ -26,7 +26,6 @@ related_skills:
   - compliance/audit-log-checker
   - security/cve-monitor
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Write, Grep
 model: opus
 ---

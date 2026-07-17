@@ -88,9 +88,8 @@ function countDocsFiles() {
   return fs.readdirSync(path.join(ROOT, 'docs')).filter(f => f.endsWith('.md')).length;
 }
 
-function countScouts() {
-  return walk(path.join(ROOT, 'agents', 'scouts'), p => p.endsWith('.md')).length;
-}
+// DELETED by plan F3b: countScouts(). It walked agents/scouts/, a directory that no
+// longer exists — it would now return 0 for every caller rather than fail honestly.
 
 function countFrameworkRefs(category) {
   const dir = path.join(ROOT, 'skills', 'frameworks', category);
@@ -111,12 +110,12 @@ function countQualityConfigs() {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('Ground truth — project counts (sanity checks)', () => {
-  it('agents/: 128 .md files (excluding _shared/, +12 CU5 Tier-3 wrappers; gdpr thin wrapper stays deleted per EC2-s3)', () => {
-    assert.equal(countAgentMdFiles(), 128);
+  it('agents/: 123 .md files (excluding _shared/; 128 minus the 5 Tier-3 scouts deleted by F3b)', () => {
+    assert.equal(countAgentMdFiles(), 123);
   });
 
-  it('agents/: 25 categories (+safety, +legal, +realtime, CU5)', () => {
-    assert.equal(countAgentCategories(), 25);
+  it('agents/: 24 categories (+safety, +legal, +realtime, CU5; -scouts, deleted by F3b)', () => {
+    assert.equal(countAgentCategories(), 24);
   });
 
   it('skills/: 99 SKILL.md specialist bodies (v6.9.27 added 8 cross-industry-critique skills)', () => {
@@ -133,8 +132,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 100 JS modules at top level (+streaming-precompute 2026-07-16)', () => {
-    assert.equal(countTopLevelJs("src/lib"), 100);
+  it('src/lib/: 101 JS modules at top level (+agent-slots 2026-07-16)', () => {
+    assert.equal(countTopLevelJs("src/lib"), 101);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {
@@ -144,8 +143,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countSlashCommandSpecs(), 3);
   });
 
-  it('src/hooks/: 14 hook files (PrePush/PreReview/andon-halt deleted: unregistered hooks pretending to be enforcement)', () => {
-    assert.equal(countTopLevelFiles('src/hooks'), 14);
+  it('src/hooks/: 16 hook files (+PreToolUse.Task/SubagentStop — the subagent concurrency fence, 2026-07-16)', () => {
+    assert.equal(countTopLevelFiles('src/hooks'), 16);
   });
 
   it('src/tabs/: 4 dashboard tab files (functional removed with assignDirectly in R5-B/C — dead after the assign path was deleted)', () => {
@@ -160,9 +159,9 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countDocsFiles(), 16);
   });
 
-  it('scouts (Tier 3): 5 Haiku scout agents', () => {
-    assert.equal(countScouts(), 5);
-  });
+  // DELETED by plan F3b: 'scouts (Tier 3): 5 Haiku scout agents', which asserted
+  // countScouts() === 5. Tier 3 is deleted; there are zero scouts by design, and
+  // tests/no-tier-3.test.js asserts the directory's absence directly.
 
   it('skills/languages: 50 language references', () => {
     assert.equal(countLanguages(), 50);
@@ -198,24 +197,24 @@ describe('Ground truth — project counts (sanity checks)', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('README — explicit numeric claims match reality', () => {
-  it('badge: agents-128', () => {
-    assert.match(README, /agents-128-orange/);
+  it('badge: agents-123', () => {
+    assert.match(README, /agents-123-orange/);
   });
 
   it('badge: skills-422 (v6.10.3+)', () => {
     assert.match(README, /skills-426-blue/);
   });
 
-  it('lead paragraph: 128 agents across 25 categories', () => {
-    assert.match(README, /\*\*128 agents\*\* across \*\*25 categories\*\*/);
+  it('lead paragraph: 123 agents across 24 categories', () => {
+    assert.match(README, /\*\*123 agents\*\* across \*\*24 categories\*\*/);
   });
 
-  it('Compare table: 128 across 25 categories', () => {
-    assert.match(README, /128 across 25 categories/);
+  it('Compare table: 123 across 24 categories', () => {
+    assert.match(README, /123 across 24 categories/);
   });
 
-  it('Key Features: 128 agents across 25 categories', () => {
-    assert.match(README, /\*\*128 agents\*\* across 25 categories/);
+  it('Key Features: 123 agents across 24 categories', () => {
+    assert.match(README, /\*\*123 agents\*\* across 24 categories/);
   });
 
   it('Key Features: 426 skill files (v6.10.3+)', () => {
@@ -230,8 +229,12 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /20 sub-orchestrators/);
   });
 
-  it('Tier table: 5 Haiku scouts in Tier 3', () => {
-    assert.match(README, /5 Haiku scouts/);
+  // DELETED by plan F3b: 'Tier table: 5 Haiku scouts in Tier 3', which asserted the
+  // README tier table matched /5 Haiku scouts/. That row described Tier 3 and was
+  // removed with it. Replaced by the inverse below — the claim must NOT come back.
+  it('Tier table: no Haiku scout tier (F3b deleted Tier 3)', () => {
+    assert.doesNotMatch(README, /Haiku scouts?/);
+    assert.doesNotMatch(README, /\| \*\*Tier 3\*\* \|/);
   });
 
   it('Refinement loop: K-budget phases listed (critical/medium/low/final)', () => {
@@ -254,24 +257,24 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /3 slash commands/);
   });
 
-  it('Project structure: 14 Claude Code hooks', () => {
-    assert.match(README, /14 Claude Code hooks/);
+  it('Project structure: 16 Claude Code hooks', () => {
+    assert.match(README, /16 Claude Code hooks/);
   });
 
-  it('Project structure: 91 JS modules in src/lib', () => {
-    assert.match(README, /100 JS modules/);
+  it('Project structure: 101 JS modules in src/lib', () => {
+    assert.match(README, /101 JS modules/);
   });
 
-  it('Project structure: 128 agent definitions across 25 categories', () => {
-    assert.match(README, /128 agent definitions across 25 categories/);
+  it('Project structure: 123 agent definitions across 24 categories', () => {
+    assert.match(README, /123 agent definitions across 24 categories/);
   });
 
   it('Project structure: 426 skill files (v6.10.3+)', () => {
     assert.match(README, /426 skill files/);
   });
 
-  it('Agents intro: 128 agents across 25 categories', () => {
-    assert.match(README, /\*\*128 agents across 25 categories\*\*/);
+  it('Agents intro: 123 agents across 24 categories', () => {
+    assert.match(README, /\*\*123 agents across 24 categories\*\*/);
   });
 
   it('Skills intro: 426 skill files (v6.10.3+)', () => {
@@ -290,7 +293,7 @@ describe('README — explicit numeric claims match reality', () => {
 
 describe('README — every major subsystem is documented', () => {
   const REQUIRED_SECTIONS = [
-    /^## The 4-Tier Agent Architecture$/m,
+    /^## The 3-Tier Agent Architecture$/m,
     /^## The Refinement Loop$/m,
     /^## The Canvas — 6-Month Pre-Mortem \+ 5-Scenario Cash Flow$/m,
     /^## The Product Loop$/m,

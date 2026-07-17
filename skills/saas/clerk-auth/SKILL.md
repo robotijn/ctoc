@@ -30,7 +30,6 @@ related_skills:
   - security/sast-scanner
   - api/rate-limiting
 effort_level: medium
-model_optimized_for: opus-4-7
 model: opus
 tools: Read, Write, Edit, Bash
 ---

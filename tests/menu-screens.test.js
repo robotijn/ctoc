@@ -223,102 +223,80 @@ describe('Menu Screens Tests', () => {
     console.log('# route browse vision reaches Vision Mode');
   });
 
-  test('planActions returns Create new, View/Edit, Discuss, Approve', () => {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Opening a plan is a QUESTION now, not a menu.
+  //
+  // The four screens these tests used to call — planActions, planActionsMore,
+  // reviewActions, discussMenu — are gone. They asked "What would you like to do
+  // with this plan?" over a list of navigation routes; the owner replaced that
+  // with questions. What follows re-asserts, through the REAL `plan` route, that
+  // every DECISION those screens carried still reaches the human. The navigation
+  // rows (Back to list, ◀ Actions, Back to actions, Continue) are intentionally
+  // gone — removing them was the point, so no test may demand them back.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** All option labels across every question on a screen. */
+  function allLabels(result) {
+    return result.ask.questions.flatMap(q => q.options.map(o => o.label));
+  }
+
+  test('opening a plan asks a question and carries View/Edit + Discuss + Delete', () => {
     createPlan('functional', 'my-plan');
 
-    const result = menuScreens.planActions('functional', 'my-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
+    const result = menuScreens.route(['plan', 'functional/my-plan.md'], testDir);
+    const labels = allLabels(result);
 
-    assert.ok(labels.includes('Create new'), 'Should have Create new');
-    assert.ok(labels.includes('View/Edit'), 'Should have View/Edit (See and Edit merged)');
-    assert.ok(labels.includes('Discuss'), 'Should have Discuss');
-    assert.ok(labels.some(l => l.startsWith('Approve')), 'Should have Approve');
+    assert.ok(result.ask.questions[0].question.length > 0, 'a plan screen ASKS something');
+    assert.ok(labels.includes('View/Edit'), 'View/Edit survives (See and Edit merged)');
+    assert.ok(labels.includes('Discuss'), 'critique survives');
+    assert.ok(labels.includes('Delete'), 'Delete survives — it used to need the "more" sub-menu');
     assert.ok(!labels.includes('View'), 'View is merged into View/Edit, not a separate option');
     assert.ok(result.actions['View/Edit'].startsWith('claude:view-edit'),
       'View/Edit maps to the merged claude:view-edit action');
-    console.log('# planActions returns Create new, View/Edit, Discuss, Approve');
+    assert.ok(result.actions['Delete'].startsWith('claude:delete'), 'Delete maps to claude:delete');
   });
 
-  test('planActions Approve includes next stage', () => {
+  test('a gate plan is asked about its gate, and Approve crosses via the gate-safe path', () => {
     createPlan('functional', 'my-plan');
 
-    const result = menuScreens.planActions('functional', 'my-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
+    const result = menuScreens.route(['plan', 'functional/my-plan.md'], testDir);
 
-    assert.ok(labels.some(l => l.includes('implementation')), 'Approve should mention implementation');
-    console.log('# planActions Approve includes next stage');
+    assert.match(result.ask.questions[0].question, /Approve my-plan across Gate 1\?/,
+      'the gate question names the gate, replacing "Approve → implementation"');
+    // TIGHTER than the screen it replaces: Approve used to route through `validate`
+    // and a second confirm. It now goes straight to the gate-safe `stream approve`
+    // (approvePlan — validates, refuses an invalid transition, stamps approved_by).
+    assert.equal(result.actions['Approve'], 'stream approve functional/my-plan.md');
+    // The validation detail screen (and its deliberate override) stays reachable.
+    assert.equal(result.actions['Check validation'], 'validate functional/my-plan.md');
   });
 
-  test('planActions Approve maps to validate command', () => {
-    createPlan('functional', 'my-plan');
-
-    const result = menuScreens.planActions('functional', 'my-plan.md', testDir);
-
-    // Find the approve action
-    const approveKey = Object.keys(result.actions).find(k => k.startsWith('Approve'));
-    assert.ok(approveKey, 'Should have an approve action');
-    assert.ok(result.actions[approveKey].startsWith('validate'), 'Approve should map to validate command');
-    console.log('# planActions Approve maps to validate command');
-  });
-
-  test('planActionsMore returns Delete, Back to list, Actions (Edit merged away)', () => {
-    createPlan('functional', 'my-plan');
-
-    const result = menuScreens.planActionsMore('functional', 'my-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
-
-    assert.ok(!labels.includes('Edit'), 'Edit is merged into the main menu View/Edit action');
-    assert.ok(labels.includes('Delete'), 'Should have Delete');
-    assert.ok(labels.includes('Back to list'), 'Should have Back to list');
-    assert.ok(labels.some(l => l.includes('Actions')), 'Should have Actions back');
-    console.log('# planActionsMore returns Delete, Back to list, Actions');
-  });
-
-  test('reviewActions returns View/Edit, Approve, Feedback, Rework', () => {
+  test('a review plan keeps Approve, Feedback → Functional and Rework → Implementation', () => {
     createPlan('review', 'reviewed-plan');
 
-    const result = menuScreens.reviewActions('review', 'reviewed-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
+    const result = menuScreens.route(['plan', 'review/reviewed-plan.md'], testDir);
+    const labels = allLabels(result);
 
-    assert.ok(labels.includes('View/Edit'), 'Should have View/Edit (See and Edit merged)');
-    assert.ok(!labels.includes('View'), 'View is merged into View/Edit, not a separate option');
     assert.ok(labels.some(l => l.includes('Approve')), 'Should have Approve');
     assert.ok(labels.some(l => l.includes('Feedback')), 'Should have Feedback');
     assert.ok(labels.some(l => l.includes('Rework')), 'Should have Rework');
-    console.log('# reviewActions returns View/Edit, Approve, Feedback, Rework');
-  });
+    assert.ok(labels.includes('View/Edit'), 'Should have View/Edit');
+    assert.ok(!labels.includes('View'), 'View is merged into View/Edit');
 
-  test('reviewActions maps to correct claude actions', () => {
-    createPlan('review', 'reviewed-plan');
-
-    const result = menuScreens.reviewActions('review', 'reviewed-plan.md', testDir);
-
-    assert.ok(result.actions['Approve → Done'].startsWith('validate'), 'Approve should validate first');
+    assert.equal(result.actions['Approve'], 'stream approve review/reviewed-plan.md',
+      'Approve → Done now crosses Gate 3 through the gate-safe approvePlan');
     assert.ok(result.actions['Feedback → Functional'].startsWith('claude:reject'), 'Feedback should reject');
     assert.ok(result.actions['Rework → Implementation'].startsWith('claude:reject'), 'Rework should reject');
-    console.log('# reviewActions maps to correct claude actions');
   });
 
-  test('planActions for review stage delegates to reviewActions', () => {
-    createPlan('review', 'reviewed-plan');
+  test('"Create new" survives on the stage list, where creating a plan belongs', () => {
+    createPlan('functional', 'my-plan');
 
-    const result = menuScreens.planActions('review', 'reviewed-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
-
-    // Should have review-specific actions, not generic ones
-    assert.ok(labels.some(l => l.includes('Approve → Done')), 'Should show review-specific Approve');
-    console.log('# planActions for review stage delegates to reviewActions');
-  });
-
-  test('discussMenu returns Continue, Apply edits, Approve, Back', () => {
-    const result = menuScreens.discussMenu('functional', 'my-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
-
-    assert.ok(labels.includes('Continue'), 'Should have Continue');
-    assert.ok(labels.includes('Apply edits'), 'Should have Apply edits');
-    assert.ok(labels.some(l => l.startsWith('Approve')), 'Should have Approve');
-    assert.ok(labels.includes('Back to actions'), 'Should have Back to actions');
-    console.log('# discussMenu returns Continue, Apply edits, Approve, Back');
+    // It used to sit on the plan-actions menu, which is an odd place to create a
+    // DIFFERENT plan. The stage list already carried it as the `n` word shortcut.
+    const list = menuScreens.route(['browse', 'functional'], testDir);
+    assert.equal(list.actions['n'], 'claude:create-plan functional');
+    assert.equal(list.actions['new'], 'claude:create-plan functional');
   });
 
   test('validateScreen returns validation results', () => {
@@ -426,32 +404,33 @@ describe('Menu Screens Tests', () => {
   // the three real gates MUST keep it (no regression).
   // ─────────────────────────────────────────────────────────────────────────
 
-  test('planActions (todo) does NOT offer an Approve-to-next-stage action', () => {
+  test('plan route (todo) does NOT offer an Approve-to-next-stage action', () => {
     createPlan('todo', 'queued-plan');
 
-    const result = menuScreens.planActions('todo', 'queued-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
+    const result = menuScreens.route(['plan', 'todo/queued-plan.md'], testDir);
+    const labels = allLabels(result);
     assert.ok(!labels.some(l => l.startsWith('Approve')),
       'todo is not a human gate — no Approve option (approvePlan throws Unknown plan location)');
     assert.ok(!Object.keys(result.actions).some(k => k.startsWith('Approve')),
       'no Approve action string for a todo plan');
+    // The gate question must not appear at all for a non-gate stage.
+    assert.doesNotMatch(result.ask.questions[0].question, /across Gate/,
+      'a non-gate plan is never asked a gate question');
     // Non-approve affordances remain.
     assert.ok(labels.includes('Discuss') && labels.includes('View/Edit'),
-      'browse/discuss/view affordances are untouched for todo');
-    console.log('# planActions todo has no Approve');
+      'discuss/view affordances are untouched for todo');
   });
 
-  test('planActions (canvas) does NOT offer an Approve-to-next-stage action', () => {
+  test('plan route (canvas) does NOT offer an Approve-to-next-stage action', () => {
     fs.mkdirSync(path.join(plansDir, 'canvas'), { recursive: true });
     createPlan('canvas', 'canvas-plan');
 
-    const result = menuScreens.planActions('canvas', 'canvas-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
+    const result = menuScreens.route(['plan', 'canvas/canvas-plan.md'], testDir);
+    const labels = allLabels(result);
     assert.ok(!labels.some(l => l.startsWith('Approve')),
       'canvas is not a human gate — no Approve option');
     assert.ok(!Object.keys(result.actions).some(k => k.startsWith('Approve')),
       'no Approve action string for a canvas plan');
-    console.log('# planActions canvas has no Approve');
   });
 
   test('validateScreen (todo) does NOT return autoApprove:true with a claude:approve action', () => {
@@ -477,15 +456,18 @@ describe('Menu Screens Tests', () => {
     console.log('# validateScreen canvas no autoApprove');
   });
 
-  test('planActions (implementation) STILL offers Approve → todo (real gate, no regression)', () => {
+  test('plan route (implementation) STILL offers the Gate 2 crossing (real gate, no regression)', () => {
     createPlan('implementation', 'impl-plan');
 
-    const result = menuScreens.planActions('implementation', 'impl-plan.md', testDir);
-    const labels = result.ask.questions[0].options.map(o => o.label);
-    assert.ok(labels.includes('Approve → todo'), 'implementation is a real human gate — keeps Approve → todo');
-    assert.strictEqual(result.actions['Approve → todo'], 'validate implementation/impl-plan.md',
-      'Approve routes to validate for the real gate');
-    console.log('# planActions implementation keeps Approve → todo');
+    const result = menuScreens.route(['plan', 'implementation/impl-plan.md'], testDir);
+    const labels = allLabels(result);
+    assert.ok(labels.includes('Approve'), 'implementation is a real human gate — keeps its Approve');
+    assert.match(result.ask.questions[0].question, /Approve impl-plan across Gate 2\?/,
+      'the gate is named outright, replacing the "Approve → todo" label');
+    assert.strictEqual(result.actions['Approve'], 'stream approve implementation/impl-plan.md',
+      'Approve crosses Gate 2 through the gate-safe approvePlan');
+    assert.strictEqual(result.actions['Check validation'], 'validate implementation/impl-plan.md',
+      'the validation detail screen stays reachable at the real gate');
   });
 
   test('validateScreen (implementation, clean) STILL autoApprove:true with claude:approve (real gate)', () => {
@@ -507,9 +489,10 @@ describe('Menu Screens Tests', () => {
       menuScreens.dashboardPipeline(testDir),
       menuScreens.dashboardCommands(testDir),
       menuScreens.stageBrowse('functional', testDir),
-      menuScreens.planActions('functional', 'plan-a.md', testDir),
-      menuScreens.planActionsMore('functional', 'plan-a.md', testDir),
-      menuScreens.discussMenu('functional', 'plan-a.md', testDir),
+      // The plan screen replaces planActions / planActionsMore / discussMenu and
+      // must satisfy the same text protocol.
+      menuScreens.route(['plan', 'functional/plan-a.md'], testDir),
+      menuScreens.route(['plan', 'review/plan-a.md'], testDir),
       menuScreens.validateScreen('functional', 'plan-a.md', testDir)
     ];
 
@@ -526,20 +509,24 @@ describe('Menu Screens Tests', () => {
     const askScreens = [
       menuScreens.dashboardPipeline(testDir),
       menuScreens.dashboardCommands(testDir),
-      menuScreens.planActions('functional', 'plan-a.md', testDir),
-      menuScreens.planActionsMore('functional', 'plan-a.md', testDir),
-      menuScreens.discussMenu('functional', 'plan-a.md', testDir)
+      // The plan screen replaces planActions / planActionsMore / discussMenu. It
+      // asks more than one question (the decision, plus the plan's own lifecycle
+      // decisions riding along), so EVERY question is checked — a stricter sweep
+      // than the first-question-only check it replaces.
+      menuScreens.route(['plan', 'functional/plan-a.md'], testDir),
+      menuScreens.route(['plan', 'todo/plan-a.md'], testDir)
     ];
 
     askScreens.forEach((screen, i) => {
-      const options = screen.ask.questions[0].options;
-      options.forEach(opt => {
-        const hasAction = opt.label in screen.actions;
-        // Allow "Other" options that don't map to actions
-        if (!hasAction && opt.label !== 'Other') {
-          assert.ok(opt.label in screen.actions,
-            `Screen ${i}: option "${opt.label}" has no action mapping`);
-        }
+      screen.ask.questions.forEach(q => {
+        q.options.forEach(opt => {
+          const hasAction = opt.label in screen.actions;
+          // Allow "Other" options that don't map to actions
+          if (!hasAction && opt.label !== 'Other') {
+            assert.ok(opt.label in screen.actions,
+              `Screen ${i}: option "${opt.label}" has no action mapping`);
+          }
+        });
       });
     });
 
@@ -611,13 +598,15 @@ describe('Menu Screens Tests', () => {
     const browse = menuScreens.route(['browse', 'functional'], testDir);
     assert.ok(browse.text.includes('[functional]'));
 
-    // plan stage/file -> plan actions
+    // plan stage/file -> the plan QUESTION (not an actions menu)
     const plan = menuScreens.route(['plan', 'functional/test-plan.md'], testDir);
-    assert.ok(plan.ask.questions[0].options.some(o => o.label === 'View/Edit'));
+    assert.match(plan.ask.questions[0].question, /Approve test-plan across Gate 1\?/,
+      'the plan route asks the gate decision, not "what would you like to do"');
+    assert.ok(allLabels(plan).includes('View/Edit'), 'View/Edit is still offered');
 
-    // plan stage/file more -> more actions
+    // The `more` sub-screen is gone; its Delete lives on the plan screen itself.
     const more = menuScreens.route(['plan', 'functional/test-plan.md', 'more'], testDir);
-    assert.ok(more.ask.questions[0].options.some(o => o.label === 'Delete'));
+    assert.ok(allLabels(more).includes('Delete'));
 
     // validate stage/file -> validation
     const validate = menuScreens.route(['validate', 'functional/test-plan.md'], testDir);
@@ -635,18 +624,17 @@ describe('Menu Screens Tests', () => {
     console.log('# toggle menus work: Pipeline <-> Commands');
   });
 
-  test('planActionsMore returns to the main plan actions menu', () => {
+  test('there is no "more" sub-menu to return from — the plan screen carries everything', () => {
     createPlan('functional', 'plan-a');
 
-    // planActions no longer has a "More ▶" button — its four slots are
-    // Create new, View/Edit, Discuss, Approve. planActionsMore is reached by
-    // typing "more" and routes back to the main actions menu.
-    const actions = menuScreens.planActions('functional', 'plan-a.md', testDir);
-    assert.ok(!('More ▶' in actions.actions), 'planActions has no More ▶ button');
-
-    const more = menuScreens.planActionsMore('functional', 'plan-a.md', testDir);
-    assert.ok(more.actions['◀ Actions'].includes('plan'), 'More returns to the actions menu');
-    console.log('# planActionsMore returns to the main plan actions menu');
+    // The old shape was two screens: a four-slot actions menu plus a "more" screen
+    // reached by typing `more`, carrying Delete and a route back. Both are gone.
+    // Delete now sits on the one plan screen, so there is nothing to navigate to
+    // and nothing to come back from.
+    const screen = menuScreens.route(['plan', 'functional/plan-a.md'], testDir);
+    assert.ok(!('More ▶' in screen.actions), 'no More ▶ button');
+    assert.ok(!('◀ Actions' in screen.actions), 'no route back to an actions menu');
+    assert.ok(allLabels(screen).includes('Delete'), 'Delete is on the plan screen itself');
   });
 });
 

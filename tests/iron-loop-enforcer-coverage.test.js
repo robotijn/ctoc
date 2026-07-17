@@ -278,44 +278,18 @@ describe('iron-loop-enforcer — checkTier2NoSubagent continue short-circuit', (
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('iron-loop-enforcer — checkTier3Scouts', () => {
-  const arch = { mode: 'fast', scopes: ['architecture'] };
-  const goodScout = '---\nname: s\ntier: 3\nmodel: haiku\nreports_to: cto-chief\nmax_subagents: 0\n---\nbody';
-
-  it('warns (not blocks) when fewer than five scouts exist', () => {
-    // Arrange — only 4 scouts present: the count guard (248-249) fires before any
-    // per-file config check, so the severity is warn.
-    const root = mkTmp();
-    for (let i = 0; i < 4; i++) write(root, `agents/scouts/s${i}.md`, goodScout);
-
-    // Act
-    const f = findingById(root, 'tier-3-scouts', arch);
-
-    // Assert
-    assert.ok(f, 'expected a tier-3-scouts finding');
-    assert.equal(f.severity, 'warn');
-    assert.match(f.message, /Expected .*5 scouts, found 4/);
-  });
-
-  it('blocks and reports the FIRST failing rule (model) for a misconfigured scout', () => {
-    // Arrange — five scouts so the count guard passes; one scout has tier: 3 but is
-    // missing model: haiku. The else-if chain must report the MODEL reason, not a
-    // later one — pinning the branch order.
-    const root = mkTmp();
-    for (let i = 0; i < 4; i++) write(root, `agents/scouts/s${i}.md`, goodScout);
-    write(root, 'agents/scouts/bad.md',
-      '---\nname: bad\ntier: 3\nreports_to: cto-chief\nmax_subagents: 0\n---\nbody'); // no model: haiku
-
-    // Act
-    const f = findingById(root, 'tier-3-scouts', arch);
-
-    // Assert
-    assert.ok(f, 'expected a tier-3-scouts finding');
-    assert.equal(f.severity, 'block');
-    assert.ok(f.details.offenders.some((o) => o === 'bad.md: missing model: haiku'),
-      `expected the model reason, got ${JSON.stringify(f.details.offenders)}`);
-  });
-});
+// DELETED by plan F3b (v6.12.79): describe('iron-loop-enforcer — checkTier3Scouts').
+// Two assertions stood here, both contracting a check that no longer exists:
+//   1. 'warns (not blocks) when fewer than five scouts exist' — asserted severity
+//      'warn' and /Expected .*5 scouts, found 4/ from the count guard.
+//   2. 'blocks and reports the FIRST failing rule (model) for a misconfigured scout'
+//      — asserted severity 'block' and the offender 'bad.md: missing model: haiku',
+//      pinning the else-if branch order.
+// checkTier3Scouts and its CHECKS registry entry are deleted from
+// src/lib/iron-loop-enforcer.js: the check demanded that agents/scouts/ exist and
+// raised a CRITICAL when it did not, so it enforced the very false-green machine the
+// owner ordered removed. There is no code left for these tests to exercise. The
+// inverse invariant is fenced by tests/no-tier-3.test.js.
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('iron-loop-enforcer — checkActivePlanStepLabels', () => {

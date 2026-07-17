@@ -4,8 +4,8 @@ description: Web-sourced EU-compliance solution recommender; turns an EC2/EC3 fi
 category: compliance
 tier: 2
 model: opus
+effort: xhigh
 effort_level: high
-model_optimized_for: opus-4-7
 tools: WebSearch, WebFetch
 reads_ancestry: true
 dispatch_protocol: v1

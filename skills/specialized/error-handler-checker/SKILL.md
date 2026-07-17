@@ -14,7 +14,6 @@ related_skills:
   - specialized/observability-checker
   - quality/code-reviewer
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Grep
 model: opus
 tier: 2

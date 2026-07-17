@@ -4,8 +4,8 @@ description: Plan-ancestry + code-scan GDPR agent; gated on the gdpr regulatory 
 category: compliance
 tier: 2
 model: opus
+effort: xhigh
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Grep
 reads_ancestry: true
 dispatch_protocol: v1

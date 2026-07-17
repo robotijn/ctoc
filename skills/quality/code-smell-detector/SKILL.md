@@ -19,7 +19,6 @@ related_skills:
   - quality/duplicate-code-detector
   - quality/dead-code-detector
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Grep, Glob
 model: opus
 tier: 2

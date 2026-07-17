@@ -10,7 +10,6 @@ top_level: false
 effort: xhigh
 reads_ancestry: true
 async_choice_protocol: enabled
-model_optimized_for: opus-4-7
 dispatch_protocol: v1
 audit_root: .ctoc/audit/ivv-dispatches
 effort_budget:

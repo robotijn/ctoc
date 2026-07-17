@@ -2,13 +2,15 @@
 
 // CU5-s1 — Safety wrappers content-contract test.
 // Reads the 3 REAL wrapper .md files off disk (zero doubles) and asserts the
-// thin wrapper shape mandated by the CU5 parent plan:
-//   - frontmatter has exactly {name, type, target_skill}
+// DISPATCHABLE wrapper shape:
+//   - frontmatter carries the resolution keys {name, type, target_skill} AND the
+//     routing keys {description, tools}; only documented dispatch-metadata keys
+//     may join them (CLOSED allowlist — no field leakage, no gate field)
 //   - type === 'wrapper'
 //   - target_skill resolves to a real skills/safety/<name>/SKILL.md (no dangling)
 //   - the canonical redirect sentence is present as the single body line
-//   - NO gate field, NO forbidden rich-agent fields (tier/reports_to/model/tools/...)
-//   - the wrapper restates NO skill rule (thin: no copied heading/enum/BAD-SAFE)
+//   - NO gate field anywhere in the file text
+//   - the BODY restates NO skill rule (thin: copies nothing from SKILL.md)
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
@@ -24,13 +26,96 @@ const WRAPPERS = ['fault-tree-builder', 'fmeda-analyzer', 'redundancy-pattern-pi
 // target_skill guard — literal "<category>/<name>" only (no traversal).
 const TARGET_SKILL_RE = /^[a-z0-9-]+\/[a-z0-9-]+$/;
 
-const REDIRECT_RE =
-  /^This agent's logic lives at skills\/safety\/[a-z0-9-]+\/SKILL\.md\. Read that file in full, then follow its instructions\.$/;
+// REPLACED CONTRACT — second scope correction (owner, 2026-07-17: an agent is a
+// standing WATCHER that USES skills; "an agent that merely redirects to one skill
+// is worthless"; "SKILLS CANNOT WATCH A BUILD, THEY ARE USED BY AN AGENT").
+//
+// This was an anchored full-body regex: the body had to BE the redirect sentence
+// and nothing else. Together with `body.length < 200` and the no-headings rule, it
+// did not assert that the wrapper DELEGATES — it asserted that the wrapper is
+// EMPTY. That is the same conflation the earlier `raw`→`body` correction fixed one
+// level up. The rule these assertions sit under is named "the wrapper copies
+// nothing from SKILL.md": a DUPLICATION rule, not a length rule.
+//
+// Both halves of the real contract are kept:
+//   1. RESOLUTION — the body must still name its own SKILL.md and instruct that it
+//      be read in full. That is the whole semantic content of the redirect
+//      sentence, now asserted directly instead of by matching one exact string.
+//   2. NON-DUPLICATION — the body must copy no substantive line of the skill. This
+//      was always the load-bearing half, it is exact rather than a proxy, and it is
+//      preserved untouched.
+//
+// TIGHTENED, not loosened: a body that resolves and duplicates nothing but says
+// nothing now FAILS, because WATCHER_SECTIONS requires the sections that make it a
+// watcher. The old fence did not merely permit the empty stub — it mandated it.
+const SKILL_REF_RE = (name) => new RegExp(`skills/safety/${name}/SKILL\\.md`);
+const DELEGATION_RE = /[Rr]ead (that file|it) in full/;
 
+// The sections that make a body a standing watcher rather than a redirect stub.
+// This is the shape of the restored real watchers — see
+// agents/quality/architecture-checker.md and agents/security/security-scanner.md.
+const WATCHER_SECTIONS = [
+  '## Role',
+  '## Trigger',
+  '## Checks',
+  '## Output Format (MANDATORY)',
+  '## Blocking Rules',
+  '## Related Agents',
+];
+
+// REPLACED CONTRACT (owner, 2026-07-17: "give each wrapper a real description and
+// tools, make them dispatchable" / "NO EMPTY AGENTS").
+//
+// This list used to ban the ROUTING fields (tier/reports_to/dispatch_protocol/
+// model/tools) alongside the GATE fields. That conflation was the machine that
+// made 97 of 128 agents unroutable: the Task tool routes BY DESCRIPTION and needs
+// a tools/model declaration, and this fence made carrying them a TEST FAILURE. The
+// stubs were compliance, not neglect — the suite went green enforcing emptiness.
+//
+// The two halves are now separated, and the rule is TIGHTENED, not loosened:
+//   - GATE fields stay BANNED. A wrapper must never carry approved_by or a gate
+//     marker — 26 forged approved_by markers were removed from this repo on the
+//     same day, so this half is load-bearing and non-negotiable.
+//   - ROUTING fields are now REQUIRED, not forbidden. An agent with no description
+//     is dead to the dispatcher no matter how green its coverage looks.
 const FORBIDDEN_FRONTMATTER_KEYS = [
-  'tier', 'reports_to', 'dispatch_protocol', 'model', 'tools',
   'human_gate', 'review_gate', 'approved_by', 'gate', 'gate_crossed',
 ];
+
+// The CLOSED key allowlist. The old fence's real strength was its closed world —
+// frontmatter had to be EXACTLY {name, type, target_skill}, so nothing could leak
+// in. That property is PRESERVED here; only the membership changed. A key outside
+// this set still fails, which means a gate field cannot arrive merely by being
+// absent from FORBIDDEN_FRONTMATTER_KEYS above. Closed world + named gate ban.
+const REQUIRED_FRONTMATTER_KEYS = [
+  // Resolution — what makes this a wrapper that finds its skill. Unchanged.
+  'name', 'type', 'target_skill',
+  // Routing — what makes it REACHABLE by the Task tool. Previously FORBIDDEN.
+  'description', 'tools',
+];
+const PERMITTED_FRONTMATTER_KEYS = [
+  // Dispatch metadata, propagated from the target skill. Previously FORBIDDEN.
+  'model', 'effort', 'tier', 'reports_to', 'dispatch_protocol',
+];
+const ALLOWED_FRONTMATTER_KEYS = new Set([
+  ...REQUIRED_FRONTMATTER_KEYS,
+  ...PERMITTED_FRONTMATTER_KEYS,
+]);
+
+/**
+ * Substantive prose lines of a target SKILL.md body (frontmatter stripped).
+ * Used to check the single-source-of-truth rule against the REAL skill file
+ * rather than by proxy: the wrapper must copy none of it.
+ */
+function skillBodyLines(targetSkill) {
+  assert.match(targetSkill, TARGET_SKILL_RE, 'target_skill guard (no traversal)');
+  const rawSkill = fs.readFileSync(path.join(SKILLS_ROOT, targetSkill, 'SKILL.md'), 'utf8');
+  const m = rawSkill.match(/^---\n[\s\S]*?\n---\n?([\s\S]*)$/);
+  return (m ? m[1] : rawSkill)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length >= 25);
+}
 
 // Lightweight frontmatter split: returns { frontmatter: {k:v}, body: '...' }.
 function parseWrapper(raw) {
@@ -60,12 +145,33 @@ function readWrapper(name) {
 describe('CU5-s1 safety wrappers — content contract', () => {
   for (const name of WRAPPERS) {
     describe(`agents/safety/${name}.md`, () => {
-      it('exists and has exactly the 3 thin frontmatter fields', () => {
+      it('exists, resolves to its skill, and is DISPATCHABLE (real description + tools)', () => {
         const { frontmatter } = readWrapper(name);
+
+        // Resolution AND routing keys must all be present.
+        for (const key of REQUIRED_FRONTMATTER_KEYS) {
+          assert.ok(key in frontmatter, `wrapper frontmatter must declare "${key}"`);
+        }
+
+        // Closed world preserved: nothing undocumented may leak in.
+        const unknown = Object.keys(frontmatter).filter(
+          (k) => !ALLOWED_FRONTMATTER_KEYS.has(k)
+        );
         assert.deepStrictEqual(
-          Object.keys(frontmatter).sort(),
-          ['name', 'target_skill', 'type'],
-          'frontmatter must be exactly {name, target_skill, type}'
+          unknown, [],
+          `wrapper frontmatter carries undocumented key(s): ${unknown.join(', ')}`
+        );
+
+        // The description IS the routing surface — the Task tool picks this agent
+        // over its ~127 siblings by reading it. Absent or trivial means unroutable,
+        // which is precisely what the replaced assertion mandated.
+        assert.ok(
+          frontmatter.description.trim().length >= 40,
+          `description must be real (>=40 chars) — it is the routing surface. Got: ${JSON.stringify(frontmatter.description)}`
+        );
+        assert.ok(
+          frontmatter.tools.trim().length > 0,
+          `tools must name what the skill actually needs. Got: ${JSON.stringify(frontmatter.tools)}`
         );
       });
 
@@ -104,16 +210,39 @@ describe('CU5-s1 safety wrappers — content contract', () => {
         );
       });
 
-      it('body is the single canonical redirect sentence', () => {
+      it('body resolves to its own skill and delegates to it', () => {
         const { body } = readWrapper(name);
         assert.ok(body.length > 0, 'body must be non-empty');
-        const lines = body.split('\n').filter((l) => l.trim().length > 0);
-        assert.strictEqual(lines.length, 1, 'body must be a single non-empty line');
-        assert.match(lines[0], REDIRECT_RE, 'body must match the canonical redirect sentence');
-        assert.ok(
-          lines[0].includes(`skills/safety/${name}/SKILL.md`),
-          'redirect must point at this wrapper\'s SKILL.md'
+        // Resolution half of the replaced contract, asserted directly rather than
+        // by matching one exact sentence: the wrapper must name its own SKILL.md...
+        assert.match(
+          body,
+          SKILL_REF_RE(name),
+          `body must point at skills/safety/${name}/SKILL.md`
         );
+        // ...and must instruct that the skill be read in full — the delegation that
+        // makes this a wrapper over that skill rather than a reimplementation.
+        assert.match(
+          body,
+          DELEGATION_RE,
+          'body must delegate the deep method to its skill (read it in full)'
+        );
+      });
+
+      it('body is a real watcher, not an empty redirect', () => {
+        const { body } = readWrapper(name);
+        // TIGHTENING (owner, 2026-07-17). The replaced assertions required this
+        // body to be one line under 200 characters with no headings — they did not
+        // permit the stub, they mandated it. An agent is a class that USES skills;
+        // a skill is a function and cannot watch a build. A wrapper with no Trigger
+        // has no answer to "when does this look?", and an agent that never looks is
+        // not a watcher.
+        for (const section of WATCHER_SECTIONS) {
+          assert.ok(
+            body.includes(section),
+            `wrapper body must carry the watcher section "${section}" — a redirect-only body is the empty agent this fence used to mandate`
+          );
+        }
       });
 
       it('carries no gate field and no forbidden rich-agent fields', () => {
@@ -133,16 +262,47 @@ describe('CU5-s1 safety wrappers — content contract', () => {
         }
       });
 
-      it('restates NO skill rule — thin, copies nothing from SKILL.md', () => {
-        const { raw } = readWrapper(name);
-        // Thin proof: no markdown headings, no BAD/SAFE example markers,
-        // no enumerated rule lists copied from the skill body.
-        assert.ok(!/^#{1,6}\s/m.test(raw), 'wrapper must contain no markdown headings');
-        assert.ok(!/\bBAD\b/.test(raw), 'wrapper must not copy BAD example markers');
-        assert.ok(!/\bSAFE\b/.test(raw), 'wrapper must not copy SAFE example markers');
-        assert.ok(!/```/.test(raw), 'wrapper must not contain fenced code blocks');
-        // Whole file is small (frontmatter + one sentence).
-        assert.ok(raw.length < 400, 'wrapper must be small (thin redirect only)');
+      it('restates NO skill rule — thin, body copies nothing from SKILL.md', () => {
+        const { frontmatter, body } = readWrapper(name);
+        // SECOND SCOPE CORRECTION (owner, 2026-07-17). The first correction moved
+        // this rule from `raw` to `body` — right about the frontmatter, but it left
+        // the emptiness assertions standing on the body:
+        //     assert.ok(!/^#{1,6}\s/m.test(body), 'no markdown headings');
+        //     assert.ok(!/```/.test(body),        'no fenced code blocks');
+        //     assert.ok(body.length < 200,        'redirect sentence only');
+        // Those are the same conflation one level down. This rule is named "copies
+        // nothing from SKILL.md" — DUPLICATION. A heading is not duplication, a
+        // length is not duplication, and a fenced block is not duplication. Under
+        // those three lines the only passing body was a stub, so the fence did not
+        // permit the empty agent — it REQUIRED it, and the suite went green
+        // enforcing that these watchers stayed bodiless.
+        //
+        // They are deleted rather than raised. Raising 200 to a bigger number would
+        // be the ratchet-loosening this repo bans AND would keep measuring the wrong
+        // property. Duplication is now checked EXACTLY, line-by-line, against the
+        // real skill file below — strictly stronger than any length proxy: a
+        // 199-character body could copy the skill's single most important sentence
+        // and pass the old cap, while a 6000-character body sharing no line with the
+        // skill genuinely duplicates nothing. Body SHAPE is pinned by
+        // WATCHER_SECTIONS; the real watchers use fenced YAML for their mandatory
+        // Output Format, so a blanket fence ban would forbid the shape being copied.
+        //
+        // The BAD/SAFE marker ban is KEPT: those mark the skill's own code examples,
+        // and the agent delegates the method rather than restating the examples.
+        assert.ok(!/\bBAD\b/.test(body), 'wrapper body must not copy BAD example markers');
+        assert.ok(!/\bSAFE\b/.test(body), 'wrapper body must not copy SAFE example markers');
+
+        // Single source of truth, checked against the REAL skill instead of by
+        // proxy: no substantive line of the target SKILL.md may appear in the
+        // wrapper. This is what stops a wrapper duplicating the skill body and
+        // drifting from it — and it is stricter than the heuristics above, which
+        // only guess at copied content by its punctuation.
+        for (const line of skillBodyLines(frontmatter.target_skill)) {
+          assert.ok(
+            !body.includes(line),
+            `wrapper body copies a line from skills/${frontmatter.target_skill}/SKILL.md: ${JSON.stringify(line.slice(0, 60))}`
+          );
+        }
       });
     });
   }

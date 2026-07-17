@@ -3,10 +3,9 @@ name: agent-qa
 description: Final quality check on agents. Detects regressions and validates improvements. Sub-orchestrator reporting to CTO Chief.
 tools: Read, Grep
 model: opus
-effort: high
+effort: xhigh
 reads_ancestry: true
 async_choice_protocol: enabled
-model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---

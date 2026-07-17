@@ -209,15 +209,45 @@ describe('CU5-s5 — coverage completeness (real corpus)', () => {
 
   // ── 5. No forbidden fields on any CU5 wrapper ─────────────────────────
 
-  it('each CU5 wrapper frontmatter has exactly {name, type, target_skill}', () => {
+  // REPLACED CONTRACT (owner, 2026-07-17: "give each wrapper a real description and
+  // tools, make them dispatchable").
+  //
+  // This test previously asserted the frontmatter was EXACTLY {name, type,
+  // target_skill}. That assertion was the machine that made 97 of 128 agents
+  // unroutable: the Task tool routes agents BY THEIR DESCRIPTION, and this test
+  // FORBADE one. Every wrapper was generated with exactly three fields — not by
+  // oversight, but in compliance with this test. The stubs were the fence working.
+  //
+  // The rule is now inverted and TIGHTENED, not loosened: a wrapper MUST still
+  // resolve to its skill (name/type/target_skill preserved — that is what wrapper
+  // coverage means), and MUST additionally carry the routing surface it was denied.
+  // A wrapper with no description is dead to the dispatcher no matter how green its
+  // coverage looks.
+  it('each CU5 wrapper resolves to its skill AND is dispatchable (has a real description + tools)', () => {
     for (const skill of CU5_WRAPPED) {
       const wrapperPath = path.join(AGENTS_DIR, `${skill}.md`);
       const fm = frontmatter(wrapperPath);
-      const keys = Object.keys(fm).sort();
-      assert.deepEqual(
-        keys,
-        ['name', 'target_skill', 'type'],
-        `agents/${skill}.md frontmatter keys must be exactly name/type/target_skill, got: ${keys.join(', ')}`
+
+      // The wrapper contract: still a wrapper, still resolves to its skill.
+      assert.equal(fm.name, path.basename(skill), `agents/${skill}.md must declare its own name`);
+      assert.equal(fm.type, 'wrapper', `agents/${skill}.md must stay type: wrapper`);
+      assert.equal(fm.target_skill, skill, `agents/${skill}.md must target ${skill}`);
+
+      // The routing contract: the description is HOW the Task tool picks this agent
+      // over its ~127 siblings. Absent or trivial means unroutable.
+      assert.ok(
+        typeof fm.description === 'string' && fm.description.trim().length >= 40,
+        `agents/${skill}.md needs a real description — it is the routing surface. Got: ${JSON.stringify(fm.description)}`
+      );
+      assert.ok(
+        typeof fm.tools === 'string' && fm.tools.trim().length > 0,
+        `agents/${skill}.md must declare the tools its skill actually needs. Got: ${JSON.stringify(fm.tools)}`
+      );
+
+      // The deleted category error must not creep back in via a wrapper.
+      assert.equal(
+        fm.model_optimized_for, undefined,
+        `agents/${skill}.md must not declare model_optimized_for — it was deleted corpus-wide as a category error`
       );
     }
   });

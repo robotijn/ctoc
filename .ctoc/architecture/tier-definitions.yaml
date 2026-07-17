@@ -1,6 +1,6 @@
 # ===============================================================================
 #  CTOC Architecture v8 — Tier Definitions
-#  Machine-readable registry of the four-tier agent hierarchy.
+#  Machine-readable registry of the three-tier agent hierarchy.
 #  See docs/AGENT_ARCHITECTURE.md for the human-readable spec.
 # ===============================================================================
 
@@ -51,7 +51,6 @@ tiers:
       - implementation/implementation-reviewer
       - coordinator/synthesizer            # NEW in v8
     model_default: opus
-    model_optimized_for: opus-4-7
     effort_budget:
       max_subagents: 10
     required_frontmatter:
@@ -59,7 +58,6 @@ tiers:
       - effort: high
       - reads_ancestry: true
       - async_choice_protocol: enabled
-      - model_optimized_for: opus-4-7
       - reports_to: cto-chief
       - dispatch_protocol: v1
     invariants:
@@ -101,7 +99,6 @@ tiers:
       - effort_level: low | medium | high
       - effort_budget: { max_subagents }
       - parallel_safe: true | false
-      - model_optimized_for: opus-4-7
       - dispatch_protocol: v1
       - confidence_calibration: enabled
     output_contract: docs/DISPATCH_PROTOCOL.md#response-schema
@@ -111,63 +108,29 @@ tiers:
       - "Cannot dispatch other agents"
     enforced_by: tests/architecture-invariants.test.js
 
-  tier_3:
-    name: scout
-    description: "Haiku-tier subagent pre-screens. Fast pass/flag decision in isolated 200K context; short-circuits Tier 2 if pass. Safe because Task-tool subagents have their own context independent of the user's terminal session."
-    member_count: 5
-    members:
-      - scouts/syntax-scout
-      - scouts/secret-scout
-      - scouts/dep-scout
-      - scouts/lint-scout
-      - scouts/test-scout
-    model_default: haiku
-    model_optimized_for: haiku-4-5
-    effort_budget:
-      max_subagents: 0
-    required_frontmatter:
-      - tier: 3
-      - effort: low
-      - effort_budget: { max_subagents: 0 }
-      - model: haiku
-      - model_optimized_for: haiku-4-5
-      - parallel_safe: true
-      - dispatch_protocol: v1
-    expected_output:
-      decision: pass | flag | error
-      pillar: <pillar-name>
-      reason: <one-line>
-      next_specialist: <category/name>     # if flag
-    cost_rationale: |
-      A Haiku scout subagent is ~10-50x cheaper than the Opus/Sonnet specialist it
-      short-circuits. On a clean codebase, 4 of 5 scouts return 'pass', eliminating
-      4 deep dispatches per gate.
-    why_haiku_is_safe_for_subagents: |
-      Scouts are dispatched via the Claude Code Task tool, which spawns a fresh agent
-      instance with its own isolated 200K-token context window. The subagent does NOT
-      inherit the parent's conversation history — only the prompt the parent passes
-      it. So a Haiku subagent never sees the parent's Opus-sized context; it runs
-      independently and returns one summary message back.
-
-      What crashes the CLI is /model switching the FRONT process (the user's terminal
-      session) from Opus → Haiku — because that switch preserves conversation context,
-      and Opus's 1M-context conversation can't fit in Haiku's 200K. That's a separate
-      concern from subagent dispatch and is controlled by the user via /model, not by
-      agent frontmatter.
-
-      Sources:
-        - Anthropic Agent SDK: "during a code review, you can run style-checker,
-          security-scanner, and test-coverage subagents simultaneously" with
-          different models.
-        - Claude Code docs: subagents are "named, isolated Claude instances with
-          their own system prompt, context window, tool access list, and permission
-          mode."
-    invariants:
-      - "Must return pass | flag | error decision"
-      - "Cannot dispatch other agents (max_subagents: 0)"
-      - "Latency target ≤ 200ms"
-      - "MUST declare model: haiku in frontmatter (Task-tool subagent context)"
-    enforced_by: tests/architecture-invariants.test.js
+  # ---------------------------------------------------------------------------
+  #  tier-3-tombstone:begin
+  #  tier_3 — DELETED (plan F3b, owner ruling 2026-07-17)
+  #
+  #  "A scout is NOT A STUPID REGEX WITH HAIKU, IT IS AN OPUS THINKING ABOUT THE
+  #   CODE. CTO Chief dispatches real agents to check on the code and aggregates
+  #   the information, then steers the build."
+  #
+  #  The five Haiku scouts were a false-green machine, not a cost saving. Each
+  #  declared `short_circuits: <a Tier 2 specialist>` — a key whose entire purpose
+  #  was to PREVENT the deep specialist from running. secret-scout pattern-matched
+  #  twenty known secret formats; a credential in any other shape returned `pass`,
+  #  the deep detector never ran, and the audit record said "scanned, nothing
+  #  found". A critique that did not RUN is not "nothing found".
+  #
+  #  Nothing was lost. Every scout's domain was already owned by an Opus watcher:
+  #    secret-scout → security/secrets-detector      dep-scout  → security/dependency-auditor
+  #    lint-scout   → quality/code-smell-detector    test-scout → testing/smart-test-runner
+  #    syntax-scout → quality/type-checker
+  #
+  #  Do not re-add a tier here. The absence is fenced by tests/no-tier-3.test.js.
+  #  tier-3-tombstone:end
+  # ---------------------------------------------------------------------------
 
 # ===============================================================================
 #  Dispatch graph
@@ -176,19 +139,17 @@ tiers:
 dispatch_rules:
 
   who_can_dispatch:
-    tier_0: [tier_1, tier_2, tier_3]      # CTO Chief dispatches everything
-    tier_1: [tier_2, tier_3]              # Sub-orchestrators may dispatch their own children
-                                          # (specialists, scouts) to do work — needed for parallel
+    tier_0: [tier_1, tier_2]              # CTO Chief dispatches everything
+    tier_1: [tier_2]                      # Sub-orchestrators may dispatch their own children
+                                          # (specialists) to do work — needed for parallel
                                           # critic fan-out in the refinement loop and Iron Loop
                                           # step orchestration. They MUST NOT dispatch peer Tier 1
                                           # agents (no cross-orchestrator cascading). Reconciles
                                           # the load-bearing `max_subagents: 10` budget on Tier 1.
     tier_2: []                            # Specialists never dispatch
-    tier_3: []                            # Scouts never dispatch
 
   recommendation_authority:
     tier_1: [tier_2]                      # Sub-orchestrators recommend Tier 2 specialists
-    tier_3: [tier_2]                      # Scouts recommend the corresponding Tier 2 specialist when flagging
 
   cross_tier_communication:
     via: dispatch_protocol_v1
@@ -198,26 +159,24 @@ dispatch_rules:
 #  Pillar mapping (for synthesizer cross-pillar integration)
 # ===============================================================================
 
+# Every pillar is covered by Opus specialists that actually read the code. The
+# former `primary_scout:` key on each pillar named the Haiku pre-screen allowed to
+# skip these — deleted with Tier 3 (plan F3b). No pillar has a shortcut now.
 pillars:
   readability:
     primary_specialists: [quality/code-reviewer, quality/code-smell-detector]
-    primary_scout: scouts/syntax-scout
 
   maintainability:
     primary_specialists: [quality/complexity-analyzer, quality/dead-code-detector, quality/duplicate-code-detector]
-    primary_scout: scouts/lint-scout
 
   reliability:
     primary_specialists: [testing/coverage-enforcer, specialized/error-handler-checker, specialized/resilience-checker]
-    primary_scout: scouts/test-scout
 
   performance:
     primary_specialists: [quality/performance-validator, specialized/performance-profiler, frontend/bundle-analyzer]
-    primary_scout: null                    # no scout-level performance check yet
 
   security:
     primary_specialists: [security/security-scanner, security/sast-scanner, security/secrets-detector]
-    primary_scout: scouts/secret-scout
 
 # ===============================================================================
 #  Conflict resolution priority (synthesizer uses this)

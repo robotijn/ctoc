@@ -15,7 +15,7 @@ This document defines the architecture. See companion docs:
 
 v7 made CTO Chief the sole top-level coordinator. v8 makes the system **scalable, auditable, and self-improving** by:
 
-1. **Cost-tiering work** so 60-80% of routine checks run on Haiku (Tier 3 scouts) instead of Opus.
+1. **Dispatching real watchers** that think about the code with Opus and report what they actually found.
 2. **Synthesizing across pillars** so the user gets a *minimal change set*, not 12 siloed reports.
 3. **Structured dispatch** so every agent call is auditable, replayable, and gradable.
 4. **Confidence calibration** so the system learns which agents reliably produce HIGH-confidence findings.
@@ -23,7 +23,7 @@ v7 made CTO Chief the sole top-level coordinator. v8 makes the system **scalable
 6. **Worker isolation** so specialists are proven to work alone before being chained.
 7. **MCP + A2A conformance** so the architecture is future-proof for inter-org agent dispatch.
 
-## The four tiers
+## The three tiers
 
 ```
                           ┌─────────────────┐
@@ -38,28 +38,32 @@ v7 made CTO Chief the sole top-level coordinator. v8 makes the system **scalable
                           │ (1 agent, opus) │   issues all dispatches
                           └────────┬────────┘
                                    │
-                  ┌────────────────┼────────────────────────────┐
-                  ▼                ▼                            ▼
-        ┌─────────────────┐  ┌───────────────────┐  ┌────────────────────┐
-        │ TIER 1          │  │ TIER 3            │  │ TIER 1 (synthesis) │
-        │ Sub-orchestrators│  │ Scouts (Haiku)    │  │ synthesizer        │
-        │ (~16, opus)     │  │ (~5, fast scan)   │  │ (cross-pillar)     │
-        │ planning, iron- │  │ syntax, secret,   │  │ produces minimal-  │
-        │ loop, pipeline, │  │ dep, lint, test   │  │ change list across │
-        │ reviewers       │  │ pre-screens       │  │ pillars            │
-        └────────┬────────┘  └─────────┬─────────┘  └──────────▲─────────┘
-                 │ recommend            │ flag                  │ findings
-                 │ dispatches           │ pillars               │
-                 ▼                      ▼                       │
-            ┌──────────────────────────────────────────┐        │
-            │ TIER 2                                   │────────┘
-            │ Specialist Skills (72, opus/sonnet)      │
+                  ┌────────────────┴────────────────────────────┐
+                  ▼                                             ▼
+        ┌──────────────────┐                       ┌────────────────────┐
+        │ TIER 1           │                       │ TIER 1 (synthesis) │
+        │ Sub-orchestrators│                       │ synthesizer        │
+        │ (20, opus)       │                       │ (cross-pillar)     │
+        │ planning, iron-  │                       │ produces minimal-  │
+        │ loop, pipeline,  │                       │ change list across │
+        │ reviewers        │                       │ pillars            │
+        └────────┬─────────┘                       └──────────▲─────────┘
+                 │ recommend                                   │ findings
+                 │ dispatches                                  │
+                 ▼                                             │
+            ┌──────────────────────────────────────────┐       │
+            │ TIER 2 — the watchers                    │───────┘
+            │ Specialist Skills (99, opus)             │
             │ quality, testing, doc, security,         │
             │ specialized, infra, frontend, mobile,    │
             │ compliance, data-ml, versioning,         │
             │ ai-quality, architecture, devex, cost    │
             └──────────────────────────────────────────┘
 ```
+
+**There is no Tier 3.** It existed until 2026-07-17 and held five Haiku "scouts"
+that pre-screened the watchers above and skipped them on `pass`. See
+[Tier 3 — deleted](#tier-3--deleted) for why that was a defect and not a saving.
 
 ### Tier 0 — Top-Level Coordinator
 
@@ -75,7 +79,6 @@ tier: 0
 effort: xhigh
 reads_ancestry: true
 async_choice_protocol: enabled
-model_optimized_for: opus-4-7
 always_available: true
 reports_to: user
 dispatches: [<all-19-categories>]
@@ -99,10 +102,9 @@ dispatches: [<all-19-categories>]
 **Frontmatter contract**:
 ```yaml
 tier: 1
-effort: high              # or xhigh for synthesizer/reviewers
+effort: xhigh             # every agent not in EFFORT_EXEMPT; see below
 reads_ancestry: true
 async_choice_protocol: enabled
-model_optimized_for: opus-4-7
 reports_to: cto-chief     # invariant: must equal "cto-chief"
 dispatch_protocol: v1
 ```
@@ -111,7 +113,7 @@ dispatch_protocol: v1
 
 **Members** (99 `SKILL.md` bodies across 20 categories): 14 testing + 12 saas + 11 quality + 11 specialized + 10 security + 5 compliance + 5 infrastructure + 3 ai-quality + 3 data-ml + 3 frontend + 3 mobile + 3 safety + 3 versioning + 2 architecture + 2 devex + 2 documentation + 2 legal + 2 product + 2 realtime + 1 cost.
 
-**Wrapper coverage (CU5).** Every one of the 99 `SKILL.md` bodies is now dispatch-reachable through an agent under `agents/<category>/`: a rich agent (which declares `extends_skill:` in frontmatter or references the skill by `skills/<category>/<name>/` path in its body), or a thin `type: wrapper` redirect whose frontmatter is exactly `{name, type, target_skill}` and whose body points at `skills/<category>/<name>/SKILL.md`. CU5 added **12 thin wrappers** for the previously-unwrapped skills — safety/{fault-tree-builder, fmeda-analyzer, redundancy-pattern-picker}, security/{cra-incident-clocks, incident-responder, threat-modeler}, legal/{clm-obligations, dsar-handler}, realtime/{hil-harness, wcet-budget}, compliance/sbom-cra-checker, and ai-quality/llm-security-tester — creating three new agent directories: `agents/safety/`, `agents/legal/`, and `agents/realtime/`. The 13th candidate, `compliance/gdpr-compliance-checker`, gets **no** thin wrapper: it is already covered by the rich `agents/compliance/gdpr-agent.md`, which subsumed and deleted the old thin wrapper in EC2-s3 and delegates to the same SKILL.md body — CU5 honors that removal rather than re-introducing a redundant wrapper. Net +12 agent files → 124 agent `.md` files across 25 categories. `tests/cu5-wrapper-coverage-completeness.test.js` enforces that the unwrapped set stays empty. The subsequent adversarial gate-critique fleet added 4 more Tier-1 agents (`premortem-critic`, `devils-advocate-critic`, `red-team-critic`, `gate-critic`) → **128 agent `.md` files across 25 categories**.
+**Wrapper coverage (CU5).** Every one of the 99 `SKILL.md` bodies is now dispatch-reachable through an agent under `agents/<category>/`: a rich agent (which declares `extends_skill:` in frontmatter or references the skill by `skills/<category>/<name>/` path in its body), or a thin `type: wrapper` redirect whose frontmatter is exactly `{name, type, target_skill}` and whose body points at `skills/<category>/<name>/SKILL.md`. CU5 added **12 thin wrappers** for the previously-unwrapped skills — safety/{fault-tree-builder, fmeda-analyzer, redundancy-pattern-picker}, security/{cra-incident-clocks, incident-responder, threat-modeler}, legal/{clm-obligations, dsar-handler}, realtime/{hil-harness, wcet-budget}, compliance/sbom-cra-checker, and ai-quality/llm-security-tester — creating three new agent directories: `agents/safety/`, `agents/legal/`, and `agents/realtime/`. The 13th candidate, `compliance/gdpr-compliance-checker`, gets **no** thin wrapper: it is already covered by the rich `agents/compliance/gdpr-agent.md`, which subsumed and deleted the old thin wrapper in EC2-s3 and delegates to the same SKILL.md body — CU5 honors that removal rather than re-introducing a redundant wrapper. Net +12 agent files → 124 agent `.md` files across 25 categories. `tests/cu5-wrapper-coverage-completeness.test.js` enforces that the unwrapped set stays empty. The subsequent adversarial gate-critique fleet added 4 more Tier-1 agents (`premortem-critic`, `devils-advocate-critic`, `red-team-critic`, `gate-critic`) → 128 agent `.md` files across 25 categories. Plan F3b then deleted the 5 Tier-3 pre-screen agents and the `agents/scouts/` directory with them → **123 agent `.md` files across 24 categories** (the live count today; `tests/doc-counts.test.js` and `tests/readme-numbers.test.js` hold it to disk).
 
 **Authority**: domain expert. Single-purpose. Returns structured findings (YAML format per [`DISPATCH_PROTOCOL.md`](./DISPATCH_PROTOCOL.md)).
 
@@ -126,7 +128,6 @@ related_skills: [...]
 effort_level: low | medium | high
 effort_budget:
   max_subagents: 0        # leaf agents do not dispatch (the only runtime-enforced cap)
-model_optimized_for: opus-4-7
 model: opus | sonnet
 parallel_safe: true | false
 dispatch_protocol: v1
@@ -136,32 +137,51 @@ output_contract: ./CONTRACT.yaml  # optional schema ref
 
 **Body must include** a "## v8 Output Contract" section declaring the structured findings format.
 
-### Tier 3 — Scouts
+### Tier 3 — deleted
 
-**Members** (5, all Haiku subagents, NEW in v8):
-- `scouts/syntax-scout` — AST/parser-level syntax check (~50ms)
-- `scouts/secret-scout` — pattern-only secret scan (no entropy/verification, ~100ms)
-- `scouts/dep-scout` — known-bad CVE list lookup (~50ms)
-- `scouts/lint-scout` — fast lint pass via language-native tool
-- `scouts/test-scout` — does the test suite currently pass?
+<!-- tier-3-tombstone:begin — prose about the deleted tier; tests/no-tier-3.test.js
+     permits the dead agents to be NAMED inside this marked region so the record can
+     say what was removed and who covers its domain now. Nothing here is a live
+     pointer. Do not extend this region to shelter a live roster. -->
 
-**Authority**: pre-screen. Returns one of: `pass`, `flag`, `error`. If `pass`, CTO Chief may skip the corresponding deep specialist. If `flag`, CTO Chief dispatches the Tier 2 specialist.
+**Tier 3 no longer exists.** It held five Haiku "scouts" (`syntax-scout`,
+`secret-scout`, `dep-scout`, `lint-scout`, `test-scout`) that pre-screened the
+Tier 2 watchers and let CTO Chief skip them on a `pass`. It was removed on
+2026-07-17 by plan F3b, on the owner's ruling:
 
-**Model**: scouts declare `model: haiku` in their frontmatter. They run as **Task-tool subagents** — Claude Code spawns a fresh agent instance with its own isolated 200K-token context. The Haiku model is safe at this layer because subagent context is independent of the user's terminal session. See "Front-process vs subagent model rules" below.
+> "A scout is NOT A STUPID REGEX WITH HAIKU, IT IS AN OPUS THINKING ABOUT THE
+> CODE. CTO Chief dispatches real agents to check on the code and aggregates the
+> information, then steers the build."
 
-**Frontmatter contract**:
-```yaml
-tier: 3
-effort: low
-effort_budget:
-  max_subagents: 0
-model: haiku
-model_optimized_for: haiku-4-5
-parallel_safe: true
-dispatch_protocol: v1
-```
+**Why it was a defect, not a saving.** Each scout declared
+`short_circuits: <a Tier 2 specialist>` — a frontmatter key whose whole purpose
+was to stop a better-equipped agent from looking. `secret-scout` pattern-matched
+the twenty highest-prevalence secret formats with a Haiku model. A credential in
+any other shape returned `pass`, the deep `security/secrets-detector` never ran,
+and the audit record said *scanned, nothing found*. That is not a cheap scan; it
+is a **false-green machine** that manufactures unwarranted confidence. It broke
+this repo's own rule: a critique that did not RUN is not "nothing found" —
+absence of evidence is never evidence of absence.
 
-**Cost rationale**: a Haiku scout subagent is ~10-50x cheaper than the Opus/Sonnet specialist it short-circuits. On a clean codebase, 4 of 5 scouts return `pass`, eliminating 4 deep dispatches per gate.
+**Nothing was lost.** Every scout's domain was already owned by an Opus watcher
+that reads the code rather than grepping it:
+
+| Deleted scout | Domain now owned by |
+|---|---|
+| `secret-scout` | `security/secrets-detector` — the very agent it short-circuited |
+| `dep-scout` | `security/dependency-auditor` |
+| `lint-scout` | `quality/code-smell-detector`, `quality/complexity-analyzer` |
+| `syntax-scout` | `quality/type-checker` |
+| `test-scout` | `testing/smart-test-runner` |
+
+**Do not re-add this tier.** The absence is fenced by
+[`tests/no-tier-3.test.js`](../tests/no-tier-3.test.js), which asserts that
+`agents/scouts/` does not exist, that no agent declares `model: haiku`, that no
+agent declares `short_circuits:`, and that the dispatch schema's `target_tier`
+maxes at 2. A prior corpus-wide deletion in this repo was silently undone by a
+`git restore` and stayed undone because only an edit — not a fence — held it.
+
+<!-- tier-3-tombstone:end -->
 
 ### Front-process vs subagent model rules (corrected v6.9.29)
 
@@ -174,36 +194,36 @@ Claude Code has two execution contexts that matter for model declarations. An ea
 | **Slash command** | Runs **inside the user's session**, not a separate process — its `model:` frontmatter switches the live session | **MUST NOT declare `model:`.** Pinning a model (especially Haiku) switches the live session and can force autocompact and a crash. |
 
 The rule for CTOC v6.9.29+:
-- Agent frontmatter `model:` declarations are **valid only for subagents** (Tier 2 specialists, Tier 3 scouts, Tier 1 sub-orchestrators dispatched via the Task tool)
+- Agent frontmatter `model:` declarations are **valid only for subagents** (Tier 2 specialists, Tier 1 sub-orchestrators dispatched via the Task tool)
 - Slash command frontmatter must **never** contain a `model:` key
 - The **front process** (the live `claude` terminal session) is controlled by the user via `/model` or session-start args
 - No code path in CTOC should programmatically `/model`-switch the front process
 
-This preserves both safety (front process untouched, no slash-command-induced model switch) and cost benefit (Haiku scouts deliver 10-50x savings on the Tier 3 subagent dispatches, where the isolated context makes Haiku genuinely safe).
+This keeps the front process untouched and free of slash-command-induced model switches.
+
+Note that the subagent context being *isolated* only ever made Haiku technically
+**safe** to run — it never made Haiku **adequate** for judging Opus-written code.
+That distinction is what the deleted Tier 3 got wrong, and it is why no agent
+declares `model: haiku` today.
 
 ## Dispatch flow
 
 ```
 1. USER  → CTO CHIEF: "please review my changes"
-2. CTO CHIEF → SCOUTS (parallel, Tier 3):
-     - syntax-scout
-     - secret-scout
-     - dep-scout
-     - lint-scout
-     - test-scout
-   Each returns: pass | flag | error
-3. CTO CHIEF computes the pillars-to-check set from scout flags + change shape.
-4. CTO CHIEF → TIER 1 sub-orchestrators relevant to the change
+2. CTO CHIEF computes the pillars-to-check set from the shape of the change.
+3. CTO CHIEF → TIER 1 sub-orchestrators relevant to the change
    (e.g., `implementation-reviewer` for a code change in plans/in-progress).
    Sub-orchestrators recommend Tier 2 specialists.
-5. CTO CHIEF dispatches the recommended Tier 2 specialists IN PARALLEL.
-   Each returns structured findings (YAML).
-6. CTO CHIEF → SYNTHESIZER (Tier 1, NEW):
+4. CTO CHIEF dispatches the recommended Tier 2 watchers IN PARALLEL.
+   Each thinks about the actual code and returns structured findings (YAML).
+   An empty findings list is a real result: the watcher looked and found nothing.
+   No agent may skip another agent — see "Tier 3 — deleted".
+5. CTO CHIEF → SYNTHESIZER (Tier 1, NEW):
    Consumes all specialist findings, applies priority rules
    (Security > Correctness > Maintainability > Consistency),
    resolves cross-pillar conflicts, produces a MINIMAL CHANGE LIST.
-7. CTO CHIEF approves with audit trail.
-8. USER reviews the minimal change list (not 12 siloed reports).
+6. CTO CHIEF approves with audit trail.
+7. USER reviews the minimal change list (not 12 siloed reports).
 ```
 
 Every dispatch goes to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml`.
@@ -212,11 +232,11 @@ Every dispatch goes to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml`.
 
 1. **Hierarchy enables scale**. No flat meshes. Every agent has exactly one parent in the dispatch graph.
 2. **Specialization beats generalization**. 5 focused agents > 1 monolithic agent.
-3. **Cost-tier the work**. Haiku scouts → Sonnet/Opus specialists → Opus orchestrators. Don't pay Opus for what Haiku can decide.
+3. **Never pay for a check with a model that cannot make it.** Cost-tiering was tried and removed (see "Tier 3 — deleted"): a cheap agent that returns `pass` without thinking does not save a dispatch, it fakes one, and the audit trail then lies. Anything that judges Opus-written code thinks with Opus. Spend less by dispatching *fewer* watchers, never by dispatching *weaker* ones.
 4. **Audit trail is non-negotiable**. Every dispatch is reproducible, replayable, gradable.
 5. **Workers prove themselves in isolation** before integration. Specialists must pass isolated tests before sub-orchestrators chain them.
 6. **Structured outputs**. YAML/JSON, not prose. Enables automated grading, conflict resolution, and progress tracking.
-7. **Effort budgets prevent runaway**. The runtime-enforced cap is `max_subagents` (Tier 2/3 = 0, prevents cascading dispatches). Per-agent token/tool-call caps were noise and dropped in v6.9.3; real session-level budgets (max session hours, max total dispatches, max Iron Loop iterations) live in `.ctoc/config/budget.yaml` (v6.9.4+).
+7. **Effort budgets prevent runaway**. The runtime-enforced cap is `max_subagents` (Tier 2 = 0, prevents cascading dispatches). Per-agent token/tool-call caps were noise and dropped in v6.9.3; real session-level budgets (max session hours, max total dispatches, max Iron Loop iterations) live in `.ctoc/config/budget.yaml` (v6.9.4+).
 8. **Confidence is calibrated**. HIGH/MEDIUM/LOW is meaningless without measurement. Agents are scored on precision/recall over time.
 9. **Cite-your-sources by default**. Every finding cites file+line evidence and a category brief source URL. Cuts hallucination 20-40% (per AI quality research).
 10. **Synthesis over enumeration**. The output is a *minimal change list*, not a *complete finding list*. Most systems fail here.
@@ -261,13 +281,80 @@ Every dispatch goes to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml`.
 - Audit log directory: `.ctoc/audit/dispatches/`
 - Agent grades: `.ctoc/agents/grades.yaml`
 
+## The effort floor
+
+A watcher — any agent that reads code or artifacts and emits findings — declares
+`effort: xhigh`. Owner ruling, 2026-07-17, verbatim: **"ok let the agents have xhigh"**,
+answering whether effort must rise alongside `model: opus`. It must — to `xhigh`, the
+highest level Anthropic ships no caveat against.
+
+The model floor and the effort floor are two separate controls and the first cannot see
+the second: `model: opus` with `effort: low` satisfies every model assertion in the
+corpus and still produces a shallow read — a green record rather than a review. Both are
+fenced in `tests/agent-model-floor.test.js`.
+
+The rule is written as an **exemption**, not a roster. `EFFORT_EXEMPT` in that fence names
+every agent permitted below `xhigh`, each with a written reason; everything else must be
+`xhigh`. A new agent therefore defaults to being a watcher and must be argued *into* the
+map to think at anything less. The exempt groups are actuators (they write, they do not
+watch), planners (they ask the human; the bottleneck is the answer, not thinking depth),
+and the `saas/*` agents scheduled for demotion to skills.
+
+Coordinators are deliberately **not** exempt: `synthesizer` resolves every cross-pillar
+conflict in the system.
+
+### Why `xhigh` and not `max` — read this before "improving" it back
+
+An earlier ruling said `max`, and plan F3c applied `max` to 91 agents in one edit. The
+owner **reversed it the same day, on evidence**, after being shown Anthropic's own
+guidance in the model configuration reference, verbatim:
+
+> | `max` | Can improve performance on demanding tasks but **may show diminishing returns
+> and is prone to overthinking. Test before adopting broadly** |
+
+and: *"`max` provides the deepest reasoning with **no constraint on token spending**."*
+
+Putting `max` on 91 agents at once **is** adopting broadly without testing. `xhigh` is the
+highest level on the documented scale (`low, medium, high, xhigh, max`) that carries no
+such caveat. `max` remains a legal, documented value and is still accepted by the fences —
+what changed is that nothing in this corpus sits at it without the owner deciding so again.
+
+### The caveat that inverts
+
+`xhigh` is **not supported on every model, and `max` is**:
+
+```
+Fable 5 · Sonnet 5 · Opus 4.8 · Opus 4.7   ->  low, medium, high, xhigh, max
+Opus 4.6 · Sonnet 4.6                      ->  low, medium, high,        max
+```
+
+> *"If you set a level the active model does not support, Claude Code falls back to the
+> highest supported level at or below the one you set. For example, `xhigh` runs as `high`
+> on Opus 4.6."*
+
+So on a pinned older model, `xhigh` **silently drops two steps to `high`** while `max`
+would have held — nothing errors, the agent simply thinks less, and every assertion in the
+fence still passes. For a pinned older model, `xhigh` is strictly worse than `max`.
+
+This does not bite today, and that is **measured, not assumed**: all 123 agents declare a
+model *alias* (`opus`, `sonnet`), zero pin a version, and those aliases resolve to models
+that support `xhigh`. The fence case *"every agent declares a model ALIAS, never a pinned
+model version"* is the tripwire for the day that stops being true. It is a **warning, not
+a ban** — pinning a version is a decision the owner has not made, and the fence does not
+make it for him.
+
 ## Test invariants
 
 `tests/architecture-invariants.test.js` enforces:
 1. Exactly one agent has `role: top-level-coordinator` (CTO Chief).
 2. Every Tier 1 sub-orchestrator declares `reports_to: cto-chief`.
 3. Every Tier 2 specialist (converted leaf agents → skills) declares `tier: 2`, `effort_budget`, `parallel_safe`, `dispatch_protocol: v1`.
-4. Every Tier 3 scout declares `tier: 3`, `model: haiku`, `model_optimized_for: haiku-4-5`.
-5. The synthesizer agent exists at `agents/coordinator/synthesizer.md` with `tier: 1`.
-6. At least 5 scouts exist under `agents/scouts/`.
-7. No agent outside `agents/coordinator/cto-chief.md` claims `role: top-level-coordinator`.
+4. The synthesizer agent exists at `agents/coordinator/synthesizer.md` with `tier: 1`.
+5. No agent outside `agents/coordinator/cto-chief.md` claims `role: top-level-coordinator`.
+
+[`tests/no-tier-3.test.js`](../tests/no-tier-3.test.js) enforces the absence of Tier 3:
+1. `agents/scouts/` does not exist.
+2. No agent declares `model: haiku`.
+3. No agent declares `short_circuits:` — no agent may suppress another agent.
+4. The dispatch schema defines no `scout_response` and caps `target_tier` at 2.
+5. No live spec or source points at a deleted pre-screen agent.

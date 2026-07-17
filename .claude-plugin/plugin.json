@@ -1,6 +1,31 @@
 {
   "name": "ctoc",
-  "version": "6.12.78",
+  "version": "6.12.79",
   "description": "Your Virtual CTO — 60 AI agents. 265 expert skills. 15 quality gates.",
-  "commands": "./src/commands/"
+  "commands": "./src/commands/",
+  "skills": [
+    "./skills/",
+    "./skills/ai-quality",
+    "./skills/architecture",
+    "./skills/compliance",
+    "./skills/cost",
+    "./skills/data-ml",
+    "./skills/devex",
+    "./skills/documentation",
+    "./skills/frontend",
+    "./skills/infrastructure",
+    "./skills/legal",
+    "./skills/mobile",
+    "./skills/product",
+    "./skills/quality",
+    "./skills/realtime",
+    "./skills/saas",
+    "./skills/safety",
+    "./skills/security",
+    "./skills/specialized",
+    "./skills/testing",
+    "./skills/testing/runners",
+    "./skills/testing/writers",
+    "./skills/versioning"
+  ]
 }

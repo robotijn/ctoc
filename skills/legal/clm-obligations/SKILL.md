@@ -31,7 +31,6 @@ related_skills:
   - compliance/gdpr-compliance-checker
   - compliance/audit-log-checker
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Write, Grep, Glob
 model: opus
 ---

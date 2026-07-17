@@ -15,7 +15,6 @@ related_skills:
   - quality/complexity-analyzer
   - security/dependency-auditor
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Grep, Bash
 model: opus
 tier: 2

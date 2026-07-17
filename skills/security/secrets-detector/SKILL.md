@@ -17,7 +17,6 @@ related_skills:
   - security/security-scanner
   - security/dependency-auditor
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2

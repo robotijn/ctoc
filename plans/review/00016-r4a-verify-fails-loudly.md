@@ -1,18 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T20:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's standing 2026-07-14 orders ("fix them all",
-  "fix everything", "keep fixing the code"). CONFIRMED BY EXECUTION by the
-  coordinator: runVerify on a toolchain-less project runs ZERO checks and
-  returns {passed:true, summary:"All fallback quality checks passed."} — the
-  artifact Gate 3 consumes. Gate 3 opens on a verification that verified
-  nothing, and two tests pin the fail-open as the contract.
----
-
----
 title: "R4-A — VERIFY fails loudly: no checks run is NOT a pass; Gate 3 evidence becomes real"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

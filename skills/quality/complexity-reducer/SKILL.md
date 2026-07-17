@@ -20,7 +20,6 @@ related_skills:
   - testing/writers/unit-test-writer
   - quality/dead-code-finder
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Grep
 model: opus
 tier: 2

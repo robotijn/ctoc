@@ -3,10 +3,9 @@ name: iron-loop-critic
 description: Scores execution plan on 5 dimensions and provides actionable feedback. Sub-orchestrator reporting to CTO Chief.
 tools: Read, Grep
 model: opus
-effort: high
+effort: xhigh
 reads_ancestry: true
 async_choice_protocol: enabled
-model_optimized_for: opus-4-8
 reports_to: cto-chief
 tier: 1
 ---

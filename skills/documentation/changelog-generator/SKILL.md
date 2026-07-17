@@ -15,7 +15,6 @@ related_skills:
   - documentation/documentation-updater
   - versioning/backwards-compatibility-checker
 effort_level: low
-model_optimized_for: opus-4-7
 tools: Bash, Read
 model: sonnet
 tier: 2

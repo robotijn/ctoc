@@ -23,7 +23,6 @@ related_skills:
   - saas/resend-email
   - specialized/resilience-checker
 effort_level: medium
-model_optimized_for: opus-4-7
 model: sonnet
 tools: Read, Write, Edit, Bash
 ---

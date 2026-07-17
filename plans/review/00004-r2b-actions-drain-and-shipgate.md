@@ -1,15 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T14:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's explicit 2026-07-14 order "fix them all, do 50
-  rounds of hard critique, keep fixing the code" against the Round-1 critic
-  findings. The person ordering the fixes IS the approval.
----
-
----
 title: "R2-B — Actions: task/plan coupling, drain that never stalls, cancel two-phase, deploy trigger behind the ship gate"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

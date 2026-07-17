@@ -1,15 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T16:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's explicit 2026-07-14 order "fix them all, do 50
-  rounds of hard critique, keep fixing the code". Scope expansion of R2-C's
-  kicked-back items (its D1), with the pin-test files in scope.
----
-
----
 title: "R2-C2 — Persisted answers unblocked: the pin-tests move with the contracts"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

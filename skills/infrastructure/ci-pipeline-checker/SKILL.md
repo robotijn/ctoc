@@ -15,7 +15,6 @@ related_skills:
   - security/secrets-detector
   - security/security-scanner
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Grep, Bash
 model: sonnet
 tier: 2

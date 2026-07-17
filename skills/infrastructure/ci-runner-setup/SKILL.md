@@ -20,7 +20,6 @@ related_skills:
   - security/secrets-detector
   - security/sast-scanner
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read, Write, WebFetch
 model: sonnet
 tier: 2

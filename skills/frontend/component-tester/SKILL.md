@@ -18,7 +18,6 @@ related_skills:
   - testing/unit-test-writer
   - specialized/accessibility-checker
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read
 model: sonnet
 tier: 2

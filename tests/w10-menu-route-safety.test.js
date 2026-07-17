@@ -128,7 +128,20 @@ describe('W10-s3 — menu route crash-safety and traversal guard', () => {
     assertScreenShape(screen);
     assert.match(screen.text, /Some Real Plan/);
     assert.doesNotMatch(screen.text, /Invalid plan reference/);
-    // The normal plan-actions screen offers its four verbs.
-    assert.equal(Object.keys(screen.actions).length, 4);
+    // The plan screen renders the plan's BODY, not just its heading.
+    assert.match(screen.text, /A perfectly valid functional plan\./);
+    // It used to be a four-verb actions menu, so this counted four action keys.
+    // Opening a plan is a question now and the key count is no longer the
+    // contract — the invariant that matters is that every option the human can
+    // pick actually resolves to an action. That is asserted directly, which is
+    // stronger than a magic number that any relabelling would break.
+    for (const q of screen.ask.questions) {
+      for (const opt of q.options) {
+        assert.ok(
+          opt.label in screen.actions,
+          `option "${opt.label}" has no action — it would be a dead button`,
+        );
+      }
+    }
   });
 });

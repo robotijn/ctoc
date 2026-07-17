@@ -23,7 +23,6 @@ related_skills:
   - testing/smart-test-runner
   - testing/quality-gate-runner
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Bash, Read, Write, Grep, Glob, Task
 model: opus
 tier: 2

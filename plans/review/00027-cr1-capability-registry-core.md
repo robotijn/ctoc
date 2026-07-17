@@ -1,12 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-15T02:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: "Human decision 2026-07-15: 'combine 1 and 3' — build the unified Capability Registry (keystone) AND the corpus refresh. CR1 is the keystone: the data-driven registry that makes the top-20 languages + Flutter/Android/Rust actually detectable/verifiable/runnable. Vision: plans/vision/ctoc-capability-registry.md."
----
-
----
 title: "CR1 — Capability Registry core: schema, engine, seed data for Flutter/Android/Rust + parity langs"
 type: implementation
 parent_plan: ctoc-capability-registry

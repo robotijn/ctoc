@@ -242,32 +242,17 @@ function checkTier2NoSubagent(root) {
   return null;
 }
 
-function checkTier3Scouts(root) {
-  const scoutsDir = path.join(root, 'agents/scouts');
-  if (!safeFs.existsSync(scoutsDir)) {
-    return { severity: 'critical', message: 'agents/scouts/ directory missing' };
-  }
-  const files = safeFs.readdirSync(scoutsDir).filter(f => f.endsWith('.md'));
-  if (files.length < 5) {
-    return { severity: 'warn', message: `Expected ≥5 scouts, found ${files.length}` };
-  }
-  const offenders = [];
-  for (const f of files) {
-    const { fm } = readFM(path.join(scoutsDir, f));
-    if (!/^tier:\s*3$/m.test(fm)) offenders.push(`${f}: missing tier: 3`);
-    else if (!/^model:\s*haiku$/m.test(fm)) offenders.push(`${f}: missing model: haiku`);
-    else if (!/reports_to:\s*cto-chief/.test(fm)) offenders.push(`${f}: missing reports_to: cto-chief`);
-    else if (!/max_subagents:\s*0/.test(fm)) offenders.push(`${f}: missing max_subagents: 0`);
-  }
-  if (offenders.length > 0) {
-    return {
-      severity: 'block',
-      message: `${offenders.length} scouts misconfigured`,
-      details: { offenders },
-    };
-  }
-  return null;
-}
+// DELETED by plan F3b (v6.12.79): checkTier3Scouts.
+//
+// It required agents/scouts/ to exist and each scout to declare tier: 3 +
+// model: haiku, returning severity 'critical' when the directory was missing.
+// With Tier 3 deleted on the owner's ruling, this check made CTOC's own
+// self-check report a CRITICAL against the deletion the owner ordered — an
+// enforcer demanding the false-green machine it was supposed to catch.
+//
+// The INVERSE is now fenced by tests/no-tier-3.test.js: the directory must NOT
+// exist, no agent may declare model: haiku, and no agent may declare
+// short_circuits:. Its registry entry in CHECKS is removed with it.
 
 // ─────────────────────────────────────────────────────────────────────
 //  Iron Loop invariants
@@ -583,7 +568,6 @@ const CHECKS = [
   { id: 'synthesizer-exists',          scope: 'architecture', mode: 'fast', fn: checkSynthesizerExists },
   { id: 'tier-1-reports-to',           scope: 'architecture', mode: 'fast', fn: checkTier1ReportsTo },
   { id: 'tier-2-no-subagent',          scope: 'architecture', mode: 'thorough', fn: checkTier2NoSubagent },
-  { id: 'tier-3-scouts',               scope: 'architecture', mode: 'fast', fn: checkTier3Scouts },
   { id: 'active-plan-step-labels',     scope: 'iron-loop',    mode: 'thorough', fn: checkActivePlanStepLabels },
   { id: 'gate-destinations-approved',  scope: 'iron-loop',    mode: 'fast', fn: checkGateDestinationsApproved },
   { id: 'stale-plans',                 scope: 'iron-loop',    mode: 'fast', fn: checkStalePlans },

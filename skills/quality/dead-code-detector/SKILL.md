@@ -16,7 +16,6 @@ related_skills:
   - quality/duplicate-code-detector
   - quality/technical-debt-tracker
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2

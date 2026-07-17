@@ -4,14 +4,20 @@
  * Every screen outputs JSON with { text, ask, actions }.
  *
  * Usage:
- *   node menu.js                            -> dashboardPipeline()
+ *   node menu.js                            -> streaming-gate.streamingGateScreen()
  *   node menu.js menu commands              -> dashboardCommands()
  *   node menu.js browse {stage}             -> stageBrowse(stage)
- *   node menu.js plan {stage}/{file}        -> planActions(stage, file)
- *   node menu.js plan {stage}/{file} more   -> planActionsMore(stage, file)
- *   node menu.js plan {stage}/{file} review -> reviewActions(stage, file)
- *   node menu.js plan {stage}/{file} discuss -> discussMenu(stage, file)
+ *   node menu.js plan {stage}/{file}        -> streaming-gate.planDecisionScreen(ref)
  *   node menu.js validate {stage}/{file}    -> validateScreen(stage, file)
+ *
+ * Opening a plan is a QUESTION, not a navigation menu. The four plan-menu screens
+ * that used to live here — planActions, planActionsMore, reviewActions, discussMenu
+ * — asked "What would you like to do with this plan?" over a list of routes. They
+ * are replaced by `streaming-gate.planDecisionScreen`, which renders the plan's
+ * BODY and asks the next real decision: the PRODUCT question when one is waiting,
+ * the gate question only as a fallback. Every decision they carried survives there
+ * (critique, view/edit, delete, approve, reject-to-stage, validation detail); only
+ * their navigation rows are gone, which was the point.
  */
 
 const safeFs = require('./safe-fs');
@@ -114,14 +120,12 @@ function invalidPlanRefScreen(stage, file) {
   };
 }
 
-// Stage flow: what stage comes next after approval
-const NEXT_STAGE = {
-  functional: 'implementation',
-  implementation: 'todo',
-  todo: 'in-progress',
-  'in-progress': 'review',
-  review: 'done'
-};
+// NEXT_STAGE (the full pipeline flow: functional → implementation → todo →
+// in-progress → review → done) lived here to label the discussion menu's
+// "Approve → <next stage>" row. That menu is gone — opening a plan asks a question
+// now — and nothing else ever read it, so the constant went with its only reader
+// rather than lingering as dead data. HUMAN_GATES below is the set that actually
+// governs a crossing, and it is read by the live screens.
 
 // Human gates: transitions requiring human approval marker
 const HUMAN_GATES = {
@@ -1389,234 +1393,6 @@ function visionStubsBrowse(slug, projectPath) {
 }
 
 /**
- * Plan Actions Menu A
- * Shows: View, Discuss, Approve, More
- */
-function planActions(stage, file, projectPath) {
-  const root = getProjectPath(projectPath);
-  const plansDir = getPlansDir(root);
-  const folder = STAGE_FOLDERS[stage];
-  // M8/M11: an unknown stage (folder undefined) or a traversal filename must
-  // fail safe with the shared refusal screen BEFORE path.join — placed first so
-  // an unknown stage never reaches the review redirect or the file read.
-  if (!folder || isUnsafePlanFile(file)) return invalidPlanRefScreen(stage, file);
-  const planPath = path.join(plansDir, folder, file);
-  const planName = file.replace('.md', '');
-
-  // Check if this is a review plan - if so, use review actions
-  if (stage === 'review') {
-    return reviewActions(stage, file, projectPath);
-  }
-
-  let text = `[${stage}] ${planName}\n`;
-  text += `${'─'.repeat(40)}\n`;
-
-  // Read summary if file exists
-  if (safeFs.existsSync(planPath)) {
-    const content = safeFs.readFileSync(planPath, 'utf8');
-    const titleMatch = content.match(/^#\s+(.+)$/m);
-    if (titleMatch) {
-      text += `\n  ${titleMatch[1]}\n`;
-    }
-  }
-
-  text += '\n  Type "more" for delete and other actions.\n\n\n';
-
-  // Approve is a HUMAN-GATE affordance, gated on the REAL crossable set
-  // (HUMAN_GATES: functional→implementation, implementation→todo) — NOT on the
-  // full pipeline flow NEXT_STAGE. approvePlan only crosses the three human-gate
-  // edges and THROWS "Unknown plan location" for anything else; offering Approve
-  // for a non-gate stage (todo, canvas, in-progress) made validate signal
-  // autoApprove:true and the driver auto-crashed on the clean path. (review has
-  // its own reviewActions, handled above.)
-  const gateTarget = HUMAN_GATES[stage];
-
-  // Critique comes FIRST — it is the most important thing you can do to a plan.
-  // Then the same verbs: Create, View/Edit, and (only at a real gate) Approve.
-  // View and Edit are one action — opening a plan shows it and lets you edit it.
-  const options = [
-    { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.' },
-    { label: 'Create new', description: `Create a new ${stage} plan` },
-    { label: 'View/Edit', description: 'Show the plan, then edit it' }
-  ];
-
-  const actions = {
-    'Discuss': 'claude:discuss',
-    'Create new': `claude:create-plan ${stage}`,
-    'View/Edit': `claude:view-edit ${stage}/${file}`
-  };
-
-  if (gateTarget) {
-    const approveLabel = `Approve → ${gateTarget}`;
-    options.push({ label: approveLabel, description: `Validate and move to ${gateTarget}` });
-    actions[approveLabel] = `validate ${stage}/${file}`;
-  }
-
-  return {
-    text,
-    ask: {
-      questions: [{
-        question: 'What would you like to do with this plan?',
-        header: planName,
-        options
-      }]
-    },
-    actions
-  };
-}
-
-/**
- * Plan Actions Menu B (More)
- * Shows: Edit, Delete, Back to list, Actions
- */
-function planActionsMore(stage, file, projectPath) {
-  const root = getProjectPath(projectPath);
-  const plansDir = getPlansDir(root);
-  const folder = STAGE_FOLDERS[stage];
-  // M8/M11: same fail-safe guard as planActions — the identical unguarded
-  // path.join here was a known-identical latent crash/traversal.
-  if (!folder || isUnsafePlanFile(file)) return invalidPlanRefScreen(stage, file);
-  const planPath = path.join(plansDir, folder, file);
-  const planName = file.replace('.md', '');
-
-  let text = `[${stage}] ${planName}\n`;
-  text += `${'─'.repeat(40)}\n`;
-
-  if (safeFs.existsSync(planPath)) {
-    const content = safeFs.readFileSync(planPath, 'utf8');
-    const titleMatch = content.match(/^#\s+(.+)$/m);
-    if (titleMatch) {
-      text += `\n  ${titleMatch[1]}\n`;
-    }
-  }
-
-  text += '\n\n\n';
-
-  // Edit merged into the main menu's View/Edit action; this secondary screen
-  // now carries only Delete plus navigation. Reached by typing "more".
-  const options = [
-    { label: 'Delete', description: 'Remove this plan permanently' },
-    { label: 'Back to list', description: `Return to ${stage} plan list` },
-    { label: '◀ Actions', description: 'Return to main action menu' }
-  ];
-
-  const actions = {
-    'Delete': `claude:delete ${stage}/${file}`,
-    'Back to list': `browse ${stage}`,
-    '◀ Actions': `plan ${stage}/${file}`
-  };
-
-  return {
-    text,
-    ask: {
-      questions: [{
-        question: 'Select an action:',
-        header: planName,
-        options
-      }]
-    },
-    actions
-  };
-}
-
-/**
- * Review Actions (unique for review stage)
- * Shows: View, Approve -> Done, Feedback -> Functional, Rework -> Implementation
- */
-function reviewActions(stage, file, projectPath) {
-  const root = getProjectPath(projectPath);
-  const plansDir = getPlansDir(root);
-  const folder = STAGE_FOLDERS[stage] || 'review';
-  // M11: folder defaults to 'review' so it is never falsy here — the traversal
-  // check is the load-bearing guard; refuse a traversal filename before path.join.
-  if (isUnsafePlanFile(file)) return invalidPlanRefScreen(stage, file);
-  const planPath = path.join(plansDir, folder, file);
-  const planName = file.replace('.md', '');
-
-  let text = `[Review] ${planName}\n`;
-  text += `${'─'.repeat(40)}\n`;
-
-  if (safeFs.existsSync(planPath)) {
-    const content = safeFs.readFileSync(planPath, 'utf8');
-    const titleMatch = content.match(/^#\s+(.+)$/m);
-    if (titleMatch) {
-      text += `\n  ${titleMatch[1]}\n`;
-    }
-  }
-
-  text += '\n\n\n';
-
-  // Critique comes FIRST even at the human gate — brutally attack the work before
-  // you approve or kick it back. Then View/Edit plus the three gate transitions.
-  const options = [
-    { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.' },
-    { label: 'View/Edit', description: 'Show the plan, then edit it' },
-    { label: 'Approve → Done', description: 'Validate and mark as complete' },
-    { label: 'Feedback → Functional', description: 'Send back to functional for requirements rework' },
-    { label: 'Rework → Implementation', description: 'Send back to implementation for technical rework' }
-  ];
-
-  const actions = {
-    'Discuss': 'claude:discuss',
-    'View/Edit': `claude:view-edit review/${file}`,
-    'Approve → Done': `validate review/${file}`,
-    'Feedback → Functional': `claude:reject review/${file} functional`,
-    'Rework → Implementation': `claude:reject review/${file} implementation`
-  };
-
-  return {
-    text,
-    ask: {
-      questions: [{
-        question: 'Review this plan:',
-        header: 'Review',
-        options
-      }]
-    },
-    actions
-  };
-}
-
-/**
- * Discussion Menu
- * Shown after Claude's critique of a plan
- */
-function discussMenu(stage, file, projectPath) {
-  const planName = file.replace('.md', '');
-  const nextStage = NEXT_STAGE[stage];
-
-  const text = `[Discussion] ${planName}\n\n\n`;
-
-  const options = [
-    { label: 'Continue', description: 'Continue the discussion' },
-    { label: 'Apply edits', description: 'Make changes based on discussion' },
-    { label: `Approve → ${nextStage || 'next'}`, description: `Validate and move to ${nextStage || 'next stage'}` },
-    { label: 'Back to actions', description: 'Return to plan action menu' }
-  ];
-
-  const approveLabel = `Approve → ${nextStage || 'next'}`;
-
-  const actions = {
-    'Continue': 'claude:discuss',
-    'Apply edits': 'claude:edit',
-    [approveLabel]: `validate ${stage}/${file}`,
-    'Back to actions': `plan ${stage}/${file}`
-  };
-
-  return {
-    text,
-    ask: {
-      questions: [{
-        question: 'How would you like to proceed?',
-        header: 'Discussion',
-        options
-      }]
-    },
-    actions
-  };
-}
-
-/**
  * Validation Screen
  * Shows pre-transition validation results and options.
  */
@@ -2315,28 +2091,20 @@ function route(args, projectPath, opts = {}) {
       }
       return dashboardPipeline(projectPath, opts); // unknown inbox subcommand → safe default
 
+    // Opening a plan is a QUESTION, never a navigation menu. The old screens
+    // (planActions / planActionsMore / reviewActions / discussMenu) asked "What
+    // would you like to do with this plan?" over a list of routes; every one of
+    // them is replaced by `planDecisionScreen`, which renders the plan's BODY and
+    // asks the next real decision — the PRODUCT question when one is waiting, the
+    // gate question only as a fallback. The `more` / `review` / `discuss`
+    // sub-screens are gone: their decisions (delete, edit, critique, reject) are
+    // carried on the one screen, so nothing is reachable only by navigating.
     case 'plan': {
       const ref = args[1]; // stage/file
       if (!ref) {
-        return dashboardPipeline(projectPath, opts);
+        return streamingGate.streamingGateScreen(projectPath);
       }
-      const slashIndex = ref.indexOf('/');
-      if (slashIndex === -1) {
-        return dashboardPipeline(projectPath, opts);
-      }
-      const stage = ref.substring(0, slashIndex);
-      const file = ref.substring(slashIndex + 1);
-
-      if (args[2] === 'more') {
-        return planActionsMore(stage, file, projectPath);
-      }
-      if (args[2] === 'review') {
-        return reviewActions(stage, file, projectPath);
-      }
-      if (args[2] === 'discuss') {
-        return discussMenu(stage, file, projectPath);
-      }
-      return planActions(stage, file, projectPath);
+      return streamingGate.planDecisionScreen(ref, projectPath);
     }
 
     case 'stubs':
@@ -2383,10 +2151,8 @@ module.exports = {
   _buildCleanupItems,
   stageBrowse,
   visionStubsBrowse,
-  planActions,
-  planActionsMore,
-  reviewActions,
-  discussMenu,
+  // planActions / planActionsMore / reviewActions / discussMenu are GONE — opening a
+  // plan is a question now (streaming-gate.planDecisionScreen), not a route list.
   validateScreen,
   // NB2 — task wiring
   taskCommand,
@@ -2398,6 +2164,5 @@ module.exports = {
   buildDashboardTable,
   getVersion,
   STAGE_FOLDERS,
-  NEXT_STAGE,
   HUMAN_GATES
 };

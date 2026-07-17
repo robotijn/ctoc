@@ -14,7 +14,6 @@ related_skills:
   - security/dependency-auditor
   - security/dependency-checker
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read
 model: sonnet
 tier: 2

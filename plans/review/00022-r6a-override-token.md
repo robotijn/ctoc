@@ -1,12 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-15T00:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: "Standing 2026-07-14 orders. R5-B flagged follow-up: the Approve-anyway menu option must carry the override reason so approvePlan records it — today it emits a bare claude:approve with no override, so a forced crossing is not auditable at the menu surface."
----
-
----
 title: "R6-A — Approve-anyway emits the override token so a forced crossing is auditable"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

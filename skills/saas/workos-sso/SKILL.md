@@ -24,7 +24,6 @@ related_skills:
   - compliance/audit-log-checker
   - security/secrets-detector
 effort_level: high
-model_optimized_for: opus-4-7
 model: opus
 tools: Read, Write, Edit, Bash
 ---

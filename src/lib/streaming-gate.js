@@ -111,16 +111,234 @@ function planTitle(plan) {
   return stripCtl(plan.name);
 }
 
+// ── Opening a plan ───────────────────────────────────────────────────────────
+// Every stage a plan file can sit in. `parseRef` above is deliberately narrow (the
+// three approvePlan gate stages); OPENING a plan is legitimate at any stage, so the
+// plan route needs its own, wider parser with the identical traversal guard.
+const ALL_STAGES = Object.freeze({
+  canvas: true,
+  functional: true,
+  implementation: true,
+  todo: true,
+  'in-progress': true,
+  review: true,
+  done: true,
+});
+
+/** Parse a `stage/file.md` ref for ANY known stage, or null when malformed/unsafe. */
+function parseAnyRef(ref) {
+  if (typeof ref !== 'string') return null;
+  const slash = ref.indexOf('/');
+  if (slash === -1) return null;
+  const stage = ref.substring(0, slash);
+  const file = ref.substring(slash + 1);
+  if (!ALL_STAGES[stage]) return null;
+  if (isUnsafePlanFile(file)) return null;
+  return { stage, file };
+}
+
+/**
+ * The refusal screen for a reference that escapes plans/ or names no known stage.
+ * Mirrors menu-screens.invalidPlanRefScreen exactly (same text, same shape). It is
+ * duplicated rather than imported because menu-screens requires THIS module — an
+ * import back would close a load-time cycle.
+ */
+function invalidPlanRefScreen(stage, file) {
+  return {
+    text: `Invalid plan reference: ${stripCtl(String(stage))}/${stripCtl(String(file))}\n${'─'.repeat(40)}\n\n  Refusing a reference that escapes the plans/ directory.\n\n\n`,
+    ask: { questions: [{ question: 'Invalid reference.', header: 'Error', options: [{ label: '◀ Back', description: 'Return to the pending decisions' }] }] },
+    actions: { '◀ Back': '' },
+  };
+}
+
+/**
+ * Drop every LEADING frontmatter block and return the body that follows.
+ *
+ * Plans in this repository routinely carry TWO stacked frontmatter blocks — an
+ * `approved_by: human` approval block, a blank line, then the real
+ * `title`/`type`/`files` block. `state.parseMetadata` already merges stacked blocks
+ * for METADATA (via stale-detector.extractFrontmatterRegion), but rendering needs
+ * the opposite operation: skip ALL of them and show the prose. Skipping only the
+ * first block would print the second block's raw YAML at the top of the body.
+ *
+ * Reading-only: this never edits a plan.
+ *
+ * @param {string} content
+ * @returns {string} the body after the leading frontmatter blocks
+ */
+function stripLeadingFrontmatter(content) {
+  if (typeof content !== 'string' || content.length === 0) return '';
+  const lines = content.split(/\r?\n/);
+  let i = 0;
+  while (i < lines.length && lines[i].trim() === '') i++;
+  while (i < lines.length && lines[i].trim() === '---') {
+    let j = i + 1;
+    let closed = false;
+    while (j < lines.length) {
+      if (lines[j].trim() === '---') { closed = true; break; }
+      j++;
+    }
+    if (!closed) break; // unterminated block — leave the text alone
+    i = j + 1;
+    while (i < lines.length && lines[i].trim() === '') i++;
+  }
+  return lines.slice(i).join('\n');
+}
+
+// A plan body is shown in full up to this many lines; beyond it the body is cut and
+// the cut is DISCLOSED (never silently swallowed).
+const MAX_BODY_LINES = 120;
+
+/**
+ * The plan's body, ready to render: frontmatter dropped, control characters
+ * stripped (a hostile plan must not be able to forge screen rows or emit ANSI), and
+ * bounded to MAX_BODY_LINES with an honest "… N more lines" notice.
+ *
+ * @param {string} content raw plan file content
+ * @returns {string}
+ */
+function renderPlanBody(content) {
+  const body = stripLeadingFrontmatter(content).replace(/\s+$/, '');
+  if (body === '') return '  (this plan file has no body yet)\n';
+  const lines = body.split('\n').map((l) => stripCtl(l));
+  const shown = lines.slice(0, MAX_BODY_LINES);
+  let out = shown.map((l) => (l === '' ? '' : `  ${l}`)).join('\n');
+  if (lines.length > MAX_BODY_LINES) {
+    out += `\n\n  … ${lines.length - MAX_BODY_LINES} more lines — open the file to read the rest.`;
+  }
+  return out + '\n';
+}
+
+/**
+ * The next question for `ref` that the human has not answered yet, or null when
+ * there are no fresh precomputed questions or every one is already answered.
+ *
+ * This is the PRODUCT-question lookup. The questions are written ahead of time by
+ * the dispatcher (`streaming-precompute.writePlanQuestions`) from what the
+ * `product-owner` / vision agents emit and what the adversarial gate-critique fleet
+ * synthesizes. The read is instant and fail-soft — the human NEVER waits for a
+ * critique to run.
+ *
+ * @param {string} root
+ * @param {string} ref
+ * @returns {{ question: object, index: number, total: number }|null}
+ */
+function nextUnansweredQuestion(root, ref) {
+  if (!isNonEmptyStr(root)) return null;
+  let questions;
+  try {
+    // Lazy require avoids a load-time circular dependency (streaming-precompute
+    // requires this module at call time for plansNeedingQuestions).
+    const precompute = require('./streaming-precompute');
+    questions = precompute.loadPlanQuestions(root, ref);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const answered = answeredQuestionIds(root, ref);
+  const index = questions.findIndex((q) => !answered.has(q.id));
+  if (index === -1) return null;
+  return { question: questions[index], index, total: questions.length };
+}
+
+/**
+ * Turn ONE precomputed question into the screen's question + actions. The
+ * recommended option leads (the menu convention); every option's pros/cons are
+ * composed into the description the human reads.
+ *
+ * @param {object} q the Question
+ * @param {string} ref the plan it belongs to
+ * @param {string} header the question header
+ * @returns {{ question: object, actions: object }}
+ */
+function precomputedQuestionParts(q, ref, header) {
+  const ordered = [
+    ...q.options.filter((o) => o.recommended === true),
+    ...q.options.filter((o) => o.recommended !== true),
+  ];
+  const entries = ordered.map((o) => ({
+    key: o.key,
+    label: stripCtl(o.label),
+    description: precomputedOptionDescription(o),
+  }));
+  const actions = {};
+  for (const e of entries) actions[e.label] = `stream answer ${ref} ${q.id} ${e.key}`;
+  return {
+    question: {
+      question: stripCtl(q.prompt),
+      header,
+      options: entries.map((e) => ({ label: e.label, description: e.description })),
+    },
+    actions,
+  };
+}
+
+/**
+ * This plan's ENOUGH-INFORMATION verdict, shaped for DISPLAY.
+ *
+ * The predicate is `streaming-precompute.hasEnoughInformation` — the computable
+ * form of the owner's principle, "the gate is enough information, not human
+ * approval". It answers whether a plan can be built WITHOUT GUESSING: its decision
+ * questions were computed against the CURRENT plan text, and every real fork among
+ * them has been answered. It FAILS CLOSED on every state where the answer is not
+ * known, and that property is preserved here — a predicate that throws degrades to
+ * `enough: false` ('unavailable'), never to a pass.
+ *
+ * ── IT SHOWS. IT DOES NOT CROSS. ─────────────────────────────────────────────
+ * `enough: true` is rendered to the human and nothing more. It must NOT
+ * auto-approve, because `approval-ledger.entryKind` classifies any entry whose
+ * `advanced_by` it does not recognise as `'human'` — so an automatic crossing
+ * would be recorded as the human's own approval. That is a forged approval created
+ * by a classifier default. Auto-crossing is safe only once `entryKind` fails
+ * closed; until then this is display, deliberately.
+ *
+ * The require is LAZY, mirroring `nextUnansweredQuestion` above (the established
+ * idiom in this file). It is not strictly required today — `streaming-precompute`
+ * reaches this module only through its own call-time require, so ONE load-time edge
+ * would not close a cycle. It is kept lazy for consistency with the sibling call
+ * site and so that a future top-level edge from precompute back to here cannot
+ * silently create one.
+ *
+ * @param {string} root project root
+ * @param {string} ref plan reference ("stage/file.md")
+ * @returns {{enough:boolean, reason:string, unansweredQuestionIds:string[],
+ *   blockingQuestionIds:string[]}}
+ */
+function sufficiencyFor(root, ref) {
+  const closed = (reason) => ({ enough: false, reason, unansweredQuestionIds: [], blockingQuestionIds: [] });
+  if (!isNonEmptyStr(root)) return closed('unavailable');
+  try {
+    const { hasEnoughInformation } = require('./streaming-precompute');
+    const v = hasEnoughInformation(root, ref);
+    const ids = (list) => (Array.isArray(list) ? list.map((q) => stripCtl(String(q && q.id))) : []);
+    return {
+      enough: v.enough === true,
+      reason: stripCtl(String(v.reason)),
+      unansweredQuestionIds: ids(v.unanswered),
+      blockingQuestionIds: ids(v.blocking),
+    };
+  } catch {
+    // The predicate could not run. That is IGNORANCE, not sufficiency — fail closed.
+    return closed('unavailable');
+  }
+}
+
 /**
  * The ORDERED list of plans currently sitting at a human gate awaiting the human's
  * approval decision. Pure read: never mutates. Fail-soft: readPlans skips an
  * unreadable/unparseable plan file, and a validator that throws degrades that plan
  * to passesValidation:false rather than crashing the whole list.
  *
+ * Each decision also carries its SUFFICIENCY VERDICT (`enough`,
+ * `sufficiencyReason`, `unansweredQuestionIds`, `blockingQuestionIds`) so the human
+ * SEES whether a plan has enough information to be built and exactly which
+ * questions are still open. Display only — see `sufficiencyFor`.
+ *
  * @param {string} projectRoot
  * @returns {Array<{ref:string, slug:string, title:string, summary:string,
  *   fromStage:string, toStage:string, gateName:string, passesValidation:boolean,
- *   critical:boolean}>}
+ *   critical:boolean, enough:boolean, sufficiencyReason:string,
+ *   unansweredQuestionIds:string[], blockingQuestionIds:string[]}>}
  */
 function pendingGateDecisions(projectRoot) {
   const plansDir = getPlansDir(projectRoot);
@@ -143,8 +361,10 @@ function pendingGateDecisions(projectRoot) {
         passesValidation = false; // an exploding validator → honestly "does not pass"
       }
       const title = planTitle(plan);
+      const ref = `${stage}/${plan.name}.md`;
+      const sufficiency = sufficiencyFor(projectRoot, ref);
       out.push({
-        ref: `${stage}/${plan.name}.md`,
+        ref,
         slug: stripCtl(plan.name),
         title,
         summary: title,
@@ -153,6 +373,11 @@ function pendingGateDecisions(projectRoot) {
         gateName: `Gate ${meta.gate}`,
         passesValidation,
         critical: isCritical(plan.metadata),
+        // The ENOUGH-INFORMATION verdict — shown to the human, acted on by nothing.
+        enough: sufficiency.enough,
+        sufficiencyReason: sufficiency.reason,
+        unansweredQuestionIds: sufficiency.unansweredQuestionIds,
+        blockingQuestionIds: sufficiency.blockingQuestionIds,
       });
     }
   }
@@ -226,42 +451,21 @@ function answeredQuestionIds(root, ref) {
  * @returns {object|null} a { text, ask, actions } screen, or null to fall back
  */
 function richQuestionScreen(d, index, total, statusLine, root) {
-  // Lazy require avoids a load-time circular dependency (streaming-precompute
-  // requires this module at call time for plansNeedingQuestions).
-  const precompute = require('./streaming-precompute');
-  const questions = precompute.loadPlanQuestions(root, d.ref);
-  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const next = nextUnansweredQuestion(root, d.ref);
+  if (next === null) return null; // none / all answered → simple Approve (final gate crossing)
+  const { question: q, index: nextIdx, total: qTotal } = next;
 
-  const answered = answeredQuestionIds(root, d.ref);
-  const nextIdx = questions.findIndex((q) => !answered.has(q.id));
-  if (nextIdx === -1) return null; // all answered → simple Approve (final gate crossing)
-
-  const q = questions[nextIdx];
-
-  // Recommended option first (menu convention), stable otherwise.
-  const ordered = [
-    ...q.options.filter((o) => o.recommended === true),
-    ...q.options.filter((o) => o.recommended !== true),
-  ];
-
-  const optionEntries = ordered.map((o) => ({
-    key: o.key,
-    label: stripCtl(o.label),
-    description: precomputedOptionDescription(o),
-  }));
+  const parts = precomputedQuestionParts(q, d.ref, d.gateName);
+  const actions = Object.assign({}, parts.actions);
 
   // Question options + Skip; add Open the plan only if it fits the harness's
   // 4-explicit-option cap (comment rides the built-in "Other" free-text path).
-  const options = optionEntries.map((e) => ({ label: e.label, description: e.description }));
+  const options = parts.question.options.slice();
   options.push({ label: 'Skip for now', description: 'Move to the next pending decision (nothing is changed).' });
   if (options.length < 4) {
     options.push({ label: 'Open the plan', description: 'View the plan before deciding.' });
   }
 
-  const actions = {};
-  for (const e of optionEntries) {
-    actions[e.label] = `stream answer ${d.ref} ${q.id} ${e.key}`;
-  }
   actions['Skip for now'] = `stream skip ${d.ref}`;
   actions['Open the plan'] = `plan ${d.ref}`;
   actions['Other'] = `stream comment ${d.ref}`;
@@ -269,21 +473,197 @@ function richQuestionScreen(d, index, total, statusLine, root) {
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
   text += `Topic: ${d.slug}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  `
-    + `decision ${index + 1} of ${total}  ·  question ${nextIdx + 1} of ${questions.length}\n`;
+    + `decision ${index + 1} of ${total}  ·  question ${nextIdx + 1} of ${qTotal}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${stripCtl(q.prompt)}\n\n\n`;
 
   return {
     text,
-    ask: {
-      questions: [{
-        question: stripCtl(q.prompt),
-        header: d.gateName,
-        options,
-      }],
-    },
+    ask: { questions: [Object.assign({}, parts.question, { options })] },
     actions,
   };
+}
+
+/**
+ * `plan <ref>` — OPEN a plan. This is a QUESTION, never a navigation menu.
+ *
+ * What it renders:
+ *   text — the plan's BODY. Opening a plan shows the work.
+ *   ask  — the NEXT DECISION about this plan, in priority order:
+ *            1. the PRODUCT question waiting for it (what the application should
+ *               DO), with its precomputed pros/cons and one recommendation;
+ *            2. otherwise, if the plan sits at a human gate, the plain gate
+ *               question — the LAST-RESORT fallback, not the main event;
+ *            3. otherwise the plan-lifecycle decision (critique / edit / delete).
+ *
+ * Every option DOES something. None of them is a route to another list. The plan's
+ * remaining lifecycle decisions ride along as a second question (the established
+ * ride-along pattern — environment, compliance, task board) so that no capability
+ * is lost to AskUserQuestion's four-option cap.
+ *
+ * Pure read: renders only. Nothing here crosses a gate — crossing stays on the
+ * explicit `stream approve`, which routes through the gate-safe `approvePlan`.
+ *
+ * @param {string} ref plan reference ("stage/file.md")
+ * @param {string} projectRoot
+ * @returns {{text: string, ask: object, actions: object}}
+ */
+function planDecisionScreen(ref, projectRoot) {
+  const parsed = parseAnyRef(ref);
+  if (!parsed) {
+    const slash = typeof ref === 'string' ? ref.indexOf('/') : -1;
+    const stage = slash === -1 ? String(ref) : String(ref).substring(0, slash);
+    const file = slash === -1 ? '' : String(ref).substring(slash + 1);
+    return invalidPlanRefScreen(stage, file);
+  }
+  const { stage, file } = parsed;
+  const slug = file.replace(/\.md$/, '');
+  const planPath = path.join(getPlansDir(projectRoot), stage, file);
+
+  let content = '';
+  try {
+    content = safeFs.existsSync(planPath) ? safeFs.readFileSync(planPath, 'utf8') : '';
+  } catch {
+    content = ''; // unreadable → an honest empty body, never a crash
+  }
+
+  const titleMatch = content.match(/^#\s+(.+)$/m);
+  const title = titleMatch ? stripCtl(titleMatch[1].trim()) : slug;
+
+  const gate = GATE_META[stage];
+  const gateLabel = gate ? `  ·  Gate ${gate.gate} (${stage} → ${gate.toStage})` : '';
+
+  let text = `Topic: ${stripCtl(slug)}  ·  [${stripCtl(stage)}]${gateLabel}\n`;
+  text += `${'─'.repeat(40)}\n\n`;
+  text += `  ${title}\n\n`;
+  text += renderPlanBody(content);
+  text += '\n\n';
+
+  const questions = [];
+  const actions = {};
+
+  // 1. The PRODUCT question — what the application should do. Always first.
+  const next = nextUnansweredQuestion(projectRoot, ref);
+  if (next !== null) {
+    const parts = precomputedQuestionParts(
+      next.question,
+      ref,
+      gate ? `Gate ${gate.gate}` : stripCtl(slug)
+    );
+    questions.push(parts.question);
+    Object.assign(actions, parts.actions);
+    actions['Other'] = `stream comment ${ref}`;
+  } else if (gate) {
+    // 2. Fallback: the plain gate question. Reached only when no product question
+    //    is waiting — this is the rubber stamp, kept honest but never promoted.
+    let passes = false;
+    try {
+      const v = validateTransition(planPath, stage, gate.toStage, projectRoot);
+      passes = !(v && v.valid === false);
+    } catch {
+      passes = false;
+    }
+    const approve = {
+      label: 'Approve',
+      description: passes
+        ? 'Recommended — passes validation. Cross the gate now (records approved_by: human).'
+        : 'This plan FAILS validation — approving is refused here. Check what is failing first.',
+    };
+    // `validate <ref>` is the ONLY route to the validation detail screen and to the
+    // deliberate `claude:approve --override` force-crossing — the human's own
+    // escape hatch when they choose to cross past a failed check. It leads when the
+    // plan fails, because then it is the only thing that can move the plan forward.
+    const check = {
+      label: 'Check validation',
+      description: passes
+        ? 'Show the pre-transition validation detail before crossing.'
+        : 'Recommended — show exactly which checks fail, with the option to override.',
+    };
+    const options = passes ? [approve, check] : [check, approve];
+    if (stage === 'review') {
+      options.push({ label: 'Feedback → Functional', description: 'Send back to functional for requirements rework' });
+      options.push({ label: 'Rework → Implementation', description: 'Send back to implementation for technical rework' });
+      actions['Feedback → Functional'] = `claude:reject ${stage}/${file} functional`;
+      actions['Rework → Implementation'] = `claude:reject ${stage}/${file} implementation`;
+    }
+    actions['Approve'] = `stream approve ${ref}`;
+    actions['Check validation'] = `validate ${stage}/${file}`;
+    actions['Other'] = `stream comment ${ref}`;
+    questions.push({
+      question: `Approve ${stripCtl(slug)} across Gate ${gate.gate}?`,
+      header: `Gate ${gate.gate}`,
+      options,
+    });
+  } else {
+    // 3. Not at a gate and nothing precomputed: the plan-lifecycle decision.
+    questions.push({
+      question: `What should happen to ${stripCtl(slug)}?`,
+      header: stripCtl(slug),
+      options: [
+        { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.' },
+        { label: 'View/Edit', description: 'Show the plan, then edit it' },
+        { label: 'Delete', description: 'Remove this plan permanently' },
+      ],
+    });
+    actions['Discuss'] = 'claude:discuss';
+    actions['View/Edit'] = `claude:view-edit ${stage}/${file}`;
+    actions['Delete'] = `claude:delete ${stage}/${file}`;
+  }
+
+  // The plan's remaining lifecycle decisions ride along, so that opening a plan to
+  // answer a product question never costs the human the ability to edit or delete
+  // it. Ride-along only — the primary question above stays the one decision asked.
+  const taken = new Set(questions[0].options.map((o) => o.label));
+  const rest = [
+    { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.', action: 'claude:discuss' },
+    { label: 'View/Edit', description: 'Show the plan, then edit it', action: `claude:view-edit ${stage}/${file}` },
+    { label: 'Delete', description: 'Remove this plan permanently', action: `claude:delete ${stage}/${file}` },
+  ].filter((o) => !taken.has(o.label));
+
+  if (rest.length > 0) {
+    const options = rest.slice(0, 3).map((o) => ({ label: o.label, description: o.description }));
+    options.push({ label: 'Not now', description: 'Nothing else for this plan.' });
+    for (const o of rest.slice(0, 3)) actions[o.label] = o.action;
+    actions['Not now'] = '';
+    questions.push({
+      question: `Anything else for ${stripCtl(slug)}?`,
+      header: 'This plan',
+      options,
+    });
+  }
+
+  return { text, ask: { questions }, actions };
+}
+
+/**
+ * The one line that tells the human whether this plan has ENOUGH INFORMATION to be
+ * built without guessing, and what is still open if not. This is the whole point of
+ * carrying the verdict: a person deciding a gate can see, before they decide,
+ * whether the implementer would have to guess.
+ *
+ * Each not-ready reason is spelled out in plain words — a human should never have
+ * to decode a status code (`not-computed`, `open-forks`) to know what is going on.
+ *
+ * @param {object} d a pendingGateDecisions descriptor
+ * @returns {string}
+ */
+function sufficiencyLine(d) {
+  if (d.enough === true) {
+    return '  Enough information: YES — every decision this plan needs has been answered.\n';
+  }
+  const open = Array.isArray(d.blockingQuestionIds) ? d.blockingQuestionIds : [];
+  const why = {
+    'open-forks': open.length > 0
+      ? `${open.length} decision${open.length === 1 ? '' : 's'} still unanswered (${open.join(', ')})`
+      : 'a decision is still unanswered',
+    'not-computed': 'nobody has worked out what this plan still needs to be asked',
+    'stale': 'the plan changed after its questions were worked out',
+    'invalid': 'the stored questions are unreadable',
+    'unknown-plan': 'the plan file could not be read',
+    'answers-unreadable': 'the answers log could not be read, and a decision is open',
+    'unavailable': 'the check could not run',
+  }[d.sufficiencyReason] || String(d.sufficiencyReason);
+  return `  Enough information: NO — ${why}.\n`;
 }
 
 /** Build the option list; the RECOMMENDED option is placed FIRST (menu convention). */
@@ -365,7 +745,9 @@ function gateScreenAt(decisions, index, statusLine, root) {
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
   text += `Topic: ${d.slug}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  decision ${index + 1} of ${total}\n`;
   text += `${'─'.repeat(40)}\n\n`;
-  text += `  ${d.summary}\n\n\n`;
+  text += `  ${d.summary}\n\n`;
+  text += sufficiencyLine(d);
+  text += '\n\n';
 
   const actions = {
     'Approve': `stream approve ${d.ref}`,
@@ -546,4 +928,5 @@ module.exports = {
   streamSkip,
   streamComment,
   streamAnswer,
+  planDecisionScreen,
 };

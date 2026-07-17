@@ -17,7 +17,6 @@ related_skills:
   - testing/quality-gate-runner
   - testing/smart-test-runner
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read
 model: sonnet
 tier: 2

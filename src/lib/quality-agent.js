@@ -20,6 +20,17 @@
  *    (runLint, runTypecheck, runSmartTests, runFullTests, runSecurityScan,
  *    runTieredChecks, pushToRemote, printSummary) with NO auto-run side effect.
  *    Consumed by src/commands/push.js.
+ *
+ * X4 — READING THE RUNNER. This module's test verdict GATES THE PUSH (src/commands/
+ * push.js blocks on `!passed`), so it reads THREE runner vocabularies — node:test
+ * (`# pass N` / `ℹ pass N`, TAP and spec reporters, colorized or not), jest
+ * (`Tests: N passed`) and mocha (`N passing`) — and it fails CLOSED on an instrument
+ * that was PRESENT but ILLEGIBLE, surfacing the existing `undetermined` state rather
+ * than a green verdict. It cross-checks the exit code against a readable fail count:
+ * a runner that reports failures on stdout and exits 0 anyway is a liar, not a pass.
+ * A project with NO counters at all (a plain assertion script whose exit code IS its
+ * instrument) still passes — refusing it would be a false red, and a guard that cries
+ * wolf gets disabled.
  */
 
 const { execSync, execFileSync } = require('child_process');
@@ -197,6 +208,221 @@ function undeterminedTestsResult(langs) {
   return { passed: false, undetermined: true, passCount: 0, failed: 0, skipped: 0, flaky: 0, output: msg };
 }
 
+// ---------------------------------------------------------------------------
+// X4 — ANSI. Node COLORIZES its reporter output when FORCE_COLOR is set, EVEN WHEN
+// PIPED, so the line these parsers receive is `ESC[32mℹ pass 8ESC[39m`, not `ℹ pass 8`.
+//
+// Mirrored from src/lib/step-13-verify.js (X3), which mirrored src/scripts/test-gate.js
+// (X2) — deliberately NOT imported: neither exports stripAnsi (it has no caller outside
+// itself, and the export fence treats an unreachable export as dead surface).
+//
+// DEBT, RECORDED: this is the THIRD copy. X3 flagged that a shared src/lib/ansi.js is
+// the better answer at two copies; at three that argument is stronger still. It is
+// nonetheless NOT this plan's call — consolidating would change two landed contracts
+// from inside a third plan. Recorded in the plan for the owner to schedule.
+//
+// No new dependency (`strip-ansi` would do this in one import): the repo rule is stdlib
+// and what is already installed. The escape byte is the `\x1b` ESCAPE SEQUENCE, never a
+// raw control byte (invisible in review, mangles diffs). LITERAL RegExp, not
+// `new RegExp(...)`: src/ enforces `security/detect-non-literal-regexp` at error under
+// --max-warnings 0, and warnings are bugs.
+// ---------------------------------------------------------------------------
+const ANSI_PATTERN =
+  /\x1b\[[0-9;:<=>?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
+//  ^ CSI (SGR colour `ESC[31m`, cursor moves)  ^ OSC (hyperlinks/titles)  ^ 2-char escapes
+
+/**
+ * Remove ANSI escape sequences so the line-anchored parsers below see the real first
+ * character of each line rather than an escape byte.
+ * @param {string} text - Raw captured output.
+ * @returns {string} The text with all ANSI escape sequences removed.
+ */
+function stripAnsi(text) {
+  return String(text == null ? '' : text).replace(ANSI_PATTERN, '');
+}
+
+/**
+ * Return the LAST match of `re` (which MUST carry the `g` flag) in `text`, or null.
+ * A runner emits its aggregate summary AFTER all test output, so the last match is the
+ * real one — an earlier stray/spoofed counter must never win over it.
+ * @param {string} text
+ * @param {RegExp} re - a global regex with one capture group.
+ * @returns {RegExpExecArray|null}
+ */
+function lastCap(text, re) {
+  let m;
+  let last = null;
+  while ((m = re.exec(text)) !== null) last = m;
+  return last;
+}
+
+/**
+ * Read the PASSING-test count from a runner's output.
+ *
+ * THREE vocabularies, in precision order (Decision 2: EXTEND, never replace — this
+ * module serves every project CTOC is installed into, not only CTOC's own node:test
+ * suite, and deleting the jest/mocha idiom to fix node:test would be a regression):
+ *
+ *   1. node:test — `# pass 8` (TAP) / `ℹ pass 8` (spec, node's DEFAULT). The idiom is
+ *      `pass`, NOT `passed|passing`; the old regex could not read EITHER reporter, in
+ *      EITHER colour. CTOC's own suite is node:test, so this module was blind to the
+ *      runner CTOC itself uses.
+ *   2. jest — the `Tests: 8 passed, 8 total` summary line, anchored to `Tests:`.
+ *      MEASURED, not assumed: on REAL jest output the old unanchored regex matched
+ *      `Test Suites: 1 passed` FIRST and reported the SUITE count (1) as the test
+ *      count (8). It did not read jest correctly either.
+ *   3. mocha — `8 passing`, anchored to line start.
+ *
+ * Every pattern is LINE-ANCHORED and takes the LAST match, so a counter embedded
+ * mid-line in a TEST NAME (this module's own fixtures name such strings) cannot hijack
+ * the count. The final fallback is the ORIGINAL unanchored `N passed|passing` regex,
+ * kept last so any other runner that used to be read still is — never first, because it
+ * is the imprecise one.
+ *
+ * @param {string} out - Captured runner output (colour tolerated).
+ * @returns {number|null} The passing count, or null when no counter could be read.
+ */
+function parsePassCount(out) {
+  const text = stripAnsi(out);
+  const node = lastCap(text, /^\s*(?:#|ℹ)\s+pass\s+(\d+)/gim);
+  if (node) return parseInt(node[1], 10);
+  const jest = lastCap(text, /^\s*Tests:\s.*?(\d+)\s+passed/gim);
+  if (jest) return parseInt(jest[1], 10);
+  const mocha = lastCap(text, /^\s*(\d+)\s+passing\b/gim);
+  if (mocha) return parseInt(mocha[1], 10);
+  const legacy = text.match(/(\d+)\s*(passed|passing)/i);
+  return legacy ? parseInt(legacy[1], 10) : null;
+}
+
+/**
+ * Read the FAILING-test count from a runner's output.
+ *
+ * Returns NULL — not 0 — when the counter cannot be read. That distinction is the whole
+ * point: a parser whose no-match default is the SUCCESS value is a false-green machine.
+ * Copied from `parseFailCount` in src/lib/step-13-verify.js (X3) and `parseFail` in
+ * src/scripts/test-gate.js (X2).
+ *
+ * EVERY pattern is line-anchored, deliberately: an unanchored fail regex would read a
+ * failure count out of a TEST NAME and block a legitimate push — a FALSE RED on the one
+ * verdict that gates shipping.
+ *
+ * @param {string} out - Captured runner output (colour tolerated).
+ * @returns {number|null} The failing count, or null when unreadable.
+ */
+function parseFailCount(out) {
+  const text = stripAnsi(out);
+  const node = lastCap(text, /^\s*(?:#|ℹ)\s+fail\s+(\d+)/gim);
+  if (node) return parseInt(node[1], 10);
+  const jest = lastCap(text, /^\s*Tests:\s.*?(\d+)\s+failed/gim);
+  if (jest) return parseInt(jest[1], 10);
+  const mocha = lastCap(text, /^\s*(\d+)\s+failing\b/gim);
+  if (mocha) return parseInt(mocha[1], 10);
+  return null;
+}
+
+/**
+ * Read the SKIPPED/TODO test count from a runner's output.
+ *
+ * Mirrors `parseSkippedCount` in src/lib/step-13-verify.js. This module used to return a
+ * HARDCODED `0` for every run — so it did not enforce CLAUDE.md's "0 skipped" contract,
+ * it ASSERTED compliance with it, whatever the run actually did.
+ *
+ * @param {string} out - Captured runner output (colour tolerated).
+ * @returns {number} The skipped+todo count (0 when none is reported).
+ */
+function parseSkippedCount(out) {
+  let n = 0;
+  const text = stripAnsi(out);
+  for (const re of [/(?:#|ℹ)\s*skipped\s+(\d+)/ig, /(?:#|ℹ)\s*todo\s+(\d+)/ig]) {
+    let m;
+    while ((m = re.exec(text)) !== null) n += parseInt(m[1], 10);
+  }
+  if (n === 0) {
+    const mSkip = text.match(/(\d+)\s+skipped/i);
+    if (mSkip) n += parseInt(mSkip[1], 10);
+    const mPend = text.match(/(\d+)\s+pending/i);
+    if (mPend) n += parseInt(mPend[1], 10);
+  }
+  return n;
+}
+
+/**
+ * True when the output carries evidence that a node:test-shaped runner reported a
+ * SUMMARY — i.e. the instrument this module claims to read was PRESENT.
+ *
+ * MIRRORED VERBATIM from `hasTestSummaryEvidence` in src/lib/step-13-verify.js (X3),
+ * deliberately unchanged. It is the boundary that keeps the fail-closed rule from
+ * becoming a FALSE RED — which would be worse than the false green it replaces, because
+ * a guard that cries wolf gets disabled. A project whose runner is not node:test at all
+ * (`node test/widget.test.js` printing `ok: ...` and exiting 0 — what
+ * tests/greenfield-journey.test.js seeds) has output, no fail line, and ITS EXIT CODE IS
+ * ITS INSTRUMENT: it reported success and there is no illegible dial to fail on.
+ *
+ * The rule is therefore narrower than "output but no fail line": the run must LOOK like
+ * the thing we parse. When it does and the fail count still cannot be read, the run is
+ * UNCERTIFIED.
+ *
+ * @param {string} out - Captured runner output (colour tolerated).
+ * @returns {boolean} Whether a node:test-shaped fail counter should have been readable.
+ */
+function hasTestSummaryEvidence(out) {
+  const text = stripAnsi(out);
+  return (
+    // A sibling summary counter from the same block as `fail` (TAP `#` or spec `ℹ`).
+    /^\s*(?:#|ℹ)\s+(?:tests|suites|pass|cancelled|skipped|todo|duration_ms)\b/im.test(text)
+    // A fail-SHAPED counter line we could not read a number out of — a renamed key
+    // (`ℹ failures 2`) or a malformed value. The dial is there; it is illegible.
+    || /^\s*(?:#|ℹ)\s+fail\w*\b/im.test(text)
+    // Raw TAP failure output with no readable aggregate: failures are evident and
+    // unquantified. That is uncertified, never clean.
+    || /^\s*not ok\b/im.test(text)
+    || /^\s*TAP version\b/im.test(text)
+  );
+}
+
+/**
+ * Read every counter out of ONE runner's exit-0 output in a single pass.
+ *
+ * `failCount` is null when unreadable; `unreadable` is true ONLY when the instrument was
+ * PRESENT but illegible (see hasTestSummaryEvidence) — never merely because no counter
+ * exists.
+ *
+ * @param {string} out - Captured runner output.
+ * @returns {{passCount: number, failCount: (number|null), skipped: number, unreadable: boolean}}
+ */
+function readRunnerCounters(out) {
+  const failCount = parseFailCount(out);
+  const passCount = parsePassCount(out);
+  return {
+    passCount: passCount === null ? 0 : passCount,
+    failCount,
+    skipped: parseSkippedCount(out),
+    unreadable: failCount === null && hasTestSummaryEvidence(out)
+  };
+}
+
+/**
+ * The NON-pass result for a run whose instrument was PRESENT but ILLEGIBLE.
+ *
+ * Decision 4: reuses this module's EXISTING `undetermined` state rather than inventing a
+ * fourth one — consumers (push.js) block on `!passed`, so undetermined already blocks,
+ * and `undetermined:true` tells the human WHY it is not a pass. "I could not read the
+ * fail count" and "there were zero failures" are different facts and must never produce
+ * the same verdict.
+ *
+ * @param {string} lang - The language whose runner went unread.
+ * @param {number} passCount - Passing tests counted so far.
+ * @param {number} skipped - Skipped tests counted so far.
+ * @returns {{passed:false, undetermined:true, passCount:number, failed:number, skipped:number, flaky:number, output:string}}
+ */
+function unreadableTestsResult(lang, passCount, skipped) {
+  const msg = `tests undetermined — NOT verified for ${lang}: the runner reported a test `
+    + 'summary but its fail counter could not be read. An unreadable instrument is not a '
+    + 'clean run — this run is UNCERTIFIED, not green.';
+  console.log(`   ${msg}`);
+  return { passed: false, undetermined: true, passCount, failed: 0, skipped, flaky: 0, output: msg };
+}
+
 /**
  * Run lint check
  */
@@ -257,8 +483,9 @@ function runSpecificTests(tools, testFiles) {
 
   let totalPassed = 0;
   let totalFailed = 0;
+  let totalSkipped = 0;
 
-  for (const [_lang, langTools] of Object.entries(tools)) {
+  for (const [lang, langTools] of Object.entries(tools)) {
     if (!langTools.test) continue;
 
     // COMMAND-INJECTION FIX: testFiles come from .ctoc/state/coverage-map.json
@@ -301,24 +528,40 @@ function runSpecificTests(tools, testFiles) {
         passed: false,
         passCount: totalPassed,
         failed: totalFailed + 1,
-        skipped: 0,
+        skipped: totalSkipped + parseSkippedCount(result.output),
         flaky: 0,
         output: result.output || result.error
       };
     }
 
-    // Try to parse pass count from output
-    const passMatch = result.output?.match(/(\d+)\s*(passed|passing)/i);
-    if (passMatch) {
-      totalPassed += parseInt(passMatch[1]);
+    // X4 — the runner exited 0. That is its CLAIM, not a verdict: read the instrument
+    // and cross-check it. Same contract as runFullTests below.
+    const counters = readRunnerCounters(result.output);
+
+    if (counters.unreadable) {
+      return unreadableTestsResult(lang, totalPassed, totalSkipped);
     }
+
+    if (counters.failCount !== null && counters.failCount > 0) {
+      return {
+        passed: false,
+        passCount: totalPassed + counters.passCount,
+        failed: totalFailed + counters.failCount,
+        skipped: totalSkipped + counters.skipped,
+        flaky: 0,
+        output: result.output
+      };
+    }
+
+    totalPassed += counters.passCount;
+    totalSkipped += counters.skipped;
   }
 
   return {
     passed: true,
     passCount: totalPassed,
     failed: 0,
-    skipped: 0,
+    skipped: totalSkipped,
     flaky: 0
   };
 }
@@ -361,17 +604,39 @@ async function runFullTests(tools) {
         passed: false,
         passCount: totalPassed,
         failed: totalFailed + 1,
-        skipped: totalSkipped,
+        skipped: totalSkipped + parseSkippedCount(output),
         flaky: 0,
         output
       };
     }
 
-    // Try to parse pass count from output
-    const passMatch = result.output?.match(/(\d+)\s*(passed|passing)/i);
-    if (passMatch) {
-      totalPassed += parseInt(passMatch[1]);
+    // X4 — the runner exited 0. Do NOT take that as the verdict on its own: a runner can
+    // report FAILURES on stdout yet exit 0 (a wrapping `|| true`, `set +e`, jest
+    // --passWithNoTests, or a reporter that swallows the child's exit code). This module's
+    // verdict gates the push, so read the instrument and cross-check the claim.
+    const counters = readRunnerCounters(result.output);
+
+    if (counters.unreadable) {
+      // The instrument was THERE and we could not read it → UNCERTIFIED, never clean.
+      // Only fires when a summary was actually reported: a plain assertion script that
+      // printed a line and exited 0 has no illegible dial and stays green (Decision 1).
+      return unreadableTestsResult(lang, totalPassed, totalSkipped);
     }
+
+    if (counters.failCount !== null && counters.failCount > 0) {
+      console.log(`   ${counters.failCount} failing test(s) reported despite exit 0 — NOT a pass`);
+      return {
+        passed: false,
+        passCount: totalPassed + counters.passCount,
+        failed: totalFailed + counters.failCount,
+        skipped: totalSkipped + counters.skipped,
+        flaky: 0,
+        output: result.output
+      };
+    }
+
+    totalPassed += counters.passCount;
+    totalSkipped += counters.skipped;
   }
 
   console.log(`   Tests passed (${totalPassed} total)`);
@@ -379,7 +644,10 @@ async function runFullTests(tools) {
     passed: true,
     passCount: totalPassed,
     failed: 0,
-    skipped: 0,
+    // X4: the REAL count, read from the output — never a hardcoded 0. Reporting is this
+    // module's job; the "0 skipped" contract is enforced at Step 14 VERIFY, whose
+    // threshold this plan deliberately does not touch.
+    skipped: totalSkipped,
     flaky: 0
   };
 }

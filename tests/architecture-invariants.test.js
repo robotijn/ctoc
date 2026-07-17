@@ -171,10 +171,12 @@ describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
   });
 
   // v6.9.11: pin the dispatch-graph semantics for Tier 1.
-  // Tier 1 may dispatch its own children (Tier 2 specialists + Tier 3 scouts)
-  // — this is needed for parallel critic fan-out in the refinement loop and
-  // for Iron Loop step orchestration. It MUST NOT dispatch peer Tier 1 agents
-  // (no cross-orchestrator cascading). The matching budget is max_subagents: 10.
+  // Tier 1 may dispatch its own children (Tier 2 specialists) — this is needed
+  // for parallel critic fan-out in the refinement loop and for Iron Loop step
+  // orchestration. It MUST NOT dispatch peer Tier 1 agents (no cross-orchestrator
+  // cascading). The matching budget is max_subagents: 10.
+  // v6.12.79 (plan F3b): the tier_3 arms of these assertions were removed — Tier 3
+  // is deleted, and its absence is fenced by tests/no-tier-3.test.js.
   describe('Dispatch graph — Tier 1 children + peer-dispatch ban', () => {
     const tierDefsPath = path.join(projectRoot, '.ctoc', 'architecture', 'tier-definitions.yaml');
     const content = fs.existsSync(tierDefsPath) ? fs.readFileSync(tierDefsPath, 'utf8') : '';
@@ -187,11 +189,11 @@ describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
       return m ? m[1] : null;
     }
 
-    it('tier_1 in who_can_dispatch lists tier_2 and tier_3', () => {
+    it('tier_1 in who_can_dispatch lists tier_2', () => {
       const t1 = extractWhoCanDispatchLine('tier_1');
       assert.ok(t1, 'tier_1 entry missing from who_can_dispatch');
       assert.match(t1, /tier_2/, 'tier_1 must dispatch tier_2 (refinement loop fan-out)');
-      assert.match(t1, /tier_3/, 'tier_1 must dispatch tier_3 (scout pre-screens)');
+      assert.doesNotMatch(t1, /tier_3/, 'tier_3 is deleted — tier_1 must not dispatch it');
     });
 
     it('tier_1 does NOT dispatch peer tier_1 (no cross-orchestrator cascading)', () => {
@@ -207,11 +209,14 @@ describe('v8 Architecture — Tier 1 (Sub-orchestrators)', () => {
         'tier_1.effort_budget.max_subagents must remain 10 to support refinement-loop critic fan-out');
     });
 
-    it('tier_2 and tier_3 still cannot dispatch (leaf agents)', () => {
+    it('tier_2 still cannot dispatch (leaf agents)', () => {
       const t2 = extractWhoCanDispatchLine('tier_2');
-      const t3 = extractWhoCanDispatchLine('tier_3');
       assert.equal(t2, '[]', 'tier_2 must not dispatch');
-      assert.equal(t3, '[]', 'tier_3 must not dispatch');
+      assert.equal(
+        extractWhoCanDispatchLine('tier_3'),
+        null,
+        'tier_3 must not appear in who_can_dispatch — the tier is deleted'
+      );
     });
   });
 });
@@ -250,52 +255,17 @@ describe('v8 Architecture — Tier 2 (Specialist skills)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
-//  Tier 3: Scouts
+//  Tier 3 (Scouts) — DELETED by plan F3b (v6.12.79).
+//
+//  The three assertions that stood here contracted a thing that no longer
+//  exists: that ≥ 5 scouts exist under agents/scouts/; that each declares
+//  tier: 3 + model: haiku; and that each declares short_circuits: to the Tier 2
+//  specialist it may suppress. Removing an assertion about a deleted thing is
+//  not green-washing — the contract itself is gone.
+//
+//  The INVERSE assertions now live in tests/no-tier-3.test.js, which fails if
+//  the directory, the haiku model, or the short_circuits key ever return.
 // ─────────────────────────────────────────────────────────────────────
-
-describe('v8 Architecture — Tier 3 (Scouts)', () => {
-  it('at least 5 scouts exist under agents/scouts/', () => {
-    const scoutsDir = path.join(projectRoot, 'agents', 'scouts');
-    assert.ok(fs.existsSync(scoutsDir), 'agents/scouts/ must exist');
-    const files = fs.readdirSync(scoutsDir).filter(f => f.endsWith('.md'));
-    assert.ok(files.length >= 5, `expected ≥ 5 scouts, got ${files.length}`);
-  });
-
-  it('every scout declares tier: 3, model: haiku, parallel_safe: true, reports_to: cto-chief', () => {
-    // Scouts run as Task-tool SUBAGENTS — fresh agent instance with isolated 200K
-    // context. The Haiku model is safe at the subagent layer because subagent
-    // context is independent of the user's terminal session. See
-    // docs/AGENT_ARCHITECTURE.md § "Front-process vs subagent model rules".
-    const scoutsDir = path.join(projectRoot, 'agents', 'scouts');
-    const files = fs.readdirSync(scoutsDir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => path.join(scoutsDir, f));
-
-    for (const scout of files) {
-      const { fm } = readFM(scout);
-      const rel = path.relative(projectRoot, scout);
-      assert.match(fm, /^tier:\s*3$/m, `${rel} missing tier: 3`);
-      assert.match(fm, /^model:\s*haiku$/m, `${rel} scouts must declare model: haiku (Task-tool subagent, isolated context)`);
-      assert.match(fm, /model_optimized_for:\s*haiku-4-5/, `${rel} must be optimized for haiku-4-5`);
-      assert.match(fm, /parallel_safe:\s*true/, `${rel} scouts must be parallel_safe`);
-      assert.match(fm, /reports_to:\s*cto-chief/, `${rel} scouts must report to cto-chief`);
-      assert.match(fm, /dispatch_protocol:\s*v1/, `${rel} must declare dispatch_protocol: v1`);
-    }
-  });
-
-  it('every scout declares short_circuits to a Tier 2 specialist', () => {
-    const scoutsDir = path.join(projectRoot, 'agents', 'scouts');
-    const files = fs.readdirSync(scoutsDir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => path.join(scoutsDir, f));
-
-    for (const scout of files) {
-      const { fm } = readFM(scout);
-      const rel = path.relative(projectRoot, scout);
-      assert.match(fm, /short_circuits:\s*\S+/, `${rel} must declare short_circuits target`);
-    }
-  });
-});
 
 // ─────────────────────────────────────────────────────────────────────
 //  Documents exist
@@ -318,7 +288,10 @@ describe('v8 Architecture — Companion documents', () => {
     assert.ok(fs.existsSync(path.join(projectRoot, '.ctoc', 'architecture', 'dispatch-schema.yaml')));
   });
 
-  it('.ctoc/security/known-bad-deps.yaml exists (for dep-scout)', () => {
+  // Retained deliberately after plan F3b deleted the pre-screen that read it:
+  // this is curated CVE DATA, not an agent. Deleting an agent must never delete
+  // the data it happened to read — security/dependency-auditor (opus) wants it.
+  it('.ctoc/security/known-bad-deps.yaml exists (curated CVE data)', () => {
     assert.ok(fs.existsSync(path.join(projectRoot, '.ctoc', 'security', 'known-bad-deps.yaml')));
   });
 });
@@ -327,7 +300,8 @@ describe('v8 Architecture — Companion documents', () => {
 //  Dispatch authority invariant
 //
 //  Per the architecture: only Tier 0 issues dispatches. Tier 2 specialists
-//  must declare max_subagents: 0 (cannot dispatch). Tier 3 scouts likewise.
+//  must declare max_subagents: 0 (cannot dispatch). Tier 2 is the leaf tier —
+//  Tier 3 was deleted by plan F3b.
 // ─────────────────────────────────────────────────────────────────────
 
 describe('v8 Architecture — Dispatch authority', () => {
@@ -348,18 +322,12 @@ describe('v8 Architecture — Dispatch authority', () => {
     }
   });
 
-  it('all Tier 3 scouts declare max_subagents: 0', () => {
-    const scoutsDir = path.join(projectRoot, 'agents', 'scouts');
-    if (!fs.existsSync(scoutsDir)) return;
-    const files = fs.readdirSync(scoutsDir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => path.join(scoutsDir, f));
-    for (const scout of files) {
-      const { fm } = readFM(scout);
-      const rel = path.relative(projectRoot, scout);
-      assert.match(fm, /max_subagents:\s*0/, `${rel} Tier 3 must have max_subagents: 0`);
-    }
-  });
+  // DELETED by plan F3b: 'all Tier 3 scouts declare max_subagents: 0'. Note this
+  // assertion opened with `if (!fs.existsSync(scoutsDir)) return;` — with the
+  // directory gone it would have returned early and reported GREEN having asserted
+  // NOTHING, which is the silent-pass pattern CLAUDE.md bans outright. It is
+  // removed rather than left to pass vacuously. tests/no-tier-3.test.js asserts the
+  // directory's absence loudly instead.
 });
 
 // ─────────────────────────────────────────────────────────────────────

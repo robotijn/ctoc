@@ -25,7 +25,6 @@ related_skills:
   - security/secrets-detector
   - frontend/bundle-analyzer
 effort_level: low
-model_optimized_for: opus-4-7
 model: sonnet
 tools: Read, Write, Bash
 ---

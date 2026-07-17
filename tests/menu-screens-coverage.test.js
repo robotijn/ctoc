@@ -126,25 +126,29 @@ afterEach(() => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 describe('invalid plan reference — traversal + unknown-stage refusal', () => {
-  test('planActions_with_unknown_stage_returns_refusal_screen_not_a_crash', () => {
+  // The plan-menu screens these tests used to call (planActions / planActionsMore /
+  // reviewActions) are gone — opening a plan is a question now. The REFUSAL contract
+  // they guarded is unchanged and is re-asserted here through the real `plan` route,
+  // which is how a human actually reaches it. Driving the route instead of the
+  // deleted function is strictly closer to the human's path, not further from it.
+  test('plan_route_with_unknown_stage_returns_refusal_screen_not_a_crash', () => {
     const root = mkProject();
-    const r = menu.planActions('nonsense-stage', 'x.md', root);
+    const r = menu.route(['plan', 'nonsense-stage/x.md'], root);
     assert.match(r.text, /Invalid plan reference: nonsense-stage\/x\.md/);
     assert.deepEqual(r.actions, { '◀ Back': '' });
   });
 
-  test('planActions_with_traversal_filename_is_refused_before_path_join', () => {
+  test('plan_route_with_traversal_filename_is_refused_before_path_join', () => {
     const root = mkProject();
-    const r = menu.planActions('functional', '../../etc/passwd', root);
+    const r = menu.route(['plan', 'functional/../../etc/passwd'], root);
     assert.match(r.text, /Invalid plan reference/);
     assert.match(r.text, /escapes the plans\/ directory/);
   });
 
-  test('planActionsMore_and_reviewActions_and_validateScreen_refuse_traversal', () => {
+  test('plan_route_and_validateScreen_refuse_traversal', () => {
     const root = mkProject();
-    // reviewActions defaults folder to 'review', so the traversal check is the guard.
-    assert.match(menu.planActionsMore('functional', 'a/b.md', root).text, /Invalid plan reference/);
-    assert.match(menu.reviewActions('review', '..', root).text, /Invalid plan reference/);
+    assert.match(menu.route(['plan', 'functional/a/b.md'], root).text, /Invalid plan reference/);
+    assert.match(menu.route(['plan', 'review/..'], root).text, /Invalid plan reference/);
     assert.match(menu.validateScreen('functional', 'sub\\dir.md', root).text, /Invalid plan reference/);
   });
 
@@ -1024,19 +1028,45 @@ describe('router — every arm', () => {
     }
   });
 
-  test('plan_route_without_a_ref_or_without_a_slash_falls_back_to_the_dashboard', () => {
+  // `plan` with no ref used to fall back to the DASHBOARD's section list. There is
+  // no dashboard fallback any more: the menu was replaced by questions, so a bare
+  // `plan` lands on the streaming question — and a malformed ref is now REFUSED
+  // outright rather than silently swallowed into a navigation screen. Both are
+  // tighter than the behaviour they replace: one asks, the other tells the truth.
+  test('plan_route_without_a_ref_asks_a_question_instead_of_showing_a_dashboard', () => {
     const root = mkProject();
-    assert.ok(menu.route(['plan'], root).ask.questions[0].options.some(o => o.label === 'Business'));
-    assert.ok(menu.route(['plan', 'noslash'], root).ask.questions[0].options.some(o => o.label === 'Business'));
+    const r = menu.route(['plan'], root);
+    assert.ok(r.ask.questions[0].question.length > 0, 'a bare `plan` must still ASK something');
+    assert.ok(
+      !r.ask.questions[0].options.some(o => o.label === 'Business'),
+      'the section-navigation dashboard must not be the fallback any more'
+    );
   });
 
-  test('plan_route_with_more_review_discuss_suffixes_reach_the_right_screens', () => {
+  test('plan_route_without_a_slash_is_refused_as_a_malformed_reference', () => {
+    const root = mkProject();
+    assert.match(menu.route(['plan', 'noslash'], root).text, /Invalid plan reference/);
+  });
+
+  test('plan_route_more_review_discuss_suffixes_no_longer_open_sub_menus', () => {
     const root = mkProject();
     writePlan(root, 'functional', 'pp');
-    assert.ok(menu.route(['plan', 'functional/pp.md', 'more'], root).ask.questions[0].options.some(o => o.label === 'Delete'));
-    assert.ok(menu.route(['plan', 'functional/pp.md', 'discuss'], root).ask.questions[0].options.some(o => o.label === 'Continue'));
     writePlan(root, 'review', 'rr');
-    assert.ok(menu.route(['plan', 'review/rr.md', 'review'], root).ask.questions[0].options.some(o => o.label.includes('Approve → Done')));
+
+    // The three sub-screens are gone. Their decisions live on the one plan screen,
+    // so a stale suffix must degrade to that screen — never to a navigation list.
+    for (const [ref, suffix] of [['functional/pp.md', 'more'], ['functional/pp.md', 'discuss'], ['review/rr.md', 'review']]) {
+      const r = menu.route(['plan', ref, suffix], root);
+      const labels = r.ask.questions.flatMap(q => q.options.map(o => o.label));
+      assert.deepEqual(
+        labels.filter(l => /Back to list|◀ Actions|Continue|Apply edits/.test(l)),
+        [],
+        `plan ${ref} ${suffix} must not resurrect a navigation sub-menu`
+      );
+      // The plan's real decisions are still all there, on the one screen.
+      assert.ok(labels.includes('Discuss'), 'critique survives');
+      assert.ok(labels.includes('Delete'), 'delete survives');
+    }
   });
 
   test('validate_route_without_a_ref_or_without_a_slash_falls_back_to_the_dashboard', () => {

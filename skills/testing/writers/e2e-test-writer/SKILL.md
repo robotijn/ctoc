@@ -14,7 +14,6 @@ related_skills:
   - testing/runners/e2e-test-runner
   - testing/writers/integration-test-writer
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Write, Edit, Bash
 model: opus
 tier: 2

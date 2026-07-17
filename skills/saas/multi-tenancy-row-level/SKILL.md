@@ -21,7 +21,6 @@ related_skills:
   - security/sast-scanner
   - specialized/database-reviewer
 effort_level: high
-model_optimized_for: opus-4-7
 model: opus
 tools: Read, Write, Edit, Bash, Grep
 ---

@@ -1,20 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T20:15:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's standing 2026-07-14 orders ("fix them all",
-  "fix everything", "keep fixing the code"). Verified by the coordinator on
-  disk: reachability.js:496 treats a bare token match in ANY markdown prose as
-  a live caller (so completeExecution — the export the fence exists for — is
-  "live" only because two .md files spell its name); init-project.js:536 still
-  writes the `push: auto_push: true` placebo the v6.12.4 commit message wrongly
-  claimed was deleted; sync.js:156 moveToReviewAfterPush renames into review/
-  with no evidence, has zero callers, and is default-ON via a visible setting.
----
-
----
 title: "R4-B — A fence prose cannot disarm; every placebo switch deleted"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

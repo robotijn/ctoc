@@ -4,7 +4,7 @@
  * Streaming PRE-COMPUTE core — the FILE LAYER behind the ahead-of-time streaming
  * questions model.
  *
- * The owner's requirement, in two halves:
+ * The owner's requirement, in three parts:
  *
  *   1. BACKGROUND, ahead of time — a critique subagent pre-critiques each plan
  *      sitting at a gate and writes its decision QUESTIONS (each with pros, cons,
@@ -18,9 +18,17 @@
  *      back to the simple Approve question). The human NEVER waits for a critique
  *      to run.
  *
+ *   3. THE GATE CONDITION — is there ENOUGH INFORMATION to build this plan without
+ *      guessing? `planQuestionsStatus` names WHY the questions are or are not
+ *      usable ('ready' | 'not-computed' | 'stale' | 'invalid' | 'unknown-plan'),
+ *      and `hasEnoughInformation` answers the predicate itself by cross-referencing
+ *      those questions against the human's recorded answers. It FAILS CLOSED on
+ *      every state where the answer is not known. This module ships the PREDICATE
+ *      only — it wires into no gate, crosses nothing, and stamps no approval.
+ *
  * Everything here is pure/near-pure, FAIL-SOFT (never throws to the caller — a
- * bad/absent/stale file degrades to `null` / `{ok:false}`), and cross-platform
- * (path.join, safeFs, os-agnostic).
+ * bad/absent/stale file degrades to `null` / `{ok:false}` / a closed verdict), and
+ * cross-platform (path.join, safeFs, os-agnostic).
  *
  * ── The per-plan questions file ────────────────────────────────────────────────
  * Path:    <root>/.ctoc/streaming/questions/<sanitized-ref>.json
@@ -259,55 +267,138 @@ function writePlanQuestions(root, ref, questions, planMtimeMs) {
 }
 
 /**
+ * The per-plan questions' STATE — a discriminated result that names WHY the
+ * questions are or are not usable. This is the read `loadPlanQuestions` is built
+ * on, and the one the ENOUGH-INFORMATION gate needs: the gate must fail closed on
+ * every not-ready state, but "never computed" (→ the dispatcher should generate
+ * them) is a different instruction from "corrupt" (→ repair) or "the plan is gone"
+ * (→ nothing to do). One `null` cannot carry that.
+ *
+ *   { status: 'ready',        questions, reason }  computed AND fresh. `questions`
+ *                                                  MAY be [] — the honest "the
+ *                                                  critique ran and found nothing
+ *                                                  to ask". That is a REAL state.
+ *   { status: 'not-computed', reason }             no questions file — never generated.
+ *   { status: 'stale',        reason }             computed, but the plan changed since.
+ *   { status: 'invalid',      errors, reason }     the file exists but is unreadable,
+ *                                                  unparseable, structurally wrong,
+ *                                                  carries invalid questions, or has an
+ *                                                  unevaluable freshness stamp.
+ *   { status: 'unknown-plan', reason }             the ref is malformed, or no plan file.
+ *
+ * Every status carries a plain-language `reason` so a caller never has to invent
+ * the explanation it shows a human. PURE-ish and NEVER throws: every failure path
+ * returns a status.
+ *
+ * ── Order of checks (deliberate) ───────────────────────────────────────────────
+ * The PLAN is resolved and stat-ed BEFORE the questions file is read, so a ref
+ * that names no plan reports 'unknown-plan' rather than 'not-computed' — the
+ * latter would tell the dispatcher to go generate questions for a plan that does
+ * not exist. This order is unobservable through `loadPlanQuestions`, whose every
+ * non-ready branch collapses to the same `null`.
+ *
+ * @param {string} root project root
+ * @param {string} ref plan reference ("stage/file.md")
+ * @returns {{status:string, questions?:Array<object>, errors?:string[], reason:string}}
+ */
+function planQuestionsStatus(root, ref) {
+  const shownRef = typeof ref === 'string' ? ref : typeof ref;
+
+  // 1. The ref must name a plan that EXISTS. A questions file for a plan that is
+  //    gone (or a ref that escapes plans/) describes nothing.
+  const file = questionsPath(root, ref);
+  const planPath = refToPlanPath(root, ref);
+  if (file === null || planPath === null) {
+    return { status: 'unknown-plan', reason: `${shownRef} is not a valid plan reference` };
+  }
+  let currentMtimeMs;
+  try {
+    currentMtimeMs = safeFs.statSync(planPath).mtimeMs;
+  } catch {
+    return { status: 'unknown-plan', reason: `there is no plan file at ${shownRef}` };
+  }
+
+  // 2. The questions file: absent is NOT-COMPUTED (generate it); anything present
+  //    but unreadable is INVALID (repair it). These are different instructions.
+  let raw;
+  try {
+    if (!safeFs.existsSync(file)) {
+      return { status: 'not-computed', reason: `no questions have been generated for ${shownRef} yet` };
+    }
+    raw = safeFs.readFileSync(file, 'utf8');
+  } catch (err) {
+    return {
+      status: 'invalid',
+      errors: [(err && err.message) || String(err)],
+      reason: `the questions file for ${shownRef} could not be read`,
+    };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return {
+      status: 'invalid',
+      errors: [(err && err.message) || String(err)],
+      reason: `the questions file for ${shownRef} is not valid JSON`,
+    };
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {
+      status: 'invalid',
+      errors: [`the questions file must contain an object; got ${parsed === null ? 'null' : Array.isArray(parsed) ? 'an array' : typeof parsed}`],
+      reason: `the questions file for ${shownRef} has the wrong shape`,
+    };
+  }
+
+  const { valid, errors } = validatePlanQuestions(parsed.questions);
+  if (!valid) {
+    return { status: 'invalid', errors, reason: `the questions stored for ${shownRef} do not meet the questions contract` };
+  }
+
+  // 3. STALENESS: the stored generation stamp must not be older than the plan's
+  //    CURRENT mtime. A stamp that is not a finite number makes freshness
+  //    unevaluable — that is a corrupt file, not merely an outdated one.
+  const storedMtimeMs = Number(parsed.planMtimeMs);
+  if (!Number.isFinite(storedMtimeMs)) {
+    return {
+      status: 'invalid',
+      errors: [`planMtimeMs must be a finite number; got ${JSON.stringify(parsed.planMtimeMs)}`],
+      reason: `the questions file for ${shownRef} has no usable freshness stamp`,
+    };
+  }
+  if (storedMtimeMs < currentMtimeMs) {
+    return {
+      status: 'stale',
+      reason: `${shownRef} changed after its questions were generated (generated against mtime ${storedMtimeMs}, the plan is now ${currentMtimeMs})`,
+    };
+  }
+
+  return { status: 'ready', questions: parsed.questions, reason: `${shownRef} has fresh precomputed questions` };
+}
+
+/**
  * Read the per-plan questions for `ref` and return the `questions[]` array ONLY
  * when the file is present, parseable, valid, AND FRESH. Returns `null` — NEVER
  * throws — for every not-ready case: absent, unreadable, unparseable, structurally
  * wrong, questions invalid, or STALE (the stored planMtimeMs is older than the
  * plan file's current mtime, or the plan file is gone).
  *
+ * A THIN WRAPPER over `planQuestionsStatus` — deliberately, so the staleness rule
+ * and the questions contract have exactly ONE implementation and cannot drift
+ * apart. The `Array|null` contract is unchanged: `ready` yields its questions
+ * (INCLUDING the empty array for a computed set with nothing to ask — that has
+ * always been `[]`, never `null`), every other status yields `null`.
+ *
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
  * @returns {Array<object>|null}
  */
 function loadPlanQuestions(root, ref) {
-  const file = questionsPath(root, ref);
-  if (file === null) return null;
-
-  let raw;
-  try {
-    if (!safeFs.existsSync(file)) return null; // absent → not ready
-    raw = safeFs.readFileSync(file, 'utf8');
-  } catch {
-    return null; // unreadable → not ready
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null; // unparseable → not ready
-  }
-
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-
-  const { valid } = validatePlanQuestions(parsed.questions);
-  if (!valid) return null;
-
-  // STALENESS: the plan's CURRENT mtime must not be newer than the generation
-  // stamp. A missing plan file (statSync throws) is treated as stale (not ready).
-  const planPath = refToPlanPath(root, ref);
-  if (planPath === null) return null;
-  let currentMtimeMs;
-  try {
-    currentMtimeMs = safeFs.statSync(planPath).mtimeMs;
-  } catch {
-    return null; // plan gone → nothing to ask about
-  }
-  const storedMtimeMs = Number(parsed.planMtimeMs);
-  if (!Number.isFinite(storedMtimeMs)) return null;
-  if (storedMtimeMs < currentMtimeMs) return null; // stale
-
-  return parsed.questions;
+  const st = planQuestionsStatus(root, ref);
+  return st.status === 'ready' ? st.questions : null;
 }
 
 /**
@@ -345,11 +436,155 @@ function plansNeedingQuestions(root) {
   return decisions.filter((d) => d && !isFresh(root, d.ref));
 }
 
+/**
+ * A question is BLOCKING when it is a real FORK — a load-bearing decision that is
+ * the human's to make and that the implementer must never guess. That is exactly
+ * the `critical` and `important` tiers. A `normal` question is a small detail that
+ * can be resolved while building, so it never blocks.
+ *
+ * This rule lives HERE, in one place, on purpose: a caller that re-derives
+ * "critical or important" from a question list is where drift gets in (forget
+ * `important` and half the forks silently stop blocking). `hasEnoughInformation`
+ * returns the blocking set so nobody has to.
+ *
+ * Strict `=== true` matches validatePlanQuestions, which requires a boolean when
+ * the flag is present — a truthy non-boolean is a contract violation, not a fork.
+ *
+ * @param {object} question
+ * @returns {boolean}
+ */
+function isBlockingQuestion(question) {
+  return !!question && (question.critical === true || question.important === true);
+}
+
+/**
+ * The set of question ids ALREADY answered for `ref`, read from the append-only
+ * answers log (`.ctoc/streaming/answers.jsonl`) that `streaming-gate.streamAnswer`
+ * writes — one JSON object per line, `{ts, ref, questionId, optionKey}`. Read back
+ * exactly as it is written.
+ *
+ * Returns `{ ok, ids }`, distinguishing two states a gate must NOT confuse:
+ *   - `ok: true`  — the log was READ. An ABSENT log is this case: it is knowledge
+ *                   ("nothing has been answered yet"), the normal starting state.
+ *   - `ok: false` — the log could not be read at all. That is IGNORANCE, not
+ *                   knowledge, and the caller must treat it as such.
+ *
+ * In BOTH cases `ids` contains only answers actually proven present. A malformed
+ * line is skipped rather than fatal: skipping can only ever REMOVE an answer from
+ * the set, never add one, so it can only push the verdict toward "not enough" —
+ * fail-closed by construction. Failing hard on one bad line would instead let a
+ * single junk append deadlock the gate forever, since the log is never pruned.
+ *
+ * Only ever called once `planQuestionsStatus` reports `ready`, which proves `root`
+ * is a usable non-empty string — so `path.join` here cannot throw.
+ *
+ * @param {string} root project root
+ * @param {string} ref plan reference ("stage/file.md")
+ * @returns {{ok: boolean, ids: Set<string>}}
+ */
+function readAnsweredQuestionIds(root, ref) {
+  const ids = new Set();
+  const file = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
+
+  let raw;
+  try {
+    if (!safeFs.existsSync(file)) return { ok: true, ids }; // nothing answered YET
+    raw = safeFs.readFileSync(file, 'utf8');
+  } catch {
+    return { ok: false, ids }; // unreadable → we do not KNOW what was answered
+  }
+
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry;
+    try { entry = JSON.parse(trimmed); } catch { continue; }
+    if (entry && entry.ref === ref && typeof entry.questionId === 'string') {
+      ids.add(entry.questionId);
+    }
+  }
+  return { ok: true, ids };
+}
+
+/**
+ * ENOUGH INFORMATION? — the gate predicate. True when `ref` can be built WITHOUT
+ * GUESSING: its decision questions were computed against the CURRENT plan, and
+ * every real fork among them has been answered by the human.
+ *
+ * This is CTOC's Pipeline Philosophy #1 inverted into a computable condition: "the
+ * implementer never guesses; if the implementer would have to guess, upstream
+ * context is incomplete." A plan has enough information exactly when no unanswered
+ * fork remains.
+ *
+ * ── IT FAILS CLOSED. This is the load-bearing property. ────────────────────────
+ * `not-computed`, `stale`, `invalid` and `unknown-plan` ALL return `enough: false`,
+ * carrying that status as the `reason`. ABSENCE OF EVIDENCE IS NOT EVIDENCE OF
+ * ABSENCE: a plan whose questions were never computed does not thereby have
+ * "enough information" — we simply do not KNOW, and not-knowing is not a pass.
+ * The same discipline applies to the answers log: it is never trusted into a pass,
+ * only ever out of one.
+ *
+ * ── What makes it return false ─────────────────────────────────────────────────
+ *   'not-computed'       the questions were never generated — nothing is known
+ *   'stale'              the questions predate the plan's current text
+ *   'invalid'            the questions file is corrupt
+ *   'unknown-plan'       the ref is malformed, or the plan file is gone
+ *   'open-forks'         a critical/important question is unanswered
+ *   'answers-unreadable' a fork exists and the answers log could not be read
+ * and `enough: true` with reason 'enough' in every other case — which means: the
+ * questions are fresh, and no unanswered fork remains. Unanswered NORMAL questions
+ * do NOT block; they are details resolvable during implementation, and they are
+ * still reported honestly in `unanswered`.
+ *
+ * An unreadable answers log deliberately does NOT block a plan with no forks: no
+ * critical/important question exists, so the log cannot change the verdict, and
+ * blocking there would be a false negative that answering could never clear.
+ *
+ * NEVER throws. Pure read — writes nothing, and crosses nothing. This is the
+ * PREDICATE only: whether and how a gate consumes it is a separate decision.
+ *
+ * @param {string} root project root
+ * @param {string} ref plan reference ("stage/file.md")
+ * @returns {{enough: boolean, reason: string, unanswered: Array<object>,
+ *   blocking: Array<object>}} `unanswered` is EVERY still-open question (nothing
+ *   hidden); `blocking` is the subset that is a fork and therefore fails the gate.
+ */
+function hasEnoughInformation(root, ref) {
+  const status = planQuestionsStatus(root, ref);
+
+  // FAIL CLOSED: every not-ready state. We do not know what this plan needs, and
+  // not-knowing is never a pass.
+  if (status.status !== 'ready') {
+    return { enough: false, reason: status.status, unanswered: [], blocking: [] };
+  }
+
+  const questions = status.questions;
+  const answers = readAnsweredQuestionIds(root, ref);
+
+  // An unreadable log yields an EMPTY answered set, so nothing can read as
+  // answered — the ignorance can only ever move the verdict toward false.
+  const unanswered = questions.filter((q) => !answers.ids.has(q.id));
+  const blocking = unanswered.filter(isBlockingQuestion);
+
+  if (blocking.length > 0) {
+    return {
+      enough: false,
+      reason: answers.ok ? 'open-forks' : 'answers-unreadable',
+      unanswered,
+      blocking,
+    };
+  }
+
+  return { enough: true, reason: 'enough', unanswered, blocking: [] };
+}
+
 module.exports = {
   questionsPath,
   validatePlanQuestions,
   writePlanQuestions,
+  planQuestionsStatus,
   loadPlanQuestions,
+  hasEnoughInformation,
   isFresh,
   plansNeedingQuestions,
 };

@@ -75,26 +75,34 @@ describe('v8-dispatcher — tier routing invariants', () => {
     try {
       const { normalizeRequest } = loadDispatcher();
 
-      // cto-chief infers tier 0; a dispatch TARGET must be tier 1-3. This is the
+      // cto-chief infers tier 0; a dispatch TARGET must be tier 1-2. This is the
       // no-dispatch-to-the-top-coordinator invariant — mutating the lower bound
       // (< 1) to <= 0 would let this through.
       assert.throws(
         () => normalizeRequest({ target: 'coordinator/cto-chief', goal: 'Please review this thing.' }),
-        /target_tier must be 1-3, got 0/
+        /target_tier must be 1-2, got 0/
       );
     } finally {
       teardownTempProject();
     }
   });
 
-  it('rejects an explicit target_tier above the tier-3 ceiling', () => {
+  // Plan F3b LOWERED this ceiling from 3 to 2 and added the tier-3 case. Tier 2 is
+  // now the leaf tier, so a dispatch to tier 3 must be refused outright rather than
+  // routed to a tier that has no agents.
+  it('rejects an explicit target_tier above the tier-2 ceiling', () => {
     setupTempProject();
     try {
       const { normalizeRequest } = loadDispatcher();
 
       assert.throws(
+        () => normalizeRequest({ target: 'quality/code-reviewer', goal: 'Review the changes.', targetTier: 3 }),
+        /target_tier must be 1-2, got 3/,
+        'tier 3 is deleted — a dispatch to it must be refused, not accepted'
+      );
+      assert.throws(
         () => normalizeRequest({ target: 'quality/code-reviewer', goal: 'Review the changes.', targetTier: 4 }),
-        /target_tier must be 1-3, got 4/
+        /target_tier must be 1-2, got 4/
       );
     } finally {
       teardownTempProject();
@@ -106,12 +114,14 @@ describe('v8-dispatcher — tier routing invariants', () => {
     try {
       const { normalizeRequest } = loadDispatcher();
 
-      // Target string infers tier 3 (scouts/), but the caller declares tier 1.
-      // The explicit value must win (the `opts.targetTier != null` first operand),
-      // and a tier-1 sub-orchestrator is ALLOWED a non-zero max_subagents — the
-      // `targetTier >= 2` guard must NOT fire at tier 1.
+      // Target string infers tier 2 (specialist default), but the caller declares
+      // tier 1. The explicit value must win (the `opts.targetTier != null` first
+      // operand), and a tier-1 sub-orchestrator is ALLOWED a non-zero max_subagents
+      // — the `targetTier >= 2` guard must NOT fire at tier 1.
+      // (Plan F3b: the target string here was a deleted scout; only the string
+      // changed. The explicit-over-inferred contract is untouched.)
       const req = normalizeRequest({
-        target: 'scouts/syntax-scout',
+        target: 'quality/code-reviewer',
         goal: 'Coordinate a sub-review across pillars.',
         targetTier: 1,
         effortBudget: { max_subagents: 5 },
@@ -124,38 +134,30 @@ describe('v8-dispatcher — tier routing invariants', () => {
     }
   });
 
-  it('rejects a tier-3 scout that requests sub-agents (no-cascade guard fires at tier 3)', () => {
-    setupTempProject();
-    try {
-      const { normalizeRequest } = loadDispatcher();
+  // DELETED by plan F3b: 'rejects a tier-3 scout that requests sub-agents
+  // (no-cascade guard fires at tier 3)'. It asserted that normalizeRequest throws
+  // /Tier 3 target must have max_subagents: 0/ for a scouts/ target with
+  // max_subagents: 2. Its stated purpose was to pin the `>= 2` guard at tier 3 so a
+  // mutant narrowing it to `=== 2` would go red. With the ceiling lowered to 2, tier
+  // 3 is unreachable — `>= 2` and `=== 2` are now equivalent, so the mutant this
+  // guarded against no longer exists and the scenario cannot be constructed. The
+  // tier-2 case is still asserted by the existing suite.
 
-      // Existing suite only proves the tier-2 case; this pins the `>= 2` guard at
-      // tier 3 so a mutant narrowing it to `=== 2` goes red.
-      assert.throws(
-        () => normalizeRequest({
-          target: 'scouts/syntax-scout',
-          goal: 'Quick parse pass of changed files.',
-          effortBudget: { max_subagents: 2 },
-        }),
-        /Tier 3 target must have max_subagents: 0/
-      );
-    } finally {
-      teardownTempProject();
-    }
-  });
-
-  it('defaults an unknown category to specialist tier 2 without a false scout/orchestrator match', () => {
+  it('defaults an unknown category to specialist tier 2 without a false orchestrator match', () => {
     setupTempProject();
     try {
       const { inferTier } = loadDispatcher();
 
       // The fallback: any category the switch does not recognise is a specialist.
-      // The `startsWith` (not `includes`) prefix checks matter — a category that
-      // merely CONTAINS "scouts/" or "planning/" mid-string must NOT route to 3/1.
+      // The `startsWith` (not `includes`) prefix check matters — a category that
+      // merely CONTAINS "planning/" mid-string must NOT route to tier 1.
       const rows = [
         { target: 'made-up-category/agent', expected: 2, id: 'unknown-prefix' },
-        { target: 'x/scouts/nested', expected: 2, id: 'scouts-not-at-start' },
         { target: 'x/planning/nested', expected: 2, id: 'planning-not-at-start' },
+        // Plan F3b: `scouts/` no longer has a branch at all. A leftover scout target
+        // must fall through to the specialist default, NOT to a resurrected tier 3.
+        { target: 'scouts/syntax-scout', expected: 2, id: 'deleted-scout-has-no-branch' },
+        { target: 'x/scouts/nested', expected: 2, id: 'scouts-not-at-start' },
       ];
       for (const row of rows) {
         assert.equal(inferTier(row.target), row.expected, `row=${row.id}`);

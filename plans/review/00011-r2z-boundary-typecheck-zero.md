@@ -1,15 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T17:30:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's explicit 2026-07-14 order "fix them all, do 50
-  rounds of hard critique, keep fixing the code". Boundary reconciliation of
-  the R2 wave: the typecheck ratchet regressed 64→94 and must go to zero.
----
-
----
 title: "R2-Z — Boundary: typecheck to zero, ratchet tightened, last fixtures to the new contracts"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

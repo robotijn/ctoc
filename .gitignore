@@ -33,3 +33,9 @@ examples/
 
 # Working artifact: opus operating pack (source for the genericized template)
 opus48-operating-pack.zip
+
+# Sweep runtime artifacts (regenerable; not source)
+.ctoc/sweep-state.json
+.ctoc/sweep-*.log
+.ctoc/sweep-STOP
+.ctoc/sweep-AUTOSTART-STOP

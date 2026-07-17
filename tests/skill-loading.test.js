@@ -20,7 +20,11 @@ const projectRoot = path.join(__dirname, '..');
 
 const { resolveAgent, listConvertedAgents } = require('./helpers/agent-resolver');
 
-const REQUIRED_SKILL_FIELDS = ['name', 'description', 'when_to_load', 'related_skills', 'effort_level', 'model_optimized_for'];
+// `model_optimized_for` was deleted from the corpus: it meant provenance on the
+// opus rows but was read as an execution target on the scouts, where it was false.
+// `model:` is the field that declares what runs an artifact. See
+// tests/no-model-optimized-for.test.js for the fence that keeps it gone.
+const REQUIRED_SKILL_FIELDS = ['name', 'description', 'when_to_load', 'related_skills', 'effort_level'];
 
 // Test corpus — per B2-6 refinement.
 // Each entry: a natural-language prompt + the skill that should auto-load.
@@ -252,7 +256,6 @@ describe('B2 — every converted skill has valid v7 frontmatter', () => {
       for (const field of REQUIRED_SKILL_FIELDS) {
         assert.ok(field in fm, `${c.targetSkill} missing field: ${field}`);
       }
-      assert.equal(fm.model_optimized_for, 'opus-4-7', `${c.targetSkill} must be marked for opus-4-7`);
       assert.ok(Array.isArray(fm.when_to_load), `${c.targetSkill} when_to_load must be a list`);
       assert.ok(fm.when_to_load.length >= 2, `${c.targetSkill} should have ≥2 triggers`);
     });

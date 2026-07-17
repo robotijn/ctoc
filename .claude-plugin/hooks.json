@@ -73,6 +73,15 @@
         ]
       },
       {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/PreToolUse.Task.js\""
+          }
+        ]
+      },
+      {
         "matcher": "Read|Edit|Write|Bash",
         "hooks": [
           {
@@ -87,6 +96,16 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/human-gate-check.js\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/SubagentStop.js\""
           }
         ]
       }
