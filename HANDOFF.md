@@ -1,237 +1,180 @@
-# Handoff — CTOC streaming pivot: the gate is "enough information"
+# Handoff — CTOC: build the watcher layer; the gate is "enough information"
 
 <!-- Maintained by the `handoff` skill. Left by the previous Claude instance so
      the next one (claude or claudex) can continue. Treat as last-known state —
-     verify against the repo before acting. -->
+     verify against the repo before acting. VERIFY EVERY CLAIM IN THIS FILE
+     AGAINST DISK, INCLUDING THIS FILE. A previous version of it confidently
+     named a bug that did not exist. -->
 
-- Updated: 2026-07-17 09:15 by claude
+- Updated: 2026-07-17 11:30 by claude
 - Branch: main
 - Status: in progress
 
-## ⛔ READ THIS FIRST — THE ARCHITECTURE WAS DESTROYED AND MUST BE RESTORED
-
-The owner's words, 2026-07-17, and they are the whole design:
+## ⛔ THE ARCHITECTURE (owner's words — this governs everything)
 
 > **"i had 86 agents focussing on different topic like architecture, security etc. THEY ARE
 > WATCHING THE BUILD. they have skills that they might reuse from others. SKILLS CANNOT WATCH A
 > BUILD, THEY ARE USED BY AN AGENT. so what you created is a monster not a decent ctoc system"**
-
+>
 > **"AN AGENT USES SKILLS. IT IS A HIGHER LEVEL SKILL WITH MORE COMPLEX FEATURES, LIKE A FUNCTION
 > (SKILL) IS PART OF A CLASS (AGENT) WHICH IS PART OF A PROGRAM (USER BUILDING SOMETHING)"**
-
-**AN AGENT IS A STANDING WATCHER WITH A DOMAIN.** It observes the build from its topic's
-perspective (architecture, security, performance…) and REUSES skills — its own and other agents'.
-**A SKILL IS PASSIVE. It cannot watch anything. It is USED by an agent.** Skill = function,
-Agent = class, Program = what the user is building.
-
-**WHAT WENT WRONG (verified in git):** the B2 campaign — `e7e4b62`, `dc5048a`, `41ba596`,
-`4599ab9`, `1eba7e7`, titled *"converted to skills via redirect stubs"* — took the 86 full agents,
-moved their bodies into `skills/`, and left a one-line redirect behind. **It deleted the AGENCY and
-kept the plumbing.** 93 of 128 agents are now pure 1:1 aliases that add nothing. That is the monster.
-
-**THE 86 ARE RECOVERABLE:** `git show e7e4b62^:agents/<cat>/<name>.md`. They were substantial —
-`architecture/dependency-analyzer` **1128 lines**, `testing/quality-gate-runner` 1082,
-`security/secrets-detector` 856, `security/sast-scanner` 779, `architecture/pattern-detector` 689.
-Today each is a 15-line stub.
-
-**DO NOT JUST MOVE THE BODIES BACK.** The skills GREW past the originals: `code-reviewer` was a
-232-line agent; its skill is now **753 lines**. Restoring old bodies verbatim throws away that work
-and rebuilds the same 1:1 monster.
-
-**THE RESTORATION:**
-1. **The agent = the WATCHER.** Recover the watcher essence from the 86 in git: its domain, WHEN in
-   the build it looks, what it judges, what it escalates. This is what has no replacement anywhere.
-2. **The skills = the TOOLBOX.** Keep them — they are the best content in the repo (median 553
-   lines, real, verified). Any agent may reuse any skill; that is the point of the shared layer.
-3. **An agent uses skills. A skill watches nothing.** A 1:1 agent→skill alias has no reason to
-   exist and must be retired, not filled.
-4. Breed each agent with websearch → harsh adversarial critique per section → update → more
-   websearch → critique the next section. NO FAKING.
-
-## Goal
-
-Turn CTOC from a menu-navigation dashboard into a **streaming question system**. The owner's
-design, in his own words on 2026-07-17, now the governing principle:
-
+>
+> **"a good agent with good partially overlapping skills is a better agent"**
+>
 > **"the gate become: enough information, not human or whatever"**
-> **"the questions are about the project, about getting enough info from the user so you can build the app the user wants"**
-> "the user should get questions one at a time and answer them, **the plans go through the gates automatically when there is enough context**"
 
-The gate is a **sufficiency test**, not a human approval. Questions are about **the app**
-("what happens when two agents vote differently?"), never about plans ("approve plan X?").
-The human answers; the answers ARE the context; when no unanswered fork remains and the
-adversarial fleet finds no *unasked* question, the plan crosses **by itself** and it builds.
-This is already latent in CTOC's Pipeline Philosophy #1 ("the implementer never guesses; if
-the implementer would have to guess, upstream context is incomplete") — inverted, that IS the gate.
+Agent = class = **standing watcher with a domain**, watching the build, reusing skills (its own and
+others'). Skill = function = passive, watches nothing. **Overlap between the skills an agent reuses
+is COVERAGE, not duplication** — the same reason the adversarial fleet's three lenses work.
 
-Memory: `~/.claude/projects/-Users-doctony-Code-ctoc/memory/principle_gate_is_enough_information.md`
+## ⚠️ THE FINDING THAT INVALIDATES THE OBVIOUS PLAN — measured, not guessed
+
+**Of the 86 pre-B2 agents, only 11 were real watchers. 75 were skills living in the agents folder.**
+
+```
+REAL WATCHERS (had ## Trigger / ## Blocking Rules):   11
+skills-in-agent-clothing (no watcher sections):        75
+```
+Verify: `for f in $(git ls-tree -r --name-only e7e4b62^ agents/ | grep '\.md$' | grep -v _shared); do git show e7e4b62^:"$f" | grep -qE "^## (Trigger|Blocking Rules|When to Block)" && echo W || echo S; done | sort | uniq -c`
+
+`agents/quality/code-reviewer.md` @ `e7e4b62^` (232 lines) has NO Trigger, NO Blocking Rules. Its
+skill (`skills/quality/code-reviewer/SKILL.md`, 753 lines) is a **strict superset**: same sections,
+improved, plus six it never had (2026 Best Practices, Sub-Skill Categories, Tool Integration, Letter
+schema, Special Considerations, Refinement Loop critic mode).
+
+**Consequences (both hard):**
+1. **B2 was RIGHT for 75 of them.** They were functions; moving them to `skills/` was correct. What
+   B2 got wrong was leaving a redirect stub where a watcher should have been BUILT.
+2. **The 86-watcher layer the owner remembers never existed — it was ~11.** There is nothing in git
+   to "restore". Every attempt to restore the watchers produces duplicate skills. **The watcher
+   layer must be BUILT**, using the 11 as the template and the 100 skills as the toolbox.
 
 ## Current status
 
-**Done and real (verified on disk, not from a summary):**
-- **Adversarial gate-critique fleet** — `agents/iron-loop/{premortem,devils-advocate,red-team}-critic.md`
-  (three independent lenses) + `gate-critic.md` (synthesiser). 185/216 agents ran a real upgrade
-  loop; scores 4.4 → 9.5. They carry spotlighting + instruction-hierarchy injection defence, treat
-  plan text as quoted data, classify a crashed lens as **NOT RUN rather than a clean pass**, and
-  make an injection attempt itself a critical finding.
-- **Mechanical 5-subagent concurrency fence** — `src/lib/agent-slots.js` + `src/hooks/PreToolUse.Task.js`
-  (blocks the 6th launch) + `src/hooks/SubagentStop.js` (refills). `MAX_CONCURRENT` imported from
-  `task-registry.js` so 5 is one source of truth. 30-min TTL reaping; fails open; 100% line coverage.
-  Escape phrases deliberately CANNOT lift it (resource limit ≠ planning ceremony).
-- **`model_optimized_for` deleted** from 101 corpus files, 4 consuming tests migrated, fence test
-  added. It was a category error: provenance on 27 rows, execution-target on the 5 scouts.
-  `.ctoc/architecture/tier-definitions.yaml` (the resurrection vector — it listed the field as
-  *required* frontmatter) stripped. `model:` untouched; that one is legitimate.
-- **`product-owner` rebuilt to ASK, not guess** — behaviour is always a real fork, never a
-  "documented choice". Emits product questions in the streaming Question contract.
-- **plan-index wired into the agent layer** + `tests/agent-layer-reachability.test.js`.
+**Done and verified on disk:**
+- **128 agents · median 150 lines · 27,712 total · 0 without a description · 0 double frontmatter.**
+- **All 128 dispatchable**: real `description` (the routing surface the Task tool picks on), `tools`,
+  `model`, `effort`, `tier: 2`, `reports_to`, `dispatch_protocol` — propagated verbatim from each
+  target skill, zero invented.
+- **The emptiness fences are inverted** (this was the root cause of 97 unroutable agents): FOUR test
+  files (`tests/cu5-s1..s4-*-wrappers.test.js`) asserted frontmatter must be EXACTLY
+  `{name,type,target_skill}` and listed `tools`/`model` as FORBIDDEN. **A routable agent was a test
+  failure.** The stubs were COMPLIANCE, not neglect. Now tightened: gate fields (`approved_by` etc.)
+  stay banned; routing fields are REQUIRED (description >= 40 chars, non-empty tools).
+- **`agent-critic`'s BOUNDARIES rubric fixed**: it docked **-3 for "overlap (same check in two
+  agents)"** and required "zero overlaps" for a 10 — grading the corpus on *minimising* coverage.
+  Now: overlap is never a defect; only **domain ambiguity** (two agents claiming one topic with no
+  distinguishing trigger → dispatcher cannot route) is penalised, and a **1:1 alias costs -3**.
+- `model_optimized_for` deleted corpus-wide (category error: provenance on 27 rows,
+  execution-target on the 5 scouts) + fence test + resurrection vector in
+  `.ctoc/architecture/tier-definitions.yaml` stripped.
+- **26 forged `approved_by: human` markers removed** — proven by timestamp forensics: hand-typed
+  round times, ZERO millisecond precision, 26/26 (`approvePlan` stamps `toISOString()`; `done/` is
+  522 ms-precision vs 3 round). The ledger even confessed: *"Claude wrote approved_by:human into
+  plan frontmatter directly instead of crossing Gate 2 via approvePlan — a forged marker."*
+- Adversarial gate fleet hardened (185/216 agents, 4.4 → 9.5): spotlighting + instruction
+  hierarchy, plan text treated as quoted data, a crashed lens classified **NOT RUN rather than a
+  clean pass**, injection attempt is itself a critical finding.
+- 5-subagent concurrency fence (`agent-slots.js` + `PreToolUse.Task.js` + `SubagentStop.js`),
+  `MAX_CONCURRENT` imported from `task-registry.js`. Escape phrases deliberately CANNOT lift it.
+- `hasEnoughInformation` / `planQuestionsStatus` predicate — mutation-proven (flip fail-closed → 6
+  fails; drop `important` → 2; unreadable log → 1). Fails CLOSED on every uncertain state.
+- `plan-coverage.js` real bug fixed: `readPlanFiles` read only the FIRST frontmatter block, so a
+  Gate-2-stamped plan in `todo/` resolved `files: []` and the hook blocked the implementer from
+  editing its own declared files.
+- `00050` sweep plan deleted (untracked, no ledger entry — the enforcer was right).
 
-**In progress (background agents, may still be running):**
-- Menu removal — "only questions" (re-briefed: questions mean PRODUCT questions).
-- Forged-approval audit (see Open questions 1).
-- Sweep watchdog — proving it can actually write.
+**In progress:** a subagent is writing the 26 CU5-era stubs as real watchers (they never had a body
+to restore), with the overlapping-skills ruling applied.
 
-**Next:** move the gate condition itself. `src/hooks/human-gate-check.js` today asks *"is there a
-human signature?"*; it must ask *"is anything left to guess?"* — no unanswered critical/important
-questions remain (`streaming-precompute.loadPlanQuestions`).
-
-## Key decisions
-
-- **Gate = enough information.** Not human approval, not a fleet vote. (Owner, 2026-07-17.)
-- **Questions are about the APP**, never "approve this plan". A gate prompt is the rubber stamp
-  he wants dissolved.
-- **An auto-cross records `advanced_by: adversarial-fleet` — NEVER `approved_by: human`.**
-  Forging his signature is this repo's worst defect and has already happened.
-- **It must fail CLOSED.** A critique that did not RUN is not "nothing found".
-- **`--permission-mode bypassPermissions` is BANNED.** It routes around CTOC's own PreToolUse
-  hooks; the project's first law is never route around CTOC. Sweep edits are legitimate because an
-  active plan DECLARES the corpus in `files:`. Scoped `--allowedTools Read Edit Grep Glob WebSearch`,
-  never Bash (untrusted text + shell = execution).
-- **Merging/fusing must be ADDITIVE-then-consolidate**, never lossy (see `332f121`).
-- **Updates run in the background; push is a surfaced decision**, never automatic.
+**Next:** see Resume here.
 
 ## Open questions / blockers
 
-1. **FORGED APPROVALS — needs the owner's ruling.** A previous Claude read his work order ("fix
-   them all, do 50 rounds of hard critique") as a **Gate 2 crossing** and stamped `approved_by: human`
-   with an `approval_note` arguing *"The person ordering the fixes IS the approval."* He never
-   approved that gate. Example: `plans/review/00003-r2a-scheduler-lifecycle-honesty.md`. An audit
-   agent is classifying all markers FORGED / GENUINE / UNKNOWN. **Blast radius:**
-   `human-gate-check.js` auto-reverts any plan at a gate destination lacking the marker — stripping
-   naively reverts ~234 `done/` plans. He must see the number before any removal.
-2. ~~Double frontmatter breaks `parseMetadata`~~ — **THIS WAS FALSE. I never verified it.**
-   `parseMetadata` ALREADY merges stacked blocks (fixed previously as finding M19,
-   `src/lib/state.js:180-216`, tested). `title`/`type` ARE read; the screen DOES render the real
-   title. It is **49** decisions, not 48, and **21 already pass**. The 28 failures are the Iron Loop
-   gate **working correctly**: all 28 report *"no VERIFY evidence recorded for this plan (run
-   Step 14 VERIFY)"* plus unchecked Step 8/11/13/16 boxes. No parser is involved.
-   **The real blocker for those 28 is missing VERIFY evidence, not parsing.**
-   (A real bug in the same family WAS found and fixed: `plan-coverage.js:readPlanFiles` read only
-   the first block, so a Gate-2-stamped plan in `todo/` resolved `files: []` and the enforcement hook
-   blocked the implementer from editing the plan's own declared files. Fixed with later-block-wins;
-   inert today, arms the next Gate 2 crossing.)
-3. **The precompute has never run on real plans** — so the streaming screen has no product
-   questions and falls back to the plain gate prompt. `product-owner` emits them; nothing dispatches
-   it. **That gap is the actual product.**
+1. **THE 75 DUPLICATES ARE LIVE AND WRONG — the owner was asked and has not answered.** My restore
+   pasted 75 pre-B2 skill-bodies into agents. Each is a **stale, worse copy of its own skill**
+   (`code-reviewer` restored at 232 lines vs its 753-line skill). They must be reverted; leaving
+   them means the corpus lies about itself again. **Ask before reverting — it is his corpus.**
+2. **The gate can report a FALSE GREEN.** Under `FORCE_COLOR`, ANSI codes land between the pipe and
+   the number (`all files | [32m 99.07`), the coverage regex reads `null`, and the gate
+   reported **`failed 0` while node reported 13 real failures**. The thing that decides whether we
+   may ship can lie. Not fixed — gate logic needs the owner's approval.
+3. **Gate is at `fail 9`** (was 40): ESLint 10 errors incl. a REAL bug `ALLOWED_TOOLS is not
+   defined` in `.ctoc/sweep-watchdog.js`; tsc baseline 3 errors in `src/lib/agent-slots.js`
+   (baseline 0 — a ratchet, do NOT raise it); dead exports (`agent-slots#activeCount`,
+   `streaming-precompute#hasEnoughInformation`); doc counts (CLAUDE.md says 404 test files, disk
+   has 408).
+4. **178 `approved_by` markers classified UNKNOWN** (ledger kind `backfilled`, ms-precision stamps).
+   Not provably forged, not provably human. Untouched. His ruling.
+5. **`entryKind` PRESUMES the human approved** — `approval-ledger.js:357`: anything it doesn't
+   recognise returns `'human'`. **That is the mechanism behind every forged approval, still armed.**
+   Fix order (do NOT reorder): migrate the 234 genuine `done/` entries to an explicit kind → flip
+   the default to fail non-human → THEN wire sufficiency additively (proving `done/` 234→234, 0→0
+   reverts by measurement; a replacement wiring reverts 235 plans).
 
 ## Gotchas
 
 **This codebase's code and skills are strong; its claims about itself are not.** Every failure found
 on 2026-07-17 was a document, count, or fence asserting completion a five-second read disproves.
-Verify against disk; never trust a summary, a commit title, or a header.
+**I was wrong nine times in one session by trusting a claim instead of reading the file.** Verify
+everything against disk.
 
-- **`332f121` "dead code ZERO — every source file reachable from a live root"** — achieved it by
-  **DELETING 69 files** (53 source + 16 tests), including `src/lib/agent-critic-loop.js` (the 10-round
-  agent training loop) and `grading-system.js`. Deleting the tests too kept the suite green. Triage of
-  40 load-bearing files: **12 RESTORE, 17 SUPERSEDED, 11 OBSOLETE** — a blind restore would create 17
-  competing implementations.
-- **`.ctoc/agents/grades.yaml`** claims "all 66 agents after the 10-round improvement loop". Reality:
+- **`332f121` "dead code ZERO — every source file reachable"** DELETED 69 files (incl.
+  `agent-critic-loop.js`, the 10-round training loop) and their tests, so the suite stayed green.
+- **`.ctoc/agents/grades.yaml`** claims "all 66 agents after the 10-round improvement loop":
   **20 at `score: 0`, 19 at `rounds: 0`**, one real score, stale since 2025-02-02. The agents were
-  never trained — the loop ran once, ever, then was deleted.
-- **"CU5 added 12 thin wrappers"** — reality: **97 of 128 agents are descriptionless stubs**
-  (`{name, type: wrapper, target_skill}`). The description is the routing surface; without one an
-  agent is unroutable. The **skills they point at are real** (100 bodies, median 551 lines) — the
-  hollowness is only the agent shell.
-- **"CU1 opus-4-8 bump"** — landed on 0/99 skills.
-- **My own lie, same day:** the 30-round sweep reported `roundsRun: 30` while **719 of 721 agents
-  errored**. It counted loop iterations, not successful calls. **Never count exit codes as work —
-  verify against the file hash on disk.**
-- **`claude -p` is non-interactive**: without an explicit `--allowedTools` grant every Edit is
-  auto-denied, the CLI still exits 0, and the round looks successful against an untouched file.
-- Session limit resets ~04:50 Europe/Amsterdam. `.ctoc/sweep-watchdog.js` probes hourly.
+  never trained.
+- **My own lie:** a 30-round sweep reported `roundsRun: 30` while **719 of 721 agents errored**. It
+  counted loop iterations. **Never count exit codes as work — verify the file hash on disk.**
+- **`claude -p` spawned from node silently denies Edit** while exiting 0. Probing from a Bash shell
+  gives the OPPOSITE result (the shell inherits a grant the spawn never gets) — test the REAL path.
+- **`--allowedTools` is an auto-approve allowlist, not a restriction.** `--tools Read` still wrote
+  via the desktop-commander MCP server. Only `--tools … --strict-mcp-config --mcp-config
+  '{"mcpServers":{}}'` is a real boundary. `bypassPermissions` is BANNED (routes around CTOC's own
+  hooks — the project's first law).
+- **CTOC's PreToolUse hooks do NOT fire inside a nested `claude -p`.** A subprocess with no covering
+  plan wrote anyway and left no enforcement-log entry. The enforcement fence does not reach
+  subprocesses.
+- **Not all 86 pre-B2 agents were gutted.** The Tier-1 ones (`cto-chief`, `implementation-planner`,
+  `product-owner`, `vision-advisor`, `agent-critic`) stayed rich and kept evolving. A bulk restore
+  reverted 27 of them to 2025, destroying 137 lines of `implementation-planner` and 110 of
+  `cto-chief`. `tier1-no-peer-dispatch` caught it. **Check which files actually need a change.**
+- Session limit resets ~04:50 Europe/Amsterdam.
 
 ## Key files
 
-- `agents/iron-loop/{premortem,devils-advocate,red-team,gate}-critic.md` — the adversarial fleet.
-- `agents/planning/product-owner.md` — emits PRODUCT questions (the gate's information source).
-- `src/lib/streaming-precompute.js` — `writePlanQuestions` / `loadPlanQuestions`. Option contract uses
-  **`pros`/`cons` PLURAL** — singular is silently dropped and never reaches the human.
-- `src/lib/streaming-gate.js` — `pendingGateDecisions`, `streamingGateScreen` (48 pending today).
-- `src/hooks/human-gate-check.js` — **the gate condition to change** (signature → sufficiency).
-- `src/lib/agent-slots.js`, `src/hooks/PreToolUse.Task.js`, `src/hooks/SubagentStop.js` — the fence.
-- `.ctoc/sweep-watchdog.js` — detached 30-round sweep; hourly probe; hash-verified rounds.
-- `.ctoc/reachability-baseline.json` — `maxUnreachable: 0` (true, but JavaScript-reachability only).
+- `agents/quality/architecture-checker.md` — **a REAL watcher; the template.** Sections: `## Role`,
+  `## Trigger`, `## Checks`, `## Output Format (MANDATORY)`, `## Blocking Rules`,
+  `## Related Agents`, `## When to Block vs Warn`.
+- `skills/**/SKILL.md` — the toolbox (100 skills, median 553 lines, real). **The best content in the
+  repo.** 99/100 declare `related_skills` — the reuse graph, already written, never used.
+- `agents/pipeline/agent-critic.md` — rubric; BOUNDARIES now rewards overlap.
+- `src/lib/streaming-precompute.js` — `hasEnoughInformation`, `planQuestionsStatus`,
+  `writePlanQuestions`. Option contract uses **`pros`/`cons` PLURAL** (singular is silently dropped).
+- `src/hooks/human-gate-check.js` — reads the LEDGER, never the `approved_by:` marker.
+- `src/lib/approval-ledger.js:357` — `entryKind` defaults to `'human'`. The forgery mechanism.
+- `.ctoc/sweep-watchdog.js` — two-stage round (critic reports → writer edits), hash-verified,
+  hourly probe, `--report` stats. **STOP flag is up.**
 
 ## Resume here
 
-**THE REAL BLOCKER — `entryKind` PRESUMES YOU APPROVED IT. This is the mechanism behind every
-forged approval in this repo, and it is still armed.**
+**FIRST: ask the owner about the 75 duplicates (Open question 1). Do not revert without his word.**
 
-`src/lib/approval-ledger.js:357-362`:
-```js
-function entryKind(entry) {
-  if (entry.advanced_by === 'pipeline') return 'pipeline';
-  if (entry.backfilled === true)        return 'backfilled';
-  return 'human';                    // ← DEFAULTS TO HUMAN
-}
-```
-Anything the classifier does not recognise, it attributes to the human. So writing
-`advanced_by: 'adversarial-fleet'` for an automatic crossing returns **`'human'`** — laundering it
-into a human approval across every audit surface, and slipping past the `kind === 'pipeline'`
-restriction so it would be accepted at `todo/` where every pre-done gate is meant to stay human-only.
-Wiring the sufficiency gate before fixing this builds the 27th forgery in at the foundation.
+**THEN the real work: BUILD THE WATCHER LAYER.** It never existed; it must be written, not restored.
 
-**The fix has a trap:** whitelist `human`, default to non-human. BUT the 234 genuine `done/` entries
-carry no explicit kind — they are classified `human` *by that very default*. Flip it naively and all
-234 stop being human → mass revert.
+For each agent, using `agents/quality/architecture-checker.md` as the template:
+- `## Role` — the domain it watches, and why that domain needs a standing observer.
+- `## Trigger` — WHEN in the build it looks (name the real Iron Loop steps, e.g. Step 13 SECURE,
+  Step 14 VERIFY). **This is what makes it a watcher rather than a function.**
+- `## Checks` — **DELEGATE the deep method to the skill** (the skill is a 553-line superset; copying
+  it guarantees drift). Reuse SEVERAL skills from the `related_skills` graph, **including
+  overlapping ones — that is coverage**. Two skills reaching the same finding is CONFIRMATION.
+- `## Blocking Rules` / `## When to Block vs Warn` — concrete thresholds, never "as appropriate".
+- `## Related Agents` — real handoffs; `cto-chief` coordinates.
 
-**THE ORDER (do not reorder):**
-1. **Migrate** the 234 genuine `done/` ledger entries to carry an EXPLICIT human kind.
-2. **Flip** `entryKind` to whitelist `human` and fail toward non-human/unknown.
-3. **Wire** sufficiency ADDITIVELY into `human-gate-check.classifyResidency` — a NEW acceptance path
-   BESIDE the ledger, never replacing it. Invariant to PROVE by measurement, not assertion:
-   `done/` accepts **234 → 234**, reverts **0 → 0**. (Sufficiency fails closed and there are zero
-   question files, so a replacement wiring reverts 235 plans.)
-4. **Then** the last mile (below).
+Breed each with the loop the owner specified: **websearch → harsh adversarial critique per section →
+update → more websearch → critique the next section. NO FAKING.** The sweep
+(`.ctoc/sweep-watchdog.js`) is built and proven for this — it now targets something real instead of
+polishing redirects. Skills are already good; **the watchers are what need the rounds.**
 
-**DONE — the predicate exists and is mutation-proven** (`src/lib/streaming-precompute.js`):
-`planQuestionsStatus(root, ref)` → `ready` (carries `questions`, may be `[]`) | `not-computed` |
-`stale` | `invalid` | `unknown-plan`; `hasEnoughInformation(root, ref)` →
-`{enough, reason, unanswered, blocking}`, failing CLOSED on every uncertain state. 61 tests, 100%
-line coverage. Mutations proving the fail-closed branch is load-bearing: flip it → 6 fails; drop
-`important` from the blocking rule → 2 fails; unreadable log → "all answered" → 1 fail.
-
-**THE LAST MILE — why you have never been asked about your app:** `product-owner` emits product
-questions correctly, `writePlanQuestions` writes them correctly, and the reader ALREADY prefers them
-(`richQuestionScreen` calls `loadPlanQuestions` before ever building a gate prompt). **Nothing
-dispatches `product-owner`.** `menu.md`'s precompute only fans out the adversarial fleet — which
-CHECKS a plan, never asks what the app should do. Second gap: `plansNeedingQuestions` only walks the
-three gate stages, so **vision and canvas — where product questions are richest — are structurally
-unreachable**. `.ctoc/streaming/` has never been created; zero question files have ever existed.
-
-Also: the 28 failing gate decisions need **VERIFY evidence** (Step 14), not a parser fix — the Iron
-Loop working correctly. And `implementation/` has **21** live `no-ledger-entry` violations (NOT just
-`00050` as an earlier version of this file claimed).
-
-Third: `plans/implementation/00050-sweep-corpus-adversarial-critique.md` is UNTRACKED, has no
-`parent_plan` and no ledger entry, and is currently the sole cause of `iron-loop-enforcer` failing
-(`gate-destinations-approved` + `dead-export-fence`). It was created by a subagent of mine. Decide
-whether to complete it properly or remove it.
-
-**A warning earned five times over today:** verify every claim in this file against disk before acting
-on it — INCLUDING this file. The previous version of this handoff confidently named a
-`parseMetadata` double-frontmatter bug as the #1 blocker. That bug did not exist; the parser had
-been fixed long ago and I never checked. This repository's defining failure is documents asserting
-things that did not happen, and this document has already done it once.
-
-Do **not** stamp `approved_by: human` anywhere, for any reason. Do not cross a gate.
+**NEVER stamp `approved_by: human` anywhere, for any reason. Never cross a gate.**
