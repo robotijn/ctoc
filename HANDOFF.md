@@ -79,11 +79,17 @@ questions remain (`streaming-precompute.loadPlanQuestions`).
    agent is classifying all markers FORGED / GENUINE / UNKNOWN. **Blast radius:**
    `human-gate-check.js` auto-reverts any plan at a gate destination lacking the marker — stripping
    naively reverts ~234 `done/` plans. He must see the number before any removal.
-2. **Double frontmatter** — many `plans/review/*.md` have TWO stacked frontmatter blocks
-   (`approved_by` block, blank line, then the real `title`/`type`/`files` block). `parseMetadata`
-   reads the first, finds no title → the screen renders a bare heading → **Gate 3 reports
-   `passesValidation: false` across all 48 pending decisions.** The plans are fine (80–105 lines of
-   real work); the parser is broken.
+2. ~~Double frontmatter breaks `parseMetadata`~~ — **THIS WAS FALSE. I never verified it.**
+   `parseMetadata` ALREADY merges stacked blocks (fixed previously as finding M19,
+   `src/lib/state.js:180-216`, tested). `title`/`type` ARE read; the screen DOES render the real
+   title. It is **49** decisions, not 48, and **21 already pass**. The 28 failures are the Iron Loop
+   gate **working correctly**: all 28 report *"no VERIFY evidence recorded for this plan (run
+   Step 14 VERIFY)"* plus unchecked Step 8/11/13/16 boxes. No parser is involved.
+   **The real blocker for those 28 is missing VERIFY evidence, not parsing.**
+   (A real bug in the same family WAS found and fixed: `plan-coverage.js:readPlanFiles` read only
+   the first block, so a Gate-2-stamped plan in `todo/` resolved `files: []` and the enforcement hook
+   blocked the implementer from editing the plan's own declared files. Fixed with later-block-wins;
+   inert today, arms the next Gate 2 crossing.)
 3. **The precompute has never run on real plans** — so the streaming screen has no product
    questions and falls back to the plain gate prompt. `product-owner` emits them; nothing dispatches
    it. **That gap is the actual product.**
@@ -128,13 +134,27 @@ Verify against disk; never trust a summary, a commit title, or a header.
 
 ## Resume here
 
-**Run `node src/commands/menu.js` and read the JSON.** It emits the real streaming screen and tells
-you the truth: 48 pending gate decisions, all `passesValidation: false` because of the
-double-frontmatter parse bug (Open question 2).
+**The highest-value action: split the `null` in `streaming-precompute.loadPlanQuestions`.**
 
-Then the single highest-value action: **fix `parseMetadata` (`src/lib/state.js`) to merge stacked
-frontmatter blocks**, test-first. That one fix unblocks the 48 decisions, makes the plans render,
-and lets the gate see them honestly — everything else in the streaming flow waits behind it.
+That is the one thing blocking the owner's whole design. `loadPlanQuestions` returns `null` for BOTH
+*"no questions needed"* and *"not computed yet"* — indistinguishable. There are currently **zero
+question files on disk**. So a gate built on "enough information" today fails **open** (null → cross →
+all 255 plans cross instantly, the gate ceases to exist) or **closed** (null → nothing ever crosses →
+deadlock). Split those states, then make the precompute actually populate questions for every plan.
+Until that exists, the "enough information" gate cannot ship — everything else waits behind it.
 
-Do **not** stamp `approved_by: human` anywhere, for any reason. Do not cross a gate. Verify every
-claim in this file against disk before acting on it — including this file.
+Second: the 28 failing gate decisions need **VERIFY evidence** (Step 14), not a parser fix. That is
+the Iron Loop working correctly, not a bug.
+
+Third: `plans/implementation/00050-sweep-corpus-adversarial-critique.md` is UNTRACKED, has no
+`parent_plan` and no ledger entry, and is currently the sole cause of `iron-loop-enforcer` failing
+(`gate-destinations-approved` + `dead-export-fence`). It was created by a subagent of mine. Decide
+whether to complete it properly or remove it.
+
+**A warning earned five times over today:** verify every claim in this file against disk before acting
+on it — INCLUDING this file. The previous version of this handoff confidently named a
+`parseMetadata` double-frontmatter bug as the #1 blocker. That bug did not exist; the parser had
+been fixed long ago and I never checked. This repository's defining failure is documents asserting
+things that did not happen, and this document has already done it once.
+
+Do **not** stamp `approved_by: human` anywhere, for any reason. Do not cross a gate.
