@@ -8,6 +8,46 @@
 - Branch: main
 - Status: in progress
 
+## ⛔ READ THIS FIRST — THE ARCHITECTURE WAS DESTROYED AND MUST BE RESTORED
+
+The owner's words, 2026-07-17, and they are the whole design:
+
+> **"i had 86 agents focussing on different topic like architecture, security etc. THEY ARE
+> WATCHING THE BUILD. they have skills that they might reuse from others. SKILLS CANNOT WATCH A
+> BUILD, THEY ARE USED BY AN AGENT. so what you created is a monster not a decent ctoc system"**
+
+> **"AN AGENT USES SKILLS. IT IS A HIGHER LEVEL SKILL WITH MORE COMPLEX FEATURES, LIKE A FUNCTION
+> (SKILL) IS PART OF A CLASS (AGENT) WHICH IS PART OF A PROGRAM (USER BUILDING SOMETHING)"**
+
+**AN AGENT IS A STANDING WATCHER WITH A DOMAIN.** It observes the build from its topic's
+perspective (architecture, security, performance…) and REUSES skills — its own and other agents'.
+**A SKILL IS PASSIVE. It cannot watch anything. It is USED by an agent.** Skill = function,
+Agent = class, Program = what the user is building.
+
+**WHAT WENT WRONG (verified in git):** the B2 campaign — `e7e4b62`, `dc5048a`, `41ba596`,
+`4599ab9`, `1eba7e7`, titled *"converted to skills via redirect stubs"* — took the 86 full agents,
+moved their bodies into `skills/`, and left a one-line redirect behind. **It deleted the AGENCY and
+kept the plumbing.** 93 of 128 agents are now pure 1:1 aliases that add nothing. That is the monster.
+
+**THE 86 ARE RECOVERABLE:** `git show e7e4b62^:agents/<cat>/<name>.md`. They were substantial —
+`architecture/dependency-analyzer` **1128 lines**, `testing/quality-gate-runner` 1082,
+`security/secrets-detector` 856, `security/sast-scanner` 779, `architecture/pattern-detector` 689.
+Today each is a 15-line stub.
+
+**DO NOT JUST MOVE THE BODIES BACK.** The skills GREW past the originals: `code-reviewer` was a
+232-line agent; its skill is now **753 lines**. Restoring old bodies verbatim throws away that work
+and rebuilds the same 1:1 monster.
+
+**THE RESTORATION:**
+1. **The agent = the WATCHER.** Recover the watcher essence from the 86 in git: its domain, WHEN in
+   the build it looks, what it judges, what it escalates. This is what has no replacement anywhere.
+2. **The skills = the TOOLBOX.** Keep them — they are the best content in the repo (median 553
+   lines, real, verified). Any agent may reuse any skill; that is the point of the shared layer.
+3. **An agent uses skills. A skill watches nothing.** A 1:1 agent→skill alias has no reason to
+   exist and must be retired, not filled.
+4. Breed each agent with websearch → harsh adversarial critique per section → update → more
+   websearch → critique the next section. NO FAKING.
+
 ## Goal
 
 Turn CTOC from a menu-navigation dashboard into a **streaming question system**. The owner's
