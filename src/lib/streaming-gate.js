@@ -863,6 +863,113 @@ function gateScreenAt(decisions, index, statusLine, root) {
   };
 }
 
+// ── PQ2: background question GENERATION (never-wait) ───────────────────────────
+// The generation half of "precompute questions, never wait": opening the gate screen
+// KICKS the background producer for any plan that still needs its decision questions.
+// The kick is DETACHED and fire-and-forget — it returns in milliseconds, never awaits
+// a `claude -p` call, and never throws into the render. Next open, the questions are
+// there. This is the useful wiring that makes `streaming-producer.js` reachable from a
+// live root (Operating Lesson 16): the menu path spawns `produce-questions.js`.
+
+/** The de-stampede marker: a fresh one means a producer is already running. */
+const PRODUCER_MARKER = '.producing';
+/** A marker older than this is assumed crashed and ignored (a new kick may proceed). */
+const PRODUCER_STALE_MS = 5 * 60 * 1000; // 5 minutes
+
+/** The detached background producer script — a DECLARED reachability root. */
+function producerScriptPath() {
+  return path.join(__dirname, '..', 'scripts', 'produce-questions.js');
+}
+
+/**
+ * The shipped detached spawn: launch the producer in its own process group with no
+ * stdio and unref it, so the parent (the menu render) returns immediately and the
+ * child outlives the turn. execFile-style array argv, no shell — a crafted `root`
+ * cannot inject a command. Isolated so `opts.spawn` can replace it in tests.
+ */
+function defaultDetachedSpawn(bin, args) {
+  const child = require('child_process').spawn(bin, args, { detached: true, stdio: 'ignore' });
+  if (child && typeof child.unref === 'function') child.unref();
+  return child;
+}
+
+/**
+ * KICK the background question producer for `root`, fire-and-forget. Returns in
+ * milliseconds; NEVER blocks on generation, NEVER reads the model, NEVER throws into
+ * the render. The menu MUST render regardless of what happens here.
+ *
+ * Guards, in order:
+ *   1. invalid root → clean no-op.
+ *   2. `plansNeedingQuestions(root)` empty → nothing to generate, no spawn.
+ *   3. a FRESH `.ctoc/streaming/.producing` marker → a producer is already running;
+ *      no stampede on repeated opens (a stale marker is ignored).
+ *   4. when NO spawn is injected AND we are inside the Node test runner
+ *      (`NODE_TEST_CONTEXT`), the REAL detached spawn is suppressed so the suite never
+ *      forks a real `node produce-questions.js` / `claude -p`. A live menu open (not
+ *      under the test runner) fires it for real; a test that WANTS to observe the kick
+ *      injects `opts.spawn`, which is honored unconditionally.
+ * A spawn failure is swallowed (logged) — the render still returns.
+ *
+ * @param {string} root project root
+ * @param {{spawn?:Function}} [opts] `spawn` injectable for hermetic tests
+ * @returns {{kicked:boolean, reason?:string}}
+ */
+function maybeKickProduction(root, opts = {}) {
+  try {
+    if (!isNonEmptyStr(root)) return { kicked: false, reason: 'invalid root' };
+
+    let needing;
+    try {
+      const { plansNeedingQuestions } = require('./streaming-precompute');
+      needing = plansNeedingQuestions(root);
+    } catch {
+      needing = [];
+    }
+    if (!Array.isArray(needing) || needing.length === 0) {
+      return { kicked: false, reason: 'no plan needs questions' };
+    }
+
+    const dir = path.join(root, '.ctoc', 'streaming');
+    const marker = path.join(dir, PRODUCER_MARKER);
+    try {
+      if (safeFs.existsSync(marker)) {
+        // A marker younger than the staleness window means a producer is running.
+        // A NEGATIVE age (mtime marginally ahead of Date.now() due to timer/clock
+        // granularity on a just-written marker) is ALSO the running case — treating it
+        // as "not running" would spawn a second producer on a rapid re-open (a
+        // stampede). Only a marker OLDER than the window (age >= STALE) is ignored.
+        const age = Date.now() - safeFs.statSync(marker).mtimeMs;
+        if (age < PRODUCER_STALE_MS) {
+          return { kicked: false, reason: 'a producer is already running' };
+        }
+      }
+    } catch { /* unreadable marker → treat as not running */ }
+
+    const injected = typeof opts.spawn === 'function' ? opts.spawn : null;
+    if (injected === null && process.env.NODE_TEST_CONTEXT) {
+      return { kicked: false, reason: 'suppressed under the test runner' };
+    }
+
+    // Mark BEFORE spawning so a concurrent open sees "already running". Best-effort.
+    try {
+      if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
+      safeFs.writeFileSync(marker, String(Date.now()));
+    } catch { /* best-effort marker — still attempt the spawn */ }
+
+    try {
+      (injected || defaultDetachedSpawn)(process.execPath, [producerScriptPath(), root]);
+    } catch (err) {
+      // Swallow: the menu MUST render even if generation cannot start.
+      try { console.warn(`[streaming-gate] could not start background question generation: ${(err && err.message) || String(err)}`); } catch { /* non-fatal */ }
+      return { kicked: false, reason: 'spawn failed' };
+    }
+    return { kicked: true };
+  } catch (err) {
+    // The render path must never see an exception from the kick.
+    return { kicked: false, reason: `unexpected: ${(err && err.message) || String(err)}` };
+  }
+}
+
 /**
  * The streaming gate screen: the FIRST pending decision, or the nothing-pending
  * screen when the queue is empty. This is the new `/ctoc:menu` default.
@@ -870,6 +977,9 @@ function gateScreenAt(decisions, index, statusLine, root) {
  * @param {string} [statusLine]
  */
 function streamingGateScreen(projectRoot, statusLine) {
+  // Never-wait: opening the screen kicks background question generation for any plan
+  // that still needs it. Fully guarded — it never blocks and never throws into render.
+  try { maybeKickProduction(projectRoot); } catch { /* the menu renders regardless */ }
   const decisions = pendingGateDecisions(projectRoot);
   return gateScreenAt(decisions, 0, statusLine, projectRoot);
 }
@@ -1022,4 +1132,5 @@ module.exports = {
   streamComment,
   streamAnswer,
   planDecisionScreen,
+  maybeKickProduction,
 };

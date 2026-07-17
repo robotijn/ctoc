@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.12.81-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.12.82-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-123-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-426-blue">
@@ -821,7 +821,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.12.81'
+getVersion()       // → '6.12.82'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -841,7 +841,7 @@ ctoc/
 │   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       16 Claude Code hooks (session, pre/post tool use, andon-halt,
 │   │                subagent concurrency fence)
-│   ├── lib/         101 JS modules (planning, quality, refinement, dispatcher; the
+│   ├── lib/         102 JS modules (planning, quality, refinement, dispatcher; the
 │   │                EU-compliance program — regulatory-regime, compliance-regime,
 │   │                compliance-dedup, compliance-integration, iron-loop-compliance-trigger,
 │   │                gdpr-helpers, gdpr-agent-runner, eu-ai-act-helpers,
@@ -854,7 +854,7 @@ ctoc/
 │   │                duplicate-guard, conflict-detect, ollama-client, sync/reconcile)
 │   ├── areas/       5 dashboard areas (pipeline, inbox, agent, library, system)
 │   ├── tabs/        8 legacy tab modules (superseded by areas/, kept for drill-in flows)
-│   ├── scripts/     7 build/release utilities
+│   ├── scripts/     9 build/release utilities
 │   └── data/        Static data files
 ├── agents/          123 agent definitions across 24 categories
 │                    (+ _shared/ — 4 cross-cutting rules: ancestry-read,
@@ -865,7 +865,7 @@ ctoc/
 │                    86 existing SKILL.md improved in v6.9.15–v6.9.23;
 │                    5 gap-fill SKILL.md added in v6.9.24; 8 cross-industry
 │                    SKILL.md added in v6.9.27.
-├── tests/           164 test files (guard + behavior suites; run with `node --test tests/*.test.js`)
+├── tests/           417 test files (guard + behavior suites; run with `node --test tests/*.test.js`)
 ├── .ctoc/           Config, templates, operations, audit, loop journals
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
@@ -891,6 +891,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.12.81** · Built by [@robotijn](https://github.com/robotijn)
+**6.12.82** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
