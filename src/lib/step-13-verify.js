@@ -24,12 +24,59 @@
  * check that ran passed, no test was skipped (CLAUDE.md: "0 skipped"), coverage —
  * when measurable against the project's declared floor (.ctoc/coverage-baseline
  * .json `minPct`) — cleared it, and any app-shaped project launched and responded.
+ *
+ * X3 — IT ALSO FAILS CLOSED ON AN UNREADABLE INSTRUMENT. When a test runner emits a
+ * node:test-shaped summary but its fail counter cannot be READ from it, that run is
+ * UNCERTIFIED, not clean: "I could not read the fail count" and "there were zero
+ * failures" are different facts and must never produce the same verdict. Node's
+ * reporter format is not our contract and has already changed once (the `ℹ` spec
+ * reporter, and colour) — the next change must be a LOUD failure, not a silent green.
  */
 
 const { execSync, spawnSync } = require('child_process');
 const safeFs = require('./safe-fs');
 const path = require('path');
 const { driveAppSync } = require('./app-runner');
+
+// ---------------------------------------------------------------------------
+// X3 — ANSI. Node COLORIZES its reporter output when FORCE_COLOR is set, EVEN WHEN
+// PIPED, and its DEFAULT "spec" reporter prefixes summary counters with `ℹ`, not the
+// TAP `#`. The line these parsers receive is therefore not `# fail 8` but
+// `ESC[31mℹ fail 8ESC[39m`, so a `^`-anchored, `#`-only parse matches the ESCAPE BYTE
+// and finds nothing. Of the four shapes node actually emits (TAP/spec x plain/colour)
+// this module read exactly ONE — and its no-match path fell through in SILENCE.
+//
+// Mirrored from src/scripts/test-gate.js (X2), deliberately NOT imported: that module
+// does not export stripAnsi (it has no caller outside itself, and the export fence
+// treats an unreachable export as dead surface). Ten duplicated lines with this
+// pointer is the smaller debt. If review prefers a shared src/lib/ansi.js imported by
+// both, that is a better answer — it changes X2's landed contract, so it is flagged
+// rather than taken here.
+//
+// No new dependency (`strip-ansi` would do this in one import): the repo rule is
+// stdlib and what is already installed.
+//
+// The escape byte is the `\x1b` ESCAPE SEQUENCE, never a raw control byte: a raw byte
+// is invisible in review and mangles diffs. This is a LITERAL RegExp, not
+// `new RegExp(...)` over a built string — src/ enforces `security/detect-non-literal-
+// regexp` at error under --max-warnings 0, and a dynamic constructor here would add a
+// NEW lint error (warnings are bugs). `no-control-regex` is off repo-wide, so the
+// `\x1b` escapes are permitted. The test file uses String.fromCharCode(27) for its
+// fixtures; it is exempt from that rule.
+// ---------------------------------------------------------------------------
+const ANSI_PATTERN =
+  /\x1b\[[0-9;:<=>?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
+//  ^ CSI (SGR colour `ESC[31m`, cursor moves)  ^ OSC (hyperlinks/titles)  ^ 2-char escapes
+
+/**
+ * Remove ANSI escape sequences so the line-anchored parsers below see the real first
+ * character of each line rather than an escape byte.
+ * @param {string} text - Raw captured output.
+ * @returns {string} The text with all ANSI escape sequences removed.
+ */
+function stripAnsi(text) {
+  return String(text == null ? '' : text).replace(ANSI_PATTERN, '');
+}
 
 /**
  * Run Step 14 VERIFY quality checks.
@@ -313,11 +360,73 @@ function readCoverageFloor(projectPath) {
   }
 }
 
+/**
+ * Read the test runner's FAIL counter from its output.
+ *
+ * Returns NULL — not 0 — when the counter cannot be read. That distinction is the
+ * whole of X3: the old parser's no-match path was indistinguishable from a clean
+ * run, and a parser whose no-match default is the SUCCESS value is a false-green
+ * machine. `parseCoveragePct` already returned null correctly; this copies it.
+ *
+ * Handles all four shapes node emits: the TAP reporter (`# fail N`) and the spec
+ * reporter (`ℹ fail N` — node's DEFAULT on a TTY), each plain or colorized. Anchored
+ * to the LINE START and taking the LAST match: node emits the aggregate summary after
+ * all test output, so a `# fail 2` embedded mid-line in a TEST NAME (e.g. this
+ * module's own test, which names such a fixture) is never at line-start and can never
+ * hijack the count.
+ *
+ * @param {string} out - Captured runner output (colour tolerated).
+ * @returns {number|null} The failing-test count, or null when unreadable.
+ */
+function parseFailCount(out) {
+  const matches = [...stripAnsi(out).matchAll(/^\s*(?:#|ℹ)\s+fail\s+(\d+)/gim)];
+  return matches.length ? parseInt(matches[matches.length - 1][1], 10) : null;
+}
+
+/**
+ * True when the output carries evidence that a node:test-shaped runner reported a
+ * SUMMARY — i.e. the instrument this module claims to read is PRESENT.
+ *
+ * This is the boundary that keeps the fail-closed rule from becoming a FALSE RED,
+ * which would be worse than the false green it replaces (a guard that cries wolf gets
+ * disabled). Plenty of legitimate runs carry no fail counter at all and must stay
+ * green: a clean lint or typecheck, and a project whose test script is a plain
+ * assertion script (`node test/widget.test.js` printing `ok: ...` and exiting 0). For
+ * those, the exit code IS the instrument and it reported success — there is no
+ * illegible dial to fail on.
+ *
+ * The rule is therefore narrower than "output but no fail line": the run must LOOK
+ * like the thing we parse. When it does — a sibling summary counter, a fail-shaped
+ * counter we could not read a number from, or raw TAP failure output — and the fail
+ * count still cannot be read, the run is UNCERTIFIED.
+ *
+ * @param {string} out - Captured runner output (colour tolerated).
+ * @returns {boolean} Whether a node:test-shaped fail counter should have been readable.
+ */
+function hasTestSummaryEvidence(out) {
+  const text = stripAnsi(out);
+  return (
+    // A sibling summary counter from the same block as `fail` (TAP `#` or spec `ℹ`).
+    /^\s*(?:#|ℹ)\s+(?:tests|suites|pass|cancelled|skipped|todo|duration_ms)\b/im.test(text)
+    // A fail-SHAPED counter line we could not read a number out of — a renamed key
+    // (`ℹ failures 2`) or a malformed value. The dial is there; it is illegible.
+    || /^\s*(?:#|ℹ)\s+fail\w*\b/im.test(text)
+    // Raw TAP failure output with no readable aggregate: failures are evident and
+    // unquantified. That is uncertified, never clean.
+    || /^\s*not ok\b/im.test(text)
+    || /^\s*TAP version\b/im.test(text)
+  );
+}
+
 /** Parse a skipped/todo test count from test-runner output. */
 function parseSkippedCount(out) {
   let n = 0;
-  const text = out || '';
-  for (const re of [/#\s*skipped\s+(\d+)/ig, /#\s*todo\s+(\d+)/ig]) {
+  // X3: strip colour and accept the spec reporter's `ℹ` prefix as well as TAP's `#`.
+  // This counter was ANSI-naive and TAP-only too, so a colorized or spec-reporter run
+  // silently read 0 skipped — the same false green as the fail counter, on the axis
+  // CLAUDE.md states as "0 skipped".
+  const text = stripAnsi(out);
+  for (const re of [/(?:#|ℹ)\s*skipped\s+(\d+)/ig, /(?:#|ℹ)\s*todo\s+(\d+)/ig]) {
     let m;
     while ((m = re.exec(text)) !== null) n += parseInt(m[1], 10);
   }
@@ -349,7 +458,12 @@ function lastCap(text, re) {
 
 /** Parse a coverage percentage from test-runner output, or null if not present. */
 function parseCoveragePct(out) {
-  const text = out || '';
+  // X3: strip colour before parsing. The coverage row is colorized too
+  // (`ESC[32mℹ all files | 40.12 …`), and the `^` anchor otherwise matches the escape
+  // byte — so a real below-floor figure read as null. With a floor declared that
+  // currently fails closed (correct), but it fails for the WRONG REASON and hides the
+  // real number from the operator; with no floor it is simply unenforced.
+  const text = stripAnsi(out);
   // Node's own --experimental-test-coverage table prints the summary row as
   // `# all files | <line%> | …` (lowercase, leading `# ` under the TAP reporter).
   // Match it case-insensitively and tolerant of the `# ` prefix, and BEFORE the
@@ -361,7 +475,9 @@ function parseCoveragePct(out) {
   // last, so an earlier line reading `all files | 100` (a stray log or a spoof)
   // must never win over the real below-floor summary that follows it. A non-global
   // `.match()` returned the FIRST match and let a spoofed 100 pass a below-floor run.
-  let m = lastCap(text, /^\s*#?\s*all files\s*\|\s*([\d.]+)/img);
+  // X3: accept the spec reporter's `ℹ ` prefix alongside TAP's `# ` (mirrors
+  // src/scripts/test-gate.js) — node's default reporter emits `ℹ all files | …`.
+  let m = lastCap(text, /^\s*(?:ℹ|#)?\s*all files\s*\|\s*([\d.]+)/img);
   if (m) return parseFloat(m[1]);
   m = lastCap(text, /Lines\s*:\s*([\d.]+)\s*%/ig);
   if (m) return parseFloat(m[1]);
@@ -384,13 +500,34 @@ function parseCoveragePct(out) {
 function applyTestQualityContracts(check, projectPath, errors) {
   // A runner can report FAILURES on stdout yet exit 0 (jest --passWithNoTests, a
   // wrapping `|| true`, `set +e`, or a custom reporter that swallows the exit
-  // code). tryCommand derives success solely from the zero exit, so parse the TAP
-  // `# fail N` summary and fail closed — mirroring the skipped-count logic below,
-  // which already proves we do not fully trust the exit code.
-  const mFail = (check.output || '').match(/^#\s*fail\s+(\d+)/im);
-  if (mFail && parseInt(mFail[1], 10) > 0) {
+  // code). tryCommand derives success solely from the zero exit, so parse the
+  // `# fail N` / `ℹ fail N` summary and fail closed — mirroring the skipped-count
+  // logic below, which already proves we do not fully trust the exit code.
+  //
+  // X3 — THIS SAID "fail closed" AND FAILED OPEN. The parser was `/^#\s*fail\s+(\d+)/im`
+  // (TAP-only, ANSI-naive) guarded by `if (mFail && …)`, so THREE of the four shapes
+  // node actually emits matched NOTHING and the guard was skipped in SILENCE:
+  // check.passed stayed true and no error was pushed. There was no third state between
+  // "read a number" and "certified clean". parseFailCount now reads all four shapes and
+  // returns NULL — never 0 — when it cannot read the counter at all.
+  const failCount = parseFailCount(check.output);
+  if (failCount === null) {
+    // Unreadable. Fail closed ONLY when the instrument was actually THERE (see
+    // hasTestSummaryEvidence): a run that emits no summary block at all — a plain
+    // assertion script that printed a line and exited 0 — has no illegible dial and
+    // must stay green. Over-correcting into a false RED is worse than the false green,
+    // because a guard that cries wolf gets disabled.
+    if (hasTestSummaryEvidence(check.output)) {
+      check.passed = false;
+      errors.push(
+        'could not read the fail count from the test output, which reported a test ' +
+        'summary — the run is UNCERTIFIED, not clean (an unreadable instrument is ' +
+        'never a pass)'
+      );
+    }
+  } else if (failCount > 0) {
     check.passed = false;
-    errors.push(`${mFail[1]} failing test(s) reported despite exit 0`);
+    errors.push(`${failCount} failing test(s) reported despite exit 0`);
   }
 
   const skipped = parseSkippedCount(check.output);

@@ -24,7 +24,6 @@ related_skills:
   - saas/posthog-analytics
   - versioning/feature-flag-auditor
 effort_level: high
-model_optimized_for: opus-4-7
 model: opus
 tools: Read, Write
 ---

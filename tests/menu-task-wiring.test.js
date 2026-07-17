@@ -597,10 +597,20 @@ describe('NB2 — bounded inputs + pagination (LOW)', () => {
 
 const SRC = path.join(__dirname, '..', 'src');
 
-/** Every `claude:<key>` token that appears in a menu-EMITTING source file. */
+/**
+ * Every `claude:<key>` token that appears in a menu-EMITTING source file.
+ *
+ * `streaming-gate.js` joined this list when opening a plan became a QUESTION: its
+ * `planDecisionScreen` replaced the four plan-menu screens that used to live in
+ * menu-screens.js, and it is now the emitter of `claude:discuss`,
+ * `claude:view-edit`, `claude:delete`, and `claude:reject`. The fence must follow
+ * the emitter — a key that moved file is still a key a human can pick, and a dead
+ * button is exactly what this fence exists to catch.
+ */
 function emittedActionKeys() {
   const files = [
     path.join(SRC, 'lib', 'menu-screens.js'),
+    path.join(SRC, 'lib', 'streaming-gate.js'),
     path.join(SRC, 'commands', 'menu.js'),
   ];
   const keys = new Set();

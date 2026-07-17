@@ -224,11 +224,11 @@ Each row scores one credible failure mode for one Iron Loop step. The scores ref
 | Dimension | Score | Rationale |
 |---|---|---|
 | Severity | 7 | Moderate rework. Environment debugging is time-consuming. |
-| Occurrence | 5 | Moderately low. The Tier 3 scouts catch the common cases. |
+| Occurrence | 5 | Moderately low. The Step 9 watchers catch the common cases. |
 | Detection | 6 | Low. Continuous integration usually matches production but not always. |
 | Action Priority | Medium | Severity seven with Occurrence five and Detection six. |
 
-**Mitigation**: the scout layer (`scouts/syntax-scout`, `scouts/secret-scout`, `scouts/dep-scout`, `scouts/lint-scout`, `scouts/test-scout`) runs in parallel. The cross-platform requirements in CLAUDE.md mandate `path.join`, `fs.promises`, `process.platform`, and `os.homedir`.
+**Mitigation**: the Step 9 watchers (`security/sast-scanner`, `security/dependency-auditor`, `quality/type-checker`) run in parallel and read the actual code. The cross-platform requirements in CLAUDE.md mandate `path.join`, `fs.promises`, `process.platform`, and `os.homedir`.
 
 ### Step 10 — IMPLEMENT
 
@@ -277,18 +277,20 @@ Each row scores one credible failure mode for one Iron Loop step. The scores ref
 
 ### Step 13 — SECURE
 
-**Failure mode**: the scout pre-screen returns pass but a real threat slipped through because the scout's coverage of a newer attack technique is incomplete.
+**Failure mode**: a real threat ships because the security review's coverage of a newer attack technique is incomplete.
 
 **Symptom**: post-ship vulnerability discovered later by a security researcher, by a bug-bounty submission, or by an incident.
 
 | Dimension | Score | Rationale |
 |---|---|---|
 | Severity | 9 | Severe customer impact, possible regulatory exposure under the active profile (Cyber Resilience Act incident clocks, DORA incident classification). |
-| Occurrence | 4 | Low. The Tier 3 scout plus the threat-modeler at Step 6.5 plus the SAST scanner at Step 9 plus the dependency auditor at Step 9 catch the great majority. The remaining risk is novel techniques. |
+| Occurrence | 4 | Low. The threat-modeler at Step 6.5, the SAST scanner at Step 9, the dependency auditor at Step 9, and the secrets-detector at Step 13 catch the great majority. The remaining risk is novel techniques. |
 | Detection | 5 | Moderate. The defence-in-depth catches most; novel techniques wait for catalogue updates. |
 | Action Priority | High | Severity nine triggers High regardless. |
 
-**Mitigation**: keep the scout's threat catalogue current. Subscribe to the MITRE ATT&CK and MITRE ATLAS release feed (per `security/threat-modeler`'s `atlas_version` pinning rule). Run the security-scanner skill at Step 9 with the latest rule pack.
+**Mitigation**: keep the threat catalogue current. Subscribe to the MITRE ATT&CK and MITRE ATLAS release feed (per `security/threat-modeler`'s `atlas_version` pinning rule). Run the security-scanner skill at Step 9 with the latest rule pack.
+
+**A prior variant of this failure mode has been eliminated at the source.** Until 2026-07-17 this entry read: *"the scout pre-screen returns pass but a real threat slipped through because the scout's coverage of a newer attack technique is incomplete."* That was not a residual risk to be managed with a catalogue refresh — it was a **designed-in** false negative. A Haiku pre-screen matched twenty known secret formats and, on `pass`, prevented `security/secrets-detector` from ever running, while the audit trail recorded a completed scan. Plan F3b deleted that pre-screen layer (see [AGENT_ARCHITECTURE.md](./AGENT_ARCHITECTURE.md#tier-3--deleted)). The deep detector now runs unconditionally wherever it is in scope, so a novel secret format is a *detection* limit of an agent that looked — not a scan that silently never happened.
 
 ### Step 14 — VERIFY
 

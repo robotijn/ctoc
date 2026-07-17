@@ -1,21 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T18:30:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's explicit 2026-07-14 orders "fix them all, do 50
-  rounds of hard critique, keep fixing the code" and "fix everything", against
-  the Round-5 gate-machinery audit. The core defect is the direct negation of
-  the human's OWN decided rule ("push and deploy stay as gates", 2026-07-14):
-  machines push by default and the off-switch is a placebo. Verified on disk by
-  the coordinator: init writes `push: auto_push: true` which NO code reads
-  (sync.js reads the `sync` category); post-commit.js hardcodes
-  `--on-success=push`; sync.js:104 runs `git push origin main` on a 5-minute
-  timer gated by `general.syncEnabled` (schema default TRUE).
----
-
----
 title: "R3-C — The push ship gate becomes real; approvePlan validates; assignDirectly dies"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

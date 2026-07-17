@@ -24,7 +24,6 @@ related_skills:
   - saas/stripe-subscriptions
   - product/experiment-designer
 effort_level: high
-model_optimized_for: opus-4-7
 model: opus
 tools: Read, Write, Bash, WebFetch
 ---

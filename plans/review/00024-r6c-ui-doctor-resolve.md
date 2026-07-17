@@ -1,12 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-15T00:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: "Standing 2026-07-14 orders. ui.js#doctor is a dead export in the 104 baseline (R4-C surfaced it — R4-B had falsely credited it via unrelated 'clinic doctor'/'mix doctor' prose tokens). The live doctor screen is tools.js#renderDoctor (wired via menu.js). Resolve: wire or delete, no third state."
----
-
----
 title: "R6-C — Resolve the dead ui.js#doctor export: wire it or delete it"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

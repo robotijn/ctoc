@@ -1,19 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T18:45:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's explicit 2026-07-14 orders "fix them all, do 50
-  rounds of hard critique, keep fixing the code" and "fix everything", against
-  the Round-5 greenfield-journey audit. THE defect: completeExecution has ZERO
-  callers (verified by the coordinator's own grep across src/, agents/, skills/)
-  — so verify evidence is never produced and Gate 3, correctly fail-closed on
-  evidence, is un-passable except by override. Same root cause as the 92-dead-
-  file catastrophe, one level down: a dead EXPORT inside a live file.
----
-
----
 title: "R3-D — Wire the last mile: completion runs completeExecution; the fence learns about exports"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

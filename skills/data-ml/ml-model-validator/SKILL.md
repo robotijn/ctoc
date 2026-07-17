@@ -16,7 +16,6 @@ related_skills:
   - data-ml/feature-store-validator
   - ai-quality/ai-code-quality-reviewer
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Bash, Read
 model: opus
 tier: 2

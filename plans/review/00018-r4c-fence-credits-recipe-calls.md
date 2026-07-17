@@ -1,21 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T21:30:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's standing 2026-07-14 orders ("fix them all",
-  "fix everything", "keep fixing the code"). Integrator finding: R4-B's fence
-  tightening (fenced-code-block-only) over-corrected — it baselined 24 exports
-  as DEAD that are invoked as REAL function calls in menu.md recipes
-  (approveSubplans(parentSlug,'review') — the Gate 3 done-all gate;
-  declineComplianceRegime(); dismissStale(); completeVision()). CTOC recipes use
-  INLINE code, not fenced blocks, so fenced-only misses them. Verified on disk
-  by the coordinator: `approveSubplans(` appears as a call at menu.md:45,46;
-  `completeExecution` appears only as a bare prose name (no paren).
----
-
----
 title: "R4-C — The fence credits a CALL, not a fenced block: recipe invocations are live, prose is not"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

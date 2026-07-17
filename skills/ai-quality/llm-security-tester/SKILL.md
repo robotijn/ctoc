@@ -26,7 +26,6 @@ related_skills:
   - security/secrets-detector
   - compliance/ai-governance-checker
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob, WebSearch
 model: opus
 tier: 2

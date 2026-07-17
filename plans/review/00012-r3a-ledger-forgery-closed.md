@@ -1,17 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T18:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's explicit 2026-07-14 orders "fix them all, do 50
-  rounds of hard critique, keep fixing the code" and "fix everything", against
-  the Round-5 security critic's findings (two verified by the coordinator's own
-  execution: Bash ALWAYS_ALLOWED matches /^\s*node\s+/ first and PreToolUse.Bash
-  never mentions .ctoc/approvals; isVisionExempt tests only `type: vision`).
----
-
----
 title: "R3-A — Close ledger forgery for real: Bash parity, vision exemption killed, collision guard live, injection gates"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

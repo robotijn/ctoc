@@ -16,7 +16,6 @@ related_skills:
   - testing/writers/property-test-writer
   - testing/runners/mutation-test-runner
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Write, Edit, Bash
 model: opus
 tier: 2

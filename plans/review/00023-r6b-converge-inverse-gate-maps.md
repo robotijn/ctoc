@@ -1,12 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-15T00:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: "Standing 2026-07-14 orders. R5-B flagged: two MORE copies of the three human-gate edges exist as destination→source inverse maps (human-gate-check.js:105 HUMAN_GATES, approval-ledger.js:99 STAGE_SOURCE), outside R5-B's file scope. Converge them onto gate-order.js — the ONE encoding — so no copy can diverge."
----
-
----
 title: "R6-B — The last two gate-edge copies derive from gate-order (ONE encoding, finished)"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

@@ -511,3 +511,185 @@ describe('route wiring — `stream answer` records the answer, never crosses a g
     assert.ok(!fs.existsSync(path.join(root, '.ctoc', 'streaming', 'answers.jsonl')), 'no log for a bad ref');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W1 — THE SUFFICIENCY VERDICT REACHES THE HUMAN.
+//
+// `streaming-precompute.hasEnoughInformation` is the predicate for the owner's
+// load-bearing principle: "the gate is enough information, not human approval".
+// It was built, proven fail-closed, and wired to NOTHING. These cases wire it to
+// the one screen a human actually reads — the pending gate decisions.
+//
+// DISPLAY ONLY, DELIBERATELY. The verdict is SHOWN; it crosses nothing and writes
+// nothing. Auto-crossing on `enough: true` is unsafe until `approval-ledger`'s
+// `entryKind` stops classifying an unrecognised `advanced_by` as `'human'` — that
+// default would forge the human's approval. See the plan's Decision 1.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A question in the real Question contract. `critical: true` makes it a FORK. */
+function forkQuestion(id) {
+  return {
+    id,
+    prompt: `Which store backs ${id}?`,
+    critical: true,
+    options: [
+      { key: 'pg', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
+      { key: 'sqlite', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
+    ],
+  };
+}
+
+/** A `normal` question — a detail, resolvable while building. Never a fork. */
+function detailQuestion(id) {
+  return {
+    id,
+    prompt: `What should ${id} be called?`,
+    options: [{ key: 'a', label: 'Option A', recommended: true }],
+  };
+}
+
+describe('W1 — pendingGateDecisions carries each plan\'s SUFFICIENCY VERDICT (display only)', () => {
+  it('a plan whose every fork is answered reports enough:true and no unanswered forks', () => {
+    const root = makeSandbox();
+    const p = writePlan(root, 'functional', 'suff-ok', validFunctionalBody('suff-ok'));
+    const ref = 'functional/suff-ok.md';
+    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
+    // The REAL answer writer — the predicate reads the log this produces.
+    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+
+    const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
+    assert.ok(d, 'the plan is still listed at its gate');
+    assert.equal(d.enough, true, 'every fork is answered → enough information to build');
+    assert.equal(d.sufficiencyReason, 'enough');
+    assert.deepEqual(d.unansweredQuestionIds, [], 'nothing is still open');
+    assert.deepEqual(d.blockingQuestionIds, []);
+  });
+
+  it('a plan with an UNANSWERED CRITICAL question reports enough:false and names it', () => {
+    const root = makeSandbox();
+    const p = writePlan(root, 'functional', 'suff-fork', validFunctionalBody('suff-fork'));
+    const ref = 'functional/suff-fork.md';
+    precompute.writePlanQuestions(root, ref, [forkQuestion('db'), detailQuestion('name')], fs.statSync(p).mtimeMs);
+
+    const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
+    assert.equal(d.enough, false, 'an unanswered FORK means the implementer would have to guess');
+    assert.equal(d.sufficiencyReason, 'open-forks');
+    // `unanswered` is EVERY open question (nothing hidden); `blocking` is the fork subset.
+    assert.deepEqual(d.unansweredQuestionIds, ['db', 'name'], 'every open question is reported honestly');
+    assert.deepEqual(d.blockingQuestionIds, ['db'], 'only the critical one is a fork');
+  });
+
+  it('a plan whose questions were NEVER COMPUTED reports enough:false — it FAILS CLOSED', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'suff-none', validFunctionalBody('suff-none'));
+
+    const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === 'functional/suff-none.md');
+    // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF SUFFICIENCY. Not `true`, not a crash.
+    assert.equal(d.enough, false, 'never-computed must never read as "enough" — we simply do not KNOW');
+    assert.equal(d.sufficiencyReason, 'not-computed');
+    assert.deepEqual(d.unansweredQuestionIds, []);
+  });
+
+  it('the verdict is DISPLAY ONLY: reading it crosses no gate and writes no approval', () => {
+    const root = makeSandbox();
+    const p = writePlan(root, 'functional', 'suff-pure', validFunctionalBody('suff-pure'));
+    const ref = 'functional/suff-pure.md';
+    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
+    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+
+    const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
+    assert.equal(d.enough, true, 'the plan HAS enough information …');
+
+    // … and NOTHING acted on it. The plan did not move and no approval exists.
+    assert.ok(fs.existsSync(p), 'the plan is still in functional/ — enough information did NOT cross the gate');
+    assert.ok(
+      !fs.existsSync(path.join(root, 'plans', 'implementation', 'suff-pure.md')),
+      'the plan must NOT have been auto-advanced'
+    );
+    assert.ok(
+      !fs.existsSync(ledgerFile(root, 'suff-pure')),
+      'NO approval ledger entry may exist — an auto-entry would be classified as the HUMAN (entryKind default) and forge his approval'
+    );
+    assert.ok(
+      !fs.readFileSync(p, 'utf8').includes('approved_by'),
+      'the plan body must carry no approval stamp'
+    );
+  });
+});
+
+describe('W1 — wiring the predicate did not create a REQUIRE CYCLE', () => {
+  // WHY A FRESH PROCESS: a cycle is a LOAD-ORDER defect. In this suite both modules
+  // are already required at the top, so the cache hides it. Only a cold process in a
+  // controlled order can observe a partially-initialised module.
+  //
+  // WHAT A REAL CYCLE LOOKS LIKE (measured, not assumed): it needs BOTH edges at
+  // load time. Node then hands the second module a partially-initialised export
+  // object — the missing name reads `undefined` and Node prints
+  // "Warning: Accessing non-existent property … inside circular dependency".
+  // Both assertions below detect exactly that, so this case CAN fail: restore a
+  // top-level `require('./streaming-precompute')` to streaming-precompute's own
+  // importer and it breaks. (Verified by mutation — see the plan's Step 8 report.)
+  function loadInOrder(first, second) {
+    const script = `
+      const a = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'lib', first))});
+      const b = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'lib', second))});
+      const pick = (m) => Object.keys(m).sort();
+      process.stdout.write(JSON.stringify({ first: pick(a), second: pick(b) }));
+    `;
+    const r = require('node:child_process').spawnSync(process.execPath, ['-e', script], {
+      encoding: 'utf8',
+      cwd: path.join(__dirname, '..'),
+    });
+    return { ...r, parsed: r.stdout ? JSON.parse(r.stdout) : null };
+  }
+
+  it('streaming-gate FIRST, then streaming-precompute → both fully export, no cycle warning', () => {
+    const r = loadInOrder('streaming-gate.js', 'streaming-precompute.js');
+    assert.equal(r.status, 0, `a cold load must not fail. stderr: ${r.stderr}`);
+    assert.ok(
+      r.parsed.first.includes('pendingGateDecisions'),
+      `streaming-gate must export pendingGateDecisions; a cycle would drop it. got ${JSON.stringify(r.parsed.first)}`
+    );
+    assert.ok(
+      r.parsed.second.includes('hasEnoughInformation'),
+      `streaming-precompute must export hasEnoughInformation. got ${JSON.stringify(r.parsed.second)}`
+    );
+    assert.ok(
+      !/circular dependency/i.test(r.stderr),
+      `Node reported a circular dependency — the wiring introduced a load-time cycle:\n${r.stderr}`
+    );
+  });
+
+  it('streaming-precompute FIRST, then streaming-gate → both fully export, no cycle warning', () => {
+    const r = loadInOrder('streaming-precompute.js', 'streaming-gate.js');
+    assert.equal(r.status, 0, `a cold load must not fail. stderr: ${r.stderr}`);
+    assert.ok(r.parsed.first.includes('hasEnoughInformation'), 'precompute exports its predicate');
+    assert.ok(
+      r.parsed.second.includes('pendingGateDecisions'),
+      `streaming-gate must export pendingGateDecisions in this order too. got ${JSON.stringify(r.parsed.second)}`
+    );
+    assert.ok(
+      !/circular dependency/i.test(r.stderr),
+      `Node reported a circular dependency in the reverse load order:\n${r.stderr}`
+    );
+  });
+
+  it('the sufficiency verdict SURVIVES a cold gate-first load (the real menu path)', () => {
+    // The end-to-end guard: the lazy require must actually resolve at CALL time in a
+    // process that never loaded precompute first. If the wiring is absent or the
+    // lazy require is broken, `enough` is undefined here and this fails.
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'cold', validFunctionalBody('cold'));
+    const script = `
+      const gate = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'lib', 'streaming-gate.js'))});
+      const d = gate.pendingGateDecisions(${JSON.stringify(root)});
+      process.stdout.write(JSON.stringify(d.map((x) => ({ ref: x.ref, enough: x.enough, reason: x.sufficiencyReason }))));
+    `;
+    const r = require('node:child_process').spawnSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+    assert.equal(r.status, 0, `cold gate-first call must not throw. stderr: ${r.stderr}`);
+    const decisions = JSON.parse(r.stdout);
+    assert.equal(decisions.length, 1);
+    assert.equal(decisions[0].enough, false, 'the predicate ran cold and failed closed');
+    assert.equal(decisions[0].reason, 'not-computed', 'the real predicate answered, not a default');
+  });
+});

@@ -19,7 +19,6 @@ related_skills:
   - documentation/documentation-updater
   - documentation/changelog-generator
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2

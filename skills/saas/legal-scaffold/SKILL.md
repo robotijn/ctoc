@@ -32,7 +32,6 @@ related_skills:
   - compliance/license-scanner
   - quality/accessibility-checker
 effort_level: medium
-model_optimized_for: opus-4-7
 model: opus
 tools: Read, Write, WebFetch
 ---

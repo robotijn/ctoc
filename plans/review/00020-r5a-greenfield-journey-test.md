@@ -1,18 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T22:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's standing 2026-07-14 orders ("fix them all",
-  "fix everything", "keep fixing the code"). The false-green audit's finding #8,
-  verified: ZERO test files call both initProject and approvePlan/movePlan.
-  Nothing drives the greenfield path a human takes, which is the MECHANISM by
-  which every round finds a new dead seam — each seam is individually green and
-  no test walks the seam line.
----
-
----
 title: "R5-A — The greenfield journey test: walk the seam line a human walks"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

@@ -19,7 +19,6 @@ related_skills:
   - specialized/memory-safety-checker
   - specialized/database-reviewer
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep
 model: opus
 tier: 2

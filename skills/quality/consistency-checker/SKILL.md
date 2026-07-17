@@ -15,7 +15,6 @@ related_skills:
   - quality/code-reviewer
   - quality/code-smell-detector
 effort_level: low
-model_optimized_for: opus-4-7
 tools: Read, Grep, Glob
 model: sonnet
 tier: 2

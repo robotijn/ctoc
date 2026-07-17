@@ -376,8 +376,18 @@ describe('e2e: menu state machine via real process', () => {
         `args [${args.join(' ')}] produce an actions map`);
     }
 
-    // Spot-check the fall-throughs that must land on the dashboard.
-    for (const args of [['totally-bogus-command'], ['plan'], ['plan', 'no-slash-here'], ['validate']]) {
+    // The `plan` route no longer falls back to a navigation dashboard: opening a
+    // plan is a QUESTION, so a missing ref lands on the pending gate decisions and
+    // a malformed ref is refused outright instead of being silently swallowed into
+    // a menu. Both are honest answers; neither is a list to browse.
+    assert.equal(runMenu(['plan']).json.ask.questions[0].header, 'Gate decisions',
+      'a bare `plan` asks the pending decision, it does not open a dashboard');
+    assert.equal(runMenu(['plan', 'no-slash-here']).json.ask.questions[0].header, 'Error',
+      'a malformed plan ref is refused, not swallowed into a dashboard');
+
+    // The remaining fall-throughs still land on the dashboard — those routes are
+    // not part of this change.
+    for (const args of [['totally-bogus-command'], ['validate']]) {
       const { json } = runMenu(args);
       assert.equal(json.ask.questions[0].header, 'Pipeline',
         `args [${args.join(' ')}] fall back to the pipeline dashboard`);

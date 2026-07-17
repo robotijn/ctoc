@@ -12,7 +12,6 @@ when_to_load:
 related_skills:
   - documentation/changelog-generator
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Write, Edit
 model: sonnet
 tier: 2

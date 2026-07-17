@@ -15,7 +15,6 @@ related_skills:
   - devex/api-deprecation-checker
   - specialized/api-contract-validator
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep
 model: opus
 tier: 2

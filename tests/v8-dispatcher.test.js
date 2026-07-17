@@ -86,13 +86,12 @@ describe('v8-dispatcher — tier inference', () => {
     teardownTempProject();
   });
 
-  it('infers tier 3 for scouts', () => {
-    setupTempProject();
-    const { inferTier } = loadDispatcher();
-    assert.equal(inferTier('scouts/syntax-scout'), 3);
-    assert.equal(inferTier('scouts/test-scout'), 3);
-    teardownTempProject();
-  });
+  // DELETED by plan F3b: 'infers tier 3 for scouts', which asserted
+  // inferTier('scouts/syntax-scout') === 3 and inferTier('scouts/test-scout') === 3.
+  // Tier 3 is deleted and inferTier no longer has a `scouts/` branch, so the
+  // contract this asserted no longer exists. An unknown category now correctly
+  // falls through to the tier-2 specialist default, which the coverage suite
+  // asserts. tests/no-tier-3.test.js fences the tier's absence.
 });
 
 describe('v8-dispatcher — request normalization', () => {
@@ -208,7 +207,7 @@ describe('v8-dispatcher — audit log round-trip', () => {
     teardownTempProject();
   });
 
-  it('rejects responses with no findings/synthesis/decision', () => {
+  it('rejects responses with no findings/synthesis', () => {
     setupTempProject();
     const { beginDispatch, recordResponse } = loadDispatcher();
     const token = beginDispatch({
@@ -217,33 +216,52 @@ describe('v8-dispatcher — audit log round-trip', () => {
     });
     assert.throws(
       () => recordResponse(token, { self_assessment: { coverage: 1.0 } }),
-      /must include findings, synthesis.*decision/
+      /must include findings or synthesis/
     );
     teardownTempProject();
   });
 
-  it('validates scout responses have decision: pass|flag|error', () => {
+  // TIGHTENED by plan F3b (this is a new assertion, not a relaxed one). `decision`
+  // used to be an accepted response shape — the scout's pass|flag|error verdict.
+  // With Tier 3 deleted, a bare verdict that a deep specialist was skipped is not a
+  // response at all: every agent returns real findings (an empty list is a real
+  // result) or a synthesis. This pins that narrowing so `decision` cannot creep back
+  // in as an accepted shape.
+  it('rejects a bare scout-style decision as a response shape', () => {
     setupTempProject();
     const { beginDispatch, recordResponse } = loadDispatcher();
     const token = beginDispatch({
-      target: 'scouts/syntax-scout',
-      goal: 'Quick parse check of the changed files.',
+      target: 'security/secrets-detector',
+      goal: 'Scan the changed files for leaked credentials.',
     });
     assert.throws(
-      () => recordResponse(token, { decision: 'maybe' }),
-      /scout response must declare decision: pass\|flag\|error/
+      () => recordResponse(token, { decision: 'pass', pillar: 'security', reason: 'no patterns' }),
+      /must include findings or synthesis/,
+      'a bare `decision: pass` must NOT be accepted — that was the scout form, and a ' +
+        'verdict recorded without findings is how "scanned, nothing found" got written ' +
+        'for a scan that never ran'
     );
     teardownTempProject();
   });
 
+  // DELETED by plan F3b: 'validates scout responses have decision: pass|flag|error'.
+  // It asserted that a tier-3 target rejects a decision outside pass|flag|error.
+  // `decision` was the scout response form; the scout tier and the schema's
+  // `scout_response` definition are both gone, so there is no such contract to
+  // validate. A bare verdict is no longer an accepted response at all — the
+  // tightened rule (findings or synthesis, nothing else) is asserted directly above.
+
+  // Retargeted by plan F3b, NOT deleted: this asserts finalizeDispatch writes the
+  // outcome block — a contract that is very much alive. Only the target string and
+  // the response shape changed, from a deleted scout to a real watcher.
   it('finalizes a dispatch with outcome', () => {
     setupTempProject();
     const { beginDispatch, recordResponse, finalizeDispatch } = loadDispatcher();
     const token = beginDispatch({
-      target: 'scouts/syntax-scout',
-      goal: 'Quick parse check of the changed files.',
+      target: 'quality/type-checker',
+      goal: 'Type-check the changed files.',
     });
-    recordResponse(token, { decision: 'pass', pillar: 'readability', reason: 'all files parse' });
+    recordResponse(token, { findings: [] });
     finalizeDispatch(token, { status: 'completed' });
     const content = fs.readFileSync(token.auditPath, 'utf8');
     assert.match(content, /outcome:/);

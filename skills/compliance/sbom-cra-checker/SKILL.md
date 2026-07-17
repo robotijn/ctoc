@@ -22,7 +22,6 @@ related_skills:
   - compliance/gdpr-compliance-checker
   - security/secrets-detector
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2

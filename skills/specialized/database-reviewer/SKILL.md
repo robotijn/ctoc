@@ -20,7 +20,6 @@ related_skills:
   - quality/architecture-checker
   - security/sast-scanner
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Grep, Bash
 model: opus
 tier: 2

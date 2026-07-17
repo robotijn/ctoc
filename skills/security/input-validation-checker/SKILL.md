@@ -14,7 +14,6 @@ related_skills:
   - security/sast-scanner
   - specialized/api-contract-validator
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Grep
 model: opus
 tier: 2

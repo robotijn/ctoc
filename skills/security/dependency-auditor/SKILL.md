@@ -17,7 +17,6 @@ related_skills:
   - security/secrets-detector
   - compliance/license-scanner
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2

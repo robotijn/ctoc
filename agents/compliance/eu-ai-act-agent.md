@@ -4,8 +4,8 @@ description: Plan-ancestry + code-scan EU AI Act (Regulation (EU) 2024/1689) age
 category: compliance
 tier: 2
 model: opus
+effort: xhigh
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Read, Grep
 reads_ancestry: true
 dispatch_protocol: v1

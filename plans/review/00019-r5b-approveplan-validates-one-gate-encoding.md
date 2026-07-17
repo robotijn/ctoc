@@ -1,18 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T22:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's standing 2026-07-14 orders ("fix them all",
-  "fix everything", "keep fixing the code"). The F3 core, deferred from R3-C for
-  file-disjointness with the concurrent scheduler slice. Verified across two
-  gate-machinery audits: approvePlan validates NOTHING on single-plan
-  transitions; HUMAN_GATES + flowMap are duplicate encodings; assignDirectly
-  inserts stamp-less into todo and the revived hook reverts it.
----
-
----
 title: "R5-B — approvePlan validates; ONE gate-rule encoding; assignDirectly dies; enforcer trusts the ledger"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

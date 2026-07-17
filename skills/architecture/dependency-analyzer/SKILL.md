@@ -17,7 +17,6 @@ related_skills:
   - quality/architecture-checker
   - quality/code-smell-detector
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Grep, Glob, Bash
 model: sonnet
 tier: 2

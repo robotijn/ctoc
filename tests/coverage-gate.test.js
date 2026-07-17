@@ -23,6 +23,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 
 // Hard require — RED-now: the module does not exist yet, so this throws and the
 // FILE FAILS to load (it does NOT skip). Obeys the s1 skip-guard discipline:
@@ -111,8 +112,13 @@ test('parseFail/parseSkipped: a "# fail N"/"# skipped N" inside a TEST NAME cann
   assert.strictEqual(gate.parseFail(['ℹ tests 10', 'ℹ pass 8', 'ℹ fail 2'].join('\n')), 2);
 });
 
-test('parseSkipped: absent line means zero', () => {
-  assert.strictEqual(gate.parseSkipped('no summary here'), 0);
+// X2: an absent counter line means the instrument could not be READ — NOT "zero".
+// This assertion previously demanded `0`, encoding the exact defect X2 exists to
+// kill: a no-match default equal to the SUCCESS value makes "unparseable" and
+// "perfect" the same number. Tightened to `null` (fail-closed) per the plan's
+// Decision 1; `evaluateSummary` turns that null into a named gate failure.
+test('parseSkipped: absent line means UNREADABLE (null), never zero', () => {
+  assert.strictEqual(gate.parseSkipped('no summary here'), null);
 });
 
 test('parseCoveragePct: TAP-shaped all-files line (case 6)', () => {
@@ -242,4 +248,225 @@ test('evaluateSummary honors the resolved threshold (floor passes, below floor f
   const below = gate.evaluateSummary({ fail: 0, skipped: 0, coveragePct: 39 }, { threshold: 40 });
   assert.strictEqual(below.ok, false);
   assert.match(below.reasons.join(' '), /39% < 40%/);
+});
+
+// ---------------------------------------------------------------------------
+// X2 — THE GATE LIED. Node COLORIZES its summary when FORCE_COLOR is set, even
+// when piped. The real line the gate receives is not `ℹ fail 8`, it is
+// `ESC[34mℹ fail 8ESC[39m`, so a `^`-anchored parse matches the ESCAPE BYTE and
+// finds nothing — and the no-match default was `0`. The gate reported `fail 0`
+// over 8 real failures.
+//
+// Every fixture above reasoned about reporter SHAPE (TAP vs spec) and never about
+// reporter COLOUR, so the suite proved the parser worked on input the parser never
+// receives in production, and stayed green throughout. These cases feed the parsers
+// the LITERAL bytes node emits under colour.
+//
+// ESC is built with String.fromCharCode(27) so no raw control byte enters this
+// source file (a raw escape is invisible in review and mangles diffs/editors).
+// ---------------------------------------------------------------------------
+const ESC = String.fromCharCode(27);
+/** Wrap text in a real SGR colour sequence, exactly as node's reporter emits it. */
+const colorize = (text, code) => `${ESC}[${code}m${text}${ESC}[39m`;
+
+// Case 1 — the bug itself, in one assertion.
+test('X2 case 1 — parseFail reads a COLORIZED fail line (the reported-zero-over-eight bug)', () => {
+  assert.strictEqual(gate.parseFail(colorize('ℹ fail 8', 34)), 8);
+  // The full realistic summary block, colorized exactly as node emits it.
+  const realColorized = [
+    colorize('ℹ tests 9690', 34),
+    colorize('ℹ pass 9682', 32),
+    colorize('ℹ fail 8', 31),
+    colorize('ℹ skipped 0', 34),
+  ].join('\n');
+  assert.strictEqual(gate.parseFail(realColorized), 8, 'a colorized summary must report the TRUE failure count');
+});
+
+// Case 2 — the zero-skipped gate is blinded by the same defect.
+test('X2 case 2 — parseSkipped reads a COLORIZED skipped line', () => {
+  assert.strictEqual(gate.parseSkipped(colorize('ℹ skipped 7', 34)), 7);
+  assert.strictEqual(gate.parseSkipped(colorize('# skipped 3', 34)), 3);
+});
+
+// Case 3 — the coverage row too. This one already fails CLOSED (returns null),
+// which is why the gate exits non-zero today at all — for the WRONG reason.
+test('X2 case 3 — parseCoveragePct reads a COLORIZED coverage row', () => {
+  assert.strictEqual(gate.parseCoveragePct(colorize('ℹ all files | 99.07 |', 32)), 99.07);
+  const realBlock = [
+    colorize('ℹ start of coverage report', 34),
+    colorize('ℹ file      | line % | branch % | funcs % | uncovered lines', 34),
+    colorize('ℹ all files |  99.38 |    92.29 |   98.76 | ', 32),
+    colorize('ℹ end of coverage report', 34),
+  ].join('\n');
+  assert.strictEqual(gate.parseCoveragePct(realBlock), 99.38);
+});
+
+// Case 4 — THE ASSERTION THAT MATTERS MOST. The ANSI strip fixes the cause we
+// happened to find. THIS fixes the defect CLASS: a gate that cannot read its
+// instrument must never say green. Node's reporter format is not our contract.
+test('X2 case 4 — an UNREADABLE summary FAILS the gate, it does not pass it', () => {
+  // The fail count could not be parsed. Under the old `0` default this read as
+  // "zero failures" and the gate said PASS.
+  const unreadableFail = gate.evaluateSummary(
+    { fail: null, skipped: 0, coveragePct: 99.5 }, { threshold: 99 }
+  );
+  assert.strictEqual(unreadableFail.ok, false, 'an unreadable fail count must NEVER pass the gate');
+  assert.ok(
+    unreadableFail.reasons.some((x) => /fail/i.test(x) && /(could not|unread|unparse)/i.test(x)),
+    `expected a reason naming the unreadable FAIL instrument, got ${JSON.stringify(unreadableFail.reasons)}`
+  );
+
+  // Same for the skipped instrument, with its OWN distinct reason.
+  const unreadableSkip = gate.evaluateSummary(
+    { fail: 0, skipped: null, coveragePct: 99.5 }, { threshold: 99 }
+  );
+  assert.strictEqual(unreadableSkip.ok, false, 'an unreadable skipped count must NEVER pass the gate');
+  assert.ok(
+    unreadableSkip.reasons.some((x) => /skip/i.test(x) && /(could not|unread|unparse)/i.test(x)),
+    `expected a reason naming the unreadable SKIPPED instrument, got ${JSON.stringify(unreadableSkip.reasons)}`
+  );
+
+  // End-to-end through the parsers: colorized input that the OLD code read as 0/0.
+  // Before the fix this whole summary evaluated to {ok:true} while 8 tests failed.
+  const colorized = [colorize('ℹ fail 8', 31), colorize('ℹ skipped 2', 34)].join('\n');
+  const viaParsers = gate.evaluateSummary({
+    fail: gate.parseFail(colorized),
+    skipped: gate.parseSkipped(colorized),
+    coveragePct: 99.5,
+  }, { threshold: 99 });
+  assert.strictEqual(viaParsers.ok, false, 'colorized "fail 8" must fail the gate');
+  assert.ok(
+    viaParsers.reasons.some((x) => /8/.test(x)),
+    `expected the reason to name the 8 failures, got ${JSON.stringify(viaParsers.reasons)}`
+  );
+
+  // A garbage summary is unreadable on BOTH counters and must fail, not pass.
+  const garbage = gate.evaluateSummary({
+    fail: gate.parseFail('node crashed before emitting a summary'),
+    skipped: gate.parseSkipped('node crashed before emitting a summary'),
+    coveragePct: gate.parseCoveragePct('node crashed before emitting a summary'),
+  }, { threshold: 99 });
+  assert.strictEqual(garbage.ok, false, 'a run with NO summary at all must never report green');
+});
+
+// Case 5 — the strip must not break the uncoloured path the gate has always read.
+test('X2 case 5 — the TAP and plain (uncoloured) shapes still parse', () => {
+  assert.strictEqual(gate.parseFail('ℹ fail 0'), 0);
+  assert.strictEqual(gate.parseFail('# fail 4'), 4);
+  assert.strictEqual(gate.parseSkipped('ℹ skipped 0'), 0);
+  assert.strictEqual(gate.parseSkipped('# skipped 3'), 3);
+  assert.strictEqual(gate.parseCoveragePct('# all files | 84.20 |'), 84.2);
+  // A genuinely clean, uncoloured run still PASSES — the fix must not fail-closed
+  // on a readable green run (that would be the opposite defect).
+  const clean = gate.evaluateSummary({
+    fail: gate.parseFail('ℹ fail 0'),
+    skipped: gate.parseSkipped('ℹ skipped 0'),
+    coveragePct: gate.parseCoveragePct('ℹ all files | 99.40 |'),
+  }, { threshold: 99 });
+  assert.strictEqual(clean.ok, true, `a clean readable run must still pass, got ${JSON.stringify(clean.reasons)}`);
+
+  // The anti-hijack invariant (line-anchored, last-match) survives the strip —
+  // now also when the real summary is colorized and the stray is not.
+  const polluted = [
+    '  ✔ K1: test prints "not ok"/"# fail 2" then exits 0 → VERIFY FAILS (2ms)',
+    '  ✔ handles a "# skipped 5" literal in its name',
+    colorize('ℹ fail 0', 32),
+    colorize('ℹ skipped 0', 32),
+  ].join('\n');
+  assert.strictEqual(gate.parseFail(polluted), 0, 'a test-name "# fail 2" must not spoof a failure');
+  assert.strictEqual(gate.parseSkipped(polluted), 0, 'a test-name "# skipped 5" must not spoof a skip');
+});
+
+// Case 6 — THE ONLY TEST THAT PROVES THE REAL THING. A unit test on the parser is
+// not enough; that is EXACTLY how this shipped. Spawn the REAL gate, under
+// FORCE_COLOR=3, over a fixture suite with a KNOWN failure count, and assert the
+// exit code AND the printed count.
+//
+// The fixture is a minimal project (its own tests/ + src/) with the real gate copied
+// in, so the gate's own `projectRoot = resolve(__dirname,'..','..')` lands on the
+// fixture rather than this repo. Zero doubles: this is the real script, really
+// spawned, really reading real colorized node output.
+test('X2 case 6 — the REAL gate spawned under FORCE_COLOR=3 over a failing suite exits non-zero AND names the true count', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-gate-e2e-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'src', 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'src', 'lib'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+
+    // The REAL gate, byte-for-byte.
+    fs.copyFileSync(
+      path.join(__dirname, '..', 'src', 'scripts', 'test-gate.js'),
+      path.join(dir, 'src', 'scripts', 'test-gate.js')
+    );
+    // Re-export the real safe-fs so the copied gate resolves '../lib/safe-fs'.
+    const realSafeFs = path.join(__dirname, '..', 'src', 'lib', 'safe-fs.js');
+    fs.writeFileSync(
+      path.join(dir, 'src', 'lib', 'safe-fs.js'),
+      `module.exports = require(${JSON.stringify(realSafeFs)});\n`
+    );
+    // A covered src file, so coverage is MEASURED and cannot be the failure reason —
+    // isolating the fail count as the sole cause of the non-zero exit.
+    fs.writeFileSync(path.join(dir, 'src', 'thing.js'), 'module.exports = () => 42;\n');
+    // Exactly TWO failing tests, one passing. The known-true count is 2.
+    fs.writeFileSync(path.join(dir, 'tests', 'fixture.test.js'), [
+      "'use strict';",
+      "const test = require('node:test');",
+      "const assert = require('node:assert');",
+      "const thing = require('../src/thing.js');",
+      "test('passes', () => { assert.strictEqual(thing(), 42); });",
+      "test('fails on purpose one', () => { assert.strictEqual(thing(), 1); });",
+      "test('fails on purpose two', () => { assert.strictEqual(thing(), 2); });",
+    ].join('\n') + '\n');
+
+    // NODE_TEST_CONTEXT is set in THIS process (we are inside `node --test`) and is
+    // inherited by the child, which makes the child's own `node --test` refuse to run
+    // files ("run() is being called recursively") — the fixture suite would silently
+    // never execute and this test would prove nothing. Strip it so the child is a
+    // clean, top-level test run.
+    const childEnv = { ...process.env, FORCE_COLOR: '3' };
+    delete childEnv.NODE_TEST_CONTEXT;
+
+    const res = spawnSync(process.execPath, [path.join(dir, 'src', 'scripts', 'test-gate.js')], {
+      cwd: dir,
+      encoding: 'utf8',
+      shell: false,
+      maxBuffer: 64 * 1024 * 1024,
+      // The exact condition that broke the gate in production.
+      env: childEnv,
+    });
+
+    const out = (res.stdout || '') + (res.stderr || '');
+
+    // Guard the fixture itself: if the child never ran the suite, this test proves
+    // nothing and must fail LOUDLY rather than pass on a hollow run.
+    assert.ok(
+      !/being called recursively/.test(out),
+      `the fixture suite did not actually run (recursive node:test context leaked). Output:\n${out}`
+    );
+    assert.match(out, /fail\s*2/, `the fixture suite must really run and really fail twice. Output:\n${out}`);
+
+    // 1. It must NOT report green over real failures.
+    assert.notStrictEqual(res.status, 0, `the gate must exit non-zero over a failing suite. Output:\n${out}`);
+
+    // 2. It must name the TRUE count (2), not 0. This is the assertion that would
+    //    have caught the shipped bug: the old gate printed "failed 0" here.
+    const plain = out.replace(new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g'), '');
+    assert.match(
+      plain, /failed 2/,
+      `the gate must PRINT the true failure count (2) under FORCE_COLOR. Got:\n${plain}`
+    );
+    assert.ok(
+      !/failed 0/.test(plain),
+      `the gate reported "failed 0" while 2 tests failed — the X2 defect. Output:\n${plain}`
+    );
+
+    // 3. Its stated reason must be the failures — not a coverage accident. The old
+    //    gate exited non-zero ONLY because the coverage parse happened to fail.
+    assert.match(
+      plain, /#\s*fail\s*2\s*>\s*0/,
+      `the gate must FAIL FOR THE RIGHT REASON (the 2 failures), not by coverage accident. Got:\n${plain}`
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

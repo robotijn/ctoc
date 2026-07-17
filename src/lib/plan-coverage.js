@@ -208,21 +208,55 @@ function touchesOverlap(aList, bList) {
 function readPlanFiles(planPath) {
   let content;
   try { content = safeFs.readFileSync(planPath, 'utf8'); } catch { return []; }
-  // CRLF-safe via the shared ./frontmatter helper (finding H1): a plan checked
-  // out on Windows (CRLF) resolves the same coverage as its LF twin. The helper's
-  // `raw` is \r-free, so the `files:` block walk below is safe on both. Do NOT
-  // re-inline a bare /^---\n/ here — that LF-only pattern silently resolves CRLF
-  // plans to EMPTY coverage, locking the Windows user out of their declared files.
-  const { hasFrontmatter, raw } = parseFrontmatter(content);
-  if (!hasFrontmatter) return [];
-  const fmBody = raw;
-  // Find `files:` block then collect lines that look like `  - "..."` until next top-level key or end
-  const filesIdx = fmBody.search(/^files:\s*$/m);
+
+  // Read the UNION of every LEADING `---…---` block, not just the first.
+  //
+  // `addApprovalMarker` (actions.js) PREPENDS a marker block on each human-gate
+  // crossing, so a plan that crossed Gate 2 arrives in `todo/` with the marker
+  // FIRST and its own frontmatter — the block that carries `files:` — SECOND
+  // (a multi-gate plan carries three or four blocks). The single-block reader
+  // found no `files:` in the marker and resolved such a plan to EMPTY coverage,
+  // which made the enforcement hook BLOCK the implementer from editing the very
+  // files the plan declares. `state.parseMetadata` already merges leading blocks
+  // for this exact reason (finding M19); the coverage oracle must agree with it,
+  // or the hook and the parsed plan view disagree about the same file.
+  //
+  // Robustness mirrors parseMetadata: `extractFrontmatterRegion` is lazy-required
+  // (no cycle today — stale-detector imports none of this — and the lazy require
+  // keeps it that way) and ANY error or an empty region FALLS OPEN to the previous
+  // CRLF-safe single-block reader, so a parser fault can never resolve to less
+  // coverage than before. The region is \r-free on both readers (finding H1): do
+  // NOT re-inline a bare /^---\n/ here — that LF-only pattern silently resolves a
+  // CRLF plan to EMPTY coverage, locking the Windows user out of declared files.
+  let fmBody = null;
+  try {
+    const { extractFrontmatterRegion } = require('./stale-detector');
+    const region = extractFrontmatterRegion(content);
+    if (typeof region === 'string' && region.length > 0) fmBody = region;
+  } catch {
+    fmBody = null; // fail-open to the single-block reader below
+  }
+  if (fmBody === null) {
+    const { hasFrontmatter, raw } = parseFrontmatter(content);
+    if (!hasFrontmatter) return [];
+    fmBody = raw;
+  }
+
+  // Find the `files:` block, then collect `  - "..."` items until the next
+  // top-level key or end. MERGE RULE — the LAST `files:` in the region wins,
+  // matching `parseFrontmatterLines`' documented "a later duplicate key
+  // OVERRIDES an earlier one": the plan's own block is physically later than any
+  // prepended marker, so the plan's own declaration is authoritative. The winning
+  // list REPLACES an earlier one rather than unioning with it — a plan's declared
+  // coverage is exactly what its own block says, never an accumulation.
+  const regionLines = fmBody.split('\n');
+  let filesIdx = -1;
+  for (let k = 0; k < regionLines.length; k++) {
+    if (/^files:\s*$/.test(regionLines[k])) filesIdx = k;
+  }
   if (filesIdx === -1) return [];
-  const after = fmBody.slice(filesIdx);
-  const lines = after.split('\n').slice(1);
   const files = [];
-  for (const line of lines) {
+  for (const line of regionLines.slice(filesIdx + 1)) {
     const m = line.match(/^\s*-\s*["']?([^"'\n]+?)["']?\s*$/);
     if (m) {
       files.push(m[1]);

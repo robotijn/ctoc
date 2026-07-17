@@ -23,7 +23,6 @@ related_skills:
   - security/input-validation-checker
   - security/secrets-detector
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Read, Grep
 model: sonnet
 tier: 2

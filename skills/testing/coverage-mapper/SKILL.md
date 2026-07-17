@@ -18,7 +18,6 @@ related_skills:
   - testing/smart-test-runner
   - testing/runners/unit-test-runner
 effort_level: medium
-model_optimized_for: opus-4-7
 tools: Bash, Read, Write, Grep, Glob
 model: sonnet
 tier: 2

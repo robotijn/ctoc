@@ -22,7 +22,6 @@ related_skills:
   - testing/runners/e2e-test-runner
   - quality/quality-gate
 effort_level: high
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob, Task
 model: opus
 tier: 2

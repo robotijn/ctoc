@@ -82,11 +82,24 @@ describe('Phase 1 modernized agents have v7 frontmatter', () => {
       const p = path.join(projectRoot, agentPath);
       assert.ok(fs.existsSync(p), `${agentPath} must exist`);
       const content = fs.readFileSync(p, 'utf8');
-      // Must declare effort, reads_ancestry, async_choice_protocol, model_optimized_for
-      assert.match(content, /effort:\s*(xhigh|high|medium|low)/, `${agentPath} declares effort`);
+      // Must declare effort, reads_ancestry, async_choice_protocol.
+      // `model_optimized_for` was deleted from the corpus — it conflated authorship
+      // provenance with execution target. See tests/no-model-optimized-for.test.js.
+      //
+      // `max` is in the alternation deliberately. It is the documented top of the effort
+      // scale (low, medium, high, xhigh, max — Claude Code subagent reference) and is
+      // supported on every model this corpus targets. Omitting it did not make this a
+      // stricter floor; it made it a CEILING that rejected the HIGHEST value while
+      // admitting `low`. It was green only because this covered subset happened to
+      // contain no `max` agent. Fenced by tests/agent-model-floor.test.js.
+      //
+      // The `^...$/m` anchor is load-bearing, not style: unanchored, this matched an
+      // `effort:` written anywhere in the body — including inside a fenced code block
+      // documenting the agent-file format. The runtime honours frontmatter only at
+      // byte 0, so an unanchored match can certify a code sample as a declaration.
+      assert.match(content, /^effort:\s*(low|medium|high|xhigh|max)\s*$/m, `${agentPath} declares effort`);
       assert.match(content, /reads_ancestry:\s*(true|false)/, `${agentPath} declares reads_ancestry`);
       assert.match(content, /async_choice_protocol:\s*enabled/, `${agentPath} declares async_choice_protocol`);
-      assert.match(content, /model_optimized_for:\s*opus-4-8/, `${agentPath} declares model_optimized_for`);
     });
 
     it(`${agentPath} references at least one shared snippet`, () => {

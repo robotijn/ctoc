@@ -1,18 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T18:15:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's explicit 2026-07-14 orders "fix them all, do 50
-  rounds of hard critique, keep fixing the code" and "fix everything", against
-  the Round-5 concurrency critic's findings. Two CRITICALs verified by the
-  coordinator's own read: menu-screens taskTransition('start') applies
-  {status:'running'} with NO canRun call; completeExecution's find() returns the
-  EARLIEST non-terminal task (a queued duplicate shadows the running one).
----
-
----
 title: "R3-B — The scheduler ENFORCES: guarded start, no duplicate tasks, live-list honesty, cross-process safety"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

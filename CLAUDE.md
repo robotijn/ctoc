@@ -5,15 +5,15 @@
 
 ---
 
-## Agent Architecture (v8, 4 tiers)
+## Agent Architecture (v8, 3 tiers)
 
-CTOC v8 organizes the agent layer into four tiers. See [`docs/AGENT_ARCHITECTURE.md`](./docs/AGENT_ARCHITECTURE.md) for the full spec.
+CTOC v8 organizes the agent layer into three tiers. See [`docs/AGENT_ARCHITECTURE.md`](./docs/AGENT_ARCHITECTURE.md) for the full spec.
 
 ```
 Tier 0  CTO CHIEF (1)              top-level, sole dispatcher
 Tier 1  Sub-orchestrators (20)     incl. synthesizer (cross-pillar) + adversarial gate-critique fleet (4)
-Tier 2  Specialist skills (99)     leaf agents → skills, structured outputs
-Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatches
+Tier 2  Watchers / specialists (99) Opus. They think about the code, structured outputs
+        (Tier 3 — DELETED)         a pre-screen that can pass without thinking is a lie
 ```
 
 **Model rules (v6.9.29+, corrected)**: Claude Code has two execution contexts that matter for model declarations. The earlier v8.2 guidance — that slash commands run in a "fresh, separate context" and may safely pin any model — was **wrong in practice and caused crashes**. A slash command's `model:` frontmatter switches the **live session**; when it switched to Haiku, the session conversation no longer fit Haiku's smaller context window, forcing autocompact and crashing the session.
@@ -22,9 +22,11 @@ Tier 3  Scouts (5, Haiku subagents) fast pre-screens, short-circuit deep dispatc
 |---|---|---|
 | Front process (terminal `claude` session) | Stays on user's chosen model; CTOC never auto-switches | `/model` mid-session preserves context; Opus→Haiku doesn't fit and breaks the session |
 | Slash commands (`/ctoc:menu`, `/ctoc:push`, `/ctoc:update`) | **MUST NOT declare `model:` in frontmatter** | A slash command's `model:` switches the live session, not a fresh process; pinning Haiku triggers autocompact + crash |
-| Subagents (Task tool — Tier 2/3 dispatches) | MAY declare any model | Subagent is a genuinely fresh Claude instance with isolated 200K context, no inheritance from parent |
+| Subagents (Task tool — Tier 1/2 dispatches) | MAY declare any model | Subagent is a genuinely fresh Claude instance with isolated 200K context, no inheritance from parent |
 
-Scouts (Tier 3) declare `model: haiku` because they run as **subagents** — isolated context, the Haiku model is safe at this layer. The user's terminal session is untouched. Slash commands are NOT subagents: they run inside the user's session and must never pin a model. Enforced by `tests/slash-command-no-model-pin.test.js`.
+Slash commands are NOT subagents: they run inside the user's session and must never pin a model. Enforced by `tests/slash-command-no-model-pin.test.js`.
+
+**No agent declares `model: haiku`.** The five Haiku pre-screen agents (Tier 3) were deleted on 2026-07-17 — each declared `short_circuits: <a Tier 2 specialist>`, a key whose purpose was to stop a better-equipped agent from looking, and recorded "nothing found" for a scan that never ran. Subagent isolation made Haiku technically *safe* to run; it never made Haiku *adequate* to judge Opus-written code. Enforced by `tests/no-tier-3.test.js`.
 
 ## Step-driven question routing
 
@@ -84,8 +86,7 @@ The Product Loop is dispatched outside the CTO Chief technical chain — the fou
 **CTO Chief** (`agents/coordinator/cto-chief.md`, `role: top-level-coordinator`) is the only agent with top-level authority. All other agents and skills are dispatched by CTO Chief — directly or via a sub-orchestrator (planning, iron-loop, implementation-reviewer, synthesizer). No sub-orchestrator dispatches a sibling without routing through CTO Chief.
 
 ```
-USER (human CTO) → CTO CHIEF (Tier 0) → SCOUTS (Tier 3, parallel)
-                                       → SUB-ORCHESTRATORS (Tier 1)
+USER (human CTO) → CTO CHIEF (Tier 0) → SUB-ORCHESTRATORS (Tier 1)
                                        → SPECIALISTS (Tier 2)
                                        → SYNTHESIZER (Tier 1, cross-pillar)
 ```
@@ -202,13 +203,15 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 402 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 414 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
 All tests must show `# fail 0`. If any test fails, fix before committing.
+
+**The gate FAILS CLOSED when it cannot read its own instrument.** `test-gate.js` strips ANSI before parsing and returns `null` — never `0` — when a counter is unreadable, so an unparseable run is a loud failure instead of a silent green: a parser whose no-match default is the success value cannot tell "everything passed" from "I could not read my input" (it once reported `fail 0` over 8 real failures under `FORCE_COLOR`).
 
 **Coverage floor — the shipped truth.** Step 14 VERIFY enforces the coverage floor
 recorded in `.ctoc/coverage-baseline.json`, which is **99** today (real src line
@@ -266,14 +269,14 @@ ctoc/
   docs/                  IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
-    hooks/               14 Claude Code hooks (session start, pre-tool-use, post-tool-use)
-    lib/                 100 JS modules (state, quality, security, planning, UI, analysis)
+    hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
+    lib/                 101 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
-  agents/                128 agent definitions across 25 categories
+  agents/                123 agent definitions across 24 categories
   skills/                426 skill files (100 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill; + 326 reference)
-  tests/                 402 test files
+  tests/                 414 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
@@ -374,7 +377,7 @@ ctoc/
 
 **Plans: ALWAYS sequential.** Process todo plans one at a time, FIFO order. Never parallelize plan implementation — plans may modify overlapping files and later plans may depend on earlier changes.
 
-**Everything else: Parallelize when independent.**
+**Everything else: Parallelize when independent — up to 5 concurrent subagents.** Independent work fans out, but never more than **5 background subagents in flight at any one time**. When 5 are running, wait for one to complete before launching the next, refilling the free slot immediately so the slots stay full while work remains.
 
 | Safe to parallelize | Must serialize |
 |---------------------|----------------|

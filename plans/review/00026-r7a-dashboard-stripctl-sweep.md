@@ -1,12 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-15T02:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: "Standing 2026-07-14 orders. Injection critic (verified): the live dashboard src/areas/*.js + pipeline conflict/related panels + review.renderRejectInput render AGENT-WRITABLE fields (plan title, files: frontmatter, task description) to the terminal WITHOUT the stripCtl the codebase already ships in menu-screens.js/task-view.js. A files: value carrying \\x1b[2J\\x1b[H + a fake 'Gate 3 approved — press 1' spoofs a human gate decision. HIGH."
----
-
----
 title: "R7-A — The live dashboard sanitizes untrusted fields: stripCtl the area/tab render layer"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

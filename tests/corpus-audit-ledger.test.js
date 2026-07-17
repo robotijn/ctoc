@@ -135,19 +135,26 @@ describe('CU1 s6 — corpus audit ledger', () => {
     }
   });
 
-  it('records the 7 out-of-scope opus-4-7 agents, which really still carry opus-4-7', () => {
+  it('records the 7 agents that were out of scope for the opus-4-7 model bump', () => {
     const ledger = loadLedger();
     const byPath = new Map(ledger.records.map((r) => [r.path, r]));
     for (const p of OUT_OF_SCOPE_OPUS_47) {
       const rec = byPath.get(p);
       assert.ok(rec, `out-of-scope opus-4-7 agent not recorded: ${p}`);
       assert.ok(rec.note && /opus-4-7/i.test(rec.note), `out-of-scope note must mention opus-4-7: ${p}`);
-      // spot-check reality: the file must genuinely still carry opus-4-7
-      const src = fs.readFileSync(path.join(projectRoot, p), 'utf8');
+      // spot-check reality: the recorded path must still be a real agent on disk,
+      // so the ledger cannot drift into referencing files that no longer exist.
       assert.ok(
-        /model_optimized_for:\s*opus-4-7/.test(src),
-        `${p} recorded out-of-scope but no longer carries opus-4-7 on disk`
+        fs.existsSync(path.join(projectRoot, p)),
+        `${p} recorded in the ledger but missing on disk`
       );
+      // The former assertion here re-read each file and required
+      // `model_optimized_for: opus-4-7` to still be present. That field has since
+      // been DELETED from the corpus (it recorded authorship provenance on the opus
+      // rows but was read as an execution target on the scouts, where it was false).
+      // The ledger stays a historical record of the 2026-06-15 audit; it is no longer
+      // re-verifiable against a field that does not exist. See
+      // tests/no-model-optimized-for.test.js.
     }
   });
 

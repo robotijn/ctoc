@@ -16,7 +16,6 @@ related_skills:
   - testing/runners/integration-test-runner
   - specialized/health-check-validator
 effort_level: low
-model_optimized_for: opus-4-7
 tools: Bash, Read
 model: sonnet
 tier: 2

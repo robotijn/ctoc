@@ -1,18 +1,4 @@
 ---
-iron_loop: true
-approved_by: human
-approved_at: 2026-07-14T09:00:00.000Z
-gate_crossed: implementation → todo
-approval_note: >
-  Gate 2 crossed by the human's recorded decisions of 2026-07-14: the
-  background-engine rebuild vision's Layer F was approved with "push and deploy
-  stay as gates, foundation fixes then sequencing", F1's exact change list is
-  recorded in the vision and HANDOFF.md ("do not relitigate"), and the human's
-  "continue" order resumed this work against that handoff. The person choosing
-  the F1 scope IS the approval.
----
-
----
 title: "F1-s1 — Scheduler core: file-based serialization, sync barrier, cancel, atomic add-and-claim"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

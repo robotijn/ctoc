@@ -28,9 +28,11 @@ definitions:
         type: string
         pattern: "^[a-z][a-z0-9-]+/[a-z][a-z0-9-]+$"
       target_tier:
+        # Ceiling is 2: the Tier 3 scout layer was deleted (plan F3b). A maximum
+        # of 3 would validate a dispatch to a tier that has no agents.
         type: integer
         minimum: 1
-        maximum: 3
+        maximum: 2
       goal:
         type: string
         minLength: 10
@@ -185,35 +187,6 @@ definitions:
         type: array
         items: { type: string }
 
-  scout_response:
-    # Tier 3 scouts use a simplified response form.
-    type: object
-    required: [dispatch_id, protocol_version, agent, decision, pillar]
-    properties:
-      dispatch_id:
-        type: string
-      protocol_version:
-        type: integer
-        const: 1
-      agent:
-        type: string
-      decision:
-        type: string
-        enum: [pass, flag, error]
-      pillar:
-        type: string
-      reason:
-        type: string
-      next_specialist:
-        type: string
-        # Required when decision == flag
-      metadata:
-        type: object
-        properties:
-          tokens_used: { type: integer }
-          tool_calls: { type: integer }
-          duration_ms: { type: integer }
-
   audit_entry:
     type: object
     required: [request, response]
@@ -221,9 +194,10 @@ definitions:
       request:
         $ref: "#/definitions/dispatch_request"
       response:
-        oneOf:
-          - $ref: "#/definitions/dispatch_response"
-          - $ref: "#/definitions/scout_response"
+        # Single form. The simplified pre-screen alternative was deleted along with
+        # Tier 3 (plan F3b): every agent returns real findings, never a bare verdict
+        # that a deep specialist was skipped.
+        $ref: "#/definitions/dispatch_response"
       outcome:
         type: object
         properties:

@@ -121,20 +121,15 @@ test('cto-chief loads its declared tool contract via a byte-0 parse (runtime pro
   }
 });
 
-for (const scout of ['dep', 'lint', 'secret', 'syntax', 'test']) {
-  test(`${scout}-scout loads model: haiku via a byte-0 parse (runtime proxy)`, () => {
-    const file = path.join(AGENTS_DIR, 'scouts', `${scout}-scout.md`);
-    const fm = parseByte0FM(fs.readFileSync(file, 'utf8'));
-
-    assert.notEqual(
-      fm,
-      null,
-      `${scout}-scout frontmatter is not at byte 0 — the runtime would run it on the session model`
-    );
-    assert.match(
-      fm,
-      /^model:\s*haiku$/m,
-      `${scout}-scout must declare model: haiku at byte-0-parseable frontmatter`
-    );
-  });
-}
+// DELETED by plan F3b (v6.12.79): a five-case loop over ['dep','lint','secret',
+// 'syntax','test'] titled `<scout>-scout loads model: haiku via a byte-0 parse
+// (runtime proxy)`. Each case asserted two things about agents/scouts/<n>-scout.md:
+//   (a) its frontmatter parses at byte 0 (else the runtime would run it on the
+//       session model rather than its declared one); and
+//   (b) that byte-0 frontmatter declares `model: haiku`.
+// Both contract a file that no longer exists — the five scouts are deleted. Left in
+// place they would throw ENOENT rather than fail meaningfully.
+//
+// The byte-0 parse invariant these cases exercised is NOT lost: it remains asserted
+// for the live agents above, and tests/no-tier-3.test.js uses the same byte-0
+// anchored read to assert the INVERSE — that no agent anywhere declares model: haiku.

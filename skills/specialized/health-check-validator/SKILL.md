@@ -19,7 +19,6 @@ related_skills:
   - specialized/observability-checker
   - infrastructure/kubernetes-checker
 effort_level: low
-model_optimized_for: opus-4-7
 tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2

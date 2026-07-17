@@ -50,11 +50,14 @@ const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 // runtime-enforced. The dispatcher now ONLY enforces max_subagents (the real
 // invariant that prevents specialists from cascading dispatches). Session-level
 // budget enforcement lives in src/lib/budget.js (v6.9.4+).
+//
+// v6.12.79 (plan F3b): tier 3 removed. The Haiku scout tier is deleted — a
+// pre-screen that could return `pass` without thinking suppressed the deep
+// specialist and recorded "nothing found". There is no tier above 2.
 const TIER_BUDGETS = {
   0: { max_subagents: Number.MAX_SAFE_INTEGER },
   1: { max_subagents: 10 },
   2: { max_subagents: 0 },
-  3: { max_subagents: 0 },
 };
 
 /**
@@ -100,10 +103,9 @@ function auditPathForId(id) {
 
 /**
  * Tier inference from target string. Falls back to tier 2 if not declared.
- * @param {string} target — e.g. "quality/code-reviewer" or "scouts/syntax-scout"
+ * @param {string} target — e.g. "quality/code-reviewer" or "security/secrets-detector"
  */
 function inferTier(target) {
-  if (target.startsWith('scouts/')) return 3;
   if (target.startsWith('coordinator/cto-chief')) return 0;
   if (
     target.startsWith('coordinator/synthesizer') ||
@@ -123,7 +125,7 @@ function normalizeRequest(opts) {
   if (!opts.goal || opts.goal.length < 10) throw new Error('dispatch: goal must be ≥ 10 chars');
 
   const targetTier = opts.targetTier != null ? opts.targetTier : inferTier(opts.target);
-  if (targetTier < 1 || targetTier > 3) throw new Error(`dispatch: target_tier must be 1-3, got ${targetTier}`);
+  if (targetTier < 1 || targetTier > 2) throw new Error(`dispatch: target_tier must be 1-2, got ${targetTier}`);
 
   const issuer = opts.issuedBy || 'cto-chief';
   if (issuer !== 'cto-chief') throw new Error('dispatch: only cto-chief may issue dispatches (Tier 0)');
@@ -188,8 +190,13 @@ function beginDispatch(opts) {
  * after Claude's Task tool returns. Validates required fields.
  */
 function recordResponse(token, response) {
-  if (!response.findings && !response.synthesis && !response.decision) {
-    throw new Error('dispatch: response must include findings, synthesis (synthesizer), or decision (scout)');
+  // v6.12.79 (plan F3b): `decision` is no longer an accepted response shape. It
+  // was the scout form (pass|flag|error), and the scout tier is deleted along
+  // with the `scout_response` definition in dispatch-schema.yaml. Every agent now
+  // returns real findings (possibly empty) or a synthesis — never a bare verdict
+  // that a deep specialist was skipped.
+  if (!response.findings && !response.synthesis) {
+    throw new Error('dispatch: response must include findings or synthesis (synthesizer)');
   }
 
   const fullResponse = {
@@ -199,13 +206,6 @@ function recordResponse(token, response) {
     completed_at: isoNow(),
     ...response,
   };
-
-  // For scout responses, validate the decision field
-  if (token.request.target_tier === 3) {
-    if (!['pass', 'flag', 'error'].includes(fullResponse.decision)) {
-      throw new Error(`scout response must declare decision: pass|flag|error (got ${fullResponse.decision})`);
-    }
-  }
 
   const existing = parseYamlFile(token.auditPath);
   existing.response = fullResponse;
