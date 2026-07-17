@@ -108,11 +108,23 @@ const VIOLATIONS_FILE = path.join(LOG_DIR, 'gate-violations.json');
 // hook path. The keys are the three gate destinations `implementation, todo, done`,
 // in that order (Object.keys drives the folder sweep in `main()`), byte-identical to
 // the former local literal.
-const { GATE_SOURCE: HUMAN_GATES } = require('../lib/gate-order');
+const { GATE_SOURCE: HUMAN_GATES, GATE_DESTINATIONS, STAGE_ORDER } = require('../lib/gate-order');
 
 // Terminal gate-destination folders where no legitimate agent editing occurs, so
 // acceptance additionally requires a live-content hash match (invalidate-on-edit).
 const HASH_SENSITIVE_FOLDERS = new Set(['todo', 'done']);
+
+// PRE-BUILD gate destinations (X6): the gate destinations reached BEFORE any code is
+// built — derived from the ONE gate-edge encoding, never hardcoded. A destination is
+// pre-build iff it sits earlier in the stage order than the build phase (which begins
+// at `in-progress`): implementation(1) and todo(2) qualify; done(5) does NOT. A
+// SUFFICIENCY entry — "the plan has enough information to be built" — is accepted only
+// here. `done/` is Gate 3 ("was this built correctly?"), answered by review and the 14
+// quality dimensions, NEVER by an answered-question log (X6 Decision 1).
+const BUILD_PHASE_START = STAGE_ORDER.indexOf('in-progress');
+const PRE_BUILD_GATES = new Set(
+  GATE_DESTINATIONS.filter((dest) => STAGE_ORDER.indexOf(dest) < BUILD_PHASE_START),
+);
 
 function plansDir(projectPath) {
   return path.join(projectPath, 'plans');
@@ -164,7 +176,7 @@ function readPlan(filePath) {
  * Never trusts the plan-body `approved_by: human` marker.
  *
  * HONEST KIND (R3-A item 5). Every verdict — accepted or not — carries the entry's
- * REAL `kind` (`human` | `backfilled` | `pipeline` | `unknown` | `null`). A backfilled
+ * REAL `kind` (`human` | `backfilled` | `pipeline` | `sufficiency` | `unknown` | `null`). A backfilled
  * entry is still ACCEPTED (the human ordered the migration): acceptance is not
  * weakened. But it is reported as `'backfilled'`, never laundered into `'human'`, so a
  * later audit can always separate a migrated record from a live human approval.
@@ -181,10 +193,11 @@ function readPlan(filePath) {
  * @param {string} folderName - the gate-destination folder the plan resides in
  * @param {string} [projectPath] - project root (defaults to cwd)
  * @param {string|null} [content] - pre-read file content, to avoid a re-read
- * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|'unknown'|null)}}
+ * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|'sufficiency'|'unknown'|null)}}
  *   accepted (with the entry's real kind), or a reason: `ledger-unkeyable` |
  *   `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` | `hash-mismatch` |
- *   `unreadable` | `unknown-provenance` | `pipeline-no-evidence` | `pipeline-not-allowed`
+ *   `unreadable` | `unknown-provenance` | `pipeline-no-evidence` | `pipeline-not-allowed` |
+ *   `sufficiency-no-evidence` | `sufficiency-not-allowed`
  */
 function classifyResidency(filePath, folderName, projectPath = process.cwd(), content = null) {
   const ledger = require('../lib/approval-ledger');
@@ -226,6 +239,18 @@ function classifyResidency(filePath, folderName, projectPath = process.cwd(), co
     if (folderName !== 'done') return { accepted: false, reason: 'pipeline-not-allowed', kind };
     if (typeof entry.evidence !== 'string' || entry.evidence.trim() === '') {
       return { accepted: false, reason: 'pipeline-no-evidence', kind };
+    }
+  }
+
+  if (kind === 'sufficiency') {
+    // SUFFICIENCY provenance (X6) — "the plan had enough information to be built
+    // without guessing" — crosses the PRE-BUILD gates (implementation, todo) ONLY,
+    // and only with evidence. It is REJECTED at `done/`: Gate 3 asks whether the work
+    // was built correctly, which a sufficiency verdict cannot answer. Mirrors the
+    // pipeline guard exactly, with the allowed set inverted (pre-build, not done).
+    if (!PRE_BUILD_GATES.has(folderName)) return { accepted: false, reason: 'sufficiency-not-allowed', kind };
+    if (typeof entry.evidence !== 'string' || entry.evidence.trim() === '') {
+      return { accepted: false, reason: 'sufficiency-no-evidence', kind };
     }
   }
   return { accepted: true, reason: null, kind };

@@ -20,10 +20,11 @@ const os = require('node:os');
 const path = require('node:path');
 
 const precompute = require('../src/lib/streaming-precompute.js');
-// The REAL answer writer. `hasEnoughInformation` reads the log this function
-// writes, so the two are pinned to ONE format here rather than hand-rolling the
-// shape in a fixture: if either side ever drifts, these tests break loudly.
-const { streamAnswer } = require('../src/lib/streaming-gate.js');
+// `streamAnswer` is intentionally NOT imported here. As of X6 it re-renders through
+// `pendingGateDecisions`, which AUTO-CROSSES a plan that has become sufficient (moving
+// it out of its stage folder). These are unit tests of the `hasEnoughInformation`
+// predicate, inspected on the plan's ORIGINAL ref, so the `answer` helper below writes
+// the answers log DIRECTLY — same record shape, without the cross side-effect.
 
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
 const sandboxes = [];
@@ -398,9 +399,25 @@ function normalOnlyQuestions() {
   ];
 }
 
-/** Record an answer through the REAL writer, so read side and write side agree. */
+/**
+ * Record an answer to the append-only log — the SAME record `streamAnswer` writes,
+ * written directly here.
+ *
+ * WHY NOT `streamAnswer` (X6): as of X6, `streamAnswer` re-renders through
+ * `streamingGateScreen` → `pendingGateDecisions`, which AUTO-CROSSES a plan that has
+ * become sufficient (moving it out of its stage folder). These are unit tests of the
+ * `hasEnoughInformation` predicate, inspected on the plan's ORIGINAL ref; the cross
+ * side-effect would move the plan and make that read fail closed. Writing the log
+ * directly keeps read side and write side agreeing on the format without the cross.
+ */
 function answer(root, ref, questionId, optionKey) {
-  streamAnswer(ref, questionId, optionKey, root);
+  const dir = path.join(root, '.ctoc', 'streaming');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.appendFileSync(
+    path.join(dir, 'answers.jsonl'),
+    JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey }) + '\n',
+    'utf8',
+  );
 }
 
 /** Seed a plan at a gate stage with fresh precomputed questions. Returns its ref. */

@@ -161,6 +161,94 @@ describe('writePipelineEntry records a pipeline-kind entry that never reads as h
 });
 
 // ===========================================================================
+// X6 — writeSufficiencyEntry mirrors writePipelineEntry, with ONE extra guard:
+// `approved_by` is FORBIDDEN, not stripped. Evidence is MANDATORY. The entry
+// stamps advanced_by:'sufficiency' and NO approved_by, so a machine cross can
+// never wear the human's marker (the exact forgery shape X5 removed).
+// ===========================================================================
+
+describe('X6 — writeSufficiencyEntry: evidence mandatory, approved_by REFUSED', () => {
+  // Case 1: no evidence is refused LOUDLY, like the pipeline writer.
+  const badEvidence = [
+    { id: 'evidence-absent', entry: { content_sha256: 'h', stage_from: 'functional', stage_to: 'implementation' } },
+    { id: 'evidence-empty', entry: { content_sha256: 'h', stage_from: 'functional', stage_to: 'implementation', evidence: '' } },
+    { id: 'evidence-whitespace', entry: { content_sha256: 'h', stage_from: 'functional', stage_to: 'implementation', evidence: '  ' } },
+    { id: 'evidence-non-string', entry: { content_sha256: 'h', stage_from: 'functional', stage_to: 'implementation', evidence: 7 } },
+  ];
+  for (const { id, entry } of badEvidence) {
+    it(`case 1 — throws for [${id}] and writes no partial file`, () => {
+      const root = makeSandbox();
+      assert.throws(() => ledger.writeSufficiencyEntry('s', entry, root),
+        /sufficiency entry requires non-empty "evidence"/);
+      assert.equal(fs.existsSync(path.join(root, '.ctoc', 'approvals', 's.json')), false,
+        'a refused sufficiency write must leave no file');
+    });
+  }
+
+  it('case 1 — a null entry falls through to the evidence guard (no crash)', () => {
+    const root = makeSandbox();
+    assert.throws(() => ledger.writeSufficiencyEntry('s', null, root),
+      /sufficiency entry requires non-empty "evidence"/);
+  });
+
+  // Case 2: THE FORGERY GUARD — approved_by is THROWN, never stripped. A caller
+  // passing approved_by:'human' must crash loudly; silent sanitisation is how the
+  // forgery becomes possible again (Decision 2).
+  it('case 2 — REFUSES approved_by:human, it does not silently strip it', () => {
+    const root = makeSandbox();
+    assert.throws(
+      () => ledger.writeSufficiencyEntry('s', {
+        content_sha256: 'h', stage_from: 'functional', stage_to: 'implementation',
+        evidence: 'sufficiency: functional/s.md — 1 answered (db)', approved_by: 'human',
+      }, root),
+      /must NOT carry "approved_by"|approved_by/,
+      'a machine cross wearing the human marker is the forgery shape — REFUSE it',
+    );
+    assert.equal(fs.existsSync(path.join(root, '.ctoc', 'approvals', 's.json')), false,
+      'the refused write leaves NO entry — nothing to later launder');
+  });
+
+  it('case 2 — the presence of the approved_by KEY decides, not its value', () => {
+    const root = makeSandbox();
+    // Even approved_by: undefined is a positive attempt to set the human marker on a
+    // machine entry — the presence-guard refuses it (mirrors entryKind's presence rule).
+    assert.throws(
+      () => ledger.writeSufficiencyEntry('s', {
+        content_sha256: 'h', stage_from: 'functional', stage_to: 'implementation',
+        evidence: 'sufficiency: functional/s.md — 0 answered ()', approved_by: undefined,
+      }, root),
+      /approved_by/);
+  });
+
+  it('happy path — stamps advanced_by:sufficiency, NO approved_by, entryKind returns sufficiency', () => {
+    const root = makeSandbox();
+    const content = '---\ntitle: "x"\n---\n# body\n';
+    const written = ledger.writeSufficiencyEntry('s', {
+      content_sha256: ledger.computeContentHash(content),
+      stage_from: 'functional',
+      stage_to: 'implementation',
+      evidence: 'sufficiency: functional/s.md — 2 answered (db, auth)',
+      plan_basename: 's',
+    }, root);
+    const read = ledger.readEntry('s', root);
+    assert.equal(written.advanced_by, 'sufficiency');
+    assert.equal(read.advanced_by, 'sufficiency');
+    assert.equal(read.approved_by, undefined, 'a sufficiency entry must carry NO approved_by marker');
+    assert.equal(read.evidence, 'sufficiency: functional/s.md — 2 answered (db, auth)');
+    assert.equal(ledger.entryKind(read), 'sufficiency');
+    // Still a structurally valid ledger entry: verify accepts the matching edge.
+    assert.equal(ledger.verify('s', content, 'implementation', root), true);
+  });
+
+  it('still enforces the required fields AFTER the evidence + approved_by guards pass', () => {
+    const root = makeSandbox();
+    assert.throws(
+      () => ledger.writeSufficiencyEntry('s', { stage_from: 'functional', stage_to: 'implementation', evidence: 'e' }, root),
+      /missing required field "content_sha256"/);
+  });
+});
+
+// ===========================================================================
 // writeVisionArchiveEntry — a decomposed vision archived to done/ earns its
 // residency as a PIPELINE-kind entry hashing the file's CURRENT bytes. Lines
 // 275-285. Kills mutants on the stage mapping (vision->done), the evidence
@@ -276,6 +364,21 @@ describe('entryKind classifies provenance honestly and never launders a backfill
       entry: { advanced_by: {}, approved_by: 'human' }, expected: 'unknown' },
     { id: 'false-advanced_by-with-backfill',
       entry: { advanced_by: false, backfilled: true }, expected: 'unknown' },
+
+    // --- X6: the recognised set grows by EXACTLY ONE — 'sufficiency' ----------
+    // Case 3: the new provenance is recognised. RED before X6 (returned 'unknown').
+    { id: 'sufficiency-recognised', entry: { advanced_by: 'sufficiency' }, expected: 'sufficiency' },
+    // Case 4: the no-WIDENING guard. Recognition stays EXACT — the near-misses of
+    // the new value must ALL keep failing closed to 'unknown', exactly like the
+    // pipeline near-misses above. This is the guard that the X6 fix did not widen
+    // into the hole X5 just closed; these rows are GREEN before X6 and MUST stay green.
+    { id: 'sufficiency-gate-still-unknown', entry: { advanced_by: 'sufficiency-gate' }, expected: 'unknown' },
+    { id: 'sufficiency-capitalized', entry: { advanced_by: 'Sufficiency' }, expected: 'unknown' },
+    { id: 'sufficiency-padded', entry: { advanced_by: ' sufficiency ' }, expected: 'unknown' },
+    // ...and the forgery shape on the NEW provenance: a sufficiency-ish claim wearing
+    // the human's marker is still 'unknown' — advanced_by is checked before approved_by.
+    { id: 'sufficiency-near-miss-wearing-human',
+      entry: { advanced_by: 'Sufficiency', approved_by: 'human' }, expected: 'unknown' },
   ];
 
   for (const { id, entry, expected } of rows) {

@@ -43,7 +43,20 @@ const path = require('path');
 const safeFs = require('./safe-fs');
 const { readPlans, getPlansDir } = require('./state');
 const { validateTransition } = require('./plan-validator');
-const { approvePlan } = require('./actions');
+const { approvePlan, movePlan } = require('./actions');
+const gateOrder = require('./gate-order');
+
+// PRE-BUILD gate destinations (X6): the gates reached BEFORE any code is built,
+// derived from the ONE gate-edge encoding, never hardcoded. A destination is
+// pre-build iff it precedes the build phase (which begins at `in-progress`) in the
+// stage order — implementation and todo qualify, `done` does not. A plan with ENOUGH
+// INFORMATION crosses these gates by itself; `done` (Gate 3) is out of scope — it
+// asks whether the work was built correctly, which a sufficiency verdict cannot
+// answer. This mirrors `human-gate-check.PRE_BUILD_GATES` (same derivation).
+const BUILD_PHASE_START = gateOrder.STAGE_ORDER.indexOf('in-progress');
+const PRE_BUILD_DESTINATIONS = new Set(
+  gateOrder.GATE_DESTINATIONS.filter((d) => gateOrder.STAGE_ORDER.indexOf(d) < BUILD_PHASE_START),
+);
 
 // Security (mirrors menu-screens.stripCtl): strip C0/C1 control chars from any
 // plan-derived string before rendering, so a hostile slug/title cannot inject
@@ -324,15 +337,84 @@ function sufficiencyFor(root, ref) {
 }
 
 /**
- * The ORDERED list of plans currently sitting at a human gate awaiting the human's
- * approval decision. Pure read: never mutates. Fail-soft: readPlans skips an
- * unreadable/unparseable plan file, and a validator that throws degrades that plan
- * to passesValidation:false rather than crashing the whole list.
+ * X6 — CROSS a plan by SUFFICIENCY: the plan had enough information to be built
+ * without guessing, so the pipeline advances it ITSELF and the human approves
+ * nothing. Writes a sufficiency ledger entry (advanced_by:'sufficiency', evidence,
+ * NO approved_by) keyed to the plan's CURRENT bytes, then performs the pure stage
+ * move. A pure move leaves the bytes byte-identical, so a hash-sensitive destination
+ * (todo/) still matches the recorded hash.
  *
- * Each decision also carries its SUFFICIENCY VERDICT (`enough`,
+ * INVARIANT: entry-and-moved, or NEITHER. The entry is written FIRST; if the move
+ * then fails (e.g. a same-basename collision at the destination), the orphan entry is
+ * rolled back. IDEMPOTENT (Decision 3): a plan already carrying an entry for this
+ * destination is never re-crossed. FAIL-SOFT: any error returns false so a cross
+ * failure never bricks the pending-decisions read.
+ *
+ * @param {string} root project root
+ * @param {string} planPath absolute path to the plan at its gate-source stage
+ * @param {string} ref the plan reference ("stage/file.md")
+ * @param {string} fromStage the gate source stage
+ * @param {string} toStage the gate destination stage (a PRE-BUILD destination)
+ * @returns {boolean} true iff the plan was crossed (entry written + moved)
+ */
+function crossBySufficiency(root, planPath, ref, fromStage, toStage) {
+  try {
+    const ledger = require('./approval-ledger');
+    const slug = ledger.slugFromPlanPath(planPath);
+    // IDEMPOTENT: an entry already recorded for THIS destination means the plan
+    // already crossed this edge — never write a second one, never re-cross.
+    const existing = ledger.readEntry(slug, root);
+    if (existing && existing.stage_to === toStage) return false;
+
+    const content = safeFs.readFileSync(planPath, 'utf8');
+    // Evidence an auditor can reconstruct the decision from: the plan ref, the count
+    // of answered questions, and their ids.
+    const answered = [...answeredQuestionIds(root, ref)];
+    const evidence =
+      `sufficiency: ${ref} — ${answered.length} question(s) answered` +
+      `${answered.length ? ` (${answered.join(', ')})` : ''}; enough (no unanswered fork)`;
+
+    ledger.writeSufficiencyEntry(slug, {
+      content_sha256: ledger.computeContentHash(content),
+      stage_from: fromStage,
+      stage_to: toStage,
+      evidence,
+      plan_basename: path.basename(planPath).replace(/\.md$/i, ''),
+    }, root);
+
+    try {
+      movePlan(planPath, toStage, root);
+    } catch {
+      // Roll back the orphan entry so the invariant holds (entry-and-moved, or neither).
+      try { ledger.removeEntry(slug, root); } catch { /* best-effort */ }
+      return false;
+    }
+    return true;
+  } catch {
+    return false; // fail-soft: never brick the read
+  }
+}
+
+/**
+ * The ORDERED list of plans currently sitting at a human gate awaiting a decision.
+ *
+ * X6 — THE GATE CROSSES ITSELF. This is no longer a pure read: before listing, any
+ * plan at a PRE-BUILD gate (implementation, todo) that has ENOUGH INFORMATION to be
+ * built without guessing AND passes its transition validation is CROSSED here, by a
+ * sufficiency ledger entry + the stage move (`crossBySufficiency`), and OMITTED from
+ * the returned list — the human is never shown a decision that has already been
+ * answered. Everything else is still a pure, fail-soft read: readPlans skips an
+ * unreadable plan, a validator that throws degrades that plan to
+ * passesValidation:false, and a cross that fails leaves the plan listed.
+ *
+ * FAIL CLOSED. A plan crosses ONLY on `enough === true` (every fork answered) at a
+ * pre-build gate with passing validation. An unanswered fork, never-computed
+ * questions, a failing validation, or the `done/` gate all keep the plan pending —
+ * X6 adds an automatic YES, never an automatic NO, and never silences a question.
+ *
+ * Each still-pending decision carries its SUFFICIENCY VERDICT (`enough`,
  * `sufficiencyReason`, `unansweredQuestionIds`, `blockingQuestionIds`) so the human
- * SEES whether a plan has enough information to be built and exactly which
- * questions are still open. Display only — see `sufficiencyFor`.
+ * SEES exactly which questions are still open — see `sufficiencyFor`.
  *
  * @param {string} projectRoot
  * @returns {Array<{ref:string, slug:string, title:string, summary:string,
@@ -360,9 +442,20 @@ function pendingGateDecisions(projectRoot) {
       } catch {
         passesValidation = false; // an exploding validator → honestly "does not pass"
       }
-      const title = planTitle(plan);
       const ref = `${stage}/${plan.name}.md`;
+      // Decision 5: the predicate is called ONCE per decision; the SAME verdict both
+      // ACTS (the cross below) and, if the plan stays, DISPLAYS (pushed into `out`).
       const sufficiency = sufficiencyFor(projectRoot, ref);
+
+      // X6: enough information at a pre-build gate crosses the plan by itself and it
+      // stops being a pending decision. Fail-closed conditions are all short-circuited.
+      if (sufficiency.enough === true && passesValidation
+          && PRE_BUILD_DESTINATIONS.has(meta.toStage)
+          && crossBySufficiency(projectRoot, plan.path, ref, stage, meta.toStage)) {
+        continue;
+      }
+
+      const title = planTitle(plan);
       out.push({
         ref,
         slug: stripCtl(plan.name),

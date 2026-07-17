@@ -439,59 +439,83 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     assert.equal(screen.actions['Approve'], 'stream approve functional/plain.md');
   });
 
-  it('answering the LAST precomputed question routes the screen back to `stream approve <ref>`', () => {
+  it('answering the LAST fork CROSSES the plan by sufficiency — the human approves nothing (X6)', () => {
     const root = makeSandbox();
-    writePlan(root, 'functional', 'seq', validFunctionalBody('seq'));
-    // ONE precomputed question so answering it exhausts the set.
-    const oneQ = [{
+    const p = writePlan(root, 'functional', 'seq', validFunctionalBody('seq'));
+    // ONE FORK, so answering it makes the plan sufficient (enough information to build).
+    const oneFork = [{
       id: 'db',
       prompt: 'Which database engine?',
+      critical: true,
       options: [
         { key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS' },
         { key: 'sqlite', label: 'SQLite', cons: 'No concurrency' },
       ],
     }];
-    precompute.writePlanQuestions(root, 'functional/seq.md', oneQ, planMtimeMs(root, 'functional', 'seq'));
+    precompute.writePlanQuestions(root, 'functional/seq.md', oneFork, planMtimeMs(root, 'functional', 'seq'));
 
-    // Answer the only precomputed question.
+    // Answer the only fork → the plan has ENOUGH INFORMATION → it CROSSES automatically.
     const after = route(['stream', 'answer', 'functional/seq.md', 'db', 'pg'], root);
 
-    // All precomputed questions answered → the screen is now the simple gate crossing.
-    assert.match(after.ask.questions[0].question, /Approve seq across Gate 1\?/);
-    assert.equal(after.actions['Approve'], 'stream approve functional/seq.md');
+    // Pre-X6 this screen offered "Approve seq across Gate 1?". X6 replaces that: the
+    // plan crossed as a SUFFICIENCY entry and the human never saw an Approve button.
+    assert.ok(!fs.existsSync(p), 'seq left functional/ by itself');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'implementation', 'seq.md')), 'landed in implementation/');
+    const entry = JSON.parse(fs.readFileSync(ledgerFile(root, 'seq'), 'utf8'));
+    assert.equal(entry.advanced_by, 'sufficiency', 'crossed by sufficiency, not a human approval');
+    assert.equal(entry.approved_by, undefined, 'the human approved NOTHING');
+    assert.notEqual(after.actions && after.actions['Approve'], 'stream approve functional/seq.md',
+      'no Gate-1 Approve is offered for a plan that already crossed');
   });
 
-  it('advances through MULTIPLE precomputed questions before offering the gate crossing', () => {
+  it('advances through MULTIPLE fork questions, then the LAST answer CROSSES the plan (X6)', () => {
     const root = makeSandbox();
     writePlan(root, 'functional', 'multi', validFunctionalBody('multi'));
-    precompute.writePlanQuestions(root, 'functional/multi.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'multi'));
+    // TWO FORKS: answering the first leaves a fork open, so the human steps to the second.
+    const twoForks = [
+      { id: 'db', prompt: 'Which database engine?', critical: true,
+        options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }] },
+      { id: 'auth', prompt: 'Which auth provider?', critical: true,
+        options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll your own' }] },
+    ];
+    precompute.writePlanQuestions(root, 'functional/multi.md', twoForks, planMtimeMs(root, 'functional', 'multi'));
 
-    // Answer question 1 (db) → screen should now ask question 2 (auth).
+    // Answer fork 1 (db) → fork 2 (auth) still open → NOT sufficient → screen asks auth.
     const afterFirst = route(['stream', 'answer', 'functional/multi.md', 'db', 'pg'], root);
     assert.match(afterFirst.ask.questions[0].question, /Which auth provider\?/);
     assert.match(afterFirst.text, /question 2 of 2/i);
     assert.equal(afterFirst.actions['Clerk'], 'stream answer functional/multi.md auth clerk');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'functional', 'multi.md')), 'a fork is still open → stays put');
 
-    // Answer question 2 (auth) → all answered → simple Approve.
-    const afterSecond = route(['stream', 'answer', 'functional/multi.md', 'auth', 'clerk'], root);
-    assert.match(afterSecond.ask.questions[0].question, /Approve multi across Gate 1\?/);
-    assert.equal(afterSecond.actions['Approve'], 'stream approve functional/multi.md');
+    // Answer fork 2 (auth) → every fork answered → the plan CROSSES automatically.
+    route(['stream', 'answer', 'functional/multi.md', 'auth', 'clerk'], root);
+    assert.ok(!fs.existsSync(path.join(root, 'plans', 'functional', 'multi.md')), 'crossed out of functional/');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'implementation', 'multi.md')), 'landed in implementation/');
+    assert.equal(JSON.parse(fs.readFileSync(ledgerFile(root, 'multi'), 'utf8')).advanced_by, 'sufficiency');
   });
 });
 
 describe('route wiring — `stream answer` records the answer, never crosses a gate or edits the plan', () => {
-  it('records the answer to .ctoc/streaming/answers.jsonl and leaves the plan byte-identical + in place', () => {
+  it('records the answer and leaves the plan byte-identical + in place while a fork is still open', () => {
     const root = makeSandbox();
     const planPath = writePlan(root, 'functional', 'ans', validFunctionalBody('ans'));
     const before = fs.readFileSync(planPath, 'utf8');
-    precompute.writePlanQuestions(root, 'functional/ans.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'ans'));
+    // TWO FORKS; answer only one, so the plan is NOT yet sufficient and must not cross.
+    const twoForks = [
+      { id: 'db', prompt: 'db?', critical: true,
+        options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }] },
+      { id: 'auth', prompt: 'auth?', critical: true,
+        options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll' }] },
+    ];
+    precompute.writePlanQuestions(root, 'functional/ans.md', twoForks, planMtimeMs(root, 'functional', 'ans'));
 
     route(['stream', 'answer', 'functional/ans.md', 'db', 'pg'], root);
 
-    // Plan untouched, unmoved (no gate crossing).
+    // Plan untouched, unmoved — a fork (auth) is still open, so it is not sufficient.
     assert.equal(fs.readFileSync(planPath, 'utf8'), before, 'the plan body is never edited');
-    assert.ok(fs.existsSync(planPath), 'plan stays in functional/');
+    assert.ok(fs.existsSync(planPath), 'plan stays in functional/ while a fork is open');
     assert.ok(!fs.existsSync(path.join(root, 'plans', 'implementation', 'ans.md')), 'nothing crossed the gate');
+    assert.ok(!fs.existsSync(ledgerFile(root, 'ans')), 'no ledger entry while not yet sufficient');
 
     // Answer recorded to the append-only log.
     const log = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
@@ -513,17 +537,22 @@ describe('route wiring — `stream answer` records the answer, never crosses a g
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// W1 — THE SUFFICIENCY VERDICT REACHES THE HUMAN.
+// X6 — THE GATE CROSSES ITSELF. Enough information advances the plan; the human
+// approves nothing.
 //
 // `streaming-precompute.hasEnoughInformation` is the predicate for the owner's
 // load-bearing principle: "the gate is enough information, not human approval".
-// It was built, proven fail-closed, and wired to NOTHING. These cases wire it to
-// the one screen a human actually reads — the pending gate decisions.
+// W1 wired the verdict to the screen for DISPLAY only, because auto-crossing was
+// unsafe while `approval-ledger.entryKind` classified an unrecognised
+// `advanced_by` as `'human'` (that default would forge the human's approval). X5
+// closed that hole — an unrecognised provenance now fails closed to `'unknown'` —
+// so X6 makes the verdict ACT: when `enough === true` at a PRE-BUILD gate, the
+// plan crosses itself through a SUFFICIENCY ledger entry (advanced_by:
+// 'sufficiency', evidence, and NO approved_by) and leaves the pending list.
 //
-// DISPLAY ONLY, DELIBERATELY. The verdict is SHOWN; it crosses nothing and writes
-// nothing. Auto-crossing on `enough: true` is unsafe until `approval-ledger`'s
-// `entryKind` stops classifying an unrecognised `advanced_by` as `'human'` — that
-// default would forge the human's approval. See the plan's Decision 1.
+// FAIL CLOSED EVERYWHERE ELSE. An unanswered fork, never-computed questions, a
+// failing validation, or the done/ gate all keep the plan exactly where it is —
+// X6 adds an automatic YES, never an automatic NO, and never silences a question.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** A question in the real Question contract. `critical: true` makes it a FORK. */
@@ -548,8 +577,9 @@ function detailQuestion(id) {
   };
 }
 
-describe('W1 — pendingGateDecisions carries each plan\'s SUFFICIENCY VERDICT (display only)', () => {
-  it('a plan whose every fork is answered reports enough:true and no unanswered forks', () => {
+describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the pending list', () => {
+  // Case 8 — the whole point: enough information crosses the pre-build gate itself.
+  it('case 8 — a plan with enough information CROSSES the pre-build gate and leaves the list', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-ok', validFunctionalBody('suff-ok'));
     const ref = 'functional/suff-ok.md';
@@ -557,63 +587,95 @@ describe('W1 — pendingGateDecisions carries each plan\'s SUFFICIENCY VERDICT (
     // The REAL answer writer — the predicate reads the log this produces.
     streamingGate.streamAnswer(ref, 'db', 'pg', root);
 
-    const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
-    assert.ok(d, 'the plan is still listed at its gate');
-    assert.equal(d.enough, true, 'every fork is answered → enough information to build');
-    assert.equal(d.sufficiencyReason, 'enough');
-    assert.deepEqual(d.unansweredQuestionIds, [], 'nothing is still open');
-    assert.deepEqual(d.blockingQuestionIds, []);
+    const decisions = streamingGate.pendingGateDecisions(root);
+
+    // It crossed itself: gone from the functional pending list, moved to implementation/,
+    // recorded as a SUFFICIENCY entry (never a human approval).
+    assert.ok(!decisions.some((x) => x.ref === ref), 'the sufficient plan left the functional pending list');
+    assert.ok(!fs.existsSync(p), 'left functional/ by itself');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'implementation', 'suff-ok.md')), 'landed in implementation/');
+    const entry = JSON.parse(fs.readFileSync(ledgerFile(root, 'suff-ok'), 'utf8'));
+    assert.equal(entry.advanced_by, 'sufficiency', 'crossed by sufficiency');
+    assert.equal(entry.approved_by, undefined, 'the human approved NOTHING');
+    assert.equal(entry.stage_to, 'implementation');
+    assert.match(entry.evidence, /suff-ok/, 'evidence names the plan …');
+    assert.match(entry.evidence, /db/, '… and reconstructs the answered fork');
   });
 
-  it('a plan with an UNANSWERED CRITICAL question reports enough:false and names it', () => {
+  // Case 9 — the no-automatic-NO guard. GREEN before AND after X6.
+  it('case 9 — a plan with an UNANSWERED fork does NOT cross and stays pending (no automatic NO)', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-fork', validFunctionalBody('suff-fork'));
     const ref = 'functional/suff-fork.md';
     precompute.writePlanQuestions(root, ref, [forkQuestion('db'), detailQuestion('name')], fs.statSync(p).mtimeMs);
+    // Deliberately answer NOTHING.
 
     const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
-    assert.equal(d.enough, false, 'an unanswered FORK means the implementer would have to guess');
+    assert.ok(d, 'an unanswered FORK keeps the plan pending — the implementer would guess');
+    assert.equal(d.enough, false);
     assert.equal(d.sufficiencyReason, 'open-forks');
-    // `unanswered` is EVERY open question (nothing hidden); `blocking` is the fork subset.
-    assert.deepEqual(d.unansweredQuestionIds, ['db', 'name'], 'every open question is reported honestly');
+    assert.deepEqual(d.unansweredQuestionIds, ['db', 'name'], 'every open question reported honestly');
     assert.deepEqual(d.blockingQuestionIds, ['db'], 'only the critical one is a fork');
+    // Nothing moved, nothing ledgered.
+    assert.ok(fs.existsSync(p), 'still in functional/');
+    assert.ok(!fs.existsSync(ledgerFile(root, 'suff-fork')), 'no ledger entry — nothing crossed');
   });
 
-  it('a plan whose questions were NEVER COMPUTED reports enough:false — it FAILS CLOSED', () => {
+  // Case 10 — fail closed on never-computed. GREEN before AND after X6.
+  it('case 10 — a plan whose questions were NEVER COMPUTED does NOT cross (fail closed)', () => {
     const root = makeSandbox();
-    writePlan(root, 'functional', 'suff-none', validFunctionalBody('suff-none'));
+    const p = writePlan(root, 'functional', 'suff-none', validFunctionalBody('suff-none'));
 
     const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === 'functional/suff-none.md');
-    // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF SUFFICIENCY. Not `true`, not a crash.
+    // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF SUFFICIENCY. Not `true`, not a crash, not a cross.
     assert.equal(d.enough, false, 'never-computed must never read as "enough" — we simply do not KNOW');
     assert.equal(d.sufficiencyReason, 'not-computed');
-    assert.deepEqual(d.unansweredQuestionIds, []);
+    assert.ok(fs.existsSync(p), 'not moved');
+    assert.ok(!fs.existsSync(ledgerFile(root, 'suff-none')), 'no ledger entry');
   });
 
-  it('the verdict is DISPLAY ONLY: reading it crosses no gate and writes no approval', () => {
+  // Case 11 — idempotent: running the read twice writes ONE entry, never re-crosses.
+  it('case 11 — the auto-cross is IDEMPOTENT: two passes write ONE entry, never a second cross', () => {
     const root = makeSandbox();
-    const p = writePlan(root, 'functional', 'suff-pure', validFunctionalBody('suff-pure'));
-    const ref = 'functional/suff-pure.md';
+    const p = writePlan(root, 'functional', 'suff-idem', validFunctionalBody('suff-idem'));
+    const ref = 'functional/suff-idem.md';
     precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
     streamingGate.streamAnswer(ref, 'db', 'pg', root);
 
-    const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
-    assert.equal(d.enough, true, 'the plan HAS enough information …');
+    streamingGate.pendingGateDecisions(root); // first pass: crosses
+    const entryPath = ledgerFile(root, 'suff-idem');
+    assert.ok(fs.existsSync(entryPath), 'crossed on the first pass');
+    const first = fs.readFileSync(entryPath, 'utf8');
 
-    // … and NOTHING acted on it. The plan did not move and no approval exists.
-    assert.ok(fs.existsSync(p), 'the plan is still in functional/ — enough information did NOT cross the gate');
-    assert.ok(
-      !fs.existsSync(path.join(root, 'plans', 'implementation', 'suff-pure.md')),
-      'the plan must NOT have been auto-advanced'
-    );
-    assert.ok(
-      !fs.existsSync(ledgerFile(root, 'suff-pure')),
-      'NO approval ledger entry may exist — an auto-entry would be classified as the HUMAN (entryKind default) and forge his approval'
-    );
-    assert.ok(
-      !fs.readFileSync(p, 'utf8').includes('approved_by'),
-      'the plan body must carry no approval stamp'
-    );
+    streamingGate.pendingGateDecisions(root); // second pass: must NOT re-cross or rewrite
+    const second = fs.readFileSync(entryPath, 'utf8');
+    assert.equal(first, second, 'the entry is byte-identical — no second write, no re-cross');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'implementation', 'suff-idem.md')), 'still resident once');
+  });
+
+  // Case 12 — walk the ledger: no sufficiency entry anywhere carries approved_by.
+  it('case 12 — no sufficiency entry carries approved_by; each carries evidence', () => {
+    const root = makeSandbox();
+    const p = writePlan(root, 'functional', 'suff-walk', validFunctionalBody('suff-walk'));
+    const ref = 'functional/suff-walk.md';
+    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
+    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    streamingGate.pendingGateDecisions(root); // cross
+
+    const dir = path.join(root, '.ctoc', 'approvals');
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
+    assert.ok(files.length >= 1, 'at least one entry was written by the cross');
+    let sufficiencyEntries = 0;
+    for (const f of files) {
+      const e = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+      if (e.advanced_by === 'sufficiency') {
+        sufficiencyEntries++;
+        assert.equal(e.approved_by, undefined, `sufficiency entry ${f} must carry NO approved_by`);
+        assert.ok(typeof e.evidence === 'string' && e.evidence.length > 0,
+          `sufficiency entry ${f} must carry reconstructable evidence`);
+      }
+    }
+    assert.ok(sufficiencyEntries >= 1, 'the cross wrote a sufficiency entry');
   });
 });
 
