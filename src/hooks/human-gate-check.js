@@ -164,19 +164,27 @@ function readPlan(filePath) {
  * Never trusts the plan-body `approved_by: human` marker.
  *
  * HONEST KIND (R3-A item 5). Every verdict — accepted or not — carries the entry's
- * REAL `kind` (`human` | `backfilled` | `pipeline` | `null`). A backfilled entry is
- * still ACCEPTED (the human ordered the migration): acceptance is not weakened. But
- * it is reported as `'backfilled'`, never laundered into `'human'`, so a later audit
- * can always separate a migrated record from a live human approval.
+ * REAL `kind` (`human` | `backfilled` | `pipeline` | `unknown` | `null`). A backfilled
+ * entry is still ACCEPTED (the human ordered the migration): acceptance is not
+ * weakened. But it is reported as `'backfilled'`, never laundered into `'human'`, so a
+ * later audit can always separate a migrated record from a live human approval.
+ *
+ * FAILS CLOSED ON UNRECOGNISED PROVENANCE (X5). `'pipeline'` used to be the ONLY
+ * guarded kind, and every other kind fell through to `accepted: true` — which, paired
+ * with `entryKind`'s old `return 'human'` default, meant an entry with an unrecognised
+ * `advanced_by` was accepted at EVERY gate including `todo/` with no evidence. An
+ * `'unknown'` kind is now rejected (`unknown-provenance`) BEFORE the pipeline branch,
+ * on every path. A new provenance earns acceptance only by being added to
+ * `approval-ledger.entryKind` AND given an explicit guard here.
  *
  * @param {string} filePath - absolute path to the plan file
  * @param {string} folderName - the gate-destination folder the plan resides in
  * @param {string} [projectPath] - project root (defaults to cwd)
  * @param {string|null} [content] - pre-read file content, to avoid a re-read
- * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|null)}}
+ * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|'unknown'|null)}}
  *   accepted (with the entry's real kind), or a reason: `ledger-unkeyable` |
  *   `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` | `hash-mismatch` |
- *   `unreadable` | `pipeline-no-evidence` | `pipeline-not-allowed`
+ *   `unreadable` | `unknown-provenance` | `pipeline-no-evidence` | `pipeline-not-allowed`
  */
 function classifyResidency(filePath, folderName, projectPath = process.cwd(), content = null) {
   const ledger = require('../lib/approval-ledger');
@@ -198,6 +206,17 @@ function classifyResidency(filePath, folderName, projectPath = process.cwd(), co
       return { accepted: false, reason: 'hash-mismatch', kind };
     }
   }
+
+  // FAIL CLOSED ON UNRECOGNISED PROVENANCE (X5). This must come BEFORE the pipeline
+  // branch, so no unrecognised provenance can reach `accepted: true` on ANY path.
+  // Until X5 `'pipeline'` was the ONLY guarded kind and the function ended in a bare
+  // `return { accepted: true }` — so an entry stamped `advanced_by: 'sufficiency-gate'`
+  // classified as `'human'` (the old classifier's fallthrough), skipped the guard
+  // below, and was ACCEPTED at every gate including `todo/`, with no evidence. It was
+  // not mislabelled; it was waved through. That is the mechanism behind the 26 forged
+  // approvals removed from this repo. A kind this hook does not RECOGNISE is never
+  // accepted: adding a new provenance means adding its guard here, deliberately.
+  if (kind === 'unknown') return { accepted: false, reason: 'unknown-provenance', kind };
 
   if (kind === 'pipeline') {
     // Pipeline provenance is accepted ONLY at the terminal `done/` gate, and only
