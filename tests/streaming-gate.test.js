@@ -679,6 +679,61 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PQ2 — maybeKickProduction: opening the gate screen KICKS background question
+// generation (never-wait). The spawn is DETACHED and fire-and-forget; the render
+// returns in milliseconds and never awaits or throws into the screen.
+//
+// The injected `opts.spawn` seam is honored ALWAYS (so these tests observe the
+// spawn deterministically). The REAL detached spawn is suppressed under the Node
+// test runner (NODE_TEST_CONTEXT) so the suite never forks a real
+// `node produce-questions.js` / `claude -p`; a live menu open fires it for real.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('PQ2 — maybeKickProduction (never-wait background generation)', () => {
+  it('case 3 — swallows a failing spawn and never throws; the render stays synchronous', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'kick', validFunctionalBody('kick'));
+
+    let attempts = 0;
+    const throwingSpawn = () => { attempts += 1; throw new Error('boom'); };
+    const res = streamingGate.maybeKickProduction(root, { spawn: throwingSpawn });
+    assert.equal(res.kicked, false, 'a spawn failure is swallowed, not propagated');
+    assert.equal(attempts, 1, 'the spawn was attempted before the failure was swallowed');
+
+    // The render path returns a plain screen object SYNCHRONOUSLY — it never awaits
+    // production and never throws, even though a plan needs questions.
+    const screen = streamingGate.streamingGateScreen(root);
+    assert.ok(screen && screen.ask && Array.isArray(screen.ask.questions), 'a well-formed screen');
+    assert.notEqual(typeof screen.then, 'function', 'the render is synchronous — it does not await production');
+  });
+
+  it('case 4 — no stampede: a second rapid open does not spawn a second producer', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'stamp', validFunctionalBody('stamp'));
+
+    let spawns = 0;
+    const okSpawn = () => { spawns += 1; return { unref() {} }; };
+    streamingGate.maybeKickProduction(root, { spawn: okSpawn }); // marks + spawns
+    streamingGate.maybeKickProduction(root, { spawn: okSpawn }); // marker is fresh → skip
+    assert.equal(spawns, 1, 'only one producer is spawned while one is marked running');
+  });
+
+  it('case 5 — skips when no plan needs questions (empty queue → no spawn)', () => {
+    const root = makeSandbox(); // no plans at any gate
+    let spawns = 0;
+    const res = streamingGate.maybeKickProduction(root, { spawn: () => { spawns += 1; } });
+    assert.equal(res.kicked, false, 'nothing to generate → nothing kicked');
+    assert.equal(spawns, 0, 'no producer is spawned for an empty queue');
+  });
+
+  it('case 5b — an invalid root is a clean no-op', () => {
+    let spawns = 0;
+    const res = streamingGate.maybeKickProduction('', { spawn: () => { spawns += 1; } });
+    assert.equal(res.kicked, false);
+    assert.equal(spawns, 0);
+  });
+});
+
 describe('W1 — wiring the predicate did not create a REQUIRE CYCLE', () => {
   // WHY A FRESH PROCESS: a cycle is a LOAD-ORDER defect. In this suite both modules
   // are already required at the top, so the cache hides it. Only a cold process in a
