@@ -7,8 +7,6 @@ effort: high
 tier: 2
 reports_to: cto-chief
 dispatch_protocol: v1
-skills:
-  - <the-one-skill-it-always-uses>
 color: <pillar colour>
 maxTurns: <bound>
 ---
@@ -73,18 +71,23 @@ call it cannot see far enough to make.
 
 ## What I Borrow
 
-<Skills invoked lazily through the Skill tool when a finding needs them — never
-preloaded. The lens skill in `skills:` above is the one that loads every run;
-everything here loads only when a specific finding demands it. Overlap with
-other watchers is deliberate: convergence from two routes raises confidence and
-must be said in the finding; divergence is itself a finding.>
+<Skills invoked lazily through the Skill tool when a finding needs them.
+Overlap with other watchers is deliberate: convergence from two routes raises
+confidence and must be said in the finding; divergence is itself a finding.>
 
-`Skill` MUST stay in `tools:` above or this whole section is dead. The Claude
-Code reference is explicit: *"To prevent a subagent from invoking skills
-entirely, omit `Skill` from the tools list."* `skills:` controls what is
-PRELOADED; the `Skill` tool is what makes lazy borrowing possible. A watcher
-declaring only `Read, Grep` cannot borrow anything, no matter what this section
-says. The two fields are not alternatives — hybrid depth needs both.
+THERE IS NO PRELOADING. A `skills:` frontmatter key used to sit above, and this
+section used to say it loaded a lens skill every run. That was TESTED on
+2026-07-18 — an agent declaring it was dispatched and its own context inspected.
+Nothing had been injected. Do not put rules an agent NEEDS into a skill and
+expect them to arrive: an agent's body is its entire system prompt and the only
+text it is guaranteed to receive. A contract that must be FETCHED is weaker than
+one that is PRESENT, because an agent that skips the fetch runs with no contract
+and does not know it.
+
+`Skill` MUST stay in `tools:` above or this section is dead. The Claude Code
+reference is explicit: *"To prevent a subagent from invoking skills entirely,
+omit `Skill` from the tools list."* A watcher declaring only `Read, Grep` cannot
+borrow anything, no matter what this section says.
 
 ## Anti-Scope
 

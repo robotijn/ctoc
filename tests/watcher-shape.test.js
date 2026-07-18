@@ -51,53 +51,30 @@ const BASELINE_FILE = path.join(ROOT, '.ctoc', 'watcher-baseline.json');
 const SCHEMA_PATH = '.ctoc/architecture/dispatch-schema.yaml';
 
 /**
- * The body cap. One screen. A watcher that cannot fit is two roles.
+ * The body cap.
  *
- * RAISED 80 -> 120 on 2026-07-18, and the reason is the whole justification —
- * read it before treating this as a loosened fence.
+ * The previous number (120) rested on a rationale that is now known to be false.
+ * That rationale was: an agent body may be short because its depth is PRELOADED
+ * from a skill declared in `skills:` frontmatter, so the cap can force depth out
+ * of the agent and into that skill.
  *
- * 80 WAS AN UNTESTED NUMBER. It was written when `conforming` was empty and all
- * 124 agents sat in `legacy`, so not one agent had ever met it. A limit nothing
- * has ever passed was never validated as ACHIEVABLE; it is a wall, not a ratchet.
- * Raising it here is not relaxing a proven fence — it is correcting a constant
- * that was guessed and never exercised. That distinction is load-bearing, because
- * "we raised the limit to make it pass" is exactly the green-washing this
- * repository fences against everywhere else.
+ * THE PRELOAD MECHANISM WAS VERIFIED NOT TO WORK on 2026-07-18. The check was
+ * direct: agents/iron-loop/advocate-critic.md was dispatched with
+ * `skills: [iron-loop/advocate-lens]` declared, and its own context was
+ * inspected. The skill body was NOT there. Nothing had been injected. The agent
+ * shipped in v6.12.88 saying "my rules live in my preloaded skill" while holding
+ * no such skill — it could not emit a valid payload at all.
  *
- * THE MEASUREMENT that replaced the guess. agents/iron-loop/advocate-critic.md
- * was split into a thin lens agent plus a preloaded skill
- * (skills/iron-loop/advocate-lens/SKILL.md) — the first agent in this repository
- * written to this template. Everything deep moved into the skill: the evidence
- * whitelist, the degraded-input table, the severity/confidence/variance scales,
- * the exhibit-marker neutralisation, the path-binding rules, the output contract
- * and the escalation table. What REMAINS in the agent is the irreducible set the
- * template itself demands: identity and lens, trigger plus standing trigger, the
- * untrusted-input discipline, the degraded-input discipline, the three report
- * tiers, the honesty rule, the borrow section, and anti-scope. That measured
- * floor is 103 BODY LINES.
+ * So the agent was restored whole: every rule from the skill was merged back into
+ * the agent body, because an agent's body IS its entire system prompt and is the
+ * only text it is guaranteed to receive.
  *
- * THE CAP: 103 measured floor + 17 lines of headroom = 120. The headroom is
- * deliberately modest — enough that a second and a third conforming agent can be
- * written without another raise, and NOT enough to stop the cap forcing depth
- * into skills. It still bites hard: the pre-split advocate-critic body was 288
- * lines, 2.4x over this cap, and it could not be brought under it by trimming —
- * only by moving its disciplines into a preloaded skill, which is the behaviour
- * this constant exists to force.
- *
- * .ctoc/templates/watcher.md itself sat at EXACTLY 80 body lines under the old
- * number — pinned against the wall, unable to absorb one more sentence. Under 120
- * it has 40 lines of margin, which is the right place for the document every
- * future agent copies.
- *
- * THIS NUMBER MAY ONLY GO DOWN FROM HERE. It became a ratchet the moment a
- * conforming agent existed to hold it: advocate-critic sits at 103, so lowering
- * below 103 is a real (and welcome) tightening that must be earned by making that
- * agent thinner first. Raising it again requires the same thing this raise
- * required — a measurement, written down here, of what a genuinely thin agent
- * needs. Never raise it to admit a fat agent.
+ * THERE IS NO LENGTH LIMIT. A body-line cap used to live here. Its only
+ * justification was that a body could be short because depth loaded from a
+ * preloaded skill — and that mechanism does not work. An agent's body IS its
+ * system prompt and is the only text it is guaranteed to receive, so a limit on
+ * it is a limit on what the agent knows. Removed 2026-07-18. Do not add another.
  */
-const MAX_BODY_LINES = 120;
-
 /** The five headings, literal text, in order. */
 const REQUIRED_HEADINGS = [
   '# What I watch',
@@ -222,10 +199,16 @@ function shapeViolations(text, label) {
     v.push(`${label}: missing "model: opus"`);
   }
 
-  // frontmatter: THE LENS — the preloaded skill is why the body can be one page
-  if (!/^skills:\s*$/m.test(frontmatter) && !/^skills:\s*\S/m.test(frontmatter)) {
-    v.push(`${label}: missing "skills:" key (the lens — native preload)`);
-  }
+  // frontmatter: no `skills:` assertion.
+  //
+  // This slot used to REQUIRE a `skills:` key, on the stated grounds that it was
+  // "the lens — native preload" and therefore why a body could be one page. That
+  // was verified false on 2026-07-18 by dispatching a conforming agent and
+  // inspecting its context: the declared skill body was absent. Requiring an
+  // agent to declare a mechanism that does nothing is a test asserting a lie, so
+  // the assertion is gone rather than inverted — an agent may still declare
+  // `skills:` (the template does), it just may not be REQUIRED to, and no agent
+  // may rely on it for content it needs.
 
   // body: the five headings, literal text, in order
   const bodyLines = body.split(/\r?\n/);
@@ -245,12 +228,6 @@ function shapeViolations(text, label) {
     if (/^#+\s*(Blocking Rules|Red Lines|When to Block vs Warn)/i.test(h)) {
       v.push(`${label}: has "${h}" — a watcher REPORTS; the aggregator DECIDES`);
     }
-  }
-
-  // body: one page
-  const bodyLineCount = bodyLines.filter((l, i) => !(i === bodyLines.length - 1 && l === '')).length;
-  if (bodyLineCount > MAX_BODY_LINES) {
-    v.push(`${label}: body is ${bodyLineCount} lines; cap is ${MAX_BODY_LINES}`);
   }
 
   return v;

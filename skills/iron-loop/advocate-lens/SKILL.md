@@ -1,6 +1,6 @@
 ---
 name: advocate-lens
-description: The full operating contract for the defense lens at a human gate — input binding, the six sources of the case for crossing, the untrusted-input and exhibit-marker rules, the evidence whitelist, the degraded-input table, the severity/confidence/variance scales, the output contract, and the escalation table. Preloaded into agents/iron-loop/advocate-critic.md at startup.
+description: Reference copy of the operating contract for the defense lens at a human gate — input binding, the six sources of the case for crossing, the untrusted-input and exhibit-marker rules, the evidence whitelist, the degraded-input table, the severity/confidence/variance scales, the output contract, and the escalation table. NOT preloaded into any agent. agents/iron-loop/advocate-critic.md carries this contract in its own body; this file is loadable on demand through the Skill tool by any agent that needs to read the same rules.
 type: skill
 when_to_load:
   - "argue for crossing a gate"
@@ -24,10 +24,15 @@ effort_budget:
 
 # Advocate Lens (the defense lens contract)
 
-> This skill is PRELOADED into [[advocate-critic]] at startup — the full text below is
-> injected into that agent's context, not merely offered to it. The agent file is the
-> one-page lens statement; every rule that lens must obey lives here. Nothing in this
-> file is optional, and nothing here may be summarised at runtime.
+> NOT PRELOADED. This file was written on the belief that a `skills:` frontmatter
+> declaration injects a skill body into an agent's context at startup. That belief was
+> tested on 2026-07-18 — [[advocate-critic]] was dispatched with the declaration in place
+> and its own context inspected — and NOTHING WAS INJECTED. The declaration has been
+> removed and the whole contract below now lives in the body of
+> `agents/iron-loop/advocate-critic.md`, which is the only text that agent is guaranteed
+> to receive. This file remains as the reference copy of the same rules, loadable on
+> demand through the `Skill` tool. It is not the source of truth for the lens; the agent
+> body is. Nothing in it is optional, and nothing here may be summarised at runtime.
 
 ## Input — what the dispatcher hands you
 
