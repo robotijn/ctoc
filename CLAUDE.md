@@ -207,7 +207,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 416 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 415 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -274,13 +274,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 101 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 100 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                123 agent definitions across 24 categories
   skills/                426 skill files (100 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill; + 326 reference)
-  tests/                 416 test files
+  tests/                 415 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

@@ -311,6 +311,21 @@ Any failure falls back silently to the plain gate question — the human is neve
 or shown a crash. This is the async-overnight / precompute-never-wait principle applied
 to the gates.
 
+### Build-flow idea submit — dispatch vision-decomposer (warm, never-wait)
+
+**When the human submits a free-text idea in the streaming Build flow, DISPATCH the
+`vision-decomposer` agent to decompose it — never spawn a second `claude -p`.** The submit
+path (`src/lib/streaming-render.js`) spawns NOTHING: it sets an awaiting-decomposition
+state and returns an instant `Breaking "<idea>" into topics…` acknowledgment. Your job on
+that turn is to dispatch `vision-decomposer` as **background WORK** (per the Two-Plane
+Protocol — never foreground, never blocking the render) with the submitted idea. The agent
+decomposes the idea into the topic/question contract and persists it via
+`streaming-topics.writeTopics(process.cwd(), topics)` — the atomic, validated store writer.
+On the next render, `streaming-render` loads the written `topics.json` and drives the first
+question. The human saw an immediate acknowledgment and never a frozen terminal or a
+cold-start second Claude — this is the never-wait principle (a warm, in-session subagent)
+applied to idea-decompose, the same pattern the gate-question precompute uses.
+
 ### Interactive work — async with documented choices
 
 `discuss` and `decompose` are **WORK**, not foreground prompts. They dispatch as

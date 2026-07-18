@@ -189,4 +189,38 @@ function loadTopics(projectRoot) {
   return parsed;
 }
 
-module.exports = { validateTopics, loadTopics };
+/**
+ * Write a validated topics ARRAY to `<projectRoot>/.ctoc/streaming/topics.json`
+ * ATOMICALLY: validate first (a malformed structure writes NOTHING), then write a temp
+ * file in the same directory and rename it over the target so a concurrent reader never
+ * sees a half-written file. The on-disk shape is the bare array `loadTopics` reads (NOT
+ * `{ topics: [...] }`). NEVER throws for a bad argument — returns a discriminated result.
+ *
+ * This is the canonical WRITER for the topics store, moved here (X8) from the deleted
+ * `streaming-decompose` so the topics module owns BOTH read and write. The
+ * `vision-decomposer` agent writes real, model-decomposed topics through this function
+ * (see agents/planning/vision-decomposer.md), replacing the old cold-start Claude CLI
+ * spawn on the idea-submit path with a warm, model-dispatched decomposition.
+ *
+ * @param {string} projectRoot absolute path to the project root (write target parent)
+ * @param {Array<object>} topics the topics array to persist
+ * @returns {{ ok: boolean, errors?: string[] }} `{ok:true}` on a written file;
+ *   `{ok:false, errors}` when the root is invalid or the topics fail validation (no write)
+ */
+function writeTopics(projectRoot, topics) {
+  if (!isNonEmptyString(projectRoot)) {
+    return { ok: false, errors: ['projectRoot must be a non-empty string'] };
+  }
+  const { valid, errors } = validateTopics(topics);
+  if (!valid) return { ok: false, errors };
+
+  const dir = path.join(projectRoot, '.ctoc', 'streaming');
+  safeFs.mkdirSync(dir, { recursive: true });
+  const target = path.join(dir, 'topics.json');
+  const tmp = path.join(dir, `.topics.${process.pid}.${Date.now()}.tmp`);
+  safeFs.writeFileSync(tmp, JSON.stringify(topics, null, 2), 'utf8');
+  safeFs.renameSync(tmp, target);
+  return { ok: true };
+}
+
+module.exports = { validateTopics, loadTopics, writeTopics };

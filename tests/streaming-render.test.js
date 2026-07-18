@@ -680,63 +680,76 @@ test('b with a NON-empty buffer is a normal character (does not trigger the demo
   assert.equal(app.ideaMode, true, 'still typing the idea');
 });
 
-test('Enter with a decompose that returns ok reloads real topics and exits idea mode', () => {
+// X8 case 1 — the WARM submit path spawns NOTHING and shows the decomposing screen.
+// The old flow synchronously spawned a cold-start `claude -p` here; the warm flow sets
+// an awaiting-decomposition state and returns immediate feedback. The session model
+// (per menu.md) dispatches vision-decomposer to write topics; the next render drives them.
+test('submit does NOT spawn a process and shows the "Breaking … into topics" screen', () => {
+  const cp = require('child_process');
+  const originalSpawnSync = cp.spawnSync;
+  let spawnCalls = 0;
+  cp.spawnSync = (...args) => { spawnCalls++; return originalSpawnSync(...args); };
+  try {
+    withTempProject((root) => {
+      const app = { projectPath: root };
+      render.initBuildFlow(app);
+      for (const ch of 'a note taking app') render.handleKey({ sequence: ch }, app);
+      const consumed = render.handleKey({ name: 'return' }, app);
+      assert.equal(consumed, true, 'Enter is consumed');
+      assert.equal(spawnCalls, 0, 'submit must NOT spawn any child process (no cold-start Claude)');
+      assert.ok(app.awaitingDecomposition, 'the awaiting-decomposition state is set');
+      assert.equal(app.ideaMode, true, 'still in idea mode until topics land');
+      assert.ok(!app.buildFlow, 'no flow yet — topics have not been written');
+      // No topics.json was written by submit itself — the vision-decomposer writes it.
+      assert.ok(!nodeFs.existsSync(path.join(root, '.ctoc', 'streaming', 'topics.json')),
+        'submit writes nothing — decomposition is dispatched, not run inline');
+      const out = plain(render.render(app));
+      assert.ok(out.toLowerCase().includes('breaking'), 'the decomposing screen says "Breaking"');
+      assert.ok(out.includes('a note taking app'), 'the submitted idea is echoed on the decomposing screen');
+      assert.ok(out.toLowerCase().includes('into topics'), 'the "into topics" acknowledgment is shown');
+    });
+  } finally {
+    cp.spawnSync = originalSpawnSync;
+  }
+});
+
+// X8 case 2 — once the dispatched vision-decomposer has written topics, the next render
+// loads and drives them (the awaiting-decomposition state resolves into the real flow).
+test('once topics exist after an idea submit, the next render drives them', () => {
   withTempProject((root) => {
     const app = { projectPath: root };
     render.initBuildFlow(app);
     for (const ch of 'a blog') render.handleKey({ sequence: ch }, app);
-    // Stub decompose: write a REAL topics.json (what decomposeIdea does) and return ok.
-    app.decompose = (idea, projectRoot) => {
-      assert.equal(idea, 'a blog', 'the typed idea is passed to decompose');
-      assert.equal(projectRoot, root, 'the project path is passed to decompose');
-      writeRealTopics(projectRoot, JSON.stringify([
-        {
-          id: 'db', label: 'Database', critical: true,
-          questions: [{ id: 'engine', prompt: 'Which engine?', options: [{ key: '1', label: 'Postgres', recommended: true }] }],
-        },
-      ]));
-      return { ok: true, topics: [] };
-    };
-    const consumed = render.handleKey({ name: 'return' }, app);
-    assert.equal(consumed, true);
+    render.handleKey({ name: 'return' }, app); // submit → awaiting decomposition
+    assert.ok(app.awaitingDecomposition, 'awaiting after submit');
+
+    // The vision-decomposer writes topics.json (simulated here via the real writer).
+    require('../src/lib/streaming-topics').writeTopics(root, [
+      {
+        id: 'db', label: 'Database', critical: true,
+        questions: [{ id: 'engine', prompt: 'Which engine?', options: [{ key: '1', label: 'Postgres', recommended: true }] }],
+      },
+    ]);
+
+    const out = plain(render.render(app)); // re-render → loads + drives the real topics
     assert.equal(app.ideaMode, false, 'exited idea mode into the real flow');
-    assert.equal(flow.currentTopic(app.buildFlow).id, 'db', 'real topics drive after decompose');
-    assert.ok(app.message && app.message.length > 0, 'a non-silent status message was set');
+    assert.ok(!app.awaitingDecomposition, 'awaiting state cleared once topics landed');
+    assert.equal(flow.currentTopic(app.buildFlow).id, 'db', 'real topics drive after decomposition');
+    assert.ok(out.includes('Which engine?'), 'the real question renders');
   });
 });
 
-test('Enter with a no-cli decompose falls back to the demo with a non-silent message', () => {
-  const app = {};
-  render.initBuildFlow(app);
-  render.handleKey({ sequence: 'x' }, app); // a non-empty buffer
-  app.decompose = () => ({ ok: false, reason: 'no-cli' });
-  const consumed = render.handleKey({ name: 'return' }, app);
-  assert.equal(consumed, true);
-  assert.equal(app.ideaMode, false, 'fell back into the demo');
-  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth', 'the demo is loaded');
-  assert.ok(app.message && app.message.toLowerCase().includes('claude cli'), 'CLI-absent message shown');
-});
-
-test('Enter with an invalid-output decompose stays in idea mode with an error message', () => {
-  const app = {};
-  render.initBuildFlow(app);
-  render.handleKey({ sequence: 'x' }, app);
-  app.decompose = () => ({ ok: false, reason: 'invalid-output', errors: ['bad'] });
-  const consumed = render.handleKey({ name: 'return' }, app);
-  assert.equal(consumed, true);
-  assert.equal(app.ideaMode, true, 'stays in idea mode so the human can retry');
-  assert.ok(!app.buildFlow, 'no flow driven on a failed decompose');
-  assert.ok(app.message && app.message.length > 0, 'a non-silent error message was set');
-});
-
-test('Enter with a blank idea buffer prompts to type first and stays in idea mode', () => {
-  const app = {};
-  render.initBuildFlow(app);
-  app.decompose = () => ({ ok: false, reason: 'empty-idea' });
-  const consumed = render.handleKey({ name: 'return' }, app);
-  assert.equal(consumed, true);
-  assert.equal(app.ideaMode, true);
-  assert.ok(app.message && app.message.length > 0);
+test('a blank idea submit prompts to type first and stays in idea mode (empty-idea preserved)', () => {
+  withTempProject((root) => {
+    const app = { projectPath: root };
+    render.initBuildFlow(app); // idea mode, empty buffer
+    const consumed = render.handleKey({ name: 'return' }, app);
+    assert.equal(consumed, true);
+    assert.equal(app.ideaMode, true, 'stays in idea mode on a blank submit');
+    assert.ok(!app.awaitingDecomposition, 'a blank submit does NOT enter awaiting-decomposition');
+    assert.ok(app.message && app.message.length > 0, 'a non-silent prompt-to-type message');
+    assert.ok(!nodeFs.existsSync(path.join(root, '.ctoc', 'streaming', 'topics.json')), 'no file written');
+  });
 });
 
 test('with a valid topics.json present, idea mode is NOT entered (real topics drive)', () => {
@@ -765,30 +778,16 @@ test('the echoed idea buffer is control-char stripped in the render', () => {
   assert.ok(!out.includes('\x07'), 'bell stripped from the echoed idea');
 });
 
-test('Enter with NO injected decompose uses the real entry — a blank idea short-circuits (no CLI)', () => {
-  // Exercises the DEFAULT decompose path (module require → decomposeIdea) without a real
-  // CLI: a blank idea returns empty-idea before any spawn. Proves the wiring, CLI-free.
-  withTempProject((root) => {
-    const app = { projectPath: root };
-    render.initBuildFlow(app); // idea mode, empty buffer, no app.decompose
-    const consumed = render.handleKey({ name: 'return' }, app);
-    assert.equal(consumed, true);
-    assert.equal(app.ideaMode, true, 'stays in idea mode on a blank submit');
-    assert.ok(app.message && app.message.length > 0, 'a non-silent prompt-to-type message');
-    assert.ok(!nodeFs.existsSync(path.join(root, '.ctoc', 'streaming', 'topics.json')), 'no file written');
-  });
-});
-
-test('Enter with a decompose that returns ok but writes NO file falls back to the demo', () => {
+test('the demo fallback is preserved — b on an empty idea buffer still loads the demo', () => {
+  // The graceful escape hatch survives the warm-path rework: from the idea prompt, `b`
+  // on an empty buffer loads the canned demo so the screen is never empty.
   const app = {};
   render.initBuildFlow(app);
-  render.handleKey({ sequence: 'x' }, app);
-  app.decompose = () => ({ ok: true, topics: [] }); // claims success but no topics.json exists
-  const consumed = render.handleKey({ name: 'return' }, app);
+  const consumed = render.handleKey({ sequence: 'b' }, app);
   assert.equal(consumed, true);
-  assert.equal(app.ideaMode, false, 'never leaves the screen empty — the demo is shown');
-  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth', 'demo loaded');
-  assert.ok(app.message && app.message.toLowerCase().includes('demo'), 'a non-silent reload-failed message');
+  assert.equal(app.ideaMode, false, 'left idea mode into the demo');
+  assert.equal(flow.currentTopic(app.buildFlow).id, 'auth', 'the demo is loaded');
+  assert.ok(app.message && app.message.length > 0, 'a non-silent status message was set');
 });
 
 test('a non-typing key (e.g. left arrow) in idea mode is an unconsumed no-op', () => {
@@ -797,4 +796,75 @@ test('a non-typing key (e.g. left arrow) in idea mode is an unconsumed no-op', (
   const consumed = render.handleKey({ name: 'left' }, app);
   assert.equal(consumed, false, 'a navigation key is not swallowed by the idea buffer');
   assert.equal(app.ideaBuffer, '', 'buffer unchanged');
+});
+
+// ===========================================================================
+// X8 — the warm-decompose instruction surface + reachability + no-spawn guards.
+// The last `claude -p` (streaming-decompose's cold-start spawn) is deleted; decompose
+// is now a model-dispatched vision-decomposer that writes topics via
+// streaming-topics.writeTopics. These pin the instruction-surface anchors (which also
+// keep writeTopics a LIVE export), the zero-spawn invariant across src/, and the fences.
+// ===========================================================================
+
+const REPO_ROOT = path.join(__dirname, '..');
+const reachability = require('../src/lib/reachability');
+
+// X8 case 5 — the agent that owns decomposition names the store writer with CALL syntax.
+// This is the real write path AND the instruction-surface anchor (a surface CALL,
+// `writeTopics(`, is the export-fence's live-caller signal) that keeps writeTopics live.
+test('X8 case 5 — vision-decomposer.md names streaming-topics + calls writeTopics(', () => {
+  const md = nodeFs.readFileSync(path.join(REPO_ROOT, 'agents', 'planning', 'vision-decomposer.md'), 'utf8');
+  assert.match(md, /streaming-topics/, 'the store module is named');
+  assert.match(md, /writeTopics\s*\(/, 'writeTopics is named as a CALL (the export-fence live signal)');
+});
+
+// X8 case 6 — the menu command instructs the model to dispatch vision-decomposer on an
+// idea submit (this is what makes the model decompose, warm, instead of a cold CLI).
+test('X8 case 6 — menu.md instructs dispatch of vision-decomposer on an idea submit', () => {
+  const md = nodeFs.readFileSync(path.join(REPO_ROOT, 'src', 'commands', 'menu.md'), 'utf8');
+  assert.match(md, /vision-decomposer/, 'vision-decomposer is named as the dispatch target');
+  assert.match(md, /writeTopics/, 'the write path (streaming-topics.writeTopics) is named');
+  // The instruction ties the dispatch to a free-text idea submit in the build flow.
+  assert.match(md, /idea/i, 'the trigger is an idea submit');
+});
+
+// X8 case 7 — streaming-decompose.js is gone and NO claude -p / model spawn remains
+// anywhere in src/ (comments allowed nowhere for a spawn; we walk real files with node).
+test('X8 case 7 — streaming-decompose deleted; no claude -p / model spawn anywhere in src/', () => {
+  assert.ok(
+    !nodeFs.existsSync(path.join(REPO_ROOT, 'src', 'lib', 'streaming-decompose.js')),
+    'streaming-decompose.js is deleted',
+  );
+  const walk = (dir, acc = []) => {
+    for (const e of nodeFs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) walk(f, acc);
+      else if (f.endsWith('.js')) acc.push(f);
+    }
+    return acc;
+  };
+  const offenders = [];
+  for (const f of walk(path.join(REPO_ROOT, 'src'))) {
+    const text = nodeFs.readFileSync(f, 'utf8');
+    // A cold-start second Claude: the `claude -p` CLI form (whitespace-separated so the
+    // `.claude-plugin` path literal — `claude` immediately followed by `-plugin` — is
+    // NOT a false match), or a spawn of the `claude` binary by name.
+    if (/claude\s+-p\b/.test(text)) offenders.push(path.relative(REPO_ROOT, f) + ' (claude -p)');
+    if (/spawn(Sync)?\s*\(\s*[`'"]claude/.test(text)) offenders.push(path.relative(REPO_ROOT, f) + ' (spawn claude)');
+  }
+  assert.deepEqual(offenders, [], `no src/ file may spawn a second Claude. Offenders: ${offenders.join(', ')}`);
+});
+
+// X8 case 8 — the dead-code fences stay green: 0 unreachable FILES, and writeTopics is a
+// LIVE export kept alive by the vision-decomposer.md CALL (no token JS caller added),
+// with streaming-topics itself still reachable.
+test('X8 case 8 — reachability at zero; writeTopics live; streaming-topics reachable', () => {
+  const { unreachable, reachable } = reachability.analyze(REPO_ROOT);
+  assert.deepEqual(unreachable, [], 'every src file is reachable from a live root after the deletion');
+  assert.ok(reachable.includes('src/lib/streaming-topics.js'), 'streaming-topics stays reachable');
+  assert.ok(!reachable.includes('src/lib/streaming-decompose.js'), 'streaming-decompose is gone from the graph');
+
+  const { dead } = reachability.analyzeExports(REPO_ROOT);
+  const deadWrite = dead.filter((k) => k.endsWith('#writeTopics'));
+  assert.deepEqual(deadWrite, [], 'writeTopics must be LIVE (kept so by the vision-decomposer.md CALL, not a JS caller)');
 });

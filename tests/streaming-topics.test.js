@@ -385,3 +385,58 @@ test('loadTopics returns null for an invalid projectRoot argument (no throw)', (
     assert.equal(topics, null);
   }
 });
+
+// ---------------------------------------------------------------------------
+// writeTopics — the atomic, validated WRITER (X8: moved here from the deleted
+// streaming-decompose so the canonical topics module owns BOTH read and write;
+// vision-decomposer writes through it).
+// ---------------------------------------------------------------------------
+
+// X8 case 3 — round-trip: writeTopics writes validated topics that loadTopics reads.
+test('writeTopics writes validated topics that loadTopics reads back (round-trip)', () => {
+  withTempRoot((root) => {
+    const res = topicsLib.writeTopics(root, goodTopics());
+    assert.equal(res.ok, true, 'a valid write reports ok');
+    // The on-disk shape is the bare array (what loadTopics reads), not { topics }.
+    const back = topicsLib.loadTopics(root);
+    assert.ok(Array.isArray(back), 'loadTopics reads the written file');
+    assert.equal(back.length, 2);
+    assert.equal(back[0].id, 'stack');
+    assert.equal(back[1].id, 'auth');
+  });
+});
+
+test('writeTopics writes ATOMICALLY (final file is complete JSON, no temp residue)', () => {
+  withTempRoot((root) => {
+    topicsLib.writeTopics(root, minimalTopics());
+    const dir = path.join(root, '.ctoc', 'streaming');
+    const entries = fs.readdirSync(dir);
+    assert.deepEqual(entries, ['topics.json'], 'only the target file remains — the temp was renamed away');
+    const parsed = JSON.parse(fs.readFileSync(path.join(dir, 'topics.json'), 'utf8'));
+    assert.equal(parsed[0].id, 't1');
+  });
+});
+
+// X8 case 4 — the no-garbage guard: invalid topics are rejected and NOTHING is written.
+test('writeTopics rejects invalid topics and writes nothing', () => {
+  withTempRoot((root) => {
+    for (const bad of [null, undefined, 'nope', 42, [{ id: 'x', label: 'X' }] /* no questions */]) {
+      const res = topicsLib.writeTopics(root, bad);
+      assert.equal(res.ok, false, `${JSON.stringify(bad)} must be rejected`);
+      assert.ok(Array.isArray(res.errors) && res.errors.length > 0, 'errors are reported');
+    }
+    assert.ok(
+      !fs.existsSync(path.join(root, '.ctoc', 'streaming', 'topics.json')),
+      'a rejected write leaves no file behind',
+    );
+  });
+});
+
+test('writeTopics rejects an invalid projectRoot without throwing', () => {
+  for (const bad of [null, undefined, '', 42]) {
+    let res;
+    assert.doesNotThrow(() => { res = topicsLib.writeTopics(bad, minimalTopics()); });
+    assert.equal(res.ok, false);
+    assert.ok(res.errors.length > 0);
+  }
+});

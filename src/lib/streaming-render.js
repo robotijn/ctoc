@@ -199,8 +199,8 @@ function ensureFlow(app) {
 
 /**
  * Load the canned DEMO topics and leave idea mode. This is the graceful fallback the
- * `b` key and the CLI-absent decompose path use so the screen always shows something
- * drivable, even when no real decomposition exists yet.
+ * `b` key uses so the screen always shows something drivable, even when no real
+ * decomposition exists yet.
  * @param {object} app
  * @returns {object} the demo flow state
  */
@@ -208,21 +208,9 @@ function loadDemo(app) {
   app.buildFlow = streamingFlow.initFlow(exampleTopics());
   app.ideaMode = false;
   app.ideaBuffer = '';
+  app.awaitingDecomposition = false;
+  app.pendingIdea = '';
   return app.buildFlow;
-}
-
-/**
- * Default idea decomposer: the real `./streaming-decompose` entry (which spawns the
- * Claude CLI). Isolated + lazily required so a host/test can inject `app.decompose`
- * without the real CLI, and so the require edge keeps `streaming-decompose` REACHABLE
- * from this menu-reachable module (the dead-code fence).
- * @param {string} idea
- * @param {string} projectRoot
- * @returns {{ ok: boolean, topics?: Array<object>, reason?: string, errors?: string[], message?: string }}
- */
-function defaultDecompose(idea, projectRoot) {
-  const { decomposeIdea } = require('./streaming-decompose');
-  return decomposeIdea(idea, projectRoot);
 }
 
 /**
@@ -243,44 +231,47 @@ function renderIdea(app) {
 }
 
 /**
- * Submit the typed idea to the decomposer and route the discriminated result:
- *   ok:true          → reload real topics from disk, exit idea mode, drive them;
- *   reason:'no-cli'  → fall back to the demo with a non-silent CLI-absent message;
- *   reason:'empty-idea' → a non-silent "type your idea first" prompt (stay in idea mode);
- *   any other reason → a non-silent error message (stay in idea mode so the human retries).
+ * Render the AWAITING-DECOMPOSITION screen: immediate acknowledgment that the idea was
+ * received while the model-dispatched `vision-decomposer` decomposes it into topics.
+ * This is the warm path's instant feedback — NO cold-start process, no frozen terminal.
+ * All model-supplied text (the echoed idea) is control-char sanitized.
+ * @param {object} app
+ * @returns {string}
+ */
+function renderDecomposing(app) {
+  const idea = stripCtl(app.pendingIdea || app.ideaBuffer || '');
+  let out = '\n';
+  out += `${c.bold}Build${c.reset}\n\n`;
+  out += `  ${c.cyan}Breaking${c.reset} "${idea}" ${c.cyan}into topics…${c.reset}\n\n`;
+  out += `  ${c.dim}Decomposing your idea — the topics appear here the moment they're ready.${c.reset}\n`;
+  out += '\n' + line() + '\n';
+  out += renderFooter(['decomposing…', 'b demo']);
+  return out;
+}
+
+/**
+ * Submit the typed idea. The WARM path (X8): this SPAWNS NOTHING. A blank idea is a
+ * non-silent "type your idea first" prompt that stays in the idea prompt. A non-empty
+ * idea enters the AWAITING-DECOMPOSITION state and returns immediate feedback; the
+ * session model — per `src/commands/menu.md` — then dispatches the `vision-decomposer`
+ * agent, which decomposes the idea and writes topics via `streaming-topics.writeTopics`.
+ * The next `render` loads those topics and drives them (see `render`). No cold-start
+ * second Claude, no frozen terminal.
  * @param {object} app
  * @returns {boolean} always true (the key was consumed → the host re-renders)
  */
 function submitIdea(app) {
-  const idea = app.ideaBuffer || '';
-  const decompose = (typeof app.decompose === 'function') ? app.decompose : defaultDecompose;
-  const result = decompose(idea, app.projectPath) || { ok: false, reason: 'error' };
-
-  if (result.ok) {
-    const real = streamingTopics.loadTopics(app.projectPath);
-    if (Array.isArray(real) && real.length > 0) {
-      app.buildFlow = streamingFlow.initFlow(real);
-      app.ideaMode = false;
-      app.ideaBuffer = '';
-      app.message = 'Decomposed your idea into topics';
-      return true;
-    }
-    // Wrote ok but could not reload → never leave the screen empty; show the demo.
-    loadDemo(app);
-    app.message = 'Decomposition saved but could not be reloaded — showing the demo';
-    return true;
-  }
-
-  if (result.reason === 'no-cli') {
-    loadDemo(app);
-    app.message = 'decomposition needs the Claude CLI — showing the demo';
-    return true;
-  }
-  if (result.reason === 'empty-idea') {
+  const idea = (app.ideaBuffer || '').trim();
+  if (idea.length === 0) {
+    // empty-idea prompt preserved: a non-silent nudge, staying in the idea prompt.
     app.message = 'Type your idea first, then press Enter to decompose';
     return true;
   }
-  app.message = `Could not decompose the idea (${result.reason || 'error'}) — try again, or press b for the demo`;
+  // Warm, non-blocking: record the awaiting state + immediate acknowledgment. The model
+  // dispatches vision-decomposer (per menu.md); the next render drives the written topics.
+  app.awaitingDecomposition = true;
+  app.pendingIdea = idea;
+  app.message = `Breaking "${idea}" into topics…`;
   return true;
 }
 
@@ -297,6 +288,19 @@ function handleIdeaKey(key, app) {
   const name = key ? key.name : undefined;
   const seq = key ? key.sequence : undefined;
   if (!name && !seq) return false;
+
+  // AWAITING-DECOMPOSITION screen: the idea is already submitted and the model is
+  // decomposing it. The only advertised (and only working) key is `b` — the demo
+  // escape hatch, so a human who does not want to wait can drop into the demo. Every
+  // other key is an unadvertised no-op (the idea is captured; typing does nothing here).
+  if (app.awaitingDecomposition) {
+    if (seq === 'b') {
+      loadDemo(app);
+      app.message = 'Loaded the demo topics';
+      return true;
+    }
+    return false;
+  }
 
   // Enter → submit the idea for decomposition.
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
@@ -361,7 +365,27 @@ function render(app) {
   // Decide idea-prompt vs. real/demo flow ONCE, then render the idea prompt when the
   // empty state is active (no real topics on disk yet).
   ensureInit(app);
-  if (app.ideaMode) return renderIdea(app);
+  if (app.ideaMode) {
+    if (app.awaitingDecomposition) {
+      // The idea was submitted; the model dispatches vision-decomposer to write topics.
+      // On each render, try to load them — drive them the instant they land, otherwise
+      // keep showing the immediate "Breaking … into topics…" acknowledgment.
+      const real = streamingTopics.loadTopics(app.projectPath);
+      if (Array.isArray(real) && real.length > 0) {
+        app.buildFlow = streamingFlow.initFlow(real);
+        app.ideaMode = false;
+        app.ideaBuffer = '';
+        app.awaitingDecomposition = false;
+        app.pendingIdea = '';
+        app.message = 'Decomposed your idea into topics';
+        // fall through to render the real flow below
+      } else {
+        return renderDecomposing(app);
+      }
+    } else {
+      return renderIdea(app);
+    }
+  }
 
   const state = ensureFlow(app);
 
