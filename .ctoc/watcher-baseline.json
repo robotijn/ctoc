@@ -1,11 +1,13 @@
 {
-  "comment": "THE WATCHER FENCE baseline. Every agent file is in EXACTLY ONE of conforming/legacy. `conforming` matches .ctoc/templates/watcher.md exactly. `legacy` predates the template (plan F2, 2026-07-17) and is the debt plan W1 pays down one agent at a time. THIS IS A RATCHET: legacy may only ever SHRINK and maxLegacy may only ever be LOWERED. NEVER add a name to legacy and NEVER raise maxLegacy to make a build pass — rewrite the agent to the template and move it to conforming. A NEW agent file must be born conforming: a file in neither list is red, and legacy cannot grow to admit it. HONEST NOTE: conforming is EMPTY today, so the `every conforming agent matches the template` case is VACUOUSLY GREEN. That is deliberate — seeding it with near-misses would make the fence lie on day one — and w1_started is the guard that stops it sitting green-and-vacuous forever. A green run today means the ratchet is armed, NOT that any agent conforms.",
+  "comment": "THE WATCHER FENCE baseline. Every agent file is in EXACTLY ONE of conforming/legacy. `conforming` matches .ctoc/templates/watcher.md exactly. `legacy` predates the template (plan F2, 2026-07-17) and is the debt plan W1 pays down one agent at a time. THIS IS A RATCHET: legacy may only ever SHRINK and maxLegacy may only ever be LOWERED. NEVER add a name to legacy and NEVER raise maxLegacy to make a build pass — rewrite the agent to the template and move it to conforming. A NEW agent file must be born conforming: a file in neither list is red, and legacy cannot grow to admit it. STATUS 2026-07-18: W1 HAS BEGUN. agents/iron-loop/advocate-critic.md is the FIRST conforming agent — its 288-line body was split into a one-page lens statement plus the preloaded skill skills/iron-loop/advocate-lens/SKILL.md, which carries the evidence whitelist, the degraded-input table, the severity/confidence/variance scales, the exhibit-marker neutralisation, the path-binding rules, the output contract and the escalation table. Nothing was deleted; it moved. The `every conforming agent matches the template` case is therefore NO LONGER VACUOUS: it now reads a real file. Note advocate-critic declares tier: 1 where the template shows tier: 2 — it is a gate-critique lens reporting to cto-chief alongside its three sibling lenses. The shape fence does not assert on tier, so this is an OPEN ARCHITECTURE QUESTION for the owner, deliberately not resolved by a silent edit.",
   "establishedAt": "2026-07-17",
   "establishedAtVersion": "6.12.78",
   "template": ".ctoc/templates/watcher.md",
-  "w1_started": false,
+  "w1_started": true,
   "maxLegacy": 123,
-  "conforming": [],
+  "conforming": [
+    "agents/iron-loop/advocate-critic.md"
+  ],
   "legacy": [
     "agents/ai-quality/ai-code-quality-reviewer.md",
     "agents/ai-quality/hallucination-detector.md",

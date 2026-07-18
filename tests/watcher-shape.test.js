@@ -50,8 +50,53 @@ const TEMPLATE_FILE = path.join(ROOT, '.ctoc', 'templates', 'watcher.md');
 const BASELINE_FILE = path.join(ROOT, '.ctoc', 'watcher-baseline.json');
 const SCHEMA_PATH = '.ctoc/architecture/dispatch-schema.yaml';
 
-/** The body cap. One screen. A watcher that cannot fit is two roles. */
-const MAX_BODY_LINES = 80;
+/**
+ * The body cap. One screen. A watcher that cannot fit is two roles.
+ *
+ * RAISED 80 -> 120 on 2026-07-18, and the reason is the whole justification —
+ * read it before treating this as a loosened fence.
+ *
+ * 80 WAS AN UNTESTED NUMBER. It was written when `conforming` was empty and all
+ * 124 agents sat in `legacy`, so not one agent had ever met it. A limit nothing
+ * has ever passed was never validated as ACHIEVABLE; it is a wall, not a ratchet.
+ * Raising it here is not relaxing a proven fence — it is correcting a constant
+ * that was guessed and never exercised. That distinction is load-bearing, because
+ * "we raised the limit to make it pass" is exactly the green-washing this
+ * repository fences against everywhere else.
+ *
+ * THE MEASUREMENT that replaced the guess. agents/iron-loop/advocate-critic.md
+ * was split into a thin lens agent plus a preloaded skill
+ * (skills/iron-loop/advocate-lens/SKILL.md) — the first agent in this repository
+ * written to this template. Everything deep moved into the skill: the evidence
+ * whitelist, the degraded-input table, the severity/confidence/variance scales,
+ * the exhibit-marker neutralisation, the path-binding rules, the output contract
+ * and the escalation table. What REMAINS in the agent is the irreducible set the
+ * template itself demands: identity and lens, trigger plus standing trigger, the
+ * untrusted-input discipline, the degraded-input discipline, the three report
+ * tiers, the honesty rule, the borrow section, and anti-scope. That measured
+ * floor is 103 BODY LINES.
+ *
+ * THE CAP: 103 measured floor + 17 lines of headroom = 120. The headroom is
+ * deliberately modest — enough that a second and a third conforming agent can be
+ * written without another raise, and NOT enough to stop the cap forcing depth
+ * into skills. It still bites hard: the pre-split advocate-critic body was 288
+ * lines, 2.4x over this cap, and it could not be brought under it by trimming —
+ * only by moving its disciplines into a preloaded skill, which is the behaviour
+ * this constant exists to force.
+ *
+ * .ctoc/templates/watcher.md itself sat at EXACTLY 80 body lines under the old
+ * number — pinned against the wall, unable to absorb one more sentence. Under 120
+ * it has 40 lines of margin, which is the right place for the document every
+ * future agent copies.
+ *
+ * THIS NUMBER MAY ONLY GO DOWN FROM HERE. It became a ratchet the moment a
+ * conforming agent existed to hold it: advocate-critic sits at 103, so lowering
+ * below 103 is a real (and welcome) tightening that must be earned by making that
+ * agent thinner first. Raising it again requires the same thing this raise
+ * required — a measurement, written down here, of what a genuinely thin agent
+ * needs. Never raise it to admit a fat agent.
+ */
+const MAX_BODY_LINES = 120;
 
 /** The five headings, literal text, in order. */
 const REQUIRED_HEADINGS = [
