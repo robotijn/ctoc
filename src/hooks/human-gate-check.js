@@ -38,16 +38,43 @@
  * violation (including a Gate 3 violation). When any revert fails the sweep
  * records an INCOMPLETE outcome rather than a silent clean pass.
  *
- * Migration open-decision (flagged for the maintainer, not silently resolved):
- * plans approved before the ledger existed have no ledger entry, so on first run
- * the strict `todo`/`done` rule would flag them. This module does NOT auto-
- * backfill (the ledger is trusted-write-only) and does NOT grandfather the
- * forgeable in-plan marker (that would reopen C4). The recommended path is a
- * one-time TRUSTED maintainer-run backfill converting each legacy in-plan marker
- * into a ledger entry at adoption — run through the sanctioned, checked-in
- * `node src/scripts/ledger-backfill.js` (R3-A; the old "`node -e` at the wave
- * boundary" instruction is now DENIED by the Bash hook, because that one-liner
- * shape WAS the forgery) — a scheduling call for the maintainer.
+ * MIGRATION — RESOLVED (Z1). Plans approved before the ledger existed have no
+ * ledger entry, so the strict rule classifies EVERY one of them `no-ledger-entry`.
+ * Because this hook is registered under `PreToolUse` with matcher `"*"` and used to
+ * call `revertAll` unconditionally, a user's FIRST tool call after a plugin update
+ * would have moved and rewritten their entire plan archive — on every installed
+ * project at once, un-recallable, since CTOC ships from the marketplace. It no
+ * longer does. The sweep now REPORTS until the project is migrated:
+ *
+ *   | project state          | `no-ledger-entry`          | every other reason |
+ *   |------------------------|----------------------------|--------------------|
+ *   | unmigrated (no marker) | REPORT (file untouched)    | REVERT (unchanged) |
+ *   | migrated (marker)      | REVERT (unchanged)         | REVERT (unchanged) |
+ *
+ * Migration is a POSITIVE RECORDED FACT — a marker written ONLY by the sanctioned
+ * `node src/scripts/ledger-backfill.js --mark-migrated` into the agent-write-denied
+ * `.ctoc/approvals/` directory, so an agent can neither forge it (arming a bulk
+ * revert of a human's archive) nor delete it (disarming enforcement). A marker that
+ * is absent, unreadable, corrupt, or not strictly `migrated === true` means
+ * UNMIGRATED: fail SAFE toward reporting, never fail open. After migration the
+ * marker is what ARMS the revert — the project is known clean as of that moment, so
+ * a NEW `no-ledger-entry` is a forgery, not a legacy resident.
+ *
+ * THIS IS NOT A GATE WEAKENING, on three independent legs (see
+ * `src/lib/gate-migration.js` for the full argument, and the tests that PROVE it):
+ *   1. Exactly ONE reason is withheld, `no-ledger-entry`. Every other reason —
+ *      `hash-mismatch`, `wrong-edge`, `unknown-provenance`, `ledger-corrupt`,
+ *      `ledger-unkeyable`, `pipeline-not-allowed`, `pipeline-no-evidence`,
+ *      `sufficiency-not-allowed`, `sufficiency-no-evidence`, `unreadable` — means
+ *      provenance EXISTS and is WRONG (a live attack signature) and still reverts on
+ *      EVERY project, migrated or not. Enforcement is unchanged where provenance exists.
+ *   2. `no-ledger-entry` is precisely and only the "provenance was never recorded"
+ *      signature. Under that genuine ambiguity the fail-safe direction for a
+ *      destructive, irreversible, BULK action is to report, not to move the archive.
+ *   3. Detection is NEVER withheld: the violation is still computed, still printed,
+ *      still durably logged, and additionally surfaced in the human's menu inbox
+ *      (`inbox migration`) carrying the exact command that migrates the project.
+ * The action withheld is a MIGRATION action on an UNMIGRATED project, not a gate.
  *
  * PER-PLAN FAULT ISOLATION (R2-F). Historically a single legacy uppercase-slug
  * plan in `done/` made `ledger.verify` throw `Invalid slug`, which propagated out
@@ -92,6 +119,9 @@ const path = require('path');
 
 const safeFs = require('../lib/safe-fs');
 const durableLog = require('../lib/durable-log');
+// Z1: the migration guard. Requires only `path` + `safe-fs` — deliberately no
+// ledger, settings, or YAML parsing on the every-tool-call hook path.
+const gateMigration = require('../lib/gate-migration');
 
 const LOG_DIR = path.join(process.cwd(), '.ctoc', 'logs');
 // The gate-violations store is an append-only JSONL file managed through the
@@ -442,17 +472,33 @@ function main() {
       allViolations.push(...checkFolder(folder, projectPath));
     }
 
+    // Z1: withhold the DESTRUCTIVE bulk revert on a project whose approval
+    // provenance was never recorded. Detection above is untouched; only the
+    // `no-ledger-entry` revert is deferred until the project is migrated.
+    const migrated = gateMigration.isMigrated(projectPath);
+    const { revert: toRevert, withheld } =
+      gateMigration.partitionViolations(allViolations, migrated);
+
+    // The notice is a SNAPSHOT rewritten on every sweep (compare-then-write, so it
+    // writes zero bytes in the steady state), which means it self-clears the moment
+    // the project is migrated or the residents are ledgered.
+    const noticeChanged = gateMigration.writePendingNotice(projectPath, withheld);
+
     if (allViolations.length > 0) {
       console.error('\n⛔ HUMAN GATE VIOLATION DETECTED\n');
 
+      const withheldSet = new Set(withheld);
       for (const v of allViolations) {
         console.error(`  Plan: ${v.file}`);
         console.error(`  Location: ${v.folder}/`);
         console.error(`  Issue: No ledger-verified human approval (${v.reason || 'no-ledger-entry'})`);
+        console.error(withheldSet.has(v)
+          ? `  Disposition: REPORTED (project not migrated to the approval ledger — plan left untouched)`
+          : `  Disposition: reverting to ${v.revertTo}/`);
       }
 
       // Fault-isolated revert (C5): one throw never abandons the rest.
-      const { reverted, failures } = revertAll(allViolations);
+      const { reverted, failures } = revertAll(toRevert);
 
       for (const r of reverted) {
         const v = r.violation;
@@ -485,6 +531,31 @@ function main() {
           console.error(`  ⚠️ REVERT FAILED for ${v.file}: ${f.error} — violation UNRESOLVED`);
         }
         console.error(`⚠️  Revert sweep INCOMPLETE: ${failures.length} violation(s) remain unresolved.\n`);
+      }
+
+      if (withheld.length > 0) {
+        console.error(
+          `\n⚠️  ${withheld.length} plan(s) REPORTED, NOT reverted: this project's approval\n` +
+          `    provenance was never recorded in the ledger, so CTOC will not move your plan\n` +
+          `    archive. Enforcement is fully active for every other violation kind.\n` +
+          `    Review them:  /ctoc:menu → inbox migration\n` +
+          `    Migrate:      ${gateMigration.MIGRATION_COMMAND}\n`);
+        // The hook fires on EVERY tool call and logViolation APPENDS, so the withheld
+        // set is recorded only when it actually CHANGED. That is the difference
+        // between one durable entry per real change and one per keystroke.
+        if (noticeChanged) {
+          for (const v of withheld) {
+            logViolation({
+              id: `v-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              plan: v.file,
+              violation: `Resident in ${v.folder}/ with no ledger entry`,
+              action: 'REPORTED (project not migrated to the approval ledger)',
+              status: 'migration_pending',
+              resolvedAt: null,
+            });
+          }
+        }
       }
 
       console.error('⚠️  Plans must be approved by human via menu to cross human gates\n');

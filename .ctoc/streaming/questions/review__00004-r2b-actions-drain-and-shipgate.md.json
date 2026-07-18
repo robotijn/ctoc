@@ -1,0 +1,219 @@
+{
+  "ref": "review/00004-r2b-actions-drain-and-shipgate.md",
+  "planMtimeMs": 1784271999079.6401,
+  "questions": [
+    {
+      "id": "q10-ship-gate-standing-flag",
+      "prompt": "The human decided on 2026-07-14 that deploy stays a human gate. This plan satisfies that with one standing per-project flag that permanently authorizes every future auto-deploy. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?",
+      "critical": true,
+      "important": false,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send back — make the ship gate a per-crossing stamp, not a standing setting",
+          "recommended": true,
+          "pros": "Confidence HIGH — grounded in a verbatim quote at plans/vision/ctoc-background-engine-rebuild.md:227, read and confirmed. The vision asks for a per-crossing stamp and this ships a permanent setting; a gate that one boolean disarms forever is a setting, not a gate. Reconciling it now keeps the human's own recorded ruling intact.",
+          "cons": "Costs one round, and the per-crossing stamp needs a design decision the plan does not currently contain.",
+          "description": "vision line 227 reads that push and deploy STAY as the two human gates, decided by the human on 2026-07-14; line 132 requires the auto-trigger be disabled unless ship-gate-stamped. src/lib/actions.js:517 ships a standing config value, not a per-crossing stamp."
+        },
+        {
+          "key": "2",
+          "label": "Approve 00004-r2b-actions-drain-and-shipgate across Gate 3 anyway",
+          "pros": "The flag defaults to absent and reads falsy, so nothing deploys until someone deliberately sets it once; src/lib/actions.js:524-528 confirms the unconfirmed path writes a notice and does not deploy.",
+          "cons": "A decision the human recorded is reversed without the human being asked, and once the flag is set every subsequent Gate 3 approval crosses into a live deploy with no human act at the deploy gate."
+        }
+      ]
+    },
+    {
+      "id": "q11-step-14-skipped-full-suite",
+      "prompt": "This plan's Step 14 VERIFY explicitly excluded the full suite and ran one test file, while the plan itself records two tests red on the working tree. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?",
+      "critical": true,
+      "important": false,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send back — run the full quality gate on this tree and attach the real output",
+          "recommended": true,
+          "pros": "Confidence HIGH — devils-advocate and red-team flagged this independently on different evidence and both rated it HIGH. Gate 3 is where this project defines done as the full suite plus the coverage floor plus zero skipped, and a green run over the one file the slice chose is not that gate.",
+          "cons": "Crossing waits on the two failing tests being resolved, or on the R2-A slice landing first. The plan's attribution of those failures to R2-A rests on an experiment with no recorded output, so it cannot be checked without re-running it.",
+          "description": "Plan line 87 confirms Step 14 reads one test file plus lint, no full suite; lines 145-150 record two tests red. Correcting both lenses on mechanism: src/lib/actions.js:948-963 and src/lib/step-13-verify.js:609,614 confirm the Gate 3 evidence artifact is machine-produced by a full run, not by the plan's Step 14 prose — so the narrow step does not itself bypass the gate. What survives is that the plan records two red tests, which that machine run would report."
+        },
+        {
+          "key": "2",
+          "label": "Accept the one-file verification and cross now",
+          "pros": "The slice's own behaviour is covered by its own test file, and the evidence artifact Gate 3 reads is produced automatically rather than by the plan's own step list.",
+          "cons": "A plan reaches done having never run the gate that defines done here, and the reason the two red tests are not this slice's problem cannot be checked by anyone but the author."
+        }
+      ]
+    },
+    {
+      "id": "q12-ship-gate-test-proves-nothing",
+      "prompt": "The test named for the confirmed-ship-gate path asserts only that a notice file is absent, with the deploy pipeline configured to do nothing. An empty implementation of that branch passes it green. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?",
+      "critical": true,
+      "important": false,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send back — drive the confirmed path and assert the artifact it produces",
+          "recommended": true,
+          "pros": "Confidence HIGH — grounded in a verbatim quote at tests/actions-scheduler.test.js:562, read and confirmed. The sibling test for the unconfirmed path already asserts positively that the pipeline did not run, so the same assertion shape proves the enabling direction too — symmetric evidence on both sides of a gate that authorizes an irreversible deploy.",
+          "cons": "The test must configure an environment it currently avoids, and the pipeline call is asynchronous with its rejection swallowed at src/lib/actions.js:521, so the test must await or poll for the artifact.",
+          "description": "tests/actions-scheduler.test.js:563 configures the deployment with no environments so the pipeline no-ops, and line 570 asserts only that the notice file does not exist. The sibling test at line 559 does assert positively that no deployment artifact was written. Raised above the lens's own tier because it is a false-green test standing in for the one branch that authorizes a deploy."
+        },
+        {
+          "key": "2",
+          "label": "Rename the test to state what it actually checks and cross",
+          "pros": "Cheap, and it removes the false claim from the test name without new machinery.",
+          "cons": "The confirmed branch of the ship gate stays undriven by any test, so a future edit that empties it ships green with nothing to catch it."
+        }
+      ]
+    },
+    {
+      "id": "q94-lens-findings-contradict",
+      "prompt": "The premortem and devils-advocate critiques assert facts about this plan that cannot both be true: one reports the parent program document absent from every stage, the other quotes it verbatim. Rule on which the gate should act on.",
+      "critical": true,
+      "important": false,
+      "options": [
+        {
+          "key": "1",
+          "label": "Act on the position verified by reading the source",
+          "recommended": true,
+          "pros": "No confidence level applies — two lenses contradict, so their agreement is not available as evidence. plans/vision/ctoc-background-engine-rebuild.md:227 was opened directly: the document exists and reads that push and deploy stay as the two human gates, decided by the human on 2026-07-14. The premortem's missing-parent finding was dropped; its method explains the error, because a search of file contents cannot find a file by its name. A second contradiction resolved the same way: red-team reported the menu recipe does not yet pass the force flag, devils-advocate reported it already does — src/commands/menu.md:62 confirms it already calls the start with force set, so red-team's critical dead-end finding was dropped too.",
+          "cons": "Two of the three lenses reported a file or line as absent that was found present, so this payload's search-based negative claims are the weakest class of evidence in it, and every remaining one was treated as unproven until opened directly.",
+          "description": "Escalated to CTO Chief: lens findings contradict; adjudication needed."
+        },
+        {
+          "key": "2",
+          "label": "Act on the other lens's position instead",
+          "pros": "The premortem claims a search across the plans directory returned twenty-six child slices and no parent, and a filename search returned nothing — which, if correct, would mean the defect list this slice claims to fix is unverifiable at every gate in this program.",
+          "cons": "The path was opened and the document is there and readable, with line 227 quoted above. The claim did not survive the check, so acting on it would send the plan back to restore a file that was never missing."
+        }
+      ]
+    },
+    {
+      "id": "q13-task-result-asserts-ok-true",
+      "prompt": "The task record is stamped with a success result before the quality gate runs, and again when a plan completes during a cancellation — the plan's own text forbids the second. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?",
+      "critical": false,
+      "important": true,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send back — derive the settled task result from the verify outcome",
+          "recommended": true,
+          "pros": "Confidence HIGH — grounded in a verbatim quote at src/lib/actions.js:920-928, read and confirmed. The durable registry record is read by the dashboard, the wave barrier and every later reader, so it stops asserting an outcome it cannot yet know. This is the honesty the slice is chartered to deliver, applied to its own record.",
+          "cons": "One reordering inside the completion path plus a test pinning a failed-verify completion to a non-success result. Two premortem findings were merged here because both trace to the same mechanism, the result value being supplied rather than derived.",
+          "description": "src/lib/actions.js writes the success result at lines 920-924, the verify run happens 33 lines later at line 957, and the failed-verify handler at lines 968-974 logs and records a kickback without ever touching the task record. Lines 925-928 stamp a cancelling task with a success result too, against the plan's own requirement at its lines 26-27. The lens's further claim about how the task renderer buckets a cancelled task was not verified."
+        },
+        {
+          "key": "2",
+          "label": "Approve 00004-r2b-actions-drain-and-shipgate across Gate 3 anyway",
+          "pros": "Gate 3 still fails closed on the plan itself, because the review validator reads the verify artifact rather than the task result, confirmed at src/lib/plan-validator.js:641-646.",
+          "cons": "The task pane and the wave report say the work succeeded while the plan sits in review with failing evidence, and no reader can tell a genuine cancellation from a plan that finished during one."
+        }
+      ]
+    },
+    {
+      "id": "q14-shared-actions-file-unverified",
+      "prompt": "Many plans still in review all change the same actions file, and this plan's acceptance criteria cover one test file with the full suite excluded — so the merged state of that file is verified by none of them. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?",
+      "critical": false,
+      "important": true,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send back — verify the shared-file review set as one batch in dependency order",
+          "recommended": true,
+          "pros": "Confidence HIGH — grounded in a verbatim quote at src/lib/actions.js:903, read and confirmed. The thing actually being shipped is the merged file, so that is the thing to verify, and cross-slice interference gets one place to surface instead of none.",
+          "cons": "Costs a round and couples several gate decisions, so one failing slice holds the others.",
+          "description": "src/lib/actions.js:903 carries a comment attributing that code to a different slice, R3-B item 2, sitting inside the block this plan's first change owns. Twelve plans in the review stage reference this file; the lens's count of eight that declare it in files: was not separately verified, so treat the number as approximate and the interleaving as confirmed."
+        },
+        {
+          "key": "2",
+          "label": "Cross this slice on its own narrow criteria",
+          "pros": "The gate crosses today for one slice that is itself well described and well scoped.",
+          "cons": "Interactions between the slices sharing this file are checked by nobody, and each later slice inherits a base no one has verified."
+        }
+      ]
+    },
+    {
+      "id": "q15-dependency-not-checked-at-gate",
+      "prompt": "This plan declares a dependency on the R2-A slice, which is still sitting in review, and Gate 3 performs no dependency check at all. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?",
+      "critical": false,
+      "important": true,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send back — cross the dependency first, or cross the siblings as one ordered batch",
+          "recommended": true,
+          "pros": "Confidence HIGH — grounded in a verbatim quote at src/lib/actions.js:1986, read and confirmed. The done record stops asserting a completed slice resting on an unaccepted one, and if the dependency is later kicked back that happens while this slice is still inside the loop and can be re-verified.",
+          "cons": "Gate 3 for this slice waits on its dependency's own gate, and the batch route means ruling on more slices in one decision.",
+          "description": "The plan declares its dependency at line 5 and treats it as load-bearing at lines 80-82; the dependency is still in the review stage; a search for the dependency field across src/lib/plan-validator.js returns nothing so the Gate 3 validator never reads it; and src/lib/actions.js:1986 states in its own contract comment that a dependency naming a sibling outside the batch is ignored for ordering."
+        },
+        {
+          "key": "2",
+          "label": "Approve this slice alone now",
+          "pros": "No wait, and the dependency's code is present on the working tree today.",
+          "cons": "Nothing in the pipeline records or enforces the ordering, so if the dependency is later kicked back the inconsistency is silent and this slice is already past the point where the loop can re-verify it."
+        }
+      ]
+    },
+    {
+      "id": "q16-plan-record-drifted",
+      "prompt": "The plan a reviewer reads no longer describes the code on disk: it states a concurrency mechanism that was not what shipped, and reports as untouched two menu changes the file already carries. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?",
+      "critical": false,
+      "important": true,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send back — bring the plan's decisions and reported-up sections up to the shipped code",
+          "recommended": true,
+          "pros": "Confidence HIGH — grounded in a verbatim quote at src/commands/menu.md:62, read and confirmed. The permanent record in done describes the code that exists, so the next person debugging this region does not start from a false description of how it handles concurrency.",
+          "cons": "Costs a documentation pass, and editing the plan file resets its modification time, which makes any verify evidence produced before that edit stale by the validator's freshness rule.",
+          "description": "The plan at line 98 states it performs its own single load, update and save cycle, while src/lib/actions.js:902 runs a transaction with an abort path at line 913, undocumented duplicate retirement at lines 933-941, and a warning log at line 914. The plan's reported-up section at lines 141-144 claims the menu file is untouched, while src/commands/menu.md:62 already calls the start with the force flag and line 345 already documents the new two-phase cancel return shape."
+        },
+        {
+          "key": "2",
+          "label": "Cross with the record as written",
+          "pros": "The gate crosses today, and the code itself is correct regardless of what the plan says about it.",
+          "cons": "The archived plan misstates the concurrency mechanism and claims as outstanding two changes that already shipped, so a future reader is misled in both directions."
+        }
+      ]
+    },
+    {
+      "id": "q98-critique-coverage",
+      "prompt": "Coverage of this critique, and what it could not check.",
+      "critical": false,
+      "important": false,
+      "options": [
+        {
+          "key": "1",
+          "label": "Noted",
+          "recommended": true,
+          "pros": "All three adversarial lenses ran and returned well-formed findings. The parent vision and this implementation plan were read, and every location behind each carried finding was opened and confirmed — in the actions module, the plan validator, the verify producer, the scheduler test file and the menu document.",
+          "cons": "Four lens findings were dropped because their evidence could not be reproduced: critical-tier, a menu dead end where a drain stop could not be cleared — refuted, the menu recipe already passes the force flag; important-tier, a missing parent program document — refuted, the parent vision exists and was read; important-tier, a deploy notice written where nothing reads it — refuted, the inbox screen reads it; important-tier, a cancel return contract broken for callers — refuted, no live caller uses the old shape. Beyond that: the verify evidence directory is outside the permitted read scope, so whether an artifact exists for this plan is unknown; the suite was not run, so the plan's two red tests and its unrecorded attribution experiment are unchecked; and no functional-stage document was located for this program."
+        }
+      ]
+    },
+    {
+      "id": "q99-gate-ruling",
+      "prompt": "Lens verdict: REJECT — three critical findings survived: the ship gate ships as a standing flag that permanently reverses the human's recorded 2026-07-14 decision, Step 14 excluded the full suite over two known-red tests, and the test guarding the deploy trigger proves only that the other branch was skipped. Four further important findings are unresolved. The next screen offers the actual crossing and will recommend Approve on the transition validation alone. Rule now.",
+      "critical": true,
+      "important": false,
+      "options": [
+        {
+          "key": "1",
+          "label": "Send 00004-r2b-actions-drain-and-shipgate back for rework",
+          "recommended": true,
+          "pros": "The reversal of your own recorded ship-gate decision is settled before it ships rather than after; the slice is verified by the gate this project defines as done rather than by a subset it chose; and the branch that authorizes an irreversible deploy gets a test that actually drives it. Every one of the three is grounded in a location opened and read directly.",
+          "cons": "The slice returns upstream and its gate waits on the two failing tests and on the R2-A slice it depends on. The code itself is largely sound — four of the thirteen incoming findings were refuted by direct reading, and the drain-stop dead end that looked worst does not exist.",
+          "description": "The strongest single reason is the ship gate: a decision you recorded on 2026-07-14 is implemented as a setting that, once switched on, crosses the deploy gate for you on every future approval."
+        },
+        {
+          "key": "2",
+          "label": "Approve 00004-r2b-actions-drain-and-shipgate across Gate 3",
+          "pros": "The deploy flag defaults absent and reads falsy, so nothing deploys today; the verify artifact the gate reads is machine-produced rather than self-reported; and this slice's own behaviour is covered by its own test file.",
+          "cons": "Three critical findings survived verification, including a standing flag that reverses a decision you recorded and a plan whose own text records two tests red. The verify evidence directory could not be read, so whether this plan has a passing verify artifact is unknown, and the tests were not run. This critique covers the adversarial lenses only; the transition validation is checked separately at the gate itself."
+        }
+      ]
+    }
+  ]
+}

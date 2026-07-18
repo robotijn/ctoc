@@ -419,3 +419,6 @@
 {"timestamp":"2026-07-13T20:53:25.260Z","plan":"ctoc-audit-w11-state-durability-and-deadcode.md","from":"review","to":"done","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true}
 {"timestamp":"2026-07-13T20:53:25.285Z","plan":"menu-critique-first.md","from":"review","to":"done","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true}
 {"timestamp":"2026-07-16T08:01:15.053Z","plan":"x.md","from":"review","to":"done","actor":"human","validation":null,"humanGate":true,"marker":true,"override":true}
+{"timestamp":"2026-07-18T11:11:00.192Z","plan":"00066-x9-gate-critic-writes-its-own-questions.md","from":"implementation","to":"todo","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true,"override":false}
+{"timestamp":"2026-07-18T11:11:00.225Z","plan":"00067-y1-ctoc-start-entry-point.md","from":"implementation","to":"todo","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true,"override":false}
+{"timestamp":"2026-07-18T11:12:18.214Z","plan":"00068-z1-gate-sweep-reports-before-it-reverts.md","from":"implementation","to":"todo","actor":"human","validation":{"passed":true,"checks":0,"warnings":0},"humanGate":true,"marker":true,"override":false}

@@ -299,13 +299,22 @@ they touch disjoint files, so they run concurrently — and on each scheduler `r
    lenses, criticals first, each option carrying a precomputed pro/con and exactly one
    recommended (the highest-quality path, never the easy one), the last question the
    gate ruling.
-4. **Validate and write** the synthesized JSON via
-   `streaming-precompute.writePlanQuestions(root, ref, questions)` — it validates the
-   contract (malformed → `{ok:false, errors}`, no file written) and atomically stamps
-   the plan's current mtime so the file reads fresh until the plan changes. The
-   dispatcher writes the file; the critics never do. No plan is moved, no gate crossed —
-   this is pure precompute. Every subagent return frees a slot: refill it immediately with
-   the next pending ref, so 5 stay in flight while work remains.
+4. **`gate-critic` persists its own questions.** It writes its synthesized object to
+   `.ctoc/streaming/questions/pending/<sanitized-ref>.json` itself — a QUARANTINE
+   directory no gate screen ever reads — so the payload never passes through the session
+   model's context and no human waits in the foreground for it to be hand-written. The
+   next menu render sweeps that directory
+   (`streaming-questions-sweeper.sweepPendingQuestions`, reached from
+   `streaming-gate.nextUnansweredQuestion`), validates each file through
+   `streaming-precompute.writePlanQuestions` — which checks the full contract (malformed
+   → `{ok:false, errors}`, no file written) — stamps the plan's CURRENT modification time
+   so the promoted file reads fresh until the plan changes, and deletes the pending file.
+   A malformed, superseded, or hostile payload is discarded and logged to
+   `.ctoc/logs/streaming-sweeper.jsonl`; nothing is written and the human sees the plain
+   Approve screen. The critic can propose questions; it can never author the file the
+   human reads. No plan is moved, no gate crossed — this is pure precompute. Every
+   subagent return frees a slot: refill it immediately with the next pending ref, so 5
+   stay in flight while work remains.
 
 Any failure falls back silently to the plain gate question — the human is never blocked
 or shown a crash. This is the async-overnight / precompute-never-wait principle applied

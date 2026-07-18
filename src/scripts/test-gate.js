@@ -31,6 +31,12 @@
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const safeFs = require('../lib/safe-fs');
+// This script prints a very large report and then its VERDICT. `process.exit` would
+// discard whatever is still buffered when stdout is a PIPE — which is exactly how
+// Step 14 VERIFY reads this gate — cutting the output at ~64KB and throwing away the
+// coverage table and the PASS/FAIL line. requestExit records the status and lets Node
+// drain first. See src/lib/request-exit.js and tests/request-exit.test.js.
+const { requestExit } = require('../lib/request-exit');
 
 const DEFAULT_THRESHOLD = 80;
 
@@ -229,7 +235,7 @@ function main() {
 
   if (files.length === 0) {
     process.stderr.write('[CTOC test-gate] no test files found under tests/ — refusing to report green on an empty run.\n');
-    process.exit(1);
+    return requestExit(1);
   }
 
   // Always run WITH coverage — the flag is hardcoded here so coverage can never
@@ -256,7 +262,7 @@ function main() {
 
   if (result.error) {
     process.stderr.write(`[CTOC test-gate] could not run the suite: ${result.error.message}\n`);
-    process.exit(1);
+    return requestExit(1);
   }
 
   const output = (result.stdout || '') + (result.stderr || '');
@@ -282,11 +288,11 @@ function main() {
     for (const reason of verdict.reasons) {
       process.stderr.write(`  - ${reason}\n`);
     }
-    process.exit(1);
+    return requestExit(1);
   }
 
   process.stdout.write('[CTOC test-gate] PASS\n');
-  process.exit(0);
+  return requestExit(0);
 }
 
 // stripAnsi is deliberately NOT exported: it has no caller outside this module (the

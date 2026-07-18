@@ -31,6 +31,23 @@
  * failures" are different facts and must never produce the same verdict. Node's
  * reporter format is not our contract and has already changed once (the `ℹ` spec
  * reporter, and colour) — the next change must be a LOUD failure, not a silent green.
+ *
+ * V1 — PARSE THE WHOLE OUTPUT, BOUND ONLY WHAT IS STORED. A fail-closed rule is only
+ * as honest as the input it judges. This module captured a run, truncated it to the
+ * first 4000 characters for storage, and then parsed THE TRUNCATED STRING for the
+ * coverage percentage, the fail count and the skipped count. Runners print their
+ * verdict LAST, so on every real run the verdict fell past the cut, coverage read as
+ * null, and VERIFY refused the plan as "unmeasured" — making Gate 3 un-passable for
+ * every plan in the project and leaving the override as the only exit. An override
+ * that is the only path is not a gate.
+ *
+ * The ordering is therefore load-bearing and is enforced by
+ * tests/verify-parses-full-output.test.js:
+ *   1. evalCategory returns the COMPLETE output,
+ *   2. applyTestQualityContracts parses it,
+ *   3. runFallbackChecks calls boundCheckOutputs LAST, keeping head + tail so the
+ *      persisted evidence still shows the verdict a human needs to read.
+ * Never truncate before step 2.
  */
 
 const { execSync, spawnSync } = require('child_process');
@@ -334,18 +351,73 @@ function evalCategory(label, candidates, projectPath, errors) {
     }
     return { ran: false, applicable: false, passed: null, command: null, reason: `${label} candidates were not runnable` };
   }
+  // V1 — THE OUTPUT IS RETURNED COMPLETE, DELIBERATELY. This used to be
+  // `(r.output || '').slice(0, 4000)`, and that truncated string was the ONLY input
+  // applyTestQualityContracts ever saw — so every instrument (parseFailCount,
+  // hasTestSummaryEvidence, parseSkippedCount, parseCoveragePct) read a PREFIX of the
+  // run. A test runner prints its verdict LAST: this repository's own gate ends with
+  // `[CTOC test-gate] coverage 99.05% ...` after hundreds of kilobytes of output, so
+  // on every real run the verdict fell past the cut, coverage parsed to null, and
+  // VERIFY failed closed with "no coverage figure was produced". Gate 3 became
+  // un-passable for EVERY plan, leaving "Approve anyway" as the only exit — the
+  // override-training failure the parent vision names as a founding defect.
+  //
+  // The fail-closed rule was never wrong; its INPUT was. Bounding now happens in
+  // runFallbackChecks AFTER the contracts have been applied (see boundOutput). Do not
+  // reintroduce a slice here: it silently blinds four parsers at once.
   const check = {
     ran: true,
     applicable: true,
     passed: r.success === true,
     command: r.command,
-    output: (r.output || '').slice(0, 4000),
+    output: r.output || '',
     error: r.error || null
   };
   if (!check.passed) {
     errors.push(`${label} failed: ${r.error || 'nonzero exit'}`);
   }
   return check;
+}
+
+// The stored-evidence budget, in characters. Every VERIFY result is persisted to
+// .ctoc/state/verify/<slug>.json, so a chatty runner must not grow that artifact
+// without limit. This is a STORAGE budget only — never a parsing budget (V1).
+const OUTPUT_BUDGET = 4000;
+
+/**
+ * Bound a captured output for STORAGE, keeping both ends.
+ *
+ * Head AND tail, not just head: the head shows how the run started (what a human
+ * needs when a suite dies early), and the TAIL carries the verdict line — the
+ * runner prints its summary last, and that summary is what decided the gate. An
+ * explicit marker names how many characters were dropped, so the artifact states
+ * that it is an excerpt rather than silently misrepresenting the run.
+ *
+ * MUST be called only AFTER every parser has read the complete output. Bounding
+ * before parsing is the exact defect V1 fixed.
+ *
+ * @param {string} text - The complete captured output.
+ * @returns {string} The output verbatim when within budget, else head + marker + tail.
+ */
+function boundOutput(text) {
+  const s = String(text == null ? '' : text);
+  if (s.length <= OUTPUT_BUDGET) return s;
+  const half = Math.floor(OUTPUT_BUDGET / 2);
+  const elided = s.length - OUTPUT_BUDGET;
+  return `${s.slice(0, half)}\n… [${elided} characters elided] …\n${s.slice(s.length - half)}`;
+}
+
+/**
+ * Bound the stored `output` of every check in place. Called at the END of
+ * runFallbackChecks, after applyTestQualityContracts has read the complete output.
+ *
+ * @param {Object} checks - The assembled checks map (mutated in place).
+ */
+function boundCheckOutputs(checks) {
+  for (const key of ['lint', 'types', 'tests']) {
+    const c = checks[key];
+    if (c && typeof c.output === 'string') c.output = boundOutput(c.output);
+  }
 }
 
 /** Read the project's coverage floor (minPct) from .ctoc/coverage-baseline.json. */
@@ -617,26 +689,65 @@ function runFallbackChecks(projectPath) {
   }
   checks.tests = testCheck;
 
+  // V1 — PARSE FIRST, BOUND SECOND. Every instrument above has now read the COMPLETE
+  // output; only here is the stored copy cut down to the persistence budget. Moving
+  // this call earlier — or reintroducing a slice at capture time — hands the parsers a
+  // prefix and silently re-breaks the coverage, fail and skipped readers at once.
+  boundCheckOutputs(checks);
+
   return { checks, errors };
 }
 
 /**
- * Try running a single command.
+ * Try running a single command, capturing its complete output.
  *
- * @param {string} command - Command to run
- * @param {string} cwd - Working directory
- * @returns {Object} Result with success, output, and error
+ * The command strings are FIXED candidates chosen upstream by
+ * `runFallbackChecks` (`npm test`, `ruff check .`, `go vet ./...`, …) — never user
+ * input — so the shell used by execSync is not an injection surface here.
+ *
+ * @param {string} command - Command to run.
+ * @param {string} cwd - Working directory.
+ * @param {Object} [options] - Capture options.
+ * @param {number} [options.maxBuffer=67108864] - Capture budget in bytes. Beyond it
+ *   the run is reported as UNCERTIFIED with an overflow reason — never as a test
+ *   failure, which it is not.
+ * @returns {Object} `{ success, output, error, spawnFailed }`.
  */
-function tryCommand(command, cwd) {
+function tryCommand(command, cwd, options = {}) {
+  // execSync defaults to a 1MB capture buffer and THROWS ENOBUFS beyond it. A real
+  // suite exceeds that easily — this repository's own emits well over 1MB — and the
+  // throw was reported as "Tests failed: spawnSync /bin/sh ENOBUFS": a PASSING suite
+  // recorded as a test failure, for a reason with nothing to do with the tests.
+  //
+  // It stayed hidden only because a second defect masked it: the gate script's
+  // `process.exit` truncated its own output at the ~64KB pipe buffer, so nothing ever
+  // reached 1MB. Fixing that unmasked this. 64MB matches the budget the gate script
+  // already uses for its own spawn — the same number, for the same reason.
+  const maxBuffer = typeof options.maxBuffer === 'number' ? options.maxBuffer : 64 * 1024 * 1024;
   try {
     const output = execSync(command, {
       cwd,
       encoding: 'utf8',
       timeout: 120000,
+      maxBuffer,
       stdio: ['pipe', 'pipe', 'pipe']
     });
     return { success: true, output: output.trim(), error: null, spawnFailed: false };
   } catch (e) {
+    // An OVERFLOW is not a failing suite, and must never be reported as one. The run
+    // is UNCERTIFIED — we could not read all of it — so it still fails closed, but
+    // with the TRUE reason, which is the only one an operator can act on (raise the
+    // budget, or quieten the runner). Saying "your tests failed" when they did not is
+    // the same class of dishonesty as reporting "failed 0" for a count we could not read.
+    if (e && e.code === 'ENOBUFS') {
+      return {
+        success: false,
+        output: e.stdout ? e.stdout.toString().trim() : '',
+        error: `output exceeded the capture buffer of ${maxBuffer} bytes — the run could ` +
+          'not be read in full and is UNCERTIFIED (this is NOT a test failure)',
+        spawnFailed: false
+      };
+    }
     return {
       success: false,
       output: e.stdout ? e.stdout.toString().trim() : '',

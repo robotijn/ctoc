@@ -97,6 +97,37 @@ function questionsPath(root, ref) {
 }
 
 /**
+ * The absolute path of the QUARANTINE (pending) questions file for `ref`, under
+ * `<root>/.ctoc/streaming/questions/pending/`.
+ *
+ * ── What the quarantine directory is for ───────────────────────────────────────
+ * `pending/` is the ONE path family the `gate-critic` agent may write. That agent
+ * holds UNTRUSTED input (plan text, and the lens critics' payloads), so it must
+ * never be able to author the file a human reads at a gate. It drops its
+ * synthesized `{ref, planMtimeMs, questions}` object here instead. NO gate screen
+ * ever reads this directory. A file becomes visible to a human only after
+ * `src/lib/streaming-questions-sweeper.js` VALIDATES it — filename↔ref binding,
+ * plan existence, supersession, and then the full Question/Option contract via
+ * `writePlanQuestions` — and promotes it into the live questions path. Anything
+ * malformed or hostile is discarded and nothing is written.
+ *
+ * Traversal-proof by construction: this reuses the SAME `sanitizeRef` as
+ * `questionsPath`, so an adversarial `functional/../../etc/passwd` collapses to one
+ * inert filename segment inside `pending/`. There is deliberately no second
+ * sanitiser.
+ *
+ * @param {string} root project root
+ * @param {*} ref plan reference ("stage/file.md")
+ * @returns {string|null} null on a fundamentally invalid root/ref (callers fail soft)
+ */
+function pendingQuestionsPath(root, ref) {
+  if (!isNonEmptyString(root)) return null;
+  const base = sanitizeRef(ref);
+  if (base === null) return null;
+  return path.join(root, '.ctoc', 'streaming', 'questions', 'pending', `${base}.json`);
+}
+
+/**
  * A plan ref's file part must be a bare filename inside a stage folder (no path
  * separator, no "..", no NUL, not absolute). Mirrors streaming-gate /
  * menu-screens.isUnsafePlanFile — duplicated locally to keep this module's guard
@@ -580,6 +611,8 @@ function hasEnoughInformation(root, ref) {
 
 module.exports = {
   questionsPath,
+  pendingQuestionsPath,
+  refToPlanPath,
   validatePlanQuestions,
   writePlanQuestions,
   planQuestionsStatus,

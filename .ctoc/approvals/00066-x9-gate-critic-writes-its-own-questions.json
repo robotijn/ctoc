@@ -1,0 +1,8 @@
+{
+  "content_sha256": "3284bd15eff6d4f400b85e241653a596442c9069d34457b4dbe324a4fdc6185c",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-18T11:11:00.191Z",
+  "approved_by": "human",
+  "plan_basename": "00066-x9-gate-critic-writes-its-own-questions"
+}

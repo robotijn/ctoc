@@ -36,6 +36,17 @@
  *                              reports `'backfilled'`, never `'human'`, so the record
  *                              stays auditable.
  *
+ *   --mark-migrated [--force]  record that this project's approval provenance has been
+ *                              migrated. THIS ARMS the residency sweep's revert for
+ *                              `no-ledger-entry` violations (Z1): until the marker
+ *                              exists, `src/hooks/human-gate-check.js` REPORTS those
+ *                              instead of moving the plan archive. Self-verifying — it
+ *                              REFUSES while any un-ledgered resident remains, so the
+ *                              marker can never be written prematurely and re-arm a
+ *                              bulk revert over legacy plans. `--force` overrides that
+ *                              refusal and is recorded in the marker as `mode: forced`.
+ *
+
  * Common flags: `--root <dir>` (defaults to cwd), `--dry-run`, `--help`.
  * Exit status: 0 on success, 1 on any error — a failure is LOUD, never a silent
  * no-op (`run()` returns `{ok:false, error}` and the CLI prints it to stderr).
@@ -60,6 +71,12 @@ const USAGE = `ctoc ledger-backfill — record approval provenance for plans tha
                                       [--reason <text>] [--root <dir>] [--dry-run]
       Ledger ONE existing plan as a backfilled human-kind entry.
 
+  node src/scripts/ledger-backfill.js --mark-migrated [--force] [--root <dir>] [--dry-run]
+      Record that this project's approval provenance is migrated. This ARMS the
+      residency sweep's revert for plans with no ledger entry — until then the
+      sweep REPORTS them instead of moving your plan archive. Refuses while any
+      un-ledgered resident remains; --force overrides and is recorded in the marker.
+
   It NEVER moves a plan and NEVER crosses a human gate.`;
 
 /**
@@ -69,7 +86,8 @@ const USAGE = `ctoc ledger-backfill — record approval provenance for plans tha
  *
  * @param {string[]} argv - argument list (WITHOUT node/script)
  * @returns {{vision?: boolean, plan?: string, stage?: string, reason?: string,
- *            root?: string, dryRun?: boolean, help?: boolean, error?: string}}
+ *            root?: string, dryRun?: boolean, help?: boolean, error?: string,
+ *            markMigrated?: boolean, force?: boolean}}
  */
 function parseArgs(argv) {
   const opts = {};
@@ -78,6 +96,8 @@ function parseArgs(argv) {
     const arg = String(list[i]);
     switch (arg) {
       case '--vision': opts.vision = true; break;
+      case '--mark-migrated': opts.markMigrated = true; break;
+      case '--force': opts.force = true; break;
       case '--dry-run': opts.dryRun = true; break;
       case '--help': case '-h': opts.help = true; break;
       case '--plan': opts.plan = list[++i]; break;
@@ -185,6 +205,92 @@ function backfillOnePlan(root, opts) {
   }
 }
 
+/** Gate-destination folders the residency sweep enumerates. */
+const GATE_DESTINATION_FOLDERS = ['implementation', 'todo', 'done'];
+
+/** How many plan entries the ledger currently holds (dot-files, e.g. the marker, excluded). */
+function countLedgerEntries(root) {
+  try {
+    const dir = ledger.ledgerDir(root);
+    if (!safeFs.existsSync(dir)) return 0;
+    return safeFs.readdirSync(dir).filter((f) => f.endsWith('.json') && !f.startsWith('.')).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * --mark-migrated: record that this project's approval provenance has been migrated,
+ * which ARMS the residency sweep's revert for `no-ledger-entry` violations (Z1).
+ *
+ * SELF-VERIFYING. It runs the LIVE residency sweep first and refuses unless the
+ * withheld set is empty, so the marker can never be written prematurely and re-arm a
+ * bulk revert over legacy plans — the exact hazard Z1 exists to prevent, one command
+ * later. `--force` overrides the refusal and is recorded in the marker as
+ * `mode: 'forced'`, an explicit human-typed act that stays auditable.
+ *
+ * Requiring the hook here is safe: `human-gate-check.js` is guarded by
+ * `require.main === module`, so importing it never runs the sweep or calls
+ * `process.exit` — only its exported `checkFolder` is driven, read-only.
+ *
+ * @param {string} root - project root
+ * @param {{force?: boolean, dryRun?: boolean}} opts
+ * @returns {{ok: boolean, ledgered: string[], skipped: Array<object>, error?: string, marker?: object}}
+ */
+function markMigrated(root, opts) {
+  const gate = require('../hooks/human-gate-check');
+  const gateMigration = require('../lib/gate-migration');
+
+  const pending = [];
+  for (const folder of GATE_DESTINATION_FOLDERS) {
+    let violations;
+    try {
+      violations = gate.checkFolder(folder, root);
+    } catch (err) {
+      // FAIL SAFE: if the sweep cannot be read, the marker is NOT written. Arming a
+      // bulk revert on an undeterminable state is exactly the wrong direction.
+      return {
+        ok: false, ledgered: [], skipped: [],
+        error: `cannot verify ${folder}/: ${err && err.message ? err.message : String(err)}`,
+      };
+    }
+    for (const v of violations) {
+      if (gateMigration.WITHHELD_REASONS.has(v.reason || 'no-ledger-entry')) {
+        pending.push(`${folder}/${v.file}`);
+      }
+    }
+  }
+
+  if (pending.length > 0 && opts.force !== true) {
+    const shown = pending.slice(0, 20).map((p) => `    ${p}`).join('\n');
+    const more = pending.length > 20 ? `\n    … and ${pending.length - 20} more` : '';
+    return {
+      ok: false, ledgered: [], skipped: pending.map((plan) => ({ plan, reason: 'no-ledger-entry' })),
+      error:
+        `refusing to mark migrated: ${pending.length} plan(s) still have no ledger entry.\n` +
+        `Marking now would ARM the residency sweep to revert every one of them.\n\n${shown}${more}\n\n` +
+        `Either ledger each one:\n` +
+        `    node src/scripts/ledger-backfill.js --plan plans/<stage>/<plan>.md --stage <stage> --reason "<why>"\n` +
+        `or, if you accept that these plans will be reverted, re-run with --force.`,
+    };
+  }
+
+  const marker = {
+    migrated: true,
+    at: new Date().toISOString(),
+    mode: opts.force === true ? 'forced' : 'verified',
+    ledgered: countLedgerEntries(root),
+    pending_at_mark: pending.length,
+  };
+  if (opts.dryRun === true) return { ok: true, ledgered: [], skipped: [], marker };
+  try {
+    gateMigration.writeMarker(root, marker);
+  } catch (err) {
+    return { ok: false, ledgered: [], skipped: [], error: err && err.message ? err.message : String(err) };
+  }
+  return { ok: true, ledgered: [], skipped: [], marker };
+}
+
 /**
  * The script's whole behavior, as a pure-ish function of argv (testable without a
  * subprocess). NEVER throws: every failure surfaces as `{ok:false, error}` so the
@@ -192,7 +298,7 @@ function backfillOnePlan(root, opts) {
  *
  * @param {string[]} argv - arguments WITHOUT node/script
  * @param {string} [cwd] - default project root
- * @returns {{ok: boolean, ledgered: string[], skipped: Array<object>, error?: string, usage?: string, entry?: object}}
+ * @returns {{ok: boolean, ledgered: string[], skipped: Array<object>, error?: string, usage?: string, entry?: object, marker?: object}}
  */
 function run(argv, cwd = process.cwd()) {
   const opts = parseArgs(argv);
@@ -201,8 +307,18 @@ function run(argv, cwd = process.cwd()) {
 
   const root = opts.root ? String(opts.root) : cwd;
 
-  if (opts.vision && opts.plan) {
-    return { ok: false, ledgered: [], skipped: [], error: '--vision and --plan are mutually exclusive' };
+  // The three modes are mutually exclusive; --force is meaningful ONLY with
+  // --mark-migrated (a silently-ignored --force would be exactly the kind of quiet
+  // no-op this script exists to refuse).
+  const modes = [opts.vision, opts.plan, opts.markMigrated].filter(Boolean).length;
+  if (modes > 1) {
+    return { ok: false, ledgered: [], skipped: [], error: '--vision, --plan and --mark-migrated are mutually exclusive' };
+  }
+  if (opts.force && !opts.markMigrated) {
+    return { ok: false, ledgered: [], skipped: [], error: '--force is only meaningful with --mark-migrated' };
+  }
+  if (opts.markMigrated) {
+    return markMigrated(root, { force: opts.force === true, dryRun: opts.dryRun === true });
   }
   if (opts.vision) return backfillVisions(root, opts.dryRun === true);
   if (opts.plan) {
@@ -228,6 +344,8 @@ if (require.main === module) {
     process.stderr.write(`ledger-backfill: ${result.error}\n`);
     process.exit(1);
   }
-  process.stdout.write(JSON.stringify({ ledgered: result.ledgered, skipped: result.skipped }, null, 2) + '\n');
+  const report = { ledgered: result.ledgered, skipped: result.skipped };
+  if (result.marker) report.marker = result.marker;
+  process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   process.exit(0);
 }

@@ -1,0 +1,8 @@
+{
+  "content_sha256": "cd86a4b63b3003dac35f21ca4515ae4d993bc8c2ae3ce52c88fc1509c0a0d04e",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-18T11:12:18.214Z",
+  "approved_by": "human",
+  "plan_basename": "00068-z1-gate-sweep-reports-before-it-reverts"
+}

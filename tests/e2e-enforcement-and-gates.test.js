@@ -57,6 +57,19 @@ function makeProject({ ctoc = true, strict = true } = {}) {
   }
   if (ctoc) {
     fs.mkdirSync(path.join(dir, '.ctoc', 'logs'), { recursive: true });
+    // Z1: record the fixture as MIGRATED to the approval ledger. The residency sweep
+    // now WITHHOLDS the revert of `no-ledger-entry` violations on a project whose
+    // approval provenance was never recorded — otherwise a real user's first tool
+    // call after a plugin update would move their entire plan archive. These gate
+    // tests assert the ARMED, post-migration enforcement, so they state that
+    // precondition explicitly. NO assertion is weakened: every one of them still
+    // demands the full revert, and every non-`no-ledger-entry` violation reverts
+    // with or without this marker.
+    fs.mkdirSync(path.join(dir, '.ctoc', 'approvals'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, '.ctoc', 'approvals', '.migration-complete.json'),
+      JSON.stringify({ migrated: true, at: new Date().toISOString(), mode: 'verified', ledgered: 0 }),
+    );
     // ctoc-project-detector requires BOTH .ctoc/ AND a CLAUDE.md marker.
     fs.writeFileSync(
       path.join(dir, 'CLAUDE.md'),

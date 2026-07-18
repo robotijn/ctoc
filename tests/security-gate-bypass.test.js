@@ -74,6 +74,20 @@ function makeProject() {
     fs.mkdirSync(path.join(dir, 'plans', stage), { recursive: true });
   }
   fs.mkdirSync(path.join(dir, '.ctoc', 'logs'), { recursive: true });
+  // Z1: record the fixture as MIGRATED to the approval ledger. The residency sweep
+  // now WITHHOLDS the revert of `no-ledger-entry` violations on a project whose
+  // approval provenance was never recorded — otherwise a real user's first tool call
+  // after a plugin update would move their entire plan archive. These bypass tests
+  // assert the ARMED, post-migration enforcement, so they state that precondition
+  // explicitly. NO assertion is weakened: every forged/absent marker below is still
+  // required to be reverted, and the marker cannot be written by an agent (the
+  // `.ctoc/approvals/` directory is agent-write-denied on both the Edit and the Bash
+  // channel), so it is not itself a bypass.
+  fs.mkdirSync(path.join(dir, '.ctoc', 'approvals'), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, '.ctoc', 'approvals', '.migration-complete.json'),
+    JSON.stringify({ migrated: true, at: new Date().toISOString(), mode: 'verified', ledgered: 0 }),
+  );
   fs.writeFileSync(
     path.join(dir, 'CLAUDE.md'),
     '# CTOC Project Instructions\n\nHermetic security fixture.\n',
