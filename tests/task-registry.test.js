@@ -1197,6 +1197,47 @@ describe('Drain-stop flag trio', () => {
 // Exported constants
 // ─────────────────────────────────────────────────────────────────────────────
 
+describe('precompute kind (streaming gate-question generation)', () => {
+  it('accepts the precompute kind — the streaming precompute loop records a task per plan ref', () => {
+    assert.ok(
+      reg.KINDS.has('precompute'),
+      'precompute must be a valid kind: without it `menu task add precompute` throws, ' +
+      'record-first fails, no lens critic is ever dispatched, no questions file is ' +
+      'written, and the streaming screen falls back to the bare gate prompt.'
+    );
+  });
+
+  it('records a precompute task and runs disjoint refs concurrently', () => {
+    const r = reg.emptyRegistry();
+    const a = reg.addTask(r, {
+      kind: 'precompute',
+      plan: 'review/00003-r2a.md',
+      touches: ['.ctoc/streaming/questions/review__00003-r2a.md.json'],
+    });
+    assert.equal(a.kind, 'precompute');
+    assert.equal(reg.canRun(a, r).run, true, 'a recorded precompute task is runnable');
+
+    // A second ref touches a DIFFERENT questions file, so the two run concurrently.
+    a.status = 'running';
+    const b = reg.addTask(r, {
+      kind: 'precompute',
+      plan: 'review/00004-r2b.md',
+      touches: ['.ctoc/streaming/questions/review__00004-r2b.md.json'],
+    });
+    assert.equal(reg.canRun(b, r).run, true, 'disjoint questions files never serialize');
+
+    // Same ref twice DOES serialize — two writers to one questions file would clobber.
+    const dup = reg.addTask(r, {
+      kind: 'precompute',
+      plan: 'review/00003-r2a.md',
+      touches: ['.ctoc/streaming/questions/review__00003-r2a.md.json'],
+    });
+    const d = reg.canRun(dup, r);
+    assert.equal(d.run, false);
+    assert.equal(d.reason, 'file-conflict');
+  });
+});
+
 describe('Exported constants + surface', () => {
   it('exposes MAX_CONCURRENT=5, REGISTRY_VERSION=1, frozen KINDS; kind-based plan-serial export is removed', () => {
     assert.equal(reg.MAX_CONCURRENT, 5);
