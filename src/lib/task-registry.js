@@ -122,9 +122,20 @@ const MAX_TASKS = 10000;
  */
 const MAX_TOUCH_LENGTH = 512;
 
-/** The valid task kinds (vision §3a enumeration). */
+/**
+ * The valid task kinds (vision §3a enumeration).
+ *
+ * `precompute` is the streaming gate-question generation task — one per plan ref.
+ * It writes ONLY `.ctoc/streaming/questions/<ref>.json`, never a plan file, so
+ * refs run concurrently (their `touches` are disjoint by construction) and the
+ * completion path never invokes plan completion (that is gated on `implement`).
+ * Its absence was load-bearing: `menu task add precompute` threw, the record-first
+ * step failed, no lens critic was ever dispatched, no questions file was ever
+ * written, and the streaming screen silently fell back to the bare gate prompt.
+ */
 const KINDS = Object.freeze(new Set([
-  'implement', 'plan', 'review', 'quality', 'security', 'decompose', 'discuss', 'sync'
+  'implement', 'plan', 'review', 'quality', 'security', 'decompose', 'discuss', 'sync',
+  'precompute'
 ]));
 /**
  * All valid task statuses. `cancelling` is a NON-terminal in-flight state (C1-2):
