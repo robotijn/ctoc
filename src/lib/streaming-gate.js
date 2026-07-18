@@ -537,7 +537,7 @@ function isNonEmptyStr(v) {
 // than no matrix at all, so the TOTAL rendered width — every border character
 // included — never exceeds this ceiling. Long cell text WRAPS inside its cell;
 // nothing is ever dropped or truncated to fit. Tune the whole matrix here.
-const MATRIX_TOTAL_WIDTH = 88;
+const MATRIX_TOTAL_WIDTH = 108;
 const MATRIX_COLUMNS = Object.freeze(['Option', 'Pros', 'Cons', 'Recommendation']);
 // Share of the available content width per column. Weights, not absolute widths,
 // so MATRIX_TOTAL_WIDTH stays the single tuning knob. Option is the NARROWEST: it
@@ -624,21 +624,64 @@ function wrapMatrixCell(text, width) {
 }
 
 /**
- * The SHORT reason for the Recommendation cell.
+ * The reason for the Recommendation cell — a REAL argument, never a pointer.
  *
- * The stored question schema has no dedicated reason field — it has `pros`, `cons`,
- * `description` and a boolean `recommended` — and copying the pros into this cell
- * makes it a second, truncated copy of the cell beside it. So the reason is DERIVED:
- * when the critique recorded a confidence level (its own convention for how well
- * grounded a finding is), that level is the clause, and the cell points at the Pros
- * column for the argument itself rather than repeating it.
+ * A cell reading "confidence high, on the reasoning in the Pros column" is not a
+ * recommendation: it states how sure the critic is of the FINDING and then points at
+ * the cell beside it. Confidence is how sure you are; tier is how bad it is; neither
+ * is a reason to pick an option. That phrasing shipped and the human rejected it on
+ * sight, correctly.
+ *
+ * The synthesizer's rule 7d requires the recommended option's `pros` to carry, after
+ * the confidence sentence, at least one further sentence arguing in its own words why
+ * THIS OPTION produces the better outcome. That sentence is the recommendation, so it
+ * is what this extracts: drop a leading confidence sentence, take what follows.
+ *
+ * On questions generated before that rule existed there may be no such sentence. Then
+ * the first substantive sentence of the case is used — a real claim the human can
+ * weigh, rather than an instruction to go read another column.
  */
 function recommendationReason(pros, description) {
-  const confidence = /confidence\s+(high|medium|low)/i.exec(`${pros} ${description}`);
-  if (confidence) {
-    return `confidence ${confidence[1].toLowerCase()}, on the reasoning in the Pros column.`;
-  }
-  return 'the highest-quality option; the reasoning is in the Pros column.';
+  const source = isNonEmptyStr(pros) ? pros : (isNonEmptyStr(description) ? description : '');
+  if (!source) return 'the highest-quality option on the evidence gathered.';
+
+  // Sentence split that keeps decimals and file:line references intact.
+  const sentences = source
+    .split(/(?<=[.!?])\s+(?=[A-Z(])/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  // Drop a leading confidence sentence — it rates the finding, not the option.
+  const argued = sentences.filter((t) => !/^confidence\s+(high|medium|low)\b/i.test(t));
+  const chosen = (argued.length > 0 ? argued : sentences)[0];
+  return chosen || 'the highest-quality option on the evidence gathered.';
+}
+
+/**
+ * The plan's name AS A HUMAN READS IT.
+ *
+ * The screen used to print the slug — `00003-r2a-scheduler-lifecycle-honesty` — which
+ * names a file, not a piece of work. A reader cannot decode a number and an internal
+ * code, and asking someone to rule on "00003-r2a" is asking them to approve a filename.
+ * So: prefer the plan's title, drop any leading internal code (`R2-A — `, `X9 — `), and
+ * keep only the part before a colon, which is the sentence a person would actually say.
+ * Falls back to the slug only when there is no title at all.
+ */
+function humanPlanName(title, slug) {
+  const raw = isNonEmptyStr(title) ? String(title).trim() : '';
+  if (!raw) return stripCtl(String(slug || '').trim());
+  // The separator MUST be surrounded by whitespace. Without that requirement a bare
+  // `-` is ambiguous — it can be the code's own suffix hyphen (`R2-A`) or the
+  // separator — and two readings of one character is exponential backtracking on a
+  // hostile title. Whitespace disambiguates it in one pass.
+  // Two flat patterns, never one nested one. `(?:-[A-Za-z0-9]+)?` puts a `+` inside a
+  // `?` — star height 2 — and that is the shape that backtracks exponentially.
+  const split = /^(\S+)\s+[—–-]\s+(.*)$/.exec(raw);
+  const head = split ? split[1] : '';
+  const isCode = /^[A-Z]{1,3}[0-9]+$/.test(head) || /^[A-Z]{1,3}[0-9]+-[A-Za-z0-9]+$/.test(head);
+  const withoutCode = isCode ? split[2].trim() : raw;
+  const headline = withoutCode.split(':')[0].trim();
+  return stripCtl(headline || withoutCode || raw);
 }
 
 /** One horizontal edge: left/junction/right characters over the column widths. */
@@ -767,7 +810,7 @@ function richQuestionScreen(d, index, total, statusLine, root) {
 
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
-  text += `Topic: ${d.slug}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  `
+  text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  `
     + `decision ${index + 1} of ${total}  ·  question ${nextIdx + 1} of ${qTotal}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   // Matrix FIRST, then the question sentence (the ask-me-questions contract).
@@ -1043,7 +1086,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
 
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
-  text += `Topic: ${d.slug}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  decision ${index + 1} of ${total}\n`;
+  text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  decision ${index + 1} of ${total}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${d.summary}\n\n`;
   text += sufficiencyLine(d);
@@ -1238,4 +1281,5 @@ module.exports = {
   streamComment,
   streamAnswer,
   planDecisionScreen,
+  humanPlanName,
 };

@@ -784,7 +784,7 @@ describe('W1 — wiring the predicate did not create a REQUIRE CYCLE', () => {
 // recommendation were flattened into one run-on sentence. The screen text must
 // carry a real box-drawing decision matrix, and it must fit a narrow terminal.
 
-const MATRIX_WIDTH_CEILING = 88;
+const MATRIX_WIDTH_CEILING = 108;
 
 function matrixLines(text) {
   return String(text).split('\n').filter((l) => /[┌├└│]/.test(l));
@@ -1054,14 +1054,24 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     const recommendation = sendBack[3];
 
     assert.match(recommendation, /^Recommended — /, 'the cell opens with the recommendation marker');
-    assert.ok(recommendation.length <= 90,
-      `the Recommendation cell must be a short clause, saw ${recommendation.length} characters: ${recommendation}`);
+
+    // A recommendation is an ARGUMENT, never a pointer and never a confidence rating.
+    // Confidence is how sure the critic is of the FINDING; it is not a reason to pick
+    // an option. The previous behaviour emitted "confidence high, on the reasoning in
+    // the Pros column" and the human rejected it on sight — a cell that points at the
+    // cell beside it has said nothing.
+    assert.ok(!/confidence\s+(high|medium|low)/i.test(recommendation),
+      `the Recommendation must not rate the finding's confidence: ${recommendation}`);
+    assert.ok(!/in the Pros column|see the Pros|reasoning is in/i.test(recommendation),
+      `the Recommendation must not point at another cell: ${recommendation}`);
+
+    // It carries the sentence that actually argues the decision — here, why a setting
+    // is not a gate — rather than the confidence sentence that precedes it.
+    assert.ok(recommendation.includes('a setting, not a gate'),
+      `the Recommendation must carry the arguing sentence, saw: ${recommendation}`);
     assert.ok(!recommendation.includes('grounded in a verbatim quote'),
-      'the Recommendation cell must not copy the Pros text');
+      'and must not carry the confidence sentence it follows');
     assert.ok(!recommendation.endsWith('quote at'), 'and must not trail off mid-sentence');
-    // The data states a confidence level; the short reason carries it.
-    assert.match(recommendation, /confidence high/i,
-      'the derived reason surfaces the confidence level the critique recorded');
   });
 
   it('NEVER truncates mid-word — every cell renders its whole text, or ends with an ellipsis', () => {
@@ -1158,5 +1168,41 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     for (const line of matrixLines(screen.text)) {
       assert.ok([...line].length <= MATRIX_WIDTH_CEILING, `plan-screen matrix line over the ceiling:\n${line}`);
     }
+  });
+});
+
+// ── humanPlanName — the topic line names the WORK, not the file ────────────────
+// A reader cannot decode `00003-r2a-scheduler-lifecycle-honesty`; asking someone to
+// rule on that is asking them to approve a filename. These cases exist because a
+// refactor that returned "A" for "R2-A — Scheduler lifecycle honesty" passed the
+// entire suite: the prefix stripping had no test at all.
+describe('humanPlanName — the topic line a human can read', () => {
+  const { humanPlanName } = require('../src/lib/streaming-gate.js');
+
+  it('strips a leading internal code with a hyphenated suffix', () => {
+    assert.equal(humanPlanName('R2-A — Scheduler lifecycle honesty', 'x'), 'Scheduler lifecycle honesty');
+  });
+
+  it('strips a leading internal code with no suffix', () => {
+    assert.equal(humanPlanName('X9 — Gate critic writes its own questions', 'x'), 'Gate critic writes its own questions');
+  });
+
+  it('keeps a title whose first word merely LOOKS like a prefix but is not a code', () => {
+    assert.equal(humanPlanName('Scheduler — lifecycle honesty', 'x'), 'Scheduler — lifecycle honesty');
+  });
+
+  it('keeps only the part before a colon', () => {
+    assert.equal(humanPlanName('R2-A — Scheduler: the pure rules', 'x'), 'Scheduler');
+  });
+
+  it('falls back to the slug when there is no title', () => {
+    assert.equal(humanPlanName('', '00003-r2a-scheduler'), '00003-r2a-scheduler');
+  });
+
+  it('does not hang on a hostile title (linear, not exponential)', () => {
+    const started = process.hrtime.bigint();
+    humanPlanName(`A1${'-a'.repeat(40)}!`, 'x');
+    const ms = Number(process.hrtime.bigint() - started) / 1e6;
+    assert.ok(ms < 100, `took ${ms}ms — the pattern is backtracking`);
   });
 });

@@ -1,3 +1,16 @@
 {"ts":"2026-07-18T10:36:36.274Z","ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q10-sync-barrier-settles-on-unconfirmed-orphan","optionKey":"1"}
 {"ts":"2026-07-18T14:01:14.569Z","ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q11-staleness-quarantine-one-path-only","optionKey":"1"}
 {"ts":"2026-07-18T14:01:54.576Z","ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q12-step-14-narrower-than-quality-gate","optionKey":"1"}
+{"ts":"2026-07-18T19:57:12.846Z","ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q13-concurrent-edit-guard-fails-open","optionKey":"1"}
+{"ts":"2026-07-18T19:57:44.656Z","ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q14-wedge-report-has-no-reader","optionKey":"1"}
+{"ts":"2026-07-18T19:58:04.228Z","ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q15-wiring-table-row-shipped-dead","optionKey":"1"}
+{"ts":"2026-07-18T20:03:30.189Z","ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q16-wiring-row-owned-by-ungated-sibling","optionKey":"1"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q10-step-14-excludes-the-quality-gate","answer":"Run the full quality gate once over the wave, then rule","at":"2026-07-18T20:17:42.997Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q11-quarantine-covers-one-of-three-paths","answer":"Route the quarantine hardening to the sibling that declares all three files","at":"2026-07-18T20:18:59.581Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q12-sync-barrier-settles-on-unconfirmed-orphan","answer":"Record the precondition and leave the pure scheduler alone","at":"2026-07-18T20:21:01.551Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q13-wedge-reports-have-no-reader","answer":"Ship the inbox reader with the sibling that declares the render file, and correct this plan claim","at":"2026-07-18T20:23:31.753Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q14-quarantine-guard-fails-open-silently","answer":"Record the fault and drop the affected candidates","at":"2026-07-18T20:29:56.740Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q15-mandatory-wiring-table-unverified","answer":"Cross this and the actions-layer sibling as one gate decision","at":"2026-07-18T20:30:35.199Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q16-executor-decision-record-empty","answer":"Fill the decision record and the final report before crossing","at":"2026-07-18T20:33:30.270Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q98-critique-coverage","answer":"Noted","at":"2026-07-18T20:33:56.014Z"}
+{"ref":"review/00003-r2a-scheduler-lifecycle-honesty.md","questionId":"q99-gate-ruling","answer":"Hold until the full quality gate is run over this wave","derived_from":"q10,q13,q15,q16","at":"2026-07-18T20:33:56.014Z"}
