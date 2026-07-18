@@ -582,6 +582,7 @@ const CHECKS = [
   { id: 'plan-counts',                 scope: 'info',         mode: 'fast', fn: checkPlanCounts },
   { id: 'reachability-fence',          scope: 'architecture', mode: 'thorough', fn: checkReachabilityFence },
   { id: 'dead-export-fence',           scope: 'architecture', mode: 'thorough', fn: checkDeadExportFence },
+  { id: 'false-green-fence',           scope: 'architecture', mode: 'thorough', fn: checkFalseGreenFence },
 ];
 
 /**
@@ -640,6 +641,65 @@ function checkReachabilityFence(root) {
   return {
     severity: 'block',
     message: `${result.unreachable.length} source file(s) unreachable from every live root (dead on arrival): ${result.unreachable.join(', ')} — wire each to a live root or delete it; a module is not done when its test passes, it is done when a human can reach it`
+  };
+}
+
+/**
+ * False-green fence invariant (2026-07-18). The defect class, in the human's words:
+ * "a check that reports failure or success based on input it never actually
+ * received." It shipped FIVE times — a parser whose no-match default was the SUCCESS
+ * value 0; a verdict parsed off a TRUNCATED copy of the output; `process.exit`
+ * discarding ~1.4MB of pending piped writes; an `execSync` overflowing its default
+ * 1MB maxBuffer and reporting a PASSING suite as failed. Every one passed review and
+ * a green suite, because the instrument was blind and the blindness was reported as
+ * a value.
+ *
+ * This compares the live scan against `.ctoc/false-green-baseline.json`. That file
+ * holds TWO deliberately separate structures: `findings` is pre-existing DEBT which
+ * may only ever SHRINK (no per-entry justification — demanding one for each of 135
+ * sites would mean the fence never lands), and `whitelist` is a PERMANENT exemption
+ * requiring a written justification per entry. Anything in neither is a NEW
+ * false-green site and blocks.
+ *
+ * A malformed baseline excuses NOTHING (mirroring checkDeadExportFence): a baseline
+ * that cannot be read must never read as "all clear" — that would be this very
+ * defect class, committed by the check built to catch it. The ratchet itself lives in
+ * tests/false-green-fence.test.js; this surfaces the same truth on demand. Thorough
+ * mode only (walks the whole src tree).
+ *
+ * @param {string} root - Project root
+ * @returns {{severity: string, message: string}|null} null when clean or when this is
+ *   not a CTOC source tree.
+ */
+function checkFalseGreenFence(root) {
+  const { scanFalseGreen } = require('./false-green-scan');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  const result = scanFalseGreen(root);
+  if (result.filesScanned === 0) return null; // not a CTOC source tree — nothing to check
+
+  const baselineFile = path.join(root, '.ctoc', 'false-green-baseline.json');
+  /** @type {Set<string>} */
+  const excused = new Set();
+  if (safeFs.existsSync(baselineFile)) {
+    try {
+      const parsed = JSON.parse(safeFs.readFileSync(baselineFile, 'utf8'));
+      for (const key of (parsed && parsed.findings) || []) if (typeof key === 'string') excused.add(key);
+      for (const key of Object.keys((parsed && parsed.whitelist) || {})) excused.add(key);
+    } catch { /* malformed baseline → nothing is excused; every finding blocks */ }
+  }
+
+  const fresh = result.findings.filter((f) => !excused.has(f.key));
+  if (fresh.length === 0) return null;
+
+  const shown = fresh.slice(0, 5).map(
+    (f) => `${f.file}:${f.line} [${f.signature}] ${f.evidence} → ${f.fix}`
+  );
+  return {
+    severity: 'block',
+    message: `${fresh.length} NEW false-green site(s) — a check that can report a verdict on input it never received: ` +
+      `${shown.join(' | ')}${fresh.length > 5 ? ` (+${fresh.length - 5} more)` : ''}`
   };
 }
 
