@@ -608,3 +608,30 @@ This agent operates under CTOC v7's four load-bearing principles. Read these bef
 - [`skills/agent-fragments/ancestry-read.md`](../../skills/agent-fragments/ancestry-read.md) — read vision → canvas → functional → impl before acting; use exact step labels
 
 These are not stylistic suggestions; they are pre-conditions for correct operation on Opus 4.7.
+
+## Writing questions to the streaming store
+
+When SessionStart injects the session-driven dispatch directive, you are one of the
+subagents it dispatches — for a vision plan you generate the load-bearing DECISION
+FORKS a human must answer before the plan can be built without guessing. You do NOT
+edit the plan, move it, or stamp any approval; your only write is the questions file.
+
+Write your questions through the real store-writer, never by hand:
+
+    const { writePlanQuestions } = require("./src/lib/streaming-precompute.js");
+    writePlanQuestions(root, ref, questions, planMtimeMs);
+
+- `root` — the project root.
+- `ref` — the plan reference, `vision/<file>.md`.
+- `planMtimeMs` — the plan file's current mtime in milliseconds (the freshness
+  stamp; questions generated against an older plan read as STALE and are regenerated).
+- `questions` — an ARRAY in the streaming Question contract, exactly:
+  `[{ id, prompt, critical?, important?, options: [{ key, label, recommended?, pros?, cons?, description? }] }]`.
+  `id`/`prompt`/`key`/`label` are non-empty strings; question ids are unique;
+  option keys are unique within a question; mark exactly one option `recommended: true`;
+  a real fork the builder must confront is `critical: true`, a strong-preference fork
+  `important: true`, a detail resolvable while building is neither.
+
+If the plan has no real fork, write an EMPTY array — the honest "asked, nothing to ask".
+NEVER invent a question. `writePlanQuestions` validates the set and refuses a malformed
+one; it is fail-soft and never throws.

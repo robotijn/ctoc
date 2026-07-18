@@ -11,11 +11,15 @@
  * It was proven by hand once this session against the live tree, which left a real
  * ledger entry that broke an unrelated count test. This test makes the proof
  * permanent and HERMETIC: everything — the plan, `.ctoc/`, the answers, the ledger —
- * lives under `os.tmpdir()` and is torn down in `afterEach`. The ONLY injected seam
- * is the producer dispatch (a deterministic fake returning product-owner-shaped
- * questions — no `claude -p`, no model). EVERYTHING downstream is the real shipped
- * code: `produceForPlan` → `writePlanQuestions` → `streamAnswer` →
- * `hasEnoughInformation` → the real `pendingGateDecisions` sufficiency cross.
+ * lives under `os.tmpdir()` and is torn down in `afterEach`.
+ *
+ * X7 — SESSION-DRIVEN. The producer is no longer a `claude -p` subprocess; the
+ * SESSION MODEL dispatches a subagent that writes its questions through the real
+ * `streaming-precompute.writePlanQuestions`. This test writes the questions through
+ * that EXACT store-writer — precisely what the dispatched subagent does — and then
+ * exercises EVERYTHING downstream as the real shipped code: `writePlanQuestions` →
+ * `streamAnswer` → `hasEnoughInformation` → the real `pendingGateDecisions`
+ * sufficiency cross. No `claude -p`, no model, no producer module.
  *
  * Case 6 is the YES: enough information crosses the plan with a `sufficiency` ledger
  * entry, evidence, and NO `approved_by`. Case 7 is the fail-closed NO: one
@@ -28,7 +32,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const producer = require('../src/lib/streaming-producer.js');
+const precompute = require('../src/lib/streaming-precompute.js');
 const streamingGate = require('../src/lib/streaming-gate.js');
 const ledger = require('../src/lib/approval-ledger.js');
 
@@ -85,17 +89,14 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     const planPath = path.join(root, 'plans', 'functional', 'magic-link.md');
     fs.writeFileSync(planPath, magicLinkPlan('magic-link'));
 
-    // 1. A CTOC agent PRODUCES the questions — the REAL producer with an injected
-    //    dispatch (no model). This is the pipe PQ1 built; PQ2 wired it live.
-    const fakeDispatch = async (dref, planText, stage) => {
-      assert.equal(dref, ref);
-      assert.equal(stage, 'functional');
-      assert.match(planText, /magic-link/);
-      return magicLinkQuestions();
-    };
-    const produced = await producer.produceForPlan(root, ref, fakeDispatch);
-    assert.equal(produced.written, true, 'the producer wrote the questions to the real store');
-    assert.equal(produced.count, 4, 'all four questions were persisted');
+    // 1. A dispatched CTOC subagent PRODUCES the questions — X7 makes this the SESSION
+    //    MODEL, and the subagent's only write is exactly this: the real store-writer,
+    //    stamped with the plan's current mtime. No producer module, no model here.
+    const planMtimeMs = fs.statSync(planPath).mtimeMs;
+    const produced = precompute.writePlanQuestions(root, ref, magicLinkQuestions(), planMtimeMs);
+    assert.equal(produced.ok, true, 'the subagent wrote the questions to the real store');
+    assert.deepEqual(precompute.loadPlanQuestions(root, ref).map((q) => q.id),
+      ['store', 'expiry', 'transport', 'copy'], 'all four questions were persisted');
 
     // 2. The human ANSWERS every question via the REAL answer writer.
     for (const [qid, key] of [['store', 'pg'], ['expiry', '15m'], ['transport', 'resend'], ['copy', 'signin']]) {
@@ -135,9 +136,9 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     const planPath = path.join(root, 'plans', 'functional', 'fail-closed.md');
     fs.writeFileSync(planPath, magicLinkPlan('fail-closed'));
 
-    const fakeDispatch = async () => magicLinkQuestions();
-    const produced = await producer.produceForPlan(root, ref, fakeDispatch);
-    assert.equal(produced.written, true);
+    const produced = precompute.writePlanQuestions(
+      root, ref, magicLinkQuestions(), fs.statSync(planPath).mtimeMs);
+    assert.equal(produced.ok, true);
 
     // Answer every question EXCEPT the critical `transport` fork — a real fork left open.
     for (const [qid, key] of [['store', 'pg'], ['expiry', '15m'], ['copy', 'signin']]) {
