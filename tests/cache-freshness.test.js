@@ -577,6 +577,24 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // question cache never changes a plan-stage/vision/inbox count, so there is nothing
     // to invalidate.
     ['streaming-precompute.js', 'writes .ctoc/streaming/questions/<ref>.json question-cache files (atomic temp+rename) via writePlanQuestions; never a counted plan/vision/inbox file'],
+    // X9: the pending-questions sweeper writes ONLY under .ctoc/streaming/ —
+    // promotion via streaming-precompute.writePlanQuestions, deletion of the
+    // consumed quarantine file, and an append to .ctoc/logs/streaming-sweeper.jsonl.
+    // Never a counted plan/vision/inbox *.md, so no plan-stage/vision/inbox count
+    // can change and there is nothing to invalidate. (It is broad-flagged because it
+    // calls safeFs.unlinkSync/appendFileSync AND its header documents that a ref
+    // names a plan at plans/<stage>/<file>.md — a doc string, not a write target.)
+    ['streaming-questions-sweeper.js', 'writes only .ctoc/streaming/questions/** (promotion + quarantine cleanup) and .ctoc/logs/streaming-sweeper.jsonl; never a counted plan/vision/inbox file'],
+    // Z1: the approval-ledger migration guard writes EXACTLY two non-counted paths —
+    // the marker .ctoc/approvals/.migration-complete.json and the pending-notice
+    // snapshot .ctoc/logs/gate-migration-pending.json (both atomic temp+rename).
+    // It never creates, deletes, or moves a plan/vision/inbox *.md, so no
+    // plan-stage/vision/inbox count can change and there is nothing to invalidate.
+    // It is broad-flagged only because its header PROSE explains the hazard it
+    // guards (a sweep that would move a user's plan archive) — doc text, not a
+    // write target. It must also stay free of ./cache: it sits on the
+    // every-tool-call PreToolUse hook path and requires only path + safe-fs.
+    ['gate-migration.js', 'writes only .ctoc/approvals/.migration-complete.json (migration marker) and .ctoc/logs/gate-migration-pending.json (pending-notice snapshot); never a counted plan/vision/inbox file'],
   ]);
 
   // The known count-mutating writers already wired (CF1 + its kickback). These

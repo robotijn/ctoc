@@ -40,6 +40,10 @@ const taskReconcile = require('./task-reconcile');
 // (`stream approve|skip|comment`) live here in the router; the `dashboard` route
 // keeps the classic pipeline overview reachable.
 const streamingGate = require('./streaming-gate');
+// Z1: the residency sweep REPORTS (never moves) un-ledgered plans on a project whose
+// approval provenance was never migrated. This is that report's READER — a report
+// path with no reader is the same defect R3-D fixed for deploy-ready.
+const gateMigration = require('./gate-migration');
 
 // R3-B item 4: the terminal set is IMPORTED from the registry — there is exactly ONE
 // encoding. The former local mirror (`['done','failed','orphaned']`) was STALE in both
@@ -248,7 +252,13 @@ function buildDashboardTable(projectPath, opts = {}) {
   // lie). Counted into the inbox total so a deploy-ready plan cannot sit invisible
   // behind "Inbox clear"; zero notices add zero output (no dashboard regression).
   const deployReady = readDeployReady(root).length;
-  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale + escalations + deployReady;
+  // Z1: plans the gate sweep REPORTED instead of reverting (this project's approval
+  // provenance was never migrated). Counted in so the notice cannot sit invisible
+  // behind "Inbox clear"; zero pending adds zero output, so the dashboard renders
+  // byte-identically for a migrated or clean project.
+  const migrationPending = gateMigration.readPendingNotice(root).length;
+  const inboxTotal = inbox.questions + inbox.decisions + inbox.gatesWaiting + stale + escalations
+    + deployReady + migrationPending;
   // NB2: completed background work slots into the inbox as a pull notice (D3).
   let bgLine = '';
   try { bgLine = taskView.tasksInboxLine(taskReg); } catch { bgLine = ''; }
@@ -272,6 +282,9 @@ function buildDashboardTable(projectPath, opts = {}) {
       }
       if (deployReady > 0) {
         out += `  ⊙ ${deployReady} plan${deployReady === 1 ? '' : 's'} deploy-ready — deploy is a separate ship gate · view: inbox escalations\n`;
+      }
+      if (migrationPending > 0) {
+        out += `  ⛔ ${migrationPending} plan${migrationPending === 1 ? '' : 's'} would be reverted — approval ledger not migrated · view: inbox migration\n`;
       }
       out += `  ⊙ ${inbox.decisions} decision${inbox.decisions === 1 ? '' : 's'} awaiting review${inbox.decisions > 0 ? ' · view: inbox decisions' : ''}\n`;
       out += `  ⊙ ${inbox.gatesWaiting} plan${inbox.gatesWaiting === 1 ? '' : 's'} at gates${inbox.gatesWaiting > 0 ? ' · view: inbox gates' : ''}\n`;
@@ -665,6 +678,68 @@ function inboxEscalationsScreen(projectPath) {
     ask: {
       questions: [{
         question: 'Escalations & deploy-ready notices (read-only).',
+        header: 'Inbox',
+        options: [{ label: '◀ Back', description: 'Return to dashboard' }],
+      }],
+    },
+    actions: { '◀ Back': '' },
+  };
+}
+
+/**
+ * Inbox ▸ Approval-ledger migration — the door behind the dashboard's
+ * "⛔ N plans would be reverted" count (route `inbox migration`).
+ *
+ * Z1: these plans sit in a gate-destination folder with NO recorded approval
+ * provenance, which is the ordinary condition of every project that predates the
+ * approval ledger. CTOC is deliberately NOT moving them: the residency sweep runs on
+ * every tool call, and reverting them would rewrite the human's whole plan archive on
+ * their first tool call after an update. Enforcement stays fully active for every
+ * OTHER violation kind (a tampered hash, a forged provenance, a corrupt record) —
+ * those still revert, on every project, migrated or not.
+ *
+ * Read-only: this screen opens nothing and crosses nothing. Every attacker-
+ * influenceable field (a plan basename or reason off the notice) passes through
+ * `stripCtl`, exactly as `inboxEscalationsScreen` does.
+ *
+ * @param {string} [projectPath]
+ * @returns {{text:string, ask:Object, actions:Object}}
+ */
+function inboxMigrationScreen(projectPath) {
+  const root = getProjectPath(projectPath);
+  const pending = gateMigration.readPendingNotice(root);
+
+  let text = `Inbox ▸ Approval-ledger migration (${pending.length})\n${'─'.repeat(40)}\n\n`;
+
+  if (pending.length === 0) {
+    text += '  Nothing pending — this project\'s approval provenance is recorded.\n';
+  } else {
+    text += '  These plans reside in a gate destination with no recorded approval\n';
+    text += '  provenance. CTOC is NOT moving them. Enforcement is fully active for\n';
+    text += '  every other violation kind (tampered, forged, or corrupt provenance\n';
+    text += '  still reverts).\n\n';
+    for (const e of pending.slice(0, INBOX_DOOR_MAX_ROWS)) {
+      const plan = stripCtl(String(e.plan || '(unknown plan)'));
+      const folder = stripCtl(String(e.folder || '?'));
+      const age = stripCtl(_inboxAge(e.at));
+      text += `  • ${folder}/${plan}${age ? '  ' + age : ''}\n`;
+    }
+    if (pending.length > INBOX_DOOR_MAX_ROWS) {
+      text += `  … and ${pending.length - INBOX_DOOR_MAX_ROWS} more\n`;
+    }
+    text += '\n  Two ways forward:\n';
+    text += '  1) Record provenance for each plan, one at a time:\n';
+    text += '     node src/scripts/ledger-backfill.js --plan plans/done/<x>.md --stage done --reason "<why>"\n';
+    text += `  2) Then mark the project migrated (this ARMS the revert from now on):\n`;
+    text += `     ${gateMigration.MIGRATION_COMMAND}\n`;
+  }
+  text += '\n\n\n';
+
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: 'Approval-ledger migration (read-only).',
         header: 'Inbox',
         options: [{ label: '◀ Back', description: 'Return to dashboard' }],
       }],
@@ -2080,6 +2155,7 @@ function route(args, projectPath, opts = {}) {
       if (args[1] === 'decisions') return inboxDecisionsScreen(projectPath);
       if (args[1] === 'gates') return inboxGatesScreen(projectPath);
       if (args[1] === 'escalations') return inboxEscalationsScreen(projectPath);
+      if (args[1] === 'migration') return inboxMigrationScreen(projectPath);
       if (args[1] === 'verify') return inboxVerifyProposals(projectPath);
       if (args[1] === 'stale') return inboxStalePlansDrillIn(projectPath);
       if (args[1] === 'cleanup') {

@@ -207,7 +207,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 415 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 419 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -274,13 +274,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 100 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 103 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                123 agent definitions across 24 categories
   skills/                426 skill files (100 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill; + 326 reference)
-  tests/                 415 test files
+  tests/                 419 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
@@ -518,30 +518,26 @@ CTOC improves itself. When implementing features:
     change must tighten the test toward the real behavior, never loosen it to make
     red go green. Weakening an assertion, widening a range, deleting a case, or
     whitelisting without a justified reason is green-washing, not fixing.
-15. **Never halt without a decision — drive the whole authorization.** CTOC is
-    autonomous building steered by the human on the MAIN decisions. An agent or
-    pipeline that is in flight has exactly two legitimate stopping states: (a) the
-    authorized work is COMPLETE, or (b) a genuine FORK — a load-bearing decision that
-    is the human's to make — is surfaced as an explicit question that blocks only its
-    subtree. There is NO third state. A bare "I paused — tell me what to do", a
-    "should I continue?" check-in, or stopping partway through an authorized batch is
-    a DEFECT: it strands the human and is neither autonomous progress nor a real
-    decision. When authorized for N units of work (N rounds, a sweep, a queue, "do it
-    all"), drive ALL N to completion, committing/checkpointing at each natural
-    boundary, and stop only to surface a real fork or on genuine completion. Report
-    milestones as you pass them, but a report is not a stop — keep going. Asking the
-    human to re-authorize work they already authorized is the junior failure this
-    lesson exists to kill. (Sibling of lessons 7 no-stub and 8 async-overnight:
-    maximal lossless progress, forks block their subtree, never a stall below the
-    decision floor.)
+15. **Ask before you build — an unanswered question is a red flag.** Making
+    software is a collaboration between the human and the model: build enough
+    context by asking BEFORE building so that no guessing is required. A model
+    guessing produces plausible-but-wrong outcomes exactly as surely as a human
+    deciding carelessly does. When context is missing, the correct output is a
+    question, not a guess dressed up as a decision.
+16. **A module is not done when its test passes — it is done when a human can
+    reach it.** A test is a caller, so "module + its own test" proves nothing
+    about being wired into the product. Every new module must be reachable from
+    a live entry point in the same unit of work that creates it; deferring the
+    wiring to "a follow-up" is an unasked question and produces well-tested dead
+    code. Enforce this with a reachability gate where one can exist.
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2
 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT**
 (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all
 tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json`
-`minPct`, **99** today (measured 99.37% src line coverage, scoped to `src/**`),
-ratchet-up only — 0 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
+`minPct`, **40** today, ratchet-up only; 80 is the new-code target at review — 0
+skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
 `/ctoc:menu`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.
 

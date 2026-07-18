@@ -404,6 +404,13 @@ test('X2 case 6 — the REAL gate spawned under FORCE_COLOR=3 over a failing sui
       path.join(dir, 'src', 'lib', 'safe-fs.js'),
       `module.exports = require(${JSON.stringify(realSafeFs)});\n`
     );
+    // Same treatment for the real request-exit, which the gate uses to flush its
+    // output before exiting (without it the copied gate cannot resolve its require).
+    const realRequestExit = path.join(__dirname, '..', 'src', 'lib', 'request-exit.js');
+    fs.writeFileSync(
+      path.join(dir, 'src', 'lib', 'request-exit.js'),
+      `module.exports = require(${JSON.stringify(realRequestExit)});\n`
+    );
     // A covered src file, so coverage is MEASURED and cannot be the failure reason —
     // isolating the fail count as the sole cause of the non-zero exit.
     fs.writeFileSync(path.join(dir, 'src', 'thing.js'), 'module.exports = () => 42;\n');
@@ -466,6 +473,87 @@ test('X2 case 6 — the REAL gate spawned under FORCE_COLOR=3 over a failing sui
       plain, /#\s*fail\s*2\s*>\s*0/,
       `the gate must FAIL FOR THE RIGHT REASON (the 2 failures), not by coverage accident. Got:\n${plain}`
     );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('V1 case 8 — the REAL gate PIPED over a LOUD suite still delivers its coverage verdict at the very end', () => {
+  // THE DEFECT. The gate printed the whole suite output, then its verdict, then
+  // called process.exit(0). Writes to a PIPE are asynchronous and process.exit does
+  // not drain them, so everything past the ~64KB pipe buffer was discarded — the
+  // coverage table and the verdict line among it. Step 14 VERIFY reads this gate
+  // through exactly such a pipe, so it saw a run with no coverage figure and failed
+  // closed: "coverage floor 99% declared but no coverage figure was produced". Gate 3
+  // became un-passable for every plan, leaving "Approve anyway" as the only exit.
+  //
+  // Interactively the gate looked perfect, because a write to a TERMINAL is
+  // synchronous. Only a pipe over a LOUD suite reveals it — which is what this does.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-gate-flush-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'src', 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'src', 'lib'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
+
+    // The REAL gate, byte-for-byte, with its two real library dependencies.
+    fs.copyFileSync(
+      path.join(__dirname, '..', 'src', 'scripts', 'test-gate.js'),
+      path.join(dir, 'src', 'scripts', 'test-gate.js')
+    );
+    for (const mod of ['safe-fs', 'request-exit']) {
+      const real = path.join(__dirname, '..', 'src', 'lib', `${mod}.js`);
+      fs.writeFileSync(
+        path.join(dir, 'src', 'lib', `${mod}.js`),
+        `module.exports = require(${JSON.stringify(real)});\n`
+      );
+    }
+    fs.writeFileSync(path.join(dir, 'src', 'thing.js'), 'module.exports = () => 42;\n');
+    fs.writeFileSync(path.join(dir, '.ctoc', 'coverage-baseline.json'), JSON.stringify({ minPct: 50 }));
+
+    // A LOUD but entirely PASSING suite: ~300KB of output, far past the pipe buffer,
+    // so the verdict printed after it is the part at risk.
+    fs.writeFileSync(path.join(dir, 'tests', 'loud.test.js'), [
+      "'use strict';",
+      "const test = require('node:test');",
+      "const assert = require('node:assert');",
+      "const thing = require('../src/thing.js');",
+      "test('loud but passing', () => {",
+      "  for (let i = 0; i < 3000; i++) {",
+      "    console.log('padding line ' + i + ' '.repeat(80));",
+      '  }',
+      '  assert.strictEqual(thing(), 42);',
+      '});',
+    ].join('\n') + '\n');
+
+    const childEnv = { ...process.env };
+    delete childEnv.NODE_TEST_CONTEXT;
+
+    const res = spawnSync(process.execPath, [path.join(dir, 'src', 'scripts', 'test-gate.js')], {
+      cwd: dir, encoding: 'utf8', shell: false, maxBuffer: 64 * 1024 * 1024, env: childEnv,
+    });
+
+    const out = (res.stdout || '') + (res.stderr || '');
+
+    // Guard the fixture: a hollow run must fail loudly, not pass vacuously.
+    assert.ok(
+      !/being called recursively/.test(out),
+      `the fixture suite did not actually run. Output tail:\n${out.slice(-500)}`
+    );
+    assert.ok(
+      out.length > 64 * 1024,
+      `the fixture must exceed the pipe buffer or it cannot demonstrate the defect; got ${out.length} bytes`
+    );
+
+    // THE POINT: the verdict is printed LAST and must survive the pipe.
+    assert.match(
+      res.stdout, /\[CTOC test-gate\] coverage [\d.]+% \(threshold 50%\)/,
+      `the coverage verdict is printed after ~300KB of output and must not be discarded ` +
+      `on exit — this is what Step 14 VERIFY reads. Received ${res.stdout.length} bytes, ` +
+      `tail:\n${res.stdout.slice(-300)}`
+    );
+    assert.match(res.stdout, /\[CTOC test-gate\] PASS/, 'the final PASS line must survive too');
+    assert.strictEqual(res.status, 0, `a clean loud suite must exit 0. Tail:\n${out.slice(-500)}`);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

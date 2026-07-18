@@ -31,6 +31,7 @@ timezone: "UTC"
 # ─────────────────────────────────────────────────────────────────────────────
 
 regulatory_regime:
+  declined: true
   # Profiles to activate. Default empty list = `none` (lean, opt-in nothing).
   # Available profiles (stack multiple if the project is multi-regime):
   #   - pci-dss-v4        (payment card industry, mandatory March 2025)

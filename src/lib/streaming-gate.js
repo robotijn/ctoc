@@ -238,6 +238,25 @@ function renderPlanBody(content) {
  */
 function nextUnansweredQuestion(root, ref) {
   if (!isNonEmptyStr(root)) return null;
+
+  // X9: promote any question file the gate critic dropped in the quarantine
+  // directory BEFORE reading the store. The lazy require + try/catch mirrors the
+  // established pattern below (lines ~246 and ~324): a sweeper failure must never
+  // reach the render. The sweep is idempotent and cheap (a readdir of a normally
+  // empty directory).
+  //
+  // WHY HERE and not menu-screens.buildDashboardTable: this function is the single
+  // funnel BOTH question consumers pass through — richQuestionScreen (serving
+  // streamingGateScreen / advanceAfter / advanceExcludingSlug) and
+  // planDecisionScreen. The dashboard's on-open reconcile is the PATTERN this
+  // copies (render-time, best-effort, never blocking), but the dashboard is not
+  // where questions are read, so sweeping only there would leave a promoted file
+  // unread until the human happened to open the dashboard. One call site, both
+  // readers, promotion always precedes the read.
+  try {
+    require('./streaming-questions-sweeper').sweepPendingQuestions(root);
+  } catch { /* fail-soft: the human still gets the plain Approve screen */ }
+
   let questions;
   try {
     // Lazy require avoids a load-time circular dependency (streaming-precompute

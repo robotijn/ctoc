@@ -250,3 +250,102 @@ test('entryKind distinguishes human from pipeline; readEntryResult reports statu
   fs.writeFileSync(path.join(projectDir, '.ctoc', 'approvals', 'broken.json'), 'not json');
   assert.equal(ledger.readEntryResult('broken', projectDir).status, 'corrupt');
 });
+
+// ============================================================================
+// Z1 — THE HAZARD: the residency sweep REPORTS on an UNMIGRATED project.
+//
+// The hook is registered on EVERY tool call and calls revertAll unconditionally,
+// so on a project that predates the approval ledger the FIRST tool call after a
+// plugin update would move and rewrite the entire plan archive. These cases drive
+// the REAL main() in a REAL child process (it calls process.exit(0), so it cannot
+// run in-process) — the exact path .claude-plugin/hooks.json invokes.
+// ============================================================================
+
+const { spawnSync } = require('node:child_process');
+const gateMigration = require('../src/lib/gate-migration');
+
+const HOOK_PATH = path.resolve(__dirname, '..', 'src', 'hooks', 'human-gate-check.js');
+
+/** Run the hook's main() in a real child process rooted at projectDir. */
+function runSweep(root) {
+  return spawnSync(process.execPath, ['-e', `require(${JSON.stringify(HOOK_PATH)}).main();`], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+}
+
+const atStage = (stage, base) => path.join(projectDir, 'plans', stage, `${base}.md`);
+
+test('Z1: an UNMIGRATED project reports its unledgered done/ plan and does NOT move it', () => {
+  const { filePath, content } = writePlan('done', 'legacy-plan', { title: 'Pre-ledger archive' });
+  const before = fs.readFileSync(filePath, 'utf8');
+  assert.equal(gateMigration.isMigrated(projectDir), false, 'precondition: no migration marker');
+
+  const res = runSweep(projectDir);
+
+  assert.equal(res.status, 0, 'the hook still fails open on the tool call itself');
+  assert.equal(fs.existsSync(filePath), true, 'the legacy plan must NOT be moved out of done/');
+  assert.equal(fs.readFileSync(filePath, 'utf8'), before,
+    'the legacy plan must be BYTE-IDENTICAL — no violation note appended');
+  assert.equal(before, content);
+  assert.equal(fs.existsSync(atStage('review', 'legacy-plan')), false,
+    'nothing may land in review/ on an unmigrated project');
+
+  const pending = gateMigration.readPendingNotice(projectDir);
+  assert.ok(pending.some((e) => e.plan === 'legacy-plan.md'),
+    'detection is NEVER withheld — the plan must be REPORTED in the pending notice');
+  assert.match(res.stderr, /HUMAN GATE VIOLATION/, 'the violation is still printed');
+});
+
+test('Z1: the SAME project, once MIGRATED, is enforced exactly as before', () => {
+  const { filePath } = writePlan('done', 'legacy-plan', { title: 'Pre-ledger archive' });
+
+  gateMigration.writeMarker(projectDir, {
+    migrated: true,
+    at: new Date().toISOString(),
+    mode: 'verified',
+    ledgered: 0,
+  });
+  const res = runSweep(projectDir);
+
+  assert.equal(res.status, 0);
+  assert.equal(fs.existsSync(filePath), false, 'a migrated project still reverts an unledgered resident');
+  const moved = atStage('review', 'legacy-plan');
+  assert.equal(fs.existsSync(moved), true, 'the plan lands in review/');
+  assert.match(fs.readFileSync(moved, 'utf8'), /HUMAN GATE VIOLATION/,
+    'the reverted plan carries the violation note, unchanged from today');
+});
+
+test('Z1: a TAMPERED plan is reverted even on an UNMIGRATED project (provenance exists and is WRONG)', () => {
+  const { filePath, content } = writePlan('done', 'tampered-plan', { title: 'Ledgered then edited' });
+  humanApprove('tampered-plan', content, 'review', 'done');
+  fs.appendFileSync(filePath, '\nsmuggled line after approval\n');
+  assert.equal(gate.checkFolder('done', projectDir)[0].reason, 'hash-mismatch',
+    'precondition: the tamper classifies as hash-mismatch, not no-ledger-entry');
+  assert.equal(gateMigration.isMigrated(projectDir), false, 'precondition: unmigrated');
+
+  const res = runSweep(projectDir);
+
+  assert.equal(res.status, 0);
+  assert.equal(fs.existsSync(filePath), false,
+    'a live attack signature is NEVER withheld — enforcement is unchanged where provenance exists');
+  assert.equal(fs.existsSync(atStage('review', 'tampered-plan')), true, 'it reverts to review/');
+});
+
+test('Z1: mixed set on an UNMIGRATED project — exactly one moved, exactly one reported', () => {
+  const legacy = writePlan('done', 'mixed-legacy', { title: 'No provenance' });
+  const tampered = writePlan('done', 'mixed-tampered', { title: 'Wrong provenance' });
+  humanApprove('mixed-tampered', tampered.content, 'review', 'done');
+  fs.appendFileSync(tampered.filePath, '\ntampered\n');
+
+  const res = runSweep(projectDir);
+
+  assert.equal(res.status, 0);
+  assert.equal(fs.existsSync(legacy.filePath), true, 'the no-ledger-entry plan stays put');
+  assert.equal(fs.existsSync(tampered.filePath), false, 'the hash-mismatch plan is reverted');
+  assert.equal(fs.existsSync(atStage('review', 'mixed-tampered')), true);
+  assert.equal(fs.existsSync(atStage('review', 'mixed-legacy')), false);
+
+  const pending = gateMigration.readPendingNotice(projectDir).map((e) => e.plan);
+  assert.deepEqual(pending, ['mixed-legacy.md'], 'exactly the withheld plan is reported');
+});

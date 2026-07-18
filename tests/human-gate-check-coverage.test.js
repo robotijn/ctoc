@@ -74,6 +74,24 @@ function writePlan(projectDir, stage, slug, extraFm = '') {
   return { filePath, content, slug };
 }
 
+/**
+ * Record this sandbox as MIGRATED to the approval ledger (Z1).
+ *
+ * The residency sweep now withholds the revert of `no-ledger-entry` violations on a
+ * project whose approval provenance was never recorded — otherwise a user's first
+ * tool call after a plugin update would move their whole plan archive. These
+ * main()-driving tests assert the ARMED, post-migration behavior, so they state that
+ * precondition explicitly instead of relying on the default. No assertion is
+ * weakened: every one of them still demands the full revert.
+ */
+function markMigrated(projectDir) {
+  fs.mkdirSync(path.join(projectDir, '.ctoc', 'approvals'), { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, '.ctoc', 'approvals', '.migration-complete.json'),
+    JSON.stringify({ migrated: true, at: new Date().toISOString(), mode: 'verified', ledgered: 0 }),
+  );
+}
+
 /** Run the hook's main() in a real child process rooted at projectDir. */
 function runMain(projectDir) {
   return spawnSync(process.execPath, ['-e', `require(${JSON.stringify(MODULE_PATH)}).main();`], {
@@ -439,6 +457,7 @@ test('loadViolations_readsRecordsFromTheDurableStore', () => {
 test('main_revertsUnapprovedDonePlan_toReview_logsPendingReapproval_andExitsZero', () => {
   // Arrange
   const projectDir = makeProject();
+  markMigrated(projectDir); // Z1: assert the ARMED, post-migration behavior
   writePlan(projectDir, 'done', 'unapproved-ship');
 
   // Act
@@ -465,6 +484,7 @@ test('main_revertsUnapprovedDonePlan_toReview_logsPendingReapproval_andExitsZero
 test('main_isolatesRevertFailure_revertsOthers_andLogsIncomplete', () => {
   // Arrange — one normal squatter and one `.md` DIRECTORY (unrevertable) in done/.
   const projectDir = makeProject();
+  markMigrated(projectDir); // Z1: assert the ARMED, post-migration behavior
   writePlan(projectDir, 'done', 'good-victim');
   fs.mkdirSync(path.join(projectDir, 'plans', 'done', 'trap.md')); // directory → EISDIR on read
 

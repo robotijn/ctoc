@@ -131,7 +131,7 @@ relocated, fence 0, the preserved overview/review/tools counts.
   - eslint on the test file → clean (exit 0).
   - No live `require('../src/tabs/functional')` / `loadTabWithMocks('functional')`
     remains.
-- **KNOWN, NOT-MY-CHANGE, CANNOT-RESOLVE:** `tests/iron-loop-enforcer.test.js`
+- **PREVIOUSLY KNOWN, NOW RESOLVED:** `tests/iron-loop-enforcer.test.js`
   still fails on ONE block finding — `gate-destinations-approved` — which flags
   THIS plan (`plans/todo/00021-…`): it sits at a gate destination (todo/) with a
   frontmatter `approved_by: human` marker but NO approval-ledger entry, and the
@@ -139,3 +139,36 @@ relocated, fence 0, the preserved overview/review/tools counts.
   carve (the reachability block cleared 2 → 1) and resolving it would require
   writing a Gate-2 approval-ledger entry — a forbidden self-cross of a human gate.
   Surfaced to the coordinator rather than green-washed.
+  **Cleared without any code change:** a Gate-2 approval-ledger entry now exists at
+  `.ctoc/approvals/00021-r5c-delete-dead-functional-tab.json` (written by the human's
+  ledger backfill, not by an executor), and the plan has since left the `todo/` gate
+  destination. `tests/iron-loop-enforcer.test.js` → 25/25 pass, 0 fail.
+
+## Executor Re-Verification (task t46, 2026-07-18) — final Step 8–16 pass
+
+The code work landed in commit `a854872` (v6.12.6). This pass re-derived the evidence
+from disk rather than inheriting the notes above.
+
+- **Step 8 TEST — RED evidence captured THIS session (not inherited).** Restored
+  `src/tabs/functional.js` from `a854872^` and re-ran the file fence:
+  `reachability.analyze().unreachable` → `["src/tabs/functional.js"]`, and
+  `tests/reachability.test.js` → **pass 2, fail 3 (RED)**. Deleted the file again:
+  `unreachable` → `[]`, `tests/reachability.test.js` → **5/5 pass (GREEN)**. The
+  red→green transition is therefore verified, not believed. Working tree left clean
+  (`git status --short src/tabs/ tests/tab-modules.test.js` → empty).
+- **Steps 9–13** — no further work required; the carve is committed and the deletion
+  slice has no optimize/secure surface.
+- **Step 14 VERIFY — FULL gate, not a subset.** `npm test` (exit 0):
+  `tests 9774 · suites 1700 · pass 9774 · fail 0 · cancelled 0 · skipped 0 · todo 0`,
+  and `[CTOC test-gate] coverage 99.04% (threshold 99%), skipped 0, failed 0` →
+  `[CTOC test-gate] PASS`.
+  - File fence: 0 unreachable.
+  - Coverage report `src/tabs` section lists only `overview.js`, `review.js`,
+    `tools.js`, `vision.js` — independent confirmation `functional.js` is gone.
+  - `tests/tab-modules.test.js` + `tests/reachability.test.js` → 59/59 pass; the
+    relocated `actions.assignDirectly is GONE (require-time)` guard runs and passes.
+  - `tests/iron-loop-enforcer.test.js` → 25/25 pass (the one prior known failure).
+  - No `tabs/functional` reference remains anywhere in `src/` or `tests/`; the only
+    residue is stale historical text in `.ctoc/index/plan-index.json` and
+    `.ctoc/state/tasks.json`, which are generated data, not call sites.
+- **Steps 15–16** — test-file header already lists only the surviving tabs. Gate 3 ready.

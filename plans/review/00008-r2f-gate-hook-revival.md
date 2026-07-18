@@ -50,15 +50,38 @@ the integrator executes the data migration before the commit).
    gate destinations before done (todo) keep human-only. Also: `backfilled:
    true` + `backfill_reason` optional fields, accepted as human-kind (the
    2026-07-14 legacy migration provenance).
-4. **Vision exemption parity (contradiction 1).** checkFolder('done') exempts
+4. **Vision exemption parity (contradiction 1).** ~~checkFolder('done') exempts
    `type: vision` plans exactly as iron-loop-enforcer.js:337-339 does — the
    two acceptance semantics must agree; document the exemption in both places'
-   comments (enforcer file itself is out of scope; reference it).
+   comments (enforcer file itself is out of scope; reference it).~~
+
+   > **SUPERSEDED by R3-A item 3 — DO NOT IMPLEMENT.** The `type: vision`
+   > exemption was a FORGERY HOLE, not a nicety, and the shipped hook REMOVED it
+   > (`human-gate-check.js`, "UNIFORM LEDGER ACCEPTANCE"). Because `plans/**.md`
+   > is Edit-whitelisted, any agent could write `plans/done/anything.md`
+   > containing the single line `type: vision` and squat the terminal folder with
+   > zero provenance — and the predicate tested only `type: vision`, never the
+   > `status: decomposed` its own header claimed. What SHIPPED: no exemption and
+   > no special case. Every resident of a gate-destination folder must be vouched
+   > for by the agent-write-denied ledger. A legitimately decomposed vision earns
+   > its `done/` residency with a PIPELINE-kind entry
+   > (`approval-ledger.writeVisionArchiveEntry`, `evidence: 'vision-decomposed'`).
+   > `tests/gate-hook-revival.test.js` asserts the exact opposite of the text
+   > above: "a bare type: vision plan in done/ is FLAGGED".
+
 5. **Backfill helper.** Export `backfillEntry(projectPath, planPath, { stage_to,
    reason })` on approval-ledger — writes a human-kind entry with backfilled
-   provenance for an EXISTING plan file, hashing current content. No standalone
+   provenance for an EXISTING plan file, hashing current content. ~~No standalone
    script file (one-shot scripts become dead code); the integrator drives it
-   via `node -e` at the boundary.
+   via `node -e` at the boundary.~~
+
+   > **SUPERSEDED by R3-A item 2 — DO NOT USE `node -e`.** The `node -e` shape
+   > WAS the forgery: `PreToolUse.Bash.js` allowed any command starting with
+   > `node `, so an agent could mint a human-kind approval entry for any plan and
+   > cross Gate 2 or Gate 3 by itself. Inline evaluation that touches the ledger
+   > is now DENIED. The standalone script `src/scripts/ledger-backfill.js` EXISTS
+   > and is the ONE sanctioned migration channel — checked in, reviewable,
+   > argv-only, with no `eval` and no `new Function`.
 
 ### Wiring — the live call sites (MANDATORY)
 
@@ -66,7 +89,7 @@ the integrator executes the data migration before the commit).
 |---|---|---|
 | all hook changes | registered PreToolUse hook (hooks.json) | hook root |
 | ledger changes | stampAndLedger (actions.js, exists) + hook verify | /ctoc:menu + hook |
-| backfillEntry | integrator boundary migration (node -e, this wave) + documented in the module header | hook root |
+| backfillEntry | ~~integrator boundary migration (node -e, this wave)~~ **SUPERSEDED (R3-A item 2)**: driven by the checked-in `src/scripts/ledger-backfill.js`, the one sanctioned channel; inline `node -e` against the ledger is DENIED | hook root |
 
 ### Test Plan (TDD-Red first) — new tests/gate-hook-revival.test.js + updates
 Uppercase-slug plan in a temp done/ → sweep completes, classifies it (not
@@ -74,7 +97,10 @@ crash); after backfillEntry → accepted. 181-gap simulation: three plans, one
 ledgered, one backfilled, one bare → exactly the bare one flagged. Pipeline
 entry with evidence accepted in done/, rejected in todo/. Pipeline entry
 WITHOUT evidence → write refused. Corrupt entry JSON → that plan flagged
-`ledger-corrupt`, sweep continues. Vision-typed plan in done/ exempt. Case
+`ledger-corrupt`, sweep continues. ~~Vision-typed plan in done/ exempt.~~
+**SUPERSEDED (R3-A item 3)**: the vision exemption is GONE; a bare `type: vision`
+plan in done/ is FLAGGED, and a real decomposed vision is accepted only on its
+pipeline-kind ledger entry. Case
 collision on appendEntry → loud failure. Existing w02-s3 acceptance/revert
 tests: keep passing or tighten (never weaken).
 
@@ -92,8 +118,9 @@ agent-write deny untouched.
 NOT run the backfill against the real repo (integrator's job).
 ### Step 15: DOCUMENT — module headers: two entry kinds, backfill provenance,
 fault-isolation rules.
-### Step 16: FINAL-REVIEW — report + exact `node -e` backfill invocation the
-integrator should run.
+### Step 16: FINAL-REVIEW — report + the exact backfill invocation the
+integrator should run. **SUPERSEDED (R3-A item 2)**: that invocation is
+`node src/scripts/ledger-backfill.js`, never `node -e`.
 
 ## Decisions Taken Under Ambiguity
 
@@ -140,10 +167,17 @@ integrator should run.
    exemption was tightened to require a TRUE `absent` status (a corrupt/un-keyable
    entry can no longer be laundered into an exemption).
 
-7. **Vision exemption scoped to `done/` only**, matching `iron-loop-enforcer.js`'s
+7. ~~**Vision exemption scoped to `done/` only**, matching `iron-loop-enforcer.js`'s
    `type:\s*vision` check exactly (that file is out of scope and only referenced).
    A `type: vision` archive in `done/` is skipped before classification; every
-   non-vision bare plan is still flagged.
+   non-vision bare plan is still flagged.~~
+
+   > **SUPERSEDED by R3-A item 3.** This decision was WRONG and the exemption it
+   > scoped has been DELETED. `plans/**.md` is Edit-whitelisted, so the exemption
+   > let any agent squat the terminal `done/` folder with one frontmatter line and
+   > zero provenance. What shipped: uniform, ledger-only acceptance with no
+   > exemption anywhere. Archives that predate the ledger are migrated with
+   > `node src/scripts/ledger-backfill.js --vision`.
 
 8. **Plan file left in `todo/` — no stage move.** The parent's explicit
    constraints ("NO git; leave unstaged"; the INTEGRATOR runs the data migration
@@ -152,36 +186,43 @@ integrator should run.
    integrator sequence the backfill-then-enforce transition IS the plan's design
    ("acceptance must be sequenced with the backfill the integrator runs").
 
-## Integrator boundary migration (exact invocation)
+## Integrator boundary migration — SUPERSEDED (R3-A item 2, then Z1)
 
-Run from the repo root AFTER this slice's code lands and BEFORE the hook is
-allowed to enforce (the sequencing the plan mandates). It ledgers every legacy
-`done/` + `todo/` (+ any `implementation/`) resident the revived sweep would
-flag, hashing each plan's current content; `type: vision` archives are exempt and
-skipped; it is idempotent and re-runnable, and prints `remaining flagged` = 0 on
-success:
+> **DO NOT RUN THE `node -e` ONE-LINER THAT USED TO BE HERE.** It required
+> `./src/lib/approval-ledger` inline and looped `backfillEntry`. That shape WAS the
+> forgery R3-A closed: `PreToolUse.Bash.js` allowed any command starting with
+> `node `, so an agent could mint human-kind approval entries for arbitrary plans and
+> cross Gate 2 or Gate 3 by itself. Inline evaluation touching the ledger is now
+> DENIED on the Bash channel. It is removed here rather than left as an example,
+> because CTOC agents read full plan ancestry — an archived plan is an active
+> instruction surface, not a historical record.
+
+The sanctioned migration, one plan at a time, from the repo root:
 
 ```
-node -e '
-const gate = require("./src/hooks/human-gate-check.js");
-const ledger = require("./src/lib/approval-ledger");
-const root = process.cwd();
-const reason = "2026-07-14 legacy pre-ledger migration (R2-F wave boundary)";
-let ok = 0, fail = 0;
-for (const folder of ["implementation", "todo", "done"]) {
-  for (const v of gate.checkFolder(folder, root)) {
-    try { ledger.backfillEntry(root, v.path, { stage_to: folder, reason }); ok++; }
-    catch (e) { fail++; console.error(`  SKIP ${folder}/${v.file}: ${e.message}`); }
-  }
-}
-console.log(`backfilled=${ok} failed=${fail}`);
-let remaining = 0;
-for (const f of ["implementation","todo","done"]) remaining += gate.checkFolder(f, root).length;
-console.log(`remaining flagged after backfill = ${remaining}`);
-'
+node src/scripts/ledger-backfill.js --plan plans/<stage>/<plan>.md --stage <stage> --reason "<why>"
 ```
 
-Against the real repo at this slice's completion the sweep reports (read-only,
-verified): `implementation: 0`, `todo: 7`, `done: 172` flagged
-(`no-ledger-entry`) — the ~181 legacy gap minus the now-exempt `type: vision`
-archives — so the migration will ledger 179 residents and drive the sweep to 0.
+Archived decomposed visions have their own mode:
+
+```
+node src/scripts/ledger-backfill.js --vision
+```
+
+Then, once the residency sweep reports nothing un-ledgered, record the migration —
+which is what ARMS the sweep's revert for future `no-ledger-entry` violations (Z1):
+
+```
+node src/scripts/ledger-backfill.js --mark-migrated
+```
+
+`--mark-migrated` is SELF-VERIFYING: it refuses while any un-ledgered resident
+remains, and names exactly what blocks it. Until it has been run, the residency
+sweep REPORTS un-ledgered residents (surfaced at `/ctoc:menu` → `inbox migration`)
+instead of moving them — so a project that predates the ledger can never have its
+plan archive rewritten on the first tool call after an update.
+
+**As measured at the time (2026-07-14, read-only)** the sweep against this repo
+reported `implementation: 0`, `todo: 7`, `done: 172` flagged (`no-ledger-entry`) —
+the ~181 legacy gap minus the then-exempt `type: vision` archives. Those numbers are
+the historical record of that moment and are NOT re-measured here.
