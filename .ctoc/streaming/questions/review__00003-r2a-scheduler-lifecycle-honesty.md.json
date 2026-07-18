@@ -3,212 +3,156 @@
   "planMtimeMs": 1784271999070.0571,
   "questions": [
     {
-      "id": "q10-sync-barrier-settles-on-unconfirmed-orphan",
-      "prompt": "A wave sync can run the suite and commit while an agent it was meant to wait for is still writing files. A dependency orphaned on age alone satisfies the sync barrier, and the code itself says such an agent was never confirmed dead. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
+      "id": "q10-step-14-excludes-the-quality-gate",
+      "prompt": "Step 14 ran two test files; 24 test files reference the two modules this plan changes, and the project defines Step 14 as the full suite plus the coverage floor and the zero-skipped gate. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
       "critical": true,
       "important": false,
       "options": [
         {
           "key": "1",
-          "label": "Send back — an age-only orphan must not settle a sync barrier",
+          "label": "Run the full quality gate once over the wave, then rule",
           "recommended": true,
-          "pros": "Confidence HIGH — premortem and red-team flagged this independently on different evidence, and devils-advocate reached it from a third direction. The barrier's premise becomes true before a commit is taken, and the fix is local: depsSatisfied already holds the dependency task and can read its orphan reason.",
-          "cons": "A sync then waits for the presumed-dead bound or a confirmed-dead signal, so a genuinely dead agent delays the wave commit by up to 240 minutes for an implement task. The exclusion has to be time-bounded, or it partially reopens the barrier deadlock this plan was written to fix.",
-          "description": "src/lib/task-registry.js:823 reads isSync ? TERMINAL.has(dep.status) : dep.status === 'done', and TERMINAL at :154 contains orphaned. src/lib/task-reconcile.js:347 sets terminate from age alone when the live list is absent; :368-373 stamps reason staleness with the summary 'may still be editing its files'. The presumed-dead bound at :414 is 120 minutes times 2. The quarantine at :639 tests touches.length > 0, and src/lib/actions.js:1685 creates every wave sync with touches: [] — so the quarantine can never hold a sync."
+          "pros": "Confidence HIGH — the devils-advocate lens grounded this in a verbatim quote at plans/review/00003-r2a-scheduler-lifecycle-honesty.md:89 that I read and confirmed. One run answers the verify question for every plan now in review rather than for this one alone, and it produces the integrated evidence the wave's sync barrier was designed to produce but has never been observed producing — I confirmed enqueueWaveSync has no JavaScript caller anywhere in src, so that barrier has never actually run. A contract regression in the 22 dependent test files this plan never executed then surfaces before a done marker rather than after nine dependent plans have crossed on top of it.",
+          "cons": "Costs a full suite plus a coverage run before any plan in review can be ruled on, and a red result spread across the wave is harder to attribute to one slice than a per-plan failure would be. It also concedes that the barrier is a design rather than a mechanism: nothing in code schedules this run, so it happens only because a human chooses it, and the same gap returns unchanged on the next wave."
         },
         {
           "key": "2",
-          "label": "Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3 and rely on the 120-minute floor",
-          "pros": "No further work, and the widened 120-minute floor already makes falsely orphaning a live implement agent uncommon.",
-          "cons": "When it does happen the artifact is a commit of a partially-written working tree entering git history, at the step whose job is to certify the wave. It surfaces as an unexplained bad merge rather than an error. The exposed path is the one src/lib/task-reconcile.js:450 itself calls the normal degraded path — the default menu run passes no live agent list, so it is the ordinary case."
+          "label": "Cross on the two-file evidence",
+          "pros": "The two declared test files cover the new lifecycle behaviour in real detail — the settled-barrier cases, the cancelling transitions, the 120-minute staleness floor and the unsatisfiable-task cases are each exercised directly, which is more than most changes get. The narrow scope is also the wave's declared division of labour rather than a private shortcut: I found the same file-scoped Step 14 in at least fourteen other plans now in review, and 00011-r2z states 'no full suite' explicitly, so rejecting this one plan for it leaves the convention untouched everywhere else.",
+          "cons": "Gate 3 would be crossed on a check the plan text itself scoped to exclude the coverage floor and the zero-skipped gate that the project defines Step 14 as. The convention is not universal either — 00071-fg1 records a full gate pass in review — so it is a habit rather than a rule, and the contracts changed here are read by 24 test files and nine dependent plans."
         }
       ]
     },
     {
-      "id": "q11-staleness-quarantine-one-path-only",
-      "prompt": "The quarantine that stops two agents landing on the same file guards only one of the three channels that hand those files out, and the dashboard offers the human a re-run of exactly the case the code believes unsafe. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
+      "id": "q11-quarantine-covers-one-of-three-paths",
+      "prompt": "The concurrent-edit quarantine filters one of three paths that compute the promote set; computePromote in menu-screens and the dashboard re-run offer both bypass it. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
       "critical": true,
       "important": false,
       "options": [
         {
           "key": "1",
-          "label": "Send back — make the quarantine an invariant of canRun and label age-only orphans",
+          "label": "Route the quarantine hardening to the sibling that declares all three files",
           "recommended": true,
-          "pros": "Confidence HIGH — grounded in a verbatim quote at src/lib/task-reconcile.js:637-649 the synthesizer read and confirmed. One oracle then enforces the rule, which is the discipline the scheduler's own module header already states, and the human stops being offered a re-run the code believes unsafe.",
-          "cons": "canRun gains a dependency on the orphan reason field, so a scheduler that is pure today takes on a field dependency it does not have, and its tests reopen at Step 8.",
-          "description": "The quarantine is local: src/lib/task-reconcile.js:637-649 filters only the promote array. src/lib/task-registry.js:780 defines the occupying set as running and cancelling only, so an orphaned task's files read as free to both nextRunnable and canRun. src/lib/menu-screens.js:228-229 reads only report.orphaned, and :240 renders one identical line for an age-only orphan and a confirmed-dead one. A grep for report.stalenessOrphaned finds only its definition, its push and its documentation — no reader."
+          "pros": "Confidence HIGH — the premortem lens grounded this in a verbatim quote at src/lib/menu-screens.js:1744 that I read and confirmed: computePromote calls taskRegistry.nextRunnable with no quarantine filter and feeds three render paths. The sibling 00013-r3b declares task-registry.js, task-reconcile.js AND menu-screens.js while this plan declares only the first two, so the sibling is the only plan at this gate that can make all three paths agree in one pass — and the quarantine code is marked in-comment as R3-B item 8, meaning it already belongs to that slice. Sending this plan back cannot fix the defect, because the file carrying the bypass is not in its declared list.",
+          "cons": "It splits one hazard across two rulings, and 00013-r3b is itself sitting in review — if it crosses without the fix, nobody owns the gap and the three paths stay inconsistent with no plan left to carry it. Recording an objection against a sibling is also weaker than fixing it: that plan's reviewer has to rediscover why it matters, and this plan is meanwhile recorded done carrying a guard its own module header describes as an invariant.",
+          "description": "I verified the bypass at src/lib/menu-screens.js:1744-1745 and its three call sites at :1838, :1880 and :2027; the quarantine filter is at src/lib/task-reconcile.js:637-649."
         },
         {
           "key": "2",
-          "label": "Approve with the quarantine covering the on-open path only",
-          "pros": "No change is needed, the on-open path is genuinely protected, and the file-overlap precondition does not arise in every wave.",
-          "cons": "The completion turn is the most frequent turn in a wave and is the one channel that actually hands the files out. Two agents on one file produces no error — it produces a wrong diff nobody sees until someone reads the result."
+          "label": "Make the scheduler lifecycle-aware in this plan",
+          "pros": "One guard inside canRun and nextRunnable covers all three paths at once and cannot be bypassed by any caller that computes promote for itself, which is the property a safety invariant is supposed to have. It also puts the fix in the same commit as the defect rather than trusting a second plan and a second reviewer to carry it, and this plan does declare both scheduler files, so the change is reachable from here without widening the slice or waiting on anyone.",
+          "cons": "It inverts the module dependency I verified: task-registry.js:773 opens the scheduler section as pure and reads only status, kind, touches and gitOp, while the orphan reason is written by task-reconcile, which calls into the scheduler at :616 and not the other way round. The scheduler's four rules and two test files are written against that narrow input contract, so this widens the rule surface at a gate to guard a path the promote projection already covers."
         }
       ]
     },
     {
-      "id": "q12-step-14-narrower-than-quality-gate",
-      "prompt": "This plan defines its own Step 14 VERIFY as a two-file test run that explicitly excludes the full suite, the coverage floor and the zero-skipped gate — while changing contracts that 23 test files depend on. Gate 3 would be crossed on that evidence. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
+      "id": "q12-sync-barrier-settles-on-unconfirmed-orphan",
+      "prompt": "A wave sync commits once every dependency has SETTLED, and settled includes an orphan declared dead on age alone whose own record says the agent may still be editing its files. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
       "critical": true,
       "important": false,
       "options": [
         {
           "key": "1",
-          "label": "Run the full quality gate and attach the result before crossing",
+          "label": "Record the precondition and leave the pure scheduler alone",
           "recommended": true,
-          "pros": "Confidence HIGH — grounded in a verbatim quote at the plan's line 89. The 21 other dependent test files are actually exercised, so a contract regression surfaces now rather than after the done marker. It is also the gate this project already defines, so no exception has to be carved.",
-          "cons": "Costs one full suite run, and if the suite is red for an unrelated reason this plan is held behind someone else's failure.",
-          "description": "Plan line 89 reads 'Step 14: VERIFY — node --test on the two files + eslint on all four; no git.' CLAUDE.md defines Step 14 as lint, typecheck, all tests, the coverage floor and zero skipped via npm test, and records that the file-scoped runner bypasses both gates. A grep of tests/ for task-registry or task-reconcile returns 23 files; this plan runs 2."
+          "pros": "Confidence HIGH — the premortem lens grounded this in a verbatim quote at src/lib/task-registry.js:823 that I read and confirmed; the code reads exactly as claimed. Two conjuncts I verified myself make the path unopenable today: enqueueWaveSync at actions.js:1670 is the sole producer of a sync task and has no JavaScript caller anywhere in src, and Rule 2 at task-registry.js:845 refuses a sync while ANY task occupies a slot, so every other wave member must already have settled — a conjunct all three prosecution lenses omitted. Leaving the scheduler pure keeps its four rules testable in isolation rather than adding lifecycle provenance to close a path no code can currently open.",
+          "cons": "An unreachable path is not a guarded path. The moment a wave sync is enqueued for real — and the menu instruction surface at menu.md:62 already tells the session to do it — the precondition set shrinks by one and nothing re-checks this argument then. If it ever fires the artifact is a commit of a partially-written tree, surfacing as an unexplained bad merge rather than an error. I also could not verify the defense lens's zero-occurrence task history, because .ctoc/state/tasks.json lies outside my permitted read scope and I did not open it."
         },
         {
           "key": "2",
-          "label": "Cross on the two-file evidence the plan specified",
-          "pros": "The gate crosses today, and the two declared test files do cover the new behaviour in real detail.",
-          "cons": "Gate 3 exists to prevent shipping unreviewed code, and would be crossed on a check the plan text itself scoped to exclude the gate that catches cross-module breakage. A change breaking menu-task-wiring, scheduler-enforced, actions-scheduler, greenfield-journey or last-mile-wired passes this plan's Step 14 green."
+          "label": "Exclude age-only orphans from settling a sync barrier now",
+          "pros": "The barrier's own premise — that the wave has settled — becomes true before a commit is taken, and it is then guarded by code rather than by the absence of an occurrence, so it stays guarded when wave syncs become routine rather than hypothetical. depsSatisfied already holds the dependency object and the orphan reason is durably recorded on result.orphanReason at task-reconcile.js:368-373, so the change is small and reachable from this plan's own declared files without waiting for a sibling.",
+          "cons": "It puts a reconcile-authored lifecycle field into the section task-registry.js:773 declares pure, reopening both scheduler test files at the gate. A sync would then wait up to the presumed-dead bound at task-reconcile.js:414 — the kind floor times the multiplier — so the exclusion must be time-bounded or it reopens the barrier deadlock this plan was written to close."
         }
       ]
     },
     {
-      "id": "q13-concurrent-edit-guard-fails-open",
-      "prompt": "The guard that stops two agents editing one file is wrapped in an empty catch that falls through to the unguarded promote list and records nothing. Any fault inside it silently produces the exact defect it exists to prevent. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
+      "id": "q13-wedge-reports-have-no-reader",
+      "prompt": "The plan states every wedge becomes a loud event, but report.unsatisfiable, report.deferred and report.stalenessOrphaned have no reader anywhere in src. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
       "critical": false,
       "important": true,
       "options": [
         {
           "key": "1",
-          "label": "Send back — record the fault and drop the affected candidates when the guard cannot run",
+          "label": "Ship the inbox reader with the sibling that declares the render file, and correct this plan's claim",
           "recommended": true,
-          "pros": "Confidence HIGH — grounded in a verbatim quote at src/lib/task-reconcile.js:651. Keeps the render unbreakable, which was the original intent, while making the failure visible and failing safe rather than open. Matches the loud-report convention every other error path in the same file follows.",
-          "cons": "Requires a new report field and a test that injects a fault into the overlap check, so Step 8 and both reconcile tests reopen.",
-          "description": "src/lib/task-reconcile.js:651 catches with the comment that the quarantine is defensive and a fault must never break the render, leaving promote standing. Every other failure path in the same file is loud — report.saveFailed at :599. CLAUDE.md names empty catch blocks that swallow errors as a blocked pattern."
+          "pros": "Confidence HIGH — the premortem lens grounded this in a verbatim quote at src/lib/menu-screens.js:243 that I read and confirmed: the dashboard renders one orphaned count and nothing else, and my own search found no reader for the three report fields outside the module that writes them. The data is already computed with its reason and dependency ids, so only a render line is missing, and 00013-r3b declares menu-screens.js while this plan does not. Correcting the claim matters on its own: a plan recorded done asserting a loud event that does not exist is the dead-producer pattern the parent vision names as a reason for this rebuild.",
+          "cons": "It leaves the wedge unrendered for however long the sibling takes, and an unsatisfiable task is marked failed at task-reconcile.js:474 and then swept from the active view once past the retention window — so the record of a permanent dependency cycle is eventually lost, not merely quiet. Editing the plan's claim also costs a round on work that is otherwise complete, and a claim corrected downward reads worse than one that was never overstated."
         },
         {
           "key": "2",
-          "label": "Keep the fail-open behaviour but add a report entry",
-          "pros": "Smallest possible change, and it preserves the current promote behaviour exactly.",
-          "cons": "It still hands conflicting files to a second agent on the failure path. The human learns about it only after the concurrent edit has already been scheduled."
+          "label": "Accept the reports as a computed surface a consuming slice will render",
+          "pros": "The wedge is not invisible today: an unsatisfiable task is marked failed with its reason and dependency ids in result.summary, so it appears in the failed count and the reason is there on drill-in. Keeping the slice at two modules is also what makes its diff reviewable, and the report contract is exactly the interface a rendering slice needs — building a producer before its consumer is a normal order rather than a defect, provided the consumer actually lands.",
+          "cons": "A permanent dependency cycle and an ordinary one-off failure render identically, so the human learns nothing about which one they are looking at, and that distinction is the entire point of the unsatisfiable detection this plan added. By CTOC's own measure — a module is done when a human can reach it — this feature is not done, and 'a consuming slice will render it' is exactly the deferral that produced the unwired machinery the vision was written to fix."
+        }
+      ]
+    },
+    {
+      "id": "q14-quarantine-guard-fails-open-silently",
+      "prompt": "The concurrent-edit guard sits in an empty catch that falls through to the unquarantined promote list and records nothing, in a file where every other failure path is loud. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
+      "critical": false,
+      "important": true,
+      "options": [
+        {
+          "key": "1",
+          "label": "Record the fault and drop the affected candidates",
+          "recommended": true,
+          "pros": "Confidence HIGH — the red-team lens grounded this in a verbatim quote at src/lib/task-reconcile.js:651 that I read and confirmed; the catch body is a comment only, and the loud contrast recording report.saveFailed at :599 sits in the same function. The change keeps the render unbreakable, which is that comment's actual intent, while failing safe instead of open: a throw inside the glob overlap test currently produces exactly the concurrent edit the block exists to prevent. The project's own rules name a swallowing empty catch as a blocked pattern, and this file is one the plan declares, so it can be fixed here rather than routed to anyone.",
+          "cons": "It needs a new report field and a fault-injection test, reopening Step 8 and both reconcile test files on a diff that four later slices have already layered onto — task-reconcile.js:302, :312, :363 and :389-410 are marked in-comment as belonging to a later slice, so an executor returning here edits around another plan's uncrossed work and the review evidence for both becomes harder to separate. The fault path may also never have fired once."
         },
         {
-          "key": "3",
+          "key": "2",
           "label": "Approve with the empty catch as built",
-          "pros": "No work at all, and the fault path may never fire in practice.",
-          "cons": "A safety guard whose failure mode is silence, in a file whose stated design principle is that every wedge becomes a loud event. At runtime a guard that failed open is indistinguishable from a guard that ran and found nothing."
+          "pros": "The catch is a deliberate choice with a stated reason: the quarantine is a defensive refinement and a fault inside it must never take down the dashboard render, which is the surface the human actually depends on. Failing open restores precisely the promote behaviour that shipped before the quarantine existed, so the failure mode is a return to the prior baseline rather than a newly introduced hazard, and touchesOverlap operating over two string arrays has a narrow throw surface to begin with.",
+          "cons": "A guard whose failure mode is silence cannot be distinguished at runtime from a guard that ran and found nothing, so nobody will ever learn that it fired. The consequence on that path is two agents editing one file, which produces no error at all — only a wrong diff — in a wave designed to run five agents concurrently."
         }
       ]
     },
     {
-      "id": "q14-wedge-report-has-no-reader",
-      "prompt": "The plan's stated purpose for change 2 — every wedge becomes a loud event — did not ship. The wedge report is produced and tested, but nothing renders it, so a permanent dependency cycle looks exactly like an ordinary agent failure and is swept from the record after 7 days. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
+      "id": "q15-mandatory-wiring-table-unverified",
+      "prompt": "One row of the mandatory wiring table was dead code when this shipped, and another row's call site is delivered by a sibling still in review. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
       "critical": false,
       "important": true,
       "options": [
         {
           "key": "1",
-          "label": "Send back — give the wedge and deferral reports an inbox reader in this wave",
+          "label": "Cross this and the actions-layer sibling as one gate decision",
           "recommended": true,
-          "pros": "Confidence HIGH — premortem and red-team flagged this independently on different evidence. It delivers the loud event change 2 promises, and the data is already computed and already carries the reason and dependency ids, so the remaining work is the render line.",
-          "cons": "A file outside this plan's declared files list must be touched, which either widens the slice or requires a sibling plan in the same wave commit, plus one more line in the dashboard render path and its regression tests.",
-          "description": "A grep of src/ for report.unsatisfiable, report.deferred, report.stalenessOrphaned and report.quarantined finds only definitions, pushes and documentation inside task-reconcile.js itself — no reader anywhere. menu-screens.js:228-229 reads report.orphaned and nothing else. This feature area has already shipped a contract dead once: menu-screens.js:44-49 records that a stale local copy of the terminal set made this plan's own orphaned-to-done contract dead code."
+          "pros": "Confidence HIGH — the devils-advocate and red-team lenses flagged this independently on different evidence — devils-advocate at plans/review/00004-r2b-actions-drain-and-shipgate.md:5, red-team at src/lib/menu-screens.js:48 — and both already rated it HIGH, so the level stands at HIGH on that label; their independent agreement corroborates it and cannot raise it further. I traced all four rows myself and three are live today, so what remains is narrower than the finding claims: the cancelling row's call site is actions.cancelTask at actions.js:1614, in a file this plan does not declare, inside a sibling that declares depends_on on this plan and has not crossed. Ruling on both together makes the done marker mean every mandatory row has a shipped and crossed call site.",
+          "cons": "This plan is then held behind whatever the sibling's own review surfaces, and that sibling covers a far wider scope — the drain, the deploy trigger and the ship gate — so an objection with nothing to do with lifecycle can block work that is otherwise ready. Batching also makes the decision coarser: a reason to send one back sends both, and the human loses the ability to accept one diff and reject the other."
         },
         {
           "key": "2",
-          "label": "Cross and treat the rendering as a consuming slice's responsibility",
-          "pros": "Keeps this slice at its declared boundary of two modules and two test files, and the wedge is at least visible as a failed count with its reason readable on drill-in.",
-          "cons": "A dependency cycle and a genuine agent failure are indistinguishable on the dashboard, and the record is deleted after 7 days by the retention sweep. The plan's central claim stays unproven at the only point that matters, and this exact contract has already shipped dead once here."
+          "label": "Cross this plan alone on the rows as traced",
+          "pros": "Three of the four rows are live and reachable from a real root today, which I confirmed by reading them rather than taking the table's word for it — and the fourth, the orphaned-to-done contract, has already been repaired by another slice and is recorded as such at menu-screens.js:48-53. The cancelling transition is independently reachable through the reconcile path this plan itself delivers, so it is not dead code even if the sibling never crosses, and judging each diff on its own evidence is what a gate is for.",
+          "cons": "It is recorded done carrying a row marked mandatory whose call site belongs to a plan that has not crossed, so the done marker asserts a reachability the pipeline has not itself established. The one row that was independently checked turned out false at ship, which is a poor prior for treating any such table as evidence rather than as a claim."
         }
       ]
     },
     {
-      "id": "q15-wiring-table-row-shipped-dead",
-      "prompt": "One of the four rows in this plan's mandatory wiring table was false when the plan shipped, and the codebase records it in a comment — the contract was dead code until a different slice repaired it. The other three rows were never checked. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
+      "id": "q16-executor-decision-record-empty",
+      "prompt": "The plan stands at Gate 3 with its Decisions Taken Under Ambiguity section still reading '(Executor fills in.)' and no Step 16 report of files, tests, red evidence or decisions. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
       "critical": false,
       "important": true,
       "options": [
         {
           "key": "1",
-          "label": "Send back — verify the other three wiring rows from their named live roots first",
+          "label": "Fill the decision record and the final report before crossing",
           "recommended": true,
-          "pros": "Confidence HIGH — grounded in a verbatim quote at src/lib/menu-screens.js:44-49. The one row that was independently checked turned out false, so the prior on the three unchecked rows is poor. Tracing three call paths is cheap and closes this plan's central reachability claim with evidence instead of assertion.",
-          "cons": "Costs a round of tracing, and all three rows may well prove sound.",
-          "description": "src/lib/menu-screens.js:44-49 records that the former local mirror of the terminal set included orphaned, so completing an orphaned task threw before the registry was reached and this plan's orphaned-to-done contract was dead code. The defect lived in a file this plan neither declares nor tests, which is why its own two-file Step 14 could not have caught it."
+          "pros": "Confidence HIGH — the devils-advocate lens grounded this in a verbatim quote at plans/review/00003-r2a-scheduler-lifecycle-honesty.md:93 that I read and confirmed; the section holds the unedited template placeholder. The plan's own line 91 commits Step 16 to reporting files, tests, red evidence and decisions, so crossing without it means Gate 3 rules on an artifact the plan promised and did not produce. The choices made here were real and load-bearing — the presumed-dead bound, the quarantine placement, the soft-terminal treatment of orphaned — and a reviewer currently has to reconstruct each one from the diff.",
+          "cons": "A record written after the fact is weaker evidence than one written as the decisions were made, so what comes back is a narrative rather than a contemporaneous account, and it costs a round on a plan whose code is otherwise complete. The executor may also no longer be able to separate a decision it genuinely weighed from one it never noticed taking, which makes the reconstructed record quietly misleading."
         },
         {
           "key": "2",
-          "label": "Accept the wiring table as written",
-          "pros": "The gate crosses today, and the one false row has already been repaired by another slice.",
-          "cons": "A plan is recorded done on a table marked mandatory that has a documented false entry, and the pattern that produced it — a reachability claim asserted rather than traced — is left in place for the next plan to repeat."
-        }
-      ]
-    },
-    {
-      "id": "q16-wiring-row-owned-by-ungated-sibling",
-      "prompt": "This plan declares no dependencies, but one row of its mandatory wiring table names a live call site delivered by sibling plan R2-B — which is still in review and declares a dependency on this plan, pointing the other way. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
-      "critical": false,
-      "important": true,
-      "options": [
-        {
-          "key": "1",
-          "label": "Cross R2-A and R2-B as one gate decision",
-          "recommended": true,
-          "pros": "Confidence HIGH — grounded in a verbatim quote at the sibling plan's line 5. The done marker then means what it says: every mandatory wiring row has a shipped live call site. It also makes explicit in the tooling what this plan already assumed in prose.",
-          "cons": "R2-A is held behind whatever R2-B's own review surfaces.",
-          "description": "Plan line 5 declares depends_on: none, while plan line 66 maps the cancelling transitions to actions.cancelTask, attributed to slice R2-B in the same wave commit. The sibling at plans/review/00004-r2b-actions-drain-and-shipgate.md:5 declares depends_on: 00003-r2a-scheduler-lifecycle-honesty and is still in review. The same-wave assumption is stated in prose only, in a plan whose subject is making the scheduler honest about exactly that kind of unstated ordering."
-        },
-        {
-          "key": "2",
-          "label": "Cross R2-A on its own",
-          "pros": "The gate crosses today, and the cancelling transition is independently reachable through the reconcile path this plan does deliver.",
-          "cons": "A plan is recorded done carrying a mandatory wiring row whose named call site belongs to a plan that has not crossed its own gate."
-        }
-      ]
-    },
-    {
-      "id": "q17-executor-decision-record-empty",
-      "prompt": "This plan is at Gate 3 with its decision record still holding the unedited template text and no Step 16 report of files, tests, red evidence or decisions anywhere. There is no record that the failing-test-first step was ever run red. Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3?",
-      "critical": false,
-      "important": true,
-      "options": [
-        {
-          "key": "1",
-          "label": "Send back — have the executor fill the decision record and the final report",
-          "recommended": true,
-          "pros": "Confidence HIGH — grounded in a verbatim quote at the plan's lines 93-94. The choices actually made become reviewable instead of inferred from the diff, which restores the artifact Gate 3 is supposed to rule on.",
-          "cons": "Costs a round, and a decision record reconstructed after the fact is genuinely weaker evidence than one written as the decisions were made.",
-          "description": "Plan lines 93-94 read '## Decisions Taken Under Ambiguity' followed by '(Executor fills in.)'. The plan's own line 91 commits Step 16 to reporting files, tests, red evidence and decisions. The parent vision at plans/vision/ctoc-background-engine-rebuild.md:20-22 names this exact pattern as a reason for the rebuild: a gate that demands verify evidence no live code path writes, whose only exit is approving anyway, which trains gate-override."
-        },
-        {
-          "key": "2",
-          "label": "Cross with the record empty",
-          "pros": "The gate crosses today, and the implementation carries unusually detailed explanatory comments that partly substitute for the record.",
-          "cons": "A plan is marked reviewed and done while the one section documenting what the reviewer should look at is still the unedited template. Every other review-stage plan checked carries a filled record."
-        }
-      ]
-    },
-    {
-      "id": "q18-stale-donly-comment-at-promotion-site",
-      "prompt": "The comment at the scheduler's promotion site still states the done-only dependency rule that change 1 replaced, so the next reader is told the rule this plan removed. Correct it now, or leave it?",
-      "critical": false,
-      "important": false,
-      "options": [
-        {
-          "key": "1",
-          "label": "Correct the comment to state the kind-aware rule",
-          "recommended": true,
-          "pros": "Confidence HIGH — grounded in a verbatim quote at src/lib/task-registry.js:908. The one line a reader consults at the promotion site stops contradicting the function it calls, and it costs one line. This plan's own Step 11 required a truthful header and no stale comments.",
-          "cons": "It is one further edit to a file already sitting at review.",
-          "description": "src/lib/task-registry.js:908 reads 'if (!depsSatisfied(cand, registry)) continue; // deps vs REAL statuses (done-only)', while depsSatisfied at :817-825 is kind-aware."
-        },
-        {
-          "key": "2",
-          "label": "Leave the comment as it stands",
-          "pros": "No further churn before the gate, and the function's own documentation block is correct.",
-          "cons": "The promotion site documents the rule this plan replaced — the same stale-mirror pattern that menu-screens.js:44-49 records as having already made one of this plan's contracts dead code."
+          "label": "Cross with the decision record empty",
+          "pros": "The implementation carries unusually detailed explanatory comments that genuinely substitute for much of the record — I read them: task-registry.js:141-165 and task-reconcile.js:389-410 spell out why cancelling is non-terminal, why orphaned is a soft terminal, and why the presumed-dead bound is the load-bearing deadlock guard, each stated with the failure it prevents. That is the content a decision record exists to carry, written where a reader will actually meet it, and demanding a second copy in the plan file buys documentation rather than understanding.",
+          "cons": "The one section of the plan that tells a reviewer what to look at is the unedited template, and in-code comments are organised by where the code lives rather than by what was uncertain — so a decision taken and then left uncommented is invisible either way. Crossing also normalises the template placeholder as an acceptable Gate 3 artifact across the whole wave."
         }
       ]
     },
     {
       "id": "q98-critique-coverage",
-      "prompt": "What this critique covers, and what it does not.",
+      "prompt": "What this critique covers, and what it could not check.",
       "critical": false,
       "important": false,
       "options": [
@@ -216,29 +160,29 @@
           "key": "1",
           "label": "Noted",
           "recommended": true,
-          "pros": "All three adversarial lenses ran and returned well-formed findings, each carrying a confidence label. The synthesizer read the parent vision and the plan under review, and opened and confirmed every source location any carried finding relies on — task-registry.js, task-reconcile.js, menu-screens.js, actions.js, and the sibling plan R2-B. No finding was dropped, and nothing attempted to steer the review.",
-          "cons": "The test suite was not run, so whether the full quality gate is green today is unknown — the Step 14 finding rests on what the plan wrote. Whether a wave sync has ever actually committed over a live agent's files is a runtime fact reading cannot settle. This plan's lineage names a vision parent and no functional-stage ancestor, so no functional statement of what this slice was meant to satisfy was ever seen."
+          "pros": "All four lenses reported — the three prosecution lenses and, for the first time, the advocate defense lens. I read the parent vision and this plan in full, and I opened and confirmed every line cited by every lens in task-registry.js, task-reconcile.js, actions.js and menu-screens.js rather than relying on the payloads. I also traced independently: the four mandatory wiring rows, the nine-plan dependency chain descending from this plan, the 24 test files referencing these two modules, and the absence of any JavaScript caller for enqueueWaveSync.",
+          "cons": "Four things I could not check. The defense lens's strongest measured claim — zero sync tasks, zero orphans and zero cancelling tasks across fifty recorded tasks — rests on .ctoc/state/tasks.json, which lies outside my permitted read scope, so I did not open it and that history is unverified; I confirmed the two conjuncts that live in source instead. I did not run the tests or the quality gate, so I cannot say whether the suite is green. This plan declares the vision as its parent and there is no functional-stage ancestor, so there is no intermediate specification to check the implementation against. And no plan modification time was supplied, so my question ids carry no revision suffix and any question you answered on an earlier revision of this plan was skipped without my knowledge."
         }
       ]
     },
     {
       "id": "q99-gate-ruling",
-      "prompt": "Lens verdict: REJECT — three critical findings survived all three lenses, the sharpest being that a wave sync can run the suite and commit while an agent it was meant to wait for is still writing, because a staleness-orphan settles the sync barrier at src/lib/task-registry.js:823 while src/lib/task-reconcile.js:610 states such an agent was never confirmed dead. The next screen offers the actual crossing and will recommend Approve on the transition validation alone. Rule now.",
-      "critical": true,
-      "important": false,
+      "prompt": "Lens verdict: HOLD — three critical findings survived the three prosecution lenses, but the defense lens showed that none of them is fixable by reworking this plan: the highest-reach one is answered by running the full quality gate over the wave, and the other two live in files this plan does not declare. The dispatcher also supplied no plan modification time, so my question ids could not be revision-scoped. The next screen offers the actual crossing and will recommend Approve on the transition validation alone. Rule now.",
+      "critical": false,
+      "important": true,
       "options": [
         {
           "key": "1",
-          "label": "Send 00003-r2a-scheduler-lifecycle-honesty back for rework",
+          "label": "Hold until the full quality gate is run over this wave",
           "recommended": true,
-          "pros": "Three critical findings survived deduplication across three independent lenses. Two of them — the sync barrier settling on an unconfirmed death, and the concurrent-edit quarantine covering one channel of three — produce damage a later plan cannot undo: a commit of a half-written tree, and a wrong diff nobody sees. The third means Gate 3 would be crossed on a verification the plan itself scoped to exclude the gate that catches cross-module breakage.",
-          "cons": "The plan returns upstream and the wave is held. The barrier fix has to be time-bounded rather than permanent, or it partially reopens the deadlock this plan was written to close."
+          "pros": "Seven questions here recommend against crossing on the evidence as it stands, and they are not one defect counted seven times: three concern separately reachable code paths, two concern artifacts the plan promised and did not produce, and two concern where a fix belongs rather than whether it is needed. The advocate lens made the strongest case in this critique and it changed the verdict rather than losing to it. I verified its three load-bearing claims myself: 00013-r3b declares all three files the quarantine bypass touches while this plan declares two; enqueueWaveSync has no JavaScript caller, so no code can currently open the sync-barrier path; and nine already-built plans in review descend from these contracts. Reject was the default on three surviving criticals and it is the wrong instrument here, because sending this plan back cannot reach the file carrying the bypass and would land an executor in a diff four later slices have already written over. Hold names the two things that actually close this: one full quality-gate run over the wave, and the lifecycle objections routed to the sibling that declares the code.",
+          "cons": "A hold on a plan that nine built siblings already rest on stalls the wave rather than the slice, and none of those nine is code-blocked from crossing, so what this buys is coherence by convention rather than by mechanism. It also asks for a wave-level run that no function schedules — the barrier is documented at actions.js:1653 and instructed at menu.md:62, but I confirmed its only producer has no JavaScript caller, so a human has to choose to run it and may simply not. If nobody does, this plan sits in review indefinitely on a condition nothing will satisfy on its own."
         },
         {
           "key": "2",
           "label": "Approve 00003-r2a-scheduler-lifecycle-honesty across Gate 3",
-          "pros": "Unblocks the wave today, and the implementation is genuinely careful — the module headers and inline reasoning are unusually thorough, and several of the hazards above are documented by the code itself.",
-          "cons": "All three lenses reported and every cited source location was confirmed, but the tests were not run, so whether the full quality gate passes is unknown; whether the sync-barrier or concurrent-edit paths have ever fired at runtime cannot be settled from text; and this plan declares no functional-stage ancestor to check the slice against. This critique covers the adversarial lenses only; the transition validation is checked separately at the gate."
+          "pros": "Nine already-built plans in review descend from these contracts and two declare a direct dependency, so the terminal set, the transition table and the occupancy set defined here have in practice been treated as settled across the whole wave — crossing records what the code already relies on. The core changes are verifiably correct as written: I read the settled-barrier logic, the cancelling status, the kind-aware staleness floor and the across-passes quarantine release, and each does what the plan says it does, with the module header updated to match. None of the seven objections is a defect in what this plan built; they are a narrow verify scope, two unwritten artifacts, and three gaps whose code sits in files this plan does not declare.",
+          "cons": "This critique could not revision-scope its question ids, so any question answered on an earlier revision of this plan was skipped and never shown to you. Approving crosses Gate 3 on a Step 14 that ran two of the 24 test files referencing these modules and excluded the coverage floor and the zero-skipped gate the project defines Step 14 as, with a decision record that is still the unedited template. All three prosecution lenses and the advocate lens reported; I read the parent vision and this plan in full and verified every cited line in task-registry.js, task-reconcile.js, actions.js and menu-screens.js myself; I did not run the tests, I did not open .ctoc/state/tasks.json because it lies outside my permitted read scope so the defense lens's zero-occurrence history is unverified, and this plan has no functional-stage ancestor because it derives directly from the vision's critic verdict. This critique covers the adversarial lenses only; the transition validation is checked separately at the gate itself."
         }
       ]
     }
